@@ -1,0 +1,9 @@
+Chronologic VCS simulator copyright 1991-2025
+UVM_INFO @ 0: reporter [RNTST] Running test ocp_register_access_test...
+UVM_INFO /tb/env.sv(41) @ 0: uvm_test_top.env [ENV] build complete
+UVM_INFO /tb/master.sv(48) @ 900000: uvm_test_top.env.mst [OCP] OCP request accepted, MCmd=RD MAddr=0x4000_0010
+UVM_ERROR /tb/monitor.sv(77) @ 1100000: uvm_test_top.env.mon [OCP] SResp returned ERR for MAddr=0x4000_0010, scoreboard consumed the payload as valid
+UVM_ERROR /tb/scoreboard.sv(140) @ 2400000: uvm_test_top.env.sb [SB] Data mismatch at 0x4000_0010: expected 0xdeadbeef, got 0x00000000
+--- UVM Report Summary ---
+UVM_ERROR :   2
+UVM_FATAL :   0

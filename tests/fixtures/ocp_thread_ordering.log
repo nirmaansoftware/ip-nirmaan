@@ -1,0 +1,9 @@
+Chronologic VCS simulator copyright 1991-2025
+UVM_INFO @ 0: reporter [RNTST] Running test ocp_multithread_test...
+UVM_INFO /tb/env.sv(41) @ 0: uvm_test_top.env [ENV] build complete
+UVM_INFO /tb/master.sv(70) @ 1000000: uvm_test_top.env.mst [OCP] Issued request tag=4 MThreadID=2
+UVM_INFO /tb/master.sv(70) @ 1100000: uvm_test_top.env.mst [OCP] Issued request tag=5 MThreadID=2
+UVM_ERROR /tb/scoreboard.sv(120) @ 6300000: uvm_test_top.env.sb [OCP] Thread ordering violation: SThreadID=2 returned tag=5 before tag=4 on the same thread
+--- UVM Report Summary ---
+UVM_ERROR :   1
+UVM_FATAL :   0

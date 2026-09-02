@@ -82,6 +82,9 @@ EXPECTED_PACK_IDS = {
     # Numeric / omission clause upgrade unlocks these
     "performance",
     "security",
+    # Milestone 19 - remaining open interconnects
+    "ocp",
+    "wishbone",
 }
 
 #: fixture -> pattern id it must match. One entry per protocol/domain pack
@@ -99,6 +102,15 @@ _PATTERN_FIXTURES = {
     "axi_write_response_missing.log": "axi.write-response-missing",
     "axi_exclusive_fail.log": "axi.exclusive-fail",
     "sva_assertion_before_timeout.log": "sva.assertion-before-timeout",
+    # Milestone 19 - OCP and Wishbone
+    "ocp_request_not_accepted.log": "ocp.request-not-accepted",
+    "ocp_response_error.log": "ocp.response-error",
+    "ocp_burst_length_mismatch.log": "ocp.burst-length-mismatch",
+    "ocp_thread_ordering.log": "ocp.thread-ordering-violation",
+    "wishbone_no_termination.log": "wishbone.no-termination",
+    "wishbone_err_ignored.log": "wishbone.err-ignored",
+    "wishbone_rty_livelock.log": "wishbone.rty-livelock",
+    "wishbone_cyc_stb_violation.log": "wishbone.cyc-stb-violation",
     # Tier 1 - RISC-V & CPU/ISA depth
     "riscv_sc_never_succeeds.log": "riscv-atomics.sc-never-succeeds",
     "riscv_amo_ordering.log": "riscv-atomics.amo-ordering-violation",
