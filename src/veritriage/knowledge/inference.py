@@ -19,6 +19,8 @@ and is fully deterministic.
 
 from __future__ import annotations
 
+import weakref
+
 from veritriage.graph.graph import EvidenceGraph
 from veritriage.knowledge.graph import KnowledgeGraph
 from veritriage.knowledge.matcher import (
@@ -50,6 +52,37 @@ _OWNERSHIP_LABEL = {
 }
 
 
+class _SharedMatchPass:
+    """One match pass shared by every pattern rule built together.
+
+    There is one :class:`KnowledgePatternRule` per known failure pattern, and
+    each needs the same ``match_patterns`` result for the same graph. Calling
+    it per rule made the knowledge stage quadratic in pattern count: with 100
+    patterns, one analysis ran 100 full passes over every pattern, clause and
+    node to use one row of each. This memo makes it one pass.
+
+    The graph is held by weak reference and compared by identity, so the cache
+    can never serve a stale result and never keeps an Evidence Graph alive
+    after the run that produced it.
+    """
+
+    __slots__ = ("_ref", "_matches")
+
+    def __init__(self) -> None:
+        self._ref: weakref.ref | None = None
+        self._matches: list[PatternMatch] = []
+
+    def matches(self, knowledge: KnowledgeGraph, graph: EvidenceGraph) -> list[PatternMatch]:
+        cached = self._ref() if self._ref is not None else None
+        if cached is not graph:
+            self._matches = match_patterns(knowledge, graph)
+            try:
+                self._ref = weakref.ref(graph)
+            except TypeError:  # pragma: no cover - defensive
+                self._ref = None
+        return self._matches
+
+
 class KnowledgePatternRule(ReasoningRule):
     """Adapter: one failure pattern exposed as a standard reasoning rule.
 
@@ -59,16 +92,24 @@ class KnowledgePatternRule(ReasoningRule):
     like every other rule, knowledge only shifts hypothesis ranking.
     """
 
-    def __init__(self, knowledge: KnowledgeGraph, pattern_id: str) -> None:
+    def __init__(
+        self,
+        knowledge: KnowledgeGraph,
+        pattern_id: str,
+        shared: "_SharedMatchPass | None" = None,
+    ) -> None:
         self._knowledge = knowledge
         self._pattern_id = pattern_id
+        # Rules built together share one pass; a rule built alone gets its own,
+        # so the constructor stays usable on its own exactly as before.
+        self._shared = shared if shared is not None else _SharedMatchPass()
         self.name = f"knowledge:{pattern_id}"
 
     def evaluate(self, graph: EvidenceGraph, working_set: WorkingSet) -> ReasoningSignal | None:
         match = next(
             (
                 m
-                for m in match_patterns(self._knowledge, graph)
+                for m in self._shared.matches(self._knowledge, graph)
                 if m.pattern.id == self._pattern_id
             ),
             None,
@@ -95,8 +136,9 @@ class KnowledgePatternRule(ReasoningRule):
 def knowledge_reasoning_rules(knowledge: KnowledgeGraph | None = None) -> list[ReasoningRule]:
     """One reasoning rule per known failure pattern, in deterministic order."""
     knowledge = knowledge or KnowledgeGraph.build()
+    shared = _SharedMatchPass()
     return [
-        KnowledgePatternRule(knowledge, pattern.id)
+        KnowledgePatternRule(knowledge, pattern.id, shared)
         for _, pattern in sorted(knowledge.patterns(), key=lambda pair: pair[1].id)
     ]
 

@@ -126,6 +126,31 @@ class RecommendationOutcome(LearningArtifact):
     )
 
 
+class RuleGap(LearningArtifact):
+    """A failure signature the deterministic rules keep getting wrong.
+
+    Not a conclusion and not a correction: a bounded, auditable statement
+    that engineers overruled the platform on this signature often enough
+    that a missing rule or pack pattern is the likely explanation. What to
+    do about it stays a human decision.
+    """
+
+    kind: str = "rule_gap"
+    signature: str = ""
+    classification: str = Field(
+        default="", description="What the platform concluded, repeatedly and wrongly."
+    )
+    times_judged: int = 0
+    times_incorrect: int = 0
+    incorrect_rate: float | None = Field(
+        default=None, description="times_incorrect / times_judged; None until judged."
+    )
+    reported_root_causes: list[str] = Field(
+        default_factory=list, description="What engineers said the cause actually was."
+    )
+    typical_modules: list[str] = Field(default_factory=list)
+
+
 class HypothesisHistory(LearningArtifact):
     """How often a hypothesis category led, and how often it was confirmed."""
 
@@ -177,6 +202,15 @@ class LearningContext(BaseModel):
     project_profile: ProjectProfile | None = None
     recurring_pattern: InvestigationPattern | None = None
     common_recommendations: list[RecommendationOutcome] = Field(default_factory=list)
+    recommendation_weights: dict[str, float] = Field(
+        default_factory=dict,
+        description="Recommendation action -> learned usefulness in [0, 1], from engineer votes. "
+        "Used to reorder advice; never to add, remove or rewrite it.",
+    )
+    rule_gaps: list[RuleGap] = Field(
+        default_factory=list,
+        description="Signatures engineers repeatedly judged incorrect: candidates for a new rule.",
+    )
     calibration: dict[str, float] = Field(
         default_factory=dict,
         description="Agent ID -> bounded influence multiplier applied by the Coordinator.",
@@ -190,6 +224,7 @@ class LearningContext(BaseModel):
             or self.project_profile
             or self.recurring_pattern
             or self.common_recommendations
+            or self.rule_gaps
         )
 
     def hints_of_kind(self, kind: str) -> list[LearningHint]:

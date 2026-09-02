@@ -7,6 +7,7 @@ nothing more, which ``test_new_learner_needs_only_registration`` proves.
 """
 
 from veritriage.learning.learners.agents import AgentReliabilityLearner
+from veritriage.learning.learners.gaps import RuleGapLearner
 from veritriage.learning.learners.outcomes import (
     HypothesisHistoryLearner,
     RecommendationOutcomeLearner,
@@ -26,4 +27,5 @@ __all__ = [
     "ProjectProfileLearner",
     "ProtocolStatisticsLearner",
     "RecommendationOutcomeLearner",
+    "RuleGapLearner",
 ]

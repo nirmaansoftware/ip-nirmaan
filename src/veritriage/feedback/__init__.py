@@ -25,7 +25,21 @@ from typing import Literal, Protocol
 
 from pydantic import BaseModel, Field
 
-__all__ = ["FeedbackRecord", "FeedbackSink"]
+from veritriage.feedback.reweight import (
+    MIN_VOTES,
+    NEUTRAL,
+    recommendation_weights,
+    reweight_recommendations,
+)
+
+__all__ = [
+    "FeedbackRecord",
+    "FeedbackSink",
+    "MIN_VOTES",
+    "NEUTRAL",
+    "recommendation_weights",
+    "reweight_recommendations",
+]
 
 
 class FeedbackRecord(BaseModel):
