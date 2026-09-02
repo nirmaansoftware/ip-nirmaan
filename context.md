@@ -8,8 +8,8 @@ see `README.md` and `docs/` for that - this is the "how we got here and
 what's next" record.
 
 Repo: https://github.com/patel-om/veritriage (public, Apache-2.0)
-Local path: `/Users/ompatel/Documents/veritriage`
-Current version: **1.14.0**
+Local path: `/Users/ompatel/veritriage` (moved from `~/Documents/veritriage`; a venv built before the move has stale absolute paths in `pyvenv.cfg` and every console script, so rebuild it)
+Current version: **1.15.0**
 Portfolio integration: card + sample artifacts in
 `/Users/ompatel/Documents/Om Portfolio` (`index.html`,
 `veritriage-sample-report.html`, `veritriage-sample-dashboard.html`)
@@ -1024,6 +1024,81 @@ Fixed to cite on applicability.
 Deferred to M18.x: a CI adapter publishing events from GitHub Actions/Jenkins;
 Slack and VS Code subscribers; a `due()` evaluation for schedule ticks.
 
+### Milestone 19 (v1.15.0) - Platform Completion
+
+The milestone with no new subsystem. It closes the four items section 5 had
+been carrying as "designed, not built", and it is deliberately the last one
+that can be described that way.
+
+**OCP and Wishbone packs (was 5.1).** The last two open interconnects. Same
+shape as APB/AHB: concepts, a transfer state machine, patterns with
+playbooks, real spec references. OCP covers request/response handshake
+stalls, SResp ERR/FAIL accepted as data, precise bursts delivering a length
+they did not declare, and out-of-order responses within one thread. Wishbone
+covers phases that never terminate, ERR consumed as data, RTY livelock, and
+CYC/STB framing violations. Eight fixtures, one per pattern. 44 packs, 100
+patterns. No matcher, reasoning or report change was needed, which was the
+point of the seam.
+
+**The learning feedback loop (was 5.3).** M4 designed `FeedbackRecord` and
+left the readers unbuilt; M13 built the readers for the recommendation votes
+and stopped short of acting on them. Both halves now close:
+
+* A `rule-gaps` learner groups failures by signature digest and counts
+  engineer overrules, speaking only after two judgments and two overrules.
+  It proposes no rule and edits no pack: a gap is an argument for human
+  attention. Surfaced in the dashboard as "Needs a New Rule", computed there
+  straight from history so the dashboard still needs no learning store.
+* `useful_recommendations` / `false_recommendations` become a weight table
+  that reorders the advice a run produces. A reorder only, deterministic,
+  and inert without history. Applied in the pipeline only when a learning
+  context was recalled.
+
+The guarantee is tested directly: advice may move, the graph, classification,
+signals and ranked hypotheses may not.
+
+**Reference resolution (was 5.2).** `Reference.uri` had been a hook with
+nothing behind it. The two uses pull in opposite directions (a company spec
+database cannot ship here; fetching public specs would put a network call in
+a deterministic pipeline), so a registry settles both. The built-in resolver
+is a static offline catalogue of public standards; a test parses the package
+and fails if it ever imports `urllib`, `requests`, `httpx`, `socket` or
+`subprocess`. A site adds its own resolver above the catalogue in priority so
+an internal mirror shadows the public page. Resolution happens at the report
+boundary and copies rather than mutates, because packs are process-wide
+constants.
+
+**Cross-regression diffing (was 5.6).** "It worked yesterday, what landed
+since?" Both halves existed and had never been introduced: the regression
+database has recorded `execution.git_commit` since v0.4.0, and the M7
+provider seam can list commits. New `CHANGE_RANGE` capability and an optional
+`changes_between()` defaulting to `None`, so every existing provider keeps
+working. The honesty rule drove the design: an unanswerable question returns
+`None`, while an empty commit list is a real answer meaning both runs were
+built from the same code, which points at the environment rather than the
+RTL. Keeping those distinguishable required a raw git runner, because the
+existing one collapses "succeeded with no output" into `None`. The manifest
+provider stopped claiming every capability: an export cannot answer a live
+range query.
+
+**Real bug found and fixed on the way.** There is one reasoning rule per
+failure pattern, and each rule called `match_patterns` itself, so a single
+analysis ran one full pass over every pattern, clause and node *per pattern*:
+roughly 100 passes to use one row of each. Quadratic in pattern count, and
+invisible until this milestone's eight new patterns made the suite time jump.
+Rules built together now share one pass, memoized on the Evidence Graph by
+weak reference and compared by identity, so it can neither serve a stale
+result nor keep a graph alive. `analyze()` is about 9x faster (10 runs:
+0.863s to 0.095s) and the whole suite dropped from 48.9s to 23.5s while
+gaining 65 tests. `test_pattern_rules_share_a_single_match_pass` fails if the
+passes come back.
+
+65 new tests (749 total: 748 passed, 1 skipped). New packages:
+`references/`. New modules: `learning/learners/gaps.py`,
+`feedback/reweight.py`, `engineering/regression_diff.py`.
+
+---
+
 ---
 
 ## 3. Current architecture map
@@ -1257,66 +1332,60 @@ This section is intentionally detailed - it's the answer to "what's left"
 for whoever (human or agent) picks this up next. Nothing here should be
 started without the user asking for it; this is a map, not a queue.
 
-### 5.1 Knowledge Engine - more packs (natural continuation of the M5 fix)
-The M5 follow-up covered the milestone's explicit list. Real breadth still
-missing, in likely priority order for a DV audience:
-- **AXI-Stream and ACE/ACE-Lite** (cache-coherent AXI extensions) - natural
-  sibling to the existing AXI pack; ACE shares failure-pattern shape with
-  the `coherency` pack (illegal snoop responses, barrier ordering).
-- **OCP, Wishbone** - older but still-used open interconnects; low effort,
-  same pattern-library shape as APB/AHB.
-- **UCIe / die-to-die interconnect** - increasingly relevant for chiplet
-  designs; would need new concepts (link training analogous to PCIe LTSSM,
-  but for die-to-die).
-- **Power management / UPF-aware sequencing** - power domain
-  sequencing violations (isolation before power-down, retention timing)
-  are a distinct enough failure class to warrant concepts + a state
-  machine (power domain lifecycle: On → Isolate → Retain → Off).
-  This is genuinely new territory (not just "another protocol"); think
-  through the state machine before writing patterns.
-- **Security verification** (side-channel timing hints, access-control
-  bypass patterns) - mentioned explicitly in the M5 spec, not yet started.
-  Needs care: security failure signatures in a sim log are often *absence*
-  of an expected check firing, which the current matcher (presence-based
-  clauses) handles awkwardly; may need a new clause type ("expected marker
-  never appears" as a first-class forbidden-by-omission clause rather than
-  today's `must_fail` workaround).
-- **Performance verification** (bandwidth/latency SLA misses) - also
-  named in the spec. Needs a new evidence shape (numeric threshold
-  comparison, not just regex presence) - likely needs `EvidenceClause` to
-  grow a numeric-comparison variant, which *is* a matcher change (the one
-  legitimate reason to touch `knowledge/matcher.py` rather than just add a
-  pack). Worth flagging to the user before starting since it's the first
-  extension that isn't purely additive.
-- **Formal verification result ingestion** - the M5 spec's "formal
-  verification" line item. This is bigger than a pack: formal tools
-  produce proof/counterexample artifacts, not simulation logs, so it likely
-  wants a new `ArtifactType` (`formal_result`) and parser first (that's
-  Evidence Graph / M2-shaped work), with a `knowledge` pack layered on top
-  once the artifact type exists. Sequence matters here.
+### 5.1 Knowledge Engine - more packs - DONE through M19
 
-### 5.2 External documentation / reference resolution
-`Reference.uri` exists as a hook but nothing resolves it yet. Two directions:
-- Company-internal spec/wiki adapters (the M5 doc already names this as an
-  extensibility point) - would live outside `knowledge/packs/` entirely,
-  as a separate installable pack a company writes against the same schema.
-- Live link validation / fetching for public specs (AMBA, PCIe SIG) - low
-  priority, mostly a nice-to-have for the HTML report's reference links.
+This section was badly stale before M19: it listed AXI-Stream, ACE, UCIe,
+power management, security and performance verification, and formal-result
+ingestion as unstarted, when v1.1.0 through v1.6.0 had already shipped all of
+them. M19 added the last two it named, OCP and Wishbone. **44 packs, 100
+patterns; no protocol on the original list is missing.**
 
-### 5.3 Learning feedback (M4's deliberately-unbuilt half)
-`feedback/` ships interfaces and storage only, by explicit M4 design ("do
-not implement machine learning yet, only design the interfaces"). Concrete
-next steps when the user asks for this:
-- Use `FeedbackRecord.diagnosis == "incorrect"` aggregated by
-  `FailureSignature` digest to flag signatures where the deterministic
-  rules/patterns are systematically wrong - surface this in the dashboard
-  as a "needs a new rule" list, not as any model training.
-- Use `useful_recommendations` / `false_recommendations` votes to reweight
-  the `RecommendationEngine`'s per-category step templates - still
-  deterministic (a weighted-count reorder), not ML.
-- The explicit non-goal remains: no model retraining, no embedding
-  fine-tuning. If a future request asks for that, it's a scope change from
-  everything built so far and should be confirmed with the user first.
+The two matcher extensions this section warned would be needed both landed in
+v1.5.0: `EvidenceClause.numeric` (a numeric-comparison variant, which
+unlocked the performance pack) and `EvidenceClause.absent` (first-class
+forbidden-by-omission, which unlocked security, where the signature is often
+the *absence* of an expected check firing).
+
+Genuinely open, and only worth doing on request:
+- More RISC-V and chiplet depth as those specs move.
+- A pack for a company-internal protocol, which is exactly the seam's purpose
+  and belongs in that company's repository, not this one.
+
+Before adding a pack, check `test_pack_pattern_matches_realistic_evidence`:
+every pattern needs a fixture proving it fires on realistic evidence, not
+just validating against the schema.
+
+### 5.2 External documentation / reference resolution - DONE in M19
+
+Delivered by `references/`. `Reference.uri` resolves through a registry: the
+built-in resolver is a static offline catalogue of public standards, and a
+company plugs its spec database or wiki in by registering one class above the
+catalogue in priority. Resolution happens at the report boundary and the HTML
+report renders a resolved citation as a link.
+
+Remaining follow-up, deliberately not done: live link validation for public
+specs. It would put a network call in a deterministic pipeline, and the
+package has a test that fails if it ever imports an HTTP client. If someone
+wants this it belongs in a separate tool that validates the catalogue
+offline, in CI, not in `analyze()`.
+
+### 5.3 Learning feedback - DONE in M19
+
+M4's deliberately-unbuilt half, closed by the `rule-gaps` learner and
+`feedback/reweight.py`. See the M19 milestone entry for the shape and the
+guarantee.
+
+The explicit non-goal still stands and did not move: **no model retraining,
+no embedding fine-tuning.** Both halves are deterministic aggregations over
+recorded history. If a future request asks for learned models, that is a
+scope change from everything built so far and should be confirmed with the
+user first.
+
+Remaining follow-up: nothing consumes `RuleGap` beyond the dashboard. An
+agent that read gaps as memory ("this signature is one the platform gets
+wrong") would be a reasonable M20 increment, and would need care, because it
+edges toward learning influencing a conclusion.
+
 
 ### 5.4 Learned similarity embeddings
 `similarity.EmbeddingProvider` is a `Protocol` specifically so a learned
@@ -1342,19 +1411,24 @@ coordinate the two); resolving observation scopes to actual dump-file offsets
 so a report link can jump straight into the viewer. See
 `docs/WAVEFORM_ENGINE.md`.
 
-### 5.6 Git history / commit correlation - LARGELY DONE in M7 (v0.7.0)
+### 5.6 Git history / commit correlation - DONE in M7 and M19
 Delivered by the Engineering Context Engine, which superseded the M4-era
 plan of "a new history/ adapter" with a first-class `engineering/` package
 (providers are a general seam, not a git-only one; the M7 spec was explicit
 about this). Shipped: recent-commit collection (git provider), change ->
 failure correlation pass, change-category reasoning signals, ownership
 routing, two-tier test impact, timeline, investigation view.
-`capture_execution_metadata` now delegates to the git provider. Remaining
-follow-up worth a future increment: cross-regression diffing ("what changed
-between THIS run's commit and the last green run's commit?"), which needs
-the regression DB's per-run commits joined with a provider diff query;
-would live as a new history-aware analysis in `engineering/impact.py` or a
-`history/` consumer, still behind the provider seam.
+`capture_execution_metadata` now delegates to the git provider.
+
+Cross-regression diffing, the follow-up this section named, landed in M19 as
+`engineering/regression_diff.py`, a `CHANGE_RANGE` capability, and an
+optional `changes_between()` on the provider interface. Reachable as
+`WorkspaceServices.changes_since_last_green()`.
+
+Remaining follow-up: nothing surfaces the diff in the HTML report, the CLI or
+MCP yet. It is a service method away from being visible where an engineer
+would actually look for it, and that is the cheapest high-value increment
+left in this file.
 
 ### 5.7 CI / issue-tracker adapters - seam now exists (M7)
 The `ContextProvider` interface (M7) is exactly the seam these plug into:
@@ -1386,6 +1460,10 @@ PyPI to reserve the name. Requires explicit user go-ahead.
   pass any time a new milestone lands, to keep the "why v3+ needs no
   restructuring" style tables current (this file's section 3 is a faster
   place to check current state than re-reading every doc).
-- No known failing tests or open bugs as of M10 / v1.0.0 (278/278 passing).
+- No known failing tests or open bugs as of M19 / v1.15.0 (748 passed, 1
+  skipped, in ~24s). The single skip is an optional-dependency skip.
+- The mounted-folder workflow cannot delete files, so a session that commits
+  from one leaves `.git/objects/tmp_obj_*` and stale `*.lock` files behind.
+  Harmless, cleared by `git gc` run locally.
 - `analyzers/` package (superseded by `reasoning/ai.py` at M3) was already
   removed; if it ever reappears from a bad merge, delete it again.

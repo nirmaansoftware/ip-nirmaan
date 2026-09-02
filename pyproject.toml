@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "veritriage"
-version = "1.14.0"
+version = "1.15.0"
 description = "Verification intelligence platform: turn simulation logs into evidence-backed root-cause reports."
 readme = "README.md"
 requires-python = ">=3.11"
