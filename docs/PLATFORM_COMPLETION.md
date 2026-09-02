@@ -124,11 +124,21 @@ OpenCores), so resolution stays a pure function. A test parses every module
 in the package and fails if it ever imports `urllib`, `requests`, `httpx`,
 `socket` or `subprocess`.
 
-Matching is on the longest matching source fragment, so "AMBA AXI-Stream"
-does not resolve through the shorter "AMBA AXI" entry. Resolution happens at
-the report boundary and returns copies, because packs are process-wide
-constants shared by every analysis. A reference that already carries a URI
-keeps it.
+The catalogue is an **ordered** list, most specific first, and the first
+fragment found in the source wins. An earlier draft ranked by fragment
+length, which is the wrong proxy for specificity and produced two wrong
+links: "AMBA AXI4-Stream Protocol Specification" resolved through "amba axi"
+to the AXI document (the catalogue had no "axi4-stream" fragment at all), and
+"MIPI I3C / NXP I2C-bus Specification" resolved through the longer "mipi" to
+the generic MIPI index instead of the I3C page. Sending an engineer to the
+wrong standard is worse than sending them nowhere, so
+`test_every_built_in_citation_resolves_as_expected` now pins the resolution
+of every source the built-in packs actually cite, and a second test fails if
+any catalogue entry is unreachable because an earlier fragment contains it.
+
+Resolution happens at the report boundary and returns copies, because packs
+are process-wide constants shared by every analysis. A reference that already
+carries a URI keeps it.
 
 ---
 
@@ -154,15 +164,38 @@ range query, and a provider must not declare what it cannot do.
 
 | Situation | Answer |
 | --- | --- |
-| No green run recorded, or a run with no commit | `None` |
+| No green run recorded, or the newest green run has no commit | `None` |
 | No provider that can resolve a range | `None` |
 | Commits unknown to this checkout (shallow clone, pruned branch) | `None` |
+| Baseline is not an ancestor of the failing run | `None` |
 | Both runs built from the same code | `RegressionDiff` with `commits == []` |
 
 The last row is a real and useful answer: nothing changed, so look at the
 environment rather than the RTL. It must not look like a failure. Keeping the
 two distinguishable required a raw git runner, because the existing
 `_run_git` collapses "succeeded with no output" into `None`.
+
+Three of those rows came out of an adversarial review of this milestone, and
+each was a case where the code gave a confidently wrong answer instead of
+`None`:
+
+* **Inverted range.** `git log base..head` is legitimately empty when head is
+  an ancestor of base (a re-run of older code, a revert, a stale checkout),
+  and that empty result read as "nothing changed" while the code genuinely
+  differed. Now checked with `merge-base --is-ancestor`.
+* **A newer green run with no commit was skipped** in favour of an older one
+  that had a commit, silently widening the range and attributing
+  already-green commits to the failure. The newest green run is now the
+  baseline whether or not it carries a commit; if it does not, the answer is
+  `None`.
+* **Truncation was silent.** `max_commits` clipped the range, and
+  `changed_modules` and `suspect_commits` were then computed over a prefix
+  that could omit the culprit. Providers are now asked for one more than the
+  cap, and `RegressionDiff.truncated` says so.
+
+A fourth: a store holding both naive and timezone-aware `created_at` values
+(written across a schema or timezone change) raised `TypeError` from the
+baseline comparison. Naive values are now read as UTC.
 
 Commits touching a module the failure signature implicates are flagged
 `suspect_commits`. A name overlap and nothing cleverer: it narrows where to
@@ -196,6 +229,13 @@ full test suite   48.9s  ->   23.5s     (while gaining 65 tests)
 ```
 
 `test_pattern_rules_share_a_single_match_pass` fails if the passes come back.
+
+The memo is scoped to one unmutated graph. Identity-after-collection is safe
+(a dead weak reference simply fails the comparison, so a recycled address
+cannot be mistaken for the original), but identity alone would serve a stale
+result for a graph mutated in place. `knowledge_reasoning_rules()` is public,
+so the node and edge counts are checked as well. That is a guard rather than
+a guarantee, and the docstring says so.
 
 ---
 

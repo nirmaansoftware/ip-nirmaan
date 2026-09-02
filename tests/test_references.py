@@ -43,14 +43,76 @@ def test_unknown_sources_resolve_to_nothing():
     assert resolve_reference(Reference(source="Acme Internal Bus Note v2")) is None
 
 
-def test_the_longest_matching_fragment_wins():
-    """'AMBA AXI-Stream' must not resolve through the shorter 'AMBA AXI'."""
-    stream = resolve_reference(
-        Reference(source="AMBA AXI-Stream Protocol Specification (IHI 0051)")
-    )
-    axi = resolve_reference(Reference(source="AMBA AXI Protocol Specification"))
-    assert stream != axi
-    assert "ihi0051" in stream
+@pytest.mark.parametrize(
+    "source,expected_fragment",
+    [
+        # A narrower standard must not resolve through the family it belongs to.
+        ("AMBA AXI4-Stream Protocol Specification", "ihi0051"),
+        ("AMBA AXI Protocol Specification", "ihi0022"),
+        ("AMBA AXI/ACE Protocol Specification", "ihi0022"),
+        ("MIPI I3C / NXP I2C-bus Specification", "i3c-sensor-specification"),
+        ("MIPI CSI-2 / DSI / D-PHY Specification", "mipi.org/specifications"),
+        # "ieee 1800" is a textual prefix of "ieee 1800.2".
+        ("IEEE 1800.2 (UVM)", "ieee/1800.2/"),
+        ("IEEE 1800-2023 (SystemVerilog), Chapter 16 (Assertions)", "ieee/1800/"),
+    ],
+)
+def test_a_narrower_standard_beats_the_family_it_belongs_to(source, expected_fragment):
+    """Specificity, not fragment length, decides.
+
+    Ranking by length sent 'AMBA AXI4-Stream' to the AXI document and
+    'MIPI I3C' to the generic MIPI index. Linking an engineer to the wrong
+    standard is worse than linking them nowhere.
+    """
+    uri = resolve_reference(Reference(source=source))
+    assert uri is not None, f"{source} should resolve"
+    assert expected_fragment in uri, f"{source} -> {uri}"
+
+
+def test_every_built_in_citation_resolves_as_expected():
+    """Pin every source the built-in packs actually cite.
+
+    The catalogue matches on fragments of titles engineers wrote, so a new
+    pack or a retitled citation can silently start matching the wrong entry.
+    This fails when that happens. A source that resolves to None is fine and
+    expected for methodology notes and papers with no canonical page; a
+    source resolving to the *wrong* document is not.
+    """
+    from veritriage.knowledge.registry import load_packs
+
+    expected = {
+        "AMBA AHB Protocol Specification (IHI 0033)": "ihi0033",
+        "AMBA APB Protocol Specification (IHI 0024)": "ihi0024",
+        "AMBA AXI Protocol Specification": "ihi0022",
+        "AMBA AXI/ACE Protocol Specification": "ihi0022",
+        "AMBA AXI4-Stream Protocol Specification": "ihi0051",
+        "AMBA CHI Architecture Specification (IHI 0050)": "ihi0050",
+        "Compute Express Link (CXL) Specification": "computeexpresslink.org",
+        "IEEE 1149.1 (JTAG) Standard": "ieee/1149.1/",
+        "IEEE 1800.2 (UVM)": "ieee/1800.2/",
+        "IEEE 1801 (UPF) Unified Power Format": "ieee/1801/",
+        "IEEE 802.3 Ethernet Standard": "ieee/802.3/",
+        "MIPI I3C / NXP I2C-bus Specification": "i3c-sensor-specification",
+        "Open Core Protocol Specification 3.0 (Accellera/OCP-IP)": "accellera.org",
+        "PCI Express Base Specification": "pcisig.com",
+        "SiFive TileLink Specification 1.9": "sifive.com",
+        "UCIe (Universal Chiplet Interconnect Express) Specification": "uciexpress.org",
+        "Universal Serial Bus Specification": "usb.org",
+        "Wishbone B4 System-on-Chip Interconnect Specification (OpenCores)": "opencores.org",
+    }
+    sources = {
+        r.source
+        for pack in load_packs()
+        for r in [
+            *pack.references,
+            *(x for c in pack.concepts for x in c.references),
+            *(x for pat in pack.patterns for x in pat.references),
+        ]
+    }
+    for source, fragment in expected.items():
+        assert source in sources, f"pinned citation no longer used by any pack: {source}"
+        uri = resolve_reference(Reference(source=source))
+        assert uri is not None and fragment in uri, f"{source} -> {uri}"
 
 
 def test_matching_ignores_case_and_revision_suffixes():
@@ -60,8 +122,26 @@ def test_matching_ignores_case_and_revision_suffixes():
 
 
 def test_every_catalogue_entry_is_an_https_url():
-    for fragment, uri in CATALOGUE.items():
+    for fragment, uri in CATALOGUE:
         assert uri.startswith("https://"), f"{fragment} -> {uri}"
+
+
+def test_catalogue_fragments_are_lowercase_and_unique():
+    fragments = [f for f, _ in CATALOGUE]
+    assert fragments == [f.lower() for f in fragments]
+    assert len(fragments) == len(set(fragments))
+
+
+def test_no_catalogue_fragment_is_shadowed_by_an_earlier_one():
+    """Order is specificity; an entry no source can ever reach is dead code."""
+    seen: list[str] = []
+    for fragment, _ in CATALOGUE:
+        shadow = next((s for s in seen if s in fragment), None)
+        assert shadow is None, (
+            f"{fragment!r} can never match: {shadow!r} appears earlier and is "
+            "contained in it"
+        )
+        seen.append(fragment)
 
 
 # --- Purity -----------------------------------------------------------------

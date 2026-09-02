@@ -17,6 +17,7 @@ module names cross the boundary; diff text never does.
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Sequence
 
@@ -30,6 +31,21 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
     from veritriage.history.record import RegressionRecord
 
 
+def _as_utc(moment: datetime) -> datetime:
+    """A comparable timestamp.
+
+    The regression database round-trips naive timestamps as naive, so a store
+    written across a schema or timezone change can hold both shapes and
+    comparing them raises. Naive values are read as UTC, which is what every
+    writer in this platform records.
+    """
+    return moment if moment.tzinfo is not None else moment.replace(tzinfo=timezone.utc)
+
+
+def _ordering(record: "RegressionRecord") -> tuple[datetime, str]:
+    return (_as_utc(record.created_at), record.regression_id)
+
+
 def last_green_before(
     records: Sequence["RegressionRecord"], target: "RegressionRecord"
 ) -> "RegressionRecord | None":
@@ -37,17 +53,19 @@ def last_green_before(
 
     Ordered by recorded time and tie-broken by regression ID so the answer is
     the same however the rows came back from the database.
+
+    A green run missing a commit is still the newest green run and is
+    returned as such. Skipping it to find an older one that has a commit
+    would silently widen the range and attribute changes that were already
+    green to the failure; the caller declines to answer instead.
     """
+    target_key = _ordering(target)
     candidates = [
-        r
-        for r in records
-        if not r.is_failure
-        and r.execution.git_commit
-        and (r.created_at, r.regression_id) < (target.created_at, target.regression_id)
+        r for r in records if not r.is_failure and _ordering(r) < target_key
     ]
     if not candidates:
         return None
-    return max(candidates, key=lambda r: (r.created_at, r.regression_id))
+    return max(candidates, key=_ordering)
 
 
 def diff_against_last_green(
@@ -80,6 +98,11 @@ def diff_against_last_green(
     )
     if commits is None:
         return None
+    # Providers are asked for one more than the cap so truncation is visible
+    # rather than silent: a truncated range computes changed_modules and
+    # suspect_commits over a prefix and can omit the commit that broke it.
+    truncated = len(commits) > max_commits
+    commits = commits[:max_commits]
 
     changed_modules = sorted({m for c in commits for f in c.files for m in f.modules})
     # A commit is suspect when it touched a module this failure implicates.
@@ -102,4 +125,5 @@ def diff_against_last_green(
         changed_modules=changed_modules,
         suspect_commits=suspects,
         provider=provider.name,
+        truncated=truncated,
     )

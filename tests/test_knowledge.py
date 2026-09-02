@@ -640,3 +640,22 @@ def test_a_rule_built_on_its_own_still_works(fixture_log):
     signal = rule.evaluate(outcome.graph, outcome.report.reasoning.working_set)
     assert signal is not None
     assert signal.name == "knowledge:axi.no-response-after-accept"
+
+
+def test_shared_pass_notices_a_graph_that_grew(fixture_log):
+    """Rules held across analyses must not reason from a previous pass."""
+    from veritriage.knowledge.inference import _SharedMatchPass
+
+    graph = analyze(fixture_log("uvm_pass.log")).graph
+    knowledge = KnowledgeGraph.build()
+    shared = _SharedMatchPass()
+    before = [m.pattern.id for m in shared.matches(knowledge, graph)]
+
+    grown = analyze(fixture_log("axi_timeout.log")).graph
+    for node in grown.nodes.values():
+        if node.id not in graph.nodes:
+            graph.add_node(node)
+
+    after = [m.pattern.id for m in shared.matches(knowledge, graph)]
+    assert after == [m.pattern.id for m in match_patterns(knowledge, graph)]
+    assert after != before

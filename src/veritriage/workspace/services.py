@@ -326,7 +326,14 @@ class WorkspaceServices:
         and the provider seam could list commits since M7; this joins them.
         Returns None whenever the question cannot be honestly answered: no
         recorded green run, a run without a commit, no registered provider
-        that can resolve a range, or commits this checkout does not have.
+        that can resolve a range, commits this checkout does not have, or a
+        baseline that is not an ancestor of the failing run.
+
+        ``root`` defaults to the current working directory, matching the other
+        root-taking services here. That makes the answer depend on where the
+        process was started, so pass it explicitly from anything that is not
+        already running inside the design repository. It fails safe: a wrong
+        cwd yields None, never a wrong diff.
         """
         if self._db is None or not Path(self._db).is_file():
             return None

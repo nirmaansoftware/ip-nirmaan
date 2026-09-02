@@ -175,17 +175,30 @@ class GitProvider(ContextProvider):
         Returns None when either commit is unknown to this clone, which is a
         real and common case: the regression database may hold a commit from
         a shallow CI checkout, or from a branch that has since been pruned.
-        An empty list means the two runs were built from the same code, which
-        is a genuine and useful answer, so it must not look like a failure.
+
+        Also returns None when ``base_commit`` is not an ancestor of
+        ``head_commit``. ``git log base..head`` is legitimately empty for a
+        re-run of older code, a revert, or two divergent branches, and an
+        empty answer there would read as "both runs were built from the same
+        code" and send the investigation at the environment while the code
+        actually differs. Only a true ancestor makes an empty range mean what
+        the caller will take it to mean.
         """
         for commit in (base_commit, head_commit):
             ok, _ = _run_git_raw(root, "rev-parse", "--verify", "--quiet", f"{commit}^{{commit}}")
             if not ok:
                 return None
+        ancestor, _ = _run_git_raw(
+            root, "merge-base", "--is-ancestor", base_commit, head_commit
+        )
+        if not ancestor:
+            return None
+        # One more than asked for, so the caller can tell a full range from a
+        # truncated one. The extra commit is dropped before returning.
         ok, log = _run_git_raw(
             root,
             "log",
-            f"-n{max_commits}",
+            f"-n{max_commits + 1}",
             "--numstat",
             "--no-merges",
             f"--format={_REC}%H{_FIELD}%an{_FIELD}%aI{_FIELD}%s",

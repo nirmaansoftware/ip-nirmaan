@@ -282,3 +282,105 @@ def test_workspace_without_a_database_returns_none(tmp_path, repo):
     root, _ = repo
     services = WorkspaceServices(session_root=tmp_path / "s")
     assert services.changes_since_last_green("anything", root=root) is None
+
+
+# --- Answers that would have been wrong (found in review) -------------------
+
+
+def test_a_failing_run_built_from_older_code_is_not_called_unchanged(
+    repo, tmp_path, fixture_log
+):
+    """An inverted range must not read as "nothing changed".
+
+    ``git log base..head`` is legitimately empty when head is an ancestor of
+    base: a re-run of an older build, a revert, a stale CI checkout. Reporting
+    an empty diff there would send the investigation at the environment while
+    the code genuinely differs.
+    """
+    root, shas = repo
+    db = tmp_path / "r.db"
+    now = datetime.now(timezone.utc)
+    with RegressionStore(db) as store:
+        _record(store, fixture_log("uvm_pass.log"), commit=shas[2], when=now - timedelta(hours=1))
+        fail = _record(store, fixture_log("axi_timeout.log"), commit=shas[0], when=now)
+        records = store.all_records()
+
+    assert diff_against_last_green(records, fail, GitProvider(), root) is None
+
+
+def test_divergent_branches_are_not_called_unchanged(repo, tmp_path, fixture_log):
+    root, shas = repo
+    _git(root, "checkout", "-q", "-b", "side", shas[0])
+    (root / "rtl" / "side.sv").write_text("module side; endmodule\n")
+    _git(root, "add", "-A")
+    _git(root, "commit", "-q", "-m", "side branch work")
+    side = _git(root, "rev-parse", "HEAD")
+
+    db = tmp_path / "r.db"
+    now = datetime.now(timezone.utc)
+    with RegressionStore(db) as store:
+        _record(store, fixture_log("uvm_pass.log"), commit=shas[2], when=now - timedelta(hours=1))
+        fail = _record(store, fixture_log("axi_timeout.log"), commit=side, when=now)
+        records = store.all_records()
+
+    assert diff_against_last_green(records, fail, GitProvider(), root) is None
+
+
+def test_a_newer_green_without_a_commit_is_not_skipped_for_an_older_one(
+    repo, tmp_path, fixture_log
+):
+    """Skipping it would attribute already-green commits to the failure."""
+    root, shas = repo
+    db = tmp_path / "r.db"
+    now = datetime.now(timezone.utc)
+    with RegressionStore(db) as store:
+        _record(store, fixture_log("uvm_pass.log"), commit=shas[0], when=now - timedelta(hours=3))
+        _record(store, fixture_log("uvm_pass.log"), commit=None, when=now - timedelta(hours=2))
+        fail = _record(store, fixture_log("axi_timeout.log"), commit=shas[2], when=now)
+        records = store.all_records()
+
+    base = last_green_before(records, fail)
+    assert base is not None and base.execution.git_commit is None, (
+        "the newest green run is the baseline whether or not it has a commit"
+    )
+    assert diff_against_last_green(records, fail, GitProvider(), root) is None
+
+
+def test_truncation_is_reported_rather_than_silent(repo, tmp_path, fixture_log):
+    """A truncated range computes its derived fields over a prefix."""
+    root, shas = repo
+    db = tmp_path / "r.db"
+    now = datetime.now(timezone.utc)
+    with RegressionStore(db) as store:
+        _record(store, fixture_log("uvm_pass.log"), commit=shas[0], when=now - timedelta(hours=1))
+        fail = _record(store, fixture_log("axi_timeout.log"), commit=shas[2], when=now)
+        records = store.all_records()
+
+    full = diff_against_last_green(records, fail, GitProvider(), root)
+    assert full is not None and full.truncated is False
+    assert len(full.commits) == 2
+
+    clipped = diff_against_last_green(records, fail, GitProvider(), root, max_commits=1)
+    assert clipped is not None
+    assert clipped.truncated is True
+    assert len(clipped.commits) == 1
+
+
+def test_a_store_mixing_naive_and_aware_timestamps_does_not_raise(
+    repo, tmp_path, fixture_log
+):
+    """A store written across a timezone or schema change must still compare."""
+    root, shas = repo
+    db = tmp_path / "r.db"
+    now = datetime.now(timezone.utc)
+    with RegressionStore(db) as store:
+        _record(store, fixture_log("uvm_pass.log"), commit=shas[0], when=now - timedelta(hours=2))
+        fail = _record(store, fixture_log("axi_timeout.log"), commit=shas[2], when=now)
+        records = store.all_records()
+
+    naive = records[0].model_copy(
+        update={"created_at": (now - timedelta(hours=3)).replace(tzinfo=None)}
+    )
+    mixed = [naive, *records[1:]]
+    # Must not raise "can't compare offset-naive and offset-aware datetimes".
+    assert last_green_before(mixed, fail) is not None

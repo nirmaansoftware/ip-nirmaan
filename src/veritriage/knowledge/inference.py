@@ -62,21 +62,34 @@ class _SharedMatchPass:
     patterns, one analysis ran 100 full passes over every pattern, clause and
     node to use one row of each. This memo makes it one pass.
 
-    The graph is held by weak reference and compared by identity, so the cache
-    can never serve a stale result and never keeps an Evidence Graph alive
-    after the run that produced it.
+    The graph is held by a **weak** reference and compared by **identity**, so
+    a collected graph is never kept alive and a recycled address can never be
+    mistaken for the graph that produced the cached matches: the weak
+    reference dies with the object and the comparison then fails.
+
+    Scope: one Evidence Graph, unmutated. ``pipeline.analyze()`` builds the
+    rules per run and never mutates the graph after ``builder.build()``, which
+    is the only path the platform itself uses. Because
+    ``knowledge_reasoning_rules()`` is public, the shape of the graph is
+    checked too, so rules held across analyses of a graph that grew do not
+    silently reason from the previous pass. That check is a guard, not a
+    guarantee: a mutation that leaves node and edge counts unchanged would
+    not be caught, so do not reuse rules across mutations of one graph.
     """
 
-    __slots__ = ("_ref", "_matches")
+    __slots__ = ("_ref", "_shape", "_matches")
 
     def __init__(self) -> None:
         self._ref: weakref.ref | None = None
+        self._shape: tuple[int, int] = (-1, -1)
         self._matches: list[PatternMatch] = []
 
     def matches(self, knowledge: KnowledgeGraph, graph: EvidenceGraph) -> list[PatternMatch]:
         cached = self._ref() if self._ref is not None else None
-        if cached is not graph:
+        shape = (len(graph.nodes), len(graph.edges))
+        if cached is not graph or shape != self._shape:
             self._matches = match_patterns(knowledge, graph)
+            self._shape = shape
             try:
                 self._ref = weakref.ref(graph)
             except TypeError:  # pragma: no cover - defensive

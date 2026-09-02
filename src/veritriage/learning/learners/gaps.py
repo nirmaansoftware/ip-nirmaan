@@ -51,13 +51,19 @@ def compute_rule_gaps(corpus: Corpus) -> list[RuleGap]:
 
         rate = round(len(incorrect) / len(judged), 4)
         classification = group[0].classification
-        causes = sorted(
-            {
-                cause
-                for r in incorrect
-                if (cause := corpus.confirmed_cause(r.regression_id)) is not None
-            }
-        )
+        # Ranked by how often engineers reported them, ties broken
+        # alphabetically. An earlier version took causes[0] of a sorted set,
+        # which is the alphabetically first cause and says nothing about
+        # which one engineers actually kept finding.
+        tally: dict[str, int] = {}
+        for r in incorrect:
+            cause = corpus.confirmed_cause(r.regression_id)
+            if cause is not None:
+                tally[cause] = tally.get(cause, 0) + 1
+        causes = [
+            cause
+            for cause, _ in sorted(tally.items(), key=lambda pair: (-pair[1], pair[0]))
+        ]
         modules = sorted({m for r in group for m in r.signature.modules})
         readable = classification.replace("_", " ")
         summary = (
@@ -66,7 +72,8 @@ def compute_rule_gaps(corpus: Corpus) -> list[RuleGap]:
             f"{readable} each time."
         )
         if causes:
-            summary += f" Reported cause: {causes[0]}"
+            label = "Most reported cause" if len(causes) > 1 else "Reported cause"
+            summary += f" {label}: {causes[0]}."
         summary += " No rule or pack pattern explains it yet."
 
         artifacts.append(

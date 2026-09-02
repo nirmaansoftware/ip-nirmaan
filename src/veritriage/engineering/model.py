@@ -250,6 +250,11 @@ class RegressionDiff(BaseModel):
         description="SHAs touching a module the failure implicates; the place to look first.",
     )
     provider: str = Field(default="", description="Provider that resolved the range.")
+    truncated: bool = Field(
+        default=False,
+        description="The range held more commits than were collected, so changed_modules "
+        "and suspect_commits are computed over a prefix and may omit the culprit.",
+    )
 
     @property
     def is_empty(self) -> bool:

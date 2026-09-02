@@ -1093,7 +1093,7 @@ result nor keep a graph alive. `analyze()` is about 9x faster (10 runs:
 gaining 65 tests. `test_pattern_rules_share_a_single_match_pass` fails if the
 passes come back.
 
-65 new tests (749 total: 748 passed, 1 skipped). New packages:
+80 new tests (764 total: 763 passed, 1 skipped). New packages:
 `references/`. New modules: `learning/learners/gaps.py`,
 `feedback/reweight.py`, `engineering/regression_diff.py`.
 
@@ -1460,8 +1460,8 @@ PyPI to reserve the name. Requires explicit user go-ahead.
   pass any time a new milestone lands, to keep the "why v3+ needs no
   restructuring" style tables current (this file's section 3 is a faster
   place to check current state than re-reading every doc).
-- No known failing tests or open bugs as of M19 / v1.15.0 (748 passed, 1
-  skipped, in ~24s). The single skip is an optional-dependency skip.
+- No known failing tests or open bugs as of M19 / v1.15.0 (763 passed, 1
+  skipped, in ~26s). The single skip is an optional-dependency skip.
 - The mounted-folder workflow cannot delete files, so a session that commits
   from one leaves `.git/objects/tmp_obj_*` and stale `*.lock` files behind.
   Harmless, cleared by `git gc` run locally.
