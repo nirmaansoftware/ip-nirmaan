@@ -108,7 +108,10 @@ def _make_git_repo(tmp_path: Path) -> Path:
 def test_manifest_provider_roundtrips(fixture_log):
     context = load_manifest(fixture_log("change_context.engctx.json"))
     assert context.sources == ("engineering_manifest",)
-    assert context.capabilities == frozenset(ContextCapability)
+    # A manifest carries recorded context but cannot answer a live range query.
+    assert context.capabilities == frozenset(ContextCapability) - {
+        ContextCapability.CHANGE_RANGE
+    }
     assert [c.revision for c in context.commits] == ["a1b2c3d4e5f", "9f8e7d6c5b4"]
     rtl = context.commits[0].files_in_category(ChangeCategory.RTL)
     assert {f.path for f in rtl} == {"rtl/axi_monitor.sv", "rtl/axi_arbiter.sv"}
@@ -123,7 +126,11 @@ def test_git_provider_reads_a_real_repo(tmp_path):
     assert GitProvider.available(repo)
     context = GitProvider().collect(repo, max_commits=5)
     assert context.capabilities == frozenset(
-        {ContextCapability.COMMITS, ContextCapability.CHANGED_FILES}
+        {
+            ContextCapability.COMMITS,
+            ContextCapability.CHANGED_FILES,
+            ContextCapability.CHANGE_RANGE,
+        }
     )
     assert len(context.commits) == 2
     by_title = {c.title: c for c in context.commits}

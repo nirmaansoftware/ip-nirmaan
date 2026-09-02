@@ -39,6 +39,7 @@ class ContextCapability(str, Enum):
 
     COMMITS = "commits"
     CHANGED_FILES = "changed_files"
+    CHANGE_RANGE = "change_range"
     CI_RUNS = "ci_runs"
     OWNERSHIP = "ownership"
     ISSUES = "issues"
@@ -220,6 +221,39 @@ class HistoricalRegression(BaseModel):
     failing_modules: tuple[str, ...] = Field(default=())
     classification: str = "unknown_failure"
     created_at: datetime | None = None
+
+
+class RegressionDiff(BaseModel):
+    """What changed between this run's commit and the last green run's.
+
+    The question every verification engineer asks first and the platform
+    could not answer: the regression database knew the commit each run was
+    built from, and the provider seam could list commits, but nothing joined
+    the two. This is that join.
+
+    Lossy by design like everything else a provider emits: normalized commit
+    summaries and module names, never diff text or patch content.
+    """
+
+    base_regression_id: str = Field(description="The last green run this compares against.")
+    base_commit: str = Field(description="Commit that run was built from.")
+    head_regression_id: str = Field(description="The failing run being explained.")
+    head_commit: str = Field(description="Commit the failing run was built from.")
+    commits: list[Commit] = Field(
+        default_factory=list, description="Commits in (base, head], newest first."
+    )
+    changed_modules: list[str] = Field(
+        default_factory=list, description="Every module touched across the range."
+    )
+    suspect_commits: list[str] = Field(
+        default_factory=list,
+        description="SHAs touching a module the failure implicates; the place to look first.",
+    )
+    provider: str = Field(default="", description="Provider that resolved the range.")
+
+    @property
+    def is_empty(self) -> bool:
+        return not self.commits
 
 
 class UnavailableContextAnalysis(BaseModel):

@@ -166,7 +166,10 @@ class ManifestProvider(ContextProvider):
 
     name = "engineering_manifest"
     source = "manifest"
-    capabilities = frozenset(ContextCapability)  # canonical: can declare everything
+    # Canonical: a manifest can carry every kind of *recorded* context. It
+    # cannot answer CHANGE_RANGE, which is a live query against a system
+    # rather than a field in an export, so it does not claim it.
+    capabilities = frozenset(ContextCapability) - {ContextCapability.CHANGE_RANGE}
 
     @classmethod
     def available(cls, root: Path) -> bool:

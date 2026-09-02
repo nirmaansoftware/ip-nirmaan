@@ -17,6 +17,9 @@ Public surface:
   reasoning, and report integration.
 * ``impacted_tests_in_run`` / ``impacted_tests_from_history``: deterministic
   test impact analysis.
+* ``diff_against_last_green``: what landed between a failing run and the
+  last recorded green one, joined from the regression database and a
+  provider range query.
 
 Importing this package registers the built-in providers and the manifest
 parser, so ``pipeline.analyze()`` handles a context manifest with no other
@@ -32,9 +35,14 @@ from veritriage.engineering.impact import (
     impacted_tests_from_history,
     impacted_tests_in_run,
 )
+from veritriage.engineering.regression_diff import (
+    diff_against_last_green,
+    last_green_before,
+)
 from veritriage.engineering.inference import engineering_reasoning_rules
 from veritriage.engineering.investigation import build_investigation
 from veritriage.engineering.model import (
+    RegressionDiff,
     ChangeCategory,
     ChangedFile,
     CIRun,
@@ -78,7 +86,10 @@ __all__ = [
     "emit_engineering_evidence",
     "engineering_reasoning_rules",
     "impacted_tests_from_history",
+    "RegressionDiff",
+    "diff_against_last_green",
     "impacted_tests_in_run",
+    "last_green_before",
     "register_provider",
     "stored_context",
     "unregister_provider",

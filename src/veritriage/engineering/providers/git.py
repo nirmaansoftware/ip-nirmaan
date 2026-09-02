@@ -40,6 +40,28 @@ _TB_MARKERS = ("/tb/", "/tb_", "/testbench", "/verif", "/tests/", "/test/", "/en
 _TB_SUFFIXES = ("_test", "_tb", "_seq", "_env", "_agent", "_driver", "_monitor_tb", "_scoreboard")
 
 
+def _run_git_raw(root: Path | None, *args: str) -> tuple[bool, str]:
+    """Run one git command, returning (succeeded, stdout).
+
+    :func:`_run_git` collapses "succeeded with no output" into None, which is
+    the right default for context collection but wrong for a range query:
+    "no commits between these two" and "I cannot resolve these two" must not
+    look alike.
+    """
+    try:
+        out = subprocess.run(
+            ["git", *args],
+            cwd=root,
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=True,
+        ).stdout
+        return True, out
+    except (OSError, subprocess.SubprocessError):
+        return False, ""
+
+
 def _run_git(root: Path | None, *args: str) -> str | None:
     """Run one git command, returning stdout or None on any failure.
 
@@ -117,7 +139,13 @@ class GitProvider(ContextProvider):
 
     name = "git"
     source = "git"
-    capabilities = frozenset({ContextCapability.COMMITS, ContextCapability.CHANGED_FILES})
+    capabilities = frozenset(
+        {
+            ContextCapability.COMMITS,
+            ContextCapability.CHANGED_FILES,
+            ContextCapability.CHANGE_RANGE,
+        }
+    )
 
     @classmethod
     def available(cls, root: Path) -> bool:
@@ -138,6 +166,34 @@ class GitProvider(ContextProvider):
             capabilities=self.capabilities,
             commits=commits,
         )
+
+    def changes_between(
+        self, root: Path, base_commit: str, head_commit: str, max_commits: int = 50
+    ) -> list[Commit] | None:
+        """Commits in ``(base_commit, head_commit]``, newest first.
+
+        Returns None when either commit is unknown to this clone, which is a
+        real and common case: the regression database may hold a commit from
+        a shallow CI checkout, or from a branch that has since been pruned.
+        An empty list means the two runs were built from the same code, which
+        is a genuine and useful answer, so it must not look like a failure.
+        """
+        for commit in (base_commit, head_commit):
+            ok, _ = _run_git_raw(root, "rev-parse", "--verify", "--quiet", f"{commit}^{{commit}}")
+            if not ok:
+                return None
+        ok, log = _run_git_raw(
+            root,
+            "log",
+            f"-n{max_commits}",
+            "--numstat",
+            "--no-merges",
+            f"--format={_REC}%H{_FIELD}%an{_FIELD}%aI{_FIELD}%s",
+            f"{base_commit}..{head_commit}",
+        )
+        if not ok:
+            return None
+        return self._parse_log(log) if log.strip() else []
 
     def _parse_log(self, log: str) -> list[Commit]:
         commits: list[Commit] = []

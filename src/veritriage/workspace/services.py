@@ -21,6 +21,7 @@ from typing import TYPE_CHECKING, Sequence
 from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
+    from veritriage.engineering.model import RegressionDiff
     from veritriage.models import (
         AgentAssessment,
         AgentReliability,
@@ -312,6 +313,44 @@ class WorkspaceServices:
         from veritriage.learning import LearningEngine, LearningStore
 
         return LearningEngine(LearningStore(self._learning_db))
+
+    def changes_since_last_green(
+        self,
+        regression_id: str,
+        root: Path | None = None,
+        max_commits: int = 50,
+    ) -> "RegressionDiff | None":
+        """What landed between the last recorded green run and this one.
+
+        The regression database has recorded each run's commit since v0.4.0
+        and the provider seam could list commits since M7; this joins them.
+        Returns None whenever the question cannot be honestly answered: no
+        recorded green run, a run without a commit, no registered provider
+        that can resolve a range, or commits this checkout does not have.
+        """
+        if self._db is None or not Path(self._db).is_file():
+            return None
+        from veritriage.engineering.providers import available_providers
+        from veritriage.engineering.regression_diff import diff_against_last_green
+        from veritriage.storage import RegressionStore
+
+        where = Path(root) if root is not None else Path.cwd()
+        with RegressionStore(self._db) as store:
+            records = store.all_records()
+        target = next(
+            (r for r in records if r.regression_id == regression_id), None
+        )
+        if target is None:
+            return None
+        for provider_cls in available_providers().values():
+            if not provider_cls.available(where):
+                continue
+            diff = diff_against_last_green(
+                records, target, provider_cls(), where, max_commits=max_commits
+            )
+            if diff is not None:
+                return diff
+        return None
 
     def learn_from_history(self) -> "LearningStatistics | None":
         """Recompute every learning artifact from the regression database.
