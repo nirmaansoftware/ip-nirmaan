@@ -40,6 +40,7 @@ from veritriage.models import (
     ReasoningSignal,
     WorkingSet,
 )
+from veritriage.references.resolve import resolve_references
 from veritriage.reasoning.signals import ReasoningRule
 
 #: Ownership -> the hypothesis category it corroborates (for display only;
@@ -197,8 +198,13 @@ class KnowledgeEngine:
             ownership=_OWNERSHIP_LABEL.get(match.pattern.ownership, match.pattern.ownership),
             suggested_signals=match.pattern.suggested_signals,
             references=[
-                KnowledgeReference(source=r.source, section=r.section, note=r.note)
-                for r in match.pattern.references
+                KnowledgeReference(
+                    source=r.source, section=r.section, note=r.note, uri=r.uri
+                )
+                # Citations become links here, at the report boundary, so the
+                # packs themselves stay plain data and the resolver seam is
+                # the only thing that knows about URIs.
+                for r in resolve_references(list(match.pattern.references))
             ],
             playbook=playbook,
         )
