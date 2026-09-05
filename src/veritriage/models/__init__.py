@@ -30,6 +30,7 @@ from veritriage.models.learning import (
     ProjectProfile,
     ProtocolStatistics,
     RecommendationOutcome,
+    RuleGap,
 )
 from veritriage.models.planning import (
     CompletionCondition,
@@ -228,6 +229,7 @@ __all__ = [
     "ProjectProfile",
     "ProtocolStatistics",
     "RecommendationOutcome",
+    "RuleGap",
     "DutModuleView",
     "DutTopologyView",
     "EngineeringContextView",

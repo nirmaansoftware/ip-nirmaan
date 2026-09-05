@@ -5,13 +5,14 @@ raw verification artifacts (simulation logs, compile logs, coverage summaries,
 test metadata) into a normalized **Evidence Graph**, a deterministic failure
 classification with confidence and evidence, an engineering-grade HTML report,
 and suggested next debugging steps - in one command. A **Verification
-Knowledge Engine** ships 42 pluggable Knowledge Packs across six domains
+Knowledge Engine** ships 44 pluggable Knowledge Packs across six domains
 (interconnect, CPU/ISA, memory, serial IO, coherency, and methodology):
-AMBA AXI/APB/AHB/ACE/AXI-Stream, CHI, TileLink, NoC, PCIe, CXL, UCIe, DDR,
+AMBA AXI/APB/AHB/ACE/AXI-Stream, CHI, TileLink, OCP, Wishbone, NoC, PCIe,
+CXL, UCIe, DDR,
 HBM, USB, Ethernet, MIPI, I2C/I3C, SPI, UART, JTAG, UVM methodology with
 RAL/phasing/TLM, SVA, formal, low power, DFT, X-propagation, CDC, reset,
-coherency, security, performance, and RISC-V depth (92 deterministic failure
-patterns, 90 debug playbooks, 15 protocol state machines total) that match the
+coherency, security, performance, and RISC-V depth (100 deterministic failure
+patterns, 98 debug playbooks, 17 protocol state machines total) that match the
 evidence against known failure patterns, project it onto protocol state
 machines to show where progress stopped, and attach deterministic debug
 playbooks with real specification references. An **Agent Framework** then puts
@@ -124,7 +125,11 @@ render rather than reason, how grounding is enforced instead of requested, and
 why one vendor registry serves both agent narration and every renderer, and
 [docs/AUTOMATION_ENGINE.md](docs/AUTOMATION_ENGINE.md) for the Automation
 Engine: why automation decides rather than executes, why events are immutable,
-and how CI, schedulers, and chat clients plug in as event producers.
+and how CI, schedulers, and chat clients plug in as event producers, and
+[docs/PLATFORM_COMPLETION.md](docs/PLATFORM_COMPLETION.md) for Platform
+Completion: the feedback loop that turns engineer verdicts into rule gaps and
+reordered advice, offline reference resolution, cross-regression commit
+diffing, and why the knowledge stage is no longer quadratic in pattern count.
 
 ## Installation
 
@@ -337,8 +342,9 @@ since v1.8.0 the `Agent` / `ReasoningProvider` contracts, since v1.9.0 the
 `Learner` / `LearningArtifact` contracts, since v1.10.0 the `StepSource` /
 `DebugPlan` contracts, since v1.11.0 the `StructureExtractor` / `DesignGraph`
 contracts, since v1.12.0 the `Question` / `Answer` / `QuestionHandler`
-contracts, since v1.13.0 the `LLMProvider` / `Prompt` contracts, and since v1.14.0 the
-`Event` / `Trigger` / `AutomationRule` contracts) is frozen; future
+contracts, since v1.13.0 the `LLMProvider` / `Prompt` contracts, since v1.14.0 the
+`Event` / `Trigger` / `AutomationRule` contracts, and since v1.15.0 the
+`ReferenceResolver` contract) is frozen; future
 work is integrations over existing seams: AI providers (Claude, GPT, Gemini,
 local models, MCP-hosted reasoners) as `ReasoningProvider` implementations
 behind the M12 seam -> a VS Code

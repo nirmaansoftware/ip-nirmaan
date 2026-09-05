@@ -17,6 +17,10 @@ class KnowledgeReference(BaseModel):
     source: str = Field(description="Document or standard, e.g. 'AMBA AXI Specification'.")
     section: str | None = Field(default=None, description="Section/rule, e.g. 'A3.2.1'.")
     note: str | None = Field(default=None, description="Why this reference is relevant.")
+    uri: str | None = Field(
+        default=None,
+        description="Resolved link into external documentation, when a resolver knew one.",
+    )
 
 
 class MatchedConcept(BaseModel):

@@ -1,0 +1,9 @@
+Chronologic VCS simulator copyright 1991-2025
+UVM_INFO @ 0: reporter [RNTST] Running test wb_arbitration_test...
+UVM_INFO /tb/env.sv(41) @ 0: uvm_test_top.env [ENV] build complete
+UVM_INFO /tb/master.sv(44) @ 500000: uvm_test_top.env.mst [WB] Wishbone bus cycle open, ADR_O=0x0000_5000
+UVM_WARNING /tb/master.sv(58) @ 1500000: uvm_test_top.env.mst [WB] RTY termination repeated, re-issuing the same phase
+UVM_ERROR /tb/master.sv(63) @ 8800000: uvm_test_top.env.mst [WB] Maximum retries exceeded: RTY termination repeated 256 times, retry loop with no forward progress
+--- UVM Report Summary ---
+UVM_ERROR :   1
+UVM_FATAL :   0

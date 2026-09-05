@@ -1,0 +1,9 @@
+Chronologic VCS simulator copyright 1991-2025
+UVM_INFO @ 0: reporter [RNTST] Running test ocp_precise_burst_test...
+UVM_INFO /tb/env.sv(41) @ 0: uvm_test_top.env [ENV] build complete
+UVM_INFO /tb/master.sv(60) @ 1500000: uvm_test_top.env.mst [OCP] Precise burst issued, MBurstSeq=INCR MBurstLength=8
+UVM_ERROR /tb/scoreboard.sv(93) @ 5100000: uvm_test_top.env.sb [OCP] Burst length mismatch: MBurstLength declared 8 transfers, 6 data phases observed
+UVM_ERROR /tb/scoreboard.sv(96) @ 5100000: uvm_test_top.env.sb [SB] Burst counter desynchronized, remaining beats dropped
+--- UVM Report Summary ---
+UVM_ERROR :   2
+UVM_FATAL :   0

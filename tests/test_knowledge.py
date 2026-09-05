@@ -82,6 +82,9 @@ EXPECTED_PACK_IDS = {
     # Numeric / omission clause upgrade unlocks these
     "performance",
     "security",
+    # Milestone 19 - remaining open interconnects
+    "ocp",
+    "wishbone",
 }
 
 #: fixture -> pattern id it must match. One entry per protocol/domain pack
@@ -99,6 +102,15 @@ _PATTERN_FIXTURES = {
     "axi_write_response_missing.log": "axi.write-response-missing",
     "axi_exclusive_fail.log": "axi.exclusive-fail",
     "sva_assertion_before_timeout.log": "sva.assertion-before-timeout",
+    # Milestone 19 - OCP and Wishbone
+    "ocp_request_not_accepted.log": "ocp.request-not-accepted",
+    "ocp_response_error.log": "ocp.response-error",
+    "ocp_burst_length_mismatch.log": "ocp.burst-length-mismatch",
+    "ocp_thread_ordering.log": "ocp.thread-ordering-violation",
+    "wishbone_no_termination.log": "wishbone.no-termination",
+    "wishbone_err_ignored.log": "wishbone.err-ignored",
+    "wishbone_rty_livelock.log": "wishbone.rty-livelock",
+    "wishbone_cyc_stb_violation.log": "wishbone.cyc-stb-violation",
     # Tier 1 - RISC-V & CPU/ISA depth
     "riscv_sc_never_succeeds.log": "riscv-atomics.sc-never-succeeds",
     "riscv_amo_ordering.log": "riscv-atomics.amo-ordering-violation",
@@ -554,3 +566,96 @@ def test_numeric_and_absent_are_backward_compatible_defaults():
     clause = EvidenceClause(name="plain", pattern=r"timeout")
     assert clause.numeric is None
     assert clause.absent is False
+
+
+# --- One match pass per analysis (Milestone 19) -----------------------------
+
+
+def test_pattern_rules_share_a_single_match_pass(fixture_log, monkeypatch):
+    """The knowledge stage must be linear in pattern count, not quadratic.
+
+    There is one reasoning rule per failure pattern and each needs the same
+    match set, so calling the matcher per rule ran a full pass over every
+    pattern, clause and node once per pattern. With 100 patterns that is 100
+    passes to use one row of each.
+    """
+    import veritriage.knowledge.inference as inference
+
+    calls = 0
+    original = inference.match_patterns
+
+    def counted(knowledge, graph):
+        nonlocal calls
+        calls += 1
+        return original(knowledge, graph)
+
+    monkeypatch.setattr(inference, "match_patterns", counted)
+    analyze(fixture_log("axi_timeout.log"))
+
+    n_patterns = len([p for pack in load_packs() for p in pack.patterns])
+    assert n_patterns > 50, "guard assumes a large pack library"
+    assert calls <= 3, (
+        f"{calls} match passes for {n_patterns} patterns; the rules should "
+        "share one pass, not run one each"
+    )
+
+
+def test_shared_pass_returns_what_a_direct_match_would(fixture_log):
+    """The memo is an optimization, never a different answer."""
+    from veritriage.knowledge.inference import _SharedMatchPass
+
+    graph = analyze(fixture_log("axi_timeout.log")).graph
+    knowledge = KnowledgeGraph.build()
+    shared = _SharedMatchPass()
+    assert [m.pattern.id for m in shared.matches(knowledge, graph)] == [
+        m.pattern.id for m in match_patterns(knowledge, graph)
+    ]
+    # Second call on the same graph is served from the memo, same answer.
+    assert [m.pattern.id for m in shared.matches(knowledge, graph)] == [
+        m.pattern.id for m in match_patterns(knowledge, graph)
+    ]
+
+
+def test_shared_pass_recomputes_for_a_different_graph(fixture_log):
+    """Identity, not equality: a new graph never reuses another's matches."""
+    from veritriage.knowledge.inference import _SharedMatchPass
+
+    timeout_graph = analyze(fixture_log("axi_timeout.log")).graph
+    compile_graph = analyze(fixture_log("compile.log")).graph
+    knowledge = KnowledgeGraph.build()
+    shared = _SharedMatchPass()
+    first = [m.pattern.id for m in shared.matches(knowledge, timeout_graph)]
+    second = [m.pattern.id for m in shared.matches(knowledge, compile_graph)]
+    assert first != second
+    assert second == [m.pattern.id for m in match_patterns(knowledge, compile_graph)]
+
+
+def test_a_rule_built_on_its_own_still_works(fixture_log):
+    """The shared pass is optional; the old one-rule construction still runs."""
+    from veritriage.knowledge.inference import KnowledgePatternRule
+
+    knowledge = KnowledgeGraph.build()
+    rule = KnowledgePatternRule(knowledge, "axi.no-response-after-accept")
+    outcome = analyze(fixture_log("axi_timeout.log"))
+    signal = rule.evaluate(outcome.graph, outcome.report.reasoning.working_set)
+    assert signal is not None
+    assert signal.name == "knowledge:axi.no-response-after-accept"
+
+
+def test_shared_pass_notices_a_graph_that_grew(fixture_log):
+    """Rules held across analyses must not reason from a previous pass."""
+    from veritriage.knowledge.inference import _SharedMatchPass
+
+    graph = analyze(fixture_log("uvm_pass.log")).graph
+    knowledge = KnowledgeGraph.build()
+    shared = _SharedMatchPass()
+    before = [m.pattern.id for m in shared.matches(knowledge, graph)]
+
+    grown = analyze(fixture_log("axi_timeout.log")).graph
+    for node in grown.nodes.values():
+        if node.id not in graph.nodes:
+            graph.add_node(node)
+
+    after = [m.pattern.id for m in shared.matches(knowledge, graph)]
+    assert after == [m.pattern.id for m in match_patterns(knowledge, graph)]
+    assert after != before

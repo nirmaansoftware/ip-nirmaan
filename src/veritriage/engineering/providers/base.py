@@ -20,7 +20,11 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import ClassVar
 
-from veritriage.engineering.model import ContextCapability, EngineeringContext
+from veritriage.engineering.model import (
+    Commit,
+    ContextCapability,
+    EngineeringContext,
+)
 
 
 class ContextProviderError(RuntimeError):
@@ -50,6 +54,19 @@ class ContextProvider(ABC):
     def available(cls, root: Path) -> bool:
         """Whether this provider can produce context for ``root``."""
         raise NotImplementedError
+
+    def changes_between(
+        self, root: Path, base_commit: str, head_commit: str, max_commits: int = 50
+    ) -> list["Commit"] | None:
+        """Normalized commits in ``(base_commit, head_commit]``, newest first.
+
+        Optional. The default returns None, meaning "this system cannot answer
+        a range query", so every existing provider keeps working untouched and
+        a caller can tell "no commits between them" (an empty list) from "I
+        cannot tell you" (None). A provider that implements this must also
+        declare :attr:`ContextCapability.CHANGE_RANGE`.
+        """
+        return None
 
     @abstractmethod
     def collect(self, root: Path, max_commits: int = 10) -> EngineeringContext:

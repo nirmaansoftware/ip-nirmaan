@@ -1,0 +1,9 @@
+Chronologic VCS simulator copyright 1991-2025
+UVM_INFO @ 0: reporter [RNTST] Running test wb_bridge_test...
+UVM_INFO /tb/env.sv(41) @ 0: uvm_test_top.env [ENV] build complete
+UVM_INFO /tb/master.sv(44) @ 400000: uvm_test_top.env.mst [WB] Wishbone bus cycle open, CYC asserted, STB asserted
+UVM_ERROR /tb/protocol_checker.sv(58) @ 1600000: uvm_test_top.env.chk [WB] Wishbone protocol violation: CYC deasserted before the outstanding phase terminated
+UVM_ERROR /tb/protocol_checker.sv(61) @ 1600000: uvm_test_top.env.chk [WB] Slave still driving a response for an abandoned phase
+--- UVM Report Summary ---
+UVM_ERROR :   2
+UVM_FATAL :   0

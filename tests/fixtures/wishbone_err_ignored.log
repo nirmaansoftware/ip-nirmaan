@@ -1,0 +1,9 @@
+Chronologic VCS simulator copyright 1991-2025
+UVM_INFO @ 0: reporter [RNTST] Running test wb_memory_map_test...
+UVM_INFO /tb/env.sv(41) @ 0: uvm_test_top.env [ENV] build complete
+UVM_INFO /tb/master.sv(44) @ 600000: uvm_test_top.env.mst [WB] Wishbone bus cycle open, ADR_O=0x0000_2004
+UVM_ERROR /tb/monitor.sv(81) @ 700000: uvm_test_top.env.mon [WB] Wishbone error termination: ERR_I asserted at 0x0000_2004, master latched DAT_I as valid data
+UVM_ERROR /tb/scoreboard.sv(133) @ 2100000: uvm_test_top.env.sb [SB] Read data mismatch at 0x0000_2004: expected 0xa5a5a5a5, got 0xffffffff
+--- UVM Report Summary ---
+UVM_ERROR :   2
+UVM_FATAL :   0

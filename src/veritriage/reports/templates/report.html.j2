@@ -430,7 +430,7 @@
       </p>
       {% if pat.references %}
       <p class="ev-refs"><b>References:</b>
-        {% for ref in pat.references %}{{ ref.source }}{% if ref.section %} §{{ ref.section }}{% endif %}{% if ref.note %} ({{ ref.note }}){% endif %}{% if not loop.last %}; {% endif %}{% endfor %}
+        {% for ref in pat.references %}{% if ref.uri %}<a href="{{ ref.uri }}" rel="noreferrer noopener" target="_blank">{{ ref.source }}</a>{% else %}{{ ref.source }}{% endif %}{% if ref.section %} §{{ ref.section }}{% endif %}{% if ref.note %} ({{ ref.note }}){% endif %}{% if not loop.last %}; {% endif %}{% endfor %}
       </p>
       {% endif %}
       {% if pat.playbook %}
