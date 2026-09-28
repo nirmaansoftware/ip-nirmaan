@@ -111,6 +111,8 @@ Rules for each binding:
 
 ## Stage 3 (M22): IP Nirmaan over MCP, and events
 
+**Status: done (M22).** Design and decisions in `docs/NIRMAAN_MCP.md`; history in `context.md`.
+
 **Scope:**
 - A separate MCP tool table for Nirmaan (plan, status, why, task actions). It must not be added to VeriTriage's table, which would break the import law.
 - Publish organizational events (task completed, gate approved, escalation raised) to the M18 event bus through the bridge, so VeriTriage automation rules can react.
