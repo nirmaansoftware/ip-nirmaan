@@ -34,14 +34,22 @@
   <link rel="preload" href="/fonts/hanken-grotesk.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="stylesheet" href="/styles.css" />
 
-  <!-- Motion is opt-in: only with JavaScript and without a reduced-motion
-       preference. Without it, every section renders complete and still. -->
+  <!-- Before first paint: apply a saved theme choice, and opt in to motion
+       only without a reduced-motion preference. -->
   <script>
-    if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      document.documentElement.classList.add('motion');
-    }
+    (function () {
+      var root = document.documentElement;
+      try {
+        var saved = localStorage.getItem('ip-nirmaan-theme');
+        if (saved === 'light' || saved === 'dark') root.setAttribute('data-theme', saved);
+      } catch (e) {}
+      root.classList.add('js');
+      if (!matchMedia('(prefers-reduced-motion: reduce)').matches) root.classList.add('motion');
+    })();
   </script>
+  <script src="/site.js" defer></script>
   <script src="/motion.js" defer></script>
+  <script src="/hero.js" defer></script>
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
@@ -60,14 +68,20 @@
       <a href="#veritriage">VeriTriage</a>
       <a href="#status">Status</a>
     </nav>
-    <a class="btn btn--small" href="https://www.nirmaan.online/contact.html">Talk to us</a>
+    <div class="nav__actions">
+      <button class="theme-toggle" type="button" data-theme-toggle data-mode="system" aria-label="Colour theme: match system"><svg class="theme-toggle__icon theme-toggle__icon--system" viewBox="0 0 5 5" aria-hidden="true" focusable="false" shape-rendering="crispEdges"><rect x="0" y="4" width="1" height="1"/><rect x="1" y="4" width="1" height="1"/><rect x="2" y="4" width="1" height="1"/><rect x="3" y="4" width="1" height="1"/><rect x="4" y="4" width="1" height="1"/><rect x="0" y="3" width="1" height="1"/><rect x="1" y="3" width="1" height="1"/><rect x="4" y="3" width="1" height="1"/><rect x="0" y="2" width="1" height="1"/><rect x="1" y="2" width="1" height="1"/><rect x="4" y="2" width="1" height="1"/><rect x="0" y="1" width="1" height="1"/><rect x="1" y="1" width="1" height="1"/><rect x="4" y="1" width="1" height="1"/><rect x="0" y="0" width="1" height="1"/><rect x="1" y="0" width="1" height="1"/><rect x="2" y="0" width="1" height="1"/><rect x="3" y="0" width="1" height="1"/><rect x="4" y="0" width="1" height="1"/></svg><svg class="theme-toggle__icon theme-toggle__icon--light" viewBox="0 0 5 5" aria-hidden="true" focusable="false" shape-rendering="crispEdges"><rect x="0" y="4" width="1" height="1"/><rect x="2" y="4" width="1" height="1"/><rect x="4" y="4" width="1" height="1"/><rect x="1" y="3" width="1" height="1"/><rect x="2" y="3" width="1" height="1"/><rect x="3" y="3" width="1" height="1"/><rect x="0" y="2" width="1" height="1"/><rect x="1" y="2" width="1" height="1"/><rect x="3" y="2" width="1" height="1"/><rect x="4" y="2" width="1" height="1"/><rect x="1" y="1" width="1" height="1"/><rect x="2" y="1" width="1" height="1"/><rect x="3" y="1" width="1" height="1"/><rect x="0" y="0" width="1" height="1"/><rect x="2" y="0" width="1" height="1"/><rect x="4" y="0" width="1" height="1"/></svg><svg class="theme-toggle__icon theme-toggle__icon--dark" viewBox="0 0 5 5" aria-hidden="true" focusable="false" shape-rendering="crispEdges"><rect x="1" y="4" width="1" height="1"/><rect x="2" y="4" width="1" height="1"/><rect x="3" y="4" width="1" height="1"/><rect x="0" y="3" width="1" height="1"/><rect x="1" y="3" width="1" height="1"/><rect x="2" y="3" width="1" height="1"/><rect x="0" y="2" width="1" height="1"/><rect x="1" y="2" width="1" height="1"/><rect x="0" y="1" width="1" height="1"/><rect x="1" y="1" width="1" height="1"/><rect x="2" y="1" width="1" height="1"/><rect x="1" y="0" width="1" height="1"/><rect x="2" y="0" width="1" height="1"/><rect x="3" y="0" width="1" height="1"/></svg></button>
+      <a class="btn btn--small" href="https://www.nirmaan.online/contact.html">Talk to us</a>
+    </div>
   </div>
 </header>
 
 <main id="main" tabindex="-1">
 
   <!-- HERO -->
-  <section class="hero" id="top">
+  <section class="hero" id="top" data-hero>
+    <!-- hero.js (shared with nirmaan.online) draws the construction grid here
+         and assembles the pixel N from falling blocks inside the slot. -->
+    <canvas class="hero__canvas" data-hero-canvas aria-hidden="true"></canvas>
     <div class="hero__grid" aria-hidden="true"></div>
     <div class="wrap hero__inner">
       <div class="hero__copy">
@@ -81,6 +95,12 @@
         <div class="actions">
           <a class="btn" href="https://www.nirmaan.online/contact.html">Talk to us</a>
           <a class="btn btn--ghost" href="#how">See how it works</a>
+        </div>
+      </div>
+
+      <div class="hero__side">
+        <div class="hero__slot" data-hero-slot>
+          <svg class="hero__mark-fallback" viewBox="0 0 5 5" aria-hidden="true" focusable="false" shape-rendering="crispEdges"><path d="M0 0h1v5H0zM4 0h1v5H4zM1 1h1v1H1zM2 2h1v1H2zM3 3h1v1H3z"/></svg>
         </div>
       </div>
 
@@ -172,41 +192,105 @@
   </section>
 
   <!-- HOW IT WORKS -->
-  <section class="section" id="how">
+  <section class="section scene" id="how" data-scene>
     <div class="wrap">
       <header class="section__head" data-reveal>
         <p class="eyebrow">How it works</p>
         <h2 class="section__title">From one sentence to routed, gated work.</h2>
-        <p class="section__lede">Example requirement: <q>Create a 4-port AXI-to-NoC bridge.</q></p>
+        <p class="section__lede">Follow one requirement through the organization. Scroll to move it along.</p>
       </header>
+    </div>
 
-      <ol class="flow" role="list" data-play="flow" data-reveal>
-        <li class="flow__step" style="--n:0">
-          <span class="flow__node" aria-hidden="true"></span>
-          <h3>Requirement</h3>
-          <p>A plain-language request comes in. Nothing else is needed to start.</p>
-        </li>
-        <li class="flow__step" style="--n:1">
-          <span class="flow__node" aria-hidden="true"></span>
-          <h3>Analyze</h3>
-          <p>Intent, features, and parameters are extracted. Anything left unstated becomes a written assumption, not a silent guess.</p>
-        </li>
-        <li class="flow__step" style="--n:2">
-          <span class="flow__node" aria-hidden="true"></span>
-          <h3>Route to roles</h3>
-          <p>Each task goes to the role whose skills, capabilities, and authority fit it. Routing reads the organization as data.</p>
-        </li>
-        <li class="flow__step" style="--n:3">
-          <span class="flow__node" aria-hidden="true"></span>
-          <h3>Review and gate</h3>
-          <p>Critical work gets an independent reviewer. Gates such as architecture approval wait for a named human.</p>
-        </li>
-        <li class="flow__step" style="--n:4">
-          <span class="flow__node" aria-hidden="true"></span>
-          <h3>Deliverable</h3>
-          <p>The work product arrives with its trail: who did what, from which inputs, backed by which evidence.</p>
-        </li>
-      </ol>
+    <!-- Pinned while you scroll through it; scroll position drives the story
+         (motion.js). Without motion it is one finished diagram in normal flow. -->
+    <div class="scene__track">
+    <div class="scene__sticky">
+      <div class="wrap scene__body">
+        <ol class="flow" role="list">
+          <li class="flow__step" data-span="0 0.12">
+            <span class="flow__node" aria-hidden="true">1</span>
+            <h3>Requirement</h3>
+            <p>A plain-language request comes in. Nothing else is needed to start.</p>
+          </li>
+          <li class="flow__step" data-span="0.12 0.28">
+            <span class="flow__node" aria-hidden="true">2</span>
+            <h3>Analyze</h3>
+            <p>Intent, features, and parameters are extracted. Anything left unstated becomes a written assumption, not a silent guess.</p>
+          </li>
+          <li class="flow__step" data-span="0.28 0.5">
+            <span class="flow__node" aria-hidden="true">3</span>
+            <h3>Route to roles</h3>
+            <p>Each task goes to the role whose skills, capabilities, and authority fit it. Routing reads the organization as data.</p>
+          </li>
+          <li class="flow__step" data-span="0.5 0.86">
+            <span class="flow__node" aria-hidden="true">4</span>
+            <h3>Review and gate</h3>
+            <p>Work is executed, then verified by an independent reviewer. Gates such as architecture approval wait for a named human.</p>
+          </li>
+          <li class="flow__step" data-span="0.86 1.01">
+            <span class="flow__node" aria-hidden="true">5</span>
+            <h3>Deliverable</h3>
+            <p>The work product arrives with its trail: who did what, from which inputs, backed by which evidence.</p>
+          </li>
+        </ol>
+
+        <figure class="machine">
+          <div class="machine__in">
+            <p class="req" data-at="0.02 0.08"><span class="req__label">Requirement</span> Create a 4-port AXI-to-NoC bridge.</p>
+            <ul class="chips" role="list" aria-label="Features found">
+              <li data-at="0.130 0.160">axi</li>
+              <li data-at="0.155 0.185">noc</li>
+              <li data-at="0.180 0.210">multi_port</li>
+              <li data-at="0.205 0.235">cdc</li>
+              <li data-at="0.230 0.260">registers</li>
+            </ul>
+            <p class="assume" data-at="0.23 0.27"><span class="req__label">Assumption</span> Clocking was not stated, so CDC work is planned conservatively.</p>
+          </div>
+          <ol class="tasks" role="list" aria-label="Tasks, owners and status">
+            <li class="task" data-at="0.300 0.330" data-states='[[0.300,"planned"],[0.520,"executed"],[0.640,"verified"]]'>
+              <span class="task__name">Interface specification: AXI</span>
+              <span class="task__owner">Senior AXI Interface Architect</span>
+              <span class="task__state" data-state="verified">verified</span>
+            </li>
+            <li class="task" data-at="0.328 0.358" data-states='[[0.328,"planned"],[0.550,"executed"],[0.670,"verified"]]'>
+              <span class="task__name">Microarchitecture</span>
+              <span class="task__owner">Staff NoC Microarchitect</span>
+              <span class="task__state" data-state="verified">verified</span>
+            </li>
+            <li class="task task--gate" data-at="0.356 0.386" data-states='[[0.356,"planned"],[0.700,"awaits human"],[0.800,"approved"]]'>
+              <span class="task__name"><span class="gate">GATE</span> Architecture approval</span>
+              <span class="task__owner">Chief Architect <span class="human">(human)</span></span>
+              <span class="task__state" data-state="approved">approved</span>
+            </li>
+            <li class="task" data-at="0.384 0.414" data-states='[[0.384,"planned"],[0.580,"executed"],[0.700,"verified"]]'>
+              <span class="task__name">RTL: AXI slave interface</span>
+              <span class="task__owner">Senior Interface Design Engineer</span>
+              <span class="task__state" data-state="verified">verified</span>
+            </li>
+            <li class="task" data-at="0.412 0.442" data-states='[[0.412,"planned"],[0.610,"executed"],[0.730,"verified"]]'>
+              <span class="task__name">RTL: Arbitration</span>
+              <span class="task__owner">Senior Interconnect Design Engineer</span>
+              <span class="task__state" data-state="verified">verified</span>
+            </li>
+            <li class="task" data-at="0.440 0.470" data-states='[[0.440,"planned"],[0.640,"executed"],[0.760,"verified"]]'>
+              <span class="task__name">Verification plan</span>
+              <span class="task__owner">Senior Verification Planning Engineer</span>
+              <span class="task__state" data-state="verified">verified</span>
+            </li>
+            <li class="task task--gate" data-at="0.468 0.498" data-states='[[0.468,"planned"],[0.730,"awaits human"],[0.830,"approved"]]'>
+              <span class="task__name"><span class="gate">GATE</span> Verification signoff</span>
+              <span class="task__owner">VP, Verification <span class="human">(human)</span></span>
+              <span class="task__state" data-state="approved">approved</span>
+            </li>
+          </ol>
+          <div class="machine__out" data-at="0.87 0.94">
+            <span class="req__label">Deliverable</span> The work, with its trail of evidence.
+          </div>
+          <div class="chain" aria-label="Audit trail: every change above is one hash-chained entry"><span class="chain__label">Audit trail</span><span class="chain__blocks" aria-hidden="true"><i data-at="0.300 0.312"></i><i data-at="0.328 0.340"></i><i data-at="0.356 0.368"></i><i data-at="0.384 0.396"></i><i data-at="0.412 0.424"></i><i data-at="0.440 0.452"></i><i data-at="0.468 0.480"></i><i data-at="0.520 0.532"></i><i data-at="0.550 0.562"></i><i data-at="0.580 0.592"></i><i data-at="0.610 0.622"></i><i data-at="0.640 0.652"></i><i data-at="0.640 0.652"></i><i data-at="0.670 0.682"></i><i data-at="0.700 0.712"></i><i data-at="0.700 0.712"></i><i data-at="0.730 0.742"></i><i data-at="0.730 0.742"></i><i data-at="0.760 0.772"></i><i data-at="0.800 0.812"></i><i data-at="0.830 0.842"></i></span></div>
+          <figcaption>Illustration of the rules every task moves under, using the plan above. It shows the flow, not delivered work: see Status below.</figcaption>
+        </figure>
+      </div>
+    </div>
     </div>
   </section>
 
@@ -225,7 +309,7 @@
         <li class="stat"><span class="stat__num" data-count="7">7</span><span class="stat__label">engineering workflows</span></li>
         <li class="stat"><span class="stat__num" data-count="12">12</span><span class="stat__label">constitution principles</span></li>
         <li class="stat"><span class="stat__num" data-count="42">42</span><span class="stat__label">verification knowledge packs</span></li>
-        <li class="stat"><span class="stat__num" data-count="877">877</span><span class="stat__label">automated tests</span></li>
+        <li class="stat"><span class="stat__num" data-count="880">880</span><span class="stat__label">automated tests</span></li>
       </ul>
 
       <figure class="org" data-reveal>

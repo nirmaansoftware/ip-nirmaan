@@ -120,6 +120,79 @@
     });
   }
 
+  // ---- How it works: a pinned scene scrubbed by scroll -------------------
+  // Scroll through the tall track turns into progress p (0 to 1). Each
+  // [data-at="a b"] element gets --t, its own 0 to 1 over that span; each
+  // task shows the last state whose time has passed; the step being told is
+  // marked current. The HTML holds the finished diagram, so p = 1 is simply
+  // the page as written.
+  var scene = document.querySelector('[data-scene]');
+  if (scene) {
+    var track = scene.querySelector('.scene__track');
+    var sticky = scene.querySelector('.scene__sticky');
+    var body = scene.querySelector('.scene__body');
+    var nav = document.querySelector('.nav');
+    var span = function (el, attr) { var r = el.getAttribute(attr).split(' ').map(Number); return { el: el, a: r[0], b: r[1] }; };
+    var timed = Array.prototype.map.call(scene.querySelectorAll('[data-at]'), function (el) { return span(el, 'data-at'); });
+    var steps = Array.prototype.map.call(scene.querySelectorAll('[data-span]'), function (el) { return span(el, 'data-span'); });
+    var tasks = Array.prototype.map.call(scene.querySelectorAll('[data-states]'), function (el) {
+      return { chip: el.querySelector('.task__state'), states: JSON.parse(el.getAttribute('data-states')) };
+    });
+    var clamp01 = function (v) { return v < 0 ? 0 : v > 1 ? 1 : v; };
+    var pinned = true, queued = false;
+
+    tasks.forEach(function (t) {
+      t.chip.addEventListener('animationend', function () { t.chip.classList.remove('is-changed'); });
+    });
+
+    function layoutScene() {
+      // Pin when the scene fits on screen, shrinking it a little (zoom) when
+      // it nearly fits; otherwise it plays in normal flow as it scrolls past.
+      scene.classList.remove('scene--unpinned');
+      body.style.setProperty('--fit', '1');
+      render(progress()); // phones show only the current step: measure that
+      var fit = (window.innerHeight - nav.offsetHeight - 16) / body.offsetHeight;
+      pinned = fit >= 0.72;
+      body.style.setProperty('--fit', pinned ? Math.min(1, fit).toFixed(3) : '1');
+      scene.classList.toggle('scene--unpinned', !pinned);
+    }
+
+    function progress() {
+      if (pinned) {
+        var total = track.offsetHeight - sticky.offsetHeight;
+        return total > 0 ? clamp01((nav.offsetHeight - track.getBoundingClientRect().top) / total) : 1;
+      }
+      var r = body.getBoundingClientRect(), vh = window.innerHeight;
+      return clamp01((vh * 0.85 - r.top) / (r.height + vh * 0.1));
+    }
+
+    function render(p) {
+      timed.forEach(function (x) { x.el.style.setProperty('--t', clamp01((p - x.a) / (x.b - x.a)).toFixed(3)); });
+      steps.forEach(function (x) {
+        x.el.classList.toggle('is-current', p >= x.a && p < x.b);
+        x.el.classList.toggle('is-done', p >= x.b);
+      });
+      tasks.forEach(function (t) {
+        var state = t.states[0][1];
+        t.states.forEach(function (s) { if (p >= s[0]) state = s[1]; });
+        if (t.chip.getAttribute('data-state') !== state) {
+          t.chip.setAttribute('data-state', state);
+          t.chip.textContent = state;
+          t.chip.classList.add('is-changed');
+        }
+      });
+    }
+
+    function frame() { queued = false; render(progress()); }
+    function queue() { if (!queued) { queued = true; requestAnimationFrame(frame); } }
+
+    layoutScene();
+    frame();
+    window.addEventListener('scroll', queue, { passive: true });
+    window.addEventListener('resize', function () { layoutScene(); queue(); });
+    reduce.addEventListener && reduce.addEventListener('change', function (e) { if (e.matches) render(1); });
+  }
+
   if (term) {
     // Hold the plan hidden from the first frame, then print once the hero has arrived.
     term.classList.add('is-printing');

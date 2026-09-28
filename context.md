@@ -1104,7 +1104,7 @@ deploy separately) and follows that site's motion standard
 (`html.motion`, set only without a reduced-motion preference) and only animates
 toward content already in the HTML. `tests/test_landing_site.py` ties the stat
 tiles to `build_organization().stats()` and the pack registry, and the
-constitution cards to `CONSTITUTION`; the test count (877, up from the brief's 853
+constitution cards to `CONSTITUTION`; the test count (880, up from the brief's 853
 with this change) is maintained by hand.
 Not deployed yet: hosting and the `ip` CNAME are the owner's call. See
 `site/README.md`.
