@@ -20,6 +20,8 @@ This milestone binds five tools to open-source backends:
 `sta.run` (OpenSTA) is not bound. It needs a liberty file and constraints that
 the fixture flow does not have yet, so it stays `CONTRACT_ONLY` for Stage 6.
 
+(M25 bound it, and `pnr.run`, through OpenSTA and OpenROAD: see `docs/PHYSICAL_DESIGN.md`.)
+
 ```
 nirmaan org tools          # the five tools now show a binding
 ```

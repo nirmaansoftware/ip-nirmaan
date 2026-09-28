@@ -79,6 +79,10 @@ class Backend:
     required: tuple[str, ...] = ("sources",)
     #: Where the steps run; the job's working directory unless the tool needs another.
     cwd: Callable[[Job], Path] | None = None
+    #: Parameters naming files (comma separated) that must exist before any step runs.
+    files: tuple[str, ...] = ()
+    #: Asked with the executables: why this machine's environment (a PDK) cannot serve the job, or None.
+    environment: Callable[[dict[str, str]], str | None] | None = None
 
 
 _BACKENDS: dict[str, list[Backend]] = {}
@@ -125,10 +129,14 @@ def select_backend(tool: str, params: dict[str, str]) -> tuple[Backend | None, s
     reasons = []
     for backend in candidates:
         missing = _missing(backend)
-        if not missing:
+        lacking = backend.environment(params) if backend.environment else None
+        if not missing and not lacking:
             return backend, ""
-        reasons.append(f"{backend.name} needs {', '.join(missing)}")
-    return None, f"{tool} cannot run here: {'; '.join(reasons)} on PATH, not found (refused, never simulated)"
+        if missing:
+            reasons.append(f"{backend.name} needs {', '.join(missing)} on PATH, not found")
+        if lacking:
+            reasons.append(f"{backend.name}: {lacking}")
+    return None, f"{tool} cannot run here: {'; '.join(reasons)} (refused, never simulated)"
 
 
 def _probe(tool: str) -> Callable[[dict[str, str]], str | None]:
@@ -156,6 +164,7 @@ def execute(backend: Backend, params: dict[str, str]) -> ToolOutcome:
         return ToolOutcome(False, f"{backend.name}: missing parameter {', '.join(missing)}")
     sources = tuple(str(Path(s.strip()).resolve()) for s in params.get("sources", "").split(",") if s.strip())
     files = [*sources, *([str(Path(params["sby"]).resolve())] if params.get("sby") else [])]
+    files += [str(Path(f.strip()).resolve()) for p in backend.files for f in params.get(p, "").split(",") if f.strip()]
     absent = [f for f in files if not Path(f).is_file()]
     if absent:
         return ToolOutcome(False, f"{backend.name}: not found: {', '.join(absent)}")
