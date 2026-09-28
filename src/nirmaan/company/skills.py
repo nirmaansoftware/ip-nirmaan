@@ -496,9 +496,23 @@ SKILLS: list[Skill] = [
     sk("embedded_firmware", "Embedded firmware", "software", "firmware", provides=("fw.develop", "sw.review"),
        includes=("c_programming",), procedures=("Write boot, HAL, and BSP code.",),
        fails=("Hardware assumptions not in the spec.",), valid=("Firmware runs on the reference model.",)),
-    sk("device_drivers", "Device drivers", "software", "drivers", provides=("sw.driver",), includes=("c_programming",),
-       procedures=("Implement drivers from the programming model.",), fails=("Race conditions.",),
-       valid=("Driver passes diagnostics.",)),
+    sk("device_drivers", "Device drivers", "software", "drivers", provides=("sw.driver", "fw.driver"),
+       includes=("c_programming",), tools=("fw.build", "fw.test"),
+       procedures=("Implement drivers from the programming model.",
+                   "Write the register map header from the approved interface specification, never from the RTL.",
+                   "Reach the hardware only through nirmaan_hal.h: hal->read32(ctx, offset, &value) and "
+                   "hal->write32(ctx, offset, value, strobe) return the bus response (NIRMAAN_BUS_OKAY, "
+                   "NIRMAAN_BUS_SLVERR, ...); return every error to the caller.",
+                   "Write driver tests in C: define void nirmaan_fw_test(const nirmaan_hal *hal) and report "
+                   "each check with nirmaan_test_result(name, passed, detail).",
+                   "Test reset values, every register written then read back (write all before reading any), "
+                   "byte-lane writes, and the error response for an unmapped access."),
+       constraints=("C11 that compiles with -Wall -Wextra -Werror -pedantic.",
+                    "No hardware address is dereferenced outside the HAL."),
+       fails=("Race conditions.", "Register offsets that alias.", "Bus errors swallowed by the driver.",
+              "Tests that cannot fail."),
+       valid=("Driver passes diagnostics.",
+              "Builds clean and passes its tests against the approved RTL (fw.build, fw.test).")),
     sk("register_programming", "Register programming", "software", "registers",
        provides=("sw.register_programming",), packs=("uvm-ral",),
        procedures=("Write programming sequences from the register spec.",),

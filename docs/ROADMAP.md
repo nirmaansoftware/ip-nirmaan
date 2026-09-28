@@ -164,6 +164,8 @@ AXI4-Lite register block end to end against the fixture set in
 - DFT and firmware agents.
 - This is the largest stage. Scope it only after Stage 4 has proven that agent work holds up under review.
 
+**Firmware status (M25, firmware part):** done on branch `m25/firmware`. Design: `docs/FIRMWARE.md`. `fw.build` (strict C11) and `fw.test` (the driver's own tests run against a Verilator model of the approved RTL, over real AXI4-Lite transactions) gate a firmware seat's driver before review; `test_the_firmware_seat_runs_its_driver_on_the_approved_rtl` runs it end to end on the AXI4-Lite block, locally and in CI.
+
 ## Side work (any time; owner-driven)
 
 - **Landing page**: live at https://ip.nirmaan.online since 2026-09-28 (Vercel project `ip-nirmaan` in the Nirmaan team, deploys on every merge to `main`; DNS is a CNAME at Hostinger). See `site/README.md`.

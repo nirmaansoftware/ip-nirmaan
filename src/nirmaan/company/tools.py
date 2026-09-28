@@ -8,6 +8,8 @@ no agent can ever claim an STA or place-and-route run happened.
 Lint, simulation, tests, synthesis, and formal are AVAILABLE through
 open-source EDA (``nirmaan/integrations/eda.py``, M21). Their bindings still
 refuse, with a reason, on a machine whose PATH lacks the executable.
+Firmware build and co-simulation are AVAILABLE the same way
+(``nirmaan/integrations/firmware.py``, M25).
 """
 
 from __future__ import annotations
@@ -66,6 +68,9 @@ TOOLS: list[ToolSpec] = [
     _tool("dft.run", "DFT tools", "eda", EXE, CO, "Scan insertion, ATPG, MBIST."),
     # Software and infrastructure.
     _tool("compiler.run", "Compiler toolchain", "software", EXE, CO, "Build firmware and software."),
+    _tool("fw.build", "Firmware build", "software", EXE, AV, "Compile C firmware under strict warning flags."),
+    _tool("fw.test", "Firmware co-simulation", "software", EXE, AV,
+          "Run a driver's tests against a Verilator model of the RTL, over real bus transactions."),
     _tool("debugger.attach", "Debugger", "software", EXE, CO, "Attach to targets and models."),
     _tool("ci.configure", "CI configuration", "infrastructure", WR, CO, "Change CI pipelines."),
     _tool("farm.submit", "Compute farm", "infrastructure", EXE, CO, "Submit jobs to the compute farm."),

@@ -73,8 +73,8 @@ DELIVERABLE_FOLDERS: list[DeliverableFolder] = [
     DeliverableFolder(
         id="08_documentation", title="Documentation",
         description="Integration guide, user manual, register reference, and reference software.",
-        artifact_kinds=("document", "register_doc", "programming_guide", "driver"),
-        capabilities=("doc.write", "doc.registers", "sw.register_programming", "sw.driver"),
+        artifact_kinds=("document", "register_doc", "programming_guide", "driver", "driver_test"),
+        capabilities=("doc.write", "doc.registers", "sw.register_programming", "sw.driver", "fw.driver"),
     ),
     DeliverableFolder(
         id="09_evidence", title="Evidence",

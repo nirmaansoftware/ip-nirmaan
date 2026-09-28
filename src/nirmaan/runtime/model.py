@@ -12,8 +12,9 @@ work packet, never from a role, skill, or stage name:
   the bridge), drops artifacts left with no citation, and passes the tool runs
   the model says it relied on to the engine unfiltered, where P5 judges them;
 * files in the answer (M23) are written with a digest, and the tools of any
-  evidence requirement over the task's own files run on them afterwards. When
-  such a check must pass before review and cannot run here, the work is blocked.
+  evidence requirement over the task's own files run on them afterwards (with
+  any approved upstream file the requirement names, M25). When such a check
+  must pass before review and cannot run here, the work is blocked.
 
 Two LLMs ship. :class:`RegistryLLM` reaches any provider in the one M17
 registry through the bridge. :class:`MockLLM` is deterministic and scriptable,
@@ -40,7 +41,7 @@ from nirmaan.runtime.base import (
     register_runtime,
 )
 from nirmaan.runtime.context import WorkPacket
-from nirmaan.runtime.files import split_files, write_file
+from nirmaan.runtime.files import read_verified, split_files, write_file
 from nirmaan.runtime.prompt import ToolNote, WorkPrompt, render_work_prompt
 from nirmaan.runtime.tools import ToolAccessDenied
 
@@ -317,8 +318,16 @@ class ModelRuntime:
                 continue
             params, missing = dict(inputs), None
             for binding in req["files"]:
-                matched = [f for kind in binding["kinds"] for f in produced if f["kind"] == kind]
                 kinds = " or ".join(binding["kinds"])
+                if binding.get("upstream"):  # approved upstream files only, bytes as recorded
+                    value = ",".join(a["location"] for kind in binding["kinds"]
+                                     for a in packet.task["upstream_artifacts"]
+                                     if a["kind"] == kind and a.get("trusted")
+                                     and read_verified(a["location"], a["digest"])[0] is not None)
+                    missing = missing or (None if value else f"no approved upstream {kinds} file")
+                    params[binding["param"]] = value
+                    continue
+                matched = [f for kind in binding["kinds"] for f in produced if f["kind"] == kind]
                 if binding["entry"]:
                     value = matched[0]["entry"] if matched else None
                     why = f"no {kinds} file declares an entry"

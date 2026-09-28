@@ -124,6 +124,8 @@ CAPABILITIES: list[Capability] = [
     # --- Software ------------------------------------------------------------
     _cap("fw.develop", "Firmware development", E, "Boot, HAL, and BSP code.", PR, ("firmware",)),
     _cap("sw.driver", "Driver development", E, "Device drivers for an IP.", PR, ("driver",)),
+    _cap("fw.driver", "Driver against approved RTL", E, "A driver and its tests, run on the approved RTL.", PR,
+         ("driver", "driver_test"), approved_inputs=True),
     _cap("sw.register_programming", "Register programming", E, "Programming sequences and register models.", PR, ("programming_guide",)),
     _cap("sw.diagnostics", "Diagnostics", E, "Diagnostics and validation software.", PR, ("diagnostics",)),
     _cap("sw.tools", "Developer tools", E, "SDKs, compilers, debuggers, and utilities.", PR, ("developer_tool",)),
