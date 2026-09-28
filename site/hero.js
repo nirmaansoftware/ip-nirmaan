@@ -1,7 +1,5 @@
 /*
-  hero.js: the hero's construction grid. The same file as nirmaan.online's
-  (nirmaansoftware/Nirmaan, /hero.js), so both sites share the mark and its
-  motion; change it there first, then copy it here.
+  hero.js: the homepage hero's construction grid.
 
   The Nirmaan pixel-N assembles from falling blocks, bottom row first (the
   way a structure goes up), on the same grid the page is drawn on. After it

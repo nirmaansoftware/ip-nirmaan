@@ -52,10 +52,15 @@ def test_constitution_cards_are_the_constitution() -> None:
 
 
 TEXT_SUFFIXES = {".html", ".css", ".js", ".md", ".svg", ".txt", ".xml", ".json"}
+# nirmaan.online's own files, copied unchanged so the two sites share every
+# component; they follow that repository's conventions, not this one's.
+VENDORED = {"nirmaan.css", "site.js", "hero.js"}
 
 
 @pytest.mark.parametrize(
-    "path", sorted(p.name for p in SITE.iterdir() if p.is_file() and p.suffix in TEXT_SUFFIXES)
+    "path",
+    sorted(p.name for p in SITE.iterdir()
+           if p.is_file() and p.suffix in TEXT_SUFFIXES and p.name not in VENDORED),
 )
 def test_no_dashes(path: str) -> None:
     text = (SITE / path).read_text(encoding="utf-8")
@@ -75,12 +80,13 @@ def test_motion_is_opt_in_and_respects_reduced_motion() -> None:
     assert "prefers-reduced-motion: reduce" in HTML
     css = (SITE / "styles.css").read_text(encoding="utf-8")
     motion_layer = re.sub(r"/\*.*?\*/", "", css[css.index("@layer motion {"):], flags=re.S)
-    # Every animated rule in the motion layer is scoped to html.motion.
+    # Every animated rule in the motion layer is scoped to html.motion, or to
+    # the pinned scene (.build.is-pinned), which site.js sets only with motion.
     keyframe_step = re.compile(r"^(from|to|[\d%, ]+)$")
     for selector in re.findall(r"^\s*([^@\s{}][^{}]*)\{", motion_layer, re.M):
         selector = selector.strip()
         if not keyframe_step.match(selector):
-            assert selector.startswith(".motion"), selector
+            assert selector.startswith((".motion", ".build.is-pinned")), selector
 
 
 def test_launch_list_items_are_present() -> None:
@@ -105,7 +111,7 @@ def test_the_scene_is_written_in_its_finished_state() -> None:
     import json
 
     rows = re.findall(
-        r"data-states='([^']+)'>.*?<span class=\"task__state\" data-state=\"([^\"]+)\">([^<]+)<",
+        r"data-states='([^']+)'>.*?<span class=\"order__state task__state\" data-state=\"([^\"]+)\">([^<]+)<",
         HTML, re.S,
     )
     assert len(rows) == 7
@@ -116,13 +122,27 @@ def test_the_scene_is_written_in_its_finished_state() -> None:
 
 
 def test_pages_load_nothing_from_third_parties() -> None:
-    # Fonts are self-hosted: a third-party stylesheet would block the first paint.
-    for name in ("index.html", "404.html", "styles.css"):
+    # Fonts are self-hosted: a third-party stylesheet would block the first
+    # paint. Links to other sites are fine; loaded resources are not.
+    for name in ("index.html", "404.html"):
         text = (SITE / name).read_text(encoding="utf-8")
-        assert not re.search(r'(src|href)="https?://(?!www\.nirmaan\.online|ip\.nirmaan\.online)', text), name
-        assert "url(http" not in text, name
+        assert not re.search(r'src="https?://', text), name
+        assert not re.search(r'<link[^>]+href="https?://(?!ip\.nirmaan\.online)', text), name
+    for name in ("styles.css", "nirmaan.css"):
+        assert "url(http" not in (SITE / name).read_text(encoding="utf-8"), name
     for font in ("archivo", "hanken-grotesk", "jetbrains-mono"):
-        assert (SITE / "fonts" / f"{font}.woff2").is_file(), font
+        assert (SITE / "assets" / "fonts" / f"{font}.woff2").is_file(), font
+
+
+def test_shared_components_come_from_nirmaan_online() -> None:
+    # Both pages load nirmaan.online's stylesheet first and this site's own
+    # after it, so every shared component is nirmaan.online's, unchanged.
+    for name in ("index.html", "404.html"):
+        text = (SITE / name).read_text(encoding="utf-8")
+        assert text.index('href="/nirmaan.css"') < text.index('href="/styles.css"'), name
+        assert 'src="/site.js"' in text, name
+    for name in VENDORED:
+        assert (SITE / name).is_file(), name
 
 
 def test_the_site_does_not_send_visitors_to_github() -> None:
