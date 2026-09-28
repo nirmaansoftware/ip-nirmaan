@@ -166,6 +166,17 @@ and `09_evidence/requirement_gaps.md` in the export.
 
 ## Stage 6 (M25+): Physical design, DFT, firmware (spec Phase 7)
 
+**Status (physical design part):** bindings built, not yet run against the real
+tools. `sta.run` (OpenSTA) and `pnr.run` (OpenROAD: one staged run, floorplan,
+place, route, then timing) are `AVAILABLE` and refuse, with a reason, where the
+executable or the PDK inputs are missing; neither tool is installed on the
+development machine or in CI. `synth.run` gained a Liberty-mapped backend that
+writes the netlist. The `physical-implementation` workflow plans constraints,
+synthesis, floorplan, place and route, and STA signoff. Parser tests read
+labelled synthetic samples. Next: run on a machine with OpenROAD and sky130,
+replace the samples with captured logs, then CTS, power grid, and parasitic
+extraction. Design doc: `docs/PHYSICAL_DESIGN.md`.
+
 - OpenROAD bindings for floorplan, place, route, and timing.
 - DFT and firmware agents.
 - This is the largest stage. Scope it only after Stage 4 has proven that agent work holds up under review.
