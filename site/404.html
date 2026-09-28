@@ -1,67 +1,193 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en-IN">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+
   <title>Page not found · IP Nirmaan</title>
   <meta name="description" content="This page doesn't exist. Head back to IP Nirmaan, or talk to us." />
   <meta name="robots" content="noindex" />
+
+
   <meta name="color-scheme" content="light dark" />
   <meta name="theme-color" content="#F1F1EC" media="(prefers-color-scheme: light)" />
   <meta name="theme-color" content="#0E0E0F" media="(prefers-color-scheme: dark)" />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-  <link rel="preload" href="/fonts/archivo.woff2" as="font" type="font/woff2" crossorigin />
-  <link rel="preload" href="/fonts/jetbrains-mono.woff2" as="font" type="font/woff2" crossorigin />
-  <link rel="preload" href="/fonts/hanken-grotesk.woff2" as="font" type="font/woff2" crossorigin />
+
+  <link rel="preload" href="/assets/fonts/archivo.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="preload" href="/assets/fonts/hanken-grotesk.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="preload" href="/assets/fonts/jetbrains-mono.woff2" as="font" type="font/woff2" crossorigin />
+  <!-- nirmaan.css is nirmaan.online's own stylesheet, copied unchanged, so every
+       shared component matches exactly; styles.css holds only what is IP Nirmaan's. -->
+  <link rel="stylesheet" href="/nirmaan.css" />
   <link rel="stylesheet" href="/styles.css" />
-  <!-- Before first paint: apply a saved theme choice, and opt in to motion
-       only without a reduced-motion preference. -->
+
+  <!-- Before first paint (the same script as nirmaan.online): apply a saved
+       theme choice, and opt in to motion only without a reduced-motion preference. -->
   <script>
     (function () {
       var root = document.documentElement;
       try {
-        var saved = localStorage.getItem('ip-nirmaan-theme');
+        var saved = localStorage.getItem('nirmaan-theme');
         if (saved === 'light' || saved === 'dark') root.setAttribute('data-theme', saved);
       } catch (e) {}
       root.classList.add('js');
-      if (!matchMedia('(prefers-reduced-motion: reduce)').matches) root.classList.add('motion');
+      if ('IntersectionObserver' in window && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        root.classList.add('motion');
+      }
     })();
   </script>
   <script src="/site.js" defer></script>
 </head>
-<body>
-<header class="nav">
+<body class="page page--home" id="top">
+
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="nav" id="navbar" data-nav>
   <div class="wrap nav__inner">
     <a class="brand" href="/" aria-label="IP Nirmaan, home">
-      <svg class="glyph glyph--assemble brand__mark" viewBox="0 0 5 5" aria-hidden="true" focusable="false" shape-rendering="crispEdges"><rect x="0" y="4" width="1" height="1" style="--i:0"/><rect x="4" y="4" width="1" height="1" style="--i:1"/><rect x="0" y="3" width="1" height="1" style="--i:2"/><rect x="3" y="3" width="1" height="1" style="--i:3"/><rect x="4" y="3" width="1" height="1" style="--i:4"/><rect x="0" y="2" width="1" height="1" style="--i:5"/><rect x="2" y="2" width="1" height="1" style="--i:6"/><rect x="4" y="2" width="1" height="1" style="--i:7"/><rect x="0" y="1" width="1" height="1" style="--i:8"/><rect x="1" y="1" width="1" height="1" style="--i:9"/><rect x="4" y="1" width="1" height="1" style="--i:10"/><rect x="0" y="0" width="1" height="1" style="--i:11"/><rect x="4" y="0" width="1" height="1" style="--i:12"/></svg>
-      <span class="brand__name">IP Nirmaan</span>
+      <svg class="logo brand__mark" viewBox="0 0 5 5" aria-hidden="true" focusable="false" shape-rendering="crispEdges"><path d="M0 0h1v5H0zM4 0h1v5H4zM1 1h1v1H1zM2 2h1v1H2zM3 3h1v1H3z"/></svg>
+      <span class="brand__word">IP Nirmaan</span>
     </a>
+
+    <nav class="nav__links" aria-label="Primary">
+      <ul role="list">
+        <li><a href="/#idea">Idea</a></li>
+        <li><a href="/#how">How it works</a></li>
+        <li><a href="/#organization">Organization</a></li>
+        <li><a href="/#constitution">Constitution</a></li>
+        <li><a href="/#veritriage">VeriTriage</a></li>
+        <li><a href="/#status">Status</a></li>
+      </ul>
+    </nav>
+
     <div class="nav__actions">
-      <button class="theme-toggle" type="button" data-theme-toggle data-mode="system" aria-label="Colour theme: match system"><svg class="theme-toggle__icon theme-toggle__icon--system" viewBox="0 0 5 5" aria-hidden="true" focusable="false" shape-rendering="crispEdges"><rect x="0" y="4" width="1" height="1"/><rect x="1" y="4" width="1" height="1"/><rect x="2" y="4" width="1" height="1"/><rect x="3" y="4" width="1" height="1"/><rect x="4" y="4" width="1" height="1"/><rect x="0" y="3" width="1" height="1"/><rect x="1" y="3" width="1" height="1"/><rect x="4" y="3" width="1" height="1"/><rect x="0" y="2" width="1" height="1"/><rect x="1" y="2" width="1" height="1"/><rect x="4" y="2" width="1" height="1"/><rect x="0" y="1" width="1" height="1"/><rect x="1" y="1" width="1" height="1"/><rect x="4" y="1" width="1" height="1"/><rect x="0" y="0" width="1" height="1"/><rect x="1" y="0" width="1" height="1"/><rect x="2" y="0" width="1" height="1"/><rect x="3" y="0" width="1" height="1"/><rect x="4" y="0" width="1" height="1"/></svg><svg class="theme-toggle__icon theme-toggle__icon--light" viewBox="0 0 5 5" aria-hidden="true" focusable="false" shape-rendering="crispEdges"><rect x="0" y="4" width="1" height="1"/><rect x="2" y="4" width="1" height="1"/><rect x="4" y="4" width="1" height="1"/><rect x="1" y="3" width="1" height="1"/><rect x="2" y="3" width="1" height="1"/><rect x="3" y="3" width="1" height="1"/><rect x="0" y="2" width="1" height="1"/><rect x="1" y="2" width="1" height="1"/><rect x="3" y="2" width="1" height="1"/><rect x="4" y="2" width="1" height="1"/><rect x="1" y="1" width="1" height="1"/><rect x="2" y="1" width="1" height="1"/><rect x="3" y="1" width="1" height="1"/><rect x="0" y="0" width="1" height="1"/><rect x="2" y="0" width="1" height="1"/><rect x="4" y="0" width="1" height="1"/></svg><svg class="theme-toggle__icon theme-toggle__icon--dark" viewBox="0 0 5 5" aria-hidden="true" focusable="false" shape-rendering="crispEdges"><rect x="1" y="4" width="1" height="1"/><rect x="2" y="4" width="1" height="1"/><rect x="3" y="4" width="1" height="1"/><rect x="0" y="3" width="1" height="1"/><rect x="1" y="3" width="1" height="1"/><rect x="2" y="3" width="1" height="1"/><rect x="0" y="2" width="1" height="1"/><rect x="1" y="2" width="1" height="1"/><rect x="0" y="1" width="1" height="1"/><rect x="1" y="1" width="1" height="1"/><rect x="2" y="1" width="1" height="1"/><rect x="1" y="0" width="1" height="1"/><rect x="2" y="0" width="1" height="1"/><rect x="3" y="0" width="1" height="1"/></svg></button>
-      <a class="btn btn--small" href="https://www.nirmaan.online/contact.html">Talk to us</a>
+      <button class="theme-toggle" type="button" data-theme-toggle data-mode="system" aria-label="Colour theme: match system">
+        <svg class="glyph theme-toggle__icon theme-toggle__icon--system" viewBox="0 0 5 5" aria-hidden="true" focusable="false" shape-rendering="crispEdges"><rect x="0" y="4" width="1" height="1" style="--i:0"/><rect x="1" y="4" width="1" height="1" style="--i:1"/><rect x="2" y="4" width="1" height="1" style="--i:2"/><rect x="3" y="4" width="1" height="1" style="--i:3"/><rect x="4" y="4" width="1" height="1" style="--i:4"/><rect x="0" y="3" width="1" height="1" style="--i:5"/><rect x="1" y="3" width="1" height="1" style="--i:6"/><rect x="4" y="3" width="1" height="1" style="--i:7"/><rect x="0" y="2" width="1" height="1" style="--i:8"/><rect x="1" y="2" width="1" height="1" style="--i:9"/><rect x="4" y="2" width="1" height="1" style="--i:10"/><rect x="0" y="1" width="1" height="1" style="--i:11"/><rect x="1" y="1" width="1" height="1" style="--i:12"/><rect x="4" y="1" width="1" height="1" style="--i:13"/><rect x="0" y="0" width="1" height="1" style="--i:14"/><rect x="1" y="0" width="1" height="1" style="--i:15"/><rect x="2" y="0" width="1" height="1" style="--i:16"/><rect x="3" y="0" width="1" height="1" style="--i:17"/><rect x="4" y="0" width="1" height="1" style="--i:18"/></svg>
+        <svg class="glyph theme-toggle__icon theme-toggle__icon--light" viewBox="0 0 5 5" aria-hidden="true" focusable="false" shape-rendering="crispEdges"><rect x="0" y="4" width="1" height="1" style="--i:0"/><rect x="2" y="4" width="1" height="1" style="--i:1"/><rect x="4" y="4" width="1" height="1" style="--i:2"/><rect x="1" y="3" width="1" height="1" style="--i:3"/><rect x="2" y="3" width="1" height="1" style="--i:4"/><rect x="3" y="3" width="1" height="1" style="--i:5"/><rect x="0" y="2" width="1" height="1" style="--i:6"/><rect x="1" y="2" width="1" height="1" style="--i:7"/><rect x="3" y="2" width="1" height="1" style="--i:8"/><rect x="4" y="2" width="1" height="1" style="--i:9"/><rect x="1" y="1" width="1" height="1" style="--i:10"/><rect x="2" y="1" width="1" height="1" style="--i:11"/><rect x="3" y="1" width="1" height="1" style="--i:12"/><rect x="0" y="0" width="1" height="1" style="--i:13"/><rect x="2" y="0" width="1" height="1" style="--i:14"/><rect x="4" y="0" width="1" height="1" style="--i:15"/></svg>
+        <svg class="glyph theme-toggle__icon theme-toggle__icon--dark" viewBox="0 0 5 5" aria-hidden="true" focusable="false" shape-rendering="crispEdges"><rect x="1" y="4" width="1" height="1" style="--i:0"/><rect x="2" y="4" width="1" height="1" style="--i:1"/><rect x="3" y="4" width="1" height="1" style="--i:2"/><rect x="0" y="3" width="1" height="1" style="--i:3"/><rect x="1" y="3" width="1" height="1" style="--i:4"/><rect x="2" y="3" width="1" height="1" style="--i:5"/><rect x="0" y="2" width="1" height="1" style="--i:6"/><rect x="1" y="2" width="1" height="1" style="--i:7"/><rect x="0" y="1" width="1" height="1" style="--i:8"/><rect x="1" y="1" width="1" height="1" style="--i:9"/><rect x="2" y="1" width="1" height="1" style="--i:10"/><rect x="1" y="0" width="1" height="1" style="--i:11"/><rect x="2" y="0" width="1" height="1" style="--i:12"/><rect x="3" y="0" width="1" height="1" style="--i:13"/></svg>
+      </button>
+      <a class="btn btn--sm nav__cta" href="https://www.nirmaan.online/contact.html">Talk to us <svg class="glyph btn__arrow" viewBox="0 0 5 5" aria-hidden="true" focusable="false" shape-rendering="crispEdges"><rect x="2" y="4" width="1" height="1" style="--i:0"/><rect x="3" y="3" width="1" height="1" style="--i:1"/><rect x="0" y="2" width="1" height="1" style="--i:2"/><rect x="1" y="2" width="1" height="1" style="--i:3"/><rect x="2" y="2" width="1" height="1" style="--i:4"/><rect x="3" y="2" width="1" height="1" style="--i:5"/><rect x="4" y="2" width="1" height="1" style="--i:6"/><rect x="3" y="1" width="1" height="1" style="--i:7"/><rect x="2" y="0" width="1" height="1" style="--i:8"/></svg></a>
+      <button class="nav__burger" type="button" data-menu-toggle aria-expanded="false" aria-controls="menu">
+        <span class="visually-hidden">Menu</span>
+        <span class="nav__burger-bar" aria-hidden="true"></span>
+        <span class="nav__burger-bar" aria-hidden="true"></span>
+      </button>
     </div>
   </div>
+  <div class="nav__progress" data-scroll-progress aria-hidden="true"></div>
 </header>
 
-<main id="main">
-  <section class="hero">
-    <div class="hero__grid" aria-hidden="true"></div>
-    <div class="wrap hero__inner">
-      <div class="hero__copy">
-        <p class="eyebrow">404</p>
-        <h1 class="hero__title">
-          <span class="line"><span>Not planned,</span></span>
-          <span class="line"><span>not <em>built.</em></span></span>
-        </h1>
-        <p class="lede">This page doesn't exist, or it has moved.</p>
-        <div class="actions">
-          <a class="btn" href="/">Back to IP Nirmaan</a>
-          <a class="btn btn--ghost" href="https://www.nirmaan.online/contact.html">Talk to us</a>
-        </div>
+<div class="menu" id="menu" data-menu hidden>
+  <nav class="wrap menu__inner" aria-label="Mobile">
+    <ul class="menu__links" role="list">
+      <li><a href="/#idea">Idea</a></li>
+      <li><a href="/#how">How it works</a></li>
+      <li><a href="/#organization">Organization</a></li>
+      <li><a href="/#constitution">Constitution</a></li>
+      <li><a href="/#veritriage">VeriTriage</a></li>
+      <li><a href="/#status">Status</a></li>
+    </ul>
+    <div class="menu__foot">
+      <a class="btn menu__cta" href="https://www.nirmaan.online/contact.html">Talk to us <svg class="glyph btn__arrow" viewBox="0 0 5 5" aria-hidden="true" focusable="false" shape-rendering="crispEdges"><rect x="2" y="4" width="1" height="1" style="--i:0"/><rect x="3" y="3" width="1" height="1" style="--i:1"/><rect x="0" y="2" width="1" height="1" style="--i:2"/><rect x="1" y="2" width="1" height="1" style="--i:3"/><rect x="2" y="2" width="1" height="1" style="--i:4"/><rect x="3" y="2" width="1" height="1" style="--i:5"/><rect x="4" y="2" width="1" height="1" style="--i:6"/><rect x="3" y="1" width="1" height="1" style="--i:7"/><rect x="2" y="0" width="1" height="1" style="--i:8"/></svg></a><p class="mono">nirmaansoftware@gmail.com</p>
+      <p class="mono">IP Nirmaan · Semiconductor IP</p>
+    </div>
+  </nav>
+</div>
+
+
+<main id="main" tabindex="-1">
+<section class="page-head" aria-labelledby="page-title">
+  <div class="page-head__grid" aria-hidden="true"></div>
+  <div class="wrap page-head__inner">
+    <div class="page-head__copy">
+      <nav aria-label="Breadcrumb" class="crumbs mono">
+        <ol role="list">
+          <li><a href="/">Home</a></li>
+          <li aria-current="page">Page not found</li>
+        </ol>
+      </nav>
+      <p class="eyebrow">404</p>
+      <h1 class="page-head__title display" id="page-title">
+        <span class="line"><span>Not planned,</span></span>
+        <span class="line"><span class="accent">not built.</span></span>
+      </h1>
+      <p class="lede">This page doesn't exist, or it has moved.</p>
+      <div class="actions">
+        <a class="btn" href="https://www.nirmaan.online/contact.html">Talk to us <svg class="glyph btn__arrow" viewBox="0 0 5 5" aria-hidden="true" focusable="false" shape-rendering="crispEdges"><rect x="2" y="4" width="1" height="1" style="--i:0"/><rect x="3" y="3" width="1" height="1" style="--i:1"/><rect x="0" y="2" width="1" height="1" style="--i:2"/><rect x="1" y="2" width="1" height="1" style="--i:3"/><rect x="2" y="2" width="1" height="1" style="--i:4"/><rect x="3" y="2" width="1" height="1" style="--i:5"/><rect x="4" y="2" width="1" height="1" style="--i:6"/><rect x="3" y="1" width="1" height="1" style="--i:7"/><rect x="2" y="0" width="1" height="1" style="--i:8"/></svg></a>
+        <a class="link-arrow" href="/">Back to IP Nirmaan <span aria-hidden="true">→</span></a>
       </div>
     </div>
-  </section>
+    <div class="page-head__mark">
+      <svg class="glyph glyph--assemble page-head__glyph" viewBox="0 0 5 5" aria-hidden="true" focusable="false" shape-rendering="crispEdges"><rect x="0" y="4" width="1" height="1" style="--i:0"/><rect x="4" y="4" width="1" height="1" style="--i:1"/><rect x="1" y="3" width="1" height="1" style="--i:2"/><rect x="3" y="3" width="1" height="1" style="--i:3"/><rect x="2" y="2" width="1" height="1" style="--i:4"/><rect x="1" y="1" width="1" height="1" style="--i:5"/><rect x="3" y="1" width="1" height="1" style="--i:6"/><rect x="0" y="0" width="1" height="1" style="--i:7"/><rect x="4" y="0" width="1" height="1" style="--i:8"/></svg>
+    </div>
+  </div>
+</section>
 </main>
+
+<footer class="footer">
+  <div class="wrap">
+    <div class="footer__grid">
+      <div class="footer__brand">
+        <a class="brand brand--lockup" href="/" aria-label="IP Nirmaan Semiconductor IP, home">
+          <svg class="logo brand__mark" viewBox="0 0 5 5" aria-hidden="true" focusable="false" shape-rendering="crispEdges"><path d="M0 0h1v5H0zM4 0h1v5H4zM1 1h1v1H1zM2 2h1v1H2zM3 3h1v1H3z"/></svg>
+          <span class="brand__stack">
+            <span class="brand__word">IP Nirmaan</span>
+            <span class="brand__descriptor">Semiconductor IP</span>
+          </span>
+        </a>
+        <p class="footer__blurb">A semiconductor IP company modeled as software: an organization that plans, routes, reviews, and gates the work, with evidence behind every claim.</p>
+        <ul class="footer__social" role="list">
+          <li><a href="https://x.com/Nirmaansoftware" rel="noopener noreferrer" target="_blank">X · @Nirmaansoftware<span class="visually-hidden"> (opens in a new tab)</span></a></li>
+        </ul>
+      </div>
+
+      <nav class="footer__col" aria-label="IP Nirmaan">
+        <p class="footer__heading mono">IP Nirmaan</p>
+        <ul role="list">
+          <li><a href="/#idea">Idea</a></li>
+          <li><a href="/#how">How it works</a></li>
+          <li><a href="/#organization">Organization</a></li>
+          <li><a href="/#constitution">Constitution</a></li>
+          <li><a href="/#veritriage">VeriTriage</a></li>
+          <li><a href="/#status">Status</a></li>
+        </ul>
+      </nav>
+
+      <nav class="footer__col" aria-label="Nirmaan">
+        <p class="footer__heading mono">Nirmaan</p>
+        <ul role="list">
+          <li><a href="https://www.nirmaan.online/">nirmaan.online</a></li>
+          <li><a href="https://www.nirmaan.online/services.html">Services</a></li>
+          <li><a href="https://www.nirmaan.online/projects.html">Projects</a></li>
+          <li><a href="https://www.nirmaan.online/process.html">Process</a></li>
+          <li><a href="https://www.nirmaan.online/technology.html">Technology</a></li>
+        </ul>
+      </nav>
+
+      <div class="footer__col">
+        <p class="footer__heading mono">Start</p>
+        <ul role="list">
+          <li><a href="https://www.nirmaan.online/contact.html">Talk to us</a></li>
+          <li><a href="mailto:nirmaansoftware@gmail.com">nirmaansoftware@gmail.com</a></li><li><a href="https://wa.me/919493833697" target="_blank" rel="noopener noreferrer">WhatsApp us <span aria-hidden="true">↗</span><span class="visually-hidden">(opens WhatsApp)</span></a></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="footer__base mono">
+      <span>© 2026 Nirmaan</span>
+      <span>Built by Om Patel</span>
+      <span class="footer__legal"><a href="https://www.nirmaan.online/privacy.html">Privacy</a> <a href="https://www.nirmaan.online/terms.html">Terms</a></span>
+      <a href="#top" class="footer__top" data-to-top>Back to top <span aria-hidden="true">↑</span></a>
+    </div>
+  </div>
+</footer>
+
+<div class="dock" data-dock aria-label="Quick actions" role="region">
+  <a class="btn dock__cta" href="https://www.nirmaan.online/contact.html">Talk to us <svg class="glyph btn__arrow" viewBox="0 0 5 5" aria-hidden="true" focusable="false" shape-rendering="crispEdges"><rect x="2" y="4" width="1" height="1" style="--i:0"/><rect x="3" y="3" width="1" height="1" style="--i:1"/><rect x="0" y="2" width="1" height="1" style="--i:2"/><rect x="1" y="2" width="1" height="1" style="--i:3"/><rect x="2" y="2" width="1" height="1" style="--i:4"/><rect x="3" y="2" width="1" height="1" style="--i:5"/><rect x="4" y="2" width="1" height="1" style="--i:6"/><rect x="3" y="1" width="1" height="1" style="--i:7"/><rect x="2" y="0" width="1" height="1" style="--i:8"/></svg></a>
+  <a class="dock__link" href="/#how">How it works</a>
+</div>
+
 </body>
 </html>
