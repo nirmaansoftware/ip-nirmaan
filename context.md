@@ -1,4 +1,4 @@
-# VeriTriage - Project Context
+# Nirmaan IP - Project Context
 
 This file is a continuity document: what VeriTriage is, how it got built,
 where every piece lives, and what is deliberately left for later. It exists
@@ -7,9 +7,10 @@ re-deriving decisions already made. It is not user-facing documentation -
 see `README.md` and `docs/` for that - this is the "how we got here and
 what's next" record.
 
-Repo: https://github.com/patel-om/veritriage (public, Apache-2.0)
+Repo: https://github.com/patel-om/nirmaan-ip (public, Apache-2.0; renamed from
+`veritriage` after M19, GitHub redirects the old URL)
 Local path: `/Users/ompatel/Documents/veritriage`
-Current version: **1.15.0** (VeriTriage 1.15.0 + Nirmaan IP 0.1.0)
+Current version: **1.16.0** (distribution `nirmaan-ip`; packages `nirmaan` and `veritriage`)
 Portfolio integration: card + sample artifacts in
 `/Users/ompatel/Documents/Om Portfolio` (`index.html`,
 `veritriage-sample-report.html`, `veritriage-sample-dashboard.html`)
@@ -1305,7 +1306,7 @@ from the repo root.
   than only passing schema validation.
 - The Anthropic integration (`reasoning/ai.py`) uses `claude-opus-4-8` with
   `thinking={"type": "adaptive"}` and structured JSON output; it's an
-  optional extra (`pip install veritriage[ai]`) and degrades gracefully
+  optional extra (`pip install nirmaan-ip[ai]`) and degrades gracefully
   (warns, continues deterministic-only) if the SDK or API key is missing.
 - Portfolio integration is a separate repo
   (`/Users/ompatel/Documents/Om Portfolio`, → `patel-om/portfolio`). Each
@@ -1319,8 +1320,16 @@ from the repo root.
 - Package naming history: TraceIQ (M1, collided with existing PyPI/products)
   → briefly considered "verifAI" (collided with Berkeley's VerifAI) →
   renamed to **VeriTriage** at M2/M3 boundary (GitHub redirect preserved
-  from the rename). Never suggest reverting or renaming again without the
-  user raising it.
+  from the rename). After M19 the user renamed the PROJECT to **Nirmaan IP**
+  (repo `patel-om/nirmaan-ip`, distribution `nirmaan-ip`, v1.16.0). VeriTriage
+  was deliberately NOT renamed: it is the verification engine inside Nirmaan
+  IP, and the user wants its technology kept and built on, with the platform
+  now "bigger than just a verification tool". The `veritriage` package, CLI,
+  MCP server, and `.veritriage/` data directory keep their names. Never
+  suggest renaming again without the user raising it.
+- Domain: the user considered `nirmaan.online` (their existing software-services
+  company) and leaned toward buying `ipnirmaan.com` for this project. Do not put
+  a domain into project metadata until the user confirms they own it.
 - **iCloud eviction (discovered at M19).** The repo lives in iCloud-synced
   `~/Documents` with storage optimization on, and macOS evicts files to
   "dataless" placeholders, including freshly written `.py` and `.pyc` files.

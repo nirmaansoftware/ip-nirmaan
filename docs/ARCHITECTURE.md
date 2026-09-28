@@ -1,5 +1,9 @@
 # VeriTriage Architecture
 
+This document covers VeriTriage, the verification-intelligence engine of
+Nirmaan IP. For the organizational OS built on top of it, see
+[NIRMAAN_ORG_OS.md](NIRMAAN_ORG_OS.md).
+
 VeriTriage is a pipeline of small, replaceable layers. Data flows one way, every
 layer speaks typed Pydantic models, and each extension point is a plugin
 registry. Since v2 the layers meet in the middle at the **Evidence Graph**,

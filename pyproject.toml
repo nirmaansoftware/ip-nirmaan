@@ -3,14 +3,14 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "veritriage"
-version = "1.15.0"
-description = "Verification intelligence platform: turn simulation logs into evidence-backed root-cause reports."
+name = "nirmaan-ip"
+version = "1.16.0"
+description = "Nirmaan IP: an organizational operating system for semiconductor engineering, with VeriTriage verification intelligence."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "Apache-2.0" }
 authors = [{ name = "Om Patel", email = "patel2om002@gmail.com" }]
-keywords = ["eda", "verification", "uvm", "systemverilog", "regression", "debug", "root-cause"]
+keywords = ["eda", "semiconductor", "ip", "verification", "rtl", "uvm", "systemverilog", "agents", "workflow", "root-cause"]
 classifiers = [
   "Development Status :: 5 - Production/Stable",
   "Intended Audience :: Developers",
@@ -32,7 +32,8 @@ ai = ["anthropic>=0.40"]
 dev = ["pytest>=8.0"]
 
 [project.urls]
-Homepage = "https://github.com/patel-om/veritriage"
+Homepage = "https://github.com/patel-om/nirmaan-ip"
+Repository = "https://github.com/patel-om/nirmaan-ip"
 
 [project.scripts]
 veritriage = "veritriage.cli.main:app"
