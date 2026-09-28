@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "veritriage"
-version = "1.14.0"
+version = "1.15.0"
 description = "Verification intelligence platform: turn simulation logs into evidence-backed root-cause reports."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -36,9 +36,10 @@ Homepage = "https://github.com/patel-om/veritriage"
 
 [project.scripts]
 veritriage = "veritriage.cli.main:app"
+nirmaan = "nirmaan.cli:app"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/veritriage"]
+packages = ["src/veritriage", "src/nirmaan"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
