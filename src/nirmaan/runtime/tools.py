@@ -62,6 +62,13 @@ def available_bindings() -> list[str]:
     return sorted(_BINDINGS)
 
 
+def unavailable_reason(tool_id: str, params: dict[str, str] | None = None) -> str | None:
+    """Why this machine cannot run a bound tool now (the probe the broker asks), or None."""
+    _ensure_builtin_bindings()
+    probe = _PROBES.get(tool_id)
+    return probe(params or {}) if probe else None
+
+
 class ToolAccessDenied(PermissionError):
     pass
 
@@ -142,5 +149,5 @@ def _trace(params: dict[str, str], engine: TaskEngine) -> ToolOutcome:
 
 
 def _ensure_builtin_bindings() -> None:
-    """Import the VeriTriage bridge and the EDA bindings so they register (lazily)."""
-    from nirmaan.integrations import eda, veritriage  # noqa: F401
+    """Import the VeriTriage bridge and the EDA and physical-design bindings so they register (lazily)."""
+    from nirmaan.integrations import eda, physical, veritriage  # noqa: F401

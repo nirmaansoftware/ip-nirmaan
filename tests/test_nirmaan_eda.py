@@ -77,7 +77,7 @@ def invoke(engine, tool: str, params: dict[str, str], tmp_path: Path, task: str 
 def test_the_open_source_tools_are_available_and_the_rest_stay_contracts(nirmaan_org):
     for tool in ("lint.run", "simulator.run", "test.run", "synth.run", "formal.run"):
         assert nirmaan_org.tools[tool].status is ToolStatus.AVAILABLE, tool
-    for tool in ("sta.run", "pnr.run", "equivalence.run", "cdc.run"):
+    for tool in ("equivalence.run", "cdc.run"):  # sta.run and pnr.run: M25, tests/test_nirmaan_physical.py
         assert nirmaan_org.tools[tool].status is ToolStatus.CONTRACT_ONLY, tool
 
 

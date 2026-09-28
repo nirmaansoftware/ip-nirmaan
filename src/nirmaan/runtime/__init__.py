@@ -26,6 +26,7 @@ from nirmaan.runtime.tools import (
     ToolOutcome,
     available_bindings,
     register_binding,
+    unavailable_reason,
     unregister_binding,
 )
 

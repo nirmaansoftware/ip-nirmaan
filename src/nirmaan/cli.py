@@ -167,14 +167,17 @@ def org_skill(skill_id: str) -> None:
 @org_app.command("tools")
 def org_tools() -> None:
     """The tool catalog: which tools really execute here, and which are contracts."""
-    from nirmaan.runtime import available_bindings
+    from nirmaan.runtime import available_bindings, unavailable_reason
 
     bound = set(available_bindings())
     table = Table(title="Tools")
-    for col in ("ID", "Category", "Risk", "Status", "Binding"):
+    for col in ("ID", "Category", "Risk", "Status", "Binding", "Here"):
         table.add_column(col)
     for tool in _org().tools.values():
-        table.add_row(tool.id, tool.category, tool.risk.value, tool.status.value, "yes" if tool.id in bound else "-")
+        why = unavailable_reason(tool.id) if tool.id in bound else None
+        here = "-" if tool.id not in bound else f"no: {why}" if why else "yes"
+        table.add_row(tool.id, tool.category, tool.risk.value, tool.status.value,
+                      "yes" if tool.id in bound else "-", here)
     console.print(table)
 
 
