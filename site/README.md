@@ -41,10 +41,41 @@ The terminal and the ladder have a Replay button.
 - Constitution cards match `CONSTITUTION`, same IDs in the same order.
 - No em or en dashes, no hype words, no claims the project cannot back.
 
-The test count (870, the standard run that deselects the SDK test) is not checked automatically; update it by hand when it changes.
+The test count (875, the standard run that deselects the SDK test) is not checked automatically; update it by hand when it changes.
+
+## Launch list
+
+Nirmaan runs every website through its launch list
+([`docs/engineering/list.md`](https://github.com/nirmaansoftware/Nirmaan/blob/main/docs/engineering/list.md)
+in `nirmaansoftware/Nirmaan`). Last run 2026-09-28, before first deploy:
+
+| # | Item | Result |
+|---|---|---|
+| 1 | Privacy policy | PASS: footer links to nirmaan.online/privacy.html, which covers this site |
+| 2 | Terms & conditions | PASS: footer links to nirmaan.online/terms.html; the code is under Apache-2.0 |
+| 3 | Frontend secrets | PASS: none; the page has no keys at all |
+| 4 | HTTPS | Vercel enforces it; check with `curl -I` after deploy |
+| 5 | Cookie banner | N/A: no cookies and no storage |
+| 6 | Meta titles / descriptions | PASS: title, description, canonical, `og:url` |
+| 7 | Social preview image | PASS: `og-image.png`, 1200x630, with alt text |
+| 8 | Favicon | PASS: `favicon.svg` (light and dark) and `apple-touch-icon.png` |
+| 9 | Sitemap and robots.txt | PASS |
+| 10 | Image alt text | PASS: no `<img>`; the graph SVG has a title, glyphs are `aria-hidden` |
+| 11 | Image compression | PASS: largest file is the 52 KB preview image |
+| 12 | Page load speed | Lighthouse mobile, local server without compression: performance 84, LCP 3.3 s, CLS 0.005, TBT 0 ms. Re-run on the deployed URL |
+| 13 | Color contrast | PASS: Lighthouse accessibility 100 |
+| 14 | Mobile responsiveness | PASS: checked at a true 390 px viewport |
+| 15 | Custom 404 page | PASS: `404.html` (Vercel serves it with status 404) |
+| 16 | Broken links | PASS |
+| 17 | Form validation | N/A: no forms |
+| 18 | Spam protection | N/A: no forms |
+| 19 | Analytics | None, per the brief ("no tracking"). Open for the owner to revisit |
+| 20 | Single clear CTA | PASS: "View on GitHub" |
 
 ## Deploying
 
-Any static host works; point it at this folder. Then add a CNAME record for
-`ip` on `nirmaan.online` pointing at the host, and add the URL to
-`pyproject.toml` and the README (see `docs/ROADMAP.md`).
+Deploy on Vercel as its own project with **Root Directory** set to `site`
+(`vercel.json` here adds the security headers; there is no build step). Add
+`ip.nirmaan.online` as the project's domain, then a CNAME record for `ip` on
+`nirmaan.online` pointing at `cname.vercel-dns.com`. After it is live, re-run
+item 12 and add the URL to `pyproject.toml` and the README (see `docs/ROADMAP.md`).
