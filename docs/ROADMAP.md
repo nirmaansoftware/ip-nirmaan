@@ -1,6 +1,6 @@
 # IP Nirmaan roadmap
 
-The plan for what comes after v1.17.0. Read this together with `context.md`
+The plan for what comes after v1.18.0. Read this together with `context.md`
 (what exists and why) and `CLAUDE.md` (how to work here). Each stage ships the
 way every milestone has:
 - a design doc approved before code,
@@ -8,19 +8,21 @@ way every milestone has:
 - a `context.md` entry,
 - a PR merged into `main`.
 
-## Where we are (v1.17.0, 2026-09-28)
+## Where we are (v1.18.0, 2026-09-28)
 
 | Built | Not yet |
 |---|---|
-| Organization model: 207 units, 685 derived roles, skills, authority, a 12-principle constitution | AI workers outside verification seats (architecture, RTL: Stage 4) |
-| Planner: requirement to owned, reviewed, gated task graph; 7 workflows | `sta.run` (OpenSTA) is still `CONTRACT_ONLY` |
-| Task engine: lifecycle, reviews, approvals, human gates, hash-chained audit | Formal runs in CI (Ubuntu apt has no `sby`) |
-| VeriTriage as a real, evidence-producing tool (`veritriage.investigate`) | The cross-domain engineering graph (Stage 5) |
-| AI workers in three verification seats, off by default, on Opus 5.5 (M20) | Physical design, DFT, firmware (Stage 6) |
+| Organization model: 207 units, 685 derived roles, skills, authority, a 12-principle constitution | A repair loop feeding lint and simulation logs back to the RTL seat |
+| Planner: requirement to owned, reviewed, gated task graph; 8 workflows | FIFO, arbiter, and APB blocks; approved-inputs gating on the `new-ip` RTL stages |
+| Task engine: lifecycle, reviews, approvals, human gates, hash-chained audit | `sta.run` (OpenSTA) is still `CONTRACT_ONLY`; formal and synthesis are not yet before-review checks |
+| VeriTriage as a real, evidence-producing tool (`veritriage.investigate`) | Formal runs in CI (Ubuntu apt has no `sby`) |
+| AI workers in three verification seats, off by default, on Opus 5.5 (M20) | The cross-domain engineering graph (Stage 5) |
+| Design agents: spec, microarchitecture, and RTL seats; RTL gated on real lint and simulation; the AXI4-Lite register block end to end (M23) | Physical design, DFT, firmware (Stage 6) |
+| `nirmaan export`: the numbered `01_requirement` to `10_signoff` deliverable tree (M23) | |
 | Real lint, simulation, synthesis, and formal via open-source EDA (M21) | |
 | IP Nirmaan over MCP; organizational events on the M18 bus (M22) | |
 | CI on Python 3.11 and 3.12, plus a dash check (Stage 0) | |
-| 936 tests; CLI `nirmaan`; HTML dashboard; landing page live at https://ip.nirmaan.online | |
+| 984 tests; CLI `nirmaan`; HTML dashboard; landing page live at https://ip.nirmaan.online | |
 
 ## Resume checklist (after the folder rename)
 
@@ -36,7 +38,7 @@ PYTHONPYCACHEPREFIX=/tmp/nirmaan-pycache .venv/bin/python -m pytest -q \
   --deselect tests/test_ai_boundary.py::test_missing_sdk_raises_clean_error
 ```
 
-Expect 936 passing. The folder is still in iCloud, so the eviction hangs
+Expect 984 passing. The folder is still in iCloud, so the eviction hangs
 described in `context.md` section 4 still apply. If imports stall, pre-read the tree:
 
 ```
