@@ -214,6 +214,7 @@ class Artifact(BaseModel):
     produced_by: str = Field(description="Actor label, for provenance.")
     assurance: Assurance = Assurance.EXECUTED
     location: str | None = None
+    summary: str = Field(default="", description="The written content, e.g. an agent's cited report.")
     evidence: tuple[str, ...] = ()
     derived_from: tuple[str, ...] = Field(default=(), description="Upstream artifact IDs.")
 
