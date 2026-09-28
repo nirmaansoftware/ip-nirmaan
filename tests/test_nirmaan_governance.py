@@ -81,7 +81,7 @@ def test_tools_are_refused_honestly(authority):
     assert ok
     ok, why = authority.may_use_tool("verification.debug.triage.engineer", "simulator.run")
     assert not ok and "not granted" in why
-    ok, why = authority.may_use_tool("design.rtl.design.fsm.engineer", "simulator.run")
+    ok, why = authority.may_use_tool("design.rtl.design.fsm.engineer", "git.write")
     assert not ok and "contract-only" in why
 
 
