@@ -41,7 +41,7 @@ The terminal and the ladder have a Replay button.
 - Constitution cards match `CONSTITUTION`, same IDs in the same order.
 - No em or en dashes, no hype words, no claims the project cannot back.
 
-The test count (875, the standard run that deselects the SDK test) is not checked automatically; update it by hand when it changes.
+The test count (876, the standard run that deselects the SDK test) is not checked automatically; update it by hand when it changes.
 
 ## Launch list
 
@@ -70,7 +70,7 @@ in `nirmaansoftware/Nirmaan`). Last run 2026-09-28, before first deploy:
 | 17 | Form validation | N/A: no forms |
 | 18 | Spam protection | N/A: no forms |
 | 19 | Analytics | None, per the brief ("no tracking"). Open for the owner to revisit |
-| 20 | Single clear CTA | PASS: "View on GitHub" |
+| 20 | Single clear CTA | PASS: "Talk to us" (nirmaan.online contact page). The page links nowhere on GitHub, by the owner's decision |
 
 ## Deploying
 
