@@ -1,0 +1,53 @@
+{
+   "creator": "Yosys 0.69+post (git sha1 143eb14f9cc55d6f8927e68523b0c9d2166ed02c, Release, AppleClang clang++ 21.0.0.21000334)",
+   "invocation": "stat -json ",
+   "modules": {
+      "\\counter": {
+         "num_wires":         13,
+         "num_wire_bits":     22,
+         "num_pub_wires":     5,
+         "num_pub_wire_bits": 8,
+         "num_ports":         5,
+         "num_port_bits":     8,
+         "num_memories":      0,
+         "num_memory_bits":   0,
+         "num_processes":     0,
+         "num_cells":         15,
+         "num_submodules":       0,
+         "num_cells_by_type": {
+            "$_ANDNOT_": 2,
+            "$_AND_": 3,
+            "$_NAND_": 1,
+            "$_NOT_": 1,
+            "$_OR_": 1,
+            "$_SDFFE_PP0P_": 4,
+            "$_XNOR_": 1,
+            "$_XOR_": 2
+         }
+      }
+   },
+      "design": {
+         "num_wires":         13,
+         "num_wire_bits":     22,
+         "num_pub_wires":     5,
+         "num_pub_wire_bits": 8,
+         "num_ports":         5,
+         "num_port_bits":     8,
+         "num_memories":      0,
+         "num_memory_bits":   0,
+         "num_processes":     0,
+         "num_cells":         15,
+         "num_submodules":       0,
+         "num_cells_by_type": {
+            "$_ANDNOT_": 2,
+            "$_AND_": 3,
+            "$_NAND_": 1,
+            "$_NOT_": 1,
+            "$_OR_": 1,
+            "$_SDFFE_PP0P_": 4,
+            "$_XNOR_": 1,
+            "$_XOR_": 2
+         }
+      }
+}
+

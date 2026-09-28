@@ -123,7 +123,7 @@ def test_contract_only_tools_are_never_run(regression):
 
     broker = ToolBroker(regression)
     with pytest.raises(ToolAccessDenied, match="contract-only"):
-        broker.invoke(agent("design.rtl.design.fsm.engineer"), "simulator.run", {})
+        broker.invoke(agent("design.rtl.design.fsm.engineer"), "git.write", {})
     with pytest.raises(ToolAccessDenied, match="not granted"):
         broker.invoke(agent("product.management.roadmap.engineer"), "veritriage.investigate", {})
     assert regression.state.tool_runs == {}
