@@ -14,6 +14,15 @@
 
 
 /* ---------------------------------------------------------------
+   FONTS: self-hosted (Latin subset, variable), so the first paint never
+   waits on a third party. Licenses: fonts/OFL-*.txt (SIL Open Font License).
+--------------------------------------------------------------- */
+@font-face { font-family: "Archivo"; font-style: normal; font-weight: 500 900; font-stretch: 100% 125%; font-display: swap; src: url("/fonts/archivo.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Hanken Grotesk"; font-style: normal; font-weight: 400 600; font-display: swap; src: url("/fonts/hanken-grotesk.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "JetBrains Mono"; font-style: normal; font-weight: 400 500; font-display: swap; src: url("/fonts/jetbrains-mono.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+
+
+/* ---------------------------------------------------------------
    TOKENS (mirrors nirmaan.online). Light by default, dark from the OS.
 --------------------------------------------------------------- */
 :root {
@@ -400,7 +409,7 @@
 
   .motion .hero__copy > :not(.hero__title) { animation: fade-up 0.9s var(--ease-out) both 320ms; }
   .motion .hero__copy > .eyebrow { animation-delay: 0ms; }
-  .motion .term { animation: fade-up 0.9s var(--ease-out) both 520ms; }
+  .motion .term { animation: fade-up 0.7s var(--ease-out) both 150ms; }
   .motion .hero__grid { animation: fade 1.6s var(--ease-out) both 200ms; }
   @keyframes fade-up { from { opacity: 0; transform: translateY(0.75rem); } }
   @keyframes fade { from { opacity: 0; } }
@@ -410,7 +419,14 @@
   @keyframes cell-drop { from { opacity: 0; transform: translateY(-3px); } }
 
   /* ---- Terminal: motion.js prints it line by line ---- */
-  .motion .term.is-printing .ln:not(.is-shown) { visibility: hidden; }
+  /* The plan is painted in full from the first frame, in the terminal's dim
+     grey (still AA contrast), so it never delays the page's largest paint.
+     Printing then lights it line by line and stamps each GATE. The command
+     line itself types. */
+  .motion .term.is-printing .ln:not(.is-shown),
+  .motion .term.is-printing .ln:not(.is-shown) * { color: var(--term-dim); background: none; }
+  .motion .term.is-printing .cmd:not(.is-shown) { visibility: hidden; }
+  .motion .term .ln, .motion .term .ln * { transition: color 0.3s var(--ease-out); }
   .motion .term .cmd.is-typing::after {
     content: ""; display: inline-block; width: 0.55em; height: 1.1em; margin-left: 1px;
     vertical-align: -0.2em; background: var(--term-blue); animation: blink 1s steps(1) infinite;

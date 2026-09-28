@@ -2,12 +2,13 @@
 
 The IP Nirmaan landing page. Built from `docs/LANDING_PAGE_BRIEF.md`.
 
-Three files and a favicon, no build step, no dependencies, no tracking:
+Three files, self-hosted fonts and icons; no build step, no dependencies, no tracking, and no third-party requests:
 
 | File | Role |
 |---|---|
 | `index.html` | All content. Every number and every line of the plan is in the HTML, so the page is complete without JavaScript. |
 | `styles.css` | The Nirmaan design system (shared with nirmaan.online), plus a `motion` layer. |
+| `fonts/` | Archivo, Hanken Grotesk and JetBrains Mono, self-hosted (Latin subset, variable), with their OFL licenses. |
 | `motion.js` | Plays the motion. It only animates toward what the HTML already says; it never supplies content. |
 
 ## Preview
@@ -27,7 +28,7 @@ preference, and every animated rule is scoped to it (a test checks this).
 
 | Piece | What moves | Why |
 |---|---|---|
-| Hero | Headline rises line by line; the command is typed, then the plan prints line by line and each GATE stamps in | It is the product's real output, arriving the way it does in a terminal |
+| Hero | Headline rises line by line; the command is typed, then the plan (already on screen in dim grey) lights up line by line and each GATE stamps in | It is the product's real output, arriving the way it does in a terminal |
 | Assurance ladder | A token climbs planned, executed, verified, approved; each rung latches as it arrives; then a self-approval is refused | "Planned is not done" and "an AI cannot approve its own work", shown rather than told |
 | How it works | The line is drawn and the five steps light in order | A flow, read in order |
 | Organization | Stats count up to their real values; the org chart's root lands, the trunk draws, divisions drop in | Built from the top down, like the org itself |
@@ -41,7 +42,7 @@ The terminal and the ladder have a Replay button.
 - Constitution cards match `CONSTITUTION`, same IDs in the same order.
 - No em or en dashes, no hype words, no claims the project cannot back.
 
-The test count (876, the standard run that deselects the SDK test) is not checked automatically; update it by hand when it changes.
+The test count (877, the standard run that deselects the SDK test) is not checked automatically; update it by hand when it changes.
 
 ## Launch list
 
@@ -51,7 +52,7 @@ in `nirmaansoftware/Nirmaan`). Last run 2026-09-28, before first deploy:
 
 | # | Item | Result |
 |---|---|---|
-| 1 | Privacy policy | PASS: footer links to nirmaan.online/privacy.html, which covers this site |
+| 1 | Privacy policy | PASS: footer links to nirmaan.online/privacy.html, which covers this site. This page loads nothing from third parties |
 | 2 | Terms & conditions | PASS: footer links to nirmaan.online/terms.html; the code is under Apache-2.0 |
 | 3 | Frontend secrets | PASS: none; the page has no keys at all |
 | 4 | HTTPS | Vercel enforces it; check with `curl -I` after deploy |
@@ -62,7 +63,7 @@ in `nirmaansoftware/Nirmaan`). Last run 2026-09-28, before first deploy:
 | 9 | Sitemap and robots.txt | PASS |
 | 10 | Image alt text | PASS: no `<img>`; the graph SVG has a title, glyphs are `aria-hidden` |
 | 11 | Image compression | PASS: largest file is the 52 KB preview image |
-| 12 | Page load speed | Lighthouse mobile, local server without compression: performance 84, LCP 3.3 s, CLS 0.005, TBT 0 ms. Re-run on the deployed URL |
+| 12 | Page load speed | FIXED: the first live run scored 79 (LCP 3.6 s): Google Fonts blocked the first paint and the terminal hid the plan until printed. Fonts are now self-hosted and preloaded, and the plan is painted from the first frame (printing only lights it). Lighthouse mobile: performance 99, LCP 2.3 s, CLS 0.006, TBT 0 ms |
 | 13 | Color contrast | PASS: Lighthouse accessibility 100 |
 | 14 | Mobile responsiveness | PASS: checked at a true 390 px viewport |
 | 15 | Custom 404 page | PASS: `404.html` (Vercel serves it with status 404) |

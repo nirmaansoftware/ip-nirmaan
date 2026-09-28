@@ -99,6 +99,16 @@ def test_launch_list_items_are_present() -> None:
         assert f'href="{link}"' in HTML
 
 
+def test_pages_load_nothing_from_third_parties() -> None:
+    # Fonts are self-hosted: a third-party stylesheet would block the first paint.
+    for name in ("index.html", "404.html", "styles.css"):
+        text = (SITE / name).read_text(encoding="utf-8")
+        assert not re.search(r'(src|href)="https?://(?!www\.nirmaan\.online|ip\.nirmaan\.online)', text), name
+        assert "url(http" not in text, name
+    for font in ("archivo", "hanken-grotesk", "jetbrains-mono"):
+        assert (SITE / "fonts" / f"{font}.woff2").is_file(), font
+
+
 def test_the_site_does_not_send_visitors_to_github() -> None:
     # Owner decision: the repository is the factory, not the storefront.
     for name in ("index.html", "404.html"):
