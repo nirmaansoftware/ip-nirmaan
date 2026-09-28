@@ -98,7 +98,8 @@ def fake_eda(tmp_path, monkeypatch):
                              parse("fakelint: clean")))
     register_backend(Backend("fakesim", "simulator.run", ("fakesim",), lambda j: [["fakesim", *j.sources]],
                              parse("fakesim: PASS"), ("sources", "top")))
-    monkeypatch.setenv("PATH", f"{bin_dir}:{Path(shutil.which('sh')).parent}")
+    # Only the fakes: on CI the real tools share /usr/bin with sh, and the scripts need no PATH (#!/bin/sh).
+    monkeypatch.setenv("PATH", str(bin_dir))
     monkeypatch.delenv("FAKESIM", raising=False)
     yield bin_dir
     unregister_backend("lint.run", "fakelint")
