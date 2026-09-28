@@ -1,4 +1,4 @@
-"""Nirmaan IP vocabulary: plain, frozen data shared by every layer.
+"""IP Nirmaan vocabulary: plain, frozen data shared by every layer.
 
 Importing nothing but pydantic is a law (test-enforced): the organization is
 data first, and engines, registries, and runtimes are built on top of it.

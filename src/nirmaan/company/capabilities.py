@@ -1,4 +1,4 @@
-"""Capabilities: the units of work Nirmaan IP can perform.
+"""Capabilities: the units of work IP Nirmaan can perform.
 
 A task requires a capability; a skill provides it; a role holds the skill at
 some proficiency. Routing is nothing more than that join, which is why a new

@@ -72,7 +72,7 @@ class Orchestrator:
     def plan(
         self,
         text: str,
-        program: str = "nirmaan-ip-portfolio",
+        program: str = "ip-nirmaan-portfolio",
         gate_overrides: dict[str, bool] | None = None,
         submitted_by: str = "owner",
     ) -> TaskEngine:

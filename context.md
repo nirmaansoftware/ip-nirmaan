@@ -1,4 +1,4 @@
-# Nirmaan IP - Project Context
+# IP Nirmaan - Project Context
 
 This file is a continuity document: what VeriTriage is, how it got built,
 where every piece lives, and what is deliberately left for later. It exists
@@ -7,10 +7,10 @@ re-deriving decisions already made. It is not user-facing documentation -
 see `README.md` and `docs/` for that - this is the "how we got here and
 what's next" record.
 
-Repo: https://github.com/patel-om/nirmaan-ip (public, Apache-2.0; renamed from
-`veritriage` after M19, GitHub redirects the old URL)
+Repo: https://github.com/patel-om/ip-nirmaan (public, Apache-2.0; renamed from
+`veritriage` (then `nirmaan-ip`) after M19, GitHub redirects the old URL)
 Local path: `/Users/ompatel/Documents/veritriage`
-Current version: **1.16.0** (distribution `nirmaan-ip`; packages `nirmaan` and `veritriage`)
+Current version: **1.16.1** (distribution `ip-nirmaan`; packages `nirmaan` and `veritriage`)
 Portfolio integration: card + sample artifacts in
 `/Users/ompatel/Documents/Om Portfolio` (`index.html`,
 `veritriage-sample-report.html`, `veritriage-sample-dashboard.html`)
@@ -1025,9 +1025,9 @@ Fixed to cite on applicability.
 Deferred to M18.x: a CI adapter publishing events from GitHub Actions/Jenkins;
 Slack and VS Code subscribers; a `due()` evaluation for schedule ticks.
 
-### Milestone 19 (v1.15.0) - Nirmaan IP: the Organizational Operating System
+### Milestone 19 (v1.15.0) - IP Nirmaan: the Organizational Operating System
 
-The user named the larger vision **Nirmaan IP**: an AI-native semiconductor IP
+The user named the larger vision **IP Nirmaan**: an AI-native semiconductor IP
 company in which a requirement goes in and an organization plans, owns,
 reviews, gates, and evidences the work. VeriTriage becomes its verification-
 intelligence subsystem. This milestone delivers the spec's Phases 1-3 in full,
@@ -1045,7 +1045,7 @@ protocol knowledge (`missing_packs()` proves every citation resolves).
 
 Structure:
 - `models/` (frozen vocabulary; imports only pydantic)
-- `company/` (the Nirmaan IP definition as data: org chart, 140 skills, 97
+- `company/` (the IP Nirmaan definition as data: org chart, 140 skills, 97
   capabilities, 38 tools with AVAILABLE/CONTRACT_ONLY status, authority
   matrix, escalation routes, 6 gates, 12-article constitution, 7 workflows,
   requirement vocabulary)
@@ -1237,7 +1237,7 @@ src/veritriage/
                      Nothing below imports it (guard-enforced).
   reports/           HTML report generator (Jinja2, self-contained, light/dark).
 
-src/nirmaan/         M19: Nirmaan IP, the organizational OS ABOVE VeriTriage (sibling
+src/nirmaan/         M19: IP Nirmaan, the organizational OS ABOVE VeriTriage (sibling
                      package; `nirmaan` CLI). models/ (plain data), company/ (the
                      company as data), org/ (derived staffing, validation, authority),
                      orchestrator/ (analyze, route, plan), work/ (TaskEngine, policy,
@@ -1286,7 +1286,7 @@ v11 adds `plan` (M14) → v12 adds `design` (M15) →
 v13 adds `automation` (M18). Bump on any breaking field change; tests assert the current
 value (`test_cli.py`).
 
-**Current test count: 854** (684 VeriTriage + 170 Nirmaan IP), across `tests/test_*.py`: parsers, rules,
+**Current test count: 854** (684 VeriTriage + 170 IP Nirmaan), across `tests/test_*.py`: parsers, rules,
 graph, artifact parsers, models, report, CLI, AI boundary, reasoning,
 history, analytics, knowledge, waveform, engineering, workspace/MCP,
 orchestrator, collaboration, project, agents, learning, planning, design,
@@ -1306,7 +1306,7 @@ from the repo root.
   than only passing schema validation.
 - The Anthropic integration (`reasoning/ai.py`) uses `claude-opus-4-8` with
   `thinking={"type": "adaptive"}` and structured JSON output; it's an
-  optional extra (`pip install nirmaan-ip[ai]`) and degrades gracefully
+  optional extra (`pip install ip-nirmaan[ai]`) and degrades gracefully
   (warns, continues deterministic-only) if the SDK or API key is missing.
 - Portfolio integration is a separate repo
   (`/Users/ompatel/Documents/Om Portfolio`, → `patel-om/portfolio`). Each
@@ -1320,15 +1320,17 @@ from the repo root.
 - Package naming history: TraceIQ (M1, collided with existing PyPI/products)
   → briefly considered "verifAI" (collided with Berkeley's VerifAI) →
   renamed to **VeriTriage** at M2/M3 boundary (GitHub redirect preserved
-  from the rename). After M19 the user renamed the PROJECT to **Nirmaan IP**
-  (repo `patel-om/nirmaan-ip`, distribution `nirmaan-ip`, v1.16.0). VeriTriage
+  from the rename). After M19 the user renamed the PROJECT, first to "Nirmaan IP"
+  (repo `nirmaan-ip`, v1.16.0) and then, to match the `ipnirmaan.com` domain, to
+  **IP Nirmaan** (repo `patel-om/ip-nirmaan`, distribution `ip-nirmaan`, v1.16.1).
+  The `nirmaan` package and CLI keep their short name by the user's choice. VeriTriage
   was deliberately NOT renamed: it is the verification engine inside Nirmaan
   IP, and the user wants its technology kept and built on, with the platform
   now "bigger than just a verification tool". The `veritriage` package, CLI,
   MCP server, and `.veritriage/` data directory keep their names. Never
   suggest renaming again without the user raising it.
 - Domain: the user considered `nirmaan.online` (their existing software-services
-  company) and leaned toward buying `ipnirmaan.com` for this project. Do not put
+  company) and chose `ipnirmaan.com` for this project; the brand was renamed to match. Do not put
   a domain into project metadata until the user confirms they own it.
 - **iCloud eviction (discovered at M19).** The repo lives in iCloud-synced
   `~/Documents` with storage optimization on, and macOS evicts files to
@@ -1475,7 +1477,7 @@ or workspace changes; `test_new_endpoint_needs_only_a_tool` is the proof.
 Standing offer, not executed: publish an initial `veritriage` release to
 PyPI to reserve the name. Requires explicit user go-ahead.
 
-### 5.10a Nirmaan IP next steps (M19 follow-ups)
+### 5.10a IP Nirmaan next steps (M19 follow-ups)
 - A model-backed `AgentRuntime` (Claude via the M17 provider registry, so one
   vendor registry still serves everything), first on verification seats where
   `veritriage.investigate` already produces real evidence.

@@ -1,7 +1,7 @@
 # VeriTriage Architecture
 
 This document covers VeriTriage, the verification-intelligence engine of
-Nirmaan IP. For the organizational OS built on top of it, see
+IP Nirmaan. For the organizational OS built on top of it, see
 [NIRMAAN_ORG_OS.md](NIRMAAN_ORG_OS.md).
 
 VeriTriage is a pipeline of small, replaceable layers. Data flows one way, every
@@ -528,7 +528,7 @@ registries, and the `.vtb` bundle format - is now declared stable. Future
 work is integrations and ecosystem adoption over these seams, not core
 expansion.
 
-## v1.15.0: Nirmaan IP, the organization above the platform
+## v1.15.0: IP Nirmaan, the organization above the platform
 
 Milestone 19 adds a sibling package, `src/nirmaan/`, rather than growing the
 core. It is an organizational operating system: a validated model of a

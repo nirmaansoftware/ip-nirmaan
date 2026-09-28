@@ -21,12 +21,12 @@ def fixture_log():
     return _get
 
 
-# --- Nirmaan IP (Milestone 19) ------------------------------------------------------
+# --- IP Nirmaan (Milestone 19) ------------------------------------------------------
 
 
 @pytest.fixture(scope="session")
 def nirmaan_org():
-    """The built, validated Nirmaan IP organization (immutable, so shared)."""
+    """The built, validated IP Nirmaan organization (immutable, so shared)."""
     from nirmaan.company import build_organization
 
     return build_organization()

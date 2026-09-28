@@ -1,4 +1,4 @@
-"""The requirement vocabulary: how Nirmaan IP reads a request.
+"""The requirement vocabulary: how IP Nirmaan reads a request.
 
 Declared, not learned. Every intent, feature, and parameter the organization
 recognizes is a pattern here, so an analysis can always say exactly which

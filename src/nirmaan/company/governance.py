@@ -1,4 +1,4 @@
-"""Nirmaan IP governance: authority matrix, escalation routes, gates, constitution."""
+"""IP Nirmaan governance: authority matrix, escalation routes, gates, constitution."""
 
 from __future__ import annotations
 

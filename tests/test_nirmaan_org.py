@@ -1,4 +1,4 @@
-"""Milestone 19, Phase 1: the organizational foundation of Nirmaan IP.
+"""Milestone 19, Phase 1: the organizational foundation of IP Nirmaan.
 
 Covers the organization as data: the hierarchy exists and is whole, staffing
 is derived from structure, chains of command and escalation terminate and rise
@@ -34,7 +34,7 @@ from nirmaan.org import OrganizationBuilder, OrganizationError
 
 def test_the_company_builds_and_validates(nirmaan_org):
     stats = nirmaan_org.stats()
-    assert nirmaan_org.name == "Nirmaan IP"
+    assert nirmaan_org.name == "IP Nirmaan"
     assert stats["divisions"] >= 15
     assert stats["roles"] >= 600
     assert stats["skills"] >= 120

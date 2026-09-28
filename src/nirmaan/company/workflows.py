@@ -1,4 +1,4 @@
-"""The workflow registry: Nirmaan IP's reusable engineering processes.
+"""The workflow registry: IP Nirmaan's reusable engineering processes.
 
 Each workflow names capabilities, never teams or people; the router decides
 who. Conditions select stages from requirement features, variants fan a stage

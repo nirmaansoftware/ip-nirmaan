@@ -1,4 +1,4 @@
-"""Milestone 19: the laws that keep Nirmaan IP an organization, not a script.
+"""Milestone 19: the laws that keep IP Nirmaan an organization, not a script.
 
 * VeriTriage never imports Nirmaan; Nirmaan reaches VeriTriage through exactly
   one bridge module.
@@ -181,7 +181,7 @@ def cli():
 
 def test_cli_inspects_the_organization(cli):
     result = cli("org", "tree", "--depth", "1")
-    assert result.exit_code == 0 and "Verification" in result.output and "Nirmaan IP" in result.output
+    assert result.exit_code == 0 and "Verification" in result.output and "IP Nirmaan" in result.output
     assert "Staff NoC Microarchitect" in cli("org", "role", "architecture.micro.noc.staff").output
     assert cli("org", "validate").exit_code == 0
     assert "P12" in cli("policies").output

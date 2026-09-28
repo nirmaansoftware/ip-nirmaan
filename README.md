@@ -1,6 +1,6 @@
-# Nirmaan IP
+# IP Nirmaan
 
-**An AI-native semiconductor IP company, as software.** Nirmaan IP is an
+**An AI-native semiconductor IP company, as software.** IP Nirmaan is an
 organizational operating system for semiconductor engineering. Give it a
 requirement ("Create a 4-port AXI-to-NoC bridge") and a machine-readable
 company plans the work: divisions, teams, and roles from Intern to CEO, with
@@ -24,10 +24,10 @@ and cannot mark their own work verified. Design:
 
 | Component | What it is | Entry point |
 |---|---|---|
-| **Nirmaan IP organizational OS** (`src/nirmaan/`) | The company as data, the task engine, the orchestrator, and the agent runtime interface | `nirmaan` |
+| **IP Nirmaan organizational OS** (`src/nirmaan/`) | The company as data, the task engine, the orchestrator, and the agent runtime interface | `nirmaan` |
 | **VeriTriage** (`src/veritriage/`) | The verification-intelligence engine: evidence graphs, knowledge packs, reasoning, regression memory | `veritriage` |
 
-Nirmaan IP is bigger than verification, and it builds on VeriTriage's
+IP Nirmaan is bigger than verification, and it builds on VeriTriage's
 verification technology rather than replacing it:
 
 * VeriTriage investigations are real, evidence-producing tools inside Nirmaan's task engine.
