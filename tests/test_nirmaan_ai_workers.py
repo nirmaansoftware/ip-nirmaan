@@ -339,7 +339,7 @@ def test_the_anthropic_seat_sends_one_grounded_prompt(regression, monkeypatch):
     prompt = render_work_prompt(assemble(regression, tid(regression, "triage")))
     completion = runtime.llm.complete(prompt)
     assert completion.error is None and completion.text == "not json"
-    assert sent["model"] == "claude-opus-5" and sent["thinking"] == {"type": "adaptive"}
+    assert sent["model"] == "claude-opus-5-5" and sent["thinking"] == {"type": "adaptive"}
     assert sent["system"] == prompt.system and "## Company" in sent["messages"][0]["content"]
     assert sent["fallbacks"] == "default" and sent["betas"] == ["server-side-fallback-2026-07-01"]
 

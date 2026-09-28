@@ -386,6 +386,14 @@ def dashboard(project: str, output: Path = typer.Option(Path("nirmaan-dashboard.
     console.print(f"Wrote {output}")
 
 
+@app.command()
+def mcp(root: Path = ROOT_OPTION) -> None:
+    """Serve IP Nirmaan over MCP (stdio): plan, status, why, and task actions."""
+    from nirmaan.mcp import serve
+
+    serve(str(root))
+
+
 # --- Task lifecycle ----------------------------------------------------------------------
 
 

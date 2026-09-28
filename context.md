@@ -1109,6 +1109,16 @@ with this change) is maintained by hand.
 Not deployed yet: hosting and the `ip` CNAME are the owner's call. See
 `site/README.md`.
 
+### Continuous integration (side work, Stage 0) - `.github/workflows/ci.yml`
+
+GitHub Actions runs the full suite on Python 3.11 and 3.12 for every PR and
+every push to `main`, installing with `pip install -e ".[ai,dev]"`. CI runs
+`test_missing_sdk_raises_clean_error` too; it is deselected only locally, where
+iCloud eviction stalls the `anthropic` import. A second job runs
+`scripts/check_dashes.py`, which fails on U+2014 or U+2013 in any tracked text
+file except the vendored nirmaan.online files (`site/nirmaan.css`,
+`site/site.js`, `site/hero.js`). The README carries the CI badge.
+
 ### Milestone 20 - AI workers in verification seats (roadmap Stage 1)
 
 The first language-model workers, seated where their output can be checked:
@@ -1125,7 +1135,7 @@ model through the bridge, not through its own adapter. The bridge gained
 `render_prompt`, `generate`, and `ground`, which wrap the M17 registry, its
 frozen `Prompt`, and `grounding.enforce`. So one vendor registry still serves
 the whole platform, and citation stripping has one implementation. The
-Anthropic provider (`claude-opus-5`, adaptive thinking, effort high,
+Anthropic provider (`claude-opus-5-5`, adaptive thinking, effort high,
 `fallbacks: "default"` under `server-side-fallback-2026-07-01`, SDK imported
 lazily) is registered into the M17 registry by the bridge, because
 `test_no_vendor_sdk_in_ai` forbids vendor SDKs in `veritriage/ai/` and
@@ -1169,6 +1179,102 @@ new model runtime and runs it through `nirmaan run`; a second test proves any
 M17 provider (VeriTriage's `mock`) serves a seat through the one registry.
 Deferred: seating from `AgentProfile.runtime`, model-chosen tool calls, seats
 outside verification, token and cost accounting.
+
+### Milestone 21 - Real design tools through open-source EDA (roadmap Stage 2)
+
+`lint.run` (Verilator `--lint-only -Wall`), `simulator.run` and `test.run`
+(Icarus Verilog, else Verilator `--binary`), `synth.run` (Yosys), and
+`formal.run` (SymbiYosys) moved from `CONTRACT_ONLY` to `AVAILABLE`, backed by
+`nirmaan/integrations/eda.py` (runner, backends) and `eda_parsers.py` (pure
+parsers). `sta.run` stays a contract.
+
+Key design points worth not re-deriving:
+- Two facts, kept apart: the catalog status says a real implementation exists
+  in the repo; a binding **probe** says this machine can run it now. The broker
+  gained one generic hook, `register_binding(tool, probe=...)`; a probe
+  returning a reason makes the broker refuse (`ToolAccessDenied`), so a missing
+  executable is never a run, simulated or otherwise.
+- `register_backend(Backend(...))` is the extension point (executables, steps
+  as argv lists, parser, required params, optional cwd); the first backend for
+  a tool also binds it. Crown jewel
+  `test_a_new_backend_needs_no_core_changes` adds a lint backend whose
+  executable is a script the test writes, and its run substantiates the lint
+  requirement.
+- Tool failures (lint warnings, `$error`, counterexamples, missing sources,
+  timeouts) are recorded runs with `succeeded=False`. Each run writes
+  `<backend>.log` and `<backend>.result.json`; those paths are its references.
+- Lint warnings fail lint (lint-clean means clean; waivers live in the RTL).
+  Icarus exits 0 on `$error`, so simulation passes only with exit 0, no error
+  message, and `$finish` reached.
+- `triage_simulation()` hands a simulation log to `veritriage.investigate`
+  through the broker, as its own recorded run. `eda.py` never imports
+  VeriTriage.
+- Existing tests that used `simulator.run` as the example contract-only tool
+  now use `git.write`.
+
+Fixtures: `tests/fixtures/rtl/` (4-bit counter, passing and failing
+testbenches, a `.sby` proof) and `tests/fixtures/eda/` (captured outputs).
+`tests/test_nirmaan_eda.py` (24 tests): parsers against captured output, real
+tools (skipped when absent, or failing when named in `NIRMAAN_REQUIRE_EDA`),
+refusal with a reason, and a real lint run substantiating the RTL lint
+requirement with no human attestation. Design doc: `docs/EDA_TOOLS.md`.
+
+### Milestone 22 - IP Nirmaan over MCP, and organizational events (roadmap Stage 3)
+
+Claude Code or Cursor can now plan a project, ask "why is this blocked?", and
+move tasks through their lifecycle over MCP, and organizational moments reach
+the M18 bus so VeriTriage automation rules can react. Version bump is left to
+the coordinator at merge.
+
+**A second tool table, not an extension of the first.** `src/nirmaan/mcp/`
+(`tools.py` table with `@register_tool`, `server.py` stdio transport,
+`__main__.py`) mirrors M8's shape. VeriTriage's table cannot hold Nirmaan tools
+(it would have to import Nirmaan), and its `McpStdioServer` is bound to its
+table and `WorkspaceServices`, so Nirmaan carries its own ~80-line JSON-RPC
+subset rather than generalizing VeriTriage for Nirmaan's sake. Serve with
+`nirmaan mcp --root .nirmaan` or `python -m nirmaan.mcp`. 16 tools: plan,
+list, show, status, why, audit, organization events, and nine task actions.
+No tool name collides with VeriTriage's (`recent_events` was renamed
+`organization_events` when a test caught the overlap).
+
+**Actions go through the engine.** Each action tool is load, one `TaskEngine`
+call, save: state machine, authority, constitution, one audit entry. Refusals
+come back as MCP tool errors and save nothing. **The MCP caller is always
+`ActorKind.AI_AGENT`**; there is no flag to act as a human, so human-required
+gates are refused by P12 and attestations over MCP are unsubstantiated. People
+use the CLI for those.
+
+**The event-bus coupling question, resolved.** `EventKind` stays a closed
+verification vocabulary plus ONE generic member, `EventKind.EXTERNAL`: events
+published by a system beside VeriTriage, with `Event.source` naming the
+publisher and `payload["topic"]` naming what happened. VeriTriage names no
+Nirmaan concept; no built-in trigger applies to EXTERNAL, so it is inert until
+someone registers a trigger. That one enum member is the only change inside
+`src/veritriage/`. Rejected: Nirmaan members in `EventKind` (couples the
+engine), a Nirmaan-only bus (rules could not react), wrapping `EventBus`
+(`Event.kind` is typed).
+
+**Events are projections of the audit trail**, not engine hooks.
+`nirmaan/events.py` maps `task.complete`, `gate.approve`, `escalation.raise`
+audit entries to `task.completed`, `gate.approved`, `escalation.raised`
+`OrgEvent`s carrying the entry's sequence and hash. The engine is untouched,
+indirect completions (approval implies completion) are caught for free, and an
+event cannot exist for a change the engine did not commit. The bridge registers
+three triggers (`nirmaan.task_completed`, `nirmaan.gate_approved`,
+`nirmaan.escalation_raised`), ships one rule (`nirmaan-escalation-raised` ->
+NOTIFY), and adds `AutomationBridge`, which publishes onto a
+`WorkspaceServices` bus with `source="nirmaan"`, evaluates rules, and dispatches
+through `dispatch_actions`. Each MCP action returns the events it caused and
+what automation decided.
+
+13 new tests in `tests/test_nirmaan_mcp.py` (892 total). Crown jewel
+`test_a_new_mcp_tool_needs_only_registration`. The existing M19 import-law and
+no-dash tests cover the new modules and `docs/NIRMAAN_MCP.md` automatically.
+Design doc: `docs/NIRMAAN_MCP.md`.
+
+Deferred: a durable event log (the audit trail is the durable record), more
+topics (one row in `TOPICS` plus a trigger), and tool-run evidence over MCP
+(after Stage 2's real bindings).
 
 ---
 

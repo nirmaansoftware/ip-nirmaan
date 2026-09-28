@@ -1,0 +1,19 @@
+
+ /----------------------------------------------------------------------------\
+ |  yosys -- Yosys Open SYnthesis Suite                                       |
+ |  Copyright (C) 2012 - 2026  Claire Xenia Wolf <claire@yosyshq.com>         |
+ |  Distributed under an ISC-like license, type "license" to see terms        |
+ \----------------------------------------------------------------------------/
+ Yosys 0.69+post (git sha1 143eb14f9cc55d6f8927e68523b0c9d2166ed02c, Release, AppleClang clang++ 21.0.0.21000334)
+
+-- Executing script file `synth_err.ys' --
+
+1. Executing Verilog-2005 frontend: counter.v
+Parsing SystemVerilog input from `counter.v' to AST representation.
+Generating RTLIL representation for module `\counter'.
+Successfully finished Verilog frontend.
+
+2. Executing SYNTH pass.
+
+2.1. Executing HIERARCHY pass (managing design hierarchy).
+ERROR: Module `nosuch' not found!

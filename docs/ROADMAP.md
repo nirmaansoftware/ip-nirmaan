@@ -14,7 +14,7 @@ way every milestone has:
 |---|---|
 | Organization model: 207 units, 685 derived roles, skills, authority, a 12-principle constitution | Any AI worker actually doing work: every seat runs `NullRuntime` |
 | Planner: requirement to owned, reviewed, gated task graph; 7 workflows | Real design tools: lint, simulation, synthesis, formal, and STA are `CONTRACT_ONLY` |
-| Task engine: lifecycle, reviews, approvals, human gates, hash-chained audit | CI: the repo has no GitHub Actions; tests only run locally |
+| Task engine: lifecycle, reviews, approvals, human gates, hash-chained audit | CI: done in Stage 0 (GitHub Actions, Python 3.11 and 3.12) |
 | VeriTriage as a real, evidence-producing tool (`veritriage.investigate`) | IP Nirmaan over MCP; events on the M18 bus |
 | 853 tests; CLI `nirmaan`; HTML dashboard; landing page live at https://ip.nirmaan.online | |
 
@@ -43,7 +43,11 @@ Then continue with **Stage 0** below.
 
 ---
 
-## Stage 0: Continuous integration (small, do first)
+## Stage 0: Continuous integration (DONE)
+
+**Status:** done. `.github/workflows/ci.yml` runs the suite on Python 3.11 and
+3.12, and `scripts/check_dashes.py` runs as a separate job. See `context.md`
+section 2.
 
 **Why:** every PR so far was verified only on one laptop with iCloud trouble.
 CI makes "tests pass" a public, repeatable fact, which fits the project's own
@@ -83,6 +87,12 @@ there, so agent output can be checked rather than trusted.
 
 ## Stage 2 (M21): Real design tools, through open-source EDA
 
+**Status: done**, except the optional `sta.run` (OpenSTA), which stays
+`CONTRACT_ONLY`. Design doc: `docs/EDA_TOOLS.md`. The "in CI" half of Done-when
+depends on the Stage 0 workflow installing `verilator iverilog yosys` (apt)
+and setting `NIRMAAN_REQUIRE_EDA`; locally all five bindings, formal included,
+were exercised against the real tools.
+
 **Why:** most evidence requirements (lint, simulation, formal, synthesis,
 timing) can today only be met by a human attesting. Open-source EDA can make
 them real without licenses.
@@ -105,6 +115,8 @@ Rules for each binding:
 **Done when:** a tiny fixture RTL module (checked into `tests/fixtures/rtl/`) passes a real `lint.run` and `synth.run` in CI. Its evidence substantiates the RTL lint requirement with no human attestation. A crown-jewel test adds a fake tool binding with zero core changes.
 
 ## Stage 3 (M22): IP Nirmaan over MCP, and events
+
+**Status: done (M22).** Design and decisions in `docs/NIRMAAN_MCP.md`; history in `context.md`.
 
 **Scope:**
 - A separate MCP tool table for Nirmaan (plan, status, why, task actions). It must not be added to VeriTriage's table, which would break the import law.
