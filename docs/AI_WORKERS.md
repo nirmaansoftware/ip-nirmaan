@@ -68,8 +68,7 @@ imports the `anthropic` SDK lazily, inside `generate`. Without the optional
 raising, which is the M17 failure contract. Moving it into VeriTriage later,
 if VeriTriage wants it for its own renderers, is a file move and nothing else.
 
-The provider calls `claude-opus-5-5` (Opus 5.5, chosen by the owner over the
-`claude-api` skill default `claude-opus-5`) through
+The provider calls `claude-opus-5-5` (Opus 5.5, the owner's choice) through
 `client.beta.messages.create` with adaptive thinking, effort `high`, `max_tokens` 16000, and the server-side refusal fallback
 (`fallbacks: "default"` under beta `server-side-fallback-2026-07-01`). It
 branches on `stop_reason` before reading content: a refusal or a truncated
