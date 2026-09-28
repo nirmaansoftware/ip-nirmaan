@@ -10,4 +10,4 @@ verification-intelligence subsystem, reached through exactly one bridge module
 (``nirmaan.integrations.veritriage``).
 """
 
-__version__ = "1.18.0"
+__version__ = "1.19.0"
