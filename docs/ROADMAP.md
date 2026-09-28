@@ -16,7 +16,7 @@ way every milestone has:
 | Planner: requirement to owned, reviewed, gated task graph; 7 workflows | Real design tools: lint, simulation, synthesis, formal, and STA are `CONTRACT_ONLY` |
 | Task engine: lifecycle, reviews, approvals, human gates, hash-chained audit | CI: the repo has no GitHub Actions; tests only run locally |
 | VeriTriage as a real, evidence-producing tool (`veritriage.investigate`) | IP Nirmaan over MCP; events on the M18 bus |
-| 853 tests; CLI `nirmaan`; HTML dashboard | Landing page at `ip.nirmaan.online`: built in `site/`, not yet deployed |
+| 853 tests; CLI `nirmaan`; HTML dashboard; landing page live at https://ip.nirmaan.online | |
 
 ## Resume checklist (after the folder rename)
 
@@ -134,7 +134,7 @@ Rules for each binding:
 
 ## Side work (any time; owner-driven)
 
-- **Landing page** at `ip.nirmaan.online`: built in `site/` (see `site/README.md`), not yet deployed. Next: pick a static host, add the `ip` CNAME on `nirmaan.online`, then add the URL to `pyproject.toml` and the README.
+- **Landing page**: live at https://ip.nirmaan.online since 2026-09-28 (Vercel project `ip-nirmaan` in the Nirmaan team, deploys on every merge to `main`; DNS is a CNAME at Hostinger). See `site/README.md`.
 - **Moving the repo out of iCloud** would remove the test hangs entirely. The owner has chosen to keep it in `~/Documents` for now.
 - **The PyPI name** `ip-nirmaan`: publishing an initial release would reserve it. Needs the owner's explicit go-ahead.
 
