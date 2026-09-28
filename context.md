@@ -12,7 +12,7 @@ Repo: https://github.com/nirmaansoftware/ip-nirmaan (public, Apache-2.0; renamed
 to the `nirmaansoftware` account on 2026-09-28; GitHub redirects the old URLs,
 and `patel-om` keeps push access as a collaborator)
 Local path: `/Users/ompatel/Documents/veritriage`
-Current version: **1.18.0** (distribution `ip-nirmaan`; packages `nirmaan` and `veritriage`)
+Current version: **1.19.0** (distribution `ip-nirmaan`; packages `nirmaan` and `veritriage`)
 Portfolio: removed from `/Users/ompatel/Documents/Om Portfolio` at the user's
 request after M19 (card and sample pages deleted).
 
@@ -1655,6 +1655,11 @@ a Verilator backend for `dft.scan_sim`, a seat that records a tool-written file
 (the runtime records only model-written files today), and the before-review
 checks on `new-ip`'s `dft` stage.
 
+v1.19.0 is the one version bump for Stage 5 (M24, #29) and the three Stage 6
+parts (physical design #28, firmware #30, DFT #31), built in parallel. The
+standard run is 1055 tests with 2 skipped: the real OpenSTA and OpenROAD tests,
+whose tools are not installed anywhere yet.
+
 ---
 
 ## 3. Current architecture map
@@ -1878,7 +1883,7 @@ from the repo root.
   renamed to **VeriTriage** at M2/M3 boundary (GitHub redirect preserved
   from the rename). After M19 the user renamed the PROJECT, first to "Nirmaan IP"
   (repo `nirmaan-ip`, v1.16.0) and then, to match the `ipnirmaan.com` domain, to
-  **IP Nirmaan** (repo `patel-om/ip-nirmaan`, distribution `ip-nirmaan`, v1.18.0).
+  **IP Nirmaan** (repo `patel-om/ip-nirmaan`, distribution `ip-nirmaan`, v1.19.0).
   On 2026-09-28 the repo was transferred to `nirmaansoftware/ip-nirmaan`.
   The `nirmaan` package and CLI keep their short name by the user's choice. VeriTriage
   was deliberately NOT renamed: it is the verification engine inside Nirmaan

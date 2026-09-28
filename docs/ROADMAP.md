@@ -1,6 +1,6 @@
 # IP Nirmaan roadmap
 
-The plan for what comes after v1.18.0. Read this together with `context.md`
+The plan for what comes after v1.19.0. Read this together with `context.md`
 (what exists and why) and `CLAUDE.md` (how to work here). Each stage ships the
 way every milestone has:
 - a design doc approved before code,
@@ -8,21 +8,25 @@ way every milestone has:
 - a `context.md` entry,
 - a PR merged into `main`.
 
-## Where we are (v1.18.0, 2026-09-28)
+## Where we are (v1.19.0, 2026-09-29)
 
 | Built | Not yet |
 |---|---|
-| Organization model: 207 units, 685 derived roles, skills, authority, a 12-principle constitution | A repair loop feeding lint and simulation logs back to the RTL seat |
-| Planner: requirement to owned, reviewed, gated task graph; 8 workflows | FIFO, arbiter, and APB blocks; approved-inputs gating on the `new-ip` RTL stages |
-| Task engine: lifecycle, reviews, approvals, human gates, hash-chained audit | `sta.run` (OpenSTA) is still `CONTRACT_ONLY`; formal and synthesis are not yet before-review checks |
-| VeriTriage as a real, evidence-producing tool (`veritriage.investigate`) | Formal runs in CI (Ubuntu apt has no `sby`) |
-| AI workers in three verification seats, off by default, on Opus 5.5 (M20) | The cross-domain engineering graph (Stage 5) |
-| Design agents: spec, microarchitecture, and RTL seats; RTL gated on real lint and simulation; the AXI4-Lite register block end to end (M23) | Physical design, DFT, firmware (Stage 6) |
-| `nirmaan export`: the numbered `01_requirement` to `10_signoff` deliverable tree (M23) | |
+| Organization model: 207 units, 685 derived roles, skills, authority, a 12-principle constitution | A first real run of `sta.run` and `pnr.run`: neither OpenSTA nor OpenROAD is installed here or in CI; their parser samples are synthetic |
+| Planner: requirement to owned, reviewed, gated task graph; 9 workflows | CTS, power grid, parasitics, multi-corner timing |
+| Task engine: lifecycle, reviews, approvals, human gates, hash-chained audit | ATPG, multiple scan chains, MBIST; a RISC-V cross-compile and ISS in the firmware loop |
+| VeriTriage as a real, evidence-producing tool (`veritriage.investigate`) | A repair loop feeding tool logs back to design, DFT, and firmware seats |
+| AI workers in three verification seats, off by default, on Opus 5.5 (M20) | FIFO, arbiter, and APB blocks; approved-inputs gating on the `new-ip` RTL stages |
+| Design agents: spec, microarchitecture, and RTL seats; RTL gated on real lint and simulation; the AXI4-Lite register block end to end (M23) | Formal and synthesis as before-review checks; formal in CI (Ubuntu apt has no `sby`) |
+| `nirmaan export`: the numbered `01_requirement` to `10_signoff` deliverable tree (M23) | Loading requirements and verification items from a file; a verification-plan seat |
+| Engineering graph: artifacts linked to Design Graph nodes from their real bytes; `nirmaan gaps` names every requirement not backed by a passing run (M24) | |
+| DFT: real mux-D scan insertion, testability rules, and chain simulation through Yosys and Icarus (M25) | |
+| Firmware: a driver built strict and run against the approved RTL through a Verilator model (M25) | |
+| Physical design: OpenSTA and OpenROAD bindings and a `physical-implementation` workflow, refused where the tools or PDK are missing (M25) | |
 | Real lint, simulation, synthesis, and formal via open-source EDA (M21) | |
 | IP Nirmaan over MCP; organizational events on the M18 bus (M22) | |
 | CI on Python 3.11 and 3.12, plus a dash check (Stage 0) | |
-| 984 tests; CLI `nirmaan`; HTML dashboard; landing page live at https://ip.nirmaan.online | |
+| 1055 tests; CLI `nirmaan`; HTML dashboard; landing page live at https://ip.nirmaan.online | |
 
 ## Resume checklist (after the folder rename)
 
@@ -38,7 +42,7 @@ PYTHONPYCACHEPREFIX=/tmp/nirmaan-pycache .venv/bin/python -m pytest -q \
   --deselect tests/test_ai_boundary.py::test_missing_sdk_raises_clean_error
 ```
 
-Expect 984 passing. The folder is still in iCloud, so the eviction hangs
+Expect 1055 passing (2 skipped: OpenSTA and OpenROAD are not installed). The folder is still in iCloud, so the eviction hangs
 described in `context.md` section 4 still apply. If imports stall, pre-read the tree:
 
 ```
@@ -166,7 +170,10 @@ and `09_evidence/requirement_gaps.md` in the export.
 
 ## Stage 6 (M25+): Physical design, DFT, firmware (spec Phase 7)
 
-**Status (physical design part):** bindings built, not yet run against the real
+**Status: DFT and firmware done and real; physical design built but never run
+against the real tools.** Details for each part follow.
+
+**Physical design part:** bindings built, not yet run against the real
 tools. `sta.run` (OpenSTA) and `pnr.run` (OpenROAD: one staged run, floorplan,
 place, route, then timing) are `AVAILABLE` and refuse, with a reason, where the
 executable or the PDK inputs are missing; neither tool is installed on the
@@ -179,10 +186,10 @@ extraction. Design doc: `docs/PHYSICAL_DESIGN.md`.
 
 - OpenROAD bindings for floorplan, place, route, and timing.
 - DFT and firmware agents.
-- **DFT status (M25, branch `m25/dft`):** `dft.scan_insert` (Yosys: mux-D scan, one chain), `dft.check` (testability rules as a registry), and `dft.scan_sim` (Icarus: shift and capture through the chain) are real; the `block-design` workflow gains a `dft` stage gated on both checks before review. ATPG, multiple chains, and MBIST are deferred. See `docs/DFT.md`.
+- **DFT status (M25, done):** `dft.scan_insert` (Yosys: mux-D scan, one chain), `dft.check` (testability rules as a registry), and `dft.scan_sim` (Icarus: shift and capture through the chain) are real; the `block-design` workflow gains a `dft` stage gated on both checks before review. ATPG, multiple chains, and MBIST are deferred. See `docs/DFT.md`.
 - This is the largest stage. Scope it only after Stage 4 has proven that agent work holds up under review.
 
-**Firmware status (M25, firmware part):** done on branch `m25/firmware`. Design: `docs/FIRMWARE.md`. `fw.build` (strict C11) and `fw.test` (the driver's own tests run against a Verilator model of the approved RTL, over real AXI4-Lite transactions) gate a firmware seat's driver before review; `test_the_firmware_seat_runs_its_driver_on_the_approved_rtl` runs it end to end on the AXI4-Lite block, locally and in CI.
+**Firmware status (M25, firmware part):** done. Design: `docs/FIRMWARE.md`. `fw.build` (strict C11) and `fw.test` (the driver's own tests run against a Verilator model of the approved RTL, over real AXI4-Lite transactions) gate a firmware seat's driver before review; `test_the_firmware_seat_runs_its_driver_on_the_approved_rtl` runs it end to end on the AXI4-Lite block, locally and in CI.
 
 ## Side work (any time; owner-driven)
 
