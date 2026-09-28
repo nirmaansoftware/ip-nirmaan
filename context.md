@@ -1397,7 +1397,7 @@ Key design points worth not re-deriving:
   checks the copy against the artifact's recorded `digest` (match, mismatch,
   or none recorded).
 
-20 new tests in `tests/test_nirmaan_export.py` (983 total), built by planning
+20 new tests in `tests/test_nirmaan_export.py` (984 total), built by planning
 and driving a project through the engine. Crown jewel
 `test_a_new_folder_or_a_remap_needs_zero_core_changes`. Design doc:
 `docs/DELIVERABLE_EXPORT.md`.
