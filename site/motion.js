@@ -123,6 +123,6 @@
   if (term) {
     // Hold the plan hidden from the first frame, then print once the hero has arrived.
     term.classList.add('is-printing');
-    wait(1100).then(printTerminal);
+    wait(700).then(printTerminal);
   }
 })();
