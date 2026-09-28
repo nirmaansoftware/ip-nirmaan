@@ -7,7 +7,8 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    # 24.04 ships Verilator 5, which the `--binary` simulation backend needs.
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -17,9 +18,15 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+      - name: Install open-source EDA tools
+        run: sudo apt-get update && sudo apt-get install -y verilator iverilog yosys
       - name: Install
         run: pip install -e ".[ai,dev]"
       - name: Test
+        # A real-tool test whose executable is named here fails instead of
+        # skipping. `sby` is not in Ubuntu's apt, so formal still skips.
+        env:
+          NIRMAAN_REQUIRE_EDA: verilator iverilog vvp yosys
         run: python -m pytest -q
 
   dashes:

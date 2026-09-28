@@ -1,6 +1,6 @@
 # IP Nirmaan roadmap
 
-The plan for what comes after v1.16.1. Read this together with `context.md`
+The plan for what comes after v1.17.0. Read this together with `context.md`
 (what exists and why) and `CLAUDE.md` (how to work here). Each stage ships the
 way every milestone has:
 - a design doc approved before code,
@@ -8,15 +8,19 @@ way every milestone has:
 - a `context.md` entry,
 - a PR merged into `main`.
 
-## Where we are (v1.16.1, 2026-09-28)
+## Where we are (v1.17.0, 2026-09-28)
 
 | Built | Not yet |
 |---|---|
-| Organization model: 207 units, 685 derived roles, skills, authority, a 12-principle constitution | Any AI worker actually doing work: every seat runs `NullRuntime` |
-| Planner: requirement to owned, reviewed, gated task graph; 7 workflows | Real design tools: lint, simulation, synthesis, formal, and STA are `CONTRACT_ONLY` |
-| Task engine: lifecycle, reviews, approvals, human gates, hash-chained audit | CI: done in Stage 0 (GitHub Actions, Python 3.11 and 3.12) |
-| VeriTriage as a real, evidence-producing tool (`veritriage.investigate`) | IP Nirmaan over MCP; events on the M18 bus |
-| 853 tests; CLI `nirmaan`; HTML dashboard; landing page live at https://ip.nirmaan.online | |
+| Organization model: 207 units, 685 derived roles, skills, authority, a 12-principle constitution | AI workers outside verification seats (architecture, RTL: Stage 4) |
+| Planner: requirement to owned, reviewed, gated task graph; 7 workflows | `sta.run` (OpenSTA) is still `CONTRACT_ONLY` |
+| Task engine: lifecycle, reviews, approvals, human gates, hash-chained audit | Formal runs in CI (Ubuntu apt has no `sby`) |
+| VeriTriage as a real, evidence-producing tool (`veritriage.investigate`) | The cross-domain engineering graph (Stage 5) |
+| AI workers in three verification seats, off by default, on Opus 5.5 (M20) | Physical design, DFT, firmware (Stage 6) |
+| Real lint, simulation, synthesis, and formal via open-source EDA (M21) | |
+| IP Nirmaan over MCP; organizational events on the M18 bus (M22) | |
+| CI on Python 3.11 and 3.12, plus a dash check (Stage 0) | |
+| 936 tests; CLI `nirmaan`; HTML dashboard; landing page live at https://ip.nirmaan.online | |
 
 ## Resume checklist (after the folder rename)
 
@@ -32,7 +36,7 @@ PYTHONPYCACHEPREFIX=/tmp/nirmaan-pycache .venv/bin/python -m pytest -q \
   --deselect tests/test_ai_boundary.py::test_missing_sdk_raises_clean_error
 ```
 
-Expect 853 passing. The folder is still in iCloud, so the eviction hangs
+Expect 936 passing. The folder is still in iCloud, so the eviction hangs
 described in `context.md` section 4 still apply. If imports stall, pre-read the tree:
 
 ```
