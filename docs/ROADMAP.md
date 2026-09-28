@@ -1,0 +1,146 @@
+# IP Nirmaan roadmap
+
+The plan for what comes after v1.16.1. Read this together with `context.md`
+(what exists and why) and `CLAUDE.md` (how to work here). Each stage ships the
+way every milestone has:
+- a design doc approved before code,
+- the implementation with a crown-jewel extension test,
+- a `context.md` entry,
+- a PR merged into `main`.
+
+## Where we are (v1.16.1, 2026-09-28)
+
+| Built | Not yet |
+|---|---|
+| Organization model: 207 units, 685 derived roles, skills, authority, a 12-principle constitution | Any AI worker actually doing work: every seat runs `NullRuntime` |
+| Planner: requirement to owned, reviewed, gated task graph; 7 workflows | Real design tools: lint, simulation, synthesis, formal, and STA are `CONTRACT_ONLY` |
+| Task engine: lifecycle, reviews, approvals, human gates, hash-chained audit | CI: the repo has no GitHub Actions; tests only run locally |
+| VeriTriage as a real, evidence-producing tool (`veritriage.investigate`) | IP Nirmaan over MCP; events on the M18 bus |
+| 853 tests; CLI `nirmaan`; HTML dashboard | Landing page at `ip.nirmaan.online` (brief: `docs/LANDING_PAGE_BRIEF.md`, owner builds it) |
+
+## Resume checklist (after the folder rename)
+
+The owner is renaming the working folder from `~/Documents/veritriage` to a new
+name inside `~/Documents` and restarting the session. The editable install
+records absolute paths, so rebuild the venv first:
+
+```
+cd ~/Documents/<new-folder-name>
+rm -rf .venv && python3.11 -m venv .venv && .venv/bin/pip install -e ".[ai,dev]"
+git remote -v                       # expect https://github.com/patel-om/ip-nirmaan.git
+PYTHONPYCACHEPREFIX=/tmp/nirmaan-pycache .venv/bin/python -m pytest -q \
+  --deselect tests/test_ai_boundary.py::test_missing_sdk_raises_clean_error
+```
+
+Expect 853 passing. The folder is still in iCloud, so the eviction hangs
+described in `context.md` section 4 still apply. If imports stall, pre-read the tree:
+
+```
+find src tests -flags +dataless -type f -print0 | xargs -0 cat > /dev/null
+```
+
+Then continue with **Stage 0** below.
+
+---
+
+## Stage 0: Continuous integration (small, do first)
+
+**Why:** every PR so far was verified only on one laptop with iCloud trouble.
+CI makes "tests pass" a public, repeatable fact, which fits the project's own
+"evidence or it did not happen" rule.
+
+**Scope:**
+- A GitHub Actions workflow running the full suite on Python 3.11 and 3.12 for every PR and push to `main`.
+- An extra CI step that fails on em or en dashes in tracked text files.
+- The README badge.
+
+**Done when:** a PR shows a green check, and a deliberately broken test turns it red.
+
+## Stage 1 (M20): The first AI workers, in verification seats
+
+**Why:** the organization plans and enforces, but nobody works. Verification is
+the right first department because VeriTriage already produces real evidence
+there, so agent output can be checked rather than trusted.
+
+**Scope:**
+- **A model-backed `AgentRuntime`** that goes through the M17 LLM provider registry (`veritriage.ai`), so one vendor registry still serves the whole platform. It stays off by default, and the null runtime remains the default seat.
+  - Only the bridge module may import `veritriage`. Either expose the provider through `integrations/veritriage.py`, or give the runtime its own thin adapter. Decide this in the design doc.
+  - Check the `claude-api` skill for current model IDs and API usage before writing it; do not work from memory.
+- **Seat three roles:** failure triage (runs `veritriage.investigate`), root cause (reads the triage evidence and concludes one of the declared outcomes), and debug review (an independent reviewer, a different seat and model call).
+- **Work packets become prompts.** Only the packet's four scopes (company, domain, project, task) are rendered, and every artifact must cite evidence IDs. Reuse M17's grounding enforcement idea: strip citations the packet did not contain.
+- **A `nirmaan run PROJECT TASK --runtime <id>` command**, with a `--dry-run` that shows the exact prompt.
+- **A deterministic `MockLLM` runtime for tests**, so the suite never calls an API.
+
+**Done when:**
+- Demo 4 ("Investigate a regression failure...") runs triage, root cause, and review with agents, on fixture logs, ending at a human approval.
+- A test proves an agent citing a tool run that never happened is refused (P5), and that an agent cannot review its own output (P6).
+- Nothing changes for users who never configure a model.
+
+## Stage 2 (M21): Real design tools, through open-source EDA
+
+**Why:** most evidence requirements (lint, simulation, formal, synthesis,
+timing) can today only be met by a human attesting. Open-source EDA can make
+them real without licenses.
+
+**Scope:** broker bindings, each one moving a tool from `CONTRACT_ONLY` to `AVAILABLE`:
+
+| Tool ID | Open-source backend |
+|---|---|
+| `lint.run` | Verilator `--lint-only` |
+| `simulator.run` / `test.run` | Verilator or Icarus Verilog |
+| `synth.run` | Yosys |
+| `formal.run` | SymbiYosys |
+| `sta.run` | OpenSTA (optional, later) |
+
+Rules for each binding:
+- It only works when its executable is found on `PATH`; otherwise the tool stays refused and says why.
+- Its output is parsed into a structured result, and failures are recorded runs, never exceptions.
+- Simulation logs feed straight into `veritriage.investigate`.
+
+**Done when:** a tiny fixture RTL module (checked into `tests/fixtures/rtl/`) passes a real `lint.run` and `synth.run` in CI. Its evidence substantiates the RTL lint requirement with no human attestation. A crown-jewel test adds a fake tool binding with zero core changes.
+
+## Stage 3 (M22): IP Nirmaan over MCP, and events
+
+**Scope:**
+- A separate MCP tool table for Nirmaan (plan, status, why, task actions). It must not be added to VeriTriage's table, which would break the import law.
+- Publish organizational events (task completed, gate approved, escalation raised) to the M18 event bus through the bridge, so VeriTriage automation rules can react.
+
+**Done when:** Claude Code or Cursor can plan a project and ask "why is this blocked?" over MCP.
+
+## Stage 4 (M23): Architecture and RTL agents (spec Phase 6)
+
+**Why:** with real tools in place (Stage 2), design work can be verified, not just claimed.
+
+**Scope:**
+- Agents for interface specification, microarchitecture, and RTL implementation, each working from approved upstream artifacts only.
+- RTL agents must pass real lint and simulation (Stage 2) before review.
+- Start with small, self-contained blocks: a FIFO, an arbiter, an APB register block.
+
+**Done when:** "Create a parameterizable round-robin arbiter" produces spec, RTL, testbench, and a passing simulation, reviewed and approved through the engine, with every claim backed by a recorded tool run.
+
+## Stage 5 (M24): The cross-domain engineering graph (spec Phase 8)
+
+**Scope:**
+- Link trace-graph artifacts to VeriTriage Design Graph nodes: an RTL artifact to its module, a test to the interface it covers.
+- Requirement-to-coverage traceability: which requirement each coverage point proves.
+
+**Done when:** "which requirements are not yet backed by passing verification evidence?" is a single query.
+
+## Stage 6 (M25+): Physical design, DFT, firmware (spec Phase 7)
+
+- OpenROAD bindings for floorplan, place, route, and timing.
+- DFT and firmware agents.
+- This is the largest stage. Scope it only after Stage 4 has proven that agent work holds up under review.
+
+## Side work (any time; owner-driven)
+
+- **Landing page** at `ip.nirmaan.online`, built by the owner's web-development setup from `docs/LANDING_PAGE_BRIEF.md`. After it goes live, add the URL to `pyproject.toml` and the README.
+- **Moving the repo out of iCloud** would remove the test hangs entirely. The owner has chosen to keep it in `~/Documents` for now.
+- **The PyPI name** `ip-nirmaan`: publishing an initial release would reserve it. Needs the owner's explicit go-ahead.
+
+## Principles that do not change
+
+- VeriTriage stays standalone and never imports Nirmaan.
+- The organization is data; routing never names a domain.
+- Nothing is marked verified or approved without evidence the engine can substantiate.
+- A human approves the gates marked human-required.

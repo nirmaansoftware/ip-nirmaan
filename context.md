@@ -1477,6 +1477,9 @@ Standing offer, not executed: publish an initial `veritriage` release to
 PyPI to reserve the name. Requires explicit user go-ahead.
 
 ### 5.10a IP Nirmaan next steps (M19 follow-ups)
+
+Superseded by `docs/ROADMAP.md`, which is now the authoritative plan (Stages
+0 to 6, with scope and done-when criteria). The notes below are kept for history.
 - A model-backed `AgentRuntime` (Claude via the M17 provider registry, so one
   vendor registry still serves everything), first on verification seats where
   `veritriage.investigate` already produces real evidence.

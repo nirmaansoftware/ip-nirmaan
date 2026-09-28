@@ -1,8 +1,8 @@
 # CLAUDE.md
 
-Guidance for AI coding agents working in the IP Nirmaan repository. Read
-`context.md` before starting a milestone: it records what exists, why, and what
-is deliberately left for later.
+Guidance for AI coding agents working in the IP Nirmaan repository. Before
+starting work, read `context.md` (what exists and why) and `docs/ROADMAP.md`
+(what comes next, and the resume checklist).
 
 ## How to work
 
