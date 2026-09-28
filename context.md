@@ -12,7 +12,7 @@ Repo: https://github.com/nirmaansoftware/ip-nirmaan (public, Apache-2.0; renamed
 to the `nirmaansoftware` account on 2026-09-28; GitHub redirects the old URLs,
 and `patel-om` keeps push access as a collaborator)
 Local path: `/Users/ompatel/Documents/veritriage`
-Current version: **1.17.0** (distribution `ip-nirmaan`; packages `nirmaan` and `veritriage`)
+Current version: **1.18.0** (distribution `ip-nirmaan`; packages `nirmaan` and `veritriage`)
 Portfolio: removed from `/Users/ompatel/Documents/Om Portfolio` at the user's
 request after M19 (card and sample pages deleted).
 
@@ -1409,6 +1409,10 @@ Deferred: an archive format with a signed manifest, and artifact bodies beyond
 the recorded summary (the Stage 4 design agents will record located files,
 which the export already copies).
 
+v1.18.0 is the one version bump for the three M23 parts (fixtures, design
+agents, export), built in parallel and merged as #23, #24, #26, and #25. The
+standard run is 984 tests.
+
 ---
 
 ## 3. Current architecture map
@@ -1632,7 +1636,7 @@ from the repo root.
   renamed to **VeriTriage** at M2/M3 boundary (GitHub redirect preserved
   from the rename). After M19 the user renamed the PROJECT, first to "Nirmaan IP"
   (repo `nirmaan-ip`, v1.16.0) and then, to match the `ipnirmaan.com` domain, to
-  **IP Nirmaan** (repo `patel-om/ip-nirmaan`, distribution `ip-nirmaan`, v1.17.0).
+  **IP Nirmaan** (repo `patel-om/ip-nirmaan`, distribution `ip-nirmaan`, v1.18.0).
   On 2026-09-28 the repo was transferred to `nirmaansoftware/ip-nirmaan`.
   The `nirmaan` package and CLI keep their short name by the user's choice. VeriTriage
   was deliberately NOT renamed: it is the verification engine inside Nirmaan
