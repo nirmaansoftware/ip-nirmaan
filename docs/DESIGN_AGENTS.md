@@ -286,7 +286,7 @@ reviewed and approved.
    changes.
 10. The AXI4-Lite demo: spec, microarchitecture, and RTL seats on scripted
     answers, real lint and simulation, reviewed and approved, every claim
-    backed by a recorded run. Skipped until the fixture set lands.
+    backed by a recorded run, against `tests/fixtures/rtl/axi4_lite/`.
 
 ---
 

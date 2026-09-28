@@ -130,14 +130,12 @@ Rules for each binding:
 
 ## Stage 4 (M23): Architecture and RTL agents (spec Phase 6)
 
-**Status: in progress.** The mechanism is built on branch `m23/design-agents`
-(design: `docs/DESIGN_AGENTS.md`; history: the M23 entry in `context.md`):
-approved-inputs-only seats, files in model answers as artifacts with a digest,
-and RTL gated on real lint and simulation before review. It is proven on the
-M21 counter. Done once the AXI4-Lite fixture set lands in
-`tests/fixtures/rtl/axi4_lite/` and its end-to-end test
-(`test_the_axi4_lite_register_block_is_designed_by_agents`) runs instead of
-skipping.
+**Status: done (M23).** Design: `docs/DESIGN_AGENTS.md`; history: the M23
+entries in `context.md`. Approved-inputs-only seats, files in model answers as
+artifacts with a digest, and RTL gated on real lint and simulation before
+review. `test_the_axi4_lite_register_block_is_designed_by_agents` runs the
+AXI4-Lite register block end to end against the fixture set in
+`tests/fixtures/rtl/axi4_lite/`, locally and in CI.
 
 **Why:** with real tools in place (Stage 2), design work can be verified, not just claimed.
 

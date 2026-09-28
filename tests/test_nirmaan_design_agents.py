@@ -445,14 +445,12 @@ def test_a_new_design_seat_needs_no_core_changes(fixed_clock, tmp_path):
         unregister_binding("regmap.check")
 
 
-# --- The AXI4-Lite register block (activated when the fixture set lands) ------------------
+# --- The AXI4-Lite register block: the Stage 4 demo -------------------------------------
 
 
 @needs("verilator", "iverilog", "vvp")
 def test_the_axi4_lite_register_block_is_designed_by_agents(nirmaan_org, fixed_clock, tmp_path):
     """Spec, microarchitecture, and RTL seats; real lint and simulation; reviewed and approved."""
-    if not AXI.is_dir():
-        pytest.skip(f"the AXI4-Lite fixture set is not in {AXI} yet")
     engine = Orchestrator(nirmaan_org, clock=fixed_clock).plan(AXI_BLOCK)
     stages = (("interface-spec", "requirements", [("interface_spec.md", "interface_spec", None)]),
               ("microarchitecture", "interface-spec", [("microarchitecture.md", "microarchitecture_spec", None)]),
