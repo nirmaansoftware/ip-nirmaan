@@ -30,6 +30,8 @@ All three are technical. Write for engineers: concrete, specific, and without hy
 
 A shorter tagline for the hero: **"A semiconductor IP company, as software."**
 
+On the page (2026-09-28) the hero headline reads **"Chip IP, built as software."**, with "Semiconductor IP" in the label above it. Each line then fits nirmaan.online's headline rule, so both sites' headlines are the same size; any line containing "semiconductor" is too wide for it.
+
 ## 4. Sections, in order
 
 ### Hero

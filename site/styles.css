@@ -21,11 +21,6 @@
   @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --term-bg: #17171A; } }
   :root[data-theme="dark"] { --term-bg: #17171A; }
 
-  /* The hero headline sizes itself to its column, as on nirmaan.online; the
-     cap is set for this site's longest line ("A semiconductor"). */
-  .hero__title { font-size: min(clamp(2.4rem, 1.2rem + 3.4vw, 5rem), 10.4cqi); }
-  @media (max-width: 60rem) { .hero__title { font-size: min(10.4cqi, 5rem); } }
-
   code { font-family: var(--mono); font-size: 0.92em; }
 
   /* Headings inside this site's components use nirmaan.css's card heading. */
