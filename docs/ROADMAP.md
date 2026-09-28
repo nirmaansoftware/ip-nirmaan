@@ -150,7 +150,13 @@ AXI4-Lite register block end to end against the fixture set in
 
 **Status:** the project deliverable export lands as part of M23: `nirmaan export PROJECT --out DIR` writes the numbered tree (`01_requirement/` to `10_signoff/`) from recorded state, never raising assurance, listing missing deliverables as missing, and flagging a broken audit chain. See `docs/DELIVERABLE_EXPORT.md`.
 
-## Stage 5 (M24): The cross-domain engineering graph (spec Phase 8)
+## Stage 5 (M24): The cross-domain engineering graph (spec Phase 8) (DONE)
+
+**Status: done (M24).** Design: `docs/ENGINEERING_GRAPH.md`; history: the M24
+entry in `context.md`. The single query is
+`nirmaan.engineering.unbacked_requirements(state)`, also `nirmaan gaps PROJECT`
+and `09_evidence/requirement_gaps.md` in the export.
+`test_stage5_demo_on_the_axi4_lite_flow` shows it on the AXI4-Lite flow.
 
 **Scope:**
 - Link trace-graph artifacts to VeriTriage Design Graph nodes: an RTL artifact to its module, a test to the interface it covers.
