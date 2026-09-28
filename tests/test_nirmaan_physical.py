@@ -1,0 +1,416 @@
+"""Milestone 25 (physical design part): OpenSTA and OpenROAD behind the broker.
+
+* Parsers are tested against labelled SYNTHETIC samples in tests/fixtures/pd
+  (neither tool could be run where they were written; see docs/PHYSICAL_DESIGN.md).
+* A missing executable or a missing PDK input is a refusal with a reason, and
+  no run is recorded. Design-input problems, tool failures, and timeouts are
+  recorded failed runs.
+* Liberty-mapped synthesis (the netlist STA and place-and-route consume) runs
+  for real with Yosys and a toy test library.
+* The physical-implementation workflow plans synth, floorplan, place and
+  route, then STA signoff.
+* Crown jewel: a new physical-design backend needs zero core changes.
+* Real OpenSTA and OpenROAD tests skip without the tools and sky130.
+"""
+
+from __future__ import annotations
+
+import ast
+import os
+import shutil
+from pathlib import Path
+
+import pytest
+from typer.testing import CliRunner
+
+from nirmaan_helpers import agent, tid
+from test_nirmaan_eda import holder, needs
+
+from nirmaan.integrations.eda import Backend, EdaResult, register_backend, unregister_backend
+from nirmaan.integrations.pd_parsers import parse_openroad, parse_opensta
+from nirmaan.integrations.physical import PDK_ROOT_ENV, needs_pdk
+from nirmaan.models import EvidenceKind, TaskKind, ToolStatus
+from nirmaan.orchestrator import Orchestrator
+from nirmaan.runtime import ToolAccessDenied, ToolBroker, available_bindings, unavailable_reason
+from nirmaan.work.policy import unsatisfied_requirements
+
+FIXTURES = Path(__file__).parent / "fixtures"
+PD = FIXTURES / "pd"
+AXI = FIXTURES / "rtl" / "axi4_lite" / "axi4_lite_regs.v"
+TOP = "axi4_lite_regs"
+SDC = PD / "axi4_lite_regs.sdc"
+TINY_LIB = PD / "tiny_cells.lib"
+PNR_REQUEST = "Place and route the AXI4-Lite register block."
+PNR_PDK = {"site": "unithd", "hor_layers": "met3", "ver_layers": "met2"}
+
+
+def _text(name: str) -> str:
+    return (PD / name).read_text(encoding="utf-8")
+
+
+@pytest.fixture()
+def project(nirmaan_org, fixed_clock):
+    return Orchestrator(nirmaan_org, clock=fixed_clock).plan(PNR_REQUEST)
+
+
+def invoke(engine, tool: str, params: dict[str, str], workdir: Path, task: str | None = None):
+    return ToolBroker(engine).invoke(agent(holder(engine, tool)), tool, {"workdir": str(workdir), **params}, task)
+
+
+def fake_tool(bin_dir: Path, name: str, body: str) -> Path:
+    """A stand-in executable the test writes: it exercises the runner, and never stands in for evidence of a real tool."""
+    bin_dir.mkdir(parents=True, exist_ok=True)
+    exe = bin_dir / name
+    exe.write_text(f"#!/bin/sh\n{body}\n", encoding="utf-8")
+    exe.chmod(0o755)
+    return exe
+
+
+def only_on_path(monkeypatch, bin_dir: Path) -> None:
+    """PATH holds the test's stand-ins and the shell utilities they use, nothing else."""
+    monkeypatch.setenv("PATH", f"{bin_dir}:{Path(shutil.which('sh')).parent}")
+
+
+def fake_pdk(root: Path) -> dict[str, str]:
+    root.mkdir(parents=True, exist_ok=True)
+    for name in ("cells.lib", "tech.lef", "cells.lef"):
+        (root / name).write_text("stand-in\n", encoding="utf-8")
+    return {"liberty": str(root / "cells.lib"), "tech_lef": str(root / "tech.lef"), "lef": str(root / "cells.lef")}
+
+
+# --- The catalog ------------------------------------------------------------------------
+
+
+def test_sta_and_pnr_have_real_bindings(nirmaan_org):
+    for tool in ("sta.run", "pnr.run"):
+        assert nirmaan_org.tools[tool].status is ToolStatus.AVAILABLE, tool
+        assert tool in available_bindings(), tool
+
+
+def test_the_catalog_says_why_a_tool_cannot_run_here(monkeypatch, tmp_path):
+    monkeypatch.setenv("PATH", str(tmp_path))
+    reason = unavailable_reason("sta.run")
+    assert "opensta needs sta on PATH, not found" in reason and "never simulated" in reason
+    assert "openroad needs openroad" in unavailable_reason("pnr.run")
+    assert unavailable_reason("status.read") is None  # a platform tool always runs
+
+    from nirmaan.cli import app
+
+    result = CliRunner().invoke(app, ["org", "tools"], env={"COLUMNS": "400"})
+    assert result.exit_code == 0, result.output
+    line = next(ln for ln in result.output.splitlines() if "sta.run" in ln)
+    assert "no:" in line and "opensta needs sta" in line
+
+
+# --- Parsers, against labelled synthetic samples ----------------------------------------
+
+
+def test_the_samples_say_they_are_synthetic():
+    for sample in PD.glob("synthetic_*.log"):
+        assert sample.read_text(encoding="utf-8").startswith("# SYNTHETIC:"), sample
+
+
+def test_opensta_timing_met():
+    result = parse_opensta(_text("synthetic_opensta_met.log"), 0)
+    assert result.passed, result.summary
+    m = result.metrics
+    assert (m["worst_slack"], m["worst_hold_slack"], m["tns"], m["wns"]) == (7.688, 2.146, 0.0, 0.0)
+    assert m["violating_endpoints"] == [] and result.diagnostics == ()
+    assert result.summary == "timing met: worst setup slack 7.688, worst hold slack 2.146, TNS 0.000"
+
+
+def test_opensta_timing_violated():
+    result = parse_opensta(_text("synthetic_opensta_violated.log"), 0)
+    assert not result.passed
+    m = result.metrics
+    assert (m["worst_slack"], m["worst_hold_slack"], m["tns"], m["wns"]) == (-0.375, 0.546, -0.53, -0.375)
+    assert m["violating_endpoints"] == [
+        {"endpoint": "_2640_", "check": "setup", "slack": -0.375},
+        {"endpoint": "_2641_", "check": "setup", "slack": -0.155},
+    ]
+    assert len(result.warnings) == 1 and not result.errors
+    assert result.summary == ("timing violated: 2 violating endpoints, worst setup slack -0.375, "
+                              "worst hold slack 0.546, TNS -0.530; worst: _2640_ (setup) -0.375")
+
+
+def test_opensta_unconstrained_or_crashed_is_not_timing_met():
+    unconstrained = parse_opensta("No paths found.\nworst slack INF\nworst slack INF\ntns 0.000\nwns 0.000\n", 0)
+    assert not unconstrained.passed and "no constrained timing paths" in unconstrained.summary
+    crashed = parse_opensta("Error: sta.tcl, 2 cannot read file netlist.v\n", 1)
+    assert not crashed.passed and crashed.errors[0].message == "sta.tcl, 2 cannot read file netlist.v"
+    assert "1 error" in crashed.summary
+    orstyle = parse_opensta("[ERROR STA-0164] liberty file not found\n", 1)
+    assert orstyle.errors[0].code == "STA-0164"
+
+
+def test_openroad_full_flow():
+    result = parse_openroad(_text("synthetic_openroad_route.log"), 0, "route")
+    assert result.passed, result.summary
+    m = result.metrics
+    assert m["stages_completed"] == ["floorplan", "place", "route", "timing"] and m["failed_stage"] is None
+    assert (m["design_area_um2"], m["utilization_pct"]) == (8207.0, 41.0)
+    assert (m["wirelength_um"], m["drc_violations"]) == (21456.0, 0)  # the last iteration's count
+    assert (m["worst_slack"], m["worst_hold_slack"]) == (6.912, 0.215)
+    assert [d.code for d in result.warnings] == ["IFP-0028"]
+    assert result.summary.startswith("place and route passed: routed, 0 DRC violations, wirelength 21456 um")
+
+
+def test_openroad_failure_names_the_stage():
+    result = parse_openroad(_text("synthetic_openroad_error.log"), 1, "route")
+    assert not result.passed
+    assert result.metrics["stages_completed"] == ["floorplan"] and result.metrics["failed_stage"] == "place"
+    assert result.errors[0].code == "GPL-0301" and "212.4" in result.errors[0].message
+    assert "failed in place" in result.summary
+
+
+def test_openroad_drc_violations_and_missing_stages_fail():
+    log = _text("synthetic_openroad_route.log").replace("Number of violations = 0.", "Number of violations = 7.")
+    drc = parse_openroad(log, 0, "route")
+    assert not drc.passed and drc.metrics["drc_violations"] == 7 and "7 DRC violations" in drc.summary
+    floorplan_only = "\n".join(ln for ln in _text("synthetic_openroad_route.log").splitlines()
+                               if "stage" not in ln or "floorplan" in ln or "timing" in ln)
+    assert parse_openroad(floorplan_only, 0, "floorplan").passed
+    assert not parse_openroad(floorplan_only, 0, "route").passed  # route was asked for and never finished
+
+
+# --- Refusal: a missing executable or PDK is never a run ----------------------------------
+
+
+def test_a_missing_executable_is_a_refusal_with_a_reason(project, tmp_path, monkeypatch):
+    monkeypatch.setenv("PATH", str(tmp_path))
+    pdk = fake_pdk(tmp_path / "pdk")
+    with pytest.raises(ToolAccessDenied, match="opensta needs sta on PATH, not found"):
+        invoke(project, "sta.run", {"netlist": str(AXI), "sdc": str(SDC), "top": TOP, **pdk}, tmp_path)
+    with pytest.raises(ToolAccessDenied, match="openroad needs openroad on PATH, not found"):
+        invoke(project, "pnr.run", {"netlist": str(AXI), "sdc": str(SDC), "top": TOP, **pdk, **PNR_PDK}, tmp_path)
+    assert project.state.tool_runs == {}
+
+
+def test_a_missing_pdk_is_a_refusal_with_a_reason(project, tmp_path, monkeypatch):
+    bin_dir = tmp_path / "bin"
+    fake_tool(bin_dir, "sta", "echo should never run; exit 1")
+    fake_tool(bin_dir, "openroad", "echo should never run; exit 1")
+    only_on_path(monkeypatch, bin_dir)
+    monkeypatch.delenv(PDK_ROOT_ENV, raising=False)
+    design = {"netlist": str(AXI), "sdc": str(SDC), "top": TOP}
+    with pytest.raises(ToolAccessDenied, match="needs a Liberty file .*no PDK is bundled"):
+        invoke(project, "sta.run", design, tmp_path)
+    with pytest.raises(ToolAccessDenied, match="liberty not found: .*nowhere.lib"):
+        invoke(project, "sta.run", {**design, "liberty": str(tmp_path / "nowhere.lib")}, tmp_path)
+    with pytest.raises(ToolAccessDenied, match="needs a technology LEF.*needs a placement site"):
+        invoke(project, "pnr.run", {**design, "liberty": str(TINY_LIB)}, tmp_path)
+    assert project.state.tool_runs == {}  # the stand-ins never ran
+
+
+def test_relative_pdk_paths_resolve_under_the_pdk_root(project, tmp_path, monkeypatch):
+    bin_dir = tmp_path / "bin"
+    fake_tool(bin_dir, "sta", f"cat '{PD / 'synthetic_opensta_met.log'}'")
+    only_on_path(monkeypatch, bin_dir)
+    fake_pdk(tmp_path / "sky")
+    monkeypatch.setenv(PDK_ROOT_ENV, str(tmp_path / "sky"))
+    params = {"netlist": str(AXI), "sdc": str(SDC), "top": TOP, "liberty": "cells.lib"}
+    run, _ = invoke(project, "sta.run", params, tmp_path / "w")
+    assert run.succeeded, run.summary
+    script = (tmp_path / "w" / "sta.tcl").read_text()
+    assert f'read_liberty "{tmp_path / "sky" / "cells.lib"}"' in script
+
+
+# --- The runner: real steps, parsed output, recorded failures ------------------------------
+
+
+def test_sta_runs_the_script_it_writes_and_parses_the_output(project, tmp_path, monkeypatch):
+    bin_dir = tmp_path / "bin"
+    fake_tool(bin_dir, "sta", f"echo \"argv: $*\"; cat '{PD / 'synthetic_opensta_violated.log'}'")
+    only_on_path(monkeypatch, bin_dir)
+    params = {"netlist": str(AXI), "sdc": str(SDC), "top": TOP, "liberty": str(TINY_LIB)}
+    run, outcome = invoke(project, "sta.run", params, tmp_path / "w")
+    assert not run.succeeded and run.id in project.state.tool_runs  # a violation is a recorded failed run
+    assert run.summary.startswith("opensta: timing violated: 2 violating endpoints")
+    log, result = (Path(r) for r in run.references)
+    assert "argv: -no_init -no_splash -exit sta.tcl" in log.read_text() and result.is_file()
+    assert outcome.data["result"]["metrics"]["worst_slack"] == -0.375
+    script = (tmp_path / "w" / "sta.tcl").read_text()
+    for line in (f'read_liberty "{TINY_LIB}"', f'read_verilog "{AXI}"', f"link_design {TOP}",
+                 f'read_sdc "{SDC}"', "report_worst_slack -max", "report_tns"):
+        assert line in script, line
+    assert "read_spef" not in script
+
+
+def test_design_input_problems_and_timeouts_are_recorded_failed_runs(project, tmp_path, monkeypatch):
+    bin_dir = tmp_path / "bin"
+    fake_tool(bin_dir, "sta", "sleep 30")
+    only_on_path(monkeypatch, bin_dir)
+    base = {"sdc": str(SDC), "top": TOP, "liberty": str(TINY_LIB)}
+    missing, _ = invoke(project, "sta.run", {**base, "netlist": str(tmp_path / "nope.v")}, tmp_path / "a")
+    assert not missing.succeeded and "not found" in missing.summary and "nope.v" in missing.summary
+    no_param, _ = invoke(project, "sta.run", base, tmp_path / "b")
+    assert not no_param.succeeded and "missing parameter netlist" in no_param.summary
+    slow, _ = invoke(project, "sta.run", {**base, "netlist": str(AXI), "timeout": "1"}, tmp_path / "c")
+    assert not slow.succeeded and slow.summary == "opensta: timed out after 1s in sta"
+    fake_tool(bin_dir, "sta", "echo 'Error: sta.tcl, 3 unknown cell INV'; exit 1")
+    crashed, _ = invoke(project, "sta.run", {**base, "netlist": str(AXI)}, tmp_path / "d")
+    assert not crashed.succeeded and "unknown cell INV" in crashed.summary
+    assert len(project.state.tool_runs) == 4
+
+
+def test_pnr_stages_follow_stop_after(project, tmp_path, monkeypatch):
+    bin_dir = tmp_path / "bin"
+    fake_tool(bin_dir, "openroad", f"cat '{PD / 'synthetic_openroad_route.log'}'")
+    only_on_path(monkeypatch, bin_dir)
+    params = {"netlist": str(AXI), "sdc": str(SDC), "top": TOP, **fake_pdk(tmp_path / "pdk"), **PNR_PDK}
+    run, outcome = invoke(project, "pnr.run", params, tmp_path / "full")
+    assert run.succeeded, run.summary
+    assert outcome.data["commands"] == [["openroad", "-no_init", "-no_splash", "-exit", "pnr.tcl"]]
+    full = (tmp_path / "full" / "pnr.tcl").read_text()
+    for step in ("initialize_floorplan -utilization 40 -aspect_ratio 1 -core_space 2 -site unithd",
+                 "place_pins -hor_layers met3 -ver_layers met2", "global_placement", "detailed_route",
+                 "estimate_parasitics -global_routing", "report_worst_slack -min", "write_def route.def"):
+        assert step in full, step
+    assert full.index("read_lef") < full.index("read_liberty") < full.index("link_design")
+
+    run, _ = invoke(project, "pnr.run", {**params, "stop_after": "floorplan", "utilization": "55"},
+                    tmp_path / "fp")
+    floorplan = (tmp_path / "fp" / "pnr.tcl").read_text()
+    assert "-utilization 55" in floorplan and "global_placement" not in floorplan
+    assert "estimate_parasitics" not in floorplan and "write_def floorplan.def" in floorplan
+
+    bad, _ = invoke(project, "pnr.run", {**params, "stop_after": "cts"}, tmp_path / "bad")
+    assert not bad.succeeded and "stop_after" in bad.summary
+
+
+# --- Liberty-mapped synthesis, for real ---------------------------------------------------
+
+
+@needs("yosys")
+def test_real_liberty_mapped_synthesis_writes_the_netlist(project, tmp_path):
+    params = {"sources": str(AXI), "top": TOP, "liberty": str(TINY_LIB), "backend": "yosys-liberty"}
+    run, outcome = invoke(project, "synth.run", params, tmp_path)
+    assert run.succeeded, run.summary
+    metrics = outcome.data["result"]["metrics"]
+    netlist = Path(metrics["netlist"])
+    assert netlist.is_file() and f"module {TOP}(" in netlist.read_text()
+    assert set(metrics["cells_by_type"]) <= {"INV", "BUF", "NAND2", "NOR2", "DFF"}
+    assert metrics["flip_flops"] == metrics["cells_by_type"]["DFF"] > 0 and metrics["area"] > 0
+
+
+def test_liberty_mapped_synthesis_without_a_liberty_is_refused(project, tmp_path):
+    with pytest.raises(ToolAccessDenied, match="needs a Liberty file"):
+        invoke(project, "synth.run", {"sources": str(AXI), "top": TOP, "backend": "yosys-liberty"}, tmp_path)
+
+
+# --- The workflow -----------------------------------------------------------------------
+
+
+def test_the_physical_implementation_workflow_plans_the_stages(project):
+    assert project.state.project.workflows == ("physical-implementation",)
+    tasks = {t.stage: t for t in project.state.tasks.values() if t.stage and t.kind is TaskKind.WORK}
+    order = ["timing-constraints", "synthesis", "floorplan", "place-route", "sta-signoff"]
+    assert set(order) <= set(tasks)
+    for earlier, later in zip(order, order[1:]):
+        assert tasks[earlier].id in tasks[later].depends_on, later
+    tools = {stage: {t for r in tasks[stage].evidence_requirements for t in r.tools} for stage in order}
+    assert tools["synthesis"] == {"synth.run"} and tools["floorplan"] == {"pnr.run"}
+    assert tools["place-route"] == {"pnr.run"} and tools["sta-signoff"] == {"sta.run"}
+    gates = [t for t in project.state.tasks.values() if t.kind is TaskKind.GATE and t.stage == "sta-signoff"]
+    assert [g.gate for g in gates] == ["gate.implementation"] and tasks["sta-signoff"].id in gates[0].depends_on
+
+
+# --- Crown jewel: a new PD backend needs zero core changes ---------------------------------
+
+
+def test_a_new_pd_backend_needs_no_core_changes(project, tmp_path, monkeypatch):
+    """A router the core has never heard of: an executable, a PDK requirement, steps, a parser."""
+    bin_dir = tmp_path / "bin"
+    fake_tool(bin_dir, "tinyroute", 'echo "routed $1 with $2"; echo "tinyroute: 0 opens, 0 shorts"')
+
+    def parse(run) -> EdaResult:
+        clean = run.returncode == 0 and "0 opens, 0 shorts" in run.log
+        return EdaResult(clean, "routed clean" if clean else "routing failed")
+
+    register_backend(Backend("tinyroute", "pnr.run", ("tinyroute",),
+                             lambda job: [["tinyroute", job.params["netlist"], job.params["lef"]]], parse,
+                             required=("netlist",), files=("netlist",),
+                             environment=needs_pdk(lef="a cell LEF")))
+    try:
+        only_on_path(monkeypatch, bin_dir)
+        params = {"netlist": str(AXI), "backend": "tinyroute"}
+        with pytest.raises(ToolAccessDenied, match="tinyroute: needs a cell LEF"):
+            invoke(project, "pnr.run", params, tmp_path / "w1")  # no PDK: refused
+        assert project.state.tool_runs == {}
+        lef = fake_pdk(tmp_path / "pdk")["lef"]
+        place_route = tid(project, "place-route")
+        run, _ = invoke(project, "pnr.run", {**params, "lef": lef}, tmp_path / "w2", place_route)
+        assert run.succeeded and run.summary == "tinyroute: routed clean"
+        assert f"routed {AXI} with {lef}" in Path(run.references[0]).read_text()  # it really ran
+        owner = agent(project.task(place_route).owner)
+        ev = project.record_evidence(place_route, owner, EvidenceKind.TOOL_RUN, run.summary, tool_run=run.id)
+        assert ev.substantiated
+        pnr_req = next(r for r in project.task(place_route).evidence_requirements if r.tools == ("pnr.run",))
+        unmet = unsatisfied_requirements(project.state, project.task(place_route))
+        assert pnr_req.description not in unmet and unmet  # met by the run; the review is still owed
+    finally:
+        unregister_backend("pnr.run", "tinyroute")
+
+
+# --- The import laws ----------------------------------------------------------------------
+
+
+def test_the_physical_modules_keep_the_import_laws():
+    src = Path(__file__).resolve().parent.parent / "src" / "nirmaan" / "integrations"
+    imports = {}
+    for name in ("physical.py", "pd_parsers.py"):
+        tree = ast.parse((src / name).read_text(encoding="utf-8"))
+        modules = {n.module or "" for n in ast.walk(tree) if isinstance(n, ast.ImportFrom)}
+        modules |= {a.name for n in ast.walk(tree) if isinstance(n, ast.Import) for a in n.names}
+        assert not any(m.split(".")[0] == "veritriage" for m in modules), name
+        imports[name] = {m for m in modules if m.startswith("nirmaan")}
+    assert imports["pd_parsers.py"] <= {"nirmaan.integrations.eda_parsers"}  # the parsers stay pure
+
+
+# --- Real tools (skipped without OpenSTA or OpenROAD and sky130) --------------------------
+
+SKY130 = {
+    "liberty": "libs.ref/sky130_fd_sc_hd/lib/sky130_fd_sc_hd__tt_025C_1v80.lib",
+    "tech_lef": "libs.ref/sky130_fd_sc_hd/techlef/sky130_fd_sc_hd__nom.tlef",
+    "lef": "libs.ref/sky130_fd_sc_hd/lef/sky130_fd_sc_hd.lef",
+}
+
+
+def sky130() -> dict[str, str]:
+    """sky130 HD under NIRMAAN_PDK_ROOT; skip without it (fail when CI requires STA or OpenROAD)."""
+    root = os.environ.get(PDK_ROOT_ENV, "")
+    if root and all((Path(root) / p).is_file() for p in SKY130.values()):
+        return dict(SKY130)
+    required = set(os.environ.get("NIRMAAN_REQUIRE_EDA", "").replace(",", " ").split())
+    if required & {"sta", "openroad"}:
+        pytest.fail(f"{PDK_ROOT_ENV} does not point at sky130A with the HD library")
+    pytest.skip(f"{PDK_ROOT_ENV} does not point at sky130A with the HD library")
+
+
+def _mapped_netlist(project, tmp_path, pdk) -> str:
+    params = {"sources": str(AXI), "top": TOP, "backend": "yosys-liberty", **pdk}
+    run, outcome = invoke(project, "synth.run", params, tmp_path / "synth")
+    assert run.succeeded, run.summary
+    return outcome.data["result"]["metrics"]["netlist"]
+
+
+@needs("sta", "yosys")
+def test_real_opensta_times_the_axi4_lite_block(project, tmp_path):
+    pdk = sky130()
+    netlist = _mapped_netlist(project, tmp_path, pdk)
+    run, outcome = invoke(project, "sta.run", {"netlist": netlist, "sdc": str(SDC), "top": TOP,
+                                              "liberty": pdk["liberty"]}, tmp_path / "sta")
+    metrics = outcome.data["result"]["metrics"]
+    assert metrics["worst_slack"] is not None, run.summary
+    assert run.succeeded, run.summary
+
+
+@needs("openroad", "yosys")
+def test_real_openroad_places_and_routes_the_axi4_lite_block(project, tmp_path):
+    pdk = sky130()
+    netlist = _mapped_netlist(project, tmp_path, pdk)
+    run, outcome = invoke(project, "pnr.run", {"netlist": netlist, "sdc": str(SDC), "top": TOP, **pdk, **PNR_PDK},
+                          tmp_path / "pnr")
+    metrics = outcome.data["result"]["metrics"]
+    assert metrics["stages_completed"][:3] == ["floorplan", "place", "route"], run.summary
+    assert metrics["wirelength_um"] and metrics["utilization_pct"], run.summary

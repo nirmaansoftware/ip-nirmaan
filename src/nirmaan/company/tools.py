@@ -3,13 +3,15 @@
 ``AVAILABLE`` means a real binding exists in this repository and an
 invocation executes. ``CONTRACT_ONLY`` means the organization plans around the
 tool but nothing here can run it, and the broker refuses rather than pretends:
-no agent can ever claim an STA or place-and-route run happened.
+no agent can ever claim a CDC or equivalence run happened.
 
 Lint, simulation, tests, synthesis, and formal are AVAILABLE through
-open-source EDA (``nirmaan/integrations/eda.py``, M21). Their bindings still
-refuse, with a reason, on a machine whose PATH lacks the executable.
-Firmware build and co-simulation are AVAILABLE the same way
-(``nirmaan/integrations/firmware.py``, M25).
+open-source EDA (``nirmaan/integrations/eda.py``, M21); static timing and
+place and route through OpenSTA and OpenROAD (``integrations/physical.py``,
+M25). Their bindings still refuse, with a reason, on a machine whose PATH
+lacks the executable or that has no PDK input for the run. Firmware build and
+co-simulation are AVAILABLE the same way (``nirmaan/integrations/firmware.py``,
+M25).
 """
 
 from __future__ import annotations
@@ -61,8 +63,9 @@ TOOLS: list[ToolSpec] = [
     _tool("cdc.run", "CDC/RDC analyzer", "eda", EXE, CO, "Structural and functional crossing analysis."),
     # Implementation EDA.
     _tool("synth.run", "Synthesis", "eda", EXE, AV, "Logic synthesis."),
-    _tool("sta.run", "Static timing", "eda", EXE, CO, "Multi-mode, multi-corner timing."),
-    _tool("pnr.run", "Place and route", "eda", EXE, CO, "Floorplan, placement, CTS, routing."),
+    _tool("sta.run", "Static timing", "eda", EXE, AV, "Static timing of a netlist under an SDC (OpenSTA)."),
+    _tool("pnr.run", "Place and route", "eda", EXE, AV,
+          "Floorplan, placement, and routing in one staged run, with timing (OpenROAD)."),
     _tool("power.run", "Power analysis", "eda", EXE, CO, "Power, IR-drop, and EM."),
     _tool("pv.run", "Physical verification", "eda", EXE, CO, "DRC, LVS, ERC, antenna, density."),
     _tool("dft.run", "DFT tools", "eda", EXE, CO, "Scan insertion, ATPG, MBIST."),
