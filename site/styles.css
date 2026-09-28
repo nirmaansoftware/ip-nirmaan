@@ -52,7 +52,6 @@
   --body:    "Hanken Grotesk", "Helvetica Neue", Arial, sans-serif;
   --mono:    "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
 
-  --fs-hero:  clamp(2.375rem, 1rem + 6.2vw, 7rem);
   --fs-h2:    clamp(2rem, 1.35rem + 2.8vw, 3.75rem);
   --fs-h3:    clamp(1.125rem, 1.04rem + 0.35vw, 1.3125rem);
   --fs-lede:  clamp(1.125rem, 1.02rem + 0.45vw, 1.375rem);
@@ -70,8 +69,10 @@
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
 }
 
+/* Dark follows the OS unless the visitor picked light, or applies when they
+   picked dark (the theme toggle sets data-theme on <html>). */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --paper: #0E0E0F; --paper-2: #17171A; --paper-3: #202024;
     --ink: #EDEDE7; --ink-2: #B2B2AA; --ink-3: #8C8C85;
     --line: rgb(237 237 231 / 0.10); --line-2: rgb(237 237 231 / 0.2);
@@ -80,6 +81,15 @@
     --term-bg: #17171A;
     color-scheme: dark;
   }
+}
+:root[data-theme="dark"] {
+  --paper: #0E0E0F; --paper-2: #17171A; --paper-3: #202024;
+  --ink: #EDEDE7; --ink-2: #B2B2AA; --ink-3: #8C8C85;
+  --line: rgb(237 237 231 / 0.10); --line-2: rgb(237 237 231 / 0.2);
+  --blue: #8190FF; --blue-ink: #0B0B14; --blue-wash: rgb(129 144 255 / 0.12); --blue-on-ink: #2E43F5;
+  --grid: rgb(237 237 231 / 0.05);
+  --term-bg: #17171A;
+  color-scheme: dark;
 }
 
 
@@ -183,6 +193,19 @@
   .nav__links a { text-decoration: none; color: var(--ink-2); padding-block: var(--s1); }
   .nav__links a:hover { color: var(--ink); }
   @media (min-width: 64rem) { .nav__links { display: flex; } }
+  .nav__actions { display: flex; align-items: center; gap: var(--s1); }
+  .theme-toggle {
+    display: inline-grid; place-items: center;
+    width: 2.5rem; height: 2.5rem;
+    color: var(--ink-2); border: 1px solid var(--line);
+    transition: color 0.2s, border-color 0.2s;
+  }
+  .theme-toggle:hover { color: var(--ink); border-color: var(--line-2); }
+  .theme-toggle__icon { width: 0.9rem; height: 0.9rem; grid-area: 1 / 1; display: none; fill: currentColor; }
+  .theme-toggle[data-mode="system"] .theme-toggle__icon--system,
+  .theme-toggle[data-mode="light"]  .theme-toggle__icon--light,
+  .theme-toggle[data-mode="dark"]   .theme-toggle__icon--dark { display: block; }
+  html:not(.js) .theme-toggle { display: none; }
 
   /* ---- Buttons ---- */
   .btn {
@@ -205,19 +228,40 @@
   .replay:hover, .term__replay:hover { color: var(--blue); border-color: var(--blue); }
 
   /* ---- Hero ---- */
-  .hero { position: relative; padding-block: clamp(3.5rem, 2rem + 6vw, 7.5rem) var(--section); overflow: hidden; }
+  /* Hero: headline beside the pixel N (hero.js assembles it from falling
+     blocks on the canvas grid, as on nirmaan.online), the plan below. */
+  .hero { position: relative; overflow: hidden; --cell: 1.5rem; padding-block: clamp(2.5rem, 1.5rem + 4vw, 5.5rem) var(--section); }
+  .hero__canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
   .hero__grid {
-    position: absolute; inset: 0; z-index: -1; pointer-events: none;
+    position: absolute; inset: 0; pointer-events: none;
     background-image:
       linear-gradient(var(--grid) 1px, transparent 1px),
       linear-gradient(90deg, var(--grid) 1px, transparent 1px);
-    background-size: 2.5rem 2.5rem;
-    -webkit-mask-image: radial-gradient(ellipse 80% 70% at 70% 30%, #000 30%, transparent 75%);
-    mask-image: radial-gradient(ellipse 80% 70% at 70% 30%, #000 30%, transparent 75%);
+    background-size: var(--cell) var(--cell);
   }
-  .hero__inner { display: grid; gap: clamp(3rem, 2rem + 4vw, 5.5rem); }
-  .hero__title { font-size: var(--fs-hero); font-stretch: 112%; line-height: 0.95; letter-spacing: -0.035em; }
-  @media (max-width: 30rem) { .hero__title { font-stretch: 100%; } }
+  .js .hero__grid { display: none; }
+  .hero__inner {
+    position: relative; display: grid; align-items: center;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.8fr);
+    gap: clamp(2.5rem, 1.5rem + 4vw, 5rem) clamp(2rem, 5vw, 5rem);
+  }
+  .hero__copy { container-type: inline-size; min-width: 0; }
+  .hero__side { min-width: 0; align-self: stretch; display: grid; }
+  .hero__slot { min-height: clamp(18rem, 34vw, 32rem); --mark-align: end; }
+  .hero__mark-fallback { width: clamp(14rem, 26vw, 24rem); height: auto; fill: var(--ink); align-self: center; justify-self: end; }
+  .js .hero__mark-fallback { display: none; }
+  .term { grid-column: 1 / -1; }
+  /* Each headline line always fits its column ("A semiconductor" is the longest). */
+  .hero__title { font-size: min(clamp(2.5rem, 1.2rem + 4vw, 6.25rem), 10.2cqi); font-stretch: 112%; line-height: 0.95; letter-spacing: -0.035em; }
+  .hero__title .line { white-space: nowrap; }
+  @media (max-width: 60rem) {
+    .hero { --cell: 1.25rem; }
+    .hero__inner { grid-template-columns: 1fr; gap: var(--s4); }
+    .hero__side { order: -1; }
+    .hero__slot { min-height: min(52vw, 28svh); --mark-align: start; }
+    .hero__mark-fallback { width: min(56vw, 30svh); justify-self: start; }
+    .hero__title { font-size: 11.4cqi; font-stretch: 100%; }
+  }
   .hero__title .line { display: block; overflow: hidden; padding-bottom: 0.06em; }
   .hero__title .line > span { display: inline-block; }
   .lede { margin-top: var(--s4); max-width: 44rem; font-size: var(--fs-lede); color: var(--ink-2); line-height: 1.5; }
@@ -291,24 +335,60 @@
     .ladder__track { display: none; }
   }
 
-  /* ---- Flow ---- */
-  .flow { position: relative; display: grid; gap: var(--s4); grid-template-columns: repeat(5, 1fr); }
-  .flow::before {
-    content: ""; position: absolute; left: 0.45rem; right: 0; top: 0.45rem; height: 1px; background: var(--ink);
-    transform-origin: left;
-  }
-  .flow__step { position: relative; padding-top: var(--s5); }
+  /* ---- How it works: the scene ----
+     Resting state (no motion) is the finished diagram, in normal flow:
+     the five steps beside the machine, every task in its final state. */
+  .scene__body { display: grid; gap: var(--s5); grid-template-columns: minmax(0, 0.72fr) minmax(0, 1.28fr); align-items: start; }
+  .flow { display: grid; gap: var(--s3); align-content: start; }
+  .flow__step { display: grid; grid-template-columns: 2rem minmax(0, 1fr); column-gap: var(--s2); }
   .flow__node {
-    position: absolute; top: 0; left: 0; width: 0.9rem; height: 0.9rem;
-    background: var(--blue); border: 1px solid var(--blue);
+    grid-row: span 2; width: 2rem; height: 2rem; display: grid; place-items: center;
+    font-family: var(--mono); font-size: var(--fs-mono); color: var(--ink); border: 1px solid var(--ink);
   }
-  .flow__step h3 { margin-bottom: var(--s1); }
+  .flow__step h3 { font-size: 1.0625rem; margin: 0.2rem 0 0.25rem; }
   .flow__step p { color: var(--ink-2); font-size: var(--fs-small); }
+
+  .machine { display: grid; gap: var(--s2); padding: var(--s3); border: 1px solid var(--line-2); background: var(--paper-2); }
+  .req__label {
+    display: block; margin-bottom: 0.2rem; font-family: var(--mono); font-size: 0.6875rem;
+    letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3);
+  }
+  .req { padding: 0.75rem var(--s2); background: var(--paper); border: 1px solid var(--ink); font-family: var(--mono); font-size: 0.9375rem; }
+  .chips { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.6rem; }
+  .chips li { padding: 0.15rem 0.55rem; font-family: var(--mono); font-size: 0.8125rem; color: var(--blue); border: 1px solid var(--blue); background: var(--blue-wash); }
+  .assume { margin-top: 0.6rem; font-size: 0.875rem; color: var(--ink-2); }
+  /* Each row carries its own border, so rows not yet routed leave no empty box. */
+  .tasks { display: grid; }
+  .task + .task { border-top-width: 0; }
+  .task {
+    display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) 7.25rem; gap: var(--s2); align-items: center;
+    padding: 0.5rem 0.75rem; background: var(--paper); font-size: 0.875rem; border: 1px solid var(--line);
+  }
+  .task__name { font-weight: 600; }
+  .task__owner { color: var(--ink-2); font-size: 0.8125rem; }
+  .task .gate { font-family: var(--mono); font-size: 0.6875rem; font-weight: 500; padding: 0.05rem 0.35rem; margin-right: 0.3rem; background: var(--blue); color: var(--blue-ink); }
+  .task .human { color: var(--blue); }
+  .task__state {
+    justify-self: end; padding: 0.1rem 0.5rem; white-space: nowrap;
+    font-family: var(--mono); font-size: 0.75rem; color: var(--ink-3); border: 1px solid var(--line-2);
+    transition: color 0.3s, background-color 0.3s, border-color 0.3s;
+  }
+  .task__state[data-state="executed"] { color: var(--ink); border-color: var(--ink); }
+  .task__state[data-state="verified"] { color: var(--blue); border-color: var(--blue); background: var(--blue-wash); }
+  .task__state[data-state="awaits human"] { color: var(--ink); border: 1px dashed var(--ink); }
+  .task__state[data-state="approved"] { color: var(--blue-ink); background: var(--blue); border-color: var(--blue); }
+  .machine__out { padding: 0.6rem var(--s2); border: 1px solid var(--blue); background: var(--paper); font-size: 0.875rem; }
+  .chain { display: flex; align-items: center; gap: var(--s2); }
+  .chain__label { flex: none; font-family: var(--mono); font-size: 0.6875rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
+  .chain__blocks { display: flex; flex-wrap: wrap; gap: 3px; }
+  .chain__blocks i { width: 0.625rem; height: 0.625rem; background: var(--ink); }
+  .machine figcaption { font-family: var(--mono); font-size: var(--fs-mono); color: var(--ink-3); }
   @media (max-width: 63.99rem) {
-    .flow { grid-template-columns: 1fr; gap: var(--s4); padding-left: var(--s5); }
-    .flow::before { left: 0.45rem; right: auto; top: 0.45rem; bottom: 0.45rem; width: 1px; height: auto; transform-origin: top; }
-    .flow__step { padding-top: 0; }
-    .flow__node { left: calc(-1 * var(--s5)); top: 0.2rem; }
+    .scene__body { grid-template-columns: 1fr; gap: var(--s4); }
+    .machine { padding: var(--s2); }
+    .task { grid-template-columns: minmax(0, 1fr) auto; row-gap: 0.1rem; column-gap: var(--s1); padding: 0.4rem 0.6rem; }
+    .task__state { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
+    .task__owner { grid-column: 1; font-size: 0.75rem; }
   }
 
   /* ---- Stats and org ---- */
@@ -410,7 +490,6 @@
   .motion .hero__copy > :not(.hero__title) { animation: fade-up 0.9s var(--ease-out) both 320ms; }
   .motion .hero__copy > .eyebrow { animation-delay: 0ms; }
   .motion .term { animation: fade-up 0.7s var(--ease-out) both 150ms; }
-  .motion .hero__grid { animation: fade 1.6s var(--ease-out) both 200ms; }
   @keyframes fade-up { from { opacity: 0; transform: translateY(0.75rem); } }
   @keyframes fade { from { opacity: 0; } }
 
@@ -488,20 +567,35 @@
   .motion .ladder.is-playing .refused { animation: refuse 0.5s var(--ease-out) both 4.3s; }
   @keyframes refuse { 0% { transform: translateX(0); } 25% { transform: translateX(-4px); } 50% { transform: translateX(4px); } 75% { transform: translateX(-2px); } }
 
-  /* ---- Flow: draw, then light each step in order ---- */
-  .motion .flow:not(.is-playing)::before { transform: scaleX(0); }
-  .motion .flow:not(.is-playing) .flow__node { background: var(--paper); border-color: var(--line-2); }
-  .motion .flow:not(.is-playing) .flow__step :is(h3, p) { opacity: 0.35; }
-  .motion .flow.is-playing::before { animation: draw-x 2.6s var(--ease-in-out) both; }
-  .motion .flow.is-playing .flow__node { animation: node-on 0.5s var(--ease-out) both; animation-delay: calc(var(--n) * 0.6s); }
-  .motion .flow.is-playing .flow__step :is(h3, p) { animation: dim-in 0.6s var(--ease-out) both; animation-delay: calc(var(--n) * 0.6s); }
-  @keyframes draw-x { from { transform: scaleX(0); } }
-  @keyframes node-on { from { background: var(--paper); border-color: var(--line-2); transform: scale(0.6); } 60% { transform: scale(1.35); } }
-  @keyframes dim-in { from { opacity: 0.35; } }
+  /* ---- How it works: pinned scene, scrubbed by scroll ----
+     motion.js pins .scene__sticky inside the tall .scene__track, turns
+     scroll into progress, and sets --t (0 to 1) on each [data-at] element
+     and data-state on each task. Everything here only styles those values. */
+  .motion .scene__track { height: 420vh; }
+  .motion .scene__sticky {
+    position: sticky; top: var(--nav-h); height: calc(100svh - var(--nav-h));
+    display: grid; align-items: center; overflow: hidden;
+  }
+  .motion .scene__body { zoom: var(--fit, 1); }
+  .motion .scene--unpinned .scene__track { height: auto; }
+  .motion .scene--unpinned .scene__sticky { position: static; height: auto; overflow: visible; }
+
+  .motion .scene [data-at] { opacity: var(--t, 0); transform: translateY(calc((1 - var(--t, 0)) * 0.75rem)); }
+  .motion .scene .chips [data-at] { transform: scale(calc(0.6 + var(--t, 0) * 0.4)); }
+  .motion .scene .task[data-at] { transform: translateX(calc((1 - var(--t, 0)) * -2.5rem)); }
+  .motion .scene .chain__blocks [data-at] { transform: translateY(calc((1 - var(--t, 0)) * -0.6rem)); }
+  .motion .scene .task__state { transition: color 0.3s, background-color 0.3s, border-color 0.3s, transform 0.3s var(--ease-out); }
+  .motion .scene .task__state.is-changed { animation: chip-stamp 0.4s var(--ease-out); }
+  @keyframes chip-stamp { from { transform: scale(1.18); opacity: 0.4; } }
+
+  .motion .scene .flow__step { opacity: 0.35; transition: opacity 0.35s var(--ease-out); }
+  .motion .scene .flow__node { transition: background-color 0.35s, color 0.35s, border-color 0.35s; }
+  .motion .scene .flow__step.is-done { opacity: 0.6; }
+  .motion .scene .flow__step.is-current { opacity: 1; }
+  .motion .scene .flow__step.is-current .flow__node { background: var(--blue); border-color: var(--blue); color: var(--blue-ink); }
   @media (max-width: 63.99rem) {
-    .motion .flow:not(.is-playing)::before { transform: scaleY(0); }
-    .motion .flow.is-playing::before { animation-name: draw-y; }
-    @keyframes draw-y { from { transform: scaleY(0); } }
+    /* Phones: only the step being told, so the machine keeps the screen. */
+    .motion .scene:not(.scene--unpinned) .flow__step:not(.is-current) { display: none; }
   }
 
   /* ---- Organization: the root lands, the trunk draws, divisions drop in ---- */

@@ -9,7 +9,9 @@ Three files, self-hosted fonts and icons; no build step, no dependencies, no tra
 | `index.html` | All content. Every number and every line of the plan is in the HTML, so the page is complete without JavaScript. |
 | `styles.css` | The Nirmaan design system (shared with nirmaan.online), plus a `motion` layer. |
 | `fonts/` | Archivo, Hanken Grotesk and JetBrains Mono, self-hosted (Latin subset, variable), with their OFL licenses. |
-| `motion.js` | Plays the motion. It only animates toward what the HTML already says; it never supplies content. |
+| `motion.js` | Plays the motion, including the pinned "How it works" scene. It only animates toward what the HTML already says; it never supplies content. |
+| `hero.js` | The pixel N assembling from falling blocks on the construction grid: the same file as nirmaan.online's (change it there first). |
+| `site.js` | The theme toggle (system, light, dark), the same control as nirmaan.online. |
 
 ## Preview
 
@@ -28,9 +30,9 @@ preference, and every animated rule is scoped to it (a test checks this).
 
 | Piece | What moves | Why |
 |---|---|---|
-| Hero | Headline rises line by line; the command is typed, then the plan (already on screen in dim grey) lights up line by line and each GATE stamps in | It is the product's real output, arriving the way it does in a terminal |
+| Hero | The Nirmaan N assembles from falling blocks, bottom row first, and the grid lights under the pointer (or ripples from a tap). The headline rises line by line; the command is typed, then the plan (already on screen in dim grey) lights up line by line and each GATE stamps in | It is the product's real output, arriving the way it does in a terminal |
 | Assurance ladder | A token climbs planned, executed, verified, approved; each rung latches as it arrives; then a self-approval is refused | "Planned is not done" and "an AI cannot approve its own work", shown rather than told |
-| How it works | The line is drawn and the five steps light in order | A flow, read in order |
+| How it works | A pinned scene scrubbed by scroll: the requirement arrives, splits into features and a written assumption, seven tasks route to their owners, each moves planned, executed, verified (gates: awaits human, approved), every change drops a block into the audit trail, and the deliverable closes it. Phones show only the step being told and zoom the scene to fit | The whole product in one story, at the reader's pace. Written in its finished state, so without motion it is one complete diagram |
 | Organization | Stats count up to their real values; the org chart's root lands, the trunk draws, divisions drop in | Built from the top down, like the org itself |
 | VeriTriage | Inputs appear, edges draw, evidence nodes land, the top cause fills | Evidence first, conclusion last. Captioned as an illustration |
 
@@ -42,7 +44,7 @@ The terminal and the ladder have a Replay button.
 - Constitution cards match `CONSTITUTION`, same IDs in the same order.
 - No em or en dashes, no hype words, no claims the project cannot back.
 
-The test count (877, the standard run that deselects the SDK test) is not checked automatically; update it by hand when it changes.
+The test count (880, the standard run that deselects the SDK test) is not checked automatically; update it by hand when it changes.
 
 ## Launch list
 

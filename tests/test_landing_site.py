@@ -99,6 +99,22 @@ def test_launch_list_items_are_present() -> None:
         assert f'href="{link}"' in HTML
 
 
+def test_the_scene_is_written_in_its_finished_state() -> None:
+    # Motion only animates toward what the HTML says: each task's visible
+    # state is the last one its timeline reaches, and gates end approved.
+    import json
+
+    rows = re.findall(
+        r"data-states='([^']+)'>.*?<span class=\"task__state\" data-state=\"([^\"]+)\">([^<]+)<",
+        HTML, re.S,
+    )
+    assert len(rows) == 7
+    for states, attr, text in rows:
+        final = json.loads(states)[-1][1]
+        assert attr == text == final
+    assert HTML.count('data-state="approved">approved<') == 2
+
+
 def test_pages_load_nothing_from_third_parties() -> None:
     # Fonts are self-hosted: a third-party stylesheet would block the first paint.
     for name in ("index.html", "404.html", "styles.css"):
