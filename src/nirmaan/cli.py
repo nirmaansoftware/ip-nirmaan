@@ -407,6 +407,38 @@ def export_cmd(project: str, out: Path = typer.Option(..., "--out", help="A new 
 
 
 @app.command()
+def gaps(project: str, as_json: bool = typer.Option(False, "--json"), root: Path = ROOT_OPTION) -> None:
+    """Which requirements are not yet backed by passing verification evidence? Exits 1 when any."""
+    from nirmaan.engineering import requirement_coverage
+
+    coverage = requirement_coverage(_load(project, root).state)
+    unbacked = [r for r in coverage if not r.backed]
+    if as_json:
+        typer.echo(json.dumps([r.to_dict() for r in coverage], indent=2))
+    else:
+        console.print(f"{len(coverage) - len(unbacked)} of {len(coverage)} recorded requirements are backed "
+                      "by passing, cited tool runs.")
+        for req in unbacked:
+            console.print(f"\n[bold]{escape(req.requirement)}[/bold] {escape(req.text)}")
+            for reason in req.reasons:
+                console.print(f"  - {escape(reason)}")
+    if unbacked:
+        raise typer.Exit(1)
+
+
+@app.command()
+def links(project: str, root: Path = ROOT_OPTION) -> None:
+    """Design Graph nodes each artifact links to, parsed from its digest-checked file."""
+    from nirmaan.engineering import artifact_links
+
+    report = artifact_links(_load(project, root).state)
+    for link in report.links:
+        console.print(f"{escape(link.artifact)} {link.kind} {link.node_kind} {escape(link.node_name)}")
+    for refused in report.refused:
+        console.print(f"[red]refused[/red] {escape(refused.artifact)}: {escape(refused.reason)}")
+
+
+@app.command()
 def mcp(root: Path = ROOT_OPTION) -> None:
     """Serve IP Nirmaan over MCP (stdio): plan, status, why, and task actions."""
     from nirmaan.mcp import serve

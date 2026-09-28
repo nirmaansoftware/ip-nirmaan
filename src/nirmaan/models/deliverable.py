@@ -20,6 +20,7 @@ class ExportSection(str, Enum):
     REVIEWS = "reviews"
     AUDIT_CHAIN = "audit_chain"  # the trail, its head hash, and a fresh verification
     SIGNOFF = "signoff"  # what is and is not signed off, from recorded gate approvals
+    ENGINEERING_GRAPH = "engineering_graph"  # design links and requirement gaps (M24)
 
 
 class DeliverableFolder(BaseModel):

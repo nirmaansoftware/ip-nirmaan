@@ -59,10 +59,12 @@ from nirmaan.models.work import (
     ReviewState,
     RoutingCandidate,
     RoutingDecision,
+    SpecRequirement,
     Task,
     TaskKind,
     TaskStatus,
     ToolRun,
+    VerificationItem,
     Verdict,
 )
 from nirmaan.models.workflow import (
