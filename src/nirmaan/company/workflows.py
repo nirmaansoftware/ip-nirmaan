@@ -486,6 +486,15 @@ BLOCK_DESIGN = WorkflowTemplate(
                      checked("Self-checking simulation passes", "simulator.run",
                              FileInput(param="sources", kinds=("rtl_source", "testbench")),
                              FileInput(param="top", kinds=("testbench",), entry=True)))),
+        st("firmware", "Driver and driver tests", "Software", "fw.driver",
+           depends_on=("interface-spec", "rtl-implementation"), when=when("firmware"), criticality=M,
+           review=rv("sw.review"), outputs=("driver", "driver_test"),
+           evidence=(REVIEWED,
+                     checked("Driver builds clean under strict C flags", "fw.build",
+                             FileInput(param="sources", kinds=("driver",))),
+                     checked("Driver tests pass against the approved RTL", "fw.test",
+                             FileInput(param="sources", kinds=("driver", "driver_test")),
+                             FileInput(param="rtl", kinds=("rtl_source",), upstream=True)))),
     ),
 )
 

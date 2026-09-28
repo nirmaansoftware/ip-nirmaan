@@ -282,7 +282,16 @@ def _before_review(ctx: PolicyContext) -> list[str]:
         if not met:
             problems.append(f"{task.id} cannot go to review: {req.description!r} is not met")
             continue
-        for binding in (b for b in req.files if not b.entry):
+        for binding in (b for b in req.files if b.upstream):
+            approved = {art.location for dep in task.depends_on for art in
+                        (ctx.state.artifacts[a] for a in ctx.state.tasks[dep].artifacts)
+                        if art.kind in binding.kinds and art.assurance is Assurance.APPROVED and art.location}
+            if not any(ev.kind is not EvidenceKind.TOOL_RUN
+                       or approved & set(ctx.state.tool_runs[ev.tool_run].params.get(binding.param, "").split(","))
+                       for ev in met):
+                problems.append(f"{task.id} cannot go to review: no passing run for {req.description!r} "
+                                f"used an approved upstream {' or '.join(binding.kinds)} file")
+        for binding in (b for b in req.files if not b.entry and not b.upstream):
             for draft in ctx.payload.get("artifacts", ()):
                 location = draft.get("location")
                 if draft.get("kind") not in binding.kinds or not location:
