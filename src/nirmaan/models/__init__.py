@@ -4,6 +4,7 @@ Importing nothing but pydantic is a law (test-enforced): the organization is
 data first, and engines, registries, and runtimes are built on top of it.
 """
 
+from nirmaan.models.deliverable import DeliverableFolder, ExportSection
 from nirmaan.models.governance import (
     AuthorityRule,
     AuthorityScope,

@@ -139,6 +139,8 @@ Rules for each binding:
 
 **Done when:** "Create a parameterizable round-robin arbiter" produces spec, RTL, testbench, and a passing simulation, reviewed and approved through the engine, with every claim backed by a recorded tool run.
 
+**Status:** the project deliverable export lands as part of M23: `nirmaan export PROJECT --out DIR` writes the numbered tree (`01_requirement/` to `10_signoff/`) from recorded state, never raising assurance, listing missing deliverables as missing, and flagging a broken audit chain. See `docs/DELIVERABLE_EXPORT.md`.
+
 ## Stage 5 (M24): The cross-domain engineering graph (spec Phase 8)
 
 **Scope:**

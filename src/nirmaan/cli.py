@@ -386,6 +386,23 @@ def dashboard(project: str, output: Path = typer.Option(Path("nirmaan-dashboard.
     console.print(f"Wrote {output}")
 
 
+@app.command("export")
+def export_cmd(project: str, out: Path = typer.Option(..., "--out", help="A new or empty directory."),
+               root: Path = ROOT_OPTION) -> None:
+    """Write the numbered deliverable tree. A read: project state is not changed."""
+    from nirmaan.export import ExportError, export_project
+
+    try:
+        state = ProjectStore(root).load(project, verify=False)  # the export reports a broken chain itself
+        report = export_project(_org(), state, out)
+    except (KeyError, ValueError, ExportError) as exc:
+        _fail(str(exc))
+    if report.chain_problems:
+        console.print(f"[bold red]AUDIT CHAIN FAILED VERIFICATION: {escape(report.chain_problems[0])}[/bold red]")
+    console.print(f"Wrote {len(report.files)} files to {escape(str(out))}: {report.artifacts} artifacts, "
+                  f"{len(report.missing)} missing, {report.signed_off} of {report.gates} gates signed off")
+
+
 @app.command()
 def mcp(root: Path = ROOT_OPTION) -> None:
     """Serve IP Nirmaan over MCP (stdio): plan, status, why, and task actions."""

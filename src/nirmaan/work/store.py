@@ -31,7 +31,8 @@ class ProjectStore:
         )
         return target
 
-    def load(self, project_id: str) -> ProjectState:
+    def load(self, project_id: str, verify: bool = True) -> ProjectState:
+        """``verify=False`` is for readers that report a broken chain themselves (the export)."""
         path = self.path(project_id)
         if not path.exists():
             matches = sorted(self._dir.glob(f"{project_id}*.json")) if self._dir.exists() else []
@@ -39,7 +40,7 @@ class ProjectStore:
                 raise KeyError(f"Unknown project {project_id!r}")
             path = matches[0]
         state = ProjectState.model_validate_json(path.read_text(encoding="utf-8"))
-        problems = verify_chain(state.audit)
+        problems = verify_chain(state.audit) if verify else []
         if problems:
             raise ValueError(f"Project {project_id} failed audit verification: {problems[0]}")
         return state
