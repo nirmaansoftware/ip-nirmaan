@@ -97,3 +97,9 @@ def test_launch_list_items_are_present() -> None:
 
     for link in ("https://www.nirmaan.online/privacy.html", "https://www.nirmaan.online/terms.html"):
         assert f'href="{link}"' in HTML
+
+
+def test_the_site_does_not_send_visitors_to_github() -> None:
+    # Owner decision: the repository is the factory, not the storefront.
+    for name in ("index.html", "404.html"):
+        assert "github.com" not in (SITE / name).read_text(encoding="utf-8").lower(), name

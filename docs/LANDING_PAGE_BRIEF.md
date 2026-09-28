@@ -18,7 +18,7 @@ up to the builder.
 
 1. **Semiconductor engineers and verification leads** who want to see what an AI-native engineering organization looks like.
 2. **Technical recruiters and hiring managers**, evaluating the owner's systems and DV skills.
-3. **Potential collaborators**, who should be able to find the code within one click.
+3. **Potential collaborators and customers**, who should be able to reach us within one click.
 
 All three are technical. Write for engineers: concrete, specific, and without hype.
 
@@ -33,7 +33,8 @@ A shorter tagline for the hero: **"A semiconductor IP company, as software."**
 ## 4. Sections, in order
 
 ### Hero
-- Tagline, the one-sentence pitch, and two buttons: **View on GitHub** and **See how it works** (scrolls down).
+- Tagline, the one-sentence pitch, and two buttons: **Talk to us** (the nirmaan.online contact page) and **See how it works** (scrolls down).
+- The page does not link to GitHub or advertise the source (owner decision, 2026-09-28): the repository is the factory, not the storefront.
 - One visual: an excerpt of a real plan tree (sample in section 6), styled as a terminal.
 
 ### The idea
@@ -79,7 +80,7 @@ Be honest and specific:
 - **Not yet:** no chip or IP block has been designed or delivered by the system.
 
 ### Footer
-GitHub link, Apache-2.0 license, a link back to `nirmaan.online`, and "Built by Om Patel".
+"Talk to us", a link back to `nirmaan.online`, privacy and terms, and "Built by Om Patel".
 
 ## 5. Rules the copy must follow
 
