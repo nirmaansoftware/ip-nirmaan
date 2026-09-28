@@ -11,10 +11,11 @@ passes the same state machine, authority matrix, and constitution as a human:
 * uncertainty must be declared, and an escalation request is routed up the
   real chain rather than answered by the agent itself.
 
-Two runtimes ship. ``NullRuntime`` (the default for every seat) declines
-honestly: no worker is attached. ``ScriptedRuntime`` replays a fixed result,
-for tests and simulations. A model-backed runtime is one class implementing
-``accepts`` and ``execute``, registered with ``@register_runtime``.
+``NullRuntime`` (the default for every seat) declines honestly: no worker is
+attached. ``ScriptedRuntime`` replays a fixed result, for tests and
+simulations. Model-backed runtimes (M20) live in :mod:`nirmaan.runtime.model`.
+A runtime is one class implementing ``accepts`` and ``execute`` (and, to sit
+in a review seat, ``review``), registered with ``@register_runtime``.
 """
 
 from __future__ import annotations
@@ -23,7 +24,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Protocol
 
-from nirmaan.models import Actor, ActorKind, EscalationKind, EvidenceKind, TaskStatus
+from nirmaan.models import Actor, ActorKind, EscalationKind, EvidenceKind, TaskStatus, Verdict
 from nirmaan.runtime.context import WorkPacket, assemble
 from nirmaan.runtime.tools import ToolBroker, ToolOutcome
 from nirmaan.work.engine import TaskEngine, WorkError
@@ -57,6 +58,16 @@ class WorkResult:
     escalation: EscalationRequest | None = None
 
 
+@dataclass(frozen=True)
+class ReviewResult:
+    """A reviewing runtime's verdict. ``None`` means no review is recorded."""
+
+    verdict: Verdict | None
+    comments: str = ""
+    uncertainty: float | None = None
+    notes: str = ""
+
+
 class ToolHandle:
     """What a runtime gets instead of the broker: bound to one actor and task."""
 
@@ -87,6 +98,10 @@ def register_runtime(runtime_id: str) -> Callable[[Callable[[], AgentRuntime]], 
         return factory
 
     return _register
+
+
+def unregister_runtime(runtime_id: str) -> None:
+    _RUNTIMES.pop(runtime_id, None)
 
 
 def get_runtime(runtime_id: str) -> AgentRuntime:
@@ -142,6 +157,7 @@ class RunReport:
     tool_runs: list[str] = field(default_factory=list)
     evidence: list[str] = field(default_factory=list)
     escalation: str | None = None
+    review: str | None = None
 
 
 def run_task(engine: TaskEngine, task_id: str, runtime: AgentRuntime,
@@ -188,3 +204,35 @@ def run_task(engine: TaskEngine, task_id: str, runtime: AgentRuntime,
     elif result.status is ResultStatus.SUBMITTED:
         engine.submit(task_id, actor, list(result.artifacts), notes=result.notes, outcome=result.outcome)
     return report
+
+
+def review_task(engine: TaskEngine, task_id: str, runtime: AgentRuntime, role: str | None = None,
+                kind: ActorKind = ActorKind.AI_AGENT) -> RunReport:
+    """Seat a runtime as a task's reviewer (by default the planned one) and record its verdict.
+
+    Independence (P6) is enforced before the runtime is asked anything, so a
+    seat can never be handed its own work to judge.
+    """
+    task = engine.task(task_id)
+    seat = role or task.reviewer
+    if seat is None:
+        raise WorkError(f"{task_id} has no reviewer")
+    actor = Actor(role=seat, kind=kind, name=getattr(runtime, "runtime_id", "runtime"))
+    policy = PolicyEngine(engine.org)
+    policy.enforce(PolicyContext(engine.org, engine.state, "task.review", actor, task))
+    if task.status is not TaskStatus.IN_REVIEW:
+        raise WorkError(f"{task_id} is {task.status.value}, not in review")
+    packet = assemble(engine, task_id, role=seat)
+    review = getattr(runtime, "review", None)
+    if review is None or not runtime.accepts(packet):
+        return RunReport(task_id, ResultStatus.DECLINED, f"runtime {runtime.runtime_id!r} does not review {task_id}")
+
+    result: ReviewResult = review(packet)
+    policy.enforce(PolicyContext(engine.org, engine.state, "runtime.result", actor, task,
+                                 {"uncertainty": result.uncertainty, "artifacts": (), "claims_completion": False}))
+    if result.verdict is None:
+        return RunReport(task_id, ResultStatus.DECLINED, result.notes)
+    engine.review(task_id, actor, result.verdict, result.comments)
+    record = [r for r in engine.state.reviews.values() if r.task == task_id and r.reviewer == seat][-1]
+    detail = "; ".join(p for p in (f"{result.verdict.value}: {result.comments}", result.notes) if p)
+    return RunReport(task_id, ResultStatus.SUBMITTED, detail, review=record.id)

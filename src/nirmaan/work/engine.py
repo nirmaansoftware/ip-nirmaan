@@ -286,6 +286,7 @@ class TaskEngine:
                 produced_by=actor.label,
                 assurance=Assurance.EXECUTED,
                 location=draft.get("location"),
+                summary=draft.get("summary", ""),
                 derived_from=tuple(draft.get("derived_from", ())),
             )
             ids.append(art_id)

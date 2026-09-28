@@ -253,7 +253,9 @@ Two runtimes ship:
 * `NullRuntime` is the default for every seat. It declines honestly.
 * `ScriptedRuntime` exists for tests and simulations.
 
-A model-backed runtime is one class plus `@register_runtime`.
+A model-backed runtime is one class plus `@register_runtime`. Since M20,
+`ModelRuntime` (registered as `mock-llm` and `anthropic`, both off by default)
+fills verification seats; see `docs/AI_WORKERS.md`.
 
 The tool broker executes only AVAILABLE tools with a registered binding, for a
 role that holds the grant. `veritriage.investigate` runs the full deterministic
@@ -295,7 +297,7 @@ and workflow, and plans real work into it with zero core changes.
 | 1. Organizational foundation | Done: schema, hierarchy, roles, skills, capabilities, authority, escalation, constitution, registry, validation |
 | 2. Task and workflow foundation | Done: project, task, dependency graph, workflows, review, approval, gates, escalation, audit, persistence |
 | 3. Organizational orchestrator | Done: requirement analysis, workflow selection, routing, task graph, workstreams, seven demos |
-| 4. Agent runtime | Interface done: `AgentRuntime`, work packets, tool broker, `run_task`. No model-backed runtime ships yet. |
+| 4. Agent runtime | Interface done: `AgentRuntime`, work packets, tool broker, `run_task`. M20 adds model-backed seats in verification debug (`docs/AI_WORKERS.md`). |
 | 5. Verification organization | Bridge done: VeriTriage investigations are real, evidence-producing tools. Deeper integration is future work. |
 | 6. RTL / architecture agents | Not started |
 | 7. PD / DFT / firmware agents | Organization and workflow contracts exist; no execution |

@@ -516,6 +516,58 @@ def task_resolve(project: str, escalation: str, resolution: str, role: str = AS_
     _mutate(project, root, lambda e: e.resolve_escalation(escalation, _actor(role, agent), resolution).state.value)
 
 
+# --- Agents (M20) ------------------------------------------------------------------------
+
+
+@app.command("run")
+def run_cmd(
+    project: str, task: str,
+    runtime: str = typer.Option("unbound", "--runtime", help="Registered runtime ID (e.g. mock-llm, anthropic)."),
+    review: bool = typer.Option(False, "--review", help="Seat the runtime as the task's reviewer instead."),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Print the exact prompt; run nothing, change nothing."),
+    inputs: List[str] = typer.Option([], "--input", help="key=value for the task's tools, e.g. paths=fail.log"),
+    root: Path = ROOT_OPTION,
+) -> None:
+    """Hand one task to an agent runtime. The default runtime (unbound) declines."""
+    from nirmaan.models import MemoryScope
+    from nirmaan.runtime import assemble, get_runtime, render_work_prompt, review_task, run_task
+
+    engine = _load(project, root)
+    tid = _task_id(engine, task)
+    if tid not in engine.state.tasks:
+        _fail(f"Unknown task {task!r}")
+    try:
+        agent = get_runtime(runtime)
+    except KeyError as exc:
+        _fail(str(exc.args[0]))
+    target = engine.task(tid)
+    if dry_run:
+        seat = target.reviewer if review else None
+        _print_lines(render_work_prompt(assemble(engine, tid, role=seat), "review" if review else "work")
+                     .render().splitlines())
+        _err.print("dry run: no model was called, no tool was run, nothing was saved")
+        return
+    try:
+        for spec in inputs:
+            key, sep, value = spec.partition("=")
+            if not sep:
+                _fail(f"--input must be key=value, got {spec!r}")
+            engine.remember(MemoryScope.TASK, tid, f"input.{key}", value, _actor(target.owner, False))
+        report = review_task(engine, tid, agent) if review else run_task(engine, tid, agent)
+    except (WorkError, PolicyViolationError, PermissionError) as exc:
+        _fail(str(exc))
+    ProjectStore(root).save(engine.state)
+    console.print(f"{report.task}: {report.status.value}", highlight=False)
+    if report.detail:
+        console.print(escape(report.detail), highlight=False, soft_wrap=True)
+    for label, ids in (("tool runs", report.tool_runs), ("evidence", report.evidence)):
+        if ids:
+            console.print(f"{label}: {', '.join(ids)}", highlight=False)
+    for label, ref in (("escalation", report.escalation), ("review", report.review)):
+        if ref:
+            console.print(f"{label}: {ref}", highlight=False)
+
+
 @app.command()
 def version() -> None:
     """Print the platform version and its verification engine."""

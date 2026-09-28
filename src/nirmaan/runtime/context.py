@@ -28,12 +28,22 @@ class WorkPacket:
     memory: tuple[dict[str, Any], ...] = field(default_factory=tuple)
 
 
-def assemble(engine: TaskEngine, task_id: str) -> WorkPacket:
+def _artifact(art, trusted: bool | None = None) -> dict[str, Any]:
+    entry = {"id": art.id, "kind": art.kind, "title": art.title, "assurance": art.assurance.value,
+             "summary": art.summary}
+    if trusted is not None:
+        entry["trusted"] = trusted
+    return entry
+
+
+def assemble(engine: TaskEngine, task_id: str, role: str | None = None) -> WorkPacket:
+    """The packet for ``role``'s seat on a task: the owner by default, or e.g. its reviewer."""
     org, state = engine.org, engine.state
     task = engine.task(task_id)
     if task.owner is None:
         raise ValueError(f"{task_id} has no owner to assemble context for")
-    card = org.agent_card(task.owner)
+    seat = role or task.owner
+    card = org.agent_card(seat)
 
     skills = [org.skills[s] for s in task.skills if s in org.skills]
     if task.capability:
@@ -57,19 +67,19 @@ def assemble(engine: TaskEngine, task_id: str) -> WorkPacket:
     for dep in task.depends_on:
         for art_id in state.tasks[dep].artifacts:
             art = state.artifacts[art_id]
-            upstream.append({
-                "id": art.id,
-                "kind": art.kind,
-                "title": art.title,
-                "assurance": art.assurance.value,
-                "trusted": art.assurance is Assurance.APPROVED,
-            })
+            upstream.append(_artifact(art, trusted=art.assurance is Assurance.APPROVED))
+    evidence = [
+        {"id": ev.id, "task": ev.task, "kind": ev.kind.value, "description": ev.description,
+         "substantiated": ev.substantiated, "tool_run": ev.tool_run, "reference": ev.reference}
+        for source in (*task.depends_on, task_id)
+        for ev in (state.evidence[e] for e in state.tasks[source].evidence)
+    ]
     memory = tuple(
         m.model_dump(mode="json")
         for m in state.memory
         if (m.scope is MemoryScope.PROJECT and m.owner == state.project.id)
         or (m.scope is MemoryScope.TASK and m.owner == task_id)
-        or (m.scope is MemoryScope.AGENT and m.owner == task.owner)
+        or (m.scope is MemoryScope.AGENT and m.owner == seat)
         or (m.scope is MemoryScope.TEAM and task.unit and org.is_within(task.unit, m.owner))
     )
     return WorkPacket(
@@ -101,6 +111,9 @@ def assemble(engine: TaskEngine, task_id: str) -> WorkPacket:
             "evidence_requirements": [r.model_dump(mode="json") for r in task.evidence_requirements],
             "outcomes": list(task.outcomes),
             "upstream_artifacts": upstream,
+            "artifacts": [_artifact(state.artifacts[a]) for a in task.artifacts],
+            "evidence": evidence,
+            "owner": task.owner,
             "reviewer": task.reviewer,
             "escalation_path": list(task.escalation_path),
             "ready": task.status in (TaskStatus.READY, TaskStatus.IN_PROGRESS, TaskStatus.CHANGES_REQUESTED),

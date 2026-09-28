@@ -10,12 +10,21 @@ What crosses the bridge is real: ``veritriage.investigate`` runs the full
 deterministic pipeline and returns a session ID that a VERITRIAGE_SESSION
 evidence record cites, which is how an organizational claim ("the regression
 failure was triaged") becomes traceable into an Evidence Graph.
+
+Since M20 the bridge is also how an agent seat reaches a language model: the
+one M17 provider registry (``veritriage.ai``), its frozen prompt, and its
+grounding enforcement. The Anthropic provider is registered into that
+registry here, because VeriTriage's own ``ai`` package ships no vendor SDK.
 """
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
+
+from veritriage.ai import BaseProvider, register_llm_provider
+from veritriage.models import GenerationRequest, GenerationResponse, ProviderCapabilities
 
 from nirmaan.events import TOPICS, OrgEvent
 from nirmaan.runtime.tools import ToolOutcome, register_binding
@@ -185,3 +194,97 @@ def missing_packs(org) -> list[str]:
         for src in skill.knowledge_sources
         if src.kind.value == "veritriage_pack" and src.ref not in catalog
     )
+
+
+# --- Language models (M20): the one M17 provider registry, reached from here -------------
+#
+# A Nirmaan work prompt (``nirmaan.runtime.prompt.WorkPrompt``) is read by duck
+# type: ``system``, ``task``, ``sections`` as (heading, lines) pairs, and
+# ``citations`` with ``kind``, ``ref``, and ``label``. It becomes a frozen M17
+# ``Prompt``, so rendering, generation, and grounding are VeriTriage's own code.
+
+
+@dataclass(frozen=True)
+class Generation:
+    text: str
+    provider: str
+    model: str | None = None
+    error: str | None = None
+
+
+def _llm_prompt(prompt, system: str | None = None):
+    from veritriage.models import Citation, Prompt, PromptSection
+
+    return Prompt(
+        template_id="nirmaan-work", system=prompt.system if system is None else system, task=prompt.task,
+        sections=tuple(PromptSection(heading=h, lines=tuple(lines)) for h, lines in prompt.sections),
+        citations=tuple(Citation(kind=c.kind, ref_id=c.ref, label=c.label) for c in prompt.citations),
+    )
+
+
+def render_prompt(prompt) -> str:
+    """Exactly the text a provider is handed."""
+    return _llm_prompt(prompt).render()
+
+
+def generate(provider: str, prompt, max_output_chars: int = 64_000) -> Generation:
+    """Ask a registered M17 provider. Never raises: a failure is returned."""
+    from veritriage.ai import get_llm_provider
+    from veritriage.models import GenerationRequest
+
+    try:
+        llm = get_llm_provider(provider)
+    except KeyError as exc:
+        return Generation("", provider, error=str(exc))
+    response = llm.generate(GenerationRequest(prompt=_llm_prompt(prompt), max_output_chars=max_output_chars))
+    return Generation(response.text, response.provider or provider, response.model,
+                      (response.error or "the provider failed") if response.failed else None)
+
+
+def ground(text: str, prompt) -> tuple[str, tuple[str, ...], tuple[str, ...]]:
+    """M17 grounding: keep citations the prompt declared, strip the rest.
+
+    Returns the cleaned text, the tokens it legitimately used, and the tokens removed.
+    """
+    from veritriage.ai import grounding
+
+    cleaned, used, stripped = grounding.enforce(text, _llm_prompt(prompt))
+    return cleaned, tuple(c.token for c in used), tuple(stripped)
+
+
+@register_llm_provider
+class AnthropicProvider(BaseProvider):
+    """Claude, behind the M17 registry. Only used when a person names it.
+
+    The SDK is the optional ``ai`` extra and is imported only when a request is
+    made. A refusal or a truncated response is a failed generation, never work.
+    """
+
+    name = "anthropic"
+    model = "claude-opus-5-5"
+
+    def capabilities(self) -> ProviderCapabilities:
+        return ProviderCapabilities(name=self.name, version=self.model, generates=True, deterministic=False,
+                                    local=False, max_prompt_chars=400_000, supports_citations=True,
+                                    notes="Anthropic Messages API; needs the ai extra and credentials.")
+
+    def _generate(self, request: GenerationRequest) -> GenerationResponse:
+        import anthropic
+
+        prompt = request.prompt
+        response = anthropic.Anthropic().beta.messages.create(
+            model=self.model,
+            max_tokens=16_000,
+            system=prompt.system,
+            messages=[{"role": "user", "content": prompt.model_copy(update={"system": ""}).render()}],
+            thinking={"type": "adaptive"},
+            output_config={"effort": "high"},
+            betas=["server-side-fallback-2026-07-01"],
+            fallbacks="default",
+        )
+        if response.stop_reason in ("refusal", "max_tokens"):
+            return GenerationResponse(provider=self.name, model=self.model, failed=True,
+                                      error=f"the model stopped with {response.stop_reason}")
+        text = "".join(block.text for block in response.content if block.type == "text")
+        return GenerationResponse(provider=self.name, model=getattr(response, "model", self.model),
+                                  text=text[: request.max_output_chars])

@@ -60,7 +60,12 @@ CI makes "tests pass" a public, repeatable fact, which fits the project's own
 
 **Done when:** a PR shows a green check, and a deliberately broken test turns it red.
 
-## Stage 1 (M20): The first AI workers, in verification seats
+## Stage 1 (M20): The first AI workers, in verification seats (DONE)
+
+**Status:** done on branch `m20/ai-workers`. Design: `docs/AI_WORKERS.md`
+(the provider is exposed through the bridge). History: the M20 entry in
+`context.md`. Try it: `nirmaan run <project> triage --runtime mock-llm
+--input paths=<log>`.
 
 **Why:** the organization plans and enforces, but nobody works. Verification is
 the right first department because VeriTriage already produces real evidence
