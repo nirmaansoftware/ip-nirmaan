@@ -2,8 +2,9 @@
 
 VeriTriage is IP Nirmaan's verification-intelligence subsystem. The
 organization reaches it here and nowhere else (a test enforces the law), and
-only through its stable public surfaces: ``WorkspaceServices`` and the
-Knowledge Pack registry. VeriTriage itself never imports Nirmaan.
+only through its stable public surfaces: ``WorkspaceServices``, the
+Knowledge Pack registry, and the M18 automation registries (organizational
+events, M22). VeriTriage itself never imports Nirmaan.
 
 What crosses the bridge is real: ``veritriage.investigate`` runs the full
 deterministic pipeline and returns a session ID that a VERITRIAGE_SESSION
@@ -16,8 +17,12 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 
+from nirmaan.events import TOPICS, OrgEvent
 from nirmaan.runtime.tools import ToolOutcome, register_binding
 from nirmaan.work.engine import TaskEngine
+
+#: ``Event.source`` for everything IP Nirmaan publishes on the M18 bus.
+SOURCE = "nirmaan"
 
 
 def _services(params: dict[str, str]):
@@ -80,6 +85,95 @@ def pack_catalog() -> dict[str, dict[str, str]]:
     from veritriage.knowledge.registry import load_packs
 
     return {p.id: {"name": p.name, "domain": p.domain, "summary": p.summary} for p in load_packs()}
+
+
+def _register_event_vocabulary() -> None:
+    """Organizational triggers and the shipped rule, on VeriTriage's M18 registries.
+
+    Organizational events travel as ``EventKind.EXTERNAL`` with
+    ``source="nirmaan"``; these triggers are Nirmaan's vocabulary for them, so
+    they live on this side of the bridge (see docs/NIRMAAN_MCP.md).
+    """
+    from veritriage.automation import Trigger, available_triggers, register_rule, register_trigger
+    from veritriage.models import ActionKind, AutomationRule, EventKind
+
+    for topic in TOPICS.values():
+        trigger_id = "nirmaan." + topic.replace(".", "_")
+        if trigger_id in available_triggers():
+            continue
+
+        def matches(self, event, _topic=topic):
+            if event.source == SOURCE and event.payload.get("topic") == _topic:
+                return True, f"IP Nirmaan: {_topic} ({event.subject})"
+            return False, f"not an IP Nirmaan {_topic} event"
+
+        register_trigger(type(
+            f"OrgTrigger_{trigger_id}", (Trigger,),
+            {"trigger_id": trigger_id, "kind": EventKind.EXTERNAL,
+             "description": f"IP Nirmaan published {topic}.", "matches": matches},
+        ))
+    register_rule(AutomationRule(
+        rule_id="nirmaan-escalation-raised",
+        description="An IP Nirmaan escalation was raised. Surface it to whoever it is routed to.",
+        when="nirmaan.escalation_raised",
+        then=(ActionKind.NOTIFY,),
+        priority=35,
+    ))
+
+
+class AutomationBridge:
+    """Publishes organizational events onto a VeriTriage workspace's M18 bus.
+
+    Each event is evaluated by the registered automation rules and whatever
+    they request is dispatched by the workspace, which executes only its own
+    closed action vocabulary. Returns the reactions as plain data.
+    """
+
+    def __init__(self, services=None) -> None:
+        self._services = services
+
+    @property
+    def services(self):
+        if self._services is None:
+            from veritriage.workspace import WorkspaceServices
+
+            self._services = WorkspaceServices()
+        return self._services
+
+    def publish(self, events: list[OrgEvent]) -> list[dict]:
+        from veritriage.automation import RuleEngine
+        from veritriage.models import EventKind
+
+        reactions = []
+        for org_event in events:
+            event = self.services.events.publish(
+                EventKind.EXTERNAL, org_event.payload(), subject=org_event.subject, source=SOURCE
+            )
+            outcomes = [o for o in RuleEngine().evaluate(event) if o.matched]
+            requests = [r for o in outcomes for r in o.requests]
+            results = self.services.dispatch_actions(requests) if requests else []
+            reactions.append({
+                "event_id": event.event_id,
+                "sequence": event.sequence,
+                "topic": org_event.topic,
+                "subject": org_event.subject,
+                "rules_fired": [o.rule_id for o in outcomes],
+                "actions": [r.model_dump(mode="json") for r in results],
+            })
+        return reactions
+
+    def recent(self, limit: int = 50) -> list[dict]:
+        """Organizational events recorded on the bus, oldest first."""
+        from veritriage.models import EventKind
+
+        return [
+            e.model_dump(mode="json")
+            for e in self.services.events.events(kind=EventKind.EXTERNAL)
+            if e.source == SOURCE
+        ][-limit:]
+
+
+_register_event_vocabulary()
 
 
 def missing_packs(org) -> list[str]:
