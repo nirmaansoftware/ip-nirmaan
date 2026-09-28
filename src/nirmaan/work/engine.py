@@ -39,11 +39,13 @@ from nirmaan.models import (
     ProjectState,
     ReviewRecord,
     ReviewState,
+    SpecRequirement,
     Task,
     TaskKind,
     TaskStatus,
     ToolRun,
     ToolStatus,
+    VerificationItem,
     Verdict,
 )
 from nirmaan.org import AuthorityService, Organization, route_escalation
@@ -697,6 +699,54 @@ class TaskEngine:
         self._commit(actor, "memory.write", owner, reason=key, warnings=warnings,
                      details={"scope": scope.value, "key": key}, memory=[*self._state.memory, entry])
         return entry
+
+    # --- Requirement-to-verification traceability (M24) --------------------------------------
+
+    def _artifact_task(self, artifact_id: str, actor: Actor, what: str) -> Task:
+        """The task that produced an artifact, if ``actor`` owns, reviews, or manages it."""
+        art = self._state.artifacts.get(artifact_id)
+        if art is None:
+            raise WorkError(f"unknown artifact {artifact_id!r}")
+        task = self.task(art.task)
+        self._require(actor.role in (task.owner, task.reviewer) or self._manages(actor, task),
+                      f"{actor.role} neither owns, reviews, nor manages {task.id}, so may not record {what}")
+        return task
+
+    def record_spec_requirement(self, actor: Actor, requirement_id: str, text: str, source: str,
+                                section: str = "") -> SpecRequirement:
+        """Quote a requirement from a specification artifact, so verification items can prove it."""
+        if requirement_id in self._state.spec_requirements:
+            raise WorkError(f"requirement {requirement_id!r} is already recorded")
+        task = self._artifact_task(source, actor, "its requirements")
+        req = SpecRequirement(id=requirement_id, text=text, source=source, section=section,
+                              recorded_by=actor.label)
+        warnings = self._check("trace.requirement", actor, task)
+        self._commit(actor, "trace.requirement", requirement_id, reason=text, warnings=warnings,
+                     details={"source": source, "section": section},
+                     spec_requirements={**self._state.spec_requirements, requirement_id: req})
+        return req
+
+    def record_verification_item(self, actor: Actor, item_id: str, kind: str, name: str, artifact: str,
+                                 proves: tuple[str, ...], rationale: str = "") -> VerificationItem:
+        """Declare which requirements a test, assertion, or coverage point proves. Backs nothing by itself."""
+        if item_id in self._state.verification_items:
+            raise WorkError(f"verification item {item_id!r} is already recorded")
+        if not proves:
+            raise WorkError(f"{item_id} proves no requirement")
+        unknown = [r for r in proves if r not in self._state.spec_requirements]
+        if unknown:
+            raise WorkError(f"{item_id} names unknown requirement(s): {', '.join(unknown)}")
+        art = self._state.artifacts.get(artifact)
+        if art is not None and not art.location:
+            raise WorkError(f"{artifact} has no recorded file; a verification item must live in one")
+        task = self._artifact_task(artifact, actor, "its verification items")
+        item = VerificationItem(id=item_id, kind=kind, name=name, artifact=artifact, proves=tuple(proves),
+                                rationale=rationale, recorded_by=actor.label)
+        warnings = self._check("trace.item", actor, task)
+        self._commit(actor, "trace.item", item_id, reason=rationale or name, warnings=warnings,
+                     details={"kind": kind, "artifact": artifact, "proves": list(proves)},
+                     verification_items={**self._state.verification_items, item_id: item})
+        return item
 
     # --- Branching -------------------------------------------------------------------------
 

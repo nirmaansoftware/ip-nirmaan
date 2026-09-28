@@ -82,7 +82,7 @@ DELIVERABLE_FOLDERS: list[DeliverableFolder] = [
         description="Requirement traceability, tool runs, reviews, and the verified audit chain.",
         artifact_kinds=("traceability_matrix", "audit_report"),
         capabilities=("quality.traceability", "quality.audit"),
-        sections=(X.TRACE, X.TOOL_RUNS, X.REVIEWS, X.AUDIT_CHAIN),
+        sections=(X.TRACE, X.TOOL_RUNS, X.REVIEWS, X.AUDIT_CHAIN, X.ENGINEERING_GRAPH),
     ),
     DeliverableFolder(
         id="10_signoff", title="Signoff",

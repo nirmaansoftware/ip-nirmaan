@@ -185,6 +185,35 @@ class AutomationBridge:
 _register_event_vocabulary()
 
 
+def parse_design(name: str, data: bytes) -> dict:
+    """The Design Graph of exactly these bytes, as plain data (M24).
+
+    The bytes are written to a private temporary file (so what is parsed is what
+    the caller checked, not whatever the original path holds by now), read by
+    VeriTriage's project providers, and turned into a Design Graph. A node's
+    ``source_file`` is reported as ``name`` when it is this file.
+    """
+    import tempfile
+
+    from veritriage.design import build_design_graph
+    from veritriage.project import build_project_model
+
+    with tempfile.TemporaryDirectory(prefix="nirmaan-design-") as tmp:
+        path = Path(tmp) / Path(name).name
+        path.write_bytes(data)
+        graph = build_design_graph(build_project_model(path))
+        here = str(path)
+    return {
+        "nodes": [{"id": n.id, "kind": n.kind.value, "name": n.name,
+                   "source_file": name if n.source_file == here else n.source_file,
+                   "attributes": dict(n.attributes)}
+                  for n in sorted(graph.nodes.values(), key=lambda n: n.id)],
+        "edges": [{"from": e.source_id, "to": e.target_id, "relation": e.relation.value,
+                   "rationale": e.rationale, "inferred": e.inferred} for e in graph.edges],
+        "fingerprint": graph.fingerprint(),
+    }
+
+
 def missing_packs(org) -> list[str]:
     """Skill knowledge sources that cite a pack VeriTriage does not ship."""
     catalog = pack_catalog()
