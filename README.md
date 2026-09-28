@@ -43,6 +43,28 @@ them, and requests follow-up work. It observes and decides; it never executes.
 veritriage analyze simulation.log coverage.txt test_metadata.json
 ```
 
+## Nirmaan IP: the organization above VeriTriage (v1.15.0)
+
+VeriTriage is now the verification-intelligence subsystem of **Nirmaan IP**, a
+machine-readable semiconductor IP company in `src/nirmaan/`. Nirmaan models
+divisions, teams, and roles from Intern to CEO, along with skills,
+capabilities, authority, escalation, gates, and a 12-article constitution that
+its task engine enforces. Give it a requirement and it produces an
+organization-driven plan: every task has an owner, an independent reviewer, an
+authorized approver, evidence requirements, and an escalation path, and each
+routing decision records why it was made.
+
+```
+nirmaan plan "Create a 4-port AXI-to-NoC bridge." --detail
+nirmaan demo all
+```
+
+The task engine keeps planned, executed, verified, and approved distinct, and
+it makes a fake tool run or a self-approval impossible. VeriTriage
+investigations are real, evidence-producing tools inside it. VeriTriage itself
+is unchanged and never imports Nirmaan. See
+[docs/NIRMAAN_ORG_OS.md](docs/NIRMAAN_ORG_OS.md).
+
 ## Why
 
 Today's debug flow after a regression failure is manual: open the log, grep for

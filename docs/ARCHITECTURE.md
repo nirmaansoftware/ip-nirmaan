@@ -524,6 +524,20 @@ registries, and the `.vtb` bundle format - is now declared stable. Future
 work is integrations and ecosystem adoption over these seams, not core
 expansion.
 
+## v1.15.0: Nirmaan IP, the organization above the platform
+
+Milestone 19 adds a sibling package, `src/nirmaan/`, rather than growing the
+core. It is an organizational operating system: a validated model of a
+semiconductor IP company, a task engine that enforces a constitution and
+hash-chains every change, and an orchestrator that routes requirements to
+roles purely from organizational data. VeriTriage is its verification-
+intelligence subsystem. Two laws keep the layering honest, both AST-enforced
+in `tests/test_nirmaan_architecture.py`: VeriTriage never imports Nirmaan, and
+only `nirmaan/integrations/veritriage.py` imports VeriTriage (through
+`WorkspaceServices` and the Knowledge Pack registry). Skills cite Knowledge
+Packs by ID instead of duplicating protocol knowledge. Full design:
+[NIRMAAN_ORG_OS.md](NIRMAAN_ORG_OS.md).
+
 ## Known limitations
 
 - Single-line messages only (Questa's multi-line assertion context is ignored).

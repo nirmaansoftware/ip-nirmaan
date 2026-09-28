@@ -9,7 +9,7 @@ what's next" record.
 
 Repo: https://github.com/patel-om/veritriage (public, Apache-2.0)
 Local path: `/Users/ompatel/Documents/veritriage`
-Current version: **1.14.0**
+Current version: **1.15.0** (VeriTriage 1.15.0 + Nirmaan IP 0.1.0)
 Portfolio integration: card + sample artifacts in
 `/Users/ompatel/Documents/Om Portfolio` (`index.html`,
 `veritriage-sample-report.html`, `veritriage-sample-dashboard.html`)
@@ -1024,6 +1024,74 @@ Fixed to cite on applicability.
 Deferred to M18.x: a CI adapter publishing events from GitHub Actions/Jenkins;
 Slack and VS Code subscribers; a `due()` evaluation for schedule ticks.
 
+### Milestone 19 (v1.15.0) - Nirmaan IP: the Organizational Operating System
+
+The user named the larger vision **Nirmaan IP**: an AI-native semiconductor IP
+company in which a requirement goes in and an organization plans, owns,
+reviews, gates, and evidences the work. VeriTriage becomes its verification-
+intelligence subsystem. This milestone delivers the spec's Phases 1-3 in full,
+the Phase 4 runtime interface, and a thin but real Phase 5 bridge.
+
+**Placement decision.** A sibling top-level package `src/nirmaan/` in the same
+distribution (`nirmaan` CLI entry point), not growth inside `veritriage/`.
+Two AST-enforced laws: VeriTriage never imports Nirmaan; only
+`nirmaan/integrations/veritriage.py` imports VeriTriage (through
+`WorkspaceServices` and the Knowledge Pack registry). The M9 Kahn engine, M18
+event bus, and M10 reviews were evaluated and deliberately not reused (each is
+verification-specific; bending them would couple VeriTriage to Nirmaan). The
+42 Knowledge Packs ARE reused: skills cite them by ID, never duplicating
+protocol knowledge (`missing_packs()` proves every citation resolves).
+
+Structure:
+- `models/` (frozen vocabulary; imports only pydantic)
+- `company/` (the Nirmaan IP definition as data: org chart, 140 skills, 97
+  capabilities, 38 tools with AVAILABLE/CONTRACT_ONLY status, authority
+  matrix, escalation routes, 6 gates, 12-article constitution, 7 workflows,
+  requirement vocabulary)
+- `org/` (builder that DERIVES 685 roles from unit kinds, immutable
+  `Organization` with memoized queries, validation, authority service,
+  escalation routing)
+- `orchestrator/` (analyze, router, planner)
+- `work/` (TaskEngine, policy checks, hash-chained audit, blockers,
+  management, trace graph, store)
+- `runtime/` (AgentRuntime protocol, NullRuntime, ScriptedRuntime, work
+  packets with four separate knowledge scopes, ToolBroker)
+- `integrations/veritriage.py`, `views.py`, `dashboard.py`, `demos.py` (7
+  demos), `cli.py`
+
+Key design points worth not re-deriving:
+- Staffing is derived: division->VP, department->Director,
+  team->Manager+Tech Lead, leaf->IC ladder (override inherits down).
+- Escalation rises one rung at a time (spec chain verified by test).
+- Proficiency is derived from level; signoff capabilities also need a
+  `min_level`; tools flow from skills (execute/write need WORKING).
+- Routing is a scored join, and a test forbids domain literals in
+  `orchestrator/`. The score weighs stage skills, then unit specialty
+  (distance-decayed), then capped requirement-context skills, then level fit.
+- Un-reviewable work is planned BLOCKED, never a silent deadlock.
+- Evidence requirements name the tools whose runs count, so a lint
+  requirement cannot be met by an unrelated tool run.
+- Every mutation passes the state machine, authority, and constitution, then
+  one audit entry; P10 detects state changed outside the engine by
+  fingerprint.
+
+Real bugs found by the validator and tests on the way:
+- staff escalating down to a tech lead
+- `rtl.impact` held by nobody
+- ladder overrides not inheriting
+- the only `debug.review` holder being the owner
+- a trace-graph keyword collision
+- `division_of` returning the company for top-level departments
+
+170 new tests across 6 files (`tests/test_nirmaan_*.py` +
+`nirmaan_helpers.py`). Crown jewel
+`test_a_new_engineering_domain_needs_only_an_extension` adds silicon photonics
+(unit, skill, capabilities, tool, feature, intent, workflow) through one
+`@register_extension` and plans owned, reviewed, gated work into it. The
+end-to-end test drives the 55-task AXI-to-NoC bridge project to COMPLETED
+under the real rules. Design doc: `docs/NIRMAAN_ORG_OS.md` (includes the
+architecture assessment and the extension guide).
+
 ---
 
 ## 3. Current architecture map
@@ -1167,6 +1235,14 @@ src/veritriage/
                      subprocess, socket, or thread: it decides, the workspace executes.
                      Nothing below imports it (guard-enforced).
   reports/           HTML report generator (Jinja2, self-contained, light/dark).
+
+src/nirmaan/         M19: Nirmaan IP, the organizational OS ABOVE VeriTriage (sibling
+                     package; `nirmaan` CLI). models/ (plain data), company/ (the
+                     company as data), org/ (derived staffing, validation, authority),
+                     orchestrator/ (analyze, route, plan), work/ (TaskEngine, policy,
+                     audit, blockers, management, trace, store), runtime/ (agent
+                     interface + tool broker), integrations/veritriage.py (the ONLY
+                     VeriTriage import site). VeriTriage never imports it.
   cli/main.py        Typer app: analyze, parsers, knowledge, waveform, context,
                      project, dut, env, flow, explain, investigate, impact, mcp, sessions, run,
                      profiles, bundle (export/import/validate/compare), review,
@@ -1209,7 +1285,7 @@ v11 adds `plan` (M14) → v12 adds `design` (M15) →
 v13 adds `automation` (M18). Bump on any breaking field change; tests assert the current
 value (`test_cli.py`).
 
-**Current test count: 684**, across `tests/test_*.py`: parsers, rules,
+**Current test count: 854** (684 VeriTriage + 170 Nirmaan IP), across `tests/test_*.py`: parsers, rules,
 graph, artifact parsers, models, report, CLI, AI boundary, reasoning,
 history, analytics, knowledge, waveform, engineering, workspace/MCP,
 orchestrator, collaboration, project, agents, learning, planning, design,
@@ -1245,6 +1321,15 @@ from the repo root.
   renamed to **VeriTriage** at M2/M3 boundary (GitHub redirect preserved
   from the rename). Never suggest reverting or renaming again without the
   user raising it.
+- **iCloud eviction (discovered at M19).** The repo lives in iCloud-synced
+  `~/Documents` with storage optimization on, and macOS evicts files to
+  "dataless" placeholders, including freshly written `.py` and `.pyc` files.
+  Reads then block until iCloud re-downloads them (about 1s per file), which
+  shows up as tests hanging inside `importlib` `get_data` (the old 13-minute
+  `test_ai_boundary.py` stall was this). Workarounds: run tests with
+  `PYTHONPYCACHEPREFIX` pointing outside iCloud, pre-read the tree
+  (`find src tests -flags +dataless -type f -print0 | xargs -0 cat >/dev/null`),
+  or move the repo out of `~/Documents` / mark it "Keep Downloaded".
 - Standing unexecuted offer: publish an initial release to PyPI to reserve
   the `veritriage` package name. Not done; requires explicit confirmation
   before acting (irreversible-ish - name squatting disputes are a hassle).
@@ -1380,6 +1465,19 @@ or workspace changes; `test_new_endpoint_needs_only_a_tool` is the proof.
 ### 5.9 Packaging
 Standing offer, not executed: publish an initial `veritriage` release to
 PyPI to reserve the name. Requires explicit user go-ahead.
+
+### 5.10a Nirmaan IP next steps (M19 follow-ups)
+- A model-backed `AgentRuntime` (Claude via the M17 provider registry, so one
+  vendor registry still serves everything), first on verification seats where
+  `veritriage.investigate` already produces real evidence.
+- Deeper Phase 5: map the M12 specialists onto verification roles' work
+  packets; publish organizational events to the M18 bus through the bridge.
+- Real bindings for CONTRACT_ONLY tools (lint, simulator, formal) behind the
+  broker, each proven by a crown-jewel-style test.
+- MCP tools for Nirmaan (a separate tool table; the VeriTriage table must not
+  learn about Nirmaan).
+- Cross-domain graph (Phase 8): link trace-graph artifacts to Design Graph
+  nodes, not only to VeriTriage session IDs.
 
 ### 5.10 Housekeeping / debt
 - `docs/EVIDENCE_GRAPH.md` and `docs/ARCHITECTURE.md` should get a light
