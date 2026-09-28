@@ -1,0 +1,2 @@
+counter_tb: PASS
+counter_tb.v:29: $finish called at 130000 (1ps)

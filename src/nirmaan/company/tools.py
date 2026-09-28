@@ -3,7 +3,11 @@
 ``AVAILABLE`` means a real binding exists in this repository and an
 invocation executes. ``CONTRACT_ONLY`` means the organization plans around the
 tool but nothing here can run it, and the broker refuses rather than pretends:
-no agent can ever claim a simulator, synthesis, or STA run happened.
+no agent can ever claim an STA or place-and-route run happened.
+
+Lint, simulation, tests, synthesis, and formal are AVAILABLE through
+open-source EDA (``nirmaan/integrations/eda.py``, M21). Their bindings still
+refuse, with a reason, on a machine whose PATH lacks the executable.
 """
 
 from __future__ import annotations
@@ -44,17 +48,17 @@ TOOLS: list[ToolSpec] = [
     _tool("git.merge", "Git merge", "scm", WR, CO, "Merge to protected branches."),
     _tool("code.search", "Code search", "scm", RD, CO, "Search source code."),
     # RTL and verification EDA.
-    _tool("lint.run", "Lint", "eda", EXE, CO, "RTL lint against coding standards."),
-    _tool("simulator.run", "Simulator", "eda", EXE, CO, "Compile and simulate RTL and testbenches."),
-    _tool("test.run", "Run tests", "eda", EXE, CO, "Run individual tests."),
+    _tool("lint.run", "Lint", "eda", EXE, AV, "RTL lint against coding standards."),
+    _tool("simulator.run", "Simulator", "eda", EXE, AV, "Compile and simulate RTL and testbenches."),
+    _tool("test.run", "Run tests", "eda", EXE, AV, "Run individual tests."),
     _tool("regression.run", "Run regressions", "eda", EXE, CO, "Launch and monitor regressions."),
     _tool("waveform.inspect", "Waveform viewer", "eda", RD, CO, "Inspect waveforms."),
     _tool("coverage.read", "Coverage database", "eda", RD, CO, "Read and merge coverage."),
-    _tool("formal.run", "Formal engine", "eda", EXE, CO, "Model checking and property proofs."),
+    _tool("formal.run", "Formal engine", "eda", EXE, AV, "Model checking and property proofs."),
     _tool("equivalence.run", "Equivalence checker", "eda", EXE, CO, "Logic equivalence checking."),
     _tool("cdc.run", "CDC/RDC analyzer", "eda", EXE, CO, "Structural and functional crossing analysis."),
     # Implementation EDA.
-    _tool("synth.run", "Synthesis", "eda", EXE, CO, "Logic synthesis."),
+    _tool("synth.run", "Synthesis", "eda", EXE, AV, "Logic synthesis."),
     _tool("sta.run", "Static timing", "eda", EXE, CO, "Multi-mode, multi-corner timing."),
     _tool("pnr.run", "Place and route", "eda", EXE, CO, "Floorplan, placement, CTS, routing."),
     _tool("power.run", "Power analysis", "eda", EXE, CO, "Power, IR-drop, and EM."),

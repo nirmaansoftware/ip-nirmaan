@@ -1,0 +1,282 @@
+"""Open-source EDA behind the tool broker: real runs, or an honest refusal.
+
+A :class:`Backend` declares the executables it needs, the commands it runs,
+and how its output is parsed. ``register_backend`` is the extension point: the
+first backend for a tool also registers the tool's broker binding, with a probe
+that refuses the invocation (and says why) when no backend's executables are
+on PATH. Nothing here simulates a tool: a run either happened, and its log and
+parsed result are on disk, or the broker refused it.
+
+A failing tool (lint errors, a failing test, a counterexample, a missing
+source, a timeout) is a recorded run with ``succeeded=False``, never an
+exception. Simulation logs reach VeriTriage through :func:`triage_simulation`,
+which invokes ``veritriage.investigate`` through the same broker. This module
+never imports VeriTriage.
+"""
+
+from __future__ import annotations
+
+import json
+import shlex
+import shutil
+import subprocess
+import tempfile
+from dataclasses import dataclass
+from pathlib import Path
+from typing import TYPE_CHECKING, Callable
+
+from nirmaan.integrations.eda_parsers import (
+    EdaResult,
+    parse_sby,
+    parse_simulation,
+    parse_verilator_lint,
+    parse_yosys,
+)
+from nirmaan.runtime.tools import ToolOutcome, register_binding, unregister_binding
+from nirmaan.work.engine import TaskEngine
+
+if TYPE_CHECKING:
+    from nirmaan.models import Actor, ToolRun
+    from nirmaan.runtime.tools import ToolBroker
+
+DEFAULT_TIMEOUT = 300
+
+
+@dataclass(frozen=True)
+class Job:
+    """One invocation: the parameters, resolved, and a working directory."""
+
+    tool: str
+    params: dict[str, str]
+    workdir: Path
+    sources: tuple[str, ...]
+    top: str | None
+
+    def top_args(self, flag: str) -> list[str]:
+        return [flag, self.top] if self.top else []
+
+
+@dataclass(frozen=True)
+class RunRecord:
+    """What the executables did: their combined output and exit statuses."""
+
+    log: str
+    returncodes: tuple[int, ...]
+    workdir: Path
+
+    @property
+    def returncode(self) -> int:
+        return self.returncodes[-1] if self.returncodes else -1
+
+
+@dataclass(frozen=True)
+class Backend:
+    name: str
+    tool: str
+    executables: tuple[str, ...]
+    steps: Callable[[Job], list[list[str]]]
+    parse: Callable[[RunRecord], EdaResult]
+    required: tuple[str, ...] = ("sources",)
+    #: Where the steps run; the job's working directory unless the tool needs another.
+    cwd: Callable[[Job], Path] | None = None
+
+
+_BACKENDS: dict[str, list[Backend]] = {}
+_BOUND: set[str] = set()
+
+#: Tools whose runs produce a simulation log VeriTriage can investigate.
+SIMULATION_TOOLS = ("simulator.run", "test.run")
+
+
+def register_backend(backend: Backend) -> Backend:
+    """Add a backend. The first one for a tool also binds the tool in the broker."""
+    backends = _BACKENDS.setdefault(backend.tool, [])
+    if any(b.name == backend.name for b in backends):
+        raise ValueError(f"{backend.tool} already has a backend named {backend.name!r}")
+    backends.append(backend)
+    if backend.tool not in _BOUND:
+        register_binding(backend.tool, probe=_probe(backend.tool))(_binding(backend.tool))
+        _BOUND.add(backend.tool)
+    return backend
+
+
+def unregister_backend(tool: str, name: str) -> None:
+    backends = [b for b in _BACKENDS.get(tool, []) if b.name != name]
+    _BACKENDS[tool] = backends
+    if not backends and tool in _BOUND:
+        unregister_binding(tool)
+        _BOUND.discard(tool)
+
+
+def backends_for(tool: str) -> list[Backend]:
+    return list(_BACKENDS.get(tool, []))
+
+
+def _missing(backend: Backend) -> list[str]:
+    return [exe for exe in backend.executables if shutil.which(exe) is None]
+
+
+def select_backend(tool: str, params: dict[str, str]) -> tuple[Backend | None, str]:
+    """The backend that will run, or None and the reason none can run here."""
+    wanted = params.get("backend")
+    candidates = [b for b in _BACKENDS.get(tool, []) if not wanted or b.name == wanted]
+    if not candidates:
+        return None, f"{tool} has no backend named {wanted!r}"
+    reasons = []
+    for backend in candidates:
+        missing = _missing(backend)
+        if not missing:
+            return backend, ""
+        reasons.append(f"{backend.name} needs {', '.join(missing)}")
+    return None, f"{tool} cannot run here: {'; '.join(reasons)} on PATH, not found (refused, never simulated)"
+
+
+def _probe(tool: str) -> Callable[[dict[str, str]], str | None]:
+    def probe(params: dict[str, str]) -> str | None:
+        backend, why = select_backend(tool, params)
+        return None if backend else why
+
+    return probe
+
+
+def _binding(tool: str) -> Callable[[dict[str, str], TaskEngine], ToolOutcome]:
+    def run(params: dict[str, str], engine: TaskEngine) -> ToolOutcome:
+        backend, why = select_backend(tool, params)
+        if backend is None:  # the executable vanished after the probe
+            return ToolOutcome(False, why)
+        return execute(backend, params)
+
+    return run
+
+
+def execute(backend: Backend, params: dict[str, str]) -> ToolOutcome:
+    """Run the backend's steps for real, parse what they printed, and write both to disk."""
+    missing = [p for p in backend.required if not params.get(p, "").strip()]
+    if missing:
+        return ToolOutcome(False, f"{backend.name}: missing parameter {', '.join(missing)}")
+    sources = tuple(str(Path(s.strip()).resolve()) for s in params.get("sources", "").split(",") if s.strip())
+    files = [*sources, *([str(Path(params["sby"]).resolve())] if params.get("sby") else [])]
+    absent = [f for f in files if not Path(f).is_file()]
+    if absent:
+        return ToolOutcome(False, f"{backend.name}: not found: {', '.join(absent)}")
+    workdir = Path(params["workdir"]) if params.get("workdir") else Path(tempfile.mkdtemp(prefix="nirmaan-eda-"))
+    workdir.mkdir(parents=True, exist_ok=True)
+    workdir = workdir.resolve()
+    job = Job(backend.tool, params, workdir, sources, params.get("top") or None)
+    timeout = int(params.get("timeout") or DEFAULT_TIMEOUT)
+
+    chunks: list[str] = []
+    codes: list[int] = []
+    commands: list[list[str]] = []
+    timed_out = None
+    cwd = backend.cwd(job) if backend.cwd else workdir
+    for argv in backend.steps(job):
+        commands.append(argv)
+        chunks.append(f"$ {shlex.join(argv)}\n")
+        try:
+            proc = subprocess.run(argv, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                  text=True, errors="replace", timeout=timeout)
+        except subprocess.TimeoutExpired as exc:
+            out = exc.output.decode(errors="replace") if isinstance(exc.output, bytes) else (exc.output or "")
+            chunks.append(out)
+            timed_out = argv[0]
+            break
+        except OSError as exc:  # not executable, vanished mid-run
+            chunks.append(f"{type(exc).__name__}: {exc}\n")
+            codes.append(-1)
+            break
+        chunks.append(proc.stdout)
+        codes.append(proc.returncode)
+        if proc.returncode != 0:
+            break
+    log = "".join(chunks)
+    log_path = workdir / f"{backend.name}.log"
+    log_path.write_text(log, encoding="utf-8")
+
+    result = backend.parse(RunRecord(log, tuple(codes), workdir))
+    if timed_out:
+        result = EdaResult(False, f"timed out after {timeout}s in {timed_out}", result.diagnostics, result.metrics)
+    record = {
+        "tool": backend.tool,
+        "backend": backend.name,
+        "executables": {exe: shutil.which(exe) for exe in backend.executables},
+        "commands": commands,
+        "exit_statuses": codes,
+        "log": str(log_path),
+        "result": result.to_dict(),
+    }
+    result_path = workdir / f"{backend.name}.result.json"
+    result_path.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
+    return ToolOutcome(result.passed, f"{backend.name}: {result.summary}",
+                       references=(str(log_path), str(result_path)), data=record)
+
+
+def triage_simulation(broker: ToolBroker, actor: Actor, run: ToolRun, task_id: str | None = None,
+                      workspace: str | None = None):
+    """Hand a recorded simulation's log to ``veritriage.investigate``, as its own brokered run."""
+    if run.tool not in SIMULATION_TOOLS or not run.references:
+        raise ValueError(f"{run.id} is not a simulation run with a log")
+    params = {"paths": run.references[0]}
+    if workspace:
+        params["workspace"] = workspace
+    return broker.invoke(actor, "veritriage.investigate", params, task_id or run.task)
+
+
+# --- The built-in backends --------------------------------------------------------------
+
+
+def _verilator_lint(job: Job) -> list[list[str]]:
+    return [["verilator", "--lint-only", "-Wall", *job.top_args("--top-module"), *job.sources]]
+
+
+def _icarus(job: Job) -> list[list[str]]:
+    return [["iverilog", "-g2012", "-o", "sim.vvp", "-s", str(job.top), *job.sources],
+            ["vvp", "-n", "sim.vvp"]]
+
+
+def _verilator_sim(job: Job) -> list[list[str]]:
+    return [["verilator", "--binary", "-Wno-fatal", "-j", "0", "--top-module", str(job.top),
+             "-Mdir", "obj", *job.sources],
+            [str(job.workdir / "obj" / f"V{job.top}")]]
+
+
+def _yosys(job: Job) -> list[list[str]]:
+    script = [*(f'read_verilog -sv "{src}"' for src in job.sources),
+              f"synth -top {job.top}", "tee -q -o stat.json stat -json"]
+    (job.workdir / "synth.ys").write_text("\n".join(script) + "\n", encoding="utf-8")
+    (job.workdir / "stat.json").unlink(missing_ok=True)
+    return [["yosys", "-s", "synth.ys"]]
+
+
+def _yosys_parse(run: RunRecord) -> EdaResult:
+    stat = run.workdir / "stat.json"
+    return parse_yosys(run.log, run.returncode, stat.read_text(encoding="utf-8") if stat.is_file() else None)
+
+
+def _sby(job: Job) -> list[list[str]]:
+    return [["sby", "-f", "-d", str(job.workdir / "sby"), str(Path(job.params["sby"]).resolve())]]
+
+
+def _sby_dir(job: Job) -> Path:
+    """sby resolves its [files] against the directory it runs in: the .sby file's own."""
+    return Path(job.params["sby"]).resolve().parent
+
+
+def _lint_parse(run: RunRecord) -> EdaResult:
+    return parse_verilator_lint(run.log, run.returncode)
+
+
+def _sim_parse(run: RunRecord) -> EdaResult:
+    return parse_simulation(run.log, run.returncodes)
+
+
+def _sby_parse(run: RunRecord) -> EdaResult:
+    return parse_sby(run.log, run.returncode)
+
+
+register_backend(Backend("verilator-lint", "lint.run", ("verilator",), _verilator_lint, _lint_parse))
+for _tool in SIMULATION_TOOLS:
+    register_backend(Backend("icarus", _tool, ("iverilog", "vvp"), _icarus, _sim_parse, ("sources", "top")))
+    register_backend(Backend("verilator-sim", _tool, ("verilator",), _verilator_sim, _sim_parse, ("sources", "top")))
+register_backend(Backend("yosys", "synth.run", ("yosys",), _yosys, _yosys_parse, ("sources", "top")))
+register_backend(Backend("symbiyosys", "formal.run", ("sby", "yosys"), _sby, _sby_parse, ("sby",), _sby_dir))

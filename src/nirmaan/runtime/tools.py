@@ -1,7 +1,8 @@
 """The tool broker: capability-checked, honestly executed, always recorded.
 
-A tool runs only if the role is granted it, the tool is AVAILABLE, and a
-binding exists. Otherwise the broker refuses, and says why: a CONTRACT_ONLY
+A tool runs only if the role is granted it, the tool is AVAILABLE, a binding
+exists, and the binding's probe (if any) finds it can run on this machine (an
+EDA executable on PATH). Otherwise the broker refuses, and says why: a CONTRACT_ONLY
 tool (a simulator, synthesis, STA) is never "run" here, so no agent can ever
 produce evidence that one was. Every executed invocation becomes a
 :class:`ToolRun` in project state through the task engine, which is the only
@@ -27,16 +28,25 @@ class ToolOutcome:
 
 
 Binding = Callable[[dict[str, str], TaskEngine], ToolOutcome]
+#: Asked before every invocation: None when the binding can run here, else why not.
+Probe = Callable[[dict[str, str]], str | None]
 _BINDINGS: dict[str, Binding] = {}
+_PROBES: dict[str, Probe] = {}
 
 
-def register_binding(tool_id: str) -> Callable[[Binding], Binding]:
-    """Decorator: the real implementation behind an AVAILABLE tool."""
+def register_binding(tool_id: str, probe: Probe | None = None) -> Callable[[Binding], Binding]:
+    """Decorator: the real implementation behind an AVAILABLE tool.
+
+    ``probe`` decides availability at run time (an EDA binding whose executable
+    is not on PATH): when it returns a reason, the broker refuses and says why.
+    """
 
     def _register(fn: Binding) -> Binding:
         if tool_id in _BINDINGS and _BINDINGS[tool_id] is not fn:
             raise ValueError(f"Tool binding {tool_id!r} is already registered")
         _BINDINGS[tool_id] = fn
+        if probe is not None:
+            _PROBES[tool_id] = probe
         return fn
 
     return _register
@@ -44,6 +54,7 @@ def register_binding(tool_id: str) -> Callable[[Binding], Binding]:
 
 def unregister_binding(tool_id: str) -> None:
     _BINDINGS.pop(tool_id, None)
+    _PROBES.pop(tool_id, None)
 
 
 def available_bindings() -> list[str]:
@@ -71,6 +82,10 @@ class ToolBroker:
         if binding is None or tool.status is not ToolStatus.AVAILABLE:
             raise ToolAccessDenied(f"{tool_id} has no implementation in this installation")
         params = {k: str(v) for k, v in (params or {}).items()}
+        probe = _PROBES.get(tool_id)
+        unavailable = probe(params) if probe else None
+        if unavailable:
+            raise ToolAccessDenied(unavailable)
         try:
             outcome = binding(params, self._engine)
         except Exception as exc:  # a failing tool is a recorded, failed run
@@ -127,5 +142,5 @@ def _trace(params: dict[str, str], engine: TaskEngine) -> ToolOutcome:
 
 
 def _ensure_builtin_bindings() -> None:
-    """Import the VeriTriage bridge so its bindings register (lazily: it is heavy)."""
-    from nirmaan.integrations import veritriage  # noqa: F401
+    """Import the VeriTriage bridge and the EDA bindings so they register (lazily)."""
+    from nirmaan.integrations import eda, veritriage  # noqa: F401

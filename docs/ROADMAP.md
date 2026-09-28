@@ -78,6 +78,12 @@ there, so agent output can be checked rather than trusted.
 
 ## Stage 2 (M21): Real design tools, through open-source EDA
 
+**Status: done**, except the optional `sta.run` (OpenSTA), which stays
+`CONTRACT_ONLY`. Design doc: `docs/EDA_TOOLS.md`. The "in CI" half of Done-when
+depends on the Stage 0 workflow installing `verilator iverilog yosys` (apt)
+and setting `NIRMAAN_REQUIRE_EDA`; locally all five bindings, formal included,
+were exercised against the real tools.
+
 **Why:** most evidence requirements (lint, simulation, formal, synthesis,
 timing) can today only be met by a human attesting. Open-source EDA can make
 them real without licenses.
