@@ -1,4 +1,4 @@
-"""Nirmaan IP: the company definition.
+"""IP Nirmaan: the company definition.
 
 Everything here is data. ``nirmaan_definition()`` returns the declarative
 company, and ``build_organization()`` derives staffing, applies registered
@@ -39,7 +39,7 @@ def nirmaan_definition() -> CompanyDefinition:
 
 
 def builder() -> OrganizationBuilder:
-    """A builder over the Nirmaan IP definition, ready for overlays."""
+    """A builder over the IP Nirmaan definition, ready for overlays."""
     return OrganizationBuilder(nirmaan_definition())
 
 

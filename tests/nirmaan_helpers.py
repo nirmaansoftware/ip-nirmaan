@@ -1,4 +1,4 @@
-"""Test helpers for Nirmaan IP: drive a project forward the honest way.
+"""Test helpers for IP Nirmaan: drive a project forward the honest way.
 
 ``drive`` moves tasks through the engine exactly as people would: owners start
 and submit, independent reviewers review, authorized approvers approve, gate

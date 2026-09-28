@@ -1,6 +1,6 @@
 """The VeriTriage bridge: the ONLY module in Nirmaan that imports VeriTriage.
 
-VeriTriage is Nirmaan IP's verification-intelligence subsystem. The
+VeriTriage is IP Nirmaan's verification-intelligence subsystem. The
 organization reaches it here and nowhere else (a test enforces the law), and
 only through its stable public surfaces: ``WorkspaceServices`` and the
 Knowledge Pack registry. VeriTriage itself never imports Nirmaan.

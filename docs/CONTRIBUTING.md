@@ -1,4 +1,4 @@
-# Contributing to Nirmaan IP
+# Contributing to IP Nirmaan
 
 ## Setup
 

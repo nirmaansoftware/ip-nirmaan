@@ -1,6 +1,6 @@
-# Nirmaan IP: the Organizational Operating System (Milestone 19)
+# IP Nirmaan: the Organizational Operating System (Milestone 19)
 
-Nirmaan IP is a machine-readable model of a semiconductor IP company, together
+IP Nirmaan is a machine-readable model of a semiconductor IP company, together
 with the engine that runs its work. You submit a requirement ("Create a 4-port
 AXI-to-NoC bridge"). The organization analyzes it, selects a workflow, and
 routes every piece of work to a specific role. Each task gets an independent
@@ -14,7 +14,7 @@ workers who fill seats in this organization. They get no special access: their
 output passes the same state machine, authority matrix, and constitution as a
 human's, and it can never mark itself verified or approved.
 
-VeriTriage is Nirmaan IP's verification-intelligence subsystem. It is unchanged
+VeriTriage is IP Nirmaan's verification-intelligence subsystem. It is unchanged
 by this milestone and reached through one bridge module.
 
 ```
@@ -124,7 +124,7 @@ Tools declared by skills are granted too. Read tools come with any holding of
 the skill. Write, execute, and approve tools need at least WORKING proficiency,
 so an intern can read a repository but not run the simulator.
 
-The Nirmaan IP definition today has 207 units, 685 derived roles, 140 skills,
+The IP Nirmaan definition today has 207 units, 685 derived roles, 140 skills,
 97 capabilities, 38 tools, 7 workflows, 6 gates, and 12 principles. It covers
 Product and Programs, Architecture, Design Engineering, Verification, Silicon
 Implementation (physical design and DFT), Software, Security, Engineering

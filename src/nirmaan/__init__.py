@@ -1,4 +1,4 @@
-"""Nirmaan IP: an organizational operating system for semiconductor engineering.
+"""IP Nirmaan: an organizational operating system for semiconductor engineering.
 
 A machine-readable model of a semiconductor IP company (divisions, teams,
 roles, skills, authority, workflows, and a constitution), with a task engine
@@ -10,4 +10,4 @@ verification-intelligence subsystem, reached through exactly one bridge module
 (``nirmaan.integrations.veritriage``).
 """
 
-__version__ = "1.16.0"
+__version__ = "1.16.1"

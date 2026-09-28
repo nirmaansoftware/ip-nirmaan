@@ -1,4 +1,4 @@
-"""The Nirmaan IP org chart, level profiles, and executive roles.
+"""The IP Nirmaan org chart, level profiles, and executive roles.
 
 Only the structure is written here. Roles for every division, department,
 team, and practice are derived by the builder from the unit kinds: a VP per
@@ -20,7 +20,7 @@ from nirmaan.models import (
     UnitStatus,
 )
 
-COMPANY_NAME = "Nirmaan IP"
+COMPANY_NAME = "IP Nirmaan"
 ROOT = "nirmaan"
 
 ARCH_LADDER = (Level.STAFF, Level.SENIOR, Level.ENGINEER)
