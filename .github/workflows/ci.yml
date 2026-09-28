@@ -25,8 +25,9 @@ jobs:
       - name: Test
         # A real-tool test whose executable is named here fails instead of
         # skipping. `sby` is not in Ubuntu's apt, so formal still skips.
+        # `cc` and `make` build the firmware and its co-simulation (M25).
         env:
-          NIRMAAN_REQUIRE_EDA: verilator iverilog vvp yosys
+          NIRMAAN_REQUIRE_EDA: verilator iverilog vvp yosys cc make
         run: python -m pytest -q
 
   dashes:
