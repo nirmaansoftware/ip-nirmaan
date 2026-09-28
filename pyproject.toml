@@ -32,8 +32,8 @@ ai = ["anthropic>=0.40"]
 dev = ["pytest>=8.0"]
 
 [project.urls]
-Homepage = "https://github.com/patel-om/ip-nirmaan"
-Repository = "https://github.com/patel-om/ip-nirmaan"
+Homepage = "https://github.com/nirmaansoftware/ip-nirmaan"
+Repository = "https://github.com/nirmaansoftware/ip-nirmaan"
 
 [project.scripts]
 veritriage = "veritriage.cli.main:app"

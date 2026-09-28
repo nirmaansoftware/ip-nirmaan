@@ -27,7 +27,7 @@ records absolute paths, so rebuild the venv first:
 ```
 cd ~/Documents/<new-folder-name>
 rm -rf .venv && python3.11 -m venv .venv && .venv/bin/pip install -e ".[ai,dev]"
-git remote -v                       # expect https://github.com/patel-om/ip-nirmaan.git
+git remote -v                       # expect https://github.com/nirmaansoftware/ip-nirmaan.git
 PYTHONPYCACHEPREFIX=/tmp/nirmaan-pycache .venv/bin/python -m pytest -q \
   --deselect tests/test_ai_boundary.py::test_missing_sdk_raises_clean_error
 ```

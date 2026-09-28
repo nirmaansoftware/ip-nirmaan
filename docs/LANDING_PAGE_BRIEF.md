@@ -10,7 +10,7 @@ up to the builder.
 |---|---|
 | **URL** | `ip.nirmaan.online`, a subdomain of the owner's existing software-services company site (`nirmaan.online`). |
 | **Brand** | **IP Nirmaan**, always written that way. The command-line tool is `nirmaan`; the verification engine is **VeriTriage**. |
-| **Source** | https://github.com/patel-om/ip-nirmaan (public, Apache-2.0) |
+| **Source** | https://github.com/nirmaansoftware/ip-nirmaan (public, Apache-2.0) |
 | **Stage** | Early and open source: a working foundation, not a commercial product. The page must read that way. |
 | **Owner** | Om Patel. Contact details are for the owner to supply; do not invent an email address or a form endpoint. |
 
