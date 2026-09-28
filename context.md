@@ -11,9 +11,8 @@ Repo: https://github.com/patel-om/ip-nirmaan (public, Apache-2.0; renamed from
 `veritriage` (then `nirmaan-ip`) after M19, GitHub redirects the old URL)
 Local path: `/Users/ompatel/Documents/veritriage`
 Current version: **1.16.1** (distribution `ip-nirmaan`; packages `nirmaan` and `veritriage`)
-Portfolio integration: card + sample artifacts in
-`/Users/ompatel/Documents/Om Portfolio` (`index.html`,
-`veritriage-sample-report.html`, `veritriage-sample-dashboard.html`)
+Portfolio: removed from `/Users/ompatel/Documents/Om Portfolio` at the user's
+request after M19 (card and sample pages deleted).
 
 ---
 
@@ -1308,15 +1307,9 @@ from the repo root.
   `thinking={"type": "adaptive"}` and structured JSON output; it's an
   optional extra (`pip install ip-nirmaan[ai]`) and degrades gracefully
   (warns, continues deterministic-only) if the SDK or API key is missing.
-- Portfolio integration is a separate repo
-  (`/Users/ompatel/Documents/Om Portfolio`, → `patel-om/portfolio`). Each
-  milestone that changes user-visible behavior should refresh
-  `veritriage-sample-report.html` (regenerate via
-  `veritriage analyze <fixtures> -o <tmp>` and copy `report.html`) and
-  `veritriage-sample-dashboard.html` (via `veritriage dashboard`), and
-  update the project card's description/badges in `index.html`. This is a
-  habit, not a hard requirement - confirm scope with the user if a change
-  is purely internal (e.g., a docs-only fix).
+- Portfolio: no longer integrated. The project card and sample pages were
+  removed from `patel-om/portfolio` after M19; do not refresh them per
+  milestone unless the user asks to bring the project back.
 - Package naming history: TraceIQ (M1, collided with existing PyPI/products)
   → briefly considered "verifAI" (collided with Berkeley's VerifAI) →
   renamed to **VeriTriage** at M2/M3 boundary (GitHub redirect preserved
@@ -1329,8 +1322,14 @@ from the repo root.
   now "bigger than just a verification tool". The `veritriage` package, CLI,
   MCP server, and `.veritriage/` data directory keep their names. Never
   suggest renaming again without the user raising it.
-- Domain: the user considered `nirmaan.online` (their existing software-services
-  company) and chose `ipnirmaan.com` for this project; the brand was renamed to match. Do not put
+- Domain (final, for now): **`ip.nirmaan.online`**, a subdomain of the user's
+  existing software-services domain. No new domain is being purchased. The
+  brand stays **IP Nirmaan** (it was renamed to match `ipnirmaan.com`, which the
+  user may still buy later). Do not add the URL to project metadata until the
+  subdomain actually serves a page.
+- Portfolio: the user removed this project from `/Users/ompatel/Documents/Om Portfolio`
+  (card and sample pages deleted after M19). Do not refresh portfolio artifacts
+  per milestone any more unless the user asks. Do not put
   a domain into project metadata until the user confirms they own it.
 - **iCloud eviction (discovered at M19).** The repo lives in iCloud-synced
   `~/Documents` with storage optimization on, and macOS evicts files to
