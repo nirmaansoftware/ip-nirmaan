@@ -162,6 +162,7 @@ AXI4-Lite register block end to end against the fixture set in
 
 - OpenROAD bindings for floorplan, place, route, and timing.
 - DFT and firmware agents.
+- **DFT status (M25, branch `m25/dft`):** `dft.scan_insert` (Yosys: mux-D scan, one chain), `dft.check` (testability rules as a registry), and `dft.scan_sim` (Icarus: shift and capture through the chain) are real; the `block-design` workflow gains a `dft` stage gated on both checks before review. ATPG, multiple chains, and MBIST are deferred. See `docs/DFT.md`.
 - This is the largest stage. Scope it only after Stage 4 has proven that agent work holds up under review.
 
 ## Side work (any time; owner-driven)

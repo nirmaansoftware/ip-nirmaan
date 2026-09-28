@@ -280,3 +280,6 @@ for _tool in SIMULATION_TOOLS:
     register_backend(Backend("verilator-sim", _tool, ("verilator",), _verilator_sim, _sim_parse, ("sources", "top")))
 register_backend(Backend("yosys", "synth.run", ("yosys",), _yosys, _yosys_parse, ("sources", "top")))
 register_backend(Backend("symbiyosys", "formal.run", ("sby", "yosys"), _sby, _sby_parse, ("sby",), _sby_dir))
+
+# Tool families built on these backends register their own when this module loads (M25: DFT).
+from nirmaan.integrations import dft  # noqa: E402,F401

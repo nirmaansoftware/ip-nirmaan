@@ -486,6 +486,19 @@ BLOCK_DESIGN = WorkflowTemplate(
                      checked("Self-checking simulation passes", "simulator.run",
                              FileInput(param="sources", kinds=("rtl_source", "testbench")),
                              FileInput(param="top", kinds=("testbench",), entry=True)))),
+        # M25: when the request asks for test (DFT, scan chains), the scan netlist goes to review
+        # only after real rule checks and a real chain simulation over it.
+        st("dft", "Scan insertion", "Implementation", "dft.insert",
+           depends_on=("rtl-implementation",), when=when("dft"), skills=("scan_design",), criticality=M,
+           review=rv("dft.review"),
+           outputs=("dft_netlist",),
+           evidence=(REVIEWED,
+                     checked("Testability rules hold and every flop is on the chain", "dft.check",
+                             FileInput(param="sources", kinds=("dft_netlist",)),
+                             FileInput(param="top", kinds=("dft_netlist",), entry=True)),
+                     checked("The scan chain shifts and captures in simulation", "dft.scan_sim",
+                             FileInput(param="sources", kinds=("dft_netlist",)),
+                             FileInput(param="top", kinds=("dft_netlist",), entry=True)))),
     ),
 )
 

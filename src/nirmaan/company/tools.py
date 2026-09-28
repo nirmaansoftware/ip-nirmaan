@@ -6,8 +6,10 @@ tool but nothing here can run it, and the broker refuses rather than pretends:
 no agent can ever claim an STA or place-and-route run happened.
 
 Lint, simulation, tests, synthesis, and formal are AVAILABLE through
-open-source EDA (``nirmaan/integrations/eda.py``, M21). Their bindings still
-refuse, with a reason, on a machine whose PATH lacks the executable.
+open-source EDA (``nirmaan/integrations/eda.py``, M21), and so are scan
+insertion, DFT rule checks, and scan chain simulation (``dft.py``, M25). Their
+bindings still refuse, with a reason, on a machine whose PATH lacks the
+executable.
 """
 
 from __future__ import annotations
@@ -63,7 +65,10 @@ TOOLS: list[ToolSpec] = [
     _tool("pnr.run", "Place and route", "eda", EXE, CO, "Floorplan, placement, CTS, routing."),
     _tool("power.run", "Power analysis", "eda", EXE, CO, "Power, IR-drop, and EM."),
     _tool("pv.run", "Physical verification", "eda", EXE, CO, "DRC, LVS, ERC, antenna, density."),
-    _tool("dft.run", "DFT tools", "eda", EXE, CO, "Scan insertion, ATPG, MBIST."),
+    _tool("dft.run", "DFT tools", "eda", EXE, CO, "ATPG, MBIST, and commercial scan flows."),
+    _tool("dft.scan_insert", "Scan insertion", "eda", EXE, AV, "Mux-D scan flops stitched into one chain."),
+    _tool("dft.check", "DFT rule check", "eda", EXE, AV, "Testability rules over the synthesized netlist."),
+    _tool("dft.scan_sim", "Scan chain simulation", "eda", EXE, AV, "Shift and capture through the chain in simulation."),
     # Software and infrastructure.
     _tool("compiler.run", "Compiler toolchain", "software", EXE, CO, "Build firmware and software."),
     _tool("debugger.attach", "Debugger", "software", EXE, CO, "Attach to targets and models."),
