@@ -12,6 +12,9 @@ M25). Their bindings still refuse, with a reason, on a machine whose PATH
 lacks the executable or that has no PDK input for the run. Firmware build and
 co-simulation are AVAILABLE the same way (``nirmaan/integrations/firmware.py``,
 M25).
+
+Scan insertion, DFT rule checks, and scan chain simulation are AVAILABLE through
+Yosys and Icarus (``nirmaan/integrations/dft.py``, M25).
 """
 
 from __future__ import annotations
@@ -68,7 +71,10 @@ TOOLS: list[ToolSpec] = [
           "Floorplan, placement, and routing in one staged run, with timing (OpenROAD)."),
     _tool("power.run", "Power analysis", "eda", EXE, CO, "Power, IR-drop, and EM."),
     _tool("pv.run", "Physical verification", "eda", EXE, CO, "DRC, LVS, ERC, antenna, density."),
-    _tool("dft.run", "DFT tools", "eda", EXE, CO, "Scan insertion, ATPG, MBIST."),
+    _tool("dft.run", "DFT tools", "eda", EXE, CO, "ATPG, MBIST, and commercial scan flows."),
+    _tool("dft.scan_insert", "Scan insertion", "eda", EXE, AV, "Mux-D scan flops stitched into one chain."),
+    _tool("dft.check", "DFT rule check", "eda", EXE, AV, "Testability rules over the synthesized netlist."),
+    _tool("dft.scan_sim", "Scan chain simulation", "eda", EXE, AV, "Shift and capture through the chain in simulation."),
     # Software and infrastructure.
     _tool("compiler.run", "Compiler toolchain", "software", EXE, CO, "Build firmware and software."),
     _tool("fw.build", "Firmware build", "software", EXE, AV, "Compile C firmware under strict warning flags."),
