@@ -10,7 +10,7 @@ from __future__ import annotations
 import subprocess
 import sys
 
-DASHES = ("—", "–")
+DASHES = ("\u2014", "\u2013")
 
 # nirmaan.online's own files, copied unchanged (see site/README.md); they
 # follow that repository's conventions, not this one's.
