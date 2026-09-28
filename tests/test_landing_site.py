@@ -64,7 +64,7 @@ VENDORED = {"nirmaan.css", "site.js", "hero.js"}
 )
 def test_no_dashes(path: str) -> None:
     text = (SITE / path).read_text(encoding="utf-8")
-    assert "—" not in text and "–" not in text
+    assert "\u2014" not in text and "\u2013" not in text
 
 
 @pytest.mark.parametrize(

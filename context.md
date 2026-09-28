@@ -1109,6 +1109,16 @@ with this change) is maintained by hand.
 Not deployed yet: hosting and the `ip` CNAME are the owner's call. See
 `site/README.md`.
 
+### Continuous integration (side work, Stage 0) - `.github/workflows/ci.yml`
+
+GitHub Actions runs the full suite on Python 3.11 and 3.12 for every PR and
+every push to `main`, installing with `pip install -e ".[ai,dev]"`. CI runs
+`test_missing_sdk_raises_clean_error` too; it is deselected only locally, where
+iCloud eviction stalls the `anthropic` import. A second job runs
+`scripts/check_dashes.py`, which fails on U+2014 or U+2013 in any tracked text
+file except the vendored nirmaan.online files (`site/nirmaan.css`,
+`site/site.js`, `site/hero.js`). The README carries the CI badge.
+
 ---
 
 ## 3. Current architecture map
