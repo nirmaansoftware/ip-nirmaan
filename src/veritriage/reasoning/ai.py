@@ -13,7 +13,7 @@ matters most:
   alongside the deterministic result; it can never alter the graph, the
   signals, the hypothesis ranking, or the recommendations.
 
-The dependency is optional (``pip install veritriage[ai]``); without it the
+The dependency is optional (``pip install nirmaan-ip[ai]``); without it the
 reasoning pipeline is complete and deterministic.
 """
 
@@ -123,7 +123,7 @@ class AIReasoner:
         except ImportError as exc:
             raise AIReasoningError(
                 "AI review requested but the 'anthropic' package is not installed. "
-                "Install with: pip install veritriage[ai]"
+                "Install with: pip install nirmaan-ip[ai]"
             ) from exc
 
         payload = build_ai_payload(graph, result)

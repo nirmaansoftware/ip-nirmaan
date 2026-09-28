@@ -510,7 +510,10 @@ def task_resolve(project: str, escalation: str, resolution: str, role: str = AS_
 
 @app.command()
 def version() -> None:
-    console.print(f"nirmaan {nirmaan.__version__} ({COMPANY_NAME})")
+    """Print the platform version and its verification engine."""
+    from nirmaan.integrations.veritriage import engine_version
+
+    console.print(f"{COMPANY_NAME} {nirmaan.__version__} (verification engine: VeriTriage {engine_version()})")
 
 
 if __name__ == "__main__":  # pragma: no cover

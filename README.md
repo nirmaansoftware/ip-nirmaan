@@ -1,4 +1,40 @@
-# VeriTriage
+# Nirmaan IP
+
+**An AI-native semiconductor IP company, as software.** Nirmaan IP is an
+organizational operating system for semiconductor engineering. Give it a
+requirement ("Create a 4-port AXI-to-NoC bridge") and a machine-readable
+company plans the work: divisions, teams, and roles from Intern to CEO, with
+skills, authority, gates, and a 12-article constitution. Every task gets an
+owner, an independent reviewer, an authorized approver, evidence requirements,
+and an escalation path, and each routing decision records why it was made.
+
+```
+nirmaan plan "Create a 4-port AXI-to-NoC bridge." --detail
+nirmaan demo all
+nirmaan why <project> microarchitecture
+```
+
+The task engine keeps planned, executed, verified, and approved distinct, and
+it makes a fake tool run or a self-approval impossible. Language models will
+power workers who fill seats in the organization. They get no special access
+and cannot mark their own work verified. Design:
+[docs/NIRMAAN_ORG_OS.md](docs/NIRMAAN_ORG_OS.md).
+
+## The platform
+
+| Component | What it is | Entry point |
+|---|---|---|
+| **Nirmaan IP organizational OS** (`src/nirmaan/`) | The company as data, the task engine, the orchestrator, and the agent runtime interface | `nirmaan` |
+| **VeriTriage** (`src/veritriage/`) | The verification-intelligence engine: evidence graphs, knowledge packs, reasoning, regression memory | `veritriage` |
+
+Nirmaan IP is bigger than verification, and it builds on VeriTriage's
+verification technology rather than replacing it:
+
+* VeriTriage investigations are real, evidence-producing tools inside Nirmaan's task engine.
+* VeriTriage's 42 Knowledge Packs are the domain knowledge that Nirmaan's skills cite.
+* VeriTriage never depends on Nirmaan, so it stays usable as a standalone verification tool.
+
+## VeriTriage: the verification engine
 
 **Verification intelligence for semiconductor regression debug.** VeriTriage turns
 raw verification artifacts (simulation logs, compile logs, coverage summaries,
@@ -43,29 +79,7 @@ them, and requests follow-up work. It observes and decides; it never executes.
 veritriage analyze simulation.log coverage.txt test_metadata.json
 ```
 
-## Nirmaan IP: the organization above VeriTriage (v1.15.0)
-
-VeriTriage is now the verification-intelligence subsystem of **Nirmaan IP**, a
-machine-readable semiconductor IP company in `src/nirmaan/`. Nirmaan models
-divisions, teams, and roles from Intern to CEO, along with skills,
-capabilities, authority, escalation, gates, and a 12-article constitution that
-its task engine enforces. Give it a requirement and it produces an
-organization-driven plan: every task has an owner, an independent reviewer, an
-authorized approver, evidence requirements, and an escalation path, and each
-routing decision records why it was made.
-
-```
-nirmaan plan "Create a 4-port AXI-to-NoC bridge." --detail
-nirmaan demo all
-```
-
-The task engine keeps planned, executed, verified, and approved distinct, and
-it makes a fake tool run or a self-approval impossible. VeriTriage
-investigations are real, evidence-producing tools inside it. VeriTriage itself
-is unchanged and never imports Nirmaan. See
-[docs/NIRMAAN_ORG_OS.md](docs/NIRMAAN_ORG_OS.md).
-
-## Why
+### Why VeriTriage
 
 Today's debug flow after a regression failure is manual: open the log, grep for
 errors, open the waveform, inspect signals, form a hypothesis. VeriTriage

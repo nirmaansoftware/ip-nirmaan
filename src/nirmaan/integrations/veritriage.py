@@ -67,6 +67,13 @@ def search(params: dict[str, str], engine: TaskEngine) -> ToolOutcome:
                        data={"hits": [h.model_dump(mode="json") for h in hits[:20]]})
 
 
+def engine_version() -> str:
+    """The installed VeriTriage engine's version."""
+    import veritriage
+
+    return veritriage.__version__
+
+
 @lru_cache(maxsize=1)
 def pack_catalog() -> dict[str, dict[str, str]]:
     """Registered VeriTriage Knowledge Packs: id -> name, domain, summary."""

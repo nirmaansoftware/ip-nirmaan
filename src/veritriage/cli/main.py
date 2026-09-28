@@ -29,7 +29,7 @@ DEFAULT_DB = Path(".veritriage") / "regressions.db"
 
 app = typer.Typer(
     name="veritriage",
-    help="VeriTriage - turn verification artifacts into evidence-backed root-cause reports.",
+    help="VeriTriage, the Nirmaan IP verification engine - turn verification artifacts into evidence-backed root-cause reports.",
     no_args_is_help=True,
     add_completion=False,
 )
@@ -53,7 +53,7 @@ def analyze(
         None, "--parser", help="Force one registered parser for every artifact instead of auto-detecting."
     ),
     ai: bool = typer.Option(
-        False, "--ai/--no-ai", help="Also run the AI review stage (requires 'pip install veritriage[ai]')."
+        False, "--ai/--no-ai", help="Also run the AI review stage (requires 'pip install nirmaan-ip[ai]')."
     ),
     ai_model: str = typer.Option(
         "claude-opus-4-8", "--ai-model", help="Claude model to use for the AI review."
