@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+
+  <title>IP Nirmaan: a semiconductor IP company, as software</title>
+  <meta name="description" content="IP Nirmaan is an open-source, AI-native semiconductor IP company modeled as software: give it a requirement, and a machine-readable organization plans, routes, reviews, and gates the work, with evidence behind every claim." />
+  <link rel="canonical" href="https://ip.nirmaan.online/" />
+
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="IP Nirmaan" />
+  <meta property="og:url" content="https://ip.nirmaan.online/" />
+  <meta property="og:title" content="IP Nirmaan: a semiconductor IP company, as software" />
+  <meta property="og:description" content="Give it a requirement, and a machine-readable organization plans, routes, reviews, and gates the work, with evidence behind every claim. Open source, Apache-2.0." />
+
+  <meta name="color-scheme" content="light dark" />
+  <meta name="theme-color" content="#F1F1EC" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#0E0E0F" media="(prefers-color-scheme: dark)" />
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,500..900&family=Hanken+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="styles.css" />
+
+  <!-- Motion is opt-in: only with JavaScript and without a reduced-motion
+       preference. Without it, every section renders complete and still. -->
+  <script>
+    if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.classList.add('motion');
+    }
+  </script>
+  <script src="motion.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="nav">
+  <div class="wrap nav__inner">
+    <a class="brand" href="#top" aria-label="IP Nirmaan, back to top">
+      <svg class="glyph glyph--assemble brand__mark" viewBox="0 0 5 5" aria-hidden="true" focusable="false" shape-rendering="crispEdges"><rect x="0" y="4" width="1" height="1" style="--i:0"/><rect x="4" y="4" width="1" height="1" style="--i:1"/><rect x="0" y="3" width="1" height="1" style="--i:2"/><rect x="3" y="3" width="1" height="1" style="--i:3"/><rect x="4" y="3" width="1" height="1" style="--i:4"/><rect x="0" y="2" width="1" height="1" style="--i:5"/><rect x="2" y="2" width="1" height="1" style="--i:6"/><rect x="4" y="2" width="1" height="1" style="--i:7"/><rect x="0" y="1" width="1" height="1" style="--i:8"/><rect x="1" y="1" width="1" height="1" style="--i:9"/><rect x="4" y="1" width="1" height="1" style="--i:10"/><rect x="0" y="0" width="1" height="1" style="--i:11"/><rect x="4" y="0" width="1" height="1" style="--i:12"/></svg>
+      <span class="brand__name">IP Nirmaan</span>
+    </a>
+    <nav class="nav__links" aria-label="Sections">
+      <a href="#idea">Idea</a>
+      <a href="#how">How it works</a>
+      <a href="#organization">Organization</a>
+      <a href="#constitution">Constitution</a>
+      <a href="#veritriage">VeriTriage</a>
+      <a href="#status">Status</a>
+    </nav>
+    <a class="btn btn--small" href="https://github.com/nirmaansoftware/ip-nirmaan">GitHub</a>
+  </div>
+</header>
+
+<main id="main" tabindex="-1">
+
+  <!-- HERO -->
+  <section class="hero" id="top">
+    <div class="hero__grid" aria-hidden="true"></div>
+    <div class="wrap hero__inner">
+      <div class="hero__copy">
+        <p class="eyebrow">Open source &middot; Apache-2.0 &middot; v1.16.1</p>
+        <h1 class="hero__title">
+          <span class="line"><span>A semiconductor</span></span>
+          <span class="line"><span>IP company,</span></span>
+          <span class="line"><span>as <em>software.</em></span></span>
+        </h1>
+        <p class="lede">IP Nirmaan is an AI-native semiconductor IP company modeled as software: you give it a requirement, and a machine-readable organization plans, routes, reviews, and gates the work, with evidence behind every claim.</p>
+        <div class="actions">
+          <a class="btn" href="https://github.com/nirmaansoftware/ip-nirmaan">View on GitHub</a>
+          <a class="btn btn--ghost" href="#how">See how it works</a>
+        </div>
+      </div>
+
+      <figure class="term" data-term>
+        <div class="term__bar">
+          <span class="term__dots" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span class="term__title">nirmaan plan</span>
+          <button class="term__replay" type="button" data-replay="term" hidden>Replay</button>
+        </div>
+<pre class="term__body" tabindex="0" aria-label="Output of nirmaan plan for a 4-port AXI-to-NoC bridge, trimmed"><span class="ln cmd"><span class="prompt">$</span> <span data-type>nirmaan plan "Create a 4-port AXI-to-NoC bridge."</span></span>
+<span class="ln"> </span>
+<span class="ln"><b>PROJECT:</b> Create a 4-port AXI-to-NoC bridge</span>
+<span class="ln"><span class="k">Intent:</span> new_ip   <span class="k">Features:</span> axi, cdc, multi_port, noc, registers</span>
+<span class="ln"><span class="k">Assumption:</span> Clocking was not stated, so CDC/RDC work is planned conservatively.</span>
+<span class="ln"> </span>
+<span class="ln"><b>PROGRAM MANAGER</b>  Senior Technical Program Manager</span>
+<span class="ln">├── <b>Architecture</b>  <span class="o">(lead: Chief Architect)</span></span>
+<span class="ln">│   ├── Interface specification: AXI interface   <span class="o">owner: Senior AXI Interface Architect</span></span>
+<span class="ln">│   ├── Microarchitecture                        <span class="o">owner: Staff NoC Microarchitect</span></span>
+<span class="ln">│   └── <span class="gate">GATE</span> Architecture approval                <span class="o">owner: Chief Architect</span> <span class="human">(human approval)</span></span>
+<span class="ln">├── <b>RTL</b>  <span class="o">(lead: Director, RTL Engineering)</span></span>
+<span class="ln">│   ├── RTL implementation: AXI slave interface  <span class="o">owner: Senior Interface Design Engineer</span></span>
+<span class="ln">│   └── RTL implementation: Arbitration          <span class="o">owner: Senior Interconnect Design Engineer</span></span>
+<span class="ln">├── <b>Verification</b>  <span class="o">(lead: VP, Verification)</span></span>
+<span class="ln">│   ├── Verification plan                         <span class="o">owner: Senior Verification Planning Engineer</span></span>
+<span class="ln">│   └── Coverage closure                          <span class="o">owner: Senior Functional Coverage Engineer</span></span>
+<span class="ln">└── <b>Signoff</b></span>
+<span class="ln">    └── <span class="gate">GATE</span> Verification signoff                 <span class="o">owner: VP, Verification</span> <span class="human">(human approval)</span></span></pre>
+        <figcaption>Real output of <code>nirmaan plan</code>, trimmed.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- THE IDEA -->
+  <section class="section" id="idea">
+    <div class="wrap">
+      <header class="section__head" data-reveal>
+        <p class="eyebrow">The idea</p>
+        <h2 class="section__title">Engineering work, run by an organization you can read.</h2>
+      </header>
+
+      <ul class="ideas" role="list">
+        <li class="idea" data-reveal style="--d:0">
+          <svg class="glyph glyph--assemble idea__glyph" viewBox="0 0 5 5" aria-hidden="true" focusable="false" shape-rendering="crispEdges"><rect x="0" y="4" width="1" height="1" style="--i:0"/><rect x="2" y="4" width="1" height="1" style="--i:1"/><rect x="4" y="4" width="1" height="1" style="--i:2"/><rect x="0" y="3" width="1" height="1" style="--i:3"/><rect x="1" y="3" width="1" height="1" style="--i:4"/><rect x="2" y="3" width="1" height="1" style="--i:5"/><rect x="3" y="3" width="1" height="1" style="--i:6"/><rect x="4" y="3" width="1" height="1" style="--i:7"/><rect x="2" y="2" width="1" height="1" style="--i:8"/><rect x="2" y="1" width="1" height="1" style="--i:9"/><rect x="1" y="0" width="1" height="1" style="--i:10"/><rect x="2" y="0" width="1" height="1" style="--i:11"/><rect x="3" y="0" width="1" height="1" style="--i:12"/></svg>
+          <h3>An organization, not a chatbot.</h3>
+          <p>Divisions, teams, and roles from intern to CEO, each with skills, authority, and an escalation path.</p>
+        </li>
+        <li class="idea" data-reveal style="--d:1">
+          <svg class="glyph glyph--assemble idea__glyph" viewBox="0 0 5 5" aria-hidden="true" focusable="false" shape-rendering="crispEdges"><rect x="0" y="4" width="1" height="1" style="--i:0"/><rect x="1" y="4" width="1" height="1" style="--i:1"/><rect x="1" y="3" width="1" height="1" style="--i:2"/><rect x="2" y="3" width="1" height="1" style="--i:3"/><rect x="2" y="2" width="1" height="1" style="--i:4"/><rect x="3" y="2" width="1" height="1" style="--i:5"/><rect x="3" y="1" width="1" height="1" style="--i:6"/><rect x="4" y="1" width="1" height="1" style="--i:7"/><rect x="4" y="0" width="1" height="1" style="--i:8"/></svg>
+          <h3>Planned is not done.</h3>
+          <p>Work moves through planned, executed, verified, and approved, and nothing skips a step.</p>
+        </li>
+        <li class="idea" data-reveal style="--d:2">
+          <svg class="glyph glyph--assemble idea__glyph" viewBox="0 0 5 5" aria-hidden="true" focusable="false" shape-rendering="crispEdges"><rect x="1" y="4" width="1" height="1" style="--i:0"/><rect x="0" y="3" width="1" height="1" style="--i:1"/><rect x="1" y="3" width="1" height="1" style="--i:2"/><rect x="2" y="3" width="1" height="1" style="--i:3"/><rect x="0" y="2" width="1" height="1" style="--i:4"/><rect x="2" y="2" width="1" height="1" style="--i:5"/><rect x="3" y="2" width="1" height="1" style="--i:6"/><rect x="3" y="1" width="1" height="1" style="--i:7"/><rect x="4" y="1" width="1" height="1" style="--i:8"/><rect x="4" y="0" width="1" height="1" style="--i:9"/></svg>
+          <h3>Evidence or it did not happen.</h3>
+          <p>A tool run, a review, or a named person's sign-off backs every claim. An AI cannot mark its own work approved.</p>
+        </li>
+      </ul>
+
+      <!-- Assurance ladder: a task climbs one rung at a time, and each rung
+           only latches when its evidence arrives. -->
+      <figure class="ladder" data-play="ladder" data-reveal>
+        <div class="ladder__head">
+          <figcaption><span class="eyebrow">The assurance ladder</span> Each rung needs its own evidence.</figcaption>
+          <button class="replay" type="button" data-replay="ladder" hidden>Replay</button>
+        </div>
+        <ol class="ladder__rungs" role="list">
+          <li class="rung" style="--r:0">
+            <span class="rung__state">planned</span>
+            <span class="rung__need">A plan with an owner</span>
+          </li>
+          <li class="rung" style="--r:1">
+            <span class="rung__state">executed</span>
+            <span class="rung__need">A recorded tool run</span>
+          </li>
+          <li class="rung" style="--r:2">
+            <span class="rung__state">verified</span>
+            <span class="rung__need">An independent review</span>
+          </li>
+          <li class="rung" style="--r:3">
+            <span class="rung__state">approved</span>
+            <span class="rung__need">A named human's sign-off</span>
+          </li>
+        </ol>
+        <div class="ladder__track" aria-hidden="true"><span class="ladder__token"></span></div>
+        <p class="ladder__refusal"><span class="refused">Refused</span> An AI worker asking to approve its own work is turned away: nobody approves their own work.</p>
+      </figure>
+    </div>
+  </section>
+
+  <!-- HOW IT WORKS -->
+  <section class="section" id="how">
+    <div class="wrap">
+      <header class="section__head" data-reveal>
+        <p class="eyebrow">How it works</p>
+        <h2 class="section__title">From one sentence to routed, gated work.</h2>
+        <p class="section__lede">Example requirement: <q>Create a 4-port AXI-to-NoC bridge.</q></p>
+      </header>
+
+      <ol class="flow" role="list" data-play="flow" data-reveal>
+        <li class="flow__step" style="--n:0">
+          <span class="flow__node" aria-hidden="true"></span>
+          <h3>Requirement</h3>
+          <p>A plain-language request comes in. Nothing else is needed to start.</p>
+        </li>
+        <li class="flow__step" style="--n:1">
+          <span class="flow__node" aria-hidden="true"></span>
+          <h3>Analyze</h3>
+          <p>Intent, features, and parameters are extracted. Anything left unstated becomes a written assumption, not a silent guess.</p>
+        </li>
+        <li class="flow__step" style="--n:2">
+          <span class="flow__node" aria-hidden="true"></span>
+          <h3>Route to roles</h3>
+          <p>Each task goes to the role whose skills, capabilities, and authority fit it. Routing reads the organization as data.</p>
+        </li>
+        <li class="flow__step" style="--n:3">
+          <span class="flow__node" aria-hidden="true"></span>
+          <h3>Review and gate</h3>
+          <p>Critical work gets an independent reviewer. Gates such as architecture approval wait for a named human.</p>
+        </li>
+        <li class="flow__step" style="--n:4">
+          <span class="flow__node" aria-hidden="true"></span>
+          <h3>Deliverable</h3>
+          <p>The work product arrives with its trail: who did what, from which inputs, backed by which evidence.</p>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- ORGANIZATION -->
+  <section class="section section--ink" id="organization">
+    <div class="wrap">
+      <header class="section__head" data-reveal>
+        <p class="eyebrow">What the organization looks like</p>
+        <h2 class="section__title">A whole company, defined as data.</h2>
+      </header>
+
+      <ul class="stats" role="list" data-reveal>
+        <li class="stat"><span class="stat__num" data-count="207">207</span><span class="stat__label">organizational units</span></li>
+        <li class="stat"><span class="stat__num" data-count="685">685</span><span class="stat__label">roles, from intern to CEO</span></li>
+        <li class="stat"><span class="stat__num" data-count="140">140</span><span class="stat__label">engineering skills</span></li>
+        <li class="stat"><span class="stat__num" data-count="7">7</span><span class="stat__label">engineering workflows</span></li>
+        <li class="stat"><span class="stat__num" data-count="12">12</span><span class="stat__label">constitution principles</span></li>
+        <li class="stat"><span class="stat__num" data-count="42">42</span><span class="stat__label">verification knowledge packs</span></li>
+        <li class="stat"><span class="stat__num" data-count="870">870</span><span class="stat__label">automated tests</span></li>
+      </ul>
+
+      <figure class="org" data-reveal>
+        <div class="org__root"><span>IP Nirmaan</span></div>
+        <ul class="org__divs" role="list">
+          <li style="--k:0">Product</li>
+          <li style="--k:1">Architecture</li>
+          <li style="--k:2">Design Engineering</li>
+          <li style="--k:3">Verification</li>
+          <li style="--k:4">Silicon Implementation</li>
+          <li style="--k:5">Software</li>
+          <li style="--k:6">Security</li>
+          <li style="--k:7">Infrastructure</li>
+          <li style="--k:8">Documentation</li>
+          <li style="--k:9">Quality</li>
+        </ul>
+        <figcaption>Engineering, simplified. The model also has an executive office and business divisions, from finance and legal to sales.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- CONSTITUTION -->
+  <section class="section" id="constitution">
+    <div class="wrap">
+      <header class="section__head" data-reveal>
+        <p class="eyebrow">The company constitution</p>
+        <h2 class="section__title">Twelve principles the engine enforces.</h2>
+      </header>
+
+      <ol class="principles" role="list">
+        <li class="principle" data-reveal style="--d:0" data-principle="P1"><span class="principle__id">P1</span><h3>Traceability</h3><p>Every task traces to the requirement it serves.</p></li>
+        <li class="principle" data-reveal style="--d:1" data-principle="P2"><span class="principle__id">P2</span><h3>Evidence for decisions</h3><p>Important engineering decisions require evidence.</p></li>
+        <li class="principle" data-reveal style="--d:2" data-principle="P3"><span class="principle__id">P3</span><h3>Explicit uncertainty</h3><p>Agents must explicitly represent uncertainty.</p></li>
+        <li class="principle" data-reveal style="--d:0" data-principle="P4"><span class="principle__id">P4</span><h3>No fabricated work</h3><p>Agents must not fabricate completed work.</p></li>
+        <li class="principle" data-reveal style="--d:1" data-principle="P5"><span class="principle__id">P5</span><h3>No fabricated tool runs</h3><p>No claim that a tool ran unless it did.</p></li>
+        <li class="principle" data-reveal style="--d:2" data-principle="P6"><span class="principle__id">P6</span><h3>Independent review</h3><p>Critical work is reviewed. Nobody approves their own work.</p></li>
+        <li class="principle" data-reveal style="--d:0" data-principle="P7"><span class="principle__id">P7</span><h3>Conflicts escalate</h3><p>Conflicting outputs are escalated before approval.</p></li>
+        <li class="principle" data-reveal style="--d:1" data-principle="P8"><span class="principle__id">P8</span><h3>Provenance</h3><p>Every change records who, what, and from which inputs.</p></li>
+        <li class="principle" data-reveal style="--d:2" data-principle="P9"><span class="principle__id">P9</span><h3>Evidence for signoff</h3><p>Signoff requires evidence.</p></li>
+        <li class="principle" data-reveal style="--d:0" data-principle="P10"><span class="principle__id">P10</span><h3>No hidden state changes</h3><p>Every change goes through the engine and the audit trail.</p></li>
+        <li class="principle" data-reveal style="--d:1" data-principle="P11"><span class="principle__id">P11</span><h3>Auditability</h3><p>The audit trail is append-only and hash-chained.</p></li>
+        <li class="principle" data-reveal style="--d:2" data-principle="P12"><span class="principle__id">P12</span><h3>Human approval at gates</h3><p>Gates can require a human to approve.</p></li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- VERITRIAGE -->
+  <section class="section" id="veritriage">
+    <div class="wrap vt">
+      <div class="vt__copy" data-reveal>
+        <p class="eyebrow">Built on VeriTriage</p>
+        <h2 class="section__title">The verification engine inside.</h2>
+        <p>VeriTriage is the verification-intelligence engine inside IP Nirmaan. It turns simulation logs, coverage, and waveforms into an evidence graph and a ranked, evidence-backed root cause.</p>
+        <p>When IP Nirmaan triages a regression, VeriTriage does the investigation, and its results become evidence in the task.</p>
+      </div>
+
+      <figure class="graph" data-play="graph" data-reveal>
+        <svg viewBox="0 0 440 300" role="img" aria-labelledby="graph-title">
+          <title id="graph-title">Illustration: simulation logs, coverage, and waveforms feed an evidence graph, which ranks root-cause hypotheses.</title>
+          <g class="graph__edges">
+            <path pathLength="1" d="M92 50 C150 50 150 110 206 110"/>
+            <path pathLength="1" d="M92 150 C150 150 150 110 206 110"/>
+            <path pathLength="1" d="M92 150 C150 150 150 190 206 190"/>
+            <path pathLength="1" d="M92 250 C150 250 150 190 206 190"/>
+            <path pathLength="1" d="M254 110 C300 110 300 88 330 88"/>
+            <path pathLength="1" d="M254 190 C300 190 300 88 330 88"/>
+            <path pathLength="1" d="M254 190 C300 190 300 212 330 212"/>
+          </g>
+          <g class="graph__src">
+            <rect x="8" y="32" width="84" height="36"/><text x="50" y="55">sim log</text>
+            <rect x="8" y="132" width="84" height="36"/><text x="50" y="155">coverage</text>
+            <rect x="8" y="232" width="84" height="36"/><text x="50" y="255">waveform</text>
+          </g>
+          <g class="graph__ev">
+            <rect x="206" y="92" width="48" height="36"/><text x="230" y="115">ev</text>
+            <rect x="206" y="172" width="48" height="36"/><text x="230" y="195">ev</text>
+          </g>
+          <g class="graph__rank">
+            <rect class="top" x="330" y="64" width="102" height="48"/><text x="381" y="85">#1 cause</text><text class="sub" x="381" y="101">3 links</text>
+            <rect x="330" y="188" width="102" height="48"/><text x="381" y="209">#2 cause</text><text class="sub" x="381" y="225">1 link</text>
+          </g>
+        </svg>
+        <figcaption>Illustration, not real output.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- STATUS -->
+  <section class="section" id="status">
+    <div class="wrap">
+      <header class="section__head" data-reveal>
+        <p class="eyebrow">Status and roadmap</p>
+        <h2 class="section__title">Early, open, and honest about it.</h2>
+      </header>
+
+      <div class="status">
+        <section class="status__col status__col--now" data-reveal style="--d:0">
+          <h3><span class="mark" aria-hidden="true"></span>Working today</h3>
+          <p>The organization model, planning, routing, reviews, gates, the audit trail, and real VeriTriage investigations.</p>
+        </section>
+        <section class="status__col status__col--next" data-reveal style="--d:1">
+          <h3><span class="mark" aria-hidden="true"></span>Next</h3>
+          <p>AI workers in verification roles, then connections to open-source design tools, then design and RTL agents.</p>
+        </section>
+        <section class="status__col status__col--not" data-reveal style="--d:2">
+          <h3><span class="mark" aria-hidden="true"></span>Not yet</h3>
+          <p>No chip or IP block has been designed or delivered by the system.</p>
+        </section>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="footer">
+  <div class="wrap footer__inner">
+    <p class="footer__brand">IP Nirmaan</p>
+    <ul class="footer__links" role="list">
+      <li><a href="https://github.com/nirmaansoftware/ip-nirmaan">Source on GitHub</a></li>
+      <li><a href="https://github.com/nirmaansoftware/ip-nirmaan/blob/main/LICENSE">Apache-2.0 license</a></li>
+      <li><a href="https://www.nirmaan.online/">nirmaan.online</a></li>
+    </ul>
+    <p class="footer__by">Built by Om Patel.</p>
+  </div>
+</footer>
+</body>
+</html>
