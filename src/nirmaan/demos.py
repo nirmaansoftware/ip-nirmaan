@@ -43,6 +43,9 @@ DEMOS: tuple[Demo, ...] = (
     Demo("7", "Timing closure",
          "Fix the setup timing violation on the NoC router.",
          "timing_closure", ("Implementation", "Fix")),
+    Demo("8", "Block design: AXI4-Lite register block",
+         "Create an AXI4-Lite register block.",
+         "block_design", ("Requirements", "Architecture", "RTL")),
 )
 
 

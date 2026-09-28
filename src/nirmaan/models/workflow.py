@@ -33,6 +33,19 @@ class EvidenceKind(str, Enum):
     CLAIM = "claim"
 
 
+class FileInput(BaseModel):
+    """One tool parameter filled from the files the task itself produced (M23)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    param: str = Field(description="The tool parameter to fill, e.g. 'sources'.")
+    kinds: tuple[str, ...] = Field(description="Artifact kinds whose files feed it, in this order.")
+    entry: bool = Field(
+        default=False,
+        description="Pass the entry point the first such file declares (e.g. its top module), not paths.",
+    )
+
+
 class EvidenceRequirement(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -43,6 +56,14 @@ class EvidenceRequirement(BaseModel):
     tools: tuple[str, ...] = Field(
         default=(),
         description="For tool-backed kinds: the tools whose runs count. Empty means any.",
+    )
+    files: tuple[FileInput, ...] = Field(
+        default=(),
+        description="Run the tools over the task's own produced files, filling these parameters.",
+    )
+    before_review: bool = Field(
+        default=False,
+        description="Must be met, over the files submitted, before the work may be submitted for review.",
     )
 
 

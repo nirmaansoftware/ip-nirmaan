@@ -28,13 +28,17 @@ from nirmaan.models import Actor, ActorKind, EscalationKind, EvidenceKind, TaskS
 from nirmaan.runtime.context import WorkPacket, assemble
 from nirmaan.runtime.tools import ToolBroker, ToolOutcome
 from nirmaan.work.engine import TaskEngine, WorkError
-from nirmaan.work.policy import PolicyContext, PolicyEngine
+from nirmaan.work.policy import PolicyContext, PolicyEngine, PolicyViolationError
 
 
 class ResultStatus(str, Enum):
     SUBMITTED = "submitted"
     NEEDS_ESCALATION = "needs_escalation"
     DECLINED = "declined"
+    #: A check the work must pass cannot run here (e.g. its tool is not installed); the task is blocked.
+    BLOCKED = "blocked"
+    #: Set by ``run_task``, not a runtime: the engine refused the submission; the evidence stands.
+    REFUSED = "refused"
 
 
 @dataclass(frozen=True)
@@ -201,8 +205,16 @@ def run_task(engine: TaskEngine, task_id: str, runtime: AgentRuntime,
                               evidence=tuple(report.evidence), blocking_question=req.blocking_question,
                               recommended_options=req.recommended_options)
         report.escalation = esc.id
+    elif result.status is ResultStatus.BLOCKED:
+        engine.block(task_id, actor, result.notes)
     elif result.status is ResultStatus.SUBMITTED:
-        engine.submit(task_id, actor, list(result.artifacts), notes=result.notes, outcome=result.outcome)
+        try:
+            engine.submit(task_id, actor, list(result.artifacts), notes=result.notes, outcome=result.outcome)
+        except PolicyViolationError as exc:
+            # The runs recorded above really happened (a failed lint is a fact worth keeping), so a
+            # refused submission is reported rather than raised: the caller can save the evidence.
+            report.status = ResultStatus.REFUSED
+            report.detail = "; ".join(p for p in (result.notes, f"submission refused: {exc}") if p)
     return report
 
 
