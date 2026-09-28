@@ -10,7 +10,10 @@ work packet, never from a role, skill, or stage name:
   :class:`LLM`;
 * it strips every citation the prompt did not declare (M17 grounding, through
   the bridge), drops artifacts left with no citation, and passes the tool runs
-  the model says it relied on to the engine unfiltered, where P5 judges them.
+  the model says it relied on to the engine unfiltered, where P5 judges them;
+* files in the answer (M23) are written with a digest, and the tools of any
+  evidence requirement over the task's own files run on them afterwards. When
+  such a check must pass before review and cannot run here, the work is blocked.
 
 Two LLMs ship. :class:`RegistryLLM` reaches any provider in the one M17
 registry through the bridge. :class:`MockLLM` is deterministic and scriptable,
@@ -21,7 +24,10 @@ so no test ever calls an API. The model-backed seats are off by default:
 from __future__ import annotations
 
 import json
+import re
+import tempfile
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Protocol, Sequence
 
 from nirmaan.models import EscalationKind, EvidenceKind, Verdict
@@ -34,6 +40,7 @@ from nirmaan.runtime.base import (
     register_runtime,
 )
 from nirmaan.runtime.context import WorkPacket
+from nirmaan.runtime.files import split_files, write_file
 from nirmaan.runtime.prompt import ToolNote, WorkPrompt, render_work_prompt
 from nirmaan.runtime.tools import ToolAccessDenied
 
@@ -128,6 +135,50 @@ def _uncertainty(value: Any) -> float | None:
     return float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else None
 
 
+#: The file blocks of an answer, by path, and the blocks that were rejected.
+_Files = tuple[dict[str, str], list[str]]
+_ID_UNSAFE = re.compile(r"[^A-Za-z0-9._\-]")
+
+
+def _inputs(packet: WorkPacket) -> dict[str, str]:
+    """The task's inputs (task memory ``input.<key>``), which parameterize its tools."""
+    return {
+        m["key"].removeprefix("input."): m["value"] for m in packet.memory
+        if m["scope"] == "task" and m["owner"] == packet.task_id and m["key"].startswith("input.")
+    }
+
+
+def _grounded(art: dict[str, Any], prompt: WorkPrompt, stripped: list[str]) -> dict[str, Any] | None:
+    """An artifact draft with its summary grounded, derived from the approved artifacts it cites.
+
+    None when nothing it cites survives: an uncited artifact is dropped.
+    """
+    from nirmaan.integrations.veritriage import ground
+
+    summary, used, removed = ground(str(art.get("summary", "")), prompt)
+    stripped += [t for t in removed if t not in stripped]
+    if not used:
+        return None
+    derived = tuple(c.target for c in prompt.citations if c.kind == "artifact" and c.token in used)
+    return {"kind": str(art.get("kind", "")), "title": str(art.get("title", "")), "summary": summary,
+            **({"derived_from": derived} if derived else {})}
+
+
+def _attempt_dir(task_id: str, workspace: str | None) -> Path:
+    """A fresh directory per attempt, so no later attempt overwrites files an earlier run checked."""
+    base = Path(workspace) if workspace else Path(tempfile.mkdtemp(prefix="nirmaan-work-"))
+    root = base / _ID_UNSAFE.sub("_", task_id)
+    attempt = 1
+    while (root / str(attempt)).exists():
+        attempt += 1
+    (root / str(attempt)).mkdir(parents=True)
+    return root / str(attempt)
+
+
+def _join(remarks: list[str]) -> str:
+    return "; ".join(r for r in remarks if r)
+
+
 class ModelRuntime:
     """A language model filling a seat. Registered as ``mock-llm`` and ``anthropic``."""
 
@@ -141,23 +192,23 @@ class ModelRuntime:
     # --- Work --------------------------------------------------------------------------
 
     def execute(self, packet: WorkPacket, tools: ToolHandle) -> WorkResult:
-        notes = self._preflight(packet, tools)
+        inputs = _inputs(packet)
+        notes = self._preflight(packet, tools, inputs)
         runs = tuple(n.run for n in notes if n.run)
         prompt = render_work_prompt(packet, "work", notes)
-        data, problem = self._ask(prompt)
+        data, files, problem = self._ask(prompt)
         if data is None:
             return WorkResult(ResultStatus.DECLINED, uncertainty=1.0, tool_runs=runs, notes=problem)
-        return self._result(data, prompt, runs, notes)
+        return self._result(data, files, prompt, packet, tools, inputs, notes)
 
-    def _preflight(self, packet: WorkPacket, tools: ToolHandle) -> tuple[ToolNote, ...]:
-        """Run the tools the task's evidence requirements name, as the seat, before asking."""
-        params = {
-            m["key"].removeprefix("input."): m["value"] for m in packet.memory
-            if m["scope"] == "task" and m["owner"] == packet.task_id and m["key"].startswith("input.")
-        }
+    def _preflight(self, packet: WorkPacket, tools: ToolHandle, params: dict[str, str]) -> tuple[ToolNote, ...]:
+        """Run the tools the task's evidence requirements name, as the seat, before asking.
+
+        A requirement over the task's own files waits for them: it runs after the answer.
+        """
         wanted = dict.fromkeys(
             tool for req in packet.task["evidence_requirements"]
-            if _TOOL_BACKED & set(req["accepts"]) for tool in req["tools"]
+            if _TOOL_BACKED & set(req["accepts"]) and not req["files"] for tool in req["tools"]
         )
         notes = []
         for tool in wanted:
@@ -169,31 +220,28 @@ class ModelRuntime:
                 notes.append(ToolNote(tool, run_id, outcome.succeeded, outcome.summary))
         return tuple(notes)
 
-    def _result(self, data: dict[str, Any], prompt: WorkPrompt, runs: tuple[str, ...],
-                notes: tuple[ToolNote, ...]) -> WorkResult:
-        from nirmaan.integrations.veritriage import ground
-
+    def _result(self, data: dict[str, Any], files: _Files, prompt: WorkPrompt, packet: WorkPacket,
+                tools: ToolHandle, inputs: dict[str, str], notes: tuple[ToolNote, ...]) -> WorkResult:
         kept, dropped, stripped = [], [], []
         for art in data.get("artifacts") or []:
             if not isinstance(art, dict):
                 continue
-            summary, used, removed = ground(str(art.get("summary", "")), prompt)
-            stripped += [t for t in removed if t not in stripped]
-            if not used:
+            draft = _grounded(art, prompt, stripped)
+            if draft is None:
                 dropped.append(str(art.get("title") or art.get("kind") or "untitled"))
                 continue
-            kept.append({"kind": str(art.get("kind", "")), "title": str(art.get("title", "")), "summary": summary})
-        # Declared runs go to the engine unfiltered: a run that never happened is P5's to refuse.
-        tool_runs = tuple(dict.fromkeys([*runs, *(str(r) for r in data.get("tool_runs") or [])]))
+            kept.append(draft)
         remarks = [str(data.get("notes") or "")]
         if stripped:
             remarks.append(f"stripped undeclared citations: {', '.join(stripped)}")
         if dropped:
             remarks.append(f"dropped uncited artifacts: {', '.join(dropped)}")
         remarks += [f"{n.tool} not run: {n.summary}" for n in notes if n.run is None]
-        common = dict(uncertainty=_uncertainty(data.get("uncertainty")), tool_runs=tool_runs,
-                      claims=tuple(str(c) for c in data.get("claims") or []),
-                      notes="; ".join(r for r in remarks if r))
+        common = dict(uncertainty=_uncertainty(data.get("uncertainty")),
+                      claims=tuple(str(c) for c in data.get("claims") or []))
+        # Declared runs go to the engine unfiltered: a run that never happened is P5's to refuse.
+        declared = [str(r) for r in data.get("tool_runs") or []]
+        runs = [n.run for n in notes if n.run]
         escalation = data.get("escalation")
         if isinstance(escalation, dict) and escalation:
             return WorkResult(ResultStatus.NEEDS_ESCALATION, escalation=EscalationRequest(
@@ -201,10 +249,103 @@ class ModelRuntime:
                 str(escalation.get("question", "How should this task proceed?")),
                 attempted_actions=tuple(f"ran {n.tool}" for n in notes if n.run),
                 recommended_options=tuple(str(o) for o in escalation.get("options") or ()),
-            ), **common)
+            ), tool_runs=tuple(dict.fromkeys([*runs, *declared])), notes=_join(remarks), **common)
+
+        before = len(stripped)
+        produced = self._write(data, files, prompt, packet, inputs, stripped, remarks)
+        if len(stripped) > before:
+            remarks.append(f"stripped undeclared citations from files: {', '.join(stripped[before:])}")
+        after, blocked = self._postflight(packet, tools, inputs, produced)
+        runs += [n.run for n in after if n.run]
+        remarks += [f"{n.tool} not run: {n.summary}" for n in after if n.run is None]
+        remarks += [f"{n.tool} {n.run} failed: {n.summary}" for n in after if n.run and not n.succeeded]
+        tool_runs = tuple(dict.fromkeys([*runs, *declared]))
+        if blocked:  # a check the work must pass cannot run here: nothing goes forward
+            return WorkResult(ResultStatus.BLOCKED, tool_runs=tool_runs, notes=_join([*blocked, *remarks]), **common)
         outcome = data.get("outcome") if prompt.outcomes else None
-        return WorkResult(ResultStatus.SUBMITTED, artifacts=tuple(kept),
+        artifacts = (*kept, *({k: v for k, v in f.items() if k != "entry"} for f in produced))
+        return WorkResult(ResultStatus.SUBMITTED, artifacts=artifacts, tool_runs=tool_runs, notes=_join(remarks),
                           outcome=str(outcome) if outcome is not None else None, **common)
+
+    # --- Files (M23) --------------------------------------------------------------------
+
+    def _write(self, data: dict[str, Any], files: _Files, prompt: WorkPrompt, packet: WorkPacket,
+               inputs: dict[str, str], stripped: list[str], remarks: list[str]) -> list[dict[str, Any]]:
+        """Ground each declared file's summary, then write the kept ones with a digest."""
+        blocks, problems = files
+        chosen, uncited, orphans = [], [], []
+        declared = [f for f in data.get("files") or [] if isinstance(f, dict)]
+        for meta in declared:
+            path = str(meta.get("path", ""))
+            if path not in blocks:
+                orphans.append(path or "(no path)")
+                continue
+            draft = _grounded({"title": path, **meta}, prompt, stripped)
+            if draft is None:
+                uncited.append(path)
+                continue
+            entry = meta.get("entry")
+            chosen.append((path, {**draft, "entry": str(entry) if entry else None}))
+        named = {str(f.get("path", "")) for f in declared}
+        problems = [*problems, *(f"file block {p} was declared by no files entry" for p in blocks if p not in named)]
+        if uncited:
+            remarks.append(f"dropped uncited files: {', '.join(uncited)}")
+        if orphans:
+            remarks.append(f"dropped files with no content block: {', '.join(orphans)}")
+        remarks += problems
+        if not chosen:
+            return []
+        root = _attempt_dir(packet.task_id, inputs.get("workspace"))
+        produced = []
+        for path, draft in chosen:
+            location, digest = write_file(root, path, blocks[path])
+            produced.append({**draft, "location": str(location), "digest": digest})
+        return produced
+
+    def _postflight(self, packet: WorkPacket, tools: ToolHandle, inputs: dict[str, str],
+                    produced: list[dict[str, Any]]) -> tuple[tuple[ToolNote, ...], list[str]]:
+        """Run each requirement over the task's own files, filling parameters as the requirement says.
+
+        Returns the notes, and the refusals that block the work: a before-review
+        requirement none of whose tools can run here.
+        """
+        notes: list[ToolNote] = []
+        blocked: list[str] = []
+        seen: dict[tuple[str, tuple[tuple[str, str], ...]], ToolNote] = {}
+        for req in packet.task["evidence_requirements"]:
+            if not req["files"] or not _TOOL_BACKED & set(req["accepts"]):
+                continue
+            params, missing = dict(inputs), None
+            for binding in req["files"]:
+                matched = [f for kind in binding["kinds"] for f in produced if f["kind"] == kind]
+                kinds = " or ".join(binding["kinds"])
+                if binding["entry"]:
+                    value = matched[0]["entry"] if matched else None
+                    why = f"no {kinds} file declares an entry"
+                else:
+                    value = ",".join(f["location"] for f in matched)
+                    why = f"the answer carried no {kinds} file"
+                missing = missing or (None if value else why)
+                params[binding["param"]] = value or ""
+            refusals = []
+            for tool in req["tools"]:
+                if missing:
+                    notes.append(ToolNote(tool, None, False, missing))
+                    continue
+                key = (tool, tuple(sorted(params.items())))
+                if key not in seen:
+                    try:
+                        run_id, outcome = tools.invoke(tool, **params)
+                    except ToolAccessDenied as exc:
+                        seen[key] = ToolNote(tool, None, False, str(exc))
+                    else:
+                        seen[key] = ToolNote(tool, run_id, outcome.succeeded, outcome.summary)
+                    notes.append(seen[key])
+                if seen[key].run is None:
+                    refusals.append(seen[key].summary)
+            if req["before_review"] and refusals and len(refusals) == len(req["tools"]):
+                blocked += [r for r in refusals if r not in blocked]
+        return tuple(notes), blocked
 
     # --- Review ------------------------------------------------------------------------
 
@@ -212,7 +353,7 @@ class ModelRuntime:
         from nirmaan.integrations.veritriage import ground
 
         prompt = render_work_prompt(packet, "review")
-        data, problem = self._ask(prompt)
+        data, _, problem = self._ask(prompt)
         if data is None:
             return ReviewResult(None, uncertainty=1.0, notes=problem)
         verdict = _VERDICTS.get(str(data.get("verdict")))
@@ -225,14 +366,16 @@ class ModelRuntime:
         notes = f"stripped undeclared citations: {', '.join(stripped)}" if stripped else ""
         return ReviewResult(verdict, comments, uncertainty, notes)
 
-    def _ask(self, prompt: WorkPrompt) -> tuple[dict[str, Any] | None, str]:
+    def _ask(self, prompt: WorkPrompt) -> tuple[dict[str, Any] | None, _Files, str]:
         completion = self.llm.complete(prompt)
         if completion.error:
-            return None, f"the model call failed: {completion.error}"
-        data = _parse(completion.text)
+            return None, ({}, []), f"the model call failed: {completion.error}"
+        # File blocks come off first: their content is full of braces the JSON parser would take.
+        rest, blocks, problems = split_files(completion.text)
+        data = _parse(rest)
         if data is None:
-            return None, "the model's answer was not a JSON object; nothing was recorded"
-        return data, ""
+            return None, ({}, []), "the model's answer was not a JSON object; nothing was recorded"
+        return data, (blocks, problems), ""
 
 
 register_runtime("mock-llm")(lambda: ModelRuntime(MockLLM(), runtime_id="mock-llm"))

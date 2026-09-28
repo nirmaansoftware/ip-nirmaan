@@ -13,7 +13,11 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from nirmaan.models import Assurance, MemoryScope, TaskStatus
+from nirmaan.runtime.files import read_verified
 from nirmaan.work.engine import TaskEngine
+
+#: The most of one file's content a packet carries.
+MAX_CONTENT = 60_000
 
 
 @dataclass(frozen=True)
@@ -28,11 +32,17 @@ class WorkPacket:
     memory: tuple[dict[str, Any], ...] = field(default_factory=tuple)
 
 
-def _artifact(art, trusted: bool | None = None) -> dict[str, Any]:
+def _artifact(art, trusted: bool | None = None, content: bool = False) -> dict[str, Any]:
     entry = {"id": art.id, "kind": art.kind, "title": art.title, "assurance": art.assurance.value,
-             "summary": art.summary}
+             "summary": art.summary, "location": art.location, "digest": art.digest}
     if trusted is not None:
         entry["trusted"] = trusted
+    if content and art.digest:
+        # A recorded file is read only if its bytes still match what was recorded.
+        text, problem = read_verified(art.location, art.digest)
+        if text is not None and len(text) > MAX_CONTENT:
+            text, problem = None, f"too large to include ({len(text)} characters)"
+        entry["content"], entry["content_problem"] = text, problem
     return entry
 
 
@@ -44,6 +54,7 @@ def assemble(engine: TaskEngine, task_id: str, role: str | None = None) -> WorkP
         raise ValueError(f"{task_id} has no owner to assemble context for")
     seat = role or task.owner
     card = org.agent_card(seat)
+    capability = org.capabilities.get(task.capability or "")
 
     skills = [org.skills[s] for s in task.skills if s in org.skills]
     if task.capability:
@@ -67,7 +78,8 @@ def assemble(engine: TaskEngine, task_id: str, role: str | None = None) -> WorkP
     for dep in task.depends_on:
         for art_id in state.tasks[dep].artifacts:
             art = state.artifacts[art_id]
-            upstream.append(_artifact(art, trusted=art.assurance is Assurance.APPROVED))
+            approved = art.assurance is Assurance.APPROVED
+            upstream.append(_artifact(art, trusted=approved, content=approved))
     evidence = [
         {"id": ev.id, "task": ev.task, "kind": ev.kind.value, "description": ev.description,
          "substantiated": ev.substantiated, "tool_run": ev.tool_run, "reference": ev.reference}
@@ -110,8 +122,9 @@ def assemble(engine: TaskEngine, task_id: str, role: str | None = None) -> WorkP
             "expected_outputs": list(task.expected_outputs),
             "evidence_requirements": [r.model_dump(mode="json") for r in task.evidence_requirements],
             "outcomes": list(task.outcomes),
+            "approved_inputs": bool(capability and capability.approved_inputs),
             "upstream_artifacts": upstream,
-            "artifacts": [_artifact(state.artifacts[a]) for a in task.artifacts],
+            "artifacts": [_artifact(state.artifacts[a], content=True) for a in task.artifacts],
             "evidence": evidence,
             "owner": task.owner,
             "reviewer": task.reviewer,

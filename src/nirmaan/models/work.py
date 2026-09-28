@@ -215,6 +215,7 @@ class Artifact(BaseModel):
     assurance: Assurance = Assurance.EXECUTED
     location: str | None = None
     summary: str = Field(default="", description="The written content, e.g. an agent's cited report.")
+    digest: str | None = Field(default=None, description="'sha256:<hex>' of the file at location, when it is one.")
     evidence: tuple[str, ...] = ()
     derived_from: tuple[str, ...] = Field(default=(), description="Upstream artifact IDs.")
 

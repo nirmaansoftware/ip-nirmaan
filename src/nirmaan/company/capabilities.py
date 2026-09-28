@@ -27,6 +27,7 @@ def _cap(
     proficiency: Proficiency = PR,
     produces: tuple[str, ...] = (),
     min_level: Level | None = None,
+    approved_inputs: bool = False,
 ) -> Capability:
     return Capability(
         id=id,
@@ -36,6 +37,7 @@ def _cap(
         min_proficiency=proficiency,
         produces=produces,
         min_level=min_level,
+        approved_inputs=approved_inputs,
     )
 
 
@@ -60,12 +62,15 @@ CAPABILITIES: list[Capability] = [
     _cap("arch.power", "Power architecture", E, "Power domains, states, and intent.", EX, ("power_architecture",)),
     _cap("arch.performance", "Performance architecture", A, "Bandwidth, latency, and throughput modeling.", EX, ("performance_model",)),
     _cap("arch.software", "Software architecture", E, "Hardware/software interface and programming model.", EX, ("software_architecture",)),
-    _cap("arch.interface", "Interface specification", E, "Specify a protocol interface: signals, channels, ordering, parameters.", PR, ("interface_spec",)),
-    _cap("arch.microarchitecture", "Microarchitecture", E, "Pipelines, buffers, arbitration, and datapaths at cycle level.", EX, ("microarchitecture_spec",)),
+    _cap("arch.interface", "Interface specification", E, "Specify a protocol interface: signals, channels, ordering, parameters.", PR, ("interface_spec",),
+         approved_inputs=True),
+    _cap("arch.microarchitecture", "Microarchitecture", E, "Pipelines, buffers, arbitration, and datapaths at cycle level.", EX, ("microarchitecture_spec",),
+         approved_inputs=True),
     _cap("arch.review", "Architecture review", R, "Independently review an architecture or microarchitecture.", EX),
     _cap("signoff.architecture", "Architecture signoff", S, "Approve an architecture baseline.", PR, (), Level.DIRECTOR),
     # --- RTL -----------------------------------------------------------------
-    _cap("rtl.implement", "RTL implementation", E, "Write synthesizable RTL for a specified block.", PR, ("rtl_source",)),
+    _cap("rtl.implement", "RTL implementation", E, "Write synthesizable RTL for a specified block.", PR, ("rtl_source",),
+         approved_inputs=True),
     _cap("rtl.review", "RTL review", R, "Independently review RTL for correctness, quality, and intent.", EX),
     _cap("rtl.lint", "Lint and coding-standard checks", E, "Run and disposition lint against coding standards.", WK, ("lint_report",)),
     _cap("rtl.quality", "RTL quality analysis", A, "Synthesis-awareness, area/timing risk, and quality metrics.", PR, ("quality_report",)),
