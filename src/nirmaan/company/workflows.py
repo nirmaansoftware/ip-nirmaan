@@ -499,6 +499,41 @@ BLOCK_DESIGN = WorkflowTemplate(
                      checked("The scan chain shifts and captures in simulation", "dft.scan_sim",
                              FileInput(param="sources", kinds=("dft_netlist",)),
                              FileInput(param="top", kinds=("dft_netlist",), entry=True)))),
+        st("firmware", "Driver and driver tests", "Software", "fw.driver",
+           depends_on=("interface-spec", "rtl-implementation"), when=when("firmware"), criticality=M,
+           review=rv("sw.review"), outputs=("driver", "driver_test"),
+           evidence=(REVIEWED,
+                     checked("Driver builds clean under strict C flags", "fw.build",
+                             FileInput(param="sources", kinds=("driver",))),
+                     checked("Driver tests pass against the approved RTL", "fw.test",
+                             FileInput(param="sources", kinds=("driver", "driver_test")),
+                             FileInput(param="rtl", kinds=("rtl_source",), upstream=True)))),
+    ),
+)
+
+# --- 9. Physical implementation (M25) ---------------------------------------------------
+
+PHYSICAL_IMPLEMENTATION = WorkflowTemplate(
+    id="physical-implementation",
+    name="Physical implementation",
+    description="Constraints, Liberty-mapped synthesis, floorplan, place and route, then STA signoff. "
+                "The PDK is a task input; a machine without the tools refuses the runs.",
+    intents=("physical_implementation",),
+    stages=(
+        st("timing-constraints", "Timing constraints (SDC)", "Implementation", "sta.constraints", criticality=M,
+           review=rv("sta.review"), outputs=("constraints",), evidence=(REVIEWED,)),
+        st("synthesis", "Synthesis to the target library", "Implementation", "synth.run",
+           depends_on=("timing-constraints",), criticality=M, outputs=("netlist", "synthesis_report"),
+           evidence=(ran("Netlist mapped to the target library", "synth.run"),)),
+        st("floorplan", "Floorplan", "Implementation", "pd.floorplan", depends_on=("synthesis",), criticality=M,
+           review=rv("pd.review"), outputs=("floorplan",),
+           evidence=(REVIEWED, ran("Floorplan run with utilization reported", "pnr.run"))),
+        st("place-route", "Placement and routing", "Implementation", "pd.place_route", depends_on=("floorplan",),
+           criticality=H, review=rv("pd.review"), outputs=("layout",),
+           evidence=(REVIEWED, ran("Placed and routed, with DRC count and wirelength reported", "pnr.run"))),
+        st("sta-signoff", "STA signoff", "Signoff", "sta.analyze", depends_on=("place-route",), criticality=H,
+           review=rv("sta.review"), gate="gate.implementation", outputs=("timing_report",),
+           evidence=(REVIEWED, ran("Signoff timing on the implemented netlist", "sta.run"))),
     ),
 )
 
@@ -511,4 +546,5 @@ WORKFLOWS: list[WorkflowTemplate] = [
     SIGNOFF_PREPARATION,
     TIMING_CLOSURE,
     BLOCK_DESIGN,
+    PHYSICAL_IMPLEMENTATION,
 ]

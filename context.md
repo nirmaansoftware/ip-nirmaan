@@ -1413,13 +1413,136 @@ v1.18.0 is the one version bump for the three M23 parts (fixtures, design
 agents, export), built in parallel and merged as #23, #24, #26, and #25. The
 standard run is 984 tests.
 
+### Milestone 25 (part) - Physical design through OpenSTA and OpenROAD (roadmap Stage 6)
+
+`sta.run` (backend `opensta`, executable `sta`) and `pnr.run` (backend
+`openroad`) moved from `CONTRACT_ONLY` to `AVAILABLE`, in
+`nirmaan/integrations/physical.py` (bindings) and `pd_parsers.py` (pure
+parsers), on the M21 `register_backend` registry. `synth.run` gained a second
+backend, `yosys-liberty` (chosen with `backend=yosys-liberty`), that maps to a
+Liberty library and writes `netlist.v`, the input STA and PnR need. **Neither
+OpenSTA nor OpenROAD has run in this repository**: they are not installed
+locally or in CI, and Homebrew has no formula. Version bump left to the
+coordinator.
+
+Key design points worth not re-deriving:
+- **One staged `pnr.run`**, not four tools: OpenROAD is one process and one
+  database, so one run does floorplan, place, route (ending at `stop_after`),
+  then timing, and prints `nirmaan-stage:` / `nirmaan-stage-done:` markers the
+  parser reads. The existing skills already named `pnr.run`.
+- **The PDK is an input, never bundled.** `liberty`, `tech_lef`, `lef`, `site`,
+  `hor_layers`, `ver_layers` are task parameters; relative files resolve under
+  `pdk_root` or `NIRMAAN_PDK_ROOT`. A missing PDK input is a *refusal* (the
+  probe; no run recorded), like a missing executable; a missing netlist or SDC
+  is a recorded failed run, like a missing source.
+- `Backend` gained two optional generic fields in `eda.py`: `environment`
+  (asked by the probe after the executables; its reason joins the refusal) and
+  `files` (parameters whose paths must exist). `select_backend`'s refusal text
+  now reads `<backend> needs <exe> on PATH, not found; <backend>: <reason>`.
+- `nirmaan.runtime.unavailable_reason(tool, params)` exposes the broker's probe;
+  `nirmaan org tools` shows it in a new **Here** column.
+- STA passes only with a worst setup slack reported and non-negative, hold
+  non-negative, and no violating endpoint; `worst slack INF` (unconstrained)
+  fails. PnR passes only when every requested stage and timing finished, DRC
+  count is 0 after routing, and timing is met.
+- New workflow `physical-implementation` (intent `physical_implementation`,
+  priority 50: "place and route", "PnR", "physical design/implementation"):
+  timing-constraints -> synthesis -> floorplan -> place-route -> sta-signoff
+  (gate.implementation). Existing capabilities and skills only. `floorplan`
+  artifacts and `pd.floorplan` file into `04_rtl` in the export. The landing
+  page's workflow tile is now 9.
+
+Fixtures `tests/fixtures/pd/`: `axi4_lite_regs.sdc` (100 MHz), `tiny_cells.lib`
+(a toy Liberty library, no timing, so `yosys-liberty` runs for real in CI), and
+four **synthetic** logs (`synthetic_*.log`, first line `# SYNTHETIC:`) written to
+the documented report formats. `tests/test_nirmaan_physical.py` (22 tests, 2
+skip without `sta`/`openroad` and sky130 under `NIRMAAN_PDK_ROOT`; CI does not
+require them). Test stand-in executables exercise the runner (script written,
+argv, parse, timeout, failures). Crown jewel
+`test_a_new_pd_backend_needs_no_core_changes`. The `test_nirmaan_eda` catalog
+test no longer lists `sta.run` and `pnr.run` as contracts. Design doc:
+`docs/PHYSICAL_DESIGN.md`. Deferred: CTS, power grid, tap/filler cells, repair,
+parasitic extraction, MCMM, captured logs, a physical deliverable folder.
+
+### Milestone 25 (firmware part) - A driver run on the approved RTL (roadmap Stage 6)
+
+The firmware part of Stage 6, built in parallel with the physical-design and
+DFT parts and the Stage 5 graph. A firmware seat writes a C driver and its
+tests; they reach review only after a strict build and a co-simulation against
+a Verilator model of the approved RTL passed. Version bump left to the
+coordinator.
+
+**Two tools, through the M21 registry.** `src/nirmaan/integrations/firmware.py`
+registers `fw.build` (backends `host-cc`, and `riscv-gcc`, which is refused
+unless `riscv64-unknown-elf-gcc` is on PATH) and `fw.test` (backend
+`verilator-cosim`, needs `cc`, `verilator`, `make`). Both are `AVAILABLE` in
+`company/tools.py`; `compiler.run` stays `CONTRACT_ONLY`. `fw.build` compiles
+every `.c` under `-std=c11 -Wall -Wextra -Werror -pedantic` and checks each
+`.h` alone (through a generated one-line file, since a macro-only header is an
+empty translation unit under `-pedantic`). `fw.test` compiles the driver and
+tests the same way, builds the RTL with Verilator (`--prefix Vdut`) around
+`integrations/firmware_harness/axil_manager.cpp`, and runs it. Parsers
+`parse_c_build` (GCC and Clang, `-Werror=` and `-Werror,-W` mapped to the
+warning code) and `parse_fw_test` (the harness's `FWTEST` lines) are pure.
+
+**The HAL.** `firmware_harness/nirmaan_hal.h`: a struct of `read32`/`write32`
+function pointers plus a context, each returning the AXI response code; tests
+define `nirmaan_fw_test(const nirmaan_hal *)` and report through
+`nirmaan_test_result`. The harness is a generic AXI4-Lite manager over the
+`s_axil_*` port convention (32-bit data): real VALID/READY handshakes, one
+`FWTEST BUS` line per transfer, a 1000-cycle handshake timeout that fails the
+run, and exit 0 only when at least one check passed and none failed.
+
+**The seat, as data.** Capability `fw.driver` (`approved_inputs=True`,
+produces `driver`, `driver_test`), provided by the existing `device_drivers`
+skill (now with tools `fw.build` and `fw.test` and the HAL contract in its
+procedures; extended rather than a new skill so the landing page's skill count
+stays true), held by the existing Driver Engineer practice; review is
+`sw.review` (HAL, BSP, and boot engineers). Stage `firmware` in `block-design`,
+when the requirement mentions firmware or a driver, depending on
+`interface-spec` and `rtl-implementation`. `driver_test` joins `driver` in the
+`08_documentation` export folder.
+
+**One generic addition: `FileInput.upstream`.** A tool parameter can be filled
+from the task's approved upstream artifacts of given kinds, not only its own
+files. The runtime passes only files that are APPROVED and still match their
+digest; the `evidence-before-review` policy additionally requires a passing run
+to have named an approved upstream file in that parameter (so a co-simulation
+against some other copy of the RTL does not open review); the prompt says
+"with the approved rtl_source". None of the three names a seat, kind, or tool.
+`runtime/tools.py` now imports every `nirmaan.integrations` module to register
+bindings, instead of naming `eda` and `veritriage`, so the runtime names no
+integration (a test checks it names no firmware).
+
+Key design points worth not re-deriving:
+- Verilator's `--build` runs make, which breaks on a space in a path, and this
+  repo lives under `~/Documents/IP Nirmaan`. `fw.test` copies the harness and
+  the RTL into the working directory first; the run records the given paths.
+  A working directory with a space in it fails as a recorded run.
+- The wrong-driver fixture (`axi4_lite_regs_map_wrong.h`, REG2 at REG1's
+  offset) builds clean; only the co-simulation catches it, because the tests
+  write all four registers before reading any back.
+- An approved RTL that changed on disk is not co-simulated: the check does not
+  run and the submission is refused (as M23 treats a missing file), not
+  blocked.
+
+18 new tests in `tests/test_nirmaan_firmware.py`, including the end-to-end
+`test_the_firmware_seat_runs_its_driver_on_the_approved_rtl` (the M23 flow,
+then the firmware seat on the `tests/fixtures/fw/axi4_lite/` answer, real
+build and co-simulation, agent review, human approval) and the crown jewel
+`test_a_new_firmware_backend_needs_no_core_changes` (an `arm-cc` backend whose
+compiler is a script the test writes). CI adds `cc make` to
+`NIRMAAN_REQUIRE_EDA`. Design doc: `docs/FIRMWARE.md`. Deferred: a RISC-V
+cross compile in CI and an instruction-set simulator in the loop, a repair
+loop, APB and AXI4 harnesses, static analysis, generated register headers.
+
 ### Milestone 25 (DFT part) - Design for test through Yosys and Icarus (roadmap Stage 6)
 
 Three new tools, all `AVAILABLE` and backed by M21 backends in
-`nirmaan/integrations/dft.py` (registered when `eda.py` loads): `dft.scan_insert`
+`nirmaan/integrations/dft.py` (the broker imports every integrations module): `dft.scan_insert`
 (backend `yosys-scan`), `dft.check` (`yosys-dft`), and `dft.scan_sim`
 (`icarus-scan`). `dft.run` (ATPG, MBIST) stays `CONTRACT_ONLY`. Physical design
-and firmware are built in parallel on other branches.
+and firmware are the two M25 entries above.
 
 Key design points worth not re-deriving:
 - **Architecture: mux-D, one chain.** Yosys `synth -flatten` then `dffunmap`
@@ -1456,7 +1579,7 @@ Key design points worth not re-deriving:
 
 Fixtures: `tests/fixtures/rtl/dft/` (`untestable.v`: latch, gated and divided
 clocks, a combinational loop; `broken_chain.v`: a flop with no scan mux).
-`tests/test_nirmaan_dft.py`: pure stitcher, tracer, and rule tests; real
+`tests/test_nirmaan_dft.py` (16 tests, 1038 total with physical design and firmware): pure stitcher, tracer, and rule tests; real
 insertion, rules, and chain simulation on `counter.v` and `axi4_lite_regs.v`;
 a broken chain and a mis-shifting chain as recorded failed runs; refusal
 without Yosys; the DFT stage gated before review end to end; crown jewel

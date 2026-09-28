@@ -42,10 +42,11 @@ DELIVERABLE_FOLDERS: list[DeliverableFolder] = [
         id="04_rtl", title="RTL",
         description="RTL, power intent, quality, and the implementation views built from the RTL.",
         artifact_kinds=("rtl_source", "power_intent", "quality_report", "constraints", "netlist", "synthesis_report",
-                        "timing_report", "power_report", "dft_netlist", "layout", "ip_package", "merge_record"),
+                        "timing_report", "power_report", "dft_netlist", "floorplan", "layout", "ip_package",
+                        "merge_record"),
         capabilities=("rtl.implement", "rtl.cdc_design", "rtl.power_intent", "rtl.quality", "rtl.integrate",
                       "scm.merge", "synth.run", "sta.analyze", "sta.constraints", "power.analyze", "dft.insert",
-                      "pd.place_route"),
+                      "pd.floorplan", "pd.place_route"),
     ),
     DeliverableFolder(
         id="05_verification", title="Verification",
@@ -73,8 +74,8 @@ DELIVERABLE_FOLDERS: list[DeliverableFolder] = [
     DeliverableFolder(
         id="08_documentation", title="Documentation",
         description="Integration guide, user manual, register reference, and reference software.",
-        artifact_kinds=("document", "register_doc", "programming_guide", "driver"),
-        capabilities=("doc.write", "doc.registers", "sw.register_programming", "sw.driver"),
+        artifact_kinds=("document", "register_doc", "programming_guide", "driver", "driver_test"),
+        capabilities=("doc.write", "doc.registers", "sw.register_programming", "sw.driver", "fw.driver"),
     ),
     DeliverableFolder(
         id="09_evidence", title="Evidence",

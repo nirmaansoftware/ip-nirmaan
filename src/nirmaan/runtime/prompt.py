@@ -187,9 +187,12 @@ def _task(packet: WorkPacket, mode: str, cites: list[Citable], tools: tuple[Tool
         lines.append(f"Outcomes (conclude exactly one): {', '.join(t['outcomes'])}")
     for req in t["evidence_requirements"]:
         tools_named = f"; tools: {', '.join(req['tools'])}" if req["tools"] else ""
-        kinds = dict.fromkeys(k for b in req["files"] for k in b["kinds"])
+        kinds = dict.fromkeys(k for b in req["files"] if not b.get("upstream") for k in b["kinds"])
+        upstream = dict.fromkeys(k for b in req["files"] if b.get("upstream") for k in b["kinds"])
         if kinds:
             tools_named += f"; run by the platform over your {', '.join(kinds)} files"
+        if upstream:
+            tools_named += f", with the approved {', '.join(upstream)}"
         if req["before_review"]:
             tools_named += "; must be met before review"
         lines.append(f"Evidence requirement: {req['description']} (accepts: {', '.join(req['accepts'])}{tools_named})")

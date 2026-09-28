@@ -160,10 +160,23 @@ AXI4-Lite register block end to end against the fixture set in
 
 ## Stage 6 (M25+): Physical design, DFT, firmware (spec Phase 7)
 
+**Status (physical design part):** bindings built, not yet run against the real
+tools. `sta.run` (OpenSTA) and `pnr.run` (OpenROAD: one staged run, floorplan,
+place, route, then timing) are `AVAILABLE` and refuse, with a reason, where the
+executable or the PDK inputs are missing; neither tool is installed on the
+development machine or in CI. `synth.run` gained a Liberty-mapped backend that
+writes the netlist. The `physical-implementation` workflow plans constraints,
+synthesis, floorplan, place and route, and STA signoff. Parser tests read
+labelled synthetic samples. Next: run on a machine with OpenROAD and sky130,
+replace the samples with captured logs, then CTS, power grid, and parasitic
+extraction. Design doc: `docs/PHYSICAL_DESIGN.md`.
+
 - OpenROAD bindings for floorplan, place, route, and timing.
 - DFT and firmware agents.
 - **DFT status (M25, branch `m25/dft`):** `dft.scan_insert` (Yosys: mux-D scan, one chain), `dft.check` (testability rules as a registry), and `dft.scan_sim` (Icarus: shift and capture through the chain) are real; the `block-design` workflow gains a `dft` stage gated on both checks before review. ATPG, multiple chains, and MBIST are deferred. See `docs/DFT.md`.
 - This is the largest stage. Scope it only after Stage 4 has proven that agent work holds up under review.
+
+**Firmware status (M25, firmware part):** done on branch `m25/firmware`. Design: `docs/FIRMWARE.md`. `fw.build` (strict C11) and `fw.test` (the driver's own tests run against a Verilator model of the approved RTL, over real AXI4-Lite transactions) gate a firmware seat's driver before review; `test_the_firmware_seat_runs_its_driver_on_the_approved_rtl` runs it end to end on the AXI4-Lite block, locally and in CI.
 
 ## Side work (any time; owner-driven)
 

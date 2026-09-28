@@ -44,6 +44,10 @@ class FileInput(BaseModel):
         default=False,
         description="Pass the entry point the first such file declares (e.g. its top module), not paths.",
     )
+    upstream: bool = Field(
+        default=False,
+        description="Fill from the approved upstream artifacts of these kinds (M25), not the task's own files.",
+    )
 
 
 class EvidenceRequirement(BaseModel):

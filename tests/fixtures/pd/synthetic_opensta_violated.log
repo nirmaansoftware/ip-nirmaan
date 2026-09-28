@@ -1,0 +1,96 @@
+# SYNTHETIC: hand-written to the OpenSTA report_checks / report_worst_slack / report_tns / report_wns formats; not captured from a tool run.
+$ sta -no_init -no_splash -exit sta.tcl
+Warning: axi4_lite_regs.sdc line 7, set_input_delay relative to a clock defined on the same port/pin not allowed.
+Startpoint: _2570_ (rising edge-triggered flip-flop clocked by aclk)
+Endpoint: _2640_ (rising edge-triggered flip-flop clocked by aclk)
+Path Group: aclk
+Path Type: max
+
+  Delay    Time   Description
+---------------------------------------------------------
+  0.000   0.000   clock aclk (rise edge)
+  0.000   0.000   clock network delay (ideal)
+  0.000   0.000 ^ _2570_/CLK (sky130_fd_sc_hd__dfxtp_1)
+  0.320   0.320 ^ _2570_/Q (sky130_fd_sc_hd__dfxtp_1)
+  1.412   1.732 v _1802_/Y (sky130_fd_sc_hd__nor2_1)
+  0.518   2.250 ^ _1805_/Y (sky130_fd_sc_hd__nand2_1)
+  0.000   2.250 ^ _2640_/D (sky130_fd_sc_hd__dfxtp_1)
+          2.250   data arrival time
+
+  2.000   2.000   clock aclk (rise edge)
+  0.000   2.000   clock network delay (ideal)
+  0.000   2.000   clock reconvergence pessimism
+          2.000 ^ _2640_/CLK (sky130_fd_sc_hd__dfxtp_1)
+ -0.125   1.875   library setup time
+          1.875   data required time
+---------------------------------------------------------
+          1.875   data required time
+         -2.250   data arrival time
+---------------------------------------------------------
+         -0.375   slack (VIOLATED)
+
+
+Startpoint: s_axil_wdata[0] (input port clocked by aclk)
+Endpoint: _2601_ (rising edge-triggered flip-flop clocked by aclk)
+Path Group: aclk
+Path Type: min
+
+  Delay    Time   Description
+---------------------------------------------------------
+  0.000   0.000   clock aclk (rise edge)
+  0.000   0.000   clock network delay (ideal)
+  0.400   0.400 v input external delay
+  0.000   0.400 v s_axil_wdata[0] (in)
+  0.105   0.505 v _1733_/Y (sky130_fd_sc_hd__nand2_1)
+  0.000   0.505 v _2601_/D (sky130_fd_sc_hd__dfxtp_1)
+          0.505   data arrival time
+
+  0.000   0.000   clock aclk (rise edge)
+  0.000   0.000   clock network delay (ideal)
+  0.000   0.000   clock reconvergence pessimism
+          0.000 ^ _2601_/CLK (sky130_fd_sc_hd__dfxtp_1)
+ -0.041  -0.041   library hold time
+         -0.041   data required time
+---------------------------------------------------------
+         -0.041   data required time
+         -0.505   data arrival time
+---------------------------------------------------------
+          0.546   slack (MET)
+
+
+Startpoint: _2570_ (rising edge-triggered flip-flop clocked by aclk)
+Endpoint: _2640_ (rising edge-triggered flip-flop clocked by aclk)
+Path Group: aclk
+Path Type: max
+
+  Delay    Time   Description
+---------------------------------------------------------
+          2.250   data arrival time
+          1.875   data required time
+---------------------------------------------------------
+          1.875   data required time
+         -2.250   data arrival time
+---------------------------------------------------------
+         -0.375   slack (VIOLATED)
+
+
+Startpoint: _2571_ (rising edge-triggered flip-flop clocked by aclk)
+Endpoint: _2641_ (rising edge-triggered flip-flop clocked by aclk)
+Path Group: aclk
+Path Type: max
+
+  Delay    Time   Description
+---------------------------------------------------------
+          2.030   data arrival time
+          1.875   data required time
+---------------------------------------------------------
+          1.875   data required time
+         -2.030   data arrival time
+---------------------------------------------------------
+         -0.155   slack (VIOLATED)
+
+
+worst slack -0.375
+worst slack 0.546
+tns -0.530
+wns -0.375
