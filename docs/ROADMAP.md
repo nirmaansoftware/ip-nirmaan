@@ -14,7 +14,7 @@ way every milestone has:
 |---|---|
 | Organization model: 207 units, 685 derived roles, skills, authority, a 12-principle constitution | Any AI worker actually doing work: every seat runs `NullRuntime` |
 | Planner: requirement to owned, reviewed, gated task graph; 7 workflows | Real design tools: lint, simulation, synthesis, formal, and STA are `CONTRACT_ONLY` |
-| Task engine: lifecycle, reviews, approvals, human gates, hash-chained audit | CI: the repo has no GitHub Actions; tests only run locally |
+| Task engine: lifecycle, reviews, approvals, human gates, hash-chained audit | CI: done in Stage 0 (GitHub Actions, Python 3.11 and 3.12) |
 | VeriTriage as a real, evidence-producing tool (`veritriage.investigate`) | IP Nirmaan over MCP; events on the M18 bus |
 | 853 tests; CLI `nirmaan`; HTML dashboard; landing page live at https://ip.nirmaan.online | |
 
@@ -43,7 +43,11 @@ Then continue with **Stage 0** below.
 
 ---
 
-## Stage 0: Continuous integration (small, do first)
+## Stage 0: Continuous integration (DONE)
+
+**Status:** done. `.github/workflows/ci.yml` runs the suite on Python 3.11 and
+3.12, and `scripts/check_dashes.py` runs as a separate job. See `context.md`
+section 2.
 
 **Why:** every PR so far was verified only on one laptop with iCloud trouble.
 CI makes "tests pass" a public, repeatable fact, which fits the project's own

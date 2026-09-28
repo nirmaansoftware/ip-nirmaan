@@ -1,5 +1,7 @@
 # IP Nirmaan
 
+[![CI](https://github.com/nirmaansoftware/ip-nirmaan/actions/workflows/ci.yml/badge.svg)](https://github.com/nirmaansoftware/ip-nirmaan/actions/workflows/ci.yml)
+
 Website: https://ip.nirmaan.online
 
 **An AI-native semiconductor IP company, as software.** IP Nirmaan is an

@@ -359,7 +359,7 @@ canonical `sample.vproj.json`.
   - Crown jewel `test_new_project_source_needs_only_a_provider`: a throwaway
     `ProjectProvider` defined inside the test reaches the model, a `project:*`
     reasoning signal, and the report with zero core changes.
-- Report: the Project section renders; no `—` / `–` in output.
+- Report: the Project section renders; no em or en dashes (U+2014, U+2013) in output.
 
 ---
 
