@@ -5,7 +5,7 @@ import), the same side-effect-import pattern as ``knowledge.packs`` and
 ``engineering.providers``.
 """
 
-from veritriage.project.providers import manifest  # noqa: F401  (register on import)
+from veritriage.project.providers import manifest, rtl  # noqa: F401  (register on import)
 from veritriage.project.providers.base import (
     ProjectCapability,
     ProjectProvider,

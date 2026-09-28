@@ -15,7 +15,7 @@ import json
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from nirmaan.company import deliverables
 from nirmaan.models import (
@@ -73,6 +73,15 @@ def validate_folders(table: list[DeliverableFolder]) -> None:
                 if (what, value) in seen:
                     raise ExportError(f"{what} {value!r} is claimed by both {seen[what, value]} and {folder.id}")
                 seen[what, value] = folder.id
+
+
+#: Writers for sections that live outside this module: (org, state, writer, folder) -> files written.
+_SECTION_WRITERS: dict[ExportSection, Callable[..., list[str]]] = {}
+
+
+def register_section_writer(section: ExportSection, writer: Callable[..., list[str]]) -> None:
+    """Give a section its writer. The folder table decides where (and whether) it is written."""
+    _SECTION_WRITERS[section] = writer
 
 
 # --- Report ----------------------------------------------------------------------------------
@@ -419,6 +428,8 @@ def export_project(org: Organization, state: ProjectState, out: Path,
                 section_files[folder.id] += _audit_chain(state, w, folder, problems)
             elif section is ExportSection.SIGNOFF:
                 section_files[folder.id] += _signoff(org, state, w, folder, problems)
+            elif section in _SECTION_WRITERS:
+                section_files[folder.id] += _SECTION_WRITERS[section](org, state, w, folder)
     gates = _gates(org, state)
     report.gates, report.signed_off = len(gates), sum(1 for g in gates if g["signed_off"])
 
@@ -510,3 +521,9 @@ def _index(state: ProjectState, table: list[DeliverableFolder], placed: dict[str
                   for a in report.unfiled]
         lines += ["- MISSING: " + _missing_line(m)[2:] for m in orphans]
     return lines
+
+
+# The engineering-graph section (M24) brings its own writer.
+from nirmaan import engineering as _engineering  # noqa: E402
+
+register_section_writer(ExportSection.ENGINEERING_GRAPH, _engineering.export_section)

@@ -337,6 +337,36 @@ class AuditEntry(BaseModel):
     hash: str
 
 
+class SpecRequirement(BaseModel):
+    """A requirement quoted from a specification artifact, so verification can prove it (M24)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    id: str
+    text: str
+    source: str = Field(description="The artifact it is quoted from, e.g. the interface spec.")
+    section: str = ""
+    recorded_by: str
+
+
+class VerificationItem(BaseModel):
+    """A test, assertion, or coverage point, and the requirements it is declared to prove (M24).
+
+    A declaration of intent: it backs nothing on its own. Only a passing,
+    substantiated run over the file that holds it does.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    id: str
+    kind: str = Field(description="A registered verification-item kind, e.g. 'test'.")
+    name: str = Field(description="The test, check label, property, or cover point, as it appears in the file.")
+    artifact: str = Field(description="The located artifact whose file holds the item.")
+    proves: tuple[str, ...]
+    rationale: str = ""
+    recorded_by: str
+
+
 class Project(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -368,4 +398,6 @@ class ProjectState(BaseModel):
     decisions: dict[str, Decision] = Field(default_factory=dict)
     memory: list[MemoryEntry] = Field(default_factory=list)
     audit: list[AuditEntry] = Field(default_factory=list)
+    spec_requirements: dict[str, SpecRequirement] = Field(default_factory=dict)
+    verification_items: dict[str, VerificationItem] = Field(default_factory=dict)
     schema_version: str = "1"
