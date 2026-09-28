@@ -1297,14 +1297,14 @@ waivers, simulation passing under Icarus and Verilator, the wrong testbench a
 recorded failed run, Yosys synthesis with no latches, and a SymbiYosys proof
 of the handshake rules (formal skips in CI, which has no `sby`).
 
-### Milestone 23 - Architecture and RTL agents (roadmap Stage 4, in progress)
+### Milestone 23 - Architecture and RTL agents (roadmap Stage 4)
 
 Model seats for interface specification, microarchitecture, and RTL
 implementation, all filled by the one M20 `ModelRuntime` with no branch per
 seat. The first IP is an AXI4-Lite register block (not the roadmap's original
-arbiter). The mechanism is proven on the M21 counter; the AXI4-Lite
-end-to-end test waits for its fixture set in `tests/fixtures/rtl/axi4_lite/`
-and skips until then. Version bump left to the coordinator.
+arbiter). The mechanism is proven on the M21 counter, and end to end on the
+AXI4-Lite fixture set above (`tests/fixtures/rtl/axi4_lite/`). Version bump
+left to the coordinator.
 
 **A small-block workflow, as data.** `block-design` (requirements ->
 interface-spec -> microarchitecture -> rtl-implementation) with a new intent
@@ -1352,8 +1352,11 @@ Key design points worth not re-deriving:
   flows (and tests) submit before attaching evidence. Adopting `files` and
   `before_review` there is a data edit, deferred.
 
-19 new tests in `tests/test_nirmaan_design_agents.py` (one skips until the
-AXI4-Lite fixtures land), plus Demo 8 in the demo test. Crown jewel
+19 new tests in `tests/test_nirmaan_design_agents.py`, plus Demo 8 in the
+demo test. `test_the_axi4_lite_register_block_is_designed_by_agents` runs the
+spec, microarchitecture, and RTL seats on MockLLM answers scripted with the
+fixture files, real Verilator lint and Icarus simulation, agent reviews and
+human approvals, and checks every tool-run evidence record is a passing run. Crown jewel
 `test_a_new_design_seat_needs_no_core_changes`: a register-map seat with its
 own capability, skill, unit, intent, workflow, and `regmap.check` tool, refused
 on an overlapping map and approved on a clean one. Design doc:
