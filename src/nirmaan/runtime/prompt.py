@@ -8,9 +8,11 @@ runtime uses and the model does not need).
 Every evidence record and tool run the seat may rely on is declared as a
 citation. Nirmaan IDs contain ``:`` and ``#``, which the M17 token grammar does
 not allow, so an evidence token uses the ID with both replaced by ``.``; the
-prompt keeps the mapping back to the real ID. Rendering goes through the
-bridge, so the text shown by ``nirmaan run --dry-run`` is exactly the text a
-provider receives.
+prompt keeps the mapping back to the real ID. Approved upstream artifacts are
+citable too (M23), and a recorded file's content is rendered only while its
+digest still matches; a task that works only from approved inputs never sees
+an unapproved one. Rendering goes through the bridge, so the text shown by
+``nirmaan run --dry-run`` is exactly the text a provider receives.
 """
 
 from __future__ import annotations
@@ -26,9 +28,20 @@ SCOPES = ("Company", "Domain", "Project", "Task")
 _OUTPUT_WORK = (
     '{"uncertainty": number, "outcome": string or null, '
     '"artifacts": [{"kind": string, "title": string, "summary": string}], '
+    '"files": [{"path": string, "kind": string, "title": string, "summary": string, "entry": string or null}], '
     '"tool_runs": [string], "claims": [string], '
     '"escalation": null or {"reason": string, "question": string, "options": [string]}, "notes": string}'
 )
+_FILE_FORMAT = """\
+When an output is a file (a specification, RTL, a testbench), describe it in "files" and put its
+exact content after the JSON object, once per file:
+=== FILE: <path> ===
+<content>
+=== END FILE ===
+Paths are relative (letters, digits, '_', '.', '-', '/'). A file's summary must cite like an
+artifact's. "entry" names what a tool starts from, such as the top module. The platform writes
+the files and runs the checks your task's evidence requirements name over them; you cannot run
+or report those checks yourself."""
 _OUTPUT_REVIEW = '{"verdict": "approve" or "request_changes", "comments": string, "uncertainty": number}'
 
 WORK_SYSTEM = f"""\
@@ -43,8 +56,9 @@ Rules:
   cannot cite in "claims"; they are recorded and prove nothing.
 - Declare your uncertainty, from 0 (certain) to 1. If the evidence does not support a
   conclusion, escalate instead of guessing.
-Answer with one JSON object and nothing else:
-{_OUTPUT_WORK}"""
+Answer with one JSON object and nothing else, except the file blocks described below:
+{_OUTPUT_WORK}
+{_FILE_FORMAT}"""
 
 REVIEW_SYSTEM = f"""\
 You are an independent reviewer in an engineering organization whose work is checked, not trusted.
@@ -142,7 +156,22 @@ def _citations(packet: WorkPacket, tools: tuple[ToolNote, ...]) -> list[Citable]
     for note in tools:
         if note.run:
             found.setdefault(note.run, Citable("run", note.run, note.run, f"{note.tool}: {note.summary}"))
+    for art in packet.task["upstream_artifacts"]:  # only what the organization approved is citable
+        if art["trusted"]:
+            found.setdefault(art["id"], Citable("artifact", _UNSAFE.sub(".", art["id"]), art["id"],
+                                                f"{art['kind']}: {art['title']} (approved)"))
     return list(found.values())
+
+
+def _content(art: dict[str, Any], label: str) -> list[str]:
+    """A recorded file's verified content, in the same block format a seat writes files in."""
+    if art.get("content") is not None:
+        text = art["content"] if art["content"].endswith("\n") else art["content"] + "\n"
+        name = art["location"].rsplit("/", 1)[-1]
+        return [f"Content of {label} ({art['digest']}):\n=== FILE: {name} ===\n{text}=== END FILE ==="]
+    if art.get("content_problem"):
+        return [f"Content of {label} is withheld: {art['content_problem']}"]
+    return []
 
 
 def _task(packet: WorkPacket, mode: str, cites: list[Citable], tools: tuple[ToolNote, ...]) -> tuple[str, ...]:
@@ -158,14 +187,25 @@ def _task(packet: WorkPacket, mode: str, cites: list[Citable], tools: tuple[Tool
         lines.append(f"Outcomes (conclude exactly one): {', '.join(t['outcomes'])}")
     for req in t["evidence_requirements"]:
         tools_named = f"; tools: {', '.join(req['tools'])}" if req["tools"] else ""
+        kinds = dict.fromkeys(k for b in req["files"] for k in b["kinds"])
+        if kinds:
+            tools_named += f"; run by the platform over your {', '.join(kinds)} files"
+        if req["before_review"]:
+            tools_named += "; must be met before review"
         lines.append(f"Evidence requirement: {req['description']} (accepts: {', '.join(req['accepts'])}{tools_named})")
     lines.append(f"Permitted tools: {', '.join(packet.tools) or 'none'}")
     for art in t["upstream_artifacts"]:
+        if t.get("approved_inputs") and not art["trusted"]:
+            lines.append(f"Upstream artifact {art['id']} withheld: it is {art['assurance']}, not approved")
+            continue
         body = f": {art['summary']}" if art["summary"] else ""
-        lines.append(f"Upstream artifact {art['title']} ({art['kind']}, {art['assurance']}){body}")
+        cite = f" {token[art['id']]}" if art["id"] in token else ""
+        lines.append(f"Upstream artifact{cite} {art['title']} ({art['kind']}, {art['assurance']}){body}")
+        lines += _content(art, token.get(art["id"], art["title"]))
     if mode == "review":
         for art in t["artifacts"]:
             lines.append(f"Artifact under review: {art['title']} ({art['kind']}): {art['summary'] or '(no content)'}")
+            lines += _content(art, art["title"])
     for ev in t["evidence"]:
         state = "substantiated" if ev["substantiated"] else "NOT substantiated"
         run = f", tool run {token[ev['tool_run']]}" if ev["tool_run"] else ""

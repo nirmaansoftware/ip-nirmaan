@@ -14,6 +14,7 @@ from nirmaan.models import (
     Criticality,
     EvidenceKind,
     EvidenceRequirement,
+    FileInput,
     Level,
     OnFailure,
     ReviewRequirement,
@@ -52,6 +53,12 @@ def dv_ran(description: str, *tools: str) -> EvidenceRequirement:
         description=description, accepts=(K.TOOL_RUN, K.VERITRIAGE_SESSION, K.HUMAN_ATTESTATION),
         tools=(*tools, "veritriage.investigate"),
     )
+
+
+def checked(description: str, tool: str, *files: FileInput) -> EvidenceRequirement:
+    """A real run of ``tool`` over the task's own produced files, met before the work goes to review."""
+    return EvidenceRequirement(description=description, accepts=(K.TOOL_RUN,), tools=(tool,), files=files,
+                               before_review=True)
 
 
 def documented(description: str) -> EvidenceRequirement:
@@ -452,6 +459,36 @@ TIMING_CLOSURE = WorkflowTemplate(
     ),
 )
 
+# --- 8. Small, self-contained block design (M23) -------------------------------------
+
+BLOCK_DESIGN = WorkflowTemplate(
+    id="block-design",
+    name="Block design",
+    description="A small, self-contained block (register block, FIFO, arbiter): specified, "
+                "microarchitected, and implemented from approved inputs, with RTL lint-clean and "
+                "simulated before review.",
+    intents=("block_design",),
+    stages=(
+        st("requirements", "Requirements specification", "Requirements", "req.analyze", criticality=M,
+           review=rv("req.review"), outputs=("requirements_spec",), evidence=(REVIEWED,)),
+        st("interface-spec", "Interface specification", "Architecture", "arch.interface",
+           depends_on=("requirements",), criticality=H, review=rv("arch.review"),
+           outputs=("interface_spec",), evidence=(REVIEWED,)),
+        st("microarchitecture", "Microarchitecture", "Architecture", "arch.microarchitecture",
+           depends_on=("interface-spec",), criticality=H, review=rv("arch.review"),
+           outputs=("microarchitecture_spec",), evidence=(REVIEWED,)),
+        st("rtl-implementation", "RTL implementation and testbench", "RTL", "rtl.implement",
+           depends_on=("microarchitecture",), criticality=H, review=rv("rtl.review"),
+           outputs=("rtl_source", "testbench"),
+           evidence=(REVIEWED,
+                     checked("Lint-clean under the RTL lint rules", "lint.run",
+                             FileInput(param="sources", kinds=("rtl_source",))),
+                     checked("Self-checking simulation passes", "simulator.run",
+                             FileInput(param="sources", kinds=("rtl_source", "testbench")),
+                             FileInput(param="top", kinds=("testbench",), entry=True)))),
+    ),
+)
+
 WORKFLOWS: list[WorkflowTemplate] = [
     NEW_IP,
     FEATURE_ADDITION,
@@ -460,4 +497,5 @@ WORKFLOWS: list[WorkflowTemplate] = [
     REGRESSION_INVESTIGATION,
     SIGNOFF_PREPARATION,
     TIMING_CLOSURE,
+    BLOCK_DESIGN,
 ]

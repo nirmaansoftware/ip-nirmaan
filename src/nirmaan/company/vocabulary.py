@@ -31,6 +31,9 @@ INTENTS: list[IntentRule] = [
     IntentRule(intent="rtl_change", priority=45, description="Change RTL.",
                patterns=(r"\b(rtl|design) (change|fix|update|modification)\b", r"\bmodify\b.*\brtl\b",
                          r"\bfix\b.*\b(bug|rtl)\b")),
+    IntentRule(intent="block_design", priority=55, description="Build a small, self-contained block.",
+               patterns=(r"\b(create|build|design|develop|implement|write)\b.*"
+                         r"\b(register (block|file|bank)|fifo|arbiter|counter)\b",)),
     IntentRule(intent="new_ip", priority=60, description="Build something new.",
                patterns=(r"\b(create|build|design|develop|implement|architect)\b.*\b(ip|bridge|controller|router|block|"
                          r"interconnect|fabric|core|engine|phy|interface|subsystem|accelerator)\b",)),

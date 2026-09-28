@@ -179,6 +179,10 @@ class Capability(BaseModel):
         default=None,
         description="Seniority also required (signoff): skill alone is not enough.",
     )
+    approved_inputs: bool = Field(
+        default=False,
+        description="Work of this kind builds only on approved upstream artifacts.",
+    )
 
 
 class Skill(BaseModel):

@@ -15,6 +15,7 @@ from typing import Any, Callable
 from nirmaan.models import (
     Actor,
     ActorKind,
+    Assurance,
     Criticality,
     Enforcement,
     EscalationKind,
@@ -248,6 +249,50 @@ def _signoff_evidence(ctx: PolicyContext) -> list[str]:
     if task is None or ctx.action not in ("task.approve", "task.complete"):
         return []
     return [f"{task.id} lacks evidence: {m}" for m in unsatisfied_requirements(ctx.state, task)]
+
+
+@register_check("approved-inputs")
+def _approved_inputs(ctx: PolicyContext) -> list[str]:
+    """Work whose capability requires it starts only from approved upstream artifacts."""
+    task = ctx.task
+    if task is None or ctx.action != "task.start" or not task.capability:
+        return []
+    capability = ctx.org.capabilities.get(task.capability)
+    if capability is None or not capability.approved_inputs:
+        return []
+    return [
+        f"{task.id} works only from approved upstream artifacts: {art.id} ({art.title}) is "
+        f"{art.assurance.value}, not approved"
+        for dep in task.depends_on
+        for art in (ctx.state.artifacts[a] for a in ctx.state.tasks[dep].artifacts)
+        if art.assurance is not Assurance.APPROVED
+    ]
+
+
+@register_check("evidence-before-review")
+def _before_review(ctx: PolicyContext) -> list[str]:
+    """A requirement marked before_review is met, over the very files submitted, at submission."""
+    task = ctx.task
+    if task is None or ctx.action != "task.submit":
+        return []
+    attached = [ctx.state.evidence[e] for e in task.evidence if e in ctx.state.evidence]
+    problems = []
+    for req in (r for r in task.evidence_requirements if r.before_review):
+        met = [ev for ev in attached if satisfies(ctx.state, ev, req)]
+        if not met:
+            problems.append(f"{task.id} cannot go to review: {req.description!r} is not met")
+            continue
+        for binding in (b for b in req.files if not b.entry):
+            for draft in ctx.payload.get("artifacts", ()):
+                location = draft.get("location")
+                if draft.get("kind") not in binding.kinds or not location:
+                    continue
+                if not any(ev.kind is not EvidenceKind.TOOL_RUN
+                           or location in ctx.state.tool_runs[ev.tool_run].params.get(binding.param, "").split(",")
+                           for ev in met):
+                    problems.append(f"{task.id} cannot go to review: no passing run for {req.description!r} "
+                                    f"covers {location}")
+    return problems
 
 
 @register_check("state-changes-audited")

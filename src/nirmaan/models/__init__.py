@@ -71,6 +71,7 @@ from nirmaan.models.workflow import (
     EvidenceKind,
     EvidenceRequirement,
     FeatureRule,
+    FileInput,
     IntentRule,
     OnFailure,
     ParameterRule,

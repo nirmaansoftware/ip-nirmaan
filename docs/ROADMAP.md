@@ -130,14 +130,23 @@ Rules for each binding:
 
 ## Stage 4 (M23): Architecture and RTL agents (spec Phase 6)
 
+**Status: in progress.** The mechanism is built on branch `m23/design-agents`
+(design: `docs/DESIGN_AGENTS.md`; history: the M23 entry in `context.md`):
+approved-inputs-only seats, files in model answers as artifacts with a digest,
+and RTL gated on real lint and simulation before review. It is proven on the
+M21 counter. Done once the AXI4-Lite fixture set lands in
+`tests/fixtures/rtl/axi4_lite/` and its end-to-end test
+(`test_the_axi4_lite_register_block_is_designed_by_agents`) runs instead of
+skipping.
+
 **Why:** with real tools in place (Stage 2), design work can be verified, not just claimed.
 
 **Scope:**
 - Agents for interface specification, microarchitecture, and RTL implementation, each working from approved upstream artifacts only.
 - RTL agents must pass real lint and simulation (Stage 2) before review.
-- Start with small, self-contained blocks: a FIFO, an arbiter, an APB register block.
+- Start with small, self-contained blocks. The first IP is an AXI4-Lite register block (four 32-bit registers behind the five AXI4-Lite channels); a FIFO, a round-robin arbiter, and an APB register block follow as later blocks on the same workflow.
 
-**Done when:** "Create a parameterizable round-robin arbiter" produces spec, RTL, testbench, and a passing simulation, reviewed and approved through the engine, with every claim backed by a recorded tool run.
+**Done when:** "Create an AXI4-Lite register block" produces an interface spec, a microarchitecture, RTL, a testbench, and a passing simulation, reviewed and approved through the engine, with every claim backed by a recorded tool run.
 
 **Status:** the project deliverable export lands as part of M23: `nirmaan export PROJECT --out DIR` writes the numbered tree (`01_requirement/` to `10_signoff/`) from recorded state, never raising assurance, listing missing deliverables as missing, and flagging a broken audit chain. See `docs/DELIVERABLE_EXPORT.md`.
 

@@ -214,8 +214,12 @@ def _write_artifact(state: ProjectState, w: _Writer, folder: DeliverableFolder, 
         candidate = f"{stem}.{_safe(Path(art.location).name) or 'location'}"
         location_sha, location_note = w.copy(candidate, art.location)
         location_rel = candidate if location_sha else None
-        if location_sha:
-            location_note += "; the engine does not hash a location when it records it"
+        if location_sha and not art.digest:
+            location_note += "; no digest was recorded with the artifact, so it cannot be checked"
+        elif location_sha and art.digest == f"sha256:{location_sha}":
+            location_note += "; matches the digest recorded with the artifact"
+        elif location_sha:
+            location_note += "; DOES NOT MATCH the digest recorded with the artifact: the file changed since"
     audit = [
         {"sequence": e.sequence, "action": e.action, "actor": e.actor, "at": e.at.isoformat(), "hash": e.hash}
         for e in state.audit
@@ -239,7 +243,8 @@ def _write_artifact(state: ProjectState, w: _Writer, folder: DeliverableFolder, 
         "location": {"recorded": art.location, "note": location_note},
         "files": {"content": content_rel, "location_copy": location_rel},
         "hashes": {"record_sha256": _sha(_canonical(art.model_dump(mode="json"))),
-                   "content_sha256": content_sha, "location_sha256": location_sha},
+                   "content_sha256": content_sha, "location_sha256": location_sha,
+                   "recorded_digest": art.digest},
     })
     return content_rel
 

@@ -111,8 +111,10 @@ and labelled with its assurance:
   task, the audit entries that name it (sequence and hash), and hashes: of the
   artifact record, of the exported content file, and of any copied location.
 * `<name>.<ASSURANCE>.<basename>`: when the artifact's recorded location is a
-  readable file, a copy. The engine does not hash a location when it records
-  it, so the sidecar says the copy is the file as found at export time.
+  readable file, a copy as found at export time. The sidecar compares it with
+  the `sha256:` digest recorded with the artifact (M23 design seats record
+  one): it matches, it does NOT match (the file changed since), or no digest
+  was recorded, so it cannot be checked.
 * `README.md`: what the folder collects, what is present, what is missing, and
   what is not required.
 

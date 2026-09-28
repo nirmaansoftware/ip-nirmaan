@@ -66,7 +66,8 @@ def midway(bridge, tmp_path):
     doc.write_text("# Verification plan\n\nAXI and NoC ports, one test per channel.\n", encoding="utf-8")
     bridge.start(plan, owner)
     bridge.submit(plan, owner, [{"kind": "verification_plan", "title": "Bridge verification plan",
-                                 "location": str(doc), "summary": "Plan: one test per channel."}])
+                                 "location": str(doc), "summary": "Plan: one test per channel.",
+                                 "digest": "sha256:" + hashlib.sha256(doc.read_bytes()).hexdigest()}])
     bridge.review(plan, agent(bridge.task(plan).reviewer), Verdict.APPROVE, "complete and testable")
     lint = tid(bridge, "rtl-lint")
     lint_owner = agent(bridge.task(lint).owner)
@@ -155,6 +156,18 @@ def test_the_sidecar_carries_provenance_and_hashes(midway, tmp_path):
     assert copy.read_text(encoding="utf-8").startswith("# Verification plan")
     assert hashlib.sha256(copy.read_bytes()).hexdigest() == data["hashes"]["location_sha256"]
     assert any(e["action"] == "task.submit" for e in data["audit"])
+    assert data["hashes"]["recorded_digest"] == "sha256:" + data["hashes"]["location_sha256"]
+    assert "matches the digest recorded" in data["location"]["note"]
+
+
+def test_a_location_that_changed_since_recording_is_flagged(midway, tmp_path):
+    art = next(a for a in midway.state.artifacts.values() if a.kind == "verification_plan")
+    Path(art.location).write_text("# Verification plan\n\nQuietly edited.\n", encoding="utf-8")
+    out = tmp_path / "out"
+    export_project(midway.org, midway.state, out)
+    data = _sidecars(out)[art.id]
+    assert "DOES NOT MATCH" in data["location"]["note"]
+    assert data["hashes"]["recorded_digest"] == art.digest != "sha256:" + data["hashes"]["location_sha256"]
 
 
 def test_missing_deliverables_are_reported_not_filled(midway, tmp_path):
