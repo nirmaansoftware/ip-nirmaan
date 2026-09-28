@@ -12,7 +12,7 @@ Repo: https://github.com/nirmaansoftware/ip-nirmaan (public, Apache-2.0; renamed
 to the `nirmaansoftware` account on 2026-09-28; GitHub redirects the old URLs,
 and `patel-om` keeps push access as a collaborator)
 Local path: `/Users/ompatel/Documents/veritriage`
-Current version: **1.16.1** (distribution `ip-nirmaan`; packages `nirmaan` and `veritriage`)
+Current version: **1.17.0** (distribution `ip-nirmaan`; packages `nirmaan` and `veritriage`)
 Portfolio: removed from `/Users/ompatel/Documents/Om Portfolio` at the user's
 request after M19 (card and sample pages deleted).
 
@@ -1118,6 +1118,10 @@ iCloud eviction stalls the `anthropic` import. A second job runs
 `scripts/check_dashes.py`, which fails on U+2014 or U+2013 in any tracked text
 file except the vendored nirmaan.online files (`site/nirmaan.css`,
 `site/site.js`, `site/hero.js`). The README carries the CI badge.
+Since v1.17.0 the test job runs on ubuntu-24.04 with `verilator iverilog yosys`
+from apt and `NIRMAAN_REQUIRE_EDA` set, so the M21 real-tool tests run in CI
+rather than skip (formal still skips: apt has no `sby`). v1.17.0 is the one
+version bump covering Stage 0 and M20 to M22, which were built in parallel.
 
 ### Milestone 20 - AI workers in verification seats (roadmap Stage 1)
 
@@ -1499,7 +1503,7 @@ from the repo root.
   renamed to **VeriTriage** at M2/M3 boundary (GitHub redirect preserved
   from the rename). After M19 the user renamed the PROJECT, first to "Nirmaan IP"
   (repo `nirmaan-ip`, v1.16.0) and then, to match the `ipnirmaan.com` domain, to
-  **IP Nirmaan** (repo `patel-om/ip-nirmaan`, distribution `ip-nirmaan`, v1.16.1).
+  **IP Nirmaan** (repo `patel-om/ip-nirmaan`, distribution `ip-nirmaan`, v1.17.0).
   On 2026-09-28 the repo was transferred to `nirmaansoftware/ip-nirmaan`.
   The `nirmaan` package and CLI keep their short name by the user's choice. VeriTriage
   was deliberately NOT renamed: it is the verification engine inside Nirmaan
