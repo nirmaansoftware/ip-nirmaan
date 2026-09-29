@@ -83,6 +83,7 @@ def fake_eda(tmp_path, monkeypatch):
         "fakelint": '#!/bin/sh\necho "fakelint $*"\necho "fakelint: clean"\n',
         "fakesim": ('#!/bin/sh\necho "fakesim $*"\n'
                     'if [ "$FAKESIM" = fail ]; then echo "fakesim: FAIL"; exit 1; fi\necho "fakesim: PASS"\n'),
+        "fakesynth": '#!/bin/sh\necho "fakesynth $*"\n',
     }
     for name, body in scripts.items():
         (bin_dir / name).write_text(body)
@@ -98,12 +99,17 @@ def fake_eda(tmp_path, monkeypatch):
                              parse("fakelint: clean")))
     register_backend(Backend("fakesim", "simulator.run", ("fakesim",), lambda j: [["fakesim", *j.sources]],
                              parse("fakesim: PASS"), ("sources", "top")))
+    # M26: the RTL stage also synthesizes before review, with a latch count to check.
+    register_backend(Backend("fakesynth", "synth.run", ("fakesynth",), lambda j: [["fakesynth", *j.sources]],
+                             lambda run: EdaResult(run.returncode == 0, "fakesynth: done", (), {"latches": 0}),
+                             ("sources", "top")))
     # Only the fakes: on CI the real tools share /usr/bin with sh, and the scripts need no PATH (#!/bin/sh).
     monkeypatch.setenv("PATH", str(bin_dir))
     monkeypatch.delenv("FAKESIM", raising=False)
     yield bin_dir
     unregister_backend("lint.run", "fakelint")
     unregister_backend("simulator.run", "fakesim")
+    unregister_backend("synth.run", "fakesynth")
 
 
 def run_rtl_seat(engine, tmp_path: Path, files) -> str:
@@ -454,7 +460,7 @@ def test_a_new_link_kind_or_item_kind_needs_zero_core_changes(axi, tmp_path):
 # --- The Stage 5 demo: the AXI4-Lite flow, with real tools ------------------------------------
 
 
-@needs("verilator", "iverilog", "vvp")
+@needs("verilator", "iverilog", "vvp", "yosys")
 def test_stage5_demo_on_the_axi4_lite_flow(nirmaan_org, fixed_clock, tmp_path):
     """The Stage 4 flow for real, then: what does passing simulation prove, and what is still open?"""
     engine = Orchestrator(nirmaan_org, clock=fixed_clock).plan(AXI_BLOCK)

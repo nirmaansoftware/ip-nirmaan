@@ -343,7 +343,7 @@ def approved_rtl(engine):
     return next(engine.state.artifacts[a] for a in rtl.artifacts if engine.state.artifacts[a].kind == "rtl_source")
 
 
-@needs(*COSIM, "iverilog", "vvp")
+@needs(*COSIM, "iverilog", "vvp", "yosys")
 def test_the_firmware_seat_runs_its_driver_on_the_approved_rtl(block, tmp_path):
     """Approved RTL, then the firmware seat, real build and co-simulation, review, approval."""
     design_the_block(block, tmp_path)
@@ -385,7 +385,7 @@ def test_the_firmware_seat_runs_its_driver_on_the_approved_rtl(block, tmp_path):
             assert ev.substantiated and block.state.tool_runs[ev.tool_run].succeeded
 
 
-@needs(*COSIM, "iverilog", "vvp")
+@needs(*COSIM, "iverilog", "vvp", "yosys")
 def test_the_wrong_driver_cannot_reach_review(block, tmp_path):
     design_the_block(block, tmp_path)
     seat = tid(block, "firmware")
@@ -405,7 +405,7 @@ def test_the_wrong_driver_cannot_reach_review(block, tmp_path):
     assert not ev.substantiated  # the failure is on the record
 
 
-@needs(*COSIM, "iverilog", "vvp")
+@needs(*COSIM, "iverilog", "vvp", "yosys")
 def test_a_co_simulation_against_other_rtl_does_not_open_review(block, tmp_path):
     """The policy, not only the runtime: the passing run must name the approved RTL."""
     design_the_block(block, tmp_path)
@@ -432,7 +432,7 @@ def test_a_co_simulation_against_other_rtl_does_not_open_review(block, tmp_path)
         block.submit(seat, owner, drafts)
 
 
-@needs(*COSIM, "iverilog", "vvp")
+@needs(*COSIM, "iverilog", "vvp", "yosys")
 def test_rtl_changed_after_approval_is_not_co_simulated(block, tmp_path):
     design_the_block(block, tmp_path)
     rtl = approved_rtl(block)

@@ -272,7 +272,8 @@ SKILLS: list[Skill] = [
     # --- RTL design -------------------------------------------------------------
     sk("rtl_design", "RTL design", "design", "rtl",
        provides=("rtl.implement", "rtl.review", "signoff.rtl"),
-       includes=("systemverilog", "digital_design"), tools=("git.write", "lint.run", "simulator.run"),
+       includes=("systemverilog", "digital_design"),
+       tools=("git.write", "lint.run", "simulator.run", "synth.run", "formal.run"),
        standards=("NIP-STD-020 RTL Coding Standard",),
        procedures=("Implement from the microarchitecture spec.", "Keep lint clean.", "Write design-intent assertions."),
        fails=("Spec deviations without a recorded decision.", "Latches.", "Reset gaps."),

@@ -9,8 +9,9 @@ parsed result are on disk, or the broker refused it.
 
 A failing tool (lint errors, a failing test, a counterexample, a missing
 source, a timeout) is a recorded run with ``succeeded=False``, never an
-exception. Simulation logs reach VeriTriage through :func:`triage_simulation`,
-which invokes ``veritriage.investigate`` through the same broker. This module
+exception. A ``max_<metric>`` parameter is a limit on the parsed metric of that
+name: a run over it, or one whose backend did not report the metric, fails.
+Simulation logs reach VeriTriage through :func:`triage_simulation`, which invokes ``veritriage.investigate`` through the same broker. This module
 never imports VeriTriage.
 """
 
@@ -26,6 +27,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Callable
 
 from nirmaan.integrations.eda_parsers import (
+    Diagnostic,
     EdaResult,
     parse_sby,
     parse_simulation,
@@ -83,6 +85,8 @@ class Backend:
     files: tuple[str, ...] = ()
     #: Asked with the executables: why this machine's environment (a PDK) cannot serve the job, or None.
     environment: Callable[[dict[str, str]], str | None] | None = None
+    #: Asked before any step: why these inputs cannot be run as given (a recorded failed run), or None.
+    check: Callable[[Job], str | None] | None = None
 
 
 _BACKENDS: dict[str, list[Backend]] = {}
@@ -172,6 +176,9 @@ def execute(backend: Backend, params: dict[str, str]) -> ToolOutcome:
     workdir.mkdir(parents=True, exist_ok=True)
     workdir = workdir.resolve()
     job = Job(backend.tool, params, workdir, sources, params.get("top") or None)
+    problem = backend.check(job) if backend.check else None
+    if problem:
+        return ToolOutcome(False, f"{backend.name}: {problem}")
     timeout = int(params.get("timeout") or DEFAULT_TIMEOUT)
 
     chunks: list[str] = []
@@ -205,6 +212,7 @@ def execute(backend: Backend, params: dict[str, str]) -> ToolOutcome:
     result = backend.parse(RunRecord(log, tuple(codes), workdir))
     if timed_out:
         result = EdaResult(False, f"timed out after {timeout}s in {timed_out}", result.diagnostics, result.metrics)
+    result = _within_limits(result, params)
     record = {
         "tool": backend.tool,
         "backend": backend.name,
@@ -218,6 +226,29 @@ def execute(backend: Backend, params: dict[str, str]) -> ToolOutcome:
     result_path.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
     return ToolOutcome(result.passed, f"{backend.name}: {result.summary}",
                        references=(str(log_path), str(result_path)), data=record)
+
+
+def _within_limits(result: EdaResult, params: dict[str, str]) -> EdaResult:
+    """Fail a passing result that breaks a ``max_<metric>`` limit, or whose metric was never measured."""
+    over = []
+    for key, limit in params.items():
+        if not key.startswith("max_") or not result.passed:
+            continue
+        metric, measured = key[4:], result.metrics.get(key[4:])
+        try:
+            bound = float(limit)
+        except ValueError:
+            over.append(f"{key} {limit!r} is not a number")
+            continue
+        if isinstance(measured, bool) or not isinstance(measured, (int, float)):
+            over.append(f"{metric} was not reported, so {key} cannot be checked")
+        elif measured > bound:
+            over.append(f"{metric} {measured} exceeds {key} {limit}")
+    if not over:
+        return result
+    diags = (*result.diagnostics, *(Diagnostic("error", m, "LIMIT") for m in over))
+    return EdaResult(False, f"limit not met: {'; '.join(over)} (the tool reported: {result.summary})",
+                     diags, result.metrics)
 
 
 def triage_simulation(broker: ToolBroker, actor: Actor, run: ToolRun, task_id: str | None = None,
@@ -271,6 +302,22 @@ def _sby_dir(job: Job) -> Path:
     return Path(job.params["sby"]).resolve().parent
 
 
+def _sby_reads(job: Job) -> str | None:
+    """With ``sources``, the proof must read those very files: each is listed in the .sby's [files]."""
+    if not job.sources:
+        return None
+    sby = Path(job.params["sby"]).resolve()
+    listed, section = set(), None
+    for line in sby.read_text(encoding="utf-8", errors="replace").splitlines():
+        text = line.strip()
+        if text.startswith("[") and text.endswith("]"):
+            section = text[1:-1].strip()
+        elif section == "files" and text and not text.startswith("#"):
+            listed.add(str((sby.parent / text.split()[-1]).resolve()))
+    unread = [Path(src).name for src in job.sources if src not in listed]
+    return f"{sby.name} does not read {', '.join(unread)} (not in its [files])" if unread else None
+
+
 def _lint_parse(run: RunRecord) -> EdaResult:
     return parse_verilator_lint(run.log, run.returncode)
 
@@ -288,4 +335,5 @@ for _tool in SIMULATION_TOOLS:
     register_backend(Backend("icarus", _tool, ("iverilog", "vvp"), _icarus, _sim_parse, ("sources", "top")))
     register_backend(Backend("verilator-sim", _tool, ("verilator",), _verilator_sim, _sim_parse, ("sources", "top")))
 register_backend(Backend("yosys", "synth.run", ("yosys",), _yosys, _yosys_parse, ("sources", "top")))
-register_backend(Backend("symbiyosys", "formal.run", ("sby", "yosys"), _sby, _sby_parse, ("sby",), _sby_dir))
+register_backend(Backend("symbiyosys", "formal.run", ("sby", "yosys"), _sby, _sby_parse, ("sby",), _sby_dir,
+                         check=_sby_reads))

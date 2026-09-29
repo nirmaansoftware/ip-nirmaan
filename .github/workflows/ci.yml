@@ -20,15 +20,36 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Install open-source EDA tools
         run: sudo apt-get update && sudo apt-get install -y verilator iverilog yosys
+      # M26: formal in CI. apt has no `sby`, so SymbiYosys and Yices come from a
+      # pinned YosysHQ OSS CAD Suite release. Only two wrappers go on PATH, so
+      # the suite's own Verilator, Icarus, and Yosys never replace apt's for
+      # the other tests; the suite's `sby` launcher puts the suite's `bin`
+      # first for its own process, so a proof runs the suite's matched Yosys
+      # and yosys-smtbmc. See docs/FORMAL_GATE.md.
+      - name: Install SymbiYosys and Yices (OSS CAD Suite 2026-09-28)
+        env:
+          OSS_CAD_SUITE: "2026-09-28"
+        run: |
+          curl -sSfL "https://github.com/YosysHQ/oss-cad-suite-build/releases/download/${OSS_CAD_SUITE}/oss-cad-suite-linux-x64-${OSS_CAD_SUITE//-/}.tgz" | tar -xz -C "$RUNNER_TEMP"
+          mkdir -p "$RUNNER_TEMP/formal-bin"
+          for tool in sby yices-smt2; do
+            printf '#!/bin/sh\nexec "%s/oss-cad-suite/bin/%s" "$@"\n' "$RUNNER_TEMP" "$tool" > "$RUNNER_TEMP/formal-bin/$tool"
+            chmod +x "$RUNNER_TEMP/formal-bin/$tool"
+          done
+          echo "$RUNNER_TEMP/formal-bin" >> "$GITHUB_PATH"
+      - name: Tool versions
+        run: |
+          which verilator iverilog yosys sby yices-smt2
+          yosys -V && verilator --version && sby --version && yices-smt2 --version | head -1
       - name: Install
         run: pip install -e ".[ai,dev]"
       - name: Test
         # A real-tool test whose executable is named here fails instead of
-        # skipping. `sby` is not in Ubuntu's apt, so formal still skips.
-        # `cc` and `make` build the firmware and its co-simulation (M25).
+        # skipping. `cc` and `make` build the firmware and its co-simulation
+        # (M25); `sby` and `yices-smt2` run formal (M26).
         env:
-          NIRMAAN_REQUIRE_EDA: verilator iverilog vvp yosys cc make
-        run: python -m pytest -q
+          NIRMAAN_REQUIRE_EDA: verilator iverilog vvp yosys cc make sby yices-smt2
+        run: python -m pytest -q -rs
 
   dashes:
     runs-on: ubuntu-latest
