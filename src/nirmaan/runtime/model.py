@@ -207,14 +207,15 @@ class ModelRuntime:
 
         A requirement over the task's own files waits for them: it runs after the answer.
         """
-        wanted = dict.fromkeys(
-            tool for req in packet.task["evidence_requirements"]
-            if _TOOL_BACKED & set(req["accepts"]) and not req["files"] for tool in req["tools"]
-        )
+        wanted: dict[str, dict[str, str]] = {}
+        for req in packet.task["evidence_requirements"]:
+            if _TOOL_BACKED & set(req["accepts"]) and not req["files"]:
+                for tool in req["tools"]:
+                    wanted.setdefault(tool, dict(req["params"]))
         notes = []
-        for tool in wanted:
+        for tool, fixed in wanted.items():
             try:
-                run_id, outcome = tools.invoke(tool, **params)
+                run_id, outcome = tools.invoke(tool, **{**params, **fixed})
             except ToolAccessDenied as exc:
                 notes.append(ToolNote(tool, None, False, str(exc)))
             else:
@@ -316,7 +317,9 @@ class ModelRuntime:
         for req in packet.task["evidence_requirements"]:
             if not req["files"] or not _TOOL_BACKED & set(req["accepts"]):
                 continue
-            params, missing = dict(inputs), None
+            if req["when_produced"] and not any(f["kind"] in req["when_produced"] for f in produced):
+                continue  # a conditional check whose files were not produced: not run, not claimed
+            params, missing = {**inputs, **dict(req["params"])}, None
             for binding in req["files"]:
                 kinds = " or ".join(binding["kinds"])
                 if binding.get("upstream"):  # approved upstream files only, bytes as recorded

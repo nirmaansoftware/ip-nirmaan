@@ -46,16 +46,17 @@ def test_natural_requests_plan_the_block_workflow(nirmaan_org, fixed_clock, requ
     assert stages == ["requirements", "interface-spec", "microarchitecture", "rtl-implementation"]
 
 
-@needs("verilator", "iverilog", "vvp")
+@needs("verilator", "iverilog", "vvp", "yosys", "sby", "yices-smt2")
 @pytest.mark.parametrize("request_text,folder,top", BLOCKS, ids=[b[1] for b in BLOCKS])
 def test_the_block_is_designed_by_agents(nirmaan_org, fixed_clock, tmp_path, request_text, folder, top):
-    """Spec, microarchitecture, and RTL seats; real lint and simulation; reviewed and approved."""
+    """Spec, microarchitecture, and RTL seats; real lint, simulation, synthesis, and formal; approved."""
     fixtures = RTL / folder
     engine = Orchestrator(nirmaan_org, clock=fixed_clock).plan(request_text)
     stages = (("interface-spec", "requirements", [("interface_spec.md", "interface_spec", None)]),
               ("microarchitecture", "interface-spec", [("microarchitecture.md", "microarchitecture_spec", None)]),
               ("rtl-implementation", "microarchitecture", [(f"{top}.v", "rtl_source", top),
-                                                           (f"{top}_tb.v", "testbench", f"{top}_tb")]))
+                                                           (f"{top}_tb.v", "testbench", f"{top}_tb"),
+                                                           (f"{top}.sby", "formal_spec", None)]))
     drive(engine, until=tid(engine, "interface-spec"))
     for stage, source, outputs in stages:
         seat = tid(engine, stage)
@@ -76,7 +77,7 @@ def test_the_block_is_designed_by_agents(nirmaan_org, fixed_clock, tmp_path, req
 
     rtl = engine.task(tid(engine, "rtl-implementation"))
     arts = [engine.state.artifacts[a] for a in rtl.artifacts]
-    assert {a.kind for a in arts} == {"rtl_source", "testbench"}
+    assert {a.kind for a in arts} == {"rtl_source", "testbench", "formal_spec"}
     assert all(a.assurance is Assurance.APPROVED for a in arts)
     for art in arts:  # every file is the fixture, byte for byte, derived from the approved microarchitecture
         assert art.digest == "sha256:" + hashlib.sha256(Path(art.location).read_bytes()).hexdigest()
@@ -85,7 +86,7 @@ def test_the_block_is_designed_by_agents(nirmaan_org, fixed_clock, tmp_path, req
     runs = [engine.state.tool_runs[engine.state.evidence[e].tool_run]
             for e in rtl.evidence if engine.state.evidence[e].tool_run]
     gated = {t for r in rtl.evidence_requirements if r.before_review for t in r.tools}
-    assert {"lint.run", "simulator.run"} <= {r.tool for r in runs} == gated
+    assert {"lint.run", "simulator.run", "synth.run", "formal.run"} <= {r.tool for r in runs} == gated
     sim = next(r for r in runs if r.tool == "simulator.run")
     assert sim.succeeded and f"{top}_tb: PASS" in Path(sim.references[0]).read_text()
     # Every claim is backed by a recorded run or a recorded review; nothing is a bare claim.

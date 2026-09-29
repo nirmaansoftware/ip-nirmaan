@@ -195,6 +195,8 @@ def _task(packet: WorkPacket, mode: str, cites: list[Citable], tools: tuple[Tool
             tools_named += f", with the approved {', '.join(upstream)}"
         if req["before_review"]:
             tools_named += "; must be met before review"
+        if req["when_produced"]:
+            tools_named += f"; applies only if you produce a {' or '.join(req['when_produced'])} file"
         lines.append(f"Evidence requirement: {req['description']} (accepts: {', '.join(req['accepts'])}{tools_named})")
     lines.append(f"Permitted tools: {', '.join(packet.tools) or 'none'}")
     for art in t["upstream_artifacts"]:

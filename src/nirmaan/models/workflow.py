@@ -69,6 +69,18 @@ class EvidenceRequirement(BaseModel):
         default=False,
         description="Must be met, over the files submitted, before the work may be submitted for review.",
     )
+    params: tuple[tuple[str, str], ...] = Field(
+        default=(),
+        description="Fixed tool parameters (M26); a run counts only if it was made with every one of them.",
+    )
+    when_produced: tuple[str, ...] = Field(
+        default=(),
+        description="Applies only when the task produced an artifact of one of these kinds (M26). Empty: always.",
+    )
+
+    def applies(self, kinds) -> bool:
+        """Whether the requirement binds work that produced artifacts of these ``kinds``."""
+        return not self.when_produced or any(k in self.when_produced for k in kinds)
 
 
 class ReviewRequirement(BaseModel):

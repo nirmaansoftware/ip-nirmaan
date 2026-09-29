@@ -55,10 +55,10 @@ def dv_ran(description: str, *tools: str) -> EvidenceRequirement:
     )
 
 
-def checked(description: str, tool: str, *files: FileInput) -> EvidenceRequirement:
+def checked(description: str, tool: str, *files: FileInput, **kw) -> EvidenceRequirement:
     """A real run of ``tool`` over the task's own produced files, met before the work goes to review."""
     return EvidenceRequirement(description=description, accepts=(K.TOOL_RUN,), tools=(tool,), files=files,
-                               before_review=True)
+                               before_review=True, **kw)
 
 
 def documented(description: str) -> EvidenceRequirement:
@@ -465,8 +465,9 @@ BLOCK_DESIGN = WorkflowTemplate(
     id="block-design",
     name="Block design",
     description="A small, self-contained block (register block, FIFO, arbiter): specified, "
-                "microarchitected, and implemented from approved inputs, with RTL lint-clean and "
-                "simulated before review.",
+                "microarchitected, and implemented from approved inputs, with RTL lint-clean, "
+                "simulated, synthesized, and (when the seat writes a proof setup) formally proven "
+                "before review.",
     intents=("block_design",),
     stages=(
         st("requirements", "Requirements specification", "Requirements", "req.analyze", criticality=M,
@@ -485,7 +486,16 @@ BLOCK_DESIGN = WorkflowTemplate(
                              FileInput(param="sources", kinds=("rtl_source",))),
                      checked("Self-checking simulation passes", "simulator.run",
                              FileInput(param="sources", kinds=("rtl_source", "testbench")),
-                             FileInput(param="top", kinds=("testbench",), entry=True)))),
+                             FileInput(param="top", kinds=("testbench",), entry=True)),
+                     # M26: every block synthesizes with no latches; formal runs when the seat writes a .sby.
+                     checked("Synthesizes with Yosys, with no latches", "synth.run",
+                             FileInput(param="sources", kinds=("rtl_source",)),
+                             FileInput(param="top", kinds=("rtl_source",), entry=True),
+                             params=(("max_latches", "0"),)),
+                     checked("Formal properties are proven", "formal.run",
+                             FileInput(param="sby", kinds=("formal_spec",)),
+                             FileInput(param="sources", kinds=("rtl_source",)),
+                             when_produced=("formal_spec",)))),
         # M25: when the request asks for test (DFT, scan chains), the scan netlist goes to review
         # only after real rule checks and a real chain simulation over it.
         st("dft", "Scan insertion", "Implementation", "dft.insert",

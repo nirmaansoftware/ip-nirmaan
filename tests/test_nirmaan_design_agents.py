@@ -128,7 +128,7 @@ def test_small_blocks_plan_the_block_workflow(nirmaan_org, fixed_clock):
     rtl = engine.task(tid(engine, "rtl-implementation"))
     assert set(rtl.expected_outputs) == {"rtl_source", "testbench"}
     gated = [r for r in rtl.evidence_requirements if r.before_review]
-    assert {t for r in gated for t in r.tools} == {"lint.run", "simulator.run"}
+    assert {t for r in gated for t in r.tools} == {"lint.run", "simulator.run", "synth.run", "formal.run"}
     assert orchestrator.analyze("Create a 4-port AXI-to-NoC bridge.").intent == "new_ip"
 
 
@@ -217,7 +217,7 @@ def test_a_seat_cannot_review_its_own_spec(nirmaan_org, fixed_clock, tmp_path):
 # --- RTL reaches review only through real lint and simulation -----------------------------
 
 
-@needs("verilator")
+@needs("verilator", "yosys")
 def test_rtl_whose_real_lint_fails_cannot_reach_review(rtl_ready):
     engine, rtl = rtl_ready
     cite = token(upstream(engine, "microarchitecture"))
@@ -236,7 +236,7 @@ def test_rtl_whose_real_lint_fails_cannot_reach_review(rtl_ready):
         review_task(engine, rtl, ModelRuntime(MockLLM()))
 
 
-@needs("verilator")
+@needs("verilator", "yosys")
 def test_rtl_that_passes_real_lint_and_simulation_goes_to_review(rtl_ready):
     engine, rtl = rtl_ready
     micro = upstream(engine, "microarchitecture")
@@ -251,7 +251,7 @@ def test_rtl_that_passes_real_lint_and_simulation_goes_to_review(rtl_ready):
         data = Path(art.location).read_bytes()
         assert art.digest == "sha256:" + hashlib.sha256(data).hexdigest() and art.derived_from == (micro,)
     runs = {engine.state.tool_runs[r].tool: engine.state.tool_runs[r] for r in report.tool_runs}
-    assert set(runs) == {"lint.run", "simulator.run"} and all(r.succeeded for r in runs.values())
+    assert set(runs) == {"lint.run", "simulator.run", "synth.run"} and all(r.succeeded for r in runs.values())
     assert runs["lint.run"].params["sources"] == arts["rtl_source"].location
     assert runs["simulator.run"].params["sources"] == f"{arts['rtl_source'].location},{arts['testbench'].location}"
     assert runs["simulator.run"].params["top"] == "counter_tb"
@@ -448,14 +448,15 @@ def test_a_new_design_seat_needs_no_core_changes(fixed_clock, tmp_path):
 # --- The AXI4-Lite register block: the Stage 4 demo -------------------------------------
 
 
-@needs("verilator", "iverilog", "vvp")
+@needs("verilator", "iverilog", "vvp", "yosys", "sby", "yices-smt2")
 def test_the_axi4_lite_register_block_is_designed_by_agents(nirmaan_org, fixed_clock, tmp_path):
-    """Spec, microarchitecture, and RTL seats; real lint and simulation; reviewed and approved."""
+    """Spec, microarchitecture, and RTL seats; real lint, simulation, synthesis, and formal; reviewed and approved."""
     engine = Orchestrator(nirmaan_org, clock=fixed_clock).plan(AXI_BLOCK)
     stages = (("interface-spec", "requirements", [("interface_spec.md", "interface_spec", None)]),
               ("microarchitecture", "interface-spec", [("microarchitecture.md", "microarchitecture_spec", None)]),
               ("rtl-implementation", "microarchitecture", [("axi4_lite_regs.v", "rtl_source", "axi4_lite_regs"),
-                                                           ("axi4_lite_regs_tb.v", "testbench", "axi4_lite_regs_tb")]))
+                                                           ("axi4_lite_regs_tb.v", "testbench", "axi4_lite_regs_tb"),
+                                                           ("axi4_lite_regs.sby", "formal_spec", None)]))
     drive(engine, until=tid(engine, "interface-spec"))
     for stage, source, outputs in stages:
         seat = tid(engine, stage)
@@ -476,14 +477,14 @@ def test_the_axi4_lite_register_block_is_designed_by_agents(nirmaan_org, fixed_c
 
     rtl = engine.task(tid(engine, "rtl-implementation"))
     arts = [engine.state.artifacts[a] for a in rtl.artifacts]
-    assert {a.kind for a in arts} == {"rtl_source", "testbench"}
+    assert {a.kind for a in arts} == {"rtl_source", "testbench", "formal_spec"}
     assert all(a.assurance is Assurance.APPROVED for a in arts)
     for art in arts:  # every file is the one the tools ran on, derived from the approved microarchitecture
         assert art.digest == "sha256:" + hashlib.sha256(Path(art.location).read_bytes()).hexdigest()
         assert art.derived_from == (upstream(engine, "microarchitecture"),)
     runs = {engine.state.tool_runs[engine.state.evidence[e].tool_run].tool
             for e in rtl.evidence if engine.state.evidence[e].tool_run}
-    assert runs == {"lint.run", "simulator.run"}
+    assert runs == {"lint.run", "simulator.run", "synth.run", "formal.run"}
     # Every claim is backed by a recorded run or a recorded review; nothing is a bare claim.
     for task in engine.state.tasks.values():
         for ev in (engine.state.evidence[e] for e in task.evidence):

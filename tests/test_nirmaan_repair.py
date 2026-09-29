@@ -104,7 +104,7 @@ def test_no_shipped_capability_turns_repair_on(nirmaan_org):
     assert {c.max_attempts for c in nirmaan_org.capabilities.values()} == {1}
 
 
-@needs("verilator")
+@needs("verilator", "yosys")
 def test_one_attempt_behaves_exactly_as_before(rtl_ready):
     engine, rtl, cite = rtl_ready
     llm = MockLLM(script=[counter(cite, LINT_BROKEN), counter(cite)])
@@ -123,7 +123,7 @@ def test_one_attempt_behaves_exactly_as_before(rtl_ready):
 # --- RTL: failed lint, repaired ---------------------------------------------------------------
 
 
-@needs("verilator")
+@needs("verilator", "yosys")
 def test_rtl_that_fails_lint_then_passes_reaches_review(rtl_ready):
     engine, rtl, cite = rtl_ready
     llm = MockLLM(script=[counter(cite, LINT_BROKEN), counter(cite)])
@@ -167,7 +167,7 @@ def test_rtl_that_fails_lint_then_passes_reaches_review(rtl_ready):
     assert all(engine.state.artifacts[a].assurance is Assurance.APPROVED for a in task.artifacts)
 
 
-@needs("verilator")
+@needs("verilator", "yosys")
 def test_the_repair_prompt_cites_the_failed_run_and_quotes_its_log(rtl_ready):
     engine, rtl, cite = rtl_ready
     llm = MockLLM(script=[counter(cite, LINT_BROKEN), counter(cite)])
@@ -187,7 +187,7 @@ def test_the_repair_prompt_cites_the_failed_run_and_quotes_its_log(rtl_ready):
     assert "count <= count + 5'd1;" in after  # the refused file itself, digest-checked
 
 
-@needs("verilator")
+@needs("verilator", "yosys")
 def test_exhausting_the_attempts_stays_refused_and_lists_every_attempt(rtl_ready):
     """Lint-clean but wrong, then simulating but lint-dirty: each requirement has *a* passing run, never both."""
     engine, rtl, cite = rtl_ready
@@ -277,7 +277,7 @@ def firmware_answer(cite: str, map_header: Path) -> str:
     return answer(*files)
 
 
-@needs(*COSIM, "iverilog", "vvp")
+@needs(*COSIM, "iverilog", "vvp", "yosys")
 def test_a_firmware_seat_is_repaired_by_the_same_loop(nirmaan_org, fixed_clock, tmp_path):
     engine = Orchestrator(nirmaan_org, clock=fixed_clock).plan(WITH_DRIVER)
     design_the_block(engine, tmp_path)

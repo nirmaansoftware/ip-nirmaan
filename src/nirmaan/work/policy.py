@@ -110,20 +110,22 @@ class PolicyEngine:
 def unsatisfied_requirements(state: ProjectState, task: Task) -> list[str]:
     """Evidence requirements on the task not met by substantiated evidence."""
     attached = [state.evidence[e] for e in task.evidence if e in state.evidence]
+    produced = {state.artifacts[a].kind for a in task.artifacts if a in state.artifacts}
     return [
         req.description
         for req in task.evidence_requirements
-        if not any(satisfies(state, ev, req) for ev in attached)
+        if req.applies(produced) and not any(satisfies(state, ev, req) for ev in attached)
     ]
 
 
 def satisfies(state: ProjectState, ev, req) -> bool:
-    """Substantiated, of an accepted kind, and (if tool-backed) from a named tool."""
+    """Substantiated, of an accepted kind, and (if tool-backed) from a named tool run with the fixed params."""
     if not ev.substantiated or ev.kind not in req.accepts:
         return False
-    if req.tools and ev.kind in (EvidenceKind.TOOL_RUN, EvidenceKind.VERITRIAGE_SESSION):
+    if (req.tools or req.params) and ev.kind in (EvidenceKind.TOOL_RUN, EvidenceKind.VERITRIAGE_SESSION):
         run = state.tool_runs.get(ev.tool_run or "")
-        return run is not None and run.tool in req.tools
+        return (run is not None and (not req.tools or run.tool in req.tools)
+                and all(run.params.get(k) == v for k, v in req.params))
     return True
 
 
@@ -277,7 +279,8 @@ def _before_review(ctx: PolicyContext) -> list[str]:
         return []
     attached = [ctx.state.evidence[e] for e in task.evidence if e in ctx.state.evidence]
     problems = []
-    for req in (r for r in task.evidence_requirements if r.before_review):
+    kinds = {draft.get("kind") for draft in ctx.payload.get("artifacts", ())}
+    for req in (r for r in task.evidence_requirements if r.before_review and r.applies(kinds)):
         met = [ev for ev in attached if satisfies(ctx.state, ev, req)]
         if not met:
             problems.append(f"{task.id} cannot go to review: {req.description!r} is not met")

@@ -17,13 +17,14 @@ way every milestone has:
 | Task engine: lifecycle, reviews, approvals, human gates, hash-chained audit | ATPG, multiple scan chains, MBIST; a RISC-V cross-compile and ISS in the firmware loop |
 | VeriTriage as a real, evidence-producing tool (`veritriage.investigate`) | A repair loop feeding tool logs back to design, DFT, and firmware seats |
 | AI workers in three verification seats, off by default, on Opus 5.5 (M20) | FIFO, arbiter, and APB blocks; approved-inputs gating on the `new-ip` RTL stages |
-| Design agents: spec, microarchitecture, and RTL seats; RTL gated on real lint and simulation; the AXI4-Lite register block end to end (M23) | Formal and synthesis as before-review checks; formal in CI (Ubuntu apt has no `sby`) |
+| Design agents: spec, microarchitecture, and RTL seats; RTL gated on real lint and simulation; the AXI4-Lite register block end to end (M23) | |
 | `nirmaan export`: the numbered `01_requirement` to `10_signoff` deliverable tree (M23) | Loading requirements and verification items from a file; a verification-plan seat |
 | Engineering graph: artifacts linked to Design Graph nodes from their real bytes; `nirmaan gaps` names every requirement not backed by a passing run (M24) | |
 | DFT: real mux-D scan insertion, testability rules, and chain simulation through Yosys and Icarus (M25) | |
 | Firmware: a driver built strict and run against the approved RTL through a Verilator model (M25) | |
 | Physical design: OpenSTA and OpenROAD bindings and a `physical-implementation` workflow, refused where the tools or PDK are missing (M25) | |
 | Real lint, simulation, synthesis, and formal via open-source EDA (M21) | |
+| Synthesis (no latches) and formal (when the seat writes a `.sby`) before review; formal in CI via the OSS CAD Suite (M26) | |
 | IP Nirmaan over MCP; organizational events on the M18 bus (M22) | |
 | CI on Python 3.11 and 3.12, plus a dash check (Stage 0) | |
 | 1055 tests; CLI `nirmaan`; HTML dashboard; landing page live at https://ip.nirmaan.online | |
@@ -195,6 +196,7 @@ extraction. Design doc: `docs/PHYSICAL_DESIGN.md`.
 
 - **Repair loop (M26):** a seat whose files fail their before-review checks is asked again, bounded by a capability's `max_attempts` (default 1, so off) or `nirmaan run --attempts N`, with the failed runs as citable evidence and log excerpts; refused attempts are recorded as `Attempt`s and never count. See `docs/REPAIR_LOOP.md`.
 - **More blocks (M26):** a synchronous FIFO, a round-robin arbiter, and an APB4 register block (PSLVERR for unmapped addresses, as the AXI4-Lite block's SLVERR), each with real RTL, testbenches, and proofs, and each designed end to end by agents on `block-design` with no core change. See `docs/IP_BLOCKS.md`.
+- **Formal gate (M26, done):** the `block-design` RTL stage goes to review only after real synthesis with no latches and, when the seat writes a `.sby`, a real SymbiYosys proof over the submitted RTL; CI installs `sby` and `yices-smt2` from a pinned OSS CAD Suite and runs formal instead of skipping it. See `docs/FORMAL_GATE.md`.
 
 ## Side work (any time; owner-driven)
 
