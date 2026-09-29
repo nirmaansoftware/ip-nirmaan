@@ -25,6 +25,7 @@ from nirmaan.models import (
     ApprovalState,
     Artifact,
     Assurance,
+    Attempt,
     Criticality,
     Decision,
     DecisionKind,
@@ -309,6 +310,42 @@ class TaskEngine:
             # Nothing further to wait for: the work completes on submission.
             self.complete(task_id, actor)
         return self.task(task_id)
+
+    def record_attempt(
+        self,
+        task_id: str,
+        actor: Actor,
+        artifacts: list[dict[str, Any]],
+        refusal: str,
+        tool_runs: tuple[str, ...] = (),
+        evidence: tuple[str, ...] = (),
+    ) -> Attempt:
+        """Keep a refused submission on the record (M26). Its files never become the task's artifacts."""
+        task = self.task(task_id)
+        self._require(actor.role == task.owner, f"only the owner ({task.owner}) records attempts on {task_id}")
+        if task.status is not S.IN_PROGRESS:
+            raise TransitionError(f"{task_id} is {task.status.value}; only work in progress has attempts")
+        number = 1 + sum(1 for a in self._state.attempts.values() if a.task == task_id)
+        attempt_id = f"{task_id}#t{number}"
+        kept = tuple(
+            Artifact(
+                id=f"{attempt_id}.a{index}", kind=draft["kind"], title=draft["title"], task=task_id,
+                produced_by=actor.label, assurance=Assurance.EXECUTED, location=draft.get("location"),
+                summary=draft.get("summary", ""), digest=draft.get("digest"),
+                derived_from=tuple(draft.get("derived_from", ())),
+            )
+            for index, draft in enumerate(artifacts, 1)
+        )
+        attempt = Attempt(id=attempt_id, task=task_id, number=number, actor=actor.label, refusal=refusal,
+                          tool_runs=tuple(tool_runs), evidence=tuple(evidence), artifacts=kept)
+        warnings = self._check("task.attempt", actor, task)
+        self._commit(
+            actor, "task.attempt", task_id, reason=refusal, warnings=warnings,
+            details={"attempt": attempt_id, "artifacts": [a.location or a.title for a in kept],
+                     "tool_runs": list(tool_runs), "evidence": list(evidence)},
+            attempts={**self._state.attempts, attempt_id: attempt},
+        )
+        return attempt
 
     def review(self, task_id: str, actor: Actor, verdict: Verdict, comments: str = "") -> Task:
         task = self.task(task_id)

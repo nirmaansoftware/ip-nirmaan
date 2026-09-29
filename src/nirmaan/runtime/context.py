@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from nirmaan.models import Assurance, MemoryScope, TaskStatus
-from nirmaan.runtime.files import read_verified
+from nirmaan.runtime.files import excerpt, read_verified
 from nirmaan.work.engine import TaskEngine
 
 #: The most of one file's content a packet carries.
@@ -44,6 +44,16 @@ def _artifact(art, trusted: bool | None = None, content: bool = False) -> dict[s
             text, problem = None, f"too large to include ({len(text)} characters)"
         entry["content"], entry["content_problem"] = text, problem
     return entry
+
+
+def _failed_run(state, run_id: str, evidence: tuple[str, ...]) -> dict[str, Any]:
+    """A refused attempt's failed run (M26): its evidence, and a bounded excerpt of its log."""
+    run = state.tool_runs[run_id]
+    log = run.references[0] if run.references else None
+    lines, note = excerpt(log)
+    return {"run": run.id, "tool": run.tool, "summary": run.summary, "log": log,
+            "evidence": next((e for e in evidence if state.evidence[e].tool_run == run.id), None),
+            "excerpt": lines, "excerpt_note": note}
 
 
 def assemble(engine: TaskEngine, task_id: str, role: str | None = None) -> WorkPacket:
@@ -85,6 +95,13 @@ def assemble(engine: TaskEngine, task_id: str, role: str | None = None) -> WorkP
          "substantiated": ev.substantiated, "tool_run": ev.tool_run, "reference": ev.reference}
         for source in (*task.depends_on, task_id)
         for ev in (state.evidence[e] for e in state.tasks[source].evidence)
+    ]
+    attempts = [
+        {"id": a.id, "number": a.number, "refusal": a.refusal,
+         "failed_runs": [_failed_run(state, run_id, a.evidence) for run_id in a.tool_runs
+                         if run_id in state.tool_runs and not state.tool_runs[run_id].succeeded],
+         "artifacts": [_artifact(art, content=True) for art in a.artifacts]}
+        for a in sorted(state.attempts.values(), key=lambda a: a.number) if a.task == task_id
     ]
     memory = tuple(
         m.model_dump(mode="json")
@@ -129,6 +146,7 @@ def assemble(engine: TaskEngine, task_id: str, role: str | None = None) -> WorkP
             "owner": task.owner,
             "reviewer": task.reviewer,
             "escalation_path": list(task.escalation_path),
+            "attempts": attempts,
             "ready": task.status in (TaskStatus.READY, TaskStatus.IN_PROGRESS, TaskStatus.CHANGES_REQUESTED),
         },
         tools=tuple(card["tools"]),
