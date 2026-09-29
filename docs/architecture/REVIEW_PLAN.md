@@ -103,3 +103,14 @@ veritriage.investigate `paths workspace`; explain_log `path`;
 knowledge.search `query`; project.read `task`; artifact.read `artifact`.
 Missing required inputs stay recorded failed runs (M21/M25 decision; a
 physical test asserts it).
+
+**After M28 (PR #41, stacked on #37).** Parallel sessions opened #38
+(OpenROAD in CI), #39 (repair after review), and #40 (RISC-V firmware), all
+also numbered "M27". Numbers collide with this review's M27/M28; the owner or
+coordinator decides numbering and merge order. Overlaps: #39 shares
+`runtime/base.py`, `runtime/__init__.py`, `models/org.py`, `models/work.py`,
+`work/policy.py`, `cli.py`; #38 shares `integrations/physical.py` and its
+test; #40 shares `company/tools.py` and `integrations/firmware.py`. Whichever
+of #38/#40 merges after #41 must declare any new tool parameters it reads in
+`company/tools.py`; `test_every_parameter_an_integration_reads_is_declared`
+will say which. Do not start M29 until the owner has settled the order.
