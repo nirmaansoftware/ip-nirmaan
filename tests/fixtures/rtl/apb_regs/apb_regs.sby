@@ -1,0 +1,13 @@
+[options]
+mode prove
+depth 4
+
+[engines]
+smtbmc
+
+[script]
+read -formal apb_regs.v
+prep -top apb_regs
+
+[files]
+apb_regs.v
