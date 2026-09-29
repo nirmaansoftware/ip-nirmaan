@@ -8,6 +8,6 @@ engineering-grade HTML report. An optional AI layer reasons exclusively over
 the graph's normalized view: it can narrate the evidence, never invent it.
 """
 
-__version__ = "1.19.0"
+__version__ = "1.20.0"
 
 __all__ = ["__version__"]

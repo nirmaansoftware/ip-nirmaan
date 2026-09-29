@@ -320,7 +320,9 @@ build requirement.
 
 * A RISC-V cross compile in CI, and running the driver on an instruction-set
   simulator (Spike, QEMU) against the RTL through a bus bridge.
-* A repair loop that hands the seat its compiler or co-simulation log.
+* A repair loop that hands the seat its compiler or co-simulation log: done in
+  M26 (`docs/REPAIR_LOOP.md`); a firmware capability opts in with
+  `max_attempts`.
 * Harnesses for APB, AXI4 (bursts), and interrupts; the AXI4-Lite harness
   assumes 32-bit data and the `s_axil_*` port names.
 * Static analysis (`clang-tidy`, `cppcheck`, MISRA) as another before-review

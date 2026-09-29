@@ -292,12 +292,12 @@ reviewed and approved.
 
 ## 9. Deferred
 
-* A repair loop: handing the model its own lint or simulation log for a
-  bounded number of retries. Today a failed attempt is refused and the next
-  `nirmaan run` is a fresh attempt.
+* A repair loop: done in M26, see `docs/REPAIR_LOOP.md`.
 * A separate verification seat for the testbench.
 * Applying `files` and `before_review` to the `new-ip`, `feature-addition`,
   and `rtl-change` RTL stages. It is a data edit, but the existing flows (and
   their tests) submit first and attach evidence later.
-* FIFO, arbiter, and APB register blocks on the block workflow.
-* Synthesis (`synth.run`) and formal (`formal.run`) as before-review checks.
+* FIFO, arbiter, and APB register blocks on the block workflow: done in M26,
+  see `docs/IP_BLOCKS.md`.
+* Synthesis (`synth.run`) and formal (`formal.run`) as before-review checks:
+  done in M26, see `docs/FORMAL_GATE.md`.

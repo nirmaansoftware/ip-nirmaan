@@ -36,7 +36,9 @@ INTENTS: list[IntentRule] = [
                          r"\bphysical (design|implementation)\b")),
     IntentRule(intent="block_design", priority=55, description="Build a small, self-contained block.",
                patterns=(r"\b(create|build|design|develop|implement|write)\b.*"
-                         r"\b(register (block|file|bank)|fifo|arbiter|counter)\b",)),
+                         r"\b(register (block|file|bank)|fifo|arbiter|counter)\b",
+                         r"\b(create|build|design|develop|implement|write)\b.*"
+                         r"\b(apb[34]?|axi4?[- ]?lite) (subordinate|slave|peripheral)\b")),
     IntentRule(intent="new_ip", priority=60, description="Build something new.",
                patterns=(r"\b(create|build|design|develop|implement|architect)\b.*\b(ip|bridge|controller|router|block|"
                          r"interconnect|fabric|core|engine|phy|interface|subsystem|accelerator)\b",)),
@@ -47,7 +49,7 @@ FEATURES: list[FeatureRule] = [
     FeatureRule(feature="axi_stream", skills=("axi_stream",), patterns=(r"\baxi[- ]?stream\b",)),
     FeatureRule(feature="ace", skills=("ace",), patterns=(r"\bace(-lite)?\b",)),
     FeatureRule(feature="chi", skills=("chi",), patterns=(r"\bchi\b",)),
-    FeatureRule(feature="apb", skills=("apb",), patterns=(r"\bapb\b",)),
+    FeatureRule(feature="apb", skills=("apb",), patterns=(r"\bapb[34]?\b",)),
     FeatureRule(feature="ahb", skills=("ahb",), patterns=(r"\bahb\b",)),
     FeatureRule(feature="pcie", skills=("pcie",), patterns=(r"\bpci[- ]?e(xpress)?\b",)),
     FeatureRule(feature="cxl", skills=("cxl",), patterns=(r"\bcxl\b",)),
