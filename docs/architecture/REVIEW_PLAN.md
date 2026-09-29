@@ -88,10 +88,10 @@ retried. Stage commits stage only this review's files (never `git add -A`).
 | # | Step | Status |
 |---|---|---|
 | a | Design: `docs/TOOL_CONTRACTS.md` | DONE |
-| b | Failing tests `tests/test_nirmaan_contracts.py` | TODO |
-| c | Vocabulary (`ParamKind`, `ParamSpec`, `ToolSpec.params`, `list_values`, `ToolRun.values`) and catalog contracts | TODO |
-| d | Broker validation, runtime input filtering and list parameters, split sites replaced, `nirmaan org tool` | TODO |
-| e | Full suite, `context.md`, ROADMAP, PR | TODO |
+| b | Failing tests `tests/test_nirmaan_contracts.py` | DONE |
+| c | Vocabulary (`ParamKind`, `ParamSpec`, `ToolSpec.params`, `list_values`, `ToolRun.values`) and catalog contracts | DONE |
+| d | Broker validation, runtime input filtering and list parameters, split sites replaced, `nirmaan org tool` | DONE |
+| e | Full suite (1143 passed, 2 skipped), `context.md`, ROADMAP, PR | DONE |
 
 Parameter inventory (from reading every integration, both quote styles):
 eda runner `backend workdir timeout max_*`; lint/sim/test/synth/dft
