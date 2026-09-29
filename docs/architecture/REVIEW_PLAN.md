@@ -82,3 +82,24 @@ retried. Stage commits stage only this review's files (never `git add -A`).
   M28 (typed tool contracts) on branch `m28/typed-contracts`, stacked on
   this branch until #37 merges. The first live evaluation run waits for the
   owner (it costs API credits).
+
+## M28: typed tool contracts (branch `m28/typed-contracts`, stacked on this one)
+
+| # | Step | Status |
+|---|---|---|
+| a | Design: `docs/TOOL_CONTRACTS.md` | DONE |
+| b | Failing tests `tests/test_nirmaan_contracts.py` | TODO |
+| c | Vocabulary (`ParamKind`, `ParamSpec`, `ToolSpec.params`, `list_values`, `ToolRun.values`) and catalog contracts | TODO |
+| d | Broker validation, runtime input filtering and list parameters, split sites replaced, `nirmaan org tool` | TODO |
+| e | Full suite, `context.md`, ROADMAP, PR | TODO |
+
+Parameter inventory (from reading every integration, both quote styles):
+eda runner `backend workdir timeout max_*`; lint/sim/test/synth/dft
+`sources top`; formal `sby sources`; synth-liberty adds `liberty pdk_root`;
+sta `netlist sdc spef top liberty pdk_root`; pnr `netlist sdc top liberty
+tech_lef lef pdk_root site hor_layers ver_layers utilization aspect_ratio
+core_space stop_after`; fw.build `sources`; fw.test `sources rtl top`;
+veritriage.investigate `paths workspace`; explain_log `path`;
+knowledge.search `query`; project.read `task`; artifact.read `artifact`.
+Missing required inputs stay recorded failed runs (M21/M25 decision; a
+physical test asserts it).
