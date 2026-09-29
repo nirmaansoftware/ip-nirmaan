@@ -209,6 +209,10 @@ In `tests/test_nirmaan_formal_gate.py`:
    meet it.
 9. Crown jewel: a new before-review check, with fixed parameters and a
    produced-kind condition, needs no core changes.
+10. With the M26 repair loop (`docs/REPAIR_LOOP.md`), a counterexample is
+    repairable like any before-review refusal: the refused attempt, its
+    `.sby`, and its failed proof are kept as an `Attempt`, never as the task's
+    artifacts, and the next attempt's proof covers only the new files.
 
 The AXI4-Lite demo (`test_the_axi4_lite_register_block_is_designed_by_agents`)
 now has the RTL seat answer with `axi4_lite_regs.sby` too; lint, simulation,

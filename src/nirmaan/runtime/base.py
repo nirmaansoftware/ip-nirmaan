@@ -162,14 +162,32 @@ class RunReport:
     evidence: list[str] = field(default_factory=list)
     escalation: str | None = None
     review: str | None = None
+    #: One entry per attempt (M26): number, status, detail, tool_runs, evidence, and the Attempt ID if refused.
+    attempts: list[dict[str, Any]] = field(default_factory=list)
+
+
+def _attempt_limit(engine: TaskEngine, task_id: str, attempts: int | None) -> int:
+    """How many attempts one run may make: the override, else the task's capability (M26)."""
+    if attempts is not None:
+        if attempts < 1:
+            raise WorkError(f"attempts must be at least 1, got {attempts}")
+        return attempts
+    capability = engine.org.capabilities.get(engine.task(task_id).capability or "")
+    return capability.max_attempts if capability else 1
 
 
 def run_task(engine: TaskEngine, task_id: str, runtime: AgentRuntime,
-             kind: ActorKind = ActorKind.AI_AGENT) -> RunReport:
-    """Hand one task to a runtime and apply its result through the engine."""
+             kind: ActorKind = ActorKind.AI_AGENT, attempts: int | None = None) -> RunReport:
+    """Hand one task to a runtime and apply its result through the engine.
+
+    When the engine refuses a submission and the attempt limit allows (M26),
+    the refused attempt is recorded and the same seat is asked again, with the
+    refused attempts in its packet. Nothing else is retried.
+    """
     task = engine.task(task_id)
     if task.owner is None:
         raise WorkError(f"{task_id} has no owner")
+    limit = _attempt_limit(engine, task_id, attempts)
     actor = Actor(role=task.owner, kind=kind, name=getattr(runtime, "runtime_id", "runtime"))
     packet = assemble(engine, task_id)
     if not runtime.accepts(packet):
@@ -179,7 +197,38 @@ def run_task(engine: TaskEngine, task_id: str, runtime: AgentRuntime,
     elif task.status is not TaskStatus.IN_PROGRESS:
         raise WorkError(f"{task_id} is {task.status.value}; it cannot be worked")
 
-    result = runtime.execute(packet, ToolHandle(ToolBroker(engine), actor, task_id))
+    tools = ToolHandle(ToolBroker(engine), actor, task_id)
+    report = RunReport(task_id, ResultStatus.DECLINED, "")
+    refused: list[str] = []
+    for number in range(1, limit + 1):
+        if number > 1:
+            packet = assemble(engine, task_id)  # now carries the refused attempts
+        result = runtime.execute(packet, tools)
+        step, refusal = _apply(engine, task_id, actor, result, f"attempt {number} of {limit}" if limit > 1 else "")
+        entry: dict[str, Any] = {"number": number, "status": step.status.value, "detail": step.detail,
+                                 "tool_runs": step.tool_runs, "evidence": step.evidence, "attempt": None}
+        if refusal is not None and limit > 1:
+            entry["attempt"] = engine.record_attempt(task_id, actor, list(result.artifacts), refusal,
+                                                     tuple(step.tool_runs), tuple(step.evidence)).id
+            refused.append(entry["attempt"])
+        report.attempts.append(entry)
+        report.tool_runs += step.tool_runs
+        report.evidence += step.evidence
+        report.status, report.detail = step.status, step.detail
+        report.escalation, report.review = step.escalation, step.review
+        if refusal is None:
+            break
+    if refused:
+        summary = (f"all {len(refused)} attempts were refused: {', '.join(refused)}"
+                   if report.status is ResultStatus.REFUSED
+                   else f"{report.status.value} on attempt {len(report.attempts)}, after {', '.join(refused)}")
+        report.detail = "; ".join(p for p in (report.detail, summary) if p)
+    return report
+
+
+def _apply(engine: TaskEngine, task_id: str, actor: Actor, result: WorkResult,
+           attempt: str) -> tuple[RunReport, str | None]:
+    """Apply one runtime result through the engine; also return the engine's refusal, if any."""
     PolicyEngine(engine.org).enforce(PolicyContext(
         engine.org, engine.state, "runtime.result", actor, engine.task(task_id),
         {"uncertainty": result.uncertainty, "artifacts": result.artifacts,
@@ -208,14 +257,16 @@ def run_task(engine: TaskEngine, task_id: str, runtime: AgentRuntime,
     elif result.status is ResultStatus.BLOCKED:
         engine.block(task_id, actor, result.notes)
     elif result.status is ResultStatus.SUBMITTED:
+        notes = "; ".join(p for p in (attempt, result.notes) if p)
         try:
-            engine.submit(task_id, actor, list(result.artifacts), notes=result.notes, outcome=result.outcome)
+            engine.submit(task_id, actor, list(result.artifacts), notes=notes, outcome=result.outcome)
         except PolicyViolationError as exc:
             # The runs recorded above really happened (a failed lint is a fact worth keeping), so a
             # refused submission is reported rather than raised: the caller can save the evidence.
             report.status = ResultStatus.REFUSED
             report.detail = "; ".join(p for p in (result.notes, f"submission refused: {exc}") if p)
-    return report
+            return report, str(exc)
+    return report, None
 
 
 def review_task(engine: TaskEngine, task_id: str, runtime: AgentRuntime, role: str | None = None,

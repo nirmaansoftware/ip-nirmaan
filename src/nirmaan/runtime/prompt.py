@@ -221,9 +221,31 @@ def _task(packet: WorkPacket, mode: str, cites: list[Citable], tools: tuple[Tool
             lines.append(f"Tool run {token[note.run]} {note.tool} {outcome} for this task: {note.summary}")
         else:
             lines.append(f"Tool {note.tool} was not run: {note.summary}")
+    if mode == "work" and t.get("attempts"):
+        lines += _repair(t["attempts"], token)
     if t["escalation_path"]:
         lines.append(f"Escalation path: {' -> '.join(t['escalation_path'])}")
     return tuple(lines)
+
+
+def _repair(attempts: list[dict[str, Any]], token: dict[str, str]) -> list[str]:
+    """The refused attempts (M26): each one's reason; the latest one's failed runs, logs, and files."""
+    latest = attempts[-1]
+    lines = [f"Repair: your previous attempt {latest['number']} was refused and nothing from it counts. "
+             "Fix what failed and answer again in full; files from a refused attempt are never reviewed."]
+    lines += [f"Attempt {a['number']} was refused: {a['refusal']}" for a in attempts]
+    for failed in latest["failed_runs"]:
+        run = token.get(failed["run"], failed["run"])
+        ev = f", evidence {token[failed['evidence']]}" if failed["evidence"] in token else ""
+        lines.append(f"Failed run {run} {failed['tool']}{ev}: {failed['summary']}")
+        if failed["excerpt"]:
+            body = "\n".join(f"| {line}" for line in failed["excerpt"])
+            lines.append(f"Log excerpt of {run} ({failed['excerpt_note']}):\n{body}")
+        else:
+            lines.append(f"No log excerpt of {run}: {failed['excerpt_note']}")
+    for art in latest["artifacts"]:
+        lines += _content(art, f"refused file {art['title']}")
+    return lines
 
 
 def render_work_prompt(packet: WorkPacket, mode: str = "work", tools: tuple[ToolNote, ...] = ()) -> WorkPrompt:

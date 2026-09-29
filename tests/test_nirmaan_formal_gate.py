@@ -381,3 +381,27 @@ def test_a_new_before_review_check_needs_no_core_changes(fixed_clock, tmp_path):
         unregister_extension("test-header-check")
         unregister_binding("header.check")
         unregister_binding("waiver.check")
+
+
+# --- With the repair loop: a counterexample is repairable, and never counts ---------------------
+
+
+@needs("verilator", "iverilog", "vvp", "yosys", "sby", "yices-smt2")
+def test_a_counterexample_repaired_on_the_next_attempt_reaches_review(axi_rtl):
+    engine, rtl, cite = axi_rtl
+    source = (AXI / "axi4_lite_regs.v").read_text()
+    mutant = source.replace("assign s_axil_arready = !s_axil_rvalid;", "assign s_axil_arready = 1'b1;")
+    llm = MockLLM(script=[answer(*axi_files(cite, mutant)), answer(*axi_files(cite))])
+    report = run_task(engine, rtl, ModelRuntime(llm), attempts=2)
+
+    assert report.status is ResultStatus.SUBMITTED, report.detail
+    assert [a["status"] for a in report.attempts] == ["refused", "submitted"]
+    (first,) = [a for a in engine.state.attempts.values() if a.task == rtl]
+    assert FORMAL in first.refusal and "formal_spec" in {a.kind for a in first.artifacts}
+    assert all(a.id not in engine.state.artifacts for a in first.artifacts)  # the refused files never count
+    failed = {engine.state.tool_runs[r].tool: engine.state.tool_runs[r] for r in first.tool_runs}["formal.run"]
+    assert not failed.succeeded
+    passing = {engine.state.tool_runs[r].tool: engine.state.tool_runs[r] for r in report.attempts[1]["tool_runs"]}
+    submitted = {engine.state.artifacts[a].kind: engine.state.artifacts[a] for a in engine.task(rtl).artifacts}
+    assert passing["formal.run"].succeeded and passing["formal.run"].params["sby"] == submitted["formal_spec"].location
+    assert failed.params["sby"] != submitted["formal_spec"].location

@@ -1660,6 +1660,46 @@ parts (physical design #28, firmware #30, DFT #31), built in parallel. The
 standard run is 1055 tests with 2 skipped: the real OpenSTA and OpenROAD tests,
 whose tools are not installed anywhere yet.
 
+### Milestone 26 - The repair loop (post-roadmap)
+
+When a seat's submission is refused (a before-review check failed on its
+files), `run_task` may ask the same seat again, bounded, handing it the failed
+runs as citable evidence with a log excerpt. Off unless configured: a
+capability's `max_attempts` defaults to 1 and no shipped capability sets it;
+`run_task(..., attempts=N)` and `nirmaan run --attempts N` override per run.
+
+Key design points worth not re-deriving:
+- **The loop lives in `run_task`** (`runtime/base.py`) and names nothing. Only
+  a constitution refusal at `engine.submit` starts another attempt; `blocked`
+  (the broker refused a tool), `declined`, an escalation, and a P5 raise end it
+  as before. With a limit of 1 no `Attempt` is recorded: state and audit are
+  exactly M23's.
+- **A refused attempt is an `Attempt`** (`models/work.py`, stored in the new
+  `ProjectState.attempts`, ID `<task>#t<n>`), written only by
+  `TaskEngine.record_attempt` and audited as `task.attempt`. Its files are full
+  `Artifact` records held inside it, never in `state.artifacts`, so review,
+  verification, approval, export, and the engineering links cannot see them.
+  M23's per-attempt directories (`<workspace>/<task>/<n>/`) keep the bytes.
+- **The repair prompt** (`prompt._repair`, work mode only): every refused
+  attempt's reason; the latest one's failed runs with run and evidence tokens
+  (already citable, since `run_task` recorded them as evidence), a log excerpt
+  (`files.excerpt`: the run's first reference, notable lines first, at most 20
+  lines of 240 characters), and its files, digest-checked.
+- `evidence-before-review` is unchanged; a test hand-submits a refused
+  attempt's files after an earlier attempt's lint passed and is refused with
+  "no passing run ... covers".
+
+`tests/test_nirmaan_repair.py` (10 tests): lint repaired to review; the repair
+prompt's tokens and excerpt; limit 1 unchanged; exhaustion lists and audits
+every attempt; broker refusal is blocked with one model call; CLI `--attempts`
+with the SDK import poisoned; a firmware seat repaired from the wrong register
+map to the fixture driver; crown jewel `test_a_new_check_gets_repair_with_no_core_changes`
+(a capability with `max_attempts=2` and a `units.check` tool bound in the
+test); the runtime names no seat or tool. Design doc: `docs/REPAIR_LOOP.md`.
+
+Deferred: repair after a reviewer's `request_changes`, a per-stage limit, a
+budget shared across separate runs, and file-level signoff evidence.
+
 ### Milestone 26 (formal gate) - Synthesis and formal before review, formal in CI (after Stage 6)
 
 The `block-design` rtl stage gains two `checked(...)` requirements, as data:
@@ -1696,17 +1736,19 @@ Key design points worth not re-deriving:
   `NIRMAAN_REQUIRE_EDA` gains `sby yices-smt2`, and the test step runs with
   `-rs` so the log lists every skip.
 
-Tests: `tests/test_nirmaan_formal_gate.py` (12): a latch hidden from lint by a
+Tests: `tests/test_nirmaan_formal_gate.py` (13): a latch hidden from lint by a
 waiver pragma, and a Yosys error, both refused with recorded failed runs; an
 AXI4-Lite mutant (`arready` tied high) that passes lint, simulation, and
 synthesis but fails the proof; a `.sby` proving an embedded copy of the module;
 passing synthesis and formal reach review and approval; no `.sby` means no
 formal; no `sby` blocks with nothing recorded; a claimed formal pass is refused
 (P5); a hand-made synthesis without `max_latches` does not count; metric
-limits; crown jewel `test_a_new_before_review_check_needs_no_core_changes`.
-The AXI4-Lite demo's RTL seat now also writes `axi4_lite_regs.sby`. The
+limits; crown jewel `test_a_new_before_review_check_needs_no_core_changes`;
+and, with the repair loop merged alongside, a counterexample refused on attempt
+1 (kept as an `Attempt`) and repaired on attempt 2. The AXI4-Lite demo's RTL seat now also writes `axi4_lite_regs.sby`. The
 engineering-graph fake-EDA fixture gained a fake `synth.run`; the firmware and
-design-agent tests that reach the rtl stage now also need `yosys`.
+design-agent and repair tests that reach the rtl stage now also need
+`yosys`. The standard run is 1078 tests with 2 skipped (OpenSTA, OpenROAD).
 
 Deferred: a separate properties seat and vacuity (cover) checks; formal and
 synthesis on the `new-ip`, `feature-addition`, and `rtl-change` RTL stages;

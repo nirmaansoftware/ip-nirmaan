@@ -89,3 +89,25 @@ def read_verified(location: str | None, expected: str | None) -> tuple[str | Non
     if digest(data) != expected:
         return None, "digest mismatch: the file changed after it was recorded"
     return data.decode("utf-8", errors="replace"), ""
+
+
+#: A log line worth showing a seat that is repairing its work (M26).
+_NOTABLE = re.compile(r"error|warning|fail|fatal|assert|mismatch", re.IGNORECASE)
+
+
+def excerpt(location: str | None, lines: int = 20, width: int = 240) -> tuple[list[str], str]:
+    """A bounded excerpt of a recorded log: its notable lines in order, else its last lines.
+
+    Returns the lines and a note on what they are, or no lines and why not.
+    """
+    if not location:
+        return [], "the run recorded no log"
+    try:
+        text = Path(location).read_text(encoding="utf-8", errors="replace")
+    except OSError as exc:
+        return [], f"its log is unreadable ({type(exc).__name__})"
+    every = [line.rstrip()[:width] for line in text.splitlines() if line.strip()]
+    notable = [line for line in every if _NOTABLE.search(line)]
+    if notable:
+        return notable[:lines], f"first {min(lines, len(notable))} of {len(notable)} notable lines"
+    return every[-lines:], f"last {min(lines, len(every))} of {len(every)} lines"
