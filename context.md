@@ -1866,7 +1866,7 @@ Version bump left to the coordinator.
   families such as `max_<metric>`), `ToolSpec.params` (None: no contract,
   taken as given, which keeps extension tools working), `list_values`, and
   `ToolRun.values(param)`.
-- **Catalog** (`company/tools.py`): all 22 bound tools declare parameters,
+- **Catalog** (`company/tools.py`): all 19 bound tools declare parameters,
   inventoried from what every binding and backend actually reads (both quote
   styles; OpenROAD's settings included though nothing here can run it).
   Shared tuples: `RUNNER` (backend, workdir, timeout, max_), `PDK`,
