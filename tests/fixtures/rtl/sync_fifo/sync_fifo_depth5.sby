@@ -1,0 +1,14 @@
+[options]
+mode prove
+depth 12
+
+[engines]
+smtbmc
+
+[script]
+read -formal sync_fifo.v
+chparam -set DEPTH 5 sync_fifo
+prep -top sync_fifo
+
+[files]
+sync_fifo.v
