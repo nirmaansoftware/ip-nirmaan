@@ -186,7 +186,7 @@ def test_a_pass_needs_a_recorded_run(nirmaan_org, fixed_clock, tmp_path):
 def test_a_gate_before_the_seat_stops_the_run(nirmaan_org, fixed_clock, tmp_path):
     """The harness fixes work stages only; it never passes a gate on anyone's behalf."""
     case = load_case(_spec_case(tmp_path, []))
-    case = case.model_copy(update={"request": demo("1").requirement})
+    case = case.model_copy(update={"request": demo("1").requirement, "seat": "microarchitecture"})
     with pytest.raises(EvalError, match="gate"):
         run_case(nirmaan_org, case, repo=REPO, sandbox=tmp_path / "sandbox", clock=fixed_clock)
 
@@ -238,13 +238,13 @@ def test_a_new_case_or_scorer_needs_zero_core_changes(fixed_clock, tmp_path):
         _spec_case(tmp_path, [{"name": "every artifact reads back", "scorer": "reads-back"}], "tmp/reads-back")
         out = tmp_path / "out"
         listed = CliRunner().invoke(app, ["eval", "list", "--cases", str(tmp_path / "cases")])
-        assert listed.exit_code == 0 and "tmp/reads-back" in listed.output
+        assert listed.exit_code == 0 and "tmp/reads-back  [interface-spec]" in listed.output
         ran = CliRunner().invoke(app, ["eval", "run", "--replay", "--cases", str(tmp_path / "cases"),
                                        "--repo", str(REPO), "--out", str(out)])
     finally:
         unregister_scorer("reads-back")
     assert ran.exit_code == 0, ran.output
-    assert "PASS tmp/reads-back" in ran.output
+    assert "PASS tmp/reads-back [replay]" in ran.output
     [written] = list(out.rglob("*.json"))
     assert json.loads(written.read_text())["scores"][0]["status"] == "passed"
 
