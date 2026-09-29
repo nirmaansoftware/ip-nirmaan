@@ -46,6 +46,16 @@ def test_natural_requests_plan_the_block_workflow(nirmaan_org, fixed_clock, requ
     assert stages == ["requirements", "interface-spec", "microarchitecture", "rtl-implementation"]
 
 
+@pytest.mark.parametrize("request_text", [
+    "Implement an APB4 subordinate with four registers.",
+    "Create an APB3 register block.",
+])
+def test_apb_revisions_are_recognized(nirmaan_org, fixed_clock, request_text):
+    engine = Orchestrator(nirmaan_org, clock=fixed_clock).plan(request_text)
+    assert engine.state.project.analysis.intent == "block_design"
+    assert "apb" in engine.state.project.analysis.features
+
+
 @needs("verilator", "iverilog", "vvp", "yosys", "sby", "yices-smt2")
 @pytest.mark.parametrize("request_text,folder,top", BLOCKS, ids=[b[1] for b in BLOCKS])
 def test_the_block_is_designed_by_agents(nirmaan_org, fixed_clock, tmp_path, request_text, folder, top):

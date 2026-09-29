@@ -1,6 +1,6 @@
 # IP Nirmaan roadmap
 
-The plan for what comes after v1.19.0. Read this together with `context.md`
+The plan for what comes after v1.20.0. Read this together with `context.md`
 (what exists and why) and `CLAUDE.md` (how to work here). Each stage ships the
 way every milestone has:
 - a design doc approved before code,
@@ -8,15 +8,15 @@ way every milestone has:
 - a `context.md` entry,
 - a PR merged into `main`.
 
-## Where we are (v1.19.0, 2026-09-29)
+## Where we are (v1.20.0, 2026-09-29)
 
 | Built | Not yet |
 |---|---|
 | Organization model: 207 units, 685 derived roles, skills, authority, a 12-principle constitution | A first real run of `sta.run` and `pnr.run`: neither OpenSTA nor OpenROAD is installed here or in CI; their parser samples are synthetic |
 | Planner: requirement to owned, reviewed, gated task graph; 9 workflows | CTS, power grid, parasitics, multi-corner timing |
 | Task engine: lifecycle, reviews, approvals, human gates, hash-chained audit | ATPG, multiple scan chains, MBIST; a RISC-V cross-compile and ISS in the firmware loop |
-| VeriTriage as a real, evidence-producing tool (`veritriage.investigate`) | A repair loop feeding tool logs back to design, DFT, and firmware seats |
-| AI workers in three verification seats, off by default, on Opus 5.5 (M20) | FIFO, arbiter, and APB blocks; approved-inputs gating on the `new-ip` RTL stages |
+| VeriTriage as a real, evidence-producing tool (`veritriage.investigate`) | Repair after a reviewer's request for changes; per-stage retry limits |
+| AI workers in three verification seats, off by default, on Opus 5.5 (M20) | Approved-inputs, synthesis, and formal gating on the `new-ip`, `feature-addition`, and `rtl-change` RTL stages; non-vacuity checks for properties |
 | Design agents: spec, microarchitecture, and RTL seats; RTL gated on real lint and simulation; the AXI4-Lite register block end to end (M23) | |
 | `nirmaan export`: the numbered `01_requirement` to `10_signoff` deliverable tree (M23) | Loading requirements and verification items from a file; a verification-plan seat |
 | Engineering graph: artifacts linked to Design Graph nodes from their real bytes; `nirmaan gaps` names every requirement not backed by a passing run (M24) | |
@@ -25,9 +25,11 @@ way every milestone has:
 | Physical design: OpenSTA and OpenROAD bindings and a `physical-implementation` workflow, refused where the tools or PDK are missing (M25) | |
 | Real lint, simulation, synthesis, and formal via open-source EDA (M21) | |
 | Synthesis (no latches) and formal (when the seat writes a `.sby`) before review; formal in CI via the OSS CAD Suite (M26) | |
+| A bounded repair loop: failed before-review checks go back to the seat as evidence, opt-in per capability or `--attempts` (M26) | |
+| A synchronous FIFO, a round-robin arbiter, and an APB register block, each with proofs and designed end to end by agents (M26) | |
 | IP Nirmaan over MCP; organizational events on the M18 bus (M22) | |
 | CI on Python 3.11 and 3.12, plus a dash check (Stage 0) | |
-| 1055 tests; CLI `nirmaan`; HTML dashboard; landing page live at https://ip.nirmaan.online | |
+| 1115 tests; CLI `nirmaan`; HTML dashboard; landing page live at https://ip.nirmaan.online | |
 
 ## Resume checklist (after the folder rename)
 
@@ -43,7 +45,7 @@ PYTHONPYCACHEPREFIX=/tmp/nirmaan-pycache .venv/bin/python -m pytest -q \
   --deselect tests/test_ai_boundary.py::test_missing_sdk_raises_clean_error
 ```
 
-Expect 1055 passing (2 skipped: OpenSTA and OpenROAD are not installed). The folder is still in iCloud, so the eviction hangs
+Expect 1115 passing (2 skipped: OpenSTA and OpenROAD are not installed). The folder is still in iCloud, so the eviction hangs
 described in `context.md` section 4 still apply. If imports stall, pre-read the tree:
 
 ```
