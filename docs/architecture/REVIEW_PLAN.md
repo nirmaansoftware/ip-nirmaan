@@ -33,7 +33,7 @@ retried. Stage commits stage only this review's files (never `git add -A`).
 | 1 | Inventory: read every Nirmaan module and the VeriTriage seams it uses | `docs/architecture/current-state.md` | DONE |
 | 2 | Gap analysis against the brief, concept by concept | `docs/architecture/target-state.md` | DONE |
 | 3 | Milestone roadmap and the first milestone's design | `docs/architecture/proposed-change.md` | DONE |
-| 4 | Implement milestone 1 only, test first | code + tests, full suite green | TODO |
+| 4 | Implement milestone 1 only, test first | code + tests, full suite green | DONE |
 | 5 | Design doc, `context.md` entry, PR | PR link | TODO |
 
 ## Notes carried between stages
@@ -62,3 +62,17 @@ retried. Stage commits stage only this review's files (never `git add -A`).
   `evals/cases.py` + the four case files; (d) `evals/scorers.py`; (e)
   `evals/runner.py`; (f) CLI; (g) full suite. Commit after each of (a), (c),
   (e), (g) so a resume can see progress in `git log`.
+- **During Stage 4.** Failing tests committed (cd379ce), implementation
+  committed (90d235f): `src/nirmaan/models/evaluation.py`,
+  `src/nirmaan/evals/` (cases, scorers, runner), `nirmaan eval list/run`,
+  four cases in `evals/rtl/`. 15 new tests pass. Found and fixed on the way:
+  rich swallowed `[seat]` as markup in CLI output (now escaped, and a test
+  asserts it). The `new-ip` interface-spec stage fans out into variants, so
+  the gate test uses `microarchitecture` as its seat. Remaining for Stage 5:
+  full suite result, `evals/README.md`, `docs/SEAT_EVALUATION.md`,
+  `context.md` entry, ROADMAP bullet, PR.
+- **After Stage 4.** Full suite: 1130 passed, 2 skipped (OpenSTA, OpenROAD).
+  Docs written: `docs/SEAT_EVALUATION.md`, `evals/README.md`, `context.md`
+  M27 entry, ROADMAP row and milestone list. iCloud evicted even freshly
+  written docs mid-run; `brctl download <file>` forces them back when
+  `cat` times out.

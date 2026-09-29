@@ -27,9 +27,10 @@ way every milestone has:
 | Synthesis (no latches) and formal (when the seat writes a `.sby`) before review; formal in CI via the OSS CAD Suite (M26) | |
 | A bounded repair loop: failed before-review checks go back to the seat as evidence, opt-in per capability or `--attempts` (M26) | |
 | A synchronous FIFO, a round-robin arbiter, and an APB register block, each with proofs and designed end to end by agents (M26) | |
+| Seat evaluation: cases as data, judged by real tool runs including held-out reference testbenches; `nirmaan eval` (M27) | A first live-model evaluation run; token and cost accounting |
 | IP Nirmaan over MCP; organizational events on the M18 bus (M22) | |
 | CI on Python 3.11 and 3.12, plus a dash check (Stage 0) | |
-| 1115 tests; CLI `nirmaan`; HTML dashboard; landing page live at https://ip.nirmaan.online | |
+| 1130 tests; CLI `nirmaan`; HTML dashboard; landing page live at https://ip.nirmaan.online | |
 
 ## Resume checklist (after the folder rename)
 
@@ -45,7 +46,7 @@ PYTHONPYCACHEPREFIX=/tmp/nirmaan-pycache .venv/bin/python -m pytest -q \
   --deselect tests/test_ai_boundary.py::test_missing_sdk_raises_clean_error
 ```
 
-Expect 1115 passing (2 skipped: OpenSTA and OpenROAD are not installed). The folder is still in iCloud, so the eviction hangs
+Expect 1130 passing (2 skipped: OpenSTA and OpenROAD are not installed). The folder is still in iCloud, so the eviction hangs
 described in `context.md` section 4 still apply. If imports stall, pre-read the tree:
 
 ```
@@ -199,6 +200,19 @@ extraction. Design doc: `docs/PHYSICAL_DESIGN.md`.
 - **Repair loop (M26):** a seat whose files fail their before-review checks is asked again, bounded by a capability's `max_attempts` (default 1, so off) or `nirmaan run --attempts N`, with the failed runs as citable evidence and log excerpts; refused attempts are recorded as `Attempt`s and never count. See `docs/REPAIR_LOOP.md`.
 - **More blocks (M26):** a synchronous FIFO, a round-robin arbiter, and an APB4 register block (PSLVERR for unmapped addresses, as the AXI4-Lite block's SLVERR), each with real RTL, testbenches, and proofs, and each designed end to end by agents on `block-design` with no core change. See `docs/IP_BLOCKS.md`.
 - **Formal gate (M26, done):** the `block-design` RTL stage goes to review only after real synthesis with no latches and, when the seat writes a `.sby`, a real SymbiYosys proof over the submitted RTL; CI installs `sby` and `yices-smt2` from a pinned OSS CAD Suite and runs formal instead of skipping it. See `docs/FORMAL_GATE.md`.
+
+- **Seat evaluation (M27, done):** `evals/` cases fix a seat's upstream to reference documents and judge its work with held-out checks the seat never sees (the reference testbench on its RTL), each a recorded tool run; `nirmaan eval run (--runtime ID | --replay)`. See `docs/SEAT_EVALUATION.md`.
+
+## Structural review milestones (from 2026-09-29)
+
+The structural review (`docs/architecture/`) found the engine the brief asked
+for already exists and ordered the real gaps. M27 is done; the rest follow in
+this order, each measured against M27's cases: M28 typed tool contracts and
+work packet, M29 engineering records (decision records, artifact supersession,
+failure categories), M30 a register-map IR checked against the RTL, M31
+capability-based model selection with cost accounting, M32 scalable state,
+M33 learning proposals through reviewed tasks. Details and reasons:
+`docs/architecture/target-state.md` section 5.
 
 ## Side work (any time; owner-driven)
 
