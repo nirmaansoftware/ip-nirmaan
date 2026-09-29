@@ -26,7 +26,7 @@ _SLACK_RE = re.compile(r"^(?P<slack>-?\d+(?:\.\d+)?)\s+slack \((?P<state>MET|VIO
 _WORST_RE = re.compile(r"^worst slack\s+(?P<value>\S+)")
 _TNS_RE = re.compile(r"^tns\s+(?P<value>\S+)")
 _WNS_RE = re.compile(r"^wns\s+(?P<value>\S+)")
-_AREA_RE = re.compile(r"^Design area (?P<area>[\d.]+) u\^2 (?P<util>[\d.]+)% utilization")
+_AREA_RE = re.compile(r"^Design area (?P<area>[\d.]+) um?\^2 (?P<util>[\d.]+)% utilization")
 _WIRELENGTH_RE = re.compile(r"Total wire length = (?P<um>[\d.]+) um")
 _DRC_RE = re.compile(r"Number of violations = (?P<n>\d+)")
 _STAGE_RE = re.compile(r"^nirmaan-stage(?P<done>-done)?: (?P<stage>\w+)")

@@ -278,6 +278,17 @@ def test_pnr_stages_follow_stop_after(project, tmp_path, monkeypatch):
     assert not bad.succeeded and "stop_after" in bad.summary
 
 
+def test_sta_falls_back_to_openroads_embedded_opensta(project, tmp_path, monkeypatch):
+    bin_dir = tmp_path / "bin"
+    fake_tool(bin_dir, "openroad", f"cat '{PD / 'opensta_met.log'}'")
+    only_on_path(monkeypatch, bin_dir)  # openroad, and no sta
+    params = {"netlist": str(AXI), "sdc": str(SDC), "top": TOP, "liberty": str(TINY_LIB)}
+    run, outcome = invoke(project, "sta.run", params, tmp_path / "w")
+    assert run.succeeded and run.summary.startswith("openroad-sta: timing met"), run.summary
+    assert outcome.data["commands"] == [["openroad", "-no_init", "-no_splash", "-exit", "sta.tcl"]]
+    assert f"link_design {TOP}" in (tmp_path / "w" / "sta.tcl").read_text()
+
+
 # --- Liberty-mapped synthesis, for real ---------------------------------------------------
 
 
@@ -291,6 +302,19 @@ def test_real_liberty_mapped_synthesis_writes_the_netlist(project, tmp_path):
     assert netlist.is_file() and f"module {TOP}(" in netlist.read_text()
     assert set(metrics["cells_by_type"]) <= {"INV", "BUF", "NAND2", "NOR2", "DFF"}
     assert metrics["flip_flops"] == metrics["cells_by_type"]["DFF"] > 0 and metrics["area"] > 0
+
+
+@needs("yosys")
+def test_real_liberty_mapped_synthesis_ties_constants_to_tie_cells(project, tmp_path):
+    """A router cannot route a constant net, so a PDK's tie cells drive the constants."""
+    params = {"sources": str(AXI), "top": TOP, "liberty": str(TINY_LIB), "backend": "yosys-liberty",
+              "tie_high": "TIEHI/Y", "tie_low": "TIELO/Y"}
+    run, outcome = invoke(project, "synth.run", params, tmp_path)
+    assert run.succeeded, run.summary
+    netlist = Path(outcome.data["result"]["metrics"]["netlist"]).read_text()
+    assert "TIELO" in netlist and "1'b0" not in netlist
+    bad, _ = invoke(project, "synth.run", {**params, "tie_low": "TIELO"}, tmp_path / "bad")
+    assert not bad.succeeded and "tie_low must be CELL/PORT" in bad.summary
 
 
 def test_liberty_mapped_synthesis_without_a_liberty_is_refused(project, tmp_path):
@@ -375,6 +399,7 @@ NANGATE45 = {
     "tech_lef": "nangate45/lef/NangateOpenCellLibrary.tech.lef",
     "lef": "nangate45/lef/NangateOpenCellLibrary.macro.mod.lef",
 }
+NANGATE45_TIES = {"tie_high": "LOGIC1_X1/Z", "tie_low": "LOGIC0_X1/Z"}
 NANGATE45_PNR = {"site": "FreePDK45_38x28_10R_NP_162NW_34O", "hor_layers": "metal3", "ver_layers": "metal2"}
 FAST_SDC = PD / "axi4_lite_regs_fast.sdc"
 
@@ -391,19 +416,22 @@ def nangate45() -> dict[str, str]:
 
 
 def _mapped_netlist(project, tmp_path, pdk) -> str:
-    params = {"sources": str(AXI), "top": TOP, "backend": "yosys-liberty", "liberty": pdk["liberty"]}
+    params = {"sources": str(AXI), "top": TOP, "backend": "yosys-liberty", "liberty": pdk["liberty"],
+              **NANGATE45_TIES}
     run, outcome = invoke(project, "synth.run", params, tmp_path / "synth")
     assert run.succeeded, run.summary
     return outcome.data["result"]["metrics"]["netlist"]
 
 
-@needs("sta", "yosys")
+@needs("openroad", "yosys")
 def test_real_opensta_times_the_axi4_lite_block(project, tmp_path):
+    """OpenSTA through whichever backend is installed: standalone ``sta``, or OpenROAD's embedded one."""
     pdk = nangate45()
     netlist = _mapped_netlist(project, tmp_path, pdk)
     design = {"netlist": netlist, "top": TOP, "liberty": pdk["liberty"]}
     run, outcome = invoke(project, "sta.run", {**design, "sdc": str(SDC)}, tmp_path / "sta")
     metrics = outcome.data["result"]["metrics"]
+    assert outcome.data["backend"] in {"opensta", "openroad-sta"}
     assert run.succeeded, run.summary  # 100 MHz is easy for Nangate45
     assert metrics["worst_slack"] > 0 and metrics["worst_hold_slack"] >= 0 and metrics["tns"] == 0
 

@@ -82,7 +82,7 @@ jobs:
         run: uv pip install -e ".[dev]"
       - name: Test
         env:
-          NIRMAAN_REQUIRE_EDA: yosys sta openroad
+          NIRMAAN_REQUIRE_EDA: yosys openroad
         run: python -m pytest -q -rs tests/test_nirmaan_physical.py --basetemp="$RUNNER_TEMP/pd"
       - name: Keep the tool logs
         if: always()
