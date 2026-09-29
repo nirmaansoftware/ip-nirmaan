@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from nirmaan_helpers import agent, approve_gate, drive, human, tid, work
+from nirmaan_helpers import GATE_TOOLS, agent, approve_gate, drive, human, needs, tid, work
 
 from nirmaan.models import (
     Assurance,
@@ -203,6 +203,7 @@ def test_gate_approvers_need_the_signoff_capability(bridge):
 # --- Evidence -----------------------------------------------------------------------
 
 
+@needs(*GATE_TOOLS)  # M27: drive takes the gated RTL stage through real checks on the way
 def test_signoff_needs_evidence_and_claims_never_count(nirmaan_org, fixed_clock):
     engine = Orchestrator(nirmaan_org, clock=fixed_clock).plan(BRIDGE)
     lint = tid(engine, "rtl-lint")
@@ -415,6 +416,7 @@ def test_status_report_shows_what_managers_need(bridge):
     assert any("assumption" in r["risk"] for r in report.risks)
 
 
+@needs(*GATE_TOOLS)  # M27: every RTL task in the project passes real checks before review
 def test_a_whole_project_completes_only_under_the_rules(nirmaan_org, fixed_clock, tmp_path):
     engine = Orchestrator(nirmaan_org, clock=fixed_clock).plan(BRIDGE)
     drive(engine, workspace=tmp_path)

@@ -21,7 +21,7 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from nirmaan_helpers import agent, drive, tid
+from nirmaan_helpers import GATE_TOOLS, agent, drive, tid
 
 from nirmaan.company.deliverables import DELIVERABLE_FOLDERS
 from nirmaan.export import (
@@ -304,7 +304,7 @@ def test_the_cli_exports_a_broken_chain_and_says_so(midway, tmp_path):
 # --- Real tool runs --------------------------------------------------------------------------
 
 
-@_needs("verilator")
+@_needs("verilator", *GATE_TOOLS)  # M27: the RTL stage before it is gated
 def test_a_real_lint_runs_log_and_result_are_copied(bridge, tmp_path):
     lint = tid(bridge, "rtl-lint")
     drive(bridge, until=lint)

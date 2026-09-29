@@ -1,0 +1,35 @@
+$ sby -f -d w_cond/sby_cover w_cond/cond_cover.sby
+SBY 22:17:05 [w_cond/sby_cover] Removing directory 'w_cond/sby_cover'.
+SBY 22:17:05 [w_cond/sby_cover] Copy 'cond.v' to 'w_cond/sby_cover/src/cond.v'.
+SBY 22:17:05 [w_cond/sby_cover] engine_0: smtbmc
+SBY 22:17:05 [w_cond/sby_cover] base: starting process "cd w_cond/sby_cover/src; yosys -ql ../model/design.log ../model/design.ys"
+SBY 22:17:05 [w_cond/sby_cover] base: finished (returncode=0)
+SBY 22:17:05 [w_cond/sby_cover] prep: starting process "cd w_cond/sby_cover/model; yosys -ql design_prep.log design_prep.ys"
+SBY 22:17:05 [w_cond/sby_cover] prep: finished (returncode=0)
+SBY 22:17:05 [w_cond/sby_cover] smt2: starting process "cd w_cond/sby_cover/model; yosys -ql design_smt2.log design_smt2.ys"
+SBY 22:17:05 [w_cond/sby_cover] smt2: finished (returncode=0)
+SBY 22:17:05 [w_cond/sby_cover] engine_0: starting process "cd w_cond/sby_cover; yosys-smtbmc --presat --unroll -c --noprogress -t 12  --append 0 --dump-vcd engine_0/trace%.vcd --dump-yw engine_0/trace%.yw --dump-vlogtb engine_0/trace%_tb.v --dump-smtc engine_0/trace%.smtc model/design_smt2.smt2"
+SBY 22:17:05 [w_cond/sby_cover] engine_0: ##   0:00:00  Solver: yices
+SBY 22:17:05 [w_cond/sby_cover] engine_0: ##   0:00:00  Checking cover reachability in step 0..
+SBY 22:17:05 [w_cond/sby_cover] engine_0: ##   0:00:00  Checking cover reachability in step 1..
+SBY 22:17:05 [w_cond/sby_cover] engine_0: ##   0:00:00  Checking cover reachability in step 2..
+SBY 22:17:05 [w_cond/sby_cover] engine_0: ##   0:00:00  Checking cover reachability in step 3..
+SBY 22:17:05 [w_cond/sby_cover] engine_0: ##   0:00:00  Checking cover reachability in step 4..
+SBY 22:17:05 [w_cond/sby_cover] engine_0: ##   0:00:00  Checking cover reachability in step 5..
+SBY 22:17:05 [w_cond/sby_cover] engine_0: ##   0:00:00  Checking cover reachability in step 6..
+SBY 22:17:05 [w_cond/sby_cover] engine_0: ##   0:00:00  Checking cover reachability in step 7..
+SBY 22:17:05 [w_cond/sby_cover] engine_0: ##   0:00:00  Checking cover reachability in step 8..
+SBY 22:17:05 [w_cond/sby_cover] engine_0: ##   0:00:00  Checking cover reachability in step 9..
+SBY 22:17:05 [w_cond/sby_cover] engine_0: ##   0:00:00  Checking cover reachability in step 10..
+SBY 22:17:05 [w_cond/sby_cover] engine_0: ##   0:00:00  Checking cover reachability in step 11..
+SBY 22:17:05 [w_cond/sby_cover] engine_0: ##   0:00:00  Unreached cover statement at counter: cond.v:37.13-37.25 (_witness_.check_cover_cond_v_37_11)
+SBY 22:17:05 [w_cond/sby_cover] engine_0: ##   0:00:00  Status: failed
+SBY 22:17:05 [w_cond/sby_cover] engine_0: finished (returncode=1)
+SBY 22:17:05 [w_cond/sby_cover] engine_0: Status returned by engine: FAIL
+SBY 22:17:05 [w_cond/sby_cover] summary: Elapsed clock time [H:MM:SS (secs)]: 0:00:00 (0)
+SBY 22:17:05 [w_cond/sby_cover] summary: Elapsed process time [H:MM:SS (secs)]: 0:00:00 (0)
+SBY 22:17:05 [w_cond/sby_cover] summary: engine_0 (smtbmc) returned FAIL
+SBY 22:17:05 [w_cond/sby_cover] summary: engine_0 did not produce any traces
+SBY 22:17:05 [w_cond/sby_cover] summary: unreached cover statements:
+SBY 22:17:05 [w_cond/sby_cover] summary:   counter._witness_.check_cover_cond_v_37_11 at cond.v:37.13-37.25
+SBY 22:17:05 [w_cond/sby_cover] DONE (FAIL, rc=2)
