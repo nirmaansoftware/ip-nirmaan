@@ -183,6 +183,10 @@ class Capability(BaseModel):
         default=False,
         description="Work of this kind builds only on approved upstream artifacts.",
     )
+    max_attempts: int = Field(
+        default=1, ge=1,
+        description="Attempts one run may make when the engine refuses a submission (M26); 1 means no repair.",
+    )
 
 
 class Skill(BaseModel):

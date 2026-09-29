@@ -220,6 +220,26 @@ class Artifact(BaseModel):
     derived_from: tuple[str, ...] = Field(default=(), description="Upstream artifact IDs.")
 
 
+class Attempt(BaseModel):
+    """A submission the engine refused, kept on the record (M26). Nothing in it ever counts.
+
+    Its files are full :class:`Artifact` records (location, digest, provenance)
+    held here rather than in ``ProjectState.artifacts``, so nothing that
+    reviews, verifies, approves, exports, or links artifacts can see them.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    id: str
+    task: str
+    number: int = Field(ge=1, description="Counts every refused attempt recorded on the task.")
+    actor: str
+    refusal: str = Field(description="The engine's reason for refusing the submission.")
+    tool_runs: tuple[str, ...] = ()
+    evidence: tuple[str, ...] = ()
+    artifacts: tuple[Artifact, ...] = ()
+
+
 class ToolRun(BaseModel):
     """A brokered tool invocation. The only thing a TOOL_RUN evidence may cite."""
 
@@ -400,4 +420,5 @@ class ProjectState(BaseModel):
     audit: list[AuditEntry] = Field(default_factory=list)
     spec_requirements: dict[str, SpecRequirement] = Field(default_factory=dict)
     verification_items: dict[str, VerificationItem] = Field(default_factory=dict)
+    attempts: dict[str, Attempt] = Field(default_factory=dict)
     schema_version: str = "1"

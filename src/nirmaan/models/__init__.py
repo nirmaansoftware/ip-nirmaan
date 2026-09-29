@@ -44,6 +44,7 @@ from nirmaan.models.work import (
     Artifact,
     Assumption,
     Assurance,
+    Attempt,
     AuditEntry,
     Decision,
     Escalation,

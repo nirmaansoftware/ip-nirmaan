@@ -578,6 +578,8 @@ def run_cmd(
     review: bool = typer.Option(False, "--review", help="Seat the runtime as the task's reviewer instead."),
     dry_run: bool = typer.Option(False, "--dry-run", help="Print the exact prompt; run nothing, change nothing."),
     inputs: List[str] = typer.Option([], "--input", help="key=value for the task's tools, e.g. paths=fail.log"),
+    attempts: Optional[int] = typer.Option(None, "--attempts", min=1,
+                                           help="Attempts when a submission is refused (default: the capability's)."),
     root: Path = ROOT_OPTION,
 ) -> None:
     """Hand one task to an agent runtime. The default runtime (unbound) declines."""
@@ -605,7 +607,7 @@ def run_cmd(
             if not sep:
                 _fail(f"--input must be key=value, got {spec!r}")
             engine.remember(MemoryScope.TASK, tid, f"input.{key}", value, _actor(target.owner, False))
-        report = review_task(engine, tid, agent) if review else run_task(engine, tid, agent)
+        report = review_task(engine, tid, agent) if review else run_task(engine, tid, agent, attempts=attempts)
     except (WorkError, PolicyViolationError, PermissionError) as exc:
         _fail(str(exc))
     ProjectStore(root).save(engine.state)
@@ -615,6 +617,10 @@ def run_cmd(
     for label, ids in (("tool runs", report.tool_runs), ("evidence", report.evidence)):
         if ids:
             console.print(f"{label}: {', '.join(ids)}", highlight=False)
+    if len(report.attempts) > 1:
+        for step in report.attempts:
+            recorded = f" ({step['attempt']})" if step["attempt"] else ""
+            console.print(f"attempt {step['number']}: {step['status']}{recorded}", highlight=False)
     for label, ref in (("escalation", report.escalation), ("review", report.review)):
         if ref:
             console.print(f"{label}: {ref}", highlight=False)
