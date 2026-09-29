@@ -367,28 +367,31 @@ def test_the_physical_modules_keep_the_import_laws():
     assert imports["pd_parsers.py"] <= {"nirmaan.integrations.eda_parsers"}  # the parsers stay pure
 
 
-# --- Real tools (skipped without OpenSTA or OpenROAD and sky130) --------------------------
+# --- Real tools (skipped without OpenSTA or OpenROAD and Nangate45) -------------------------
 
-SKY130 = {
-    "liberty": "libs.ref/sky130_fd_sc_hd/lib/sky130_fd_sc_hd__tt_025C_1v80.lib",
-    "tech_lef": "libs.ref/sky130_fd_sc_hd/techlef/sky130_fd_sc_hd__nom.tlef",
-    "lef": "libs.ref/sky130_fd_sc_hd/lef/sky130_fd_sc_hd.lef",
+#: Nangate45 as OpenROAD-flow-scripts lays it out under ``flow/platforms`` (NIRMAAN_PDK_ROOT).
+NANGATE45 = {
+    "liberty": "nangate45/lib/NangateOpenCellLibrary_typical.lib",
+    "tech_lef": "nangate45/lef/NangateOpenCellLibrary.tech.lef",
+    "lef": "nangate45/lef/NangateOpenCellLibrary.macro.mod.lef",
 }
+NANGATE45_PNR = {"site": "FreePDK45_38x28_10R_NP_162NW_34O", "hor_layers": "metal3", "ver_layers": "metal2"}
+FAST_SDC = PD / "axi4_lite_regs_fast.sdc"
 
 
-def sky130() -> dict[str, str]:
-    """sky130 HD under NIRMAAN_PDK_ROOT; skip without it (fail when CI requires STA or OpenROAD)."""
+def nangate45() -> dict[str, str]:
+    """Nangate45 under NIRMAAN_PDK_ROOT; skip without it (fail when CI requires STA or OpenROAD)."""
     root = os.environ.get(PDK_ROOT_ENV, "")
-    if root and all((Path(root) / p).is_file() for p in SKY130.values()):
-        return dict(SKY130)
-    required = set(os.environ.get("NIRMAAN_REQUIRE_EDA", "").replace(",", " ").split())
-    if required & {"sta", "openroad"}:
-        pytest.fail(f"{PDK_ROOT_ENV} does not point at sky130A with the HD library")
-    pytest.skip(f"{PDK_ROOT_ENV} does not point at sky130A with the HD library")
+    if root and all((Path(root) / p).is_file() for p in NANGATE45.values()):
+        return dict(NANGATE45)
+    reason = f"{PDK_ROOT_ENV} does not point at OpenROAD-flow-scripts platforms with nangate45"
+    if set(os.environ.get("NIRMAAN_REQUIRE_EDA", "").replace(",", " ").split()) & {"sta", "openroad"}:
+        pytest.fail(reason)
+    pytest.skip(reason)
 
 
 def _mapped_netlist(project, tmp_path, pdk) -> str:
-    params = {"sources": str(AXI), "top": TOP, "backend": "yosys-liberty", **pdk}
+    params = {"sources": str(AXI), "top": TOP, "backend": "yosys-liberty", "liberty": pdk["liberty"]}
     run, outcome = invoke(project, "synth.run", params, tmp_path / "synth")
     assert run.succeeded, run.summary
     return outcome.data["result"]["metrics"]["netlist"]
@@ -396,21 +399,41 @@ def _mapped_netlist(project, tmp_path, pdk) -> str:
 
 @needs("sta", "yosys")
 def test_real_opensta_times_the_axi4_lite_block(project, tmp_path):
-    pdk = sky130()
+    pdk = nangate45()
     netlist = _mapped_netlist(project, tmp_path, pdk)
-    run, outcome = invoke(project, "sta.run", {"netlist": netlist, "sdc": str(SDC), "top": TOP,
-                                              "liberty": pdk["liberty"]}, tmp_path / "sta")
+    design = {"netlist": netlist, "top": TOP, "liberty": pdk["liberty"]}
+    run, outcome = invoke(project, "sta.run", {**design, "sdc": str(SDC)}, tmp_path / "sta")
     metrics = outcome.data["result"]["metrics"]
-    assert metrics["worst_slack"] is not None, run.summary
-    assert run.succeeded, run.summary
+    assert run.succeeded, run.summary  # 100 MHz is easy for Nangate45
+    assert metrics["worst_slack"] > 0 and metrics["worst_hold_slack"] >= 0 and metrics["tns"] == 0
+
+    fast, outcome = invoke(project, "sta.run", {**design, "sdc": str(FAST_SDC)}, tmp_path / "sta_fast")
+    metrics = outcome.data["result"]["metrics"]
+    assert not fast.succeeded and fast.id in project.state.tool_runs  # a violation is a recorded failed run
+    assert metrics["worst_slack"] < 0 and metrics["tns"] < 0 and metrics["violating_endpoints"], fast.summary
+    assert fast.summary.startswith("opensta: timing violated:"), fast.summary
 
 
 @needs("openroad", "yosys")
 def test_real_openroad_places_and_routes_the_axi4_lite_block(project, tmp_path):
-    pdk = sky130()
+    pdk = nangate45()
     netlist = _mapped_netlist(project, tmp_path, pdk)
-    run, outcome = invoke(project, "pnr.run", {"netlist": netlist, "sdc": str(SDC), "top": TOP, **pdk, **PNR_PDK},
-                          tmp_path / "pnr")
+    run, outcome = invoke(project, "pnr.run", {"netlist": netlist, "sdc": str(SDC), "top": TOP, **pdk,
+                                               **NANGATE45_PNR}, tmp_path / "pnr")
     metrics = outcome.data["result"]["metrics"]
-    assert metrics["stages_completed"][:3] == ["floorplan", "place", "route"], run.summary
-    assert metrics["wirelength_um"] and metrics["utilization_pct"], run.summary
+    assert metrics["stages_completed"] == ["floorplan", "place", "route", "timing"], run.summary
+    assert metrics["drc_violations"] == 0 and metrics["wirelength_um"] > 0, run.summary
+    assert metrics["utilization_pct"] > 0 and metrics["worst_slack"] > 0, run.summary
+    assert run.succeeded, run.summary
+    assert set(metrics["outputs"]) == {"def", "netlist"}
+
+
+@needs("openroad", "yosys")
+def test_real_openroad_failure_is_a_recorded_failed_run(project, tmp_path):
+    pdk = nangate45()
+    netlist = _mapped_netlist(project, tmp_path, pdk)
+    run, outcome = invoke(project, "pnr.run", {"netlist": netlist, "sdc": str(SDC), "top": TOP, **pdk,
+                                               **NANGATE45_PNR, "utilization": "300"}, tmp_path / "pnr_over")
+    assert not run.succeeded and run.id in project.state.tool_runs
+    assert outcome.data["result"]["diagnostics"], run.summary
+    assert "place and route failed" in run.summary, run.summary
