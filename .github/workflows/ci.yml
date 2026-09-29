@@ -37,6 +37,14 @@ jobs:
             chmod +x "$RUNNER_TEMP/formal-bin/$tool"
           done
           echo "$RUNNER_TEMP/formal-bin" >> "$GITHUB_PATH"
+      # M27: the driver cross-compiled for RV32I and run on PicoRV32 against the
+      # RTL. Ubuntu's multilib GCC includes rv32i/ilp32; the SoC runtime carries
+      # its own small libc, so no picolibc. See docs/RISCV_FIRMWARE.md.
+      - name: Install the RISC-V cross compiler
+        run: |
+          sudo apt-get install -y gcc-riscv64-unknown-elf
+          riscv64-unknown-elf-gcc --version | head -1
+          riscv64-unknown-elf-gcc -print-multi-lib | grep rv32i/ilp32
       - name: Tool versions
         run: |
           which verilator iverilog yosys sby yices-smt2
@@ -46,9 +54,10 @@ jobs:
       - name: Test
         # A real-tool test whose executable is named here fails instead of
         # skipping. `cc` and `make` build the firmware and its co-simulation
-        # (M25); `sby` and `yices-smt2` run formal (M26).
+        # (M25); `sby` and `yices-smt2` run formal (M26); the RISC-V GCC builds
+        # the image PicoRV32 runs against the RTL (M27).
         env:
-          NIRMAAN_REQUIRE_EDA: verilator iverilog vvp yosys cc make sby yices-smt2
+          NIRMAAN_REQUIRE_EDA: verilator iverilog vvp yosys cc make sby yices-smt2 riscv64-unknown-elf-gcc
         run: python -m pytest -q -rs
 
   dashes:

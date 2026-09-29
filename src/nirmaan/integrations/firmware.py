@@ -124,10 +124,11 @@ _CHECK_RE = re.compile(r"^FWTEST (?P<verdict>PASS|FAIL) (?P<name>\S+?)(?::\s*(?P
 _SUMMARY_RE = re.compile(r"^FWTEST SUMMARY (?P<passed>\d+) passed, (?P<failed>\d+) failed, (?P<cycles>\d+) cycles$")
 
 
-def parse_fw_test(log: str, returncodes: tuple[int, ...]) -> EdaResult:
+def parse_fw_test(log: str, returncodes: tuple[int, ...], what: str = "co-simulation") -> EdaResult:
     """Pass means the build and the run exited 0, the harness finished, and every check passed.
 
     At least one check must have passed: tests that report nothing prove nothing.
+    ``what`` names the run in the summary (M27's SoC run shares this parser).
     """
     checks: list[dict[str, object]] = []
     harness: list[Diagnostic] = []
@@ -157,6 +158,8 @@ def parse_fw_test(log: str, returncodes: tuple[int, ...]) -> EdaResult:
         elif (m := _C_DIAG_RE.match(line)) and m["sev"] in ("error", "fatal error"):
             build.append(Diagnostic("error", m["msg"].strip(), _code(m["flag"]), m["file"], int(m["line"]),
                                     int(m["col"]) if m["col"] else None))
+        elif _LINK_RE.search(line):
+            build.append(Diagnostic("error", line, "link"))
     passed_checks = sum(1 for c in checks if c["passed"])
     failed_checks = len(checks) - passed_checks
     ran = bool(checks or harness or finished)
@@ -164,22 +167,22 @@ def parse_fw_test(log: str, returncodes: tuple[int, ...]) -> EdaResult:
     exited_clean = bool(returncodes) and all(c == 0 for c in returncodes)
     passed = exited_clean and finished and passed_checks > 0 and not failed_checks and not harness and not build
     if passed:
-        summary = (f"co-simulation passed: {_plural(passed_checks, 'check')}, 0 failed "
+        summary = (f"{what} passed: {_plural(passed_checks, 'check')}, 0 failed "
                    f"({cycles} cycles, {_plural(transfers, 'bus transfer')})")
     elif not ran:
-        summary = f"build failed before co-simulation: {_plural(len(build), 'error')}{_first(build)}"
+        summary = f"build failed before {what}: {_plural(len(build), 'error')}{_first(build)}"
         if not build:
             summary += f" (exit status {status})"
     elif failed_checks:
         first = next(c for c in checks if not c["passed"])
-        summary = (f"co-simulation failed: {failed_checks} of {_plural(len(checks), 'check')} failed; "
+        summary = (f"{what} failed: {failed_checks} of {_plural(len(checks), 'check')} failed; "
                    f"first: {first['name']}: {first['detail'] or 'check failed'}")
     elif harness:
-        summary = f"co-simulation failed: {harness[0].message}"
+        summary = f"{what} failed: {harness[0].message}"
     elif not finished:
-        summary = "co-simulation did not finish: the harness printed no summary"
+        summary = f"{what} did not finish: the harness printed no summary"
     else:
-        summary = f"co-simulation failed (exit status {status})"
+        summary = f"{what} failed (exit status {status})"
     return EdaResult(passed, summary, tuple(build + harness),
                      {"checks": checks, "passed": passed_checks, "failed": failed_checks, "cycles": cycles,
                       "bus_transfers": transfers, "exit_statuses": list(returncodes)})
@@ -228,15 +231,8 @@ def _parse_build(run: RunRecord) -> EdaResult:
     return parse_c_build(run.log, run.returncodes)
 
 
-def _cosim_steps(job: Job) -> list[list[str]]:
-    """Compile the driver and its tests, build the model with the harness, and run it.
-
-    Verilator's ``--build`` drives make, which cannot handle a space in a path,
-    so the harness and the RTL are copied, byte for byte, into the working
-    directory first. The run records the paths it was given.
-    """
-    harness = job.workdir / "harness"
-    shutil.copytree(HARNESS, harness, dirs_exist_ok=True)
+def copy_rtl(job: Job) -> list[str]:
+    """The ``rtl`` files, copied byte for byte into the working directory (make cannot take a space)."""
     rtl = []
     for i, given in enumerate(s.strip() for s in job.params["rtl"].split(",") if s.strip()):
         source = Path(given).resolve()
@@ -247,6 +243,19 @@ def _cosim_steps(job: Job) -> list[list[str]]:
         copy.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source, copy)
         rtl.append(str(copy))
+    return rtl
+
+
+def _cosim_steps(job: Job) -> list[list[str]]:
+    """Compile the driver and its tests, build the model with the harness, and run it.
+
+    Verilator's ``--build`` drives make, which cannot handle a space in a path,
+    so the harness and the RTL are copied, byte for byte, into the working
+    directory first. The run records the paths it was given.
+    """
+    harness = job.workdir / "harness"
+    shutil.copytree(HARNESS, harness, dirs_exist_ok=True)
+    rtl = copy_rtl(job)
     steps, objects = _compile("cc", (), job.sources, harness, job.workdir / "cobj", headers=False)
     model = job.workdir / "cosim"
     steps.append(["verilator", "--cc", "--exe", "--build", "-j", "0", "-Wno-fatal", "--prefix", MODEL,

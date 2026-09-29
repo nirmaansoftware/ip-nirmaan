@@ -11,7 +11,8 @@ place and route through OpenSTA and OpenROAD (``integrations/physical.py``,
 M25). Their bindings still refuse, with a reason, on a machine whose PATH
 lacks the executable or that has no PDK input for the run. Firmware build and
 co-simulation are AVAILABLE the same way (``nirmaan/integrations/firmware.py``,
-M25).
+M25), and so are the RV32I cross build and the run on a RISC-V core
+(``nirmaan/integrations/firmware_riscv.py``, M27).
 
 Scan insertion, DFT rule checks, and scan chain simulation are AVAILABLE through
 Yosys and Icarus (``nirmaan/integrations/dft.py``, M25).
@@ -80,6 +81,10 @@ TOOLS: list[ToolSpec] = [
     _tool("fw.build", "Firmware build", "software", EXE, AV, "Compile C firmware under strict warning flags."),
     _tool("fw.test", "Firmware co-simulation", "software", EXE, AV,
           "Run a driver's tests against a Verilator model of the RTL, over real bus transactions."),
+    _tool("fw.cross_build", "Firmware cross build", "software", EXE, AV,
+          "Cross-compile a driver and its tests for bare-metal RV32I into a linked ELF, with its code size."),
+    _tool("fw.soc_test", "Firmware on a RISC-V core", "software", EXE, AV,
+          "Run a driver's tests on a RISC-V core (PicoRV32) whose loads and stores reach the RTL over its bus."),
     _tool("debugger.attach", "Debugger", "software", EXE, CO, "Attach to targets and models."),
     _tool("ci.configure", "CI configuration", "infrastructure", WR, CO, "Change CI pipelines."),
     _tool("farm.submit", "Compute farm", "infrastructure", EXE, CO, "Submit jobs to the compute farm."),

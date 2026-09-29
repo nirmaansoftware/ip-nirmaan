@@ -186,7 +186,7 @@ def test_the_driver_and_its_tests_cross_build_for_rv32i(block, tmp_path):
     assert elf.read_bytes()[18] == 243  # e_machine EM_RISCV
     metrics = outcome.data["result"]["metrics"]
     assert metrics["text"] > 0 and metrics["image_bytes"] == metrics["text"] + metrics["data"]
-    assert metrics["compiled"] == 4  # the driver, its tests, the SoC runtime, the libc
+    assert metrics["compiled"] == 5  # the driver, its tests, the SoC runtime, the libc, and crt0
 
 
 @needs(riscv=True)
@@ -265,7 +265,7 @@ def test_a_new_soc_backend_needs_no_core_changes(block, tmp_path, monkeypatch):
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     sim = bin_dir / "other-rv-sim"
-    sim.write_text('#!/bin/sh\necho "FWTEST BUS read 0x0 -> 0x00000000 OKAY"\necho "FWTEST PASS ran_on $1"\n'
+    sim.write_text('#!/bin/sh\necho "FWTEST BUS read 0x0 -> 0x00000000 OKAY"\necho "FWTEST PASS ran_with_$1"\n'
                    'echo "FWTEST SUMMARY 1 passed, 0 failed, 10 cycles"\n')
     sim.chmod(0o755)
 
@@ -281,7 +281,7 @@ def test_a_new_soc_backend_needs_no_core_changes(block, tmp_path, monkeypatch):
         monkeypatch.setenv("PATH", f"{bin_dir}:{Path(shutil.which('sh')).parent}")
         run, _ = invoke(block, "fw.soc_test", params, tmp_path / "w2", tid(block, "firmware"))
         assert run.succeeded and run.summary.startswith("other-core: SoC run passed: 1 check")
-        assert "FWTEST PASS ran_on axi4_lite_regs_map.h" in Path(run.references[0]).read_text()  # it really ran
+        assert "FWTEST PASS ran_with_axi4_lite_regs_map.h" in Path(run.references[0]).read_text()  # it really ran
     finally:
         unregister_backend("fw.soc_test", "other-core")
 

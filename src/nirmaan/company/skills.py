@@ -502,7 +502,7 @@ SKILLS: list[Skill] = [
        includes=("c_programming",), procedures=("Write boot, HAL, and BSP code.",),
        fails=("Hardware assumptions not in the spec.",), valid=("Firmware runs on the reference model.",)),
     sk("device_drivers", "Device drivers", "software", "drivers", provides=("sw.driver", "fw.driver"),
-       includes=("c_programming",), tools=("fw.build", "fw.test"),
+       includes=("c_programming",), tools=("fw.build", "fw.test", "fw.cross_build", "fw.soc_test"),
        procedures=("Implement drivers from the programming model.",
                    "Write the register map header from the approved interface specification, never from the RTL.",
                    "Reach the hardware only through nirmaan_hal.h: hal->read32(ctx, offset, &value) and "

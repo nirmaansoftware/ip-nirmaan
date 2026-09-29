@@ -517,7 +517,14 @@ BLOCK_DESIGN = WorkflowTemplate(
                              FileInput(param="sources", kinds=("driver",))),
                      checked("Driver tests pass against the approved RTL", "fw.test",
                              FileInput(param="sources", kinds=("driver", "driver_test")),
-                             FileInput(param="rtl", kinds=("rtl_source",), upstream=True)))),
+                             FileInput(param="rtl", kinds=("rtl_source",), upstream=True)),
+                     # M27: when the request names RISC-V, the same tests also run as a bare-metal
+                     # RV32I image on a RISC-V core whose loads and stores reach the approved RTL.
+                     checked("Driver and tests cross-build for bare-metal RV32I", "fw.cross_build",
+                             FileInput(param="sources", kinds=("driver", "driver_test")), when=when("riscv")),
+                     checked("Driver tests pass on a RISC-V core against the approved RTL", "fw.soc_test",
+                             FileInput(param="sources", kinds=("driver", "driver_test")),
+                             FileInput(param="rtl", kinds=("rtl_source",), upstream=True), when=when("riscv")))),
     ),
 )
 
