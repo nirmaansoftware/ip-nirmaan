@@ -282,11 +282,14 @@ def test_sta_falls_back_to_openroads_embedded_opensta(project, tmp_path, monkeyp
     bin_dir = tmp_path / "bin"
     fake_tool(bin_dir, "openroad", f"cat '{PD / 'opensta_met.log'}'")
     only_on_path(monkeypatch, bin_dir)  # openroad, and no sta
-    params = {"netlist": str(AXI), "sdc": str(SDC), "top": TOP, "liberty": str(TINY_LIB)}
+    params = {"netlist": str(AXI), "sdc": str(SDC), "top": TOP, **fake_pdk(tmp_path / "pdk")}
+    with pytest.raises(ToolAccessDenied, match="openroad-sta: needs a technology LEF"):
+        invoke(project, "sta.run", {**params, "tech_lef": ""}, tmp_path / "refused")
     run, outcome = invoke(project, "sta.run", params, tmp_path / "w")
     assert run.succeeded and run.summary.startswith("openroad-sta: timing met"), run.summary
     assert outcome.data["commands"] == [["openroad", "-no_init", "-no_splash", "-exit", "sta.tcl"]]
-    assert f"link_design {TOP}" in (tmp_path / "w" / "sta.tcl").read_text()
+    script = (tmp_path / "w" / "sta.tcl").read_text()
+    assert script.index("read_lef") < script.index("read_liberty") < script.index(f"link_design {TOP}")
 
 
 # --- Liberty-mapped synthesis, for real ---------------------------------------------------
@@ -428,7 +431,7 @@ def test_real_opensta_times_the_axi4_lite_block(project, tmp_path):
     """OpenSTA through whichever backend is installed: standalone ``sta``, or OpenROAD's embedded one."""
     pdk = nangate45()
     netlist = _mapped_netlist(project, tmp_path, pdk)
-    design = {"netlist": netlist, "top": TOP, "liberty": pdk["liberty"]}
+    design = {"netlist": netlist, "top": TOP, **pdk}  # OpenROAD's OpenSTA reads the LEFs too
     run, outcome = invoke(project, "sta.run", {**design, "sdc": str(SDC)}, tmp_path / "sta")
     metrics = outcome.data["result"]["metrics"]
     assert outcome.data["backend"] in {"opensta", "openroad-sta"}
