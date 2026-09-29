@@ -22,7 +22,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Protocol
+from typing import Any, Callable, Protocol, Sequence
 
 from nirmaan.models import Actor, ActorKind, EscalationKind, EvidenceKind, TaskStatus, Verdict
 from nirmaan.runtime.context import WorkPacket, assemble
@@ -78,9 +78,13 @@ class ToolHandle:
     def __init__(self, broker: ToolBroker, actor: Actor, task_id: str) -> None:
         self._broker, self._actor, self._task = broker, actor, task_id
 
-    def invoke(self, tool_id: str, **params: str) -> tuple[str, ToolOutcome]:
+    def invoke(self, tool_id: str, **params: str | Sequence[str]) -> tuple[str, ToolOutcome]:
         run, outcome = self._broker.invoke(self._actor, tool_id, params, self._task)
         return run.id, outcome
+
+    def declared(self, tool_id: str, inputs: dict[str, str]) -> dict[str, str]:
+        """The task inputs the tool's contract declares (M28): a tool is handed only what it takes."""
+        return self._broker.declared_inputs(tool_id, inputs)
 
 
 class AgentRuntime(Protocol):

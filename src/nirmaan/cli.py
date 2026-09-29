@@ -184,6 +184,31 @@ def org_tools() -> None:
     console.print(table)
 
 
+@org_app.command("tool")
+def org_tool(tool_id: str) -> None:
+    """One tool's contract: what it takes, and whether this machine can run it."""
+    from nirmaan.runtime import available_bindings, unavailable_reason
+
+    tool = _org().tools.get(tool_id)
+    if tool is None:
+        _fail(f"Unknown tool {tool_id!r}")
+    bound = tool_id in available_bindings()
+    why = unavailable_reason(tool_id) if bound else None
+    here = "no binding" if not bound else f"no: {why}" if why else "yes"
+    _print_lines([f"{tool.id}: {tool.name} ({tool.category}, {tool.risk.value}, {tool.status.value})",
+                  tool.description, f"Runs here: {here}"])
+    if tool.params is None:
+        console.print("Parameters: no contract declared; parameters are taken as given.")
+        return
+    table = Table(title="Parameters")
+    for col in ("Name", "Kind", "Required", "Description"):
+        table.add_column(col)
+    for param in tool.params:
+        table.add_row(escape(param.label), param.kind.value, "required" if param.required else "",
+                      escape(param.description))
+    console.print(table)
+
+
 @org_app.command("validate")
 def org_validate() -> None:
     """Validate the organization (every reference, chain, and workflow)."""

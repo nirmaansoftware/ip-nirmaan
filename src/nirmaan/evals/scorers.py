@@ -82,8 +82,7 @@ def held_out_run(ctx: ScoreContext) -> Score:
         values.setdefault(param, []).extend(str(a.location) for a in files)
     for param, paths in check.case_files.items():
         values.setdefault(param, []).extend(str(resolve(ctx.repo, p)) for p in paths)
-    # Comma-joined, as every tool parameter is today (typed parameters are M28).
-    params = {**check.params, **{k: ",".join(v) for k, v in values.items()}}
+    params = {**check.params, **values}  # lists: the broker holds them to the tool's contract (M28)
     try:
         run_id, outcome = ctx.tools.invoke(str(check.tool), **params)
     except ToolAccessDenied as exc:

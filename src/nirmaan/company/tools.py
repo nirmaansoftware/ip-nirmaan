@@ -15,26 +15,62 @@ M25).
 
 Scan insertion, DFT rule checks, and scan chain simulation are AVAILABLE through
 Yosys and Icarus (``nirmaan/integrations/dft.py``, M25).
+
+Every tool with a binding declares its parameters (M28): the broker refuses an
+undeclared or ill-typed one before anything runs. The lists below are what the
+bindings and backends actually read.
 """
 
 from __future__ import annotations
 
-from nirmaan.models import ToolRisk, ToolSpec, ToolStatus
+from nirmaan.models import ParamKind, ParamSpec, ToolRisk, ToolSpec, ToolStatus
 
 RD, WR, EXE, APP = ToolRisk.READ, ToolRisk.WRITE, ToolRisk.EXECUTE, ToolRisk.APPROVE
 AV, CO = ToolStatus.AVAILABLE, ToolStatus.CONTRACT_ONLY
+TEXT, PATH, PATHS, INT, NUM = ParamKind.TEXT, ParamKind.PATH, ParamKind.PATHS, ParamKind.INTEGER, ParamKind.NUMBER
 
 
-def _tool(id: str, name: str, category: str, risk: ToolRisk, status: ToolStatus, description: str) -> ToolSpec:
-    return ToolSpec(id=id, name=name, category=category, risk=risk, status=status, description=description)
+def _p(name: str, kind: ParamKind = TEXT, description: str = "", required: bool = False,
+       prefix: bool = False) -> ParamSpec:
+    return ParamSpec(name=name, kind=kind, description=description, required=required, prefix=prefix)
+
+
+def _tool(id: str, name: str, category: str, risk: ToolRisk, status: ToolStatus, description: str,
+          params: tuple[ParamSpec, ...] | None = None) -> ToolSpec:
+    return ToolSpec(id=id, name=name, category=category, risk=risk, status=status, description=description,
+                    params=params)
+
+
+SOURCES = _p("sources", PATHS, "HDL source files.", required=True)
+TOP = _p("top", TEXT, "The top module.")
+TOP_REQUIRED = _p("top", TEXT, "The top module.", required=True)
+#: What the EDA runner itself reads, for every tool it runs (integrations/eda.py).
+RUNNER = (
+    _p("backend", TEXT, "Which backend to use, when the tool has several."),
+    _p("workdir", PATH, "The run's working directory; a new temporary one by default."),
+    _p("timeout", INT, "Seconds before the run is stopped (default 300)."),
+    _p("max_", NUM, "Fail a passing run whose parsed metric of that name exceeds this, or was not reported.",
+       prefix=True),
+)
+PDK = (
+    _p("liberty", PATHS, "Liberty files, absolute or under pdk_root / NIRMAAN_PDK_ROOT (backend yosys-liberty)."),
+    _p("pdk_root", PATH, "Where relative PDK paths resolve."),
+)
+#: For timing and place and route, where the library is not optional (their probes refuse without it).
+PDK_REQUIRED = (_p("liberty", PATHS, "Liberty files, absolute or under pdk_root / NIRMAAN_PDK_ROOT.", required=True),
+                _p("pdk_root", PATH, "Where relative PDK paths resolve."))
+NETLIST = (_p("netlist", PATH, "The gate-level netlist.", required=True),
+           _p("sdc", PATH, "Timing constraints.", required=True))
 
 
 TOOLS: list[ToolSpec] = [
     # Platform operations, implemented by Nirmaan itself.
-    _tool("project.read", "Read project", "platform", RD, AV, "Read project, task, and artifact state."),
-    _tool("status.read", "Read status", "platform", RD, AV, "Read status reports and blockers."),
-    _tool("artifact.read", "Read artifacts", "platform", RD, AV, "Read recorded artifacts and their provenance."),
-    _tool("trace.read", "Read traceability", "platform", RD, AV, "Read the requirement-to-evidence trace graph."),
+    _tool("project.read", "Read project", "platform", RD, AV, "Read project, task, and artifact state.",
+          (_p("task", TEXT, "A task ID; the project itself when omitted."),)),
+    _tool("status.read", "Read status", "platform", RD, AV, "Read status reports and blockers.", ()),
+    _tool("artifact.read", "Read artifacts", "platform", RD, AV, "Read recorded artifacts and their provenance.",
+          (_p("artifact", TEXT, "The artifact ID.", required=True),)),
+    _tool("trace.read", "Read traceability", "platform", RD, AV, "Read the requirement-to-evidence trace graph.", ()),
     _tool("escalation.raise", "Raise escalation", "platform", WR, AV, "Raise a structured escalation."),
     _tool("task.create", "Create tasks", "platform", WR, AV, "Create tasks in a project."),
     _tool("task.assign", "Assign tasks", "platform", WR, AV, "Assign or reassign task owners and reviewers."),
@@ -43,11 +79,15 @@ TOOLS: list[ToolSpec] = [
     _tool("approval.grant", "Grant approvals", "platform", APP, AV, "Approve work or a gate within authority."),
     # VeriTriage: the verification-intelligence subsystem, really executable.
     _tool("veritriage.investigate", "VeriTriage investigation", "verification-intelligence", EXE, AV,
-          "Run the deterministic VeriTriage pipeline over verification artifacts."),
+          "Run the deterministic VeriTriage pipeline over verification artifacts.",
+          (_p("paths", PATHS, "Logs and other verification artifacts.", required=True),
+           _p("workspace", PATH, "Where the session is saved."))),
     _tool("veritriage.explain_log", "VeriTriage log explanation", "verification-intelligence", RD, AV,
-          "Explain what a log is, which parser claims it, and what it contains."),
+          "Explain what a log is, which parser claims it, and what it contains.",
+          (_p("path", PATH, "The log.", required=True),)),
     _tool("knowledge.search", "Knowledge search", "verification-intelligence", RD, AV,
-          "Search the VeriTriage Knowledge Packs."),
+          "Search the VeriTriage Knowledge Packs.",
+          (_p("query", TEXT, "What to search for.", required=True),)),
     # Source control and specs (organization plans around these).
     _tool("spec.read", "Read specifications", "documents", RD, CO, "Read specifications and standards."),
     _tool("git.read", "Git read", "scm", RD, CO, "Read repositories."),
@@ -55,31 +95,54 @@ TOOLS: list[ToolSpec] = [
     _tool("git.merge", "Git merge", "scm", WR, CO, "Merge to protected branches."),
     _tool("code.search", "Code search", "scm", RD, CO, "Search source code."),
     # RTL and verification EDA.
-    _tool("lint.run", "Lint", "eda", EXE, AV, "RTL lint against coding standards."),
-    _tool("simulator.run", "Simulator", "eda", EXE, AV, "Compile and simulate RTL and testbenches."),
-    _tool("test.run", "Run tests", "eda", EXE, AV, "Run individual tests."),
+    _tool("lint.run", "Lint", "eda", EXE, AV, "RTL lint against coding standards.",
+          (SOURCES, TOP, *RUNNER)),
+    _tool("simulator.run", "Simulator", "eda", EXE, AV, "Compile and simulate RTL and testbenches.",
+          (SOURCES, TOP_REQUIRED, *RUNNER)),
+    _tool("test.run", "Run tests", "eda", EXE, AV, "Run individual tests.",
+          (SOURCES, TOP_REQUIRED, *RUNNER)),
     _tool("regression.run", "Run regressions", "eda", EXE, CO, "Launch and monitor regressions."),
     _tool("waveform.inspect", "Waveform viewer", "eda", RD, CO, "Inspect waveforms."),
     _tool("coverage.read", "Coverage database", "eda", RD, CO, "Read and merge coverage."),
-    _tool("formal.run", "Formal engine", "eda", EXE, AV, "Model checking and property proofs."),
+    _tool("formal.run", "Formal engine", "eda", EXE, AV, "Model checking and property proofs.",
+          (_p("sby", PATH, "The SymbiYosys job file.", required=True),
+           _p("sources", PATHS, "RTL the proof must read; the job file must list each one."), *RUNNER)),
     _tool("equivalence.run", "Equivalence checker", "eda", EXE, CO, "Logic equivalence checking."),
     _tool("cdc.run", "CDC/RDC analyzer", "eda", EXE, CO, "Structural and functional crossing analysis."),
     # Implementation EDA.
-    _tool("synth.run", "Synthesis", "eda", EXE, AV, "Logic synthesis."),
-    _tool("sta.run", "Static timing", "eda", EXE, AV, "Static timing of a netlist under an SDC (OpenSTA)."),
+    _tool("synth.run", "Synthesis", "eda", EXE, AV, "Logic synthesis.",
+          (SOURCES, TOP_REQUIRED, *PDK, *RUNNER)),
+    _tool("sta.run", "Static timing", "eda", EXE, AV, "Static timing of a netlist under an SDC (OpenSTA).",
+          (*NETLIST, _p("spef", PATH, "Parasitics."), TOP_REQUIRED, *PDK_REQUIRED, *RUNNER)),
     _tool("pnr.run", "Place and route", "eda", EXE, AV,
-          "Floorplan, placement, and routing in one staged run, with timing (OpenROAD)."),
+          "Floorplan, placement, and routing in one staged run, with timing (OpenROAD).",
+          (*NETLIST, TOP_REQUIRED, *PDK_REQUIRED,
+           _p("tech_lef", PATHS, "Technology LEF.", required=True),
+           _p("lef", PATHS, "Cell LEF files.", required=True),
+           _p("site", TEXT, "The placement site.", required=True),
+           _p("hor_layers", TEXT, "Horizontal pin layers, comma separated.", required=True),
+           _p("ver_layers", TEXT, "Vertical pin layers, comma separated.", required=True),
+           _p("utilization", NUM, "Core utilization percent (default 40)."),
+           _p("aspect_ratio", NUM, "Core aspect ratio (default 1)."),
+           _p("core_space", NUM, "Core to die spacing (default 2)."),
+           _p("stop_after", TEXT, "floorplan, place, or route (default)."), *RUNNER)),
     _tool("power.run", "Power analysis", "eda", EXE, CO, "Power, IR-drop, and EM."),
     _tool("pv.run", "Physical verification", "eda", EXE, CO, "DRC, LVS, ERC, antenna, density."),
     _tool("dft.run", "DFT tools", "eda", EXE, CO, "ATPG, MBIST, and commercial scan flows."),
-    _tool("dft.scan_insert", "Scan insertion", "eda", EXE, AV, "Mux-D scan flops stitched into one chain."),
-    _tool("dft.check", "DFT rule check", "eda", EXE, AV, "Testability rules over the synthesized netlist."),
-    _tool("dft.scan_sim", "Scan chain simulation", "eda", EXE, AV, "Shift and capture through the chain in simulation."),
+    _tool("dft.scan_insert", "Scan insertion", "eda", EXE, AV, "Mux-D scan flops stitched into one chain.",
+          (SOURCES, TOP_REQUIRED, *RUNNER)),
+    _tool("dft.check", "DFT rule check", "eda", EXE, AV, "Testability rules over the synthesized netlist.",
+          (SOURCES, TOP_REQUIRED, *RUNNER)),
+    _tool("dft.scan_sim", "Scan chain simulation", "eda", EXE, AV, "Shift and capture through the chain in simulation.",
+          (SOURCES, TOP_REQUIRED, *RUNNER)),
     # Software and infrastructure.
     _tool("compiler.run", "Compiler toolchain", "software", EXE, CO, "Build firmware and software."),
-    _tool("fw.build", "Firmware build", "software", EXE, AV, "Compile C firmware under strict warning flags."),
+    _tool("fw.build", "Firmware build", "software", EXE, AV, "Compile C firmware under strict warning flags.",
+          (_p("sources", PATHS, "C sources and headers.", required=True), *RUNNER)),
     _tool("fw.test", "Firmware co-simulation", "software", EXE, AV,
-          "Run a driver's tests against a Verilator model of the RTL, over real bus transactions."),
+          "Run a driver's tests against a Verilator model of the RTL, over real bus transactions.",
+          (_p("sources", PATHS, "The driver and its tests.", required=True),
+           _p("rtl", PATHS, "The RTL to build the model from.", required=True), TOP, *RUNNER)),
     _tool("debugger.attach", "Debugger", "software", EXE, CO, "Attach to targets and models."),
     _tool("ci.configure", "CI configuration", "infrastructure", WR, CO, "Change CI pipelines."),
     _tool("farm.submit", "Compute farm", "infrastructure", EXE, CO, "Submit jobs to the compute farm."),

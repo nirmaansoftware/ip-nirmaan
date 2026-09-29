@@ -154,7 +154,8 @@ def test_a_new_tool_contract_needs_no_core_changes(fixed_clock):
                      status=ToolStatus.AVAILABLE,
                      params=(ParamSpec(name="items", kind=ParamKind.PATHS, required=True),
                              ParamSpec(name="scale", kind=ParamKind.NUMBER))),
-            Skill(id="rulers", name="Rulers", domain="architecture", tools=("ruler.measure",)),
+            Skill(id="rulers", name="Rulers", domain="architecture", tools=("ruler.measure",),
+                  validation_criteria=("Every item is measured at the stated scale.",)),
             OrgUnit(id="architecture.rulers", name="Rulers", kind=UnitKind.TEAM, function=Function.ENGINEERING,
                     parent="architecture", noun="Ruler Architect", skills=("rulers",)),
         )

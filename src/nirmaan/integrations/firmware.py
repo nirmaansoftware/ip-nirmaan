@@ -24,6 +24,7 @@ from pathlib import Path
 
 from nirmaan.integrations.eda import Backend, Job, RunRecord, register_backend
 from nirmaan.integrations.eda_parsers import Diagnostic, EdaResult
+from nirmaan.models import list_values
 
 #: The harness sources and the HAL header every driver includes.
 HARNESS = Path(__file__).parent / "firmware_harness"
@@ -238,7 +239,7 @@ def _cosim_steps(job: Job) -> list[list[str]]:
     harness = job.workdir / "harness"
     shutil.copytree(HARNESS, harness, dirs_exist_ok=True)
     rtl = []
-    for i, given in enumerate(s.strip() for s in job.params["rtl"].split(",") if s.strip()):
+    for i, given in enumerate(list_values(job.params["rtl"])):
         source = Path(given).resolve()
         if not source.is_file():  # Verilator reports it, and the run is recorded as failed
             rtl.append(str(source))

@@ -25,6 +25,7 @@ from typing import Callable
 from nirmaan.integrations.eda import Backend, EdaResult, Job, RunRecord, register_backend
 from nirmaan.integrations.eda_parsers import parse_yosys
 from nirmaan.integrations.pd_parsers import PNR_STAGES, parse_openroad, parse_opensta
+from nirmaan.models import list_values
 
 #: Relative PDK paths resolve under this directory (or the ``pdk_root`` parameter).
 PDK_ROOT_ENV = "NIRMAAN_PDK_ROOT"
@@ -38,10 +39,9 @@ def pdk_paths(params: dict[str, str], key: str) -> list[Path]:
     """The comma-separated files a PDK parameter names, relative ones under the PDK root."""
     root = params.get("pdk_root") or os.environ.get(PDK_ROOT_ENV, "")
     paths = []
-    for value in (v.strip() for v in params.get(key, "").split(",")):
-        if value:
-            path = Path(value)
-            paths.append((Path(root) / path if root and not path.is_absolute() else path).resolve())
+    for value in list_values(params.get(key, "")):
+        path = Path(value)
+        paths.append((Path(root) / path if root and not path.is_absolute() else path).resolve())
     return paths
 
 
@@ -77,7 +77,7 @@ def _token(params: dict[str, str], key: str) -> str:
 
 
 def _layers(params: dict[str, str], key: str) -> str:
-    names = [n.strip() for n in params.get(key, "").split(",") if n.strip()]
+    names = list_values(params.get(key, ""))
     for name in names:
         if not _TOKEN_RE.match(name):
             raise ValueError(f"{key} must name layers, not {params.get(key)!r}")

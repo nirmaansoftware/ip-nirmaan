@@ -37,7 +37,8 @@ the authority check and before any probe or binding:
 - a `paths` value may be given as a list: the broker refuses an element that
   contains a comma (it could not be told apart from two paths) and joins the
   rest, so the stored `ToolRun` and every binding see the format they always
-  have; a `path` is one value, never a list.
+  have; a `path` is one value (a one-element list is accepted, several are
+  refused).
 
 A refusal raises `ToolContractError`, a subclass of `ToolAccessDenied`, so
 every caller that already reports a refused tool (the runtime's pre-flight and
