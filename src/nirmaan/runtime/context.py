@@ -97,7 +97,7 @@ def assemble(engine: TaskEngine, task_id: str, role: str | None = None) -> WorkP
         for ev in (state.evidence[e] for e in state.tasks[source].evidence)
     ]
     attempts = [
-        {"id": a.id, "number": a.number, "refusal": a.refusal,
+        {"id": a.id, "number": a.number, "refusal": a.refusal, "reviews": list(a.reviews),
          "failed_runs": [_failed_run(state, run_id, a.evidence) for run_id in a.tool_runs
                          if run_id in state.tool_runs and not state.tool_runs[run_id].succeeded],
          "artifacts": [_artifact(art, content=True) for art in a.artifacts]}
@@ -147,6 +147,8 @@ def assemble(engine: TaskEngine, task_id: str, role: str | None = None) -> WorkP
             "reviewer": task.reviewer,
             "escalation_path": list(task.escalation_path),
             "attempts": attempts,
+            "reviews": [{"id": r.id, "reviewer": r.reviewer, "verdict": r.verdict.value, "comments": r.comments}
+                        for r in state.reviews.values() if r.task == task_id],
             "ready": task.status in (TaskStatus.READY, TaskStatus.IN_PROGRESS, TaskStatus.CHANGES_REQUESTED),
         },
         tools=tuple(card["tools"]),
