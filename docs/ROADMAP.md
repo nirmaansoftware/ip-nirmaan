@@ -14,14 +14,14 @@ way every milestone has:
 |---|---|
 | Organization model: 207 units, 685 derived roles, skills, authority, a 12-principle constitution | A first real run of `sta.run` and `pnr.run`: neither OpenSTA nor OpenROAD is installed here or in CI; their parser samples are synthetic |
 | Planner: requirement to owned, reviewed, gated task graph; 9 workflows | CTS, power grid, parasitics, multi-corner timing |
-| Task engine: lifecycle, reviews, approvals, human gates, hash-chained audit | ATPG, multiple scan chains, MBIST; a RISC-V cross-compile and ISS in the firmware loop |
+| Task engine: lifecycle, reviews, approvals, human gates, hash-chained audit | ATPG, multiple scan chains, MBIST; interrupts and other cores in the RISC-V firmware loop |
 | VeriTriage as a real, evidence-producing tool (`veritriage.investigate`) | Repair after a reviewer's request for changes; per-stage retry limits |
 | AI workers in three verification seats, off by default, on Opus 5.5 (M20) | Approved-inputs, synthesis, and formal gating on the `new-ip`, `feature-addition`, and `rtl-change` RTL stages; non-vacuity checks for properties |
 | Design agents: spec, microarchitecture, and RTL seats; RTL gated on real lint and simulation; the AXI4-Lite register block end to end (M23) | |
 | `nirmaan export`: the numbered `01_requirement` to `10_signoff` deliverable tree (M23) | Loading requirements and verification items from a file; a verification-plan seat |
 | Engineering graph: artifacts linked to Design Graph nodes from their real bytes; `nirmaan gaps` names every requirement not backed by a passing run (M24) | |
 | DFT: real mux-D scan insertion, testability rules, and chain simulation through Yosys and Icarus (M25) | |
-| Firmware: a driver built strict and run against the approved RTL through a Verilator model (M25) | |
+| Firmware: a driver built strict and run against the approved RTL through a Verilator model (M25); on a RISC-V request, also cross-built for RV32I and run on PicoRV32 against the RTL (M27) | |
 | Physical design: OpenSTA and OpenROAD bindings and a `physical-implementation` workflow, refused where the tools or PDK are missing (M25) | |
 | Real lint, simulation, synthesis, and formal via open-source EDA (M21) | |
 | Synthesis (no latches) and formal (when the seat writes a `.sby`) before review; formal in CI via the OSS CAD Suite (M26) | |
@@ -199,6 +199,7 @@ extraction. Design doc: `docs/PHYSICAL_DESIGN.md`.
 - **Repair loop (M26):** a seat whose files fail their before-review checks is asked again, bounded by a capability's `max_attempts` (default 1, so off) or `nirmaan run --attempts N`, with the failed runs as citable evidence and log excerpts; refused attempts are recorded as `Attempt`s and never count. See `docs/REPAIR_LOOP.md`.
 - **More blocks (M26):** a synchronous FIFO, a round-robin arbiter, and an APB4 register block (PSLVERR for unmapped addresses, as the AXI4-Lite block's SLVERR), each with real RTL, testbenches, and proofs, and each designed end to end by agents on `block-design` with no core change. See `docs/IP_BLOCKS.md`.
 - **Formal gate (M26, done):** the `block-design` RTL stage goes to review only after real synthesis with no latches and, when the seat writes a `.sby`, a real SymbiYosys proof over the submitted RTL; CI installs `sby` and `yices-smt2` from a pinned OSS CAD Suite and runs formal instead of skipping it. See `docs/FORMAL_GATE.md`.
+- **RISC-V firmware (M27, done):** `fw.cross_build` compiles the driver and its tests strictly for bare-metal RV32I into an ELF with its code size, and `fw.soc_test` runs it on PicoRV32 (vendored, ISC) in one Verilator model with the approved RTL, so the driver's register accesses are CPU loads and stores on the real AXI4-Lite bus (SLVERR reaches the driver through a status register). A request that names RISC-V gates the firmware seat on both, through the new generic `EvidenceRequirement.when`; CI installs `gcc-riscv64-unknown-elf`. See `docs/RISCV_FIRMWARE.md`.
 
 ## Side work (any time; owner-driven)
 

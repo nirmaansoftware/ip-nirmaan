@@ -84,10 +84,11 @@ directories of the sources, then the harness directory that holds
 
 The `riscv-gcc` backend runs the same steps with
 `riscv64-unknown-elf-gcc -march=rv32imac_zicsr -mabi=ilp32 -ffreestanding`.
-No RISC-V toolchain is installed here or in CI, so it is always refused with
-its reason unless a machine has one; it is registered to show that a cross
-target is one registry entry, and it is never chosen unless asked for by
-`backend=riscv-gcc` or the host compiler is absent.
+It is refused with its reason unless a machine has that compiler; it is
+registered to show that a cross target is one registry entry, and it is never
+chosen unless asked for by `backend=riscv-gcc` or the host compiler is absent.
+M27 adds a full RV32I image build and a run on a RISC-V core
+(`docs/RISCV_FIRMWARE.md`).
 
 ### `fw.test`
 
@@ -318,8 +319,9 @@ build requirement.
 
 ## 9. Deferred
 
-* A RISC-V cross compile in CI, and running the driver on an instruction-set
-  simulator (Spike, QEMU) against the RTL through a bus bridge.
+* A RISC-V cross compile in CI, and running the driver on a processor against
+  the RTL: done in M27, on PicoRV32 in the same Verilator model as the RTL
+  (`docs/RISCV_FIRMWARE.md`).
 * A repair loop that hands the seat its compiler or co-simulation log: done in
   M26 (`docs/REPAIR_LOOP.md`); a firmware capability opts in with
   `max_attempts`.
