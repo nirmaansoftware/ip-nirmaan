@@ -48,7 +48,7 @@ and nothing that did not pass counts. M27 adds:
    toward the verdict.
 4. **Every limit is data, and bounded.** Precedence for both limits: the CLI
    flag, then the workflow stage, then the capability, then 1.
-5. **Exhausted budgets escalate.** When the rounds (or, with repair on, the
+5. **Exhausted budgets escalate.** When the rounds (or this round's recorded
    attempts) are used up, `run_task` escalates through the owner's existing
    escalation route instead of calling the model. It never loops.
 6. **The runtime names nothing.** No seat, tool, stage, or artifact kind.
@@ -90,7 +90,7 @@ different file.
 **What else changes.** `latest_verdicts` (policy) ignores reviews listed in an
 `Attempt`, so a second round's verdict is not in conflict with the first
 round's. A verification item declared in a superseded file reports
-`unverifiable: its artifact ... was superseded`, which is true: the file it
+`unverifiable: its artifact ... is not recorded`, which is true: the file it
 lives in is no longer a deliverable. Evidence on the task (the tool runs of
 every round) stays, as M26 keeps a refused attempt's runs: a failed run is a
 fact worth keeping.
@@ -142,7 +142,10 @@ StageTemplate(id="rtl-implementation", ..., max_attempts=2, max_review_rounds=3)
 
 Precedence, for each: `run_task(attempts=, review_rounds=)` (the CLI's
 `--attempts` and `--review-rounds`), then the task's workflow stage, then its
-capability, then 1. No shipped capability or stage sets either, so behaviour
+capability, then 1. `nirmaan.runtime.limits(engine, task, attempts=None,
+review_rounds=None)` returns the pair; the stage is found through the task's
+`workflow` and `stage`, so the runtime names neither. No shipped capability or
+stage sets either, so behaviour
 changes only where an organization or an operator asks for repair.
 
 ### Counting, across runs
@@ -165,7 +168,7 @@ so each run is one try, exactly as in M23 and M26.
 | Situation | `run_task` does | Task |
 |---|---|---|
 | `used rounds >= max_review_rounds` | escalates (technical) through the owner's route; no model call | `escalated` |
-| repair on and `used attempts >= max_attempts` | the same | `escalated` |
+| this round has recorded refused attempts, `>= max_attempts` | the same | `escalated` |
 | attempts run out within a run | `refused`, as M26 | `in_progress` |
 
 The escalation names every superseded submission and refused attempt, asks
