@@ -31,7 +31,7 @@ retried. Stage commits stage only this review's files (never `git add -A`).
 |---|---|---|---|
 | 0 | Branch and tracker | this file | DONE |
 | 1 | Inventory: read every Nirmaan module and the VeriTriage seams it uses | `docs/architecture/current-state.md` | DONE |
-| 2 | Gap analysis against the brief, concept by concept | `docs/architecture/target-state.md` | TODO |
+| 2 | Gap analysis against the brief, concept by concept | `docs/architecture/target-state.md` | DONE |
 | 3 | Milestone roadmap and the first milestone's design | `docs/architecture/proposed-change.md` | TODO |
 | 4 | Implement milestone 1 only, test first | code + tests, full suite green | TODO |
 | 5 | Design doc, `context.md` entry, PR | PR link | TODO |
@@ -49,3 +49,9 @@ retried. Stage commits stage only this review's files (never `git add -A`).
   (9) model chosen by name, (10) process-global registries. Do not create a
   parallel `nirmaan/engine/` package: `work/` + `runtime/` already are the
   engine, and the brief itself forbids rewrites for their own sake.
+- **After Stage 2.** Milestone order decided in target-state.md section 5:
+  M27 seat evaluation, M28 typed contracts, M29 engineering records, M30
+  register-map IR, M31 model selection, M32 scalable state, M33 learning
+  proposals. The brief's eleven per-topic docs are NOT created; target-state
+  section 4 indexes the existing documents instead (a deliberate choice,
+  reported to the owner).
