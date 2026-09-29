@@ -34,7 +34,7 @@ retried. Stage commits stage only this review's files (never `git add -A`).
 | 2 | Gap analysis against the brief, concept by concept | `docs/architecture/target-state.md` | DONE |
 | 3 | Milestone roadmap and the first milestone's design | `docs/architecture/proposed-change.md` | DONE |
 | 4 | Implement milestone 1 only, test first | code + tests, full suite green | DONE |
-| 5 | Design doc, `context.md` entry, PR | PR link | TODO |
+| 5 | Design doc, `context.md` entry, PR | https://github.com/nirmaansoftware/ip-nirmaan/pull/37 | DONE (CI green; awaiting owner review) |
 
 ## Notes carried between stages
 
@@ -76,3 +76,9 @@ retried. Stage commits stage only this review's files (never `git add -A`).
   M27 entry, ROADMAP row and milestone list. iCloud evicted even freshly
   written docs mid-run; `brctl download <file>` forces them back when
   `cat` times out.
+- **After Stage 5.** PR #37 open, CI green. The iCloud folder became
+  unusable (git itself timed out), so work continues in a clone outside
+  iCloud and every commit is pushed; GitHub is the durable record. Next:
+  M28 (typed tool contracts) on branch `m28/typed-contracts`, stacked on
+  this branch until #37 merges. The first live evaluation run waits for the
+  owner (it costs API credits).
