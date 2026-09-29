@@ -32,7 +32,7 @@ retried. Stage commits stage only this review's files (never `git add -A`).
 | 0 | Branch and tracker | this file | DONE |
 | 1 | Inventory: read every Nirmaan module and the VeriTriage seams it uses | `docs/architecture/current-state.md` | DONE |
 | 2 | Gap analysis against the brief, concept by concept | `docs/architecture/target-state.md` | DONE |
-| 3 | Milestone roadmap and the first milestone's design | `docs/architecture/proposed-change.md` | TODO |
+| 3 | Milestone roadmap and the first milestone's design | `docs/architecture/proposed-change.md` | DONE |
 | 4 | Implement milestone 1 only, test first | code + tests, full suite green | TODO |
 | 5 | Design doc, `context.md` entry, PR | PR link | TODO |
 
@@ -55,3 +55,10 @@ retried. Stage commits stage only this review's files (never `git add -A`).
   proposals. The brief's eleven per-topic docs are NOT created; target-state
   section 4 indexes the existing documents instead (a deliberate choice,
   reported to the owner).
+- **After Stage 3.** M27 design fixed in proposed-change.md. Baseline before
+  any code: 1115 passed, 2 skipped (all EDA tools present locally except
+  OpenSTA and OpenROAD). Stage 4 order: (a) failing tests
+  `tests/test_nirmaan_evals.py`, commit; (b) `models/evaluation.py`; (c)
+  `evals/cases.py` + the four case files; (d) `evals/scorers.py`; (e)
+  `evals/runner.py`; (f) CLI; (g) full suite. Commit after each of (a), (c),
+  (e), (g) so a resume can see progress in `git log`.
