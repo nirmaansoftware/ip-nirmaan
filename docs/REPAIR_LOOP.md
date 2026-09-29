@@ -37,7 +37,9 @@ adds:
    sees them. The M23 `evidence-before-review` check still requires passing
    runs over the exact files submitted, so a run over an earlier attempt's
    files cannot open review for a later one.
-3. **Only a refusal is repaired.** A tool the broker refuses (`blocked`), an
+3. **Only a refusal is repaired.** The constitution refusing the submission
+   (a failed before-review check, or an answer with no file to check) starts
+   another attempt. A tool the broker refuses (`blocked`), an
    answer that is not JSON (`declined`), an escalation, and a run the model
    invented (P5, raised) end the loop exactly as before. A missing tool is not
    something a model can fix.
@@ -122,16 +124,22 @@ structural rather than a filter.
 
 The packet gains `task["attempts"]`: the task's refused attempts, each with
 its reason, its failed runs, and its files. The work prompt renders them in the
-Task section (a review prompt never does):
+Task section (a review prompt never does): every attempt's reason, then the
+latest attempt's failed runs, log excerpts, and files. Captured from the
+counter test:
 
 ```
-Repair: your previous attempt 1 was refused and nothing from it counts. Fix what
-failed and answer again in full; files from a refused attempt are never reviewed.
-Attempt 1 was refused: Refused by the constitution: [P9] ... is not met
-Failed run [run:run-0002] lint.run, evidence [evidence:p.rtl-implementation.e1]: verilator-lint: 1 error
-Log excerpt of [run:run-0002] (first 3 of 3 matching lines):
-| %Warning-WIDTH: counter.v:14:20: Operator ADD expects 5 bits ...
-Refused file counter.v (sha256:...):
+- Repair: your previous attempt 1 was refused and nothing from it counts. Fix what failed
+  and answer again in full; files from a refused attempt are never reviewed.
+- Attempt 1 was refused: Refused by the constitution: [P9] ...:rtl-implementation cannot go
+  to review: 'Lint-clean under the RTL lint rules' is not met
+- Failed run [run:run-0001] lint.run, evidence [evidence:....rtl-implementation.e1]:
+  verilator-lint: lint failed: 0 errors, 1 warning; first: .../1/counter.v:20: [WIDTHTRUNC] ...
+- Log excerpt of [run:run-0001] (first 3 of 3 notable lines):
+| %Warning-WIDTHTRUNC: .../1/counter.v:20:19: Operator ASSIGNDLY expects 4 bits ...
+|                      ... For warning description see https://verilator.org/warn/WIDTHTRUNC
+| %Error: Exiting due to 1 warning(s)
+- Content of refused file counter.v (sha256:4f6b...):
 === FILE: counter.v ===
 ...
 === END FILE ===
@@ -185,7 +193,8 @@ second passes: it reaches review with only the second file.
 
 1. An RTL seat whose first answer fails real lint and whose second passes ends
    `submitted`; the first attempt's files are recorded in an `Attempt`, never
-   among the task's artifacts, and the reviewer never sees them.
+   among the task's artifacts, and the reviewer never sees their content
+   (it does see the failed run, which is the task's evidence).
 2. Attempt 2's prompt carries the failed run's evidence and run tokens and a
    bounded excerpt of its log.
 3. With a limit of 1 the result, state, and audit are as in M23: one model
@@ -211,3 +220,8 @@ second passes: it reaches review with only the second file.
 * A shared attempt budget across separate `nirmaan run` invocations. Each run
   has its own limit; attempt numbers keep counting across runs.
 * Summarizing long logs with a model. Today the excerpt is a plain filter.
+* File-level signoff. As in M23, the evidence check at approval is per tool,
+  not per file, so a passing run from a refused attempt stays on the task as
+  evidence. Review opens only with passing runs over the submitted files, so
+  this lets nothing through today; binding signoff to files is a policy change
+  for its own milestone.

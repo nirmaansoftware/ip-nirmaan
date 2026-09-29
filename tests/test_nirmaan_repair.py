@@ -111,7 +111,8 @@ def test_one_attempt_behaves_exactly_as_before(rtl_ready):
     report = run_task(engine, rtl, ModelRuntime(llm))
 
     assert report.status is ResultStatus.REFUSED and "P9" in report.detail
-    assert len(llm.calls) == 1 and "attempt" not in report.detail.lower()
+    assert len(llm.calls) == 1 and "attempts were refused" not in report.detail
+    assert [a["attempt"] for a in report.attempts] == [None]
     assert engine.state.attempts == {}
     assert "task.attempt" not in {e.action for e in engine.state.audit}
     task = engine.task(rtl)
@@ -159,7 +160,8 @@ def test_rtl_that_fails_lint_then_passes_reaches_review(rtl_ready):
     reviewer = MockLLM()
     review_task(engine, rtl, ModelRuntime(reviewer))
     seen = reviewer.calls[0].render()
-    assert "5'd1" not in seen and not any(loc in seen for loc in old)  # the reviewer never sees attempt 1
+    # The reviewer sees attempt 1's failed run (it is the task's evidence), never its files.
+    assert "count <= count + 5'd1;" not in seen and "count <= count + 4'd1;" in seen
     assert engine.task(rtl).review_state is ReviewState.PASSED
     engine.approve(rtl, human(task.approver), "repaired and simulated")
     assert all(engine.state.artifacts[a].assurance is Assurance.APPROVED for a in task.artifacts)
@@ -355,7 +357,8 @@ def test_a_new_check_gets_repair_with_no_core_changes(fixed_clock, tmp_path):
                        description="Tabulate a block's physical quantities.", produces=("units_table",),
                        approved_inputs=True, max_attempts=2),
             Skill(id="units_tables", name="Units tables", domain="architecture",
-                  provides=("arch.units_table", "arch.review"), tools=("units.check",)),
+                  provides=("arch.units_table", "arch.review"), tools=("units.check",),
+                  validation_criteria=("Every quantity names its unit.",)),
             OrgUnit(id="architecture.units", name="Units", kind=UnitKind.TEAM, function=Function.ENGINEERING,
                     parent="architecture", noun="Units Architect", skills=("units_tables",)),
             IntentRule(intent="units_table", patterns=(r"\bunits table\b",), priority=5),
