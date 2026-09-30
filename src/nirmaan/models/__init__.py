@@ -5,6 +5,15 @@ data first, and engines, registries, and runtimes are built on top of it.
 """
 
 from nirmaan.models.deliverable import DeliverableFolder, ExportSection
+from nirmaan.models.evaluation import (
+    CaseFile,
+    EvalCase,
+    EvalResult,
+    GateRun,
+    HeldOutCheck,
+    Score,
+    ScoreStatus,
+)
 from nirmaan.models.governance import (
     AuthorityRule,
     AuthorityScope,
