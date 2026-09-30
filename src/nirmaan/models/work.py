@@ -226,18 +226,21 @@ class Attempt(BaseModel):
     Its files are full :class:`Artifact` records (location, digest, provenance)
     held here rather than in ``ProjectState.artifacts``, so nothing that
     reviews, verifies, approves, exports, or links artifacts can see them.
+    With ``reviews`` it is a submission an independent review sent back (M27),
+    superseded when the change was requested.
     """
 
     model_config = ConfigDict(frozen=True)
 
     id: str
     task: str
-    number: int = Field(ge=1, description="Counts every refused attempt recorded on the task.")
+    number: int = Field(ge=1, description="Counts every refused or superseded submission on the task.")
     actor: str
-    refusal: str = Field(description="The engine's reason for refusing the submission.")
+    refusal: str = Field(description="The engine's reason for refusing the submission, or the review's.")
     tool_runs: tuple[str, ...] = ()
     evidence: tuple[str, ...] = ()
     artifacts: tuple[Artifact, ...] = ()
+    reviews: tuple[str, ...] = Field(default=(), description="The reviews that sent this submission back (M27).")
 
 
 class ToolRun(BaseModel):
