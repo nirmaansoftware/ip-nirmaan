@@ -26,7 +26,7 @@ from typing import Callable
 
 from nirmaan.integrations.eda import Backend, EdaResult, Job, RunRecord, register_backend
 from nirmaan.integrations.eda_parsers import parse_yosys
-from nirmaan.integrations.pd_parsers import PNR_STAGES, parse_openroad, parse_opensta
+from nirmaan.integrations.pd_parsers import PNR_STAGES, VIOLATOR_REPORT_LIMIT, parse_openroad, parse_opensta
 
 #: Relative PDK paths resolve under this directory (or the ``pdk_root`` parameter).
 PDK_ROOT_ENV = "NIRMAAN_PDK_ROOT"
@@ -99,7 +99,8 @@ def _design(job: Job, key: str) -> str:
 def _timing_reports() -> list[str]:
     return ["report_checks -path_delay max -digits 3",
             "report_checks -path_delay min -digits 3",
-            "report_checks -path_delay min_max -slack_max 0 -group_path_count 100 -endpoint_path_count 1 -digits 3",
+            "report_checks -path_delay min_max -slack_max 0 "
+            f"-group_path_count {VIOLATOR_REPORT_LIMIT} -endpoint_path_count 1 -digits 3",
             "report_worst_slack -max -digits 3",
             "report_worst_slack -min -digits 3",
             "report_tns -digits 3",

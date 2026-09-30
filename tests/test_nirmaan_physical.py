@@ -1,7 +1,7 @@
-"""Milestone 25 (physical design part): OpenSTA and OpenROAD behind the broker.
+"""Milestones 25 and 27 (physical design): OpenSTA and OpenROAD behind the broker.
 
-* Parsers are tested against labelled SYNTHETIC samples in tests/fixtures/pd
-  (neither tool could be run where they were written; see docs/PHYSICAL_DESIGN.md).
+* Parsers are tested against logs CAPTURED from real OpenROAD runs in CI
+  (M27; each starts with a ``# CAPTURED:`` line naming the run).
 * A missing executable or a missing PDK input is a refusal with a reason, and
   no run is recorded. Design-input problems, tool failures, and timeouts are
   recorded failed runs.
@@ -10,7 +10,8 @@
 * The physical-implementation workflow plans synth, floorplan, place and
   route, then STA signoff.
 * Crown jewel: a new physical-design backend needs zero core changes.
-* Real OpenSTA and OpenROAD tests skip without the tools and sky130.
+* Real OpenSTA and OpenROAD tests skip without the tools and Nangate45; the CI
+  physical-design job requires them.
 """
 
 from __future__ import annotations
@@ -27,7 +28,7 @@ from nirmaan_helpers import agent, tid
 from test_nirmaan_eda import holder, needs
 
 from nirmaan.integrations.eda import Backend, EdaResult, register_backend, unregister_backend
-from nirmaan.integrations.pd_parsers import parse_openroad, parse_opensta
+from nirmaan.integrations.pd_parsers import VIOLATOR_REPORT_LIMIT, parse_openroad, parse_opensta
 from nirmaan.integrations.physical import PDK_ROOT_ENV, needs_pdk
 from nirmaan.models import EvidenceKind, TaskKind, ToolStatus
 from nirmaan.orchestrator import Orchestrator
@@ -102,72 +103,81 @@ def test_the_catalog_says_why_a_tool_cannot_run_here(monkeypatch, tmp_path):
     assert "no:" in line and "opensta needs sta" in line
 
 
-# --- Parsers, against labelled synthetic samples ----------------------------------------
+# --- Parsers, against logs captured from real runs ----------------------------------------
 
 
-def test_the_samples_say_they_are_synthetic():
-    for sample in PD.glob("synthetic_*.log"):
-        assert sample.read_text(encoding="utf-8").startswith("# SYNTHETIC:"), sample
+def test_the_logs_say_where_they_were_captured():
+    logs = sorted(PD.glob("*.log"))
+    assert [p.name for p in logs] == ["openroad_error.log", "openroad_route.log", "opensta_met.log",
+                                      "opensta_violated.log"]
+    for log in logs:
+        first, second = log.read_text(encoding="utf-8").splitlines()[:2]
+        assert first.startswith("# CAPTURED:") and "CI run" in first, log
+        assert second.startswith("$ openroad -no_init -no_splash -exit "), log  # as eda.execute logs a step
 
 
 def test_opensta_timing_met():
-    result = parse_opensta(_text("synthetic_opensta_met.log"), 0)
+    result = parse_opensta(_text("opensta_met.log"), 0)
     assert result.passed, result.summary
     m = result.metrics
-    assert (m["worst_slack"], m["worst_hold_slack"], m["tns"], m["wns"]) == (7.688, 2.146, 0.0, 0.0)
+    assert (m["worst_slack"], m["worst_hold_slack"], m["tns"], m["wns"]) == (7.264, 0.101, 0.0, 0.0)
     assert m["violating_endpoints"] == [] and result.diagnostics == ()
-    assert result.summary == "timing met: worst setup slack 7.688, worst hold slack 2.146, TNS 0.000"
+    assert result.summary == "timing met: worst setup slack 7.264, worst hold slack 0.101, TNS 0.000"
 
 
 def test_opensta_timing_violated():
-    result = parse_opensta(_text("synthetic_opensta_violated.log"), 0)
+    result = parse_opensta(_text("opensta_violated.log"), 0)
     assert not result.passed
     m = result.metrics
-    assert (m["worst_slack"], m["worst_hold_slack"], m["tns"], m["wns"]) == (-0.375, 0.546, -0.53, -0.375)
-    assert m["violating_endpoints"] == [
-        {"endpoint": "_2640_", "check": "setup", "slack": -0.375},
-        {"endpoint": "_2641_", "check": "setup", "slack": -0.155},
-    ]
-    assert len(result.warnings) == 1 and not result.errors
-    assert result.summary == ("timing violated: 2 violating endpoints, worst setup slack -0.375, "
-                              "worst hold slack 0.546, TNS -0.530; worst: _2640_ (setup) -0.375")
+    assert (m["worst_slack"], m["worst_hold_slack"], m["tns"], m["wns"]) == (-0.905, 0.06, -157.481, -0.905)
+    violators = m["violating_endpoints"]
+    assert len(violators) == VIOLATOR_REPORT_LIMIT and {v["check"] for v in violators} == {"setup"}
+    assert violators[0] == {"endpoint": "_1600_", "check": "setup", "slack": -0.905}
+    assert not result.errors
+    assert result.summary == ("timing violated: at least 100 violating endpoints, worst setup slack -0.905, "
+                              "worst hold slack 0.060, TNS -157.481; worst: _1600_ (setup) -0.905")
 
 
 def test_opensta_unconstrained_or_crashed_is_not_timing_met():
-    unconstrained = parse_opensta("No paths found.\nworst slack INF\nworst slack INF\ntns 0.000\nwns 0.000\n", 0)
-    assert not unconstrained.passed and "no constrained timing paths" in unconstrained.summary
+    for unconstrained in ("No paths found.\nworst slack INF\nworst slack INF\ntns 0.000\nwns 0.000\n",
+                          "No paths found.\nworst slack max INF\nworst slack min INF\ntns max 0.000\n"):
+        result = parse_opensta(unconstrained, 0)
+        assert not result.passed and "no constrained timing paths" in result.summary
     crashed = parse_opensta("Error: sta.tcl, 2 cannot read file netlist.v\n", 1)
     assert not crashed.passed and crashed.errors[0].message == "sta.tcl, 2 cannot read file netlist.v"
     assert "1 error" in crashed.summary
-    orstyle = parse_opensta("[ERROR STA-0164] liberty file not found\n", 1)
-    assert orstyle.errors[0].code == "STA-0164"
+    orstyle = parse_opensta("[ERROR ORD-2010] no technology has been read.\n", 1)  # as M27's first run printed
+    assert orstyle.errors[0].code == "ORD-2010"
 
 
 def test_openroad_full_flow():
-    result = parse_openroad(_text("synthetic_openroad_route.log"), 0, "route")
+    result = parse_openroad(_text("openroad_route.log"), 0, "route")
     assert result.passed, result.summary
     m = result.metrics
     assert m["stages_completed"] == ["floorplan", "place", "route", "timing"] and m["failed_stage"] is None
-    assert (m["design_area_um2"], m["utilization_pct"]) == (8207.0, 41.0)
-    assert (m["wirelength_um"], m["drc_violations"]) == (21456.0, 0)  # the last iteration's count
-    assert (m["worst_slack"], m["worst_hold_slack"]) == (6.912, 0.215)
-    assert [d.code for d in result.warnings] == ["IFP-0028"]
-    assert result.summary.startswith("place and route passed: routed, 0 DRC violations, wirelength 21456 um")
+    assert (m["design_area_um2"], m["utilization_pct"]) == (1665.0, 41.0)  # printed as um^2
+    assert (m["wirelength_um"], m["drc_violations"]) == (10783.0, 0)  # the last iteration's figures
+    assert (m["worst_slack"], m["worst_hold_slack"]) == (7.12, 0.103)
+    assert [d.code for d in result.warnings] == ["IFP-0028", "DRT-0120", "DRT-0120"]
+    assert result.summary == ("place and route passed: routed, 0 DRC violations, wirelength 10783 um, "
+                              "utilization 41%, worst setup slack 7.120, worst hold slack 0.103, TNS 0.000")
 
 
 def test_openroad_failure_names_the_stage():
-    result = parse_openroad(_text("synthetic_openroad_error.log"), 1, "route")
+    result = parse_openroad(_text("openroad_error.log"), 1, "route")
     assert not result.passed
     assert result.metrics["stages_completed"] == ["floorplan"] and result.metrics["failed_stage"] == "place"
-    assert result.errors[0].code == "GPL-0301" and "212.4" in result.errors[0].message
+    assert result.metrics["utilization_pct"] == 318.0
+    assert result.errors[0].code == "GPL-0301" and "352.253" in result.errors[0].message
     assert "failed in place" in result.summary
 
 
 def test_openroad_drc_violations_and_missing_stages_fail():
-    log = _text("synthetic_openroad_route.log").replace("Number of violations = 0.", "Number of violations = 7.")
-    drc = parse_openroad(log, 0, "route")
+    route = _text("openroad_route.log")
+    assert route.count("Number of violations = 0.") == 1
+    drc = parse_openroad(route.replace("Number of violations = 0.", "Number of violations = 7."), 0, "route")
     assert not drc.passed and drc.metrics["drc_violations"] == 7 and "7 DRC violations" in drc.summary
-    floorplan_only = "\n".join(ln for ln in _text("synthetic_openroad_route.log").splitlines()
+    floorplan_only = "\n".join(ln for ln in route.splitlines()
                                if "stage" not in ln or "floorplan" in ln or "timing" in ln)
     assert parse_openroad(floorplan_only, 0, "floorplan").passed
     assert not parse_openroad(floorplan_only, 0, "route").passed  # route was asked for and never finished
@@ -204,7 +214,7 @@ def test_a_missing_pdk_is_a_refusal_with_a_reason(project, tmp_path, monkeypatch
 
 def test_relative_pdk_paths_resolve_under_the_pdk_root(project, tmp_path, monkeypatch):
     bin_dir = tmp_path / "bin"
-    fake_tool(bin_dir, "sta", f"cat '{PD / 'synthetic_opensta_met.log'}'")
+    fake_tool(bin_dir, "sta", f"cat '{PD / 'opensta_met.log'}'")
     only_on_path(monkeypatch, bin_dir)
     fake_pdk(tmp_path / "sky")
     monkeypatch.setenv(PDK_ROOT_ENV, str(tmp_path / "sky"))
@@ -220,20 +230,21 @@ def test_relative_pdk_paths_resolve_under_the_pdk_root(project, tmp_path, monkey
 
 def test_sta_runs_the_script_it_writes_and_parses_the_output(project, tmp_path, monkeypatch):
     bin_dir = tmp_path / "bin"
-    fake_tool(bin_dir, "sta", f"echo \"argv: $*\"; cat '{PD / 'synthetic_opensta_violated.log'}'")
+    fake_tool(bin_dir, "sta", f"echo \"argv: $*\"; cat '{PD / 'opensta_violated.log'}'")
     only_on_path(monkeypatch, bin_dir)
     params = {"netlist": str(AXI), "sdc": str(SDC), "top": TOP, "liberty": str(TINY_LIB)}
     run, outcome = invoke(project, "sta.run", params, tmp_path / "w")
     assert not run.succeeded and run.id in project.state.tool_runs  # a violation is a recorded failed run
-    assert run.summary.startswith("opensta: timing violated: 2 violating endpoints")
+    assert run.summary.startswith("opensta: timing violated: at least 100 violating endpoints")
     log, result = (Path(r) for r in run.references)
     assert "argv: -no_init -no_splash -exit sta.tcl" in log.read_text() and result.is_file()
-    assert outcome.data["result"]["metrics"]["worst_slack"] == -0.375
+    assert outcome.data["result"]["metrics"]["worst_slack"] == -0.905
     script = (tmp_path / "w" / "sta.tcl").read_text()
     for line in (f'read_liberty "{TINY_LIB}"', f'read_verilog "{AXI}"', f"link_design {TOP}",
-                 f'read_sdc "{SDC}"', "report_worst_slack -max", "report_tns"):
+                 f'read_sdc "{SDC}"', "report_worst_slack -max", "report_tns",
+                 "-group_path_count 100 -endpoint_path_count 1"):  # M27: -group_count is deprecated
         assert line in script, line
-    assert "read_spef" not in script
+    assert "read_spef" not in script and "read_lef" not in script  # standalone OpenSTA reads no LEF
 
 
 def test_design_input_problems_and_timeouts_are_recorded_failed_runs(project, tmp_path, monkeypatch):
@@ -255,7 +266,7 @@ def test_design_input_problems_and_timeouts_are_recorded_failed_runs(project, tm
 
 def test_pnr_stages_follow_stop_after(project, tmp_path, monkeypatch):
     bin_dir = tmp_path / "bin"
-    fake_tool(bin_dir, "openroad", f"cat '{PD / 'synthetic_openroad_route.log'}'")
+    fake_tool(bin_dir, "openroad", f"cat '{PD / 'openroad_route.log'}'")
     only_on_path(monkeypatch, bin_dir)
     params = {"netlist": str(AXI), "sdc": str(SDC), "top": TOP, **fake_pdk(tmp_path / "pdk"), **PNR_PDK}
     run, outcome = invoke(project, "pnr.run", params, tmp_path / "full")
@@ -442,7 +453,7 @@ def test_real_opensta_times_the_axi4_lite_block(project, tmp_path):
     metrics = outcome.data["result"]["metrics"]
     assert not fast.succeeded and fast.id in project.state.tool_runs  # a violation is a recorded failed run
     assert metrics["worst_slack"] < 0 and metrics["tns"] < 0 and metrics["violating_endpoints"], fast.summary
-    assert fast.summary.startswith("opensta: timing violated:"), fast.summary
+    assert fast.summary.startswith(f"{outcome.data['backend']}: timing violated:"), fast.summary
 
 
 @needs("openroad", "yosys")

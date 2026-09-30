@@ -17,6 +17,8 @@ from nirmaan.integrations.eda_parsers import Diagnostic, EdaResult, _first, _plu
 
 #: The place-and-route stages, in flow order; timing is reported after the last one run.
 PNR_STAGES = ("floorplan", "place", "route")
+#: The violator report lists at most this many paths per check, so a count this high is a lower bound.
+VIOLATOR_REPORT_LIMIT = 100
 
 _TAGGED_RE = re.compile(r"^\[(?P<sev>ERROR|WARNING) (?P<code>[A-Z]+-\d+)\]\s*(?P<msg>.*)$")
 _PLAIN_RE = re.compile(r"^(?P<sev>Error|Warning):\s*(?P<msg>.*)$")
@@ -129,7 +131,10 @@ def parse_opensta(log: str, returncode: int) -> EdaResult:
     if _timing_met(timing):
         return EdaResult(True, f"timing met: {_slacks(timing)}", tuple(diags), metrics)
     violators = timing["violating_endpoints"]
-    summary = f"timing violated: {_plural(len(violators), 'violating endpoint')}, {_slacks(timing)}"
+    count = _plural(len(violators), "violating endpoint")
+    if len(violators) >= VIOLATOR_REPORT_LIMIT:
+        count = f"at least {count}"
+    summary = f"timing violated: {count}, {_slacks(timing)}"
     if violators:
         v = violators[0]
         summary += f"; worst: {v['endpoint']} ({v['check']}) {v['slack']:.3f}"
