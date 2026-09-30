@@ -1,6 +1,6 @@
 # IP Nirmaan roadmap
 
-The plan for what comes after v1.20.0. Read this together with `context.md`
+The plan for what comes after v1.21.0. Read this together with `context.md`
 (what exists and why) and `CLAUDE.md` (how to work here). Each stage ships the
 way every milestone has:
 - a design doc approved before code,
@@ -8,7 +8,7 @@ way every milestone has:
 - a `context.md` entry,
 - a PR merged into `main`.
 
-## Where we are (v1.20.0, 2026-09-29)
+## Where we are (v1.21.0, 2026-09-30)
 
 | Built | Not yet |
 |---|---|
@@ -20,17 +20,18 @@ way every milestone has:
 | Design agents: spec, microarchitecture, and RTL seats; RTL gated on real lint and simulation; the AXI4-Lite register block end to end (M23) | |
 | `nirmaan export`: the numbered `01_requirement` to `10_signoff` deliverable tree (M23) | Loading requirements and verification items from a file; a verification-plan seat |
 | Engineering graph: artifacts linked to Design Graph nodes from their real bytes; `nirmaan gaps` names every requirement not backed by a passing run (M24) | |
-| DFT: real mux-D scan insertion, testability rules, and chain simulation through Yosys and Icarus (M25) | |
+| DFT: real mux-D scan insertion, testability rules, and chain simulation through Yosys and Icarus (M25); multiple chains per clock domain, stuck-at ATPG graded by Icarus fault simulation, and March C- MBIST (M27) | |
 | Firmware: a driver built strict and run against the approved RTL through a Verilator model (M25); on a RISC-V request, also cross-built for RV32I and run on PicoRV32 against the RTL (M27) | |
 | Physical design: OpenSTA and OpenROAD bindings and a `physical-implementation` workflow (M25), run for real in CI on Nangate45: STA, and place and route to 0 DRC (M27) | |
 | Real lint, simulation, synthesis, and formal via open-source EDA (M21) | |
 | Synthesis (no latches) and formal (when the seat writes a `.sby`) before review; formal in CI via the OSS CAD Suite (M26) | |
 | A bounded repair loop: failed before-review checks go back to the seat as evidence, opt-in per capability or `--attempts` (M26) | |
+| Repair after review: a sent-back submission is superseded and the seat reruns with the findings; retry limits per stage and a budget across runs, with escalation when spent (M27) | |
 | The design gates on every RTL workflow (`new-ip`, `feature-addition`, `rtl-change`), and proofs that must reach every cover (M27) | |
 | A synchronous FIFO, a round-robin arbiter, and an APB register block, each with proofs and designed end to end by agents (M26) | |
 | IP Nirmaan over MCP; organizational events on the M18 bus (M22) | |
 | CI on Python 3.11 and 3.12, plus a dash check (Stage 0) | |
-| 1115 tests; CLI `nirmaan`; HTML dashboard; landing page live at https://ip.nirmaan.online | |
+| 1203 tests; CLI `nirmaan`; HTML dashboard; landing page live at https://ip.nirmaan.online | |
 
 ## Resume checklist (after the folder rename)
 
@@ -46,7 +47,7 @@ PYTHONPYCACHEPREFIX=/tmp/nirmaan-pycache .venv/bin/python -m pytest -q \
   --deselect tests/test_ai_boundary.py::test_missing_sdk_raises_clean_error
 ```
 
-Expect 1128 passing (3 skipped: OpenROAD is not installed locally; the CI `physical-design` job runs those three). The folder is still in iCloud, so the eviction hangs
+Expect 1203 passing (3 skipped: OpenROAD is not installed locally; the CI `physical-design` job runs those three). The folder is still in iCloud, so the eviction hangs
 described in `context.md` section 4 still apply. If imports stall, pre-read the tree:
 
 ```

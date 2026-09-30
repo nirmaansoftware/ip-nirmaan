@@ -12,7 +12,7 @@ Repo: https://github.com/nirmaansoftware/ip-nirmaan (public, Apache-2.0; renamed
 to the `nirmaansoftware` account on 2026-09-28; GitHub redirects the old URLs,
 and `patel-om` keeps push access as a collaborator)
 Local path: `/Users/ompatel/Documents/veritriage`
-Current version: **1.20.0** (distribution `ip-nirmaan`; packages `nirmaan` and `veritriage`)
+Current version: **1.21.0** (distribution `ip-nirmaan`; packages `nirmaan` and `veritriage`)
 Portfolio: removed from `/Users/ompatel/Documents/Om Portfolio` at the user's
 request after M19 (card and sample pages deleted).
 
@@ -2301,6 +2301,13 @@ orchestrator, collaboration, project, agents, learning, planning, design,
 conversation, ai, automation. Run with `.venv/bin/python -m pytest -q`
 from the repo root.
 
+v1.21.0 is the one version bump for the five M27 parts, built in parallel and
+merged as #39 (repair after review), #38 (physical design for real), #42 (gates
+everywhere), #43 (DFT), and #40 (RISC-V firmware). The standard local run is
+1203 tests with 3 skipped: the real OpenROAD tests, which run in CI's
+`physical-design` job. The owner's structural review (PR #37) also uses the
+M27 label; it is not part of this release.
+
 ---
 
 ## 4. Operational notes for resuming work
@@ -2324,7 +2331,7 @@ from the repo root.
   renamed to **VeriTriage** at M2/M3 boundary (GitHub redirect preserved
   from the rename). After M19 the user renamed the PROJECT, first to "Nirmaan IP"
   (repo `nirmaan-ip`, v1.16.0) and then, to match the `ipnirmaan.com` domain, to
-  **IP Nirmaan** (repo `patel-om/ip-nirmaan`, distribution `ip-nirmaan`, v1.20.0).
+  **IP Nirmaan** (repo `patel-om/ip-nirmaan`, distribution `ip-nirmaan`, v1.21.0).
   On 2026-09-28 the repo was transferred to `nirmaansoftware/ip-nirmaan`.
   The `nirmaan` package and CLI keep their short name by the user's choice. VeriTriage
   was deliberately NOT renamed: it is the verification engine inside Nirmaan
