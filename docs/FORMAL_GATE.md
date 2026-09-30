@@ -224,9 +224,9 @@ and still tested.
 ## 6. Deferred
 
 * A formal-properties seat separate from the RTL seat (properties written by
-  someone other than the designer), and a vacuity check (cover statements that
-  must be reachable).
+  someone other than the designer). The vacuity check (cover statements that
+  must be reachable) is done in M27, see `docs/GATES_EVERYWHERE.md`.
 * Formal and synthesis on the `new-ip`, `feature-addition`, and `rtl-change`
-  RTL stages.
+  RTL stages: done in M27.
 * Checking that the `.sby` `[script]` reads the listed RTL, beyond `[files]`.
 * Switching all of CI to the OSS CAD Suite's tools.

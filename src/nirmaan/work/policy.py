@@ -129,6 +129,29 @@ def satisfies(state: ProjectState, ev, req) -> bool:
     return True
 
 
+def upstream_artifacts(state: ProjectState, task: Task) -> list:
+    """The artifacts a task builds on: its dependencies' own, seen through any gate (M27).
+
+    A gate produces nothing; approving it approves the stage behind it. A stage
+    that waits on a gate therefore builds on the gated stage's artifacts, and
+    those are the ones that must be approved.
+    """
+    found: dict[str, Any] = {}
+
+    def visit(task_id: str) -> None:
+        dep = state.tasks[task_id]
+        if dep.kind is TaskKind.GATE:
+            for before in dep.depends_on:
+                visit(before)
+            return
+        for art_id in dep.artifacts:
+            found.setdefault(art_id, state.artifacts[art_id])
+
+    for dep_id in task.depends_on:
+        visit(dep_id)
+    return list(found.values())
+
+
 def latest_verdicts(state: ProjectState, task_id: str) -> dict[str, Verdict]:
     verdicts: dict[str, Verdict] = {}
     for review in state.reviews.values():
@@ -265,8 +288,7 @@ def _approved_inputs(ctx: PolicyContext) -> list[str]:
     return [
         f"{task.id} works only from approved upstream artifacts: {art.id} ({art.title}) is "
         f"{art.assurance.value}, not approved"
-        for dep in task.depends_on
-        for art in (ctx.state.artifacts[a] for a in ctx.state.tasks[dep].artifacts)
+        for art in upstream_artifacts(ctx.state, task)
         if art.assurance is not Assurance.APPROVED
     ]
 
@@ -286,8 +308,7 @@ def _before_review(ctx: PolicyContext) -> list[str]:
             problems.append(f"{task.id} cannot go to review: {req.description!r} is not met")
             continue
         for binding in (b for b in req.files if b.upstream):
-            approved = {art.location for dep in task.depends_on for art in
-                        (ctx.state.artifacts[a] for a in ctx.state.tasks[dep].artifacts)
+            approved = {art.location for art in upstream_artifacts(ctx.state, task)
                         if art.kind in binding.kinds and art.assurance is Assurance.APPROVED and art.location}
             if not any(ev.kind is not EvidenceKind.TOOL_RUN
                        or approved & set(ctx.state.tool_runs[ev.tool_run].params.get(binding.param, "").split(","))

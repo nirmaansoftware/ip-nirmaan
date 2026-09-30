@@ -229,5 +229,23 @@ module axi4_lite_regs #(
                 assert (s_axil_bresp == ($past(wr_ok) ? RESP_OKAY : RESP_SLVERR));
         end
     end
+
+    // Covers (M27): each is reached under the manager assumptions above, so
+    // the proof is not vacuous and every response path is exercised.
+    always @(posedge aclk) begin
+        if (f_past_valid && $past(aresetn) && aresetn) begin
+            cover (b_hs && s_axil_bresp == RESP_OKAY);
+            cover (b_hs && s_axil_bresp == RESP_SLVERR);
+            // A register written, then read back.
+            cover (r_hs && s_axil_rresp == RESP_OKAY && s_axil_rdata != {DATA_WIDTH{1'b0}});
+            cover (r_hs && s_axil_rresp == RESP_SLVERR);
+            // Address before data, and data before address.
+            cover (aw_held && !w_held);
+            cover (w_held && !aw_held);
+            // A response held while the manager is not ready.
+            cover ($past(s_axil_bvalid && !s_axil_bready) && s_axil_bvalid);
+            cover ($past(s_axil_rvalid && !s_axil_rready) && s_axil_rvalid);
+        end
+    end
 `endif
 endmodule
