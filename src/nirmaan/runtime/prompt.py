@@ -156,6 +156,9 @@ def _citations(packet: WorkPacket, tools: tuple[ToolNote, ...]) -> list[Citable]
     for note in tools:
         if note.run:
             found.setdefault(note.run, Citable("run", note.run, note.run, f"{note.tool}: {note.summary}"))
+    for review in packet.task.get("reviews", ()):  # a recorded review is citable; it is not evidence (M27)
+        found.setdefault(review["id"], Citable("review", _UNSAFE.sub(".", review["id"]), review["id"],
+                                               f"{review['verdict']} by {review['reviewer']}"))
     for art in packet.task["upstream_artifacts"]:  # only what the organization approved is citable
         if art["trusted"]:
             found.setdefault(art["id"], Citable("artifact", _UNSAFE.sub(".", art["id"]), art["id"],
@@ -222,17 +225,40 @@ def _task(packet: WorkPacket, mode: str, cites: list[Citable], tools: tuple[Tool
         else:
             lines.append(f"Tool {note.tool} was not run: {note.summary}")
     if mode == "work" and t.get("attempts"):
-        lines += _repair(t["attempts"], token)
+        lines += _repair(t["attempts"], t.get("reviews", []), token)
+    elif mode == "review":
+        lines += _sent_back(t.get("attempts", []), t.get("reviews", []), token)
     if t["escalation_path"]:
         lines.append(f"Escalation path: {' -> '.join(t['escalation_path'])}")
     return tuple(lines)
 
 
-def _repair(attempts: list[dict[str, Any]], token: dict[str, str]) -> list[str]:
-    """The refused attempts (M26): each one's reason; the latest one's failed runs, logs, and files."""
+def _sent_back(attempts: list[dict[str, Any]], reviews: list[dict[str, Any]], token: dict[str, str]) -> list[str]:
+    """Every change request on a superseded submission (M27), with its citation token."""
+    by_id = {r["id"]: r for r in reviews}
+    return [f"Review {token.get(r['id'], r['id'])} by {r['reviewer']} on submission {a['number']} requested "
+            f"changes: {r['comments'] or '(no comments)'}"
+            for a in attempts for r in (by_id[i] for i in a["reviews"] if i in by_id)
+            if r["verdict"] == "request_changes"]
+
+
+def _repair(attempts: list[dict[str, Any]], reviews: list[dict[str, Any]], token: dict[str, str]) -> list[str]:
+    """Repair context: submissions a review sent back (M27), then this round's refused attempts (M26)."""
+    lines: list[str] = []
+    sent = [a for a in attempts if a["reviews"]]
+    if sent:
+        lines.append(f"Repair after review: submission {sent[-1]['number']} was sent back by an independent "
+                     "review and nothing from it counts. Address every finding and answer again in full; your "
+                     "new files go through every check and to review again.")
+        lines += _sent_back(sent, reviews, token)
+        for art in sent[-1]["artifacts"]:
+            lines += _content(art, f"sent-back file {art['title']}")
+    attempts = [a for a in attempts if not a["reviews"] and (not sent or a["number"] > sent[-1]["number"])]
+    if not attempts:
+        return lines
     latest = attempts[-1]
-    lines = [f"Repair: your previous attempt {latest['number']} was refused and nothing from it counts. "
-             "Fix what failed and answer again in full; files from a refused attempt are never reviewed."]
+    lines.append(f"Repair: your previous attempt {latest['number']} was refused and nothing from it counts. "
+                 "Fix what failed and answer again in full; files from a refused attempt are never reviewed.")
     lines += [f"Attempt {a['number']} was refused: {a['refusal']}" for a in attempts]
     for failed in latest["failed_runs"]:
         run = token.get(failed["run"], failed["run"])

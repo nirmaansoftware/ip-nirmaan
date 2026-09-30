@@ -22,7 +22,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Protocol
+from typing import Any, Callable, NamedTuple, Protocol
 
 from nirmaan.models import Actor, ActorKind, EscalationKind, EvidenceKind, TaskStatus, Verdict
 from nirmaan.runtime.context import WorkPacket, assemble
@@ -166,32 +166,79 @@ class RunReport:
     attempts: list[dict[str, Any]] = field(default_factory=list)
 
 
-def _attempt_limit(engine: TaskEngine, task_id: str, attempts: int | None) -> int:
-    """How many attempts one run may make: the override, else the task's capability (M26)."""
-    if attempts is not None:
-        if attempts < 1:
-            raise WorkError(f"attempts must be at least 1, got {attempts}")
-        return attempts
-    capability = engine.org.capabilities.get(engine.task(task_id).capability or "")
-    return capability.max_attempts if capability else 1
+class Limits(NamedTuple):
+    """A task's budget (M27): attempts per review round (M26), and review rounds."""
+
+    attempts: int
+    review_rounds: int
+
+
+def limits(engine: TaskEngine, task_id: str, attempts: int | None = None,
+           review_rounds: int | None = None) -> Limits:
+    """Each limit from the override, else the task's workflow stage, else its capability, else 1."""
+    task = engine.task(task_id)
+    workflow = engine.org.workflows.get(task.workflow or "")
+    stage = workflow.stage(task.stage) if workflow and task.stage else None
+    capability = engine.org.capabilities.get(task.capability or "")
+    chosen = []
+    for name, override in (("max_attempts", attempts), ("max_review_rounds", review_rounds)):
+        if override is not None and override < 1:
+            raise WorkError(f"{name.removeprefix('max_').replace('_', ' ')} must be at least 1, got {override}")
+        value = override if override is not None else getattr(stage, name, None)
+        chosen.append(value if value is not None else getattr(capability, name, 1))
+    return Limits(*chosen)
+
+
+def _spent(engine: TaskEngine, task_id: str) -> tuple[list, list]:
+    """The task's superseded submissions, and this round's refused attempts, from state (M27)."""
+    records = sorted((a for a in engine.state.attempts.values() if a.task == task_id), key=lambda a: a.number)
+    sent_back = [a for a in records if a.reviews]
+    since = sent_back[-1].number if sent_back else 0
+    return sent_back, [a for a in records if not a.reviews and a.number > since]
+
+
+def _exhausted(engine: TaskEngine, task_id: str, actor: Actor, budget: Limits) -> RunReport | None:
+    """Escalate, through the owner's route, when running the seat again would exceed a limit (M27)."""
+    sent_back, refused = _spent(engine, task_id)
+    if len(sent_back) >= budget.review_rounds:
+        reason = f"{len(sent_back)} of {budget.review_rounds} review rounds were sent back"
+    elif refused and len(refused) >= budget.attempts:  # with a limit of 1, M26 records no attempt
+        reason = f"{len(refused)} of {budget.attempts} attempts were refused in this review round"
+    else:
+        return None
+    esc = engine.escalate(
+        task_id, actor, EscalationKind.TECHNICAL, reason=f"repair budget exhausted: {reason}",
+        attempted_actions=tuple(f"{a.id}: {a.refusal}" for a in (*sent_back, *refused)),
+        blocking_question="How should this task proceed?",
+        recommended_options=("Allow more attempts or review rounds", "Reassign", "Change approach",
+                             "Cancel with rationale"),
+    )
+    return RunReport(task_id, ResultStatus.NEEDS_ESCALATION, esc.reason, escalation=esc.id)
 
 
 def run_task(engine: TaskEngine, task_id: str, runtime: AgentRuntime,
-             kind: ActorKind = ActorKind.AI_AGENT, attempts: int | None = None) -> RunReport:
+             kind: ActorKind = ActorKind.AI_AGENT, attempts: int | None = None,
+             review_rounds: int | None = None) -> RunReport:
     """Hand one task to a runtime and apply its result through the engine.
 
     When the engine refuses a submission and the attempt limit allows (M26),
     the refused attempt is recorded and the same seat is asked again, with the
-    refused attempts in its packet. Nothing else is retried.
+    refused attempts in its packet. A task a review sent back is worked again
+    with the review's findings (M27) while review rounds remain. The counts
+    live in state, so each limit covers every run; an exhausted one escalates.
     """
     task = engine.task(task_id)
     if task.owner is None:
         raise WorkError(f"{task_id} has no owner")
-    limit = _attempt_limit(engine, task_id, attempts)
+    budget = limits(engine, task_id, attempts, review_rounds)
     actor = Actor(role=task.owner, kind=kind, name=getattr(runtime, "runtime_id", "runtime"))
     packet = assemble(engine, task_id)
     if not runtime.accepts(packet):
         return RunReport(task_id, ResultStatus.DECLINED, f"runtime {runtime.runtime_id!r} declined {task_id}")
+    if task.status in (TaskStatus.READY, TaskStatus.CHANGES_REQUESTED, TaskStatus.IN_PROGRESS):
+        stop = _exhausted(engine, task_id, actor, budget)
+        if stop is not None:
+            return stop
     if task.status in (TaskStatus.READY, TaskStatus.CHANGES_REQUESTED):
         engine.start(task_id, actor)
     elif task.status is not TaskStatus.IN_PROGRESS:
@@ -200,8 +247,10 @@ def run_task(engine: TaskEngine, task_id: str, runtime: AgentRuntime,
     tools = ToolHandle(ToolBroker(engine), actor, task_id)
     report = RunReport(task_id, ResultStatus.DECLINED, "")
     refused: list[str] = []
-    for number in range(1, limit + 1):
-        if number > 1:
+    limit = budget.attempts
+    used = len(_spent(engine, task_id)[1])
+    for number in range(used + 1, limit + 1):
+        if number > used + 1:
             packet = assemble(engine, task_id)  # now carries the refused attempts
         result = runtime.execute(packet, tools)
         step, refusal = _apply(engine, task_id, actor, result, f"attempt {number} of {limit}" if limit > 1 else "")
@@ -221,7 +270,7 @@ def run_task(engine: TaskEngine, task_id: str, runtime: AgentRuntime,
     if refused:
         summary = (f"all {len(refused)} attempts were refused: {', '.join(refused)}"
                    if report.status is ResultStatus.REFUSED
-                   else f"{report.status.value} on attempt {len(report.attempts)}, after {', '.join(refused)}")
+                   else f"{report.status.value} on attempt {report.attempts[-1]['number']}, after {', '.join(refused)}")
         report.detail = "; ".join(p for p in (report.detail, summary) if p)
     return report
 

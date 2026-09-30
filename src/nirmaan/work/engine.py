@@ -279,8 +279,10 @@ class TaskEngine:
 
         new_artifacts = dict(self._state.artifacts)
         ids = list(task.artifacts)
+        # Superseded artifacts keep their IDs (M27), so a new one is numbered after them all.
+        issued = sum(len(a.artifacts) for a in self._state.attempts.values() if a.task == task_id and a.reviews)
         for index, draft in enumerate(artifacts):
-            art_id = f"{task_id}#a{len(ids) + 1}"
+            art_id = f"{task_id}#a{issued + len(ids) + 1}"
             new_artifacts[art_id] = Artifact(
                 id=art_id,
                 kind=draft["kind"],
@@ -384,17 +386,42 @@ class TaskEngine:
                 recorded_by=actor.label, reference=review_id, substantiated=True,
             )
             task_evidence.append(ev_id)
+        details: dict[str, Any] = {"verdict": verdict.value, "review_state": review_state.value}
+        updates: dict[str, Any] = {}
+        if status is S.CHANGES_REQUESTED:
+            # The submission sent back stops counting now (M27): its files leave the task's artifacts.
+            attempt = self._supersede(task, reviews, review_id, comments)
+            details.update(superseded=attempt.id, artifacts=list(task.artifacts))
+            updates = {"attempts": {**self._state.attempts, attempt.id: attempt},
+                       "artifacts": {k: v for k, v in self._state.artifacts.items() if k not in task.artifacts}}
+            task_changes: dict[str, Any] = {"artifacts": ()}
+        else:
+            task_changes = {}
         self._commit(
             actor, "task.review", task_id, reason=comments,
-            details={"verdict": verdict.value, "review_state": review_state.value},
+            details=details,
             warnings=warnings,
             tasks=self._with_task(task, status=status, review_state=review_state,
-                                  evidence=tuple(task_evidence)),
+                                  evidence=tuple(task_evidence), **task_changes),
             reviews=reviews,
             evidence=evidence,
+            **updates,
         )
         self._promote_if_verified(task_id)
         return self.task(task_id)
+
+    def _supersede(self, task: Task, reviews: dict[str, ReviewRecord], review_id: str, comments: str) -> Attempt:
+        """The submission a review sent back, as an Attempt naming every review of it (M27)."""
+        earlier = {r for a in self._state.attempts.values() if a.task == task.id for r in a.reviews}
+        of_it = tuple(r.id for r in reviews.values() if r.task == task.id and r.id not in earlier)
+        kept = tuple(self._state.artifacts[a] for a in task.artifacts if a in self._state.artifacts)
+        number = 1 + sum(1 for a in self._state.attempts.values() if a.task == task.id)
+        reviewer = reviews[review_id].reviewer
+        return Attempt(
+            id=f"{task.id}#t{number}", task=task.id, number=number,
+            actor=kept[0].produced_by if kept else task.owner or "", artifacts=kept, reviews=of_it,
+            refusal=f"changes requested by {reviewer} in {review_id}: {comments or 'no comments'}",
+        )
 
     def approve(self, task_id: str, actor: Actor, note: str = "") -> Task:
         """An authorized, independent approval. Requires a passed review and evidence."""
