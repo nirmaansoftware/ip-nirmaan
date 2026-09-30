@@ -14,14 +14,14 @@ way every milestone has:
 |---|---|
 | Organization model: 207 units, 685 derived roles, skills, authority, a 12-principle constitution | `sta.run` and `pnr.run` on the development machine (they run in CI only, M27); standalone OpenSTA and sky130 in the real-tool tests |
 | Planner: requirement to owned, reviewed, gated task graph; 9 workflows | CTS, power grid, parasitics, multi-corner timing |
-| Task engine: lifecycle, reviews, approvals, human gates, hash-chained audit | Transition-fault ATPG, lockup latches across clock domains, a memory stage for MBIST (stuck-at ATPG, multiple chains, and March C- MBIST: M27); a RISC-V cross-compile and ISS in the firmware loop |
+| Task engine: lifecycle, reviews, approvals, human gates, hash-chained audit | Transition-fault ATPG, lockup latches across clock domains, a memory stage for MBIST (stuck-at ATPG, multiple chains, and March C- MBIST: M27); interrupts and other cores in the RISC-V firmware loop (RV32I on PicoRV32: M27) |
 | VeriTriage as a real, evidence-producing tool (`veritriage.investigate`) | An unattended owner and reviewer loop in one command (repair after review and per-stage limits: M27) |
 | AI workers in three verification seats, off by default, on Opus 5.5 (M20) | The same RTL gates on `parameter-change` and the fix stages; automatic antecedent covers |
 | Design agents: spec, microarchitecture, and RTL seats; RTL gated on real lint and simulation; the AXI4-Lite register block end to end (M23) | |
 | `nirmaan export`: the numbered `01_requirement` to `10_signoff` deliverable tree (M23) | Loading requirements and verification items from a file; a verification-plan seat |
 | Engineering graph: artifacts linked to Design Graph nodes from their real bytes; `nirmaan gaps` names every requirement not backed by a passing run (M24) | |
 | DFT: real mux-D scan insertion, testability rules, and chain simulation through Yosys and Icarus (M25) | |
-| Firmware: a driver built strict and run against the approved RTL through a Verilator model (M25) | |
+| Firmware: a driver built strict and run against the approved RTL through a Verilator model (M25); on a RISC-V request, also cross-built for RV32I and run on PicoRV32 against the RTL (M27) | |
 | Physical design: OpenSTA and OpenROAD bindings and a `physical-implementation` workflow (M25), run for real in CI on Nangate45: STA, and place and route to 0 DRC (M27) | |
 | Real lint, simulation, synthesis, and formal via open-source EDA (M21) | |
 | Synthesis (no latches) and formal (when the seat writes a `.sby`) before review; formal in CI via the OSS CAD Suite (M26) | |
@@ -206,6 +206,7 @@ extraction. Design doc: `docs/PHYSICAL_DESIGN.md`.
 - **Real physical design runs (M27):** a `physical-design` CI job, in the pinned `openroad/orfs:26Q3-687-gc63a606f9` image, runs Nangate45-mapped synthesis, STA (through OpenROAD's embedded OpenSTA, a new `openroad-sta` backend), and place and route on the AXI4-Lite block for real: timing met at 100 MHz and violated at 5 GHz, routed with 0 DRC and 10783 um of wire. The first run's breakages are fixed, and the parser fixtures are captured logs, not synthetic ones. See `docs/PHYSICAL_DESIGN.md` sections 8 and 10.
 - **Gates everywhere (M27, done):** the `new-ip`, `feature-addition`, and `rtl-change` RTL stages carry the `block-design` gates as data (approved inputs, now seen through gates; lint, simulation, synthesis with no latches, formal when a `.sby` is written), and a proof counts only if a cover run over the same setup reaches every cover (`formal.cover`); the fixture proofs carry real covers. See `docs/GATES_EVERYWHERE.md`.
 - **DFT: ATPG, multiple chains, MBIST (M27):** `dft.scan_insert` takes `chains` and `max_chain_length` and cuts balanced chains per clock domain (`scan_in[k]` to `scan_out[k]`); `dft.atpg` generates stuck-at patterns (random, then PODEM) and measures coverage by an Icarus fault simulation through the scan protocol, refusing a pattern set whose claims or expected responses the simulation does not bear out; `dft.mbist` runs a generated March C- controller against a memory. The `block-design` `dft` stage now also needs 90% test coverage before review. See `docs/DFT_ADVANCED.md`.
+- **RISC-V firmware (M27, done):** `fw.cross_build` compiles the driver and its tests strictly for bare-metal RV32I into an ELF with its code size, and `fw.soc_test` runs it on PicoRV32 (vendored, ISC) in one Verilator model with the approved RTL, so the driver's register accesses are CPU loads and stores on the real AXI4-Lite bus (SLVERR reaches the driver through a status register). A request that names RISC-V gates the firmware seat on both, through the new generic `EvidenceRequirement.when`; CI installs `gcc-riscv64-unknown-elf`. See `docs/RISCV_FIRMWARE.md`.
 
 ## Side work (any time; owner-driven)
 

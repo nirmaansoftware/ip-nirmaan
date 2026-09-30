@@ -68,6 +68,7 @@ FEATURES: list[FeatureRule] = [
     FeatureRule(feature="registers", skills=("register_programming", "register_documentation"), patterns=(r"\bcsrs?\b", r"\bregisters?\b", r"\bregister map\b")),
     FeatureRule(feature="dft", skills=("dft_architecture",), patterns=(r"\bdft\b", r"\bscan chains?\b", r"\bmbist\b", r"\batpg\b")),
     FeatureRule(feature="firmware", skills=("embedded_firmware", "device_drivers"), patterns=(r"\bfirmware\b", r"\bdrivers?\b")),
+    FeatureRule(feature="riscv", patterns=(r"\brisc[- ]?v\b", r"\brv32\w*")),
     FeatureRule(feature="performance", skills=("performance_modeling",), patterns=(r"\bbandwidth\b", r"\blatency\b", r"\bthroughput\b")),
     FeatureRule(feature="existing_design", patterns=(r"\bexisting\b", r"\bcurrent\b")),
     FeatureRule(feature="recent_change", skills=("change_impact_analysis", "regression_intelligence"), patterns=(r"\b(recent|latest|last)\b.*\b(commit|change|merge)\b",
