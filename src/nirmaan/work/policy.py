@@ -153,9 +153,11 @@ def upstream_artifacts(state: ProjectState, task: Task) -> list:
 
 
 def latest_verdicts(state: ProjectState, task_id: str) -> dict[str, Verdict]:
+    """Each reviewer's latest verdict on the current submission; a superseded one's reviews are over (M27)."""
+    stale = {r for a in state.attempts.values() if a.task == task_id for r in a.reviews}
     verdicts: dict[str, Verdict] = {}
     for review in state.reviews.values():
-        if review.task == task_id:
+        if review.task == task_id and review.id not in stale:
             verdicts[review.reviewer] = review.verdict
     return verdicts
 

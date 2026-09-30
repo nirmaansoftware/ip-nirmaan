@@ -142,7 +142,9 @@ def test_changes_requested_sends_work_back(bridge):
     bridge.review(t, agent(task.reviewer), Verdict.APPROVE)
     bridge.approve(t, agent(task.approver))
     assert bridge.task(t).status is TaskStatus.COMPLETED
-    assert len(bridge.task(t).artifacts) == 2  # provenance keeps both versions
+    assert len(bridge.task(t).artifacts) == 1  # v1 was superseded by the change request (M27)
+    (v1,) = [a for a in bridge.state.attempts.values() if a.task == t]  # provenance keeps it on the record
+    assert [a.title for a in v1.artifacts] == ["v1"] and v1.reviews
 
 
 def test_conflicting_reviews_must_be_escalated(bridge):
