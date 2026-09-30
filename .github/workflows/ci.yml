@@ -74,13 +74,15 @@ jobs:
           echo /OpenROAD-flow-scripts/tools/install/yosys/bin >> "$GITHUB_PATH"
       - name: Tool versions
         run: |
-          ls /OpenROAD-flow-scripts/tools/install/OpenROAD/bin /OpenROAD-flow-scripts/tools/install/yosys/bin
-          which openroad yosys; which sta || true
+          # The image ships no standalone sta: sta.run runs in OpenROAD (openroad-sta).
+          which openroad yosys
           openroad -version && yosys -V
-          ls "$NIRMAAN_PDK_ROOT/nangate45/lib" "$NIRMAAN_PDK_ROOT/nangate45/lef" | head -20
+          ls "$NIRMAAN_PDK_ROOT/nangate45/lib/NangateOpenCellLibrary_typical.lib"
       - name: Install
         run: uv pip install -e ".[dev]"
       - name: Test
+        # openroad and yosys are required, so the real STA and place-and-route
+        # tests fail rather than skip.
         env:
           NIRMAAN_REQUIRE_EDA: yosys openroad
         run: python -m pytest -q -rs tests/test_nirmaan_physical.py --basetemp="$RUNNER_TEMP/pd"

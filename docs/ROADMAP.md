@@ -12,7 +12,7 @@ way every milestone has:
 
 | Built | Not yet |
 |---|---|
-| Organization model: 207 units, 685 derived roles, skills, authority, a 12-principle constitution | A first real run of `sta.run` and `pnr.run`: neither OpenSTA nor OpenROAD is installed here or in CI; their parser samples are synthetic |
+| Organization model: 207 units, 685 derived roles, skills, authority, a 12-principle constitution | `sta.run` and `pnr.run` on the development machine (they run in CI only, M27); standalone OpenSTA and sky130 in the real-tool tests |
 | Planner: requirement to owned, reviewed, gated task graph; 9 workflows | CTS, power grid, parasitics, multi-corner timing |
 | Task engine: lifecycle, reviews, approvals, human gates, hash-chained audit | ATPG, multiple scan chains, MBIST; a RISC-V cross-compile and ISS in the firmware loop |
 | VeriTriage as a real, evidence-producing tool (`veritriage.investigate`) | An unattended owner and reviewer loop in one command (repair after review and per-stage limits: M27) |
@@ -22,7 +22,7 @@ way every milestone has:
 | Engineering graph: artifacts linked to Design Graph nodes from their real bytes; `nirmaan gaps` names every requirement not backed by a passing run (M24) | |
 | DFT: real mux-D scan insertion, testability rules, and chain simulation through Yosys and Icarus (M25) | |
 | Firmware: a driver built strict and run against the approved RTL through a Verilator model (M25) | |
-| Physical design: OpenSTA and OpenROAD bindings and a `physical-implementation` workflow, refused where the tools or PDK are missing (M25) | |
+| Physical design: OpenSTA and OpenROAD bindings and a `physical-implementation` workflow (M25), run for real in CI on Nangate45: STA, and place and route to 0 DRC (M27) | |
 | Real lint, simulation, synthesis, and formal via open-source EDA (M21) | |
 | Synthesis (no latches) and formal (when the seat writes a `.sby`) before review; formal in CI via the OSS CAD Suite (M26) | |
 | A bounded repair loop: failed before-review checks go back to the seat as evidence, opt-in per capability or `--attempts` (M26) | |
@@ -45,7 +45,7 @@ PYTHONPYCACHEPREFIX=/tmp/nirmaan-pycache .venv/bin/python -m pytest -q \
   --deselect tests/test_ai_boundary.py::test_missing_sdk_raises_clean_error
 ```
 
-Expect 1115 passing (2 skipped: OpenSTA and OpenROAD are not installed). The folder is still in iCloud, so the eviction hangs
+Expect 1128 passing (3 skipped: OpenROAD is not installed locally; the CI `physical-design` job runs those three). The folder is still in iCloud, so the eviction hangs
 described in `context.md` section 4 still apply. If imports stall, pre-read the tree:
 
 ```
@@ -173,11 +173,13 @@ and `09_evidence/requirement_gaps.md` in the export.
 
 ## Stage 6 (M25+): Physical design, DFT, firmware (spec Phase 7)
 
-**Status: DFT and firmware done and real; physical design built but never run
-against the real tools.** Details for each part follow.
+**Status: DFT, firmware, and physical design done and real** (physical design
+runs in CI since M27). Details for each part follow.
 
-**Physical design part:** bindings built, not yet run against the real
-tools. `sta.run` (OpenSTA) and `pnr.run` (OpenROAD: one staged run, floorplan,
+**Physical design part:** bindings built in M25, run for real in CI since M27
+(the `physical-design` job, in a pinned OpenROAD-flow-scripts image, on
+Nangate45); on the development machine they refuse, since OpenROAD is not
+installed there. What follows is the M25 state. `sta.run` (OpenSTA) and `pnr.run` (OpenROAD: one staged run, floorplan,
 place, route, then timing) are `AVAILABLE` and refuse, with a reason, where the
 executable or the PDK inputs are missing; neither tool is installed on the
 development machine or in CI. `synth.run` gained a Liberty-mapped backend that
@@ -200,6 +202,7 @@ extraction. Design doc: `docs/PHYSICAL_DESIGN.md`.
 - **More blocks (M26):** a synchronous FIFO, a round-robin arbiter, and an APB4 register block (PSLVERR for unmapped addresses, as the AXI4-Lite block's SLVERR), each with real RTL, testbenches, and proofs, and each designed end to end by agents on `block-design` with no core change. See `docs/IP_BLOCKS.md`.
 - **Formal gate (M26, done):** the `block-design` RTL stage goes to review only after real synthesis with no latches and, when the seat writes a `.sby`, a real SymbiYosys proof over the submitted RTL; CI installs `sby` and `yices-smt2` from a pinned OSS CAD Suite and runs formal instead of skipping it. See `docs/FORMAL_GATE.md`.
 - **Repair after review (M27):** a submission a reviewer sends back is superseded into an `Attempt` (out of export, links, and approval), and the owner is run again with the review as a citable `[review:...]` record and the sent-back files; `max_attempts` and a new `max_review_rounds` are data on a capability or a workflow stage (CLI, then stage, then capability, then 1), counted from state across runs, and an exhausted budget escalates. See `docs/REVIEW_REPAIR.md`.
+- **Real physical design runs (M27):** a `physical-design` CI job, in the pinned `openroad/orfs:26Q3-687-gc63a606f9` image, runs Nangate45-mapped synthesis, STA (through OpenROAD's embedded OpenSTA, a new `openroad-sta` backend), and place and route on the AXI4-Lite block for real: timing met at 100 MHz and violated at 5 GHz, routed with 0 DRC and 10783 um of wire. The first run's breakages are fixed, and the parser fixtures are captured logs, not synthetic ones. See `docs/PHYSICAL_DESIGN.md` sections 8 and 10.
 
 ## Side work (any time; owner-driven)
 
