@@ -17,16 +17,19 @@ from nirmaan.integrations.eda_parsers import Diagnostic, EdaResult, _first, _plu
 
 #: The place-and-route stages, in flow order; timing is reported after the last one run.
 PNR_STAGES = ("floorplan", "place", "route")
+#: The violator report lists at most this many paths per check, so a count this high is a lower bound.
+VIOLATOR_REPORT_LIMIT = 100
 
 _TAGGED_RE = re.compile(r"^\[(?P<sev>ERROR|WARNING) (?P<code>[A-Z]+-\d+)\]\s*(?P<msg>.*)$")
 _PLAIN_RE = re.compile(r"^(?P<sev>Error|Warning):\s*(?P<msg>.*)$")
 _ENDPOINT_RE = re.compile(r"^Endpoint:\s*(?P<pin>\S+)")
 _PATH_TYPE_RE = re.compile(r"^Path Type:\s*(?P<type>max|min)\b")
 _SLACK_RE = re.compile(r"^(?P<slack>-?\d+(?:\.\d+)?)\s+slack \((?P<state>MET|VIOLATED)\)")
-_WORST_RE = re.compile(r"^worst slack\s+(?P<value>\S+)")
-_TNS_RE = re.compile(r"^tns\s+(?P<value>\S+)")
-_WNS_RE = re.compile(r"^wns\s+(?P<value>\S+)")
-_AREA_RE = re.compile(r"^Design area (?P<area>[\d.]+) u\^2 (?P<util>[\d.]+)% utilization")
+# ``report_worst_slack -max`` prints ``worst slack max 7.120``; an unlabelled figure is read in report order.
+_WORST_RE = re.compile(r"^worst slack(?:\s+(?P<kind>max|min))?\s+(?P<value>\S+)")
+_TNS_RE = re.compile(r"^tns(?:\s+(?:max|min))?\s+(?P<value>\S+)")
+_WNS_RE = re.compile(r"^wns(?:\s+(?:max|min))?\s+(?P<value>\S+)")
+_AREA_RE = re.compile(r"^Design area (?P<area>[\d.]+) um?\^2 (?P<util>[\d.]+)% utilization")
 _WIRELENGTH_RE = re.compile(r"Total wire length = (?P<um>[\d.]+) um")
 _DRC_RE = re.compile(r"Number of violations = (?P<n>\d+)")
 _STAGE_RE = re.compile(r"^nirmaan-stage(?P<done>-done)?: (?P<stage>\w+)")
@@ -52,8 +55,9 @@ def _diagnostics(lines: list[str]) -> list[Diagnostic]:
 
 
 def _timing(lines: list[str]) -> dict[str, Any]:
-    """Worst slacks (setup, then hold, in report order), TNS, WNS, and the violating endpoints."""
+    """Worst slacks (setup and hold, by label or else in report order), TNS, WNS, and the violating endpoints."""
     worst: list[float | None] = []
+    labelled: dict[str, float | None] = {}
     tns = wns = None
     endpoint, check = "", "setup"
     violators: dict[tuple[str, str], float] = {}
@@ -67,15 +71,20 @@ def _timing(lines: list[str]) -> dict[str, Any]:
                 key, slack = (endpoint, check), float(m["slack"])
                 violators[key] = min(slack, violators.get(key, slack))
         elif m := _WORST_RE.match(line):
-            worst.append(_num(m["value"]))
+            if m["kind"]:
+                labelled[m["kind"]] = _num(m["value"])
+            else:
+                worst.append(_num(m["value"]))
         elif m := _TNS_RE.match(line):
             tns = _num(m["value"])
         elif m := _WNS_RE.match(line):
             wns = _num(m["value"])
     ordered = sorted(violators.items(), key=lambda item: (item[1], item[0]))
+    setup = labelled["max"] if "max" in labelled else (worst[0] if worst else None)
+    hold = labelled["min"] if "min" in labelled else (worst[1] if len(worst) > 1 else None)
     return {
-        "worst_slack": worst[0] if worst else None,
-        "worst_hold_slack": worst[1] if len(worst) > 1 else None,
+        "worst_slack": setup,
+        "worst_hold_slack": hold,
         "tns": tns,
         "wns": wns,
         "violating_endpoints": [{"endpoint": e, "check": c, "slack": s} for (e, c), s in ordered],
@@ -122,7 +131,10 @@ def parse_opensta(log: str, returncode: int) -> EdaResult:
     if _timing_met(timing):
         return EdaResult(True, f"timing met: {_slacks(timing)}", tuple(diags), metrics)
     violators = timing["violating_endpoints"]
-    summary = f"timing violated: {_plural(len(violators), 'violating endpoint')}, {_slacks(timing)}"
+    count = _plural(len(violators), "violating endpoint")
+    if len(violators) >= VIOLATOR_REPORT_LIMIT:
+        count = f"at least {count}"
+    summary = f"timing violated: {count}, {_slacks(timing)}"
     if violators:
         v = violators[0]
         summary += f"; worst: {v['endpoint']} ({v['check']}) {v['slack']:.3f}"
