@@ -176,7 +176,7 @@ def test_the_new_tools_are_available_and_refused_without_their_executables(engin
 @needs("yosys", "iverilog", "vvp")
 @pytest.mark.parametrize("block,params", [
     ("counter", {"chains": "2"}), ("axi4_lite", {"chains": "8"}), ("apb_regs", {"max_chain_length": "20"}),
-    ("rr_arbiter", {"chains": "3"}), ("sync_fifo", {"chains": "4"})])
+    ("rr_arbiter", {"chains": "2"}), ("sync_fifo", {"chains": "4"})])
 def test_real_multi_chain_insertion_checks_and_simulates(engine, tmp_path, block, params):
     source, top = BLOCKS[block]
     metrics = insert(engine, source, top, tmp_path / "insert", **params)
@@ -230,7 +230,7 @@ def test_real_atpg_coverage_is_measured_by_fault_simulation(engine, tmp_path):
 
 
 @needs("yosys", "iverilog", "vvp")
-@pytest.mark.parametrize("block,chains", [("rr_arbiter", "3"), ("sync_fifo", "4")])
+@pytest.mark.parametrize("block,chains", [("rr_arbiter", "2"), ("sync_fifo", "4")])
 def test_real_atpg_on_multi_chain_blocks(engine, tmp_path, block, chains):
     scan, top = _scan(engine, block, tmp_path / "insert", chains=chains)
     run, metrics = atpg(engine, scan, top, tmp_path / "atpg", min_test_coverage="95")

@@ -1,16 +1,23 @@
-"""Design for test through open-source EDA: scan insertion, rule checks, chain simulation.
+"""Design for test through open-source EDA: scan, rule checks, chain simulation, ATPG, and MBIST.
 
-Three tools, each an M21 backend behind the tool broker:
+Five tools, each an M21 backend behind the tool broker:
 
 * ``dft.scan_insert`` (Yosys): synthesize, turn every flop into a mux-D scan
-  flop with a techmap, and stitch one chain from ``scan_in`` to ``scan_out``
-  under ``scan_en``. It writes the scan netlist and a chain report.
+  flop with a techmap, and stitch balanced chains (``chains``,
+  ``max_chain_length``; never mixing clock domains) from ``scan_in`` to
+  ``scan_out`` under ``scan_en``. It writes the scan netlist and a chain report.
 * ``dft.check`` (Yosys): testability rules over the synthesized netlist. The
   rules are a registry (:func:`register_rule`): a new rule is a function of
   the netlist, and needs no change here or in the core.
 * ``dft.scan_sim`` (Yosys, Icarus): a generated, self-checking testbench
   shifts a known pattern through the chain, then captures once and shifts the
   result out, and Icarus runs it.
+* ``dft.atpg`` (Yosys, Icarus, M27): stuck-at patterns from ``dft_atpg.py``
+  (random, then PODEM), graded by an Icarus fault simulation through the scan
+  protocol. The coverage is what that simulation measured; a pattern set that
+  claims a fault the simulation does not detect fails the run.
+* ``dft.mbist`` (Yosys, Icarus, M27): a March C- controller from
+  ``dft_mbist.py``, run against the memory in Icarus.
 
 A tool that cannot run here is refused with a reason (the M21 probe); a design
 that fails is a recorded run with ``succeeded=False``. The steps between tool
@@ -33,15 +40,29 @@ from nirmaan.integrations.eda import Backend, Job, RunRecord, register_backend
 from nirmaan.integrations.eda_parsers import Diagnostic, EdaResult, parse_simulation, parse_yosys
 
 HELPER = Path(__file__).with_name("dft_scan.py")
+ATPG_HELPER = Path(__file__).with_name("dft_atpg.py")
+MBIST_HELPER = Path(__file__).with_name("dft_mbist.py")
 SCAN_NETLIST = "scan.v"
 CHAIN_REPORT = "chain.json"
 DESIGN_JSON = "design.json"
 TESTBENCH = "scan_tb.v"
 TB_TOP = "nirmaan_scan_tb"
+PATTERNS = "patterns.json"
+FAULTS = "faults.json"
+ATPG_CONFIG = "atpg_config.json"
+MBIST_CONTROLLER = "nirmaan_mbist.v"
 
 _HELPER_ERROR_RE = re.compile(r"^DFT-ERROR:\s*(?P<msg>.*)$", re.M)
-_SCAN_RESULT_RE = re.compile(r"DFT-SCAN: chain length (?P<length>\d+), shift errors (?P<shift>\d+), "
-                             r"capture errors (?P<capture>\d+)")
+_SCAN_RESULT_RE = re.compile(r"DFT-SCAN: (?:(?P<chains>\d+) chains, (?P<flops>\d+) flops, )?chain length "
+                             r"(?P<length>\d+), shift errors (?P<shift>\d+), capture errors (?P<capture>\d+)")
+_FAULT_RE = re.compile(r"^DFT-FAULT (?P<index>\d+) (?P<pattern>-?\d+)$", re.M)
+_ATPG_CHECK_RE = re.compile(r"DFT-ATPG-CHECK: patterns (?P<patterns>\d+), response errors (?P<response>\d+), "
+                            r"injection errors (?P<injection>\d+)")
+_ATPG_DONE_RE = re.compile(r"DFT-ATPG: (?P<faults>\d+) faults simulated")
+_MBIST_GEN_RE = re.compile(r"DFT-MBIST-GEN: March C- for (?P<top>\S+),")
+_MBIST_RE = re.compile(r"DFT-MBIST: march C-, words (?P<words>\d+), width (?P<width>\d+), reads (?P<reads>\d+), "
+                       r"writes (?P<writes>\d+), cycles (?P<cycles>\d+), x reads (?P<x>\d+), done (?P<done>\d+), "
+                       r"fail (?P<fail>\d+), element (?P<element>\d+), address (?P<address>\d+)")
 
 
 # --- Testability rules: a registry ----------------------------------------------------------
@@ -117,13 +138,6 @@ def _reset_from_input(design: Design) -> list[str]:
             for f in design.flops if f.reset is not None and f.reset not in inputs]
 
 
-def _one_clock(design: Design) -> list[str]:
-    domains = sorted({f"{f.edge} {design.describe(f.clock)}" for f in design.flops})
-    if len(domains) <= 1:
-        return []
-    return [f"{len(domains)} clock domains or edges ({'; '.join(domains)}): one chain covers one"]
-
-
 def _known_cells(design: Design) -> list[str]:
     return [f"cell {cell} of type {kind} is not a gate or flop the checker can evaluate"
             for cell, kind in design.unknown]
@@ -141,9 +155,9 @@ for _rule in (
             "generated clocks).", _clock_from_input),
     DftRule("reset-from-input", "Every asynchronous reset or set comes directly from a module input.",
             _reset_from_input),
-    DftRule("one-clock-domain", "All flops share one clock and edge, so one chain covers them.", _one_clock),
     DftRule("recognized-cells", "Every cell is a gate or flop the checker can evaluate.", _known_cells),
-    DftRule("scan-chain-complete", "With scan_en high, every flop is on one chain from scan_in to scan_out.",
+    DftRule("scan-chain-complete", "With scan_en high, every flop is on a chain from a scan_in bit to the "
+            "matching scan_out bit, and each chain stays in one clock domain.",
             _chain_complete, applies=Design.has_scan_ports),
 ):
     register_rule(_rule)
@@ -179,8 +193,18 @@ def _insert_steps(job: Job) -> list[list[str]]:
     for stale in (SCAN_NETLIST, CHAIN_REPORT, "stitched.json", "scan_stat.json"):
         (work / stale).unlink(missing_ok=True)
     return [["yosys", "-s", "prep.ys"],
-            _helper("stitch", DESIGN_JSON, "stitched.json", CHAIN_REPORT, str(job.top)),
+            _helper("stitch", DESIGN_JSON, "stitched.json", CHAIN_REPORT, str(job.top),
+                    job.params.get("chains") or "1", job.params.get("max_chain_length") or "0"),
             ["yosys", "-s", "stitch.ys"]]
+
+
+def _chain_params(job: Job) -> str | None:
+    """Why ``chains`` or ``max_chain_length`` cannot be used as given, if so."""
+    for name in ("chains", "max_chain_length"):
+        value = job.params.get(name, "").strip()
+        if value and not (value.isdigit() and int(value) > 0):
+            return f"{name} must be a positive integer, not {value!r}"
+    return None
 
 
 def _check_steps(job: Job) -> list[list[str]]:
@@ -238,12 +262,18 @@ def parse_scan_insert(run: RunRecord) -> EdaResult:
     netlist = run.workdir / SCAN_NETLIST
     metrics: dict = {"exit_statuses": list(run.returncodes)}
     if failed is None and report is not None and netlist.is_file():
-        metrics.update(chain_length=report["length"], chains=1, clock=report["clock"], ports=report["ports"],
+        lengths = [c["length"] for c in report["chains"]]
+        metrics.update(chain_length=report["length"], chains=len(lengths), chain_lengths=lengths,
+                       flops=report["flops"], clock=report["clock"], clocks=report["clocks"], ports=report["ports"],
                        order=[f["flop"] for f in report["order"]], scan_netlist=str(netlist),
                        chain_report=str(run.workdir / CHAIN_REPORT))
-        clock = report["clock"]
-        return EdaResult(True, f"scan inserted: {report['length']} flops on one mux-D chain "
-                               f"({clock['edge']} {clock['port']}), netlist {SCAN_NETLIST}", tuple(errors), metrics)
+        clocks = "; ".join(f"{c['edge']} {c['port']}" for c in report["clocks"])
+        if len(lengths) == 1:
+            return EdaResult(True, f"scan inserted: {report['length']} flops on one mux-D chain ({clocks}), "
+                                   f"netlist {SCAN_NETLIST}", tuple(errors), metrics)
+        return EdaResult(True, f"scan inserted: {report['flops']} flops on {len(lengths)} balanced mux-D chains "
+                               f"(lengths {', '.join(map(str, lengths))}; {clocks}), netlist {SCAN_NETLIST}",
+                         tuple(errors), metrics)
     reason = failed or "no scan netlist was written"
     if errors and not _HELPER_ERROR_RE.search(run.log):
         reason = errors[0].message
@@ -270,12 +300,14 @@ def parse_dft_check(run: RunRecord) -> EdaResult:
         "flip_flops": len(design.flops), "latches": len(design.latches), "rules": verdicts,
         "scan_ports": design.has_scan_ports(), "exit_statuses": list(run.returncodes),
     }
+    chain = ", no scan ports (chain rule not applicable)"
     if design.has_scan_ports() and verdicts.get("scan-chain-complete") == "pass":
-        metrics["chain_length"] = len(design.flops)
+        lengths = [len(c) for c in design.trace_chain().chains]
+        metrics.update(chain_length=max(lengths), chains=len(lengths), chain_lengths=lengths)
+        chain = (f", chain complete ({len(design.flops)} flops)" if len(lengths) == 1 else
+                 f", {len(lengths)} chains complete ({len(design.flops)} flops, longest {max(lengths)})")
     applied = sum(v != "not applicable" for v in verdicts.values())
     if not diags:
-        chain = (f", chain complete ({len(design.flops)} flops)" if metrics.get("chain_length") is not None
-                 else ", no scan ports (chain rule not applicable)")
         return EdaResult(True, f"dft check passed: {applied} rules, {len(design.flops)} flip-flops{chain}",
                          (), metrics)
     broken = sorted({d.code for d in diags})
@@ -301,12 +333,17 @@ def parse_scan_sim(run: RunRecord) -> EdaResult:
     found = _SCAN_RESULT_RE.search(run.log)
     metrics.update(sim.metrics, testbench=str(run.workdir / TESTBENCH))
     if found:
-        metrics.update(shift_errors=int(found["shift"]), capture_errors=int(found["capture"]))
+        metrics.update(shift_errors=int(found["shift"]), capture_errors=int(found["capture"]),
+                       chains=int(found["chains"] or 1), chain_length=int(found["length"]))
     clean = found is not None and found["shift"] == "0" and found["capture"] == "0"
     if sim.passed and clean:
         length = int(found["length"])
-        return EdaResult(True, f"scan chain passed: {length} flops, {2 * length} bits shifted through, "
-                               f"one capture checked, 0 mismatches", sim.diagnostics, metrics)
+        if found["chains"] is None:
+            return EdaResult(True, f"scan chain passed: {length} flops, {2 * length} bits shifted through, "
+                                   f"one capture checked, 0 mismatches", sim.diagnostics, metrics)
+        return EdaResult(True, f"scan chains passed: {found['chains']} chains, {found['flops']} flops, longest "
+                               f"{length}, {2 * length} bits shifted through each, one capture checked, "
+                               f"0 mismatches", sim.diagnostics, metrics)
     detail = (f"{found['shift']} shift and {found['capture']} capture mismatches" if found
               else sim.summary)
     return EdaResult(False, f"scan chain failed: {detail}", sim.diagnostics, metrics)
@@ -322,10 +359,215 @@ def _top_of(run: RunRecord) -> str | None:
     return m[1] if m else None
 
 
+# --- ATPG (M27) ---------------------------------------------------------------------------------
+
+
+def atpg_helper(*args: str) -> list[str]:
+    """A step that runs ``dft_atpg.py``."""
+    return [sys.executable, str(ATPG_HELPER), *args]
+
+
+def atpg_analysis_steps(job: Job) -> list[list[str]]:
+    """Yosys synthesizes the scan netlist flat, as ``dft.check`` does, into ``design.json``."""
+    return [["yosys", "-s", _analysis_script(job, "atpg_analyze.ys")]]
+
+
+def atpg_grading_steps(job: Job, patterns: str) -> list[list[str]]:
+    """Grade ``patterns`` by fault simulation: the fault netlist, Yosys writes it, Icarus runs both machines."""
+    work = job.workdir
+    limits = {k[4:]: v for k, v in job.params.items() if k.startswith("min_")}
+    (work / ATPG_CONFIG).write_text(json.dumps({"min": limits}) + "\n", encoding="utf-8")
+    script = ["read_json faulty.json", "hierarchy -check -top nirmaan_faulty", "check -assert",
+              "write_verilog -noattr fault_netlist.v"]
+    (work / "fault.ys").write_text("\n".join(script) + "\n", encoding="utf-8")
+    for stale in (FAULTS, "faulty.json", "fault_netlist.v", "atpg_tb.v", "atpg.vvp"):
+        (work / stale).unlink(missing_ok=True)
+    return [atpg_helper("inject", DESIGN_JSON, patterns, "faulty.json", FAULTS, "atpg_tb.v", str(job.top),
+                        "--sample", job.params.get("fault_sample") or "0", "--seed", job.params.get("seed") or "1"),
+            ["yosys", "-s", "fault.ys"],
+            ["iverilog", "-g2012", "-o", "atpg.vvp", "-s", "nirmaan_atpg_tb", *job.sources, "fault_netlist.v",
+             "atpg_tb.v"],
+            ["vvp", "-n", "atpg.vvp"]]
+
+
+def _atpg_steps(job: Job) -> list[list[str]]:
+    given = job.params.get("patterns", "").strip()
+    steps = atpg_analysis_steps(job)
+    if given:
+        return steps + atpg_grading_steps(job, str(Path(given).resolve()))
+    (job.workdir / PATTERNS).unlink(missing_ok=True)
+    steps.append(atpg_helper("generate", DESIGN_JSON, PATTERNS, str(job.top), "--seed", job.params.get("seed") or "1"))
+    return steps + atpg_grading_steps(job, PATTERNS)
+
+
+def _atpg_params(job: Job) -> str | None:
+    """Why the ATPG parameters cannot be used as given, if so."""
+    for name in ("fault_sample", "seed"):
+        value = job.params.get(name, "").strip()
+        if value and not value.isdigit():
+            return f"{name} must be a non-negative integer, not {value!r}"
+    for name, value in job.params.items():
+        if name.startswith("min_"):
+            try:
+                float(value)
+            except ValueError:
+                return f"{name} {value!r} is not a number"
+    return None
+
+
+def _plural(n: int, word: str) -> str:
+    return f"{n} {word}{'' if n == 1 else 's'}"
+
+
+def parse_atpg(run: RunRecord) -> EdaResult:
+    """Coverage from the fault simulation's own detections; claims and expected responses are checked."""
+    metrics: dict = {"exit_statuses": list(run.returncodes)}
+    helper = _HELPER_ERROR_RE.search(run.log)
+    doc = _json(run.workdir / FAULTS)
+    if helper or doc is None:
+        errors = _yosys_errors(run)
+        reason = helper["msg"].strip() if helper else (errors[0].message if errors else
+                                                       _step_failed(run, 6) or "no fault list was written")
+        return EdaResult(False, f"ATPG failed before fault simulation: {reason}",
+                         tuple(errors or [Diagnostic("error", reason)]), metrics)
+    check, done = _ATPG_CHECK_RE.search(run.log), _ATPG_DONE_RE.search(run.log)
+    if check is None or done is None or any(rc != 0 for rc in run.returncodes):
+        errors = _yosys_errors(run)
+        reason = errors[0].message if errors else (_step_failed(run, len(run.returncodes)) or "no result line")
+        return EdaResult(False, f"fault simulation did not complete: {reason}",
+                         tuple(errors or [Diagnostic("error", reason)]), metrics)
+    faults = doc["faults"]
+    detected_at = {int(m["index"]): int(m["pattern"]) for m in _FAULT_RE.finditer(run.log)}
+    if sorted(detected_at) != list(range(len(faults))):
+        reason = f"the fault simulation reported {len(detected_at)} of {len(faults)} faults"
+        return EdaResult(False, f"fault simulation did not complete: {reason}", (Diagnostic("error", reason),),
+                         metrics)
+    untestable, claims = set(doc["untestable"]), doc["claims"]
+    listing = []
+    for i, fault in enumerate(faults):
+        at = detected_at[i]
+        kind = "detected" if at >= 0 else ("undetectable" if fault["name"] in untestable else "undetected")
+        listing.append({"name": fault["name"], "class": kind, "pattern": at if at >= 0 else None,
+                        "claimed": claims.get(fault["name"])})
+    by_name = {f["name"]: f for f in listing}
+    total = len(listing)
+    detected = sum(f["class"] == "detected" for f in listing)
+    undetectable = sum(f["class"] == "undetectable" for f in listing)
+    missed = [n for n in claims if by_name[n]["class"] != "detected"]
+    testable = total - undetectable
+    metrics.update(
+        faults_total=total, faults_detected=detected, faults_undetectable=undetectable,
+        faults_undetected=total - detected - undetectable,
+        fault_coverage=round(100.0 * detected / total, 2) if total else 100.0,
+        test_coverage=round(100.0 * detected / testable, 2) if testable else 100.0,
+        patterns=int(check["patterns"]), chains=doc["chains"], claimed=len(claims), claims_not_detected=len(missed),
+        response_errors=int(check["response"]), injection_errors=int(check["injection"]),
+        faults_in_universe=doc["universe"], sampled=doc["sampled"], aborted=len(doc["aborted"]),
+        patterns_file=str(run.workdir / PATTERNS) if (run.workdir / PATTERNS).is_file() else None,
+        fault_list=listing)
+    diags: list[Diagnostic] = []
+    if metrics["injection_errors"]:
+        diags.append(Diagnostic("error", f"with no fault enabled, the fault netlist differed from the design "
+                                         f"{metrics['injection_errors']} times", "ATPG-INJECTION"))
+    if metrics["response_errors"]:
+        diags.append(Diagnostic("error", f"{metrics['response_errors']} expected responses in the pattern set "
+                                         f"differ from the good machine's", "ATPG-RESPONSE"))
+    if missed:
+        diags.append(Diagnostic("error", f"the pattern set claims {_plural(len(missed), 'fault')} the fault "
+                                         f"simulation did not detect: {', '.join(missed[:5])}", "ATPG-CLAIM"))
+    if diags:
+        return EdaResult(False, "ATPG refused: " + "; ".join(d.message for d in diags), tuple(diags), metrics)
+    sample = (f"; a seeded sample of {total} of {doc['universe']} faults" if doc["sampled"] else "")
+    summary = (f"ATPG: {detected} of {total} faults detected in fault simulation ({metrics['fault_coverage']:.2f}% "
+               f"fault coverage, {metrics['test_coverage']:.2f}% test coverage; {undetectable} proven undetectable, "
+               f"{metrics['faults_undetected']} undetected), {_plural(metrics['patterns'], 'pattern')} over "
+               f"{_plural(doc['chains'], 'chain')}{sample}")
+    limits = (_json(run.workdir / ATPG_CONFIG) or {}).get("min", {})
+    short = []
+    for metric, bound in sorted(limits.items()):
+        measured = metrics.get(metric)
+        if isinstance(measured, bool) or not isinstance(measured, (int, float)):
+            short.append(f"{metric} was not reported, so min_{metric} cannot be checked")
+        elif measured < float(bound):
+            short.append(f"{metric} {measured} is below min_{metric} {bound}")
+    if short:
+        return EdaResult(False, f"limit not met: {'; '.join(short)} (the tool reported: {summary})",
+                         tuple(Diagnostic("error", m, "LIMIT") for m in short), metrics)
+    return EdaResult(True, summary, (), metrics)
+
+
+# --- MBIST (M27) ---------------------------------------------------------------------------------
+
+
+def _mbist_steps(job: Job) -> list[list[str]]:
+    work = job.workdir
+    (work / "mbist_ports.ys").write_text("\n".join([*_read(job), "proc", "write_json mbist_ports.json"]) + "\n",
+                                         encoding="utf-8")
+    for stale in ("mbist_ports.json", MBIST_CONTROLLER, "mbist_tb.v", "mbist.vvp"):
+        (work / stale).unlink(missing_ok=True)
+    return [["yosys", "-s", "mbist_ports.ys"],
+            [sys.executable, str(MBIST_HELPER), "generate", "mbist_ports.json", MBIST_CONTROLLER, "mbist_tb.v",
+             str(job.top)],
+            ["iverilog", "-g2012", "-o", "mbist.vvp", "-s", "nirmaan_mbist_tb", *job.sources, MBIST_CONTROLLER,
+             "mbist_tb.v"],
+            ["vvp", "-n", "mbist.vvp"]]
+
+
+def parse_mbist(run: RunRecord) -> EdaResult:
+    """Pass means the controller ran March C- to the end, made exactly 10N operations, and saw no mismatch."""
+    from nirmaan.integrations.dft_mbist import MARCH_C_MINUS
+
+    metrics: dict = {"exit_statuses": list(run.returncodes)}
+    helper = _HELPER_ERROR_RE.search(run.log)
+    found = _MBIST_RE.search(run.log)
+    named = _MBIST_GEN_RE.search(run.log)
+    top = named["top"] if named else "the memory"
+    if helper or found is None:
+        errors = _yosys_errors(run)
+        sim_log = "".join(f"$ {c}\n{t}" for c, t in _sections(run.log) if c.startswith(("iverilog", "vvp")))
+        errors += list(parse_simulation(sim_log, run.returncodes[2:]).diagnostics) if len(run.returncodes) > 2 else []
+        reason = helper["msg"].strip() if helper else (errors[0].message if errors else
+                                                       _step_failed(run, 4) or "no MBIST result")
+        return EdaResult(False, f"MBIST did not run: {reason}", tuple(errors or [Diagnostic("error", reason)]),
+                         metrics)
+    words, width = int(found["words"]), int(found["width"])
+    reads, writes, cycles = int(found["reads"]), int(found["writes"]), int(found["cycles"])
+    failed = found["fail"] == "1"
+    metrics.update(depth=words, width=width, reads=reads, writes=writes, operations=reads + writes, cycles=cycles,
+                   x_reads=int(found["x"]), done=found["done"] == "1", fail=failed,
+                   controller=str(run.workdir / MBIST_CONTROLLER), testbench=str(run.workdir / "mbist_tb.v"))
+    if failed:
+        element = int(found["element"])
+        direction, ops = MARCH_C_MINUS[element] if element < len(MARCH_C_MINUS) else ("?", "?")
+        metrics.update(fail_element=element, fail_address=int(found["address"]))
+        message = (f"March C- failed on {top}: first mismatch in element {element} ({direction} {ops}) at "
+                   f"address {found['address']}")
+        return EdaResult(False, message, (Diagnostic("error", message, "MBIST-FAIL"),), metrics)
+    problems = []
+    if not metrics["done"]:
+        problems.append("the controller never finished")
+    if reads != 5 * words or writes != 5 * words:
+        problems.append(f"{reads} reads and {writes} writes, not {5 * words} of each")
+    if cycles != 15 * words:
+        problems.append(f"{cycles} cycles, not {15 * words}")
+    if metrics["x_reads"]:
+        problems.append(f"{metrics['x_reads']} reads returned unknown bits")
+    if problems:
+        message = f"March C- did not run to completion on {top}: {'; '.join(problems)}"
+        return EdaResult(False, message, (Diagnostic("error", message, "MBIST-INCOMPLETE"),), metrics)
+    return EdaResult(True, f"March C- passed on {top}: {words} words of {width} bits, {reads + writes} operations, "
+                           f"{cycles} cycles", (), metrics)
+
+
 register_backend(Backend("yosys-scan", "dft.scan_insert", ("yosys",), _insert_steps, parse_scan_insert,
-                         ("sources", "top")))
+                         ("sources", "top"), check=_chain_params))
 register_backend(Backend("yosys-dft", "dft.check", ("yosys",), _check_steps, parse_dft_check, ("sources", "top")))
 register_backend(Backend("icarus-scan", "dft.scan_sim", ("yosys", "iverilog", "vvp"), _sim_steps, parse_scan_sim,
                          ("sources", "top")))
+register_backend(Backend("icarus-atpg", "dft.atpg", ("yosys", "iverilog", "vvp"), _atpg_steps, parse_atpg,
+                         ("sources", "top"), files=("patterns",), check=_atpg_params))
+register_backend(Backend("icarus-mbist", "dft.mbist", ("yosys", "iverilog", "vvp"), _mbist_steps, parse_mbist,
+                         ("sources", "top")))
 
-__all__ = ["SCAN_PORTS", "DftRule", "check_design", "register_rule", "rules", "unregister_rule"]
+__all__ = ["SCAN_PORTS", "DftRule", "atpg_analysis_steps", "atpg_grading_steps", "atpg_helper", "check_design",
+           "parse_atpg", "parse_mbist", "register_rule", "rules", "unregister_rule"]

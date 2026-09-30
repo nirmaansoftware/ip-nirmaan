@@ -508,7 +508,12 @@ BLOCK_DESIGN = WorkflowTemplate(
                              FileInput(param="top", kinds=("dft_netlist",), entry=True)),
                      checked("The scan chain shifts and captures in simulation", "dft.scan_sim",
                              FileInput(param="sources", kinds=("dft_netlist",)),
-                             FileInput(param="top", kinds=("dft_netlist",), entry=True)))),
+                             FileInput(param="top", kinds=("dft_netlist",), entry=True)),
+                     # M27: stuck-at test coverage, measured by fault simulation, before review.
+                     checked("ATPG reaches 90% stuck-at test coverage in fault simulation", "dft.atpg",
+                             FileInput(param="sources", kinds=("dft_netlist",)),
+                             FileInput(param="top", kinds=("dft_netlist",), entry=True),
+                             params=(("min_test_coverage", "90"),)))),
         st("firmware", "Driver and driver tests", "Software", "fw.driver",
            depends_on=("interface-spec", "rtl-implementation"), when=when("firmware"), criticality=M,
            review=rv("sw.review"), outputs=("driver", "driver_test"),

@@ -14,7 +14,8 @@ co-simulation are AVAILABLE the same way (``nirmaan/integrations/firmware.py``,
 M25).
 
 Scan insertion, DFT rule checks, and scan chain simulation are AVAILABLE through
-Yosys and Icarus (``nirmaan/integrations/dft.py``, M25).
+Yosys and Icarus (``nirmaan/integrations/dft.py``, M25); so are stuck-at ATPG,
+graded by fault simulation, and March C- memory BIST (M27).
 """
 
 from __future__ import annotations
@@ -75,6 +76,8 @@ TOOLS: list[ToolSpec] = [
     _tool("dft.scan_insert", "Scan insertion", "eda", EXE, AV, "Mux-D scan flops stitched into one chain."),
     _tool("dft.check", "DFT rule check", "eda", EXE, AV, "Testability rules over the synthesized netlist."),
     _tool("dft.scan_sim", "Scan chain simulation", "eda", EXE, AV, "Shift and capture through the chain in simulation."),
+    _tool("dft.atpg", "ATPG", "eda", EXE, AV, "Stuck-at patterns, with coverage measured by fault simulation."),
+    _tool("dft.mbist", "Memory BIST", "eda", EXE, AV, "A March C- controller run against the memory in simulation."),
     # Software and infrastructure.
     _tool("compiler.run", "Compiler toolchain", "software", EXE, CO, "Build firmware and software."),
     _tool("fw.build", "Firmware build", "software", EXE, AV, "Compile C firmware under strict warning flags."),
