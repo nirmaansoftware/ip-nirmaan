@@ -148,6 +148,9 @@ class StageTemplate(BaseModel):
     evidence: tuple[EvidenceRequirement, ...] = ()
     max_retries: int = Field(default=1, ge=0)
     on_failure: OnFailure = OnFailure.RETRY_THEN_ESCALATE
+    #: Overrides the capability's limits for this stage (M27); None inherits them.
+    max_attempts: int | None = Field(default=None, ge=1)
+    max_review_rounds: int | None = Field(default=None, ge=1)
     #: Continuity of ownership: this stage is owned by whoever owns that stage
     #: (e.g. "merge" by the author of the change), if they hold the capability.
     owner_from: str | None = None
