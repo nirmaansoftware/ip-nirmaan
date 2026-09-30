@@ -4,7 +4,9 @@ Three backends on the M21 registry (``eda.register_backend``):
 
 * ``yosys-liberty`` for ``synth.run``: synthesis mapped to a Liberty library,
   writing the gate-level ``netlist.v`` that STA and place-and-route consume.
-* ``opensta`` for ``sta.run``: static timing of a netlist under an SDC.
+* ``opensta`` for ``sta.run``: static timing of a netlist under an SDC; and
+  ``openroad-sta``, the same script in OpenROAD's embedded OpenSTA, when only
+  ``openroad`` is installed (packaged OpenROAD builds ship no ``sta``).
 * ``openroad`` for ``pnr.run``: floorplan, placement, and routing in one
   OpenROAD session, stopping after ``stop_after``, with timing reported last.
 
@@ -24,7 +26,7 @@ from typing import Callable
 
 from nirmaan.integrations.eda import Backend, EdaResult, Job, RunRecord, register_backend
 from nirmaan.integrations.eda_parsers import parse_yosys
-from nirmaan.integrations.pd_parsers import PNR_STAGES, parse_openroad, parse_opensta
+from nirmaan.integrations.pd_parsers import PNR_STAGES, VIOLATOR_REPORT_LIMIT, parse_openroad, parse_opensta
 
 #: Relative PDK paths resolve under this directory (or the ``pdk_root`` parameter).
 PDK_ROOT_ENV = "NIRMAAN_PDK_ROOT"
@@ -97,7 +99,8 @@ def _design(job: Job, key: str) -> str:
 def _timing_reports() -> list[str]:
     return ["report_checks -path_delay max -digits 3",
             "report_checks -path_delay min -digits 3",
-            "report_checks -path_delay min_max -slack_max 0 -group_count 100 -endpoint_count 1 -digits 3",
+            "report_checks -path_delay min_max -slack_max 0 "
+            f"-group_path_count {VIOLATOR_REPORT_LIMIT} -endpoint_path_count 1 -digits 3",
             "report_worst_slack -max -digits 3",
             "report_worst_slack -min -digits 3",
             "report_tns -digits 3",
@@ -107,12 +110,29 @@ def _timing_reports() -> list[str]:
 # --- synth.run: yosys-liberty -------------------------------------------------------------
 
 
+def _tie_cell(params: dict[str, str], key: str) -> list[str]:
+    """``CELL/PORT`` from a tie parameter, as ``hilomap`` takes it, or nothing when it is not given."""
+    value = params.get(key, "").strip()
+    if not value:
+        return []
+    cell, _, port = value.partition("/")
+    if not (_TOKEN_RE.match(cell) and _TOKEN_RE.match(port)):
+        raise ValueError(f"{key} must be CELL/PORT, not {value!r}")
+    return [cell, port]
+
+
 def _synth_steps(job: Job) -> list[list[str]]:
     lib = f'"{pdk_paths(job.params, "liberty")[0]}"'  # the first Liberty file, quoted as eda.py quotes sources
+    high, low = _tie_cell(job.params, "tie_high"), _tie_cell(job.params, "tie_low")
+    # Constants become tie cells when the PDK names them: a router cannot route a
+    # logic 0 or 1 net (OpenROAD's detailed router rejects it as a ground net).
+    ties = ["hilomap -singleton" + (" -hicell {} {}".format(*high) if high else "")
+            + (" -locell {} {}".format(*low) if low else "")] if high or low else []
     script = [*(f'read_verilog -sv "{src}"' for src in job.sources),
               f"synth -top {job.top}",
               f"dfflibmap -liberty {lib}",
               f"abc -liberty {lib}",
+              *ties,
               "opt_clean -purge",
               f"tee -q -o stat.json stat -json -liberty {lib}",
               "write_verilog -noattr -noexpr -nohex -nodec netlist.v"]
@@ -142,8 +162,10 @@ def _synth_parse(run: RunRecord) -> EdaResult:
 # --- sta.run: OpenSTA ---------------------------------------------------------------------
 
 
-def _sta_steps(job: Job) -> list[list[str]]:
-    script = [*(f"read_liberty {_tcl(str(p))}" for p in pdk_paths(job.params, "liberty")),
+def _sta_script(job: Job, lefs: bool = False) -> None:
+    lef_files = pdk_paths(job.params, "tech_lef") + pdk_paths(job.params, "lef") if lefs else []
+    script = [*(f"read_lef {_tcl(str(f))}" for f in lef_files),
+              *(f"read_liberty {_tcl(str(p))}" for p in pdk_paths(job.params, "liberty")),
               f"read_verilog {_design(job, 'netlist')}",
               f"link_design {_token(job.params, 'top')}",
               f"read_sdc {_design(job, 'sdc')}"]
@@ -151,7 +173,20 @@ def _sta_steps(job: Job) -> list[list[str]]:
         script.append(f"read_spef {_design(job, 'spef')}")
     script += _timing_reports()
     (job.workdir / "sta.tcl").write_text("\n".join(script) + "\n", encoding="utf-8")
+
+
+def _sta_steps(job: Job) -> list[list[str]]:
+    _sta_script(job)
     return [["sta", "-no_init", "-no_splash", "-exit", "sta.tcl"]]
+
+
+def _openroad_sta_steps(job: Job) -> list[list[str]]:
+    """The same script in OpenROAD, which embeds OpenSTA: packaged OpenROAD builds ship no ``sta``.
+
+    OpenROAD links a netlist into its database, so it reads the LEFs first.
+    """
+    _sta_script(job, lefs=True)
+    return [["openroad", "-no_init", "-no_splash", "-exit", "sta.tcl"]]
 
 
 def _sta_parse(run: RunRecord) -> EdaResult:
@@ -219,6 +254,10 @@ register_backend(Backend("yosys-liberty", "synth.run", ("yosys",), _synth_steps,
                          environment=needs_pdk(**LIBERTY)))
 register_backend(Backend("opensta", "sta.run", ("sta",), _sta_steps, _sta_parse, ("netlist", "sdc", "top"),
                          files=("netlist", "sdc", "spef"), environment=needs_pdk(**LIBERTY)))
+# Standalone OpenSTA first; OpenROAD's embedded OpenSTA when only OpenROAD is installed.
+register_backend(Backend("openroad-sta", "sta.run", ("openroad",), _openroad_sta_steps, _sta_parse,
+                         ("netlist", "sdc", "top"), files=("netlist", "sdc", "spef"),
+                         environment=needs_pdk(**LIBERTY, tech_lef="a technology LEF", lef="a cell LEF")))
 register_backend(Backend("openroad", "pnr.run", ("openroad",), _pnr_steps, _pnr_parse, ("netlist", "sdc", "top"),
                          files=("netlist", "sdc"),
                          environment=needs_pdk(**LIBERTY, tech_lef="a technology LEF", lef="a cell LEF",

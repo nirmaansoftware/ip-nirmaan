@@ -123,5 +123,19 @@ module rr_arbiter #(
                         assert (f_dist(f_w) == N - 1);
         end
     end
+
+    // Covers (M27): each is reached under the assumptions above, so the
+    // proof is not vacuous. Every requester is granted, and every requester
+    // waits the full bound of N - 1 cycles, so the fairness bound is tight.
+    genvar f_g;
+    generate
+        for (f_g = 0; f_g < N; f_g = f_g + 1) begin : f_cover
+            always @(posedge clk)
+                if (f_past_valid && rst_n) begin
+                    cover (grant[f_g]);
+                    cover (f_wait[8*f_g +: 8] == N - 1);
+                end
+        end
+    endgenerate
 `endif
 endmodule

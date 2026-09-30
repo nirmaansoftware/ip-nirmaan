@@ -295,8 +295,7 @@ reviewed and approved.
 * A repair loop: done in M26, see `docs/REPAIR_LOOP.md`.
 * A separate verification seat for the testbench.
 * Applying `files` and `before_review` to the `new-ip`, `feature-addition`,
-  and `rtl-change` RTL stages. It is a data edit, but the existing flows (and
-  their tests) submit first and attach evidence later.
+  and `rtl-change` RTL stages: done in M27, see `docs/GATES_EVERYWHERE.md`.
 * FIFO, arbiter, and APB register blocks on the block workflow: done in M26,
   see `docs/IP_BLOCKS.md`.
 * Synthesis (`synth.run`) and formal (`formal.run`) as before-review checks:

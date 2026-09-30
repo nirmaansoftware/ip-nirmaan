@@ -15,6 +15,7 @@ from typing import Any
 from nirmaan.models import Assurance, MemoryScope, TaskStatus
 from nirmaan.runtime.files import excerpt, read_verified
 from nirmaan.work.engine import TaskEngine
+from nirmaan.work.policy import upstream_artifacts
 
 #: The most of one file's content a packet carries.
 MAX_CONTENT = 60_000
@@ -85,11 +86,9 @@ def assemble(engine: TaskEngine, task_id: str, role: str | None = None) -> WorkP
     }
 
     upstream = []
-    for dep in task.depends_on:
-        for art_id in state.tasks[dep].artifacts:
-            art = state.artifacts[art_id]
-            approved = art.assurance is Assurance.APPROVED
-            upstream.append(_artifact(art, trusted=approved, content=approved))
+    for art in upstream_artifacts(state, task):  # M27: seen through gates
+        approved = art.assurance is Assurance.APPROVED
+        upstream.append(_artifact(art, trusted=approved, content=approved))
     evidence = [
         {"id": ev.id, "task": ev.task, "kind": ev.kind.value, "description": ev.description,
          "substantiated": ev.substantiated, "tool_run": ev.tool_run, "reference": ev.reference}

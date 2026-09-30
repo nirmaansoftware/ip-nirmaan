@@ -1863,6 +1863,112 @@ budget on resolution; file-level signoff (a passing run over a superseded file
 stays on the task as evidence); `DOCUMENT` evidence and spec requirements that
 name a superseded artifact keep their records.
 
+### Milestone 27 (physical design) - OpenROAD and OpenSTA run for real in CI (after Stage 6)
+
+M25's `sta.run` and `pnr.run` bindings had never run. A new CI job,
+`physical-design`, runs them for real, and the first runs' breakages are
+fixed. Design doc: `docs/PHYSICAL_DESIGN.md` (sections 8 and 10). No version
+bump.
+
+Key points worth not re-deriving:
+- **Where it runs.** Only in CI: the job runs inside
+  `openroad/orfs:26Q3-687-gc63a606f9` (pinned by digest; ORFS `c63a606f9`,
+  OpenROAD `c487fc70`, Yosys 0.68+post, Nangate45 under `flow/platforms`),
+  Python 3.12 from `setup-uv`, `NIRMAAN_PDK_ROOT` at the platforms directory,
+  `NIRMAAN_REQUIRE_EDA="yosys openroad"`, and only
+  `tests/test_nirmaan_physical.py`. Every run's working directory is uploaded as
+  the `pd-logs` artifact. The main test jobs are unchanged. macOS: no Homebrew
+  formula and no Docker, so the real tests skip locally.
+- **No standalone `sta` exists in packaged OpenROAD**, and `openroad` has no
+  OpenSTA-only mode. `sta.run` gained a second backend, `openroad-sta`: the same
+  script under `openroad`, plus `read_lef` (OpenROAD links into its database;
+  `ORD-2010` without LEFs), so it also needs `tech_lef` and `lef`. `opensta`
+  stays first when `sta` is on PATH.
+- **Fixes from the real output:** `yosys-liberty` takes optional
+  `tie_high`/`tie_low` (`CELL/PORT`, via `hilomap`), since the detailed router
+  rejects a constant net (`DRT-0305`); the area line is `um^2`, not `u^2`;
+  `report_worst_slack` prints `worst slack max <n>` and `report_tns` `tns max
+  <n>` (parsed by label, unlabelled still read in order); `-group_count` and
+  `-endpoint_count` became `-group_path_count` and `-endpoint_path_count`; a
+  violator count at the report cap (`VIOLATOR_REPORT_LIMIT`, 100) is "at least".
+- **Real numbers** (AXI4-Lite block, Nangate45, ideal clock, no CTS or power
+  grid): STA at 100 MHz met, setup slack 7.264, hold 0.101; at 5 GHz
+  (`axi4_lite_regs_fast.sdc`) violated, setup -0.905, TNS -157.481; place and
+  route to route, 41% utilization, 0 DRC (the signal routing only; power pins
+  are unconnected), wirelength 10783 um, setup slack 7.120; at 300% utilization
+  it fails in placement (`GPL-0301`).
+
+Fixtures: the four `synthetic_*.log` are deleted; `opensta_met.log`,
+`opensta_violated.log`, `openroad_route.log`, and `openroad_error.log` are
+captured from CI run 36600440325, each with a `# CAPTURED:` first line and the
+log unedited below it. The real-tool tests moved from sky130 to Nangate45 and
+gained the violated-timing and failed place-and-route cases; new unit tests
+cover the `openroad-sta` fallback and tie cells. The standard local run is 1128
+tests with 3 skipped (the three real OpenROAD tests); in CI the
+`physical-design` job runs them. Deferred: standalone OpenSTA in CI, sky130,
+a local OpenROAD, and CTS, power grid, and parasitic extraction as before.
+
+### Milestone 27 (gates everywhere) - The design gates on every RTL workflow, and non-vacuous proofs (after Stage 6)
+
+The `new-ip` `rtl-implementation`, `feature-addition` `rtl-change`, and
+`rtl-change` `change` stages now carry `RTL_GATES` (in `company/workflows.py`):
+the `block-design` checks (lint, simulation, synthesis with `max_latches=0`,
+formal when a `formal_spec` is produced) plus `NOT_VACUOUS`, a `formal.cover`
+run over the same `.sby`, also tied to `formal_spec`. Each of the three stages
+now produces a `testbench` too, and a human attestation no longer meets them.
+`block-design` gains `NOT_VACUOUS` as one added line. Design doc:
+`docs/GATES_EVERYWHERE.md`.
+
+Key design points worth not re-deriving:
+- **Non-vacuity is a cover run of the seat's own setup.** The
+  `symbiyosys-cover` backend (`integrations/eda.py`) writes a copy of the
+  `.sby` into the run's directory with `mode cover` and absolute `[files]`
+  paths; script, engines, depth, and assumptions are the proof's.
+  `parse_sby_cover` passes only on `DONE (PASS)`, exit 0, at least one reached
+  cover, and none unreached (SymbiYosys itself calls a setup with no covers a
+  pass). `[tasks]` setups are a recorded failure. A separate tool, not a
+  `formal.run` mode, so a cover run can never meet "Formal properties are
+  proven".
+- **What it catches:** over-constrained inputs, assumptions contradictory on
+  the path to a covered state, antecedents the seat covers. A plain
+  `assume (1'b0)` already fails `formal.run` (smtbmc `--presat`). Covers the
+  seat did not write, or trivial ones, are the reviewer's to catch.
+- **Approved inputs through gates.** On `new-ip` and `feature-addition` the RTL
+  task depends on `microarchitecture.gate`, which has no artifacts, so the seat
+  saw no upstream and the M23 approved-inputs check held vacuously.
+  `upstream_artifacts(state, task)` in `work/policy.py` looks through gate
+  tasks; the context packet, the `approved-inputs` check, and the upstream
+  bindings of `evidence-before-review` all use it.
+- **`drive` follows the gated order.** `tests/nirmaan_helpers.py`
+  `gated_submit` writes `counter.v` and `counter_tb.v`, runs each applicable
+  before-review check through the broker from the requirement's own data,
+  records the runs, then submits. Tests that drive through these stages need
+  `GATE_TOOLS` (`verilator iverilog vvp yosys`) and are marked so.
+- **Fixture covers** in `counter`, AXI4-Lite (8), FIFO (6), arbiter (2 per
+  requester, including the tight fairness bound), and APB (4), under
+  `` `ifdef FORMAL ``. The APB proof depth rose from 4 to 8 so a write and read
+  back is reachable.
+
+Tests: `tests/test_nirmaan_gates_everywhere.py` (34): the stages as data; the
+planned tasks gated and on approved inputs (through a gate, and a cancelled
+impact analysis refusing an `rtl-change`); on each of the three workflows a
+latch and a failing self-check refused and clean RTL with a proof approved;
+two vacuous proofs refused while `formal.run` passes; `assume (1'b0)` failing
+both runs; no covers refused; all
+seven fixture setups reach every cover; the cover run's isolation and
+prechecks; the parser on captured logs; crown jewel
+`test_a_fourth_workflow_is_gated_with_no_core_changes`; `drive`'s order; the
+core never names `formal.cover`; CI requires the formal tools. Migrated (each
+listed in the design doc, section 5): two `test_nirmaan_work.py` tests and one
+each in `test_nirmaan_eda.py` and `test_nirmaan_export.py` gained
+`GATE_TOOLS`; three exact tool-set assertions gained `formal.cover`. The
+standard run, merged with the review-repair milestone, is 1160 tests with 2
+skipped (OpenSTA, OpenROAD).
+
+Deferred: the same gates on `parameter-change` and the fix stages
+(`regression-investigation`, `timing-closure`) and on `cdc-design`; automatic
+antecedent covers; multi-task setups in the cover check.
+
 ---
 
 ### Milestone 27 (DFT) - ATPG, multiple scan chains, and MBIST (after Stage 6)
