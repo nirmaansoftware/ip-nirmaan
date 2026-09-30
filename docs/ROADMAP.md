@@ -14,7 +14,7 @@ way every milestone has:
 |---|---|
 | Organization model: 207 units, 685 derived roles, skills, authority, a 12-principle constitution | A first real run of `sta.run` and `pnr.run`: neither OpenSTA nor OpenROAD is installed here or in CI; their parser samples are synthetic |
 | Planner: requirement to owned, reviewed, gated task graph; 9 workflows | CTS, power grid, parasitics, multi-corner timing |
-| Task engine: lifecycle, reviews, approvals, human gates, hash-chained audit | ATPG, multiple scan chains, MBIST; a RISC-V cross-compile and ISS in the firmware loop |
+| Task engine: lifecycle, reviews, approvals, human gates, hash-chained audit | Transition-fault ATPG, lockup latches across clock domains, a memory stage for MBIST (stuck-at ATPG, multiple chains, and March C- MBIST: M27); a RISC-V cross-compile and ISS in the firmware loop |
 | VeriTriage as a real, evidence-producing tool (`veritriage.investigate`) | An unattended owner and reviewer loop in one command (repair after review and per-stage limits: M27) |
 | AI workers in three verification seats, off by default, on Opus 5.5 (M20) | Approved-inputs, synthesis, and formal gating on the `new-ip`, `feature-addition`, and `rtl-change` RTL stages; non-vacuity checks for properties |
 | Design agents: spec, microarchitecture, and RTL seats; RTL gated on real lint and simulation; the AXI4-Lite register block end to end (M23) | |
@@ -200,6 +200,7 @@ extraction. Design doc: `docs/PHYSICAL_DESIGN.md`.
 - **More blocks (M26):** a synchronous FIFO, a round-robin arbiter, and an APB4 register block (PSLVERR for unmapped addresses, as the AXI4-Lite block's SLVERR), each with real RTL, testbenches, and proofs, and each designed end to end by agents on `block-design` with no core change. See `docs/IP_BLOCKS.md`.
 - **Formal gate (M26, done):** the `block-design` RTL stage goes to review only after real synthesis with no latches and, when the seat writes a `.sby`, a real SymbiYosys proof over the submitted RTL; CI installs `sby` and `yices-smt2` from a pinned OSS CAD Suite and runs formal instead of skipping it. See `docs/FORMAL_GATE.md`.
 - **Repair after review (M27):** a submission a reviewer sends back is superseded into an `Attempt` (out of export, links, and approval), and the owner is run again with the review as a citable `[review:...]` record and the sent-back files; `max_attempts` and a new `max_review_rounds` are data on a capability or a workflow stage (CLI, then stage, then capability, then 1), counted from state across runs, and an exhausted budget escalates. See `docs/REVIEW_REPAIR.md`.
+- **DFT: ATPG, multiple chains, MBIST (M27):** `dft.scan_insert` takes `chains` and `max_chain_length` and cuts balanced chains per clock domain (`scan_in[k]` to `scan_out[k]`); `dft.atpg` generates stuck-at patterns (random, then PODEM) and measures coverage by an Icarus fault simulation through the scan protocol, refusing a pattern set whose claims or expected responses the simulation does not bear out; `dft.mbist` runs a generated March C- controller against a memory. The `block-design` `dft` stage now also needs 90% test coverage before review. See `docs/DFT_ADVANCED.md`.
 
 ## Side work (any time; owner-driven)
 

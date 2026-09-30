@@ -185,7 +185,27 @@ coverage. The reverse, a fault the simulation detects that the file did not
 claim, is fine: shifting can reveal faults the capture model cannot (for
 example on a net used only in shift mode), and the measurement is what counts.
 
-### 3.5 Parameters
+### 3.5 Measured coverage
+
+Generated patterns, graded by the Icarus fault simulation (Yosys 0.69,
+Icarus 13; the full universe, no sampling):
+
+| Block | Chains | Faults | Detected | Proven undetectable | Test coverage | Patterns | Icarus time |
+|---|---|---|---|---|---|---|---|
+| `counter` | 1 | 70 | 70 | 0 | 100% | 10 | under 1 s |
+| `atpg_demo` | 2 | 132 | 130 | 2 (`spare`) | 100% | 16 | under 1 s |
+| `rr_arbiter` | 2 | 116 | 116 | 0 | 100% | 14 | under 1 s |
+| `sync_fifo` | 4 | 754 | 754 | 0 | 100% | 50 | 8 s |
+| `apb_regs` | 8 | 1800 | 1800 | 0 | 100% | 65 | 2 min |
+| `axi4_lite_regs` | 8 | 2476 | 2476 | 0 | 100% | 74 | 3 min |
+
+On `axi4_lite_regs` PODEM proves 164 faults untestable in the capture model
+(for example stuck-at-1 on a NAND that `scan_en` drives: with `scan_en` low it
+is already 1), and the simulation detects all of them while shifting. That is
+why the class comes from the simulation. The two larger blocks are graded
+here, not in the test suite, for time; `fault_sample` bounds a run.
+
+### 3.6 Parameters
 
 | Parameter | Meaning |
 |---|---|
@@ -266,8 +286,8 @@ for real, and is removed.
 1. Multi-chain insertion, check, and simulation run for real on `counter.v`,
    `axi4_lite_regs.v`, and the M26 blocks; chains are balanced.
 2. Two clock domains get separate chains, and they shift and capture.
-3. ATPG coverage on `counter.v` and a multi-chain block is measured by the
-   Icarus fault simulation and meets its threshold.
+3. ATPG coverage on `counter.v`, `rr_arbiter`, and `sync_fifo` (multi-chain)
+   is measured by the Icarus fault simulation and meets its threshold.
 4. A pattern set with a false claim, or a wrong expected response, is refused.
 5. An undetectable fault is classified as such, with a proof, on a fixture.
 6. MBIST passes on the clean RAM and fails on each injected fault kind; the
