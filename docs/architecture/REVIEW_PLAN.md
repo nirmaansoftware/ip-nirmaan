@@ -114,3 +114,19 @@ test; #40 shares `company/tools.py` and `integrations/firmware.py`. Whichever
 of #38/#40 merges after #41 must declare any new tool parameters it reads in
 `company/tools.py`; `test_every_parameter_an_integration_reads_is_declared`
 will say which. Do not start M29 until the owner has settled the order.
+
+**2026-09-30.** #39 (M27 repair after review) merged into `main`. `main`
+was merged into #37 (context.md conflict: both M27 entries kept, this
+review's retitled "Milestone 27 (seat evaluation)"; 1141 passed, 2 skipped)
+and #37 into #41 (1154 passed, 2 skipped). The disk was full (273 MB free),
+which failed a firmware test with ENOSPC; stale test temp directories older
+than an hour were removed (about 5 GB freed). The owner should look at the
+disk: 182 GB of 228 GB is used, and a full disk also explains iCloud evicting
+files.
+
+Follow-up for whichever of #38/#40 merges after #41 (#41's tests will fail
+until done): in `company/tools.py`, give #40's new tools contracts,
+`fw.cross_build` (`sources` paths required, `*RUNNER`) and `fw.soc_test`
+(`sources` and `rtl` paths required, `TOP`, `*RUNNER`); add `tie_high` and
+`tie_low` (text) to `pnr.run` for #38. #40's `firmware_riscv.py` also splits
+`rtl` itself; `list_values` is the helper to use.
