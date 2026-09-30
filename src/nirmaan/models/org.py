@@ -185,7 +185,11 @@ class Capability(BaseModel):
     )
     max_attempts: int = Field(
         default=1, ge=1,
-        description="Attempts one run may make when the engine refuses a submission (M26); 1 means no repair.",
+        description="Attempts per review round when the engine refuses a submission (M26); 1 means no repair.",
+    )
+    max_review_rounds: int = Field(
+        default=1, ge=1,
+        description="Submissions that may go to independent review (M27); 1 means no repair after review.",
     )
 
 
