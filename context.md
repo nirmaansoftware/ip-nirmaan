@@ -1863,7 +1863,113 @@ budget on resolution; file-level signoff (a passing run over a superseded file
 stays on the task as evidence); `DOCUMENT` evidence and spec requirements that
 name a superseded artifact keep their records.
 
-### Milestone 27 - RISC-V firmware: the driver on a core against the RTL (after Stage 6)
+### Milestone 27 (physical design) - OpenROAD and OpenSTA run for real in CI (after Stage 6)
+
+M25's `sta.run` and `pnr.run` bindings had never run. A new CI job,
+`physical-design`, runs them for real, and the first runs' breakages are
+fixed. Design doc: `docs/PHYSICAL_DESIGN.md` (sections 8 and 10). No version
+bump.
+
+Key points worth not re-deriving:
+- **Where it runs.** Only in CI: the job runs inside
+  `openroad/orfs:26Q3-687-gc63a606f9` (pinned by digest; ORFS `c63a606f9`,
+  OpenROAD `c487fc70`, Yosys 0.68+post, Nangate45 under `flow/platforms`),
+  Python 3.12 from `setup-uv`, `NIRMAAN_PDK_ROOT` at the platforms directory,
+  `NIRMAAN_REQUIRE_EDA="yosys openroad"`, and only
+  `tests/test_nirmaan_physical.py`. Every run's working directory is uploaded as
+  the `pd-logs` artifact. The main test jobs are unchanged. macOS: no Homebrew
+  formula and no Docker, so the real tests skip locally.
+- **No standalone `sta` exists in packaged OpenROAD**, and `openroad` has no
+  OpenSTA-only mode. `sta.run` gained a second backend, `openroad-sta`: the same
+  script under `openroad`, plus `read_lef` (OpenROAD links into its database;
+  `ORD-2010` without LEFs), so it also needs `tech_lef` and `lef`. `opensta`
+  stays first when `sta` is on PATH.
+- **Fixes from the real output:** `yosys-liberty` takes optional
+  `tie_high`/`tie_low` (`CELL/PORT`, via `hilomap`), since the detailed router
+  rejects a constant net (`DRT-0305`); the area line is `um^2`, not `u^2`;
+  `report_worst_slack` prints `worst slack max <n>` and `report_tns` `tns max
+  <n>` (parsed by label, unlabelled still read in order); `-group_count` and
+  `-endpoint_count` became `-group_path_count` and `-endpoint_path_count`; a
+  violator count at the report cap (`VIOLATOR_REPORT_LIMIT`, 100) is "at least".
+- **Real numbers** (AXI4-Lite block, Nangate45, ideal clock, no CTS or power
+  grid): STA at 100 MHz met, setup slack 7.264, hold 0.101; at 5 GHz
+  (`axi4_lite_regs_fast.sdc`) violated, setup -0.905, TNS -157.481; place and
+  route to route, 41% utilization, 0 DRC (the signal routing only; power pins
+  are unconnected), wirelength 10783 um, setup slack 7.120; at 300% utilization
+  it fails in placement (`GPL-0301`).
+
+Fixtures: the four `synthetic_*.log` are deleted; `opensta_met.log`,
+`opensta_violated.log`, `openroad_route.log`, and `openroad_error.log` are
+captured from CI run 36600440325, each with a `# CAPTURED:` first line and the
+log unedited below it. The real-tool tests moved from sky130 to Nangate45 and
+gained the violated-timing and failed place-and-route cases; new unit tests
+cover the `openroad-sta` fallback and tie cells. The standard local run is 1128
+tests with 3 skipped (the three real OpenROAD tests); in CI the
+`physical-design` job runs them. Deferred: standalone OpenSTA in CI, sky130,
+a local OpenROAD, and CTS, power grid, and parasitic extraction as before.
+
+### Milestone 27 (gates everywhere) - The design gates on every RTL workflow, and non-vacuous proofs (after Stage 6)
+
+The `new-ip` `rtl-implementation`, `feature-addition` `rtl-change`, and
+`rtl-change` `change` stages now carry `RTL_GATES` (in `company/workflows.py`):
+the `block-design` checks (lint, simulation, synthesis with `max_latches=0`,
+formal when a `formal_spec` is produced) plus `NOT_VACUOUS`, a `formal.cover`
+run over the same `.sby`, also tied to `formal_spec`. Each of the three stages
+now produces a `testbench` too, and a human attestation no longer meets them.
+`block-design` gains `NOT_VACUOUS` as one added line. Design doc:
+`docs/GATES_EVERYWHERE.md`.
+
+Key design points worth not re-deriving:
+- **Non-vacuity is a cover run of the seat's own setup.** The
+  `symbiyosys-cover` backend (`integrations/eda.py`) writes a copy of the
+  `.sby` into the run's directory with `mode cover` and absolute `[files]`
+  paths; script, engines, depth, and assumptions are the proof's.
+  `parse_sby_cover` passes only on `DONE (PASS)`, exit 0, at least one reached
+  cover, and none unreached (SymbiYosys itself calls a setup with no covers a
+  pass). `[tasks]` setups are a recorded failure. A separate tool, not a
+  `formal.run` mode, so a cover run can never meet "Formal properties are
+  proven".
+- **What it catches:** over-constrained inputs, assumptions contradictory on
+  the path to a covered state, antecedents the seat covers. A plain
+  `assume (1'b0)` already fails `formal.run` (smtbmc `--presat`). Covers the
+  seat did not write, or trivial ones, are the reviewer's to catch.
+- **Approved inputs through gates.** On `new-ip` and `feature-addition` the RTL
+  task depends on `microarchitecture.gate`, which has no artifacts, so the seat
+  saw no upstream and the M23 approved-inputs check held vacuously.
+  `upstream_artifacts(state, task)` in `work/policy.py` looks through gate
+  tasks; the context packet, the `approved-inputs` check, and the upstream
+  bindings of `evidence-before-review` all use it.
+- **`drive` follows the gated order.** `tests/nirmaan_helpers.py`
+  `gated_submit` writes `counter.v` and `counter_tb.v`, runs each applicable
+  before-review check through the broker from the requirement's own data,
+  records the runs, then submits. Tests that drive through these stages need
+  `GATE_TOOLS` (`verilator iverilog vvp yosys`) and are marked so.
+- **Fixture covers** in `counter`, AXI4-Lite (8), FIFO (6), arbiter (2 per
+  requester, including the tight fairness bound), and APB (4), under
+  `` `ifdef FORMAL ``. The APB proof depth rose from 4 to 8 so a write and read
+  back is reachable.
+
+Tests: `tests/test_nirmaan_gates_everywhere.py` (34): the stages as data; the
+planned tasks gated and on approved inputs (through a gate, and a cancelled
+impact analysis refusing an `rtl-change`); on each of the three workflows a
+latch and a failing self-check refused and clean RTL with a proof approved;
+two vacuous proofs refused while `formal.run` passes; `assume (1'b0)` failing
+both runs; no covers refused; all
+seven fixture setups reach every cover; the cover run's isolation and
+prechecks; the parser on captured logs; crown jewel
+`test_a_fourth_workflow_is_gated_with_no_core_changes`; `drive`'s order; the
+core never names `formal.cover`; CI requires the formal tools. Migrated (each
+listed in the design doc, section 5): two `test_nirmaan_work.py` tests and one
+each in `test_nirmaan_eda.py` and `test_nirmaan_export.py` gained
+`GATE_TOOLS`; three exact tool-set assertions gained `formal.cover`. The
+standard run, merged with the review-repair milestone, is 1160 tests with 2
+skipped (OpenSTA, OpenROAD).
+
+Deferred: the same gates on `parameter-change` and the fix stages
+(`regression-investigation`, `timing-closure`) and on `cdc-design`; automatic
+antecedent covers; multi-task setups in the cover check.
+
+### Milestone 27 (RISC-V firmware) - the driver on a core against the RTL (after Stage 6)
 
 Closes M25's first deferred firmware item. The firmware seat's driver and
 tests, unchanged, are cross-compiled for bare-metal RV32I and run on PicoRV32
@@ -1932,6 +2038,70 @@ Deferred: interrupts from the design, precise bus-error traps, other cores and
 ISAs, a code-size budget in the gate, APB and AXI4 bridges.
 
 ---
+
+### Milestone 27 (DFT) - ATPG, multiple scan chains, and MBIST (after Stage 6)
+
+Two new tools, both `AVAILABLE` and backed by M21 backends in
+`nirmaan/integrations/dft.py`: `dft.atpg` (backend `icarus-atpg`) and
+`dft.mbist` (`icarus-mbist`); `dft.scan_insert` gains multiple chains. The
+step helpers are standard library only: `dft_scan.py` (as in M25),
+`dft_atpg.py`, and `dft_mbist.py`. `dft.run` stays `CONTRACT_ONLY`.
+
+Key design points worth not re-deriving:
+- **Chains.** `chains` and `max_chain_length` params; flops are grouped by
+  (clock, edge), each domain gets at least one chain, spare chains go to the
+  domain with the longest chain, and within a domain natural-order runs differ
+  in length by at most one. One chain keeps scalar `scan_in`/`scan_out`; N
+  chains make them N-bit vectors. The tracer starts a chain at each `scan_in`
+  bit and checks `scan_out[k]` and one domain per chain. The M25 rule
+  `one-clock-domain` is retired. `dft.scan_sim` pulses all clocks together;
+  each clock idles low if any flop uses its rising edge, and the expected
+  capture is evaluated in edge order (first-toggle flops, then the rest).
+- **ATPG is our own, not an external tool.** Nothing is packaged in Homebrew
+  or apt; Atalanta would need a `.bench` converter and a CI build. `dft_atpg.py
+  generate`: random 64-pattern batches with bit-parallel cone fault
+  simulation, then PODEM (three-valued good and faulty machines, D-frontier,
+  X-path, full backtracking, limit 200) on the capture model (scan_en low,
+  resets inactive). Fault universe: stuck-at 0/1 on every controllable input
+  and gate output of the Yosys gate netlist (stems, uncollapsed).
+- **Coverage is measured, not claimed.** `dft_atpg.py inject` enumerates the
+  universe again from the netlist, adds a `$_MUX_` per fault site (select
+  `nirmaan_fault_en[s]`, value `nirmaan_fault_val[s]`), and Yosys writes it.
+  The testbench runs the design as given (good machine) beside the fault
+  netlist, through the real scan protocol. It first checks the pattern file's
+  expected responses and that the fault netlist equals the design with no
+  fault; then, per fault, detection at the first differing output or
+  unloaded bit. A claim the simulation does not bear out, a wrong expected
+  response, or an injection mismatch fails the run. `min_<metric>` params
+  (for example `min_test_coverage`) are checked in `parse_atpg` from
+  `atpg_config.json`; `max_` limits work as in M21. `patterns` grades a given
+  file; `fault_sample` samples, and says so.
+- **A capture-untestable fault can still be detected** by shifting (for
+  example a NAND with `scan_en` stuck at 1): the class is from the
+  simulation, so `undetectable` means proven by PODEM and not detected.
+- **MBIST.** `dft_mbist.py` writes a March C- controller (10N operations,
+  solid backgrounds, a read is issue then compare) for a single-port sync RAM
+  (`clk`, `we`, `addr`, `wdata`, registered `rdata`) whose widths Yosys reads.
+  The testbench counts reads, writes, and cycles independently (5N, 5N, 15N)
+  and flags X reads. The controller is `verilator -Wall` lint clean (a test).
+- **Seat data.** Skills `atpg`, `fault_modeling`, `scan_design` gain
+  `dft.atpg`; `mbist` gains `dft.mbist`. The `block-design` `dft` stage's third
+  `checked(...)` requirement is `dft.atpg` with `min_test_coverage` 90.
+
+Measured (8 chains for the register blocks): counter 70/70 faults (100%),
+`atpg_demo` 130/132 (2 proven undetectable, 100% test coverage), rr_arbiter
+116/116, sync_fifo 754/754, apb_regs 1800/1800, axi4_lite_regs 2476/2476.
+The last two take about 2 and 3 minutes of Icarus, so the tests grade only
+the smaller blocks. MBIST passes the clean `sync_ram` in 240 cycles and fails
+each of six faulty RAMs (stuck-at 0 and 1, transition, inversion and
+idempotent coupling, address decoder).
+
+Fixtures: `tests/fixtures/rtl/dft/two_clocks.v`, `dft/atpg_demo.v`,
+`mbist/sync_ram.v`, `mbist/faulty_rams.v`. Tests:
+`tests/test_nirmaan_dft_advanced.py`; crown jewel
+`test_a_new_atpg_backend_needs_no_core_changes`. Design doc:
+`docs/DFT_ADVANCED.md`. Deferred: transition faults, pin faults, ATPG across
+capture edges, lockup latches, compression, other memory types, a memory stage.
 
 ## 3. Current architecture map
 

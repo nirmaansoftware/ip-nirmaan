@@ -1,0 +1,20 @@
+$ sby -f -d w_none/sby_cover w_none/none_cover.sby
+SBY 22:17:05 [w_none/sby_cover] Removing directory 'w_none/sby_cover'.
+SBY 22:17:05 [w_none/sby_cover] Copy 'none.v' to 'w_none/sby_cover/src/none.v'.
+SBY 22:17:05 [w_none/sby_cover] engine_0: smtbmc
+SBY 22:17:05 [w_none/sby_cover] base: starting process "cd w_none/sby_cover/src; yosys -ql ../model/design.log ../model/design.ys"
+SBY 22:17:05 [w_none/sby_cover] base: finished (returncode=0)
+SBY 22:17:05 [w_none/sby_cover] prep: starting process "cd w_none/sby_cover/model; yosys -ql design_prep.log design_prep.ys"
+SBY 22:17:05 [w_none/sby_cover] prep: finished (returncode=0)
+SBY 22:17:05 [w_none/sby_cover] smt2: starting process "cd w_none/sby_cover/model; yosys -ql design_smt2.log design_smt2.ys"
+SBY 22:17:05 [w_none/sby_cover] smt2: finished (returncode=0)
+SBY 22:17:05 [w_none/sby_cover] engine_0: starting process "cd w_none/sby_cover; yosys-smtbmc --presat --unroll -c --noprogress -t 12  --append 0 --dump-vcd engine_0/trace%.vcd --dump-yw engine_0/trace%.yw --dump-vlogtb engine_0/trace%_tb.v --dump-smtc engine_0/trace%.smtc model/design_smt2.smt2"
+SBY 22:17:05 [w_none/sby_cover] engine_0: ##   0:00:00  Solver: yices
+SBY 22:17:05 [w_none/sby_cover] engine_0: ##   0:00:00  Status: passed
+SBY 22:17:05 [w_none/sby_cover] engine_0: finished (returncode=0)
+SBY 22:17:05 [w_none/sby_cover] engine_0: Status returned by engine: pass
+SBY 22:17:05 [w_none/sby_cover] summary: Elapsed clock time [H:MM:SS (secs)]: 0:00:00 (0)
+SBY 22:17:05 [w_none/sby_cover] summary: Elapsed process time [H:MM:SS (secs)]: 0:00:00 (0)
+SBY 22:17:05 [w_none/sby_cover] summary: engine_0 (smtbmc) returned pass
+SBY 22:17:05 [w_none/sby_cover] summary: engine_0 did not produce any traces
+SBY 22:17:05 [w_none/sby_cover] DONE (PASS, rc=0)

@@ -119,10 +119,10 @@ def test_stitching_refuses_what_one_mux_d_chain_cannot_cover():
     latch["modules"]["top"]["cells"]["l"] = _cell("$_DLATCH_P_", E=3, D=3, Q=6)
     with pytest.raises(NetlistError, match="cannot take a mux-D scan flop"):
         stitch(latch, "top")
-    two_clocks = _two_flops()
-    two_clocks["modules"]["top"]["cells"]["f1"]["connections"]["C"] = [3]
-    with pytest.raises(NetlistError, match="one clock"):
-        stitch(two_clocks, "top")
+    generated = _two_flops()  # M27 groups clock domains into chains, but a clock must still be an input
+    generated["modules"]["top"]["cells"]["f1"]["connections"]["C"] = [6]
+    with pytest.raises(NetlistError, match="not a module input"):
+        stitch(generated, "top")
     taken = _two_flops()
     taken["modules"]["top"]["ports"]["scan_en"] = {"direction": "input", "bits": [9]}
     with pytest.raises(NetlistError, match="already has port"):
@@ -252,7 +252,7 @@ def test_rule_violations_are_found_in_untestable_rtl(engine, tmp_path):
         by_rule.setdefault(d["code"], []).append(d["message"])
     assert any("held" in m for m in by_rule["no-latches"])
     assert any("slow" in m for m in by_rule["clock-from-input"]) and any("div" in m for m in by_rule["clock-from-input"])
-    assert by_rule["no-combinational-loops"] and by_rule["one-clock-domain"]
+    assert by_rule["no-combinational-loops"] and "one-clock-domain" not in by_rule  # retired in M27
     assert result["metrics"]["rules"]["reset-from-input"] == "pass"
     insertion, _ = invoke(engine, "dft.scan_insert", params, tmp_path / "insert")
     assert not insertion.succeeded and "scan insertion failed" in insertion.summary
@@ -268,7 +268,7 @@ def test_the_dft_stage_is_planned_only_when_test_is_asked_for(engine, nirmaan_or
     assert dft.capability == "dft.insert" and dft.expected_outputs == ("dft_netlist",)
     assert dft.owner.startswith("implementation.dft.engineering.scan.")
     gated = [r for r in dft.evidence_requirements if r.before_review]
-    assert sorted(t for r in gated for t in r.tools) == ["dft.check", "dft.scan_sim"]
+    assert sorted(t for r in gated for t in r.tools) == ["dft.atpg", "dft.check", "dft.scan_sim"]
     plain = Orchestrator(nirmaan_org, clock=fixed_clock).plan("Create a 4-bit wrapping counter.")
     assert "dft" not in [t.stage for t in plain.state.tasks.values()]
 
@@ -299,8 +299,9 @@ def test_a_scan_netlist_reaches_review_only_after_real_checks(engine, tmp_path):
     broker = ToolBroker(engine)
 
     def run(tool: str, sources: str, workdir: str):
+        extra = {"min_test_coverage": "90"} if tool == "dft.atpg" else {}  # the stage's requirement (M27)
         done, outcome = broker.invoke(owner, tool, {"sources": sources, "top": "counter",
-                                                    "workdir": str(tmp_path / workdir)}, seat)
+                                                    "workdir": str(tmp_path / workdir), **extra}, seat)
         engine.record_evidence(seat, owner, EvidenceKind.TOOL_RUN, done.summary,
                                reference=done.references[0], tool_run=done.id)
         return done, outcome
@@ -313,13 +314,13 @@ def test_a_scan_netlist_reaches_review_only_after_real_checks(engine, tmp_path):
         engine.submit(seat, owner, draft)  # not checked yet
 
     # A broken netlist fails both checks; the failures are recorded, and it cannot be submitted.
-    for tool in ("dft.check", "dft.scan_sim"):
+    for tool in ("dft.check", "dft.scan_sim", "dft.atpg"):
         failed, _ = run(tool, str(BROKEN), f"broken-{tool}")
         assert not failed.succeeded
     with pytest.raises(PolicyViolationError, match="cannot go to review"):
         engine.submit(seat, owner, [{**draft[0], "location": str(BROKEN)}])
 
-    for tool in ("dft.check", "dft.scan_sim"):
+    for tool in ("dft.check", "dft.scan_sim", "dft.atpg"):
         passed, _ = run(tool, netlist, tool)
         assert passed.succeeded, passed.summary
     engine.submit(seat, owner, draft)

@@ -69,6 +69,33 @@ def st(id: str, title: str, phase: str, capability: str, **kw) -> StageTemplate:
     return StageTemplate(id=id, title=title, phase=phase, capability=capability, **kw)
 
 
+#: M27: a proof counts only if every cover in it is reached under its assumptions (docs/GATES_EVERYWHERE.md).
+NOT_VACUOUS = checked("The proof is not vacuous: every cover is reached", "formal.cover",
+                      FileInput(param="sby", kinds=("formal_spec",)),
+                      FileInput(param="sources", kinds=("rtl_source",)),
+                      when_produced=("formal_spec",))
+
+#: M27: the checks produced RTL passes before review on the new-ip, feature-addition, and rtl-change RTL
+#: stages, the same ones block-design's RTL stage carries: real lint and simulation, synthesis with no
+#: latches, and, when the seat writes a proof setup, a proof that passes and is not vacuous.
+RTL_GATES = (
+    checked("Lint-clean under the RTL lint rules", "lint.run",
+            FileInput(param="sources", kinds=("rtl_source",))),
+    checked("Self-checking simulation passes", "simulator.run",
+            FileInput(param="sources", kinds=("rtl_source", "testbench")),
+            FileInput(param="top", kinds=("testbench",), entry=True)),
+    checked("Synthesizes with Yosys, with no latches", "synth.run",
+            FileInput(param="sources", kinds=("rtl_source",)),
+            FileInput(param="top", kinds=("rtl_source",), entry=True),
+            params=(("max_latches", "0"),)),
+    checked("Formal properties are proven", "formal.run",
+            FileInput(param="sby", kinds=("formal_spec",)),
+            FileInput(param="sources", kinds=("rtl_source",)),
+            when_produced=("formal_spec",)),
+    NOT_VACUOUS,
+)
+
+
 _PROTOCOL_VARIANTS = (
     var("axi", "AXI interface", "axi", cond=when("axi")),
     var("ace", "ACE interface", "ace", cond=when("ace")),
@@ -124,7 +151,7 @@ NEW_IP = WorkflowTemplate(
                var("buffers", "Buffers and flow control", "buffering_flow_control", cond=when("multi_port", "noc")),
                var("control", "Control and CSRs", "control_logic_design"),
            ),
-           outputs=("rtl_source",), evidence=(REVIEWED, ran("Compiles and passes a smoke simulation", "simulator.run"))),
+           outputs=("rtl_source", "testbench"), evidence=(REVIEWED, *RTL_GATES)),
         st("cdc-design", "CDC-safe crossings", "RTL", "rtl.cdc_design",
            depends_on=("microarchitecture",), when=when("cdc"), criticality=H, review=rv("rtl.review"),
            outputs=("rtl_source",), evidence=(REVIEWED,)),
@@ -257,7 +284,7 @@ FEATURE_ADDITION = WorkflowTemplate(
                var("noc", "Router datapath and flow control", "interconnect_design", cond=when("noc")),
                var("control", "Control and CSRs", "control_logic_design"),
            ),
-           outputs=("rtl_source",), evidence=(REVIEWED, ran("Compiles and passes a smoke simulation", "simulator.run"))),
+           outputs=("rtl_source", "testbench"), evidence=(REVIEWED, *RTL_GATES)),
         st("rtl-lint", "Lint", "RTL", "rtl.lint", depends_on=("rtl-change",),
            outputs=("lint_report",), evidence=(ran("Lint run", "lint.run"),)),
         st("dv-plan", "Verification plan update", "Verification", "dv.plan", depends_on=("microarchitecture",),
@@ -346,7 +373,7 @@ RTL_CHANGE = WorkflowTemplate(
         st("impact", "Change impact analysis", "RTL", "rtl.impact", criticality=M, review=rv("rtl.review"),
            outputs=("impact_analysis",), evidence=(REVIEWED,)),
         st("change", "RTL change", "RTL", "rtl.implement", depends_on=("impact",), criticality=H,
-           review=rv("rtl.review"), outputs=("rtl_source",), evidence=(REVIEWED, ran("Compiles and lint-clean", "simulator.run", "lint.run"))),
+           review=rv("rtl.review"), outputs=("rtl_source", "testbench"), evidence=(REVIEWED, *RTL_GATES)),
         st("targeted", "Targeted verification", "Verification", "dv.directed_tests", depends_on=("change",),
            criticality=M, review=rv("dv.review"), outputs=("tests",), evidence=(REVIEWED, dv_ran("Targeted tests", "test.run"))),
         st("regression", "Regression", "Verification", "dv.regression", depends_on=("targeted",), criticality=H,
@@ -495,7 +522,8 @@ BLOCK_DESIGN = WorkflowTemplate(
                      checked("Formal properties are proven", "formal.run",
                              FileInput(param="sby", kinds=("formal_spec",)),
                              FileInput(param="sources", kinds=("rtl_source",)),
-                             when_produced=("formal_spec",)))),
+                             when_produced=("formal_spec",)),
+                     NOT_VACUOUS)),  # M27
         # M25: when the request asks for test (DFT, scan chains), the scan netlist goes to review
         # only after real rule checks and a real chain simulation over it.
         st("dft", "Scan insertion", "Implementation", "dft.insert",
@@ -508,7 +536,12 @@ BLOCK_DESIGN = WorkflowTemplate(
                              FileInput(param="top", kinds=("dft_netlist",), entry=True)),
                      checked("The scan chain shifts and captures in simulation", "dft.scan_sim",
                              FileInput(param="sources", kinds=("dft_netlist",)),
-                             FileInput(param="top", kinds=("dft_netlist",), entry=True)))),
+                             FileInput(param="top", kinds=("dft_netlist",), entry=True)),
+                     # M27: stuck-at test coverage, measured by fault simulation, before review.
+                     checked("ATPG reaches 90% stuck-at test coverage in fault simulation", "dft.atpg",
+                             FileInput(param="sources", kinds=("dft_netlist",)),
+                             FileInput(param="top", kinds=("dft_netlist",), entry=True),
+                             params=(("min_test_coverage", "90"),)))),
         st("firmware", "Driver and driver tests", "Software", "fw.driver",
            depends_on=("interface-spec", "rtl-implementation"), when=when("firmware"), criticality=M,
            review=rv("sw.review"), outputs=("driver", "driver_test"),
