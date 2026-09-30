@@ -16,7 +16,7 @@ way every milestone has:
 | Planner: requirement to owned, reviewed, gated task graph; 9 workflows | CTS, power grid, parasitics, multi-corner timing |
 | Task engine: lifecycle, reviews, approvals, human gates, hash-chained audit | ATPG, multiple scan chains, MBIST; a RISC-V cross-compile and ISS in the firmware loop |
 | VeriTriage as a real, evidence-producing tool (`veritriage.investigate`) | Repair after a reviewer's request for changes; per-stage retry limits |
-| AI workers in three verification seats, off by default, on Opus 5.5 (M20) | Approved-inputs, synthesis, and formal gating on the `new-ip`, `feature-addition`, and `rtl-change` RTL stages; non-vacuity checks for properties |
+| AI workers in three verification seats, off by default, on Opus 5.5 (M20) | The same RTL gates on `parameter-change` and the fix stages; automatic antecedent covers |
 | Design agents: spec, microarchitecture, and RTL seats; RTL gated on real lint and simulation; the AXI4-Lite register block end to end (M23) | |
 | `nirmaan export`: the numbered `01_requirement` to `10_signoff` deliverable tree (M23) | Loading requirements and verification items from a file; a verification-plan seat |
 | Engineering graph: artifacts linked to Design Graph nodes from their real bytes; `nirmaan gaps` names every requirement not backed by a passing run (M24) | |
@@ -26,6 +26,7 @@ way every milestone has:
 | Real lint, simulation, synthesis, and formal via open-source EDA (M21) | |
 | Synthesis (no latches) and formal (when the seat writes a `.sby`) before review; formal in CI via the OSS CAD Suite (M26) | |
 | A bounded repair loop: failed before-review checks go back to the seat as evidence, opt-in per capability or `--attempts` (M26) | |
+| The design gates on every RTL workflow (`new-ip`, `feature-addition`, `rtl-change`), and proofs that must reach every cover (M27) | |
 | A synchronous FIFO, a round-robin arbiter, and an APB register block, each with proofs and designed end to end by agents (M26) | |
 | IP Nirmaan over MCP; organizational events on the M18 bus (M22) | |
 | CI on Python 3.11 and 3.12, plus a dash check (Stage 0) | |
@@ -199,6 +200,7 @@ extraction. Design doc: `docs/PHYSICAL_DESIGN.md`.
 - **Repair loop (M26):** a seat whose files fail their before-review checks is asked again, bounded by a capability's `max_attempts` (default 1, so off) or `nirmaan run --attempts N`, with the failed runs as citable evidence and log excerpts; refused attempts are recorded as `Attempt`s and never count. See `docs/REPAIR_LOOP.md`.
 - **More blocks (M26):** a synchronous FIFO, a round-robin arbiter, and an APB4 register block (PSLVERR for unmapped addresses, as the AXI4-Lite block's SLVERR), each with real RTL, testbenches, and proofs, and each designed end to end by agents on `block-design` with no core change. See `docs/IP_BLOCKS.md`.
 - **Formal gate (M26, done):** the `block-design` RTL stage goes to review only after real synthesis with no latches and, when the seat writes a `.sby`, a real SymbiYosys proof over the submitted RTL; CI installs `sby` and `yices-smt2` from a pinned OSS CAD Suite and runs formal instead of skipping it. See `docs/FORMAL_GATE.md`.
+- **Gates everywhere (M27, done):** the `new-ip`, `feature-addition`, and `rtl-change` RTL stages carry the `block-design` gates as data (approved inputs, now seen through gates; lint, simulation, synthesis with no latches, formal when a `.sby` is written), and a proof counts only if a cover run over the same setup reaches every cover (`formal.cover`); the fixture proofs carry real covers. See `docs/GATES_EVERYWHERE.md`.
 
 ## Side work (any time; owner-driven)
 
