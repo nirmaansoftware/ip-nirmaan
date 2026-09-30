@@ -51,6 +51,48 @@ jobs:
           NIRMAAN_REQUIRE_EDA: verilator iverilog vvp yosys cc make sby yices-smt2
         run: python -m pytest -q -rs
 
+  # M27: physical design for real. OpenROAD (with its embedded OpenSTA), a
+  # matched Yosys, and the Nangate45 platform files all come from one pinned
+  # OpenROAD-flow-scripts image, so the job runs inside it. Only the physical
+  # design tests run here; the main test job stays as it was. See
+  # docs/PHYSICAL_DESIGN.md.
+  physical-design:
+    runs-on: ubuntu-24.04
+    container:
+      image: openroad/orfs:26Q3-687-gc63a606f9@sha256:2e5bf6fe865e102ca2313aba1d849da50f5973bc91c4212a2f68e7d905a39c8f
+    env:
+      NIRMAAN_PDK_ROOT: /OpenROAD-flow-scripts/flow/platforms
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+          activate-environment: true
+      - name: Tools on PATH
+        run: |
+          echo /OpenROAD-flow-scripts/tools/install/OpenROAD/bin >> "$GITHUB_PATH"
+          echo /OpenROAD-flow-scripts/tools/install/yosys/bin >> "$GITHUB_PATH"
+      - name: Tool versions
+        run: |
+          # The image ships no standalone sta: sta.run runs in OpenROAD (openroad-sta).
+          which openroad yosys
+          openroad -version && yosys -V
+          ls "$NIRMAAN_PDK_ROOT/nangate45/lib/NangateOpenCellLibrary_typical.lib"
+      - name: Install
+        run: uv pip install -e ".[dev]"
+      - name: Test
+        # openroad and yosys are required, so the real STA and place-and-route
+        # tests fail rather than skip.
+        env:
+          NIRMAAN_REQUIRE_EDA: yosys openroad
+        run: python -m pytest -q -rs tests/test_nirmaan_physical.py --basetemp="$RUNNER_TEMP/pd"
+      - name: Keep the tool logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pd-logs
+          path: ${{ runner.temp }}/pd
+
   dashes:
     runs-on: ubuntu-latest
     steps:
