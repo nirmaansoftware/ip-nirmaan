@@ -257,3 +257,46 @@ def parse_sby(log: str, returncode: int) -> EdaResult:
         summary = f"formal {status.lower()}: {_plural(len(diags), 'error')}{_first(diags)}"
     return EdaResult(passed, summary, tuple(diags),
                      {"status": status, "exit_status": returncode, "traces": traces})
+
+
+# SBY 21:59:10 [c] engine_0: ##   0:00:00  Reached cover statement in step 2 at c: c.v:6.13-6.29 (_witness_.x)
+# SBY 21:59:10 [c] engine_0: ##   0:00:00  Unreached cover statement at c: c.v:7.13-7.29 (_witness_.y)
+# (The summary repeats both in lower case; only the engine's lines are counted.)
+_SBY_COVER_RE = re.compile(r"\b(?:(?P<un>Unr)|R)eached cover statement (?:in step (?P<step>\d+) )?at (?P<what>.+?)\s*$")
+_SBY_WHERE_RE = re.compile(r"(?P<file>[^\s:]+):(?P<line>\d+)\.\d+")
+
+
+def parse_sby_cover(log: str, returncode: int) -> EdaResult:
+    """Pass means a cover-mode run reached every cover statement, and there was at least one (M27).
+
+    A proof whose assumptions contradict each other, or whose properties can
+    never fire, still passes in prove mode. In cover mode the solver must build
+    a trace, under those same assumptions, to each ``cover``: an unreachable
+    cover fails the run, and a setup with no covers proves nothing about its
+    assumptions, so it fails too.
+    """
+    base = parse_sby(log, returncode)
+    reached: dict[str, None] = {}
+    unreached: dict[str, None] = {}
+    for line in log.splitlines():
+        if m := _SBY_COVER_RE.search(line):
+            (unreached if m["un"] else reached)[m["what"]] = None
+    missed = [w for w in unreached if w not in reached]
+    diags = list(base.diagnostics)
+    for what in missed:
+        where = _SBY_WHERE_RE.search(what)
+        diags.append(Diagnostic("error", f"cover statement never reached: {what}", "COVER",
+                                where["file"] if where else "", _int(where["line"]) if where else None))
+    metrics = {**base.metrics, "covers_reached": len(reached), "covers_unreached": len(missed)}
+    total = len(reached) + len(missed)
+    if missed:
+        summary = (f"vacuous: {len(missed)} of {_plural(total, 'cover')} never reached under the "
+                   f"assumptions{_first(diags[len(base.diagnostics):])}")
+        return EdaResult(False, summary, tuple(diags), metrics)
+    if not base.passed:
+        return EdaResult(False, base.summary.replace("formal", "cover run", 1), tuple(diags), metrics)
+    if not reached:
+        return EdaResult(False, "no cover statement was reached: a setup with nothing to reach says "
+                                "nothing about its assumptions", tuple(diags), metrics)
+    return EdaResult(True, f"not vacuous: every cover reached ({len(reached)} of {len(reached)})",
+                     tuple(diags), metrics)

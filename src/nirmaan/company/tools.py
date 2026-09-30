@@ -62,6 +62,8 @@ TOOLS: list[ToolSpec] = [
     _tool("waveform.inspect", "Waveform viewer", "eda", RD, CO, "Inspect waveforms."),
     _tool("coverage.read", "Coverage database", "eda", RD, CO, "Read and merge coverage."),
     _tool("formal.run", "Formal engine", "eda", EXE, AV, "Model checking and property proofs."),
+    _tool("formal.cover", "Formal cover check", "eda", EXE, AV,
+          "Non-vacuity: every cover in a proof setup is reached under its assumptions (M27)."),
     _tool("equivalence.run", "Equivalence checker", "eda", EXE, CO, "Logic equivalence checking."),
     _tool("cdc.run", "CDC/RDC analyzer", "eda", EXE, CO, "Structural and functional crossing analysis."),
     # Implementation EDA.
