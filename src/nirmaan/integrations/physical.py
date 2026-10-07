@@ -164,19 +164,19 @@ def _synth_parse(run: RunRecord) -> EdaResult:
 # --- sta.run: OpenSTA ---------------------------------------------------------------------
 
 
-#: M29: output pins that drive no net (an unused QN, a clock-tree dummy load). A SPEF cannot annotate
-#: them, so the parser subtracts them from the unannotated drivers to count the nets the SPEF missed.
+#: M29: output pins that drive nothing: no net, or a net with no load and no port (an unused QN, a
+#: clock-tree dummy load). A net with no load has no wire, so a SPEF cannot annotate it; the parser
+#: subtracts these from the unannotated drivers to count the loaded nets the SPEF missed.
 FLOATING_OUTPUTS = '''set nirmaan_floating 0
 foreach cell [get_cells *] {
   foreach pin [get_pins -of_objects $cell] {
-    if {[get_property $pin direction] eq "output" && [llength [get_nets -of_objects $pin]] == 0} {
-      incr nirmaan_floating
-    }
+    if {[get_property $pin direction] ne "output"} { continue }
+    set net [get_nets -of_objects $pin]
+    if {[llength $net] == 0 || ([llength [get_pins -of_objects $net]] <= 1
+                                && [llength [get_ports -quiet -of_objects $net]] == 0)} { incr nirmaan_floating }
   }
 }
-puts "nirmaan-floating-outputs: $nirmaan_floating"
-foreach p [lrange [get_pins */QN] 0 1] { puts "DEBUG [get_full_name $p] dir=[get_property $p direction] nets=[get_nets -of_objects $p] n=[llength [get_nets -of_objects $p]] cellpins=[llength [get_pins -of_objects [get_cells [lindex [split [get_full_name $p] /] 0]]]]" }
-puts "DEBUG cells=[llength [get_cells *]]"'''
+puts "nirmaan-floating-outputs: $nirmaan_floating"'''
 
 
 def _sta_script(job: Job, lefs: bool = False) -> None:
