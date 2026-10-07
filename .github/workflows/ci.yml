@@ -83,7 +83,7 @@ jobs:
           echo /OpenROAD-flow-scripts/tools/install/yosys/bin >> "$GITHUB_PATH"
       - name: Tool versions
         run: |
-          # The image ships no standalone sta: sta.run runs in OpenROAD (openroad-sta).
+          # The image ships no standalone sta; the next steps build one (M29).
           which openroad yosys
           openroad -version && yosys -V
           ls "$NIRMAAN_PDK_ROOT/nangate45/lib/NangateOpenCellLibrary_typical.lib"

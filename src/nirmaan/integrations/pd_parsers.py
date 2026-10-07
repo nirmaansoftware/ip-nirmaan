@@ -310,7 +310,7 @@ def parse_openroad(log: str, returncode: int, stop_after: str = "route",
         reasons.append(f"exit status {returncode}")
     if routed and drc != 0:
         reasons.append("no DRC count reported" if drc is None else _plural(drc, "DRC violation"))
-    if checks["power_grids"] and checks["unconnected_supply_pins"] != 0:
+    if checks["power_grids"] and routed and checks["unconnected_supply_pins"] != 0:  # counted after routing
         open_pins = checks["unconnected_supply_pins"]
         reasons.append("supply pin connections not reported" if open_pins is None
                        else _plural(open_pins, "unconnected supply pin"))

@@ -193,7 +193,13 @@ rules, at 30% utilization and signals on met1 to met4.
 The first sky130hd runs did not finish. With signals allowed on met5, where
 `pdn.tcl` puts its power straps, the detailed router got down to four met5
 shorts and spacing violations and never removed them, and the run timed out
-(at 300 s, then at 900 s). Capping signals at met4 fixed it.
+(at 300 s, then at 900 s). Capping signals at met4 (`routing_layers=met1,met4`)
+then stopped global routing on a probe buffer `repair_design` had chosen,
+whose pin is on met5 (`[ERROR GRT-0029] Pin load_slew4/X does not have
+geometries below the max routing layer`). ORFS keeps those cells out with its
+`DONT_USE_CELLS`; `pnr.run` now takes `dont_use`, and the test passes the
+probe and `lpflow` cells. The test gives the run 900 s; it takes about 2
+minutes.
 
 ---
 
@@ -215,7 +221,44 @@ report corners that do not exist.
 
 See section 10 for the run they come from.
 
-NUMBERS
+One typical corner, AXI4-Lite block, 100 MHz `aclk`, `buffer_cell` in
+synthesis. Slack in ns; "place" is ideal clock on placement estimates, "cts"
+propagated clock on placement estimates, "route" global-routing estimates
+before detailed routing, "extract" the OpenRCX SPEF.
+
+| | Nangate45 signoff | sky130hd signoff | Nangate45, no signoff inputs |
+|---|---|---|---|
+| Cell area, utilization | 2153 um^2, 43% | 13220 um^2, 34% (30% asked) | 2127 um^2, 43% |
+| Taps, endcaps, fillers | 0 (one column per 120 um, wider than the die), 100, 1494 | 518, none named, 3911 | none |
+| Power grid | `grid`, every supply pin connected, `check_power_grid` clean on VDD and VSS | the same | none: 2762 supply pins open, and the summary says "no power grid" |
+| Worst IR drop at 1.1 V / 1.8 V | VDD 1.56 mV, VSS 0.59 mV | VDD 0.16 mV, VSS 0.14 mV | not run |
+| CTS | 17 buffers, 206 sinks | 17 buffers, 206 sinks | 17 buffers, 206 sinks |
+| Clock skew, insertion delay | 0.003, 0.111 | -0.009, 0.456 | -0.005, 0.115 |
+| Setup / hold slack: place | 7.471 / 0.151 | 4.092 / 0.607 | 7.458 / 0.151 |
+| cts | 7.449 / 0.155 | 4.547 / 0.632 | 7.446 / 0.156 |
+| route (estimated) | 7.435 / 0.158 | 4.197 / 0.645 | 7.422 / 0.158 |
+| extract (SPEF) | 7.449 / 0.155 | 4.419 / 0.629 | not run |
+| Detailed routing | 0 DRC, 12562 um, 51 s | 0 DRC, 30569 um, 74 s | 0 DRC, 12645 um, 54 s |
+| Antenna, placement checks | 0 net and 0 pin violations; `check_placement` clean | the same | the same |
+| Unannotated drivers, of which drive nothing, unannotated nets | 219, all, 0 | 16, all, 0 | not run |
+
+Signoff STA on `final.v` with `route.spef`, separately: 7.449 / 0.155 ns
+through both `openroad-sta` and standalone `opensta`, the same figures as the
+flow's extracted timing, with 0 unannotated nets (221 drivers that drive
+nothing: the unused `QN`s, the CTS dummy loads, and the `VDD` and `VSS`
+ports).
+
+Extracted against estimated: on Nangate45 the extracted setup slack is 14 ps
+better than the global-routing estimate and equal to the post-CTS figure; on
+sky130hd it is 222 ps better than the estimate (4.419 against 4.197). The
+estimates are pessimistic here, which is the safe direction, but they are not
+the signoff numbers.
+
+At 5 GHz (`axi4_lite_regs_fast.sdc`, `stop_after=cts`), repair halves the
+damage and does not close it: setup slack -0.601 ns (TNS -105.684) after
+placement, -0.249 ns (TNS -47.384) after CTS and `repair_timing`, and the
+final report -0.262 ns, hold -0.001 ns: a recorded failed run ("timing
+violated"). At 300% utilization placement still fails (`GPL-0301`).
 
 ---
 
@@ -231,7 +274,33 @@ are unchanged: those flows did not change.
 
 ## 10. CI
 
-CIRUN
+The numbers above are from CI run 37632069804 (head `a278ac7`), whose four
+jobs all passed; the `physical-design` job ran 29 tests, none skipped, with
+`NIRMAAN_REQUIRE_EDA="yosys openroad sta"`.
+
+| | M27 | M29 |
+|---|---|---|
+| `physical-design` job | 2 min 29 s | 7 min 0 s with the OpenSTA build (2 min 19 s, a cache miss), so about 4 min 40 s once the build is cached |
+| of which the tests | about 1 min | 3 min 26 s (three full signoff flows, a CTS-only failure run, and the M27 tests, now through CTS) |
+
+The job runs in parallel with the two main test jobs (5 to 7 minutes), so
+CI's wall time grows by little or nothing once OpenSTA is cached.
+`set_thread_count [cpu_count]` (4 threads in CI) took the Nangate45 detailed
+route from 90 s to about 50 s.
+
+What the iterations found, in order: CTS needs layer RC (`RSZ-0089`); buffers,
+the clock tree, and fillers inserted after `pdngen` need a second
+`global_connect` (2288 open supply pins until then); on sky130hd, signal
+routing on met5 against the straps never converged, and the probe buffers
+(`sky130_fd_sc_hd__probe_p_*`, met5 pins) need `dont_use` (`GRT-0029`); a
+`max_routing_layer` parameter would have been read as a `max_` limit, hence
+`routing_layers`; the annotation counts of section 2; and the `assign` and
+ideal-clock differences of section 3.
+
+Warnings left in the logs, recorded and not failing: `PDN-1051` (no macros
+for the platform's macro grids), `RCX-0514` (`-ext_model_file` is deprecated
+in favor of `set_extraction_rules_file`), `DRT-0349` on sky130hd
+(`LEF58_ENCLOSURE` without a cut class), and `RSZ-0062` in the 5 GHz run.
 
 ---
 
