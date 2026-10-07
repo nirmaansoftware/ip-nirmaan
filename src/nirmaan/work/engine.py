@@ -89,6 +89,22 @@ class AuthorityError(WorkError):
     pass
 
 
+#: M29: what approving an artifact of a kind also records. A consumer is handed the engine and the
+#: artifact before the approval commits; it refuses by raising (and then nothing changes), or returns
+#: what to record once the approval has committed. The engine names no kind.
+ApprovalConsumer = Callable[["TaskEngine", Artifact], Callable[[], None]]
+_APPROVAL_CONSUMERS: dict[str, ApprovalConsumer] = {}
+
+
+def register_approval_consumer(kind: str, consumer: ApprovalConsumer) -> None:
+    """Record something on the approval of every artifact of ``kind``, or replace what was registered."""
+    _APPROVAL_CONSUMERS[kind] = consumer
+
+
+def unregister_approval_consumer(kind: str) -> None:
+    _APPROVAL_CONSUMERS.pop(kind, None)
+
+
 def system_actor(org: Organization, name: str = "nirmaan-engine") -> Actor:
     head = org.head_of(org.root.id)
     return Actor(role=head.id if head else next(iter(org.roles)), kind=ActorKind.SYSTEM, name=name)
@@ -434,6 +450,9 @@ class TaskEngine:
             raise TransitionError(f"{task_id} has no passing independent review yet")
         self._authorize(actor, DecisionKind.APPROVE_ARTIFACT, task)
         warnings = self._check("task.approve", actor, task)
+        consequences = [_APPROVAL_CONSUMERS[art.kind](self, art)  # M29: each may refuse, before anything commits
+                        for art in (self._state.artifacts[a] for a in task.artifacts)
+                        if art.kind in _APPROVAL_CONSUMERS]
         artifacts = dict(self._state.artifacts)
         for art_id in task.artifacts:
             artifacts[art_id] = artifacts[art_id].model_copy(update={"assurance": Assurance.APPROVED})
@@ -442,6 +461,8 @@ class TaskEngine:
             tasks=self._with_task(task, status=S.APPROVED, approval_state=ApprovalState.GRANTED),
             artifacts=artifacts,
         )
+        for record in consequences:
+            record()
         # Completion is the consequence of an approval, not a separate decision.
         return self.complete(task_id, self.system)
 
@@ -777,8 +798,11 @@ class TaskEngine:
         return task
 
     def record_spec_requirement(self, actor: Actor, requirement_id: str, text: str, source: str,
-                                section: str = "") -> SpecRequirement:
-        """Quote a requirement from a specification artifact, so verification items can prove it."""
+                                section: str = "", plan: str = "") -> SpecRequirement:
+        """Quote a requirement from a specification artifact, so verification items can prove it.
+
+        ``plan`` names the approved plan it was recorded from, if any (M29), in the audit entry.
+        """
         if requirement_id in self._state.spec_requirements:
             raise WorkError(f"requirement {requirement_id!r} is already recorded")
         task = self._artifact_task(source, actor, "its requirements")
@@ -786,13 +810,42 @@ class TaskEngine:
                               recorded_by=actor.label)
         warnings = self._check("trace.requirement", actor, task)
         self._commit(actor, "trace.requirement", requirement_id, reason=text, warnings=warnings,
-                     details={"source": source, "section": section},
+                     details={"source": source, "section": section, **({"plan": plan} if plan else {})},
                      spec_requirements={**self._state.spec_requirements, requirement_id: req})
         return req
 
     def record_verification_item(self, actor: Actor, item_id: str, kind: str, name: str, artifact: str,
                                  proves: tuple[str, ...], rationale: str = "") -> VerificationItem:
         """Declare which requirements a test, assertion, or coverage point proves. Backs nothing by itself."""
+        task = self._item_task(actor, item_id, artifact, proves)
+        item = VerificationItem(id=item_id, kind=kind, name=name, artifact=artifact, proves=tuple(proves),
+                                rationale=rationale, recorded_by=actor.label)
+        warnings = self._check("trace.item", actor, task)
+        self._commit(actor, "trace.item", item_id, reason=rationale or name, warnings=warnings,
+                     details={"kind": kind, "artifact": artifact, "proves": list(proves)},
+                     verification_items={**self._state.verification_items, item_id: item})
+        return item
+
+    def record_planned_item(self, actor: Actor, item_id: str, kind: str, name: str, file: str, plan: str,
+                            proves: tuple[str, ...], rationale: str = "") -> VerificationItem:
+        """Declare an item in a file not yet recorded, as the located ``plan`` artifact says (M29).
+
+        The item is bound, each time it is asked about, to the latest recorded
+        artifact of that file name. Backs nothing by itself.
+        """
+        if not file or "/" in file or "\\" in file:
+            raise WorkError(f"{item_id} must name a plain file name, not {file!r}")
+        task = self._item_task(actor, item_id, plan, proves)
+        item = VerificationItem(id=item_id, kind=kind, name=name, file=file, plan=plan, proves=tuple(proves),
+                                rationale=rationale, recorded_by=actor.label)
+        warnings = self._check("trace.item", actor, task)
+        self._commit(actor, "trace.item", item_id, reason=rationale or name, warnings=warnings,
+                     details={"kind": kind, "file": file, "plan": plan, "proves": list(proves)},
+                     verification_items={**self._state.verification_items, item_id: item})
+        return item
+
+    def _item_task(self, actor: Actor, item_id: str, artifact: str, proves: tuple[str, ...]) -> Task:
+        """The checks every new verification item passes; the task whose artifact the actor stands behind."""
         if item_id in self._state.verification_items:
             raise WorkError(f"verification item {item_id!r} is already recorded")
         if not proves:
@@ -803,14 +856,7 @@ class TaskEngine:
         art = self._state.artifacts.get(artifact)
         if art is not None and not art.location:
             raise WorkError(f"{artifact} has no recorded file; a verification item must live in one")
-        task = self._artifact_task(artifact, actor, "its verification items")
-        item = VerificationItem(id=item_id, kind=kind, name=name, artifact=artifact, proves=tuple(proves),
-                                rationale=rationale, recorded_by=actor.label)
-        warnings = self._check("trace.item", actor, task)
-        self._commit(actor, "trace.item", item_id, reason=rationale or name, warnings=warnings,
-                     details={"kind": kind, "artifact": artifact, "proves": list(proves)},
-                     verification_items={**self._state.verification_items, item_id: item})
-        return item
+        return self._artifact_task(artifact, actor, "its verification items")
 
     # --- Branching -------------------------------------------------------------------------
 

@@ -66,6 +66,8 @@ TOOLS: list[ToolSpec] = [
     _tool("formal.run", "Formal engine", "eda", EXE, AV, "Model checking and property proofs."),
     _tool("formal.cover", "Formal cover check", "eda", EXE, AV,
           "Non-vacuity: every cover in a proof setup is reached under its assumptions (M27)."),
+    _tool("vplan.check", "Verification plan check", "verification", RD, AV,
+          "A verification plan is valid and covers exactly the requirements its approved spec tags (M29)."),
     _tool("equivalence.run", "Equivalence checker", "eda", EXE, CO, "Logic equivalence checking."),
     _tool("cdc.run", "CDC/RDC analyzer", "eda", EXE, CO, "Structural and functional crossing analysis."),
     # Implementation EDA.

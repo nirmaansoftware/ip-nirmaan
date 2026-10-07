@@ -121,7 +121,7 @@ the M24 demo quoted by hand, with the same IDs.
 | Where | What |
 |---|---|
 | `company/vocabulary.py` | A feature, `verification_plan`, for "verification plan", "vplan", or "test plan" in a request. |
-| `company/workflows.py` | A `dv-plan` stage on `block-design`, capability `dv.plan` (it existed), output `verification_plan` (it existed), after `interface-spec`, planned when the request has the feature. `rtl-implementation` depends on it, so the testbench author works from the approved plan; when the stage is not planned the dependency is dropped, as for every conditional stage. |
+| `company/workflows.py` | A `dv-plan` stage on `block-design`, capability `dv.plan` (it existed), output `verification_plan` (it existed), after `interface-spec`, planned when the request has the feature. Nothing depends on it: its items bind to the testbench whenever that file is recorded (below), so the RTL stage, and every workflow built from its stages, is unchanged. |
 | The stage's evidence | Independent review, and a before-review check: `vplan.check` over the produced plan (`plan`) and the approved upstream `interface_spec` (`spec`, `upstream=True`). |
 | `company/tools.py` | `vplan.check`, AVAILABLE, bound in `integrations/vplan.py`; the `verification_planning` skill grants it. |
 
@@ -161,7 +161,11 @@ returns what to record, which runs right after the approval commits. The
 engine names no kind; `nirmaan.vplan` registers the one for
 `verification_plan`.
 
-The verification-plan consumer:
+The verification-plan consumer acts only on a plan whose stage checks it with
+`vplan.check` (a requirement whose `files` bind the `verification_plan` kind).
+A `verification_plan` from any other stage, such as the `dv-plan` stages of
+`new-ip` and `feature-addition`, is a document and records nothing, so those
+workflows are unchanged. For a checked plan, it:
 
 1. reads the plan file, checked against its recorded digest;
 2. parses it, resolves each `source` to an approved upstream artifact of the
@@ -174,8 +178,8 @@ The verification-plan consumer:
 
 ### Items planned before their file exists
 
-The plan is approved before the RTL seat writes the testbench, so its items
-name a file that is not yet an artifact. `VerificationItem` gains two optional
+The plan is normally approved before the RTL seat writes the testbench, so its
+items name a file that is not yet an artifact. `VerificationItem` gains two optional
 fields, `file` and `plan`; `artifact` becomes optional. The engine gains
 `record_planned_item(actor, item_id, kind, name, file, plan, proves,
 rationale)`: the same checks as `record_verification_item`, with the actor

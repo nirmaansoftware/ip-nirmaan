@@ -377,6 +377,10 @@ class VerificationItem(BaseModel):
 
     A declaration of intent: it backs nothing on its own. Only a passing,
     substantiated run over the file that holds it does.
+
+    An item planned before its file exists (M29) has no ``artifact``; it names
+    the ``file`` and the approved ``plan`` that declared it, and is bound to the
+    latest recorded artifact of that file name each time it is asked about.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -384,7 +388,9 @@ class VerificationItem(BaseModel):
     id: str
     kind: str = Field(description="A registered verification-item kind, e.g. 'test'.")
     name: str = Field(description="The test, check label, property, or cover point, as it appears in the file.")
-    artifact: str = Field(description="The located artifact whose file holds the item.")
+    artifact: str = Field(default="", description="The located artifact whose file holds the item.")
+    file: str = Field(default="", description="For a planned item (M29): the file name that will hold it.")
+    plan: str = Field(default="", description="For a planned item (M29): the plan artifact that declared it.")
     proves: tuple[str, ...]
     rationale: str = ""
     recorded_by: str

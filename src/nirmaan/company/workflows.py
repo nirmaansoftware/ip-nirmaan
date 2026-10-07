@@ -505,6 +505,16 @@ BLOCK_DESIGN = WorkflowTemplate(
         st("microarchitecture", "Microarchitecture", "Architecture", "arch.microarchitecture",
            depends_on=("interface-spec",), criticality=H, review=rv("arch.review"),
            outputs=("microarchitecture_spec",), evidence=(REVIEWED,)),
+        # M29: when the request asks for a verification plan, it is written from the approved spec,
+        # checked against it before review, and recorded on approval. Nothing waits on it: its items
+        # bind to the testbench whenever that file is recorded.
+        st("dv-plan", "Verification plan", "Verification", "dv.plan",
+           depends_on=("interface-spec",), when=when("verification_plan"), criticality=M, review=rv("dv.review"),
+           outputs=("verification_plan",),
+           evidence=(REVIEWED,
+                     checked("The plan covers every requirement of the approved interface spec", "vplan.check",
+                             FileInput(param="plan", kinds=("verification_plan",)),
+                             FileInput(param="spec", kinds=("interface_spec",), upstream=True)))),
         st("rtl-implementation", "RTL implementation and testbench", "RTL", "rtl.implement",
            depends_on=("microarchitecture",), criticality=H, review=rv("rtl.review"),
            outputs=("rtl_source", "testbench"),

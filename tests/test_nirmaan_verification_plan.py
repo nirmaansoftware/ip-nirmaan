@@ -187,18 +187,13 @@ def test_a_bad_file_is_refused_with_line_reasons_and_nothing_is_recorded(axi):
     lines = text.splitlines()
 
     def line_of(needle: str, nth: int = 0) -> int:
-        """The line of the object that holds ``needle`` (the line of its opening brace)."""
-        hits = [i for i, l in enumerate(lines) if needle in l]
-        i = hits[nth]
-        while lines[i].strip() != "{":
-            i -= 1
-        return i + 1
+        return [i for i, l in enumerate(lines, 1) if needle in l][nth]
 
     with pytest.raises(vplan.PlanError) as refused:
         vplan.import_plan(engine, importer(engine, rtl), text)
     joined = "\n".join(refused.value.problems)
     status, duplicate = line_of('"status"'), line_of('"id": "AXIL-B2B"', 1)
-    kind, nope = line_of("waveform_eyeball"), line_of("AXIL-NOPE")
+    kind, nope = line_of("waveform_eyeball"), line_of("AXIL-NOPE") - 1  # the line of "proves": [
     assert f"line {status}: unknown field 'status'" in joined
     assert f"line {duplicate}: duplicate requirement ID 'AXIL-B2B'" in joined
     assert f"line {kind}: unknown verification-item kind 'waveform_eyeball'" in joined
@@ -291,7 +286,7 @@ def test_the_plan_stage_is_data_and_planned_on_request(nirmaan_org, fixed_clock)
     plan, rtl = engine.task(tid(engine, "dv-plan")), engine.task(tid(engine, "rtl-implementation"))
     assert plan.capability == "dv.plan" and plan.depends_on == (tid(engine, "interface-spec"),)
     assert plan.expected_outputs == ("verification_plan",)
-    assert tid(engine, "dv-plan") in rtl.depends_on
+    assert rtl.depends_on == (tid(engine, "microarchitecture"),)  # nothing waits on the plan
     check = next(r for r in plan.evidence_requirements if r.before_review)
     assert check.tools == ("vplan.check",)
 
@@ -348,7 +343,8 @@ def test_approval_records_the_plan_and_items_bind_to_the_file_once_written(plann
     assert {(i.file, i.plan, i.artifact) for i in items.values()} == {("axi4_lite_regs_tb.v", plan_art.id, "")}
     assert items["tb-top"].proves == ("AXIL-ORDER", "AXIL-RESET")
     recorded = [e for e in engine.state.audit if e.action.startswith("trace.")]
-    assert len(recorded) == 14 and all(plan_art.id in e.reason for e in recorded)
+    assert len(recorded) == 14 and all(e.details["plan"] == plan_art.id for e in recorded)
+    assert {e.actor for e in recorded} == {engine.system.label}  # a consequence of the approval
 
     # No testbench yet: every item is unverifiable, and says why.
     status = {r.requirement: r for r in engineering.requirement_coverage(engine.state)}
