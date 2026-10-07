@@ -148,10 +148,10 @@ pattern record, not parameters.
 | # | Step | Status |
 |---|---|---|
 | a | Design: `docs/ENGINEERING_RECORDS.md` (views, not new stored fields) | DONE |
-| b | Failing tests `tests/test_nirmaan_records.py` | TODO |
-| c | `src/nirmaan/records.py` (decision and failure views, summary) | TODO |
-| d | CLI `decisions`/`failures`, export sections, MCP read tools | TODO |
-| e | Full suite, `context.md`, ROADMAP, PR | TODO |
+| b | Failing tests `tests/test_nirmaan_records.py` | DONE |
+| c | `src/nirmaan/records.py` (decision and failure views, summary) | DONE |
+| d | CLI `decisions`/`failures`, export sections, MCP read tools | DONE |
+| e | Full suite (1241 passed, 3 skipped), `context.md`, ROADMAP, PR | DONE |
 
 Inspection findings that shaped it: no product code calls
 `record_decision`; decisions are DECISION tasks (outcomes, outcome,

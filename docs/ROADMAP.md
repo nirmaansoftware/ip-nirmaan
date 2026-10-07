@@ -31,9 +31,10 @@ way every milestone has:
 | A synchronous FIFO, a round-robin arbiter, and an APB register block, each with proofs and designed end to end by agents (M26) | |
 | Seat evaluation: cases as data, judged by real tool runs including held-out reference testbenches; `nirmaan eval` (M27) | A first live-model evaluation run; token and cost accounting |
 | Tool contracts: every bound tool declares its parameters, and the broker refuses undeclared or ill-typed ones before running; `nirmaan org tool` (M28) | Typed values end to end; the typed work packet |
+| Engineering records: decisions (alternatives, choice, rationale, evidence, consequences) and classified failures, as views; `nirmaan decisions` / `failures` (M29, working name) | Recording explicit decisions from the CLI or MCP |
 | IP Nirmaan over MCP; organizational events on the M18 bus (M22) | |
 | CI on Python 3.11 and 3.12, plus a dash check (Stage 0) | |
-| 1231 tests; CLI `nirmaan`; HTML dashboard; landing page live at https://ip.nirmaan.online | |
+| 1241 tests; CLI `nirmaan`; HTML dashboard; landing page live at https://ip.nirmaan.online | |
 
 ## Resume checklist (after the folder rename)
 
@@ -49,7 +50,7 @@ PYTHONPYCACHEPREFIX=/tmp/nirmaan-pycache .venv/bin/python -m pytest -q \
   --deselect tests/test_ai_boundary.py::test_missing_sdk_raises_clean_error
 ```
 
-Expect 1231 passing (3 skipped: OpenROAD is not installed locally; the CI `physical-design` job runs those three). The folder is still in iCloud, so the eviction hangs
+Expect 1241 passing (3 skipped: OpenROAD is not installed locally; the CI `physical-design` job runs those three). The folder is still in iCloud, so the eviction hangs
 described in `context.md` section 4 still apply. If imports stall, pre-read the tree:
 
 ```
@@ -211,6 +212,7 @@ extraction. Design doc: `docs/PHYSICAL_DESIGN.md`.
 - **DFT: ATPG, multiple chains, MBIST (M27):** `dft.scan_insert` takes `chains` and `max_chain_length` and cuts balanced chains per clock domain (`scan_in[k]` to `scan_out[k]`); `dft.atpg` generates stuck-at patterns (random, then PODEM) and measures coverage by an Icarus fault simulation through the scan protocol, refusing a pattern set whose claims or expected responses the simulation does not bear out; `dft.mbist` runs a generated March C- controller against a memory. The `block-design` `dft` stage now also needs 90% test coverage before review. See `docs/DFT_ADVANCED.md`.
 - **RISC-V firmware (M27, done):** `fw.cross_build` compiles the driver and its tests strictly for bare-metal RV32I into an ELF with its code size, and `fw.soc_test` runs it on PicoRV32 (vendored, ISC) in one Verilator model with the approved RTL, so the driver's register accesses are CPU loads and stores on the real AXI4-Lite bus (SLVERR reaches the driver through a status register). A request that names RISC-V gates the firmware seat on both, through the new generic `EvidenceRequirement.when`; CI installs `gcc-riscv64-unknown-elf`. See `docs/RISCV_FIRMWARE.md`.
 
+- **Engineering records (M29, working name, done):** `nirmaan decisions` reads every decision task as a decision record (alternatives, choice, rationale, evidence, who and when, the branches it cancelled), and `nirmaan failures` classifies failed runs, refused or sent-back submissions, blocks, failures, and escalations with whether each was resolved, across projects too; both are in the export. Views only: nothing stored or inferred. See `docs/ENGINEERING_RECORDS.md`.
 - **Tool contracts (M28, first part, done):** every tool with a binding declares its parameters (name, kind, required); the broker refuses an undeclared or ill-typed parameter, or a path containing a comma, before anything runs, and the runtime hands each tool only the inputs it declares. See `docs/TOOL_CONTRACTS.md`.
 - **Seat evaluation (M27, done):** `evals/` cases fix a seat's upstream to reference documents and judge its work with held-out checks the seat never sees (the reference testbench on its RTL), each a recorded tool run; `nirmaan eval run (--runtime ID | --replay)`. See `docs/SEAT_EVALUATION.md`.
 
