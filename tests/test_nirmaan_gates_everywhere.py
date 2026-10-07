@@ -328,7 +328,14 @@ def test_the_cover_run_uses_the_seats_own_setup_and_writes_nothing_beside_it(bro
     derived = (tmp_path / "run" / "counter_cover.sby").read_text()
     assert "mode cover" in derived and "mode prove" not in derived
     assert "depth 12" in derived and "read -formal counter.v" in derived  # the same bound and script
-    assert str((submitted / "counter.v").resolve()) in derived
+    # M29: the run reads a copy of the submitted RTL, made in its own directory, that differs only by
+    # the cover derived for the assertion's antecedent, on the assertion's own line.
+    copy = (tmp_path / "run" / "antecedents" / "counter.v").resolve()
+    assert str(copy) in derived.splitlines()  # the [files] entry names the copy
+    original, instrumented = (submitted / "counter.v").read_text().splitlines(), copy.read_text().splitlines()
+    assert len(original) == len(instrumented)
+    assert [(a, b) for a, b in zip(original, instrumented) if a != b] == [
+        ("            assert (count <= LIMIT);", "            begin cover (1'b1); assert (count <= LIMIT); end")]
 
 
 @needs("sby", "yosys")

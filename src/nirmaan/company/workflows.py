@@ -78,7 +78,9 @@ NOT_VACUOUS = checked("The proof is not vacuous: every cover is reached", "forma
 
 #: M27: the checks produced RTL passes before review on the new-ip, feature-addition, and rtl-change RTL
 #: stages, the same ones block-design's RTL stage carries: real lint and simulation, synthesis with no
-#: latches, and, when the seat writes a proof setup, a proof that passes and is not vacuous.
+#: latches, and, when the seat writes a proof setup, a proof that passes and is not vacuous. M29: also on
+#: every other stage that produces RTL (docs/GATES_REST.md); the cover run also covers each assertion's
+#: antecedent.
 RTL_GATES = (
     checked("Lint-clean under the RTL lint rules", "lint.run",
             FileInput(param="sources", kinds=("rtl_source",))),
@@ -155,7 +157,7 @@ NEW_IP = WorkflowTemplate(
            outputs=("rtl_source", "testbench"), evidence=(REVIEWED, *RTL_GATES)),
         st("cdc-design", "CDC-safe crossings", "RTL", "rtl.cdc_design",
            depends_on=("microarchitecture",), when=when("cdc"), criticality=H, review=rv("rtl.review"),
-           outputs=("rtl_source",), evidence=(REVIEWED,)),
+           outputs=("rtl_source", "testbench"), evidence=(REVIEWED, *RTL_GATES)),  # M29
         st("power-intent", "Power intent (UPF)", "RTL", "rtl.power_intent",
            depends_on=("microarchitecture",), when=when("low_power"), criticality=H,
            review=rv("rtl.review"), outputs=("power_intent",), evidence=(REVIEWED,)),
@@ -339,7 +341,7 @@ PARAMETER_CHANGE = WorkflowTemplate(
                var("buffers", "Buffers and storage", "buffering_flow_control"),
                var("axi", "AXI interface", "axi", cond=when("axi")),
            ),
-           outputs=("rtl_source",), evidence=(REVIEWED, ran("Compiles and passes a smoke simulation", "simulator.run"))),
+           outputs=("rtl_source", "testbench"), evidence=(REVIEWED, *RTL_GATES)),  # M29
         st("rtl-lint", "Lint", "RTL", "rtl.lint", depends_on=("rtl-change",), outputs=("lint_report",),
            evidence=(ran("Lint run", "lint.run"),)),
         st("cdc-recheck", "CDC re-check", "CDC/RDC", "cdc.verify", depends_on=("rtl-lint",), when=when("cdc"),
@@ -407,7 +409,7 @@ REGRESSION_INVESTIGATION = WorkflowTemplate(
            outputs=("root_cause_analysis",), evidence=(REVIEWED,)),
         st("rtl-fix", "RTL fix", "Fix", "rtl.implement", depends_on=("root-cause",),
            branch=("root-cause", "rtl_bug"), criticality=H, review=rv("rtl.review"),
-           outputs=("rtl_source",), evidence=(REVIEWED,)),
+           outputs=("rtl_source", "testbench"), evidence=(REVIEWED, *RTL_GATES)),  # M29
         st("tb-fix", "Testbench fix", "Fix", "dv.testbench", depends_on=("root-cause",),
            branch=("root-cause", "testbench_bug"), criticality=M, review=rv("dv.review"),
            outputs=("testbench",), evidence=(REVIEWED,)),
@@ -473,7 +475,7 @@ TIMING_CLOSURE = WorkflowTemplate(
            outputs=("root_cause_analysis",), evidence=(REVIEWED,)),
         st("rtl-fix", "RTL restructuring", "Fix", "rtl.implement", depends_on=("classify",),
            branch=("classify", "rtl_path"), criticality=H, review=rv("rtl.review"),
-           skills=("pipeline_design",), outputs=("rtl_source",), evidence=(REVIEWED,)),
+           skills=("pipeline_design",), outputs=("rtl_source", "testbench"), evidence=(REVIEWED, *RTL_GATES)),  # M29
         st("constraint-fix", "Constraint correction", "Fix", "sta.constraints", depends_on=("classify",),
            branch=("classify", "constraint_issue"), criticality=H, review=rv("sta.review"),
            outputs=("constraints",), evidence=(REVIEWED,)),
@@ -552,7 +554,19 @@ BLOCK_DESIGN = WorkflowTemplate(
                      checked("ATPG reaches 90% stuck-at test coverage in fault simulation", "dft.atpg",
                              FileInput(param="sources", kinds=("dft_netlist",)),
                              FileInput(param="top", kinds=("dft_netlist",), entry=True),
-                             params=(("min_test_coverage", "90"),)))),
+                             params=(("min_test_coverage", "90"),)),
+                     # M29: at-speed test asks for transition coverage too (launch on capture).
+                     checked("Transition ATPG reaches 80% test coverage in fault simulation", "dft.atpg_transition",
+                             FileInput(param="sources", kinds=("dft_netlist",)),
+                             FileInput(param="top", kinds=("dft_netlist",), entry=True),
+                             params=(("min_test_coverage", "80"),), when=when("at_speed")))),
+        # M29: a block with memory gets March C- on every memory of the approved RTL before review.
+        st("mbist", "Memory BIST", "Implementation", "dft.mbist",
+           depends_on=("rtl-implementation",), when=when("memory"), skills=("mbist",), criticality=M,
+           review=rv("dft.review"), outputs=("mbist_configuration",),
+           evidence=(REVIEWED,
+                     checked("March C- passes on every memory in the approved RTL", "dft.mbist",
+                             FileInput(param="sources", kinds=("rtl_source",), upstream=True)))),
         st("firmware", "Driver and driver tests", "Software", "fw.driver",
            depends_on=("interface-spec", "rtl-implementation"), when=when("firmware"), criticality=M,
            review=rv("sw.review"), outputs=("driver", "driver_test"),

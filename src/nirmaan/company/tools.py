@@ -16,7 +16,8 @@ M25), and so are the RV32I cross build and the run on a RISC-V core
 
 Scan insertion, DFT rule checks, and scan chain simulation are AVAILABLE through
 Yosys and Icarus (``nirmaan/integrations/dft.py``, M25); so are stuck-at ATPG,
-graded by fault simulation, and March C- memory BIST (M27).
+graded by fault simulation, and March C- memory BIST (M27), and transition
+ATPG (M29).
 
 Every tool with a binding declares its parameters (M28): the broker refuses an
 undeclared or ill-typed one before anything runs. The lists below are what the
@@ -110,7 +111,8 @@ TOOLS: list[ToolSpec] = [
           (_p("sby", PATH, "The SymbiYosys job file.", required=True),
            _p("sources", PATHS, "RTL the proof must read; the job file must list each one."), *RUNNER)),
     _tool("formal.cover", "Formal cover check", "eda", EXE, AV,
-          "Non-vacuity: every cover in a proof setup is reached under its assumptions (M27).",
+          "Non-vacuity: every cover in a proof setup (M27), and a cover derived for every assertion "
+          "antecedent (M29), is reached under its assumptions.",
           (_p("sby", PATH, "The proof's SymbiYosys job file, run in cover mode.", required=True),
            _p("sources", PATHS, "RTL the setup reads."), *RUNNER)),
     _tool("vplan.check", "Verification plan check", "verification", RD, AV,
@@ -162,7 +164,9 @@ TOOLS: list[ToolSpec] = [
     _tool("dft.run", "DFT tools", "eda", EXE, CO, "ATPG, MBIST, and commercial scan flows."),
     _tool("dft.scan_insert", "Scan insertion", "eda", EXE, AV, "Mux-D scan flops stitched into one chain.",
           (SOURCES, TOP_REQUIRED, _p("chains", INT, "Number of scan chains (default 1)."),
-           _p("max_chain_length", INT, "Longest chain allowed; 0 for no limit (default)."), *RUNNER)),
+           _p("max_chain_length", INT, "Longest chain allowed; 0 for no limit (default)."),
+           _p("cross_domains", TEXT, "'lockup': chains may cross clock domains, with a lockup latch at each crossing "
+              "(M29)."), *RUNNER)),
     _tool("dft.check", "DFT rule check", "eda", EXE, AV, "Testability rules over the synthesized netlist.",
           (SOURCES, TOP_REQUIRED, *RUNNER)),
     _tool("dft.scan_sim", "Scan chain simulation", "eda", EXE, AV, "Shift and capture through the chain in simulation.",
@@ -173,8 +177,16 @@ TOOLS: list[ToolSpec] = [
            _p("seed", INT, "Random seed (default 1)."),
            _p("min_", NUM, "Fail unless the graded metric of that name reaches this, e.g. min_test_coverage.",
               prefix=True), *RUNNER)),
+    _tool("dft.atpg_transition", "Transition ATPG", "eda", EXE, AV,
+          "Slow-to-rise and slow-to-fall pattern pairs (launch on capture), with coverage measured by fault "
+          "simulation.",
+          (SOURCES, TOP_REQUIRED, _p("patterns", PATH, "Patterns to grade instead of generating them."),
+           _p("fault_sample", INT, "Grade a sample of this many faults; 0 for all (default)."),
+           _p("seed", INT, "Random seed (default 1)."),
+           _p("min_", NUM, "Fail unless the graded metric of that name reaches this, e.g. min_test_coverage.",
+              prefix=True), *RUNNER)),
     _tool("dft.mbist", "Memory BIST", "eda", EXE, AV, "A March C- controller run against the memory in simulation.",
-          (SOURCES, TOP_REQUIRED, *RUNNER)),
+          (SOURCES, TOP, *RUNNER)),
     # Software and infrastructure.
     _tool("compiler.run", "Compiler toolchain", "software", EXE, CO, "Build firmware and software."),
     _tool("fw.build", "Firmware build", "software", EXE, AV, "Compile C firmware under strict warning flags.",
