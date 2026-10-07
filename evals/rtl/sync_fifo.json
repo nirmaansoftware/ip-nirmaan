@@ -1,0 +1,38 @@
+{
+  "id": "rtl/sync-fifo",
+  "request": "Create a parameterizable synchronous FIFO.",
+  "seat": "rtl-implementation",
+  "expected_behavior": "RTL for module sync_fifo (DEPTH 8, WIDTH 8 by default; any DEPTH of 2 or more) with ports clk rst_n wr_en wr_data full rd_en rd_data empty count, first-word fall-through, and a self-checking testbench, gated by lint, simulation, and synthesis (and formal, when a .sby is written) before review.",
+  "constraints": [
+    "Work only from the approved interface specification and microarchitecture.",
+    "Correct for a DEPTH that is not a power of two.",
+    "Lint-clean under Verilator -Wall with no waivers.",
+    "Synthesizes with no latches."
+  ],
+  "known_failure_modes": [
+    "Pointer wrap written for power-of-two depths only.",
+    "A write while full or a read while empty not dropped.",
+    "Full with a simultaneous write and read accepting the write.",
+    "count wrong at the full boundary.",
+    "A self-written testbench that never reaches full or empty; the held-out reference testbench (with coverage counters) judges instead."
+  ],
+  "upstream": {
+    "interface-spec": [{"path": "tests/fixtures/rtl/sync_fifo/interface_spec.md", "kind": "interface_spec"}],
+    "microarchitecture": [{"path": "tests/fixtures/rtl/sync_fifo/microarchitecture.md", "kind": "microarchitecture_spec"}]
+  },
+  "reference": [
+    {"path": "tests/fixtures/rtl/sync_fifo/sync_fifo.v", "kind": "rtl_source", "entry": "sync_fifo"},
+    {"path": "tests/fixtures/rtl/sync_fifo/sync_fifo_tb.v", "kind": "testbench", "entry": "sync_fifo_tb"},
+    {"path": "tests/fixtures/rtl/sync_fifo/sync_fifo.sby", "kind": "formal_spec"}
+  ],
+  "held_out": [
+    {
+      "name": "The reference testbench passes on the seat's RTL",
+      "scorer": "held-out-run",
+      "tool": "simulator.run",
+      "seat_files": {"sources": ["rtl_source"]},
+      "case_files": {"sources": ["tests/fixtures/rtl/sync_fifo/sync_fifo_tb.v"]},
+      "params": {"top": "sync_fifo_tb"}
+    }
+  ]
+}

@@ -37,8 +37,11 @@ app = typer.Typer(
 )
 org_app = typer.Typer(help="Inspect the organization: units, roles, skills, tools.", no_args_is_help=True)
 task_app = typer.Typer(help="Move a task through its lifecycle, as a role.", no_args_is_help=True)
+eval_app = typer.Typer(help="Evaluate a seat: a real or replayed model, judged by real tool runs.",
+                       no_args_is_help=True)
 app.add_typer(org_app, name="org")
 app.add_typer(task_app, name="task")
+app.add_typer(eval_app, name="eval")
 
 console = Console()
 _err = Console(stderr=True)
@@ -629,6 +632,76 @@ def run_cmd(
     for label, ref in (("escalation", report.escalation), ("review", report.review)):
         if ref:
             console.print(f"{label}: {ref}", highlight=False)
+
+
+# --- Seat evaluation (M27) ---------------------------------------------------------------
+
+CASES_OPTION = typer.Option(Path("evals"), "--cases", help="Directory of evaluation case files.")
+
+
+def _cases(cases: Path):
+    from nirmaan.evals import EvalError, load_cases
+
+    try:
+        return load_cases(cases)
+    except (EvalError, ValueError) as exc:
+        _fail(str(exc))
+
+
+@eval_app.command("list")
+def eval_list(cases: Path = CASES_OPTION) -> None:
+    """The evaluation cases: ID, seat, and request."""
+    for case in _cases(cases):
+        console.print(escape(f"{case.id}  [{case.seat}]  {case.request}"), highlight=False, soft_wrap=True)
+
+
+@eval_app.command("run")
+def eval_run(
+    case_ids: List[str] = typer.Argument(None, help="Case IDs to run (default: every case)."),
+    runtime: Optional[str] = typer.Option(None, "--runtime", help="Registered runtime ID to put in the seat."),
+    replay: bool = typer.Option(False, "--replay", help="Replay each case's reference answer instead."),
+    attempts: Optional[int] = typer.Option(None, "--attempts", min=1, help="Attempts when a submission is refused."),
+    cases: Path = CASES_OPTION,
+    repo: Path = typer.Option(Path("."), "--repo", help="Root that case file paths are relative to."),
+    out: Path = typer.Option(Path(".nirmaan") / "evals", "--out", help="Where result records are written."),
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
+    """Run evaluation cases. Exits 1 when any case fails."""
+    from nirmaan.evals import EvalError, run_case, write_result
+    from nirmaan.runtime import get_runtime
+
+    if replay == (runtime is not None):
+        _fail("choose one: --runtime ID (a model in the seat) or --replay (the reference answer)")
+    known = {case.id: case for case in _cases(cases)}
+    unknown = [c for c in case_ids or [] if c not in known]
+    if unknown:
+        _fail(f"unknown case {', '.join(unknown)}; known: {', '.join(known) or 'none'}")
+    try:
+        agent = get_runtime(runtime) if runtime else None
+    except KeyError as exc:
+        _fail(str(exc.args[0]))
+    results = []
+    for case_id in case_ids or list(known):
+        try:
+            result = run_case(_org(), known[case_id], agent, repo=repo, attempts=attempts)
+        except EvalError as exc:
+            _fail(str(exc))
+        path = write_result(result, out)
+        results.append(result)
+        if not as_json:
+            passed = sum(s.status.value == "passed" for s in result.scores)
+            console.print(escape(f"{'PASS' if result.passed else 'FAIL'} {result.case} [{result.runtime}]: "
+                                 f"{result.seat_status}, {passed}/{len(result.scores)} held-out checks passed "
+                                 f"({result.duration_s}s) -> {path}"), highlight=False, soft_wrap=True)
+            for score in result.scores:
+                console.print(f"  {score.status.value}: {escape(score.name)}: {escape(score.summary)}",
+                              highlight=False, soft_wrap=True)
+            if not result.submitted and result.detail:
+                console.print(f"  {escape(result.detail)}", highlight=False, soft_wrap=True)
+    if as_json:
+        typer.echo(json.dumps([r.model_dump(mode="json") for r in results], indent=2))
+    if not all(r.passed for r in results):
+        raise typer.Exit(1)
 
 
 @app.command()
