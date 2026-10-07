@@ -157,3 +157,22 @@ Inspection findings that shaped it: no product code calls
 `record_decision`; decisions are DECISION tasks (outcomes, outcome,
 artifacts, evidence, audit, branch cancellations by `_take_branch`). M27's
 review repair already moves superseded artifacts into an `Attempt`.
+
+**2026-10-07, later.** #46 (M29 auto-loop) merged first; `main` was merged
+into #48 (1260 passed, 3 skipped), and #48 merged (a127769) with the owner's
+approval. Parallel PRs #45, #47, #49, #50, #51 are other sessions' work.
+
+## M30: the register map as data (branch `m30/register-map`, from main a127769)
+
+| # | Step | Status |
+|---|---|---|
+| a | Design: `docs/REGISTER_MAP.md` | DONE |
+| b | Failing tests `tests/test_nirmaan_regmap.py`, fixture `register_map.json` | TODO |
+| c | `models/regmap.py`, `nirmaan/regmap.py` (validate, lowerings registry, C test generator) | TODO |
+| d | `integrations/regmap.py` (`regmap.check`, `regmap.verify` on the fw.test harness), contracts, CLI | TODO |
+| e | Eval case held-out check, full suite, `context.md`, ROADMAP, PR | TODO |
+
+Decided at design: no workflow adoption in M30 (an added expected output
+would show as a missing deliverable in the export); the map judges RTL
+through the existing AXI4-Lite co-simulation harness; APB maps are a
+recorded failed run until an APB harness exists.
