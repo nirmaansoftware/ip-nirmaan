@@ -190,9 +190,11 @@ PicoRV32 as two RV32I cores get (bit-serial, Wishbone, standard CSRs and
 `mret` against PicoRV32's custom IRQ instructions), which makes the
 core-agnostic claim worth testing.
 
-**Its cost:** SERV takes about 32 cycles per instruction, so the same tests
-take roughly ten times the cycles they take on PicoRV32 (well within the
-5,000,000-cycle limit; seconds of wall time in Verilator).
+**Its cost:** SERV is bit-serial (32 or more cycles per instruction), so the
+same tests take roughly ten times the cycles they take on PicoRV32: 682,218
+against 63,642 for the register block, 640,145 against 96,154 for the timer,
+and at most about 1,950,000 for a failing timer run. All are well within the
+5,000,000-cycle limit, and seconds of wall time in Verilator.
 
 **The wrapper.** `core_serv.v` adapts SERV to the SoC's memory interface,
 which is PicoRV32's (`mem_valid`, `mem_ready`, word-aligned `mem_addr`,
@@ -214,7 +216,9 @@ Core(name="serv", module="nirmaan_core_serv",
 
 `fw.cross_build` and `fw.soc_test` take `core=` (default `picorv32`, so every
 M27 run and requirement is unchanged); an unknown core is a recorded failed
-run naming the known ones. A new core is one `register_core` call: its
+run naming the known ones. The `fw.soc_test` backend keeps its M27 name,
+`picorv32-verilator`, so recorded runs and refusals read as before; the core
+that ran is in the log's `+define+NIRMAAN_CORE=`. A new core is one `register_core` call: its
 wrapper Verilog and its runtime file, no change to the SoC, the backends, the
 broker, or the gate (the crown-jewel test registers a third core, a PicoRV32
 built with a barrel shifter and two-cycle ALU, from files in a temporary
@@ -236,8 +240,8 @@ checked("Driver and tests cross-build for bare-metal RV32I", "fw.cross_build",
         params=(("max_text_bytes", "16384"),)),
 ```
 
-16 KiB is a quarter of the SoC's RAM, and about 1.7 times the fixture image
-(roughly 9.5 KiB, mostly the runtime's `snprintf`). A run without the
+16 KiB is a quarter of the SoC's RAM, and about 1.6 times the fixture images
+(10,012 to 10,180 bytes of text, mostly the runtime's `snprintf`). A run without the
 parameter has no limit, as before; a seat's run gets it from the requirement,
 and the policy counts only a run that carried it.
 
@@ -280,7 +284,8 @@ interrupts; section 8.
    * they fail on the `irq`-stuck and `irq`-ignores-`IE` copies, naming the
      checks;
    * the APB driver passes against `apb_regs.v`, with the RTL's own PSLVERR in
-     the log;
+     the log, and the same driver with a wrong register map fails, naming
+     the check;
    * an image over `max_text_bytes` is a recorded failed run;
    * an unknown core, and a design with no bus the SoC knows, are recorded
      failed runs that say why.
