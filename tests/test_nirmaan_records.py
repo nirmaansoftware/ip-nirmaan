@@ -131,7 +131,8 @@ def test_review_block_failure_and_escalation_are_classified(nirmaan_org, fixed_c
 
 
 def test_the_summary_counts_failures_across_projects(decided, nirmaan_org, fixed_clock):
-    other = Orchestrator(nirmaan_org, clock=fixed_clock).plan(REGRESSION)
+    other = Orchestrator(nirmaan_org, clock=fixed_clock).plan(REGRESSION + " It failed again overnight.")
+    assert other.state.project.id != decided.state.project.id  # the ID derives from the request and clock
     for engine in (decided, other):
         task = engine.task(tid(engine, "triage"))
         ToolBroker(engine).invoke(agent(task.owner), "artifact.read", {"artifact": "missing"}, task.id)
@@ -173,11 +174,11 @@ def test_cli_and_mcp_return_the_same_records(nirmaan_org, decided, tmp_path):
     project = decided.state.project.id
     cli = CliRunner().invoke(app, ["decisions", project, "--root", str(root), "--json"])
     assert cli.exit_code == 0, cli.output
-    expected = [r.to_dict() for r in decision_records(decided.state)]
+    expected = json.loads(json.dumps([r.to_dict() for r in decision_records(decided.state)]))  # tuples as lists
     assert json.loads(cli.output) == expected
     failures = CliRunner().invoke(app, ["failures", project, "--root", str(root), "--json"])
-    assert failures.exit_code == 0 and json.loads(failures.output)["failures"] == [
-        f.to_dict() for f in failure_records(decided.state)]
+    assert failures.exit_code == 0 and json.loads(failures.output)["failures"] == json.loads(json.dumps(
+        [f.to_dict() for f in failure_records(decided.state)]))
 
     bridge = AutomationBridge(WorkspaceServices(session_root=tmp_path / "sessions"))
     server = NirmaanMcpServer(McpContext(nirmaan_org, ProjectStore(root), bridge.publish, bridge.recent))
@@ -189,7 +190,10 @@ def test_cli_and_mcp_return_the_same_records(nirmaan_org, decided, tmp_path):
 
 def test_records_name_no_stage_tool_kind_or_role(nirmaan_org):
     org = nirmaan_org
-    vocabulary = (set(org.units) | set(org.skills) | set(org.capabilities) | set(org.roles) | set(org.tools)
+    # Platform tools are left out: their IDs (task.cancel, escalation.raise) are also the engine's audit
+    # actions, which the records read. Engineering tools, stages, kinds, and roles must never appear.
+    engineering_tools = {t for t, spec in org.tools.items() if spec.category != "platform"}
+    vocabulary = (set(org.units) | set(org.skills) | set(org.capabilities) | set(org.roles) | engineering_tools
                   | {s.id for w in org.workflows.values() for s in w.stages}
                   | {k for w in org.workflows.values() for s in w.stages for k in s.outputs})
     path = Path(nirmaan.__file__).parent / "records.py"
