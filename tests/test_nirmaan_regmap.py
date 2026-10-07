@@ -21,7 +21,7 @@ from nirmaan_helpers import human, tid
 from test_nirmaan_design_agents import needs
 
 from nirmaan.cli import app
-from nirmaan.models import RegisterMap
+from nirmaan.models import RegisterMap, Unmapped
 from nirmaan.orchestrator import Orchestrator
 from nirmaan.regmap import load_map, lower, lowerings, register_lowering, unregister_lowering, validate
 from nirmaan.runtime import ToolBroker
@@ -138,10 +138,11 @@ def test_the_map_fails_rtl_that_does_not_implement_it(rtl_seat, tmp_path, old, n
 
 @needs(*COSIM)
 def test_a_map_that_misstates_the_unmapped_response_fails(rtl_seat, tmp_path):
-    run, _ = _verify(rtl_seat, tmp_path, regmap=_map(unmapped="okay"))
+    run, _ = _verify(rtl_seat, tmp_path, regmap=_map(unmapped=Unmapped.OKAY))
     assert not run.succeeded and "unmapped" in run.summary, run.summary
 
 
+@needs(*COSIM)
 def test_a_bus_with_no_harness_is_a_recorded_failure_not_a_simulation(rtl_seat, tmp_path):
     engine = rtl_seat[0]
     run, _ = _verify(rtl_seat, tmp_path, regmap=_map(bus="apb"))

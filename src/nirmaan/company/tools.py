@@ -113,6 +113,13 @@ TOOLS: list[ToolSpec] = [
           "Non-vacuity: every cover in a proof setup is reached under its assumptions (M27).",
           (_p("sby", PATH, "The proof's SymbiYosys job file, run in cover mode.", required=True),
            _p("sources", PATHS, "RTL the setup reads."), *RUNNER)),
+    _tool("regmap.check", "Register map check", "eda", RD, AV,
+          "Validate a register map: alignment, overlaps, names, reset widths (M30).",
+          (_p("map", PATH, "The register map (JSON).", required=True),)),
+    _tool("regmap.verify", "Register map against RTL", "eda", EXE, AV,
+          "Run a test generated from the register map on the RTL, over the AXI4-Lite co-simulation harness (M30).",
+          (_p("map", PATH, "The register map (JSON).", required=True),
+           _p("rtl", PATHS, "The RTL to check.", required=True), TOP, *RUNNER)),
     _tool("equivalence.run", "Equivalence checker", "eda", EXE, CO, "Logic equivalence checking."),
     _tool("cdc.run", "CDC/RDC analyzer", "eda", EXE, CO, "Structural and functional crossing analysis."),
     # Implementation EDA.

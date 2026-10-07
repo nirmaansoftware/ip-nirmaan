@@ -32,6 +32,14 @@
       "seat_files": {"sources": ["rtl_source"]},
       "case_files": {"sources": ["tests/fixtures/rtl/axi4_lite/axi4_lite_regs_tb.v"]},
       "params": {"top": "axi4_lite_regs_tb"}
+    },
+    {
+      "name": "The RTL implements the register map (a test generated from the map, run over AXI4-Lite)",
+      "scorer": "held-out-run",
+      "tool": "regmap.verify",
+      "seat_files": {"rtl": ["rtl_source"]},
+      "case_files": {"map": ["tests/fixtures/rtl/axi4_lite/register_map.json"]},
+      "params": {"top": "axi4_lite_regs"}
     }
   ]
 }
