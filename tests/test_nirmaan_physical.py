@@ -463,7 +463,7 @@ def test_real_openroad_places_and_routes_the_axi4_lite_block(project, tmp_path):
     run, outcome = invoke(project, "pnr.run", {"netlist": netlist, "sdc": str(SDC), "top": TOP, **pdk,
                                                **NANGATE45_PNR}, tmp_path / "pnr")
     metrics = outcome.data["result"]["metrics"]
-    assert metrics["stages_completed"] == ["floorplan", "place", "route", "timing"], run.summary
+    assert metrics["stages_completed"] == ["floorplan", "place", "cts", "route", "timing"], run.summary
     assert metrics["drc_violations"] == 0 and metrics["wirelength_um"] > 0, run.summary
     assert metrics["utilization_pct"] > 0 and metrics["worst_slack"] > 0, run.summary
     assert run.succeeded, run.summary
@@ -479,3 +479,91 @@ def test_real_openroad_failure_is_a_recorded_failed_run(project, tmp_path):
     assert not run.succeeded and run.id in project.state.tool_runs
     assert outcome.data["result"]["diagnostics"], run.summary
     assert "place and route failed" in run.summary, run.summary
+
+
+# --- M29: signoff steps for real (power grid, CTS, repair, fillers, extraction) ------------
+
+#: The Nangate45 platform's own signoff inputs, as OpenROAD-flow-scripts ships them.
+NANGATE45_SIGNOFF = {
+    "tap_cell": "TAPCELL_X1", "endcap_cell": "TAPCELL_X1", "tap_distance": "120",
+    "pdn_tcl": "nangate45/grid_strategy-M1-M4-M7.tcl", "rc_tcl": "nangate45/setRC.tcl",
+    "rcx_rules": "nangate45/rcx_patterns.rules",
+    "filler_cells": "FILLCELL_X1,FILLCELL_X2,FILLCELL_X4,FILLCELL_X8,FILLCELL_X16,FILLCELL_X32",
+    "supply_voltage": "1.1",
+}
+
+
+def _signoff_pnr(project, tmp_path, pdk, netlist, name, **extra):
+    params = {"netlist": netlist, "sdc": str(SDC), "top": TOP, **pdk, **NANGATE45_PNR, **NANGATE45_SIGNOFF, **extra}
+    return invoke(project, "pnr.run", params, tmp_path / name)
+
+
+@needs("openroad", "yosys")
+def test_real_signoff_flow_connects_power_builds_the_clock_tree_and_extracts(project, tmp_path):
+    pdk = nangate45()
+    netlist = _mapped_netlist(project, tmp_path, pdk)
+    run, outcome = _signoff_pnr(project, tmp_path, pdk, netlist, "signoff")
+    m = outcome.data["result"]["metrics"]
+    assert m["stages_completed"] == ["floorplan", "place", "cts", "route", "extract", "timing"], run.summary
+    assert m["drc_violations"] == 0 and m["power_grids"] and m["unconnected_supply_pins"] == 0, run.summary
+    assert m["tap_cells"] > 0 and m["filler_cells"] > 0, run.summary
+    assert m["antenna_net_violations"] == 0 and m["antenna_pin_violations"] == 0, run.summary
+    assert m["cts_buffers"] > 0 and m["cts_sinks"] > 0, run.summary
+    assert m["clock_skew"] is not None and m["clock_insertion_delay"] is not None, run.summary
+    assert set(m["slack_by_stage"]) == {"place", "cts", "route", "extract"}, m["slack_by_stage"]
+    assert m["parasitics"] == "extracted" and m["worst_slack"] > 0, run.summary
+    assert set(m["outputs"]) == {"def", "netlist", "spef"} and run.succeeded, run.summary
+
+    # Signoff STA on the routed netlist with the extracted SPEF, in a separate run.
+    design = {"netlist": m["outputs"]["netlist"], "top": TOP, **pdk, "sdc": str(SDC), "spef": m["outputs"]["spef"]}
+    sta, sta_outcome = invoke(project, "sta.run", design, tmp_path / "sta_spef")
+    sm = sta_outcome.data["result"]["metrics"]
+    assert sm["unannotated_drivers"] == 0 and sm["worst_slack"] > 0, sta.summary
+    assert sta.succeeded, sta.summary
+
+
+@needs("openroad", "yosys")
+def test_real_signoff_flow_with_an_impossible_clock_is_a_recorded_failed_run(project, tmp_path):
+    pdk = nangate45()
+    netlist = _mapped_netlist(project, tmp_path, pdk)
+    run, outcome = _signoff_pnr(project, tmp_path, pdk, netlist, "signoff_fast", sdc=str(FAST_SDC))
+    m = outcome.data["result"]["metrics"]
+    assert not run.succeeded and run.id in project.state.tool_runs
+    assert "timing violated" in run.summary and m["worst_slack"] < 0, run.summary
+    assert m["parasitics"] == "extracted", run.summary  # the flow still ran to the end
+
+
+#: sky130 HD as OpenROAD-flow-scripts ships it under ``flow/platforms/sky130hd`` (M29).
+SKY130HD = {
+    "liberty": "sky130hd/lib/sky130_fd_sc_hd__tt_025C_1v80.lib",
+    "tech_lef": "sky130hd/lef/sky130_fd_sc_hd.tlef",
+    "lef": "sky130hd/lef/sky130_fd_sc_hd_merged.lef",
+}
+SKY130HD_PNR = {
+    "site": "unithd", "hor_layers": "met3", "ver_layers": "met2",
+    "min_routing_layer": "met1", "max_routing_layer": "met5",
+    "tap_cell": "sky130_fd_sc_hd__tapvpwrvgnd_1", "tap_distance": "14",
+    "pdn_tcl": "sky130hd/pdn.tcl", "rc_tcl": "sky130hd/setRC.tcl", "rcx_rules": "sky130hd/rcx_patterns.rules",
+    "filler_cells": "sky130_fd_sc_hd__fill_1,sky130_fd_sc_hd__fill_2,sky130_fd_sc_hd__fill_4,sky130_fd_sc_hd__fill_8",
+    "supply_voltage": "1.8",
+}
+
+
+@needs("openroad", "yosys")
+def test_real_signoff_flow_on_sky130hd(project, tmp_path):
+    root = os.environ.get(PDK_ROOT_ENV, "")
+    if not (root and all((Path(root) / p).is_file() for p in SKY130HD.values())):
+        if "openroad" in os.environ.get("NIRMAAN_REQUIRE_EDA", "").split():
+            pytest.fail(f"{PDK_ROOT_ENV} has no sky130hd platform")
+        pytest.skip(f"{PDK_ROOT_ENV} has no sky130hd platform")
+    params = {"sources": str(AXI), "top": TOP, "backend": "yosys-liberty", "liberty": SKY130HD["liberty"],
+              "tie_high": "sky130_fd_sc_hd__conb_1/HI", "tie_low": "sky130_fd_sc_hd__conb_1/LO"}
+    synth, outcome = invoke(project, "synth.run", params, tmp_path / "synth")
+    assert synth.succeeded, synth.summary
+    netlist = outcome.data["result"]["metrics"]["netlist"]
+    run, outcome = invoke(project, "pnr.run", {"netlist": netlist, "sdc": str(SDC), "top": TOP, **SKY130HD,
+                                               **SKY130HD_PNR}, tmp_path / "pnr")
+    m = outcome.data["result"]["metrics"]
+    assert m["stages_completed"] == ["floorplan", "place", "cts", "route", "extract", "timing"], run.summary
+    assert m["drc_violations"] == 0 and m["unconnected_supply_pins"] == 0, run.summary
+    assert m["parasitics"] == "extracted" and run.succeeded, run.summary
