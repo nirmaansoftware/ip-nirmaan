@@ -280,7 +280,7 @@ jobs all passed; the `physical-design` job ran 29 tests, none skipped, with
 
 | | M27 | M29 |
 |---|---|---|
-| `physical-design` job | 2 min 29 s | 7 min 0 s with the OpenSTA build (2 min 19 s, a cache miss), so about 4 min 40 s once the build is cached |
+| `physical-design` job | 2 min 29 s | 7 min 0 s with the OpenSTA build (2 min 19 s, a cache miss); 3 min 34 s with the build cached (run 37634417200) |
 | of which the tests | about 1 min | 3 min 26 s (three full signoff flows, a CTS-only failure run, and the M27 tests, now through CTS) |
 
 The job runs in parallel with the two main test jobs (5 to 7 minutes), so

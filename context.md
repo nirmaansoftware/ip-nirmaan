@@ -2605,7 +2605,7 @@ Key points worth not re-deriving:
 Fixtures (captured from that run): `openroad_route.log` (re-captured with
 CTS), `openroad_signoff.log`, `opensta_spef.log` (standalone OpenSTA). CI time:
 the `physical-design` job went from 2.5 to 7 minutes with an uncached OpenSTA
-build (about 4.7 minutes cached), in parallel with the 5 to 7 minute main
+build (3.6 minutes cached), in parallel with the 5 to 7 minute main
 jobs. Tests: `tests/test_nirmaan_physical.py`; crown jewel
 `test_signoff_on_extracted_parasitics_needs_no_core_changes`, and the M25
 crown jewel now meets the M29 limits.
