@@ -15,7 +15,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from nirmaan.models.governance import Criticality, DecisionKind, EscalationKind
-from nirmaan.models.org import ActorKind
+from nirmaan.models.org import ActorKind, list_values
 from nirmaan.models.workflow import EvidenceKind, EvidenceRequirement, OnFailure
 
 
@@ -256,6 +256,10 @@ class ToolRun(BaseModel):
     succeeded: bool
     summary: str
     references: tuple[str, ...] = ()
+
+    def values(self, param: str) -> list[str]:
+        """A parameter's elements (a list parameter is stored comma-joined); empty if not given."""
+        return list_values(self.params.get(param, ""))
 
 
 class Evidence(BaseModel):

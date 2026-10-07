@@ -216,7 +216,8 @@ Core(name="serv", module="nirmaan_core_serv",
 
 `fw.cross_build` and `fw.soc_test` take `core=` (default `picorv32`, so every
 M27 run and requirement is unchanged); an unknown core is a recorded failed
-run naming the known ones. The `fw.soc_test` backend keeps its M27 name,
+run naming the known ones. `core` is declared on both tools' contracts
+(`company/tools.py`, M28), the only new parameter M29 adds. The `fw.soc_test` backend keeps its M27 name,
 `picorv32-verilator`, so recorded runs and refusals read as before; the core
 that ran is in the log's `+define+NIRMAAN_CORE=`. A new core is one `register_core` call: its
 wrapper Verilog and its runtime file, no change to the SoC, the backends, the

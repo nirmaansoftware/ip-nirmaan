@@ -44,6 +44,7 @@ from nirmaan.integrations.firmware import (
     copy_rtl,
     parse_fw_test,
 )
+from nirmaan.models import list_values
 
 #: The SoC: the core, the bridge, the clock, and the firmware runtime.
 SOC = Path(__file__).parent / "firmware_soc"
@@ -295,7 +296,7 @@ def bus_of(ports: set[str]) -> Bus | None:
 
 
 def _rtl_files(job: Job) -> list[str]:
-    return [str(Path(s.strip()).resolve()) for s in job.params["rtl"].split(",") if s.strip()]
+    return [str(Path(s).resolve()) for s in list_values(job.params["rtl"])]
 
 
 def _soc_check(job: Job) -> str | None:

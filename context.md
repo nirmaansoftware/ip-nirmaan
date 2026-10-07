@@ -2037,8 +2037,6 @@ CI installs `gcc-riscv64-unknown-elf` and adds `riscv64-unknown-elf-gcc` to
 Deferred: interrupts from the design, precise bus-error traps, other cores and
 ISAs, a code-size budget in the gate, APB and AXI4 bridges.
 
----
-
 ### Milestone 27 (DFT) - ATPG, multiple scan chains, and MBIST (after Stage 6)
 
 Two new tools, both `AVAILABLE` and backed by M21 backends in
@@ -2103,6 +2101,158 @@ Fixtures: `tests/fixtures/rtl/dft/two_clocks.v`, `dft/atpg_demo.v`,
 `docs/DFT_ADVANCED.md`. Deferred: transition faults, pin faults, ATPG across
 capture edges, lockup latches, compression, other memory types, a memory stage.
 
+### Milestone 27 (seat evaluation) - Structural review, and seat evaluation
+
+The first milestone of the structural review of 2026-09-29
+(`docs/architecture/`: `current-state.md`, `target-state.md`,
+`proposed-change.md`, and the resumable `REVIEW_PLAN.md`). The review found
+that the brief's engine (task, plan, artifact, evidence, tool broker, roles vs
+skills, gates, audit, events, traceability) already exists as `work/` plus
+`runtime/`, so it adds no parallel `nirmaan/engine/` package and no duplicate
+per-topic docs; it orders the real gaps as M27 to M33 in `target-state.md`
+section 5 (the review numbered them M27 to M33 before the parallel M27 parts
+existed; the coordinator owns the numbering). Version bump left to the coordinator.
+
+M27 answers "does a seat's work actually work?" with cases as data and judges
+that are real tool runs. `evals/rtl/*.json` (four cases: the AXI4-Lite and APB
+register blocks, the FIFO, the arbiter) each fix the `rtl-implementation`
+seat's upstream to the block's interface spec and microarchitecture, hold a
+reference answer for replay, and hold out the block's reference testbench.
+`nirmaan.evals.run_case` plans the request in a sandbox, fixes the upstream,
+puts any runtime in the seat through the unchanged `run_task`, then runs each
+held-out check through the broker and returns an `EvalResult`.
+`nirmaan eval list` and `nirmaan eval run [CASE...] (--runtime ID | --replay)`.
+
+Key design points worth not re-deriving:
+- **A pass is a recorded run.** The runner records a scorer's "passed" as
+  failed unless it cites sandbox runs that all succeeded; a refused tool is
+  `not_run`, never a pass; replay results carry `replay: true`.
+- **The harness fixes work stages only**, as a `SYSTEM` actor named
+  `eval-fixture` whose review text names the reference documents; no human
+  attestation. A gate or decision upstream of the seat raises `EvalError`.
+  The `new-ip` interface-spec stage fans out into variants, so a seat must be
+  exactly one task (validated).
+- **Scorers are a registry** (`register_scorer`); one ships, `held-out-run`,
+  which fills tool parameters from the seat's submitted files by kind, then
+  the case's files. Runner and scorers name no stage, tool, kind, or role.
+- Case digest: SHA-256 over the case and every file it names.
+- Rich markup swallowed `[rtl-implementation]` in CLI lines; whole lines are
+  escaped now and a test asserts the brackets appear.
+
+`tests/test_nirmaan_evals.py` (15 tests; on v1.21.0 the standard local run is 1218 passed, 3 skipped), including replay passing on all four
+blocks with real tools, and `test_what_the_gates_miss_the_held_out_testbench_catches`
+(RTL with `reg3` reset to all ones and a testbench that checks nothing passes
+lint, simulation, and synthesis and reaches review; the reference testbench
+fails it). Crown jewel `test_a_new_case_or_scorer_needs_zero_core_changes`.
+Design doc: `docs/SEAT_EVALUATION.md`; case format: `evals/README.md`.
+
+Deferred: the first live-model run (`--runtime anthropic`), token and cost
+accounting (M31), mutation scoring of a seat's testbench, held-out proofs,
+specification-seat cases.
+
+### Milestone 28 - Tool contracts (structural review, milestone 2)
+
+Every tool with a binding declares what it takes, and the broker holds
+callers to it before anything runs. Design doc: `docs/TOOL_CONTRACTS.md`.
+Version bump left to the coordinator.
+
+- **Vocabulary** (`models/org.py`): `ParamKind` (text, path, paths, integer,
+  number), `ParamSpec` (name, kind, required, description, `prefix` for
+  families such as `max_<metric>`), `ToolSpec.params` (None: no contract,
+  taken as given, which keeps extension tools working), `list_values`, and
+  `ToolRun.values(param)`.
+- **Catalog** (`company/tools.py`): all 24 bound tools declare parameters (19 when written; the M27 parts added
+  `formal.cover`, `dft.atpg`, `dft.mbist`, `fw.cross_build`, `fw.soc_test`, given contracts at the merge),
+  inventoried from what every binding and backend actually reads (both quote
+  styles; OpenROAD's settings included though nothing here can run it).
+  Shared tuples: `RUNNER` (backend, workdir, timeout, max_), `PDK`,
+  `PDK_REQUIRED` (sta and pnr probes refuse without Liberty), `NETLIST`.
+- **Broker** (`runtime/tools.py`): `check_params` after the authority check:
+  an undeclared name or an ill-typed integer or number raises
+  `ToolContractError` (a `ToolAccessDenied`, so every caller already reports
+  it) and records no run. A `paths` value may be a list; an element with a
+  comma is refused; lists are stored comma-joined as before, so stored
+  projects and bindings are unchanged. A `path` takes a one-element list.
+- **Runtime**: each tool gets only the task inputs its contract declares
+  (`ToolHandle.declared`), so `input.workspace` no longer reaches lint; file
+  parameters go to the broker as lists.
+- **Required is declared, not enforced by the broker.** A missing required
+  input stays a recorded failed run (the M21/M25 rule, asserted by a physical
+  test); M28 does not re-decide it.
+- `nirmaan org tool ID` prints a tool's contract and whether it runs here.
+
+Found on the way: two refusal tests passed one parameter dict to every tool
+(`top` to formal, the LEFs to OpenSTA); they now pass each tool its own
+parameters. The runtime passed `sby` as a one-element list, which is why a
+`path` accepts one.
+
+`tests/test_nirmaan_contracts.py` (13), including a static scan that every
+parameter an integration reads is declared, and the crown jewel
+`test_a_new_tool_contract_needs_no_core_changes`. On v1.21.0 the standard local run is
+1231 passed, 3 skipped. Deferred to the next M28 part: typed values end to end (a
+`ToolRun` storing real lists) and the typed work packet.
+
+---
+
+### Milestone 29 - An unattended owner and reviewer loop in one command (after Stage 6)
+
+`nirmaan drive PROJECT [TASK] --runtime ID --reviewer-runtime ID` strings M27's
+steps together: the owner seat (`run_task`, with M26 attempts and M27 limits),
+the planned reviewer seat (`review_task`), the owner again after a change
+request, and so on, until a person must act. With no TASK it drives every
+ready task in dependency order. Design doc: `docs/AUTO_LOOP.md`.
+
+Key design points worth not re-deriving:
+- **The loop holds two seats only.** `nirmaan/runtime/loop.py` calls
+  `run_task` and `review_task` and nothing else that changes state, apart from
+  its audit entry. It never approves a task, signs a gate (human-required or
+  not), completes, resolves, unblocks, or cancels; a test checks the module's
+  calls. A passed review stops at `awaiting_approval`; a ready gate stops at
+  `awaiting_gate`, so dependents stay planned until a person acts. Tasks with
+  no review complete on submission (the engine's rule), so their dependents
+  are driven in the same invocation.
+- **Next step from state alone** (`next_step`): `ready`, `changes_requested`,
+  `in_progress` mean the owner; `in_review` with review `pending` means the
+  reviewer; everything else is a `Stop` (`awaiting_approval`, `conflicted`,
+  `escalated`, `blocked`, `waiting`, `done`, `awaiting_gate`). Results add
+  `declined`, `refused`, and `budget`. After a `refused` owner step the loop
+  continues only when the next owner run would escalate (no call); with one
+  attempt M26 records nothing, so it stops rather than ask forever.
+- **Budget:** `--max-calls` (default 20) per invocation. A call is one owner
+  attempt (`len(report.attempts)`) or one reviewer step (always charged 1). A
+  step starts only if its worst case fits: `owner_calls` is the stage's
+  attempts minus this round's refused attempts, or 0 when `exhausted` (M27's
+  check, extracted from `_exhausted` in `runtime/base.py` and now public). The
+  task limits in state still cap every task across invocations.
+- **Audit and resume:** `TaskEngine.record_step` (the one engine addition)
+  writes `loop.step` on the task as the acting seat (an AI agent named for its
+  runtime), with step, seat, runtime, status, calls, review, escalation,
+  attempts, and tool runs. The CLI saves after every step (`on_step`), so an
+  interruption loses at most the step in flight; rerunning resumes.
+- **Independence:** the reviewer is always the task's planned reviewer (P6 is
+  checked inside `review_task`). `--reviewer-runtime` defaults to `--runtime`;
+  the doc justifies that (different seat and packet, a fresh stateless review
+  prompt that never carries the owner's prompt, grounded verdicts, and a
+  person still approves). The CLI notes a shared runtime on stderr.
+- `plan_loop` gives the worst case sequence as data for `--dry-run`; nothing
+  is called or saved. `--input` needs a TASK.
+
+`tests/test_nirmaan_auto_loop.py` (19 tests): the full loop on the AXI4-Lite
+interface spec in one CLI command (owner, change request, repair, approving
+review, stop at the human approval, then a person approves); the same on real
+AXI4-Lite RTL with a formal counterexample repaired inside an attempt
+(`NIRMAAN_REQUIRE_EDA`); never self-approves; project mode stops at a gate
+(human-required or not) and never crosses it; the budget before a step and an
+owner charged its attempts; resume after a crash from saved state; spent
+rounds and spent attempts escalate with no call; a refusal with one attempt
+stops; a decline stops; the plan and `--dry-run`; a shared runtime is named;
+crown jewel `test_a_new_workflow_is_driven_with_no_core_changes` (a gated
+two-stage workflow and a runtime, both written in the test); the loop names
+nothing and keeps the import laws; every step audited as its seat.
+
+Deferred: concurrent tasks; a call budget across invocations; approval by a
+delegated non-human approver; task inputs in project mode.
+
 ---
 
 ### Milestone 29 (RISC-V) - interrupts, a second core, a code-size gate, and APB (after Stage 6)
@@ -2120,6 +2270,8 @@ wrapper, `core_<name>.v`, with PicoRV32's memory interface, `trap`, and `irq`)
 and `` `NIRMAAN_BRIDGE `` (`bridge_axil.v` or `bridge_apb.v`, each of which
 instantiates `` `NIRMAAN_DUT ``), so `nirmaan_soc.v` names no core, bus, or
 design. The `fw.soc_test` backend keeps its M27 name `picorv32-verilator`.
+The one new parameter, `core`, is declared (M28 contracts) on both tools in
+`company/tools.py`; the IRQ and the bus need none, being read from the RTL.
 
 Key design points worth not re-deriving:
 - **SERV 1.4.0** (olofk/serv, commit `7d9cde4`), seventeen `rtl/` files
@@ -2169,7 +2321,6 @@ now compiles six files (the core's interrupt runtime). CI is unchanged.
 Deferred: precise bus-error traps, interrupts and APB in the host
 co-simulation (`fw.test`), more than one interrupt line, and running the gate
 on both cores.
-
 
 ## 3. Current architecture map
 

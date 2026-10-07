@@ -22,7 +22,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, NamedTuple, Protocol
+from typing import Any, Callable, NamedTuple, Protocol, Sequence
 
 from nirmaan.models import Actor, ActorKind, EscalationKind, EvidenceKind, TaskStatus, Verdict
 from nirmaan.runtime.context import WorkPacket, assemble
@@ -78,9 +78,13 @@ class ToolHandle:
     def __init__(self, broker: ToolBroker, actor: Actor, task_id: str) -> None:
         self._broker, self._actor, self._task = broker, actor, task_id
 
-    def invoke(self, tool_id: str, **params: str) -> tuple[str, ToolOutcome]:
+    def invoke(self, tool_id: str, **params: str | Sequence[str]) -> tuple[str, ToolOutcome]:
         run, outcome = self._broker.invoke(self._actor, tool_id, params, self._task)
         return run.id, outcome
+
+    def declared(self, tool_id: str, inputs: dict[str, str]) -> dict[str, str]:
+        """The task inputs the tool's contract declares (M28): a tool is handed only what it takes."""
+        return self._broker.declared_inputs(tool_id, inputs)
 
 
 class AgentRuntime(Protocol):
@@ -197,15 +201,22 @@ def _spent(engine: TaskEngine, task_id: str) -> tuple[list, list]:
     return sent_back, [a for a in records if not a.reviews and a.number > since]
 
 
-def _exhausted(engine: TaskEngine, task_id: str, actor: Actor, budget: Limits) -> RunReport | None:
-    """Escalate, through the owner's route, when running the seat again would exceed a limit (M27)."""
+def exhausted(engine: TaskEngine, task_id: str, budget: Limits) -> str | None:
+    """Why running the owner seat again would exceed a limit (M27), or None. Reads state only."""
     sent_back, refused = _spent(engine, task_id)
     if len(sent_back) >= budget.review_rounds:
-        reason = f"{len(sent_back)} of {budget.review_rounds} review rounds were sent back"
-    elif refused and len(refused) >= budget.attempts:  # with a limit of 1, M26 records no attempt
-        reason = f"{len(refused)} of {budget.attempts} attempts were refused in this review round"
-    else:
+        return f"{len(sent_back)} of {budget.review_rounds} review rounds were sent back"
+    if refused and len(refused) >= budget.attempts:  # with a limit of 1, M26 records no attempt
+        return f"{len(refused)} of {budget.attempts} attempts were refused in this review round"
+    return None
+
+
+def _exhausted(engine: TaskEngine, task_id: str, actor: Actor, budget: Limits) -> RunReport | None:
+    """Escalate, through the owner's route, when running the seat again would exceed a limit (M27)."""
+    reason = exhausted(engine, task_id, budget)
+    if reason is None:
         return None
+    sent_back, refused = _spent(engine, task_id)
     esc = engine.escalate(
         task_id, actor, EscalationKind.TECHNICAL, reason=f"repair budget exhausted: {reason}",
         attempted_actions=tuple(f"{a.id}: {a.refusal}" for a in (*sent_back, *refused)),

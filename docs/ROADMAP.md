@@ -15,7 +15,7 @@ way every milestone has:
 | Organization model: 207 units, 685 derived roles, skills, authority, a 12-principle constitution | `sta.run` and `pnr.run` on the development machine (they run in CI only, M27); standalone OpenSTA and sky130 in the real-tool tests |
 | Planner: requirement to owned, reviewed, gated task graph; 9 workflows | CTS, power grid, parasitics, multi-corner timing |
 | Task engine: lifecycle, reviews, approvals, human gates, hash-chained audit | Transition-fault ATPG, lockup latches across clock domains, a memory stage for MBIST (stuck-at ATPG, multiple chains, and March C- MBIST: M27); precise bus-error traps and interrupts in host co-simulation (RV32I on PicoRV32: M27; interrupts, SERV as a second core, a code-size gate, and APB: M29) |
-| VeriTriage as a real, evidence-producing tool (`veritriage.investigate`) | An unattended owner and reviewer loop in one command (repair after review and per-stage limits: M27) |
+| VeriTriage as a real, evidence-producing tool (`veritriage.investigate`) | Concurrent tasks and a project wide call budget in the unattended loop (one command drives owner, review, and repair to the human approval: M29) |
 | AI workers in three verification seats, off by default, on Opus 5.5 (M20) | The same RTL gates on `parameter-change` and the fix stages; automatic antecedent covers |
 | Design agents: spec, microarchitecture, and RTL seats; RTL gated on real lint and simulation; the AXI4-Lite register block end to end (M23) | |
 | `nirmaan export`: the numbered `01_requirement` to `10_signoff` deliverable tree (M23) | Loading requirements and verification items from a file; a verification-plan seat |
@@ -29,9 +29,11 @@ way every milestone has:
 | Repair after review: a sent-back submission is superseded and the seat reruns with the findings; retry limits per stage and a budget across runs, with escalation when spent (M27) | |
 | The design gates on every RTL workflow (`new-ip`, `feature-addition`, `rtl-change`), and proofs that must reach every cover (M27) | |
 | A synchronous FIFO, a round-robin arbiter, and an APB register block, each with proofs and designed end to end by agents (M26) | |
+| Seat evaluation: cases as data, judged by real tool runs including held-out reference testbenches; `nirmaan eval` (M27) | A first live-model evaluation run; token and cost accounting |
+| Tool contracts: every bound tool declares its parameters, and the broker refuses undeclared or ill-typed ones before running; `nirmaan org tool` (M28) | Typed values end to end; the typed work packet |
 | IP Nirmaan over MCP; organizational events on the M18 bus (M22) | |
 | CI on Python 3.11 and 3.12, plus a dash check (Stage 0) | |
-| 1203 tests; CLI `nirmaan`; HTML dashboard; landing page live at https://ip.nirmaan.online | |
+| 1231 tests; CLI `nirmaan`; HTML dashboard; landing page live at https://ip.nirmaan.online | |
 
 ## Resume checklist (after the folder rename)
 
@@ -47,7 +49,7 @@ PYTHONPYCACHEPREFIX=/tmp/nirmaan-pycache .venv/bin/python -m pytest -q \
   --deselect tests/test_ai_boundary.py::test_missing_sdk_raises_clean_error
 ```
 
-Expect 1203 passing (3 skipped: OpenROAD is not installed locally; the CI `physical-design` job runs those three). The folder is still in iCloud, so the eviction hangs
+Expect 1231 passing (3 skipped: OpenROAD is not installed locally; the CI `physical-design` job runs those three). The folder is still in iCloud, so the eviction hangs
 described in `context.md` section 4 still apply. If imports stall, pre-read the tree:
 
 ```
@@ -208,7 +210,24 @@ extraction. Design doc: `docs/PHYSICAL_DESIGN.md`.
 - **Gates everywhere (M27, done):** the `new-ip`, `feature-addition`, and `rtl-change` RTL stages carry the `block-design` gates as data (approved inputs, now seen through gates; lint, simulation, synthesis with no latches, formal when a `.sby` is written), and a proof counts only if a cover run over the same setup reaches every cover (`formal.cover`); the fixture proofs carry real covers. See `docs/GATES_EVERYWHERE.md`.
 - **DFT: ATPG, multiple chains, MBIST (M27):** `dft.scan_insert` takes `chains` and `max_chain_length` and cuts balanced chains per clock domain (`scan_in[k]` to `scan_out[k]`); `dft.atpg` generates stuck-at patterns (random, then PODEM) and measures coverage by an Icarus fault simulation through the scan protocol, refusing a pattern set whose claims or expected responses the simulation does not bear out; `dft.mbist` runs a generated March C- controller against a memory. The `block-design` `dft` stage now also needs 90% test coverage before review. See `docs/DFT_ADVANCED.md`.
 - **RISC-V firmware (M27, done):** `fw.cross_build` compiles the driver and its tests strictly for bare-metal RV32I into an ELF with its code size, and `fw.soc_test` runs it on PicoRV32 (vendored, ISC) in one Verilator model with the approved RTL, so the driver's register accesses are CPU loads and stores on the real AXI4-Lite bus (SLVERR reaches the driver through a status register). A request that names RISC-V gates the firmware seat on both, through the new generic `EvidenceRequirement.when`; CI installs `gcc-riscv64-unknown-elf`. See `docs/RISCV_FIRMWARE.md`.
+
+- **Tool contracts (M28, first part, done):** every tool with a binding declares its parameters (name, kind, required); the broker refuses an undeclared or ill-typed parameter, or a path containing a comma, before anything runs, and the runtime hands each tool only the inputs it declares. See `docs/TOOL_CONTRACTS.md`.
+- **Seat evaluation (M27, done):** `evals/` cases fix a seat's upstream to reference documents and judge its work with held-out checks the seat never sees (the reference testbench on its RTL), each a recorded tool run; `nirmaan eval run (--runtime ID | --replay)`. See `docs/SEAT_EVALUATION.md`.
+- **Unattended owner and reviewer loop (M29):** `nirmaan drive PROJECT [TASK] --runtime ID --reviewer-runtime ID` runs the owner seat (with its attempts), the independent reviewer seat, and the repair after a change request, until a person must act (an approval or a gate), a limit escalates, or the work is blocked or declined; it never approves or crosses a gate, decides each step from state (so it resumes by being run again), audits every step as `loop.step`, starts a step only if its worst case fits `--max-calls`, and prints the plan with `--dry-run`. With no TASK it drives every ready task in dependency order. See `docs/AUTO_LOOP.md`.
 - **RISC-V next (M29):** a design's `irq` output reaches the core (PicoRV32 `irq[3]`, SERV `i_timer_irq`, both entering at 0x10), with an interrupt API (`nirmaan_irq.h`) and an AXI4-Lite timer fixture whose tests prove the interrupt fires, is acknowledged by a register write, and stays silent when masked, and fail on broken IRQs; SERV 1.4.0 (vendored, ISC) runs the same SoC, firmware, and tests as PicoRV32, chosen by `core=` (`register_core`); an APB bridge chosen from the design's ports drives `apb_regs.v` from firmware; the gate limits code size with `max_text_bytes` 16384. Precise bus-error traps are not feasible on either core, so `STATUS` stays. See `docs/RISCV_NEXT.md`.
+
+## Structural review milestones (from 2026-09-29)
+
+The structural review (`docs/architecture/`) found the engine the brief asked
+for already exists and ordered the real gaps. Seat evaluation (an M27 part) and
+the first part of M28 (tool contracts) are done; the rest follow in this order,
+each measured against the evaluation cases (working names; the coordinator
+assigns milestone numbers): M28 typed tool contracts and
+work packet, M29 engineering records (decision records, artifact supersession,
+failure categories), M30 a register-map IR checked against the RTL, M31
+capability-based model selection with cost accounting, M32 scalable state,
+M33 learning proposals through reviewed tasks. Details and reasons:
+`docs/architecture/target-state.md` section 5.
 
 ## Side work (any time; owner-driven)
 
