@@ -701,6 +701,89 @@ def run_cmd(
             console.print(f"{label}: {ref}", highlight=False)
 
 
+@app.command("drive")
+def drive_cmd(
+    project: str, task: Optional[str] = typer.Argument(None, help="One task; omit to drive every ready task."),
+    runtime: str = typer.Option("unbound", "--runtime", help="Registered runtime ID for the owner seat."),
+    reviewer_runtime: Optional[str] = typer.Option(None, "--reviewer-runtime",
+                                                   help="Runtime ID for the reviewer seat (default: --runtime)."),
+    max_calls: int = typer.Option(20, "--max-calls", min=0, help="Runtime calls this invocation may make."),
+    attempts: Optional[int] = typer.Option(None, "--attempts", min=1, help="As for nirmaan run."),
+    review_rounds: Optional[int] = typer.Option(None, "--review-rounds", min=1, help="As for nirmaan run."),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Print the plan of calls; run nothing, change nothing."),
+    inputs: List[str] = typer.Option([], "--input", help="key=value for the task's tools (needs TASK)."),
+    root: Path = ROOT_OPTION,
+) -> None:
+    """Run the owner and reviewer seats in turn until a person must act. Never approves (docs/AUTO_LOOP.md)."""
+    from nirmaan.models import MemoryScope
+    from nirmaan.runtime import get_runtime, loop, plan_loop
+
+    def say(text: str) -> None:
+        console.print(escape(text), highlight=False, soft_wrap=True)
+
+    engine = _load(project, root)
+    tid = _task_id(engine, task) if task else None
+    if tid is not None and tid not in engine.state.tasks:
+        _fail(f"Unknown task {task!r}")
+    if inputs and tid is None:
+        _fail("--input needs a TASK")
+    reviewer_id = reviewer_runtime or runtime
+    try:
+        owner, reviewer = get_runtime(runtime), get_runtime(reviewer_id)
+    except KeyError as exc:
+        _fail(str(exc.args[0]))
+    if runtime == reviewer_id:
+        _err.print(f"note: both seats run on {runtime}; independence is by seat and prompt (docs/AUTO_LOOP.md 5)",
+                   soft_wrap=True)
+    try:
+        if dry_run:
+            plan = plan_loop(engine, runtime, reviewer_id, tid, max_calls, attempts, review_rounds)
+            current = None
+            for number, step in enumerate(plan.steps, 1):
+                if step.task != current:
+                    current = step.task
+                    say(f"plan for {step.task}")
+                if step.calls == 0:
+                    later = number > 1 and plan.steps[number - 2].task == step.task
+                    what = "escalates if changes are requested again" if later else "escalates, its limits are spent"
+                    say(f"  {number}. owner {step.role}: {what} (no call)")
+                elif step.seat == "owner":
+                    calls = f"up to {step.calls} call{'s' if step.calls > 1 else ''}"
+                    say(f"  {number}. owner {step.role} on {step.runtime}: round {step.round} of "
+                        f"{step.rounds}, {calls}")
+                else:
+                    say(f"  {number}. reviewer {step.role} on {step.runtime}: 1 call")
+            for stopped, why in plan.stops.items():
+                say(f"{stopped}: then stop, {why.value}")
+            say(f"worst case: {plan.calls} calls, budget {max_calls}")
+            _err.print("dry run: no model was called, no tool was run, nothing was saved")
+            return
+        if tid is not None:
+            target = engine.task(tid)
+            for spec in inputs:
+                key, sep, value = spec.partition("=")
+                if not sep:
+                    _fail(f"--input must be key=value, got {spec!r}")
+                engine.remember(MemoryScope.TASK, tid, f"input.{key}", value, _actor(target.owner, False))
+        store = ProjectStore(root)
+        report = loop(engine, owner, reviewer, tid, max_calls, attempts, review_rounds,
+                      on_step=lambda e: store.save(e.state))
+    except (WorkError, PolicyViolationError, PermissionError) as exc:
+        _fail(str(exc))
+    store.save(engine.state)
+    for step in report.steps:
+        say(f"step {step.number}: {step.task} {step.seat} {step.role} on {step.runtime}: {step.status} "
+            f"({step.calls} call{'' if step.calls == 1 else 's'})")
+        if step.detail:
+            say("  " + step.detail)
+        for label, ref in (("review", step.review), ("escalation", step.escalation)):
+            if ref:
+                say(f"  {label}: {ref}")
+    for stopped, why in report.stops.items():
+        say(f"{stopped}: stopped, {why.value}")
+    say(f"calls: {report.calls} of {max_calls}")
+
+
 # --- Seat evaluation (M27) ---------------------------------------------------------------
 
 CASES_OPTION = typer.Option(Path("evals"), "--cases", help="Directory of evaluation case files.")
