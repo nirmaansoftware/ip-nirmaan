@@ -201,15 +201,22 @@ def _spent(engine: TaskEngine, task_id: str) -> tuple[list, list]:
     return sent_back, [a for a in records if not a.reviews and a.number > since]
 
 
-def _exhausted(engine: TaskEngine, task_id: str, actor: Actor, budget: Limits) -> RunReport | None:
-    """Escalate, through the owner's route, when running the seat again would exceed a limit (M27)."""
+def exhausted(engine: TaskEngine, task_id: str, budget: Limits) -> str | None:
+    """Why running the owner seat again would exceed a limit (M27), or None. Reads state only."""
     sent_back, refused = _spent(engine, task_id)
     if len(sent_back) >= budget.review_rounds:
-        reason = f"{len(sent_back)} of {budget.review_rounds} review rounds were sent back"
-    elif refused and len(refused) >= budget.attempts:  # with a limit of 1, M26 records no attempt
-        reason = f"{len(refused)} of {budget.attempts} attempts were refused in this review round"
-    else:
+        return f"{len(sent_back)} of {budget.review_rounds} review rounds were sent back"
+    if refused and len(refused) >= budget.attempts:  # with a limit of 1, M26 records no attempt
+        return f"{len(refused)} of {budget.attempts} attempts were refused in this review round"
+    return None
+
+
+def _exhausted(engine: TaskEngine, task_id: str, actor: Actor, budget: Limits) -> RunReport | None:
+    """Escalate, through the owner's route, when running the seat again would exceed a limit (M27)."""
+    reason = exhausted(engine, task_id, budget)
+    if reason is None:
         return None
+    sent_back, refused = _spent(engine, task_id)
     esc = engine.escalate(
         task_id, actor, EscalationKind.TECHNICAL, reason=f"repair budget exhausted: {reason}",
         attempted_actions=tuple(f"{a.id}: {a.refusal}" for a in (*sent_back, *refused)),

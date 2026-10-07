@@ -15,7 +15,7 @@ way every milestone has:
 | Organization model: 207 units, 685 derived roles, skills, authority, a 12-principle constitution | `sta.run` and `pnr.run` on the development machine (they run in CI only, M27); standalone OpenSTA and sky130 in the real-tool tests |
 | Planner: requirement to owned, reviewed, gated task graph; 9 workflows | CTS, power grid, parasitics, multi-corner timing |
 | Task engine: lifecycle, reviews, approvals, human gates, hash-chained audit | Transition-fault ATPG, lockup latches across clock domains, a memory stage for MBIST (stuck-at ATPG, multiple chains, and March C- MBIST: M27); interrupts and other cores in the RISC-V firmware loop (RV32I on PicoRV32: M27) |
-| VeriTriage as a real, evidence-producing tool (`veritriage.investigate`) | An unattended owner and reviewer loop in one command (repair after review and per-stage limits: M27) |
+| VeriTriage as a real, evidence-producing tool (`veritriage.investigate`) | Concurrent tasks and a project wide call budget in the unattended loop (one command drives owner, review, and repair to the human approval: M29) |
 | AI workers in three verification seats, off by default, on Opus 5.5 (M20) | The same RTL gates on `parameter-change` and the fix stages; automatic antecedent covers |
 | Design agents: spec, microarchitecture, and RTL seats; RTL gated on real lint and simulation; the AXI4-Lite register block end to end (M23) | |
 | `nirmaan export`: the numbered `01_requirement` to `10_signoff` deliverable tree (M23) | Verification plans on `new-ip` and `feature-addition`; amending a recorded plan (plans load from a file and a plan seat writes one on `block-design`: M29) |
@@ -214,6 +214,7 @@ extraction. Design doc: `docs/PHYSICAL_DESIGN.md`.
 
 - **Tool contracts (M28, first part, done):** every tool with a binding declares its parameters (name, kind, required); the broker refuses an undeclared or ill-typed parameter, or a path containing a comma, before anything runs, and the runtime hands each tool only the inputs it declares. See `docs/TOOL_CONTRACTS.md`.
 - **Seat evaluation (M27, done):** `evals/` cases fix a seat's upstream to reference documents and judge its work with held-out checks the seat never sees (the reference testbench on its RTL), each a recorded tool run; `nirmaan eval run (--runtime ID | --replay)`. See `docs/SEAT_EVALUATION.md`.
+- **Unattended owner and reviewer loop (M29):** `nirmaan drive PROJECT [TASK] --runtime ID --reviewer-runtime ID` runs the owner seat (with its attempts), the independent reviewer seat, and the repair after a change request, until a person must act (an approval or a gate), a limit escalates, or the work is blocked or declined; it never approves or crosses a gate, decides each step from state (so it resumes by being run again), audits every step as `loop.step`, starts a step only if its worst case fits `--max-calls`, and prints the plan with `--dry-run`. With no TASK it drives every ready task in dependency order. See `docs/AUTO_LOOP.md`.
 
 ## Structural review milestones (from 2026-09-29)
 
