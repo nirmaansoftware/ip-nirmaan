@@ -164,6 +164,15 @@ def _synth_parse(run: RunRecord) -> EdaResult:
 # --- sta.run: OpenSTA ---------------------------------------------------------------------
 
 
+#: M29: output pins that drive no net (an unused QN, a clock-tree dummy load). A SPEF cannot annotate
+#: them, so the parser subtracts them from the unannotated drivers to count the nets the SPEF missed.
+FLOATING_OUTPUTS = '''set nirmaan_floating 0
+foreach pin [get_pins -hierarchical *] {
+  if {[get_property $pin direction] eq "output" && [llength [get_nets -of_objects $pin]] == 0} { incr nirmaan_floating }
+}
+puts "nirmaan-floating-outputs: $nirmaan_floating"'''
+
+
 def _sta_script(job: Job, lefs: bool = False) -> None:
     lef_files = pdk_paths(job.params, "tech_lef") + pdk_paths(job.params, "lef") if lefs else []
     script = [*(f"read_lef {_tcl(str(f))}" for f in lef_files),
@@ -172,7 +181,7 @@ def _sta_script(job: Job, lefs: bool = False) -> None:
               f"link_design {_token(job.params, 'top')}",
               f"read_sdc {_design(job, 'sdc')}"]
     if job.params.get("spef", "").strip():  # M29: and say how much of the design the SPEF annotates
-        script += [f"read_spef {_design(job, 'spef')}", "report_parasitic_annotation"]
+        script += [f"read_spef {_design(job, 'spef')}", "report_parasitic_annotation", FLOATING_OUTPUTS]
     script += _timing_reports()
     (job.workdir / "sta.tcl").write_text("\n".join(script) + "\n", encoding="utf-8")
 
@@ -332,7 +341,8 @@ def _pnr_steps(job: Job) -> list[list[str]]:
         script += _stage("extract", ["define_process_corner -ext_model_index 0 X",
                                      f"extract_parasitics -ext_model_file {_tcl(str(rules))}",
                                      "write_spef route.spef", "read_spef route.spef",
-                                     "report_parasitic_annotation -report_unannotated", *_SLACK_CHECKPOINT])
+                                     "report_parasitic_annotation -report_unannotated", FLOATING_OUTPUTS,
+                                     *_SLACK_CHECKPOINT])
     last = plan[-1]
     parasitics = {"place": ["estimate_parasitics -placement"], "cts": ["estimate_parasitics -placement"],
                   "route": ["estimate_parasitics -global_routing"]}.get(last, [])

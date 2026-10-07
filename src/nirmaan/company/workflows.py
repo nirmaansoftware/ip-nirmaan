@@ -594,7 +594,7 @@ PHYSICAL_IMPLEMENTATION = WorkflowTemplate(
         st("sta-signoff", "STA signoff", "Signoff", "sta.analyze", depends_on=("place-route",), criticality=H,
            review=rv("sta.review"), gate="gate.implementation", outputs=("timing_report",),
            evidence=(REVIEWED, ran("Signoff timing on the routed netlist with extracted parasitics (SPEF)",
-                                   "sta.run", params=(("max_unannotated_drivers", "0"),)))),
+                                   "sta.run", params=(("max_unannotated_nets", "0"),)))),
     ),
 )
 

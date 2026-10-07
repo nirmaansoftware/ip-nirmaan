@@ -72,12 +72,13 @@ def only_on_path(monkeypatch, bin_dir: Path) -> None:
     monkeypatch.setenv("PATH", f"{bin_dir}:{Path(shutil.which('sh')).parent}")
 
 
-def fake_pdk(root: Path) -> dict[str, str]:
+def fake_pdk(root: Path, rc: bool = False) -> dict[str, str]:
+    """Stand-in PDK files; ``rc`` adds the layer RC script place and route needs from CTS on (M29)."""
     root.mkdir(parents=True, exist_ok=True)
     for name in ("cells.lib", "tech.lef", "cells.lef", "rc.tcl"):
         (root / name).write_text("stand-in\n", encoding="utf-8")
-    return {"liberty": str(root / "cells.lib"), "tech_lef": str(root / "tech.lef"), "lef": str(root / "cells.lef"),
-            "rc_tcl": str(root / "rc.tcl")}
+    pdk = {"liberty": str(root / "cells.lib"), "tech_lef": str(root / "tech.lef"), "lef": str(root / "cells.lef")}
+    return {**pdk, "rc_tcl": str(root / "rc.tcl")} if rc else pdk
 
 
 # --- The catalog ------------------------------------------------------------------------
@@ -271,7 +272,7 @@ def test_pnr_stages_follow_stop_after(project, tmp_path, monkeypatch):
     bin_dir = tmp_path / "bin"
     fake_tool(bin_dir, "openroad", f"cat '{PD / 'openroad_route.log'}'")
     only_on_path(monkeypatch, bin_dir)
-    params = {"netlist": str(AXI), "sdc": str(SDC), "top": TOP, **fake_pdk(tmp_path / "pdk"), **PNR_PDK}
+    params = {"netlist": str(AXI), "sdc": str(SDC), "top": TOP, **fake_pdk(tmp_path / "pdk", rc=True), **PNR_PDK}
     run, outcome = invoke(project, "pnr.run", params, tmp_path / "full")
     assert run.succeeded, run.summary
     assert outcome.data["commands"] == [["openroad", "-no_init", "-no_splash", "-exit", "pnr.tcl"]]
@@ -518,7 +519,7 @@ def test_real_signoff_flow_connects_power_builds_the_clock_tree_and_extracts(pro
     assert m["cts_buffers"] > 0 and m["cts_sinks"] > 0, run.summary
     assert m["clock_skew"] is not None and m["clock_insertion_delay"] is not None, run.summary
     assert set(m["slack_by_stage"]) == {"place", "cts", "route", "extract"}, m["slack_by_stage"]
-    assert m["parasitics"] == "extracted" and m["worst_slack"] > 0, run.summary
+    assert m["parasitics"] == "extracted" and m["worst_slack"] > 0 and m["unannotated_nets"] == 0, run.summary
     assert set(m["outputs"]) == {"def", "netlist", "spef"} and run.succeeded, run.summary
 
     # Signoff STA on the routed netlist with the extracted SPEF, in a separate run: through OpenROAD's
@@ -528,7 +529,7 @@ def test_real_signoff_flow_connects_power_builds_the_clock_tree_and_extracts(pro
         sta, sta_outcome = invoke(project, "sta.run", {**design, "backend": backend}, tmp_path / f"sta_{backend}")
         sm = sta_outcome.data["result"]["metrics"]
         assert sta_outcome.data["backend"] == backend
-        assert sm["unannotated_drivers"] == 0 and sm["worst_slack"] > 0, sta.summary
+        assert sm["unannotated_nets"] == 0 and sm["worst_slack"] > 0, sta.summary  # every net has parasitics
         assert sta.succeeded, sta.summary
 
 
@@ -557,7 +558,8 @@ SKY130HD = {
 }
 SKY130HD_PNR = {
     "site": "unithd", "hor_layers": "met3", "ver_layers": "met2",
-    "min_routing_layer": "met1", "max_routing_layer": "met5",
+    # Signals stop below met5, which carries the power straps: on met5 the router left shorts it never fixed.
+    "min_routing_layer": "met1", "max_routing_layer": "met4",
     "tap_cell": "sky130_fd_sc_hd__tapvpwrvgnd_1", "tap_distance": "14",
     "pdn_tcl": "sky130hd/pdn.tcl", "rc_tcl": "sky130hd/setRC.tcl", "rcx_rules": "sky130hd/rcx_patterns.rules",
     "filler_cells": "sky130_fd_sc_hd__fill_1,sky130_fd_sc_hd__fill_2,sky130_fd_sc_hd__fill_4,sky130_fd_sc_hd__fill_8",

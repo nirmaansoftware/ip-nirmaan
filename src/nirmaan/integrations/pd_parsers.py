@@ -35,6 +35,7 @@ _WIRELENGTH_RE = re.compile(r"Total wire length = (?P<um>[\d.]+) um")
 _DRC_RE = re.compile(r"Number of violations = (?P<n>\d+)")
 #: ``report_parasitic_annotation`` after ``read_spef`` (M29).
 _UNANNOTATED_RE = re.compile(r"^Found (?P<n>\d+) unannotated drivers")
+_FLOATING_RE = re.compile(r"^nirmaan-floating-outputs: (?P<n>\d+)")
 _STAGE_RE = re.compile(r"^nirmaan-stage(?P<done>-done)?: (?P<stage>\w+)")
 
 
@@ -94,6 +95,18 @@ def _timing(lines: list[str]) -> dict[str, Any]:
     }
 
 
+def _annotation(lines: list[str]) -> dict[str, int | None]:
+    """How much of the design a read SPEF annotates (M29): unannotated drivers, less those that drive no net."""
+    unannotated = floating = None
+    for line in lines:
+        if m := _UNANNOTATED_RE.match(line):
+            unannotated = int(m["n"])
+        elif m := _FLOATING_RE.match(line):
+            floating = int(m["n"])
+    nets = unannotated - floating if unannotated is not None and floating is not None else None
+    return {"unannotated_drivers": unannotated, "floating_outputs": floating, "unannotated_nets": nets}
+
+
 def _timing_met(t: dict[str, Any]) -> bool:
     hold = t["worst_hold_slack"]
     return (t["worst_slack"] is not None and t["worst_slack"] >= 0 and (hold is None or hold >= 0)
@@ -122,8 +135,7 @@ def parse_opensta(log: str, returncode: int) -> EdaResult:
     diags = _diagnostics(lines)
     errors = [d for d in diags if d.severity == "error"]
     timing = _timing(lines)
-    unannotated = next((int(m["n"]) for ln in lines if (m := _UNANNOTATED_RE.match(ln))), None)
-    metrics = {**timing, "unannotated_drivers": unannotated, "exit_status": returncode}
+    metrics = {**timing, **_annotation(lines), "exit_status": returncode}
     if errors or returncode != 0:
         summary = f"timing analysis failed: {_plural(len(errors), 'error')}{_first(errors)}"
         if not errors:
@@ -193,7 +205,7 @@ def _clock_tree(lines: list[str]) -> dict[str, Any]:
 
 
 def _signoff_checks(lines: list[str]) -> dict[str, Any]:
-    taps = endcaps = fillers = open_supply = unannotated = None
+    taps = endcaps = fillers = open_supply = None
     grids: list[str] = []
     supply_nets: list[str] = []
     antenna: dict[str, int] = {}
@@ -218,12 +230,10 @@ def _signoff_checks(lines: list[str]) -> dict[str, Any]:
             ir_net = m["net"]
         elif (m := _IR_WORST_RE.match(line)) and ir_net:
             ir[ir_net] = _num(m["v"])
-        elif m := _UNANNOTATED_RE.match(line):
-            unannotated = int(m["n"])
     return {"tap_cells": taps, "endcap_cells": endcaps, "power_grids": grids, "supply_nets": supply_nets,
             "unconnected_supply_pins": open_supply, "filler_cells": fillers,
             "antenna_net_violations": antenna.get("net"), "antenna_pin_violations": antenna.get("pin"),
-            "worst_ir_drop_v": ir, "unannotated_drivers": unannotated}
+            "worst_ir_drop_v": ir, **_annotation(lines)}
 
 
 def parse_openroad(log: str, returncode: int, stop_after: str = "route",
