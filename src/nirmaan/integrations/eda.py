@@ -35,6 +35,7 @@ from nirmaan.integrations.eda_parsers import (
     parse_verilator_lint,
     parse_yosys,
 )
+from nirmaan.models import list_values
 from nirmaan.runtime.tools import ToolOutcome, register_binding, unregister_binding
 from nirmaan.work.engine import TaskEngine
 
@@ -167,9 +168,9 @@ def execute(backend: Backend, params: dict[str, str]) -> ToolOutcome:
     missing = [p for p in backend.required if not params.get(p, "").strip()]
     if missing:
         return ToolOutcome(False, f"{backend.name}: missing parameter {', '.join(missing)}")
-    sources = tuple(str(Path(s.strip()).resolve()) for s in params.get("sources", "").split(",") if s.strip())
+    sources = tuple(str(Path(s).resolve()) for s in list_values(params.get("sources", "")))
     files = [*sources, *([str(Path(params["sby"]).resolve())] if params.get("sby") else [])]
-    files += [str(Path(f.strip()).resolve()) for p in backend.files for f in params.get(p, "").split(",") if f.strip()]
+    files += [str(Path(f).resolve()) for p in backend.files for f in list_values(params.get(p, ""))]
     absent = [f for f in files if not Path(f).is_file()]
     if absent:
         return ToolOutcome(False, f"{backend.name}: not found: {', '.join(absent)}")

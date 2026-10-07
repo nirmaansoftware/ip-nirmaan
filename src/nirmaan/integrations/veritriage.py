@@ -27,6 +27,7 @@ from veritriage.ai import BaseProvider, register_llm_provider
 from veritriage.models import GenerationRequest, GenerationResponse, ProviderCapabilities
 
 from nirmaan.events import TOPICS, OrgEvent
+from nirmaan.models import list_values
 from nirmaan.runtime.tools import ToolOutcome, register_binding
 from nirmaan.work.engine import TaskEngine
 
@@ -43,7 +44,7 @@ def _services(params: dict[str, str]):
 
 @register_binding("veritriage.investigate")
 def investigate(params: dict[str, str], engine: TaskEngine) -> ToolOutcome:
-    paths = [Path(p) for p in params.get("paths", "").split(",") if p.strip()]
+    paths = [Path(p) for p in list_values(params.get("paths", ""))]
     if not paths:
         return ToolOutcome(False, "no artifact paths given")
     missing = [str(p) for p in paths if not p.exists()]
