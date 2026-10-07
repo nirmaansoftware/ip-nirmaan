@@ -16,7 +16,8 @@ M25), and so are the RV32I cross build and the run on a RISC-V core
 
 Scan insertion, DFT rule checks, and scan chain simulation are AVAILABLE through
 Yosys and Icarus (``nirmaan/integrations/dft.py``, M25); so are stuck-at ATPG,
-graded by fault simulation, and March C- memory BIST (M27).
+graded by fault simulation, and March C- memory BIST (M27), and transition
+ATPG (M29).
 """
 
 from __future__ import annotations
@@ -80,6 +81,8 @@ TOOLS: list[ToolSpec] = [
     _tool("dft.check", "DFT rule check", "eda", EXE, AV, "Testability rules over the synthesized netlist."),
     _tool("dft.scan_sim", "Scan chain simulation", "eda", EXE, AV, "Shift and capture through the chain in simulation."),
     _tool("dft.atpg", "ATPG", "eda", EXE, AV, "Stuck-at patterns, with coverage measured by fault simulation."),
+    _tool("dft.atpg_transition", "Transition ATPG", "eda", EXE, AV,
+          "Slow-to-rise and slow-to-fall pattern pairs (launch on capture), with coverage measured by fault simulation."),
     _tool("dft.mbist", "Memory BIST", "eda", EXE, AV, "A March C- controller run against the memory in simulation."),
     # Software and infrastructure.
     _tool("compiler.run", "Compiler toolchain", "software", EXE, CO, "Build firmware and software."),

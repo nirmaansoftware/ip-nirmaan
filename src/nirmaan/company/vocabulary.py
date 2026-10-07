@@ -67,6 +67,12 @@ FEATURES: list[FeatureRule] = [
     FeatureRule(feature="security", skills=("security_architecture", "security_verification"), patterns=(r"\bsecur\w*", r"\btrustzone\b", r"\bencrypt\w*", r"\bcrypto\w*")),
     FeatureRule(feature="registers", skills=("register_programming", "register_documentation"), patterns=(r"\bcsrs?\b", r"\bregisters?\b", r"\bregister map\b")),
     FeatureRule(feature="dft", skills=("dft_architecture",), patterns=(r"\bdft\b", r"\bscan chains?\b", r"\bmbist\b", r"\batpg\b")),
+    # M29: at-speed test asks for transition-fault coverage; a memory in the block asks for memory BIST.
+    FeatureRule(feature="at_speed", skills=("atpg",), implies=("dft",),
+                patterns=(r"\bat[- ]speed\b", r"\btransition faults?\b", r"\bdelay (test|faults?)\b")),
+    FeatureRule(feature="memory", skills=("mbist",),
+                patterns=(r"\bs?rams?\b", r"\bmemory (arrays?|macros?|blocks?)\b", r"\bembedded memor(y|ies)\b",
+                          r"\bmbist\b")),
     FeatureRule(feature="firmware", skills=("embedded_firmware", "device_drivers"), patterns=(r"\bfirmware\b", r"\bdrivers?\b")),
     FeatureRule(feature="riscv", patterns=(r"\brisc[- ]?v\b", r"\brv32\w*")),
     FeatureRule(feature="performance", skills=("performance_modeling",), patterns=(r"\bbandwidth\b", r"\blatency\b", r"\bthroughput\b")),
