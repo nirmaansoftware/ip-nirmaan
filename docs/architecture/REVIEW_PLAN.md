@@ -82,3 +82,60 @@ retried. Stage commits stage only this review's files (never `git add -A`).
   M28 (typed tool contracts) on branch `m28/typed-contracts`, stacked on
   this branch until #37 merges. The first live evaluation run waits for the
   owner (it costs API credits).
+
+## M28: typed tool contracts (branch `m28/typed-contracts`, stacked on this one)
+
+| # | Step | Status |
+|---|---|---|
+| a | Design: `docs/TOOL_CONTRACTS.md` | DONE |
+| b | Failing tests `tests/test_nirmaan_contracts.py` | DONE |
+| c | Vocabulary (`ParamKind`, `ParamSpec`, `ToolSpec.params`, `list_values`, `ToolRun.values`) and catalog contracts | DONE |
+| d | Broker validation, runtime input filtering and list parameters, split sites replaced, `nirmaan org tool` | DONE |
+| e | Full suite (1143 passed, 2 skipped), `context.md`, ROADMAP, PR | DONE |
+
+Parameter inventory (from reading every integration, both quote styles):
+eda runner `backend workdir timeout max_*`; lint/sim/test/synth/dft
+`sources top`; formal `sby sources`; synth-liberty adds `liberty pdk_root`;
+sta `netlist sdc spef top liberty pdk_root`; pnr `netlist sdc top liberty
+tech_lef lef pdk_root site hor_layers ver_layers utilization aspect_ratio
+core_space stop_after`; fw.build `sources`; fw.test `sources rtl top`;
+veritriage.investigate `paths workspace`; explain_log `path`;
+knowledge.search `query`; project.read `task`; artifact.read `artifact`.
+Missing required inputs stay recorded failed runs (M21/M25 decision; a
+physical test asserts it).
+
+**After M28 (PR #41, stacked on #37).** Parallel sessions opened #38
+(OpenROAD in CI), #39 (repair after review), and #40 (RISC-V firmware), all
+also numbered "M27". Numbers collide with this review's M27/M28; the owner or
+coordinator decides numbering and merge order. Overlaps: #39 shares
+`runtime/base.py`, `runtime/__init__.py`, `models/org.py`, `models/work.py`,
+`work/policy.py`, `cli.py`; #38 shares `integrations/physical.py` and its
+test; #40 shares `company/tools.py` and `integrations/firmware.py`. Whichever
+of #38/#40 merges after #41 must declare any new tool parameters it reads in
+`company/tools.py`; `test_every_parameter_an_integration_reads_is_declared`
+will say which. Do not start M29 until the owner has settled the order.
+
+**2026-09-30.** #39 (M27 repair after review) merged into `main`. `main`
+was merged into #37 (context.md conflict: both M27 entries kept, this
+review's retitled "Milestone 27 (seat evaluation)"; 1141 passed, 2 skipped)
+and #37 into #41 (1154 passed, 2 skipped). The disk was full (273 MB free),
+which failed a firmware test with ENOSPC; stale test temp directories older
+than an hour were removed (about 5 GB freed). The owner should look at the
+disk: 182 GB of 228 GB is used, and a full disk also explains iCloud evicting
+files.
+
+Follow-up for whichever of #38/#40 merges after #41 (#41's tests will fail
+until done): in `company/tools.py`, give #40's new tools contracts,
+`fw.cross_build` (`sources` paths required, `*RUNNER`) and `fw.soc_test`
+(`sources` and `rtl` paths required, `TOP`, `*RUNNER`); add `tie_high` and
+`tie_low` (text) to `pnr.run` for #38. #40's `firmware_riscv.py` also splits
+`rtl` itself; `list_values` is the helper to use.
+
+**2026-10-07.** Everything else merged (#38, #40, #42, #43, v1.21.0). `main`
+merged into #37 (1218 passed, 3 skipped; this review's context entry moved
+after the DFT part, outside the v1.21.0 set) and #37 into #41 (1231 passed,
+3 skipped). #41 now gives contracts to the five tools the M27 parts added and
+the new parameters (`chains`, `max_chain_length`, ATPG's `patterns`,
+`fault_sample`, `seed`, `min_<metric>`, `synth.run`'s tie cells, `sta.run`'s
+LEFs). The static scan no longer reads `p["x"]`, which in `dft_atpg.py` is a
+pattern record, not parameters.

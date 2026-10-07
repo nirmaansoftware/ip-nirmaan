@@ -160,7 +160,9 @@ def test_a_missing_executable_is_a_refusal_with_a_reason(bridge, tmp_path, monke
     monkeypatch.setenv("PATH", str(tmp_path))  # nothing on PATH
     for tool in ("lint.run", "simulator.run", "synth.run", "formal.run"):
         with pytest.raises(ToolAccessDenied, match="not found"):
-            invoke(bridge, tool, {"sources": str(COUNTER), "top": "counter"}, tmp_path)
+            # Each tool gets only parameters its contract declares (M28): formal takes no top.
+            invoke(bridge, tool, {"sources": str(COUNTER), **({} if tool == "formal.run" else {"top": "counter"})},
+                   tmp_path)
     with pytest.raises(ToolAccessDenied, match="verilator"):
         invoke(bridge, "lint.run", {"sources": str(COUNTER)}, tmp_path)
     assert bridge.state.tool_runs == {}  # nothing ran, so nothing was recorded
