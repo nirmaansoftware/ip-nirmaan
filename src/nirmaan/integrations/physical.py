@@ -185,23 +185,26 @@ def _synth_parse(run: RunRecord) -> EdaResult:
 #: supply ports of a block with a power grid, whose cells carry no supply pins in Verilog). Such a net
 #: has no signal wire, so a SPEF cannot annotate it; the parser subtracts these from the unannotated
 #: drivers to count the loaded nets the SPEF missed.
-FLOATING_OUTPUTS = '''set nirmaan_floating 0
+FLOATING_OUTPUTS = '''set nirmaan_floating {}
 foreach cell [get_cells *] {
   foreach pin [get_pins -of_objects $cell] {
     if {[get_property $pin direction] ne "output"} { continue }
     set net [get_nets -of_objects $pin]
-    if {$net eq "" || $net eq "NULL"} { incr nirmaan_floating; continue }
-    if {[llength [get_pins -of_objects $net]] <= 1 && [llength [get_ports -quiet -of_objects $net]] == 0} {
-      incr nirmaan_floating
+    if {$net eq "" || $net eq "NULL" || ([llength [get_pins -of_objects $net]] <= 1
+                                         && [llength [get_ports -quiet -of_objects $net]] == 0)} {
+      lappend nirmaan_floating [get_full_name $pin]
     }
   }
 }
 foreach port [get_ports *] {
   if {[get_property $port direction] ne "input"} { continue }
   set net [get_nets -quiet [get_full_name $port]]
-  if {$net eq "" || $net eq "NULL" || [llength [get_pins -of_objects $net]] == 0} { incr nirmaan_floating }
+  if {$net eq "" || $net eq "NULL" || [llength [get_pins -of_objects $net]] == 0} {
+    lappend nirmaan_floating [get_full_name $port]
+  }
 }
-puts "nirmaan-floating-outputs: $nirmaan_floating"'''
+puts "nirmaan-floating-outputs: [llength $nirmaan_floating]"
+puts "nirmaan-floating-drivers: [join $nirmaan_floating { }]"'''
 
 
 def _sta_script(job: Job, lefs: bool = False) -> None:

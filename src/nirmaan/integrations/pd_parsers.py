@@ -96,14 +96,34 @@ def _timing(lines: list[str]) -> dict[str, Any]:
 
 
 def _annotation(lines: list[str]) -> dict[str, int | None]:
-    """How much of the design a read SPEF annotates (M29): unannotated drivers, less those that drive no net."""
+    """How much of the design a read SPEF annotates (M29).
+
+    ``report_parasitic_annotation -report_unannotated`` lists the drivers whose nets have no parasitics;
+    the script lists the drivers that drive nothing (``nirmaan-floating-drivers``), which have no wire to
+    extract. ``unannotated_nets`` counts the listed drivers that do drive something.
+    """
     unannotated = floating = None
+    listed: set[str] = set()
+    idle: set[str] | None = None
+    listing = False
     for line in lines:
         if m := _UNANNOTATED_RE.match(line):
-            unannotated = int(m["n"])
+            unannotated, listing = int(m["n"]), True
+            continue
+        if listing and line and not line.startswith("Found ") and " " not in line:
+            listed.add(line)
+            continue
         elif m := _FLOATING_RE.match(line):
             floating = int(m["n"])
-    nets = unannotated - floating if unannotated is not None and floating is not None else None
+        elif line.startswith("nirmaan-floating-drivers:"):
+            idle = set(line.split(":", 1)[1].split())
+        listing = False
+    if unannotated is None or floating is None:
+        nets = None
+    elif idle is not None and len(listed) == unannotated:
+        nets = len(listed - idle)
+    else:
+        nets = unannotated - floating
     return {"unannotated_drivers": unannotated, "floating_outputs": floating, "unannotated_nets": nets}
 
 
