@@ -7,14 +7,19 @@ tool (a simulator, synthesis, STA) is never "run" here, so no agent can ever
 produce evidence that one was. Every executed invocation becomes a
 :class:`ToolRun` in project state through the task engine, which is the only
 thing a TOOL_RUN or VERITRIAGE_SESSION evidence record may cite.
+
+A call is also held to the tool's parameter contract (M28): an undeclared or
+ill-typed parameter is refused before anything runs. A list of paths may be
+passed as a list; it is stored comma-joined, as it always has been, so a path
+containing a comma is refused rather than silently read as two.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Callable
+from typing import Any, Callable, Sequence
 
-from nirmaan.models import Actor, ToolRun, ToolStatus
+from nirmaan.models import Actor, ParamKind, ToolRun, ToolSpec, ToolStatus
 from nirmaan.org import AuthorityService
 from nirmaan.work.engine import TaskEngine
 
@@ -73,13 +78,71 @@ class ToolAccessDenied(PermissionError):
     pass
 
 
+class ToolContractError(ToolAccessDenied):
+    """A call outside the tool's parameter contract. Refused; nothing ran."""
+
+
+ParamValue = str | Sequence[str]
+
+
+def check_params(spec: ToolSpec, params: dict[str, ParamValue]) -> dict[str, str]:
+    """The call's parameters as stored (lists comma-joined), or ToolContractError saying what is wrong.
+
+    A tool with no declared contract (``params`` None) takes any parameter; lists are still joined.
+    """
+    checked: dict[str, str] = {}
+    problems: list[str] = []
+    for name, raw in params.items():
+        items = [str(v) for v in raw] if isinstance(raw, (list, tuple)) else None
+        param = spec.param(name)
+        if spec.params is not None and param is None:
+            declared = ", ".join(p.label for p in spec.params) or "no parameters"
+            problems.append(f"{spec.id} does not take {name!r} (it takes {declared})")
+            continue
+        kind = param.kind if param else None
+        if items is not None:
+            if kind is not None and kind is not ParamKind.PATHS and len(items) > 1:
+                problems.append(f"{name} takes one {'path' if kind is ParamKind.PATH else 'value'}, not a list")
+                continue
+            commas = [v for v in items if "," in v]
+            if commas:
+                problems.append(f"{name}: {', '.join(repr(v) for v in commas)} contains a comma, "
+                                "so it cannot be told apart from two paths")
+                continue
+            value = ",".join(items)
+        else:
+            value = str(raw)
+        if kind is ParamKind.INTEGER and value.strip() and not value.strip().lstrip("-").isdigit():
+            problems.append(f"{name} must be a whole number, not {value!r}")
+            continue
+        if kind is ParamKind.NUMBER and value.strip():
+            try:
+                float(value)
+            except ValueError:
+                problems.append(f"{name} must be a number, not {value!r}")
+                continue
+        checked[name] = value
+    if problems:
+        raise ToolContractError(f"{spec.id} refused before running: {'; '.join(problems)}")
+    return checked
+
+
+def declared_inputs(spec: ToolSpec, inputs: dict[str, str]) -> dict[str, str]:
+    """The task inputs this tool's contract declares (all of them for a tool with no contract)."""
+    return dict(inputs) if spec.params is None else {k: v for k, v in inputs.items() if spec.param(k)}
+
+
 class ToolBroker:
     def __init__(self, engine: TaskEngine) -> None:
         self._engine = engine
         self._authority = AuthorityService(engine.org)
         _ensure_builtin_bindings()
 
-    def invoke(self, actor: Actor, tool_id: str, params: dict[str, str] | None = None,
+    def declared_inputs(self, tool_id: str, inputs: dict[str, str]) -> dict[str, str]:
+        tool = self._engine.org.tools.get(tool_id)
+        return dict(inputs) if tool is None else declared_inputs(tool, inputs)
+
+    def invoke(self, actor: Actor, tool_id: str, params: dict[str, ParamValue] | None = None,
                task_id: str | None = None) -> tuple[ToolRun, ToolOutcome]:
         allowed, why = self._authority.may_use_tool(actor.role, tool_id)
         if not allowed:
@@ -88,7 +151,7 @@ class ToolBroker:
         tool = self._engine.org.tools[tool_id]
         if binding is None or tool.status is not ToolStatus.AVAILABLE:
             raise ToolAccessDenied(f"{tool_id} has no implementation in this installation")
-        params = {k: str(v) for k, v in (params or {}).items()}
+        params = check_params(tool, params or {})
         probe = _PROBES.get(tool_id)
         unavailable = probe(params) if probe else None
         if unavailable:

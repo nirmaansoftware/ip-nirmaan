@@ -191,7 +191,9 @@ def test_a_missing_executable_is_a_refusal_with_a_reason(project, tmp_path, monk
     monkeypatch.setenv("PATH", str(tmp_path))
     pdk = fake_pdk(tmp_path / "pdk")
     with pytest.raises(ToolAccessDenied, match="opensta needs sta on PATH, not found"):
-        invoke(project, "sta.run", {"netlist": str(AXI), "sdc": str(SDC), "top": TOP, **pdk}, tmp_path)
+        # OpenSTA reads the Liberty file only; the LEFs are OpenROAD's (M28 contracts refuse the rest).
+        invoke(project, "sta.run", {"netlist": str(AXI), "sdc": str(SDC), "top": TOP, "liberty": pdk["liberty"]},
+               tmp_path)
     with pytest.raises(ToolAccessDenied, match="openroad needs openroad on PATH, not found"):
         invoke(project, "pnr.run", {"netlist": str(AXI), "sdc": str(SDC), "top": TOP, **pdk, **PNR_PDK}, tmp_path)
     assert project.state.tool_runs == {}
