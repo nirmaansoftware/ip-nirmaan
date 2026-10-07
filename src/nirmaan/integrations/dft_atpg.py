@@ -1,4 +1,4 @@
-"""Stuck-at ATPG over a Yosys scan netlist, and the fault netlist that grades it.
+"""Stuck-at and transition ATPG over a Yosys scan netlist, and the fault netlist that grades it.
 
 Standard library only, for the reason ``dft_scan.py`` is: the ``dft.atpg``
 backend runs it as a step between Yosys and Icarus
@@ -13,6 +13,12 @@ backend runs it as a step between Yosys and Icarus
   that applies the patterns through the scan protocol to the design as given
   and to the fault netlist, one fault at a time. Icarus runs it; the coverage
   is what that simulation saw, never what the generator claimed.
+
+M29 adds transition faults (``--model transition``): slow-to-rise and
+slow-to-fall on the same sites, generated over two time frames (launch on
+capture) and graded with a one-cycle delay at each site of the fault netlist,
+active only in the at-speed cycle. It also models a pulse whose flops capture
+on both edges, for stuck-at, as two evaluations.
 
 Nothing here runs a tool or claims that one ran.
 """
@@ -35,6 +41,8 @@ X = 2  # the unknown value of three-valued simulation
 FAULTY_TOP = "nirmaan_faulty"
 TB_TOP = "nirmaan_atpg_tb"
 FORMAT = "nirmaan-atpg-1"
+STUCK_AT, TRANSITION = "stuck-at", "transition"
+FAULT_MODELS = (STUCK_AT, TRANSITION)
 
 
 def _table(kind: str) -> tuple[int, ...]:
@@ -64,6 +72,14 @@ class Fault:
     bit: object  # the netlist bit
     stuck: int
     name: str
+    #: M29: further model nets that are the same netlist net in another evaluation (stuck there too).
+    extra: tuple[int, ...] = ()
+    #: M29: (model net, value) the good machine must also show, e.g. a transition's launch value.
+    need: tuple[tuple[int, int], ...] = ()
+
+    @property
+    def sites(self) -> tuple[int, ...]:
+        return (self.site, *self.extra)
 
 
 class CaptureModel:
@@ -182,12 +198,12 @@ class CaptureModel:
         model._observed = set(model.observe)
         return model
 
-    def faults(self) -> list[Fault]:
-        """Stuck-at 0 and 1 on every controllable input and gate output: the uncollapsed stem faults."""
+    def sites(self) -> list[tuple[int, str]]:
+        """Every controllable input and gate output, once each, with a unique name: the fault sites."""
         sites = [n for n in self.controls] + [out for _, _, out in self.gates if out not in self.const]
         seen: set[int] = set()
         names: set[str] = set()
-        found: list[Fault] = []
+        found: list[tuple[int, str]] = []
         for site in sites:
             if site in seen or site in self.const:
                 continue
@@ -196,9 +212,60 @@ class CaptureModel:
             if label in names:
                 label = f"{label}#{self.bits[site]}"
             names.add(label)
+            found.append((site, label))
+        return found
+
+    def faults(self) -> list[Fault]:
+        """Stuck-at 0 and 1 on every controllable input and gate output: the uncollapsed stem faults."""
+        found: list[Fault] = []
+        for site, label in self.sites():
             for stuck in (0, 1):
                 found.append(Fault(len(found), site, self.bits[site], stuck, f"{label}/SA{stuck}"))
         return found
+
+    def copy_frame(self, refresh: set[int], separate_inputs: bool) -> dict[int, int]:
+        """Append a second evaluation of the logic (M29); return each net's net in it.
+
+        In the copy, the flops at positions ``refresh`` (of ``ppis``) output
+        their next state from the first evaluation; the other flops keep their
+        outputs. Primary inputs hold their value; with ``separate_inputs`` the
+        copy still sees them through buffers, so a fault can sit on the copy
+        alone. Constants are shared. Observed nets are left to the caller.
+        """
+        copy: dict[int, int] = {net: net for net in self.const}
+        frame = list(self.gates)
+
+        def fresh(net: int) -> int:
+            self.bits.append(("copy", self.bits[net]))
+            self.names.append(self.names[net])
+            return len(self.bits) - 1
+
+        def gate(kind: str, ins: tuple[int, ...], out: int) -> None:
+            self.driver[out] = len(self.gates)
+            for i in ins:
+                self.fanout.setdefault(i, []).append(len(self.gates))
+            self.gates.append((kind, ins, out))
+
+        for net in self.pis:
+            copy[net] = net
+            if separate_inputs:
+                copy[net] = fresh(net)
+                gate("$_BUF_", (net,), copy[net])
+        for pos, net in enumerate(self.ppis):
+            copy[net] = net
+            if pos in refresh:
+                copy[net] = fresh(net)
+                gate("$_BUF_", (self.ppos[pos],), copy[net])
+        for kind, ins, out in frame:
+            copy[out] = fresh(out)
+            gate(kind, tuple(copy[i] for i in ins), copy[out])
+        self._cones.clear()
+        return copy
+
+    def watch(self) -> None:
+        """Recompute the observed nets from ``pos`` and ``ppos``."""
+        self.observe = sorted(set(self.pos + self.ppos))
+        self._observed = set(self.observe)
 
     def cone(self, net: int) -> list[int]:
         """The gates in the transitive fanout of ``net``, in topological order."""
@@ -229,18 +296,22 @@ class CaptureModel:
         return vals
 
     def effect(self, good: list[int], fault: Fault, width: int) -> int:
-        """The patterns (bits of the word) in which ``fault`` changes an observed net."""
+        """The patterns (bits of the word) in which ``fault`` changes an observed net (and its needs hold)."""
         mask = (1 << width) - 1
         stuck = mask if fault.stuck else 0
-        if good[fault.site] == stuck:
+        for net, value in fault.need:
+            mask &= good[net] if value else ~good[net]
+        sites = fault.sites
+        diff = {s: stuck for s in sites if good[s] != stuck}
+        if not diff or not mask:
             return 0
-        diff = {fault.site: stuck}
-        for g in self.cone(fault.site):
+        cone = sorted({g for s in sites for g in self.cone(s)}) if len(sites) > 1 else self.cone(fault.site)
+        for g in cone:
             kind, ins, out = self.gates[g]
-            if not any(i in diff for i in ins):
+            if out in sites or not any(i in diff for i in ins):
                 continue
             pins, fn = GATES[kind]
-            value = fn(dict(zip(pins, (diff.get(i, good[i]) for i in ins)))) & mask
+            value = fn(dict(zip(pins, (diff.get(i, good[i]) for i in ins)))) & ((1 << width) - 1)
             if value != good[out]:
                 diff[out] = value
         seen = 0
@@ -267,8 +338,11 @@ class CaptureModel:
         bad = [X] * n
         for net, v in self.const.items():
             good[net] = bad[net] = v
-        site, stuck = fault.site, fault.stuck
-        bad[site] = stuck
+        stuck = fault.stuck
+        sites = set(fault.sites)
+        for site in sites:
+            bad[site] = stuck
+        need = list(fault.need)
         pow3 = (1, 3, 9, 27)
 
         def evaluate(gates) -> None:
@@ -276,16 +350,16 @@ class CaptureModel:
                 kind, ins, out = self.gates[g]
                 table = _TABLES[kind]
                 good[out] = table[sum(good[i] * pow3[j] for j, i in enumerate(ins))]
-                bad[out] = stuck if out == site else table[sum(bad[i] * pow3[j] for j, i in enumerate(ins))]
+                bad[out] = stuck if out in sites else table[sum(bad[i] * pow3[j] for j, i in enumerate(ins))]
 
         evaluate(range(len(self.gates)))
-        cone = self.cone(site)
+        cone = sorted({g for site in sites for g in self.cone(site)})
         in_cone = set(cone)
-        watched = [o for o in self.observe if o == site or self.driver.get(o) in in_cone]
+        watched = [o for o in self.observe if o in sites or self.driver.get(o) in in_cone]
 
         def assign(net: int, value: int) -> None:
             good[net] = value
-            bad[net] = stuck if net == site else value
+            bad[net] = stuck if net in sites else value
             evaluate(self.cone(net))
 
         def is_d(net: int) -> bool:
@@ -305,9 +379,17 @@ class CaptureModel:
             return False
 
         def objective() -> tuple[int, int] | None:
-            if good[site] == X:
-                return site, 1 - stuck
-            if good[site] == stuck:
+            # A need is a goal until met, and a dead end once contradicted: values only refine from X.
+            for net, value in need:
+                if good[net] == X:
+                    return net, value
+                if good[net] != value:
+                    return None
+            # Activation: every site still open is a goal; with none open, one must differ from the stuck value.
+            for site in sorted(sites):
+                if good[site] == X:
+                    return site, 1 - stuck
+            if all(good[site] == stuck for site in sites):
                 return None
             frontier = []
             for g in cone:
@@ -358,7 +440,7 @@ class CaptureModel:
         stack: list[list[int]] = []
         backtracks = 0
         while True:
-            if any(is_d(o) for o in watched):
+            if any(is_d(o) for o in watched) and all(good[net] == value for net, value in need):
                 return "detected", {i: good[i] for i in self.controls if good[i] != X}
             goal = objective()
             if goal is not None:
@@ -372,7 +454,7 @@ class CaptureModel:
             while stack and stack[-1][2]:
                 net, _, _ = stack.pop()
                 good[net] = bad[net] = X
-                if net == site:
+                if net in sites:
                     bad[net] = stuck
                 evaluate(self.cone(net))
             if not stack:
@@ -393,19 +475,59 @@ class CaptureModel:
 
 
 def _chains(design: Design) -> list[list]:
-    """The traced scan chains, which must be complete and capture on one clock phase."""
+    """The traced scan chains, which must be complete (M29: lockups at clock crossings, edges in order)."""
     if not design.flops:
         return []
     if not design.has_scan_ports():
         raise NetlistError(f"{design.top} has flops but no scan ports: insert scan first (dft.scan_insert)")
     chain = design.trace_chain()
     if not chain.complete:
-        raise NetlistError("the scan chain is broken: " + "; ".join(chain.problems))
-    _, phase = clocking(design, chain.order)
-    if any(phase.values()):
-        raise NetlistError("flops capture on both edges of the test clock pulse; ATPG over mixed capture phases "
-                           "is not supported")
+        raise NetlistError("the scan chain is broken: " + "; ".join(chain.problems + chain.hazards))
     return chain.chains
+
+
+def build_model(design: Design, chains: list[list] | None = None,
+                fault_model: str = STUCK_AT) -> tuple[CaptureModel, list[Fault]]:
+    """The model ATPG works on, and its fault universe (M29).
+
+    * Stuck-at, one capture edge: M27's capture model and its stem faults.
+    * Stuck-at, both edges of the pulse: the second-edge flops capture from a
+      copy of the logic in which the first-edge flops already hold their new
+      state; each fault sits on both copies of its net.
+    * Transition (launch on capture): a second frame whose flops hold the
+      first frame's next state and whose inputs are held. ``net/STR`` is the
+      frame-2 copy stuck at 0 with the net at 0 in frame 1; ``net/STF`` the
+      reverse. Needs one capture edge.
+    """
+    if fault_model not in FAULT_MODELS:
+        raise NetlistError(f"unknown fault model {fault_model!r}: one of {', '.join(FAULT_MODELS)}")
+    model = CaptureModel.build(design, chains)
+    flops = [f for c in chains for f in c] if chains else list(design.flops)
+    phase = clocking(design, flops)[1] if flops else {}
+    if fault_model == TRANSITION:
+        if any(phase.values()):
+            raise NetlistError("flops capture on both edges of the test clock pulse; transition ATPG (launch on "
+                               "capture) over two capture edges is not supported")
+        sites = model.sites()
+        copy = model.copy_frame(set(range(len(model.ppis))), separate_inputs=True)
+        model.pos = [copy[n] for n in model.pos]
+        model.ppos = [copy[n] for n in model.ppos]
+        model.watch()
+        faults: list[Fault] = []
+        for site, label in sites:
+            for kind, value in (("STR", 0), ("STF", 1)):
+                faults.append(Fault(len(faults), copy[site], model.bits[site], value, f"{label}/{kind}",
+                                    need=((site, value),)))
+        return model, faults
+    faults = model.faults()
+    if not any(phase.values()):
+        return model, faults
+    first = {i for i, f in enumerate(flops) if phase[f.name] == 0}
+    copy = model.copy_frame(first, separate_inputs=False)
+    model.ppos = [d if i in first else copy[d] for i, d in enumerate(model.ppos)]
+    model.watch()
+    return model, [Fault(f.index, f.site, f.bit, f.stuck, f.name,
+                         extra=(copy[f.site],) if copy[f.site] != f.site else ()) for f in faults]
 
 
 def _pack(patterns: list[dict[int, int]], controls: list[int]) -> dict[int, int]:
@@ -419,11 +541,10 @@ def _pack(patterns: list[dict[int, int]], controls: list[int]) -> dict[int, int]
 
 
 def generate(design: Design, seed: int = 1, limit: int = 200, random_only: bool = False,
-             batch: int = 64, max_batches: int = 32) -> dict:
+             batch: int = 64, max_batches: int = 32, fault_model: str = STUCK_AT) -> dict:
     """A pattern file for ``design``: random patterns, PODEM for the rest, then each fault's claim."""
     chains = _chains(design)
-    model = CaptureModel.build(design, chains)
-    faults = model.faults()
+    model, faults = build_model(design, chains, fault_model)
     rng = random.Random(seed)
     remaining = set(range(len(faults)))
     patterns: list[dict[int, int]] = []
@@ -496,6 +617,8 @@ def generate(design: Design, seed: int = 1, limit: int = 200, random_only: bool 
     return {
         "format": FORMAT,
         "top": design.top,
+        "fault_model": fault_model,
+        **({"protocol": "launch-on-capture"} if fault_model == TRANSITION else {}),
         "generator": "random" if random_only else "random+podem",
         "seed": seed,
         "pis": model.pi_names,
@@ -512,10 +635,13 @@ def generate(design: Design, seed: int = 1, limit: int = 200, random_only: bool 
 # --- Grading: the fault netlist and its testbench --------------------------------------------
 
 
-def _check_patterns(doc: dict, model: CaptureModel, chains: list[list], names: set[str]) -> None:
+def _check_patterns(doc: dict, model: CaptureModel, chains: list[list], names: set[str],
+                    fault_model: str = STUCK_AT) -> None:
     """Refuse a pattern file that does not fit this netlist, before anything is simulated."""
     if doc.get("format") != FORMAT:
         raise NetlistError(f"not a {FORMAT} pattern file")
+    if doc.get("fault_model", STUCK_AT) != fault_model:
+        raise NetlistError(f"the pattern file is for the {doc.get('fault_model')} fault model, not {fault_model}")
     expected = {"pis": model.pi_names, "pos": model.po_names, "chains": [[f.name for f in c] for c in chains]}
     for key, value in expected.items():
         if doc.get(key) != value:
@@ -536,12 +662,18 @@ def _check_patterns(doc: dict, model: CaptureModel, chains: list[list], names: s
         raise NetlistError(f"claims name patterns that do not exist: {', '.join(bad[:5])}")
 
 
-def fault_netlist(netlist: dict, top: str, bits: list) -> dict:
+def fault_netlist(netlist: dict, top: str, bits: list, transition: bool = False) -> dict:
     """A copy of ``top`` with a multiplexer on each bit in ``bits``, between the net and its loads.
 
     Site s is held at bit s of the new input ``nirmaan_fault_val`` while bit s
     of ``nirmaan_fault_en`` is high; with every enable low the netlist is
     unchanged in function.
+
+    With ``transition`` (M29), site s instead takes a one-cycle delay: a flop
+    on the new input ``nirmaan_fault_clk`` holds the net's previous value, and
+    the site becomes ``net & prev`` (slow to rise, value bit 0) or ``net |
+    prev`` (slow to fall, value bit 1), only while its enable and the new input
+    ``nirmaan_fault_atspeed`` are both high.
     """
     module = copy.deepcopy(netlist["modules"][top])
     used = [b for net in module.get("netnames", {}).values() for b in net["bits"] if isinstance(b, int)]
@@ -560,12 +692,32 @@ def fault_netlist(netlist: dict, top: str, bits: list) -> dict:
         module["ports"][name]["bits"] = [moved.get(b, b) for b in module["ports"][name]["bits"]]
         if name in module.get("netnames", {}):
             module["netnames"][name]["bits"] = list(module["ports"][name]["bits"])
+    spare = fresh + 3 * len(bits)
+    clk, atspeed = spare, spare + 1
+    spare += 2
+
+    def cell(name: str, kind: str, **conns) -> None:
+        dirs = {p: "output" if p in ("Y", "Q") else "input" for p in conns}
+        module["cells"][name] = {"hide_name": 1, "type": kind, "parameters": {}, "attributes": {},
+                                 "port_directions": dirs, "connections": {p: [b] for p, b in conns.items()}}
+
     for s, bit in enumerate(bits):
-        module["cells"][f"$nirmaan$fault${s}"] = {
-            "hide_name": 1, "type": "$_MUX_", "parameters": {}, "attributes": {},
-            "port_directions": {"A": "input", "B": "input", "S": "input", "Y": "output"},
-            "connections": {"A": [bit], "B": [val[s]], "S": [en[s]], "Y": [moved[bit]]}}
+        if transition:
+            prev, slow_rise, slow_fall, delayed, on = range(spare, spare + 5)
+            spare += 5
+            cell(f"$nirmaan$prev${s}", "$_DFF_P_", C=clk, D=bit, Q=prev)
+            cell(f"$nirmaan$str${s}", "$_AND_", A=bit, B=prev, Y=slow_rise)
+            cell(f"$nirmaan$stf${s}", "$_OR_", A=bit, B=prev, Y=slow_fall)
+            cell(f"$nirmaan$delay${s}", "$_MUX_", A=slow_rise, B=slow_fall, S=val[s], Y=delayed)
+            cell(f"$nirmaan$on${s}", "$_AND_", A=en[s], B=atspeed, Y=on)
+            cell(f"$nirmaan$fault${s}", "$_MUX_", A=bit, B=delayed, S=on, Y=moved[bit])
+        else:
+            cell(f"$nirmaan$fault${s}", "$_MUX_", A=bit, B=val[s], S=en[s], Y=moved[bit])
         module["netnames"][f"$nirmaan$site${s}"] = {"hide_name": 1, "bits": [moved[bit]], "attributes": {}}
+    if transition:
+        for name, bit in (("nirmaan_fault_clk", clk), ("nirmaan_fault_atspeed", atspeed)):
+            module["ports"][name] = {"direction": "input", "bits": [bit]}
+            module["netnames"][name] = {"hide_name": 0, "bits": [bit], "attributes": {}}
     module["ports"]["nirmaan_fault_en"] = {"direction": "input", "bits": en}
     module["ports"]["nirmaan_fault_val"] = {"direction": "input", "bits": val}
     module["netnames"]["nirmaan_fault_en"] = {"hide_name": 0, "bits": en, "attributes": {}}
@@ -583,32 +735,33 @@ def _concat(names: list[str]) -> str:
 
 
 def inject(design: Design, netlist: dict, doc: dict, sample: int | None = None,
-           seed: int = 1) -> tuple[dict, dict, str]:
+           seed: int = 1, fault_model: str = STUCK_AT) -> tuple[dict, dict, str]:
     """The fault netlist, the fault list (with the claims to check), and the testbench."""
     chains = _chains(design)
-    model = CaptureModel.build(design, chains)
-    universe = model.faults()
-    _check_patterns(doc, model, chains, {f.name for f in universe})
+    model, universe = build_model(design, chains, fault_model)
+    _check_patterns(doc, model, chains, {f.name for f in universe}, fault_model)
     chosen = universe
     if sample and len(universe) > sample:
         picks = sorted(random.Random(seed).sample(range(len(universe)), sample))
         chosen = [universe[i] for i in picks]
     sites: list = list(dict.fromkeys(f.bit for f in chosen))
     site_of = {bit: s for s, bit in enumerate(sites)}
-    faulty = fault_netlist(netlist, design.top, sites)
+    faulty = fault_netlist(netlist, design.top, sites, transition=fault_model == TRANSITION)
     names = {f.name for f in chosen}
     faults = {
-        "top": design.top, "universe": len(universe), "sampled": len(chosen) < len(universe),
+        "top": design.top, "fault_model": fault_model, "universe": len(universe),
+        "sampled": len(chosen) < len(universe),
         "patterns": len(doc["patterns"]), "chains": len(chains),
         "faults": [{"name": f.name, "site": site_of[f.bit], "stuck": f.stuck} for f in chosen],
         "claims": {n: k for n, k in doc.get("claims", {}).items() if n in names},
         "untestable": [n for n in doc.get("untestable", []) if n in names],
         "aborted": [n for n in doc.get("aborted", []) if n in names],
     }
-    return faulty, faults, _testbench(design, model, chains, doc, faults, len(sites))
+    return faulty, faults, _testbench(design, model, chains, doc, faults, len(sites), fault_model == TRANSITION)
 
 
-def _testbench(design: Design, model: CaptureModel, chains: list[list], doc: dict, faults: dict, sites: int) -> str:
+def _testbench(design: Design, model: CaptureModel, chains: list[list], doc: dict, faults: dict, sites: int,
+               transition: bool = False) -> str:
     flops = [f for c in chains for f in c]
     idle, _ = clocking(design, flops) if flops else ({}, {})
     inputs = design.input_bits()
@@ -641,6 +794,8 @@ def _testbench(design: Design, model: CaptureModel, chains: list[list], doc: dic
             good_conns.append(f"    .{ident}(g_o{n})")
             bad_conns.append(f"    .{ident}(b_o{n})")
     bad_conns += ["    .nirmaan_fault_en(fault_en)", "    .nirmaan_fault_val(fault_val)"]
+    if transition:
+        bad_conns += ["    .nirmaan_fault_clk(fault_clk)", "    .nirmaan_fault_atspeed(atspeed)"]
 
     def out_ref(name: str, machine: str) -> str:
         base, _, rest = name.partition("[")
@@ -667,21 +822,24 @@ def _testbench(design: Design, model: CaptureModel, chains: list[list], doc: dic
     for f, fault in enumerate(faults["faults"]):
         fill.append(f"    fault_site[{f}] = {fault['site']}; fault_stuck[{f}] = {fault['stuck']};")
     toggle = " ".join(f"{_ident(c)} = ~{_ident(c)};" for c in idle) or ";"
+    if transition:
+        toggle += " fault_clk = ~fault_clk;"
     nf = len(faults["faults"])
     scan_in = _ident(SCAN_IN) if scan_ports else "unused_scan_in"
     scan_en = _ident(SCAN_EN) if scan_ports else "unused_scan_en"
     good_so = f"g_{outputs[SCAN_OUT]}" if scan_ports else f"{width}'b0"
     bad_so = f"b_{outputs[SCAN_OUT]}" if scan_ports else f"{width}'b0"
     extra = "" if scan_ports else f"  reg [{width - 1}:0] unused_scan_in;\n  reg unused_scan_en;\n"
+    kind = "Transition (launch on capture)" if transition else "Stuck-at"
     return f"""`timescale 1ns / 1ps
-// Stuck-at fault simulation for {design.top}: generated by nirmaan.integrations.dft_atpg.
+// {kind} fault simulation for {design.top}: generated by nirmaan.integrations.dft_atpg.
 // The design as given is the good machine; {FAULTY_TOP} is the same netlist with a multiplexer on every
 // fault site. {count} patterns, {len(chains)} chain(s) of at most {length} flops, {nf} faults.
 module {TB_TOP};
 {chr(10).join(decls)}
 {extra}  reg [{max(sites, 1) - 1}:0] fault_en;
   reg [{max(sites, 1) - 1}:0] fault_val;
-  reg [{npi - 1}:0] pat_pi [0:{max(count, 1) - 1}];
+{"  reg fault_clk, atspeed;" + chr(10) if transition else ""}  reg [{npi - 1}:0] pat_pi [0:{max(count, 1) - 1}];
   reg [{npo - 1}:0] pat_po [0:{max(count, 1) - 1}];
   reg [{width - 1}:0] pat_load [0:{max(count * length, 1) - 1}];
   reg [{width - 1}:0] pat_unload [0:{max(count * length, 1) - 1}];
@@ -708,7 +866,7 @@ module {TB_TOP};
       #5 {toggle}
     end
   endtask
-
+{_at_speed_tasks(toggle) if transition else ""}
   // Compare the unload of pattern q at unload cycle t: against the file (check), or good against bad.
   task observe_unload(input integer q, input integer t, input check);
     integer k;
@@ -750,7 +908,7 @@ module {TB_TOP};
         {scan_en} = 1'b0;
         {scan_in} = {width}'b0;
         #4;
-        if (check && good_po !== pat_po[p])
+{"        launch;" + chr(10) + "        #4;" + chr(10) if transition else ""}        if (check && good_po !== pat_po[p])
           response_errors = response_errors + 1;
         if (bad_po !== good_po) begin
           if (check)
@@ -758,7 +916,7 @@ module {TB_TOP};
           else if (detected < 0)
             detected = p;
         end
-        pulse;
+        {"capture" if transition else "pulse"};
       end
       {scan_en} = 1'b1;
       if (check || detected < 0)
@@ -776,7 +934,7 @@ module {TB_TOP};
 {chr(10).join(fixed)}
     fault_en = 0;
     fault_val = 0;
-{chr(10).join(fill)}
+{"    fault_clk = 1'b0;" + chr(10) + "    atspeed = 1'b0;" + chr(10) if transition else ""}{chr(10).join(fill)}
     run_patterns(1'b1);
     $display("DFT-ATPG-CHECK: patterns %0d, response errors %0d, injection errors %0d", {count}, response_errors,
              injection_errors);
@@ -788,10 +946,32 @@ module {TB_TOP};
       run_patterns(1'b0);
       $display("DFT-FAULT %0d %0d", f, detected);
     end
-    $display("DFT-ATPG: %0d faults simulated", {nf});
+    $display("DFT-ATPG: %0d faults simulated{' (transition, launch on capture)' if transition else ''}", {nf});
     $finish;
   end
 endmodule
+"""
+
+
+def _at_speed_tasks(toggle: str) -> str:
+    """Launch and capture pulses (M29): the delay model acts from just after launch to just after capture."""
+    return f"""
+  // Launch on capture: the at-speed cycle runs from the launch edge to the capture edge.
+  task launch;
+    begin
+      #5 {toggle}
+      #1 atspeed = 1'b1;
+      #4 {toggle}
+    end
+  endtask
+
+  task capture;
+    begin
+      #5 {toggle}
+      #1 atspeed = 1'b0;
+      #4 {toggle}
+    end
+  endtask
 """
 
 
@@ -808,11 +988,12 @@ def main(argv: list[str]) -> int:
             _, design_json, out, top = argv[:4]
             opts = argv[4:]
             doc = generate(Design.load(design_json, top), seed=int(_option(opts, "--seed", "1")),
-                           limit=int(_option(opts, "--limit", "200")), random_only="--random-only" in opts)
+                           limit=int(_option(opts, "--limit", "200")), random_only="--random-only" in opts,
+                           fault_model=_option(opts, "--model", STUCK_AT))
             Path(out).write_text(json.dumps(doc, indent=1) + "\n", encoding="utf-8")
             print(f"DFT-ATPG-GEN: {doc['faults_total']} faults, {len(doc['patterns'])} patterns, "
                   f"{len(doc['claims'])} claimed, {len(doc['untestable'])} proven undetectable, "
-                  f"{len(doc['aborted'])} aborted ({doc['generator']})")
+                  f"{len(doc['aborted'])} aborted ({doc['generator']}, {doc['fault_model']})")
             return 0
         if argv[:1] == ["inject"] and len(argv) >= 7:
             _, design_json, patterns, faulty_json, faults_json, tb, top = argv[:7]
@@ -821,7 +1002,7 @@ def main(argv: list[str]) -> int:
             doc = json.loads(Path(patterns).read_text(encoding="utf-8"))
             sample = int(_option(opts, "--sample", "0")) or None
             faulty, faults, text = inject(Design.from_json(netlist, top), netlist, doc, sample,
-                                          int(_option(opts, "--seed", "1")))
+                                          int(_option(opts, "--seed", "1")), _option(opts, "--model", STUCK_AT))
             Path(faulty_json).write_text(json.dumps(faulty), encoding="utf-8")
             Path(faults_json).write_text(json.dumps(faults, indent=1) + "\n", encoding="utf-8")
             Path(tb).write_text(text, encoding="utf-8")
@@ -832,8 +1013,8 @@ def main(argv: list[str]) -> int:
     except (NetlistError, OSError, KeyError, ValueError, TypeError, json.JSONDecodeError) as exc:
         print(f"DFT-ERROR: {exc}")
         return 1
-    print("usage: dft_atpg.py generate DESIGN.json OUT.json TOP [--seed N] [--limit N] [--random-only] | "
-          "inject DESIGN.json PATTERNS.json FAULTY.json FAULTS.json TB.v TOP [--sample N] [--seed N]")
+    print("usage: dft_atpg.py generate DESIGN.json OUT.json TOP [--seed N] [--limit N] [--random-only] [--model M] | "
+          "inject DESIGN.json PATTERNS.json FAULTY.json FAULTS.json TB.v TOP [--sample N] [--seed N] [--model M]")
     return 2
 
 
