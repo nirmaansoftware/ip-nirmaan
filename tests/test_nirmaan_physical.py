@@ -343,6 +343,20 @@ def test_real_liberty_mapped_synthesis_ties_constants_to_tie_cells(project, tmp_
     assert not bad.succeeded and "tie_low must be CELL/PORT" in bad.summary
 
 
+@needs("yosys")
+def test_real_liberty_mapped_synthesis_buffers_port_to_port_assigns(project, tmp_path):
+    """M29: one output port driving another becomes a buffer, so the routed netlist has no shared port net."""
+    params = {"sources": str(AXI), "top": TOP, "liberty": str(TINY_LIB), "backend": "yosys-liberty",
+              "tie_high": "TIEHI/Y", "tie_low": "TIELO/Y"}
+    plain, outcome = invoke(project, "synth.run", params, tmp_path / "plain")
+    assert plain.succeeded and "assign " in Path(outcome.data["result"]["metrics"]["netlist"]).read_text()
+    run, outcome = invoke(project, "synth.run", {**params, "buffer_cell": "BUF/A/Y"}, tmp_path / "buf")
+    assert run.succeeded, run.summary
+    assert "assign " not in Path(outcome.data["result"]["metrics"]["netlist"]).read_text()
+    bad, _ = invoke(project, "synth.run", {**params, "buffer_cell": "BUF/A"}, tmp_path / "bad")
+    assert not bad.succeeded and "buffer_cell must be CELL/IN/OUT" in bad.summary
+
+
 def test_liberty_mapped_synthesis_without_a_liberty_is_refused(project, tmp_path):
     with pytest.raises(ToolAccessDenied, match="needs a Liberty file"):
         invoke(project, "synth.run", {"sources": str(AXI), "top": TOP, "backend": "yosys-liberty"}, tmp_path)
@@ -428,7 +442,8 @@ NANGATE45 = {
     "tech_lef": "nangate45/lef/NangateOpenCellLibrary.tech.lef",
     "lef": "nangate45/lef/NangateOpenCellLibrary.macro.mod.lef",
 }
-NANGATE45_TIES = {"tie_high": "LOGIC1_X1/Z", "tie_low": "LOGIC0_X1/Z"}
+NANGATE45_TIES = {"tie_high": "LOGIC1_X1/Z", "tie_low": "LOGIC0_X1/Z",
+                  "buffer_cell": "BUF_X1/A/Z"}  # M29: no port-to-port assign for the timer to trip on
 NANGATE45_PNR = {"site": "FreePDK45_38x28_10R_NP_162NW_34O", "hor_layers": "metal3", "ver_layers": "metal2",
                  "rc_tcl": "nangate45/setRC.tcl"}  # M29: layer RC, which clock-tree synthesis needs
 FAST_SDC = PD / "axi4_lite_regs_fast.sdc"
@@ -585,7 +600,8 @@ def test_real_signoff_flow_on_sky130hd(project, tmp_path):
             pytest.fail(f"{PDK_ROOT_ENV} has no sky130hd platform")
         pytest.skip(f"{PDK_ROOT_ENV} has no sky130hd platform")
     params = {"sources": str(AXI), "top": TOP, "backend": "yosys-liberty", "liberty": SKY130HD["liberty"],
-              "tie_high": "sky130_fd_sc_hd__conb_1/HI", "tie_low": "sky130_fd_sc_hd__conb_1/LO"}
+              "tie_high": "sky130_fd_sc_hd__conb_1/HI", "tie_low": "sky130_fd_sc_hd__conb_1/LO",
+              "buffer_cell": "sky130_fd_sc_hd__buf_4/A/X"}
     synth, outcome = invoke(project, "synth.run", params, tmp_path / "synth")
     assert synth.succeeded, synth.summary
     netlist = outcome.data["result"]["metrics"]["netlist"]

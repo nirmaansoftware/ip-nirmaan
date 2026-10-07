@@ -123,6 +123,21 @@ def _tie_cell(params: dict[str, str], key: str) -> list[str]:
     return [cell, port]
 
 
+def _port_buffers(params: dict[str, str]) -> list[str]:
+    """``insbuf`` with ``buffer_cell`` (``CELL/IN/OUT``, M29): a buffer wherever one port drives another.
+
+    Without it Yosys writes ``assign out_a = out_b;``, OpenROAD writes the routed netlist back the same
+    way, and a timer reading that netlist with the SPEF finds the shared net unannotated.
+    """
+    value = params.get("buffer_cell", "").strip()
+    if not value:
+        return []
+    parts = value.split("/")
+    if len(parts) != 3 or not all(_TOKEN_RE.match(x) for x in parts):
+        raise ValueError(f"buffer_cell must be CELL/IN/OUT, not {value!r}")
+    return [f"insbuf -buf {' '.join(parts)}"]
+
+
 def _synth_steps(job: Job) -> list[list[str]]:
     lib = f'"{pdk_paths(job.params, "liberty")[0]}"'  # the first Liberty file, quoted as eda.py quotes sources
     high, low = _tie_cell(job.params, "tie_high"), _tie_cell(job.params, "tie_low")
@@ -135,6 +150,7 @@ def _synth_steps(job: Job) -> list[list[str]]:
               f"dfflibmap -liberty {lib}",
               f"abc -liberty {lib}",
               *ties,
+              *_port_buffers(job.params),
               "opt_clean -purge",
               f"tee -q -o stat.json stat -json -liberty {lib}",
               "write_verilog -noattr -noexpr -nohex -nodec netlist.v"]
@@ -172,8 +188,10 @@ foreach cell [get_cells *] {
   foreach pin [get_pins -of_objects $cell] {
     if {[get_property $pin direction] ne "output"} { continue }
     set net [get_nets -of_objects $pin]
-    if {[llength $net] == 0 || ([llength [get_pins -of_objects $net]] <= 1
-                                && [llength [get_ports -quiet -of_objects $net]] == 0)} { incr nirmaan_floating }
+    if {$net eq "" || $net eq "NULL"} { incr nirmaan_floating; continue }
+    if {[llength [get_pins -of_objects $net]] <= 1 && [llength [get_ports -quiet -of_objects $net]] == 0} {
+      incr nirmaan_floating
+    }
   }
 }
 puts "nirmaan-floating-outputs: $nirmaan_floating"'''
@@ -187,7 +205,9 @@ def _sta_script(job: Job, lefs: bool = False) -> None:
               f"link_design {_token(job.params, 'top')}",
               f"read_sdc {_design(job, 'sdc')}"]
     if job.params.get("spef", "").strip():  # M29: and say how much of the design the SPEF annotates
-        script += [f"read_spef {_design(job, 'spef')}", "report_parasitic_annotation", FLOATING_OUTPUTS]
+        # A SPEF comes from a routed block, whose clock tree is built: time it with propagated clocks.
+        script += [f"read_spef {_design(job, 'spef')}", "set_propagated_clock [all_clocks]",
+                   "report_parasitic_annotation -report_unannotated", FLOATING_OUTPUTS]
     script += _timing_reports()
     (job.workdir / "sta.tcl").write_text("\n".join(script) + "\n", encoding="utf-8")
 

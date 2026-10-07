@@ -123,7 +123,9 @@ TOOLS: list[ToolSpec] = [
     _tool("synth.run", "Synthesis", "eda", EXE, AV, "Logic synthesis.",
           (SOURCES, TOP_REQUIRED, *PDK,
            _p("tie_high", TEXT, "Tie-high cell as CELL/PORT (backend yosys-liberty)."),
-           _p("tie_low", TEXT, "Tie-low cell as CELL/PORT (backend yosys-liberty)."), *RUNNER)),
+           _p("tie_low", TEXT, "Tie-low cell as CELL/PORT (backend yosys-liberty)."),
+           _p("buffer_cell", TEXT, "Buffer as CELL/IN/OUT, inserted where one port drives another "
+                                   "(backend yosys-liberty)."), *RUNNER)),
     _tool("sta.run", "Static timing", "eda", EXE, AV, "Static timing of a netlist under an SDC (OpenSTA).",
           (*NETLIST, _p("spef", PATH, "Parasitics (SPEF), as pnr.run extracts them."), TOP_REQUIRED, *PDK_REQUIRED,
            _p("tech_lef", PATHS, "Technology LEF (backend openroad-sta)."),
