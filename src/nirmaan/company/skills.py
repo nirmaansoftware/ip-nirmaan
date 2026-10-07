@@ -350,7 +350,7 @@ SKILLS: list[Skill] = [
        procedures=("Choose simulation/formal split and reuse strategy.",),
        fails=("Unverifiable features.",), valid=("Every feature has a verification method.",)),
     sk("verification_planning", "Verification planning", "verification", "planning",
-       provides=("dv.plan", "dv.review"), packs=("coverage",),
+       provides=("dv.plan", "dv.review"), packs=("coverage",), tools=("vplan.check",),
        procedures=("Map requirements to features, tests, assertions, and coverage.",),
        fails=("Plans not traceable to requirements.",),
        valid=("Every requirement maps to at least one verification item.",)),

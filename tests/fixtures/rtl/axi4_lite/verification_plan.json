@@ -1,0 +1,117 @@
+{
+  "format": "nirmaan.vplan",
+  "version": 1,
+  "requirements": [
+    {
+      "id": "AXIL-B2B",
+      "text": "After a response is taken, the channel can accept a new request in the next cycle.",
+      "source": "interface_spec.md",
+      "section": "6"
+    },
+    {
+      "id": "AXIL-FORMAL",
+      "text": "A formal proof of the handshake rules: responses hold until taken, follow only accepted requests, and at most one transaction is outstanding.",
+      "source": "interface_spec.md",
+      "section": "8"
+    },
+    {
+      "id": "AXIL-LATENCY",
+      "text": "The bound is **at most 2 cycles** for both writes and reads.",
+      "source": "interface_spec.md",
+      "section": "6"
+    },
+    {
+      "id": "AXIL-ORDER",
+      "text": "**Write address and write data are independent.** AW and W may arrive in either order, in the same cycle, or with any gap between them. The write is performed when both have been accepted.",
+      "source": "interface_spec.md",
+      "section": "4"
+    },
+    {
+      "id": "AXIL-RESET",
+      "text": "During and after reset, BVALID and RVALID are low, and every register holds its reset value (zero). Any half-accepted write (AW without W, or W without AW) is discarded.",
+      "source": "interface_spec.md",
+      "section": "7"
+    },
+    {
+      "id": "AXIL-SLVERR",
+      "text": "**Policy for unmapped addresses: SLVERR** (`2'b10`). An address is mapped only when it is word aligned (`addr[1:0] == 0`) and is one of `0x0`, `0x4`, `0x8`, `0xC`. With `ADDR_WIDTH` 4 the unmapped addresses are the misaligned ones (for example `0x5` or `0xE`).",
+      "source": "interface_spec.md",
+      "section": "5"
+    },
+    {
+      "id": "AXIL-SYNTH",
+      "text": "Synthesizes with Yosys, with no latches.",
+      "source": "interface_spec.md",
+      "section": "8"
+    },
+    {
+      "id": "AXIL-WSTRB",
+      "text": "**Byte enables.** Only the bytes whose `wstrb` bit is set are written. A write with `wstrb` all zero changes nothing and is still answered with OKAY.",
+      "source": "interface_spec.md",
+      "section": "4"
+    }
+  ],
+  "items": [
+    {
+      "id": "cov-b2b",
+      "kind": "coverage_point",
+      "file": "axi4_lite_regs_tb.v",
+      "name": "back-to-back",
+      "proves": [
+        "AXIL-B2B"
+      ],
+      "rationale": "A cover point on back-to-back reads with no idle cycle between them."
+    },
+    {
+      "id": "tb-b2b",
+      "kind": "test",
+      "file": "axi4_lite_regs_tb.v",
+      "name": "back-to-back read",
+      "proves": [
+        "AXIL-B2B"
+      ],
+      "rationale": "The testbench check on reads issued back to back."
+    },
+    {
+      "id": "tb-latency",
+      "kind": "test",
+      "file": "axi4_lite_regs_tb.v",
+      "name": "MAX_LATENCY",
+      "proves": [
+        "AXIL-LATENCY"
+      ],
+      "rationale": "Every response is checked against the latency bound."
+    },
+    {
+      "id": "tb-slverr",
+      "kind": "test",
+      "file": "axi4_lite_regs_tb.v",
+      "name": "unmapped write SLVERR",
+      "proves": [
+        "AXIL-SLVERR"
+      ],
+      "rationale": "Misaligned writes are answered with SLVERR and change nothing."
+    },
+    {
+      "id": "tb-top",
+      "kind": "test",
+      "file": "axi4_lite_regs_tb.v",
+      "name": "axi4_lite_regs_tb",
+      "proves": [
+        "AXIL-ORDER",
+        "AXIL-RESET"
+      ],
+      "rationale": "The self-checking testbench reads every register after reset and drives AW before W, W before AW, and both together."
+    },
+    {
+      "id": "tb-wstrb",
+      "kind": "test",
+      "file": "axi4_lite_regs_tb.v",
+      "name": "wstrb 0101",
+      "proves": [
+        "AXIL-WSTRB"
+      ],
+      "rationale": "A partial write with byte enables 0101."
+    }
+  ]
+}

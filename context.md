@@ -2192,6 +2192,70 @@ parameter an integration reads is declared, and the crown jewel
 1231 passed, 3 skipped. Deferred to the next M28 part: typed values end to end (a
 `ToolRun` storing real lists) and the typed work packet.
 
+### Milestone 29 (verification plan) - Plans loaded from a file, and a plan seat (after Stage 6)
+
+Closes M24's first deferral. A verification plan (requirements, and the items
+that prove them) is a small JSON format, `nirmaan.vplan` version 1, read and
+written by `nirmaan/vplan.py`; a seat writes one on `block-design`, a real tool
+checks it before review, and the engine records it on approval.
+
+Key design points worth not re-deriving:
+- **Format.** `{"format", "version", "requirements": [{id, text, source,
+  section}], "items": [{id, kind, file, name, proves, rationale}]}`. Unknown
+  fields are refused (a plan cannot say `status` or `passed`), kinds must be
+  registered, `proves` must name requirements in the file. JSON, not YAML:
+  there is no YAML dependency. A pure-Python `JSONDecoder` whose
+  `parse_object` records each object's line and each value's line gives
+  `line N:` reasons.
+- **Import is all or nothing, through the engine.** References (`source`,
+  `file`) resolve by artifact ID, recorded path, or unique file name. The
+  records are first made on a scratch `TaskEngine` over the same state; any
+  refusal (M24 actor rule, duplicates, policy) is collected with its line and
+  nothing is recorded. CLI: `nirmaan vplan import PROJECT FILE --as ROLE` and
+  `nirmaan vplan export PROJECT [--out FILE]`; export is canonical (sorted,
+  `indent=2`, file names when unique), so an imported file exports back
+  byte for byte.
+- **Spec requirements are tagged** `[req:ID]` in the Markdown list item or
+  paragraph (`REQUIREMENT_TAG` in `company/traceability.py`); text is that
+  item without marker or tag, section is the nearest heading's number. The
+  AXI4-Lite fixture spec now tags the eight M24 demo requirements.
+- **The seat is data.** Feature `verification_plan` ("verification plan",
+  "vplan", "test plan"); a `dv-plan` stage on `block-design` (capability
+  `dv.plan`, output `verification_plan`, after `interface-spec`, conditional on
+  the feature, nothing depends on it, so every existing plan and every
+  workflow built from block-design stages is unchanged). Before review:
+  `vplan.check` (new, AVAILABLE, in-process, `integrations/vplan.py`, granted
+  by `verification_planning`) over `plan` and the approved upstream
+  `interface_spec` (`spec`, `upstream=True`): valid, covers exactly the tagged
+  requirements, quotes each, plain item file names.
+- **On approval.** `TaskEngine` gains `register_approval_consumer(kind, fn)`:
+  `fn(engine, artifact)` runs before the approval commits (raise to refuse;
+  nothing changes) and returns what to record after it commits. The engine
+  names no kind. `nirmaan.vplan` registers for `verification_plan`, acting only
+  when the artifact's stage checks it with `vplan.check` (so `new-ip`'s
+  document plans are untouched); it re-checks the digest-verified plan against
+  the digest-verified approved spec and records as the system actor, with
+  `plan` in each audit entry. `nirmaan/work/__init__.py` imports `nirmaan.vplan`
+  last, so the consumer is registered wherever the engine is.
+- **Planned items.** `VerificationItem` gains `file` and `plan`; `artifact`
+  defaults to empty. `TaskEngine.record_planned_item` applies the M24 checks
+  with the actor rule on the plan artifact. `engineering.holding_artifact`
+  binds a planned item, on every query, to the latest recorded artifact of
+  that file name; with none it is `unverifiable` ("no recorded artifact holds
+  ... yet"). The graph adds `planned_in` edges.
+
+Demo (real tools): "Create an AXI4-Lite register block with a verification
+plan." The plan seat writes `tests/fixtures/rtl/axi4_lite/verification_plan.json`
+(8 requirements, 6 items), it is checked, reviewed, approved, and recorded
+before any RTL; after the real simulation `nirmaan gaps` reports 5 of 8
+backed, with AXIL-B2B, AXIL-SYNTH, and AXIL-FORMAL gaps, as in M24.
+
+Tests: `tests/test_nirmaan_verification_plan.py`; crown jewel
+`test_a_plan_seat_against_a_new_spec_kind_with_a_new_item_kind_needs_no_core_changes`.
+Design doc: `docs/VERIFICATION_PLAN.md`. Deferred: YAML, planned items in an
+import, amending recorded plans, non-Markdown spec tags, the plan seat on
+`new-ip` and `feature-addition`.
+
 ---
 
 ### Milestone 29 - An unattended owner and reviewer loop in one command (after Stage 6)
@@ -2252,6 +2316,44 @@ nothing and keeps the import laws; every step audited as its seat.
 
 Deferred: concurrent tasks; a call budget across invocations; approval by a
 delegated non-human approver; task inputs in project mode.
+
+### Milestone 29 (working name) - Engineering records: decisions and failures, as views
+
+The third structural-review milestone (numbering is the coordinator's).
+"Why did we choose this?" and "what went wrong, and was it fixed?" answered
+from the record. Design doc: `docs/ENGINEERING_RECORDS.md`. No version bump.
+
+Key design points worth not re-deriving:
+- **Views, not new fields.** Inspection found that nothing in the product calls
+  `record_decision`: the decisions made are DECISION tasks, which already hold
+  every decision-record field (outcomes as alternatives, outcome, artifacts as
+  rationale, evidence, `task.submit`/`task.approve` audit entries, and the
+  branches `_take_branch` cancelled as consequences). M27's review repair
+  already moves superseded artifacts into an `Attempt`. So
+  `nirmaan/records.py` reads state and stores, infers, and audits nothing.
+- **Failure categories come from structure, never prose**: `check_failed` (a
+  failed `ToolRun`; resolved by a later successful run of the same tool on the
+  same task), `review_sent_back` (an `Attempt` with reviews), `submission_refused`
+  (an `Attempt` with no failed run of its own), `blocked` (`task.block`,
+  resolved by `task.unblock`), `failed` (`task.fail`), `escalated` (an
+  `Escalation`, resolved with its resolution). Ordered by audit sequence.
+  `failure_summary(states)` counts by category and subject across projects.
+- Surfaces: `nirmaan decisions PROJECT`, `nirmaan failures PROJECT...` (both
+  `--json`), export sections `decisions` (in `10_signoff`) and `failures` (in
+  `09_evidence`) through the section-writer registry and the folder table, and
+  MCP read tools `decisions` and `failures`.
+- The records-names-nothing test leaves platform tools out of its vocabulary:
+  `task.cancel` and `escalation.raise` are both platform tool IDs and the
+  engine's audit actions.
+- Two projects planned from the same request under a fixed clock share an ID;
+  the cross-project test uses two requests.
+
+`tests/test_nirmaan_records.py` (10), including Demo 4's `root-cause` decision
+(four alternatives, `rtl_bug`, three cancelled branches) and the crown jewel
+`test_a_new_decision_stage_is_recorded_with_no_core_changes`. With the M29 loop merged,
+the standard local run is 1260 passed, 3 skipped. Deferred: recording explicit decisions
+from the CLI or MCP, declined model answers (the engine records nothing for
+them), principle IDs on refusals, learning from the summary.
 
 ### Milestone 29 (gates) - The RTL gates on the remaining workflows, and automatic antecedent covers (after Stage 6)
 

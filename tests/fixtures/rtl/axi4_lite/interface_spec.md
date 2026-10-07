@@ -2,7 +2,8 @@
 
 A block of four 32-bit control and status registers behind an AXI4-Lite
 subordinate port. This is the M23 reference fixture: the specification a spec
-engineer hands to the microarchitecture and RTL seats.
+engineer hands to the microarchitecture and RTL seats. Each requirement a
+verification plan must cover ends with its tag (M29).
 
 ## 1. Parameters
 
@@ -67,9 +68,9 @@ value written, byte by byte, as enabled by `wstrb`.
   and may be in flight at the same time.
 * **Write address and write data are independent.** AW and W may arrive in
   either order, in the same cycle, or with any gap between them. The write is
-  performed when both have been accepted.
+  performed when both have been accepted. [req:AXIL-ORDER]
 * **Byte enables.** Only the bytes whose `wstrb` bit is set are written. A write
-  with `wstrb` all zero changes nothing and is still answered with OKAY.
+  with `wstrb` all zero changes nothing and is still answered with OKAY. [req:AXIL-WSTRB]
 
 ## 5. Responses and unmapped addresses
 
@@ -77,7 +78,7 @@ value written, byte by byte, as enabled by `wstrb`.
 * **Policy for unmapped addresses: SLVERR** (`2'b10`). An address is mapped only
   when it is word aligned (`addr[1:0] == 0`) and is one of `0x0`, `0x4`,
   `0x8`, `0xC`. With `ADDR_WIDTH` 4 the unmapped addresses are the misaligned
-  ones (for example `0x5` or `0xE`).
+  ones (for example `0x5` or `0xE`). [req:AXIL-SLVERR]
   * An unmapped write changes no register and is answered with SLVERR.
   * An unmapped read returns `rdata` of zero with SLVERR.
 * DECERR is not used: it is reserved for an interconnect that finds no
@@ -89,18 +90,18 @@ Latency is counted from the rising edge that completes the request (for a
 write, the edge that accepts the later of AW and W; for a read, the edge that
 accepts AR) to the first rising edge at which BVALID or RVALID is high.
 
-* The bound is **at most 2 cycles** for both writes and reads.
+* The bound is **at most 2 cycles** for both writes and reads. [req:AXIL-LATENCY]
 * This design meets it with 1 cycle: the response is valid in the cycle right
   after the request completes.
 * After a response is taken, the channel can accept a new request in the next
-  cycle.
+  cycle. [req:AXIL-B2B]
 
 ## 7. Reset
 
 * `aresetn` is active low and sampled on the rising edge of `aclk`.
 * During and after reset, BVALID and RVALID are low, and every register holds
   its reset value (zero). Any half-accepted write (AW without W, or W without
-  AW) is discarded.
+  AW) is discarded. [req:AXIL-RESET]
 * The manager keeps its VALID signals low while `aresetn` is low.
 
 ## 8. Verification requirements
@@ -110,6 +111,6 @@ accepts AR) to the first rising edge at which BVALID or RVALID is high.
   covers: reset values; write then read of every register; `wstrb` partial
   writes; AW before W, W before AW, and both together; B and R backpressure;
   back-to-back transactions; the SLVERR policy; and the latency bound.
-* Synthesizes with Yosys, with no latches.
+* Synthesizes with Yosys, with no latches. [req:AXIL-SYNTH]
 * A formal proof of the handshake rules: responses hold until taken, follow
-  only accepted requests, and at most one transaction is outstanding.
+  only accepted requests, and at most one transaction is outstanding. [req:AXIL-FORMAL]

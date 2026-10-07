@@ -21,6 +21,8 @@ class ExportSection(str, Enum):
     AUDIT_CHAIN = "audit_chain"  # the trail, its head hash, and a fresh verification
     SIGNOFF = "signoff"  # what is and is not signed off, from recorded gate approvals
     ENGINEERING_GRAPH = "engineering_graph"  # design links and requirement gaps (M24)
+    DECISIONS = "decisions"  # decision records, read from decision tasks and recorded decisions (M29)
+    FAILURES = "failures"  # failure records: failed runs, attempts, blocks, failures, escalations (M29)
 
 
 class DeliverableFolder(BaseModel):
