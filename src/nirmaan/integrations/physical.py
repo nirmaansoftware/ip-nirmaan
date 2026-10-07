@@ -167,8 +167,12 @@ def _synth_parse(run: RunRecord) -> EdaResult:
 #: M29: output pins that drive no net (an unused QN, a clock-tree dummy load). A SPEF cannot annotate
 #: them, so the parser subtracts them from the unannotated drivers to count the nets the SPEF missed.
 FLOATING_OUTPUTS = '''set nirmaan_floating 0
-foreach pin [get_pins -hierarchical *] {
-  if {[get_property $pin direction] eq "output" && [llength [get_nets -of_objects $pin]] == 0} { incr nirmaan_floating }
+foreach cell [get_cells *] {
+  foreach pin [get_pins -of_objects $cell] {
+    if {[get_property $pin direction] eq "output" && [llength [get_nets -of_objects $pin]] == 0} {
+      incr nirmaan_floating
+    }
+  }
 }
 puts "nirmaan-floating-outputs: $nirmaan_floating"'''
 
@@ -216,6 +220,15 @@ def _cells(params: dict[str, str], key: str) -> list[str]:
     for name in names:
         if not _TOKEN_RE.match(name):
             raise ValueError(f"{key} must name cells, not {params.get(key)!r}")
+    return names
+
+
+def _dont_use(params: dict[str, str]) -> list[str]:
+    """Cells repair and CTS must not insert (M29), as names or ``*`` patterns."""
+    names = [n.strip() for n in params.get("dont_use", "").split(",") if n.strip()]
+    for name in names:
+        if not _TOKEN_RE.match(name.replace("*", "")):
+            raise ValueError(f"dont_use must name cells, not {params.get('dont_use')!r}")
     return names
 
 
@@ -274,7 +287,8 @@ def _pnr_steps(job: Job) -> list[list[str]]:
               f"read_verilog {_design(job, 'netlist')}",
               f"link_design {_token(p, 'top')}",
               f"read_sdc {_design(job, 'sdc')}",
-              *_source(p, "rc_tcl")]
+              *_source(p, "rc_tcl"),
+              *([f"set_dont_use [get_lib_cells {{{' '.join(_dont_use(p))}}}]"] if _dont_use(p) else [])]
     power = []
     if tap:
         power.append(f"tapcell -distance {_number(p, 'tap_distance', '0')} -tapcell_master {tap[0]}"

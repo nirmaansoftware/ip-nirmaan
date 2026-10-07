@@ -145,6 +145,7 @@ TOOLS: list[ToolSpec] = [
            _p("tap_distance", NUM, "Microns between tap columns; needed with tap_cell."),
            _p("pdn_tcl", PATH, "The PDK's power-grid script, sourced before pdngen."),
            _p("place_density", NUM, "Global placement target density."),
+           _p("dont_use", TEXT, "Cells (names or * patterns, comma separated) repair and CTS must not insert."),
            _p("cts_buffers", TEXT, "Clock buffer masters, comma separated (default: the tool picks)."),
            _p("min_routing_layer", TEXT, "Lowest signal routing layer (with max_routing_layer)."),
            _p("max_routing_layer", TEXT, "Highest signal routing layer."),
