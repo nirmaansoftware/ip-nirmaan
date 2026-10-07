@@ -322,6 +322,7 @@ SKILLS: list[Skill] = [
        procedures=("Trace a change to affected modules, interfaces, tests, and docs.",),
        fails=("Missed downstream consumers.",), valid=("Impact lists modules, tests, and docs affected.",)),
     sk("cdc_design", "CDC-safe design", "design", "cdc", provides=("rtl.cdc_design",), packs=("cdc", "reset-clocking"),
+       tools=("lint.run", "simulator.run", "synth.run", "formal.run", "formal.cover"),  # M29: the RTL gates
        procedures=("Use approved synchronizers.", "Gray-code multi-bit crossings."),
        fails=("Unsynchronized crossings.", "Reconvergence."),
        valid=("Every crossing uses an approved structure.",)),

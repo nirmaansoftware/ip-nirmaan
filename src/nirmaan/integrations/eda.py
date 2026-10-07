@@ -26,6 +26,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable
 
+from nirmaan.integrations.eda_antecedents import DERIVED, derive
 from nirmaan.integrations.eda_parsers import (
     Diagnostic,
     EdaResult,
@@ -43,6 +44,9 @@ if TYPE_CHECKING:
     from nirmaan.runtime.tools import ToolBroker
 
 DEFAULT_TIMEOUT = 300
+
+#: The files a cover run derives antecedent covers in (M29).
+HDL_SUFFIXES = (".v", ".sv", ".vh", ".svh")
 
 
 @dataclass(frozen=True)
@@ -319,20 +323,54 @@ def _sby_reads(job: Job) -> str | None:
     return f"{sby.name} does not read {', '.join(unread)} (not in its [files])" if unread else None
 
 
-def _sby_cover(job: Job) -> list[list[str]]:
-    """Run the seat's own setup in cover mode (M27), from a copy written into the run's directory.
-
-    The copy differs only in ``mode cover`` and in naming each ``[files]`` entry
-    by absolute path, so the design, the script, the engines, the depth, and the
-    assumptions are exactly the ones the proof used, and nothing is written next
-    to the submitted files.
-    """
-    sby = Path(job.params["sby"]).resolve()
+def _sby_sections(sby: Path) -> list[tuple[str | None, str]]:
+    """Each line of a .sby, with the section it is in."""
     out, section = [], None
     for line in sby.read_text(encoding="utf-8", errors="replace").splitlines():
         text = line.strip()
         if text.startswith("[") and text.endswith("]"):
             section = text[1:-1].strip()
+        out.append((section, line))
+    return out
+
+
+def _hdl_files(sby: Path) -> list[tuple[str, Path]]:
+    """The Verilog the setup reads: each [files] entry's name in the run, and the file itself."""
+    files = []
+    for section, line in _sby_sections(sby):
+        text = line.strip()
+        if section == "files" and text and not text.startswith("[") and not text.startswith("#"):
+            *dest, src = text.split()
+            path = (sby.parent / src).resolve()
+            if path.suffix in HDL_SUFFIXES:
+                files.append((dest[0] if dest else path.name, path))
+    return files
+
+
+def _sby_cover(job: Job) -> list[list[str]]:
+    """Run the seat's own setup in cover mode (M27), from a copy written into the run's directory.
+
+    The copy differs only in ``mode cover`` and in naming each ``[files]`` entry
+    by absolute path, so the script, the engines, the depth, and the
+    assumptions are exactly the ones the proof used, and nothing is written next
+    to the submitted files. Each Verilog file it reads is itself a copy with a
+    cover derived for every assertion (M29, ``eda_antecedents``); the derived
+    covers are listed in ``antecedents.json`` beside the run, for the parser.
+    """
+    sby = Path(job.params["sby"]).resolve()
+    copies, sites = {}, []
+    for name, path in _hdl_files(sby):
+        derivation = derive(path.read_text(encoding="utf-8", errors="replace"), name)
+        copy = job.workdir / "antecedents" / name
+        copy.parent.mkdir(parents=True, exist_ok=True)
+        copy.write_text(derivation.text, encoding="utf-8")
+        copies[path] = copy
+        sites += [{**s.to_dict(), "source": str(path)} for s in derivation.sites]
+    (job.workdir / "antecedents.json").write_text(json.dumps({"sites": sites}, indent=2) + "\n", encoding="utf-8")
+    out = []
+    for section, line in _sby_sections(sby):
+        text = line.strip()
+        if text.startswith("[") and text.endswith("]"):
             out.append(line)
             if section == "options":
                 out.append("mode cover")
@@ -341,7 +379,8 @@ def _sby_cover(job: Job) -> list[list[str]]:
             continue
         if section == "files" and text and not text.startswith("#"):
             *dest, src = text.split()
-            line = " ".join([*dest, str((sby.parent / src).resolve())])
+            path = (sby.parent / src).resolve()
+            line = " ".join([*dest, str(copies.get(path, path))])
         out.append(line)
     cover = job.workdir / f"{sby.stem}_cover.sby"
     cover.write_text("\n".join(out) + "\n", encoding="utf-8")
@@ -349,15 +388,26 @@ def _sby_cover(job: Job) -> list[list[str]]:
 
 
 def _sby_cover_check(job: Job) -> str | None:
-    """The cover run needs a single-task setup with options to rewrite, over the RTL it claims to cover."""
-    text = Path(job.params["sby"]).read_text(encoding="utf-8", errors="replace")
+    """The cover run needs a single-task setup with options to rewrite, over the RTL it claims to cover,
+    with an antecedent cover derivable for every assertion it reads (M29)."""
+    sby = Path(job.params["sby"])
+    text = sby.read_text(encoding="utf-8", errors="replace")
     sections = {ln.strip()[1:-1].strip() for ln in text.splitlines()
                 if ln.strip().startswith("[") and ln.strip().endswith("]")}
     if "tasks" in sections:
-        return f"{Path(job.params['sby']).name} declares [tasks]; the cover check runs single-task setups only"
+        return f"{sby.name} declares [tasks]; the cover check runs single-task setups only"
     if "options" not in sections:
-        return f"{Path(job.params['sby']).name} has no [options] section to run in cover mode"
-    return _sby_reads(job)
+        return f"{sby.name} has no [options] section to run in cover mode"
+    unread = _sby_reads(job)
+    if unread:
+        return unread
+    underived = [s for name, path in _hdl_files(sby.resolve())
+                 for s in derive(path.read_text(encoding="utf-8", errors="replace"), name).underived]
+    if underived:
+        listed = "; ".join(f"{s.where} ({s.reason})" for s in underived)
+        return (f"cannot derive the antecedent of {len(underived)} assertion{'s' if len(underived) > 1 else ''}: "
+                f"{listed}. A proof whose antecedents cannot be covered is not known to check anything")
+    return None
 
 
 def _lint_parse(run: RunRecord) -> EdaResult:
@@ -373,7 +423,9 @@ def _sby_parse(run: RunRecord) -> EdaResult:
 
 
 def _sby_cover_parse(run: RunRecord) -> EdaResult:
-    return parse_sby_cover(run.log, run.returncode)
+    manifest = run.workdir / "antecedents.json"
+    sites = json.loads(manifest.read_text(encoding="utf-8"))["sites"] if manifest.is_file() else []
+    return parse_sby_cover(run.log, run.returncode, [s for s in sites if s["kind"] in DERIVED])
 
 
 register_backend(Backend("verilator-lint", "lint.run", ("verilator",), _verilator_lint, _lint_parse))
