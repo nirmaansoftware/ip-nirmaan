@@ -215,7 +215,7 @@ class ModelRuntime:
         notes = []
         for tool, fixed in wanted.items():
             try:
-                run_id, outcome = tools.invoke(tool, **{**params, **fixed})
+                run_id, outcome = tools.invoke(tool, **{**tools.declared(tool, params), **fixed})
             except ToolAccessDenied as exc:
                 notes.append(ToolNote(tool, None, False, str(exc)))
             else:
@@ -319,32 +319,34 @@ class ModelRuntime:
                 continue
             if req["when_produced"] and not any(f["kind"] in req["when_produced"] for f in produced):
                 continue  # a conditional check whose files were not produced: not run, not claimed
-            params, missing = {**inputs, **dict(req["params"])}, None
+            files: dict[str, str | list[str]] = {}
+            missing = None
             for binding in req["files"]:
                 kinds = " or ".join(binding["kinds"])
                 if binding.get("upstream"):  # approved upstream files only, bytes as recorded
-                    value = ",".join(a["location"] for kind in binding["kinds"]
-                                     for a in packet.task["upstream_artifacts"]
-                                     if a["kind"] == kind and a.get("trusted")
-                                     and read_verified(a["location"], a["digest"])[0] is not None)
-                    missing = missing or (None if value else f"no approved upstream {kinds} file")
-                    params[binding["param"]] = value
+                    paths = [a["location"] for kind in binding["kinds"]
+                             for a in packet.task["upstream_artifacts"]
+                             if a["kind"] == kind and a.get("trusted")
+                             and read_verified(a["location"], a["digest"])[0] is not None]
+                    missing = missing or (None if paths else f"no approved upstream {kinds} file")
+                    files[binding["param"]] = paths
                     continue
                 matched = [f for kind in binding["kinds"] for f in produced if f["kind"] == kind]
                 if binding["entry"]:
-                    value = matched[0]["entry"] if matched else None
-                    why = f"no {kinds} file declares an entry"
+                    entry = matched[0]["entry"] if matched else None
+                    missing = missing or (None if entry else f"no {kinds} file declares an entry")
+                    files[binding["param"]] = entry or ""
                 else:
-                    value = ",".join(f["location"] for f in matched)
-                    why = f"the answer carried no {kinds} file"
-                missing = missing or (None if value else why)
-                params[binding["param"]] = value or ""
+                    paths = [f["location"] for f in matched]
+                    missing = missing or (None if paths else f"the answer carried no {kinds} file")
+                    files[binding["param"]] = paths
             refusals = []
             for tool in req["tools"]:
                 if missing:
                     notes.append(ToolNote(tool, None, False, missing))
                     continue
-                key = (tool, tuple(sorted(params.items())))
+                params = {**tools.declared(tool, inputs), **dict(req["params"]), **files}
+                key = (tool, tuple(sorted((k, str(v)) for k, v in params.items())))
                 if key not in seen:
                     try:
                         run_id, outcome = tools.invoke(tool, **params)

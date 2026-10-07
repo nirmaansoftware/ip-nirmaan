@@ -728,6 +728,12 @@ class TaskEngine:
             supersedes=escalation_id, target_role=chain[0].id,
         )
 
+    def record_step(self, task_id: str, actor: Actor, summary: str, details: dict[str, Any]) -> None:
+        """Audit one step an automated loop took on a task (M29). Changes nothing but the trail."""
+        task = self.task(task_id)
+        warnings = self._check("loop.step", actor, task)
+        self._commit(actor, "loop.step", task_id, reason=summary, warnings=warnings, details=details)
+
     # --- Decisions and memory -------------------------------------------------------------
 
     def record_decision(
