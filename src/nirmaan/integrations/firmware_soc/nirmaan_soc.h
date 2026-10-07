@@ -17,4 +17,12 @@
 #define NIRMAAN_SOC_EXIT (*(volatile uint32_t *)0x20000008u)    /* write: end the run with this code */
 #define NIRMAAN_SOC_CYCLES (*(volatile uint32_t *)0x2000000Cu)  /* read: cycles since reset */
 
+/* The core's part of the runtime, in irq_<core>.S (docs/RISCV_NEXT.md, section 2). */
+void nirmaan_core_init(void);                 /* called by crt0.S before the tests; interrupts stay off */
+unsigned nirmaan_core_irq_set(unsigned on);   /* enable (1) or disable (0) the design's line; returns the old setting */
+
+/* Called by the core's trap entry: an interrupt, or (on a core that traps through the vector) an exception. */
+void nirmaan_irq_dispatch(void);
+void nirmaan_soc_trapped(uint32_t cause, uint32_t pc);
+
 #endif /* NIRMAAN_SOC_H */
