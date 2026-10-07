@@ -27,7 +27,7 @@ the parser already reads:
 | `floorplan` | `initialize_floorplan`, `make_tracks`, **`tapcell`** (with `tap_cell`), **`source <pdn_tcl>` and `pdngen`** (with `pdn_tcl`), `place_pins`, `report_design_area` |
 | `place` | `global_placement`, **`estimate_parasitics -placement`, `repair_design`**, `detailed_placement`, `check_placement -verbose`, **a slack checkpoint** |
 | **`cts`** | **`clock_tree_synthesis`, `set_propagated_clock`, `repair_clock_nets`, `detailed_placement`, `repair_timing -setup -hold`, `detailed_placement`, `check_placement -verbose`, `report_cts`, `report_clock_skew`, `report_clock_latency`, a slack checkpoint** |
-| `route` | **`set_routing_layers`** (with `min_routing_layer`), `global_route`, **a slack checkpoint on global-routing parasitics**, `detailed_route`, **`filler_placement`** (with `filler_cells`), **`check_placement`, `check_antennas`, `global_connect`, a count of unconnected supply pins, `check_power_grid` per supply net, `analyze_power_grid` per supply net** (with `supply_voltage`) |
+| `route` | **`set_routing_layers`** (with `routing_layers`), `global_route`, **a slack checkpoint on global-routing parasitics**, `detailed_route`, **`filler_placement`** (with `filler_cells`), **`check_placement`, `check_antennas`, `global_connect`, a count of unconnected supply pins, `check_power_grid` per supply net, `analyze_power_grid` per supply net** (with `supply_voltage`) |
 | **`extract`** | **`define_process_corner`, `extract_parasitics -ext_model_file <rcx_rules>`, `write_spef route.spef`, `read_spef route.spef`, `report_parasitic_annotation`, a slack checkpoint** (only with `rcx_rules`) |
 | `timing` | the full timing reports of M25, on the best parasitics the run has: extracted, else global-routing estimates, else placement estimates; clocks are propagated after `cts` |
 
@@ -55,7 +55,7 @@ missing PDK input, with the reason and the way out (`stop_after=place`).
 | `pdn_tcl` | PDK file | The platform's power-grid script (global connections, voltage domain, grid), sourced before `pdngen` |
 | `place_density` | number | Global placement target density |
 | `cts_buffers` | settings | Clock buffer masters; by default CTS picks from the Liberty |
-| `min_routing_layer`, `max_routing_layer` | settings | Signal routing layers |
+| `routing_layers` | settings | Lowest and highest signal routing layers, `LOWEST,HIGHEST` (a `max_` name would be read as a limit) |
 | `filler_cells` | settings | Filler masters, comma separated |
 | `supply_voltage` | number | Volts on each power net (ground nets at 0) for IR-drop analysis |
 | `rcx_rules` | PDK file | OpenRCX rules; enables `extract` |

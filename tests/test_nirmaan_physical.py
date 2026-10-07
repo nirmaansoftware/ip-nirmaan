@@ -559,7 +559,7 @@ SKY130HD = {
 SKY130HD_PNR = {
     "site": "unithd", "hor_layers": "met3", "ver_layers": "met2",
     # Signals stop below met5, which carries the power straps: on met5 the router left shorts it never fixed.
-    "min_routing_layer": "met1", "max_routing_layer": "met4",
+    "routing_layers": "met1,met4",
     # The probe buffers have met5 pins the router cannot reach below met4 (GRT-0029 when repair chose one).
     "dont_use": "sky130_fd_sc_hd__probe_p_*,sky130_fd_sc_hd__probec_p_*,sky130_fd_sc_hd__lpflow_*",
     "tap_cell": "sky130_fd_sc_hd__tapvpwrvgnd_1", "tap_distance": "14",

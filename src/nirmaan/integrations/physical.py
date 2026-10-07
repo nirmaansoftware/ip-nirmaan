@@ -174,7 +174,9 @@ foreach cell [get_cells *] {
     }
   }
 }
-puts "nirmaan-floating-outputs: $nirmaan_floating"'''
+puts "nirmaan-floating-outputs: $nirmaan_floating"
+foreach p [lrange [get_pins */QN] 0 1] { puts "DEBUG [get_full_name $p] dir=[get_property $p direction] nets=[get_nets -of_objects $p] n=[llength [get_nets -of_objects $p]] cellpins=[llength [get_pins -of_objects [get_cells [lindex [split [get_full_name $p] /] 0]]]]" }
+puts "DEBUG cells=[llength [get_cells *]]"'''
 
 
 def _sta_script(job: Job, lefs: bool = False) -> None:
@@ -327,8 +329,10 @@ def _pnr_steps(job: Job) -> list[list[str]]:
             "report_design_area",
             *_SLACK_CHECKPOINT])
     if "route" in plan:
-        layers = (f"set_routing_layers -signal {_token(p, 'min_routing_layer')}-{_token(p, 'max_routing_layer')}"
-                  if p.get("min_routing_layer", "").strip() else None)
+        layers = (f"set_routing_layers -signal {'-'.join(_cells(p, 'routing_layers'))}"
+                  if p.get("routing_layers", "").strip() else None)
+        if layers and len(_cells(p, "routing_layers")) != 2:
+            raise ValueError("routing_layers must be LOWEST,HIGHEST")
         fillers = _cells(p, "filler_cells")
         voltage = p.get("supply_voltage", "").strip()
         ir = []
