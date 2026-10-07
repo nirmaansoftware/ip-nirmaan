@@ -1,0 +1,37 @@
+{
+  "id": "rtl/rr-arbiter",
+  "request": "Create a round-robin arbiter for four requesters.",
+  "seat": "rtl-implementation",
+  "expected_behavior": "RTL for module rr_arbiter (N 4 by default) with ports clk rst_n req grant, a combinational same-cycle grant, and a pointer that moves to one past the winner, so no requester waits more than N-1 grants; with a self-checking testbench, gated by lint, simulation, and synthesis (and formal, when a .sby is written) before review.",
+  "constraints": [
+    "Work only from the approved interface specification and microarchitecture.",
+    "Correct for an N that is not a power of two.",
+    "Lint-clean under Verilator -Wall with no waivers.",
+    "Synthesizes with no latches."
+  ],
+  "known_failure_modes": [
+    "The winner keeps top priority (fixed priority, not round robin).",
+    "The pointer advancing when nothing was granted.",
+    "More than one grant, or a grant with no request.",
+    "A self-written testbench that never has everyone requesting; the held-out reference testbench judges instead."
+  ],
+  "upstream": {
+    "interface-spec": [{"path": "tests/fixtures/rtl/rr_arbiter/interface_spec.md", "kind": "interface_spec"}],
+    "microarchitecture": [{"path": "tests/fixtures/rtl/rr_arbiter/microarchitecture.md", "kind": "microarchitecture_spec"}]
+  },
+  "reference": [
+    {"path": "tests/fixtures/rtl/rr_arbiter/rr_arbiter.v", "kind": "rtl_source", "entry": "rr_arbiter"},
+    {"path": "tests/fixtures/rtl/rr_arbiter/rr_arbiter_tb.v", "kind": "testbench", "entry": "rr_arbiter_tb"},
+    {"path": "tests/fixtures/rtl/rr_arbiter/rr_arbiter.sby", "kind": "formal_spec"}
+  ],
+  "held_out": [
+    {
+      "name": "The reference testbench passes on the seat's RTL",
+      "scorer": "held-out-run",
+      "tool": "simulator.run",
+      "seat_files": {"sources": ["rtl_source"]},
+      "case_files": {"sources": ["tests/fixtures/rtl/rr_arbiter/rr_arbiter_tb.v"]},
+      "params": {"top": "rr_arbiter_tb"}
+    }
+  ]
+}

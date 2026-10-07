@@ -23,7 +23,7 @@ from pathlib import Path
 
 from nirmaan.company import traceability
 from nirmaan.company.traceability import ItemKind, LinkKind
-from nirmaan.models import Artifact, EvidenceKind, ProjectState, ToolRun, VerificationItem
+from nirmaan.models import Artifact, EvidenceKind, ProjectState, ToolRun, VerificationItem, list_values
 from nirmaan.work.trace import trace_graph
 
 # --- The kind tables, as registries -------------------------------------------------------
@@ -187,8 +187,8 @@ class RequirementStatus:
 
 def _names(run: ToolRun, location: str) -> bool:
     target = Path(location).resolve()
-    return any(p.strip() and (p.strip() == location or Path(p.strip()).resolve() == target)
-               for value in run.params.values() for p in value.split(","))
+    return any(p == location or Path(p).resolve() == target
+               for value in run.params.values() for p in list_values(value))
 
 
 def _unaccepted(state: ProjectState, task_id: str) -> str:
