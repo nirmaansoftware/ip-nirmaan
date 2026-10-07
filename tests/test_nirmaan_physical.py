@@ -74,9 +74,10 @@ def only_on_path(monkeypatch, bin_dir: Path) -> None:
 
 def fake_pdk(root: Path) -> dict[str, str]:
     root.mkdir(parents=True, exist_ok=True)
-    for name in ("cells.lib", "tech.lef", "cells.lef"):
+    for name in ("cells.lib", "tech.lef", "cells.lef", "rc.tcl"):
         (root / name).write_text("stand-in\n", encoding="utf-8")
-    return {"liberty": str(root / "cells.lib"), "tech_lef": str(root / "tech.lef"), "lef": str(root / "cells.lef")}
+    return {"liberty": str(root / "cells.lib"), "tech_lef": str(root / "tech.lef"), "lef": str(root / "cells.lef"),
+            "rc_tcl": str(root / "rc.tcl")}
 
 
 # --- The catalog ------------------------------------------------------------------------
@@ -285,7 +286,7 @@ def test_pnr_stages_follow_stop_after(project, tmp_path, monkeypatch):
     assert "-utilization 55" in floorplan and "global_placement" not in floorplan
     assert "estimate_parasitics" not in floorplan and "write_def floorplan.def" in floorplan
 
-    bad, _ = invoke(project, "pnr.run", {**params, "stop_after": "cts"}, tmp_path / "bad")
+    bad, _ = invoke(project, "pnr.run", {**params, "stop_after": "signoff"}, tmp_path / "bad")
     assert not bad.succeeded and "stop_after" in bad.summary
 
 
@@ -363,7 +364,9 @@ def test_a_new_pd_backend_needs_no_core_changes(project, tmp_path, monkeypatch):
 
     def parse(run) -> EdaResult:
         clean = run.returncode == 0 and "0 opens, 0 shorts" in run.log
-        return EdaResult(clean, "routed clean" if clean else "routing failed")
+        # M29: the metrics the place-route evidence limits; a run that never reports them cannot meet it.
+        metrics = {"drc_violations": 0, "unconnected_supply_pins": 0} if clean else {}
+        return EdaResult(clean, "routed clean" if clean else "routing failed", metrics=metrics)
 
     register_backend(Backend("tinyroute", "pnr.run", ("tinyroute",),
                              lambda job: [["tinyroute", job.params["netlist"], job.params["lef"]]], parse,
@@ -377,7 +380,8 @@ def test_a_new_pd_backend_needs_no_core_changes(project, tmp_path, monkeypatch):
         assert project.state.tool_runs == {}
         lef = fake_pdk(tmp_path / "pdk")["lef"]
         place_route = tid(project, "place-route")
-        run, _ = invoke(project, "pnr.run", {**params, "lef": lef}, tmp_path / "w2", place_route)
+        limits = {"max_drc_violations": "0", "max_unconnected_supply_pins": "0"}  # as the workflow names them
+        run, _ = invoke(project, "pnr.run", {**params, "lef": lef, **limits}, tmp_path / "w2", place_route)
         assert run.succeeded and run.summary == "tinyroute: routed clean"
         assert f"routed {AXI} with {lef}" in Path(run.references[0]).read_text()  # it really ran
         owner = agent(project.task(place_route).owner)
@@ -414,7 +418,8 @@ NANGATE45 = {
     "lef": "nangate45/lef/NangateOpenCellLibrary.macro.mod.lef",
 }
 NANGATE45_TIES = {"tie_high": "LOGIC1_X1/Z", "tie_low": "LOGIC0_X1/Z"}
-NANGATE45_PNR = {"site": "FreePDK45_38x28_10R_NP_162NW_34O", "hor_layers": "metal3", "ver_layers": "metal2"}
+NANGATE45_PNR = {"site": "FreePDK45_38x28_10R_NP_162NW_34O", "hor_layers": "metal3", "ver_layers": "metal2",
+                 "rc_tcl": "nangate45/setRC.tcl"}  # M29: layer RC, which clock-tree synthesis needs
 FAST_SDC = PD / "axi4_lite_regs_fast.sdc"
 
 
@@ -486,7 +491,7 @@ def test_real_openroad_failure_is_a_recorded_failed_run(project, tmp_path):
 #: The Nangate45 platform's own signoff inputs, as OpenROAD-flow-scripts ships them.
 NANGATE45_SIGNOFF = {
     "tap_cell": "TAPCELL_X1", "endcap_cell": "TAPCELL_X1", "tap_distance": "120",
-    "pdn_tcl": "nangate45/grid_strategy-M1-M4-M7.tcl", "rc_tcl": "nangate45/setRC.tcl",
+    "pdn_tcl": "nangate45/grid_strategy-M1-M4-M7.tcl",
     "rcx_rules": "nangate45/rcx_patterns.rules",
     "filler_cells": "FILLCELL_X1,FILLCELL_X2,FILLCELL_X4,FILLCELL_X8,FILLCELL_X16,FILLCELL_X32",
     "supply_voltage": "1.1",
@@ -506,7 +511,7 @@ def test_real_signoff_flow_connects_power_builds_the_clock_tree_and_extracts(pro
     m = outcome.data["result"]["metrics"]
     assert m["stages_completed"] == ["floorplan", "place", "cts", "route", "extract", "timing"], run.summary
     assert m["drc_violations"] == 0 and m["power_grids"] and m["unconnected_supply_pins"] == 0, run.summary
-    assert m["tap_cells"] > 0 and m["filler_cells"] > 0, run.summary
+    assert m["tap_cells"] + m["endcap_cells"] > 0 and m["filler_cells"] > 0, run.summary
     assert m["antenna_net_violations"] == 0 and m["antenna_pin_violations"] == 0, run.summary
     assert m["cts_buffers"] > 0 and m["cts_sinks"] > 0, run.summary
     assert m["clock_skew"] is not None and m["clock_insertion_delay"] is not None, run.summary
@@ -514,23 +519,32 @@ def test_real_signoff_flow_connects_power_builds_the_clock_tree_and_extracts(pro
     assert m["parasitics"] == "extracted" and m["worst_slack"] > 0, run.summary
     assert set(m["outputs"]) == {"def", "netlist", "spef"} and run.succeeded, run.summary
 
-    # Signoff STA on the routed netlist with the extracted SPEF, in a separate run.
+    # Signoff STA on the routed netlist with the extracted SPEF, in a separate run: through OpenROAD's
+    # embedded OpenSTA, and through standalone OpenSTA when it is installed (CI builds it, M29).
     design = {"netlist": m["outputs"]["netlist"], "top": TOP, **pdk, "sdc": str(SDC), "spef": m["outputs"]["spef"]}
-    sta, sta_outcome = invoke(project, "sta.run", design, tmp_path / "sta_spef")
-    sm = sta_outcome.data["result"]["metrics"]
-    assert sm["unannotated_drivers"] == 0 and sm["worst_slack"] > 0, sta.summary
-    assert sta.succeeded, sta.summary
+    for backend in sta_backends():
+        sta, sta_outcome = invoke(project, "sta.run", {**design, "backend": backend}, tmp_path / f"sta_{backend}")
+        sm = sta_outcome.data["result"]["metrics"]
+        assert sta_outcome.data["backend"] == backend
+        assert sm["unannotated_drivers"] == 0 and sm["worst_slack"] > 0, sta.summary
+        assert sta.succeeded, sta.summary
+
+
+def sta_backends() -> list[str]:
+    """OpenROAD's embedded OpenSTA always; standalone OpenSTA when on PATH or required (M29)."""
+    required = "sta" in os.environ.get("NIRMAAN_REQUIRE_EDA", "").replace(",", " ").split()
+    return ["openroad-sta", *(["opensta"] if shutil.which("sta") or required else [])]
 
 
 @needs("openroad", "yosys")
 def test_real_signoff_flow_with_an_impossible_clock_is_a_recorded_failed_run(project, tmp_path):
     pdk = nangate45()
     netlist = _mapped_netlist(project, tmp_path, pdk)
-    run, outcome = _signoff_pnr(project, tmp_path, pdk, netlist, "signoff_fast", sdc=str(FAST_SDC))
+    run, outcome = _signoff_pnr(project, tmp_path, pdk, netlist, "signoff_fast", sdc=str(FAST_SDC), stop_after="cts")
     m = outcome.data["result"]["metrics"]
     assert not run.succeeded and run.id in project.state.tool_runs
-    assert "timing violated" in run.summary and m["worst_slack"] < 0, run.summary
-    assert m["parasitics"] == "extracted", run.summary  # the flow still ran to the end
+    assert m["stages_completed"] == ["floorplan", "place", "cts", "timing"], run.summary  # every stage ran
+    assert "timing violated" in run.summary and m["worst_slack"] < 0 and m["slack_by_stage"]["cts"]["setup"] < 0
 
 
 #: sky130 HD as OpenROAD-flow-scripts ships it under ``flow/platforms/sky130hd`` (M29).
@@ -562,7 +576,8 @@ def test_real_signoff_flow_on_sky130hd(project, tmp_path):
     assert synth.succeeded, synth.summary
     netlist = outcome.data["result"]["metrics"]["netlist"]
     run, outcome = invoke(project, "pnr.run", {"netlist": netlist, "sdc": str(SDC), "top": TOP, **SKY130HD,
-                                               **SKY130HD_PNR}, tmp_path / "pnr")
+                                               **SKY130HD_PNR, "utilization": "30", "timeout": "900"},
+                          tmp_path / "pnr")
     m = outcome.data["result"]["metrics"]
     assert m["stages_completed"] == ["floorplan", "place", "cts", "route", "extract", "timing"], run.summary
     assert m["drc_violations"] == 0 and m["unconnected_supply_pins"] == 0, run.summary

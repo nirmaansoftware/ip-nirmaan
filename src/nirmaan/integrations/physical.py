@@ -259,7 +259,8 @@ def _pnr_steps(job: Job) -> list[list[str]]:
     tap, endcap = _cells(p, "tap_cell"), _cells(p, "endcap_cell")
     if tap and not p.get("tap_distance", "").strip():
         raise ValueError("tap_cell needs tap_distance (microns between tap columns, from the PDK)")
-    script = [*(f"read_lef {_tcl(str(f))}" for f in pdk_paths(p, "tech_lef") + pdk_paths(p, "lef")),
+    script = ["set_thread_count [cpu_count]",  # M29: the detailed router is the long step
+              *(f"read_lef {_tcl(str(f))}" for f in pdk_paths(p, "tech_lef") + pdk_paths(p, "lef")),
               *(f"read_liberty {_tcl(str(f))}" for f in pdk_paths(p, "liberty")),
               f"read_verilog {_design(job, 'netlist')}",
               f"link_design {_token(p, 'top')}",
@@ -320,6 +321,8 @@ def _pnr_steps(job: Job) -> list[list[str]]:
             *([f"filler_placement {{{' '.join(fillers)}}}"] if fillers else []),
             "check_placement -verbose",
             "check_antennas",
+            # Buffers, the clock tree, and fillers came after the grid's global connections: connect them too.
+            *(["global_connect"] if grid else []),
             _SUPPLY_PIN_CHECK,
             _SUPPLY_NETS,
             *(["foreach net $nirmaan_supplies { check_power_grid -net $net }"] if grid else []),
@@ -329,7 +332,7 @@ def _pnr_steps(job: Job) -> list[list[str]]:
         script += _stage("extract", ["define_process_corner -ext_model_index 0 X",
                                      f"extract_parasitics -ext_model_file {_tcl(str(rules))}",
                                      "write_spef route.spef", "read_spef route.spef",
-                                     "report_parasitic_annotation"])
+                                     "report_parasitic_annotation -report_unannotated", *_SLACK_CHECKPOINT])
     last = plan[-1]
     parasitics = {"place": ["estimate_parasitics -placement"], "cts": ["estimate_parasitics -placement"],
                   "route": ["estimate_parasitics -global_routing"]}.get(last, [])
@@ -369,8 +372,22 @@ register_backend(Backend("opensta", "sta.run", ("sta",), _sta_steps, _sta_parse,
 register_backend(Backend("openroad-sta", "sta.run", ("openroad",), _openroad_sta_steps, _sta_parse,
                          ("netlist", "sdc", "top"), files=("netlist", "sdc", "spef"),
                          environment=needs_pdk(**LIBERTY, tech_lef="a technology LEF", lef="a cell LEF")))
+_PNR_PDK = needs_pdk(**LIBERTY, tech_lef="a technology LEF", lef="a cell LEF", site="a placement site",
+                     hor_layers="horizontal pin layers", ver_layers="vertical pin layers")
+
+
+def _pnr_environment(params: dict[str, str]) -> str | None:
+    """The PDK inputs, and (M29) layer RC whenever the flow reaches clock-tree synthesis."""
+    reasons = [r for r in (_PNR_PDK(params),) if r]
+    try:
+        cts = "cts" in _pnr_plan(params)
+    except ValueError:
+        cts = False  # a bad stop_after is the run's own failure, recorded when it runs
+    if cts and not params.get("rc_tcl", "").strip():
+        reasons.append("needs the layer RC script for clock-tree synthesis (rc_tcl=PATH, absolute or under "
+                       f"{PDK_ROOT_ENV}; no PDK is bundled), or stop_after=place")
+    return "; ".join(reasons) or None
+
+
 register_backend(Backend("openroad", "pnr.run", ("openroad",), _pnr_steps, _pnr_parse, ("netlist", "sdc", "top"),
-                         files=("netlist", "sdc"),
-                         environment=needs_pdk(**LIBERTY, tech_lef="a technology LEF", lef="a cell LEF",
-                                               site="a placement site", hor_layers="horizontal pin layers",
-                                               ver_layers="vertical pin layers")))
+                         files=("netlist", "sdc"), environment=_pnr_environment))

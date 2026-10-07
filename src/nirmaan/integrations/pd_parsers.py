@@ -155,6 +155,8 @@ _OPEN_SUPPLY_RE = re.compile(r"^nirmaan-unconnected-supply-pins: (?P<n>\d+)")
 _SUPPLY_NETS_RE = re.compile(r"^nirmaan-supply-nets:(?P<nets>.*)$")
 _CTS_BUFFERS_RE = re.compile(r"Total number of Buffers Inserted: (?P<n>\d+)")
 _CTS_SINKS_RE = re.compile(r"Total number of Sinks: (?P<n>\d+)")
+_SKEW_RE = re.compile(r"^(?P<skew>-?\d+(?:\.\d+)?) (?:setup|hold) skew$")
+_LATENCY_RE = re.compile(r"^(?P<min>-?\d+(?:\.\d+)?)\s+(?P<max>-?\d+(?:\.\d+)?) latency$")
 _FILLERS_RE = re.compile(r"Placed (?P<n>\d+) filler instances")
 _ANTENNA_RE = re.compile(r"Found (?P<n>\d+) (?P<kind>net|pin) violations")
 _IR_NET_RE = re.compile(r"^Net\s*:\s*(?P<net>\S+)")
@@ -176,24 +178,17 @@ def _sections(lines: list[str]) -> dict[str, list[str]]:
 
 
 def _clock_tree(lines: list[str]) -> dict[str, Any]:
-    """Buffers and sinks (``report_cts``), skew (``report_clock_skew``), and insertion delay."""
+    """Buffers and sinks (``report_cts``), skew (``report_clock_skew``), insertion delay (``report_clock_latency``)."""
     buffers = sinks = skew = latency = None
-    in_skew = in_latency = False
     for line in lines:
         if m := _CTS_BUFFERS_RE.search(line):
             buffers = int(m["n"])
         elif m := _CTS_SINKS_RE.search(line):
             sinks = int(m["n"])
-        if line.startswith("Clock ") and "Skew" not in line:
-            continue
-        if "Skew" in line and "Latency" in line:
-            in_skew, in_latency = True, False
-            continue
-        figures = [_num(f) for f in line.split() if re.fullmatch(r"-?\d+(?:\.\d+)?", f)]
-        if in_skew and len(figures) >= 3:  # latency, CRPR, skew: the row that closes a skew report
-            skew = figures[-1] if skew is None else max(skew, figures[-1])
-            latency = figures[0] if latency is None else max(latency, figures[0])
-            in_skew = False
+        elif m := _SKEW_RE.match(line):
+            skew = max(float(m["skew"]), skew if skew is not None else float("-inf"))
+        elif m := _LATENCY_RE.match(line):  # min and max network latency, per transition: the largest max
+            latency = max(float(m["max"]), latency if latency is not None else float("-inf"))
     return {"cts_buffers": buffers, "cts_sinks": sinks, "clock_skew": skew, "clock_insertion_delay": latency}
 
 

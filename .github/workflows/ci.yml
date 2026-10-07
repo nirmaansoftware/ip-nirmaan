@@ -87,25 +87,37 @@ jobs:
           which openroad yosys
           openroad -version && yosys -V
           ls "$NIRMAAN_PDK_ROOT/nangate45/lib/NangateOpenCellLibrary_typical.lib"
-      - name: Explore the image (M29, temporary)
+      # M29: standalone OpenSTA, built from the commit the image's OpenROAD embeds
+      # (OpenROAD c487fc70, src/sta), with the compilers and libraries the image
+      # already has; cached by commit. See docs/PD_SIGNOFF.md.
+      - name: Cache standalone OpenSTA
+        id: opensta
+        uses: actions/cache@v4
+        with:
+          path: /opt/opensta
+          key: opensta-e983e15b2cb346badf8f23725fd3914d25312c44-orfs-26Q3-687
+      - name: Build standalone OpenSTA
+        if: steps.opensta.outputs.cache-hit != 'true'
+        env:
+          OPENSTA: e983e15b2cb346badf8f23725fd3914d25312c44
         run: |
-          set +e
-          ls /OpenROAD-flow-scripts/tools/install/OpenROAD/bin /OpenROAD-flow-scripts/tools/install/yosys/bin
-          ls "$NIRMAAN_PDK_ROOT" "$NIRMAAN_PDK_ROOT"/*/lib | head -80
-          ls -la "$NIRMAAN_PDK_ROOT"/sky130hd "$NIRMAAN_PDK_ROOT"/sky130hd/lib "$NIRMAAN_PDK_ROOT"/sky130hd/lef
-          find / -xdev \( -name sta -o -name 'libOpenSTA*' -o -name 'libsta*' \) 2>/dev/null | head -20
-          ls /OpenROAD-flow-scripts/tools/OpenROAD/src/sta 2>&1 | head; ls /OpenROAD-flow-scripts/tools 2>&1
-          which cmake g++ gcc swig bison flex tclsh make 2>&1; ls /usr/include/tcl* -d 2>&1
-          ls /usr/lib/x86_64-linux-gnu | grep -i -E "cudd|tcl|eigen" | head; ls /usr/local/include 2>&1 | head -30
-          cat /etc/os-release | head -3; nproc
-          du -sh /OpenROAD-flow-scripts/tools 2>/dev/null
+          git init -q "$RUNNER_TEMP/OpenSTA" && cd "$RUNNER_TEMP/OpenSTA"
+          git fetch -q --depth 1 https://github.com/The-OpenROAD-Project/OpenSTA.git "$OPENSTA"
+          git checkout -q FETCH_HEAD
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DCUDD_DIR=/usr/local 2>&1 | tail -20
+          cmake --build build -j "$(nproc)" --target sta 2>&1 | tail -40
+          mkdir -p /opt/opensta/bin && cp build/sta /opt/opensta/bin/sta
+      - name: Standalone OpenSTA on PATH
+        run: |
+          echo /opt/opensta/bin >> "$GITHUB_PATH"
+          /opt/opensta/bin/sta -version
       - name: Install
         run: uv pip install -e ".[dev]"
       - name: Test
-        # openroad and yosys are required, so the real STA and place-and-route
+        # openroad, yosys, and (M29) sta are required, so the real STA and place-and-route
         # tests fail rather than skip.
         env:
-          NIRMAAN_REQUIRE_EDA: yosys openroad
+          NIRMAAN_REQUIRE_EDA: yosys openroad sta
         run: python -m pytest -q -rs tests/test_nirmaan_physical.py --basetemp="$RUNNER_TEMP/pd"
       - name: Keep the tool logs
         if: always()
