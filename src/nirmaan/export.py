@@ -525,5 +525,8 @@ def _index(state: ProjectState, table: list[DeliverableFolder], placed: dict[str
 
 # The engineering-graph section (M24) brings its own writer.
 from nirmaan import engineering as _engineering  # noqa: E402
+from nirmaan import records as _records  # noqa: E402
 
 register_section_writer(ExportSection.ENGINEERING_GRAPH, _engineering.export_section)
+register_section_writer(ExportSection.DECISIONS, _records.decisions_section)
+register_section_writer(ExportSection.FAILURES, _records.failures_section)
