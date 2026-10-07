@@ -30,6 +30,7 @@ from nirmaan.integrations.eda_parsers import (
     Diagnostic,
     EdaResult,
     parse_sby,
+    parse_sby_cover,
     parse_simulation,
     parse_verilator_lint,
     parse_yosys,
@@ -319,6 +320,47 @@ def _sby_reads(job: Job) -> str | None:
     return f"{sby.name} does not read {', '.join(unread)} (not in its [files])" if unread else None
 
 
+def _sby_cover(job: Job) -> list[list[str]]:
+    """Run the seat's own setup in cover mode (M27), from a copy written into the run's directory.
+
+    The copy differs only in ``mode cover`` and in naming each ``[files]`` entry
+    by absolute path, so the design, the script, the engines, the depth, and the
+    assumptions are exactly the ones the proof used, and nothing is written next
+    to the submitted files.
+    """
+    sby = Path(job.params["sby"]).resolve()
+    out, section = [], None
+    for line in sby.read_text(encoding="utf-8", errors="replace").splitlines():
+        text = line.strip()
+        if text.startswith("[") and text.endswith("]"):
+            section = text[1:-1].strip()
+            out.append(line)
+            if section == "options":
+                out.append("mode cover")
+            continue
+        if section == "options" and text.split()[:1] == ["mode"]:
+            continue
+        if section == "files" and text and not text.startswith("#"):
+            *dest, src = text.split()
+            line = " ".join([*dest, str((sby.parent / src).resolve())])
+        out.append(line)
+    cover = job.workdir / f"{sby.stem}_cover.sby"
+    cover.write_text("\n".join(out) + "\n", encoding="utf-8")
+    return [["sby", "-f", "-d", str(job.workdir / "sby_cover"), str(cover)]]
+
+
+def _sby_cover_check(job: Job) -> str | None:
+    """The cover run needs a single-task setup with options to rewrite, over the RTL it claims to cover."""
+    text = Path(job.params["sby"]).read_text(encoding="utf-8", errors="replace")
+    sections = {ln.strip()[1:-1].strip() for ln in text.splitlines()
+                if ln.strip().startswith("[") and ln.strip().endswith("]")}
+    if "tasks" in sections:
+        return f"{Path(job.params['sby']).name} declares [tasks]; the cover check runs single-task setups only"
+    if "options" not in sections:
+        return f"{Path(job.params['sby']).name} has no [options] section to run in cover mode"
+    return _sby_reads(job)
+
+
 def _lint_parse(run: RunRecord) -> EdaResult:
     return parse_verilator_lint(run.log, run.returncode)
 
@@ -331,6 +373,10 @@ def _sby_parse(run: RunRecord) -> EdaResult:
     return parse_sby(run.log, run.returncode)
 
 
+def _sby_cover_parse(run: RunRecord) -> EdaResult:
+    return parse_sby_cover(run.log, run.returncode)
+
+
 register_backend(Backend("verilator-lint", "lint.run", ("verilator",), _verilator_lint, _lint_parse))
 for _tool in SIMULATION_TOOLS:
     register_backend(Backend("icarus", _tool, ("iverilog", "vvp"), _icarus, _sim_parse, ("sources", "top")))
@@ -338,3 +384,5 @@ for _tool in SIMULATION_TOOLS:
 register_backend(Backend("yosys", "synth.run", ("yosys",), _yosys, _yosys_parse, ("sources", "top")))
 register_backend(Backend("symbiyosys", "formal.run", ("sby", "yosys"), _sby, _sby_parse, ("sby",), _sby_dir,
                          check=_sby_reads))
+register_backend(Backend("symbiyosys-cover", "formal.cover", ("sby", "yosys"), _sby_cover, _sby_cover_parse,
+                         ("sby",), check=_sby_cover_check))

@@ -204,12 +204,13 @@ def test_passing_synthesis_and_formal_allow_review(counter_rtl):
     arts = {engine.state.artifacts[a].kind: engine.state.artifacts[a] for a in task.artifacts}
     assert set(arts) == {"rtl_source", "testbench", "formal_spec"}
     runs = runs_of(engine, report)
-    assert set(runs) == {"lint.run", "simulator.run", "synth.run", "formal.run"}
+    assert set(runs) == {"lint.run", "simulator.run", "synth.run", "formal.run", "formal.cover"}
     assert all(r.succeeded for r in runs.values())
     assert runs["synth.run"].params["sources"] == arts["rtl_source"].location
     assert runs["synth.run"].params["top"] == "counter"
     assert runs["formal.run"].params["sby"] == arts["formal_spec"].location
     assert runs["formal.run"].params["sources"] == arts["rtl_source"].location
+    assert runs["formal.cover"].params["sby"] == arts["formal_spec"].location  # M27: and it is not vacuous
     assert unsatisfied_requirements(engine.state, task) == ["Independent review recorded"]
 
     llm = MockLLM()

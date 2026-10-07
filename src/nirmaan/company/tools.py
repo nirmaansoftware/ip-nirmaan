@@ -11,10 +11,12 @@ place and route through OpenSTA and OpenROAD (``integrations/physical.py``,
 M25). Their bindings still refuse, with a reason, on a machine whose PATH
 lacks the executable or that has no PDK input for the run. Firmware build and
 co-simulation are AVAILABLE the same way (``nirmaan/integrations/firmware.py``,
-M25).
+M25), and so are the RV32I cross build and the run on a RISC-V core
+(``nirmaan/integrations/firmware_riscv.py``, M27).
 
 Scan insertion, DFT rule checks, and scan chain simulation are AVAILABLE through
-Yosys and Icarus (``nirmaan/integrations/dft.py``, M25).
+Yosys and Icarus (``nirmaan/integrations/dft.py``, M25); so are stuck-at ATPG,
+graded by fault simulation, and March C- memory BIST (M27).
 
 Every tool with a binding declares its parameters (M28): the broker refuses an
 undeclared or ill-typed one before anything runs. The lists below are what the
@@ -107,13 +109,21 @@ TOOLS: list[ToolSpec] = [
     _tool("formal.run", "Formal engine", "eda", EXE, AV, "Model checking and property proofs.",
           (_p("sby", PATH, "The SymbiYosys job file.", required=True),
            _p("sources", PATHS, "RTL the proof must read; the job file must list each one."), *RUNNER)),
+    _tool("formal.cover", "Formal cover check", "eda", EXE, AV,
+          "Non-vacuity: every cover in a proof setup is reached under its assumptions (M27).",
+          (_p("sby", PATH, "The proof's SymbiYosys job file, run in cover mode.", required=True),
+           _p("sources", PATHS, "RTL the setup reads."), *RUNNER)),
     _tool("equivalence.run", "Equivalence checker", "eda", EXE, CO, "Logic equivalence checking."),
     _tool("cdc.run", "CDC/RDC analyzer", "eda", EXE, CO, "Structural and functional crossing analysis."),
     # Implementation EDA.
     _tool("synth.run", "Synthesis", "eda", EXE, AV, "Logic synthesis.",
-          (SOURCES, TOP_REQUIRED, *PDK, *RUNNER)),
+          (SOURCES, TOP_REQUIRED, *PDK,
+           _p("tie_high", TEXT, "Tie-high cell as CELL/PORT (backend yosys-liberty)."),
+           _p("tie_low", TEXT, "Tie-low cell as CELL/PORT (backend yosys-liberty)."), *RUNNER)),
     _tool("sta.run", "Static timing", "eda", EXE, AV, "Static timing of a netlist under an SDC (OpenSTA).",
-          (*NETLIST, _p("spef", PATH, "Parasitics."), TOP_REQUIRED, *PDK_REQUIRED, *RUNNER)),
+          (*NETLIST, _p("spef", PATH, "Parasitics."), TOP_REQUIRED, *PDK_REQUIRED,
+           _p("tech_lef", PATHS, "Technology LEF (backend openroad-sta)."),
+           _p("lef", PATHS, "Cell LEF files (backend openroad-sta)."), *RUNNER)),
     _tool("pnr.run", "Place and route", "eda", EXE, AV,
           "Floorplan, placement, and routing in one staged run, with timing (OpenROAD).",
           (*NETLIST, TOP_REQUIRED, *PDK_REQUIRED,
@@ -130,10 +140,19 @@ TOOLS: list[ToolSpec] = [
     _tool("pv.run", "Physical verification", "eda", EXE, CO, "DRC, LVS, ERC, antenna, density."),
     _tool("dft.run", "DFT tools", "eda", EXE, CO, "ATPG, MBIST, and commercial scan flows."),
     _tool("dft.scan_insert", "Scan insertion", "eda", EXE, AV, "Mux-D scan flops stitched into one chain.",
-          (SOURCES, TOP_REQUIRED, *RUNNER)),
+          (SOURCES, TOP_REQUIRED, _p("chains", INT, "Number of scan chains (default 1)."),
+           _p("max_chain_length", INT, "Longest chain allowed; 0 for no limit (default)."), *RUNNER)),
     _tool("dft.check", "DFT rule check", "eda", EXE, AV, "Testability rules over the synthesized netlist.",
           (SOURCES, TOP_REQUIRED, *RUNNER)),
     _tool("dft.scan_sim", "Scan chain simulation", "eda", EXE, AV, "Shift and capture through the chain in simulation.",
+          (SOURCES, TOP_REQUIRED, *RUNNER)),
+    _tool("dft.atpg", "ATPG", "eda", EXE, AV, "Stuck-at patterns, with coverage measured by fault simulation.",
+          (SOURCES, TOP_REQUIRED, _p("patterns", PATH, "Patterns to grade instead of generating them."),
+           _p("fault_sample", INT, "Grade a sample of this many faults; 0 for all (default)."),
+           _p("seed", INT, "Random seed (default 1)."),
+           _p("min_", NUM, "Fail unless the graded metric of that name reaches this, e.g. min_test_coverage.",
+              prefix=True), *RUNNER)),
+    _tool("dft.mbist", "Memory BIST", "eda", EXE, AV, "A March C- controller run against the memory in simulation.",
           (SOURCES, TOP_REQUIRED, *RUNNER)),
     # Software and infrastructure.
     _tool("compiler.run", "Compiler toolchain", "software", EXE, CO, "Build firmware and software."),
@@ -143,6 +162,13 @@ TOOLS: list[ToolSpec] = [
           "Run a driver's tests against a Verilator model of the RTL, over real bus transactions.",
           (_p("sources", PATHS, "The driver and its tests.", required=True),
            _p("rtl", PATHS, "The RTL to build the model from.", required=True), TOP, *RUNNER)),
+    _tool("fw.cross_build", "Firmware cross build", "software", EXE, AV,
+          "Cross-compile a driver and its tests for bare-metal RV32I into a linked ELF, with its code size.",
+          (_p("sources", PATHS, "C sources and headers.", required=True), *RUNNER)),
+    _tool("fw.soc_test", "Firmware on a RISC-V core", "software", EXE, AV,
+          "Run a driver's tests on a RISC-V core (PicoRV32) whose loads and stores reach the RTL over its bus.",
+          (_p("sources", PATHS, "The driver and its tests.", required=True),
+           _p("rtl", PATHS, "The RTL the core's bus reaches.", required=True), TOP, *RUNNER)),
     _tool("debugger.attach", "Debugger", "software", EXE, CO, "Attach to targets and models."),
     _tool("ci.configure", "CI configuration", "infrastructure", WR, CO, "Change CI pipelines."),
     _tool("farm.submit", "Compute farm", "infrastructure", EXE, CO, "Submit jobs to the compute farm."),

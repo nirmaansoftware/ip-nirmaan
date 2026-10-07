@@ -12,7 +12,7 @@ Repo: https://github.com/nirmaansoftware/ip-nirmaan (public, Apache-2.0; renamed
 to the `nirmaansoftware` account on 2026-09-28; GitHub redirects the old URLs,
 and `patel-om` keeps push access as a collaborator)
 Local path: `/Users/ompatel/Documents/veritriage`
-Current version: **1.20.0** (distribution `ip-nirmaan`; packages `nirmaan` and `veritriage`)
+Current version: **1.21.0** (distribution `ip-nirmaan`; packages `nirmaan` and `veritriage`)
 Portfolio: removed from `/Users/ompatel/Documents/Om Portfolio` at the user's
 request after M19 (card and sample pages deleted).
 
@@ -1863,6 +1863,244 @@ budget on resolution; file-level signoff (a passing run over a superseded file
 stays on the task as evidence); `DOCUMENT` evidence and spec requirements that
 name a superseded artifact keep their records.
 
+### Milestone 27 (physical design) - OpenROAD and OpenSTA run for real in CI (after Stage 6)
+
+M25's `sta.run` and `pnr.run` bindings had never run. A new CI job,
+`physical-design`, runs them for real, and the first runs' breakages are
+fixed. Design doc: `docs/PHYSICAL_DESIGN.md` (sections 8 and 10). No version
+bump.
+
+Key points worth not re-deriving:
+- **Where it runs.** Only in CI: the job runs inside
+  `openroad/orfs:26Q3-687-gc63a606f9` (pinned by digest; ORFS `c63a606f9`,
+  OpenROAD `c487fc70`, Yosys 0.68+post, Nangate45 under `flow/platforms`),
+  Python 3.12 from `setup-uv`, `NIRMAAN_PDK_ROOT` at the platforms directory,
+  `NIRMAAN_REQUIRE_EDA="yosys openroad"`, and only
+  `tests/test_nirmaan_physical.py`. Every run's working directory is uploaded as
+  the `pd-logs` artifact. The main test jobs are unchanged. macOS: no Homebrew
+  formula and no Docker, so the real tests skip locally.
+- **No standalone `sta` exists in packaged OpenROAD**, and `openroad` has no
+  OpenSTA-only mode. `sta.run` gained a second backend, `openroad-sta`: the same
+  script under `openroad`, plus `read_lef` (OpenROAD links into its database;
+  `ORD-2010` without LEFs), so it also needs `tech_lef` and `lef`. `opensta`
+  stays first when `sta` is on PATH.
+- **Fixes from the real output:** `yosys-liberty` takes optional
+  `tie_high`/`tie_low` (`CELL/PORT`, via `hilomap`), since the detailed router
+  rejects a constant net (`DRT-0305`); the area line is `um^2`, not `u^2`;
+  `report_worst_slack` prints `worst slack max <n>` and `report_tns` `tns max
+  <n>` (parsed by label, unlabelled still read in order); `-group_count` and
+  `-endpoint_count` became `-group_path_count` and `-endpoint_path_count`; a
+  violator count at the report cap (`VIOLATOR_REPORT_LIMIT`, 100) is "at least".
+- **Real numbers** (AXI4-Lite block, Nangate45, ideal clock, no CTS or power
+  grid): STA at 100 MHz met, setup slack 7.264, hold 0.101; at 5 GHz
+  (`axi4_lite_regs_fast.sdc`) violated, setup -0.905, TNS -157.481; place and
+  route to route, 41% utilization, 0 DRC (the signal routing only; power pins
+  are unconnected), wirelength 10783 um, setup slack 7.120; at 300% utilization
+  it fails in placement (`GPL-0301`).
+
+Fixtures: the four `synthetic_*.log` are deleted; `opensta_met.log`,
+`opensta_violated.log`, `openroad_route.log`, and `openroad_error.log` are
+captured from CI run 36600440325, each with a `# CAPTURED:` first line and the
+log unedited below it. The real-tool tests moved from sky130 to Nangate45 and
+gained the violated-timing and failed place-and-route cases; new unit tests
+cover the `openroad-sta` fallback and tie cells. The standard local run is 1128
+tests with 3 skipped (the three real OpenROAD tests); in CI the
+`physical-design` job runs them. Deferred: standalone OpenSTA in CI, sky130,
+a local OpenROAD, and CTS, power grid, and parasitic extraction as before.
+
+### Milestone 27 (gates everywhere) - The design gates on every RTL workflow, and non-vacuous proofs (after Stage 6)
+
+The `new-ip` `rtl-implementation`, `feature-addition` `rtl-change`, and
+`rtl-change` `change` stages now carry `RTL_GATES` (in `company/workflows.py`):
+the `block-design` checks (lint, simulation, synthesis with `max_latches=0`,
+formal when a `formal_spec` is produced) plus `NOT_VACUOUS`, a `formal.cover`
+run over the same `.sby`, also tied to `formal_spec`. Each of the three stages
+now produces a `testbench` too, and a human attestation no longer meets them.
+`block-design` gains `NOT_VACUOUS` as one added line. Design doc:
+`docs/GATES_EVERYWHERE.md`.
+
+Key design points worth not re-deriving:
+- **Non-vacuity is a cover run of the seat's own setup.** The
+  `symbiyosys-cover` backend (`integrations/eda.py`) writes a copy of the
+  `.sby` into the run's directory with `mode cover` and absolute `[files]`
+  paths; script, engines, depth, and assumptions are the proof's.
+  `parse_sby_cover` passes only on `DONE (PASS)`, exit 0, at least one reached
+  cover, and none unreached (SymbiYosys itself calls a setup with no covers a
+  pass). `[tasks]` setups are a recorded failure. A separate tool, not a
+  `formal.run` mode, so a cover run can never meet "Formal properties are
+  proven".
+- **What it catches:** over-constrained inputs, assumptions contradictory on
+  the path to a covered state, antecedents the seat covers. A plain
+  `assume (1'b0)` already fails `formal.run` (smtbmc `--presat`). Covers the
+  seat did not write, or trivial ones, are the reviewer's to catch.
+- **Approved inputs through gates.** On `new-ip` and `feature-addition` the RTL
+  task depends on `microarchitecture.gate`, which has no artifacts, so the seat
+  saw no upstream and the M23 approved-inputs check held vacuously.
+  `upstream_artifacts(state, task)` in `work/policy.py` looks through gate
+  tasks; the context packet, the `approved-inputs` check, and the upstream
+  bindings of `evidence-before-review` all use it.
+- **`drive` follows the gated order.** `tests/nirmaan_helpers.py`
+  `gated_submit` writes `counter.v` and `counter_tb.v`, runs each applicable
+  before-review check through the broker from the requirement's own data,
+  records the runs, then submits. Tests that drive through these stages need
+  `GATE_TOOLS` (`verilator iverilog vvp yosys`) and are marked so.
+- **Fixture covers** in `counter`, AXI4-Lite (8), FIFO (6), arbiter (2 per
+  requester, including the tight fairness bound), and APB (4), under
+  `` `ifdef FORMAL ``. The APB proof depth rose from 4 to 8 so a write and read
+  back is reachable.
+
+Tests: `tests/test_nirmaan_gates_everywhere.py` (34): the stages as data; the
+planned tasks gated and on approved inputs (through a gate, and a cancelled
+impact analysis refusing an `rtl-change`); on each of the three workflows a
+latch and a failing self-check refused and clean RTL with a proof approved;
+two vacuous proofs refused while `formal.run` passes; `assume (1'b0)` failing
+both runs; no covers refused; all
+seven fixture setups reach every cover; the cover run's isolation and
+prechecks; the parser on captured logs; crown jewel
+`test_a_fourth_workflow_is_gated_with_no_core_changes`; `drive`'s order; the
+core never names `formal.cover`; CI requires the formal tools. Migrated (each
+listed in the design doc, section 5): two `test_nirmaan_work.py` tests and one
+each in `test_nirmaan_eda.py` and `test_nirmaan_export.py` gained
+`GATE_TOOLS`; three exact tool-set assertions gained `formal.cover`. The
+standard run, merged with the review-repair milestone, is 1160 tests with 2
+skipped (OpenSTA, OpenROAD).
+
+Deferred: the same gates on `parameter-change` and the fix stages
+(`regression-investigation`, `timing-closure`) and on `cdc-design`; automatic
+antecedent covers; multi-task setups in the cover check.
+
+### Milestone 27 (RISC-V firmware) - the driver on a core against the RTL (after Stage 6)
+
+Closes M25's first deferred firmware item. The firmware seat's driver and
+tests, unchanged, are cross-compiled for bare-metal RV32I and run on PicoRV32
+in one Verilator model with the approved RTL. Built in parallel with other
+post-Stage-6 work; no version bump. Design doc: `docs/RISCV_FIRMWARE.md`.
+
+**Two tools, through the M21 registry.** `src/nirmaan/integrations/firmware_riscv.py`
+registers `fw.cross_build` (backend `rv32-gcc`) and `fw.soc_test` (backend
+`picorv32-verilator`, also needs `verilator`, `make`), both `AVAILABLE`. The
+compiler is `riscv64-unknown-elf-gcc` (Ubuntu) or `riscv64-elf-gcc`
+(Homebrew): the backends' `environment` hook takes the first prefix with
+`gcc`, `objcopy`, and `size` on PATH, else refuses naming both.
+`fw.cross_build` compiles the driver, the tests, and the runtime under M25's
+strict flags plus `-march=rv32i -mabi=ilp32 -ffreestanding -Os`, assembles
+`crt0.S`, links with `link.ld` and `-lgcc`, and runs `size`: metrics `text`,
+`data`, `bss`, `image_bytes`. `fw.soc_test` builds that image, converts it
+with `objcopy -O verilog`, builds `nirmaan_soc.v`, `picorv32.v`, and the RTL
+with Verilator (`--prefix Vsoc`, the design as `+define+NIRMAAN_DUT=<top>`;
+`top` defaults to the one module nothing instantiates), and runs it. Output is
+M25's `FWTEST` format, so `parse_soc_test` is `parse_fw_test(...,
+what="SoC run")` plus code size. `firmware.py` changed only by that `what`
+argument, link errors in `parse_fw_test`, and a shared `copy_rtl`.
+
+**The SoC** (`integrations/firmware_soc/`): PicoRV32 (vendored unmodified,
+ISC, SHA-256 pinned by a test; upstream YosysHQ/picorv32 at `ef203c2`), 64 KiB
+RAM at 0, the design at `0x1000_0000` behind a native-to-AXI4-Lite bridge, and
+control registers at `0x2000_0000` (`STATUS`, `CONSOLE`, `EXIT`, `CYCLES`).
+The target HAL is `soc_runtime.c`; `libc/` is a small strict-C libc
+(`snprintf`, `mem*`, `strlen`), since Homebrew's GCC ships none.
+
+Key design points worth not re-deriving:
+- **Register shift 2.** A CPU never issues an unaligned bus address, but the
+  M25 tests check SLVERR for offsets `0x5` and `0xE`. AXI offset N is the CPU
+  word at `0x1000_0000 + 4*N` (like `reg-shift = <2>` for 8250 UARTs), so
+  every offset is one aligned access and the RTL's own decode answers.
+- **Bus errors reach the driver through `STATUS`**, latched from `BRESP` or
+  `RRESP` per transfer and read by the HAL after each access; PicoRV32 has no
+  bus-error input to trap on. A zero strobe is refused by the HAL with SLVERR.
+- **Byte stores replicate the byte** (`write 0x4 = 0xabababab strobe 0x4`); the
+  byte-lane check proves the RTL takes only the strobed lane.
+- **`-fno-tree-loop-distribute-patterns`**, or GCC may turn the libc's
+  `memset` loop into a call to `memset`.
+- **The gate is conditional on the request, as data.** New feature `riscv`
+  (`RISC-V`, `riscv`, `rv32...`); the firmware stage gains two `checked(...)`
+  requirements with `when=when("riscv")`. One generic field,
+  `EvidenceRequirement.when: Condition` (default unconditional), read only by
+  the planner, which drops a requirement whose condition the request does not
+  meet. Required everywhere would make every firmware task need a RISC-V GCC;
+  opt-in by the seat (`when_produced`) would let the seat choose its own test.
+  `device_drivers` gains both tools.
+
+Tests: `tests/test_nirmaan_riscv_firmware.py` (14): the catalog; a RISC-V
+request gates the seat on four checks and a plain one on two; parsers on
+captured text; refusal with nothing on PATH; a real cross build (a 32-bit
+RISC-V ELF) and a strict warning failing it; a real SoC run passing all six
+M25 checks with the RTL's SLVERRs in the log; the wrong driver failing as a
+recorded run; the end-to-end seat
+(`test_the_firmware_seat_runs_its_driver_on_a_riscv_core`: four real runs
+against the approved RTL, review, approval); the crown jewel
+`test_a_new_soc_backend_needs_no_core_changes`; the pinned core; import laws.
+CI installs `gcc-riscv64-unknown-elf` and adds `riscv64-unknown-elf-gcc` to
+`NIRMAAN_REQUIRE_EDA`. The standard run, with M27 review repair merged, is
+1140 tests with 2 skipped.
+
+Deferred: interrupts from the design, precise bus-error traps, other cores and
+ISAs, a code-size budget in the gate, APB and AXI4 bridges.
+
+### Milestone 27 (DFT) - ATPG, multiple scan chains, and MBIST (after Stage 6)
+
+Two new tools, both `AVAILABLE` and backed by M21 backends in
+`nirmaan/integrations/dft.py`: `dft.atpg` (backend `icarus-atpg`) and
+`dft.mbist` (`icarus-mbist`); `dft.scan_insert` gains multiple chains. The
+step helpers are standard library only: `dft_scan.py` (as in M25),
+`dft_atpg.py`, and `dft_mbist.py`. `dft.run` stays `CONTRACT_ONLY`.
+
+Key design points worth not re-deriving:
+- **Chains.** `chains` and `max_chain_length` params; flops are grouped by
+  (clock, edge), each domain gets at least one chain, spare chains go to the
+  domain with the longest chain, and within a domain natural-order runs differ
+  in length by at most one. One chain keeps scalar `scan_in`/`scan_out`; N
+  chains make them N-bit vectors. The tracer starts a chain at each `scan_in`
+  bit and checks `scan_out[k]` and one domain per chain. The M25 rule
+  `one-clock-domain` is retired. `dft.scan_sim` pulses all clocks together;
+  each clock idles low if any flop uses its rising edge, and the expected
+  capture is evaluated in edge order (first-toggle flops, then the rest).
+- **ATPG is our own, not an external tool.** Nothing is packaged in Homebrew
+  or apt; Atalanta would need a `.bench` converter and a CI build. `dft_atpg.py
+  generate`: random 64-pattern batches with bit-parallel cone fault
+  simulation, then PODEM (three-valued good and faulty machines, D-frontier,
+  X-path, full backtracking, limit 200) on the capture model (scan_en low,
+  resets inactive). Fault universe: stuck-at 0/1 on every controllable input
+  and gate output of the Yosys gate netlist (stems, uncollapsed).
+- **Coverage is measured, not claimed.** `dft_atpg.py inject` enumerates the
+  universe again from the netlist, adds a `$_MUX_` per fault site (select
+  `nirmaan_fault_en[s]`, value `nirmaan_fault_val[s]`), and Yosys writes it.
+  The testbench runs the design as given (good machine) beside the fault
+  netlist, through the real scan protocol. It first checks the pattern file's
+  expected responses and that the fault netlist equals the design with no
+  fault; then, per fault, detection at the first differing output or
+  unloaded bit. A claim the simulation does not bear out, a wrong expected
+  response, or an injection mismatch fails the run. `min_<metric>` params
+  (for example `min_test_coverage`) are checked in `parse_atpg` from
+  `atpg_config.json`; `max_` limits work as in M21. `patterns` grades a given
+  file; `fault_sample` samples, and says so.
+- **A capture-untestable fault can still be detected** by shifting (for
+  example a NAND with `scan_en` stuck at 1): the class is from the
+  simulation, so `undetectable` means proven by PODEM and not detected.
+- **MBIST.** `dft_mbist.py` writes a March C- controller (10N operations,
+  solid backgrounds, a read is issue then compare) for a single-port sync RAM
+  (`clk`, `we`, `addr`, `wdata`, registered `rdata`) whose widths Yosys reads.
+  The testbench counts reads, writes, and cycles independently (5N, 5N, 15N)
+  and flags X reads. The controller is `verilator -Wall` lint clean (a test).
+- **Seat data.** Skills `atpg`, `fault_modeling`, `scan_design` gain
+  `dft.atpg`; `mbist` gains `dft.mbist`. The `block-design` `dft` stage's third
+  `checked(...)` requirement is `dft.atpg` with `min_test_coverage` 90.
+
+Measured (8 chains for the register blocks): counter 70/70 faults (100%),
+`atpg_demo` 130/132 (2 proven undetectable, 100% test coverage), rr_arbiter
+116/116, sync_fifo 754/754, apb_regs 1800/1800, axi4_lite_regs 2476/2476.
+The last two take about 2 and 3 minutes of Icarus, so the tests grade only
+the smaller blocks. MBIST passes the clean `sync_ram` in 240 cycles and fails
+each of six faulty RAMs (stuck-at 0 and 1, transition, inversion and
+idempotent coupling, address decoder).
+
+Fixtures: `tests/fixtures/rtl/dft/two_clocks.v`, `dft/atpg_demo.v`,
+`mbist/sync_ram.v`, `mbist/faulty_rams.v`. Tests:
+`tests/test_nirmaan_dft_advanced.py`; crown jewel
+`test_a_new_atpg_backend_needs_no_core_changes`. Design doc:
+`docs/DFT_ADVANCED.md`. Deferred: transition faults, pin faults, ATPG across
+capture edges, lockup latches, compression, other memory types, a memory stage.
+
 ### Milestone 27 (seat evaluation) - Structural review, and seat evaluation
 
 The first milestone of the structural review of 2026-09-29
@@ -1901,7 +2139,7 @@ Key design points worth not re-deriving:
 - Rich markup swallowed `[rtl-implementation]` in CLI lines; whole lines are
   escaped now and a test asserts the brackets appear.
 
-`tests/test_nirmaan_evals.py` (15 tests; with the M27 repair part merged, the standard run is 1141 passed, 2 skipped), including replay passing on all four
+`tests/test_nirmaan_evals.py` (15 tests; on v1.21.0 the standard local run is 1218 passed, 3 skipped), including replay passing on all four
 blocks with real tools, and `test_what_the_gates_miss_the_held_out_testbench_catches`
 (RTL with `reg3` reset to all ones and a testbench that checks nothing passes
 lint, simulation, and synthesis and reaches review; the reference testbench
@@ -1923,7 +2161,8 @@ Version bump left to the coordinator.
   families such as `max_<metric>`), `ToolSpec.params` (None: no contract,
   taken as given, which keeps extension tools working), `list_values`, and
   `ToolRun.values(param)`.
-- **Catalog** (`company/tools.py`): all 19 bound tools declare parameters,
+- **Catalog** (`company/tools.py`): all 24 bound tools declare parameters (19 when written; the M27 parts added
+  `formal.cover`, `dft.atpg`, `dft.mbist`, `fw.cross_build`, `fw.soc_test`, given contracts at the merge),
   inventoried from what every binding and backend actually reads (both quote
   styles; OpenROAD's settings included though nothing here can run it).
   Shared tuples: `RUNNER` (backend, workdir, timeout, max_), `PDK`,
@@ -1949,8 +2188,8 @@ parameters. The runtime passed `sby` as a one-element list, which is why a
 
 `tests/test_nirmaan_contracts.py` (13), including a static scan that every
 parameter an integration reads is declared, and the crown jewel
-`test_a_new_tool_contract_needs_no_core_changes`. With the M27 repair part merged, the
-standard run is 1154 passed, 2 skipped. Deferred to the next M28 part: typed values end to end (a
+`test_a_new_tool_contract_needs_no_core_changes`. On v1.21.0 the standard local run is
+1231 passed, 3 skipped. Deferred to the next M28 part: typed values end to end (a
 `ToolRun` storing real lists) and the typed work packet.
 
 ---
@@ -2153,6 +2392,13 @@ orchestrator, collaboration, project, agents, learning, planning, design,
 conversation, ai, automation. Run with `.venv/bin/python -m pytest -q`
 from the repo root.
 
+v1.21.0 is the one version bump for the five M27 parts, built in parallel and
+merged as #39 (repair after review), #38 (physical design for real), #42 (gates
+everywhere), #43 (DFT), and #40 (RISC-V firmware). The standard local run is
+1203 tests with 3 skipped: the real OpenROAD tests, which run in CI's
+`physical-design` job. The owner's structural review (PR #37) also uses the
+M27 label; it is not part of this release.
+
 ---
 
 ## 4. Operational notes for resuming work
@@ -2176,7 +2422,7 @@ from the repo root.
   renamed to **VeriTriage** at M2/M3 boundary (GitHub redirect preserved
   from the rename). After M19 the user renamed the PROJECT, first to "Nirmaan IP"
   (repo `nirmaan-ip`, v1.16.0) and then, to match the `ipnirmaan.com` domain, to
-  **IP Nirmaan** (repo `patel-om/ip-nirmaan`, distribution `ip-nirmaan`, v1.20.0).
+  **IP Nirmaan** (repo `patel-om/ip-nirmaan`, distribution `ip-nirmaan`, v1.21.0).
   On 2026-09-28 the repo was transferred to `nirmaansoftware/ip-nirmaan`.
   The `nirmaan` package and CLI keep their short name by the user's choice. VeriTriage
   was deliberately NOT renamed: it is the verification engine inside Nirmaan

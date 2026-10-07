@@ -77,6 +77,10 @@ class EvidenceRequirement(BaseModel):
         default=(),
         description="Applies only when the task produced an artifact of one of these kinds (M26). Empty: always.",
     )
+    when: "Condition" = Field(
+        default_factory=lambda: Condition(),
+        description="Planned only when the request's features meet this condition (M27). Default: always.",
+    )
 
     def applies(self, kinds) -> bool:
         """Whether the requirement binds work that produced artifacts of these ``kinds``."""
@@ -110,6 +114,9 @@ class Condition(BaseModel):
     @property
     def is_unconditional(self) -> bool:
         return not (self.all_of or self.any_of or self.none_of)
+
+
+EvidenceRequirement.model_rebuild()
 
 
 class Variant(BaseModel):

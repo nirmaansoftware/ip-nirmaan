@@ -41,8 +41,11 @@ from nirmaan.runtime import (
 )
 
 INTEGRATIONS = Path(nirmaan.__file__).parent / "integrations"
-#: A parameter read by name: params.get("x"), params["x"], p.get('x'), _token(p, 'x'), _design(job, 'x'), ...
-_READ = re.compile(r"""(?:\b(?:p|params|job\.params)(?:\.get\(|\[|,\s*)|_design\(job,\s*)['"]([a-z_]+)['"]""")
+#: A parameter read by name: params.get("x"), params["x"], helper(job.params, "x"), _design(job, 'x'), and the
+#: physical bindings' alias ``p = job.params`` (p.get('x'), _token(p, 'x')). ``p["x"]`` is left out: elsewhere
+#: ``p`` is a pattern or port record (dft_atpg.py), not the parameters.
+_READ = re.compile(r"""(?:\b(?:params|job\.params)(?:\.get\(|\[|,\s*)|\bp(?:\.get\(|,\s*)|_design\(job,\s*)"""
+                   r"""['"]([a-z_]+)['"]""")
 
 
 def _owner(engine, task_id):
