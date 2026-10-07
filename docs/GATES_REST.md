@@ -27,6 +27,7 @@ for anything: the cover run derives a cover for every assertion's antecedent.
 | `eda_antecedents.derive`: a cover beside every assertion, in a copy | `integrations/eda_antecedents.py` (new, imports nothing of Nirmaan) | one module |
 | The `symbiyosys-cover` backend reads the instrumented copies, and refuses an assertion it cannot derive | `integrations/eda.py` | one backend |
 | `parse_sby_cover` counts derived covers apart from the seat's | `integrations/eda_parsers.py` | parser |
+| The `formal.cover` contract's description names the derived covers; no parameter is added, so the M28 contract (`sby`, `sources`, and the runner's) is unchanged | `company/tools.py` | data |
 
 No seat, stage, tool, or kind is named by the runtime, the policy, the planner,
 or the models, and none of them names antecedents (a test reads their

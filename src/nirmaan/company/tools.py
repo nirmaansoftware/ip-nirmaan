@@ -110,7 +110,8 @@ TOOLS: list[ToolSpec] = [
           (_p("sby", PATH, "The SymbiYosys job file.", required=True),
            _p("sources", PATHS, "RTL the proof must read; the job file must list each one."), *RUNNER)),
     _tool("formal.cover", "Formal cover check", "eda", EXE, AV,
-          "Non-vacuity: every cover in a proof setup is reached under its assumptions (M27).",
+          "Non-vacuity: every cover in a proof setup (M27), and a cover derived for every assertion "
+          "antecedent (M29), is reached under its assumptions.",
           (_p("sby", PATH, "The proof's SymbiYosys job file, run in cover mode.", required=True),
            _p("sources", PATHS, "RTL the setup reads."), *RUNNER)),
     _tool("equivalence.run", "Equivalence checker", "eda", EXE, CO, "Logic equivalence checking."),
