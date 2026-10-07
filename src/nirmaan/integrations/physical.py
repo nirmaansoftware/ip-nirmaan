@@ -180,9 +180,11 @@ def _synth_parse(run: RunRecord) -> EdaResult:
 # --- sta.run: OpenSTA ---------------------------------------------------------------------
 
 
-#: M29: output pins that drive nothing: no net, or a net with no load and no port (an unused QN, a
-#: clock-tree dummy load). A net with no load has no wire, so a SPEF cannot annotate it; the parser
-#: subtracts these from the unannotated drivers to count the loaded nets the SPEF missed.
+#: M29: drivers that drive nothing: a cell output with no net, or with a net that reaches no other pin
+#: and no port (an unused QN, a clock-tree dummy load), and an input port that reaches no cell pin (the
+#: supply ports of a block with a power grid, whose cells carry no supply pins in Verilog). Such a net
+#: has no signal wire, so a SPEF cannot annotate it; the parser subtracts these from the unannotated
+#: drivers to count the loaded nets the SPEF missed.
 FLOATING_OUTPUTS = '''set nirmaan_floating 0
 foreach cell [get_cells *] {
   foreach pin [get_pins -of_objects $cell] {
@@ -193,6 +195,11 @@ foreach cell [get_cells *] {
       incr nirmaan_floating
     }
   }
+}
+foreach port [get_ports *] {
+  if {[get_property $port direction] ne "input"} { continue }
+  set net [get_nets -quiet [get_full_name $port]]
+  if {$net eq "" || $net eq "NULL" || [llength [get_pins -of_objects $net]] == 0} { incr nirmaan_floating }
 }
 puts "nirmaan-floating-outputs: $nirmaan_floating"'''
 

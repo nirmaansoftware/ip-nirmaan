@@ -54,6 +54,7 @@ missing PDK input, with the reason and the way out (`stop_after=place`).
 | `tap_cell`, `endcap_cell`, `tap_distance` | settings | Well-tap and endcap masters, microns between tap columns (`tap_distance` is required with `tap_cell`) |
 | `pdn_tcl` | PDK file | The platform's power-grid script (global connections, voltage domain, grid), sourced before `pdngen` |
 | `place_density` | number | Global placement target density |
+| `dont_use` | settings | Cells (names or `*` patterns) repair and CTS must not insert, applied with `set_dont_use` |
 | `cts_buffers` | settings | Clock buffer masters; by default CTS picks from the Liberty |
 | `routing_layers` | settings | Lowest and highest signal routing layers, `LOWEST,HIGHEST` (a `max_` name would be read as a limit) |
 | `filler_cells` | settings | Filler masters, comma separated |
@@ -62,6 +63,13 @@ missing PDK input, with the reason and the way out (`stop_after=place`).
 
 A PDK file parameter that is given must exist, or the probe refuses the run,
 as M25 does for the Liberty and LEFs.
+
+`synth.run` (`yosys-liberty`) gains `buffer_cell` (`CELL/IN/OUT`, for example
+`BUF_X1/A/Z`): Yosys's `insbuf` puts a buffer wherever one output port drives
+another. Without it the AXI4-Lite netlist carries
+`assign s_axil_rresp[0] = s_axil_bresp[0];`, OpenROAD writes the routed
+netlist back the same way, and a timer reading that netlist with the SPEF
+finds the shared net unannotated (section 3).
 
 ---
 
@@ -95,11 +103,17 @@ the run has. The summary says which parasitics it timed on.
 
 **Unannotated drivers are not unannotated nets.** On the first extracted run,
 `report_parasitic_annotation` found 220 unannotated drivers on Nangate45. All
-of them were outputs that drive nothing: the unused `QN` of every flip-flop and
-the outputs of the dummy loads CTS inserts to balance the tree. A SPEF cannot
-annotate a pin with no net. The script now also counts output pins with no net
-(`nirmaan-floating-outputs`), and `unannotated_nets` is the difference: the
-nets that should have parasitics and do not. It was 0 on both platforms.
+of them were outputs that drive no load: the unused `QN` of every flip-flop
+(Yosys still gives each one a named net) and the outputs of the dummy loads
+CTS inserts to balance the tree. Such a net has no wire, so there is nothing
+to extract. The separate signoff run also listed the block's `VDD` and `VSS`
+ports: the power grid gives the block supply pins, the routed netlist declares
+them as ports, and no cell in Verilog has a supply pin to load them. The
+script now also counts these drivers of nothing (a cell output with no net, or
+with a net that reaches no other pin and no port, and an input port whose net
+reaches no cell pin), printed as `nirmaan-floating-outputs`, and
+`unannotated_nets` is the difference: the loaded nets that should have
+parasitics and do not.
 
 `parse_opensta` reads the same annotation lines, so `sta.run` with a `spef`
 reports `unannotated_nets` too.
@@ -110,8 +124,14 @@ reports `unannotated_nets` too.
 
 The `extract` stage writes `route.spef`, and the run's `outputs` gain `spef`
 beside `def` and `netlist` (`final.v`). Signoff timing is a separate `sta.run`
-over `final.v` with `spef=route.spef`; its script reads the SPEF, reports the
-annotation, and times on it.
+over `final.v` with `spef=route.spef`; its script reads the SPEF, propagates
+the clocks (a SPEF comes from a routed block, whose clock tree exists), lists
+the unannotated drivers, and times on it.
+
+The first separate run found 2 unannotated nets that the in-flow timing did
+not: the routed netlist's `assign` between two output ports (section 1.1),
+which `buffer_cell` removes. It also timed on an ideal clock (7.539 ns against
+7.508 ns in the flow) until the script propagated the clocks.
 
 The workflow states this as data. The `sta-signoff` stage's tool evidence is a
 `sta.run` made with `max_unannotated_nets=0`. M21's limit rule does the rest:
