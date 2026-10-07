@@ -127,11 +127,14 @@ def test_cores_and_buses_are_data():
 
 def test_the_soc_names_no_design_no_core_and_no_bus():
     """The SoC instantiates `NIRMAAN_CORE and its bridge `NIRMAAN_BRIDGE; each bridge, `NIRMAAN_DUT."""
-    soc = (SOC / "nirmaan_soc.v").read_text()
+    def code(name: str) -> str:  # the Verilog without its comments, which do say what the macros may be
+        return re.sub(r"//[^\n]*|/\*.*?\*/", "", (SOC / name).read_text(), flags=re.DOTALL)
+
+    soc = code("nirmaan_soc.v")
     assert "`NIRMAAN_CORE" in soc and "`NIRMAAN_BRIDGE" in soc
-    assert not re.search(r"picorv32\s|serv_|axi4_lite_regs|apb_regs|axil_timer", soc)
+    assert not re.search(r"picorv32|serv|axi|apb|axi4_lite_regs|axil_timer", soc)
     for bridge in ("bridge_axil.v", "bridge_apb.v"):
-        text = (SOC / bridge).read_text()
+        text = code(bridge)
         assert "`NIRMAAN_DUT" in text and not re.search(r"axi4_lite_regs|apb_regs|axil_timer|picorv32|serv", text)
     runtime = (SOC / "soc_runtime.c").read_text()
     assert not re.search(r"picorv32|serv|maskirq|mstatus", runtime)  # the core's part is in irq_<core>.S
