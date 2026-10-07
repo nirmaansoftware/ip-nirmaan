@@ -29,5 +29,11 @@ module counter #(
         if (seen_reset)
             assert (count <= LIMIT);
     end
+
+    // Cover (M27): the count reaches LIMIT and wraps, so the assertion above
+    // is checked on a run that actually counts.
+    always @(posedge clk)
+        if (seen_reset && !rst)
+            cover (wrap);
 `endif
 endmodule

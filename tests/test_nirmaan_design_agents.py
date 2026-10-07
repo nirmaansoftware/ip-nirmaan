@@ -128,7 +128,8 @@ def test_small_blocks_plan_the_block_workflow(nirmaan_org, fixed_clock):
     rtl = engine.task(tid(engine, "rtl-implementation"))
     assert set(rtl.expected_outputs) == {"rtl_source", "testbench"}
     gated = [r for r in rtl.evidence_requirements if r.before_review]
-    assert {t for r in gated for t in r.tools} == {"lint.run", "simulator.run", "synth.run", "formal.run"}
+    assert {t for r in gated for t in r.tools} == {"lint.run", "simulator.run", "synth.run", "formal.run",
+                                                   "formal.cover"}
     assert orchestrator.analyze("Create a 4-port AXI-to-NoC bridge.").intent == "new_ip"
 
 
@@ -484,7 +485,7 @@ def test_the_axi4_lite_register_block_is_designed_by_agents(nirmaan_org, fixed_c
         assert art.derived_from == (upstream(engine, "microarchitecture"),)
     runs = {engine.state.tool_runs[engine.state.evidence[e].tool_run].tool
             for e in rtl.evidence if engine.state.evidence[e].tool_run}
-    assert runs == {"lint.run", "simulator.run", "synth.run", "formal.run"}
+    assert runs == {"lint.run", "simulator.run", "synth.run", "formal.run", "formal.cover"}
     # Every claim is backed by a recorded run or a recorded review; nothing is a bare claim.
     for task in engine.state.tasks.values():
         for ev in (engine.state.evidence[e] for e in task.evidence):

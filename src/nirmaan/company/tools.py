@@ -11,10 +11,12 @@ place and route through OpenSTA and OpenROAD (``integrations/physical.py``,
 M25). Their bindings still refuse, with a reason, on a machine whose PATH
 lacks the executable or that has no PDK input for the run. Firmware build and
 co-simulation are AVAILABLE the same way (``nirmaan/integrations/firmware.py``,
-M25).
+M25), and so are the RV32I cross build and the run on a RISC-V core
+(``nirmaan/integrations/firmware_riscv.py``, M27).
 
 Scan insertion, DFT rule checks, and scan chain simulation are AVAILABLE through
-Yosys and Icarus (``nirmaan/integrations/dft.py``, M25).
+Yosys and Icarus (``nirmaan/integrations/dft.py``, M25); so are stuck-at ATPG,
+graded by fault simulation, and March C- memory BIST (M27).
 """
 
 from __future__ import annotations
@@ -62,6 +64,8 @@ TOOLS: list[ToolSpec] = [
     _tool("waveform.inspect", "Waveform viewer", "eda", RD, CO, "Inspect waveforms."),
     _tool("coverage.read", "Coverage database", "eda", RD, CO, "Read and merge coverage."),
     _tool("formal.run", "Formal engine", "eda", EXE, AV, "Model checking and property proofs."),
+    _tool("formal.cover", "Formal cover check", "eda", EXE, AV,
+          "Non-vacuity: every cover in a proof setup is reached under its assumptions (M27)."),
     _tool("equivalence.run", "Equivalence checker", "eda", EXE, CO, "Logic equivalence checking."),
     _tool("cdc.run", "CDC/RDC analyzer", "eda", EXE, CO, "Structural and functional crossing analysis."),
     # Implementation EDA.
@@ -75,11 +79,17 @@ TOOLS: list[ToolSpec] = [
     _tool("dft.scan_insert", "Scan insertion", "eda", EXE, AV, "Mux-D scan flops stitched into one chain."),
     _tool("dft.check", "DFT rule check", "eda", EXE, AV, "Testability rules over the synthesized netlist."),
     _tool("dft.scan_sim", "Scan chain simulation", "eda", EXE, AV, "Shift and capture through the chain in simulation."),
+    _tool("dft.atpg", "ATPG", "eda", EXE, AV, "Stuck-at patterns, with coverage measured by fault simulation."),
+    _tool("dft.mbist", "Memory BIST", "eda", EXE, AV, "A March C- controller run against the memory in simulation."),
     # Software and infrastructure.
     _tool("compiler.run", "Compiler toolchain", "software", EXE, CO, "Build firmware and software."),
     _tool("fw.build", "Firmware build", "software", EXE, AV, "Compile C firmware under strict warning flags."),
     _tool("fw.test", "Firmware co-simulation", "software", EXE, AV,
           "Run a driver's tests against a Verilator model of the RTL, over real bus transactions."),
+    _tool("fw.cross_build", "Firmware cross build", "software", EXE, AV,
+          "Cross-compile a driver and its tests for bare-metal RV32I into a linked ELF, with its code size."),
+    _tool("fw.soc_test", "Firmware on a RISC-V core", "software", EXE, AV,
+          "Run a driver's tests on a RISC-V core (PicoRV32) whose loads and stores reach the RTL over its bus."),
     _tool("debugger.attach", "Debugger", "software", EXE, CO, "Attach to targets and models."),
     _tool("ci.configure", "CI configuration", "infrastructure", WR, CO, "Change CI pipelines."),
     _tool("farm.submit", "Compute farm", "infrastructure", EXE, CO, "Submit jobs to the compute farm."),

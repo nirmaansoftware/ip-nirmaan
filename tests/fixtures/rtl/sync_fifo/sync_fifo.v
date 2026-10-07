@@ -154,5 +154,22 @@ module sync_fifo #(
                 assert (rd_data == f_data);
         end
     end
+
+    // Covers (M27): each is reached under the assumptions above, so the
+    // proof is not vacuous and the guarded properties do fire.
+    always @(posedge clk) begin
+        if (f_past_valid && $past(rst_n) && rst_n) begin
+            cover (full);
+            // A write while full and a read while empty are dropped.
+            cover ($past(wr_en && full));
+            cover ($past(rd_en && empty));
+            // A write and a read in the same cycle.
+            cover (wr_acc && rd_acc);
+            // The write pointer wraps.
+            cover ($past(wr_acc) && $past(wr_ptr) == LAST);
+            // The tracked word is read out.
+            cover (f_held && rd_ptr == f_slot && rd_acc);
+        end
+    end
 `endif
 endmodule

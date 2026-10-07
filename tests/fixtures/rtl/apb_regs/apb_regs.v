@@ -171,5 +171,19 @@ module apb_regs #(
             end
         end
     end
+
+    // Covers (M27): each is reached under the manager assumptions above, so
+    // the proof is not vacuous and every response path is exercised.
+    always @(posedge pclk) begin
+        if (f_past_valid && $past(presetn) && presetn) begin
+            // A full-word write, and a write of some bytes only.
+            cover (access && pwrite && f_mapped && pstrb == {STRB_WIDTH{1'b1}});
+            cover (access && pwrite && f_mapped && pstrb != {STRB_WIDTH{1'b1}} && pstrb != 0);
+            // A register written, then read back.
+            cover (access && !pwrite && f_mapped && prdata != {DATA_WIDTH{1'b0}});
+            // An unmapped access gets pslverr.
+            cover (access && pslverr);
+        end
+    end
 `endif
 endmodule

@@ -226,6 +226,9 @@ fails the counter for real, and passes once removed.
 
 ## 8. Deferred
 
+M27 (`docs/DFT_ADVANCED.md`) delivers ATPG with fault grading, multiple chains
+grouped by clock domain, and March C- MBIST.
+
 * **ATPG and fault coverage.** Needs a fault simulator; `dft.run` stays a
   contract. Stuck-at grading with Yosys plus simulation is possible and is the
   natural next step.

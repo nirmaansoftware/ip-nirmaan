@@ -18,7 +18,7 @@ from pathlib import Path
 
 import pytest
 
-from nirmaan_helpers import agent, drive, tid
+from nirmaan_helpers import GATE_TOOLS, agent, drive, tid
 
 from nirmaan.integrations.eda import (
     Backend,
@@ -259,7 +259,7 @@ def test_real_formal_proof_and_counterexample(bridge, tmp_path):
 # --- Evidence: a real lint run meets the RTL lint requirement ------------------------------
 
 
-@needs("verilator")
+@needs("verilator", *GATE_TOOLS)  # M27: the RTL stage before it is gated
 def test_real_lint_substantiates_the_rtl_lint_requirement(bridge, tmp_path):
     lint = tid(bridge, "rtl-lint")
     drive(bridge, until=lint)
