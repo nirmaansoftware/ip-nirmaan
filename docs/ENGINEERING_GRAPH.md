@@ -183,7 +183,8 @@ link walk runs over that data on the Nirmaan side.
 ## Deferred
 
 - Loading requirements and items from a file (a CLI `trace` command), and a
-  verification-plan seat that proposes them for review.
+  verification-plan seat that proposes them for review: done in M29, see
+  `docs/VERIFICATION_PLAN.md`.
 - Per-check pass/fail inside one self-checking testbench: today a test item
   passes when its testbench's simulation passes.
 - Parsing SystemVerilog interface ports on modules, packages, and includes.

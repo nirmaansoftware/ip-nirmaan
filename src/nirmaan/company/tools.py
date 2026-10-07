@@ -120,6 +120,10 @@ TOOLS: list[ToolSpec] = [
           "Run a test generated from the register map on the RTL, over the AXI4-Lite co-simulation harness (M30).",
           (_p("map", PATH, "The register map (JSON).", required=True),
            _p("rtl", PATHS, "The RTL to check.", required=True), TOP, *RUNNER)),
+    _tool("vplan.check", "Verification plan check", "verification", RD, AV,
+          "A verification plan is valid and covers exactly the requirements its approved spec tags (M29).",
+          (_p("plan", PATHS, "The verification plan file or files to check.", required=True),
+           _p("spec", PATHS, "The approved spec file or files the plan must cover.", required=True))),
     _tool("equivalence.run", "Equivalence checker", "eda", EXE, CO, "Logic equivalence checking."),
     _tool("cdc.run", "CDC/RDC analyzer", "eda", EXE, CO, "Structural and functional crossing analysis."),
     # Implementation EDA.

@@ -45,6 +45,9 @@ app.add_typer(eval_app, name="eval")
 regmap_app = typer.Typer(help="Register maps as data: check one, or lower it to a header or a table.",
                          no_args_is_help=True)
 app.add_typer(regmap_app, name="regmap")
+vplan_app = typer.Typer(help="Load and save verification plans: requirements and the items that prove them.",
+                        no_args_is_help=True)
+app.add_typer(vplan_app, name="vplan")
 
 console = Console()
 _err = Console(stderr=True)
@@ -509,6 +512,41 @@ def links(project: str, root: Path = ROOT_OPTION) -> None:
         console.print(f"{escape(link.artifact)} {link.kind} {link.node_kind} {escape(link.node_name)}")
     for refused in report.refused:
         console.print(f"[red]refused[/red] {escape(refused.artifact)}: {escape(refused.reason)}")
+
+
+@vplan_app.command("import")
+def vplan_import(project: str, file: Path, role: str = typer.Option(..., "--as", help="Role ID acting."),
+                 agent: bool = typer.Option(False, "--agent", help="Act as an AI agent rather than a human."),
+                 root: Path = ROOT_OPTION) -> None:
+    """Record a plan's requirements and items through the engine. All or nothing; it backs nothing."""
+    from nirmaan.vplan import PlanError, import_plan
+
+    engine = _load(project, root)
+    try:
+        report = import_plan(engine, _actor(role, agent), file.read_text(encoding="utf-8"))
+    except PlanError as exc:
+        for problem in exc.problems:
+            _err.print(f"[red]{escape(str(file))}: {escape(problem)}[/red]")
+        _fail(f"refused {file}: nothing was recorded")
+    except OSError as exc:
+        _fail(str(exc))
+    ProjectStore(root).save(engine.state)
+    console.print(f"Recorded {report.requirements} requirements and {report.items} verification items. "
+                  "None is backed until a passing, cited tool run backs it.")
+
+
+@vplan_app.command("export")
+def vplan_export(project: str, out: Optional[Path] = typer.Option(None, "--out", help="Write here, not stdout."),
+                 root: Path = ROOT_OPTION) -> None:
+    """The project's requirements and verification items, in the plan format."""
+    from nirmaan.vplan import export_plan
+
+    text = export_plan(_load(project, root).state)
+    if out is None:
+        typer.echo(text, nl=False)
+    else:
+        out.write_text(text, encoding="utf-8")
+        console.print(f"Wrote {escape(str(out))}")
 
 
 @app.command()
