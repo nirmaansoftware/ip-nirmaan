@@ -87,6 +87,18 @@ jobs:
           which openroad yosys
           openroad -version && yosys -V
           ls "$NIRMAAN_PDK_ROOT/nangate45/lib/NangateOpenCellLibrary_typical.lib"
+      - name: Explore the image (M29, temporary)
+        run: |
+          set +e
+          ls /OpenROAD-flow-scripts/tools/install/OpenROAD/bin /OpenROAD-flow-scripts/tools/install/yosys/bin
+          ls "$NIRMAAN_PDK_ROOT" "$NIRMAAN_PDK_ROOT"/*/lib | head -80
+          ls -la "$NIRMAAN_PDK_ROOT"/sky130hd "$NIRMAAN_PDK_ROOT"/sky130hd/lib "$NIRMAAN_PDK_ROOT"/sky130hd/lef
+          find / -xdev \( -name sta -o -name 'libOpenSTA*' -o -name 'libsta*' \) 2>/dev/null | head -20
+          ls /OpenROAD-flow-scripts/tools/OpenROAD/src/sta 2>&1 | head; ls /OpenROAD-flow-scripts/tools 2>&1
+          which cmake g++ gcc swig bison flex tclsh make 2>&1; ls /usr/include/tcl* -d 2>&1
+          ls /usr/lib/x86_64-linux-gnu | grep -i -E "cudd|tcl|eigen" | head; ls /usr/local/include 2>&1 | head -30
+          cat /etc/os-release | head -3; nproc
+          du -sh /OpenROAD-flow-scripts/tools 2>/dev/null
       - name: Install
         run: uv pip install -e ".[dev]"
       - name: Test

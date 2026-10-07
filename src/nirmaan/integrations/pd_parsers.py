@@ -16,7 +16,8 @@ from typing import Any
 from nirmaan.integrations.eda_parsers import Diagnostic, EdaResult, _first, _plural
 
 #: The place-and-route stages, in flow order; timing is reported after the last one run.
-PNR_STAGES = ("floorplan", "place", "route")
+#: M29 added clock-tree synthesis and parasitic extraction (``extract`` needs the PDK's OpenRCX rules).
+PNR_STAGES = ("floorplan", "place", "cts", "route", "extract")
 #: The violator report lists at most this many paths per check, so a count this high is a lower bound.
 VIOLATOR_REPORT_LIMIT = 100
 
@@ -32,6 +33,8 @@ _WNS_RE = re.compile(r"^wns(?:\s+(?:max|min))?\s+(?P<value>\S+)")
 _AREA_RE = re.compile(r"^Design area (?P<area>[\d.]+) um?\^2 (?P<util>[\d.]+)% utilization")
 _WIRELENGTH_RE = re.compile(r"Total wire length = (?P<um>[\d.]+) um")
 _DRC_RE = re.compile(r"Number of violations = (?P<n>\d+)")
+#: ``report_parasitic_annotation`` after ``read_spef`` (M29).
+_UNANNOTATED_RE = re.compile(r"^Found (?P<n>\d+) unannotated drivers")
 _STAGE_RE = re.compile(r"^nirmaan-stage(?P<done>-done)?: (?P<stage>\w+)")
 
 
@@ -119,7 +122,8 @@ def parse_opensta(log: str, returncode: int) -> EdaResult:
     diags = _diagnostics(lines)
     errors = [d for d in diags if d.severity == "error"]
     timing = _timing(lines)
-    metrics = {**timing, "exit_status": returncode}
+    unannotated = next((int(m["n"]) for ln in lines if (m := _UNANNOTATED_RE.match(ln))), None)
+    metrics = {**timing, "unannotated_drivers": unannotated, "exit_status": returncode}
     if errors or returncode != 0:
         summary = f"timing analysis failed: {_plural(len(errors), 'error')}{_first(errors)}"
         if not errors:
@@ -143,9 +147,98 @@ def parse_opensta(log: str, returncode: int) -> EdaResult:
 
 # --- OpenROAD ---------------------------------------------------------------------------
 
+# M29: the signoff steps. Each pattern is a line format seen in a captured OpenROAD log.
+_TAPS_RE = re.compile(r"Inserted (?P<n>\d+) tapcells")
+_ENDCAPS_RE = re.compile(r"Inserted (?P<n>\d+) endcaps")
+_GRID_RE = re.compile(r"\[INFO PDN-\d+\] Inserting grid: (?P<grid>\S+)")
+_OPEN_SUPPLY_RE = re.compile(r"^nirmaan-unconnected-supply-pins: (?P<n>\d+)")
+_SUPPLY_NETS_RE = re.compile(r"^nirmaan-supply-nets:(?P<nets>.*)$")
+_CTS_BUFFERS_RE = re.compile(r"Total number of Buffers Inserted: (?P<n>\d+)")
+_CTS_SINKS_RE = re.compile(r"Total number of Sinks: (?P<n>\d+)")
+_FILLERS_RE = re.compile(r"Placed (?P<n>\d+) filler instances")
+_ANTENNA_RE = re.compile(r"Found (?P<n>\d+) (?P<kind>net|pin) violations")
+_IR_NET_RE = re.compile(r"^Net\s*:\s*(?P<net>\S+)")
+_IR_WORST_RE = re.compile(r"^Worstcase IR drop\s*:\s*(?P<v>\S+)\s*V")
 
-def parse_openroad(log: str, returncode: int, stop_after: str = "route") -> EdaResult:
-    """Pass means exit 0, no error, every requested stage and timing finished, 0 DRC, timing met."""
+
+def _sections(lines: list[str]) -> dict[str, list[str]]:
+    """The lines each stage printed, between its ``nirmaan-stage`` markers."""
+    sections: dict[str, list[str]] = {}
+    current = None
+    for line in lines:
+        if m := _STAGE_RE.match(line):
+            current = None if m["done"] else m["stage"]
+            if current:
+                sections[current] = []
+        elif current:
+            sections[current].append(line)
+    return sections
+
+
+def _clock_tree(lines: list[str]) -> dict[str, Any]:
+    """Buffers and sinks (``report_cts``), skew (``report_clock_skew``), and insertion delay."""
+    buffers = sinks = skew = latency = None
+    in_skew = in_latency = False
+    for line in lines:
+        if m := _CTS_BUFFERS_RE.search(line):
+            buffers = int(m["n"])
+        elif m := _CTS_SINKS_RE.search(line):
+            sinks = int(m["n"])
+        if line.startswith("Clock ") and "Skew" not in line:
+            continue
+        if "Skew" in line and "Latency" in line:
+            in_skew, in_latency = True, False
+            continue
+        figures = [_num(f) for f in line.split() if re.fullmatch(r"-?\d+(?:\.\d+)?", f)]
+        if in_skew and len(figures) >= 3:  # latency, CRPR, skew: the row that closes a skew report
+            skew = figures[-1] if skew is None else max(skew, figures[-1])
+            latency = figures[0] if latency is None else max(latency, figures[0])
+            in_skew = False
+    return {"cts_buffers": buffers, "cts_sinks": sinks, "clock_skew": skew, "clock_insertion_delay": latency}
+
+
+def _signoff_checks(lines: list[str]) -> dict[str, Any]:
+    taps = endcaps = fillers = open_supply = unannotated = None
+    grids: list[str] = []
+    supply_nets: list[str] = []
+    antenna: dict[str, int] = {}
+    ir: dict[str, float | None] = {}
+    ir_net = None
+    for line in lines:
+        if m := _TAPS_RE.search(line):
+            taps = int(m["n"])
+        elif m := _ENDCAPS_RE.search(line):
+            endcaps = int(m["n"])
+        elif m := _GRID_RE.search(line):
+            grids.append(m["grid"])
+        elif m := _OPEN_SUPPLY_RE.match(line):
+            open_supply = int(m["n"])
+        elif m := _SUPPLY_NETS_RE.match(line):
+            supply_nets = m["nets"].split()
+        elif m := _FILLERS_RE.search(line):
+            fillers = int(m["n"])
+        elif m := _ANTENNA_RE.search(line):
+            antenna[m["kind"]] = int(m["n"])
+        elif m := _IR_NET_RE.match(line):
+            ir_net = m["net"]
+        elif (m := _IR_WORST_RE.match(line)) and ir_net:
+            ir[ir_net] = _num(m["v"])
+        elif m := _UNANNOTATED_RE.match(line):
+            unannotated = int(m["n"])
+    return {"tap_cells": taps, "endcap_cells": endcaps, "power_grids": grids, "supply_nets": supply_nets,
+            "unconnected_supply_pins": open_supply, "filler_cells": fillers,
+            "antenna_net_violations": antenna.get("net"), "antenna_pin_violations": antenna.get("pin"),
+            "worst_ir_drop_v": ir, "unannotated_drivers": unannotated}
+
+
+def parse_openroad(log: str, returncode: int, stop_after: str = "route",
+                   planned: list[str] | tuple[str, ...] | None = None) -> EdaResult:
+    """Pass means exit 0, no error, every planned stage and timing finished, 0 DRC, timing met.
+
+    M29: and, when a power grid was inserted, every supply pin connected; no antenna violation; and,
+    when the flow extracted parasitics, the final timing on them. ``planned`` defaults to every stage
+    up to ``stop_after``.
+    """
     lines = _lines(log)
     diags = _diagnostics(lines)
     errors = [d for d in diags if d.severity == "error"]
@@ -162,15 +255,28 @@ def parse_openroad(log: str, returncode: int, stop_after: str = "route") -> EdaR
             wirelength = float(m["um"])
         elif m := _DRC_RE.search(line):
             drc = int(m["n"])
-    timing = _timing(lines)
+    sections = _sections(lines)
+    timing = _timing(sections.get("timing", lines))
+    checkpoints = {}
+    for stage in PNR_STAGES:
+        if stage in sections:
+            t = _timing(sections[stage])
+            if t["worst_slack"] is not None:
+                checkpoints[stage] = {"setup": t["worst_slack"], "hold": t["worst_hold_slack"], "tns": t["tns"]}
+    checks = _signoff_checks(lines)
     failed_stage = next((s for s in reversed(started) if s not in completed), None)
-    expected = [*PNR_STAGES[:PNR_STAGES.index(stop_after) + 1], "timing"] if stop_after in PNR_STAGES else ["timing"]
+    if planned is None:
+        planned = PNR_STAGES[:PNR_STAGES.index(stop_after) + 1] if stop_after in PNR_STAGES else ()
+    expected = [*planned, "timing"]
     missing = [s for s in expected if s not in completed]
     routed = "route" in expected
+    extracted = "extract" in completed
     metrics: dict[str, Any] = {
         "stop_after": stop_after, "stages_completed": completed, "failed_stage": failed_stage,
         "design_area_um2": area, "utilization_pct": utilization, "wirelength_um": wirelength,
         "drc_violations": drc, **timing, "exit_status": returncode,
+        "slack_by_stage": checkpoints, "parasitics": "extracted" if extracted else "estimated",
+        **_clock_tree(sections.get("cts", [])), **checks,
     }
     reasons = []
     if errors:
@@ -179,18 +285,33 @@ def parse_openroad(log: str, returncode: int, stop_after: str = "route") -> EdaR
         reasons.append(f"exit status {returncode}")
     if routed and drc != 0:
         reasons.append("no DRC count reported" if drc is None else _plural(drc, "DRC violation"))
+    if checks["power_grids"] and checks["unconnected_supply_pins"] != 0:
+        open_pins = checks["unconnected_supply_pins"]
+        reasons.append("supply pin connections not reported" if open_pins is None
+                       else _plural(open_pins, "unconnected supply pin"))
+    antennas = (checks["antenna_net_violations"] or 0) + (checks["antenna_pin_violations"] or 0)
+    if antennas:
+        reasons.append(_plural(antennas, "antenna violation"))
     if "timing" in completed and not _timing_met(timing):
         reasons.append("no constrained timing paths" if timing["worst_slack"] is None
                        else f"timing violated ({_slacks(timing)})")
     if not reasons and not missing:
-        reached = {"floorplan": "floorplanned", "place": "placed", "route": "routed"}.get(stop_after, stop_after)
+        last = planned[-1] if planned else stop_after
+        reached = {"floorplan": "floorplanned", "place": "placed", "cts": "clock tree built",
+                   "route": "routed", "extract": "routed and extracted"}.get(last, last)
         parts = [reached]
         if routed:
             parts += [_plural(drc or 0, "DRC violation"), f"wirelength {wirelength:.0f} um" if wirelength is not None
                       else "wirelength not reported"]
         if utilization is not None:
             parts.append(f"utilization {utilization:.0f}%")
-        parts.append(_slacks(timing))
+        if checks["power_grids"]:
+            parts.append("power grid connected")
+        elif routed:
+            parts.append("no power grid")
+        if metrics["clock_skew"] is not None:
+            parts.append(f"clock skew {metrics['clock_skew']:.3f}")
+        parts.append(_slacks(timing) + (" on extracted parasitics" if extracted else ""))
         return EdaResult(True, f"place and route passed: {', '.join(parts)}", tuple(diags), metrics)
     stage = failed_stage or (missing[0] if missing else None)
     if stage and not reasons:

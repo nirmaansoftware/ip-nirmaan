@@ -31,7 +31,7 @@ from nirmaan.integrations.pd_parsers import PNR_STAGES, VIOLATOR_REPORT_LIMIT, p
 #: Relative PDK paths resolve under this directory (or the ``pdk_root`` parameter).
 PDK_ROOT_ENV = "NIRMAAN_PDK_ROOT"
 #: PDK parameters that name files; every other PDK parameter is a setting (a site, layers).
-PDK_FILES = ("liberty", "tech_lef", "lef")
+PDK_FILES = ("liberty", "tech_lef", "lef", "pdn_tcl", "rc_tcl", "rcx_rules")
 
 _TOKEN_RE = re.compile(r"^[A-Za-z0-9_.$]+$")
 
@@ -59,6 +59,8 @@ def needs_pdk(**inputs: str) -> Callable[[dict[str, str]], str | None]:
                 reasons.append(f"needs {label} ({how})")
             elif param in PDK_FILES:
                 reasons += [f"{param} not found: {p}" for p in pdk_paths(params, param) if not p.is_file()]
+        for param in (f for f in PDK_FILES if f not in inputs):  # an optional PDK file, when given, exists (M29)
+            reasons += [f"{param} not found: {p}" for p in pdk_paths(params, param) if not p.is_file()]
         return "; ".join(reasons) or None
 
     return check
@@ -169,8 +171,8 @@ def _sta_script(job: Job, lefs: bool = False) -> None:
               f"read_verilog {_design(job, 'netlist')}",
               f"link_design {_token(job.params, 'top')}",
               f"read_sdc {_design(job, 'sdc')}"]
-    if job.params.get("spef", "").strip():
-        script.append(f"read_spef {_design(job, 'spef')}")
+    if job.params.get("spef", "").strip():  # M29: and say how much of the design the SPEF annotates
+        script += [f"read_spef {_design(job, 'spef')}", "report_parasitic_annotation"]
     script += _timing_reports()
     (job.workdir / "sta.tcl").write_text("\n".join(script) + "\n", encoding="utf-8")
 
@@ -200,50 +202,159 @@ def _stage(name: str, commands: list[str]) -> list[str]:
     return [f'puts "nirmaan-stage: {name}"', *commands, f'puts "nirmaan-stage-done: {name}"']
 
 
-def _pnr_steps(job: Job) -> list[list[str]]:
-    p = job.params
-    stop_after = p.get("stop_after", "").strip() or "route"
+def _cells(params: dict[str, str], key: str) -> list[str]:
+    names = [n.strip() for n in params.get(key, "").split(",") if n.strip()]
+    for name in names:
+        if not _TOKEN_RE.match(name):
+            raise ValueError(f"{key} must name cells, not {params.get(key)!r}")
+    return names
+
+
+def _source(params: dict[str, str], key: str) -> list[str]:
+    """``source`` the PDK script a parameter names, when it is given (M29)."""
+    return [f"source {_tcl(str(f))}" for f in pdk_paths(params, key)]
+
+
+#: Worst slack and TNS at one point in the flow, printed inside the stage that reached it (M29).
+_SLACK_CHECKPOINT = ["report_worst_slack -max -digits 3", "report_worst_slack -min -digits 3", "report_tns -digits 3"]
+
+#: Counts instance supply pins with no net after the power grid's global connections (M29).
+_SUPPLY_PIN_CHECK = '''set nirmaan_open 0
+foreach inst [[ord::get_db_block] getInsts] {
+  foreach iterm [$inst getITerms] {
+    set kind [[$iterm getMTerm] getSigType]
+    if {($kind eq "POWER" || $kind eq "GROUND") && [$iterm getNet] eq "NULL"} { incr nirmaan_open }
+  }
+}
+puts "nirmaan-unconnected-supply-pins: $nirmaan_open"'''
+
+#: Every supply net in the block, for the grid connectivity check (M29).
+_SUPPLY_NETS = '''set nirmaan_supplies {}
+foreach net [[ord::get_db_block] getNets] {
+  if {[$net getSigType] eq "POWER" || [$net getSigType] eq "GROUND"} { lappend nirmaan_supplies [$net getName] }
+}
+puts "nirmaan-supply-nets: $nirmaan_supplies"'''
+
+#: Each power net at the supply voltage and each ground net at 0 V, for IR-drop analysis (M29).
+_SUPPLY_VOLTAGES = '''foreach net $nirmaan_supplies {
+  set kind [[[ord::get_db_block] findNet $net] getSigType]
+  set_pdnsim_net_voltage -net $net -voltage [expr {$kind eq "POWER" ? SUPPLY_VOLTAGE : 0}]
+}'''
+
+
+def _pnr_plan(params: dict[str, str]) -> list[str]:
+    """The stages this run executes: up to ``stop_after``; ``extract`` only with OpenRCX rules (M29)."""
+    extract = bool(params.get("rcx_rules", "").strip())
+    stop_after = params.get("stop_after", "").strip() or ("extract" if extract else "route")
     if stop_after not in PNR_STAGES:
         raise ValueError(f"stop_after must be one of {', '.join(PNR_STAGES)}, not {stop_after!r}")
-    last = PNR_STAGES.index(stop_after)
+    if stop_after == "extract" and not extract:
+        raise ValueError("stop_after=extract needs rcx_rules (the PDK's OpenRCX rules file)")
+    return list(PNR_STAGES[:PNR_STAGES.index(stop_after) + 1])
+
+
+def _pnr_steps(job: Job) -> list[list[str]]:
+    p = job.params
+    plan = _pnr_plan(p)
+    tap, endcap = _cells(p, "tap_cell"), _cells(p, "endcap_cell")
+    if tap and not p.get("tap_distance", "").strip():
+        raise ValueError("tap_cell needs tap_distance (microns between tap columns, from the PDK)")
     script = [*(f"read_lef {_tcl(str(f))}" for f in pdk_paths(p, "tech_lef") + pdk_paths(p, "lef")),
               *(f"read_liberty {_tcl(str(f))}" for f in pdk_paths(p, "liberty")),
               f"read_verilog {_design(job, 'netlist')}",
               f"link_design {_token(p, 'top')}",
-              f"read_sdc {_design(job, 'sdc')}"]
+              f"read_sdc {_design(job, 'sdc')}",
+              *_source(p, "rc_tcl")]
+    power = []
+    if tap:
+        power.append(f"tapcell -distance {_number(p, 'tap_distance', '0')} -tapcell_master {tap[0]}"
+                     + (f" -endcap_master {endcap[0]}" if endcap else ""))
+    grid = bool(p.get("pdn_tcl", "").strip())
+    if grid:
+        power += [*_source(p, "pdn_tcl"), "pdngen"]
     script += _stage("floorplan", [
         f"initialize_floorplan -utilization {_number(p, 'utilization', '40')} "
         f"-aspect_ratio {_number(p, 'aspect_ratio', '1')} -core_space {_number(p, 'core_space', '2')} "
         f"-site {_token(p, 'site')}",
         "make_tracks",
+        *power,
         f"place_pins -hor_layers {_layers(p, 'hor_layers')} -ver_layers {_layers(p, 'ver_layers')}",
         "report_design_area"])
-    if last >= 1:
-        script += _stage("place", ["global_placement", "detailed_placement", "check_placement",
-                                   "report_design_area"])
-    if last >= 2:
-        script += _stage("route", ["global_route", "detailed_route -output_drc route_drc.rpt"])
-    parasitics = {1: ["estimate_parasitics -placement"], 2: ["estimate_parasitics -global_routing"]}.get(last, [])
+    density = f" -density {_number(p, 'place_density', '0')}" if p.get("place_density", "").strip() else ""
+    if "place" in plan:
+        script += _stage("place", [f"global_placement{density}",
+                                   "estimate_parasitics -placement", "repair_design",
+                                   "detailed_placement", "check_placement -verbose", "report_design_area",
+                                   *_SLACK_CHECKPOINT])
+    if "cts" in plan:
+        buffers = _cells(p, "cts_buffers")
+        script += _stage("cts", [
+            "clock_tree_synthesis" + (f" -buf_list {{{' '.join(buffers)}}}" if buffers else ""),
+            "set_propagated_clock [all_clocks]",
+            "estimate_parasitics -placement",
+            "repair_clock_nets",
+            "detailed_placement",
+            "repair_timing -setup -hold",
+            "detailed_placement",
+            "check_placement -verbose",
+            "report_cts",
+            "report_clock_skew -digits 3",
+            "report_clock_latency -digits 3",
+            "report_design_area",
+            *_SLACK_CHECKPOINT])
+    if "route" in plan:
+        layers = (f"set_routing_layers -signal {_token(p, 'min_routing_layer')}-{_token(p, 'max_routing_layer')}"
+                  if p.get("min_routing_layer", "").strip() else None)
+        fillers = _cells(p, "filler_cells")
+        voltage = p.get("supply_voltage", "").strip()
+        ir = []
+        if voltage:  # IR drop: each power net at the supply voltage, each ground net at 0 V
+            ir = [_SUPPLY_VOLTAGES.replace("SUPPLY_VOLTAGE", _number(p, "supply_voltage", "0")),
+                  "foreach net $nirmaan_supplies { analyze_power_grid -net $net }"]
+        script += _stage("route", [
+            *([layers] if layers else []),
+            "global_route",
+            "estimate_parasitics -global_routing",
+            *_SLACK_CHECKPOINT,
+            "detailed_route -output_drc route_drc.rpt",
+            *([f"filler_placement {{{' '.join(fillers)}}}"] if fillers else []),
+            "check_placement -verbose",
+            "check_antennas",
+            _SUPPLY_PIN_CHECK,
+            _SUPPLY_NETS,
+            *(["foreach net $nirmaan_supplies { check_power_grid -net $net }"] if grid else []),
+            *ir])
+    if "extract" in plan:
+        rules = pdk_paths(p, "rcx_rules")[0]
+        script += _stage("extract", ["define_process_corner -ext_model_index 0 X",
+                                     f"extract_parasitics -ext_model_file {_tcl(str(rules))}",
+                                     "write_spef route.spef", "read_spef route.spef",
+                                     "report_parasitic_annotation"])
+    last = plan[-1]
+    parasitics = {"place": ["estimate_parasitics -placement"], "cts": ["estimate_parasitics -placement"],
+                  "route": ["estimate_parasitics -global_routing"]}.get(last, [])
     script += _stage("timing", [*parasitics, *_timing_reports()])
-    script.append(f"write_def {stop_after}.def")
-    if stop_after == "route":
+    final = "route" if last == "extract" else last
+    script.append(f"write_def {final}.def")
+    if final == "route":
         script.append("write_verilog final.v")
     (job.workdir / "pnr.tcl").write_text("\n".join(script) + "\n", encoding="utf-8")
     return [["openroad", "-no_init", "-no_splash", "-exit", "pnr.tcl"]]
 
 
-def _planned_stop(workdir: Path) -> str:
-    """The last stage the script that ran asked for."""
+def _planned_stages(workdir: Path) -> list[str]:
+    """The stages the script that ran asked for."""
     script = workdir / "pnr.tcl"
     text = script.read_text(encoding="utf-8") if script.is_file() else ""
-    planned = [s for s in PNR_STAGES if f"nirmaan-stage: {s}" in text]
-    return planned[-1] if planned else "route"
+    return [s for s in PNR_STAGES if f"nirmaan-stage: {s}" in text] or list(PNR_STAGES[:PNR_STAGES.index("route") + 1])
 
 
 def _pnr_parse(run: RunRecord) -> EdaResult:
-    stop_after = _planned_stop(run.workdir)
-    result = parse_openroad(run.log, run.returncode, stop_after)
-    outputs = {kind: str(run.workdir / name) for kind, name in (("def", f"{stop_after}.def"), ("netlist", "final.v"))
+    planned = _planned_stages(run.workdir)
+    result = parse_openroad(run.log, run.returncode, planned[-1], planned)
+    final = "route" if planned[-1] == "extract" else planned[-1]
+    outputs = {kind: str(run.workdir / name) for kind, name in
+               (("def", f"{final}.def"), ("netlist", "final.v"), ("spef", "route.spef"))
                if (run.workdir / name).is_file()}
     return EdaResult(result.passed, result.summary, result.diagnostics, {**result.metrics, "outputs": outputs})
 
