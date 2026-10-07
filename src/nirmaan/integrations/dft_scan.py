@@ -73,6 +73,18 @@ class Flop:
     reset_value: int | None = None
 
 
+@dataclass(frozen=True)
+class Lockup:
+    """A lockup latch (M29): a latch whose D is a flop's Q and whose enable is a module input."""
+
+    cell: str
+    type: str
+    d: object  # the launching flop's Q
+    enable: object
+    q: object
+    transparent: int  # the enable level at which it passes D
+
+
 @dataclass
 class Design:
     """One flattened module of a Yosys JSON netlist."""
@@ -86,6 +98,7 @@ class Design:
     others: list[tuple[str, str, str]] = field(default_factory=list)  # (cell, type, name) sequential, not scannable
     latches: list[tuple[str, str, str]] = field(default_factory=list)
     unknown: list[tuple[str, str]] = field(default_factory=list)  # (cell, type) never evaluated
+    lockups: list[Lockup] = field(default_factory=list)  # M29: latches on scan crossings, not design latches
 
     @classmethod
     def load(cls, path: str | Path, top: str | None = None) -> Design:
@@ -140,6 +153,16 @@ class Design:
             elif kind not in GATES:
                 self.unknown.append((cell, kind))
         self.flops.sort(key=lambda f: _natural(f.name))
+        # M29: a latch fed by a flop's Q and enabled by a module input is a lockup latch, not a design latch.
+        qs, inputs, cells, latches = {f.q for f in self.flops}, self.input_bits(), self.module["cells"], []
+        for cell, kind, label in self.latches:
+            conns = cells[cell]["connections"]
+            if kind in ("$_DLATCH_P_", "$_DLATCH_N_") and conns["D"][0] in qs and conns["E"][0] in inputs:
+                self.lockups.append(Lockup(cell, kind, conns["D"][0], conns["E"][0], conns["Q"][0],
+                                           int(kind == "$_DLATCH_P_")))
+            else:
+                latches.append((cell, kind, label))
+        self.latches = latches
 
     # --- Queries --------------------------------------------------------------------------
 
@@ -174,6 +197,35 @@ class Design:
 
     def sequential_count(self) -> int:
         return len(self.flops) + len(self.latches) + len(self.others)
+
+    def lockup_leaks(self, samples: int = 64, seed: int = 3) -> list[Lockup]:
+        """Lockup latches whose output reaches capture-mode logic (a flop's D or an output with scan_en low).
+
+        A real lockup feeds only a scan input, so changing its value changes
+        nothing a capture sees. Raises NetlistError over a combinational loop.
+        """
+        if not self.lockups:
+            return []
+        rng = random.Random(seed)
+        values = {bit: rng.getrandbits(samples) for bit in [*self.input_bits(), *(f.q for f in self.flops)]}
+        for bit in self.port_bits(SCAN_EN):
+            values[bit] = 0
+        targets = [f.d for f in self.flops] + [b for n, p in self.ports.items() if p["direction"] == "output"
+                                                for b in p["bits"] if isinstance(b, int)]
+        leaks = []
+        for lockup in self.lockups:
+            one = self.evaluate(targets, {**values, lockup.q: 0}, samples)
+            other = self.evaluate(targets, {**values, lockup.q: (1 << samples) - 1}, samples)
+            if one != other:
+                leaks.append(lockup)
+        return leaks
+
+    def phases(self) -> dict[str, int]:
+        """Each flop's capture phase in a test pulse (see :func:`clocking`); empty when the clocks are not inputs."""
+        try:
+            return clocking(self, self.flops)[1]
+        except NetlistError:
+            return {}
 
     # --- Evaluation -----------------------------------------------------------------------
 
@@ -278,15 +330,20 @@ class Design:
         is held high, and each flop's D is evaluated. A flop is on a chain when
         its D equals exactly the word of a scan_in bit or of one other flop; a
         match by chance has probability 2**-samples. Chain k starts at bit k of
-        scan_in and must end at bit k of scan_out, and every flop on it must
-        share one clock and edge.
+        scan_in and must end at bit k of scan_out.
+
+        A chain may pass from one clock to another only through a lockup latch
+        clocked by the launching flop's clock and transparent at the level
+        before its active edge (M29), and a flop that captures on the second
+        edge of a pulse must not load one that captures on the first. Breaking
+        either is a hazard: the chain is traced, but it is not complete.
         """
         if not self.has_scan_ports():
             raise NetlistError(f"{self.top} has no {', '.join(SCAN_PORTS)} ports")
         rng = random.Random(seed)
         mask = (1 << samples) - 1
         values: dict[object, int] = {}
-        for bit in [*self.input_bits(), *(f.q for f in self.flops)]:
+        for bit in [*self.input_bits(), *(f.q for f in self.flops), *(lk.q for lk in self.lockups)]:
             values[bit] = rng.getrandbits(samples)
         for bit in self.port_bits(SCAN_EN):
             values[bit] = mask
@@ -301,12 +358,24 @@ class Design:
         sources = {**{values[f.q]: f.name for f in self.flops},
                    **{values[bit]: port_in[k] for k, bit in enumerate(scan_ins) if isinstance(bit, int)}}
         by_name = {f.name: f for f in self.flops}
-        loads: dict[str, str | None] = {f.name: sources.get(words[f.d]) for f in self.flops}
+        by_q = {f.q: f for f in self.flops}
+        latched = {values[lk.q]: lk for lk in self.lockups}
+        loads: dict[str, str | None] = {}
+        through: dict[str, Lockup] = {}
+        for f in self.flops:
+            word = words[f.d]
+            if word in latched:
+                through[f.name] = latched[word]
+                loads[f.name] = by_q[latched[word].d].name
+            else:
+                loads[f.name] = sources.get(word)
         successor: dict[str, list[str]] = {}
         for flop, source in loads.items():
             if source is not None and source != flop:
                 successor.setdefault(source, []).append(flop)
         problems: list[str] = []
+        hazards: list[str] = []
+        phase = self.phases()
         if len(scan_ins) != len(scan_outs):
             problems.append(f"{SCAN_IN} has {len(scan_ins)} bits but {SCAN_OUT} has {len(scan_outs)}")
         chains: list[list[str]] = []
@@ -335,10 +404,7 @@ class Design:
                 where = "the chain" if single else f"chain {k}"
                 problems.append(f"{port_out[k]} is {out_source or 'not a chain element'} in shift mode, not the "
                                 f"last flop of {where} ({tail})")
-            domains = sorted({f"{by_name[n].edge} {self.describe(by_name[n].clock)}" for n in order})
-            if len(domains) > 1:
-                problems.append(f"chain {k} mixes clock domains ({'; '.join(domains)}): a chain shifts on one "
-                                f"clock and edge")
+            hazards += self._crossings(k, [by_name[n] for n in order], through, phase)
         order_all = [n for chain in chains for n in chain]
         off = [f.name for f in self.flops if f.name not in seen]
         for name in off:
@@ -347,7 +413,27 @@ class Design:
                    else "loads no chain element when scan_en is high (no scan path)")
             problems.append(f"flop {name} is not on the scan chain: it {why}")
         return Chain(order=[by_name[n] for n in order_all], off_chain=off, problems=problems,
-                     chains=[[by_name[n] for n in chain] for chain in chains])
+                     chains=[[by_name[n] for n in chain] for chain in chains], hazards=hazards,
+                     through={n: lk.cell for n, lk in through.items()})
+
+    def _crossings(self, k: int, chain: list[Flop], through: dict[str, Lockup], phase: dict[str, int]) -> list[str]:
+        """What makes shifting along ``chain`` unsafe: an unlatched clock crossing, or a second edge loading a first."""
+        found = []
+        for x, y in zip(chain, chain[1:]):
+            lockup = through.get(y.name)
+            where = f"chain {k} at {x.name} -> {y.name}"
+            if lockup is None and x.clock != y.clock:
+                found.append(f"{where} crosses from {x.edge} {self.describe(x.clock)} to {y.edge} "
+                             f"{self.describe(y.clock)} with no lockup latch: a late {self.describe(y.clock)} edge "
+                             f"loses a bit")
+            elif lockup is not None and (lockup.enable != x.clock or lockup.transparent != int(x.edge == "negedge")):
+                level = "high" if x.edge == "negedge" else "low"
+                found.append(f"{where}: lockup latch {lockup.cell} must be enabled by {self.describe(x.clock)} and "
+                             f"transparent while it is {level}")
+            if phase.get(x.name) == 0 and phase.get(y.name) == 1:
+                found.append(f"{where}: {y.name} ({y.edge}) loads {x.name} ({x.edge}), which captures earlier in "
+                             f"the same pulse, so the bit races through both; second-edge flops go first")
+        return found
 
 
 @dataclass(frozen=True)
@@ -358,10 +444,14 @@ class Chain:
     off_chain: list[str]
     problems: list[str]
     chains: list[list[Flop]] = field(default_factory=list)
+    #: M29: shift hazards on chains that are otherwise whole (an unlatched clock crossing, edge order).
+    hazards: list[str] = field(default_factory=list)
+    #: M29: the lockup latch each flop loads through, by flop name.
+    through: dict[str, str] = field(default_factory=dict)
 
     @property
     def complete(self) -> bool:
-        return not self.problems
+        return not self.problems and not self.hazards
 
 
 def _natural(name: str) -> tuple:
@@ -399,19 +489,35 @@ def _split(flops: list, pieces: int) -> list[list]:
     return runs
 
 
-def plan_chains(design: Design, chains: int = 1, max_length: int | None = None) -> list[list[Flop]]:
-    """The flops of ``design`` cut into balanced chains, never mixing clock domains (clock and edge).
+def plan_chains(design: Design, chains: int = 1, max_length: int | None = None,
+                cross: bool = False) -> list[list[Flop]]:
+    """The flops of ``design`` cut into balanced chains.
 
-    Each domain gets at least one chain, and with ``max_length`` at least
-    ceil(n / max_length); further chains, up to ``chains``, go one at a time to
-    the domain whose longest chain is longest. Within a domain flops keep their
+    By default chains never mix clock domains (clock and edge): each domain
+    gets at least one chain, and with ``max_length`` at least ceil(n /
+    max_length); further chains, up to ``chains``, go one at a time to the
+    domain whose longest chain is longest. Within a domain flops keep their
     natural name order and chain lengths differ by at most one.
+
+    With ``cross`` (M29), chains may cross domains: the flops are ordered by
+    capture phase (second-edge domains first), then clock port and edge, then
+    name, and that one sequence is cut into balanced pieces. The stitcher puts
+    a lockup latch at each clock crossing.
     """
     if chains < 1 or (max_length is not None and max_length < 1):
         raise NetlistError("chains and max_chain_length must be positive integers")
     domains: dict[tuple, list[Flop]] = {}
     for flop in design.flops:
         domains.setdefault((flop.clock, flop.edge), []).append(flop)
+    if cross:
+        _, phase = clocking(design, design.flops)
+        inputs = design.input_bits()
+        ordered = sorted(domains, key=lambda d: (-phase[domains[d][0].name], inputs[d[0]], d[1]))
+        flops = [f for d in ordered for f in domains[d]]
+        total = max(chains, -(-len(flops) // max_length) if max_length else 1)
+        if total > len(flops):
+            raise NetlistError(f"{total} chains for {len(flops)} flops: every chain needs at least one flop")
+        return _split(flops, total)
     alloc = {d: (-(-len(f) // max_length) if max_length else 1) for d, f in domains.items()}
     total = max(chains, sum(alloc.values()))
     if total > len(design.flops):
@@ -424,14 +530,17 @@ def plan_chains(design: Design, chains: int = 1, max_length: int | None = None) 
     return [run for d in order for run in _split(domains[d], alloc[d])]
 
 
-def stitch(netlist: dict, top: str, chains: int = 1, max_length: int | None = None) -> tuple[dict, dict]:
+def stitch(netlist: dict, top: str, chains: int = 1, max_length: int | None = None,
+           cross: bool = False) -> tuple[dict, dict]:
     """Turn every flop of ``top`` into a scan cell and stitch balanced chains; return the netlist and report.
 
     One chain keeps scalar ``scan_in`` and ``scan_out`` ports; N chains make
     them N-bit vectors, chain k running from ``scan_in[k]`` to ``scan_out[k]``.
     Refuses (NetlistError) what mux-D chains cannot honestly cover: no flops,
     latches or other sequential cells, a clock that is not a module input, more
-    chains than flops, or ports that already use the scan names.
+    chains than flops, or ports that already use the scan names. With
+    ``cross`` (M29), chains may cross clock domains, and each crossing gets a
+    lockup latch clocked by the launching flop's clock.
     """
     design = Design.from_json(netlist, top)
     taken = [p for p in SCAN_PORTS if p in design.ports]
@@ -446,7 +555,7 @@ def stitch(netlist: dict, top: str, chains: int = 1, max_length: int | None = No
     stray = sorted({design.describe(f.clock) for f in design.flops if f.clock not in inputs})
     if stray:
         raise NetlistError(f"the clock is not a module input: {'; '.join(stray)}")
-    runs = plan_chains(design, chains, max_length)
+    runs = plan_chains(design, chains, max_length, cross)
 
     module = design.module
     next_bit = 1 + max((b for net in module.get("netnames", {}).values() for b in net["bits"] if isinstance(b, int)),
@@ -460,10 +569,24 @@ def stitch(netlist: dict, top: str, chains: int = 1, max_length: int | None = No
     for name, bits in ((SCAN_EN, [se]), (SCAN_IN, si), (SCAN_OUT, so)):
         module["netnames"][name] = {"hide_name": 0, "bits": bits, "attributes": {}}
 
-    order, reports = [], []
+    order, reports, lockups = [], [], []
+    fresh = next_bit + 1 + len(runs)
     for k, run in enumerate(runs):
         previous = si[k]
-        for flop in run:
+        for at, flop in enumerate(run):
+            launch = run[at - 1] if at else None
+            if launch is not None and launch.clock != flop.clock:  # M29: a lockup latch on the crossing
+                kind = "$_DLATCH_P_" if launch.edge == "negedge" else "$_DLATCH_N_"
+                name, bit = f"nirmaan_lockup_{len(lockups)}", fresh + len(lockups)
+                module["cells"][f"$nirmaan$lockup${len(lockups)}"] = {
+                    "hide_name": 1, "type": kind, "parameters": {}, "attributes": {},
+                    "port_directions": {"E": "input", "D": "input", "Q": "output"},
+                    "connections": {"E": [launch.clock], "D": [launch.q], "Q": [bit]}}
+                module["netnames"][name] = {"hide_name": 0, "bits": [bit], "attributes": {}}
+                lockups.append({"chain": k, "from": launch.name, "to": flop.name, "net": name,
+                                "cell": f"$nirmaan$lockup${len(lockups)}", "clock": inputs[launch.clock],
+                                "type": kind})
+                previous = bit
             cell = module["cells"][flop.cell]
             cell["type"] = SCAN_CELL + flop.type[1:]
             cell["connections"]["SE"] = [se]
@@ -475,9 +598,14 @@ def stitch(netlist: dict, top: str, chains: int = 1, max_length: int | None = No
         reports.append({"index": k, "length": len(run), "clock": {"port": inputs[run[0].clock], "edge": run[0].edge},
                         "order": [f.name for f in run]})
     clocks = [dict(t) for t in dict.fromkeys(tuple(r["clock"].items()) for r in reports)]
+    if cross:
+        clocks = [dict(t) for t in dict.fromkeys((("port", inputs[f.clock]), ("edge", f.edge)) for f in design.flops)]
+        for r, run in zip(reports, runs):
+            r["clocks"] = [dict(t) for t in dict.fromkeys((("port", inputs[f.clock]), ("edge", f.edge)) for f in run)]
     report = {
         "top": top,
-        "architecture": "mux-D, one chain" if len(runs) == 1 else f"mux-D, {len(runs)} chains",
+        "architecture": ("mux-D, one chain" if len(runs) == 1 else f"mux-D, {len(runs)} chains")
+                        + (f", across clock domains with {len(lockups)} lockup latch(es)" if cross else ""),
         "length": max(len(run) for run in runs),
         "flops": len(order),
         "clock": clocks[0] if len(clocks) == 1 else None,
@@ -485,6 +613,8 @@ def stitch(netlist: dict, top: str, chains: int = 1, max_length: int | None = No
         "ports": {"enable": SCAN_EN, "input": SCAN_IN, "output": SCAN_OUT},
         "chains": reports,
         "order": order,
+        "cross_domains": cross,
+        "lockups": lockups,
     }
     return netlist, report
 
@@ -542,7 +672,7 @@ def _memory(name: str, width: int, rows: list[list[int]]) -> tuple[str, list[str
     return decl, [f"    {name}[{i}] = {_literal(row)};" for i, row in enumerate(rows)]
 
 
-def testbench(design: Design, seed: int = 7) -> tuple[str, dict]:
+def testbench(design: Design, seed: int = 7, strict: bool = True) -> tuple[str, dict]:
     """A self-checking testbench for the chains of ``design``, and what it expects.
 
     1. Shift: with scan_en high, 2L known bits go into every chain at once (L
@@ -553,12 +683,18 @@ def testbench(design: Design, seed: int = 7) -> tuple[str, dict]:
        expected state is the netlist's next-state function, evaluated here in
        the pulse's edge order.
 
+    With more than one clock (M29), the shift test runs twice more with the
+    clocks skewed: each clock's edges 1 ns after the previous clock's, then in
+    the reverse order, so every crossing between clocks sees its receiving
+    clock both late and early. The capture keeps the clocks together.
+
     Raises NetlistError when a chain is not complete: a flop the chains cannot
-    load leaves nothing definite to capture.
+    load leaves nothing definite to capture. ``strict=False`` writes the
+    testbench despite shift hazards (an unlatched crossing), to watch them fail.
     """
     chain = design.trace_chain()
-    if not chain.complete:
-        raise NetlistError("the scan chain is broken: " + "; ".join(chain.problems))
+    if chain.problems or (strict and chain.hazards):
+        raise NetlistError("the scan chain is broken: " + "; ".join(chain.problems + chain.hazards))
     runs = chain.chains
     flops = chain.order
     if not flops:
@@ -621,10 +757,30 @@ def testbench(design: Design, seed: int = 7) -> tuple[str, dict]:
             drives.append(f"    {ident} = {_literal([values.get(b, 0) for b in port['bits']])};")
     clocks = [_ident(c) for c in idle]
     toggle = " ".join(f"{c} = ~{c};" for c in clocks)
+    passes = 3 if len(clocks) > 1 else 1
+    step = 1.0 if len(clocks) <= 4 else round(4.0 / len(clocks), 3)
+
+    def skewed(order: list[str]) -> str:
+        """Each clock toggled ``step`` after the one before it, twice, the second round 5 ns after the first."""
+        first = f"#5 {order[0]} = ~{order[0]};" + "".join(f" #{step:g} {c} = ~{c};" for c in order[1:])
+        gap = 5 - step * (len(order) - 1)
+        second = f"#{gap:g} {order[0]} = ~{order[0]};" + "".join(f" #{step:g} {c} = ~{c};" for c in order[1:])
+        return f"{first}\n        {second}"
+
+    pulse = (f"""      #5 {toggle}
+      #5 {toggle}""" if passes == 1 else f"""      if (skew == 0) begin
+        #5 {toggle}
+        #5 {toggle}
+      end else if (skew == 1) begin
+        {skewed(clocks)}
+      end else begin
+        {skewed(clocks[::-1])}
+      end""")
     idles = "\n".join(f"    {_ident(c)} = 1'b{v};" for c, v in idle.items())
     count = len(flops)
     summary = (f"DFT-SCAN: chain length {length}, " if width == 1
                else f"DFT-SCAN: {width} chains, {count} flops, chain length {length}, ")
+    skew_note = f", skew passes {passes - 1}" if passes > 1 else ""
     edges = "; ".join(sorted({f"{f.edge} {inputs[f.clock]}" for f in flops}))
     text = f"""`timescale 1ns / 1ps
 // Scan chain test for {design.top}: generated by nirmaan.integrations.dft_scan.
@@ -633,7 +789,7 @@ module nirmaan_scan_tb;
 {chr(10).join(decls)}
 {chr(10).join(m[0] for m in memories)}
   wire [{width - 1}:0] chain_out = {SCAN_OUT};
-  integer i, k, shift_errors, capture_errors;
+  integer i, k, pass, skew, shift_errors, capture_errors;
 
   {_ident(design.top)} dut (
 {("," + chr(10)).join(conns)}
@@ -641,30 +797,36 @@ module nirmaan_scan_tb;
 
   task pulse;
     begin
-      #5 {toggle}
-      #5 {toggle}
+{pulse}
     end
   endtask
 
   initial begin
     shift_errors = 0;
     capture_errors = 0;
+    skew = 0;
 {chr(10).join(line for m in memories for line in m[1])}
 {idles}
 {chr(10).join(drives)}
     {SCAN_EN} = 1'b1;
     {SCAN_IN} = {width}'b0;
     // 1. Shift: bit i goes in at cycle i and is at chain k's scan_out before the edge of cycle i + its length.
-    for (i = 0; i < {2 * length}; i = i + 1) begin
-      {SCAN_IN} = shift_in[i];
-      #4;
-      for (k = 0; k < {width}; k = k + 1)
-        if (shift_mask[i][k] && chain_out[k] !== shift_exp[i][k]) begin
-          $error("shift: cycle %0d chain %0d scan_out=%b, expected %b", i, k, chain_out[k], shift_exp[i][k]);
-          shift_errors = shift_errors + 1;
-        end
-      pulse;
+    //    Pass 0 pulses the clocks together; with several clocks, passes 1 and 2 skew them (M29).
+    for (pass = 0; pass < {passes}; pass = pass + 1) begin
+      skew = pass;
+      for (i = 0; i < {2 * length}; i = i + 1) begin
+        {SCAN_IN} = shift_in[i];
+        #4;
+        for (k = 0; k < {width}; k = k + 1)
+          if (shift_mask[i][k] && chain_out[k] !== shift_exp[i][k]) begin
+            $error("shift: pass %0d cycle %0d chain %0d scan_out=%b, expected %b", pass, i, k, chain_out[k],
+                   shift_exp[i][k]);
+            shift_errors = shift_errors + 1;
+          end
+        pulse;
+      end
     end
+    skew = 0;
     // 2. Capture: load the state, one functional pulse, unload.
     for (i = 0; i < {length}; i = i + 1) begin
       {SCAN_IN} = load[i];
@@ -685,7 +847,7 @@ module nirmaan_scan_tb;
         end
       pulse;
     end
-    $display("{summary}shift errors %0d, capture errors %0d", shift_errors, capture_errors);
+    $display("{summary}shift errors %0d, capture errors %0d{skew_note}", shift_errors, capture_errors);
     $finish;
   end
 endmodule
@@ -694,7 +856,8 @@ endmodule
               "clock": ({"port": inputs[flops[0].clock], "edge": flops[0].edge} if len(idle) == 1
                         and len({f.edge for f in flops}) == 1 else None),
               "chains": [{"length": len(run), "order": [f.name for f in run]} for run in runs],
-              "order": [f.name for f in flops], "flush": flush, "state": state, "captured": captured}
+              "order": [f.name for f in flops], "flush": flush, "state": state, "captured": captured,
+              "skew_passes": passes - 1, "lockups": dict(chain.through)}
     return text, expect
 
 
@@ -703,14 +866,17 @@ endmodule
 
 def main(argv: list[str]) -> int:
     try:
-        if argv[:1] == ["stitch"] and len(argv) in (5, 7):
+        if argv[:1] == ["stitch"] and len(argv) in (5, 7, 8):
             _, prep, out, report, top = argv[:5]
-            chains, max_length = (int(argv[5]), int(argv[6]) or None) if len(argv) == 7 else (1, None)
-            netlist, chain = stitch(json.loads(Path(prep).read_text(encoding="utf-8")), top, chains, max_length)
+            chains, max_length = (int(argv[5]), int(argv[6]) or None) if len(argv) >= 7 else (1, None)
+            cross = argv[7:] == ["lockup"]
+            netlist, chain = stitch(json.loads(Path(prep).read_text(encoding="utf-8")), top, chains, max_length,
+                                    cross)
             Path(out).write_text(json.dumps(netlist), encoding="utf-8")
             Path(report).write_text(json.dumps(chain, indent=2) + "\n", encoding="utf-8")
             lengths = ", ".join(str(c["length"]) for c in chain["chains"])
-            print(f"DFT-STITCH: {chain['flops']} flops on {len(chain['chains'])} chain(s) of length {lengths}")
+            print(f"DFT-STITCH: {chain['flops']} flops on {len(chain['chains'])} chain(s) of length {lengths}"
+                  f"{', ' + str(len(chain['lockups'])) + ' lockup latch(es)' if cross else ''}")
             return 0
         if argv[:1] == ["testbench"] and len(argv) == 5:
             _, design_json, tb, expect, top = argv
@@ -723,7 +889,7 @@ def main(argv: list[str]) -> int:
     except (NetlistError, OSError, KeyError, ValueError, json.JSONDecodeError) as exc:
         print(f"DFT-ERROR: {exc}")
         return 1
-    print("usage: dft_scan.py stitch PREP.json OUT.json CHAIN.json TOP [CHAINS MAX_LENGTH] | "
+    print("usage: dft_scan.py stitch PREP.json OUT.json CHAIN.json TOP [CHAINS MAX_LENGTH [lockup]] | "
           "testbench DESIGN.json TB.v EXPECT.json TOP")
     return 2
 

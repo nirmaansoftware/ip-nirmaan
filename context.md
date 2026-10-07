@@ -2192,6 +2192,70 @@ parameter an integration reads is declared, and the crown jewel
 1231 passed, 3 skipped. Deferred to the next M28 part: typed values end to end (a
 `ToolRun` storing real lists) and the typed work packet.
 
+### Milestone 29 (verification plan) - Plans loaded from a file, and a plan seat (after Stage 6)
+
+Closes M24's first deferral. A verification plan (requirements, and the items
+that prove them) is a small JSON format, `nirmaan.vplan` version 1, read and
+written by `nirmaan/vplan.py`; a seat writes one on `block-design`, a real tool
+checks it before review, and the engine records it on approval.
+
+Key design points worth not re-deriving:
+- **Format.** `{"format", "version", "requirements": [{id, text, source,
+  section}], "items": [{id, kind, file, name, proves, rationale}]}`. Unknown
+  fields are refused (a plan cannot say `status` or `passed`), kinds must be
+  registered, `proves` must name requirements in the file. JSON, not YAML:
+  there is no YAML dependency. A pure-Python `JSONDecoder` whose
+  `parse_object` records each object's line and each value's line gives
+  `line N:` reasons.
+- **Import is all or nothing, through the engine.** References (`source`,
+  `file`) resolve by artifact ID, recorded path, or unique file name. The
+  records are first made on a scratch `TaskEngine` over the same state; any
+  refusal (M24 actor rule, duplicates, policy) is collected with its line and
+  nothing is recorded. CLI: `nirmaan vplan import PROJECT FILE --as ROLE` and
+  `nirmaan vplan export PROJECT [--out FILE]`; export is canonical (sorted,
+  `indent=2`, file names when unique), so an imported file exports back
+  byte for byte.
+- **Spec requirements are tagged** `[req:ID]` in the Markdown list item or
+  paragraph (`REQUIREMENT_TAG` in `company/traceability.py`); text is that
+  item without marker or tag, section is the nearest heading's number. The
+  AXI4-Lite fixture spec now tags the eight M24 demo requirements.
+- **The seat is data.** Feature `verification_plan` ("verification plan",
+  "vplan", "test plan"); a `dv-plan` stage on `block-design` (capability
+  `dv.plan`, output `verification_plan`, after `interface-spec`, conditional on
+  the feature, nothing depends on it, so every existing plan and every
+  workflow built from block-design stages is unchanged). Before review:
+  `vplan.check` (new, AVAILABLE, in-process, `integrations/vplan.py`, granted
+  by `verification_planning`) over `plan` and the approved upstream
+  `interface_spec` (`spec`, `upstream=True`): valid, covers exactly the tagged
+  requirements, quotes each, plain item file names.
+- **On approval.** `TaskEngine` gains `register_approval_consumer(kind, fn)`:
+  `fn(engine, artifact)` runs before the approval commits (raise to refuse;
+  nothing changes) and returns what to record after it commits. The engine
+  names no kind. `nirmaan.vplan` registers for `verification_plan`, acting only
+  when the artifact's stage checks it with `vplan.check` (so `new-ip`'s
+  document plans are untouched); it re-checks the digest-verified plan against
+  the digest-verified approved spec and records as the system actor, with
+  `plan` in each audit entry. `nirmaan/work/__init__.py` imports `nirmaan.vplan`
+  last, so the consumer is registered wherever the engine is.
+- **Planned items.** `VerificationItem` gains `file` and `plan`; `artifact`
+  defaults to empty. `TaskEngine.record_planned_item` applies the M24 checks
+  with the actor rule on the plan artifact. `engineering.holding_artifact`
+  binds a planned item, on every query, to the latest recorded artifact of
+  that file name; with none it is `unverifiable` ("no recorded artifact holds
+  ... yet"). The graph adds `planned_in` edges.
+
+Demo (real tools): "Create an AXI4-Lite register block with a verification
+plan." The plan seat writes `tests/fixtures/rtl/axi4_lite/verification_plan.json`
+(8 requirements, 6 items), it is checked, reviewed, approved, and recorded
+before any RTL; after the real simulation `nirmaan gaps` reports 5 of 8
+backed, with AXIL-B2B, AXIL-SYNTH, and AXIL-FORMAL gaps, as in M24.
+
+Tests: `tests/test_nirmaan_verification_plan.py`; crown jewel
+`test_a_plan_seat_against_a_new_spec_kind_with_a_new_item_kind_needs_no_core_changes`.
+Design doc: `docs/VERIFICATION_PLAN.md`. Deferred: YAML, planned items in an
+import, amending recorded plans, non-Markdown spec tags, the plan seat on
+`new-ip` and `feature-addition`.
+
 ---
 
 ### Milestone 29 - An unattended owner and reviewer loop in one command (after Stage 6)
@@ -2252,6 +2316,171 @@ nothing and keeps the import laws; every step audited as its seat.
 
 Deferred: concurrent tasks; a call budget across invocations; approval by a
 delegated non-human approver; task inputs in project mode.
+
+### Milestone 29 (working name) - Engineering records: decisions and failures, as views
+
+The third structural-review milestone (numbering is the coordinator's).
+"Why did we choose this?" and "what went wrong, and was it fixed?" answered
+from the record. Design doc: `docs/ENGINEERING_RECORDS.md`. No version bump.
+
+Key design points worth not re-deriving:
+- **Views, not new fields.** Inspection found that nothing in the product calls
+  `record_decision`: the decisions made are DECISION tasks, which already hold
+  every decision-record field (outcomes as alternatives, outcome, artifacts as
+  rationale, evidence, `task.submit`/`task.approve` audit entries, and the
+  branches `_take_branch` cancelled as consequences). M27's review repair
+  already moves superseded artifacts into an `Attempt`. So
+  `nirmaan/records.py` reads state and stores, infers, and audits nothing.
+- **Failure categories come from structure, never prose**: `check_failed` (a
+  failed `ToolRun`; resolved by a later successful run of the same tool on the
+  same task), `review_sent_back` (an `Attempt` with reviews), `submission_refused`
+  (an `Attempt` with no failed run of its own), `blocked` (`task.block`,
+  resolved by `task.unblock`), `failed` (`task.fail`), `escalated` (an
+  `Escalation`, resolved with its resolution). Ordered by audit sequence.
+  `failure_summary(states)` counts by category and subject across projects.
+- Surfaces: `nirmaan decisions PROJECT`, `nirmaan failures PROJECT...` (both
+  `--json`), export sections `decisions` (in `10_signoff`) and `failures` (in
+  `09_evidence`) through the section-writer registry and the folder table, and
+  MCP read tools `decisions` and `failures`.
+- The records-names-nothing test leaves platform tools out of its vocabulary:
+  `task.cancel` and `escalation.raise` are both platform tool IDs and the
+  engine's audit actions.
+- Two projects planned from the same request under a fixed clock share an ID;
+  the cross-project test uses two requests.
+
+`tests/test_nirmaan_records.py` (10), including Demo 4's `root-cause` decision
+(four alternatives, `rtl_bug`, three cancelled branches) and the crown jewel
+`test_a_new_decision_stage_is_recorded_with_no_core_changes`. With the M29 loop merged,
+the standard local run is 1260 passed, 3 skipped. Deferred: recording explicit decisions
+from the CLI or MCP, declined model answers (the engine records nothing for
+them), principle IDs on refusals, learning from the summary.
+
+### Milestone 29 (gates) - The RTL gates on the remaining workflows, and automatic antecedent covers (after Stage 6)
+
+Every stage that produces `rtl_source` now carries `RTL_GATES`: M29 adds
+`parameter-change` `rtl-change`, `regression-investigation` `rtl-fix`,
+`timing-closure` `rtl-fix`, and `new-ip` `cdc-design` (each also produces a
+`testbench`; a test enumerates `WORKFLOWS` so no RTL stage is ungated). And
+the `formal.cover` run behind `NOT_VACUOUS` now derives a cover for every
+assertion's antecedent, so a proof whose assertions sit under guards that
+never hold is refused. Design doc: `docs/GATES_REST.md`.
+
+Key design points worth not re-deriving:
+- **`cdc-design` needed two data edits.** `rtl.cdc_design` gains
+  `approved_inputs=True`, and the `cdc_design` skill gains the five gate tools:
+  the runtime runs before-review checks as the seat, and the broker refuses a
+  tool the role may not use. The skill does not include `rtl_design`, so
+  routing is unchanged.
+- **No STA before review on the timing fix.** `reanalysis` already re-runs
+  `sta.run` after the fix and is the implementation gate; STA needs a Liberty
+  netlist, SDC, and PDK the RTL seat does not produce; and it runs only in CI's
+  `physical-design` job, so a before-review STA would either silently not
+  apply or block every timing fix on most machines. Tightening `reanalysis` to
+  a real run is deferred to the PD signoff work.
+- **Antecedent covers are derived by elaboration, not by parsing guards.**
+  `integrations/eda_antecedents.py` (imports nothing of Nirmaan) wraps each
+  procedural assertion as `begin cover (1'b1); <assertion> end`, so Yosys
+  gives the cover exactly the assertion's path condition: every `if`, `else`,
+  `case` arm, loop iteration, generate instance, and task call. A top-level
+  `A |-> B` covers `A` (module scope: `cover property (A);` after it); a
+  module-scope assertion with no implication is `unguarded`. Inserted text
+  never adds a newline; the manifest `<run>/antecedents.json` records each
+  derived cover's file, line, and column, and `parse_sby_cover` counts those
+  apart from the seat's covers (`antecedents_reached`, `_unreached`,
+  `_unelaborated`; `covers_*` stay the seat's).
+- **Never silently skipped.** Sequence operators, nested or chained
+  implications, named properties, action blocks, deferred assertions, and
+  macros whose body asserts are refused by the backend's precheck, as a
+  recorded failed run listing each file, line, and reason. A derived cover
+  missing from the elaborated design (generate branch not taken, task never
+  called) is a warning, not a failure.
+- **The seat's files are never edited.** The cover `.sby`'s `[files]` names
+  the instrumented copies in `<run>/antecedents/`. All seven fixture setups
+  pass unchanged: counter 1, AXI4-Lite 14, FIFO 18, arbiter 33 (N=5: 45), APB
+  38 derived covers reached.
+
+Tests: `tests/test_nirmaan_gates_rest.py` (47): the stages as data and
+the registry-wide law; the CDC seat's data; on each of the four stages a latch
+and a failing self-check refused, clean RTL with a proof approved, and a
+never-checked assertion refused while `formal.run` passes; derivation on every
+fixture (same lines, nothing else changed) and every fixture antecedent
+reached; an unreachable antecedent and an underivable assertion as recorded
+failed runs; the deriver and parser on text; crown jewel
+`test_a_new_workflow_with_the_gates_refuses_a_never_checked_assertion_with_no_core_changes`;
+`drive` on a newly gated stage; the core never names antecedents; CI requires
+the formal tools. Migrated (design doc, section 4): one M27 test, which now checks that the
+cover run reads an instrumented copy differing only by the derived cover; the
+bridge plans that reach `cdc-design` already drove the gated
+`rtl-implementation` first and pass unchanged. `formal.cover` gains no
+parameter, so its M28 contract is unchanged. The standard run, merged with
+main (M28 contracts, M29 auto loop), is 1297 passed and 3 skipped (OpenROAD).
+
+Deferred: a real `sta.run` on `timing-closure` `reanalysis`; antecedents of
+boolean implications inside an immediate assertion; expanding named
+properties and macros; multi-task setups in the cover check.
+
+### Milestone 29 (DFT) - Transition ATPG, lockup latches, and an MBIST stage (after Stage 6)
+
+One new tool, `AVAILABLE`: `dft.atpg_transition` (backend
+`icarus-atpg-transition`, in `nirmaan/integrations/dft.py`); `dft.scan_insert`
+gains `cross_domains=lockup` and `dft.mbist` makes `top` optional. Design doc:
+`docs/DFT_NEXT.md`.
+
+Key design points worth not re-deriving:
+- **Transition faults are two-frame stuck-at faults.** `build_model` in
+  `dft_atpg.py` copies the capture model into a second frame
+  (`CaptureModel.copy_frame`); `net/STR` is the frame-2 copy stuck at 0 with a
+  need (`Fault.need`) that the net is 0 in frame 1. PODEM treats needs as goals
+  and contradictions as dead ends, so "untestable" is still a proof. Primary
+  inputs are held through launch and capture (launch on capture only; LOS is
+  deferred), so their transitions are proven undetectable.
+- **The grader's delay model.** In the fault netlist each site gets a flop on
+  `nirmaan_fault_clk` holding the previous value and becomes `net & prev`
+  (STR) or `net | prev` (STF), only while `nirmaan_fault_en[s]` and
+  `nirmaan_fault_atspeed` are high; the testbench raises at-speed 1 ns after
+  the launch edge and drops it 1 ns after the capture edge. Pattern files carry
+  `fault_model` (absent means stuck-at) and a mismatch is refused.
+- **Stuck-at across capture edges is now modelled, not refused**: second-edge
+  flops capture from a copy of the logic whose first-edge flops hold their new
+  state; a fault sits on both copies (`Fault.extra`). Transition ATPG over two
+  edges is still refused with the reason.
+- **Lockups.** With `cross_domains=lockup`, flops are ordered second-edge
+  domains first, then by clock port and edge, cut into balanced chains, and a
+  `$_DLATCH_N_` (after a rising-edge flop) or `$_DLATCH_P_` goes on each clock
+  crossing. `Design.lockups` are latches whose D is a flop Q and enable a
+  module input; `no-latches` skips them unless they reach capture logic
+  (`lockup_leaks`). The tracer reports `hazards` (an unlatched crossing, a
+  wrong latch, a second-edge flop loading a first-edge one), which make a chain
+  incomplete. `dft.scan_sim` with several clocks runs the shift three times:
+  together, skewed 1 ns per clock, and skewed in reverse.
+- **MBIST.** With no memory as top, every module with the single-port
+  interface in the hierarchy is a memory, each with its own controller in one
+  testbench. `(* read_latency = N *)` sets the latency (default 1); the
+  testbench measures it first (word 0 zeros, word 1 ones, switch the address)
+  and a mismatch fails the run. Cycles are (10 + 5L)N.
+- **Data.** Features `memory` (RAM, SRAM, memory array, MBIST) and `at_speed`
+  (implies `dft`); `block-design` gains an `mbist` stage (`dft.mbist` over the
+  approved upstream `rtl_source`, no top) and the `dft` stage a fourth check,
+  `dft.atpg_transition` with `min_test_coverage` 80, `when=when("at_speed")`.
+  Skills `atpg`, `fault_modeling`, `scan_design` gain the new tool. Under the
+  M28 contracts, `dft.atpg_transition` declares `dft.atpg`'s parameters,
+  `dft.scan_insert` declares `cross_domains`, and `dft.mbist`'s `top` is no
+  longer required.
+
+Measured transition coverage (launch on capture): counter 53/70 (17 proven
+undetectable), `atpg_demo` 87/132 (45), rr_arbiter 92/116 (24): 100% test
+coverage each. The lockup `two_clocks` chain shifts clean in all three passes;
+with the latch made a wire, `dft.check` reports the crossing and the skewed
+shift loses 8 bits. MBIST passes `sync_ram_2cycle` (32x16, latency 2) in 640
+cycles.
+
+Fixtures: `mbist/sync_ram_2cycle.v`, `mbist/ram_block.v`, `mbist/block_ram.v`,
+`mbist/ram_block_tb.v`. Tests: `tests/test_nirmaan_dft_next.py`; crown jewel
+`test_a_new_transition_backend_needs_no_core_changes`. Deferred: launch on
+shift, transition ATPG over two capture edges, pin and path delay faults,
+parameterized memory instances, multi-port memories, a memory collar.
+
+---
 
 ---
 

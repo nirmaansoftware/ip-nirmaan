@@ -177,6 +177,33 @@ def _plan_project(ctx: McpContext, arguments: dict[str, Any]) -> dict:
     }
 
 
+@register_tool(
+    "decisions",
+    "Why each choice was made in a project: every decision task and recorded decision, with its "
+    "alternatives, choice, rationale, evidence, who decided and approved, and the branches it cancelled. "
+    "Read from the record; nothing is inferred.",
+    _schema(_PROJECT, ["project"]),
+)
+def _decisions(ctx: McpContext, arguments: dict[str, Any]) -> list:
+    from nirmaan.records import decision_records
+
+    return [r.to_dict() for r in decision_records(_load(ctx, str(arguments["project"])).state)]
+
+
+@register_tool(
+    "failures",
+    "What went wrong in a project and whether it was resolved: failed tool runs, refused or sent-back "
+    "submissions, blocks, failures, and escalations, with counts by category and subject.",
+    _schema(_PROJECT, ["project"]),
+)
+def _failures(ctx: McpContext, arguments: dict[str, Any]) -> dict:
+    from nirmaan.records import failure_records, failure_summary
+
+    state = _load(ctx, str(arguments["project"])).state
+    return {"failures": [r.to_dict() for r in failure_records(state)],
+            "summary": [c.to_dict() for c in failure_summary([state])]}
+
+
 @register_tool("list_projects", "Saved projects, with intent and progress.", _schema({}, []))
 def _list_projects(ctx: McpContext, arguments: dict[str, Any]) -> list:
     out = []
