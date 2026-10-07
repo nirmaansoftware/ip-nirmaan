@@ -139,3 +139,21 @@ the new parameters (`chains`, `max_chain_length`, ATPG's `patterns`,
 `fault_sample`, `seed`, `min_<metric>`, `synth.run`'s tie cells, `sta.run`'s
 LEFs). The static scan no longer reads `p["x"]`, which in `dft_atpg.py` is a
 pattern record, not parameters.
+
+**2026-10-07, merges.** The owner chose "merge both, then M29": #37 merged
+(c36b53a) and #41 merged (d9e2bf0) after green CI.
+
+## M29: engineering records (branch `m29/engineering-records`, from main d9e2bf0)
+
+| # | Step | Status |
+|---|---|---|
+| a | Design: `docs/ENGINEERING_RECORDS.md` (views, not new stored fields) | DONE |
+| b | Failing tests `tests/test_nirmaan_records.py` | DONE |
+| c | `src/nirmaan/records.py` (decision and failure views, summary) | DONE |
+| d | CLI `decisions`/`failures`, export sections, MCP read tools | DONE |
+| e | Full suite (1241 passed, 3 skipped), `context.md`, ROADMAP, PR | DONE |
+
+Inspection findings that shaped it: no product code calls
+`record_decision`; decisions are DECISION tasks (outcomes, outcome,
+artifacts, evidence, audit, branch cancellations by `_take_branch`). M27's
+review repair already moves superseded artifacts into an `Attempt`.

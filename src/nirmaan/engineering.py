@@ -203,14 +203,27 @@ def _unaccepted(state: ProjectState, task_id: str) -> str:
             "do not count: only a passing, cited tool run does)")
 
 
+def holding_artifact(state: ProjectState, item: VerificationItem) -> Artifact | None:
+    """The artifact whose file holds the item: its recorded one, or, for an item planned before its
+    file existed (M29), the latest recorded artifact of that file name. Derived on every call."""
+    if item.artifact:
+        return state.artifacts.get(item.artifact)
+    named = [a for a in state.artifacts.values() if a.location and Path(a.location).name == item.file]
+    return named[-1] if named else None
+
+
 def _item_status(state: ProjectState, item: VerificationItem, kinds: dict[str, ItemKind]) -> ItemStatus:
+    art = holding_artifact(state, item)
+
     def status(word: str, reason: str, run: str | None = None, evidence: str | None = None) -> ItemStatus:
-        return ItemStatus(item.id, item.kind, item.name, item.artifact, word, reason, run, evidence)
+        return ItemStatus(item.id, item.kind, item.name, art.id if art else item.artifact, word, reason, run,
+                          evidence)
 
     kind = kinds.get(item.kind)
     if kind is None:
         return status("unverifiable", f"unknown verification-item kind {item.kind!r}")
-    art = state.artifacts.get(item.artifact)
+    if art is None and item.file:
+        return status("unverifiable", f"no recorded artifact holds {item.file} yet (planned in {item.plan})")
     if art is None:
         return status("unverifiable", f"its artifact {item.artifact} is not recorded")
     data, why = verified_bytes(art)
@@ -280,7 +293,11 @@ def engineering_graph(state: ProjectState, links: LinkReport | None = None,
     for item in sorted(state.verification_items.values(), key=lambda i: i.id):
         nodes[item.id] = {"id": item.id, "kind": f"verification_item:{item.kind}", "label": item.name,
                           "status": status[item.id].status if item.id in status else None}
-        edges.append({"from": item.id, "relation": "held_in", "to": item.artifact})
+        held = status[item.id].artifact if item.id in status else item.artifact
+        if held:
+            edges.append({"from": item.id, "relation": "held_in", "to": held})
+        if item.plan:  # M29: declared by an approved plan before its file existed
+            edges.append({"from": item.id, "relation": "planned_in", "to": item.plan})
         for rid in item.proves:
             edges.append({"from": item.id, "relation": "proves", "to": f"req:{rid}"})
         if item.id in status and status[item.id].run:

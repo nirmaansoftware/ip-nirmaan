@@ -42,6 +42,9 @@ eval_app = typer.Typer(help="Evaluate a seat: a real or replayed model, judged b
 app.add_typer(org_app, name="org")
 app.add_typer(task_app, name="task")
 app.add_typer(eval_app, name="eval")
+vplan_app = typer.Typer(help="Load and save verification plans: requirements and the items that prove them.",
+                        no_args_is_help=True)
+app.add_typer(vplan_app, name="vplan")
 
 console = Console()
 _err = Console(stderr=True)
@@ -455,6 +458,48 @@ def gaps(project: str, as_json: bool = typer.Option(False, "--json"), root: Path
 
 
 @app.command()
+def decisions(project: str, as_json: bool = typer.Option(False, "--json"), root: Path = ROOT_OPTION) -> None:
+    """Why each choice was made: decision tasks and recorded decisions, read from the record."""
+    from nirmaan.records import decision_records
+
+    records = decision_records(_load(project, root).state)
+    if as_json:
+        typer.echo(json.dumps([r.to_dict() for r in records], indent=2))
+        return
+    for r in records:
+        console.print(escape(f"{r.id} [{r.status}] {r.question}"), highlight=False, soft_wrap=True)
+        console.print(escape(f"  chosen: {r.chosen or 'not yet decided'}; alternatives: "
+                             f"{', '.join(r.alternatives) or 'none recorded'}"), highlight=False, soft_wrap=True)
+        if r.decided_by:
+            console.print(escape(f"  decided by {r.decided_by} at {r.decided_at}"), highlight=False)
+        for c in r.consequences:
+            console.print(escape(f"  cancelled {c['task']}: {c['title']}"), highlight=False, soft_wrap=True)
+
+
+@app.command()
+def failures(projects: List[str], as_json: bool = typer.Option(False, "--json"), root: Path = ROOT_OPTION) -> None:
+    """What went wrong and whether it was resolved; with several projects, counts across them."""
+    from nirmaan.records import failure_records, failure_summary
+
+    states = [_load(p, root).state for p in projects]
+    records = [r for s in states for r in failure_records(s)]
+    summary = failure_summary(states)
+    if as_json:
+        typer.echo(json.dumps({"failures": [r.to_dict() for r in records],
+                               "summary": [c.to_dict() for c in summary]}, indent=2))
+        return
+    for r in records:
+        status = f"resolved: {r.resolution}" if r.resolved else "open"
+        console.print(escape(f"{r.category.value}{' ' + r.subject if r.subject else ''} on {r.task}: "
+                             f"{r.summary} ({status})"), highlight=False, soft_wrap=True)
+    if len(states) > 1:
+        console.print("\nAcross projects:")
+        for c in summary:
+            console.print(escape(f"  {c.category.value} {c.subject or '-'}: {c.count} in {c.projects} "
+                                 f"projects, {c.resolved} resolved"), highlight=False)
+
+
+@app.command()
 def links(project: str, root: Path = ROOT_OPTION) -> None:
     """Design Graph nodes each artifact links to, parsed from its digest-checked file."""
     from nirmaan.engineering import artifact_links
@@ -464,6 +509,41 @@ def links(project: str, root: Path = ROOT_OPTION) -> None:
         console.print(f"{escape(link.artifact)} {link.kind} {link.node_kind} {escape(link.node_name)}")
     for refused in report.refused:
         console.print(f"[red]refused[/red] {escape(refused.artifact)}: {escape(refused.reason)}")
+
+
+@vplan_app.command("import")
+def vplan_import(project: str, file: Path, role: str = typer.Option(..., "--as", help="Role ID acting."),
+                 agent: bool = typer.Option(False, "--agent", help="Act as an AI agent rather than a human."),
+                 root: Path = ROOT_OPTION) -> None:
+    """Record a plan's requirements and items through the engine. All or nothing; it backs nothing."""
+    from nirmaan.vplan import PlanError, import_plan
+
+    engine = _load(project, root)
+    try:
+        report = import_plan(engine, _actor(role, agent), file.read_text(encoding="utf-8"))
+    except PlanError as exc:
+        for problem in exc.problems:
+            _err.print(f"[red]{escape(str(file))}: {escape(problem)}[/red]")
+        _fail(f"refused {file}: nothing was recorded")
+    except OSError as exc:
+        _fail(str(exc))
+    ProjectStore(root).save(engine.state)
+    console.print(f"Recorded {report.requirements} requirements and {report.items} verification items. "
+                  "None is backed until a passing, cited tool run backs it.")
+
+
+@vplan_app.command("export")
+def vplan_export(project: str, out: Optional[Path] = typer.Option(None, "--out", help="Write here, not stdout."),
+                 root: Path = ROOT_OPTION) -> None:
+    """The project's requirements and verification items, in the plan format."""
+    from nirmaan.vplan import export_plan
+
+    text = export_plan(_load(project, root).state)
+    if out is None:
+        typer.echo(text, nl=False)
+    else:
+        out.write_text(text, encoding="utf-8")
+        console.print(f"Wrote {escape(str(out))}")
 
 
 @app.command()
