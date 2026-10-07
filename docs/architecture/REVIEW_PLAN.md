@@ -167,10 +167,10 @@ approval. Parallel PRs #45, #47, #49, #50, #51 are other sessions' work.
 | # | Step | Status |
 |---|---|---|
 | a | Design: `docs/REGISTER_MAP.md` | DONE |
-| b | Failing tests `tests/test_nirmaan_regmap.py`, fixture `register_map.json` | TODO |
-| c | `models/regmap.py`, `nirmaan/regmap.py` (validate, lowerings registry, C test generator) | TODO |
-| d | `integrations/regmap.py` (`regmap.check`, `regmap.verify` on the fw.test harness), contracts, CLI | TODO |
-| e | Eval case held-out check, full suite, `context.md`, ROADMAP, PR | TODO |
+| b | Failing tests `tests/test_nirmaan_regmap.py`, fixture `register_map.json` | DONE |
+| c | `models/regmap.py`, `nirmaan/regmap.py` (validate, lowerings registry, C test generator) | DONE |
+| d | `integrations/regmap.py` (`regmap.check`, `regmap.verify` on the fw.test harness), contracts, CLI | DONE |
+| e | Eval case held-out check, full suite (1300 passed, 3 skipped), `context.md`, ROADMAP, PR | DONE |
 
 Decided at design: no workflow adoption in M30 (an added expected output
 would show as a missing deliverable in the export); the map judges RTL
