@@ -156,13 +156,21 @@ def test_openroad_full_flow():
     result = parse_openroad(_text("openroad_route.log"), 0, "route")
     assert result.passed, result.summary
     m = result.metrics
-    assert m["stages_completed"] == ["floorplan", "place", "route", "timing"] and m["failed_stage"] is None
-    assert (m["design_area_um2"], m["utilization_pct"]) == (1665.0, 41.0)  # printed as um^2
-    assert (m["wirelength_um"], m["drc_violations"]) == (10783.0, 0)  # the last iteration's figures
-    assert (m["worst_slack"], m["worst_hold_slack"]) == (7.12, 0.103)
-    assert [d.code for d in result.warnings] == ["IFP-0028", "DRT-0120", "DRT-0120"]
-    assert result.summary == ("place and route passed: routed, 0 DRC violations, wirelength 10783 um, "
-                              "utilization 41%, worst setup slack 7.120, worst hold slack 0.103, TNS 0.000")
+    assert m["stages_completed"] == ["floorplan", "place", "cts", "route", "timing"] and m["failed_stage"] is None
+    assert (m["design_area_um2"], m["utilization_pct"]) == (1759.0, 43.0)  # printed as um^2
+    assert (m["wirelength_um"], m["drc_violations"]) == (11263.0, 0)  # the last iteration's figures
+    assert (m["worst_slack"], m["worst_hold_slack"]) == (7.501, 0.108)
+    # M29: the clock tree, and slack at each checkpoint (ideal clock, propagated, global-routing estimate).
+    assert (m["cts_buffers"], m["cts_sinks"], m["clock_skew"], m["clock_insertion_delay"]) == (17, 206, 0.005, 0.113)
+    assert m["slack_by_stage"] == {"place": {"setup": 7.498, "hold": 0.103, "tns": 0.0},
+                                   "cts": {"setup": 7.509, "hold": 0.107, "tns": 0.0},
+                                   "route": {"setup": 7.501, "hold": 0.108, "tns": 0.0}}
+    # No power grid was asked for: the supply pins stay open, and the summary says so instead of failing.
+    assert m["power_grids"] == [] and m["unconnected_supply_pins"] == 1826 and m["parasitics"] == "estimated"
+    assert [d.code for d in result.warnings] == ["IFP-0028"]
+    assert result.summary == ("place and route passed: routed, 0 DRC violations, wirelength 11263 um, "
+                              "utilization 43%, no power grid, clock skew 0.005, worst setup slack 7.501, "
+                              "worst hold slack 0.108, TNS 0.000")
 
 
 def test_openroad_failure_names_the_stage():
