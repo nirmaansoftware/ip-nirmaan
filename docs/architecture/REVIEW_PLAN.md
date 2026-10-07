@@ -130,3 +130,12 @@ until done): in `company/tools.py`, give #40's new tools contracts,
 (`sources` and `rtl` paths required, `TOP`, `*RUNNER`); add `tie_high` and
 `tie_low` (text) to `pnr.run` for #38. #40's `firmware_riscv.py` also splits
 `rtl` itself; `list_values` is the helper to use.
+
+**2026-10-07.** Everything else merged (#38, #40, #42, #43, v1.21.0). `main`
+merged into #37 (1218 passed, 3 skipped; this review's context entry moved
+after the DFT part, outside the v1.21.0 set) and #37 into #41 (1231 passed,
+3 skipped). #41 now gives contracts to the five tools the M27 parts added and
+the new parameters (`chains`, `max_chain_length`, ATPG's `patterns`,
+`fault_sample`, `seed`, `min_<metric>`, `synth.run`'s tie cells, `sta.run`'s
+LEFs). The static scan no longer reads `p["x"]`, which in `dft_atpg.py` is a
+pattern record, not parameters.
