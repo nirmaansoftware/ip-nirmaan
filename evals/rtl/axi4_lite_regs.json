@@ -1,0 +1,37 @@
+{
+  "id": "rtl/axi4-lite-regs",
+  "request": "Create an AXI4-Lite register block.",
+  "seat": "rtl-implementation",
+  "expected_behavior": "RTL for module axi4_lite_regs (ADDR_WIDTH 4, DATA_WIDTH 32, s_axil_* ports) with four 32-bit registers at 0x0 to 0xC, and a self-checking testbench, both following the approved interface specification and microarchitecture. The work reaches review only after lint, simulation, and synthesis (and formal, when a .sby is written) pass on those files.",
+  "constraints": [
+    "Work only from the approved interface specification and microarchitecture.",
+    "Lint-clean under Verilator -Wall with no waivers.",
+    "Synthesizes with no latches."
+  ],
+  "known_failure_modes": [
+    "Unmapped or misaligned addresses answered OKAY instead of SLVERR.",
+    "wstrb ignored or applied to the wrong byte lanes.",
+    "READY driven combinationally from VALID, against the specification.",
+    "A self-written testbench too weak to notice the above; the held-out reference testbench judges instead.",
+    "A different but valid latency or response choice fails the reference testbench; the upstream documents state the choices, so this is a failure to follow them."
+  ],
+  "upstream": {
+    "interface-spec": [{"path": "tests/fixtures/rtl/axi4_lite/interface_spec.md", "kind": "interface_spec"}],
+    "microarchitecture": [{"path": "tests/fixtures/rtl/axi4_lite/microarchitecture.md", "kind": "microarchitecture_spec"}]
+  },
+  "reference": [
+    {"path": "tests/fixtures/rtl/axi4_lite/axi4_lite_regs.v", "kind": "rtl_source", "entry": "axi4_lite_regs"},
+    {"path": "tests/fixtures/rtl/axi4_lite/axi4_lite_regs_tb.v", "kind": "testbench", "entry": "axi4_lite_regs_tb"},
+    {"path": "tests/fixtures/rtl/axi4_lite/axi4_lite_regs.sby", "kind": "formal_spec"}
+  ],
+  "held_out": [
+    {
+      "name": "The reference testbench passes on the seat's RTL",
+      "scorer": "held-out-run",
+      "tool": "simulator.run",
+      "seat_files": {"sources": ["rtl_source"]},
+      "case_files": {"sources": ["tests/fixtures/rtl/axi4_lite/axi4_lite_regs_tb.v"]},
+      "params": {"top": "axi4_lite_regs_tb"}
+    }
+  ]
+}

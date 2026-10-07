@@ -27,6 +27,7 @@ from nirmaan.runtime.prompt import Citable, ToolNote, WorkPrompt, render_work_pr
 from nirmaan.runtime.tools import (
     ToolAccessDenied,
     ToolBroker,
+    ToolContractError,
     ToolOutcome,
     available_bindings,
     register_binding,

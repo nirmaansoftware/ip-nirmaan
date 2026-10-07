@@ -231,6 +231,43 @@ class ToolRisk(str, Enum):
     APPROVE = "approve"
 
 
+class ParamKind(str, Enum):
+    TEXT = "text"
+    #: One file path.
+    PATH = "path"
+    #: Several file paths. Stored comma-joined, so no element may contain a comma.
+    PATHS = "paths"
+    INTEGER = "integer"
+    NUMBER = "number"
+
+
+class ParamSpec(BaseModel):
+    """One parameter a tool takes (M28)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    name: str = Field(description="The parameter, or with prefix=True the start of a family, e.g. 'max_'.")
+    kind: ParamKind = ParamKind.TEXT
+    required: bool = Field(
+        default=False,
+        description="The tool cannot do its job without it. A run missing it is a recorded failed run.",
+    )
+    description: str = ""
+    prefix: bool = Field(default=False, description="Names every parameter that starts with ``name``.")
+
+    @property
+    def label(self) -> str:
+        return f"{self.name}<metric>" if self.prefix else self.name
+
+    def covers(self, param: str) -> bool:
+        return param.startswith(self.name) if self.prefix else param == self.name
+
+
+def list_values(value: str) -> list[str]:
+    """The elements of a stored list parameter (comma-joined), without blanks."""
+    return [part.strip() for part in value.split(",") if part.strip()]
+
+
 class ToolSpec(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -240,6 +277,14 @@ class ToolSpec(BaseModel):
     risk: ToolRisk
     status: ToolStatus = ToolStatus.CONTRACT_ONLY
     description: str = ""
+    params: tuple[ParamSpec, ...] | None = Field(
+        default=None,
+        description="The parameters it takes (M28). None: no contract declared, parameters taken as given.",
+    )
+
+    def param(self, name: str) -> ParamSpec | None:
+        """The declared parameter covering ``name``, if any."""
+        return next((p for p in self.params or () if p.covers(name)), None)
 
 
 class OrgUnit(BaseModel):
