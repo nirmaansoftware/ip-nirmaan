@@ -52,3 +52,7 @@ ITEM_KINDS: list[ItemKind] = [
     ItemKind("coverage_point", ("coverage.read",),
              "A cover point, proven only by a coverage measurement."),
 ]
+
+#: M29: how a specification marks a requirement a verification plan must cover: ``[req:ID]`` in the
+#: Markdown list item or paragraph that states it. ``nirmaan.vplan`` reads it; see docs/VERIFICATION_PLAN.md.
+REQUIREMENT_TAG = r"\[req:([A-Za-z][A-Za-z0-9_.-]*)\]"

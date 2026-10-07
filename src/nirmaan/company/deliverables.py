@@ -82,13 +82,13 @@ DELIVERABLE_FOLDERS: list[DeliverableFolder] = [
         description="Requirement traceability, tool runs, reviews, and the verified audit chain.",
         artifact_kinds=("traceability_matrix", "audit_report"),
         capabilities=("quality.traceability", "quality.audit"),
-        sections=(X.TRACE, X.TOOL_RUNS, X.REVIEWS, X.AUDIT_CHAIN, X.ENGINEERING_GRAPH),
+        sections=(X.TRACE, X.TOOL_RUNS, X.REVIEWS, X.AUDIT_CHAIN, X.ENGINEERING_GRAPH, X.FAILURES),
     ),
     DeliverableFolder(
         id="10_signoff", title="Signoff",
-        description="What is and is not signed off, from gate approvals the engine recorded.",
+        description="What is and is not signed off, from gate approvals the engine recorded, and the decisions behind it.",
         artifact_kinds=("release_record",),
         capabilities=("release.manage",),
-        sections=(X.SIGNOFF,),
+        sections=(X.SIGNOFF, X.DECISIONS),
     ),
 ]

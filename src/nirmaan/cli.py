@@ -42,6 +42,9 @@ eval_app = typer.Typer(help="Evaluate a seat: a real or replayed model, judged b
 app.add_typer(org_app, name="org")
 app.add_typer(task_app, name="task")
 app.add_typer(eval_app, name="eval")
+vplan_app = typer.Typer(help="Load and save verification plans: requirements and the items that prove them.",
+                        no_args_is_help=True)
+app.add_typer(vplan_app, name="vplan")
 
 console = Console()
 _err = Console(stderr=True)
@@ -455,6 +458,48 @@ def gaps(project: str, as_json: bool = typer.Option(False, "--json"), root: Path
 
 
 @app.command()
+def decisions(project: str, as_json: bool = typer.Option(False, "--json"), root: Path = ROOT_OPTION) -> None:
+    """Why each choice was made: decision tasks and recorded decisions, read from the record."""
+    from nirmaan.records import decision_records
+
+    records = decision_records(_load(project, root).state)
+    if as_json:
+        typer.echo(json.dumps([r.to_dict() for r in records], indent=2))
+        return
+    for r in records:
+        console.print(escape(f"{r.id} [{r.status}] {r.question}"), highlight=False, soft_wrap=True)
+        console.print(escape(f"  chosen: {r.chosen or 'not yet decided'}; alternatives: "
+                             f"{', '.join(r.alternatives) or 'none recorded'}"), highlight=False, soft_wrap=True)
+        if r.decided_by:
+            console.print(escape(f"  decided by {r.decided_by} at {r.decided_at}"), highlight=False)
+        for c in r.consequences:
+            console.print(escape(f"  cancelled {c['task']}: {c['title']}"), highlight=False, soft_wrap=True)
+
+
+@app.command()
+def failures(projects: List[str], as_json: bool = typer.Option(False, "--json"), root: Path = ROOT_OPTION) -> None:
+    """What went wrong and whether it was resolved; with several projects, counts across them."""
+    from nirmaan.records import failure_records, failure_summary
+
+    states = [_load(p, root).state for p in projects]
+    records = [r for s in states for r in failure_records(s)]
+    summary = failure_summary(states)
+    if as_json:
+        typer.echo(json.dumps({"failures": [r.to_dict() for r in records],
+                               "summary": [c.to_dict() for c in summary]}, indent=2))
+        return
+    for r in records:
+        status = f"resolved: {r.resolution}" if r.resolved else "open"
+        console.print(escape(f"{r.category.value}{' ' + r.subject if r.subject else ''} on {r.task}: "
+                             f"{r.summary} ({status})"), highlight=False, soft_wrap=True)
+    if len(states) > 1:
+        console.print("\nAcross projects:")
+        for c in summary:
+            console.print(escape(f"  {c.category.value} {c.subject or '-'}: {c.count} in {c.projects} "
+                                 f"projects, {c.resolved} resolved"), highlight=False)
+
+
+@app.command()
 def links(project: str, root: Path = ROOT_OPTION) -> None:
     """Design Graph nodes each artifact links to, parsed from its digest-checked file."""
     from nirmaan.engineering import artifact_links
@@ -464,6 +509,41 @@ def links(project: str, root: Path = ROOT_OPTION) -> None:
         console.print(f"{escape(link.artifact)} {link.kind} {link.node_kind} {escape(link.node_name)}")
     for refused in report.refused:
         console.print(f"[red]refused[/red] {escape(refused.artifact)}: {escape(refused.reason)}")
+
+
+@vplan_app.command("import")
+def vplan_import(project: str, file: Path, role: str = typer.Option(..., "--as", help="Role ID acting."),
+                 agent: bool = typer.Option(False, "--agent", help="Act as an AI agent rather than a human."),
+                 root: Path = ROOT_OPTION) -> None:
+    """Record a plan's requirements and items through the engine. All or nothing; it backs nothing."""
+    from nirmaan.vplan import PlanError, import_plan
+
+    engine = _load(project, root)
+    try:
+        report = import_plan(engine, _actor(role, agent), file.read_text(encoding="utf-8"))
+    except PlanError as exc:
+        for problem in exc.problems:
+            _err.print(f"[red]{escape(str(file))}: {escape(problem)}[/red]")
+        _fail(f"refused {file}: nothing was recorded")
+    except OSError as exc:
+        _fail(str(exc))
+    ProjectStore(root).save(engine.state)
+    console.print(f"Recorded {report.requirements} requirements and {report.items} verification items. "
+                  "None is backed until a passing, cited tool run backs it.")
+
+
+@vplan_app.command("export")
+def vplan_export(project: str, out: Optional[Path] = typer.Option(None, "--out", help="Write here, not stdout."),
+                 root: Path = ROOT_OPTION) -> None:
+    """The project's requirements and verification items, in the plan format."""
+    from nirmaan.vplan import export_plan
+
+    text = export_plan(_load(project, root).state)
+    if out is None:
+        typer.echo(text, nl=False)
+    else:
+        out.write_text(text, encoding="utf-8")
+        console.print(f"Wrote {escape(str(out))}")
 
 
 @app.command()
@@ -657,6 +737,89 @@ def run_cmd(
     for label, ref in (("escalation", report.escalation), ("review", report.review)):
         if ref:
             console.print(f"{label}: {ref}", highlight=False)
+
+
+@app.command("drive")
+def drive_cmd(
+    project: str, task: Optional[str] = typer.Argument(None, help="One task; omit to drive every ready task."),
+    runtime: str = typer.Option("unbound", "--runtime", help="Registered runtime ID for the owner seat."),
+    reviewer_runtime: Optional[str] = typer.Option(None, "--reviewer-runtime",
+                                                   help="Runtime ID for the reviewer seat (default: --runtime)."),
+    max_calls: int = typer.Option(20, "--max-calls", min=0, help="Runtime calls this invocation may make."),
+    attempts: Optional[int] = typer.Option(None, "--attempts", min=1, help="As for nirmaan run."),
+    review_rounds: Optional[int] = typer.Option(None, "--review-rounds", min=1, help="As for nirmaan run."),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Print the plan of calls; run nothing, change nothing."),
+    inputs: List[str] = typer.Option([], "--input", help="key=value for the task's tools (needs TASK)."),
+    root: Path = ROOT_OPTION,
+) -> None:
+    """Run the owner and reviewer seats in turn until a person must act. Never approves (docs/AUTO_LOOP.md)."""
+    from nirmaan.models import MemoryScope
+    from nirmaan.runtime import get_runtime, loop, plan_loop
+
+    def say(text: str) -> None:
+        console.print(escape(text), highlight=False, soft_wrap=True)
+
+    engine = _load(project, root)
+    tid = _task_id(engine, task) if task else None
+    if tid is not None and tid not in engine.state.tasks:
+        _fail(f"Unknown task {task!r}")
+    if inputs and tid is None:
+        _fail("--input needs a TASK")
+    reviewer_id = reviewer_runtime or runtime
+    try:
+        owner, reviewer = get_runtime(runtime), get_runtime(reviewer_id)
+    except KeyError as exc:
+        _fail(str(exc.args[0]))
+    if runtime == reviewer_id:
+        _err.print(f"note: both seats run on {runtime}; independence is by seat and prompt (docs/AUTO_LOOP.md 5)",
+                   soft_wrap=True)
+    try:
+        if dry_run:
+            plan = plan_loop(engine, runtime, reviewer_id, tid, max_calls, attempts, review_rounds)
+            current = None
+            for number, step in enumerate(plan.steps, 1):
+                if step.task != current:
+                    current = step.task
+                    say(f"plan for {step.task}")
+                if step.calls == 0:
+                    later = number > 1 and plan.steps[number - 2].task == step.task
+                    what = "escalates if changes are requested again" if later else "escalates, its limits are spent"
+                    say(f"  {number}. owner {step.role}: {what} (no call)")
+                elif step.seat == "owner":
+                    calls = f"up to {step.calls} call{'s' if step.calls > 1 else ''}"
+                    say(f"  {number}. owner {step.role} on {step.runtime}: round {step.round} of "
+                        f"{step.rounds}, {calls}")
+                else:
+                    say(f"  {number}. reviewer {step.role} on {step.runtime}: 1 call")
+            for stopped, why in plan.stops.items():
+                say(f"{stopped}: then stop, {why.value}")
+            say(f"worst case: {plan.calls} calls, budget {max_calls}")
+            _err.print("dry run: no model was called, no tool was run, nothing was saved")
+            return
+        if tid is not None:
+            target = engine.task(tid)
+            for spec in inputs:
+                key, sep, value = spec.partition("=")
+                if not sep:
+                    _fail(f"--input must be key=value, got {spec!r}")
+                engine.remember(MemoryScope.TASK, tid, f"input.{key}", value, _actor(target.owner, False))
+        store = ProjectStore(root)
+        report = loop(engine, owner, reviewer, tid, max_calls, attempts, review_rounds,
+                      on_step=lambda e: store.save(e.state))
+    except (WorkError, PolicyViolationError, PermissionError) as exc:
+        _fail(str(exc))
+    store.save(engine.state)
+    for step in report.steps:
+        say(f"step {step.number}: {step.task} {step.seat} {step.role} on {step.runtime}: {step.status} "
+            f"({step.calls} call{'' if step.calls == 1 else 's'})")
+        if step.detail:
+            say("  " + step.detail)
+        for label, ref in (("review", step.review), ("escalation", step.escalation)):
+            if ref:
+                say(f"  {label}: {ref}")
+    for stopped, why in report.stops.items():
+        say(f"{stopped}: stopped, {why.value}")
+    say(f"calls: {report.calls} of {max_calls}")
 
 
 # --- Seat evaluation (M27) ---------------------------------------------------------------
