@@ -108,9 +108,9 @@ of them were outputs that drive no load: the unused `QN` of every flip-flop
 CTS inserts to balance the tree. Such a net has no wire, so there is nothing
 to extract. The separate signoff run also listed the block's `VDD` and `VSS`
 ports: the power grid gives the block supply pins, the routed netlist declares
-them as ports, and no cell in Verilog has a supply pin to load them. The
+them as `inout` ports, and no cell in Verilog has a supply pin to load them. The
 script now also counts these drivers of nothing (a cell output with no net, or
-with a net that reaches no other pin and no port, and an input port whose net
+with a net that reaches no other pin and no port, and an input or inout port whose net
 reaches no cell pin), printed as `nirmaan-floating-outputs`, and
 `unannotated_nets` is the difference: the loaded nets that should have
 parasitics and do not.
