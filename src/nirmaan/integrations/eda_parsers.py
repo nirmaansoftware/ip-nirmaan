@@ -9,7 +9,9 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass, field
+from pathlib import Path
 from typing import Any
 
 
@@ -263,10 +265,16 @@ def parse_sby(log: str, returncode: int) -> EdaResult:
 # SBY 21:59:10 [c] engine_0: ##   0:00:00  Unreached cover statement at c: c.v:7.13-7.29 (_witness_.y)
 # (The summary repeats both in lower case; only the engine's lines are counted.)
 _SBY_COVER_RE = re.compile(r"\b(?:(?P<un>Unr)|R)eached cover statement (?:in step (?P<step>\d+) )?at (?P<what>.+?)\s*$")
-_SBY_WHERE_RE = re.compile(r"(?P<file>[^\s:]+):(?P<line>\d+)\.\d+")
+_SBY_WHERE_RE = re.compile(r"(?P<file>[^\s:]+):(?P<line>\d+)\.(?P<column>\d+)")
 
 
-def parse_sby_cover(log: str, returncode: int) -> EdaResult:
+def _cover_site(what: str) -> tuple[str, int, int] | None:
+    """Where a cover statement is: its file's name, line, and column."""
+    where = _SBY_WHERE_RE.search(what)
+    return (where["file"].rsplit("/", 1)[-1], int(where["line"]), int(where["column"])) if where else None
+
+
+def parse_sby_cover(log: str, returncode: int, antecedents: Sequence[Mapping[str, Any]] = ()) -> EdaResult:
     """Pass means a cover-mode run reached every cover statement, and there was at least one (M27).
 
     A proof whose assumptions contradict each other, or whose properties can
@@ -274,29 +282,65 @@ def parse_sby_cover(log: str, returncode: int) -> EdaResult:
     a trace, under those same assumptions, to each ``cover``: an unreachable
     cover fails the run, and a setup with no covers proves nothing about its
     assumptions, so it fails too.
+
+    ``antecedents`` are the covers derived for the assertions (M29, from
+    :mod:`nirmaan.integrations.eda_antecedents`), each with its file, line, and
+    column. They are counted apart from the seat's own covers: one that is
+    never reached means its assertion is never checked, and the run fails. A
+    derived cover that is not in the elaborated design at all (a generate
+    branch not taken, a task never called) is listed as a warning.
     """
     base = parse_sby(log, returncode)
+    derived = {(Path(a["file"]).name, int(a["line"]), int(a["column"])): a for a in antecedents}
     reached: dict[str, None] = {}
     unreached: dict[str, None] = {}
+    ante_reached: dict[str, tuple] = {}
+    ante_unreached: dict[str, tuple] = {}
     for line in log.splitlines():
         if m := _SBY_COVER_RE.search(line):
-            (unreached if m["un"] else reached)[m["what"]] = None
+            site = _cover_site(m["what"])
+            if site in derived:
+                (ante_unreached if m["un"] else ante_reached)[m["what"]] = site
+            else:
+                (unreached if m["un"] else reached)[m["what"]] = None
     missed = [w for w in unreached if w not in reached]
+    ante_missed = [w for w in ante_unreached if w not in ante_reached]
+    seen = {*ante_reached.values(), *ante_unreached.values()}
     diags = list(base.diagnostics)
     for what in missed:
         where = _SBY_WHERE_RE.search(what)
         diags.append(Diagnostic("error", f"cover statement never reached: {what}", "COVER",
                                 where["file"] if where else "", _int(where["line"]) if where else None))
+    never = []
+    for what in ante_missed:
+        a = derived[ante_unreached[what]]
+        never.append(Diagnostic("error", f"assertion never checked, its antecedent is never reached: "
+                                         f"{a['assertion']}", "ANTECEDENT", a["file"], int(a["line"])))
+    unelaborated = [a for key, a in derived.items() if key not in seen]
+    diags += never
+    diags += [Diagnostic("warning", f"assertion not in the elaborated design, so no proof checks it: "
+                                    f"{a['assertion']}", "ANTECEDENT", a["file"], int(a["line"]))
+              for a in unelaborated]
     metrics = {**base.metrics, "covers_reached": len(reached), "covers_unreached": len(missed)}
+    if antecedents:
+        metrics.update(antecedents_reached=len(ante_reached), antecedents_unreached=len(ante_missed),
+                       antecedents_unelaborated=len(unelaborated))
     total = len(reached) + len(missed)
     if missed:
         summary = (f"vacuous: {len(missed)} of {_plural(total, 'cover')} never reached under the "
                    f"assumptions{_first(diags[len(base.diagnostics):])}")
+        return EdaResult(False, summary, tuple(diags), metrics)
+    if never:
+        first = never[0]
+        summary = (f"vacuous: {len(never)} of {_plural(len(ante_reached) + len(never), 'assertion antecedent')} "
+                   f"never reached under the assumptions, so the assertion at {first.where} is never checked")
         return EdaResult(False, summary, tuple(diags), metrics)
     if not base.passed:
         return EdaResult(False, base.summary.replace("formal", "cover run", 1), tuple(diags), metrics)
     if not reached:
         return EdaResult(False, "no cover statement was reached: a setup with nothing to reach says "
                                 "nothing about its assumptions", tuple(diags), metrics)
-    return EdaResult(True, f"not vacuous: every cover reached ({len(reached)} of {len(reached)})",
+    also = (f"; every assertion antecedent reached ({len(ante_reached)} of {len(ante_reached)})"
+            if ante_reached else "")
+    return EdaResult(True, f"not vacuous: every cover reached ({len(reached)} of {len(reached)}){also}",
                      tuple(diags), metrics)
