@@ -23,17 +23,20 @@ from typer.testing import CliRunner
 
 from nirmaan_helpers import attach_evidence, drive, human, needs, tid
 
-from nirmaan.models import ActorKind, ReviewState, TaskKind, TaskStatus
+from nirmaan.models import ActorKind, ReviewState, TaskKind, TaskStatus, Verdict
 from nirmaan.orchestrator import Orchestrator
 from nirmaan.runtime import (
     Completion,
     MockLLM,
     ModelRuntime,
     ResultStatus,
+    ReviewResult,
     Stop,
+    WorkResult,
     loop,
     plan_loop,
     register_runtime,
+    render_work_prompt,
     unregister_runtime,
 )
 from nirmaan.work import ProjectStore
@@ -94,6 +97,32 @@ def verdict(word: str, comments: str):
         cite = runs[0].token if runs else first(prompt)
         return json.dumps({"verdict": word, "comments": f"{comments} See {cite}.", "uncertainty": 0.2})
     return reply
+
+
+class Desk:
+    """A runtime for a first stage, which has no upstream record to cite: it hands in its outputs as notes.
+
+    A registered-style runtime written in the test (the M20 extension point), with a review side
+    that returns the scripted verdicts in order.
+    """
+
+    runtime_id = "desk"
+
+    def __init__(self, *verdicts: Verdict) -> None:
+        self.verdicts = list(verdicts)
+        self.packets: list = []
+
+    def accepts(self, packet) -> bool:
+        return True
+
+    def execute(self, packet, tools) -> WorkResult:
+        self.packets.append(packet)
+        notes = tuple({"kind": k, "title": f"{k} note"} for k in packet.task["expected_outputs"])
+        return WorkResult(ResultStatus.SUBMITTED, uncertainty=0.2, artifacts=notes)
+
+    def review(self, packet) -> ReviewResult:
+        self.packets.append(packet)
+        return ReviewResult(self.verdicts.pop(0), "judged on the submitted note", uncertainty=0.2)
 
 
 def loop_entries(engine) -> list:
@@ -254,7 +283,7 @@ def test_project_mode_stops_at_a_gate_and_never_crosses_it(nirmaan_org, fixed_cl
     assert gate.human_required is human_gate
     behind = [t.id for t in engine.state.tasks.values() if gate.id in t.depends_on]
 
-    report = loop(engine, ModelRuntime(MockLLM()), ModelRuntime(MockLLM()))
+    report = loop(engine, Desk(), Desk(Verdict.APPROVE))
     assert report.stops[req] is Stop.AWAITING_APPROVAL
     assert [s.task for s in report.steps] == [req, req]  # nothing else was ready
     task = engine.task(req)
@@ -263,7 +292,7 @@ def test_project_mode_stops_at_a_gate_and_never_crosses_it(nirmaan_org, fixed_cl
     assert engine.task(gate.id).status is TaskStatus.READY
 
     before = len(engine.state.audit)
-    report = loop(engine, ModelRuntime(MockLLM()), ModelRuntime(MockLLM()))
+    report = loop(engine, Desk(), Desk())  # no verdict scripted: a review would fail the test
     assert report.steps == [] and report.calls == 0
     assert report.stops[gate.id] is Stop.AWAITING_GATE
     assert engine.task(gate.id).status is TaskStatus.READY
@@ -486,25 +515,24 @@ def test_a_new_workflow_is_driven_with_no_core_changes(notes_flow):
     gate = next(t for t in engine.state.tasks.values() if t.kind is TaskKind.GATE)
     assert gate.human_required and engine.task(two).depends_on == (gate.id,)
 
-    reviewer = Seat(verdict("request_changes", "Say what the timer counts."), verdict("approve", "Clear now."),
-                    verdict("approve", "Fine."))
-    owner = MockLLM()
-    report = loop(engine, ModelRuntime(owner), ModelRuntime(reviewer))  # the whole project
+    owner, reviewer = Desk(), Desk(Verdict.REQUEST_CHANGES, Verdict.APPROVE, Verdict.APPROVE)
+    reviewer.runtime_id = "desk-review"
+    report = loop(engine, owner, reviewer)  # the whole project
     assert [(s.task, s.seat) for s in report.steps] == [(one, "owner"), (one, "reviewer")] * 2
     assert report.stops[one] is Stop.AWAITING_APPROVAL and engine.task(two).status is TaskStatus.PLANNED
-    assert "Repair after review" in owner.calls[1].render()
+    assert "Repair after review" in render_work_prompt(owner.packets[1], "work").render()
 
     engine.approve(one, human(engine.task(one).approver), "agreed")
-    report = loop(engine, ModelRuntime(owner), ModelRuntime(reviewer))
+    report = loop(engine, owner, reviewer)
     assert report.steps == [] and report.stops[gate.id] is Stop.AWAITING_GATE
 
     engine.approve_gate(gate.id, human(gate.owner), "signed")
-    report = loop(engine, ModelRuntime(owner), ModelRuntime(reviewer))
+    report = loop(engine, owner, reviewer)
     assert [(s.task, s.seat) for s in report.steps] == [(two, "owner"), (two, "reviewer")]
     assert report.stops[two] is Stop.AWAITING_APPROVAL
     assert not decisions_by_agents(engine, one, two, gate.id)
     assert {(e.details["seat"], e.details["runtime"]) for e in loop_entries(engine)} == {
-        ("owner", "mock-llm"), ("reviewer", "test-seat")}
+        ("owner", "desk"), ("reviewer", "desk-review")}
 
 
 # --- 9. The laws -----------------------------------------------------------------------------------------

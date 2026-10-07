@@ -158,15 +158,18 @@ runtime, the round, and the most calls each step may make, and ends with the
 total against the budget:
 
 ```
-plan for prj-...:rtl-implementation (reviewer seat on mock-llm, owner seat on mock-llm)
+$ nirmaan drive prj-c50cf24094 rtl-implementation --runtime mock-llm --attempts 3 --review-rounds 2 --dry-run
+plan for prj-c50cf24094:rtl-implementation
   1. owner design.rtl.interface.senior on mock-llm: round 1 of 2, up to 3 calls
   2. reviewer design.rtl.interface.tech_lead on mock-llm: 1 call
   3. owner design.rtl.interface.senior on mock-llm: round 2 of 2, up to 3 calls
   4. reviewer design.rtl.interface.tech_lead on mock-llm: 1 call
   5. owner design.rtl.interface.senior: escalates if changes are requested again (no call)
-  then: stop, awaiting a person's approval
+prj-c50cf24094:rtl-implementation: then stop, awaiting_approval
 worst case: 8 calls, budget 20
 ```
+
+`nirmaan.runtime.plan_loop` returns the same plan as data.
 
 In project mode only tasks that are actionable now are planned; tasks that
 become ready during a run (behind a stage that needs no review) are planned
@@ -192,8 +195,9 @@ property of the code rather than of the model:
 2. **A different prompt, with no shared conversation.** Each call is a fresh,
    stateless request. The review prompt is rendered in review mode from state:
    the submitted files (digest checked), the recorded tool runs, and earlier
-   change requests. It never contains the owner's prompt, reasoning, or a
-   superseded or refused file (M27). The loop also builds the two seats as
+   change requests. The owner's work reaches it only as recorded artifacts
+   and runs; it never contains the owner's prompt or a superseded or refused
+   file (M27). `nirmaan drive` builds the two seats as
    separate runtime objects, so nothing in process is shared between them.
 3. **The verdict must be grounded.** A review with no citation of a declared
    record is not recorded (M20), so a reviewer cannot approve on the owner's
@@ -234,7 +238,36 @@ through the policy checks like any other action, and changes nothing else.
 
 ---
 
-## 8. Extension points
+## 8. The command and the API
+
+```
+nirmaan drive PROJECT [TASK] --runtime ID [--reviewer-runtime ID] [--max-calls N]
+              [--attempts N] [--review-rounds N] [--input key=value ...] [--dry-run]
+```
+
+`--attempts` and `--review-rounds` are M27's overrides, passed to every owner
+step. `--input` records task inputs (for example `workspace=work/`) as
+`nirmaan run --input` does, and needs a TASK. The output is one line per step
+(task, seat, role, runtime, status, calls, and any review or escalation), one
+line per stop, and the calls spent against the budget.
+
+```python
+from nirmaan.runtime import Stop, loop, plan_loop
+
+report = loop(engine, owner_runtime, reviewer_runtime, task_id=None, max_calls=20,
+              attempts=None, review_rounds=None, on_step=save)
+report.steps      # LoopStep: number, task, seat, role, runtime, status, calls, review, escalation
+report.stops      # {task: Stop}
+report.calls      # calls spent
+```
+
+`nirmaan.runtime.exhausted(engine, task, limits)` (M27's check, now public)
+says why the owner's next run would escalate, reading state only; the loop and
+`run_task` share it.
+
+---
+
+## 9. Extension points
 
 | To add | Do this | Core changes |
 |---|---|---|
@@ -250,7 +283,7 @@ gate; after a person signs it, the next invocation drives the second stage.
 
 ---
 
-## 9. Laws, each pinned by a test (`tests/test_nirmaan_auto_loop.py`)
+## 10. Laws, each pinned by a test (`tests/test_nirmaan_auto_loop.py`)
 
 1. The full loop on the AXI4-Lite flow: owner, a change request, the repair,
    an approving review, and a stop at the human approval, in one command.
@@ -267,7 +300,7 @@ gate; after a person signs it, the next invocation drives the second stage.
 
 ---
 
-## 10. Deferred
+## 11. Deferred
 
 * Running independent tasks concurrently. The loop is sequential; a project's
   ready tasks are worked one after another.
@@ -275,5 +308,5 @@ gate; after a person signs it, the next invocation drives the second stage.
   bound the total; a project wide spend limit would be new state.
 * Approval by a delegated non-human approver. The loop leaves every approval
   to a person.
-* Setting task inputs per task in project mode beyond the same `--input` for
-  every driven task.
+* Task inputs in project mode. `--input` needs a TASK; a project wide run uses
+  the inputs each task already has.
