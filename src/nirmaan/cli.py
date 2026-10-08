@@ -519,6 +519,48 @@ def costs(project: str, as_json: bool = typer.Option(False, "--json"), root: Pat
 
 
 @app.command()
+def learn(
+    projects: List[str],
+    decide: Optional[str] = typer.Option(None, "--decide", help="A proposal ID to decide."),
+    in_project: Optional[str] = typer.Option(None, "--in", help="The project to record the decision in."),
+    role: Optional[str] = typer.Option(None, "--as", help="Role ID deciding, as a human."),
+    adopt: Optional[bool] = typer.Option(None, "--adopt/--reject", help="Adopt or reject the proposal."),
+    reason: str = typer.Option("", "--reason", help="Why: recorded as the decision's rationale."),
+    as_json: bool = typer.Option(False, "--json"),
+    root: Path = ROOT_OPTION,
+) -> None:
+    """Skill changes proposed by failures that recur across projects; decide one as a person."""
+    from nirmaan.proposals import ProposalError, decide_proposal, learning_proposals
+
+    engines = {p: _load(p, root) for p in projects}
+    proposals = learning_proposals(_org(), [e.state for e in engines.values()])
+    if decide:
+        chosen = next((p for p in proposals if p.id == decide), None)
+        if chosen is None or adopt is None or not role or not in_project:
+            _fail("--decide needs a listed proposal ID, --in PROJECT, --as ROLE, and --adopt or --reject")
+        engine = next((e for pid, e in engines.items() if pid == in_project
+                       or e.state.project.id == in_project), None)
+        if engine is None:
+            _fail(f"--in {in_project} is not one of the projects read")
+        try:
+            decision = decide_proposal(engine, chosen, _actor(role, False), adopt, reason)
+        except (ProposalError, WorkError, PolicyViolationError, PermissionError) as exc:
+            _fail(str(exc))
+        ProjectStore(root).save(engine.state)
+        console.print(escape(f"{decision.id}: {decision.statement}"), highlight=False, soft_wrap=True)
+        return
+    if as_json:
+        typer.echo(json.dumps([p.to_dict() for p in proposals], indent=2))
+        return
+    if not proposals:
+        console.print("No failure recurs often enough to propose a change.")
+    for p in proposals:
+        console.print(escape(f"{p.id} [{p.status}] {p.statement}"), highlight=False, soft_wrap=True)
+        console.print(escape(f"  for {', '.join(p.targets) or 'no providing skill'}: {p.suggestion}"),
+                      highlight=False, soft_wrap=True)
+
+
+@app.command()
 def links(project: str, root: Path = ROOT_OPTION) -> None:
     """Design Graph nodes each artifact links to, parsed from its digest-checked file."""
     from nirmaan.engineering import artifact_links

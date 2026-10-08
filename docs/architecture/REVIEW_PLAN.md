@@ -206,4 +206,23 @@ grows with the square of its length.
 | a | Measure and design: `docs/SCALABLE_STATE.md` (P10 68%, P11 32% of per-op time at 3000 runs) | DONE |
 | b | Failing tests `tests/test_nirmaan_scalable_state.py` (counted, not timed) | DONE |
 | c | `work/frozen.py`, frozen containers and nested dicts, identity P10, incremental P11 | DONE |
-| d | Full suite (1415 passed, 3 skipped), docs, PR, merge | DONE (PR open) |
+| d | Full suite (1415 passed, 3 skipped), docs, PR, merge | DONE (#54 merged, 8007c26) |
+
+## M33: learning proposals (branch `m33/learning-proposals`, from main de0cb5e)
+
+| # | Step | Status |
+|---|---|---|
+| a | Design: `docs/LEARNING_PROPOSALS.md` (a view; decisions as recorded human decisions; no new workflow, which would change the live site's workflow count) | DONE |
+| b | Tests `tests/test_nirmaan_learning_proposals.py` (9) | DONE |
+| c | `src/nirmaan/proposals.py`, `nirmaan learn` | DONE |
+| d | Full suite (1424 passed, 3 skipped), docs, PR, merge | DONE (PR open) |
+
+## Review complete
+
+All seven milestones of target-state.md section 5 are built: seat evaluation
+(#37), tool contracts (#41), engineering records (#48), the register map (#52),
+model selection and accounting (#53), scalable state (#54), learning proposals
+(#55). Left for the owner or coordinator: milestone numbering (these
+are working names), a version bump, a first live-model evaluation (API
+credits), and #45 (another session's PR). Deferred pieces are listed in each
+milestone's `context.md` entry.
