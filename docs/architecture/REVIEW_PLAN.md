@@ -191,13 +191,22 @@ session's PR).
 | b | Failing tests `tests/test_nirmaan_model_selection.py` | DONE |
 | c | Accounting: VeriTriage `GenerationResponse` tokens, bridge, `Completion`, `ModelCall`, `record_model_call`, `nirmaan costs`, eval totals | DONE |
 | d | Selection: `ModelProfile` data, derived needs, `select_model`, `auto` runtime | DONE |
-| e | Full suite (1401 passed, 3 skipped), docs, PR, merge | DONE (PR open) |
+| e | Full suite (1401 passed, 3 skipped), docs, PR, merge | DONE (#53 merged, de0cb5e) |
 
 **M31 notes.** #52 merged (1ff49ac) on green CI. Measured for M32 before
 designing it: one recorded tool run costs 3.6 ms on the 55-task NoC project,
 12 ms at 500 runs, 40 ms at 2000, 95 ms at 5000 (two whole-state
 serializations and hashes per operation), so a long project's total cost
 grows with the square of its length.
+
+## M32: scalable state (branch `m32/scalable-state`, stacked on M31)
+
+| # | Step | Status |
+|---|---|---|
+| a | Measure and design: `docs/SCALABLE_STATE.md` (P10 68%, P11 32% of per-op time at 3000 runs) | DONE |
+| b | Failing tests `tests/test_nirmaan_scalable_state.py` (counted, not timed) | DONE |
+| c | `work/frozen.py`, frozen containers and nested dicts, identity P10, incremental P11 | DONE |
+| d | Full suite (1415 passed, 3 skipped), docs, PR, merge | DONE (#54 merged, 8007c26) |
 
 ## M33: learning proposals (branch `m33/learning-proposals`, from main de0cb5e)
 
@@ -206,14 +215,14 @@ grows with the square of its length.
 | a | Design: `docs/LEARNING_PROPOSALS.md` (a view; decisions as recorded human decisions; no new workflow, which would change the live site's workflow count) | DONE |
 | b | Tests `tests/test_nirmaan_learning_proposals.py` (9) | DONE |
 | c | `src/nirmaan/proposals.py`, `nirmaan learn` | DONE |
-| d | Full suite, docs, PR, merge | IN PROGRESS |
+| d | Full suite (1424 passed, 3 skipped), docs, PR, merge | DONE (PR open) |
 
 ## Review complete
 
 All seven milestones of target-state.md section 5 are built: seat evaluation
 (#37), tool contracts (#41), engineering records (#48), the register map (#52),
 model selection and accounting (#53), scalable state (#54), learning proposals
-(this branch). Left for the owner or coordinator: milestone numbering (these
+(#55). Left for the owner or coordinator: milestone numbering (these
 are working names), a version bump, a first live-model evaluation (API
 credits), and #45 (another session's PR). Deferred pieces are listed in each
 milestone's `context.md` entry.

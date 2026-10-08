@@ -51,7 +51,9 @@ from nirmaan.models import (
     Verdict,
 )
 from nirmaan.org import AuthorityService, Organization, route_escalation
+from nirmaan.models.frozen import FrozenDict, FrozenList, deep_frozen
 from nirmaan.work import audit
+from nirmaan.work.frozen import CONTAINER_FIELDS, freeze_state
 from nirmaan.work.policy import (
     PolicyContext,
     PolicyEngine,
@@ -116,6 +118,7 @@ def _utc_now() -> datetime:
 
 
 def state_fingerprint(state: ProjectState) -> str:
+    """A hash of the whole state. For stores and tools; the engine no longer hashes per operation (M32)."""
     payload = json.dumps(state.model_dump(mode="json"), sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
@@ -123,11 +126,16 @@ def state_fingerprint(state: ProjectState) -> str:
 class TaskEngine:
     def __init__(self, org: Organization, state: ProjectState, clock: Clock | None = None) -> None:
         self._org = org
-        self._state = state
+        # M32: the engine holds a state nothing can edit in place, and remembers what it committed (P10) and how
+        # much of the audit chain it has verified (P11), so an operation costs what it changes, not the project.
+        self._state = freeze_state(state)
+        self._committed = self._state
+        trail = self._state.audit
+        self._verified = (len(trail), trail[-1].hash if trail else audit.GENESIS) \
+            if not audit.verify_chain(trail) else (0, audit.GENESIS)
         self._clock = clock or _utc_now
         self._authority = AuthorityService(org)
         self._policy = PolicyEngine(org)
-        self._fingerprint = state_fingerprint(state)
         # Derived consequences (roll-ups, completions on approval, branch pruning)
         # are attributed to the engine itself, acting under the company's head.
         self.system = system_actor(org)
@@ -156,8 +164,8 @@ class TaskEngine:
     def _check(self, action: str, actor: Actor, task: Task | None = None, **payload: Any) -> list:
         if actor.role not in self._org.roles:
             raise AuthorityError(f"Unknown role {actor.role!r}")
-        payload["_expected_fingerprint"] = self._fingerprint
-        payload["_actual_fingerprint"] = state_fingerprint(self._state)
+        payload["_state_intact"] = self._state is self._committed
+        payload["_chain_verified"] = self._verified
         ctx = PolicyContext(self._org, self._state, action, actor, task, payload)
         return self._policy.enforce(ctx)
 
@@ -174,9 +182,15 @@ class TaskEngine:
         details = dict(details or {})
         if warnings:
             details["policy_warnings"] = [f"[{w.principle}] {w.message}" for w in warnings]
+        before = len(self._state.audit)
         trail = audit.append(self._state.audit, self._clock(), actor, action, subject, reason, details)
-        self._state = self._state.model_copy(update={**updates, "audit": trail})
-        self._fingerprint = state_fingerprint(self._state)
+        frozen_updates = {name: deep_frozen(value) if name not in CONTAINER_FIELDS else
+                          (FrozenDict(value) if isinstance(value, dict) else FrozenList(value))
+                          for name, value in updates.items()}
+        self._state = self._state.model_copy(update={**frozen_updates, "audit": FrozenList(trail)})
+        self._committed = self._state
+        if self._verified[0] == before:  # the appended entry extends a verified chain
+            self._verified = (len(trail), trail[-1].hash)
 
     def _with_task(self, task: Task, **changes: Any) -> dict[str, Task]:
         if "status" in changes and changes["status"] is not task.status:

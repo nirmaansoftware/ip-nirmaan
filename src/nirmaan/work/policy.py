@@ -332,9 +332,9 @@ def _before_review(ctx: PolicyContext) -> list[str]:
 
 @register_check("state-changes-audited")
 def _audited(ctx: PolicyContext) -> list[str]:
-    expected = ctx.payload.get("_expected_fingerprint")
-    actual = ctx.payload.get("_actual_fingerprint")
-    if expected is not None and expected != actual:
+    # The engine's state cannot be edited in place (read-only containers, M32), so the one way to change
+    # it behind the engine is to replace it: the engine reports whether it still holds what it committed.
+    if ctx.payload.get("_state_intact") is False:
         return ["project state changed outside the task engine (no audit entry)"]
     return []
 
@@ -343,7 +343,9 @@ def _audited(ctx: PolicyContext) -> list[str]:
 def _chain(ctx: PolicyContext) -> list[str]:
     if ctx.action == "project.create":
         return []
-    return [f"audit trail broken: {p}" for p in verify_chain(ctx.state.audit)]
+    start, previous = ctx.payload.get("_chain_verified", (0, None))
+    problems = verify_chain(ctx.state.audit, start, previous) if start else verify_chain(ctx.state.audit)
+    return [f"audit trail broken: {p}" for p in problems]
 
 
 @register_check("human-gates")
