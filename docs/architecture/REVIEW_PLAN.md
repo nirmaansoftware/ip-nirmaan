@@ -158,6 +158,25 @@ Inspection findings that shaped it: no product code calls
 artifacts, evidence, audit, branch cancellations by `_take_branch`). M27's
 review repair already moves superseded artifacts into an `Attempt`.
 
+**2026-10-07, later.** #46 (M29 auto-loop) merged first; `main` was merged
+into #48 (1260 passed, 3 skipped), and #48 merged (a127769) with the owner's
+approval. Parallel PRs #45, #47, #49, #50, #51 are other sessions' work.
+
+## M30: the register map as data (branch `m30/register-map`, from main a127769)
+
+| # | Step | Status |
+|---|---|---|
+| a | Design: `docs/REGISTER_MAP.md` | DONE |
+| b | Failing tests `tests/test_nirmaan_regmap.py`, fixture `register_map.json` | DONE |
+| c | `models/regmap.py`, `nirmaan/regmap.py` (validate, lowerings registry, C test generator) | DONE |
+| d | `integrations/regmap.py` (`regmap.check`, `regmap.verify` on the fw.test harness), contracts, CLI | DONE |
+| e | Eval case held-out check, full suite (1300 passed, 3 skipped), `context.md`, ROADMAP, PR | DONE |
+
+Decided at design: no workflow adoption in M30 (an added expected output
+would show as a missing deliverable in the export); the map judges RTL
+through the existing AXI4-Lite co-simulation harness; APB maps are a
+recorded failed run until an APB harness exists.
+
 ## M31: model selection and model-call accounting (branch `m31/model-selection`)
 
 The owner asked (2026-10-08) to resolve everything and complete the remaining
@@ -169,7 +188,13 @@ session's PR).
 | # | Step | Status |
 |---|---|---|
 | a | Design: `docs/MODEL_SELECTION.md` (prices from the claude-api skill: Opus 5.5 $4/$20 per MTok, cache read $0.20) | DONE |
-| b | Failing tests `tests/test_nirmaan_model_selection.py` | TODO |
-| c | Accounting: VeriTriage `GenerationResponse` tokens, bridge, `Completion`, `ModelCall`, `record_model_call`, `nirmaan costs`, eval totals | TODO |
-| d | Selection: `ModelProfile` data, derived needs, `select_model`, `auto` runtime | TODO |
+| b | Failing tests `tests/test_nirmaan_model_selection.py` | DONE |
+| c | Accounting: VeriTriage `GenerationResponse` tokens, bridge, `Completion`, `ModelCall`, `record_model_call`, `nirmaan costs`, eval totals | DONE |
+| d | Selection: `ModelProfile` data, derived needs, `select_model`, `auto` runtime | DONE |
 | e | Full suite, docs, PR, merge | TODO |
+
+**M31 notes.** #52 merged (1ff49ac) on green CI. Measured for M32 before
+designing it: one recorded tool run costs 3.6 ms on the 55-task NoC project,
+12 ms at 500 runs, 40 ms at 2000, 95 ms at 5000 (two whole-state
+serializations and hashes per operation), so a long project's total cost
+grows with the square of its length.

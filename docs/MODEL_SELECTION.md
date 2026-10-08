@@ -42,8 +42,10 @@ prices per million tokens (input, output, cache read, cache write; `None` when
 unknown), and `for_testing`. Two ship:
 
 - `claude-opus-5-5` on provider `anthropic`: offers `structured_output` and
-  `files`, a 1M-token context, $4 input and $20 output per million tokens,
-  $0.20 cache reads, $5 cache writes (1.25 times input);
+  `files`; `context_chars` 400,000, the prompt budget the provider declares to
+  VeriTriage's registry (the model's own window is 1M tokens); $4 input and $20
+  output per million tokens, $0.20 cache reads, $5 cache writes (1.25 times
+  input);
 - `mock-llm` (the deterministic MockLLM), `for_testing`, cost 0.
 
 **What a seat needs** is derived from its work, not written by hand:

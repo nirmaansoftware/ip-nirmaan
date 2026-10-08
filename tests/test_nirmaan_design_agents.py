@@ -345,7 +345,8 @@ def test_a_new_design_seat_needs_no_core_changes(fixed_clock, tmp_path):
     """A register-map seat joins: capability, skill, unit, intent, workflow, and its own checker.
 
     Nothing in the runtime, prompt renderer, engine, policy, or broker changes.
-    The seat writes a JSON file; ``regmap.check`` runs over it before review.
+    The seat writes a JSON file; ``regmap.overlaps`` runs over it before review. (It was
+    ``regmap.check`` until M30 shipped a core tool of that name.)
     """
     from nirmaan.company import builder
     from nirmaan.models import (
@@ -370,7 +371,7 @@ def test_a_new_design_seat_needs_no_core_changes(fixed_clock, tmp_path):
     from nirmaan.org import register_extension, unregister_extension
     from nirmaan.runtime import ToolOutcome, register_binding, unregister_binding
 
-    @register_binding("regmap.check")
+    @register_binding("regmap.overlaps")
     def check(params, engine):
         problems = []
         for source in params.get("sources", "").split(","):
@@ -383,13 +384,13 @@ def test_a_new_design_seat_needs_no_core_changes(fixed_clock, tmp_path):
     def register_maps(b):
         review = ReviewRequirement(capability="arch.review", min_level=Level.SENIOR)
         b.add(
-            ToolSpec(id="regmap.check", name="Register map checker", category="eda", risk=ToolRisk.EXECUTE,
+            ToolSpec(id="regmap.overlaps", name="Register map checker", category="eda", risk=ToolRisk.EXECUTE,
                      status=ToolStatus.AVAILABLE),
             Capability(id="arch.register_map", name="Register map design", kind=CapabilityKind.EXECUTION,
                        description="Specify a block's software-visible registers.", produces=("register_map",),
                        approved_inputs=True),
             Skill(id="register_map_design", name="Register map design", domain="architecture",
-                  provides=("arch.register_map", "arch.review"), tools=("regmap.check",),
+                  provides=("arch.register_map", "arch.review"), tools=("regmap.overlaps",),
                   validation_criteria=("No two registers share an offset.",)),
             OrgUnit(id="architecture.regmaps", name="Register Maps", kind=UnitKind.TEAM,
                     function=Function.ENGINEERING, parent="architecture", noun="Register Map Architect",
@@ -411,7 +412,7 @@ def test_a_new_design_seat_needs_no_core_changes(fixed_clock, tmp_path):
                                                                 accepts=(EvidenceKind.REVIEW_RECORD,)),
                                             EvidenceRequirement(
                                                 description="Register map is overlap-free",
-                                                accepts=(EvidenceKind.TOOL_RUN,), tools=("regmap.check",),
+                                                accepts=(EvidenceKind.TOOL_RUN,), tools=("regmap.overlaps",),
                                                 files=(FileInput(param="sources", kinds=("register_map",)),),
                                                 before_review=True))),
                 ),
@@ -443,7 +444,7 @@ def test_a_new_design_seat_needs_no_core_changes(fixed_clock, tmp_path):
         assert art.assurance is Assurance.APPROVED and json.loads(Path(art.location).read_text()) == json.loads(clean)
     finally:
         unregister_extension("test-register-maps")
-        unregister_binding("regmap.check")
+        unregister_binding("regmap.overlaps")
 
 
 # --- The AXI4-Lite register block: the Stage 4 demo -------------------------------------

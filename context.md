@@ -2551,6 +2551,78 @@ Deferred: precise bus-error traps, interrupts and APB in the host
 co-simulation (`fw.test`), more than one interrupt line, and running the gate
 on both cores.
 
+### Milestone 30 (working name) - The register map as data
+
+The fourth structural-review milestone (numbering is the coordinator's): a
+register map that was only a table in an interface spec becomes an
+intermediate representation that is validated, lowered, and judges RTL.
+Design doc: `docs/REGISTER_MAP.md`. No version bump.
+
+Key design points worth not re-deriving:
+- `RegisterMap` (`models/regmap.py`): block, bus, `addr_width`, 32-bit
+  registers with `rw`/`ro`/`wo` access and reset values, and the `unmapped`
+  response (`slverr`, `decerr`, `okay`). No bit fields yet.
+- `nirmaan/regmap.py`: `validate` (width, alignment, address space, overlaps,
+  C identifiers, duplicates, reset width), a lowering registry
+  (`register_lowering`; `c-header` compiles under strict flags and agrees with
+  the hand-written firmware header; `markdown` reproduces the AXI4-Lite spec's
+  section 3 table line for line), and `c_test`, a `nirmaan_fw_test` whose
+  checks run in order (reset values, write-then-read with every register
+  written first, read-only, strobes, unmapped) because the co-sim parser names
+  only the first failing check.
+- Tools with contracts: `regmap.check` (validation as a recorded run) and
+  `regmap.verify`, a backend that writes the generated test and reuses
+  `fw.test`'s co-simulation steps and parser unchanged. A bus with no harness
+  (APB: the host harness drives AXI4-Lite only; M29's `fw.soc_test` reaches APB
+  through a RISC-V core) is a recorded failed run, never a simulation. Granted to `rtl_design`
+  (both) and `interface_specification` (check).
+- The `rtl/axi4-lite-regs` evaluation case holds the map out as a second judge;
+  the gates-miss eval test now expects both judges to fail the `reg3` mutant.
+- Not adopted in a workflow yet: an added expected output would show as a
+  missing deliverable in the export; a conditional-on-upstream rule is needed.
+- The M23 crown jewel's hypothetical `regmap.check` collided with the core
+  tool and was renamed `regmap.overlaps`.
+
+`tests/test_nirmaan_regmap.py` (19): real co-simulation passes on the fixture
+RTL and fails on a `reg3` reset mutant, a REG2-into-REG1 alias, and a map that
+misstates the unmapped response; crown jewel
+`test_a_new_lowering_needs_no_core_changes`. With the M29 parts merged, the
+standard local run is 1387 passed, 3 skipped.
+
+### Milestone 31 (working name) - Model selection by capability, and every model call counted
+
+The fifth structural-review milestone (numbering is the coordinator's). Design
+doc: `docs/MODEL_SELECTION.md`. No version bump.
+
+Key design points worth not re-deriving:
+- **Accounting is the engine's.** `ModelRuntime` lists every call it made in its
+  `WorkResult`/`ReviewResult` (`model_calls`); `run_task` and `review_task`
+  record each through `TaskEngine.record_model_call` (audited `model.call`)
+  before anything else, so a declined, refused, or failed call is still
+  counted. `ProjectState.model_calls` is a new, defaulted field (old projects
+  load). Usage travels VeriTriage `GenerationResponse` (new optional token
+  fields, the only VeriTriage change) -> bridge `Generation` -> `Completion`.
+  The Anthropic provider reads `response.usage` (`input_tokens`,
+  `output_tokens`, `cache_read_input_tokens`, `cache_creation_input_tokens`);
+  a missing `usage` is `None`, never zero. Cost comes from the model's profile
+  (`cost_of`); unknown price or usage is `None`.
+- **Prices** (claude-api skill, cached 2026-09-25): Opus 5.5 $4 input, $20
+  output, $0.20 cache read per million tokens; cache write 1.25 times input.
+  `context_chars` is 400,000, matching the provider's declared prompt budget.
+- **Needs are derived, not hand-written**: `structured_output` always, `files`
+  when an evidence requirement runs over files the task produces, plus the new
+  `Capability.model_needs`. `select_model` keeps profiles offering every need
+  whose budget holds the rendered prompt, excludes `for_testing` profiles unless
+  asked, picks the cheapest known price (ties by ID), and lists every rejection.
+- **The `auto` runtime** is `ModelRuntime(SelectingLLM())`; with nothing fitting,
+  it declines with the reasons and makes no call (the `NO_CALL` prefix keeps it
+  out of the accounting). `MockLLM(model=...)` reports a profile's model.
+- `nirmaan costs PROJECT [--json]`; evaluation results gain `model_calls`,
+  `input_tokens`, `output_tokens`, `cost_usd`.
+
+`tests/test_nirmaan_model_selection.py` (14), crown jewel
+`test_a_new_model_profile_needs_no_core_changes`.
+
 ## 3. Current architecture map
 
 ```
