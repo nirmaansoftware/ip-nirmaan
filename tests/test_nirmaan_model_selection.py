@@ -157,11 +157,14 @@ def test_a_declined_answer_still_records_its_call_and_unknown_usage_stays_unknow
 def test_a_review_call_is_recorded(regression, fixture_log, tmp_path):
     from test_nirmaan_ai_workers import _triaged
 
-    triage = _triaged(regression, fixture_log, tmp_path)
+    _triaged(regression, fixture_log, tmp_path)
+    root = tid(regression, "root-cause")
+    drive(regression, until=root, workspace=tmp_path)
+    run_task(regression, root, ModelRuntime(MockLLM()))
     before = len(regression.state.model_calls)
     review = Completion(text=json.dumps({"verdict": "approve", "uncertainty": 0.1, "comments": "fine"}),
                         model="claude-opus-5-5", input_tokens=500, output_tokens=50)
-    review_task(regression, triage, ModelRuntime(MockLLM(script=[review])))
+    review_task(regression, root, ModelRuntime(MockLLM(script=[review])))
     new = [c for c in regression.state.model_calls.values()][before:]
     assert [c.purpose for c in new] == ["review"] and new[0].output_tokens == 50
 

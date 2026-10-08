@@ -200,6 +200,9 @@ def run_case(org: Organization, case: EvalCase, runtime: AgentRuntime | None = N
 
     task = engine.task(seat.id)
     reached_review = task.status in _REVIEWED
+    from nirmaan.costs import calls_cost
+
+    spend = calls_cost(c for c in engine.state.model_calls.values() if c.task == seat.id)
     scores = tuple(_judge(engine, task, check, repo, reached_review) for check in case.held_out)
     ProjectStore(sandbox / ".nirmaan").save(engine.state)
     return EvalResult(
@@ -211,6 +214,8 @@ def run_case(org: Organization, case: EvalCase, runtime: AgentRuntime | None = N
                                     if r in engine.state.tool_runs)),
         scores=scores, passed=reached_review and all(s.status is ScoreStatus.PASSED for s in scores),
         detail=detail, audit_ok=not verify_chain(engine.state.audit), sandbox=str(sandbox),
+        model_calls=spend.calls, input_tokens=spend.input_tokens, output_tokens=spend.output_tokens,
+        cost_usd=None if spend.unknown_cost_calls else spend.cost_usd,
     )
 
 

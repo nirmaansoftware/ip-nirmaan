@@ -15,6 +15,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from nirmaan.models.governance import Criticality, DecisionKind, EscalationKind
+from nirmaan.models.modelcall import ModelCall
 from nirmaan.models.org import ActorKind, list_values
 from nirmaan.models.workflow import EvidenceKind, EvidenceRequirement, OnFailure
 
@@ -434,4 +435,5 @@ class ProjectState(BaseModel):
     spec_requirements: dict[str, SpecRequirement] = Field(default_factory=dict)
     verification_items: dict[str, VerificationItem] = Field(default_factory=dict)
     attempts: dict[str, Attempt] = Field(default_factory=dict)
+    model_calls: dict[str, ModelCall] = Field(default_factory=dict)
     schema_version: str = "1"

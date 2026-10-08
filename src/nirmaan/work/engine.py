@@ -36,6 +36,7 @@ from nirmaan.models import (
     EvidenceKind,
     MemoryEntry,
     MemoryScope,
+    ModelCall,
     OnFailure,
     ProjectState,
     ReviewRecord,
@@ -781,6 +782,19 @@ class TaskEngine:
         self._commit(actor, "decision.record", task_id or dec_id, reason=statement, warnings=warnings,
                      details={"decision": dec_id, "kind": kind.value}, decisions=decisions)
         return decisions[dec_id]
+
+    def record_model_call(self, task_id: str, actor: Actor, call: dict[str, Any]) -> ModelCall:
+        """Record one model call a seat made (M31): who, which model, and the usage it reported."""
+        task = self.task(task_id)
+        warnings = self._check("model.call", actor, task)
+        call_id = f"{task_id}#m{1 + sum(1 for c in self._state.model_calls.values() if c.task == task_id)}"
+        record = ModelCall(id=call_id, task=task_id, actor=actor.label, **call)
+        calls = dict(self._state.model_calls)
+        calls[call_id] = record
+        self._commit(actor, "model.call", task_id, reason=f"{record.purpose} call to {record.model or record.provider}",
+                     warnings=warnings, details={"call": call_id, "model": record.model, "succeeded": record.succeeded,
+                                                 "cost_usd": record.cost_usd}, model_calls=calls)
+        return record
 
     def remember(self, scope: MemoryScope, owner: str, key: str, value: str, actor: Actor,
                  source_task: str | None = None, evidence: tuple[str, ...] = ()) -> MemoryEntry:

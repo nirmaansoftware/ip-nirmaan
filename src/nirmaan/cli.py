@@ -500,6 +500,22 @@ def failures(projects: List[str], as_json: bool = typer.Option(False, "--json"),
 
 
 @app.command()
+def costs(project: str, as_json: bool = typer.Option(False, "--json"), root: Path = ROOT_OPTION) -> None:
+    """What the project's model calls cost, as recorded: by model, purpose, and task."""
+    from nirmaan.costs import cost_report
+
+    report = cost_report(_load(project, root).state)
+    if as_json:
+        typer.echo(json.dumps(report.to_dict(), indent=2, sort_keys=True))
+        return
+    unknown = f"; {report.unknown_cost_calls} of unknown cost" if report.unknown_cost_calls else ""
+    console.print(escape(f"{report.calls} model calls, {report.input_tokens} input and {report.output_tokens} "
+                         f"output tokens, ${report.cost_usd:.4f}{unknown}"), highlight=False)
+    for model, line in sorted(report.by_model.items()):
+        console.print(escape(f"  {model}: {line.calls} calls, ${line.cost_usd:.4f}"), highlight=False)
+
+
+@app.command()
 def links(project: str, root: Path = ROOT_OPTION) -> None:
     """Design Graph nodes each artifact links to, parsed from its digest-checked file."""
     from nirmaan.engineering import artifact_links

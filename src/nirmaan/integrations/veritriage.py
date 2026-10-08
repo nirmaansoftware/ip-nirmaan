@@ -240,6 +240,10 @@ class Generation:
     provider: str
     model: str | None = None
     error: str | None = None
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    cache_read_tokens: int | None = None
+    cache_write_tokens: int | None = None
 
 
 def _llm_prompt(prompt, system: str | None = None):
@@ -268,7 +272,9 @@ def generate(provider: str, prompt, max_output_chars: int = 64_000) -> Generatio
         return Generation("", provider, error=str(exc))
     response = llm.generate(GenerationRequest(prompt=_llm_prompt(prompt), max_output_chars=max_output_chars))
     return Generation(response.text, response.provider or provider, response.model,
-                      (response.error or "the provider failed") if response.failed else None)
+                      (response.error or "the provider failed") if response.failed else None,
+                      response.input_tokens, response.output_tokens, response.cache_read_tokens,
+                      response.cache_write_tokens)
 
 
 def ground(text: str, prompt) -> tuple[str, tuple[str, ...], tuple[str, ...]]:
@@ -312,9 +318,23 @@ class AnthropicProvider(BaseProvider):
             betas=["server-side-fallback-2026-07-01"],
             fallbacks="default",
         )
+        usage = _usage(response)
         if response.stop_reason in ("refusal", "max_tokens"):
             return GenerationResponse(provider=self.name, model=self.model, failed=True,
-                                      error=f"the model stopped with {response.stop_reason}")
+                                      error=f"the model stopped with {response.stop_reason}", **usage)
         text = "".join(block.text for block in response.content if block.type == "text")
         return GenerationResponse(provider=self.name, model=getattr(response, "model", self.model),
-                                  text=text[: request.max_output_chars])
+                                  text=text[: request.max_output_chars], **usage)
+
+
+def _usage(response) -> dict:
+    """Token usage from ``response.usage`` (M31). A field the response does not carry stays None."""
+    usage = getattr(response, "usage", None)
+
+    def count(name: str) -> int | None:
+        value = getattr(usage, name, None) if usage is not None else None
+        return value if isinstance(value, int) and not isinstance(value, bool) else None
+
+    return {"input_tokens": count("input_tokens"), "output_tokens": count("output_tokens"),
+            "cache_read_tokens": count("cache_read_input_tokens"),
+            "cache_write_tokens": count("cache_creation_input_tokens")}
