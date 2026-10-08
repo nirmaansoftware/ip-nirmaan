@@ -2651,6 +2651,11 @@ Key design points worth not re-deriving:
   `__dict__[...]`. `state_fingerprint` stays for stores and tools.
 - Tests count hashing instead of timing it, so CI is stable.
 
+`tests/test_nirmaan_scalable_state.py` (14). The standard local run is 1415 passed,
+3 skipped. Found on the way: the vocabulary may import only `__future__`, `enum`,
+`datetime`, `typing`, and pydantic, so the frozen containers copy through
+`__reduce__` alone (no `copy` import).
+
 ## 3. Current architecture map
 
 ```

@@ -191,7 +191,7 @@ session's PR).
 | b | Failing tests `tests/test_nirmaan_model_selection.py` | DONE |
 | c | Accounting: VeriTriage `GenerationResponse` tokens, bridge, `Completion`, `ModelCall`, `record_model_call`, `nirmaan costs`, eval totals | DONE |
 | d | Selection: `ModelProfile` data, derived needs, `select_model`, `auto` runtime | DONE |
-| e | Full suite (1401 passed, 3 skipped), docs, PR, merge | DONE (PR open) |
+| e | Full suite (1401 passed, 3 skipped), docs, PR, merge | DONE (#53 merged, de0cb5e) |
 
 **M31 notes.** #52 merged (1ff49ac) on green CI. Measured for M32 before
 designing it: one recorded tool run costs 3.6 ms on the 55-task NoC project,
@@ -205,5 +205,5 @@ grows with the square of its length.
 |---|---|---|
 | a | Measure and design: `docs/SCALABLE_STATE.md` (P10 68%, P11 32% of per-op time at 3000 runs) | DONE |
 | b | Failing tests `tests/test_nirmaan_scalable_state.py` (counted, not timed) | DONE |
-| c | `work/frozen.py`, frozen containers and nested dicts, identity P10, incremental P11 | TODO |
-| d | Full suite, docs, PR, merge | TODO |
+| c | `work/frozen.py`, frozen containers and nested dicts, identity P10, incremental P11 | DONE |
+| d | Full suite (1415 passed, 3 skipped), docs, PR, merge | DONE (PR open) |
