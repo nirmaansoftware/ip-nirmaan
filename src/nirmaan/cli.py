@@ -42,6 +42,9 @@ eval_app = typer.Typer(help="Evaluate a seat: a real or replayed model, judged b
 app.add_typer(org_app, name="org")
 app.add_typer(task_app, name="task")
 app.add_typer(eval_app, name="eval")
+regmap_app = typer.Typer(help="Register maps as data: check one, or lower it to a header or a table.",
+                         no_args_is_help=True)
+app.add_typer(regmap_app, name="regmap")
 vplan_app = typer.Typer(help="Load and save verification plans: requirements and the items that prove them.",
                         no_args_is_help=True)
 app.add_typer(vplan_app, name="vplan")
@@ -890,6 +893,43 @@ def eval_run(
         typer.echo(json.dumps([r.model_dump(mode="json") for r in results], indent=2))
     if not all(r.passed for r in results):
         raise typer.Exit(1)
+
+
+# --- Register maps (M30) ------------------------------------------------------------------
+
+
+def _regmap(path: Path):
+    from nirmaan.regmap import load_map
+
+    try:
+        return load_map(path)
+    except (OSError, ValueError) as exc:
+        _fail(f"cannot read the register map {path}: {str(exc).splitlines()[0]}")
+
+
+@regmap_app.command("check")
+def regmap_check(path: Path) -> None:
+    """Validate a register map. Exits 1 when it has problems."""
+    from nirmaan.regmap import map_summary, validate
+
+    regmap = _regmap(path)
+    problems = validate(regmap)
+    for problem in problems:
+        _err.print(escape(problem), highlight=False)
+    if problems:
+        raise typer.Exit(1)
+    console.print(escape(f"valid: {map_summary(regmap)}"), highlight=False)
+
+
+@regmap_app.command("lower")
+def regmap_lower(path: Path, to: str = typer.Option(..., "--to", help="A registered lowering, e.g. c-header.")) -> None:
+    """Print the map lowered to a header, a table, or any registered lowering."""
+    from nirmaan.regmap import lower
+
+    try:
+        typer.echo(lower(_regmap(path), to), nl=False)
+    except (KeyError, ValueError) as exc:
+        _fail(str(exc.args[0]))
 
 
 @app.command()

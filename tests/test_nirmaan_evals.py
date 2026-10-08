@@ -136,8 +136,9 @@ def test_what_the_gates_miss_the_held_out_testbench_catches(nirmaan_org, fixed_c
     assert result.runtime == "weak-seat" and not result.replay
     assert result.submitted, result.detail  # its own lint, simulation, and synthesis all passed
     assert {g.tool for g in result.gate_runs if g.succeeded} >= {"lint.run", "simulator.run", "synth.run"}
-    [held] = result.scores
-    assert held.status is ScoreStatus.FAILED and held.runs
+    # Both held-out judges catch it: the reference testbench, and (M30) the test generated from the map.
+    assert [s.status for s in result.scores] == [ScoreStatus.FAILED, ScoreStatus.FAILED]
+    assert all(s.runs for s in result.scores)
     assert not result.passed
 
 
