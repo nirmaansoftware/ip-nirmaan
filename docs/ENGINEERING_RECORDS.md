@@ -1,8 +1,7 @@
 # Engineering records: decisions and failures (M29)
 
 The third milestone of the structural review
-(`docs/architecture/target-state.md` section 5; a working name, the
-coordinator assigns numbers). Two questions a long-running engineering
+(`docs/architecture/target-state.md` section 5). Two questions a long-running engineering
 organization must answer from its records, not from memory:
 
 - **Why did we choose this?** (a decision record: question, context,

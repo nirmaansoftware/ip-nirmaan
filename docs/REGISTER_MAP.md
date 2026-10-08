@@ -1,7 +1,7 @@
-# The register map as data (M30, working name)
+# The register map as data (M30)
 
 The fourth structural-review milestone (`docs/architecture/target-state.md`
-section 5; the coordinator assigns numbers). The review's compiler principle,
+section 5). The review's compiler principle,
 applied where it pays first: design intent that is only prose cannot be checked
 or lowered. Today a register map lives as a Markdown table in an interface
 specification, and the C header a driver includes is written by hand from it
