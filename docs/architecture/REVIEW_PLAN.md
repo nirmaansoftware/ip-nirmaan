@@ -191,7 +191,7 @@ session's PR).
 | b | Failing tests `tests/test_nirmaan_model_selection.py` | DONE |
 | c | Accounting: VeriTriage `GenerationResponse` tokens, bridge, `Completion`, `ModelCall`, `record_model_call`, `nirmaan costs`, eval totals | DONE |
 | d | Selection: `ModelProfile` data, derived needs, `select_model`, `auto` runtime | DONE |
-| e | Full suite, docs, PR, merge | TODO |
+| e | Full suite (1401 passed, 3 skipped), docs, PR, merge | DONE (PR open) |
 
 **M31 notes.** #52 merged (1ff49ac) on green CI. Measured for M32 before
 designing it: one recorded tool run costs 3.6 ms on the 55-task NoC project,

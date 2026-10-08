@@ -36,7 +36,7 @@ way every milestone has:
 | Model selection by capability (`auto` runtime) and every model call recorded with tokens and cost; `nirmaan costs` (M31, working name) | A live-model evaluation run |
 | IP Nirmaan over MCP; organizational events on the M18 bus (M22) | |
 | CI on Python 3.11 and 3.12, plus a dash check (Stage 0) | |
-| 1387 tests; CLI `nirmaan`; HTML dashboard; landing page live at https://ip.nirmaan.online | |
+| 1401 tests; CLI `nirmaan`; HTML dashboard; landing page live at https://ip.nirmaan.online | |
 
 ## Resume checklist (after the folder rename)
 
@@ -52,7 +52,7 @@ PYTHONPYCACHEPREFIX=/tmp/nirmaan-pycache .venv/bin/python -m pytest -q \
   --deselect tests/test_ai_boundary.py::test_missing_sdk_raises_clean_error
 ```
 
-Expect 1387 passing (3 skipped: OpenROAD is not installed locally; the CI `physical-design` job runs those three). The folder is still in iCloud, so the eviction hangs
+Expect 1401 passing (3 skipped: OpenROAD is not installed locally; the CI `physical-design` job runs those three). The folder is still in iCloud, so the eviction hangs
 described in `context.md` section 4 still apply. If imports stall, pre-read the tree:
 
 ```

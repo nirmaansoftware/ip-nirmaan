@@ -2621,7 +2621,8 @@ Key design points worth not re-deriving:
   `input_tokens`, `output_tokens`, `cost_usd`.
 
 `tests/test_nirmaan_model_selection.py` (14), crown jewel
-`test_a_new_model_profile_needs_no_core_changes`.
+`test_a_new_model_profile_needs_no_core_changes`. The standard local run is
+1401 passed, 3 skipped.
 
 ## 3. Current architecture map
 
