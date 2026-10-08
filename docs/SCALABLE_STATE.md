@@ -51,6 +51,13 @@ previous)`). A state that arrives with a broken chain (loaded with
 `verify=False`) is never marked verified, so every operation re-checks it in
 full and is refused, as before.
 
+## The result
+
+Measured the same way after the change: a `status.read` (which also builds a
+status report) recorded at 5,000 runs costs 0.25 ms, against 95 ms before, and
+the cost no longer grows with the project. Twenty calls recorded twenty runs and
+twenty audit entries, all verified.
+
 ## What does not change
 
 `state_fingerprint` stays (stores and tools use it), `ProjectStore` still

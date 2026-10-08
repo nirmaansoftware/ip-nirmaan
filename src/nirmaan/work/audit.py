@@ -68,11 +68,21 @@ def append(
     return [*trail, entry]
 
 
-def verify_chain(trail: Iterable[AuditEntry]) -> list[str]:
-    """Every break in the chain, as a human-readable problem. Empty means intact."""
+def verify_chain(trail: Iterable[AuditEntry], start: int = 0, previous: str = GENESIS) -> list[str]:
+    """Every break in the chain, as a human-readable problem. Empty means intact.
+
+    ``start`` and ``previous`` verify only the entries from ``start`` on, after
+    an already-verified prefix whose last hash is ``previous`` (M32): the engine
+    verifies a trail once in full, then each operation's new entries.
+    """
     problems: list[str] = []
-    previous = GENESIS
-    for index, entry in enumerate(trail):
+    entries = list(trail)
+    if start:
+        if len(entries) < start or entries[start - 1].hash != previous:
+            return [f"the verified prefix of {start} entries changed (entries removed or replaced)"]
+    else:
+        previous = GENESIS
+    for index, entry in enumerate(entries[start:], start=start):
         if entry.sequence != index:
             problems.append(f"entry {index}: sequence {entry.sequence} out of order")
         if entry.previous_hash != previous:
