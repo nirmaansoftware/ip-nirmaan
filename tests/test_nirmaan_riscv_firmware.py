@@ -186,7 +186,8 @@ def test_the_driver_and_its_tests_cross_build_for_rv32i(block, tmp_path):
     assert elf.read_bytes()[18] == 243  # e_machine EM_RISCV
     metrics = outcome.data["result"]["metrics"]
     assert metrics["text"] > 0 and metrics["image_bytes"] == metrics["text"] + metrics["data"]
-    assert metrics["compiled"] == 5  # the driver, its tests, the SoC runtime, the libc, and crt0
+    # the driver, its tests, the SoC runtime, the libc, crt0, and (M29) the core's interrupt runtime
+    assert metrics["compiled"] == 6
 
 
 @needs(riscv=True)

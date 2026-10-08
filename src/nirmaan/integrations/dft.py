@@ -17,7 +17,15 @@ Five tools, each an M21 backend behind the tool broker:
   protocol. The coverage is what that simulation measured; a pattern set that
   claims a fault the simulation does not detect fails the run.
 * ``dft.mbist`` (Yosys, Icarus, M27): a March C- controller from
-  ``dft_mbist.py``, run against the memory in Icarus.
+  ``dft_mbist.py``, run against the memory in Icarus. M29: with no memory as
+  top, every memory in the hierarchy, at its declared and measured latency.
+* ``dft.atpg_transition`` (Yosys, Icarus, M29): slow-to-rise and slow-to-fall
+  pattern pairs (launch on capture), graded by a fault simulation with a
+  one-cycle delay at each site in the at-speed cycle.
+
+M29 also lets ``dft.scan_insert`` cross clock domains (``cross_domains=lockup``)
+with a lockup latch at each crossing, which the chain rule requires and the
+chain simulation proves with skewed clocks.
 
 A tool that cannot run here is refused with a reason (the M21 probe); a design
 that fails is a recorded run with ``succeeded=False``. The steps between tool
@@ -54,13 +62,15 @@ MBIST_CONTROLLER = "nirmaan_mbist.v"
 
 _HELPER_ERROR_RE = re.compile(r"^DFT-ERROR:\s*(?P<msg>.*)$", re.M)
 _SCAN_RESULT_RE = re.compile(r"DFT-SCAN: (?:(?P<chains>\d+) chains, (?P<flops>\d+) flops, )?chain length "
-                             r"(?P<length>\d+), shift errors (?P<shift>\d+), capture errors (?P<capture>\d+)")
+                             r"(?P<length>\d+), shift errors (?P<shift>\d+), capture errors (?P<capture>\d+)"
+                             r"(?:, skew passes (?P<skew>\d+))?")
 _FAULT_RE = re.compile(r"^DFT-FAULT (?P<index>\d+) (?P<pattern>-?\d+)$", re.M)
 _ATPG_CHECK_RE = re.compile(r"DFT-ATPG-CHECK: patterns (?P<patterns>\d+), response errors (?P<response>\d+), "
                             r"injection errors (?P<injection>\d+)")
 _ATPG_DONE_RE = re.compile(r"DFT-ATPG: (?P<faults>\d+) faults simulated")
 _MBIST_GEN_RE = re.compile(r"DFT-MBIST-GEN: March C- for (?P<top>\S+),")
-_MBIST_RE = re.compile(r"DFT-MBIST: march C-, words (?P<words>\d+), width (?P<width>\d+), reads (?P<reads>\d+), "
+_MBIST_RE = re.compile(r"DFT-MBIST: (?P<top>\S+) march C-, latency (?P<latency>\d+), measured (?P<measured>\d+), "
+                       r"words (?P<words>\d+), width (?P<width>\d+), reads (?P<reads>\d+), "
                        r"writes (?P<writes>\d+), cycles (?P<cycles>\d+), x reads (?P<x>\d+), done (?P<done>\d+), "
                        r"fail (?P<fail>\d+), element (?P<element>\d+), address (?P<address>\d+)")
 
@@ -115,7 +125,13 @@ def check_design(design: Design) -> tuple[list[Diagnostic], dict[str, str]]:
 
 
 def _no_latches(design: Design) -> list[str]:
-    return [f"latch {name} ({kind}): a latch cannot be scanned" for _, kind, name in design.latches]
+    found = [f"latch {name} ({kind}): a latch cannot be scanned" for _, kind, name in design.latches]
+    try:  # M29: a lockup latch on a scan crossing is not a design latch, unless capture logic reads it
+        leaks = design.lockup_leaks()
+    except NetlistError:
+        leaks = []
+    return found + [f"latch {design.names.get(lk.q, lk.cell)} ({lk.type}) looks like a lockup latch but reaches "
+                    f"capture-mode logic: a latch cannot be scanned" for lk in leaks]
 
 
 def _no_loops(design: Design) -> list[str]:
@@ -144,7 +160,8 @@ def _known_cells(design: Design) -> list[str]:
 
 
 def _chain_complete(design: Design) -> list[str]:
-    return design.trace_chain().problems
+    chain = design.trace_chain()
+    return chain.problems + chain.hazards
 
 
 for _rule in (
@@ -157,7 +174,8 @@ for _rule in (
             _reset_from_input),
     DftRule("recognized-cells", "Every cell is a gate or flop the checker can evaluate.", _known_cells),
     DftRule("scan-chain-complete", "With scan_en high, every flop is on a chain from a scan_in bit to the "
-            "matching scan_out bit, and each chain stays in one clock domain.",
+            "matching scan_out bit, every clock crossing on a chain has a lockup latch, and no second-edge flop "
+            "loads a first-edge one.",
             _chain_complete, applies=Design.has_scan_ports),
 ):
     register_rule(_rule)
@@ -194,7 +212,8 @@ def _insert_steps(job: Job) -> list[list[str]]:
         (work / stale).unlink(missing_ok=True)
     return [["yosys", "-s", "prep.ys"],
             _helper("stitch", DESIGN_JSON, "stitched.json", CHAIN_REPORT, str(job.top),
-                    job.params.get("chains") or "1", job.params.get("max_chain_length") or "0"),
+                    job.params.get("chains") or "1", job.params.get("max_chain_length") or "0",
+                    job.params.get("cross_domains", "").strip() or "none"),
             ["yosys", "-s", "stitch.ys"]]
 
 
@@ -204,6 +223,9 @@ def _chain_params(job: Job) -> str | None:
         value = job.params.get(name, "").strip()
         if value and not (value.isdigit() and int(value) > 0):
             return f"{name} must be a positive integer, not {value!r}"
+    cross = job.params.get("cross_domains", "").strip()
+    if cross and cross != "lockup":
+        return f"cross_domains must be 'lockup' (chains cross clock domains through lockup latches), not {cross!r}"
     return None
 
 
@@ -263,11 +285,14 @@ def parse_scan_insert(run: RunRecord) -> EdaResult:
     metrics: dict = {"exit_statuses": list(run.returncodes)}
     if failed is None and report is not None and netlist.is_file():
         lengths = [c["length"] for c in report["chains"]]
-        metrics.update(chain_length=report["length"], chains=len(lengths), chain_lengths=lengths,
+        lockups = len(report.get("lockups", []))
+        metrics.update(chain_length=report["length"], chains=len(lengths), chain_lengths=lengths, lockups=lockups,
                        flops=report["flops"], clock=report["clock"], clocks=report["clocks"], ports=report["ports"],
                        order=[f["flop"] for f in report["order"]], scan_netlist=str(netlist),
                        chain_report=str(run.workdir / CHAIN_REPORT))
         clocks = "; ".join(f"{c['edge']} {c['port']}" for c in report["clocks"])
+        if report.get("cross_domains"):
+            clocks += f"; across clock domains, {lockups} lockup latch{'es' if lockups != 1 else ''}"
         if len(lengths) == 1:
             return EdaResult(True, f"scan inserted: {report['length']} flops on one mux-D chain ({clocks}), "
                                    f"netlist {SCAN_NETLIST}", tuple(errors), metrics)
@@ -334,16 +359,18 @@ def parse_scan_sim(run: RunRecord) -> EdaResult:
     metrics.update(sim.metrics, testbench=str(run.workdir / TESTBENCH))
     if found:
         metrics.update(shift_errors=int(found["shift"]), capture_errors=int(found["capture"]),
-                       chains=int(found["chains"] or 1), chain_length=int(found["length"]))
+                       chains=int(found["chains"] or 1), chain_length=int(found["length"]),
+                       skew_passes=int(found["skew"] or 0))
     clean = found is not None and found["shift"] == "0" and found["capture"] == "0"
     if sim.passed and clean:
         length = int(found["length"])
+        skew = "; shift also passed with skewed clocks in both orders" if found["skew"] else ""
         if found["chains"] is None:
             return EdaResult(True, f"scan chain passed: {length} flops, {2 * length} bits shifted through, "
-                                   f"one capture checked, 0 mismatches", sim.diagnostics, metrics)
+                                   f"one capture checked, 0 mismatches{skew}", sim.diagnostics, metrics)
         return EdaResult(True, f"scan chains passed: {found['chains']} chains, {found['flops']} flops, longest "
                                f"{length}, {2 * length} bits shifted through each, one capture checked, "
-                               f"0 mismatches", sim.diagnostics, metrics)
+                               f"0 mismatches{skew}", sim.diagnostics, metrics)
     detail = (f"{found['shift']} shift and {found['capture']} capture mismatches" if found
               else sim.summary)
     return EdaResult(False, f"scan chain failed: {detail}", sim.diagnostics, metrics)
@@ -372,7 +399,7 @@ def atpg_analysis_steps(job: Job) -> list[list[str]]:
     return [["yosys", "-s", _analysis_script(job, "atpg_analyze.ys")]]
 
 
-def atpg_grading_steps(job: Job, patterns: str) -> list[list[str]]:
+def atpg_grading_steps(job: Job, patterns: str, fault_model: str = "stuck-at") -> list[list[str]]:
     """Grade ``patterns`` by fault simulation: the fault netlist, Yosys writes it, Icarus runs both machines."""
     work = job.workdir
     limits = {k[4:]: v for k, v in job.params.items() if k.startswith("min_")}
@@ -383,21 +410,27 @@ def atpg_grading_steps(job: Job, patterns: str) -> list[list[str]]:
     for stale in (FAULTS, "faulty.json", "fault_netlist.v", "atpg_tb.v", "atpg.vvp"):
         (work / stale).unlink(missing_ok=True)
     return [atpg_helper("inject", DESIGN_JSON, patterns, "faulty.json", FAULTS, "atpg_tb.v", str(job.top),
-                        "--sample", job.params.get("fault_sample") or "0", "--seed", job.params.get("seed") or "1"),
+                        "--sample", job.params.get("fault_sample") or "0", "--seed", job.params.get("seed") or "1",
+                        "--model", fault_model),
             ["yosys", "-s", "fault.ys"],
             ["iverilog", "-g2012", "-o", "atpg.vvp", "-s", "nirmaan_atpg_tb", *job.sources, "fault_netlist.v",
              "atpg_tb.v"],
             ["vvp", "-n", "atpg.vvp"]]
 
 
-def _atpg_steps(job: Job) -> list[list[str]]:
+def _atpg_steps(job: Job, fault_model: str = "stuck-at") -> list[list[str]]:
     given = job.params.get("patterns", "").strip()
     steps = atpg_analysis_steps(job)
     if given:
-        return steps + atpg_grading_steps(job, str(Path(given).resolve()))
+        return steps + atpg_grading_steps(job, str(Path(given).resolve()), fault_model)
     (job.workdir / PATTERNS).unlink(missing_ok=True)
-    steps.append(atpg_helper("generate", DESIGN_JSON, PATTERNS, str(job.top), "--seed", job.params.get("seed") or "1"))
-    return steps + atpg_grading_steps(job, PATTERNS)
+    steps.append(atpg_helper("generate", DESIGN_JSON, PATTERNS, str(job.top), "--seed", job.params.get("seed") or "1",
+                             "--model", fault_model))
+    return steps + atpg_grading_steps(job, PATTERNS, fault_model)
+
+
+def _transition_steps(job: Job) -> list[list[str]]:
+    return _atpg_steps(job, "transition")
 
 
 def _atpg_params(job: Job) -> str | None:
@@ -462,6 +495,7 @@ def parse_atpg(run: RunRecord) -> EdaResult:
         test_coverage=round(100.0 * detected / testable, 2) if testable else 100.0,
         patterns=int(check["patterns"]), chains=doc["chains"], claimed=len(claims), claims_not_detected=len(missed),
         response_errors=int(check["response"]), injection_errors=int(check["injection"]),
+        fault_model=doc.get("fault_model", "stuck-at"),
         faults_in_universe=doc["universe"], sampled=doc["sampled"], aborted=len(doc["aborted"]),
         patterns_file=str(run.workdir / PATTERNS) if (run.workdir / PATTERNS).is_file() else None,
         fault_list=listing)
@@ -478,10 +512,12 @@ def parse_atpg(run: RunRecord) -> EdaResult:
     if diags:
         return EdaResult(False, "ATPG refused: " + "; ".join(d.message for d in diags), tuple(diags), metrics)
     sample = (f"; a seeded sample of {total} of {doc['universe']} faults" if doc["sampled"] else "")
-    summary = (f"ATPG: {detected} of {total} faults detected in fault simulation ({metrics['fault_coverage']:.2f}% "
-               f"fault coverage, {metrics['test_coverage']:.2f}% test coverage; {undetectable} proven undetectable, "
-               f"{metrics['faults_undetected']} undetected), {_plural(metrics['patterns'], 'pattern')} over "
-               f"{_plural(doc['chains'], 'chain')}{sample}")
+    transition = metrics["fault_model"] == "transition"
+    summary = (f"ATPG: {detected} of {total} {'transition ' if transition else ''}faults detected in fault simulation "
+               f"({metrics['fault_coverage']:.2f}% fault coverage, {metrics['test_coverage']:.2f}% test coverage; "
+               f"{undetectable} proven undetectable, {metrics['faults_undetected']} undetected), "
+               f"{_plural(metrics['patterns'], 'pattern pair' if transition else 'pattern')}"
+               f"{', launch on capture,' if transition else ''} over {_plural(doc['chains'], 'chain')}{sample}")
     limits = (_json(run.workdir / ATPG_CONFIG) or {}).get("min", {})
     short = []
     for metric, bound in sorted(limits.items()):
@@ -501,28 +537,59 @@ def parse_atpg(run: RunRecord) -> EdaResult:
 
 def _mbist_steps(job: Job) -> list[list[str]]:
     work = job.workdir
-    (work / "mbist_ports.ys").write_text("\n".join([*_read(job), "proc", "write_json mbist_ports.json"]) + "\n",
+    # M29: with no top, the design's own top is found, and its memories with it.
+    hierarchy = f"hierarchy -check -top {job.top}" if job.top else "hierarchy -check -auto-top"
+    read = [*(f'read_verilog -sv "{src}"' for src in job.sources), hierarchy]
+    (work / "mbist_ports.ys").write_text("\n".join([*read, "proc", "write_json mbist_ports.json"]) + "\n",
                                          encoding="utf-8")
     for stale in ("mbist_ports.json", MBIST_CONTROLLER, "mbist_tb.v", "mbist.vvp"):
         (work / stale).unlink(missing_ok=True)
     return [["yosys", "-s", "mbist_ports.ys"],
             [sys.executable, str(MBIST_HELPER), "generate", "mbist_ports.json", MBIST_CONTROLLER, "mbist_tb.v",
-             str(job.top)],
+             str(job.top or "")],
             ["iverilog", "-g2012", "-o", "mbist.vvp", "-s", "nirmaan_mbist_tb", *job.sources, MBIST_CONTROLLER,
              "mbist_tb.v"],
             ["vvp", "-n", "mbist.vvp"]]
 
 
-def parse_mbist(run: RunRecord) -> EdaResult:
-    """Pass means the controller ran March C- to the end, made exactly 10N operations, and saw no mismatch."""
+def _one_memory(found: re.Match) -> tuple[dict, list[str], str | None]:
+    """One memory's result line: its metrics, what is wrong with the run, and its failure (if March C- failed)."""
     from nirmaan.integrations.dft_mbist import MARCH_C_MINUS
 
+    top, words, width = found["top"], int(found["words"]), int(found["width"])
+    latency, measured = int(found["latency"]), int(found["measured"])
+    reads, writes, cycles = int(found["reads"]), int(found["writes"]), int(found["cycles"])
+    metrics = {"module": top, "depth": words, "width": width, "read_latency": latency, "measured_latency": measured,
+               "reads": reads, "writes": writes, "operations": reads + writes, "cycles": cycles,
+               "x_reads": int(found["x"]), "done": found["done"] == "1", "fail": found["fail"] == "1"}
+    failure = None
+    if metrics["fail"]:
+        element = int(found["element"])
+        direction, ops = MARCH_C_MINUS[element] if element < len(MARCH_C_MINUS) else ("?", "?")
+        metrics.update(fail_element=element, fail_address=int(found["address"]))
+        failure = (f"March C- failed on {top}: first mismatch in element {element} ({direction} {ops}) at "
+                   f"address {found['address']}")
+    problems = []
+    if measured != latency:
+        seen = f"measured {measured}" if measured else f"measured no word within {8} cycles"
+        problems.append(f"{top} declares a read latency of {latency}, but the testbench {seen}")
+    if not metrics["done"]:
+        problems.append(f"the controller for {top} never finished")
+    if reads != 5 * words or writes != 5 * words:
+        problems.append(f"{top}: {reads} reads and {writes} writes, not {5 * words} of each")
+    if cycles != (10 + 5 * latency) * words:
+        problems.append(f"{top}: {cycles} cycles, not {(10 + 5 * latency) * words}")
+    if metrics["x_reads"]:
+        problems.append(f"{top}: {metrics['x_reads']} reads returned unknown bits")
+    return metrics, problems, failure
+
+
+def parse_mbist(run: RunRecord) -> EdaResult:
+    """Pass means every memory's controller ran March C- to the end, at its measured latency, with no mismatch."""
     metrics: dict = {"exit_statuses": list(run.returncodes)}
     helper = _HELPER_ERROR_RE.search(run.log)
-    found = _MBIST_RE.search(run.log)
-    named = _MBIST_GEN_RE.search(run.log)
-    top = named["top"] if named else "the memory"
-    if helper or found is None:
+    lines = list(_MBIST_RE.finditer(run.log))
+    if helper or not lines:
         errors = _yosys_errors(run)
         sim_log = "".join(f"$ {c}\n{t}" for c, t in _sections(run.log) if c.startswith(("iverilog", "vvp")))
         errors += list(parse_simulation(sim_log, run.returncodes[2:]).diagnostics) if len(run.returncodes) > 2 else []
@@ -530,33 +597,30 @@ def parse_mbist(run: RunRecord) -> EdaResult:
                                                        _step_failed(run, 4) or "no MBIST result")
         return EdaResult(False, f"MBIST did not run: {reason}", tuple(errors or [Diagnostic("error", reason)]),
                          metrics)
-    words, width = int(found["words"]), int(found["width"])
-    reads, writes, cycles = int(found["reads"]), int(found["writes"]), int(found["cycles"])
-    failed = found["fail"] == "1"
-    metrics.update(depth=words, width=width, reads=reads, writes=writes, operations=reads + writes, cycles=cycles,
-                   x_reads=int(found["x"]), done=found["done"] == "1", fail=failed,
-                   controller=str(run.workdir / MBIST_CONTROLLER), testbench=str(run.workdir / "mbist_tb.v"))
-    if failed:
-        element = int(found["element"])
-        direction, ops = MARCH_C_MINUS[element] if element < len(MARCH_C_MINUS) else ("?", "?")
-        metrics.update(fail_element=element, fail_address=int(found["address"]))
-        message = (f"March C- failed on {top}: first mismatch in element {element} ({direction} {ops}) at "
-                   f"address {found['address']}")
-        return EdaResult(False, message, (Diagnostic("error", message, "MBIST-FAIL"),), metrics)
-    problems = []
-    if not metrics["done"]:
-        problems.append("the controller never finished")
-    if reads != 5 * words or writes != 5 * words:
-        problems.append(f"{reads} reads and {writes} writes, not {5 * words} of each")
-    if cycles != 15 * words:
-        problems.append(f"{cycles} cycles, not {15 * words}")
-    if metrics["x_reads"]:
-        problems.append(f"{metrics['x_reads']} reads returned unknown bits")
+    memories, problems, failures = [], [], []
+    for found in lines:
+        one, wrong, failure = _one_memory(found)
+        memories.append(one)
+        problems += wrong
+        failures += [failure] if failure else []
+    metrics.update(memories=memories, controller=str(run.workdir / MBIST_CONTROLLER),
+                   testbench=str(run.workdir / "mbist_tb.v"))
+    if len(memories) == 1:
+        metrics.update({k: v for k, v in memories[0].items() if k != "module"})
+    else:
+        metrics.update(operations=sum(m["operations"] for m in memories), fail=bool(failures))
+    if failures:
+        message = "; ".join(failures)
+        return EdaResult(False, message, tuple(Diagnostic("error", f, "MBIST-FAIL") for f in failures), metrics)
     if problems:
-        message = f"March C- did not run to completion on {top}: {'; '.join(problems)}"
+        message = f"March C- did not run to completion: {'; '.join(problems)}"
         return EdaResult(False, message, (Diagnostic("error", message, "MBIST-INCOMPLETE"),), metrics)
-    return EdaResult(True, f"March C- passed on {top}: {words} words of {width} bits, {reads + writes} operations, "
-                           f"{cycles} cycles", (), metrics)
+    parts = [f"{m['depth']} words of {m['width']} bits, {m['operations']} operations, {m['cycles']} cycles"
+             + (f", read latency {m['read_latency']}" if m["read_latency"] != 1 else "") for m in memories]
+    if len(memories) == 1:
+        return EdaResult(True, f"March C- passed on {memories[0]['module']}: {parts[0]}", (), metrics)
+    return EdaResult(True, f"March C- passed on {len(memories)} memories: "
+                           + "; ".join(f"{m['module']} ({p})" for m, p in zip(memories, parts)), (), metrics)
 
 
 register_backend(Backend("yosys-scan", "dft.scan_insert", ("yosys",), _insert_steps, parse_scan_insert,
@@ -566,8 +630,10 @@ register_backend(Backend("icarus-scan", "dft.scan_sim", ("yosys", "iverilog", "v
                          ("sources", "top")))
 register_backend(Backend("icarus-atpg", "dft.atpg", ("yosys", "iverilog", "vvp"), _atpg_steps, parse_atpg,
                          ("sources", "top"), files=("patterns",), check=_atpg_params))
+register_backend(Backend("icarus-atpg-transition", "dft.atpg_transition", ("yosys", "iverilog", "vvp"),
+                         _transition_steps, parse_atpg, ("sources", "top"), files=("patterns",), check=_atpg_params))
 register_backend(Backend("icarus-mbist", "dft.mbist", ("yosys", "iverilog", "vvp"), _mbist_steps, parse_mbist,
-                         ("sources", "top")))
+                         ("sources",)))
 
 __all__ = ["SCAN_PORTS", "DftRule", "atpg_analysis_steps", "atpg_grading_steps", "atpg_helper", "check_design",
            "parse_atpg", "parse_mbist", "register_rule", "rules", "unregister_rule"]

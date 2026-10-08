@@ -1,15 +1,17 @@
-// nirmaan_soc.v: a PicoRV32 SoC around a design under test, for fw.soc_test.
+// nirmaan_soc.v: a RISC-V SoC around a design under test, for fw.soc_test.
 //
-// The CPU (picorv32.v, vendored unmodified, ISC license) runs the
-// cross-compiled driver and its tests from RAM. Its loads and stores to the
-// device window become real AXI4-Lite transactions on the design, through the
-// bridge below. The design is instantiated as `NIRMAAN_DUT, a macro the build
-// defines, so this file names no design. It needs only the AXI4-Lite
-// subordinate port convention of fw.test: aclk, aresetn, and s_axil_*.
+// The CPU runs the cross-compiled driver and its tests from RAM. Its loads
+// and stores to the device window become real transfers on the design's own
+// bus, through a bridge. Three macros, which the build defines, keep this
+// file free of any name it could depend on (docs/RISCV_NEXT.md):
+//   `NIRMAAN_CORE    the core's wrapper (core_<name>.v): picorv32 or serv
+//   `NIRMAAN_BRIDGE  the bridge for the design's bus (bridge_<bus>.v), which
+//                    instantiates the design as `NIRMAAN_DUT
+// The bridge passes the design's irq output, if it has one, to the core.
 //
 // Memory map (docs/RISCV_FIRMWARE.md, section 3):
-//   0x0000_0000  RAM, 64 KiB: code, data, stack
-//   0x1000_0000  the design, register shift 2: AXI byte offset N is the
+//   0x0000_0000  RAM, 64 KiB: code, data, stack; the trap vector is at 0x10
+//   0x1000_0000  the design, register shift 2: bus byte offset N is the
 //                32-bit word at 0x1000_0000 + 4*N; byte lanes are the CPU's
 //                byte and halfword stores within that word
 //   0x2000_0000  STATUS  (read)  response code of the latest device transfer
@@ -33,24 +35,18 @@ module nirmaan_soc #(
     output wire        trap
 );
     // --- The CPU --------------------------------------------------------------------------
-    wire        mem_valid, mem_instr;
+    wire        mem_valid;
     reg         mem_ready;
     wire [31:0] mem_addr, mem_wdata;
     wire [3:0]  mem_wstrb;
     reg  [31:0] mem_rdata;
+    wire        dev_irq;
 
-    picorv32 #(
-        .ENABLE_COUNTERS(0),
-        .STACKADDR(RAM_BYTES)
-    ) cpu (
+    `NIRMAAN_CORE cpu (
         .clk(clk), .resetn(resetn), .trap(trap),
-        .mem_valid(mem_valid), .mem_instr(mem_instr), .mem_ready(mem_ready),
-        .mem_addr(mem_addr), .mem_wdata(mem_wdata), .mem_wstrb(mem_wstrb), .mem_rdata(mem_rdata),
-        .mem_la_read(), .mem_la_write(), .mem_la_addr(), .mem_la_wdata(), .mem_la_wstrb(),
-        .pcpi_valid(), .pcpi_insn(), .pcpi_rs1(), .pcpi_rs2(),
-        .pcpi_wr(1'b0), .pcpi_rd(32'b0), .pcpi_wait(1'b0), .pcpi_ready(1'b0),
-        .irq(32'b0), .eoi(),
-        .trace_valid(), .trace_data()
+        .mem_valid(mem_valid), .mem_ready(mem_ready), .mem_addr(mem_addr),
+        .mem_wdata(mem_wdata), .mem_wstrb(mem_wstrb), .mem_rdata(mem_rdata),
+        .irq(dev_irq)
     );
 
     // --- RAM, loaded from the firmware image ----------------------------------------------
@@ -70,29 +66,24 @@ module nirmaan_soc #(
     wire in_ctl = mem_addr[31:4] == 28'h2000000;
     wire [31:0] ram_word = {ram[mem_addr + 3], ram[mem_addr + 2], ram[mem_addr + 1], ram[mem_addr]};
 
-    // --- The design, behind an AXI4-Lite manager bridge -----------------------------------
-    reg  [31:0] awaddr, wdata, araddr;
-    reg  [3:0]  wstrb;
-    reg         awvalid, wvalid, bready, arvalid, rready;
-    wire        awready, wready, bvalid, arready, rvalid;
-    wire [1:0]  bresp, rresp;
-    wire [31:0] rdata;
+    // --- The design, behind the bridge for its bus ----------------------------------------
+    reg         dev_req, dev_write;
+    reg  [9:0]  dev_offset;
+    reg  [31:0] dev_wdata;
+    reg  [3:0]  dev_wstrb;
+    wire        dev_done;
+    wire [31:0] dev_rdata;
+    wire [1:0]  dev_resp;
 
-    /* verilator lint_off WIDTH */
-    /* verilator lint_off PINCONNECTEMPTY */
-    `NIRMAAN_DUT dut (
-        .aclk(clk), .aresetn(resetn),
-        .s_axil_awaddr(awaddr), .s_axil_awvalid(awvalid), .s_axil_awready(awready),
-        .s_axil_wdata(wdata), .s_axil_wstrb(wstrb), .s_axil_wvalid(wvalid), .s_axil_wready(wready),
-        .s_axil_bresp(bresp), .s_axil_bvalid(bvalid), .s_axil_bready(bready),
-        .s_axil_araddr(araddr), .s_axil_arvalid(arvalid), .s_axil_arready(arready),
-        .s_axil_rdata(rdata), .s_axil_rresp(rresp), .s_axil_rvalid(rvalid), .s_axil_rready(rready)
+    `NIRMAAN_BRIDGE bridge (
+        .clk(clk), .resetn(resetn),
+        .req(dev_req), .write(dev_write), .offset(dev_offset), .wdata(dev_wdata), .wstrb(dev_wstrb),
+        .done(dev_done), .rdata(dev_rdata), .resp(dev_resp),
+        .irq(dev_irq)
     );
-    /* verilator lint_on PINCONNECTEMPTY */
-    /* verilator lint_on WIDTH */
 
-    localparam [1:0] IDLE = 2'd0, WRITE = 2'd1, READ = 2'd2;
-    reg [1:0]  state;
+    localparam IDLE = 1'b0, BUSY = 1'b1;
+    reg        state;
     reg [1:0]  status;      // STATUS: the latest device response
     reg [31:0] cycles;      // CYCLES
     reg [31:0] waited;
@@ -115,14 +106,11 @@ module nirmaan_soc #(
             waited <= 32'd0;
             done <= 1'b0;
             exit_code <= 32'd0;
-            awvalid <= 1'b0;
-            wvalid <= 1'b0;
-            bready <= 1'b0;
-            arvalid <= 1'b0;
-            rready <= 1'b0;
+            dev_req <= 1'b0;
         end else begin
             cycles <= cycles + 32'd1;
             mem_ready <= 1'b0;
+            dev_req <= 1'b0;
             case (state)
                 IDLE: if (mem_valid && !mem_ready) begin
                     if (in_ram) begin
@@ -134,20 +122,12 @@ module nirmaan_soc #(
                         if (mem_wstrb[3]) ram[mem_addr + 3] <= mem_wdata[31:24];
                     end else if (in_dut) begin
                         waited <= 32'd0;
-                        if (|mem_wstrb) begin
-                            awaddr <= {22'b0, mem_addr[11:2]};
-                            wdata <= mem_wdata;
-                            wstrb <= mem_wstrb;
-                            awvalid <= 1'b1;
-                            wvalid <= 1'b1;
-                            bready <= 1'b1;
-                            state <= WRITE;
-                        end else begin
-                            araddr <= {22'b0, mem_addr[11:2]};
-                            arvalid <= 1'b1;
-                            rready <= 1'b1;
-                            state <= READ;
-                        end
+                        dev_req <= 1'b1;
+                        dev_write <= |mem_wstrb;
+                        dev_offset <= mem_addr[11:2];
+                        dev_wdata <= mem_wdata;
+                        dev_wstrb <= mem_wstrb;
+                        state <= BUSY;
                     end else begin
                         mem_ready <= 1'b1;
                         mem_rdata <= 32'd0;
@@ -160,42 +140,26 @@ module nirmaan_soc #(
                         end
                     end
                 end
-                WRITE: begin
+                BUSY: begin
                     waited <= waited + 32'd1;
-                    if (awvalid && awready) awvalid <= 1'b0;
-                    if (wvalid && wready) wvalid <= 1'b0;
-                    if (bvalid && bready) begin
-                        bready <= 1'b0;
-                        status <= bresp;
+                    if (dev_done) begin
+                        status <= dev_resp;
+                        mem_rdata <= dev_rdata;
                         mem_ready <= 1'b1;
                         state <= IDLE;
-                        $display("FWTEST BUS write 0x%0x = 0x%08x strobe 0x%0x -> %0s", awaddr, wdata, wstrb,
-                                 resp_name(bresp));
+                        if (dev_write)
+                            $display("FWTEST BUS write 0x%0x = 0x%08x strobe 0x%0x -> %0s", dev_offset, dev_wdata,
+                                     dev_wstrb, resp_name(dev_resp));
+                        else
+                            $display("FWTEST BUS read 0x%0x -> 0x%08x %0s", dev_offset, dev_rdata,
+                                     resp_name(dev_resp));
                     end else if (waited == MAX_WAIT) begin
-                        $display("FWTEST ERROR bus timeout: no write handshake for offset 0x%0x within %0d cycles",
-                                 awaddr, MAX_WAIT);
+                        $display("FWTEST ERROR bus timeout: no %0s handshake for offset 0x%0x within %0d cycles",
+                                 dev_write ? "write" : "read", dev_offset, MAX_WAIT);
                         done <= 1'b1;
                         exit_code <= 32'd3;
                     end
                 end
-                READ: begin
-                    waited <= waited + 32'd1;
-                    if (arvalid && arready) arvalid <= 1'b0;
-                    if (rvalid && rready) begin
-                        rready <= 1'b0;
-                        status <= rresp;
-                        mem_rdata <= rdata;
-                        mem_ready <= 1'b1;
-                        state <= IDLE;
-                        $display("FWTEST BUS read 0x%0x -> 0x%08x %0s", araddr, rdata, resp_name(rresp));
-                    end else if (waited == MAX_WAIT) begin
-                        $display("FWTEST ERROR bus timeout: no read handshake for offset 0x%0x within %0d cycles",
-                                 araddr, MAX_WAIT);
-                        done <= 1'b1;
-                        exit_code <= 32'd3;
-                    end
-                end
-                default: state <= IDLE;
             endcase
         end
     end

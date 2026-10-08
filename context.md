@@ -2355,6 +2355,202 @@ the standard local run is 1260 passed, 3 skipped. Deferred: recording explicit d
 from the CLI or MCP, declined model answers (the engine records nothing for
 them), principle IDs on refusals, learning from the summary.
 
+### Milestone 29 (gates) - The RTL gates on the remaining workflows, and automatic antecedent covers (after Stage 6)
+
+Every stage that produces `rtl_source` now carries `RTL_GATES`: M29 adds
+`parameter-change` `rtl-change`, `regression-investigation` `rtl-fix`,
+`timing-closure` `rtl-fix`, and `new-ip` `cdc-design` (each also produces a
+`testbench`; a test enumerates `WORKFLOWS` so no RTL stage is ungated). And
+the `formal.cover` run behind `NOT_VACUOUS` now derives a cover for every
+assertion's antecedent, so a proof whose assertions sit under guards that
+never hold is refused. Design doc: `docs/GATES_REST.md`.
+
+Key design points worth not re-deriving:
+- **`cdc-design` needed two data edits.** `rtl.cdc_design` gains
+  `approved_inputs=True`, and the `cdc_design` skill gains the five gate tools:
+  the runtime runs before-review checks as the seat, and the broker refuses a
+  tool the role may not use. The skill does not include `rtl_design`, so
+  routing is unchanged.
+- **No STA before review on the timing fix.** `reanalysis` already re-runs
+  `sta.run` after the fix and is the implementation gate; STA needs a Liberty
+  netlist, SDC, and PDK the RTL seat does not produce; and it runs only in CI's
+  `physical-design` job, so a before-review STA would either silently not
+  apply or block every timing fix on most machines. Tightening `reanalysis` to
+  a real run is deferred to the PD signoff work.
+- **Antecedent covers are derived by elaboration, not by parsing guards.**
+  `integrations/eda_antecedents.py` (imports nothing of Nirmaan) wraps each
+  procedural assertion as `begin cover (1'b1); <assertion> end`, so Yosys
+  gives the cover exactly the assertion's path condition: every `if`, `else`,
+  `case` arm, loop iteration, generate instance, and task call. A top-level
+  `A |-> B` covers `A` (module scope: `cover property (A);` after it); a
+  module-scope assertion with no implication is `unguarded`. Inserted text
+  never adds a newline; the manifest `<run>/antecedents.json` records each
+  derived cover's file, line, and column, and `parse_sby_cover` counts those
+  apart from the seat's covers (`antecedents_reached`, `_unreached`,
+  `_unelaborated`; `covers_*` stay the seat's).
+- **Never silently skipped.** Sequence operators, nested or chained
+  implications, named properties, action blocks, deferred assertions, and
+  macros whose body asserts are refused by the backend's precheck, as a
+  recorded failed run listing each file, line, and reason. A derived cover
+  missing from the elaborated design (generate branch not taken, task never
+  called) is a warning, not a failure.
+- **The seat's files are never edited.** The cover `.sby`'s `[files]` names
+  the instrumented copies in `<run>/antecedents/`. All seven fixture setups
+  pass unchanged: counter 1, AXI4-Lite 14, FIFO 18, arbiter 33 (N=5: 45), APB
+  38 derived covers reached.
+
+Tests: `tests/test_nirmaan_gates_rest.py` (47): the stages as data and
+the registry-wide law; the CDC seat's data; on each of the four stages a latch
+and a failing self-check refused, clean RTL with a proof approved, and a
+never-checked assertion refused while `formal.run` passes; derivation on every
+fixture (same lines, nothing else changed) and every fixture antecedent
+reached; an unreachable antecedent and an underivable assertion as recorded
+failed runs; the deriver and parser on text; crown jewel
+`test_a_new_workflow_with_the_gates_refuses_a_never_checked_assertion_with_no_core_changes`;
+`drive` on a newly gated stage; the core never names antecedents; CI requires
+the formal tools. Migrated (design doc, section 4): one M27 test, which now checks that the
+cover run reads an instrumented copy differing only by the derived cover; the
+bridge plans that reach `cdc-design` already drove the gated
+`rtl-implementation` first and pass unchanged. `formal.cover` gains no
+parameter, so its M28 contract is unchanged. The standard run, merged with
+main (M28 contracts, M29 auto loop), is 1297 passed and 3 skipped (OpenROAD).
+
+Deferred: a real `sta.run` on `timing-closure` `reanalysis`; antecedents of
+boolean implications inside an immediate assertion; expanding named
+properties and macros; multi-task setups in the cover check.
+
+### Milestone 29 (DFT) - Transition ATPG, lockup latches, and an MBIST stage (after Stage 6)
+
+One new tool, `AVAILABLE`: `dft.atpg_transition` (backend
+`icarus-atpg-transition`, in `nirmaan/integrations/dft.py`); `dft.scan_insert`
+gains `cross_domains=lockup` and `dft.mbist` makes `top` optional. Design doc:
+`docs/DFT_NEXT.md`.
+
+Key design points worth not re-deriving:
+- **Transition faults are two-frame stuck-at faults.** `build_model` in
+  `dft_atpg.py` copies the capture model into a second frame
+  (`CaptureModel.copy_frame`); `net/STR` is the frame-2 copy stuck at 0 with a
+  need (`Fault.need`) that the net is 0 in frame 1. PODEM treats needs as goals
+  and contradictions as dead ends, so "untestable" is still a proof. Primary
+  inputs are held through launch and capture (launch on capture only; LOS is
+  deferred), so their transitions are proven undetectable.
+- **The grader's delay model.** In the fault netlist each site gets a flop on
+  `nirmaan_fault_clk` holding the previous value and becomes `net & prev`
+  (STR) or `net | prev` (STF), only while `nirmaan_fault_en[s]` and
+  `nirmaan_fault_atspeed` are high; the testbench raises at-speed 1 ns after
+  the launch edge and drops it 1 ns after the capture edge. Pattern files carry
+  `fault_model` (absent means stuck-at) and a mismatch is refused.
+- **Stuck-at across capture edges is now modelled, not refused**: second-edge
+  flops capture from a copy of the logic whose first-edge flops hold their new
+  state; a fault sits on both copies (`Fault.extra`). Transition ATPG over two
+  edges is still refused with the reason.
+- **Lockups.** With `cross_domains=lockup`, flops are ordered second-edge
+  domains first, then by clock port and edge, cut into balanced chains, and a
+  `$_DLATCH_N_` (after a rising-edge flop) or `$_DLATCH_P_` goes on each clock
+  crossing. `Design.lockups` are latches whose D is a flop Q and enable a
+  module input; `no-latches` skips them unless they reach capture logic
+  (`lockup_leaks`). The tracer reports `hazards` (an unlatched crossing, a
+  wrong latch, a second-edge flop loading a first-edge one), which make a chain
+  incomplete. `dft.scan_sim` with several clocks runs the shift three times:
+  together, skewed 1 ns per clock, and skewed in reverse.
+- **MBIST.** With no memory as top, every module with the single-port
+  interface in the hierarchy is a memory, each with its own controller in one
+  testbench. `(* read_latency = N *)` sets the latency (default 1); the
+  testbench measures it first (word 0 zeros, word 1 ones, switch the address)
+  and a mismatch fails the run. Cycles are (10 + 5L)N.
+- **Data.** Features `memory` (RAM, SRAM, memory array, MBIST) and `at_speed`
+  (implies `dft`); `block-design` gains an `mbist` stage (`dft.mbist` over the
+  approved upstream `rtl_source`, no top) and the `dft` stage a fourth check,
+  `dft.atpg_transition` with `min_test_coverage` 80, `when=when("at_speed")`.
+  Skills `atpg`, `fault_modeling`, `scan_design` gain the new tool. Under the
+  M28 contracts, `dft.atpg_transition` declares `dft.atpg`'s parameters,
+  `dft.scan_insert` declares `cross_domains`, and `dft.mbist`'s `top` is no
+  longer required.
+
+Measured transition coverage (launch on capture): counter 53/70 (17 proven
+undetectable), `atpg_demo` 87/132 (45), rr_arbiter 92/116 (24): 100% test
+coverage each. The lockup `two_clocks` chain shifts clean in all three passes;
+with the latch made a wire, `dft.check` reports the crossing and the skewed
+shift loses 8 bits. MBIST passes `sync_ram_2cycle` (32x16, latency 2) in 640
+cycles.
+
+Fixtures: `mbist/sync_ram_2cycle.v`, `mbist/ram_block.v`, `mbist/block_ram.v`,
+`mbist/ram_block_tb.v`. Tests: `tests/test_nirmaan_dft_next.py`; crown jewel
+`test_a_new_transition_backend_needs_no_core_changes`. Deferred: launch on
+shift, transition ATPG over two capture edges, pin and path delay faults,
+parameterized memory instances, multi-port memories, a memory collar.
+
+---
+
+---
+
+### Milestone 29 (RISC-V) - interrupts, a second core, a code-size gate, and APB (after Stage 6)
+
+Closes four of M27's deferred RISC-V items. Built in parallel with other
+post-Stage-6 work; no version bump. Design doc: `docs/RISCV_NEXT.md`.
+
+**Cores and buses are data** in `src/nirmaan/integrations/firmware_riscv.py`:
+`CORES` (`Core(name, module, verilog, runtime, march)`, `register_core`) holds
+`picorv32` (default) and `serv`; `BUSES` (`Bus(name, module, verilog, ports)`,
+`register_bus`) holds `axi4-lite` and `apb`. `fw.cross_build` and
+`fw.soc_test` take `core=`; the bus is read from the top module's ports
+(`design_ports`, `bus_of`). The SoC instantiates `` `NIRMAAN_CORE `` (a
+wrapper, `core_<name>.v`, with PicoRV32's memory interface, `trap`, and `irq`)
+and `` `NIRMAAN_BRIDGE `` (`bridge_axil.v` or `bridge_apb.v`, each of which
+instantiates `` `NIRMAAN_DUT ``), so `nirmaan_soc.v` names no core, bus, or
+design. The `fw.soc_test` backend keeps its M27 name `picorv32-verilator`.
+The one new parameter, `core`, is declared (M28 contracts) on both tools in
+`company/tools.py`; the IRQ and the bus need none, being read from the RTL.
+
+Key design points worth not re-deriving:
+- **SERV 1.4.0** (olofk/serv, commit `7d9cde4`), seventeen `rtl/` files
+  unmodified in `firmware_soc/serv/` with its ISC `LICENSE`, every SHA-256
+  pinned. `serv_compdec.v` keeps Ibex's Apache-2.0 header (unused with
+  `COMPRESSED=0`, but Verilator resolves the generate branch). Chosen over
+  VexRiscv because VexRiscv's Verilog is generated from SpinalHDL. SERV is
+  bit-serial: about ten times PicoRV32's cycles (682,218 against 63,642 for
+  the register block).
+- **The wrapper aligns SERV's address** (it puts a byte store's byte address
+  on the bus) and shares one port between its I and D buses, which are never
+  active together.
+- **Interrupts.** A design output named `irq` adds `+define+NIRMAAN_DUT_IRQ`;
+  the bridge wires it to the core. PicoRV32: `ENABLE_IRQ`, QREGS, `irq[3]`,
+  level sensitive (`LATCHED_IRQ` bit 3 clear), `PROGADDR_IRQ` 0x10, `maskirq`
+  and `retirq` emitted with `.insn`. SERV: `WITH_CSR=1`, the line on
+  `i_timer_irq` (its only one), `mtvec` = 0x10, `mstatus.MIE`, `mret`; its
+  exceptions also arrive at 0x10 and end the run as `FWTEST ERROR the CPU
+  trapped`. `crt0.S` puts the vector at 0x10; `irq_<core>.S` defines
+  `nirmaan_core_init`, `nirmaan_core_irq_set`, `nirmaan_core_trap`.
+- **`nirmaan_irq.h`** (in `firmware_harness/`, the platform's): `attach`,
+  `count`, `wait`. Each HAL access plus its `STATUS` read is a critical
+  section, or a handler touching the device could overwrite `STATUS`.
+- **No precise bus-error traps.** Neither core has a bus-error input, and
+  SLVERR on an external IRQ line would be an imprecise interrupt; `STATUS`
+  stays. A core with `data_err_i` (Ibex) would be the path.
+- **`max_text_bytes`.** `_size` adds `text_bytes`; the `block-design`
+  firmware stage's `fw.cross_build` requirement carries
+  `params=(("max_text_bytes", "16384"),)` (images are about 10 KiB).
+
+Fixtures: `tests/fixtures/rtl/axil_timer/axil_timer.v` (AXI4-Lite one-shot
+timer: `CTRL` EN and IE, `LOAD`, read-only `COUNT`, W1C `STATUS`,
+`irq = EXPIRED && IE`), its driver and interrupt tests in
+`tests/fixtures/fw/axil_timer/`, and an APB driver in
+`tests/fixtures/fw/apb_regs/` for the M26 `apb_regs.v`.
+
+Tests: `tests/test_nirmaan_riscv_next.py` (20): the gate's limit; `text_bytes`;
+cores and buses as data; the SoC naming nothing; an unknown core and an
+unknown bus as recorded failed runs; an oversized image refused; on both
+cores, the register driver, the timer's five interrupt checks, the two broken
+IRQs (stuck low, ignoring IE) each failing the expected checks, and the APB
+driver; a wrong APB map failing; crown jewel
+`test_a_new_core_needs_no_core_changes` (a third core from a temporary
+directory); SERV pinned; import laws. One M27 assertion changed: a cross build
+now compiles six files (the core's interrupt runtime). CI is unchanged.
+
+Deferred: precise bus-error traps, interrupts and APB in the host
+co-simulation (`fw.test`), more than one interrupt line, and running the gate
+on both cores.
+
 ### Milestone 30 (working name) - The register map as data
 
 The fourth structural-review milestone (numbering is the coordinator's): a
@@ -2377,7 +2573,8 @@ Key design points worth not re-deriving:
 - Tools with contracts: `regmap.check` (validation as a recorded run) and
   `regmap.verify`, a backend that writes the generated test and reuses
   `fw.test`'s co-simulation steps and parser unchanged. A bus with no harness
-  (APB) is a recorded failed run, never a simulation. Granted to `rtl_design`
+  (APB: the host harness drives AXI4-Lite only; M29's `fw.soc_test` reaches APB
+  through a RISC-V core) is a recorded failed run, never a simulation. Granted to `rtl_design`
   (both) and `interface_specification` (check).
 - The `rtl/axi4-lite-regs` evaluation case holds the map out as a second judge;
   the gates-miss eval test now expects both judges to fail the `reg3` mutant.
@@ -2389,8 +2586,8 @@ Key design points worth not re-deriving:
 `tests/test_nirmaan_regmap.py` (19): real co-simulation passes on the fixture
 RTL and fails on a `reg3` reset mutant, a REG2-into-REG1 alias, and a map that
 misstates the unmapped response; crown jewel
-`test_a_new_lowering_needs_no_core_changes`. The standard local run is 1300
-passed, 3 skipped.
+`test_a_new_lowering_needs_no_core_changes`. With the M29 parts merged, the
+standard local run is 1387 passed, 3 skipped.
 
 ## 3. Current architecture map
 

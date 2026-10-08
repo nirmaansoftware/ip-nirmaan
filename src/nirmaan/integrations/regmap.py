@@ -21,7 +21,7 @@ from nirmaan.regmap import c_test, load_map, map_summary, validate
 from nirmaan.runtime.tools import ToolOutcome, register_binding
 from nirmaan.work.engine import TaskEngine
 
-#: Buses with a co-simulation harness. Only AXI4-Lite has one today.
+#: Buses the host co-simulation harness drives. APB is reached only through fw.soc_test (M29).
 HARNESSED_BUSES = ("axi4-lite",)
 GENERATED_TEST = "regmap_test.c"
 
@@ -49,8 +49,9 @@ def _verify_check(job: Job) -> str | None:
     if problems:
         return "; ".join(problems)
     if regmap.bus not in HARNESSED_BUSES:
-        return (f"no co-simulation harness for a {regmap.bus} map (harnesses exist for "
-                f"{', '.join(HARNESSED_BUSES)}); nothing was simulated")
+        return (f"no host co-simulation harness for a {regmap.bus} map (the host harness drives "
+                f"{', '.join(HARNESSED_BUSES)}; fw.soc_test reaches other buses through a RISC-V core); "
+                "nothing was simulated")
     return None
 
 
