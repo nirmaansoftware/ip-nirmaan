@@ -1,7 +1,7 @@
-# Model selection and model-call accounting (M31, working name)
+# Model selection and model-call accounting (M31)
 
 The fifth structural-review milestone (`docs/architecture/target-state.md`
-section 5; the coordinator assigns numbers). Two gaps: a seat is bound to a
+section 5). Two gaps: a seat is bound to a
 model by runtime name (`--runtime anthropic`), and nothing records what a model
 call cost. A seat should state what it needs, the platform should pick a model
 that can serve it (or refuse, and say why), and every call should leave a record

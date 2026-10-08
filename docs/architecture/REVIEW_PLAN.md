@@ -222,7 +222,10 @@ grows with the square of its length.
 All seven milestones of target-state.md section 5 are built: seat evaluation
 (#37), tool contracts (#41), engineering records (#48), the register map (#52),
 model selection and accounting (#53), scalable state (#54), learning proposals
-(#55). Left for the owner or coordinator: milestone numbering (these
-are working names), a version bump, a first live-model evaluation (API
-credits), and #45 (another session's PR). Deferred pieces are listed in each
+(#55). The owner then delegated the remaining decisions (2026-10-09): numbering kept
+in the repo's style (seat evaluation and engineering records are parts of the
+M27 and M29 batches; M28 and M30 to M33 are the review's own); released as
+v1.22.0; the live-model evaluation could not run (no Anthropic credentials on
+this machine); #45 left to its session with the contract additions it needs
+posted on it. Deferred pieces are listed in each
 milestone's `context.md` entry.

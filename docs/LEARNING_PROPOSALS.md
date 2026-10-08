@@ -1,8 +1,7 @@
-# Learning proposals (M33, working name)
+# Learning proposals (M33)
 
 The seventh and last structural-review milestone
-(`docs/architecture/target-state.md` section 5; the coordinator assigns
-numbers). The brief's learning loop, with its own rule: **knowledge never
+(`docs/architecture/target-state.md` section 5). The brief's learning loop, with its own rule: **knowledge never
 changes automatically from one model-generated conclusion; every update has
 provenance and validation.**
 

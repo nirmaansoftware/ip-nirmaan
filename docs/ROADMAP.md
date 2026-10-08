@@ -1,6 +1,6 @@
 # IP Nirmaan roadmap
 
-The plan for what comes after v1.21.0. Read this together with `context.md`
+The plan for what comes after v1.22.0. Read this together with `context.md`
 (what exists and why) and `CLAUDE.md` (how to work here). Each stage ships the
 way every milestone has:
 - a design doc approved before code,
@@ -8,7 +8,7 @@ way every milestone has:
 - a `context.md` entry,
 - a PR merged into `main`.
 
-## Where we are (v1.21.0, 2026-09-30)
+## Where we are (v1.22.0, 2026-10-09)
 
 | Built | Not yet |
 |---|---|
@@ -31,11 +31,11 @@ way every milestone has:
 | A synchronous FIFO, a round-robin arbiter, and an APB register block, each with proofs and designed end to end by agents (M26) | |
 | Seat evaluation: cases as data, judged by real tool runs including held-out reference testbenches; `nirmaan eval` (M27) | A first live-model evaluation run; token and cost accounting |
 | Tool contracts: every bound tool declares its parameters, and the broker refuses undeclared or ill-typed ones before running; `nirmaan org tool` (M28) | Typed values end to end; the typed work packet |
-| Engineering records: decisions (alternatives, choice, rationale, evidence, consequences) and classified failures, as views; `nirmaan decisions` / `failures` (M29, working name) | Recording explicit decisions from the CLI or MCP |
-| The register map as data: validated, lowered (C header, spec table), and judging RTL through a generated co-simulation test; `nirmaan regmap` (M30, working name) | Adopting the map in `block-design`; an APB harness; bit fields |
-| Model selection by capability (`auto` runtime) and every model call recorded with tokens and cost; `nirmaan costs` (M31, working name) | A live-model evaluation run |
-| Scalable state: an engine operation costs the same on a large project (0.25 ms at 5,000 runs, from 95 ms); state cannot be edited in place (M32, working name) | An append-only store, if saves ever dominate |
-| Learning proposals: failures recurring across projects propose skill changes, citing every record; a person adopts or rejects as a recorded decision; `nirmaan learn` (M33, working name) | Proposals from evaluation results |
+| Engineering records: decisions (alternatives, choice, rationale, evidence, consequences) and classified failures, as views; `nirmaan decisions` / `failures` (M29) | Recording explicit decisions from the CLI or MCP |
+| The register map as data: validated, lowered (C header, spec table), and judging RTL through a generated co-simulation test; `nirmaan regmap` (M30) | Adopting the map in `block-design`; an APB harness; bit fields |
+| Model selection by capability (`auto` runtime) and every model call recorded with tokens and cost; `nirmaan costs` (M31) | A live-model evaluation run |
+| Scalable state: an engine operation costs the same on a large project (0.25 ms at 5,000 runs, from 95 ms); state cannot be edited in place (M32) | An append-only store, if saves ever dominate |
+| Learning proposals: failures recurring across projects propose skill changes, citing every record; a person adopts or rejects as a recorded decision; `nirmaan learn` (M33) | Proposals from evaluation results |
 | IP Nirmaan over MCP; organizational events on the M18 bus (M22) | |
 | CI on Python 3.11 and 3.12, plus a dash check (Stage 0) | |
 | 1424 tests; CLI `nirmaan`; HTML dashboard; landing page live at https://ip.nirmaan.online | |
@@ -217,11 +217,11 @@ extraction. Design doc: `docs/PHYSICAL_DESIGN.md`.
 - **RISC-V firmware (M27, done):** `fw.cross_build` compiles the driver and its tests strictly for bare-metal RV32I into an ELF with its code size, and `fw.soc_test` runs it on PicoRV32 (vendored, ISC) in one Verilator model with the approved RTL, so the driver's register accesses are CPU loads and stores on the real AXI4-Lite bus (SLVERR reaches the driver through a status register). A request that names RISC-V gates the firmware seat on both, through the new generic `EvidenceRequirement.when`; CI installs `gcc-riscv64-unknown-elf`. See `docs/RISCV_FIRMWARE.md`.
 - **Verification plans (M29):** `nirmaan vplan import` and `export` load and save requirements and the items that prove them in a small versioned JSON format, all or nothing through the task engine, with line-level reasons; on a request for a plan, a `block-design` `dv-plan` seat writes one from the approved interface spec, a real `vplan.check` holds it to the spec's tagged requirements before review, and approval records it, so `nirmaan gaps` answers from the seat's plan. Neither ever makes anything backed. See `docs/VERIFICATION_PLAN.md`.
 
-- **Learning proposals (M33, working name, done):** a view over failure records proposes skill changes with full provenance; only a human decision, through the authority matrix, adopts one, and adopting edits no skill by itself. This completes the structural review's milestones. See `docs/LEARNING_PROPOSALS.md`.
-- **Scalable state (M32, working name, done):** P10 by construction (read-only containers) and identity, P11 verified once then per new entry; per-operation cost no longer grows with the project. See `docs/SCALABLE_STATE.md`.
-- **Model selection and accounting (M31, working name, done):** a seat's needs are derived from its work; `select_model` picks the cheapest profile that serves them or refuses with reasons; every model call is recorded by the engine with the provider's reported tokens and the profile's price, unknowns kept unknown. See `docs/MODEL_SELECTION.md`.
-- **Register map as data (M30, working name, done):** a `RegisterMap` is validated, lowered through a registry (a C header that compiles strict, and the spec's own table), and turned into a test that `regmap.verify` runs on the RTL through the AXI4-Lite co-simulation harness; the AXI4-Lite evaluation case uses it as a second held-out judge. See `docs/REGISTER_MAP.md`.
-- **Engineering records (M29, working name, done):** `nirmaan decisions` reads every decision task as a decision record (alternatives, choice, rationale, evidence, who and when, the branches it cancelled), and `nirmaan failures` classifies failed runs, refused or sent-back submissions, blocks, failures, and escalations with whether each was resolved, across projects too; both are in the export. Views only: nothing stored or inferred. See `docs/ENGINEERING_RECORDS.md`.
+- **Learning proposals (M33, done):** a view over failure records proposes skill changes with full provenance; only a human decision, through the authority matrix, adopts one, and adopting edits no skill by itself. This completes the structural review's milestones. See `docs/LEARNING_PROPOSALS.md`.
+- **Scalable state (M32, done):** P10 by construction (read-only containers) and identity, P11 verified once then per new entry; per-operation cost no longer grows with the project. See `docs/SCALABLE_STATE.md`.
+- **Model selection and accounting (M31, done):** a seat's needs are derived from its work; `select_model` picks the cheapest profile that serves them or refuses with reasons; every model call is recorded by the engine with the provider's reported tokens and the profile's price, unknowns kept unknown. See `docs/MODEL_SELECTION.md`.
+- **Register map as data (M30, done):** a `RegisterMap` is validated, lowered through a registry (a C header that compiles strict, and the spec's own table), and turned into a test that `regmap.verify` runs on the RTL through the AXI4-Lite co-simulation harness; the AXI4-Lite evaluation case uses it as a second held-out judge. See `docs/REGISTER_MAP.md`.
+- **Engineering records (M29, done):** `nirmaan decisions` reads every decision task as a decision record (alternatives, choice, rationale, evidence, who and when, the branches it cancelled), and `nirmaan failures` classifies failed runs, refused or sent-back submissions, blocks, failures, and escalations with whether each was resolved, across projects too; both are in the export. Views only: nothing stored or inferred. See `docs/ENGINEERING_RECORDS.md`.
 - **Tool contracts (M28, first part, done):** every tool with a binding declares its parameters (name, kind, required); the broker refuses an undeclared or ill-typed parameter, or a path containing a comma, before anything runs, and the runtime hands each tool only the inputs it declares. See `docs/TOOL_CONTRACTS.md`.
 - **Seat evaluation (M27, done):** `evals/` cases fix a seat's upstream to reference documents and judge its work with held-out checks the seat never sees (the reference testbench on its RTL), each a recorded tool run; `nirmaan eval run (--runtime ID | --replay)`. See `docs/SEAT_EVALUATION.md`.
 - **Unattended owner and reviewer loop (M29):** `nirmaan drive PROJECT [TASK] --runtime ID --reviewer-runtime ID` runs the owner seat (with its attempts), the independent reviewer seat, and the repair after a change request, until a person must act (an approval or a gate), a limit escalates, or the work is blocked or declined; it never approves or crosses a gate, decides each step from state (so it resumes by being run again), audits every step as `loop.step`, starts a step only if its worst case fits `--max-calls`, and prints the plan with `--dry-run`. With no TASK it drives every ready task in dependency order. See `docs/AUTO_LOOP.md`.
@@ -234,8 +234,7 @@ extraction. Design doc: `docs/PHYSICAL_DESIGN.md`.
 The structural review (`docs/architecture/`) found the engine the brief asked
 for already exists and ordered the real gaps. Seat evaluation (an M27 part) and
 the first part of M28 (tool contracts) are done; the rest follow in this order,
-each measured against the evaluation cases (working names; the coordinator
-assigns milestone numbers): M28 typed tool contracts and
+each measured against the evaluation cases: M28 typed tool contracts and
 work packet, M29 engineering records (decision records, artifact supersession,
 failure categories), M30 a register-map IR checked against the RTL, M31
 capability-based model selection with cost accounting, M32 scalable state,

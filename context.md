@@ -12,7 +12,7 @@ Repo: https://github.com/nirmaansoftware/ip-nirmaan (public, Apache-2.0; renamed
 to the `nirmaansoftware` account on 2026-09-28; GitHub redirects the old URLs,
 and `patel-om` keeps push access as a collaborator)
 Local path: `/Users/ompatel/Documents/veritriage`
-Current version: **1.21.0** (distribution `ip-nirmaan`; packages `nirmaan` and `veritriage`)
+Current version: **1.22.0** (distribution `ip-nirmaan`; packages `nirmaan` and `veritriage`)
 Portfolio: removed from `/Users/ompatel/Documents/Om Portfolio` at the user's
 request after M19 (card and sample pages deleted).
 
@@ -2110,8 +2110,8 @@ that the brief's engine (task, plan, artifact, evidence, tool broker, roles vs
 skills, gates, audit, events, traceability) already exists as `work/` plus
 `runtime/`, so it adds no parallel `nirmaan/engine/` package and no duplicate
 per-topic docs; it orders the real gaps as M27 to M33 in `target-state.md`
-section 5 (the review numbered them M27 to M33 before the parallel M27 parts
-existed; the coordinator owns the numbering). Version bump left to the coordinator.
+section 5 (seat evaluation is a part of the M27 batch, engineering records of the
+M29 batch; M28 and M30 to M33 are this review's own). Released in v1.22.0.
 
 M27 answers "does a seat's work actually work?" with cases as data and judges
 that are real tool runs. `evals/rtl/*.json` (four cases: the AXI4-Lite and APB
@@ -2317,9 +2317,9 @@ nothing and keeps the import laws; every step audited as its seat.
 Deferred: concurrent tasks; a call budget across invocations; approval by a
 delegated non-human approver; task inputs in project mode.
 
-### Milestone 29 (working name) - Engineering records: decisions and failures, as views
+### Milestone 29 (engineering records) - Decisions and failures, as views (structural review, milestone 3)
 
-The third structural-review milestone (numbering is the coordinator's).
+The third structural-review milestone, a part of the M29 batch.
 "Why did we choose this?" and "what went wrong, and was it fixed?" answered
 from the record. Design doc: `docs/ENGINEERING_RECORDS.md`. No version bump.
 
@@ -2551,9 +2551,9 @@ Deferred: precise bus-error traps, interrupts and APB in the host
 co-simulation (`fw.test`), more than one interrupt line, and running the gate
 on both cores.
 
-### Milestone 30 (working name) - The register map as data
+### Milestone 30 - The register map as data
 
-The fourth structural-review milestone (numbering is the coordinator's): a
+The fourth structural-review milestone: a
 register map that was only a table in an interface spec becomes an
 intermediate representation that is validated, lowered, and judges RTL.
 Design doc: `docs/REGISTER_MAP.md`. No version bump.
@@ -2589,9 +2589,9 @@ misstates the unmapped response; crown jewel
 `test_a_new_lowering_needs_no_core_changes`. With the M29 parts merged, the
 standard local run is 1387 passed, 3 skipped.
 
-### Milestone 31 (working name) - Model selection by capability, and every model call counted
+### Milestone 31 - Model selection by capability, and every model call counted
 
-The fifth structural-review milestone (numbering is the coordinator's). Design
+The fifth structural-review milestone. Design
 doc: `docs/MODEL_SELECTION.md`. No version bump.
 
 Key design points worth not re-deriving:
@@ -2624,9 +2624,9 @@ Key design points worth not re-deriving:
 `test_a_new_model_profile_needs_no_core_changes`. The standard local run is
 1401 passed, 3 skipped.
 
-### Milestone 32 (working name) - Scalable state: hidden edits impossible, chains verified once
+### Milestone 32 - Scalable state: hidden edits impossible, chains verified once
 
-The sixth structural-review milestone (numbering is the coordinator's). Design
+The sixth structural-review milestone. Design
 doc: `docs/SCALABLE_STATE.md`. No version bump.
 
 Measured first: one recorded tool run cost 3.6 ms on the 55-task NoC project,
@@ -2656,10 +2656,9 @@ Key design points worth not re-deriving:
 `datetime`, `typing`, and pydantic, so the frozen containers copy through
 `__reduce__` alone (no `copy` import).
 
-### Milestone 33 (working name) - Learning proposals: recurring failures propose, a person decides
+### Milestone 33 - Learning proposals: recurring failures propose, a person decides
 
-The seventh and last structural-review milestone (numbering is the
-coordinator's). Design doc: `docs/LEARNING_PROPOSALS.md`. No version bump.
+The seventh and last structural-review milestone . Design doc: `docs/LEARNING_PROPOSALS.md`. No version bump.
 
 Key design points worth not re-deriving:
 - **A view over failure records (M29)**, never a writer: `learning_proposals(org,
@@ -2893,6 +2892,17 @@ everywhere), #43 (DFT), and #40 (RISC-V firmware). The standard local run is
 `physical-design` job. The owner's structural review (PR #37) also uses the
 M27 label; it is not part of this release.
 
+v1.22.0 is the one version bump for everything merged after v1.21.0: the
+structural review and its seven milestones (#37 seat evaluation, an M27 part;
+#41 M28 tool contracts; #48 engineering records, an M29 part; #52 M30 register
+map; #53 M31 model selection and accounting; #54 M32 scalable state; #55 M33
+learning proposals) and the parallel M29 parts (#46 the unattended loop, #47
+verification plans, #49 RISC-V, #50 DFT, #51 the remaining RTL gates). The
+standard local run is 1424 tests with 3 skipped: the real OpenROAD tests, which
+run in CI's `physical-design` job. No live-model evaluation has run yet: this
+machine has no Anthropic credentials (`nirmaan eval run --runtime anthropic`
+once one is set).
+
 ---
 
 ## 4. Operational notes for resuming work
@@ -2916,7 +2926,7 @@ M27 label; it is not part of this release.
   renamed to **VeriTriage** at M2/M3 boundary (GitHub redirect preserved
   from the rename). After M19 the user renamed the PROJECT, first to "Nirmaan IP"
   (repo `nirmaan-ip`, v1.16.0) and then, to match the `ipnirmaan.com` domain, to
-  **IP Nirmaan** (repo `patel-om/ip-nirmaan`, distribution `ip-nirmaan`, v1.21.0).
+  **IP Nirmaan** (repo `patel-om/ip-nirmaan`, distribution `ip-nirmaan`, v1.22.0).
   On 2026-09-28 the repo was transferred to `nirmaansoftware/ip-nirmaan`.
   The `nirmaan` package and CLI keep their short name by the user's choice. VeriTriage
   was deliberately NOT renamed: it is the verification engine inside Nirmaan

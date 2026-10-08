@@ -1,7 +1,7 @@
-# Scalable state (M32, working name)
+# Scalable state (M32)
 
 The sixth structural-review milestone (`docs/architecture/target-state.md`
-section 5; the coordinator assigns numbers). Every engine operation used to
+section 5). Every engine operation used to
 cost time in proportion to the whole project: a long project's total cost grew
 with the square of its length. This milestone makes the two checks that caused
 it cheap without weakening what they guarantee.
