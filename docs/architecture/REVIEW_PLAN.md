@@ -157,3 +157,19 @@ Inspection findings that shaped it: no product code calls
 `record_decision`; decisions are DECISION tasks (outcomes, outcome,
 artifacts, evidence, audit, branch cancellations by `_take_branch`). M27's
 review repair already moves superseded artifacts into an `Attempt`.
+
+## M31: model selection and model-call accounting (branch `m31/model-selection`)
+
+The owner asked (2026-10-08) to resolve everything and complete the remaining
+review milestones, merging each on green CI. Order: #52 (M30), then M31, M32
+(scalable state), M33 (learning proposals). Out of scope without the owner: a
+live-model evaluation (API credits), version bumps (coordinator), #45 (another
+session's PR).
+
+| # | Step | Status |
+|---|---|---|
+| a | Design: `docs/MODEL_SELECTION.md` (prices from the claude-api skill: Opus 5.5 $4/$20 per MTok, cache read $0.20) | DONE |
+| b | Failing tests `tests/test_nirmaan_model_selection.py` | TODO |
+| c | Accounting: VeriTriage `GenerationResponse` tokens, bridge, `Completion`, `ModelCall`, `record_model_call`, `nirmaan costs`, eval totals | TODO |
+| d | Selection: `ModelProfile` data, derived needs, `select_model`, `auto` runtime | TODO |
+| e | Full suite, docs, PR, merge | TODO |
