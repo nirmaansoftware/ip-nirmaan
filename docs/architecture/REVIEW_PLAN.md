@@ -198,3 +198,12 @@ designing it: one recorded tool run costs 3.6 ms on the 55-task NoC project,
 12 ms at 500 runs, 40 ms at 2000, 95 ms at 5000 (two whole-state
 serializations and hashes per operation), so a long project's total cost
 grows with the square of its length.
+
+## M32: scalable state (branch `m32/scalable-state`, stacked on M31)
+
+| # | Step | Status |
+|---|---|---|
+| a | Measure and design: `docs/SCALABLE_STATE.md` (P10 68%, P11 32% of per-op time at 3000 runs) | DONE |
+| b | Failing tests `tests/test_nirmaan_scalable_state.py` (counted, not timed) | DONE |
+| c | `work/frozen.py`, frozen containers and nested dicts, identity P10, incremental P11 | TODO |
+| d | Full suite, docs, PR, merge | TODO |
