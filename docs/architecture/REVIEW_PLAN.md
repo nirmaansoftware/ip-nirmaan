@@ -198,3 +198,22 @@ designing it: one recorded tool run costs 3.6 ms on the 55-task NoC project,
 12 ms at 500 runs, 40 ms at 2000, 95 ms at 5000 (two whole-state
 serializations and hashes per operation), so a long project's total cost
 grows with the square of its length.
+
+## M33: learning proposals (branch `m33/learning-proposals`, from main de0cb5e)
+
+| # | Step | Status |
+|---|---|---|
+| a | Design: `docs/LEARNING_PROPOSALS.md` (a view; decisions as recorded human decisions; no new workflow, which would change the live site's workflow count) | DONE |
+| b | Tests `tests/test_nirmaan_learning_proposals.py` (9) | DONE |
+| c | `src/nirmaan/proposals.py`, `nirmaan learn` | DONE |
+| d | Full suite, docs, PR, merge | IN PROGRESS |
+
+## Review complete
+
+All seven milestones of target-state.md section 5 are built: seat evaluation
+(#37), tool contracts (#41), engineering records (#48), the register map (#52),
+model selection and accounting (#53), scalable state (#54), learning proposals
+(this branch). Left for the owner or coordinator: milestone numbering (these
+are working names), a version bump, a first live-model evaluation (API
+credits), and #45 (another session's PR). Deferred pieces are listed in each
+milestone's `context.md` entry.
