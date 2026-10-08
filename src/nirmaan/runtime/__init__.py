@@ -35,4 +35,6 @@ from nirmaan.runtime.tools import (
     unregister_binding,
 )
 
+from nirmaan.runtime import selection as _selection  # noqa: E402,F401  (registers the auto runtime)
+
 __all__ = [name for name in dir() if not name.startswith("_")]

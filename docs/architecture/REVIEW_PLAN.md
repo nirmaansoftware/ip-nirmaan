@@ -176,3 +176,25 @@ Decided at design: no workflow adoption in M30 (an added expected output
 would show as a missing deliverable in the export); the map judges RTL
 through the existing AXI4-Lite co-simulation harness; APB maps are a
 recorded failed run until an APB harness exists.
+
+## M31: model selection and model-call accounting (branch `m31/model-selection`)
+
+The owner asked (2026-10-08) to resolve everything and complete the remaining
+review milestones, merging each on green CI. Order: #52 (M30), then M31, M32
+(scalable state), M33 (learning proposals). Out of scope without the owner: a
+live-model evaluation (API credits), version bumps (coordinator), #45 (another
+session's PR).
+
+| # | Step | Status |
+|---|---|---|
+| a | Design: `docs/MODEL_SELECTION.md` (prices from the claude-api skill: Opus 5.5 $4/$20 per MTok, cache read $0.20) | DONE |
+| b | Failing tests `tests/test_nirmaan_model_selection.py` | DONE |
+| c | Accounting: VeriTriage `GenerationResponse` tokens, bridge, `Completion`, `ModelCall`, `record_model_call`, `nirmaan costs`, eval totals | DONE |
+| d | Selection: `ModelProfile` data, derived needs, `select_model`, `auto` runtime | DONE |
+| e | Full suite (1401 passed, 3 skipped), docs, PR, merge | DONE (PR open) |
+
+**M31 notes.** #52 merged (1ff49ac) on green CI. Measured for M32 before
+designing it: one recorded tool run costs 3.6 ms on the 55-task NoC project,
+12 ms at 500 runs, 40 ms at 2000, 95 ms at 5000 (two whole-state
+serializations and hashes per operation), so a long project's total cost
+grows with the square of its length.

@@ -183,6 +183,9 @@ class Capability(BaseModel):
         default=False,
         description="Work of this kind builds only on approved upstream artifacts.",
     )
+    model_needs: tuple[str, ...] = Field(
+        default=(), description="What a model must offer to serve this work, beyond what the work implies (M31).",
+    )
     max_attempts: int = Field(
         default=1, ge=1,
         description="Attempts per review round when the engine refuses a submission (M26); 1 means no repair.",

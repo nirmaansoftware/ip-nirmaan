@@ -103,3 +103,8 @@ class EvalResult(BaseModel):
     detail: str = ""
     audit_ok: bool
     sandbox: str
+    #: The seat run's model calls (M31): how many, tokens as reported, and cost (None when any is unknown).
+    model_calls: int = 0
+    input_tokens: int = 0
+    output_tokens: int = 0
+    cost_usd: float | None = None

@@ -136,6 +136,7 @@ def assemble(engine: TaskEngine, task_id: str, role: str | None = None) -> WorkP
             "status": task.status.value,
             "capability": task.capability,
             "expected_outputs": list(task.expected_outputs),
+            "model_needs": list(capability.model_needs) if capability else [],
             "evidence_requirements": [r.model_dump(mode="json") for r in task.evidence_requirements],
             "outcomes": list(task.outcomes),
             "approved_inputs": bool(capability and capability.approved_inputs),

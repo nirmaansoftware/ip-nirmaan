@@ -108,6 +108,8 @@ class WorkPrompt:
     citations: tuple[Citable, ...]
     outcomes: tuple[str, ...] = ()
     outputs: tuple[str, ...] = ()
+    #: What a model must offer to serve this prompt (M31), derived from the seat's work.
+    needs: tuple[str, ...] = ()
 
     def render(self) -> str:
         from nirmaan.integrations.veritriage import render_prompt
@@ -288,5 +290,7 @@ def render_work_prompt(packet: WorkPacket, mode: str = "work", tools: tuple[Tool
         ask += f" and conclude exactly one outcome: {', '.join(t['outcomes'])}." if t["outcomes"] else "."
     sections = tuple(zip(SCOPES, (_company(packet), _domain(packet), _project(packet),
                                   _task(packet, mode, cites, tools))))
+    from nirmaan.runtime.selection import seat_needs
+
     return WorkPrompt(mode=mode, system=system, task=ask, sections=sections, citations=tuple(cites),
-                      outcomes=tuple(t["outcomes"]), outputs=tuple(t["expected_outputs"]))
+                      outcomes=tuple(t["outcomes"]), outputs=tuple(t["expected_outputs"]), needs=seat_needs(packet))
