@@ -34,9 +34,10 @@ way every milestone has:
 | Engineering records: decisions (alternatives, choice, rationale, evidence, consequences) and classified failures, as views; `nirmaan decisions` / `failures` (M29, working name) | Recording explicit decisions from the CLI or MCP |
 | The register map as data: validated, lowered (C header, spec table), and judging RTL through a generated co-simulation test; `nirmaan regmap` (M30, working name) | Adopting the map in `block-design`; an APB harness; bit fields |
 | Model selection by capability (`auto` runtime) and every model call recorded with tokens and cost; `nirmaan costs` (M31, working name) | A live-model evaluation run |
+| Scalable state: an engine operation costs the same on a large project (0.25 ms at 5,000 runs, from 95 ms); state cannot be edited in place (M32, working name) | An append-only store, if saves ever dominate |
 | IP Nirmaan over MCP; organizational events on the M18 bus (M22) | |
 | CI on Python 3.11 and 3.12, plus a dash check (Stage 0) | |
-| 1401 tests; CLI `nirmaan`; HTML dashboard; landing page live at https://ip.nirmaan.online | |
+| 1415 tests; CLI `nirmaan`; HTML dashboard; landing page live at https://ip.nirmaan.online | |
 
 ## Resume checklist (after the folder rename)
 
@@ -52,7 +53,7 @@ PYTHONPYCACHEPREFIX=/tmp/nirmaan-pycache .venv/bin/python -m pytest -q \
   --deselect tests/test_ai_boundary.py::test_missing_sdk_raises_clean_error
 ```
 
-Expect 1401 passing (3 skipped: OpenROAD is not installed locally; the CI `physical-design` job runs those three). The folder is still in iCloud, so the eviction hangs
+Expect 1415 passing (3 skipped: OpenROAD is not installed locally; the CI `physical-design` job runs those three). The folder is still in iCloud, so the eviction hangs
 described in `context.md` section 4 still apply. If imports stall, pre-read the tree:
 
 ```
@@ -215,6 +216,7 @@ extraction. Design doc: `docs/PHYSICAL_DESIGN.md`.
 - **RISC-V firmware (M27, done):** `fw.cross_build` compiles the driver and its tests strictly for bare-metal RV32I into an ELF with its code size, and `fw.soc_test` runs it on PicoRV32 (vendored, ISC) in one Verilator model with the approved RTL, so the driver's register accesses are CPU loads and stores on the real AXI4-Lite bus (SLVERR reaches the driver through a status register). A request that names RISC-V gates the firmware seat on both, through the new generic `EvidenceRequirement.when`; CI installs `gcc-riscv64-unknown-elf`. See `docs/RISCV_FIRMWARE.md`.
 - **Verification plans (M29):** `nirmaan vplan import` and `export` load and save requirements and the items that prove them in a small versioned JSON format, all or nothing through the task engine, with line-level reasons; on a request for a plan, a `block-design` `dv-plan` seat writes one from the approved interface spec, a real `vplan.check` holds it to the spec's tagged requirements before review, and approval records it, so `nirmaan gaps` answers from the seat's plan. Neither ever makes anything backed. See `docs/VERIFICATION_PLAN.md`.
 
+- **Scalable state (M32, working name, done):** P10 by construction (read-only containers) and identity, P11 verified once then per new entry; per-operation cost no longer grows with the project. See `docs/SCALABLE_STATE.md`.
 - **Model selection and accounting (M31, working name, done):** a seat's needs are derived from its work; `select_model` picks the cheapest profile that serves them or refuses with reasons; every model call is recorded by the engine with the provider's reported tokens and the profile's price, unknowns kept unknown. See `docs/MODEL_SELECTION.md`.
 - **Register map as data (M30, working name, done):** a `RegisterMap` is validated, lowered through a registry (a C header that compiles strict, and the spec's own table), and turned into a test that `regmap.verify` runs on the RTL through the AXI4-Lite co-simulation harness; the AXI4-Lite evaluation case uses it as a second held-out judge. See `docs/REGISTER_MAP.md`.
 - **Engineering records (M29, working name, done):** `nirmaan decisions` reads every decision task as a decision record (alternatives, choice, rationale, evidence, who and when, the branches it cancelled), and `nirmaan failures` classifies failed runs, refused or sent-back submissions, blocks, failures, and escalations with whether each was resolved, across projects too; both are in the export. Views only: nothing stored or inferred. See `docs/ENGINEERING_RECORDS.md`.
