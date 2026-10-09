@@ -83,17 +83,41 @@ jobs:
           echo /OpenROAD-flow-scripts/tools/install/yosys/bin >> "$GITHUB_PATH"
       - name: Tool versions
         run: |
-          # The image ships no standalone sta: sta.run runs in OpenROAD (openroad-sta).
+          # The image ships no standalone sta; the next steps build one (M29).
           which openroad yosys
           openroad -version && yosys -V
           ls "$NIRMAAN_PDK_ROOT/nangate45/lib/NangateOpenCellLibrary_typical.lib"
+      # M29: standalone OpenSTA, built from the commit the image's OpenROAD embeds
+      # (OpenROAD c487fc70, src/sta), with the compilers and libraries the image
+      # already has; cached by commit. See docs/PD_SIGNOFF.md.
+      - name: Cache standalone OpenSTA
+        id: opensta
+        uses: actions/cache@v4
+        with:
+          path: /opt/opensta
+          key: opensta-e983e15b2cb346badf8f23725fd3914d25312c44-orfs-26Q3-687
+      - name: Build standalone OpenSTA
+        if: steps.opensta.outputs.cache-hit != 'true'
+        env:
+          OPENSTA: e983e15b2cb346badf8f23725fd3914d25312c44
+        run: |
+          git init -q "$RUNNER_TEMP/OpenSTA" && cd "$RUNNER_TEMP/OpenSTA"
+          git fetch -q --depth 1 https://github.com/The-OpenROAD-Project/OpenSTA.git "$OPENSTA"
+          git checkout -q FETCH_HEAD
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DCUDD_DIR=/usr/local 2>&1 | tail -20
+          cmake --build build -j "$(nproc)" --target sta 2>&1 | tail -40
+          mkdir -p /opt/opensta/bin && cp build/sta /opt/opensta/bin/sta
+      - name: Standalone OpenSTA on PATH
+        run: |
+          echo /opt/opensta/bin >> "$GITHUB_PATH"
+          /opt/opensta/bin/sta -version
       - name: Install
         run: uv pip install -e ".[dev]"
       - name: Test
-        # openroad and yosys are required, so the real STA and place-and-route
+        # openroad, yosys, and (M29) sta are required, so the real STA and place-and-route
         # tests fail rather than skip.
         env:
-          NIRMAAN_REQUIRE_EDA: yosys openroad
+          NIRMAAN_REQUIRE_EDA: yosys openroad sta
         run: python -m pytest -q -rs tests/test_nirmaan_physical.py --basetemp="$RUNNER_TEMP/pd"
       - name: Keep the tool logs
         if: always()

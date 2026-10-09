@@ -42,9 +42,10 @@ def var(key: str, title: str, *skills: str, cond: Condition | None = None) -> Va
 REVIEWED = EvidenceRequirement(description="Independent review recorded", accepts=(K.REVIEW_RECORD,))
 
 
-def ran(description: str, *tools: str) -> EvidenceRequirement:
+def ran(description: str, *tools: str, **kw) -> EvidenceRequirement:
     """A run of one of these tools, or a named human attesting to a run made elsewhere."""
-    return EvidenceRequirement(description=description, accepts=(K.TOOL_RUN, K.HUMAN_ATTESTATION), tools=tools)
+    return EvidenceRequirement(description=description, accepts=(K.TOOL_RUN, K.HUMAN_ATTESTATION), tools=tools,
+                               **kw)
 
 
 def dv_ran(description: str, *tools: str) -> EvidenceRequirement:
@@ -592,7 +593,8 @@ BLOCK_DESIGN = WorkflowTemplate(
 PHYSICAL_IMPLEMENTATION = WorkflowTemplate(
     id="physical-implementation",
     name="Physical implementation",
-    description="Constraints, Liberty-mapped synthesis, floorplan, place and route, then STA signoff. "
+    description="Constraints, Liberty-mapped synthesis, floorplan, power grid, place, clock tree, and route, "
+                "then STA signoff on extracted parasitics. "
                 "The PDK is a task input; a machine without the tools refuses the runs.",
     intents=("physical_implementation",),
     stages=(
@@ -604,12 +606,21 @@ PHYSICAL_IMPLEMENTATION = WorkflowTemplate(
         st("floorplan", "Floorplan", "Implementation", "pd.floorplan", depends_on=("synthesis",), criticality=M,
            review=rv("pd.review"), outputs=("floorplan",),
            evidence=(REVIEWED, ran("Floorplan run with utilization reported", "pnr.run"))),
-        st("place-route", "Placement and routing", "Implementation", "pd.place_route", depends_on=("floorplan",),
-           criticality=H, review=rv("pd.review"), outputs=("layout",),
-           evidence=(REVIEWED, ran("Placed and routed, with DRC count and wirelength reported", "pnr.run"))),
+        # M29: the power grid, a clock tree, and extracted parasitics (docs/PD_SIGNOFF.md). A run counts
+        # only if made with these limits, and a limit on a metric the run never reported fails it.
+        st("power-grid", "Power grid", "Implementation", "pd.power_plan", depends_on=("floorplan",), criticality=M,
+           review=rv("pd.review"), outputs=("power_grid",),
+           evidence=(REVIEWED, ran("Power grid built, with every cell supply pin connected", "pnr.run",
+                                   params=(("max_unconnected_supply_pins", "0"),)))),
+        st("place-route", "Placement, clock tree, and routing", "Implementation", "pd.place_route",
+           depends_on=("floorplan", "power-grid"), criticality=H, review=rv("pd.review"), outputs=("layout",),
+           evidence=(REVIEWED, ran("Placed, clock tree built, and routed, with clock skew, DRC count, and "
+                                   "wirelength reported", "pnr.run",
+                                   params=(("max_drc_violations", "0"), ("max_unconnected_supply_pins", "0"))))),
         st("sta-signoff", "STA signoff", "Signoff", "sta.analyze", depends_on=("place-route",), criticality=H,
            review=rv("sta.review"), gate="gate.implementation", outputs=("timing_report",),
-           evidence=(REVIEWED, ran("Signoff timing on the implemented netlist", "sta.run"))),
+           evidence=(REVIEWED, ran("Signoff timing on the routed netlist with extracted parasitics (SPEF)",
+                                   "sta.run", params=(("max_unannotated_nets", "0"),)))),
     ),
 )
 

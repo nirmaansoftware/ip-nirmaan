@@ -360,6 +360,10 @@ NIRMAAN_REQUIRE_EDA="yosys openroad" python -m pytest tests/test_nirmaan_physica
 
 ## 9. Not in this milestone
 
+M29 added the power grid, tap and filler cells, clock-tree synthesis, repair,
+parasitic extraction feeding signoff STA, standalone OpenSTA in CI, and
+sky130hd: see `docs/PD_SIGNOFF.md`. The list below is as M25 and M27 left it.
+
 * Power-grid generation, tap and filler cells, clock-tree synthesis, repair
   (`repair_design`, `repair_timing`), and parasitic extraction (`extract_parasitics`
   and a SPEF handed to `sta.run`).

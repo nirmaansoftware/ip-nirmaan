@@ -1,4 +1,4 @@
-"""Milestones 25 and 27 (physical design): OpenSTA and OpenROAD behind the broker.
+"""Milestones 25, 27, and 29 (physical design): OpenSTA and OpenROAD behind the broker.
 
 * Parsers are tested against logs CAPTURED from real OpenROAD runs in CI
   (M27; each starts with a ``# CAPTURED:`` line naming the run).
@@ -9,7 +9,11 @@
   for real with Yosys and a toy test library.
 * The physical-implementation workflow plans synth, floorplan, place and
   route, then STA signoff.
-* Crown jewel: a new physical-design backend needs zero core changes.
+* Crown jewels: a new physical-design backend needs zero core changes; signoff
+  timing on extracted parasitics is a limit in the workflow data (M29).
+* M29: power grid, taps, CTS, repair, fillers, antenna and IR checks, and
+  OpenRCX extraction, for real on Nangate45 and sky130hd in CI, with signoff
+  STA on the SPEF through OpenROAD's OpenSTA and standalone OpenSTA.
 * Real OpenSTA and OpenROAD tests skip without the tools and Nangate45; the CI
   physical-design job requires them.
 """
@@ -72,11 +76,13 @@ def only_on_path(monkeypatch, bin_dir: Path) -> None:
     monkeypatch.setenv("PATH", f"{bin_dir}:{Path(shutil.which('sh')).parent}")
 
 
-def fake_pdk(root: Path) -> dict[str, str]:
+def fake_pdk(root: Path, rc: bool = False) -> dict[str, str]:
+    """Stand-in PDK files; ``rc`` adds the layer RC script place and route needs from CTS on (M29)."""
     root.mkdir(parents=True, exist_ok=True)
-    for name in ("cells.lib", "tech.lef", "cells.lef"):
+    for name in ("cells.lib", "tech.lef", "cells.lef", "rc.tcl"):
         (root / name).write_text("stand-in\n", encoding="utf-8")
-    return {"liberty": str(root / "cells.lib"), "tech_lef": str(root / "tech.lef"), "lef": str(root / "cells.lef")}
+    pdk = {"liberty": str(root / "cells.lib"), "tech_lef": str(root / "tech.lef"), "lef": str(root / "cells.lef")}
+    return {**pdk, "rc_tcl": str(root / "rc.tcl")} if rc else pdk
 
 
 # --- The catalog ------------------------------------------------------------------------
@@ -108,12 +114,13 @@ def test_the_catalog_says_why_a_tool_cannot_run_here(monkeypatch, tmp_path):
 
 def test_the_logs_say_where_they_were_captured():
     logs = sorted(PD.glob("*.log"))
-    assert [p.name for p in logs] == ["openroad_error.log", "openroad_route.log", "opensta_met.log",
-                                      "opensta_violated.log"]
+    assert [p.name for p in logs] == ["openroad_error.log", "openroad_route.log", "openroad_signoff.log",
+                                      "opensta_met.log", "opensta_spef.log", "opensta_violated.log"]
     for log in logs:
         first, second = log.read_text(encoding="utf-8").splitlines()[:2]
         assert first.startswith("# CAPTURED:") and "CI run" in first, log
-        assert second.startswith("$ openroad -no_init -no_splash -exit "), log  # as eda.execute logs a step
+        exe = "sta" if log.name == "opensta_spef.log" else "openroad"  # M29: standalone OpenSTA, built in CI
+        assert second.startswith(f"$ {exe} -no_init -no_splash -exit "), log  # as eda.execute logs a step
 
 
 def test_opensta_timing_met():
@@ -154,13 +161,70 @@ def test_openroad_full_flow():
     result = parse_openroad(_text("openroad_route.log"), 0, "route")
     assert result.passed, result.summary
     m = result.metrics
-    assert m["stages_completed"] == ["floorplan", "place", "route", "timing"] and m["failed_stage"] is None
-    assert (m["design_area_um2"], m["utilization_pct"]) == (1665.0, 41.0)  # printed as um^2
-    assert (m["wirelength_um"], m["drc_violations"]) == (10783.0, 0)  # the last iteration's figures
-    assert (m["worst_slack"], m["worst_hold_slack"]) == (7.12, 0.103)
-    assert [d.code for d in result.warnings] == ["IFP-0028", "DRT-0120", "DRT-0120"]
-    assert result.summary == ("place and route passed: routed, 0 DRC violations, wirelength 10783 um, "
-                              "utilization 41%, worst setup slack 7.120, worst hold slack 0.103, TNS 0.000")
+    assert m["stages_completed"] == ["floorplan", "place", "cts", "route", "timing"] and m["failed_stage"] is None
+    assert (m["design_area_um2"], m["utilization_pct"]) == (2127.0, 43.0)  # printed as um^2
+    assert (m["wirelength_um"], m["drc_violations"]) == (12645.0, 0)  # the last iteration's figures
+    assert (m["worst_slack"], m["worst_hold_slack"]) == (7.422, 0.158)
+    # M29: the clock tree, and slack at each checkpoint (ideal clock, propagated, global-routing estimate).
+    assert (m["cts_buffers"], m["cts_sinks"], m["clock_skew"], m["clock_insertion_delay"]) == (17, 206, -0.005, 0.115)
+    assert m["slack_by_stage"] == {"place": {"setup": 7.458, "hold": 0.151, "tns": 0.0},
+                                   "cts": {"setup": 7.446, "hold": 0.156, "tns": 0.0},
+                                   "route": {"setup": 7.422, "hold": 0.158, "tns": 0.0}}
+    # No power grid was asked for: the supply pins stay open, and the summary says so instead of failing.
+    assert m["power_grids"] == [] and m["unconnected_supply_pins"] == 2762 and m["parasitics"] == "estimated"
+    assert [d.code for d in result.warnings] == ["IFP-0028"]
+    assert result.summary == ("place and route passed: routed, 0 DRC violations, wirelength 12645 um, "
+                              "utilization 43%, no power grid, clock skew -0.005, worst setup slack 7.422, "
+                              "worst hold slack 0.158, TNS 0.000")
+
+
+SIGNOFF_STAGES = ["floorplan", "place", "cts", "route", "extract"]
+
+
+def test_openroad_signoff_flow():
+    """M29: taps, a connected power grid, CTS, fillers, antenna and IR checks, and extracted parasitics."""
+    result = parse_openroad(_text("openroad_signoff.log"), 0, "extract", SIGNOFF_STAGES)
+    assert result.passed, result.summary
+    m = result.metrics
+    assert m["stages_completed"] == [*SIGNOFF_STAGES, "timing"] and m["parasitics"] == "extracted"
+    assert (m["tap_cells"], m["endcap_cells"], m["filler_cells"]) == (0, 100, 1494)  # taps every 120 um > the die
+    assert m["power_grids"] == ["grid"] and m["supply_nets"] == ["VDD", "VSS"] and m["unconnected_supply_pins"] == 0
+    assert m["worst_ir_drop_v"] == {"VDD": 0.00156, "VSS": 0.000588}
+    assert (m["antenna_net_violations"], m["antenna_pin_violations"], m["drc_violations"]) == (0, 0, 0)
+    assert (m["cts_buffers"], m["clock_skew"], m["clock_insertion_delay"]) == (17, 0.003, 0.111)
+    assert m["slack_by_stage"]["route"] == {"setup": 7.435, "hold": 0.158, "tns": 0.0}  # global-routing estimate
+    assert m["slack_by_stage"]["extract"] == {"setup": 7.449, "hold": 0.155, "tns": 0.0}  # extracted
+    assert (m["worst_slack"], m["worst_hold_slack"]) == (7.449, 0.155)
+    # Unused QNs and dummy loads drive nothing, and the supply ports reach no cell pin: no wire to extract.
+    assert (m["unannotated_drivers"], m["floating_outputs"], m["unannotated_nets"]) == (219, 221, 0)
+    assert result.summary == ("place and route passed: routed and extracted, 0 DRC violations, wirelength "
+                              "12562 um, utilization 43%, power grid connected, clock skew 0.003, worst setup "
+                              "slack 7.449, worst hold slack 0.155, TNS 0.000 on extracted parasitics")
+
+
+def test_openroad_signoff_checks_fail_the_run():
+    log = _text("openroad_signoff.log")
+    for real, broken, reason in (
+            ("nirmaan-unconnected-supply-pins: 0", "nirmaan-unconnected-supply-pins: 3", "3 unconnected supply pins"),
+            ("Found 0 net violations.", "Found 2 net violations.", "2 antenna violations")):
+        assert log.count(real) == 1
+        result = parse_openroad(log.replace(real, broken), 0, "extract", SIGNOFF_STAGES)
+        assert not result.passed and reason in result.summary, result.summary
+    no_extract = "\n".join(ln for ln in log.splitlines() if "nirmaan-stage-done: extract" not in ln)
+    assert not parse_openroad(no_extract, 0, "extract", SIGNOFF_STAGES).passed  # planned, never finished
+
+
+def test_opensta_on_the_extracted_spef():
+    result = parse_opensta(_text("opensta_spef.log"), 0)
+    assert result.passed, result.summary
+    m = result.metrics
+    assert (m["worst_slack"], m["worst_hold_slack"], m["tns"]) == (7.449, 0.155, 0.0)  # the flow's extracted figures
+    assert (m["unannotated_drivers"], m["floating_outputs"], m["unannotated_nets"]) == (221, 221, 0)
+    # A listed driver that does drive a load is an unannotated net, counted by name.
+    log = _text("opensta_spef.log")
+    line = next(ln for ln in log.splitlines() if ln.startswith("nirmaan-floating-drivers:"))
+    dropped = line.replace(" VDD", "")
+    assert parse_opensta(log.replace(line, dropped), 0).metrics["unannotated_nets"] == 1
 
 
 def test_openroad_failure_names_the_stage():
@@ -270,7 +334,7 @@ def test_pnr_stages_follow_stop_after(project, tmp_path, monkeypatch):
     bin_dir = tmp_path / "bin"
     fake_tool(bin_dir, "openroad", f"cat '{PD / 'openroad_route.log'}'")
     only_on_path(monkeypatch, bin_dir)
-    params = {"netlist": str(AXI), "sdc": str(SDC), "top": TOP, **fake_pdk(tmp_path / "pdk"), **PNR_PDK}
+    params = {"netlist": str(AXI), "sdc": str(SDC), "top": TOP, **fake_pdk(tmp_path / "pdk", rc=True), **PNR_PDK}
     run, outcome = invoke(project, "pnr.run", params, tmp_path / "full")
     assert run.succeeded, run.summary
     assert outcome.data["commands"] == [["openroad", "-no_init", "-no_splash", "-exit", "pnr.tcl"]]
@@ -287,7 +351,7 @@ def test_pnr_stages_follow_stop_after(project, tmp_path, monkeypatch):
     assert "-utilization 55" in floorplan and "global_placement" not in floorplan
     assert "estimate_parasitics" not in floorplan and "write_def floorplan.def" in floorplan
 
-    bad, _ = invoke(project, "pnr.run", {**params, "stop_after": "cts"}, tmp_path / "bad")
+    bad, _ = invoke(project, "pnr.run", {**params, "stop_after": "signoff"}, tmp_path / "bad")
     assert not bad.succeeded and "stop_after" in bad.summary
 
 
@@ -333,6 +397,20 @@ def test_real_liberty_mapped_synthesis_ties_constants_to_tie_cells(project, tmp_
     assert not bad.succeeded and "tie_low must be CELL/PORT" in bad.summary
 
 
+@needs("yosys")
+def test_real_liberty_mapped_synthesis_buffers_port_to_port_assigns(project, tmp_path):
+    """M29: one output port driving another becomes a buffer, so the routed netlist has no shared port net."""
+    params = {"sources": str(AXI), "top": TOP, "liberty": str(TINY_LIB), "backend": "yosys-liberty",
+              "tie_high": "TIEHI/Y", "tie_low": "TIELO/Y"}
+    plain, outcome = invoke(project, "synth.run", params, tmp_path / "plain")
+    assert plain.succeeded and "assign " in Path(outcome.data["result"]["metrics"]["netlist"]).read_text()
+    run, outcome = invoke(project, "synth.run", {**params, "buffer_cell": "BUF/A/Y"}, tmp_path / "buf")
+    assert run.succeeded, run.summary
+    assert "assign " not in Path(outcome.data["result"]["metrics"]["netlist"]).read_text()
+    bad, _ = invoke(project, "synth.run", {**params, "buffer_cell": "BUF/A"}, tmp_path / "bad")
+    assert not bad.succeeded and "buffer_cell must be CELL/IN/OUT" in bad.summary
+
+
 def test_liberty_mapped_synthesis_without_a_liberty_is_refused(project, tmp_path):
     with pytest.raises(ToolAccessDenied, match="needs a Liberty file"):
         invoke(project, "synth.run", {"sources": str(AXI), "top": TOP, "backend": "yosys-liberty"}, tmp_path)
@@ -355,6 +433,19 @@ def test_the_physical_implementation_workflow_plans_the_stages(project):
     assert [g.gate for g in gates] == ["gate.implementation"] and tasks["sta-signoff"].id in gates[0].depends_on
 
 
+def test_the_workflow_asks_for_power_and_extracted_parasitics_as_data(project):
+    """M29: a power-grid stage, and limits a run counts only if made with (a metric it never reported fails)."""
+    tasks = {t.stage: t for t in project.state.tasks.values() if t.stage and t.kind is TaskKind.WORK}
+    assert tasks["floorplan"].id in tasks["power-grid"].depends_on
+    assert tasks["power-grid"].id in tasks["place-route"].depends_on
+    limits = {stage: {k: v for r in tasks[stage].evidence_requirements for k, v in r.params}
+              for stage in ("power-grid", "place-route", "sta-signoff")}
+    assert limits == {"power-grid": {"max_unconnected_supply_pins": "0"},
+                      "place-route": {"max_drc_violations": "0", "max_unconnected_supply_pins": "0"},
+                      "sta-signoff": {"max_unannotated_nets": "0"}}
+    assert {t for r in tasks["power-grid"].evidence_requirements for t in r.tools} == {"pnr.run"}
+
+
 # --- Crown jewel: a new PD backend needs zero core changes ---------------------------------
 
 
@@ -365,7 +456,9 @@ def test_a_new_pd_backend_needs_no_core_changes(project, tmp_path, monkeypatch):
 
     def parse(run) -> EdaResult:
         clean = run.returncode == 0 and "0 opens, 0 shorts" in run.log
-        return EdaResult(clean, "routed clean" if clean else "routing failed")
+        # M29: the metrics the place-route evidence limits; a run that never reports them cannot meet it.
+        metrics = {"drc_violations": 0, "unconnected_supply_pins": 0} if clean else {}
+        return EdaResult(clean, "routed clean" if clean else "routing failed", metrics=metrics)
 
     register_backend(Backend("tinyroute", "pnr.run", ("tinyroute",),
                              lambda job: [["tinyroute", job.params["netlist"], job.params["lef"]]], parse,
@@ -379,7 +472,8 @@ def test_a_new_pd_backend_needs_no_core_changes(project, tmp_path, monkeypatch):
         assert project.state.tool_runs == {}
         lef = fake_pdk(tmp_path / "pdk")["lef"]
         place_route = tid(project, "place-route")
-        run, _ = invoke(project, "pnr.run", {**params, "lef": lef}, tmp_path / "w2", place_route)
+        limits = {"max_drc_violations": "0", "max_unconnected_supply_pins": "0"}  # as the workflow names them
+        run, _ = invoke(project, "pnr.run", {**params, "lef": lef, **limits}, tmp_path / "w2", place_route)
         assert run.succeeded and run.summary == "tinyroute: routed clean"
         assert f"routed {AXI} with {lef}" in Path(run.references[0]).read_text()  # it really ran
         owner = agent(project.task(place_route).owner)
@@ -390,6 +484,40 @@ def test_a_new_pd_backend_needs_no_core_changes(project, tmp_path, monkeypatch):
         assert pnr_req.description not in unmet and unmet  # met by the run; the review is still owed
     finally:
         unregister_backend("pnr.run", "tinyroute")
+
+
+def test_signoff_on_extracted_parasitics_needs_no_core_changes(project, tmp_path, monkeypatch):
+    """M29 crown jewel: a timer the core has never heard of meets sta-signoff only when it reads a SPEF.
+
+    Nothing in the core names SPEF: the stage asks for ``max_unannotated_nets=0``, and a run that never
+    reports the metric fails the limit.
+    """
+    bin_dir = tmp_path / "bin"
+    fake_tool(bin_dir, "tinysta", 'if [ -n "$1" ]; then echo "annotated from $1"; fi; echo "tinysta: slack 1.0"')
+
+    def parse(run) -> EdaResult:
+        metrics = {"unannotated_nets": 0} if "annotated from" in run.log else {}
+        return EdaResult(run.returncode == 0, "timing met", metrics=metrics)
+
+    register_backend(Backend("tinysta", "sta.run", ("tinysta",),
+                             lambda job: [["tinysta", job.params.get("spef", "")]], parse,
+                             required=("netlist",), files=("netlist", "spef")))
+    try:
+        only_on_path(monkeypatch, bin_dir)
+        signoff = tid(project, "sta-signoff")
+        req = next(r for r in project.task(signoff).evidence_requirements if r.tools == ("sta.run",))
+        owner = agent(project.task(signoff).owner)
+        base = {"netlist": str(AXI), "backend": "tinysta", **dict(req.params)}
+        estimated, _ = invoke(project, "sta.run", base, tmp_path / "est", signoff)
+        assert not estimated.succeeded and "unannotated_nets was not reported" in estimated.summary
+        spef = tmp_path / "route.spef"
+        spef.write_text("*SPEF stand-in\n", encoding="utf-8")
+        extracted, _ = invoke(project, "sta.run", {**base, "spef": str(spef)}, tmp_path / "ext", signoff)
+        assert extracted.succeeded, extracted.summary
+        project.record_evidence(signoff, owner, EvidenceKind.TOOL_RUN, extracted.summary, tool_run=extracted.id)
+        assert req.description not in unsatisfied_requirements(project.state, project.task(signoff))
+    finally:
+        unregister_backend("sta.run", "tinysta")
 
 
 # --- The import laws ----------------------------------------------------------------------
@@ -415,8 +543,10 @@ NANGATE45 = {
     "tech_lef": "nangate45/lef/NangateOpenCellLibrary.tech.lef",
     "lef": "nangate45/lef/NangateOpenCellLibrary.macro.mod.lef",
 }
-NANGATE45_TIES = {"tie_high": "LOGIC1_X1/Z", "tie_low": "LOGIC0_X1/Z"}
-NANGATE45_PNR = {"site": "FreePDK45_38x28_10R_NP_162NW_34O", "hor_layers": "metal3", "ver_layers": "metal2"}
+NANGATE45_TIES = {"tie_high": "LOGIC1_X1/Z", "tie_low": "LOGIC0_X1/Z",
+                  "buffer_cell": "BUF_X1/A/Z"}  # M29: no port-to-port assign for the timer to trip on
+NANGATE45_PNR = {"site": "FreePDK45_38x28_10R_NP_162NW_34O", "hor_layers": "metal3", "ver_layers": "metal2",
+                 "rc_tcl": "nangate45/setRC.tcl"}  # M29: layer RC, which clock-tree synthesis needs
 FAST_SDC = PD / "axi4_lite_regs_fast.sdc"
 
 
@@ -465,7 +595,7 @@ def test_real_openroad_places_and_routes_the_axi4_lite_block(project, tmp_path):
     run, outcome = invoke(project, "pnr.run", {"netlist": netlist, "sdc": str(SDC), "top": TOP, **pdk,
                                                **NANGATE45_PNR}, tmp_path / "pnr")
     metrics = outcome.data["result"]["metrics"]
-    assert metrics["stages_completed"] == ["floorplan", "place", "route", "timing"], run.summary
+    assert metrics["stages_completed"] == ["floorplan", "place", "cts", "route", "timing"], run.summary
     assert metrics["drc_violations"] == 0 and metrics["wirelength_um"] > 0, run.summary
     assert metrics["utilization_pct"] > 0 and metrics["worst_slack"] > 0, run.summary
     assert run.succeeded, run.summary
@@ -481,3 +611,105 @@ def test_real_openroad_failure_is_a_recorded_failed_run(project, tmp_path):
     assert not run.succeeded and run.id in project.state.tool_runs
     assert outcome.data["result"]["diagnostics"], run.summary
     assert "place and route failed" in run.summary, run.summary
+
+
+# --- M29: signoff steps for real (power grid, CTS, repair, fillers, extraction) ------------
+
+#: The Nangate45 platform's own signoff inputs, as OpenROAD-flow-scripts ships them.
+NANGATE45_SIGNOFF = {
+    "tap_cell": "TAPCELL_X1", "endcap_cell": "TAPCELL_X1", "tap_distance": "120",
+    "pdn_tcl": "nangate45/grid_strategy-M1-M4-M7.tcl",
+    "rcx_rules": "nangate45/rcx_patterns.rules",
+    "filler_cells": "FILLCELL_X1,FILLCELL_X2,FILLCELL_X4,FILLCELL_X8,FILLCELL_X16,FILLCELL_X32",
+    "supply_voltage": "1.1",
+}
+
+
+def _signoff_pnr(project, tmp_path, pdk, netlist, name, **extra):
+    params = {"netlist": netlist, "sdc": str(SDC), "top": TOP, **pdk, **NANGATE45_PNR, **NANGATE45_SIGNOFF, **extra}
+    return invoke(project, "pnr.run", params, tmp_path / name)
+
+
+@needs("openroad", "yosys")
+def test_real_signoff_flow_connects_power_builds_the_clock_tree_and_extracts(project, tmp_path):
+    pdk = nangate45()
+    netlist = _mapped_netlist(project, tmp_path, pdk)
+    run, outcome = _signoff_pnr(project, tmp_path, pdk, netlist, "signoff")
+    m = outcome.data["result"]["metrics"]
+    assert m["stages_completed"] == ["floorplan", "place", "cts", "route", "extract", "timing"], run.summary
+    assert m["drc_violations"] == 0 and m["power_grids"] and m["unconnected_supply_pins"] == 0, run.summary
+    assert m["tap_cells"] + m["endcap_cells"] > 0 and m["filler_cells"] > 0, run.summary
+    assert m["antenna_net_violations"] == 0 and m["antenna_pin_violations"] == 0, run.summary
+    assert m["cts_buffers"] > 0 and m["cts_sinks"] > 0, run.summary
+    assert m["clock_skew"] is not None and m["clock_insertion_delay"] is not None, run.summary
+    assert set(m["slack_by_stage"]) == {"place", "cts", "route", "extract"}, m["slack_by_stage"]
+    assert m["parasitics"] == "extracted" and m["worst_slack"] > 0 and m["unannotated_nets"] == 0, run.summary
+    assert set(m["outputs"]) == {"def", "netlist", "spef"} and run.succeeded, run.summary
+
+    # Signoff STA on the routed netlist with the extracted SPEF, in a separate run: through OpenROAD's
+    # embedded OpenSTA, and through standalone OpenSTA when it is installed (CI builds it, M29).
+    design = {"netlist": m["outputs"]["netlist"], "top": TOP, **pdk, "sdc": str(SDC), "spef": m["outputs"]["spef"]}
+    for backend in sta_backends():
+        sta, sta_outcome = invoke(project, "sta.run", {**design, "backend": backend}, tmp_path / f"sta_{backend}")
+        sm = sta_outcome.data["result"]["metrics"]
+        assert sta_outcome.data["backend"] == backend
+        assert sm["unannotated_nets"] == 0 and sm["worst_slack"] > 0, sta.summary  # every net has parasitics
+        assert sta.succeeded, sta.summary
+
+
+def sta_backends() -> list[str]:
+    """OpenROAD's embedded OpenSTA always; standalone OpenSTA when on PATH or required (M29)."""
+    required = "sta" in os.environ.get("NIRMAAN_REQUIRE_EDA", "").replace(",", " ").split()
+    return ["openroad-sta", *(["opensta"] if shutil.which("sta") or required else [])]
+
+
+@needs("openroad", "yosys")
+def test_real_signoff_flow_with_an_impossible_clock_is_a_recorded_failed_run(project, tmp_path):
+    pdk = nangate45()
+    netlist = _mapped_netlist(project, tmp_path, pdk)
+    run, outcome = _signoff_pnr(project, tmp_path, pdk, netlist, "signoff_fast", sdc=str(FAST_SDC), stop_after="cts")
+    m = outcome.data["result"]["metrics"]
+    assert not run.succeeded and run.id in project.state.tool_runs
+    assert m["stages_completed"] == ["floorplan", "place", "cts", "timing"], run.summary  # every stage ran
+    assert "timing violated" in run.summary and m["worst_slack"] < 0 and m["slack_by_stage"]["cts"]["setup"] < 0
+
+
+#: sky130 HD as OpenROAD-flow-scripts ships it under ``flow/platforms/sky130hd`` (M29).
+SKY130HD = {
+    "liberty": "sky130hd/lib/sky130_fd_sc_hd__tt_025C_1v80.lib",
+    "tech_lef": "sky130hd/lef/sky130_fd_sc_hd.tlef",
+    "lef": "sky130hd/lef/sky130_fd_sc_hd_merged.lef",
+}
+SKY130HD_PNR = {
+    "site": "unithd", "hor_layers": "met3", "ver_layers": "met2",
+    # Signals stop below met5, which carries the power straps: on met5 the router left shorts it never fixed.
+    "routing_layers": "met1,met4",
+    # The probe buffers have met5 pins the router cannot reach below met4 (GRT-0029 when repair chose one).
+    "dont_use": "sky130_fd_sc_hd__probe_p_*,sky130_fd_sc_hd__probec_p_*,sky130_fd_sc_hd__lpflow_*",
+    "tap_cell": "sky130_fd_sc_hd__tapvpwrvgnd_1", "tap_distance": "14",
+    "pdn_tcl": "sky130hd/pdn.tcl", "rc_tcl": "sky130hd/setRC.tcl", "rcx_rules": "sky130hd/rcx_patterns.rules",
+    "filler_cells": "sky130_fd_sc_hd__fill_1,sky130_fd_sc_hd__fill_2,sky130_fd_sc_hd__fill_4,sky130_fd_sc_hd__fill_8",
+    "supply_voltage": "1.8",
+}
+
+
+@needs("openroad", "yosys")
+def test_real_signoff_flow_on_sky130hd(project, tmp_path):
+    root = os.environ.get(PDK_ROOT_ENV, "")
+    if not (root and all((Path(root) / p).is_file() for p in SKY130HD.values())):
+        if "openroad" in os.environ.get("NIRMAAN_REQUIRE_EDA", "").split():
+            pytest.fail(f"{PDK_ROOT_ENV} has no sky130hd platform")
+        pytest.skip(f"{PDK_ROOT_ENV} has no sky130hd platform")
+    params = {"sources": str(AXI), "top": TOP, "backend": "yosys-liberty", "liberty": SKY130HD["liberty"],
+              "tie_high": "sky130_fd_sc_hd__conb_1/HI", "tie_low": "sky130_fd_sc_hd__conb_1/LO",
+              "buffer_cell": "sky130_fd_sc_hd__buf_4/A/X"}
+    synth, outcome = invoke(project, "synth.run", params, tmp_path / "synth")
+    assert synth.succeeded, synth.summary
+    netlist = outcome.data["result"]["metrics"]["netlist"]
+    run, outcome = invoke(project, "pnr.run", {"netlist": netlist, "sdc": str(SDC), "top": TOP, **SKY130HD,
+                                               **SKY130HD_PNR, "utilization": "30", "timeout": "900"},
+                          tmp_path / "pnr")
+    m = outcome.data["result"]["metrics"]
+    assert m["stages_completed"] == ["floorplan", "place", "cts", "route", "extract", "timing"], run.summary
+    assert m["drc_violations"] == 0 and m["unconnected_supply_pins"] == 0, run.summary
+    assert m["parasitics"] == "extracted" and run.succeeded, run.summary
