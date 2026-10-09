@@ -80,7 +80,9 @@ def _record_calls(engine: TaskEngine, task_id: str, actor: Actor, calls) -> None
     from nirmaan.runtime.selection import cost_of
 
     for call in calls:
-        engine.record_model_call(task_id, actor, {**call, "cost_usd": cost_of(call)})
+        call = dict(call)
+        priced = call.pop("priced", True)
+        engine.record_model_call(task_id, actor, {**call, "cost_usd": cost_of(call) if priced else None})
 
 
 class ToolHandle:
