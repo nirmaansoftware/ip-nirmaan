@@ -8,6 +8,7 @@ with deterministic tool runs it never saw. Design: `docs/SEAT_EVALUATION.md`.
 nirmaan eval list
 nirmaan eval run --replay                      # the reference answers: proves the cases and their judges
 nirmaan eval run rtl/axi4-lite-regs --runtime anthropic --attempts 2   # a live model (needs the ai extra and credentials)
+NIRMAAN_CLAUDE_CODE=/path/to/claude nirmaan eval run --runtime claude-code   # a live model on your Claude plan
 ```
 
 Run from the repository root (case paths are relative to it, or pass

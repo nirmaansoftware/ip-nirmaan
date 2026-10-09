@@ -29,16 +29,17 @@ way every milestone has:
 | Repair after review: a sent-back submission is superseded and the seat reruns with the findings; retry limits per stage and a budget across runs, with escalation when spent (M27) | |
 | The design gates on every RTL workflow (`new-ip`, `feature-addition`, `rtl-change`), and proofs that must reach every cover (M27) | |
 | A synchronous FIFO, a round-robin arbiter, and an APB register block, each with proofs and designed end to end by agents (M26) | |
-| Seat evaluation: cases as data, judged by real tool runs including held-out reference testbenches; `nirmaan eval` (M27) | A first live-model evaluation run; token and cost accounting |
+| Seat evaluation: cases as data, judged by real tool runs including held-out reference testbenches; `nirmaan eval` (M27) | Formal proofs written by the seat; more cases |
 | Tool contracts: every bound tool declares its parameters, and the broker refuses undeclared or ill-typed ones before running; `nirmaan org tool` (M28) | Typed values end to end; the typed work packet |
 | Engineering records: decisions (alternatives, choice, rationale, evidence, consequences) and classified failures, as views; `nirmaan decisions` / `failures` (M29) | Recording explicit decisions from the CLI or MCP |
 | The register map as data: validated, lowered (C header, spec table), and judging RTL through a generated co-simulation test; `nirmaan regmap` (M30) | Adopting the map in `block-design`; an APB harness; bit fields |
-| Model selection by capability (`auto` runtime) and every model call recorded with tokens and cost; `nirmaan costs` (M31) | A live-model evaluation run |
+| Model selection by capability (`auto` runtime) and every model call recorded with tokens and cost; `nirmaan costs` (M31) | |
 | Scalable state: an engine operation costs the same on a large project (0.25 ms at 5,000 runs, from 95 ms); state cannot be edited in place (M32) | An append-only store, if saves ever dominate |
 | Learning proposals: failures recurring across projects propose skill changes, citing every record; a person adopts or rejects as a recorded decision; `nirmaan learn` (M33) | Proposals from evaluation results |
+| First live evaluation: Claude Opus 5.5 passed all four RTL cases, judged by held-out checks, through a `claude-code` runtime on the owner's plan; it found that the RTL seat lacked the interface spec (fixed) | Formal proofs written by the seat; more cases |
 | IP Nirmaan over MCP; organizational events on the M18 bus (M22) | |
 | CI on Python 3.11 and 3.12, plus a dash check (Stage 0) | |
-| 1424 tests; CLI `nirmaan`; HTML dashboard; landing page live at https://ip.nirmaan.online | |
+| 1430 tests; CLI `nirmaan`; HTML dashboard; landing page live at https://ip.nirmaan.online | |
 
 ## Resume checklist (after the folder rename)
 
@@ -54,7 +55,7 @@ PYTHONPYCACHEPREFIX=/tmp/nirmaan-pycache .venv/bin/python -m pytest -q \
   --deselect tests/test_ai_boundary.py::test_missing_sdk_raises_clean_error
 ```
 
-Expect 1424 passing (3 skipped: OpenROAD is not installed locally; the CI `physical-design` job runs those three). The folder is still in iCloud, so the eviction hangs
+Expect 1430 passing (3 skipped: OpenROAD is not installed locally; the CI `physical-design` job runs those three). The folder is still in iCloud, so the eviction hangs
 described in `context.md` section 4 still apply. If imports stall, pre-read the tree:
 
 ```

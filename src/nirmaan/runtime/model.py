@@ -59,7 +59,7 @@ def call_record(completion: "Completion", purpose: str, llm_name: str) -> dict[s
     return {"purpose": purpose, "provider": completion.provider or llm_name, "model": completion.model,
             "input_tokens": completion.input_tokens, "output_tokens": completion.output_tokens,
             "cache_read_tokens": completion.cache_read_tokens, "cache_write_tokens": completion.cache_write_tokens,
-            "succeeded": completion.error is None, "error": completion.error}
+            "succeeded": completion.error is None, "error": completion.error, "priced": completion.priced}
 
 
 @dataclass(frozen=True)
@@ -75,6 +75,8 @@ class Completion:
     output_tokens: int | None = None
     cache_read_tokens: int | None = None
     cache_write_tokens: int | None = None
+    #: False when the call has no per-call price (a subscription seat): its cost is recorded as unknown.
+    priced: bool = True
 
 
 class LLM(Protocol):
