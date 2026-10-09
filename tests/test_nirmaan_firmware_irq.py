@@ -68,7 +68,7 @@ def traps_of(outcome) -> list[tuple[str, int]]:
 
 def firmware_requirements(engine):
     task = engine.task(next(t for t in engine.state.tasks if engine.state.tasks[t].stage == "firmware"))
-    return {(r.tools[0], tuple(sorted(r.params))): r for r in task.evidence_requirements if r.tools}
+    return {(r.tools[0], tuple(sorted(dict(r.params)))): r for r in task.evidence_requirements if r.tools}
 
 
 # --- The parser (no tool needed) --------------------------------------------------------------
@@ -122,7 +122,7 @@ def test_the_gate_requires_the_interrupt_when_the_design_has_one(block, riscv):
 
 def test_the_gate_requires_interrupts_and_traps_when_the_request_asks(nirmaan_org, fixed_clock):
     asked = Orchestrator(nirmaan_org, clock=fixed_clock).plan(
-        "Create an AXI4-Lite timer with an interrupt and its driver for a RISC-V core, "
+        "Create an AXI4-Lite register block with an interrupt and its driver for a RISC-V core, "
         "with precise bus error traps.")
     reqs = firmware_requirements(asked)
     assert dict(reqs[("fw.test", ("require_irq",))].params) == {"require_irq": "yes"}
