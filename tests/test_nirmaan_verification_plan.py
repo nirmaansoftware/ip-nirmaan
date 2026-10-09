@@ -286,13 +286,16 @@ def test_the_plan_stage_is_data_and_planned_on_request(nirmaan_org, fixed_clock)
     plan, rtl = engine.task(tid(engine, "dv-plan")), engine.task(tid(engine, "rtl-implementation"))
     assert plan.capability == "dv.plan" and plan.depends_on == (tid(engine, "interface-spec"),)
     assert plan.expected_outputs == ("verification_plan",)
-    assert rtl.depends_on == (tid(engine, "microarchitecture"),)  # nothing waits on the plan
+    # Nothing waits on the plan: the RTL seat works from the interface spec and the microarchitecture only.
+    assert rtl.depends_on == (tid(engine, "interface-spec"), tid(engine, "microarchitecture"))
+    assert tid(engine, "dv-plan") not in rtl.depends_on
     check = next(r for r in plan.evidence_requirements if r.before_review)
     assert check.tools == ("vplan.check",)
 
     plain = Orchestrator(nirmaan_org, clock=fixed_clock).plan("Create an AXI4-Lite register block.")
     assert tid(plain, "dv-plan") not in plain.state.tasks
-    assert plain.task(tid(plain, "rtl-implementation")).depends_on == (tid(plain, "microarchitecture"),)
+    assert plain.task(tid(plain, "rtl-implementation")).depends_on == (tid(plain, "interface-spec"),
+                                                                       tid(plain, "microarchitecture"))
 
 
 def test_the_check_refuses_a_plan_that_misses_a_spec_requirement(planned, tmp_path):
