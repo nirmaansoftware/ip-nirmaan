@@ -112,7 +112,7 @@ class Instrument:
         self.spans: list[tuple[str, str, float, float]] = []
 
     def task_of(self, prompt) -> str:
-        run = next(c.target for c in prompt.citations if c.kind == "run")
+        run = max(c.target for c in prompt.citations if c.kind == "run")  # its own run is the newest it cites
         return self.engine.state.tool_runs[run].task
 
     def complete(self, prompt) -> Completion:

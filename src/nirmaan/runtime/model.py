@@ -45,6 +45,7 @@ from nirmaan.runtime.context import WorkPacket
 from nirmaan.runtime.files import read_verified, split_files, write_file
 from nirmaan.runtime.prompt import ToolNote, WorkPrompt, render_work_prompt
 from nirmaan.runtime.tools import ToolAccessDenied
+from nirmaan.runtime.writer import outside_writer
 
 _TOOL_BACKED = {EvidenceKind.TOOL_RUN.value, EvidenceKind.VERITRIAGE_SESSION.value}
 _VERDICTS = {"approve": Verdict.APPROVE, "request_changes": Verdict.REQUEST_CHANGES}
@@ -416,7 +417,8 @@ class ModelRuntime:
         return ReviewResult(verdict, comments, uncertainty, notes)
 
     def _ask(self, prompt: WorkPrompt) -> tuple[dict[str, Any] | None, _Files, str]:
-        completion = self.llm.complete(prompt)
+        with outside_writer():  # the call touches no project state: other tasks of a batch take turns (M36)
+            completion = self.llm.complete(prompt)
         if not (completion.error or "").startswith(NO_CALL):
             self._calls.append(call_record(completion, getattr(self, "_purpose", "work"), self.llm.name))
         if completion.error:
