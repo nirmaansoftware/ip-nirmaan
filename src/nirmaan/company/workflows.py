@@ -583,9 +583,16 @@ BLOCK_DESIGN = WorkflowTemplate(
            evidence=(REVIEWED,
                      checked("Driver builds clean under strict C flags", "fw.build",
                              FileInput(param="sources", kinds=("driver",))),
+                     # M35: a design with an irq output must have its interrupt taken by the tests; a
+                     # request that asks for interrupts requires it of any design (docs/FIRMWARE_IRQ_TRAPS.md).
                      checked("Driver tests pass against the approved RTL", "fw.test",
                              FileInput(param="sources", kinds=("driver", "driver_test")),
-                             FileInput(param="rtl", kinds=("rtl_source",), upstream=True)),
+                             FileInput(param="rtl", kinds=("rtl_source",), upstream=True),
+                             params=(("require_irq", "auto"),), when=when(none_of=("interrupts",))),
+                     checked("Driver tests pass against the approved RTL, the interrupt taken", "fw.test",
+                             FileInput(param="sources", kinds=("driver", "driver_test")),
+                             FileInput(param="rtl", kinds=("rtl_source",), upstream=True),
+                             params=(("require_irq", "yes"),), when=when("interrupts")),
                      # M27: when the request names RISC-V, the same tests also run as a bare-metal
                      # RV32I image on a RISC-V core whose loads and stores reach the approved RTL.
                      # M29: the image's code (text) must fit a budget: a quarter of the SoC's RAM.
@@ -594,7 +601,17 @@ BLOCK_DESIGN = WorkflowTemplate(
                              params=(("max_text_bytes", "16384"),)),
                      checked("Driver tests pass on a RISC-V core against the approved RTL", "fw.soc_test",
                              FileInput(param="sources", kinds=("driver", "driver_test")),
-                             FileInput(param="rtl", kinds=("rtl_source",), upstream=True), when=when("riscv")))),
+                             FileInput(param="rtl", kinds=("rtl_source",), upstream=True),
+                             params=(("require_irq", "auto"),), when=when("riscv", none_of=("interrupts",))),
+                     checked("Driver tests pass on a RISC-V core against the approved RTL, the interrupt taken",
+                             "fw.soc_test", FileInput(param="sources", kinds=("driver", "driver_test")),
+                             FileInput(param="rtl", kinds=("rtl_source",), upstream=True),
+                             params=(("require_irq", "yes"),), when=when(all_of=("riscv", "interrupts"))),
+                     # M35: asked for, a bus error must trap precisely on the default core (PicoRV32).
+                     checked("A bus error traps precisely on the RISC-V core", "fw.soc_test",
+                             FileInput(param="sources", kinds=("driver", "driver_test")),
+                             FileInput(param="rtl", kinds=("rtl_source",), upstream=True),
+                             params=(("require_bus_error_trap", "yes"),), when=when(all_of=("riscv", "bus_errors"))))),
     ),
 )
 
