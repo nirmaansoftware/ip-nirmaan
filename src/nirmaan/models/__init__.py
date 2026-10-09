@@ -10,6 +10,7 @@ from nirmaan.models.regmap import Access, Register, RegisterMap, Unmapped
 from nirmaan.models.evaluation import (
     CaseFile,
     EvalCase,
+    EvalProposalThresholds,
     EvalResult,
     GateRun,
     HeldOutCheck,

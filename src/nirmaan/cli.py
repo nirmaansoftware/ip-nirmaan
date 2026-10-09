@@ -520,7 +520,9 @@ def costs(project: str, as_json: bool = typer.Option(False, "--json"), root: Pat
 
 @app.command()
 def learn(
-    projects: List[str],
+    projects: List[str] = typer.Argument(None, help="Projects whose failure records to read."),
+    evals: Optional[Path] = typer.Option(None, "--evals", help="Recorded evaluation results to read too (M42)."),
+    cases: Path = typer.Option(Path("evals"), "--cases", help="Evaluation case files, for each seat's capability."),
     decide: Optional[str] = typer.Option(None, "--decide", help="A proposal ID to decide."),
     in_project: Optional[str] = typer.Option(None, "--in", help="The project to record the decision in."),
     role: Optional[str] = typer.Option(None, "--as", help="Role ID deciding, as a human."),
@@ -529,11 +531,21 @@ def learn(
     as_json: bool = typer.Option(False, "--json"),
     root: Path = ROOT_OPTION,
 ) -> None:
-    """Skill changes proposed by failures that recur across projects; decide one as a person."""
+    """Skill changes proposed by failures that recur across projects or evaluation runs; decide one as a person."""
     from nirmaan.proposals import ProposalError, decide_proposal, learning_proposals
 
-    engines = {p: _load(p, root) for p in projects}
-    proposals = learning_proposals(_org(), [e.state for e in engines.values()])
+    if not projects and evals is None:
+        _fail("name projects, --evals DIR, or both")
+    engines = {p: _load(p, root) for p in projects or []}
+    proposals = learning_proposals(_org(), [e.state for e in engines.values()]) if engines else []
+    if evals is not None:
+        from nirmaan.eval_proposals import eval_proposals, load_results
+
+        try:
+            runs = load_results(evals)
+        except (ValueError, OSError) as exc:
+            _fail(f"cannot read evaluation results under {evals}: {exc}")
+        proposals += eval_proposals(_org(), runs, _cases(cases), states=[e.state for e in engines.values()])
     if decide:
         chosen = next((p for p in proposals if p.id == decide), None)
         if chosen is None or adopt is None or not role or not in_project:
@@ -555,9 +567,14 @@ def learn(
     if not proposals:
         console.print("No failure recurs often enough to propose a change.")
     for p in proposals:
-        console.print(escape(f"{p.id} [{p.status}] {p.statement}"), highlight=False, soft_wrap=True)
+        console.print(escape(f"{p.id} [{p.status}] [{p.source}] {p.statement}"), highlight=False, soft_wrap=True)
         console.print(escape(f"  for {', '.join(p.targets) or 'no providing skill'}: {p.suggestion}"),
                       highlight=False, soft_wrap=True)
+        for e in p.evidence if p.source == "evaluation" else ():
+            verdicts = "; ".join(f"{v['check']} {v['status']}: {v['summary']}" for v in e["verdicts"])
+            console.print(escape(f"  run {e['run']} {e['case']} on {e['runtime']} {e['version']} "
+                                 f"{e['started_at']}: {'passed' if e['passed'] else 'failed'} ({verdicts}) "
+                                 f"<- {e['file']}"), highlight=False, soft_wrap=True)
 
 
 @app.command()
