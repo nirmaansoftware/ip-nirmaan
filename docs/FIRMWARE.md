@@ -325,8 +325,9 @@ build requirement.
 * A repair loop that hands the seat its compiler or co-simulation log: done in
   M26 (`docs/REPAIR_LOOP.md`); a firmware capability opts in with
   `max_attempts`.
-* Harnesses for APB, AXI4 (bursts), and interrupts; the AXI4-Lite harness
-  assumes 32-bit data and the `s_axil_*` port names.
+* Harnesses for APB and AXI4 (bursts); the AXI4-Lite harness assumes 32-bit
+  data and the `s_axil_*` port names. Interrupts in this harness: done in M35
+  (`docs/FIRMWARE_IRQ_TRAPS.md`).
 * Static analysis (`clang-tidy`, `cppcheck`, MISRA) as another before-review
   check. It is one more backend and one more requirement.
 * A register description (IP-XACT, SystemRDL) from which both the RTL decode
