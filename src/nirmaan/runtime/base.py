@@ -60,6 +60,8 @@ class WorkResult:
     notes: str = ""
     outcome: str | None = None
     escalation: EscalationRequest | None = None
+    #: Every model call made for this result (M31), for the engine to record.
+    model_calls: tuple[dict[str, Any], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -70,6 +72,15 @@ class ReviewResult:
     comments: str = ""
     uncertainty: float | None = None
     notes: str = ""
+    model_calls: tuple[dict[str, Any], ...] = ()
+
+
+def _record_calls(engine: TaskEngine, task_id: str, actor: Actor, calls) -> None:
+    """Record every model call through the engine, priced from the model's profile when known (M31)."""
+    from nirmaan.runtime.selection import cost_of
+
+    for call in calls:
+        engine.record_model_call(task_id, actor, {**call, "cost_usd": cost_of(call)})
 
 
 class ToolHandle:
@@ -289,6 +300,7 @@ def run_task(engine: TaskEngine, task_id: str, runtime: AgentRuntime,
 def _apply(engine: TaskEngine, task_id: str, actor: Actor, result: WorkResult,
            attempt: str) -> tuple[RunReport, str | None]:
     """Apply one runtime result through the engine; also return the engine's refusal, if any."""
+    _record_calls(engine, task_id, actor, result.model_calls)  # the calls happened, whatever follows
     PolicyEngine(engine.org).enforce(PolicyContext(
         engine.org, engine.state, "runtime.result", actor, engine.task(task_id),
         {"uncertainty": result.uncertainty, "artifacts": result.artifacts,
@@ -351,6 +363,7 @@ def review_task(engine: TaskEngine, task_id: str, runtime: AgentRuntime, role: s
         return RunReport(task_id, ResultStatus.DECLINED, f"runtime {runtime.runtime_id!r} does not review {task_id}")
 
     result: ReviewResult = review(packet)
+    _record_calls(engine, task_id, actor, result.model_calls)
     policy.enforce(PolicyContext(engine.org, engine.state, "runtime.result", actor, task,
                                  {"uncertainty": result.uncertainty, "artifacts": (), "claims_completion": False}))
     if result.verdict is None:

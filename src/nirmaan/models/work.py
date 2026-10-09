@@ -12,9 +12,11 @@ from datetime import datetime
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from nirmaan.models.frozen import deep_frozen
 from nirmaan.models.governance import Criticality, DecisionKind, EscalationKind
+from nirmaan.models.modelcall import ModelCall
 from nirmaan.models.org import ActorKind, list_values
 from nirmaan.models.workflow import EvidenceKind, EvidenceRequirement, OnFailure
 
@@ -66,6 +68,8 @@ class RequirementAnalysis(BaseModel):
     unrecognized: bool = Field(
         default=False, description="No intent matched: an honest miss, never a guess."
     )
+
+    _freeze = field_validator("feature_evidence", "parameters", mode="after")(lambda v: deep_frozen(v))
 
 
 class TaskKind(str, Enum):
@@ -257,6 +261,8 @@ class ToolRun(BaseModel):
     summary: str
     references: tuple[str, ...] = ()
 
+    _freeze = field_validator("params", mode="after")(lambda v: deep_frozen(v))
+
     def values(self, param: str) -> list[str]:
         """A parameter's elements (a list parameter is stored comma-joined); empty if not given."""
         return list_values(self.params.get(param, ""))
@@ -363,6 +369,8 @@ class AuditEntry(BaseModel):
     previous_hash: str
     hash: str
 
+    _freeze = field_validator("details", mode="after")(lambda v: deep_frozen(v))
+
 
 class SpecRequirement(BaseModel):
     """A requirement quoted from a specification artifact, so verification can prove it (M24)."""
@@ -413,6 +421,8 @@ class Project(BaseModel):
     gate_overrides: dict[str, bool] = Field(
         default_factory=dict, description="Gate ID -> human approval required."
     )
+
+    _freeze = field_validator("gate_overrides", mode="after")(lambda v: deep_frozen(v))
     created_at: datetime
 
 
@@ -434,4 +444,5 @@ class ProjectState(BaseModel):
     spec_requirements: dict[str, SpecRequirement] = Field(default_factory=dict)
     verification_items: dict[str, VerificationItem] = Field(default_factory=dict)
     attempts: dict[str, Attempt] = Field(default_factory=dict)
+    model_calls: dict[str, ModelCall] = Field(default_factory=dict)
     schema_version: str = "1"

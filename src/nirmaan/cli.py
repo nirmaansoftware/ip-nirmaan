@@ -42,6 +42,9 @@ eval_app = typer.Typer(help="Evaluate a seat: a real or replayed model, judged b
 app.add_typer(org_app, name="org")
 app.add_typer(task_app, name="task")
 app.add_typer(eval_app, name="eval")
+regmap_app = typer.Typer(help="Register maps as data: check one, or lower it to a header or a table.",
+                         no_args_is_help=True)
+app.add_typer(regmap_app, name="regmap")
 vplan_app = typer.Typer(help="Load and save verification plans: requirements and the items that prove them.",
                         no_args_is_help=True)
 app.add_typer(vplan_app, name="vplan")
@@ -500,6 +503,64 @@ def failures(projects: List[str], as_json: bool = typer.Option(False, "--json"),
 
 
 @app.command()
+def costs(project: str, as_json: bool = typer.Option(False, "--json"), root: Path = ROOT_OPTION) -> None:
+    """What the project's model calls cost, as recorded: by model, purpose, and task."""
+    from nirmaan.costs import cost_report
+
+    report = cost_report(_load(project, root).state)
+    if as_json:
+        typer.echo(json.dumps(report.to_dict(), indent=2, sort_keys=True))
+        return
+    unknown = f"; {report.unknown_cost_calls} of unknown cost" if report.unknown_cost_calls else ""
+    console.print(escape(f"{report.calls} model calls, {report.input_tokens} input and {report.output_tokens} "
+                         f"output tokens, ${report.cost_usd:.4f}{unknown}"), highlight=False)
+    for model, line in sorted(report.by_model.items()):
+        console.print(escape(f"  {model}: {line.calls} calls, ${line.cost_usd:.4f}"), highlight=False)
+
+
+@app.command()
+def learn(
+    projects: List[str],
+    decide: Optional[str] = typer.Option(None, "--decide", help="A proposal ID to decide."),
+    in_project: Optional[str] = typer.Option(None, "--in", help="The project to record the decision in."),
+    role: Optional[str] = typer.Option(None, "--as", help="Role ID deciding, as a human."),
+    adopt: Optional[bool] = typer.Option(None, "--adopt/--reject", help="Adopt or reject the proposal."),
+    reason: str = typer.Option("", "--reason", help="Why: recorded as the decision's rationale."),
+    as_json: bool = typer.Option(False, "--json"),
+    root: Path = ROOT_OPTION,
+) -> None:
+    """Skill changes proposed by failures that recur across projects; decide one as a person."""
+    from nirmaan.proposals import ProposalError, decide_proposal, learning_proposals
+
+    engines = {p: _load(p, root) for p in projects}
+    proposals = learning_proposals(_org(), [e.state for e in engines.values()])
+    if decide:
+        chosen = next((p for p in proposals if p.id == decide), None)
+        if chosen is None or adopt is None or not role or not in_project:
+            _fail("--decide needs a listed proposal ID, --in PROJECT, --as ROLE, and --adopt or --reject")
+        engine = next((e for pid, e in engines.items() if pid == in_project
+                       or e.state.project.id == in_project), None)
+        if engine is None:
+            _fail(f"--in {in_project} is not one of the projects read")
+        try:
+            decision = decide_proposal(engine, chosen, _actor(role, False), adopt, reason)
+        except (ProposalError, WorkError, PolicyViolationError, PermissionError) as exc:
+            _fail(str(exc))
+        ProjectStore(root).save(engine.state)
+        console.print(escape(f"{decision.id}: {decision.statement}"), highlight=False, soft_wrap=True)
+        return
+    if as_json:
+        typer.echo(json.dumps([p.to_dict() for p in proposals], indent=2))
+        return
+    if not proposals:
+        console.print("No failure recurs often enough to propose a change.")
+    for p in proposals:
+        console.print(escape(f"{p.id} [{p.status}] {p.statement}"), highlight=False, soft_wrap=True)
+        console.print(escape(f"  for {', '.join(p.targets) or 'no providing skill'}: {p.suggestion}"),
+                      highlight=False, soft_wrap=True)
+
+
+@app.command()
 def links(project: str, root: Path = ROOT_OPTION) -> None:
     """Design Graph nodes each artifact links to, parsed from its digest-checked file."""
     from nirmaan.engineering import artifact_links
@@ -890,6 +951,43 @@ def eval_run(
         typer.echo(json.dumps([r.model_dump(mode="json") for r in results], indent=2))
     if not all(r.passed for r in results):
         raise typer.Exit(1)
+
+
+# --- Register maps (M30) ------------------------------------------------------------------
+
+
+def _regmap(path: Path):
+    from nirmaan.regmap import load_map
+
+    try:
+        return load_map(path)
+    except (OSError, ValueError) as exc:
+        _fail(f"cannot read the register map {path}: {str(exc).splitlines()[0]}")
+
+
+@regmap_app.command("check")
+def regmap_check(path: Path) -> None:
+    """Validate a register map. Exits 1 when it has problems."""
+    from nirmaan.regmap import map_summary, validate
+
+    regmap = _regmap(path)
+    problems = validate(regmap)
+    for problem in problems:
+        _err.print(escape(problem), highlight=False)
+    if problems:
+        raise typer.Exit(1)
+    console.print(escape(f"valid: {map_summary(regmap)}"), highlight=False)
+
+
+@regmap_app.command("lower")
+def regmap_lower(path: Path, to: str = typer.Option(..., "--to", help="A registered lowering, e.g. c-header.")) -> None:
+    """Print the map lowered to a header, a table, or any registered lowering."""
+    from nirmaan.regmap import lower
+
+    try:
+        typer.echo(lower(_regmap(path), to), nl=False)
+    except (KeyError, ValueError) as exc:
+        _fail(str(exc.args[0]))
 
 
 @app.command()

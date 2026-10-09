@@ -157,3 +157,75 @@ Inspection findings that shaped it: no product code calls
 `record_decision`; decisions are DECISION tasks (outcomes, outcome,
 artifacts, evidence, audit, branch cancellations by `_take_branch`). M27's
 review repair already moves superseded artifacts into an `Attempt`.
+
+**2026-10-07, later.** #46 (M29 auto-loop) merged first; `main` was merged
+into #48 (1260 passed, 3 skipped), and #48 merged (a127769) with the owner's
+approval. Parallel PRs #45, #47, #49, #50, #51 are other sessions' work.
+
+## M30: the register map as data (branch `m30/register-map`, from main a127769)
+
+| # | Step | Status |
+|---|---|---|
+| a | Design: `docs/REGISTER_MAP.md` | DONE |
+| b | Failing tests `tests/test_nirmaan_regmap.py`, fixture `register_map.json` | DONE |
+| c | `models/regmap.py`, `nirmaan/regmap.py` (validate, lowerings registry, C test generator) | DONE |
+| d | `integrations/regmap.py` (`regmap.check`, `regmap.verify` on the fw.test harness), contracts, CLI | DONE |
+| e | Eval case held-out check, full suite (1300 passed, 3 skipped), `context.md`, ROADMAP, PR | DONE |
+
+Decided at design: no workflow adoption in M30 (an added expected output
+would show as a missing deliverable in the export); the map judges RTL
+through the existing AXI4-Lite co-simulation harness; APB maps are a
+recorded failed run until an APB harness exists.
+
+## M31: model selection and model-call accounting (branch `m31/model-selection`)
+
+The owner asked (2026-10-08) to resolve everything and complete the remaining
+review milestones, merging each on green CI. Order: #52 (M30), then M31, M32
+(scalable state), M33 (learning proposals). Out of scope without the owner: a
+live-model evaluation (API credits), version bumps (coordinator), #45 (another
+session's PR).
+
+| # | Step | Status |
+|---|---|---|
+| a | Design: `docs/MODEL_SELECTION.md` (prices from the claude-api skill: Opus 5.5 $4/$20 per MTok, cache read $0.20) | DONE |
+| b | Failing tests `tests/test_nirmaan_model_selection.py` | DONE |
+| c | Accounting: VeriTriage `GenerationResponse` tokens, bridge, `Completion`, `ModelCall`, `record_model_call`, `nirmaan costs`, eval totals | DONE |
+| d | Selection: `ModelProfile` data, derived needs, `select_model`, `auto` runtime | DONE |
+| e | Full suite (1401 passed, 3 skipped), docs, PR, merge | DONE (#53 merged, de0cb5e) |
+
+**M31 notes.** #52 merged (1ff49ac) on green CI. Measured for M32 before
+designing it: one recorded tool run costs 3.6 ms on the 55-task NoC project,
+12 ms at 500 runs, 40 ms at 2000, 95 ms at 5000 (two whole-state
+serializations and hashes per operation), so a long project's total cost
+grows with the square of its length.
+
+## M32: scalable state (branch `m32/scalable-state`, stacked on M31)
+
+| # | Step | Status |
+|---|---|---|
+| a | Measure and design: `docs/SCALABLE_STATE.md` (P10 68%, P11 32% of per-op time at 3000 runs) | DONE |
+| b | Failing tests `tests/test_nirmaan_scalable_state.py` (counted, not timed) | DONE |
+| c | `work/frozen.py`, frozen containers and nested dicts, identity P10, incremental P11 | DONE |
+| d | Full suite (1415 passed, 3 skipped), docs, PR, merge | DONE (#54 merged, 8007c26) |
+
+## M33: learning proposals (branch `m33/learning-proposals`, from main de0cb5e)
+
+| # | Step | Status |
+|---|---|---|
+| a | Design: `docs/LEARNING_PROPOSALS.md` (a view; decisions as recorded human decisions; no new workflow, which would change the live site's workflow count) | DONE |
+| b | Tests `tests/test_nirmaan_learning_proposals.py` (9) | DONE |
+| c | `src/nirmaan/proposals.py`, `nirmaan learn` | DONE |
+| d | Full suite (1424 passed, 3 skipped), docs, PR, merge | DONE (PR open) |
+
+## Review complete
+
+All seven milestones of target-state.md section 5 are built: seat evaluation
+(#37), tool contracts (#41), engineering records (#48), the register map (#52),
+model selection and accounting (#53), scalable state (#54), learning proposals
+(#55). The owner then delegated the remaining decisions (2026-10-09): numbering kept
+in the repo's style (seat evaluation and engineering records are parts of the
+M27 and M29 batches; M28 and M30 to M33 are the review's own); released as
+v1.22.0; the live-model evaluation could not run (no Anthropic credentials on
+this machine); #45 left to its session with the contract additions it needs
+posted on it. Deferred pieces are listed in each
+milestone's `context.md` entry.

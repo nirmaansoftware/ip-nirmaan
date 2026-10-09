@@ -12,7 +12,7 @@ Repo: https://github.com/nirmaansoftware/ip-nirmaan (public, Apache-2.0; renamed
 to the `nirmaansoftware` account on 2026-09-28; GitHub redirects the old URLs,
 and `patel-om` keeps push access as a collaborator)
 Local path: `/Users/ompatel/Documents/veritriage`
-Current version: **1.21.0** (distribution `ip-nirmaan`; packages `nirmaan` and `veritriage`)
+Current version: **1.22.0** (distribution `ip-nirmaan`; packages `nirmaan` and `veritriage`)
 Portfolio: removed from `/Users/ompatel/Documents/Om Portfolio` at the user's
 request after M19 (card and sample pages deleted).
 
@@ -2110,8 +2110,8 @@ that the brief's engine (task, plan, artifact, evidence, tool broker, roles vs
 skills, gates, audit, events, traceability) already exists as `work/` plus
 `runtime/`, so it adds no parallel `nirmaan/engine/` package and no duplicate
 per-topic docs; it orders the real gaps as M27 to M33 in `target-state.md`
-section 5 (the review numbered them M27 to M33 before the parallel M27 parts
-existed; the coordinator owns the numbering). Version bump left to the coordinator.
+section 5 (seat evaluation is a part of the M27 batch, engineering records of the
+M29 batch; M28 and M30 to M33 are this review's own). Released in v1.22.0.
 
 M27 answers "does a seat's work actually work?" with cases as data and judges
 that are real tool runs. `evals/rtl/*.json` (four cases: the AXI4-Lite and APB
@@ -2317,9 +2317,9 @@ nothing and keeps the import laws; every step audited as its seat.
 Deferred: concurrent tasks; a call budget across invocations; approval by a
 delegated non-human approver; task inputs in project mode.
 
-### Milestone 29 (working name) - Engineering records: decisions and failures, as views
+### Milestone 29 (engineering records) - Decisions and failures, as views (structural review, milestone 3)
 
-The third structural-review milestone (numbering is the coordinator's).
+The third structural-review milestone, a part of the M29 batch.
 "Why did we choose this?" and "what went wrong, and was it fixed?" answered
 from the record. Design doc: `docs/ENGINEERING_RECORDS.md`. No version bump.
 
@@ -2613,6 +2613,142 @@ crown jewel now meets the M29 limits.
 
 ---
 
+### Milestone 30 - The register map as data
+
+The fourth structural-review milestone: a
+register map that was only a table in an interface spec becomes an
+intermediate representation that is validated, lowered, and judges RTL.
+Design doc: `docs/REGISTER_MAP.md`. No version bump.
+
+Key design points worth not re-deriving:
+- `RegisterMap` (`models/regmap.py`): block, bus, `addr_width`, 32-bit
+  registers with `rw`/`ro`/`wo` access and reset values, and the `unmapped`
+  response (`slverr`, `decerr`, `okay`). No bit fields yet.
+- `nirmaan/regmap.py`: `validate` (width, alignment, address space, overlaps,
+  C identifiers, duplicates, reset width), a lowering registry
+  (`register_lowering`; `c-header` compiles under strict flags and agrees with
+  the hand-written firmware header; `markdown` reproduces the AXI4-Lite spec's
+  section 3 table line for line), and `c_test`, a `nirmaan_fw_test` whose
+  checks run in order (reset values, write-then-read with every register
+  written first, read-only, strobes, unmapped) because the co-sim parser names
+  only the first failing check.
+- Tools with contracts: `regmap.check` (validation as a recorded run) and
+  `regmap.verify`, a backend that writes the generated test and reuses
+  `fw.test`'s co-simulation steps and parser unchanged. A bus with no harness
+  (APB: the host harness drives AXI4-Lite only; M29's `fw.soc_test` reaches APB
+  through a RISC-V core) is a recorded failed run, never a simulation. Granted to `rtl_design`
+  (both) and `interface_specification` (check).
+- The `rtl/axi4-lite-regs` evaluation case holds the map out as a second judge;
+  the gates-miss eval test now expects both judges to fail the `reg3` mutant.
+- Not adopted in a workflow yet: an added expected output would show as a
+  missing deliverable in the export; a conditional-on-upstream rule is needed.
+- The M23 crown jewel's hypothetical `regmap.check` collided with the core
+  tool and was renamed `regmap.overlaps`.
+
+`tests/test_nirmaan_regmap.py` (19): real co-simulation passes on the fixture
+RTL and fails on a `reg3` reset mutant, a REG2-into-REG1 alias, and a map that
+misstates the unmapped response; crown jewel
+`test_a_new_lowering_needs_no_core_changes`. With the M29 parts merged, the
+standard local run is 1387 passed, 3 skipped.
+
+### Milestone 31 - Model selection by capability, and every model call counted
+
+The fifth structural-review milestone. Design
+doc: `docs/MODEL_SELECTION.md`. No version bump.
+
+Key design points worth not re-deriving:
+- **Accounting is the engine's.** `ModelRuntime` lists every call it made in its
+  `WorkResult`/`ReviewResult` (`model_calls`); `run_task` and `review_task`
+  record each through `TaskEngine.record_model_call` (audited `model.call`)
+  before anything else, so a declined, refused, or failed call is still
+  counted. `ProjectState.model_calls` is a new, defaulted field (old projects
+  load). Usage travels VeriTriage `GenerationResponse` (new optional token
+  fields, the only VeriTriage change) -> bridge `Generation` -> `Completion`.
+  The Anthropic provider reads `response.usage` (`input_tokens`,
+  `output_tokens`, `cache_read_input_tokens`, `cache_creation_input_tokens`);
+  a missing `usage` is `None`, never zero. Cost comes from the model's profile
+  (`cost_of`); unknown price or usage is `None`.
+- **Prices** (claude-api skill, cached 2026-09-25): Opus 5.5 $4 input, $20
+  output, $0.20 cache read per million tokens; cache write 1.25 times input.
+  `context_chars` is 400,000, matching the provider's declared prompt budget.
+- **Needs are derived, not hand-written**: `structured_output` always, `files`
+  when an evidence requirement runs over files the task produces, plus the new
+  `Capability.model_needs`. `select_model` keeps profiles offering every need
+  whose budget holds the rendered prompt, excludes `for_testing` profiles unless
+  asked, picks the cheapest known price (ties by ID), and lists every rejection.
+- **The `auto` runtime** is `ModelRuntime(SelectingLLM())`; with nothing fitting,
+  it declines with the reasons and makes no call (the `NO_CALL` prefix keeps it
+  out of the accounting). `MockLLM(model=...)` reports a profile's model.
+- `nirmaan costs PROJECT [--json]`; evaluation results gain `model_calls`,
+  `input_tokens`, `output_tokens`, `cost_usd`.
+
+`tests/test_nirmaan_model_selection.py` (14), crown jewel
+`test_a_new_model_profile_needs_no_core_changes`. The standard local run is
+1401 passed, 3 skipped.
+
+### Milestone 32 - Scalable state: hidden edits impossible, chains verified once
+
+The sixth structural-review milestone. Design
+doc: `docs/SCALABLE_STATE.md`. No version bump.
+
+Measured first: one recorded tool run cost 3.6 ms on the 55-task NoC project,
+95 ms at 5,000 runs; 68% was P10's whole-state fingerprint (twice per
+operation), 32% P11's full chain re-verification. After: 0.25 ms at 5,000 runs.
+
+Key design points worth not re-deriving:
+- **P10 by construction, then identity.** `FrozenDict`/`FrozenList`
+  (`models/frozen.py`, standard library only) are `dict`/`list` subclasses whose
+  mutators raise `TypeError`; they serialize identically, and every copy
+  (`dict()`, `copy.deepcopy`, pickle) is plain and writable. The engine freezes a
+  state on takeover (`work/frozen.freeze_state`) and every container it
+  commits; record dict fields (`ToolRun.params`, `AuditEntry.details`, the
+  analysis's `feature_evidence`/`parameters`, `Project.gate_overrides`) are
+  deep-frozen by field validators. With nothing editable in place, P10's check
+  compares the engine's state with the one it committed by identity.
+- **P11 incremental.** `verify_chain(trail, start, previous)`; the engine
+  verifies a trail in full when it takes it over and remembers the verified
+  length and head. A chain that arrives broken is never marked verified, so
+  every operation re-checks it in full and is refused.
+- A source law test: no Nirmaan module writes through `object.__setattr__` or
+  `__dict__[...]`. `state_fingerprint` stays for stores and tools.
+- Tests count hashing instead of timing it, so CI is stable.
+
+`tests/test_nirmaan_scalable_state.py` (14). The standard local run is 1415 passed,
+3 skipped. Found on the way: the vocabulary may import only `__future__`, `enum`,
+`datetime`, `typing`, and pydantic, so the frozen containers copy through
+`__reduce__` alone (no `copy` import).
+
+### Milestone 33 - Learning proposals: recurring failures propose, a person decides
+
+The seventh and last structural-review milestone . Design doc: `docs/LEARNING_PROPOSALS.md`. No version bump.
+
+Key design points worth not re-deriving:
+- **A view over failure records (M29)**, never a writer: `learning_proposals(org,
+  states)` runs a registry of rules (`register_proposal_rule`) over every
+  project's `failure_records`. Two ship: `recurring-check-failure` (one tool
+  failing work of one capability in at least `MIN_TASKS` = 2 different tasks ->
+  a failure mode and a procedure) and `recurring-review-send-back` (reviews
+  sending one capability's work back in two tasks -> a validation criterion
+  quoting the reviewers). Targets are the skills that provide the capability
+  (`org.providers_of`). The ID hashes rule, capability, and subject, so it is
+  the same proposal as evidence grows; every proposal cites every record.
+- **Deciding is a recorded human decision**: `decide_proposal` refuses any actor
+  that is not human, refuses a project the proposal does not rest on, and calls
+  `TaskEngine.record_decision` (cross-team, medium: the authority matrix
+  requires a manager or above). It shows in `nirmaan decisions`; a proposal's
+  status is the latest such decision across the projects read.
+- **Adopting edits no skill.** Skills are company data in
+  `company/skills.py`; an adopted proposal is the reviewed reason for a person's
+  pull request. No new workflow was added: the landing-site tests tie the
+  public page's workflow count to the organization, so a workflow would have
+  changed the live site.
+- `nirmaan learn PROJECT... [--json]`; `--decide ID --in PROJECT --as ROLE
+  (--adopt | --reject) --reason TEXT`.
+
+`tests/test_nirmaan_learning_proposals.py` (9), crown jewel
+`test_a_new_proposal_rule_needs_no_core_changes`. The standard local run is
+1424 passed, 3 skipped.
+
 ## 3. Current architecture map
 
 ```
@@ -2818,6 +2954,17 @@ everywhere), #43 (DFT), and #40 (RISC-V firmware). The standard local run is
 `physical-design` job. The owner's structural review (PR #37) also uses the
 M27 label; it is not part of this release.
 
+v1.22.0 is the one version bump for everything merged after v1.21.0: the
+structural review and its seven milestones (#37 seat evaluation, an M27 part;
+#41 M28 tool contracts; #48 engineering records, an M29 part; #52 M30 register
+map; #53 M31 model selection and accounting; #54 M32 scalable state; #55 M33
+learning proposals) and the parallel M29 parts (#46 the unattended loop, #47
+verification plans, #49 RISC-V, #50 DFT, #51 the remaining RTL gates). The
+standard local run is 1424 tests with 3 skipped: the real OpenROAD tests, which
+run in CI's `physical-design` job. No live-model evaluation has run yet: this
+machine has no Anthropic credentials (`nirmaan eval run --runtime anthropic`
+once one is set).
+
 ---
 
 ## 4. Operational notes for resuming work
@@ -2841,7 +2988,7 @@ M27 label; it is not part of this release.
   renamed to **VeriTriage** at M2/M3 boundary (GitHub redirect preserved
   from the rename). After M19 the user renamed the PROJECT, first to "Nirmaan IP"
   (repo `nirmaan-ip`, v1.16.0) and then, to match the `ipnirmaan.com` domain, to
-  **IP Nirmaan** (repo `patel-om/ip-nirmaan`, distribution `ip-nirmaan`, v1.21.0).
+  **IP Nirmaan** (repo `patel-om/ip-nirmaan`, distribution `ip-nirmaan`, v1.22.0).
   On 2026-09-28 the repo was transferred to `nirmaansoftware/ip-nirmaan`.
   The `nirmaan` package and CLI keep their short name by the user's choice. VeriTriage
   was deliberately NOT renamed: it is the verification engine inside Nirmaan

@@ -24,6 +24,7 @@ so no test ever calls an API. The model-backed seats are off by default:
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import re
 import tempfile
@@ -49,6 +50,18 @@ _TOOL_BACKED = {EvidenceKind.TOOL_RUN.value, EvidenceKind.VERITRIAGE_SESSION.val
 _VERDICTS = {"approve": Verdict.APPROVE, "request_changes": Verdict.REQUEST_CHANGES}
 
 
+#: A Completion error starting with this means no model was called (e.g. no model fits): nothing to count.
+NO_CALL = "no model was called: "
+
+
+def call_record(completion: "Completion", purpose: str, llm_name: str) -> dict[str, Any]:
+    """One model call as the runtime saw it, for the engine to record (M31)."""
+    return {"purpose": purpose, "provider": completion.provider or llm_name, "model": completion.model,
+            "input_tokens": completion.input_tokens, "output_tokens": completion.output_tokens,
+            "cache_read_tokens": completion.cache_read_tokens, "cache_write_tokens": completion.cache_write_tokens,
+            "succeeded": completion.error is None, "error": completion.error}
+
+
 @dataclass(frozen=True)
 class Completion:
     """What a model returned: text, or the reason it returned nothing usable."""
@@ -56,6 +69,12 @@ class Completion:
     text: str
     model: str | None = None
     error: str | None = None
+    #: Who served the call and the usage it reported (M31); None means not reported.
+    provider: str | None = None
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    cache_read_tokens: int | None = None
+    cache_write_tokens: int | None = None
 
 
 class LLM(Protocol):
@@ -74,7 +93,8 @@ class RegistryLLM:
         from nirmaan.integrations.veritriage import generate
 
         result = generate(self.name, prompt)
-        return Completion(result.text, result.model, result.error)
+        return Completion(result.text, result.model, result.error, result.provider, result.input_tokens,
+                          result.output_tokens, result.cache_read_tokens, result.cache_write_tokens)
 
 
 class MockLLM:
@@ -88,28 +108,29 @@ class MockLLM:
 
     name = "mock-llm"
 
-    def __init__(self, script: Sequence[str | Completion] = ()) -> None:
+    def __init__(self, script: Sequence[str | Completion] = (), model: str | None = None) -> None:
         self._script = list(script)
+        self._model = model or self.name  # the model it reports, e.g. a profile's when ``auto`` seats it (M31)
         self.calls: list[WorkPrompt] = []
 
     def complete(self, prompt: WorkPrompt) -> Completion:
         self.calls.append(prompt)
         if self._script:
             reply = self._script.pop(0)
-            return reply if isinstance(reply, Completion) else Completion(reply, self.name)
+            return reply if isinstance(reply, Completion) else Completion(reply, self._model)
         runs = [c for c in prompt.citations if c.kind == "run"]
         tokens = [c.token for c in (*runs, *(c for c in prompt.citations if c.kind != "run"))][:2]
         if prompt.mode == "review":
             if not tokens:
                 return Completion(json.dumps({"verdict": "request_changes", "comments": "No evidence to judge.",
-                                              "uncertainty": 0.9}), self.name)
+                                              "uncertainty": 0.9}), self._model)
             return Completion(json.dumps({"verdict": "approve", "uncertainty": 0.1,
                                           "comments": f"The conclusion follows from {' and '.join(tokens)}."}),
-                              self.name)
+                              self._model)
         if not tokens:
             return Completion(json.dumps({"uncertainty": 0.9, "artifacts": [], "escalation": {
                 "reason": "there is no evidence to cite", "question": "Which artifacts should this task examine?"}}),
-                self.name)
+                self._model)
         artifacts = [{"kind": out, "title": f"{out.replace('_', ' ').capitalize()} (mock)",
                       "summary": f"Deterministic {out.replace('_', ' ')} grounded in {' and '.join(tokens)}."}
                      for out in (prompt.outputs or ("note",))]
@@ -117,7 +138,7 @@ class MockLLM:
             "uncertainty": 0.2, "artifacts": artifacts, "tool_runs": [c.target for c in runs],
             "outcome": prompt.outcomes[0] if prompt.outcomes else None, "claims": [], "escalation": None,
             "notes": "deterministic mock answer",
-        }), self.name)
+        }), self._model)
 
 
 def _parse(text: str) -> dict[str, Any] | None:
@@ -193,6 +214,13 @@ class ModelRuntime:
     # --- Work --------------------------------------------------------------------------
 
     def execute(self, packet: WorkPacket, tools: ToolHandle) -> WorkResult:
+        """Do the work; every model call made on the way is listed in the result (M31)."""
+        self._calls: list[dict[str, Any]] = []
+        self._purpose = "work"
+        result = self._execute(packet, tools)
+        return dataclasses.replace(result, model_calls=tuple(self._calls))
+
+    def _execute(self, packet: WorkPacket, tools: ToolHandle) -> WorkResult:
         inputs = _inputs(packet)
         notes = self._preflight(packet, tools, inputs)
         runs = tuple(n.run for n in notes if n.run)
@@ -364,6 +392,13 @@ class ModelRuntime:
     # --- Review ------------------------------------------------------------------------
 
     def review(self, packet: WorkPacket) -> ReviewResult:
+        """Review the work; every model call made on the way is listed in the result (M31)."""
+        self._calls = []
+        self._purpose = "review"
+        result = self._review(packet)
+        return dataclasses.replace(result, model_calls=tuple(self._calls))
+
+    def _review(self, packet: WorkPacket) -> ReviewResult:
         from nirmaan.integrations.veritriage import ground
 
         prompt = render_work_prompt(packet, "review")
@@ -382,6 +417,8 @@ class ModelRuntime:
 
     def _ask(self, prompt: WorkPrompt) -> tuple[dict[str, Any] | None, _Files, str]:
         completion = self.llm.complete(prompt)
+        if not (completion.error or "").startswith(NO_CALL):
+            self._calls.append(call_record(completion, getattr(self, "_purpose", "work"), self.llm.name))
         if completion.error:
             return None, ({}, []), f"the model call failed: {completion.error}"
         # File blocks come off first: their content is full of braces the JSON parser would take.
