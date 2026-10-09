@@ -33,7 +33,7 @@ from nirmaan.models import (
 )
 from nirmaan.runtime import ToolBroker
 from nirmaan.work import TaskEngine
-from nirmaan.work.policy import unsatisfied_requirements
+from nirmaan.work.policy import unsatisfied_requirements, upstream_kinds
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -92,7 +92,8 @@ def work(engine: TaskEngine, task_id: str, outcome: str | None = None, workspace
     engine.start(task_id, owner)
     if task.kind is TaskKind.DECISION:
         outcome = outcome or task.outcomes[0]
-    if any(r.before_review for r in task.evidence_requirements):
+    upstream = upstream_kinds(engine.state, task)  # M37: a requirement may apply on one branch only
+    if any(r.before_review and r.applies(r.when_produced, upstream) for r in task.evidence_requirements):
         gated_submit(engine, task_id, outcome, workspace)
     else:
         produced = [{"kind": k, "title": f"{task.title} ({k})"} for k in (task.expected_outputs or ("note",))]
@@ -133,7 +134,8 @@ def gated_submit(engine: TaskEngine, task_id: str, outcome: str | None = None,
         produced.append((kind, str(root / name), entry))
     kinds = {kind for kind, _, _ in produced}
     broker = ToolBroker(engine)
-    for req in (r for r in task.evidence_requirements if r.before_review and r.applies(kinds)):
+    upstream = upstream_kinds(engine.state, task)
+    for req in (r for r in task.evidence_requirements if r.before_review and r.applies(kinds, upstream)):
         params = dict(req.params)
         for binding in req.files:
             matched = [(path, entry) for k in binding.kinds for kind, path, entry in produced if kind == k]

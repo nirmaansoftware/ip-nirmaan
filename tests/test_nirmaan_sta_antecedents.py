@@ -19,7 +19,7 @@ from pathlib import Path
 import pytest
 
 from nirmaan_helpers import GATE_TOOLS, agent, drive, human, tid
-from test_nirmaan_design_agents import answer, file, needs, token, upstream, with_workspace
+from test_nirmaan_design_agents import answer, counter_files, file, needs, token, upstream, with_workspace
 from test_nirmaan_formal_gate import runs_of
 from test_nirmaan_gates_everywhere import broker_owner  # noqa: F401 (a fixture)
 from test_nirmaan_physical import PD, TINY_LIB, fake_tool, invoke, nangate45, only_on_path
@@ -94,8 +94,14 @@ def test_on_the_constraint_branch_the_old_requirement_stands(nirmaan_org, fixed_
 @needs(*GATE_TOOLS)
 def test_without_a_timer_reanalysis_is_blocked_never_faked(nirmaan_org, fixed_clock, tmp_path, monkeypatch):
     engine = Orchestrator(nirmaan_org, clock=fixed_clock).plan(TIMING)
-    reanalysis = tid(engine, "reanalysis")
-    drive(engine, until=reanalysis, outcomes={"classify": "rtl_path"}, workspace=tmp_path / "drive")
+    fix, reanalysis = tid(engine, "rtl-fix"), tid(engine, "reanalysis")
+    drive(engine, until=fix, outcomes={"classify": "rtl_path"}, workspace=tmp_path / "drive")
+    with_workspace(engine, fix, tmp_path / "fix")
+    report = run_task(engine, fix, ModelRuntime(MockLLM(script=[answer(*counter_files(token(upstream(engine,
+                                                                                               "classify"))))])))
+    assert report.status is ResultStatus.SUBMITTED, report.detail
+    review_task(engine, fix, ModelRuntime(MockLLM()))
+    engine.approve(fix, human(engine.task(fix).approver), "gated")
     with_workspace(engine, reanalysis, tmp_path / "work")
     _inputs(engine, reanalysis, sdc=str(PROD3_SDC), top="counter", liberty=str(TINY_LIB))
     only_on_path(monkeypatch, tmp_path / "empty")  # no sta, no openroad, no yosys

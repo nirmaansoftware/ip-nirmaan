@@ -111,14 +111,20 @@ jobs:
         run: |
           echo /opt/opensta/bin >> "$GITHUB_PATH"
           /opt/opensta/bin/sta -version
+      # M37: a timing-closure project's RTL fix passes its RTL gates (lint and
+      # simulation) before re-analysis times it. See docs/STA_AND_ANTECEDENTS.md.
+      - name: RTL gate tools
+        run: |
+          command -v verilator iverilog vvp || (apt-get update && apt-get install -y --no-install-recommends verilator iverilog)
+          verilator --version && iverilog -V | head -1
       - name: Install
         run: uv pip install -e ".[dev]"
       - name: Test
         # openroad, yosys, and (M29) sta are required, so the real STA and place-and-route
-        # tests fail rather than skip.
+        # tests fail rather than skip; (M37) so are the RTL gate tools.
         env:
-          NIRMAAN_REQUIRE_EDA: yosys openroad sta
-        run: python -m pytest -q -rs tests/test_nirmaan_physical.py --basetemp="$RUNNER_TEMP/pd"
+          NIRMAAN_REQUIRE_EDA: yosys openroad sta verilator iverilog vvp
+        run: python -m pytest -q -rs tests/test_nirmaan_physical.py tests/test_nirmaan_sta_antecedents.py --basetemp="$RUNNER_TEMP/pd"
       - name: Keep the tool logs
         if: always()
         uses: actions/upload-artifact@v4

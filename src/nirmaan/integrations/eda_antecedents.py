@@ -16,10 +16,15 @@ the run's own directory. The seat's files are never edited.
   ``disable iff``.
 * A module-scope assertion with no implication is checked on every cycle: it
   has no antecedent, and is counted as unguarded.
+* M37: a named property (``property p(x); ... endproperty``) used as a whole
+  property body is inlined in the copy, its formal arguments replaced by the
+  actual ones, and its declaration blanked; a use of a macro whose body asserts
+  is expanded in the copy. Each is then derived as written code.
 * Anything else is not derived: a sequence operator, a nested implication, a
-  named property, an action block, a deferred assertion, or a macro whose body
-  asserts. Each is listed with its file, line, and reason, and the cover run
-  refuses: an antecedent that could not be covered is not known to fire.
+  named property inside an expression, a named sequence, an action block, a
+  deferred assertion, or a macro that asserts and cannot be expanded. Each is
+  listed with its file, line, and reason, and the cover run refuses: an
+  antecedent that could not be covered is not known to fire.
 
 Inserted text never adds a line, so every cover keeps its assertion's line; the
 exact column of each inserted cover is recorded, so a run's report can tell the
@@ -226,8 +231,9 @@ def _split_property(T: list[_Tok], lo: int, hi: int, text: str, named: set[str])
         prefix_end = i
     prefix = text[T[lo].start:T[prefix_end - 1].end] + " " if prefix_end else ""
     body = T[i:hi]
-    if len(body) == 1 and body[0].text in named:
-        return prefix, None, f"the named property {body[0].text} is not expanded"
+    for tok in body:
+        if tok.text in named:
+            return prefix, None, f"the named sequence {tok.text} is not expanded"
     depth, arrows = 0, []
     for k, tok in enumerate(body):
         if tok.text in _SEQUENCE_OPS or tok.text in _SEQUENCE_WORDS:
@@ -250,10 +256,17 @@ def _split_property(T: list[_Tok], lo: int, hi: int, text: str, named: set[str])
     return prefix, text[body[0].start:body[k - 1].end], ""
 
 
-def derive(text: str, file: str) -> Derivation:
-    """The file with an antecedent cover beside every assertion, and what was done for each."""
-    T, defines = _tokens(text)
-    regions, named = _procedural(T)
+def derive(text: str, file: str, defs: Definitions | None = None) -> Derivation:
+    """The file with an antecedent cover beside every assertion, and what was done for each.
+
+    ``defs`` are the macros and properties of every file the run reads (``definitions``); by default, this
+    file's own.
+    """
+    defs = defs or definitions([text])
+    sites: list[Site] = []
+    # Expansion and inlining never add or remove a line, but they move offsets: lines are counted after them.
+    text = _expand_macros(text, file, defs, sites)
+    text = _inline_properties(text, file, defs, sites)
     starts = [0]
     starts += [m.end() for m in re.finditer("\n", text)]
 
@@ -267,14 +280,10 @@ def derive(text: str, file: str) -> Derivation:
                 hi = mid
         return lo + 1
 
-    sites: list[Site] = []
+    T, _ = _tokens(text)
+    regions, named = _procedural(T)
     covers: list[tuple[int, int]] = []  # (index into sites, offset of the edit holding the cover)
     edits: list[tuple[int, str, int | None]] = []  # (offset, text, index of the cover keyword in text)
-    for d in defines:
-        if re.search(r"\bassert\b", d.text):
-            name = re.match(r"`define\s+(\w*)", d.text)[1] or "?"
-            sites.append(Site(file, line_of(d.start), "underived", d.text.strip()[:120],
-                              reason=f"the macro {name} asserts, and a macro body is not expanded"))
 
     for k, tok in enumerate(T):
         if tok.text != "assert":
@@ -345,3 +354,269 @@ def derive(text: str, file: str) -> Derivation:
         s = sites[index]
         sites[index] = Site(s.file, s.line, s.kind, s.assertion, pos - copy.rfind("\n", 0, pos), s.reason)
     return Derivation(copy, tuple(sorted(sites, key=lambda s: s.line)))
+
+
+# --- M37: macros that assert, and named properties ---------------------------------------------------------
+
+#: How deep a named property may name another, or a macro expand into another.
+MAX_DEPTH = 8
+_ASSERTING = re.compile(r"\bassert\b")
+
+
+@dataclass(frozen=True)
+class Macro:
+    name: str
+    formals: tuple[str, ...] | None  # None: used without parentheses
+    body: str
+    definitions: int = 1
+
+
+@dataclass(frozen=True)
+class Property:
+    name: str
+    formals: tuple[tuple[str, str | None], ...]  # each name, and its default
+    body: str
+
+
+@dataclass(frozen=True)
+class Definitions:
+    """The macros, named properties, and named sequences of every file a run reads."""
+
+    macros: dict[str, Macro]
+    properties: dict[str, Property]
+    sequences: frozenset[str]
+
+    @property
+    def asserting(self) -> set[str]:
+        """Macros whose body asserts, directly or through another macro."""
+        found = {m.name for m in self.macros.values() if _ASSERTING.search(m.body)}
+        while True:
+            more = {m.name for m in self.macros.values() if m.name not in found
+                    and any(re.search(rf"`{re.escape(n)}\b", m.body) for n in found)}
+            if not more:
+                return found
+            found |= more
+
+
+def _split_top(T: list[_Tok], lo: int, hi: int, text: str) -> list[str]:
+    """The comma-separated parts of ``T[lo:hi]`` at bracket depth zero, as text."""
+    parts, depth, start = [], 0, lo
+    for k in range(lo, hi):
+        t = T[k].text
+        if t in ("(", "[", "{"):
+            depth += 1
+        elif t in (")", "]", "}"):
+            depth -= 1
+        elif t == "," and depth == 0:
+            parts.append(text[T[start].start:T[k - 1].end] if k > start else "")
+            start = k + 1
+    if hi > start:
+        parts.append(text[T[start].start:T[hi - 1].end])
+    return [p.strip() for p in parts]
+
+
+def _macro(directive: str) -> Macro | None:
+    m = re.match(r"`define\s+([A-Za-z_]\w*)(\()?", directive)
+    if not m:
+        return None
+    rest = directive[m.end():]
+    formals = None
+    if m[2]:
+        close = rest.find(")")
+        formals = tuple(f.split("=")[0].strip() for f in rest[:close].split(",") if f.strip())
+        rest = rest[close + 1:]
+    return Macro(m[1], formals, " ".join(rest.replace("\\\n", " ").split()))
+
+
+def definitions(texts) -> Definitions:
+    """The macros, named properties, and named sequences declared across these files' texts."""
+    macros: dict[str, Macro] = {}
+    properties: dict[str, Property] = {}
+    sequences: set[str] = set()
+    for text in texts:
+        T, defines = _tokens(text)
+        for d in defines:
+            macro = _macro(d.text)
+            if macro:
+                seen = macros.get(macro.name)
+                macros[macro.name] = Macro(macro.name, macro.formals, macro.body,
+                                           (seen.definitions + 1) if seen else 1)
+        for start, end in _declarations(T):
+            name = T[start + 1].text
+            if T[start].text == "sequence":
+                sequences.add(name)
+                continue
+            j, formals = start + 2, ()
+            if j < end and T[j].text == "(":
+                close = _close(T, j)
+                formals = tuple(_formal(f) for f in _split_top(T, j + 1, close - 1, text) if f)
+                j = close
+            body = T[j + 1:end - 1]  # after the header's ';', before endproperty
+            if body and body[-1].text == ";":
+                body = body[:-1]
+            properties[name] = Property(name, formals,
+                                        " ".join(text[body[0].start:body[-1].end].split()) if body else "")
+    return Definitions(macros, properties, frozenset(sequences))
+
+
+def _formal(text: str) -> tuple[str, str | None]:
+    head, _, default = text.partition("=")
+    return re.findall(r"[A-Za-z_][\w$]*", head)[-1], (default.strip() or None)
+
+
+def _declarations(T: list[_Tok]) -> list[tuple[int, int]]:
+    """Token ranges of ``property`` and ``sequence`` declarations (not ``assert property``)."""
+    found, i = [], 0
+    while i < len(T):
+        t = T[i].text
+        if t in ("property", "sequence") and (i == 0 or T[i - 1].text not in _STATEMENTS) and i + 1 < len(T):
+            end = _match(T, i, {t}, {"end" + t})
+            found.append((i, end))
+            i = end
+        else:
+            i += 1
+    return found
+
+
+_STATEMENTS = ("assert", "assume", "cover", "restrict", "expect")
+
+
+def _line(text: str, offset: int) -> int:
+    return text.count("\n", 0, offset) + 1
+
+
+def _blank(text: str, start: int, end: int) -> str:
+    """``text`` with ``[start, end)`` replaced by spaces, newlines kept."""
+    return text[:start] + re.sub(r"[^\n]", " ", text[start:end]) + text[end:]
+
+
+def _substitute(body: str, values: dict[str, str]) -> str:
+    """``body`` with each word token named in ``values`` replaced (comments and strings untouched)."""
+    T, _ = _tokens(body)
+    out, last = [], 0
+    for tok in T:
+        if tok.text in values and _word(tok.text):
+            out += [body[last:tok.start], values[tok.text]]
+            last = tok.end
+    return "".join(out) + body[last:]
+
+
+def _expand_macros(text: str, file: str, defs: Definitions, sites: list[Site]) -> str:
+    """Each use of a macro that asserts, expanded in place; a use that cannot be is refused and blanked."""
+    asserting = defs.asserting
+    for _ in range(MAX_DEPTH):
+        T, _ = _tokens(text)
+        uses = [k for k, tok in enumerate(T) if tok.text.startswith("`") and tok.text[1:] in asserting]
+        if not uses:
+            return text
+        for k in reversed(uses):
+            macro = defs.macros[T[k].text[1:]]
+            end, actuals = k + 1, []
+            if macro.formals is not None and end < len(T) and T[end].text == "(":
+                close = _close(T, end)
+                actuals = _split_top(T, end + 1, close - 1, text) if close - 1 > end + 1 else []
+                end = close
+            given = len(actuals) if macro.formals is not None and k + 1 < len(T) and T[k + 1].text == "(" else 0
+            reason = None
+            if macro.definitions > 1:
+                reason = f"the macro {macro.name} is defined more than once"
+            elif "``" in macro.body or '`"' in macro.body:
+                reason = f"the macro {macro.name} pastes or stringifies tokens"
+            elif macro.formals is not None and given != len(macro.formals):
+                reason = f"the macro {macro.name} takes {len(macro.formals)} arguments, {given} given"
+            if end < len(T) and T[end].text == ";":
+                end += 1
+            start, stop = T[k].start, T[end - 1].end
+            if reason:
+                sites.append(Site(file, _line(text, start), "underived", text[start:stop].split("\n")[0].strip(),
+                                  reason=reason))
+                text = _blank(text, start, stop)
+                continue
+            body = macro.body
+            if macro.formals:
+                body = _substitute(body, dict(zip(macro.formals, actuals)))
+            expansion = body + (";" if T[end - 1].text == ";" else "")
+            text = text[:start] + expansion + "\n" * text.count("\n", start, stop) + text[stop:]
+    T, _ = _tokens(text)
+    for tok in reversed([t for t in T if t.text.startswith("`") and t.text[1:] in asserting]):
+        sites.append(Site(file, _line(text, tok.start), "underived", tok.text,
+                          reason=f"the macro {tok.text[1:]} expands too deeply"))
+        text = _blank(text, tok.start, tok.end)
+    return text
+
+
+def _clocked(T: list[_Tok], lo: int, hi: int) -> int:
+    """The index after a leading clocking event and ``disable iff`` in ``T[lo:hi]``."""
+    i = lo
+    if i < hi and T[i].text == "@":
+        i = _close(T, i + 1) if i + 1 < hi and T[i + 1].text == "(" else i + 2
+    if i + 1 < hi and T[i].text == "disable" and T[i + 1].text == "iff":
+        i = _close(T, i + 2)
+    return i
+
+
+def _inline(defs: Definitions, text: str, clocked: bool, depth: int = 0,
+            top: str | None = None) -> tuple[str | None, str]:
+    """A property body ``text`` (after any clocking) with named properties inlined, or None and a reason."""
+    T, _ = _tokens(text)
+    if not T or T[0].text not in defs.properties:
+        for tok in T:
+            if tok.text in defs.properties:
+                return None, (f"the named property {tok.text} is used inside an expression; "
+                              "only a whole property body is inlined")
+        return text, ""
+    prop = defs.properties[T[0].text]
+    actuals: list[str] = []
+    if len(T) > 1:
+        if T[1].text != "(" or _close(T, 1) != len(T):
+            return None, (f"the named property {prop.name} is used inside an expression; "
+                          "only a whole property body is inlined")
+        actuals = _split_top(T, 2, len(T) - 1, text) if len(T) > 3 else []
+    top = top or prop.name
+    if depth >= MAX_DEPTH:
+        return None, f"property {top} is nested too deeply"
+    if any(a.startswith(".") for a in actuals):
+        return None, "named arguments to a property are not supported"
+    if len(actuals) > len(prop.formals) or any(d is None for _, d in prop.formals[len(actuals):]):
+        return None, f"property {prop.name} takes {len(prop.formals)} arguments, {len(actuals)} given"
+    values = {name: f"({a})" for (name, _), a in zip(prop.formals, actuals)}
+    values |= {name: f"({d})" for name, d in prop.formals[len(actuals):] if d is not None}
+    body = _substitute(prop.body, values)
+    B, _ = _tokens(body)
+    after = _clocked(B, 0, len(B))
+    if after and clocked and B[0].text == "@":
+        return None, f"both the assertion and property {prop.name} name a clock"
+    prefix = body[:B[after - 1].end] + " " if after else ""
+    inner, why = _inline(defs, body[B[after].start:] if after < len(B) else "", clocked or after > 0, depth + 1, top)
+    return (None, why) if inner is None else (prefix + inner, "")
+
+
+def _inline_properties(text: str, file: str, defs: Definitions, sites: list[Site]) -> str:
+    """Each assertion, assumption, or cover of a named property, inlined; the declarations blanked."""
+    if not defs.properties:
+        return text
+    T, _ = _tokens(text)
+    edits: list[tuple[int, int, str | None]] = []  # (start, end, replacement or None to blank)
+    for k, tok in enumerate(T):
+        if tok.text not in _STATEMENTS or k + 2 >= len(T) or T[k + 1].text != "property" or T[k + 2].text != "(":
+            continue
+        close = _close(T, k + 2)
+        lo, hi = k + 3, close - 1
+        after = _clocked(T, lo, hi)
+        if not any(T[j].text in defs.properties for j in range(after, hi)):
+            continue
+        inlined, why = _inline(defs, text[T[after].start:T[hi - 1].end] if after < hi else "", after > lo)
+        if inlined is None:
+            if tok.text == "assert":
+                stop = T[close].end if close < len(T) and T[close].text == ";" else T[close - 1].end
+                sites.append(Site(file, _line(text, tok.start), "underived",
+                                  text[tok.start:].split("\n", 1)[0].strip(), reason=why))
+                edits.append((tok.start, stop, None))
+            continue
+        prefix = text[T[lo].start:T[after - 1].end] + " " if after > lo else ""
+        edits.append((T[lo].start, T[hi - 1].end, prefix + " ".join(inlined.split())))
+    edits += [(T[a].start, T[b - 1].end, None) for a, b in _declarations(T) if T[a].text == "property"]
+    for start, end, replacement in sorted(edits, reverse=True):
+        text = _blank(text, start, end) if replacement is None else (
+            text[:start] + replacement + "\n" * text.count("\n", start, end) + text[end:])
+    return text

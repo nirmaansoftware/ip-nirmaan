@@ -21,6 +21,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 from pathlib import Path
 from typing import Callable
 
@@ -209,9 +210,10 @@ puts "nirmaan-floating-drivers: [join $nirmaan_floating { }]"'''
 
 def _sta_script(job: Job, lefs: bool = False) -> None:
     lef_files = pdk_paths(job.params, "tech_lef") + pdk_paths(job.params, "lef") if lefs else []
+    netlist = _tcl(str(job.workdir / "netlist.v")) if job.sources else _design(job, "netlist")
     script = [*(f"read_lef {_tcl(str(f))}" for f in lef_files),
               *(f"read_liberty {_tcl(str(p))}" for p in pdk_paths(job.params, "liberty")),
-              f"read_verilog {_design(job, 'netlist')}",
+              f"read_verilog {netlist}",
               f"link_design {_token(job.params, 'top')}",
               f"read_sdc {_design(job, 'sdc')}"]
     if job.params.get("spef", "").strip():  # M29: and say how much of the design the SPEF annotates
@@ -222,9 +224,14 @@ def _sta_script(job: Job, lefs: bool = False) -> None:
     (job.workdir / "sta.tcl").write_text("\n".join(script) + "\n", encoding="utf-8")
 
 
+def _synthesized(job: Job) -> list[list[str]]:
+    """M37: given ``sources`` (RTL), first synthesize them to the Liberty, writing the ``netlist.v`` the timer reads."""
+    return _synth_steps(job) if job.sources else []
+
+
 def _sta_steps(job: Job) -> list[list[str]]:
     _sta_script(job)
-    return [["sta", "-no_init", "-no_splash", "-exit", "sta.tcl"]]
+    return [*_synthesized(job), ["sta", "-no_init", "-no_splash", "-exit", "sta.tcl"]]
 
 
 def _openroad_sta_steps(job: Job) -> list[list[str]]:
@@ -233,11 +240,45 @@ def _openroad_sta_steps(job: Job) -> list[list[str]]:
     OpenROAD links a netlist into its database, so it reads the LEFs first.
     """
     _sta_script(job, lefs=True)
-    return [["openroad", "-no_init", "-no_splash", "-exit", "sta.tcl"]]
+    return [*_synthesized(job), ["openroad", "-no_init", "-no_splash", "-exit", "sta.tcl"]]
 
 
 def _sta_parse(run: RunRecord) -> EdaResult:
-    return parse_opensta(run.log, run.returncode)
+    if not run.log.startswith("$ yosys "):
+        return parse_opensta(run.log, run.returncode)
+    # M37: the run synthesized first. Each step's output follows its "$ <argv>" line.
+    timer = re.search(r"^\$ (?:sta|openroad) ", run.log, re.MULTILINE)
+    synth_log, sta_log = (run.log[:timer.start()], run.log[timer.start():]) if timer else (run.log, "")
+    netlist = run.workdir / "netlist.v"
+    synth = parse_yosys(synth_log, run.returncodes[0] if run.returncodes else -1, None)
+    if not timer or not netlist.is_file():
+        return EdaResult(False, f"synthesis failed, no netlist written: {synth.summary}", synth.diagnostics,
+                         {"netlist": None})
+    result = parse_opensta(sta_log, run.returncode)
+    return EdaResult(result.passed, result.summary, result.diagnostics, {**result.metrics, "netlist": str(netlist)})
+
+
+def _sta_inputs(job: Job) -> str | None:
+    """A netlist to time, or (M37) RTL to synthesize first: exactly one of them."""
+    netlist = job.params.get("netlist", "").strip()
+    if netlist and job.sources:
+        return "give a netlist or sources, not both: the run times one design"
+    if not netlist and not job.sources:
+        return "missing parameter netlist (or sources, the RTL to synthesize and time)"
+    return None
+
+
+def _sta_environment(**inputs: str) -> Callable[[dict[str, str]], str | None]:
+    """The PDK inputs, and (M37) Yosys when the run must synthesize ``sources`` first."""
+    pdk = needs_pdk(**inputs)
+
+    def check(params: dict[str, str]) -> str | None:
+        reasons = [r for r in (pdk(params),) if r]
+        if params.get("sources", "").strip() and shutil.which("yosys") is None:
+            reasons.append("needs yosys on PATH to synthesize sources, not found")
+        return "; ".join(reasons) or None
+
+    return check
 
 
 # --- pnr.run: OpenROAD --------------------------------------------------------------------
@@ -424,12 +465,14 @@ LIBERTY = {"liberty": "a Liberty file"}
 
 register_backend(Backend("yosys-liberty", "synth.run", ("yosys",), _synth_steps, _synth_parse, ("sources", "top"),
                          environment=needs_pdk(**LIBERTY)))
-register_backend(Backend("opensta", "sta.run", ("sta",), _sta_steps, _sta_parse, ("netlist", "sdc", "top"),
-                         files=("netlist", "sdc", "spef"), environment=needs_pdk(**LIBERTY)))
+register_backend(Backend("opensta", "sta.run", ("sta",), _sta_steps, _sta_parse, ("sdc", "top"),
+                         files=("netlist", "sdc", "spef"), environment=_sta_environment(**LIBERTY),
+                         check=_sta_inputs))
 # Standalone OpenSTA first; OpenROAD's embedded OpenSTA when only OpenROAD is installed.
 register_backend(Backend("openroad-sta", "sta.run", ("openroad",), _openroad_sta_steps, _sta_parse,
-                         ("netlist", "sdc", "top"), files=("netlist", "sdc", "spef"),
-                         environment=needs_pdk(**LIBERTY, tech_lef="a technology LEF", lef="a cell LEF")))
+                         ("sdc", "top"), files=("netlist", "sdc", "spef"),
+                         environment=_sta_environment(**LIBERTY, tech_lef="a technology LEF", lef="a cell LEF"),
+                         check=_sta_inputs))
 _PNR_PDK = needs_pdk(**LIBERTY, tech_lef="a technology LEF", lef="a cell LEF", site="a placement site",
                      hor_layers="horizontal pin layers", ver_layers="vertical pin layers")
 
