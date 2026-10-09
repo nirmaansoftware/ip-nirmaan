@@ -261,6 +261,12 @@ def render_prompt(prompt) -> str:
     return _llm_prompt(prompt).render()
 
 
+def render_parts(prompt) -> tuple[str, str]:
+    """The system prompt, and the rest of the prompt without it: what a chat-shaped seat is handed."""
+    rendered = _llm_prompt(prompt)
+    return rendered.system, rendered.model_copy(update={"system": ""}).render()
+
+
 def generate(provider: str, prompt, max_output_chars: int = 64_000) -> Generation:
     """Ask a registered M17 provider. Never raises: a failure is returned."""
     from veritriage.ai import get_llm_provider

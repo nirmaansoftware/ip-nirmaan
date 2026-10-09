@@ -36,5 +36,6 @@ from nirmaan.runtime.tools import (
 )
 
 from nirmaan.runtime import selection as _selection  # noqa: E402,F401  (registers the auto runtime)
+from nirmaan.runtime import claude_code as _claude_code  # noqa: E402,F401  (registers the claude-code runtime)
 
 __all__ = [name for name in dir() if not name.startswith("_")]
