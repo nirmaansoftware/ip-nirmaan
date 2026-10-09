@@ -117,11 +117,33 @@ the suite never takes it.
   `nirmaan eval run`;
 - the CLI refuses an unclear request, and a failing case exits 1.
 
+## First live results (2026-10-09)
+
+Claude Opus 5.5 in the `rtl-implementation` seat, through the `claude-code`
+runtime (`docs/CLAUDE_CODE_RUNTIME.md`) on the owner's Claude plan, one attempt
+per case:
+
+| Case | Own gates | Held-out judges | Output tokens | Time |
+|---|---|---|---|---|
+| `rtl/axi4-lite-regs` | lint, simulation, synthesis passed | 2/2 (reference testbench; register map, 25 bus transfers) | 29,205 | 246 s |
+| `rtl/sync-fifo` | lint, simulation, synthesis passed | 1/1 | 19,071 | 167 s |
+| `rtl/rr-arbiter` | lint, simulation, synthesis passed | 1/1 | 21,431 | 195 s |
+| `rtl/apb-regs` | lint, simulation, synthesis passed | 1/1 | 12,854 | 114 s |
+
+Cost is recorded as unknown: a subscription has no per-call price. No formal
+proof ran: the model wrote no `.sby`, and on `block-design` formal applies only
+when one is produced.
+
+**What the first run found.** Before this, the AXI4-Lite case failed both
+judges with RTL that passed its own lint, simulation, and synthesis: the model
+named its ports `awaddr` instead of `s_axil_awaddr` and had no `DATA_WIDTH`.
+Those names are in the interface spec, and the RTL seat never saw it: its stage
+depended only on the microarchitecture. The stage now depends on both, and the
+same case passed. Scripted answers could never have shown this; a held-out judge
+on a real model did, which is what this milestone was for.
+
 ## Limits and what comes next
 
-- **No live model has been evaluated yet.** The cases and judges are proven by
-  replay; the first `--runtime anthropic` run is the next step, and its
-  results (not the suite) will say how well a real seat does.
 - The reference testbench encodes the fixture's choices (SLVERR on unmapped
   addresses, one-cycle latency). The upstream documents given to the seat
   state them, so a seat that ignores them fails, as intended. Each case lists
