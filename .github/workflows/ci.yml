@@ -117,6 +117,7 @@ jobs:
       # from the same pinned OSS CAD Suite the test job uses, as wrappers, so the
       # image's own Yosys stays first. See docs/STA_AND_ANTECEDENTS.md.
       - name: RTL gate tools (OSS CAD Suite 2026-09-28)
+        shell: bash  # the container's default sh has no ${var//-/}
         env:
           OSS_CAD_SUITE: "2026-09-28"
         run: |
