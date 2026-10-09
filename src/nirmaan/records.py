@@ -40,6 +40,10 @@ class DecisionRecord:
     approved_by: str | None
     consequences: tuple[dict[str, Any], ...]
     status: str
+    kind: str | None = None  # M40: a recorded decision's kind and criticality, and its supersession links
+    criticality: str | None = None
+    supersedes: str | None = None
+    superseded_by: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -82,15 +86,20 @@ def _from_task(state: ProjectState, task: Task) -> DecisionRecord:
 def decision_records(state: ProjectState) -> list[DecisionRecord]:
     """Every decision task and every recorded decision, by ID."""
     records = [_from_task(state, t) for t in state.tasks.values() if t.kind is TaskKind.DECISION]
+    replaced_by = {d.supersedes: d.id for d in state.decisions.values() if d.supersedes}
     for dec in state.decisions.values():
         entry = [e for e in state.audit if e.action == "decision.record" and e.details.get("decision") == dec.id]
+        task = state.tasks.get(dec.task or "")
         records.append(DecisionRecord(
-            id=dec.id, source="decision_record", question=dec.statement, context="", alternatives=(),
+            id=dec.id, source="decision_record", question=dec.subject or (task.title if task else dec.statement),
+            context="", alternatives=dec.options,
             chosen=dec.statement, rationale=(dec.rationale,) if dec.rationale else (),
             evidence=_evidence(state, dec.evidence),
             decided_by=entry[-1].actor if entry else dec.made_by,
             decided_at=entry[-1].at.isoformat() if entry else None,
-            approved_by=None, consequences=(), status="recorded",
+            approved_by=None, consequences=(), status="superseded" if dec.id in replaced_by else "recorded",
+            kind=dec.kind.value, criticality=dec.criticality.value, supersedes=dec.supersedes,
+            superseded_by=replaced_by.get(dec.id),
         ))
     return sorted(records, key=lambda r: r.id)
 
@@ -235,6 +244,8 @@ def decisions_section(org, state: ProjectState, w, folder) -> list[str]:
                   f"- Alternatives: {', '.join(r.alternatives) or 'none recorded'}",
                   f"- Decided by: {r.decided_by or 'nobody yet'}" + (f" at {r.decided_at}" if r.decided_at else ""),
                   f"- Approved by: {r.approved_by or 'not recorded'}"]
+        lines += [f"- Supersedes: `{r.supersedes}`"] if r.supersedes else []
+        lines += [f"- Superseded by: `{r.superseded_by}`"] if r.superseded_by else []
         lines += [f"- Rationale: {text}" for text in r.rationale]
         lines += [f"- Evidence: `{e['id']}` {e['kind']}" + ("" if e["substantiated"] else " (unsubstantiated)")
                   for e in r.evidence]

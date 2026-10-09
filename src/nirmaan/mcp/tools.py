@@ -23,7 +23,7 @@ from typing import Any, Callable
 
 from nirmaan.company import build_organization
 from nirmaan.events import org_events
-from nirmaan.models import Actor, ActorKind, EscalationKind, EvidenceKind, Verdict
+from nirmaan.models import Actor, ActorKind, Criticality, DecisionKind, EscalationKind, EvidenceKind, Verdict
 from nirmaan.orchestrator import Orchestrator
 from nirmaan.org import Organization
 from nirmaan.views import plan_tree
@@ -188,6 +188,37 @@ def _decisions(ctx: McpContext, arguments: dict[str, Any]) -> list:
     from nirmaan.records import decision_records
 
     return [r.to_dict() for r in decision_records(_load(ctx, str(arguments["project"])).state)]
+
+
+@register_tool(
+    "record_decision",
+    "Record an explicit engineering decision, as an AI agent. The decision kind and criticality set the "
+    "authority required; important decisions need substantiated evidence (P2); a decision the authority matrix marks "
+    "human-only (waivers, releases, gate approvals, anything critical) is refused here (P12). A decision may "
+    "supersede an earlier one, which is kept.",
+    _schema({
+        **_PROJECT, **_ROLE,
+        "kind": {"type": "string", "enum": [k.value for k in DecisionKind]},
+        "criticality": {"type": "string", "enum": [c.value for c in Criticality]},
+        "statement": {"type": "string", "description": "The decision, as one sentence."},
+        "subject": {"type": "string", "description": "The question decided."},
+        "task": {"type": "string", "description": "The task the decision is about (optional)."},
+        "options": {"type": "array", "items": {"type": "string"}, "description": "Alternatives considered."},
+        "evidence": {"type": "array", "items": {"type": "string"}, "description": "Evidence IDs it rests on."},
+        "rationale": {"type": "string"},
+        "supersedes": {"type": "string", "description": "A decision ID this one replaces."},
+    }, ["project", "role", "kind", "criticality", "statement"]),
+)
+def _record_decision(ctx: McpContext, arguments: dict[str, Any]) -> dict:
+    def act(e: TaskEngine, t: str | None, a: Actor):
+        dec = e.record_decision(
+            a, DecisionKind(arguments["kind"]), Criticality(arguments["criticality"]), str(arguments["statement"]),
+            str(arguments.get("rationale", "")), evidence=tuple(arguments.get("evidence", ())), task_id=t,
+            subject=str(arguments.get("subject", "")), options=tuple(arguments.get("options", ())),
+            supersedes=arguments.get("supersedes"))
+        return {"decision": dec.id, "supersedes": dec.supersedes}
+
+    return _act(ctx, arguments, act)
 
 
 @register_tool(
