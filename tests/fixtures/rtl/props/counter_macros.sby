@@ -1,0 +1,14 @@
+[options]
+mode prove
+depth 12
+
+[engines]
+smtbmc
+
+[script]
+read -formal counter_macros.v
+prep -top counter
+
+[files]
+counter_macros.v
+assert_macros.vh

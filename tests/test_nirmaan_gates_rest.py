@@ -297,10 +297,10 @@ def test_unguarded_and_unsupported_assertions_are_listed():
             "    always @(posedge clk) assert #0 (a);\n"
             "    always @(posedge clk) assert (a) $display(\"ok\"); else $error(\"no\");\n"
             "endmodule\n")
+    # M37: a macro that asserts and is never used asserts nothing; a named property is inlined.
     assert _kinds(text) == [
-        ("underived", "the macro CHECK asserts, and a macro body is not expanded"),
         ("unguarded", ""),
-        ("underived", "the named property p is not expanded"),
+        ("unguarded", ""),
         ("underived", "an implication inside parentheses is not supported"),
         ("underived", "a deferred assertion is not supported"),
         ("underived", "an assertion with an action block is not supported"),
