@@ -255,6 +255,12 @@ recorded with zero core changes.
 
 ## 8. Deferred
 
+M38 (`docs/VERIFICATION_PLAN_MORE.md`) closes three of these: the plan seat on
+`new-ip` and `feature-addition` (their `dv-plan` stages are now checked plans,
+so the "document" behavior described in section 4 no longer applies to them),
+amending and retiring recorded requirements and items, and planned items in an
+import.
+
 - A YAML or spreadsheet reader for the same format.
 - Planned items in an import (needs an artifact to attribute them to).
 - Re-planning: amending or withdrawing recorded requirements and items. Today a

@@ -575,13 +575,18 @@ def links(project: str, root: Path = ROOT_OPTION) -> None:
 @vplan_app.command("import")
 def vplan_import(project: str, file: Path, role: str = typer.Option(..., "--as", help="Role ID acting."),
                  agent: bool = typer.Option(False, "--agent", help="Act as an AI agent rather than a human."),
+                 amend: bool = typer.Option(False, "--amend", help="The file is the next version of the plan: "
+                                            "add, modify, and retire (M38)."),
                  root: Path = ROOT_OPTION) -> None:
     """Record a plan's requirements and items through the engine. All or nothing; it backs nothing."""
-    from nirmaan.vplan import PlanError, import_plan
+    from nirmaan.vplan import PlanError, amend_plan, import_plan
 
     engine = _load(project, root)
     try:
-        report = import_plan(engine, _actor(role, agent), file.read_text(encoding="utf-8"))
+        if amend:
+            changed = amend_plan(engine, _actor(role, agent), file.read_text(encoding="utf-8"))
+        else:
+            report = import_plan(engine, _actor(role, agent), file.read_text(encoding="utf-8"))
     except PlanError as exc:
         for problem in exc.problems:
             _err.print(f"[red]{escape(str(file))}: {escape(problem)}[/red]")
@@ -589,6 +594,11 @@ def vplan_import(project: str, file: Path, role: str = typer.Option(..., "--as",
     except OSError as exc:
         _fail(str(exc))
     ProjectStore(root).save(engine.state)
+    if amend:
+        console.print(f"Amended the plan: added {len(changed.added)}, modified {len(changed.modified)}, "
+                      f"retired {len(changed.retired)}, kept {len(changed.kept)}. Superseded versions stay on the "
+                      "audit trail. None is backed until a passing, cited tool run backs it.")
+        return
     console.print(f"Recorded {report.requirements} requirements and {report.items} verification items. "
                   "None is backed until a passing, cited tool run backs it.")
 
@@ -811,11 +821,12 @@ def drive_cmd(
     review_rounds: Optional[int] = typer.Option(None, "--review-rounds", min=1, help="As for nirmaan run."),
     dry_run: bool = typer.Option(False, "--dry-run", help="Print the plan of calls; run nothing, change nothing."),
     inputs: List[str] = typer.Option([], "--input", help="key=value for the task's tools (needs TASK)."),
+    jobs: int = typer.Option(1, "--jobs", min=1, help="Model calls in flight at once across independent tasks."),
     root: Path = ROOT_OPTION,
 ) -> None:
     """Run the owner and reviewer seats in turn until a person must act. Never approves (docs/AUTO_LOOP.md)."""
     from nirmaan.models import MemoryScope
-    from nirmaan.runtime import get_runtime, loop, plan_loop
+    from nirmaan.runtime import Stop, get_runtime, loop, plan_loop
 
     def say(text: str) -> None:
         console.print(escape(text), highlight=False, soft_wrap=True)
@@ -836,7 +847,7 @@ def drive_cmd(
                    soft_wrap=True)
     try:
         if dry_run:
-            plan = plan_loop(engine, runtime, reviewer_id, tid, max_calls, attempts, review_rounds)
+            plan = plan_loop(engine, runtime, reviewer_id, tid, max_calls, attempts, review_rounds, jobs)
             current = None
             for number, step in enumerate(plan.steps, 1):
                 if step.task != current:
@@ -854,7 +865,19 @@ def drive_cmd(
                     say(f"  {number}. reviewer {step.role} on {step.runtime}: 1 call")
             for stopped, why in plan.stops.items():
                 say(f"{stopped}: then stop, {why.value}")
+            if len(plan.concurrent) > 1:
+                say(f"concurrently: {', '.join(plan.concurrent)} (up to {jobs} call{'s' if jobs > 1 else ''} "
+                    "in flight)")
             say(f"worst case: {plan.calls} calls, budget {max_calls}")
+            limits = plan.project_budget
+            if limits is not None and limits.calls is not None and plan.spent is not None:
+                left = max(limits.calls - plan.spent.calls, 0)
+                fits = ("the worst case fits" if plan.calls <= left
+                        else "the worst case does not fit, so the loop stops when it is spent")
+                say(f"project budget: {plan.spent.calls} of {limits.calls} calls spent, {left} left; {fits}")
+            if limits is not None and limits.cost_usd is not None and plan.spent is not None:
+                say(f"project cost budget: {plan.spent.cost_usd} of {limits.cost_usd} USD spent"
+                    + (f", {plan.spent.unknown_cost} call(s) of unknown cost" if plan.spent.unknown_cost else ""))
             _err.print("dry run: no model was called, no tool was run, nothing was saved")
             return
         if tid is not None:
@@ -866,7 +889,7 @@ def drive_cmd(
                 engine.remember(MemoryScope.TASK, tid, f"input.{key}", value, _actor(target.owner, False))
         store = ProjectStore(root)
         report = loop(engine, owner, reviewer, tid, max_calls, attempts, review_rounds,
-                      on_step=lambda e: store.save(e.state))
+                      on_step=lambda e: store.save(e.state), jobs=jobs)
     except (WorkError, PolicyViolationError, PermissionError) as exc:
         _fail(str(exc))
     store.save(engine.state)
@@ -881,6 +904,48 @@ def drive_cmd(
     for stopped, why in report.stops.items():
         say(f"{stopped}: stopped, {why.value}")
     say(f"calls: {report.calls} of {max_calls}")
+    if Stop.PROJECT_BUDGET in report.stops.values():
+        say("the project budget is spent; a person may raise it with nirmaan budget (docs/LOOP_CONCURRENCY.md)")
+
+
+@app.command("budget")
+def budget_cmd(
+    project: str,
+    calls: Optional[int] = typer.Option(None, "--calls", min=0, help="Model calls the project may make in all."),
+    cost_usd: Optional[float] = typer.Option(None, "--cost-usd", min=0, help="Known cost the project may reach."),
+    clear: bool = typer.Option(False, "--clear", help="Lift every limit."),
+    role: Optional[str] = typer.Option(None, "--as", help="Role ID of the person deciding."),
+    reason: str = typer.Option("", "--reason", help="Why: recorded with the decision."),
+    root: Path = ROOT_OPTION,
+) -> None:
+    """Show, or as a person set, the project's model-call budget (docs/LOOP_CONCURRENCY.md)."""
+    from nirmaan.work.budget import budget, spend
+
+    engine = _load(project, root)
+    if calls is None and cost_usd is None and not clear:
+        limits, spent = budget(engine.state), spend(engine.state)
+        if limits is None:
+            console.print("no budget is set", highlight=False)
+        else:
+            console.print(escape(f"set by {limits.set_by}: {limits.reason}"), highlight=False)
+        console.print(f"calls: {spent.calls}" + (f" of {limits.calls} spent" if limits and limits.calls is not None
+                                                 else " made"), highlight=False)
+        cost = f"cost: {spent.cost_usd} USD" + (f" of {limits.cost_usd}" if limits and limits.cost_usd is not None
+                                               else "")
+        console.print(cost + (f", {spent.unknown_cost} call(s) of unknown cost" if spent.unknown_cost else ""),
+                      highlight=False)
+        return
+    if role is None or not reason.strip():
+        _fail("setting a budget is a person's decision: give --as ROLE and a --reason")
+    previous = budget(engine.state)
+    if not clear:
+        calls = calls if calls is not None else (previous.calls if previous else None)
+        cost_usd = cost_usd if cost_usd is not None else (previous.cost_usd if previous else None)
+    else:
+        calls = cost_usd = None
+    _mutate(project, root, lambda e: e.set_budget(_actor(role, False), calls, cost_usd, reason) or
+            f"budget: calls {calls if calls is not None else 'unlimited'}, "
+            f"cost {cost_usd if cost_usd is not None else 'unlimited'} USD")
 
 
 # --- Seat evaluation (M27) ---------------------------------------------------------------

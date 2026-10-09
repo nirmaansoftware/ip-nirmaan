@@ -11,10 +11,15 @@ A task with before-review checks (M23, M26, M27) is worked in the gated order:
 real files are written, every check runs for real over them through the
 broker, and only then is the work submitted. Driving such a task needs the
 EDA tools on PATH.
+
+M38: a requirements spec is a real, tagged file, and a verification plan is a
+real plan file checked against it, so a checked plan stage passes its check
+for real and is recorded on approval.
 """
 
 from __future__ import annotations
 
+import hashlib
 import os
 import shutil
 import tempfile
@@ -25,6 +30,7 @@ import pytest
 from nirmaan.models import (
     Actor,
     ActorKind,
+    Assurance,
     EvidenceKind,
     ReviewState,
     TaskKind,
@@ -33,15 +39,33 @@ from nirmaan.models import (
 )
 from nirmaan.runtime import ToolBroker
 from nirmaan.work import TaskEngine
-from nirmaan.work.policy import unsatisfied_requirements, upstream_kinds
+from nirmaan.work.policy import unsatisfied_requirements, upstream_artifacts, upstream_kinds
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
 #: The executables ``drive`` needs to take a gated RTL task through its checks for real (M27).
 GATE_TOOLS = ("verilator", "iverilog", "vvp", "yosys")
 
-#: What a gated task produces under ``drive``, per artifact kind: a real file and the entry it declares.
-GATED_FILES = {"rtl_source": ("counter.v", "counter"), "testbench": ("counter_tb.v", "counter_tb")}
+#: What a gated task produces under ``drive``, per artifact kind: a real file (under fixtures/) and the entry it
+#: declares. M38: a verification plan covering DOCUMENT_FILES' requirements spec, with items in the testbench.
+GATED_FILES = {"rtl_source": ("rtl/counter.v", "counter"), "testbench": ("rtl/counter_tb.v", "counter_tb"),
+               "verification_plan": ("vplan/verification_plan.json", None)}
+
+#: M38: what an ungated task produces as a real, digest-recorded file under ``drive``, per artifact kind.
+DOCUMENT_FILES = {"requirements_spec": "vplan/requirements_spec.md"}
+#: M38: the kinds whose drafts carry their digest, as a seat's do, so an approval consumer can read them.
+DIGESTED = {"requirements_spec", "verification_plan"}
+
+
+def _draft(kind: str, path: Path, **extra) -> dict:
+    digest = {"digest": "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()} if kind in DIGESTED else {}
+    return {"kind": kind, "title": path.name, "location": str(path), **digest, **extra}
+
+
+def _workdir(task_id: str, workspace: Path | None) -> Path:
+    root = Path(workspace or tempfile.mkdtemp(prefix="nirmaan-drive-")) / task_id.replace(":", "_")
+    root.mkdir(parents=True, exist_ok=True)
+    return root
 
 
 def needs(*executables: str):
@@ -96,7 +120,14 @@ def work(engine: TaskEngine, task_id: str, outcome: str | None = None, workspace
     if any(r.before_review and r.applies(r.when_produced, upstream) for r in task.evidence_requirements):
         gated_submit(engine, task_id, outcome, workspace)
     else:
-        produced = [{"kind": k, "title": f"{task.title} ({k})"} for k in (task.expected_outputs or ("note",))]
+        produced = []
+        for k in (task.expected_outputs or ("note",)):
+            if k in DOCUMENT_FILES:  # M38: a real, tagged file
+                path = _workdir(task_id, workspace) / Path(DOCUMENT_FILES[k]).name
+                shutil.copyfile(FIXTURES / DOCUMENT_FILES[k], path)
+                produced.append(_draft(k, path))
+            else:
+                produced.append({"kind": k, "title": f"{task.title} ({k})"})
         engine.submit(task_id, owner, produced, outcome=outcome)
     task = engine.task(task_id)
     if task.status is TaskStatus.COMPLETED:
@@ -123,28 +154,35 @@ def gated_submit(engine: TaskEngine, task_id: str, outcome: str | None = None,
     """
     task = engine.task(task_id)
     owner = agent(task.owner)
-    root = Path(workspace or tempfile.mkdtemp(prefix="nirmaan-drive-")) / task_id.replace(":", "_")
-    root.mkdir(parents=True, exist_ok=True)
+    root = _workdir(task_id, workspace)
     produced = []
     for kind in task.expected_outputs:
         if kind not in GATED_FILES:
             raise AssertionError(f"{task_id} is gated, and drive has no {kind} file to produce for it")
         name, entry = GATED_FILES[kind]
-        shutil.copyfile(FIXTURES / "rtl" / name, root / name)
-        produced.append((kind, str(root / name), entry))
+        shutil.copyfile(FIXTURES / name, root / Path(name).name)
+        produced.append((kind, str(root / Path(name).name), entry))
     kinds = {kind for kind, _, _ in produced}
     broker = ToolBroker(engine)
     upstream = upstream_kinds(engine.state, task)
     for req in (r for r in task.evidence_requirements if r.before_review and r.applies(kinds, upstream)):
         params = dict(req.params)
         for binding in req.files:
+            if binding.upstream:  # M38: the approved upstream files, as the runtime fills them
+                params[binding.param] = ",".join(
+                    a.location for k in binding.kinds for a in upstream_artifacts(engine.state, task)
+                    if a.kind == k and a.assurance is Assurance.APPROVED and a.location)
+                continue
             matched = [(path, entry) for k in binding.kinds for kind, path, entry in produced if kind == k]
             params[binding.param] = matched[0][1] if binding.entry else ",".join(p for p, _ in matched)
         for tool in req.tools:
-            run, _ = broker.invoke(owner, tool, {**params, "workdir": str(root / tool)}, task_id)
+            contract = engine.org.tools[tool].params
+            takes = contract is None or any(p.name == "workdir" for p in contract)
+            workdir = {"workdir": str(root / tool)} if takes else {}  # an in-process check takes none
+            run, _ = broker.invoke(owner, tool, {**params, **workdir}, task_id)
             engine.record_evidence(task_id, owner, EvidenceKind.TOOL_RUN, run.summary,
                                    reference=run.references[0] if run.references else None, tool_run=run.id)
-    drafts = [{"kind": kind, "title": Path(path).name, "location": path} for kind, path, _ in produced]
+    drafts = [_draft(kind, Path(path)) for kind, path, _ in produced]
     engine.submit(task_id, owner, drafts, outcome=outcome)
 
 
