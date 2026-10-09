@@ -215,7 +215,27 @@ approval with zero core changes.
 
 ## 6. Migrations
 
-MIGRATIONS_PLACEHOLDER
+Every flow through the changed stages, and every behavior an existing caller
+could see change, with what replaced it. None is weakened: each now passes a
+real check it did not have, or refuses something it used to accept.
+
+| # | What | Before | After |
+|---|---|---|---|
+| 1 | `new-ip` `dv-plan` (`company/workflows.py`) | review only | review, and `PLAN_CHECKED` before review |
+| 2 | `feature-addition` `dv-plan` | review only; depends on `microarchitecture` | `PLAN_CHECKED`; also depends on `requirements-delta` (no task waits longer) |
+| 3 | `drive` (`tests/nirmaan_helpers.py`), every requirements stage | an artifact with no file | a real file, `tests/fixtures/vplan/requirements_spec.md` (three tagged requirements of the counter), with its digest |
+| 4 | `drive`, a gated `verification_plan` | not producible: `drive` raised | the real plan file `tests/fixtures/vplan/verification_plan.json` (its item lives in `counter_tb.v`, the testbench `drive` writes), with its digest, checked for real |
+| 5 | `drive`, before-review checks | only the task's own files were bound; `workdir` passed to every tool | `upstream=True` bindings are filled from the approved upstream files, as the runtime fills them; `workdir` only to a tool whose contract takes it (an in-process check takes none). `GATED_FILES` paths are now relative to `tests/fixtures/` |
+| 6 | `tests/test_nirmaan_export.py` `midway` | a hand-written Markdown plan, submitted with no check | the plan file, through `gated_submit`, after a real passing `vplan.check`; the sidecar test reads the copied plan file's first line |
+| 7 | `tests/test_nirmaan_work.py` whole-project drive of `new-ip` | completed with a document plan | unchanged test; it now completes with the plan checked for real and recorded on approval (3 requirements, 1 planned item) |
+| 8 | The M29 approval consumer | refused a plan repeating a recorded ID | a later plan is the next version: a repeated ID with the same content is kept, a different one is modified, a dropped one must be retired |
+| 9 | `vplan.check` | file and spec rules only | also the amendment rules against the project's recorded plan |
+| 10 | `nirmaan vplan import` | an item in an unrecorded file was refused | it is planned, when its spec is a recorded file; otherwise refused at its line, as before. A recorded, tagged source spec must be covered exactly. A `retired` list is refused ("use --amend") |
+| 11 | `requirement_coverage`, `engineering_graph`, `export_plan`, `nirmaan gaps` | every record | active records only; retired ones are history |
+| 12 | `TaskEngine` new-item checks | an item could prove any recorded requirement | not a retired one |
+
+M29's demo and tests run unchanged: the `block-design` plan stage has nothing
+recorded before it, so its plan is all additions.
 
 ## 7. Deferred
 
