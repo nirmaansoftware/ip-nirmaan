@@ -3,7 +3,9 @@
 An in-process tool, so it runs on every machine: ``plan`` is the plan file (or
 files) the seat wrote, ``spec`` the approved upstream spec file (or files) the
 stage names. It passes only when each plan is valid in the ``nirmaan.vplan``
-format and covers exactly the requirements the specs tag, quoting each. A
+format and covers exactly the requirements the specs tag, quoting each, and
+(M38) is a valid next version of the project's recorded plan: every active
+record kept or retired with a reason, no retired ID reused. A
 failing check is a recorded run with ``succeeded=False``. The rules live in
 ``nirmaan.vplan``; see docs/VERIFICATION_PLAN.md.
 """
@@ -26,5 +28,5 @@ def _check(params: dict[str, str], engine: TaskEngine) -> ToolOutcome:
         return ToolOutcome(False, "no plan file to check")
     if not specs:
         return ToolOutcome(False, "no approved spec file to check the plan against")
-    passed, summary = check_files(plans, specs)
+    passed, summary = check_files(plans, specs, engine.state)  # M38: also a valid next version of the plan
     return ToolOutcome(passed, summary, tuple(plans))

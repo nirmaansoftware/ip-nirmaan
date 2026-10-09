@@ -878,15 +878,114 @@ class TaskEngine:
                      verification_items={**self._state.verification_items, item_id: item})
         return item
 
+    # --- Amending a recorded plan (M38) ---------------------------------------------------------
+    # A record is never deleted: an amendment or a retirement replaces it with the next revision, and the
+    # version it replaces goes, whole, into that audit entry (details["previous"]).
+
+    def _active(self, records: Any, record_id: str, what: str) -> Any:
+        record = records.get(record_id)
+        if record is None:
+            raise WorkError(f"{what} {record_id!r} is not recorded")
+        if record.retired:
+            raise WorkError(f"{what} {record_id!r} was retired ({record.retired}); it cannot change")
+        return record
+
+    @staticmethod
+    def _plan_details(plan: str) -> dict[str, Any]:
+        return {"plan": plan} if plan else {}
+
+    def amend_spec_requirement(self, actor: Actor, requirement_id: str, text: str, source: str,
+                               section: str = "", plan: str = "") -> SpecRequirement:
+        """Record the next revision of an active requirement (M38)."""
+        old = self._active(self._state.spec_requirements, requirement_id, "requirement")
+        if (old.text, old.source, old.section) == (text, source, section):
+            raise WorkError(f"requirement {requirement_id!r} is unchanged; nothing to amend")
+        task = self._artifact_task(source, actor, "its requirements")
+        req = SpecRequirement(id=requirement_id, text=text, source=source, section=section,
+                              recorded_by=actor.label, revision=old.revision + 1)
+        warnings = self._check("trace.requirement", actor, task)
+        self._commit(actor, "trace.requirement.amend", requirement_id, reason=text, warnings=warnings,
+                     details={"source": source, "section": section, "revision": req.revision,
+                              "previous": old.model_dump(mode="json"), **self._plan_details(plan)},
+                     spec_requirements={**self._state.spec_requirements, requirement_id: req})
+        return req
+
+    def retire_spec_requirement(self, actor: Actor, requirement_id: str, reason: str, plan: str = "",
+                                backed_by: tuple[str, ...] = ()) -> SpecRequirement:
+        """Retire an active requirement, with a reason; ``backed_by`` names the passing runs it had (M38)."""
+        old = self._active(self._state.spec_requirements, requirement_id, "requirement")
+        if not reason.strip():
+            raise WorkError(f"retiring requirement {requirement_id!r} needs a reason")
+        proving = sorted(i.id for i in self._state.verification_items.values()
+                         if not i.retired and requirement_id in i.proves)
+        if proving:
+            raise WorkError(f"requirement {requirement_id!r} is still proved by active item(s) "
+                            f"{', '.join(proving)}: amend or retire them first")
+        task = self._artifact_task(old.source, actor, "its requirements")
+        req = old.model_copy(update={"retired": reason, "revision": old.revision + 1, "recorded_by": actor.label})
+        warnings = self._check("trace.requirement", actor, task)
+        self._commit(actor, "trace.requirement.retire", requirement_id, reason=reason, warnings=warnings,
+                     details={"revision": req.revision, "backed_by": list(backed_by),
+                              "previous": old.model_dump(mode="json"), **self._plan_details(plan)},
+                     spec_requirements={**self._state.spec_requirements, requirement_id: req})
+        return req
+
+    def amend_verification_item(self, actor: Actor, item_id: str, kind: str, name: str, proves: tuple[str, ...],
+                                rationale: str = "", artifact: str = "", file: str = "",
+                                plan: str = "") -> VerificationItem:
+        """Record the next revision of an active item: bound to ``artifact``, or planned in ``file`` (M38)."""
+        old = self._active(self._state.verification_items, item_id, "verification item")
+        if artifact:
+            file, plan_of = "", ""
+        elif not file or "/" in file or "\\" in file:
+            raise WorkError(f"{item_id} must name a plain file name, not {file!r}")
+        else:
+            plan_of = plan
+        item = VerificationItem(id=item_id, kind=kind, name=name, artifact=artifact, file=file, plan=plan_of,
+                                proves=tuple(proves), rationale=rationale, recorded_by=actor.label,
+                                revision=old.revision + 1)
+        same = ("kind", "name", "artifact", "file", "proves", "rationale")
+        if all(getattr(old, f) == getattr(item, f) for f in same):
+            raise WorkError(f"verification item {item_id!r} is unchanged; nothing to amend")
+        task = self._item_checks(actor, item_id, artifact or plan_of, tuple(proves))
+        warnings = self._check("trace.item", actor, task)
+        self._commit(actor, "trace.item.amend", item_id, reason=rationale or name, warnings=warnings,
+                     details={"kind": kind, "artifact": artifact, "file": file, "proves": list(proves),
+                              "revision": item.revision, "previous": old.model_dump(mode="json"),
+                              **self._plan_details(plan)},
+                     verification_items={**self._state.verification_items, item_id: item})
+        return item
+
+    def retire_verification_item(self, actor: Actor, item_id: str, reason: str, plan: str = "",
+                                 backed_by: tuple[str, ...] = ()) -> VerificationItem:
+        """Retire an active item, with a reason (M38). A retired item proves nothing."""
+        old = self._active(self._state.verification_items, item_id, "verification item")
+        if not reason.strip():
+            raise WorkError(f"retiring verification item {item_id!r} needs a reason")
+        task = self._artifact_task(old.artifact or old.plan, actor, "its verification items")
+        item = old.model_copy(update={"retired": reason, "revision": old.revision + 1, "recorded_by": actor.label})
+        warnings = self._check("trace.item", actor, task)
+        self._commit(actor, "trace.item.retire", item_id, reason=reason, warnings=warnings,
+                     details={"revision": item.revision, "backed_by": list(backed_by),
+                              "previous": old.model_dump(mode="json"), **self._plan_details(plan)},
+                     verification_items={**self._state.verification_items, item_id: item})
+        return item
+
     def _item_task(self, actor: Actor, item_id: str, artifact: str, proves: tuple[str, ...]) -> Task:
         """The checks every new verification item passes; the task whose artifact the actor stands behind."""
         if item_id in self._state.verification_items:
             raise WorkError(f"verification item {item_id!r} is already recorded")
+        return self._item_checks(actor, item_id, artifact, proves)
+
+    def _item_checks(self, actor: Actor, item_id: str, artifact: str, proves: tuple[str, ...]) -> Task:
         if not proves:
             raise WorkError(f"{item_id} proves no requirement")
         unknown = [r for r in proves if r not in self._state.spec_requirements]
         if unknown:
             raise WorkError(f"{item_id} names unknown requirement(s): {', '.join(unknown)}")
+        retired = [r for r in proves if self._state.spec_requirements[r].retired]  # M38
+        if retired:
+            raise WorkError(f"{item_id} names retired requirement(s): {', '.join(retired)}")
         art = self._state.artifacts.get(artifact)
         if art is not None and not art.location:
             raise WorkError(f"{artifact} has no recorded file; a verification item must live in one")

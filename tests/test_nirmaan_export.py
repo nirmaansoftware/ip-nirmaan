@@ -21,7 +21,7 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from nirmaan_helpers import GATE_TOOLS, agent, drive, tid
+from nirmaan_helpers import GATE_TOOLS, agent, drive, gated_submit, tid
 
 from nirmaan.company.deliverables import DELIVERABLE_FOLDERS
 from nirmaan.export import (
@@ -57,17 +57,15 @@ def bridge(nirmaan_org, fixed_clock):
 @pytest.fixture()
 def midway(bridge, tmp_path):
     """Approved work up to RTL, a verification plan that is verified but not approved,
-    and a lint report that is only executed. Two gates signed off, the rest not."""
+    and a lint report that is only executed. Two gates signed off, the rest not.
+
+    M38: the plan is a plan file that passed a real ``vplan.check`` against the approved requirements
+    spec before review, where it was a Markdown document with no check before."""
     drive(bridge, until=tid(bridge, "rtl-lint"))
     plan = tid(bridge, "dv-plan")
     owner = agent(bridge.task(plan).owner)
-    doc = tmp_path / "inputs" / "verification_plan.md"
-    doc.parent.mkdir()
-    doc.write_text("# Verification plan\n\nAXI and NoC ports, one test per channel.\n", encoding="utf-8")
     bridge.start(plan, owner)
-    bridge.submit(plan, owner, [{"kind": "verification_plan", "title": "Bridge verification plan",
-                                 "location": str(doc), "summary": "Plan: one test per channel.",
-                                 "digest": "sha256:" + hashlib.sha256(doc.read_bytes()).hexdigest()}])
+    gated_submit(bridge, plan, workspace=tmp_path / "inputs")
     bridge.review(plan, agent(bridge.task(plan).reviewer), Verdict.APPROVE, "complete and testable")
     lint = tid(bridge, "rtl-lint")
     lint_owner = agent(bridge.task(lint).owner)
@@ -153,7 +151,7 @@ def test_the_sidecar_carries_provenance_and_hashes(midway, tmp_path):
     content = out / data["files"]["content"]
     assert hashlib.sha256(content.read_bytes()).hexdigest() == data["hashes"]["content_sha256"]
     copy = out / data["files"]["location_copy"]
-    assert copy.read_text(encoding="utf-8").startswith("# Verification plan")
+    assert copy.read_text(encoding="utf-8").startswith('{\n  "format": "nirmaan.vplan"')
     assert hashlib.sha256(copy.read_bytes()).hexdigest() == data["hashes"]["location_sha256"]
     assert any(e["action"] == "task.submit" for e in data["audit"])
     assert data["hashes"]["recorded_digest"] == "sha256:" + data["hashes"]["location_sha256"]
