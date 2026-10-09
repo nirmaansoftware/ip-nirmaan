@@ -303,9 +303,11 @@ gate; after a person signs it, the next invocation drives the second stage.
 ## 11. Deferred
 
 * Running independent tasks concurrently. The loop is sequential; a project's
-  ready tasks are worked one after another.
+  ready tasks are worked one after another. (Built in M36:
+  `docs/LOOP_CONCURRENCY.md`.)
 * A call budget that persists across invocations. The task limits already
-  bound the total; a project wide spend limit would be new state.
+  bound the total; a project wide spend limit would be new state. (Built in
+  M36, on the audit trail rather than as new state.)
 * Approval by a delegated non-human approver. The loop leaves every approval
   to a person.
 * Task inputs in project mode. `--input` needs a TASK; a project wide run uses

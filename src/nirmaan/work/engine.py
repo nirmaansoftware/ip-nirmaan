@@ -764,11 +764,36 @@ class TaskEngine:
             supersedes=escalation_id, target_role=chain[0].id,
         )
 
-    def record_step(self, task_id: str, actor: Actor, summary: str, details: dict[str, Any]) -> None:
-        """Audit one step an automated loop took on a task (M29). Changes nothing but the trail."""
+    def record_step(self, task_id: str, actor: Actor, summary: str, details: dict[str, Any],
+                    action: str = "loop.step") -> None:
+        """Audit one step an automated loop took on a task (M29), or why it stopped (M36, ``loop.stop``).
+
+        Changes nothing but the trail.
+        """
+        if not action.startswith("loop."):
+            raise WorkError(f"a loop records only loop actions, not {action!r}")
         task = self.task(task_id)
-        warnings = self._check("loop.step", actor, task)
-        self._commit(actor, "loop.step", task_id, reason=summary, warnings=warnings, details=details)
+        warnings = self._check(action, actor, task)
+        self._commit(actor, action, task_id, reason=summary, warnings=warnings, details=details)
+
+    def set_budget(self, actor: Actor, calls: int | None, cost_usd: float | None, reason: str) -> None:
+        """Set the project's model-call budget (M36): a person's decision, recorded on the trail.
+
+        The latest ``budget.set`` entry is the budget (``nirmaan.work.budget``). None lifts that limit.
+        """
+        from nirmaan.work.budget import BUDGET_SET, budget
+
+        self._require(actor.kind is ActorKind.HUMAN, "a project budget is set by a person, not an agent")
+        if (calls is not None and calls < 0) or (cost_usd is not None and cost_usd < 0):
+            raise WorkError("a budget cannot be negative")
+        if not reason.strip():
+            raise WorkError("setting a budget needs a reason")
+        warnings = self._check(BUDGET_SET, actor)
+        previous = budget(self._state)
+        self._commit(actor, BUDGET_SET, self._state.project.id, reason=reason, warnings=warnings,
+                     details={"calls": calls, "cost_usd": cost_usd,
+                              "previous_calls": previous.calls if previous else None,
+                              "previous_cost_usd": previous.cost_usd if previous else None})
 
     # --- Decisions and memory -------------------------------------------------------------
 

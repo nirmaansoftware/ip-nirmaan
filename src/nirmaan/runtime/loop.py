@@ -13,6 +13,13 @@ starts only if its worst case fits the call budget. With no task named, the
 loop works the plan in dependency order and stops at every gate. It names no
 seat, stage, or tool: who acts comes from the task's ``owner`` and
 ``reviewer``.
+
+In project mode the tasks that are actionable now form a batch, and run
+concurrently (M36): model calls in parallel, every read and write of state in
+one writer's turn, in plan order, so the result does not depend on ``jobs``
+(``nirmaan.runtime.writer``). A person's project budget (``budget.set``) is
+read from state and checked before every step, with what the steps in flight
+may still spend reserved.
 """
 
 from __future__ import annotations
@@ -32,6 +39,8 @@ from nirmaan.runtime.base import (
     review_task,
     run_task,
 )
+from nirmaan.runtime.writer import private, stopping, together
+from nirmaan.work.budget import Budget, Spend, budget, over, spend
 from nirmaan.work.engine import TaskEngine, WorkError
 
 OWNER, REVIEWER = "owner", "reviewer"
@@ -55,6 +64,8 @@ class Stop(str, Enum):
     REFUSED = "refused"
     #: The next step's worst case does not fit what is left of the call budget.
     BUDGET = "budget"
+    #: The project's budget, a person's decision that persists across invocations, does not fit (M36).
+    PROJECT_BUDGET = "project_budget"
     #: Upstream work is not done.
     WAITING = "waiting"
     DONE = "done"
@@ -92,6 +103,10 @@ class LoopReport:
     steps: list[LoopStep] = field(default_factory=list)
     stops: dict[str, Stop] = field(default_factory=dict)
     calls: int = 0
+    #: The project budget read at the start (M36), or None.
+    project_budget: Budget | None = None
+    #: Steps in flight: task -> (worst case, the task's recorded model calls when the step began).
+    _inflight: dict[str, tuple[int, int]] = field(default_factory=dict, repr=False)
 
 
 @dataclass
@@ -100,6 +115,11 @@ class LoopPlan:
     shared_runtime: bool
     steps: list[PlannedStep] = field(default_factory=list)
     stops: dict[str, Stop] = field(default_factory=dict)
+    #: The tasks that would run together in the first batch (M36), and how many calls may be in flight.
+    concurrent: tuple[str, ...] = ()
+    jobs: int = 1
+    project_budget: Budget | None = None
+    spent: Spend | None = None
 
     @property
     def calls(self) -> int:
@@ -163,32 +183,56 @@ def _runtime_id(runtime: AgentRuntime) -> str:
 def loop(engine: TaskEngine, owner: AgentRuntime, reviewer: AgentRuntime | None = None,
          task_id: str | None = None, max_calls: int = 20, attempts: int | None = None,
          review_rounds: int | None = None, kind: ActorKind = ActorKind.AI_AGENT,
-         on_step: Callable[[TaskEngine], None] | None = None) -> LoopReport:
+         on_step: Callable[[TaskEngine], None] | None = None, jobs: int = 1) -> LoopReport:
     """Drive one task (or, with none named, every task in dependency order) until each stops.
 
+    The tasks actionable at once run as one batch, at most ``jobs`` model calls in flight (M36).
     ``on_step`` is called after every step (the CLI saves the project there),
-    so an interruption loses at most the step in flight.
+    so an interruption loses at most the steps in flight.
     """
     if max_calls < 0:
         raise WorkError(f"the call budget must be at least 0, got {max_calls}")
+    if jobs < 1:
+        raise WorkError(f"jobs must be at least 1, got {jobs}")
     reviewer = reviewer or owner
-    report = LoopReport(max_calls, _runtime_id(owner) == _runtime_id(reviewer))
+    report = LoopReport(max_calls, _runtime_id(owner) == _runtime_id(reviewer), project_budget=budget(engine.state))
     targets = [task_id] if task_id else order(engine)
     for target in targets:
         engine.task(target)  # an unknown task fails before anything runs
     while True:
-        current = next((t for t in targets if t not in report.stops and next_step(engine, t)[0]), None)
-        if current is None:
+        # Every task in a batch is actionable, so its dependencies are completed or cancelled: none of
+        # them depends on another. A task that becomes ready during the batch waits for the next one.
+        batch = [t for t in targets if t not in report.stops and next_step(engine, t)[0]]
+        if not batch:
             break
-        report.stops[current] = _drive(engine, current, owner, reviewer, report, attempts, review_rounds,
-                                       kind, on_step)
-        if report.stops[current] is Stop.BUDGET:
+        seats = [(owner, reviewer)] if len(batch) == 1 else [(private(owner), private(reviewer)) for _ in batch]
+        stops = together([_task_body(engine, t, o, r, report, attempts, review_rounds, kind, on_step)
+                          for t, (o, r) in zip(batch, seats)], jobs)
+        report.stops.update(zip(batch, stops))
+        if Stop.BUDGET in stops or Stop.PROJECT_BUDGET in stops:
             break
     for target in targets:  # what is left waiting on people, or on upstream work
         stop = next_step(engine, target)[1]
         if target not in report.stops and stop is not None and (task_id or stop not in (Stop.WAITING, Stop.DONE)):
             report.stops[target] = stop
     return report
+
+
+def _task_body(engine: TaskEngine, task_id: str, owner: AgentRuntime, reviewer: AgentRuntime, report: LoopReport,
+            attempts: int | None, review_rounds: int | None, kind: ActorKind,
+            on_step: Callable[[TaskEngine], None] | None) -> Callable[[], Stop]:
+    return lambda: _drive(engine, task_id, owner, reviewer, report, attempts, review_rounds, kind, on_step)
+
+
+def _task_calls(engine: TaskEngine, task_id: str) -> int:
+    return sum(1 for c in engine.state.model_calls.values() if c.task == task_id)
+
+
+def _reserved(engine: TaskEngine, report: LoopReport) -> tuple[int, int]:
+    """What the steps in flight may still spend: against this invocation, and against the project."""
+    invocation = sum(worst for worst, _ in report._inflight.values())
+    project = sum(max(worst - (_task_calls(engine, t) - start), 0) for t, (worst, start) in report._inflight.items())
+    return invocation, project
 
 
 def _drive(engine: TaskEngine, task_id: str, owner: AgentRuntime, reviewer: AgentRuntime, report: LoopReport,
@@ -198,18 +242,32 @@ def _drive(engine: TaskEngine, task_id: str, owner: AgentRuntime, reviewer: Agen
         seat, stop = next_step(engine, task_id)
         if seat is None:
             return stop or Stop.DONE
+        if stopping():  # another task of the batch failed: start nothing new
+            return Stop.DONE
         task = engine.task(task_id)
         worst = owner_calls(engine, task_id, attempts, review_rounds) if seat == OWNER else 1
-        if worst > report.budget - report.calls:
+        invocation, project = _reserved(engine, report)
+        if worst > report.budget - report.calls - invocation:
             return Stop.BUDGET
-        if seat == OWNER:
-            runtime, role = owner, task.owner
-            run = run_task(engine, task_id, owner, kind, attempts=attempts, review_rounds=review_rounds)
-            calls = len(run.attempts)
-        else:
-            runtime, role = reviewer, task.reviewer
-            run = review_task(engine, task_id, reviewer, kind=kind)
-            calls = 1  # charged whether or not the runtime answered: at most one call
+        spent = over(engine.state, report.project_budget, worst, project)
+        if spent is not None:
+            runtime = owner if seat == OWNER else reviewer
+            role = (task.owner if seat == OWNER else task.reviewer) or ""
+            limits_ = report.project_budget
+            engine.record_step(task_id, Actor(role=role, kind=kind, name=_runtime_id(runtime)), spent,
+                               {"stop": Stop.PROJECT_BUDGET.value, "seat": seat, "worst": worst,
+                                "budget_calls": limits_.calls if limits_ else None,
+                                "budget_cost_usd": limits_.cost_usd if limits_ else None,
+                                "spent_calls": spend(engine.state).calls}, action="loop.stop")
+            if on_step is not None:
+                on_step(engine)
+            return Stop.PROJECT_BUDGET
+        report._inflight[task_id] = (worst, _task_calls(engine, task_id))
+        try:
+            run, runtime, role, calls = _step(engine, task_id, seat, task, owner, reviewer, attempts,
+                                              review_rounds, kind)
+        finally:
+            report._inflight.pop(task_id, None)
         report.calls += calls
         _record(engine, report, task_id, seat, role or "", runtime, kind, run, calls)
         if on_step is not None:
@@ -218,6 +276,17 @@ def _drive(engine: TaskEngine, task_id: str, owner: AgentRuntime, reviewer: Agen
             return Stop.DECLINED
         if run.status is ResultStatus.REFUSED and owner_calls(engine, task_id, attempts, review_rounds) > 0:
             return Stop.REFUSED  # asking again would ask the model again, not escalate
+
+
+def _step(engine: TaskEngine, task_id: str, seat: str, task: Any, owner: AgentRuntime, reviewer: AgentRuntime,
+          attempts: int | None, review_rounds: int | None, kind: ActorKind) -> tuple[RunReport, AgentRuntime, Any, int]:
+    if seat == OWNER:
+        runtime, role = owner, task.owner
+        run = run_task(engine, task_id, owner, kind, attempts=attempts, review_rounds=review_rounds)
+        return run, runtime, role, len(run.attempts)
+    runtime, role = reviewer, task.reviewer
+    run = review_task(engine, task_id, reviewer, kind=kind)
+    return run, runtime, role, 1  # charged whether or not the runtime answered: at most one call
 
 
 def _record(engine: TaskEngine, report: LoopReport, task_id: str, seat: str, role: str, runtime: AgentRuntime,
@@ -234,10 +303,15 @@ def _record(engine: TaskEngine, report: LoopReport, task_id: str, seat: str, rol
 
 
 def plan_loop(engine: TaskEngine, owner: str, reviewer: str | None = None, task_id: str | None = None,
-              max_calls: int = 20, attempts: int | None = None, review_rounds: int | None = None) -> LoopPlan:
-    """The worst case sequence of calls the loop would make from the current state. Changes nothing."""
+              max_calls: int = 20, attempts: int | None = None, review_rounds: int | None = None,
+              jobs: int = 1) -> LoopPlan:
+    """The worst case sequence of calls the loop would make from the current state. Changes nothing.
+
+    Also the first batch (the tasks that would run together, M36), and the project budget and spend.
+    """
     reviewer = reviewer or owner
-    plan = LoopPlan(max_calls, owner == reviewer)
+    plan = LoopPlan(max_calls, owner == reviewer, jobs=jobs, project_budget=budget(engine.state),
+                    spent=spend(engine.state))
     targets = [task_id] if task_id else order(engine)
     for target in targets:
         seat, stop = next_step(engine, target)
@@ -245,6 +319,7 @@ def plan_loop(engine: TaskEngine, owner: str, reviewer: str | None = None, task_
             if task_id or stop not in (Stop.WAITING, Stop.DONE):
                 plan.stops[target] = stop or Stop.DONE
             continue
+        plan.concurrent += (target,)
         plan.stops[target] = _schedule(engine, target, seat, owner, reviewer, attempts, review_rounds, plan.steps)
     return plan
 
