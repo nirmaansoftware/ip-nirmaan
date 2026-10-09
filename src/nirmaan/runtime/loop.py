@@ -206,7 +206,7 @@ def loop(engine: TaskEngine, owner: AgentRuntime, reviewer: AgentRuntime | None 
         if not batch:
             break
         seats = [(owner, reviewer)] if len(batch) == 1 else [(private(owner), private(reviewer)) for _ in batch]
-        stops = together([_driver(engine, t, o, r, report, attempts, review_rounds, kind, on_step)
+        stops = together([_task_body(engine, t, o, r, report, attempts, review_rounds, kind, on_step)
                           for t, (o, r) in zip(batch, seats)], jobs)
         report.stops.update(zip(batch, stops))
         if Stop.BUDGET in stops or Stop.PROJECT_BUDGET in stops:
@@ -218,7 +218,7 @@ def loop(engine: TaskEngine, owner: AgentRuntime, reviewer: AgentRuntime | None 
     return report
 
 
-def _driver(engine: TaskEngine, task_id: str, owner: AgentRuntime, reviewer: AgentRuntime, report: LoopReport,
+def _task_body(engine: TaskEngine, task_id: str, owner: AgentRuntime, reviewer: AgentRuntime, report: LoopReport,
             attempts: int | None, review_rounds: int | None, kind: ActorKind,
             on_step: Callable[[TaskEngine], None] | None) -> Callable[[], Stop]:
     return lambda: _drive(engine, task_id, owner, reviewer, report, attempts, review_rounds, kind, on_step)
