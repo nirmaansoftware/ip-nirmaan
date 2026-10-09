@@ -297,4 +297,23 @@ In `tests/test_nirmaan_sta_antecedents.py`:
 
 ## 7. Real numbers (CI)
 
-Filled in from the CI run that passed (section 4, law 5).
+From CI run 37924965528 (all jobs passed), the `physical-design` job, standalone
+OpenSTA, Nangate45 typical, `tests/fixtures/pd/prod3.sdc` (2.2 ns clock, 0.2 ns
+input delay). The fixture computes `y = a * b * c` (16-bit operands, low 32
+bits); the fix puts a register between the two multiplies.
+
+| | RTL | Setup slack | Hold slack | TNS | Result |
+|---|---|---|---|---|---|
+| Before (on `sta-analysis`) | `tests/fixtures/rtl/prod3/before/prod3.v` | -0.340 ns | 0.075 ns | -1.814 ns, 10 violating endpoints | recorded failed run, "timing violated" |
+| After (on `reanalysis`, the approved `rtl-fix`) | `tests/fixtures/rtl/prod3/prod3.v` | +0.452 ns | 0.075 ns | 0 | passing run, the substantiated evidence for `RETIMED` |
+
+Both runs are one `sta.run` each: `yosys -s synth_liberty.ys`, then
+`sta -no_init -no_splash -exit sta.tcl` on the `netlist.v` it wrote.
+
+What the iterations found: at a 1.8 ns clock with a 0 ns input delay the
+before-run was -0.740 ns setup but also -0.003 ns hold at the input registers,
+which would have failed the after-run too, so the SDC gives inputs 0.2 ns and
+the clock 2.2 ns. The image's Ubuntu 22.04 Icarus (11) prints no
+`$finish called` line, which the simulation parser requires, so the job takes
+Verilator, Icarus, and vvp from the same pinned OSS CAD Suite the test job uses.
+The container's default `sh` has no `${var//-/}`, so that step runs in bash.
