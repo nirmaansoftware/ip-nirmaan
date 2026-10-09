@@ -13,6 +13,7 @@ timing-closure project runs in CI's physical-design job.
 from __future__ import annotations
 
 import json
+import os
 import re
 from pathlib import Path
 
@@ -148,10 +149,13 @@ def test_sta_input_problems_are_recorded_failed_runs_or_refusals(broker_owner, t
     bin_dir = tmp_path / "bin"
     fake_tool(bin_dir, "sta", f"cat '{PD / 'opensta_met.log'}'")
     only_on_path(monkeypatch, bin_dir)
+    shell_path = os.environ["PATH"]
+    monkeypatch.setenv("PATH", str(bin_dir))  # the stand-in timer only: no Yosys, wherever the shell lives
     base = {"sdc": str(PROD3_SDC), "top": "prod3", "liberty": str(TINY_LIB)}
     with pytest.raises(ToolAccessDenied, match="needs yosys on PATH to synthesize sources"):
         invoke(engine, "sta.run", {**base, "sources": str(PROD3 / "prod3.v")}, tmp_path / "a")
     assert engine.state.tool_runs == {}
+    monkeypatch.setenv("PATH", shell_path)
 
     _yosys_stand_in(bin_dir)
     both, _ = invoke(engine, "sta.run", {**base, "sources": str(PROD3 / "prod3.v"),
