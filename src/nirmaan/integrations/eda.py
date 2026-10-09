@@ -11,6 +11,7 @@ A failing tool (lint errors, a failing test, a counterexample, a missing
 source, a timeout) is a recorded run with ``succeeded=False``, never an
 exception. A ``max_<metric>`` parameter is a limit on the parsed metric of that
 name: a run over it, or one whose backend did not report the metric, fails.
+A ``min_<metric>`` parameter (M34) is the same limit from below.
 Simulation logs reach VeriTriage through :func:`triage_simulation`, which invokes ``veritriage.investigate`` through the same broker. This module
 never imports VeriTriage.
 """
@@ -235,10 +236,12 @@ def execute(backend: Backend, params: dict[str, str]) -> ToolOutcome:
 
 
 def _within_limits(result: EdaResult, params: dict[str, str]) -> EdaResult:
-    """Fail a passing result that breaks a ``max_<metric>`` limit, or whose metric was never measured."""
+    """Fail a passing result that breaks a ``max_<metric>`` or (M34) ``min_<metric>`` limit, or whose metric
+    was never measured."""
     over = []
     for key, limit in params.items():
-        if not key.startswith("max_") or not result.passed:
+        bound_kind = key[:4]
+        if bound_kind not in ("max_", "min_") or not result.passed:
             continue
         metric, measured = key[4:], result.metrics.get(key[4:])
         try:
@@ -248,8 +251,10 @@ def _within_limits(result: EdaResult, params: dict[str, str]) -> EdaResult:
             continue
         if isinstance(measured, bool) or not isinstance(measured, (int, float)):
             over.append(f"{metric} was not reported, so {key} cannot be checked")
-        elif measured > bound:
+        elif bound_kind == "max_" and measured > bound:
             over.append(f"{metric} {measured} exceeds {key} {limit}")
+        elif bound_kind == "min_" and measured < bound:
+            over.append(f"{metric} {measured} is below {key} {limit}")
     if not over:
         return result
     diags = (*result.diagnostics, *(Diagnostic("error", m, "LIMIT") for m in over))

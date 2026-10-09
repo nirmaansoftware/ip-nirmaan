@@ -8,7 +8,7 @@ no agent can ever claim a CDC or equivalence run happened.
 Lint, simulation, tests, synthesis, and formal are AVAILABLE through
 open-source EDA (``nirmaan/integrations/eda.py``, M21); static timing and
 place and route through OpenSTA and OpenROAD (``integrations/physical.py``,
-M25). Their bindings still refuse, with a reason, on a machine whose PATH
+M25), and physical verification through KLayout (M34). Their bindings still refuse, with a reason, on a machine whose PATH
 lacks the executable or that has no PDK input for the run. Firmware build and
 co-simulation are AVAILABLE the same way (``nirmaan/integrations/firmware.py``,
 M25), and so are the RV32I cross build and the run on a RISC-V core
@@ -140,7 +140,13 @@ TOOLS: list[ToolSpec] = [
     _tool("sta.run", "Static timing", "eda", EXE, AV, "Static timing of a netlist under an SDC (OpenSTA).",
           (*NETLIST, _p("spef", PATH, "Parasitics (SPEF), as pnr.run extracts them."), TOP_REQUIRED, *PDK_REQUIRED,
            _p("tech_lef", PATHS, "Technology LEF (backend openroad-sta)."),
-           _p("lef", PATHS, "Cell LEF files (backend openroad-sta)."), *RUNNER)),
+           _p("lef", PATHS, "Cell LEF files (backend openroad-sta)."),
+           # M34: timing corners (docs/PD_FINAL.md).
+           _p("liberty_", PATHS, "One timing corner's Liberty files, e.g. liberty_ss; with any, the run times every "
+                                 "corner.", prefix=True),
+           _p("corner", TEXT, "The name of the corner the base liberty files time (default typical)."),
+           _p("min_", NUM, "Fail a passing run whose parsed metric of that name is below this, e.g. "
+                           "min_timing_corners.", prefix=True), *RUNNER)),
     _tool("pnr.run", "Place and route", "eda", EXE, AV,
           "Floorplan, power grid, placement, clock tree, routing, and extraction in one staged run, with timing "
           "(OpenROAD).",
@@ -167,9 +173,26 @@ TOOLS: list[ToolSpec] = [
            _p("routing_layers", TEXT, "Lowest and highest signal routing layers, as LOWEST,HIGHEST."),
            _p("filler_cells", TEXT, "Filler cell masters, comma separated."),
            _p("supply_voltage", NUM, "Volts on each power net, for IR-drop analysis."),
-           _p("rcx_rules", PATH, "The PDK's OpenRCX rules; enables the extract stage."), *RUNNER)),
+           _p("rcx_rules", PATH, "The PDK's OpenRCX rules; enables the extract stage."),
+           _p("fill_rules", PATH, "The PDK's metal fill rules (JSON), for density_fill after routing (M34)."),
+           *RUNNER)),
     _tool("power.run", "Power analysis", "eda", EXE, CO, "Power, IR-drop, and EM."),
-    _tool("pv.run", "Physical verification", "eda", EXE, CO, "DRC, LVS, ERC, antenna, density."),
+    _tool("pv.run", "Physical verification", "eda", EXE, AV,
+          "The routed layout streamed to GDS, then DRC and LVS with the PDK's KLayout decks (M34).",
+          (_p("def", PATH, "The routed (and filled) DEF, as pnr.run writes it.", required=True),
+           _p("netlist", PATH, "The routed netlist with supply pins (pnr.run's pg_netlist), LVS's reference.",
+              required=True),
+           TOP_REQUIRED,
+           _p("tech_lef", PATHS, "Technology LEF.", required=True),
+           _p("lef", PATHS, "Cell LEF files.", required=True),
+           _p("gds", PATHS, "The cells' GDS, merged into the layout.", required=True),
+           _p("klayout_tech", PATH, "The PDK's KLayout technology (.lyt).", required=True),
+           _p("drc_deck", PATH, "The PDK's KLayout DRC deck; enables DRC."),
+           _p("lvs_deck", PATH, "The PDK's KLayout LVS deck; enables LVS with cdl."),
+           _p("cdl", PATHS, "The cells' CDL netlists, for LVS."),
+           _p("pdk_root", PATH, "Where relative PDK paths resolve."),
+           _p("min_", NUM, "Fail a passing run whose parsed metric of that name is below this, e.g. "
+                           "min_fill_shapes.", prefix=True), *RUNNER)),
     _tool("dft.run", "DFT tools", "eda", EXE, CO, "ATPG, MBIST, and commercial scan flows."),
     _tool("dft.scan_insert", "Scan insertion", "eda", EXE, AV, "Mux-D scan flops stitched into one chain.",
           (SOURCES, TOP_REQUIRED, _p("chains", INT, "Number of scan chains (default 1)."),
