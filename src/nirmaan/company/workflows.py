@@ -518,8 +518,10 @@ BLOCK_DESIGN = WorkflowTemplate(
                      checked("The plan covers every requirement of the approved interface spec", "vplan.check",
                              FileInput(param="plan", kinds=("verification_plan",)),
                              FileInput(param="spec", kinds=("interface_spec",), upstream=True)))),
+        # The RTL seat works from the approved interface spec as well as the microarchitecture: port names,
+        # parameters, and responses are the spec's (found by the first live evaluation, which named ports freely).
         st("rtl-implementation", "RTL implementation and testbench", "RTL", "rtl.implement",
-           depends_on=("microarchitecture",), criticality=H, review=rv("rtl.review"),
+           depends_on=("interface-spec", "microarchitecture"), criticality=H, review=rv("rtl.review"),
            outputs=("rtl_source", "testbench"),
            evidence=(REVIEWED,
                      checked("Lint-clean under the RTL lint rules", "lint.run",
