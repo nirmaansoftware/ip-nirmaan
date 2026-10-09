@@ -575,13 +575,18 @@ def links(project: str, root: Path = ROOT_OPTION) -> None:
 @vplan_app.command("import")
 def vplan_import(project: str, file: Path, role: str = typer.Option(..., "--as", help="Role ID acting."),
                  agent: bool = typer.Option(False, "--agent", help="Act as an AI agent rather than a human."),
+                 amend: bool = typer.Option(False, "--amend", help="The file is the next version of the plan: "
+                                            "add, modify, and retire (M38)."),
                  root: Path = ROOT_OPTION) -> None:
     """Record a plan's requirements and items through the engine. All or nothing; it backs nothing."""
-    from nirmaan.vplan import PlanError, import_plan
+    from nirmaan.vplan import PlanError, amend_plan, import_plan
 
     engine = _load(project, root)
     try:
-        report = import_plan(engine, _actor(role, agent), file.read_text(encoding="utf-8"))
+        if amend:
+            changed = amend_plan(engine, _actor(role, agent), file.read_text(encoding="utf-8"))
+        else:
+            report = import_plan(engine, _actor(role, agent), file.read_text(encoding="utf-8"))
     except PlanError as exc:
         for problem in exc.problems:
             _err.print(f"[red]{escape(str(file))}: {escape(problem)}[/red]")
@@ -589,6 +594,11 @@ def vplan_import(project: str, file: Path, role: str = typer.Option(..., "--as",
     except OSError as exc:
         _fail(str(exc))
     ProjectStore(root).save(engine.state)
+    if amend:
+        console.print(f"Amended the plan: added {len(changed.added)}, modified {len(changed.modified)}, "
+                      f"retired {len(changed.retired)}, kept {len(changed.kept)}. Superseded versions stay on the "
+                      "audit trail. None is backed until a passing, cited tool run backs it.")
+        return
     console.print(f"Recorded {report.requirements} requirements and {report.items} verification items. "
                   "None is backed until a passing, cited tool run backs it.")
 
