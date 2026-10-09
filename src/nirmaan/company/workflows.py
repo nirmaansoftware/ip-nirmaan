@@ -99,6 +99,13 @@ RTL_GATES = (
 )
 
 
+#: M38: the plan a `dv-plan` seat writes on `new-ip` and `feature-addition` covers exactly the requirements
+#: the approved requirements spec tags, checked before review and recorded on approval
+#: (docs/VERIFICATION_PLAN_MORE.md).
+PLAN_CHECKED = checked("The plan covers every requirement of the approved requirements spec", "vplan.check",
+                       FileInput(param="plan", kinds=("verification_plan",)),
+                       FileInput(param="spec", kinds=("requirements_spec",), upstream=True))
+
 _PROTOCOL_VARIANTS = (
     var("axi", "AXI interface", "axi", cond=when("axi")),
     var("ace", "ACE interface", "ace", cond=when("ace")),
@@ -169,7 +176,7 @@ NEW_IP = WorkflowTemplate(
            gate="gate.rtl", outputs=("quality_report",), evidence=(REVIEWED,)),
         st("dv-plan", "Verification plan", "Verification", "dv.plan",
            depends_on=("requirements", "microarchitecture"), criticality=H, review=rv("dv.review"),
-           outputs=("verification_plan",), evidence=(REVIEWED,)),
+           outputs=("verification_plan",), evidence=(REVIEWED, PLAN_CHECKED)),  # M38: a checked plan
         st("dv-environment", "UVM environment", "Verification", "dv.testbench",
            depends_on=("dv-plan",), skills=("uvm",), criticality=H, review=rv("dv.review"),
            outputs=("testbench",), evidence=(REVIEWED, dv_ran("Environment smoke test runs", "simulator.run", "test.run"))),
@@ -290,8 +297,9 @@ FEATURE_ADDITION = WorkflowTemplate(
            outputs=("rtl_source", "testbench"), evidence=(REVIEWED, *RTL_GATES)),
         st("rtl-lint", "Lint", "RTL", "rtl.lint", depends_on=("rtl-change",),
            outputs=("lint_report",), evidence=(ran("Lint run", "lint.run"),)),
-        st("dv-plan", "Verification plan update", "Verification", "dv.plan", depends_on=("microarchitecture",),
-           criticality=H, review=rv("dv.review"), outputs=("verification_plan",), evidence=(REVIEWED,)),
+        st("dv-plan", "Verification plan update", "Verification", "dv.plan",
+           depends_on=("requirements-delta", "microarchitecture"), criticality=H, review=rv("dv.review"),
+           outputs=("verification_plan",), evidence=(REVIEWED, PLAN_CHECKED)),  # M38: a checked plan
         st("tests", "New feature tests", "Verification", "dv.random_tests", depends_on=("dv-plan", "rtl-change"),
            skills=("uvm",), criticality=M, review=rv("dv.review"), outputs=("tests",),
            evidence=(REVIEWED, dv_ran("Feature tests executed", "test.run", "regression.run"))),
@@ -518,8 +526,10 @@ BLOCK_DESIGN = WorkflowTemplate(
                      checked("The plan covers every requirement of the approved interface spec", "vplan.check",
                              FileInput(param="plan", kinds=("verification_plan",)),
                              FileInput(param="spec", kinds=("interface_spec",), upstream=True)))),
+        # The RTL seat works from the approved interface spec as well as the microarchitecture: port names,
+        # parameters, and responses are the spec's (found by the first live evaluation, which named ports freely).
         st("rtl-implementation", "RTL implementation and testbench", "RTL", "rtl.implement",
-           depends_on=("microarchitecture",), criticality=H, review=rv("rtl.review"),
+           depends_on=("interface-spec", "microarchitecture"), criticality=H, review=rv("rtl.review"),
            outputs=("rtl_source", "testbench"),
            evidence=(REVIEWED,
                      checked("Lint-clean under the RTL lint rules", "lint.run",

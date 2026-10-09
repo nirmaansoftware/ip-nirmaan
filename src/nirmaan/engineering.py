@@ -249,13 +249,16 @@ def _item_status(state: ProjectState, item: VerificationItem, kinds: dict[str, I
 
 
 def requirement_coverage(state: ProjectState) -> list[RequirementStatus]:
-    """Every recorded requirement, backed or not, with each proving item's status. Sorted by ID."""
+    """Every active requirement, backed or not, with each active proving item's status. Sorted by ID.
+
+    M38: a retired requirement or item is history, not current work: it is left out.
+    """
     kinds = item_kinds()
-    statuses = {i.id: _item_status(state, i, kinds) for i in state.verification_items.values()}
+    active = sorted((i for i in state.verification_items.values() if not i.retired), key=lambda i: i.id)
+    statuses = {i.id: _item_status(state, i, kinds) for i in active}
     result = []
-    for req in sorted(state.spec_requirements.values(), key=lambda r: r.id):
-        items = tuple(statuses[i.id] for i in sorted(state.verification_items.values(), key=lambda i: i.id)
-                      if req.id in i.proves)
+    for req in sorted((r for r in state.spec_requirements.values() if not r.retired), key=lambda r: r.id):
+        items = tuple(statuses[i.id] for i in active if req.id in i.proves)
         if not items:
             reasons: tuple[str, ...] = ("no verification item is recorded as proving it",)
         else:
@@ -290,7 +293,7 @@ def engineering_graph(state: ProjectState, links: LinkReport | None = None,
         rid = f"req:{req.requirement}"
         nodes[rid] = {"id": rid, "kind": "spec_requirement", "label": req.text, "backed": req.backed}
         edges.append({"from": rid, "relation": "quoted_from", "to": req.source})
-    for item in sorted(state.verification_items.values(), key=lambda i: i.id):
+    for item in sorted((i for i in state.verification_items.values() if not i.retired), key=lambda i: i.id):
         nodes[item.id] = {"id": item.id, "kind": f"verification_item:{item.kind}", "label": item.name,
                           "status": status[item.id].status if item.id in status else None}
         held = status[item.id].artifact if item.id in status else item.artifact

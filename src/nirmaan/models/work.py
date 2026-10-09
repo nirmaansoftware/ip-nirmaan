@@ -382,6 +382,8 @@ class SpecRequirement(BaseModel):
     source: str = Field(description="The artifact it is quoted from, e.g. the interface spec.")
     section: str = ""
     recorded_by: str
+    revision: int = Field(default=1, description="M38: 1 when first recorded, one more per amendment.")
+    retired: str = Field(default="", description="M38: why it was retired; empty while it is active.")
 
 
 class VerificationItem(BaseModel):
@@ -406,6 +408,8 @@ class VerificationItem(BaseModel):
     proves: tuple[str, ...]
     rationale: str = ""
     recorded_by: str
+    revision: int = Field(default=1, description="M38: 1 when first recorded, one more per amendment.")
+    retired: str = Field(default="", description="M38: why it was retired; empty while it is active.")
 
 
 class Project(BaseModel):
