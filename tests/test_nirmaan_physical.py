@@ -118,12 +118,15 @@ def test_the_catalog_says_why_a_tool_cannot_run_here(monkeypatch, tmp_path):
 
 def test_the_logs_say_where_they_were_captured():
     logs = sorted(PD.glob("*.log"))
-    assert [p.name for p in logs] == ["openroad_error.log", "openroad_route.log", "openroad_signoff.log",
-                                      "opensta_met.log", "opensta_spef.log", "opensta_violated.log"]
+    assert [p.name for p in logs] == ["klayout_pv.log", "klayout_pv_drc.log", "klayout_pv_lvs.log",  # M34
+                                      "openroad_error.log", "openroad_route.log", "openroad_signoff.log",
+                                      "openroad_sky130_fill.log", "opensta_corners.log", "opensta_met.log",
+                                      "opensta_spef.log", "opensta_violated.log"]
     for log in logs:
         first, second = log.read_text(encoding="utf-8").splitlines()[:2]
         assert first.startswith("# CAPTURED:") and "CI run" in first, log
-        exe = "sta" if log.name == "opensta_spef.log" else "openroad"  # M29: standalone OpenSTA, built in CI
+        # M29: standalone OpenSTA, built in CI. M34: pv.run's first step writes the CDL in OpenROAD.
+        exe = "sta" if log.name in ("opensta_spef.log", "opensta_corners.log") else "openroad"
         assert second.startswith(f"$ {exe} -no_init -no_splash -exit "), log  # as eda.execute logs a step
 
 
@@ -229,6 +232,68 @@ def test_opensta_on_the_extracted_spef():
     line = next(ln for ln in log.splitlines() if ln.startswith("nirmaan-floating-drivers:"))
     dropped = line.replace(" VDD", "")
     assert parse_opensta(log.replace(line, dropped), 0).metrics["unannotated_nets"] == 1
+
+
+def test_opensta_reports_each_corner():
+    """M34: slow, typical, and fast sky130hd Liberty on one extracted SPEF, through standalone OpenSTA."""
+    result = parse_opensta(_text("opensta_corners.log"), 0)
+    assert result.passed, result.summary
+    m = result.metrics
+    assert m["slack_by_corner"] == {"tt": {"setup": 4.428, "hold": 0.629}, "ss": {"setup": 1.276, "hold": 1.283},
+                                    "ff": {"setup": 5.606, "hold": 0.399}}
+    assert m["timing_corners"] == 3 and m["unannotated_nets"] == 0
+    assert (m["worst_slack"], m["worst_hold_slack"]) == (1.276, 0.399)  # setup on ss, hold on ff
+    assert result.summary == ("timing met: worst setup slack 1.276, worst hold slack 0.399, TNS 0.000 across 3 "
+                              "corners (tt 4.428/0.629, ss 1.276/1.283, ff 5.606/0.399)")
+    # A corner whose section reports no path does not count, and fails the run.
+    log = _text("opensta_corners.log")
+    ff = log[log.index("nirmaan-corner: ff"):log.index("nirmaan-corner-done: ff")]
+    empty = parse_opensta(log.replace(ff, "nirmaan-corner: ff\nNo paths found.\n"), 0)
+    assert not empty.passed and empty.metrics["timing_corners"] == 2 and "corner ff" in empty.summary
+    assert parse_opensta(_text("opensta_met.log"), 0).metrics["timing_corners"] == 1  # one corner, as before
+
+
+def test_openroad_reports_metal_fill():
+    result = parse_openroad(_text("openroad_sky130_fill.log"), 0, "extract", SIGNOFF_STAGES)
+    assert result.passed, result.summary
+    m = result.metrics
+    assert m["fill_shapes"] == 12947 and m["drc_violations"] == 0 and m["unconnected_supply_pins"] == 0
+    assert (m["worst_slack"], m["worst_hold_slack"]) == (4.428, 0.629)
+    assert "metal fill 12947 shapes" in result.summary
+    assert parse_openroad(_text("openroad_signoff.log"), 0, "extract", SIGNOFF_STAGES).metrics["fill_shapes"] is None
+
+
+def test_klayout_drc_and_lvs_clean():
+    result = parse_klayout(_text("klayout_pv.log"), 0)
+    assert result.passed, result.summary
+    m = result.metrics
+    assert (m["gds_empty_cells"], m["fill_shapes"], m["drc_violations"], m["lvs_mismatches"]) == (0, 12947, 0, 0)
+    assert m["drc_by_rule"] == {} and m["lvs_unmatched_circuits"] == []
+    assert not result.errors  # the deck's own "ERROR : ..." text is not a tool error; none here anyway
+    assert result.summary == ("physical verification passed: GDS written with 12947 fill shapes, DRC clean, "
+                              "LVS clean (layout matches the netlist)")
+
+
+def test_klayout_broken_layout_and_netlist_fail():
+    drc = parse_klayout(_text("klayout_pv_drc.log"), 0)
+    assert not drc.passed and drc.metrics["drc_violations"] == 782 and drc.metrics["lvs_mismatches"] == 0
+    assert list(drc.metrics["drc_by_rule"])[:3] == ["licon_OFFGRID", "li_OFFGRID", "poly_OFFGRID"]
+    assert drc.summary == ("physical verification failed: 782 DRC violations (licon_OFFGRID 200, li_OFFGRID 172, "
+                           "poly_OFFGRID 138)")
+    lvs = parse_klayout(_text("klayout_pv_lvs.log"), 0)
+    assert not lvs.passed and lvs.metrics["drc_violations"] == 0
+    assert lvs.metrics["lvs_mismatched"] == {"circuits": 1, "nets": 2, "devices": 0, "pins": 0, "subcircuits": 1}
+    assert lvs.metrics["lvs_unmatched_circuits"] == ["axi4_lite_regs"]
+    assert "LVS mismatch: 1 mismatched circuit, 2 mismatched nets, 1 mismatched subcircuit" in lvs.summary
+    # A check that ran and printed no count, or a stream that left a cell empty, fails.
+    clean = _text("klayout_pv.log")
+    no_lvs = "\n".join(ln for ln in clean.splitlines() if not ln.startswith("nirmaan-lvs-"))
+    assert "no LVS comparison reported" in parse_klayout(no_lvs, 0).summary
+    assert parse_klayout(no_lvs, 0, ["drc"]).passed  # DRC only: no LVS asked for
+    empty = clean.replace("nirmaan-gds-empty-cells: 0", "nirmaan-gds-empty-cells: 1\nnirmaan-gds-empty-cell: X")
+    assert "1 layout cell with no GDS (X)" in parse_klayout(empty, 0).summary
+    crashed = parse_klayout(clean + "\nERROR: drc.lydrc:12: undefined method\n", 1)
+    assert not crashed.passed and crashed.errors[-1].message == "drc.lydrc:12: undefined method"
 
 
 def test_openroad_failure_names_the_stage():
