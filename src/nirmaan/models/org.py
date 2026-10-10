@@ -7,7 +7,6 @@ a record of responsibility and authority, not a prompt.
 
 from __future__ import annotations
 
-import re
 from enum import Enum
 from typing import Any
 
@@ -250,7 +249,6 @@ class ParamKind(str, Enum):
 #: for paths, an int for integer, a float for number. A run saved before M39 stores text, also a ParamValue.
 ParamValue = str | int | float | tuple[str, ...]
 
-_INTEGER = re.compile(r"^-?\d+$")
 
 
 class ParamSpec(BaseModel):
@@ -301,7 +299,7 @@ class ParamSpec(BaseModel):
         if self.kind is ParamKind.INTEGER:
             if isinstance(raw, int) and not isinstance(raw, bool):
                 return raw
-            if isinstance(raw, str) and _INTEGER.match(raw.strip()):
+            if isinstance(raw, str) and raw.strip().removeprefix("-").isdigit():
                 return int(raw.strip())
             raise ValueError(f"{name} must be a whole number, not {raw!r}")
         try:

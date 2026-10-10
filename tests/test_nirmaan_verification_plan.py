@@ -308,7 +308,7 @@ def test_the_check_refuses_a_plan_that_misses_a_spec_requirement(planned, tmp_pa
     assert engine.task(seat).status is TaskStatus.IN_PROGRESS and not engine.task(seat).artifacts
     run = check_run(engine)
     assert not run.succeeded and "AXIL-FORMAL" in run.summary and "interface_spec.md" in run.summary
-    assert Path(run.params["spec"]).read_bytes() == SPEC_FILE.read_bytes()  # the approved spec, as recorded
+    assert Path(run.values("spec")[0]).read_bytes() == SPEC_FILE.read_bytes()  # the approved spec, as recorded
 
 
 @pytest.mark.parametrize("change, reason", [

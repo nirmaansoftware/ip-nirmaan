@@ -203,7 +203,7 @@ def test_clean_rtl_with_a_proof_reaches_review_and_approval(gated):
     task = engine.task(rtl)
     arts = {engine.state.artifacts[a].kind: engine.state.artifacts[a] for a in task.artifacts}
     assert runs["formal.cover"].params["sby"] == arts["formal_spec"].location
-    assert runs["formal.cover"].params["sources"] == arts["rtl_source"].location
+    assert runs["formal.cover"].params["sources"] == (arts["rtl_source"].location,)
     assert unsatisfied_requirements(engine.state, task) == ["Independent review recorded"]
     review_task(engine, rtl, ModelRuntime(MockLLM()))
     engine.approve(rtl, human(task.approver), "gated, proven, not vacuous")
@@ -439,7 +439,7 @@ def test_drive_runs_the_checks_before_it_submits(nirmaan_org, fixed_clock, tmp_p
     order = [a.action for a in engine.state.audit if a.subject == rtl and a.action in ("tool.run", "task.submit")]
     assert order == ["tool.run"] * 3 + ["task.submit"]  # every check ran, then the work was submitted
     locations = {engine.state.artifacts[a].location for a in task.artifacts}
-    assert runs[0].params["sources"] in locations
+    assert set(runs[0].values("sources")) <= locations
 
 
 # --- Laws ----------------------------------------------------------------------------------------------

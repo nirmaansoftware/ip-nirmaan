@@ -21,7 +21,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Callable, Sequence
 
-from nirmaan.models import Actor, ParamKind, ParamSpec, ParamValue, ToolRun, ToolSpec, ToolStatus
+from nirmaan.models import Actor, ParamKind, ParamSpec, ParamValue, ToolRun, ToolSpec, ToolStatus, text_value
 from nirmaan.org import AuthorityService
 from nirmaan.work.engine import TaskEngine
 
@@ -93,8 +93,9 @@ ParamInput = str | int | float | Sequence[str]
 def check_params(spec: ToolSpec, params: dict[str, ParamInput]) -> Params:
     """The call's parameters typed by the contract (M39), or ToolContractError saying what is wrong.
 
-    A tool with no declared contract (``params`` None) takes any parameter, untyped: a list as a tuple of
-    text, anything else as text. An empty integer or number is not given.
+    A tool with no declared contract (``params`` None) takes any parameter, untyped, as in M28: a list
+    comma-joined, anything else as text, so its binding reads what it always has. An empty integer or
+    number is not given.
     """
     checked: Params = {}
     problems: list[str] = []
@@ -109,7 +110,7 @@ def check_params(spec: ToolSpec, params: dict[str, ParamInput]) -> Params:
             if param is not None:
                 value = param.parse(raw, name)
             else:
-                value = untyped.parse(raw, name) if isinstance(raw, (list, tuple)) else str(raw)
+                value = text_value(untyped.parse(raw, name)) if isinstance(raw, (list, tuple)) else str(raw)
         except ValueError as exc:
             problems.append(str(exc))
             continue

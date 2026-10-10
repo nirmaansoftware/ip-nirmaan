@@ -133,7 +133,7 @@ def test_a_latch_hidden_from_lint_cannot_reach_review(counter_rtl):
     assert runs["lint.run"].succeeded and runs["simulator.run"].succeeded
     synth = runs["synth.run"]
     assert not synth.succeeded and "latches 1 exceeds max_latches 0" in synth.summary
-    assert synth.params["max_latches"] == "0"
+    assert synth.params["max_latches"] == 0.0  # typed by the contract (M39)
     ev = next(engine.state.evidence[e] for e in report.evidence if engine.state.evidence[e].tool_run == synth.id)
     assert not ev.substantiated  # the failure is on the record
     task = engine.task(rtl)
@@ -206,10 +206,10 @@ def test_passing_synthesis_and_formal_allow_review(counter_rtl):
     runs = runs_of(engine, report)
     assert set(runs) == {"lint.run", "simulator.run", "synth.run", "formal.run", "formal.cover"}
     assert all(r.succeeded for r in runs.values())
-    assert runs["synth.run"].params["sources"] == arts["rtl_source"].location
+    assert runs["synth.run"].params["sources"] == (arts["rtl_source"].location,)
     assert runs["synth.run"].params["top"] == "counter"
     assert runs["formal.run"].params["sby"] == arts["formal_spec"].location
-    assert runs["formal.run"].params["sources"] == arts["rtl_source"].location
+    assert runs["formal.run"].params["sources"] == (arts["rtl_source"].location,)
     assert runs["formal.cover"].params["sby"] == arts["formal_spec"].location  # M27: and it is not vacuous
     assert unsatisfied_requirements(engine.state, task) == ["Independent review recorded"]
 

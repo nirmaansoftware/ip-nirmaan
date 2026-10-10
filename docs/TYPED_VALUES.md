@@ -34,7 +34,8 @@ same value. A boolean is never an integer.
 broker records stores them (`params: dict[str, ParamValue]`), and the binding
 and its probe receive them: `timeout` is an `int`, `utilization` a `float`,
 `sources` a tuple of paths. A tool with no contract (`params` None) is not
-typed: a list is kept as a tuple of text, anything else as text, as before.
+typed: a list is comma-joined and anything else is text, exactly as in M28,
+so an extension's binding written against text keeps working.
 An ill-typed value is refused before any probe, binding, or record, as in M28.
 
 **From the CLI and task inputs.** Both stay text where they are written (a

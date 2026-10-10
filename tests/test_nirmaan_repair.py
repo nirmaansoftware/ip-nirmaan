@@ -147,12 +147,12 @@ def test_rtl_that_fails_lint_then_passes_reaches_review(rtl_ready):
     assert all(Path(a.location).parent.name == "2" for a in submitted) and not old & {a.location for a in submitted}
 
     failed = runs_of(engine, first.tool_runs)["lint.run"]
-    assert not failed.succeeded and failed.params["sources"] in old
+    assert not failed.succeeded and set(failed.values("sources")) <= old
     assert all(not engine.state.evidence[e].substantiated for e in first.evidence
                if engine.state.evidence[e].tool_run == failed.id)
     passing = runs_of(engine, report.attempts[1]["tool_runs"])
     assert all(r.succeeded for r in passing.values())
-    assert passing["lint.run"].params["sources"] == next(a.location for a in submitted if a.kind == "rtl_source")
+    assert passing["lint.run"].params["sources"] == (next(a.location for a in submitted if a.kind == "rtl_source"),)
     entries = [e for e in engine.state.audit if e.action == "task.attempt"]
     assert len(entries) == 1 and entries[0].details["attempt"] == first.id
     assert entries[0].details["tool_runs"] == list(first.tool_runs)
@@ -299,7 +299,7 @@ def test_a_firmware_seat_is_repaired_by_the_same_loop(nirmaan_org, fixed_clock, 
     assert task.status is TaskStatus.IN_REVIEW
     passing = runs_of(engine, report.attempts[1]["tool_runs"])
     assert all(r.succeeded for r in passing.values())
-    assert set(passing["fw.test"].params["sources"].split(",")) == {engine.state.artifacts[a].location
+    assert set(passing["fw.test"].values("sources")) == {engine.state.artifacts[a].location
                                                                    for a in task.artifacts}
 
 
