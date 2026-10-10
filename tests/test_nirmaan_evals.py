@@ -40,7 +40,9 @@ from nirmaan.runtime import MockLLM, ModelRuntime
 REPO = Path(__file__).parents[1]
 EVALS = REPO / "evals"
 AXI = REPO / "tests" / "fixtures" / "rtl" / "axi4_lite"
-SHIPPED = ["rtl/apb-regs", "rtl/axi4-lite-regs", "rtl/rr-arbiter", "rtl/sync-fifo"]
+RTL_CASES = ["rtl/apb-regs", "rtl/axi4-lite-regs", "rtl/rr-arbiter", "rtl/sync-fifo"]
+#: M45: a spec seat case and a firmware seat case join the four RTL cases.
+SHIPPED = ["firmware/axi4-lite-driver", *RTL_CASES, "spec/axi4-lite-interface"]
 
 #: A testbench that exercises nothing: it resets the block, prints PASS, and stops.
 WEAK_TB = """\
@@ -110,7 +112,7 @@ def test_an_invalid_case_is_reported_not_run(nirmaan_org, tmp_path):
 
 
 @needs("verilator", "iverilog", "vvp", "yosys", "sby", "yices-smt2")
-@pytest.mark.parametrize("case_id", SHIPPED)
+@pytest.mark.parametrize("case_id", RTL_CASES)
 def test_replaying_the_reference_scores_every_check(nirmaan_org, fixed_clock, tmp_path, case_id):
     case = next(c for c in load_cases(EVALS) if c.id == case_id)
     result = run_case(nirmaan_org, case, repo=REPO, sandbox=tmp_path, clock=fixed_clock)
