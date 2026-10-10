@@ -173,6 +173,11 @@ def _inputs(packet: WorkPacket) -> dict[str, str]:
     }
 
 
+def _builds_on(packet: WorkPacket, req: dict[str, Any]) -> bool:
+    """Whether the task builds on an upstream artifact of a kind the requirement is scoped to (M37)."""
+    return not req["when_upstream"] or any(a["kind"] in req["when_upstream"] for a in packet.task["upstream_artifacts"])
+
+
 def _grounded(art: dict[str, Any], prompt: WorkPrompt, stripped: list[str]) -> dict[str, Any] | None:
     """An artifact draft with its summary grounded, derived from the approved artifacts it cites.
 
@@ -240,7 +245,7 @@ class ModelRuntime:
         """
         wanted: dict[str, dict[str, str]] = {}
         for req in packet.task["evidence_requirements"]:
-            if _TOOL_BACKED & set(req["accepts"]) and not req["files"]:
+            if _TOOL_BACKED & set(req["accepts"]) and not req["files"] and _builds_on(packet, req):
                 for tool in req["tools"]:
                     wanted.setdefault(tool, dict(req["params"]))
         notes = []
@@ -350,6 +355,8 @@ class ModelRuntime:
                 continue
             if req["when_produced"] and not any(f["kind"] in req["when_produced"] for f in produced):
                 continue  # a conditional check whose files were not produced: not run, not claimed
+            if not _builds_on(packet, req):
+                continue  # scoped to work built on other kinds (M37): not run, not claimed
             files: dict[str, str | list[str]] = {}
             missing = None
             for binding in req["files"]:

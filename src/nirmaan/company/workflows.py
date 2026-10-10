@@ -106,6 +106,13 @@ PLAN_CHECKED = checked("The plan covers every requirement of the approved requir
                        FileInput(param="plan", kinds=("verification_plan",)),
                        FileInput(param="spec", kinds=("requirements_spec",), upstream=True))
 
+#: M37: on the RTL branch, re-analysis is a real STA run over the approved fixed RTL (synthesized to the PDK's
+#: Liberty, then timed under the task's SDC), before review; no attestation meets it (docs/STA_AND_ANTECEDENTS.md).
+RETIMED = checked("Timing met on the fixed RTL: synthesized to the target library, then timed under the task's SDC",
+                  "sta.run", FileInput(param="sources", kinds=("rtl_source",), upstream=True),
+                  when_upstream=("rtl_source",))
+
+
 _PROTOCOL_VARIANTS = (
     var("axi", "AXI interface", "axi", cond=when("axi")),
     var("ace", "ACE interface", "ace", cond=when("ace")),
@@ -493,7 +500,8 @@ TIMING_CLOSURE = WorkflowTemplate(
         st("reanalysis", "Re-analysis", "Implementation", "sta.analyze",
            depends_on=("rtl-fix", "constraint-fix", "pd-fix"), criticality=H, review=rv("sta.review"),
            gate="gate.implementation", outputs=("timing_report",),
-           evidence=(REVIEWED, ran("Clean timing report", "sta.run"))),
+           evidence=(REVIEWED, RETIMED,  # M37
+                     ran("Clean timing report", "sta.run", when_upstream=("constraints", "layout")))),
     ),
 )
 
@@ -620,8 +628,8 @@ BLOCK_DESIGN = WorkflowTemplate(
 PHYSICAL_IMPLEMENTATION = WorkflowTemplate(
     id="physical-implementation",
     name="Physical implementation",
-    description="Constraints, Liberty-mapped synthesis, floorplan, power grid, place, clock tree, and route, "
-                "then STA signoff on extracted parasitics. "
+    description="Constraints, Liberty-mapped synthesis, floorplan, power grid, place, clock tree, route, and "
+                "metal fill, then DRC and LVS, and STA signoff on extracted parasitics across corners. "
                 "The PDK is a task input; a machine without the tools refuses the runs.",
     intents=("physical_implementation",),
     stages=(
@@ -644,10 +652,18 @@ PHYSICAL_IMPLEMENTATION = WorkflowTemplate(
            evidence=(REVIEWED, ran("Placed, clock tree built, and routed, with clock skew, DRC count, and "
                                    "wirelength reported", "pnr.run",
                                    params=(("max_drc_violations", "0"), ("max_unconnected_supply_pins", "0"))))),
-        st("sta-signoff", "STA signoff", "Signoff", "sta.analyze", depends_on=("place-route",), criticality=H,
-           review=rv("sta.review"), gate="gate.implementation", outputs=("timing_report",),
-           evidence=(REVIEWED, ran("Signoff timing on the routed netlist with extracted parasitics (SPEF)",
-                                   "sta.run", params=(("max_unannotated_nets", "0"),)))),
+        # M34: DRC and LVS with the PDK's decks on the filled layout, and timing on at least three corners
+        # (docs/PD_FINAL.md). As in M29, a run counts only if made with these limits.
+        st("physical-verification", "DRC and LVS", "Signoff", "pd.signoff_checks", depends_on=("place-route",),
+           criticality=H, review=rv("pd.review"), outputs=("physical_verification_report",),
+           evidence=(REVIEWED, ran("DRC and LVS clean on the filled layout, with the PDK's decks", "pv.run",
+                                   params=(("max_drc_violations", "0"), ("max_lvs_mismatches", "0"),
+                                           ("min_fill_shapes", "1"))))),
+        st("sta-signoff", "STA signoff", "Signoff", "sta.analyze", depends_on=("place-route", "physical-verification"),
+           criticality=H, review=rv("sta.review"), gate="gate.implementation", outputs=("timing_report",),
+           evidence=(REVIEWED, ran("Signoff timing on the routed netlist with extracted parasitics (SPEF), "
+                                   "across slow, typical, and fast corners", "sta.run",
+                                   params=(("max_unannotated_nets", "0"), ("min_timing_corners", "3"))))),
     ),
 )
 

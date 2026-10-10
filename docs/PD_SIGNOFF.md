@@ -205,6 +205,9 @@ minutes.
 
 ## 7. Multi-corner timing: not available
 
+M34 closed this: CI fetches the sky130hd ss and ff corners (pinned by sha256),
+and `sta.run` times all three. See `docs/PD_FINAL.md`.
+
 Neither platform in the image ships more than one Liberty corner for its
 standard cells. Nangate45 has `NangateOpenCellLibrary_typical.lib` only.
 sky130hd has `sky130_fd_sc_hd__tt_025C_1v80.lib` only (and a dummy I/O
@@ -305,6 +308,9 @@ in favor of `set_extraction_rules_file`), `DRT-0349` on sky130hd
 ---
 
 ## 11. Not in this milestone
+
+M34 (`docs/PD_FINAL.md`) closed the first three items and the fourth (local
+OpenROAD on macOS arm64 is not supported).
 
 * Multi-corner, multi-mode timing (section 7).
 * Physical verification with a signoff deck (`pv.run`: KLayout DRC and LVS,

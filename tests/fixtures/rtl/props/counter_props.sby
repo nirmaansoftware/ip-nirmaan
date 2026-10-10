@@ -1,0 +1,13 @@
+[options]
+mode prove
+depth 12
+
+[engines]
+smtbmc
+
+[script]
+read -formal counter_props.v
+prep -top counter
+
+[files]
+counter_props.v
