@@ -620,8 +620,8 @@ BLOCK_DESIGN = WorkflowTemplate(
 PHYSICAL_IMPLEMENTATION = WorkflowTemplate(
     id="physical-implementation",
     name="Physical implementation",
-    description="Constraints, Liberty-mapped synthesis, floorplan, power grid, place, clock tree, and route, "
-                "then STA signoff on extracted parasitics. "
+    description="Constraints, Liberty-mapped synthesis, floorplan, power grid, place, clock tree, route, and "
+                "metal fill, then DRC and LVS, and STA signoff on extracted parasitics across corners. "
                 "The PDK is a task input; a machine without the tools refuses the runs.",
     intents=("physical_implementation",),
     stages=(
@@ -644,10 +644,18 @@ PHYSICAL_IMPLEMENTATION = WorkflowTemplate(
            evidence=(REVIEWED, ran("Placed, clock tree built, and routed, with clock skew, DRC count, and "
                                    "wirelength reported", "pnr.run",
                                    params=(("max_drc_violations", "0"), ("max_unconnected_supply_pins", "0"))))),
-        st("sta-signoff", "STA signoff", "Signoff", "sta.analyze", depends_on=("place-route",), criticality=H,
-           review=rv("sta.review"), gate="gate.implementation", outputs=("timing_report",),
-           evidence=(REVIEWED, ran("Signoff timing on the routed netlist with extracted parasitics (SPEF)",
-                                   "sta.run", params=(("max_unannotated_nets", "0"),)))),
+        # M34: DRC and LVS with the PDK's decks on the filled layout, and timing on at least three corners
+        # (docs/PD_FINAL.md). As in M29, a run counts only if made with these limits.
+        st("physical-verification", "DRC and LVS", "Signoff", "pd.signoff_checks", depends_on=("place-route",),
+           criticality=H, review=rv("pd.review"), outputs=("physical_verification_report",),
+           evidence=(REVIEWED, ran("DRC and LVS clean on the filled layout, with the PDK's decks", "pv.run",
+                                   params=(("max_drc_violations", "0"), ("max_lvs_mismatches", "0"),
+                                           ("min_fill_shapes", "1"))))),
+        st("sta-signoff", "STA signoff", "Signoff", "sta.analyze", depends_on=("place-route", "physical-verification"),
+           criticality=H, review=rv("sta.review"), gate="gate.implementation", outputs=("timing_report",),
+           evidence=(REVIEWED, ran("Signoff timing on the routed netlist with extracted parasitics (SPEF), "
+                                   "across slow, typical, and fast corners", "sta.run",
+                                   params=(("max_unannotated_nets", "0"), ("min_timing_corners", "3"))))),
     ),
 )
 

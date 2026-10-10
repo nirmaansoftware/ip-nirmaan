@@ -1,0 +1,148 @@
+# CAPTURED: standalone OpenSTA timing the sky130hd SPEF at the ss, tt, and ff corners; CI run 37913292574 (head 8e91b21), job physical-design, test_real_signoff_flow_on_sky130hd. Unedited below this line.
+$ sta -no_init -no_splash -exit sta.tcl
+Warning 198: /__w/_temp/pd/test_real_signoff_flow_on_sky10/pnr/final.v line 1067, module sky130_fd_sc_hd__fill_8 not found. Creating black box for FILLER_0_0.
+Warning 198: /__w/_temp/pd/test_real_signoff_flow_on_sky10/pnr/final.v line 1069, module sky130_fd_sc_hd__fill_4 not found. Creating black box for FILLER_0_115.
+Warning 198: /__w/_temp/pd/test_real_signoff_flow_on_sky10/pnr/final.v line 1070, module sky130_fd_sc_hd__fill_1 not found. Creating black box for FILLER_0_119.
+Warning 198: /__w/_temp/pd/test_real_signoff_flow_on_sky10/pnr/final.v line 1100, module sky130_fd_sc_hd__fill_2 not found. Creating black box for FILLER_0_28.
+Warning 198: /__w/_temp/pd/test_real_signoff_flow_on_sky10/pnr/final.v line 4978, module sky130_fd_sc_hd__tapvpwrvgnd_1 not found. Creating black box for TAP_TAPCELL_ROW_0_0.
+Found 18 unannotated drivers.
+ VDD
+ VSS
+ _1729_/HI
+ clkload0/Y
+ clkload1/Y
+ clkload10/Y
+ clkload11/Y
+ clkload12/Y
+ clkload13/Y
+ clkload14/Y
+ clkload2/Y
+ clkload3/Y
+ clkload4/Y
+ clkload5/Y
+ clkload6/Y
+ clkload7/Y
+ clkload8/Y
+ clkload9/Y
+Found 0 partially unannotated drivers.
+nirmaan-floating-outputs: 18
+nirmaan-floating-drivers: _1729_/HI clkload0/Y clkload1/Y clkload10/Y clkload11/Y clkload12/Y clkload13/Y clkload14/Y clkload2/Y clkload3/Y clkload4/Y clkload5/Y clkload6/Y clkload7/Y clkload8/Y clkload9/Y VDD VSS
+nirmaan-corner: tt
+max_delay/setup group aclk
+
+                                     Required   Actual
+Endpoint                                Delay    Delay    Slack
+---------------------------------------------------------------
+_1681_/D (sky130_fd_sc_hd__dfxtp_1)    10.382    5.954    4.428 (MET)
+
+min_delay/hold group aclk
+
+                                     Required   Actual
+Endpoint                                Delay    Delay    Slack
+---------------------------------------------------------------
+_1621_/D (sky130_fd_sc_hd__dfxtp_1)     0.410    1.039    0.629 (MET)
+
+nirmaan-corner-done: tt
+nirmaan-corner: ss
+max_delay/setup group aclk
+
+                                     Required   Actual
+Endpoint                                Delay    Delay    Slack
+---------------------------------------------------------------
+_1681_/D (sky130_fd_sc_hd__dfxtp_1)    10.619    9.342    1.276 (MET)
+
+min_delay/hold group aclk
+
+                                     Required   Actual
+Endpoint                                Delay    Delay    Slack
+---------------------------------------------------------------
+_1650_/D (sky130_fd_sc_hd__dfxtp_1)     0.680    1.962    1.283 (MET)
+
+nirmaan-corner-done: ss
+nirmaan-corner: ff
+max_delay/setup group aclk
+
+                                     Required   Actual
+Endpoint                                Delay    Delay    Slack
+---------------------------------------------------------------
+_1681_/D (sky130_fd_sc_hd__dfxtp_1)    10.272    4.666    5.606 (MET)
+
+min_delay/hold group aclk
+
+                                     Required   Actual
+Endpoint                                Delay    Delay    Slack
+---------------------------------------------------------------
+_1621_/D (sky130_fd_sc_hd__dfxtp_1)     0.288    0.687    0.399 (MET)
+
+nirmaan-corner-done: ff
+Startpoint: aresetn (input port clocked by aclk)
+Endpoint: _1681_ (rising edge-triggered flip-flop clocked by aclk)
+Path Group: aclk
+Path Type: max
+Corner: ss
+
+   Delay     Time   Description
+-----------------------------------------------------------
+   0.000    0.000   clock aclk (rise edge)
+   0.000    0.000   clock network delay (propagated)
+   2.000    2.000 ^ input external delay
+   0.000    2.000 ^ aresetn (in)
+   0.150    2.150 ^ _1981_/X (sky130_fd_sc_hd__buf_4)
+   1.302    3.453 ^ fanout22/X (sky130_fd_sc_hd__buf_2)
+   1.743    5.196 ^ fanout21/X (sky130_fd_sc_hd__buf_2)
+   1.792    6.988 v _0978_/Y (sky130_fd_sc_hd__clkinv_1)
+   1.432    8.419 v fanout20/X (sky130_fd_sc_hd__buf_2)
+   0.629    9.048 ^ _1383_/Y (sky130_fd_sc_hd__nor3_1)
+   0.294    9.342 ^ _2104_/X (sky130_fd_sc_hd__buf_4)
+   0.000    9.342 ^ _1681_/D (sky130_fd_sc_hd__dfxtp_1)
+            9.342   data arrival time
+
+  10.000   10.000   clock aclk (rise edge)
+   0.734   10.734   clock network delay (propagated)
+   0.000   10.734   clock reconvergence pessimism
+           10.734 ^ _1681_/CLK (sky130_fd_sc_hd__dfxtp_1)
+  -0.115   10.619   library setup time
+           10.619   data required time
+-----------------------------------------------------------
+           10.619   data required time
+           -9.342   data arrival time
+-----------------------------------------------------------
+            1.276   slack (MET)
+
+
+Startpoint: _1621_ (rising edge-triggered flip-flop clocked by aclk)
+Endpoint: _1621_ (rising edge-triggered flip-flop clocked by aclk)
+Path Group: aclk
+Path Type: min
+Corner: ff
+
+   Delay     Time   Description
+-----------------------------------------------------------
+   0.000    0.000   clock aclk (rise edge)
+   0.304    0.304   clock network delay (propagated)
+   0.000    0.304 ^ _1621_/CLK (sky130_fd_sc_hd__dfxtp_1)
+   0.193    0.496 ^ _1621_/Q (sky130_fd_sc_hd__dfxtp_1)
+   0.065    0.562 ^ _1880_/X (sky130_fd_sc_hd__buf_4)
+   0.069    0.630 ^ _1068_/X (sky130_fd_sc_hd__o21a_1)
+   0.057    0.687 ^ _2010_/X (sky130_fd_sc_hd__buf_4)
+   0.000    0.687 ^ _1621_/D (sky130_fd_sc_hd__dfxtp_1)
+            0.687   data arrival time
+
+   0.000    0.000   clock aclk (rise edge)
+   0.304    0.304   clock network delay (propagated)
+   0.000    0.304   clock reconvergence pessimism
+            0.304 ^ _1621_/CLK (sky130_fd_sc_hd__dfxtp_1)
+  -0.016    0.288   library hold time
+            0.288   data required time
+-----------------------------------------------------------
+            0.288   data required time
+           -0.687   data arrival time
+-----------------------------------------------------------
+            0.399   slack (MET)
+
+
+No paths found.
+worst slack max 1.276
+worst slack min 0.399
+tns max 0.000
+wns max 0.000
