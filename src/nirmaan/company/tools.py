@@ -8,7 +8,7 @@ no agent can ever claim a CDC or equivalence run happened.
 Lint, simulation, tests, synthesis, and formal are AVAILABLE through
 open-source EDA (``nirmaan/integrations/eda.py``, M21); static timing and
 place and route through OpenSTA and OpenROAD (``integrations/physical.py``,
-M25). Their bindings still refuse, with a reason, on a machine whose PATH
+M25), and physical verification through KLayout (M34). Their bindings still refuse, with a reason, on a machine whose PATH
 lacks the executable or that has no PDK input for the run. Firmware build and
 co-simulation are AVAILABLE the same way (``nirmaan/integrations/firmware.py``,
 M25), and so are the RV32I cross build and the run on a RISC-V core
@@ -66,6 +66,11 @@ PDK_REQUIRED = (_p("liberty", PATHS, "Liberty files, absolute or under pdk_root 
                 _p("pdk_root", PATH, "Where relative PDK paths resolve."))
 #: The RISC-V core a firmware image is built for and run on (M29; integrations/firmware_riscv.py CORES).
 CORE = _p("core", TEXT, "The RISC-V core: picorv32 (default), serv, or another registered core.")
+#: What a firmware run must show (M35; docs/FIRMWARE_IRQ_TRAPS.md, section 5).
+REQUIRE = (_p("require_irq", TEXT, "auto, yes, or no (default): fail unless the design's interrupt was taken; "
+                                   "auto asks it only of a design with an irq output."),
+           _p("require_bus_error_trap", TEXT, "yes or no (default): fail unless a bus error was delivered as a "
+                                              "precise trap."))
 NETLIST = (_p("netlist", PATH, "The gate-level netlist.", required=True),
            _p("sdc", PATH, "Timing constraints.", required=True))
 
@@ -143,7 +148,13 @@ TOOLS: list[ToolSpec] = [
     _tool("sta.run", "Static timing", "eda", EXE, AV, "Static timing of a netlist under an SDC (OpenSTA).",
           (*NETLIST, _p("spef", PATH, "Parasitics (SPEF), as pnr.run extracts them."), TOP_REQUIRED, *PDK_REQUIRED,
            _p("tech_lef", PATHS, "Technology LEF (backend openroad-sta)."),
-           _p("lef", PATHS, "Cell LEF files (backend openroad-sta)."), *RUNNER)),
+           _p("lef", PATHS, "Cell LEF files (backend openroad-sta)."),
+           # M34: timing corners (docs/PD_FINAL.md).
+           _p("liberty_", PATHS, "One timing corner's Liberty files, e.g. liberty_ss; with any, the run times every "
+                                 "corner.", prefix=True),
+           _p("corner", TEXT, "The name of the corner the base liberty files time (default typical)."),
+           _p("min_", NUM, "Fail a passing run whose parsed metric of that name is below this, e.g. "
+                           "min_timing_corners.", prefix=True), *RUNNER)),
     _tool("pnr.run", "Place and route", "eda", EXE, AV,
           "Floorplan, power grid, placement, clock tree, routing, and extraction in one staged run, with timing "
           "(OpenROAD).",
@@ -170,9 +181,26 @@ TOOLS: list[ToolSpec] = [
            _p("routing_layers", TEXT, "Lowest and highest signal routing layers, as LOWEST,HIGHEST."),
            _p("filler_cells", TEXT, "Filler cell masters, comma separated."),
            _p("supply_voltage", NUM, "Volts on each power net, for IR-drop analysis."),
-           _p("rcx_rules", PATH, "The PDK's OpenRCX rules; enables the extract stage."), *RUNNER)),
+           _p("rcx_rules", PATH, "The PDK's OpenRCX rules; enables the extract stage."),
+           _p("fill_rules", PATH, "The PDK's metal fill rules (JSON), for density_fill after routing (M34)."),
+           *RUNNER)),
     _tool("power.run", "Power analysis", "eda", EXE, CO, "Power, IR-drop, and EM."),
-    _tool("pv.run", "Physical verification", "eda", EXE, CO, "DRC, LVS, ERC, antenna, density."),
+    _tool("pv.run", "Physical verification", "eda", EXE, AV,
+          "The routed layout streamed to GDS, then DRC and LVS with the PDK's KLayout decks (M34).",
+          (_p("def", PATH, "The routed (and filled) DEF, as pnr.run writes it.", required=True),
+           _p("netlist", PATH, "The routed netlist with supply pins (pnr.run's pg_netlist), LVS's reference.",
+              required=True),
+           TOP_REQUIRED,
+           _p("tech_lef", PATHS, "Technology LEF.", required=True),
+           _p("lef", PATHS, "Cell LEF files.", required=True),
+           _p("gds", PATHS, "The cells' GDS, merged into the layout.", required=True),
+           _p("klayout_tech", PATH, "The PDK's KLayout technology (.lyt).", required=True),
+           _p("drc_deck", PATH, "The PDK's KLayout DRC deck; enables DRC."),
+           _p("lvs_deck", PATH, "The PDK's KLayout LVS deck; enables LVS with cdl."),
+           _p("cdl", PATHS, "The cells' CDL netlists, for LVS."),
+           _p("pdk_root", PATH, "Where relative PDK paths resolve."),
+           _p("min_", NUM, "Fail a passing run whose parsed metric of that name is below this, e.g. "
+                           "min_fill_shapes.", prefix=True), *RUNNER)),
     _tool("dft.run", "DFT tools", "eda", EXE, CO, "ATPG, MBIST, and commercial scan flows."),
     _tool("dft.scan_insert", "Scan insertion", "eda", EXE, AV, "Mux-D scan flops stitched into one chain.",
           (SOURCES, TOP_REQUIRED, _p("chains", INT, "Number of scan chains (default 1)."),
@@ -206,7 +234,7 @@ TOOLS: list[ToolSpec] = [
     _tool("fw.test", "Firmware co-simulation", "software", EXE, AV,
           "Run a driver's tests against a Verilator model of the RTL, over real bus transactions.",
           (_p("sources", PATHS, "The driver and its tests.", required=True),
-           _p("rtl", PATHS, "The RTL to build the model from.", required=True), TOP, FW_MAP,
+           _p("rtl", PATHS, "The RTL to build the model from.", required=True), TOP, *REQUIRE, FW_MAP,
            _p("bus", TEXT, "The bus manager the harness drives (axi4-lite, apb); default: the map's, else "
                            "axi4-lite (M41)."), *RUNNER)),
     _tool("fw.cross_build", "Firmware cross build", "software", EXE, AV,
@@ -215,7 +243,8 @@ TOOLS: list[ToolSpec] = [
     _tool("fw.soc_test", "Firmware on a RISC-V core", "software", EXE, AV,
           "Run a driver's tests on a RISC-V core (PicoRV32 or SERV) whose loads and stores reach the RTL over its bus.",
           (_p("sources", PATHS, "The driver and its tests.", required=True),
-           _p("rtl", PATHS, "The RTL the core's bus reaches.", required=True), TOP, CORE, FW_MAP, *RUNNER)),
+           _p("rtl", PATHS, "The RTL the core's bus reaches.", required=True), TOP, CORE, *REQUIRE, FW_MAP,
+           *RUNNER)),
     _tool("debugger.attach", "Debugger", "software", EXE, CO, "Attach to targets and models."),
     _tool("ci.configure", "CI configuration", "infrastructure", WR, CO, "Change CI pipelines."),
     _tool("farm.submit", "Compute farm", "infrastructure", EXE, CO, "Submit jobs to the compute farm."),

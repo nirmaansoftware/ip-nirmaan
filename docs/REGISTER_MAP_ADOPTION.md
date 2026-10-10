@@ -166,7 +166,9 @@ manager on the Verilator model: a setup cycle (`psel`, address, direction,
 data, and `pstrb`, zero for reads), then an access phase held until `pready`
 (at most 1000 cycles, then a recorded bus timeout). `pslverr` is reported as
 `NIRMAAN_BUS_SLVERR`, so a driver sees the same response codes on either bus.
-It prints the same `FWTEST` lines, so the parser is unchanged.
+It prints the same `FWTEST` lines, so the parser is unchanged. It is M35's
+`axil_manager.cpp` with only the bus functions and the reset replaced, so
+interrupts (`nirmaan_irq.h`) and bus-fault handlers behave the same on APB.
 
 **The protocol is selected as data.** The host harness keeps a registry of
 bus managers by bus name (`register_cosim_bus`), with `axi4-lite` and `apb`
@@ -208,4 +210,5 @@ now simulated instead of refused.
   generated test: the test checks only what a bus manager can observe from
   reset.
 * Adopting the map on `new-ip`'s interface and RTL stages.
-* Interrupts in the host co-simulation (still SoC only).
+* An evaluation case judged by the APB map (the `rtl/apb-regs` case could hold
+  `regmap.verify` out, as M30 did for AXI4-Lite).

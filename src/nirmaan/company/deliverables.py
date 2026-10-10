@@ -44,10 +44,10 @@ DELIVERABLE_FOLDERS: list[DeliverableFolder] = [
         description="RTL, power intent, quality, and the implementation views built from the RTL.",
         artifact_kinds=("rtl_source", "power_intent", "quality_report", "constraints", "netlist", "synthesis_report",
                         "timing_report", "power_report", "dft_netlist", "mbist_configuration", "floorplan",
-                        "power_grid", "layout", "ip_package", "merge_record"),
+                        "power_grid", "layout", "physical_verification_report", "ip_package", "merge_record"),
         capabilities=("rtl.implement", "rtl.cdc_design", "rtl.power_intent", "rtl.quality", "rtl.integrate",
                       "scm.merge", "synth.run", "sta.analyze", "sta.constraints", "power.analyze", "dft.insert",
-                      "dft.mbist", "pd.floorplan", "pd.power_plan", "pd.place_route"),
+                      "dft.mbist", "pd.floorplan", "pd.power_plan", "pd.place_route", "pd.signoff_checks"),
     ),
     DeliverableFolder(
         id="05_verification", title="Verification",

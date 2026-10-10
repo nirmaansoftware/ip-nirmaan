@@ -111,13 +111,50 @@ jobs:
         run: |
           echo /opt/opensta/bin >> "$GITHUB_PATH"
           /opt/opensta/bin/sta -version
+      # M34: the slow and fast sky130hd corners (the image ships typical only), from the
+      # open_pdks build of the SkyWater library, pinned by release and sha256, cached by
+      # hash, and put beside the platform's typical Liberty. See docs/PD_FINAL.md.
+      - name: Cache the sky130hd corner libraries
+        id: corners
+        uses: actions/cache@v4
+        with:
+          path: /opt/sky130hd-corners
+          key: sky130hd-corners-9b24f0db-fb61d91c
+      - name: Fetch the sky130hd corner libraries
+        if: steps.corners.outputs.cache-hit != 'true'
+        env:
+          RELEASE: sky130-ff08c23db8359afce3f134c454e7930586d0641c
+        run: |
+          curl -sSfL -o "$RUNNER_TEMP/hd.tar.zst" \
+            "https://github.com/fossi-foundation/ciel-releases/releases/download/$RELEASE/sky130_fd_sc_hd.tar.zst"
+          echo "69500f75f639989fb2c01b5fa7347aa5972e80238abb4460a7304fa8de405977  $RUNNER_TEMP/hd.tar.zst" | sha256sum -c
+          uv pip install zstandard
+          mkdir -p /opt/sky130hd-corners
+          python - "$RUNNER_TEMP/hd.tar.zst" /opt/sky130hd-corners <<'PY'
+          import sys, tarfile, zstandard
+          wanted = {f"sky130A/libs.ref/sky130_fd_sc_hd/lib/sky130_fd_sc_hd__{c}.lib" for c in ("ss_100C_1v60", "ff_n40C_1v95")}
+          with open(sys.argv[1], "rb") as f, tarfile.open(fileobj=zstandard.ZstdDecompressor().stream_reader(f), mode="r|") as tar:
+              for member in tar:
+                  if member.name in wanted and member.isfile():
+                      member.name = member.name.rsplit("/", 1)[1]
+                      tar.extract(member, sys.argv[2], filter="data")
+          PY
+      - name: Corner libraries into the platform
+        run: |
+          cd /opt/sky130hd-corners
+          sha256sum -c <<'SUMS'
+          9b24f0db3967ac67b4cae1f74bb480fd47922d18d0ed577e3c121739b412c361  sky130_fd_sc_hd__ss_100C_1v60.lib
+          fb61d91c55a7f85b1989e8149d040b13ba5e7f5478f5bf0c3c16c5da30720139  sky130_fd_sc_hd__ff_n40C_1v95.lib
+          SUMS
+          cp sky130_fd_sc_hd__*.lib "$NIRMAAN_PDK_ROOT/sky130hd/lib/"
+          klayout -v
       - name: Install
         run: uv pip install -e ".[dev]"
       - name: Test
-        # openroad, yosys, and (M29) sta are required, so the real STA and place-and-route
-        # tests fail rather than skip.
+        # openroad, yosys, (M29) sta, and (M34) klayout are required, so the real STA,
+        # place-and-route, and physical verification tests fail rather than skip.
         env:
-          NIRMAAN_REQUIRE_EDA: yosys openroad sta
+          NIRMAAN_REQUIRE_EDA: yosys openroad sta klayout
         run: python -m pytest -q -rs tests/test_nirmaan_physical.py --basetemp="$RUNNER_TEMP/pd"
       - name: Keep the tool logs
         if: always()

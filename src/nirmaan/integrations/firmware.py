@@ -24,6 +24,7 @@ module never imports VeriTriage.
 
 from __future__ import annotations
 
+import json
 import re
 import shutil
 from pathlib import Path
@@ -129,19 +130,27 @@ def parse_c_build(log: str, returncodes: tuple[int, ...]) -> EdaResult:
 # --- Parsing: the co-simulation -------------------------------------------------------------
 
 _CHECK_RE = re.compile(r"^FWTEST (?P<verdict>PASS|FAIL) (?P<name>\S+?)(?::\s*(?P<detail>.*))?$")
+_TRAP_RE = re.compile(r"^FWTEST TRAP bus-error (?P<access>read|write) 0x(?P<offset>[0-9a-fA-F]+) (?P<resp>\w+)"
+                      r"(?: at pc 0x(?P<pc>[0-9a-fA-F]+))?$")
 _SUMMARY_RE = re.compile(r"^FWTEST SUMMARY (?P<passed>\d+) passed, (?P<failed>\d+) failed, (?P<cycles>\d+) cycles$")
 
 
-def parse_fw_test(log: str, returncodes: tuple[int, ...], what: str = "co-simulation") -> EdaResult:
+def parse_fw_test(log: str, returncodes: tuple[int, ...], what: str = "co-simulation",
+                  require: dict[str, bool] | None = None) -> EdaResult:
     """Pass means the build and the run exited 0, the harness finished, and every check passed.
 
     At least one check must have passed: tests that report nothing prove nothing.
     ``what`` names the run in the summary (M27's SoC run shares this parser).
+    ``require`` (M35) may ask for at least one interrupt taken (``irq``) and one
+    bus-error trap delivered (``bus_error_trap``), counted from the platform's
+    ``FWTEST IRQ`` and ``FWTEST TRAP`` lines.
     """
     checks: list[dict[str, object]] = []
     harness: list[Diagnostic] = []
     build: list[Diagnostic] = []
     transfers = 0
+    irqs = 0
+    traps: list[dict[str, object]] = []
     cycles: int | None = None
     finished = False
     for raw in log.splitlines():
@@ -150,6 +159,11 @@ def parse_fw_test(log: str, returncodes: tuple[int, ...], what: str = "co-simula
             continue
         if line.startswith("FWTEST BUS "):
             transfers += 1
+        elif line.startswith("FWTEST IRQ "):
+            irqs += 1
+        elif m := _TRAP_RE.match(line):
+            traps.append({"access": m["access"], "offset": int(m["offset"], 16), "response": m["resp"],
+                          "pc": int(m["pc"], 16) if m["pc"] else None})
         elif m := _CHECK_RE.match(line):
             ok = m["verdict"] == "PASS"
             checks.append({"name": m["name"], "passed": ok, "detail": (m["detail"] or "").strip()})
@@ -174,9 +188,18 @@ def parse_fw_test(log: str, returncodes: tuple[int, ...], what: str = "co-simula
     status = returncodes[-1] if returncodes else -1
     exited_clean = bool(returncodes) and all(c == 0 for c in returncodes)
     passed = exited_clean and finished and passed_checks > 0 and not failed_checks and not harness and not build
+    missing = []
+    if (require or {}).get("irq") and not irqs:
+        missing.append("require_irq is set and no interrupt was taken")
+    if (require or {}).get("bus_error_trap") and not traps:
+        missing.append("require_bus_error_trap is set and no bus-error trap was delivered")
     if passed:
         summary = (f"{what} passed: {_plural(passed_checks, 'check')}, 0 failed "
                    f"({cycles} cycles, {_plural(transfers, 'bus transfer')})")
+        if missing:
+            passed = False
+            harness.extend(Diagnostic("error", m, "REQUIRE") for m in missing)
+            summary = f"{what} failed: {'; '.join(missing)} ({_plural(passed_checks, 'check')} passed)"
     elif not ran:
         summary = f"build failed before {what}: {_plural(len(build), 'error')}{_first(build)}"
         if not build:
@@ -193,7 +216,8 @@ def parse_fw_test(log: str, returncodes: tuple[int, ...], what: str = "co-simula
         summary = f"{what} failed (exit status {status})"
     return EdaResult(passed, summary, tuple(build + harness),
                      {"checks": checks, "passed": passed_checks, "failed": failed_checks, "cycles": cycles,
-                      "bus_transfers": transfers, "exit_statuses": list(returncodes)})
+                      "bus_transfers": transfers, "irq_taken": irqs, "bus_error_traps": len(traps),
+                      "traps": traps, "exit_statuses": list(returncodes)})
 
 
 # --- The backends ----------------------------------------------------------------------------
@@ -317,6 +341,93 @@ def copy_rtl(job: Job) -> list[str]:
     return rtl
 
 
+#: The port that carries a design's interrupt (active high, level sensitive; docs/RISCV_NEXT.md, section 2).
+IRQ_PORT = "irq"
+
+_MODULE_RE = re.compile(r"^\s*module\s+([A-Za-z_]\w*)", re.MULTILINE)
+
+
+def top_module(rtl: list[str]) -> str | None:
+    """The one module the RTL declares that no other module instantiates, or None if not exactly one."""
+    text = "\n".join(Path(f).read_text(encoding="utf-8", errors="replace") for f in rtl if Path(f).is_file())
+    text = re.sub(r"//[^\n]*|/\*.*?\*/", "", text, flags=re.DOTALL)
+    declared = list(dict.fromkeys(_MODULE_RE.findall(text)))
+    bodies = re.sub(r"\bmodule\s+[A-Za-z_]\w*", "", text)
+    tops = [m for m in declared if not re.search(rf"\b{m}\b\s*(?:#\s*\(|[A-Za-z_]\w*\s*\()", bodies)]
+    return tops[0] if len(tops) == 1 else None
+
+
+def design_ports(rtl: list[str], top: str) -> set[str]:
+    """The port names in the header of module ``top``, ANSI or not, or an empty set if it is not there."""
+    text = "\n".join(Path(f).read_text(encoding="utf-8", errors="replace") for f in rtl if Path(f).is_file())
+    text = re.sub(r"//[^\n]*|/\*.*?\*/", "", text, flags=re.DOTALL)
+    m = re.search(rf"\bmodule\s+{re.escape(top)}\b\s*", text)
+    if not m:
+        return set()
+    rest = text[m.end():]
+    if rest.startswith("#"):  # skip the parameter list
+        rest = rest[_closing(rest, rest.index("(")) + 1:].lstrip()
+    if not rest.startswith("("):
+        return set()
+    header = re.sub(r"\[[^\]]*\]", " ", rest[1:_closing(rest, 0)])
+    return {words[-1] for item in header.split(",") if (words := re.findall(r"[A-Za-z_]\w*", item))}
+
+
+def _closing(text: str, start: int) -> int:
+    """The index of the parenthesis that closes the one at ``start``."""
+    depth = 0
+    for i in range(start, len(text)):
+        depth += {"(": 1, ")": -1}.get(text[i], 0)
+        if depth == 0:
+            return i
+    return len(text)
+
+
+def rtl_files(job: Job) -> list[str]:
+    return [str(Path(s).resolve()) for s in list_values(job.params["rtl"])]
+
+
+# --- What a run must show: an interrupt taken, a bus error trapped (M35) ------------------------
+
+#: Where the steps record what the run is required to show, for the parser to read back.
+REQUIRE_FILE = "fw_require.json"
+
+
+def _require(job: Job) -> tuple[str, str]:
+    return ((job.params.get("require_irq") or "no").strip(), (job.params.get("require_bus_error_trap") or "no").strip())
+
+
+def require_problem(job: Job) -> str | None:
+    """Why ``require_irq`` or ``require_bus_error_trap`` cannot be met as given, or None."""
+    irq, trap = _require(job)
+    if irq not in ("auto", "yes", "no"):
+        return f"require_irq must be auto, yes, or no, not {irq!r}"
+    if trap not in ("yes", "no"):
+        return f"require_bus_error_trap must be yes or no, not {trap!r}"
+    if irq == "no":
+        return None
+    top = job.top or top_module(rtl_files(job))
+    if not top:
+        return f"require_irq={irq} needs the design's top module, and the RTL does not tell; name it with top="
+    if irq == "yes" and IRQ_PORT not in design_ports(rtl_files(job), top):
+        return f"require_irq=yes, but the design {top} has no irq output"
+    return None
+
+
+def write_requirements(job: Job, ports: set[str]) -> None:
+    """Resolve the requirements against the design's ports, into the run's working directory."""
+    irq, trap = _require(job)
+    required = {"irq": irq == "yes" or (irq == "auto" and IRQ_PORT in ports), "bus_error_trap": trap == "yes"}
+    (job.workdir / REQUIRE_FILE).write_text(json.dumps(required) + "\n", encoding="utf-8")
+
+
+def read_requirements(workdir: Path) -> dict[str, bool] | None:
+    try:
+        return json.loads((workdir / REQUIRE_FILE).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+
+
 # --- The host co-simulation's bus managers (M41) -----------------------------------------------
 
 #: Bus name to the manager source that implements ``nirmaan_hal`` over that bus on the model.
@@ -355,7 +466,7 @@ def cosim_bus(job: Job) -> tuple[str, str | None]:
 
 
 def _cosim_check(job: Job) -> str | None:
-    return map_problem(job) or cosim_bus(job)[1]
+    return map_problem(job) or cosim_bus(job)[1] or require_problem(job)
 
 
 def _cosim_steps(job: Job) -> list[list[str]]:
@@ -370,19 +481,23 @@ def _cosim_steps(job: Job) -> list[list[str]]:
     manager = _COSIM_BUSES[cosim_bus(job)[0]]
     shutil.copyfile(manager, harness / manager.name)  # a registered manager may live outside HARNESS
     rtl = copy_rtl(job)
+    top = job.top or top_module(rtl_files(job))
+    ports = design_ports(rtl_files(job), top) if top else set()
+    write_requirements(job, ports)
+    irq = ["-CFLAGS", "-DNIRMAAN_DUT_IRQ"] if IRQ_PORT in ports else []  # the harness reads the model's irq
     added, include = register_map_sources(job)
     steps, objects = _compile("cc", (), (*job.sources, *added), harness, job.workdir / "cobj", headers=False,
                               include=include)
     model = job.workdir / "cosim"
     steps.append(["verilator", "--cc", "--exe", "--build", "-j", "0", "-Wno-fatal", "--prefix", MODEL,
                   "-Mdir", str(model), *job.top_args("--top-module"), *rtl, str(harness / manager.name),
-                  *objects, "-CFLAGS", f"-I{harness}"])
+                  *objects, "-CFLAGS", f"-I{harness}", *irq])
     steps.append([str(model / MODEL)])
     return steps
 
 
 def _parse_cosim(run: RunRecord) -> EdaResult:
-    return parse_fw_test(run.log, run.returncodes)
+    return parse_fw_test(run.log, run.returncodes, require=read_requirements(run.workdir))
 
 
 register_cosim_bus("axi4-lite", HARNESS / "axil_manager.cpp")
