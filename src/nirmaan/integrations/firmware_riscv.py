@@ -54,6 +54,7 @@ from nirmaan.integrations.firmware import (
     write_requirements,
 )
 from nirmaan.models import list_values
+from nirmaan.runtime.tools import Params
 
 #: The SoC: the core, the bridge, the clock, and the firmware runtime.
 SOC = Path(__file__).parent / "firmware_soc"
@@ -161,7 +162,7 @@ def toolchain() -> str | None:
     return None
 
 
-def _needs_toolchain(params: dict[str, str]) -> str | None:
+def _needs_toolchain(params: Params) -> str | None:
     if toolchain():
         return None
     return f"no RISC-V GCC on PATH ({' or '.join(RISCV_GCC)}, with its objcopy and size)"

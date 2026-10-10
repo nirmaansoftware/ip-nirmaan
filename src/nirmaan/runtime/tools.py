@@ -9,9 +9,11 @@ produce evidence that one was. Every executed invocation becomes a
 thing a TOOL_RUN or VERITRIAGE_SESSION evidence record may cite.
 
 A call is also held to the tool's parameter contract (M28): an undeclared or
-ill-typed parameter is refused before anything runs. A list of paths may be
-passed as a list; it is stored comma-joined, as it always has been, so a path
-containing a comma is refused rather than silently read as two.
+ill-typed parameter is refused before anything runs. Values are parsed once,
+here, into the contract's types (M39): the probe, the binding, and the stored
+run all see an ``int`` for an integer, a ``float`` for a number, and a tuple
+for a list of paths. A path containing a comma is still refused, so every value
+keeps one text form.
 """
 
 from __future__ import annotations
@@ -19,7 +21,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Callable, Sequence
 
-from nirmaan.models import Actor, ParamKind, ToolRun, ToolSpec, ToolStatus
+from nirmaan.models import Actor, ParamKind, ParamSpec, ParamValue, ToolRun, ToolSpec, ToolStatus, text_value
 from nirmaan.org import AuthorityService
 from nirmaan.work.engine import TaskEngine
 
@@ -32,9 +34,11 @@ class ToolOutcome:
     data: dict[str, Any] = field(default_factory=dict)
 
 
-Binding = Callable[[dict[str, str], TaskEngine], ToolOutcome]
+#: A call's parameters as the broker checked them: typed by the tool's contract (M39).
+Params = dict[str, ParamValue]
+Binding = Callable[[Params, TaskEngine], ToolOutcome]
 #: Asked before every invocation: None when the binding can run here, else why not.
-Probe = Callable[[dict[str, str]], str | None]
+Probe = Callable[[Params], str | None]
 _BINDINGS: dict[str, Binding] = {}
 _PROBES: dict[str, Probe] = {}
 
@@ -67,7 +71,7 @@ def available_bindings() -> list[str]:
     return sorted(_BINDINGS)
 
 
-def unavailable_reason(tool_id: str, params: dict[str, str] | None = None) -> str | None:
+def unavailable_reason(tool_id: str, params: Params | None = None) -> str | None:
     """Why this machine cannot run a bound tool now (the probe the broker asks), or None."""
     _ensure_builtin_bindings()
     probe = _PROBES.get(tool_id)
@@ -82,46 +86,36 @@ class ToolContractError(ToolAccessDenied):
     """A call outside the tool's parameter contract. Refused; nothing ran."""
 
 
-ParamValue = str | Sequence[str]
+#: What a caller may pass: a value's text form, a number, or a list.
+ParamInput = str | int | float | Sequence[str]
 
 
-def check_params(spec: ToolSpec, params: dict[str, ParamValue]) -> dict[str, str]:
-    """The call's parameters as stored (lists comma-joined), or ToolContractError saying what is wrong.
+def check_params(spec: ToolSpec, params: dict[str, ParamInput]) -> Params:
+    """The call's parameters typed by the contract (M39), or ToolContractError saying what is wrong.
 
-    A tool with no declared contract (``params`` None) takes any parameter; lists are still joined.
+    A tool with no declared contract (``params`` None) takes any parameter, untyped, as in M28: a list
+    comma-joined, anything else as text, so its binding reads what it always has. An empty integer or
+    number is not given.
     """
-    checked: dict[str, str] = {}
+    checked: Params = {}
     problems: list[str] = []
+    untyped = ParamSpec(name="", kind=ParamKind.PATHS)
     for name, raw in params.items():
-        items = [str(v) for v in raw] if isinstance(raw, (list, tuple)) else None
         param = spec.param(name)
         if spec.params is not None and param is None:
             declared = ", ".join(p.label for p in spec.params) or "no parameters"
             problems.append(f"{spec.id} does not take {name!r} (it takes {declared})")
             continue
-        kind = param.kind if param else None
-        if items is not None:
-            if kind is not None and kind is not ParamKind.PATHS and len(items) > 1:
-                problems.append(f"{name} takes one {'path' if kind is ParamKind.PATH else 'value'}, not a list")
-                continue
-            commas = [v for v in items if "," in v]
-            if commas:
-                problems.append(f"{name}: {', '.join(repr(v) for v in commas)} contains a comma, "
-                                "so it cannot be told apart from two paths")
-                continue
-            value = ",".join(items)
-        else:
-            value = str(raw)
-        if kind is ParamKind.INTEGER and value.strip() and not value.strip().lstrip("-").isdigit():
-            problems.append(f"{name} must be a whole number, not {value!r}")
+        try:
+            if param is not None:
+                value = param.parse(raw, name)
+            else:
+                value = text_value(untyped.parse(raw, name)) if isinstance(raw, (list, tuple)) else str(raw)
+        except ValueError as exc:
+            problems.append(str(exc))
             continue
-        if kind is ParamKind.NUMBER and value.strip():
-            try:
-                float(value)
-            except ValueError:
-                problems.append(f"{name} must be a number, not {value!r}")
-                continue
-        checked[name] = value
+        if value is not None:
+            checked[name] = value
     if problems:
         raise ToolContractError(f"{spec.id} refused before running: {'; '.join(problems)}")
     return checked
@@ -142,7 +136,7 @@ class ToolBroker:
         tool = self._engine.org.tools.get(tool_id)
         return dict(inputs) if tool is None else declared_inputs(tool, inputs)
 
-    def invoke(self, actor: Actor, tool_id: str, params: dict[str, ParamValue] | None = None,
+    def invoke(self, actor: Actor, tool_id: str, params: dict[str, ParamInput] | None = None,
                task_id: str | None = None) -> tuple[ToolRun, ToolOutcome]:
         allowed, why = self._authority.may_use_tool(actor.role, tool_id)
         if not allowed:
@@ -178,7 +172,7 @@ class ToolBroker:
 
 
 @register_binding("status.read")
-def _status(params: dict[str, str], engine: TaskEngine) -> ToolOutcome:
+def _status(params: Params, engine: TaskEngine) -> ToolOutcome:
     from nirmaan.work.management import status_report
 
     report = status_report(engine.org, engine.state)
@@ -187,7 +181,7 @@ def _status(params: dict[str, str], engine: TaskEngine) -> ToolOutcome:
 
 
 @register_binding("project.read")
-def _project(params: dict[str, str], engine: TaskEngine) -> ToolOutcome:
+def _project(params: Params, engine: TaskEngine) -> ToolOutcome:
     task_id = params.get("task")
     if task_id:
         task = engine.task(task_id)
@@ -196,7 +190,7 @@ def _project(params: dict[str, str], engine: TaskEngine) -> ToolOutcome:
 
 
 @register_binding("artifact.read")
-def _artifact(params: dict[str, str], engine: TaskEngine) -> ToolOutcome:
+def _artifact(params: Params, engine: TaskEngine) -> ToolOutcome:
     art = engine.state.artifacts.get(params.get("artifact", ""))
     if art is None:
         return ToolOutcome(False, f"no artifact {params.get('artifact')!r}")
@@ -204,7 +198,7 @@ def _artifact(params: dict[str, str], engine: TaskEngine) -> ToolOutcome:
 
 
 @register_binding("trace.read")
-def _trace(params: dict[str, str], engine: TaskEngine) -> ToolOutcome:
+def _trace(params: Params, engine: TaskEngine) -> ToolOutcome:
     from nirmaan.work.trace import trace_graph
 
     graph = trace_graph(engine.state)

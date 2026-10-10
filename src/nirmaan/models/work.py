@@ -17,7 +17,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from nirmaan.models.frozen import deep_frozen
 from nirmaan.models.governance import Criticality, DecisionKind, EscalationKind
 from nirmaan.models.modelcall import ModelCall
-from nirmaan.models.org import ActorKind, list_values
+from nirmaan.models.org import ActorKind, ParamValue, ToolSpec, list_values
 from nirmaan.models.workflow import EvidenceKind, EvidenceRequirement, OnFailure
 
 
@@ -256,7 +256,8 @@ class ToolRun(BaseModel):
     tool: str
     actor: str
     task: str | None
-    params: dict[str, str] = Field(default_factory=dict)
+    params: dict[str, ParamValue] = Field(
+        default_factory=dict, description="Typed by the tool's contract (M39); text in runs saved before M39.")
     succeeded: bool
     summary: str
     references: tuple[str, ...] = ()
@@ -264,8 +265,23 @@ class ToolRun(BaseModel):
     _freeze = field_validator("params", mode="after")(lambda v: deep_frozen(v))
 
     def values(self, param: str) -> list[str]:
-        """A parameter's elements (a list parameter is stored comma-joined); empty if not given."""
-        return list_values(self.params.get(param, ""))
+        """A parameter's elements (a tuple, or comma-joined text saved before M39); empty if not given."""
+        return list_values(self.params.get(param))
+
+    def typed(self, spec: ToolSpec) -> dict[str, ParamValue]:
+        """The parameters as typed values (M39): text saved before M39 is parsed by the tool's contract.
+
+        A saved value that no longer parses is kept as it was stored.
+        """
+        typed: dict[str, ParamValue] = {}
+        for name, value in self.params.items():
+            param = spec.param(name)
+            try:
+                parsed = param.parse(value, name) if param and isinstance(value, str) else value
+            except ValueError:
+                parsed = value
+            typed[name] = value if parsed is None else parsed
+        return typed
 
 
 class Evidence(BaseModel):
@@ -329,6 +345,9 @@ class Decision(BaseModel):
     made_by: str
     task: str | None = None
     evidence: tuple[str, ...] = ()
+    subject: str = ""  # M40: the question decided; empty when the task's title is the question
+    options: tuple[str, ...] = ()  # M40: the alternatives considered
+    supersedes: str | None = None  # M40: the earlier decision this one replaces; that one is kept
 
 
 class MemoryScope(str, Enum):

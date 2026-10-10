@@ -98,12 +98,12 @@ def test_a_call_outside_the_contract_is_refused_and_nothing_runs(rtl_ready, tool
 
 
 @needs("verilator")
-def test_a_list_of_paths_runs_and_is_stored_as_before(rtl_ready):
+def test_a_list_of_paths_runs_and_is_stored_as_a_list(rtl_ready):
     engine, rtl = rtl_ready
     source = str(RTL / "counter.v")
     run, outcome = ToolBroker(engine).invoke(_owner(engine, rtl), "lint.run", {"sources": [source]}, rtl)
     assert outcome.succeeded, outcome.summary
-    assert run.params["sources"] == source and run.values("sources") == [source]
+    assert run.params["sources"] == (source,) and run.values("sources") == [source]
 
 
 def test_a_tool_without_a_contract_takes_parameters_as_given(nirmaan_org):
@@ -170,7 +170,7 @@ def test_a_new_tool_contract_needs_no_core_changes(fixed_clock):
         actor = Actor(role=role.id, kind=ActorKind.HUMAN, name="test")
         broker = ToolBroker(engine)
         run, outcome = broker.invoke(actor, "ruler.measure", {"items": ["a", "b"], "scale": "2.5"})
-        assert outcome.succeeded and outcome.summary == "2 items at scale 2.5" and run.params["items"] == "a,b"
+        assert outcome.succeeded and outcome.summary == "2 items at scale 2.5" and run.params["items"] == ("a", "b")
         with pytest.raises(ToolContractError, match="scale"):
             broker.invoke(actor, "ruler.measure", {"items": "a", "scale": "big"})
         with pytest.raises(ToolContractError, match="does not take 'size'"):

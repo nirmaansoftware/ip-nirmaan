@@ -642,7 +642,7 @@ def test_a_new_pd_backend_needs_no_core_changes(project, tmp_path, monkeypatch):
         return EdaResult(clean, "routed clean" if clean else "routing failed", metrics=metrics)
 
     register_backend(Backend("tinyroute", "pnr.run", ("tinyroute",),
-                             lambda job: [["tinyroute", job.params["netlist"], job.params["lef"]]], parse,
+                             lambda job: [["tinyroute", job.params["netlist"], *job.params["lef"]]], parse,
                              required=("netlist",), files=("netlist",),
                              environment=needs_pdk(lef="a cell LEF")))
     try:

@@ -40,7 +40,8 @@ from nirmaan.integrations.pd_parsers import (
     parse_openroad,
     parse_opensta,
 )
-from nirmaan.models import list_values
+from nirmaan.models import list_values, text_value
+from nirmaan.runtime.tools import Params
 
 #: Relative PDK paths resolve under this directory (or the ``pdk_root`` parameter).
 PDK_ROOT_ENV = "NIRMAAN_PDK_ROOT"
@@ -53,7 +54,7 @@ CORNER_LIBERTY = "liberty_"
 _TOKEN_RE = re.compile(r"^[A-Za-z0-9_.$]+$")
 
 
-def pdk_paths(params: dict[str, str], key: str) -> list[Path]:
+def pdk_paths(params: Params, key: str) -> list[Path]:
     """The comma-separated files a PDK parameter names, relative ones under the PDK root."""
     root = params.get("pdk_root") or os.environ.get(PDK_ROOT_ENV, "")
     paths = []
@@ -63,13 +64,13 @@ def pdk_paths(params: dict[str, str], key: str) -> list[Path]:
     return paths
 
 
-def needs_pdk(**inputs: str) -> Callable[[dict[str, str]], str | None]:
+def needs_pdk(**inputs: str) -> Callable[[Params], str | None]:
     """An ``environment`` check: each named PDK parameter (``param="a label"``) is given, and its files exist."""
 
-    def check(params: dict[str, str]) -> str | None:
+    def check(params: Params) -> str | None:
         reasons = []
         for param, label in inputs.items():
-            if not params.get(param, "").strip():
+            if not text_value(params.get(param)).strip():
                 how = (f"{param}=PATH, absolute or under {PDK_ROOT_ENV}; no PDK is bundled"
                        if param in PDK_FILES else f"{param}=VALUE")
                 reasons.append(f"needs {label} ({how})")
@@ -90,14 +91,14 @@ def _tcl(text: str) -> str:
     return f'"{text}"'
 
 
-def _token(params: dict[str, str], key: str) -> str:
-    value = params.get(key, "").strip()
+def _token(params: Params, key: str) -> str:
+    value = text_value(params.get(key)).strip()
     if not _TOKEN_RE.match(value):
         raise ValueError(f"{key} must be a plain name, not {value!r}")
     return value
 
 
-def _layers(params: dict[str, str], key: str) -> str:
+def _layers(params: Params, key: str) -> str:
     names = list_values(params.get(key, ""))
     for name in names:
         if not _TOKEN_RE.match(name):
@@ -105,8 +106,8 @@ def _layers(params: dict[str, str], key: str) -> str:
     return names[0] if len(names) == 1 else "{" + " ".join(names) + "}"
 
 
-def _number(params: dict[str, str], key: str, default: str) -> str:
-    value = params.get(key, "").strip() or default
+def _number(params: Params, key: str, default: str) -> str:
+    value = text_value(params.get(key)).strip() or default
     float(value)  # a ValueError here is a recorded failed run
     return value
 
@@ -129,9 +130,9 @@ def _timing_reports() -> list[str]:
 # --- synth.run: yosys-liberty -------------------------------------------------------------
 
 
-def _tie_cell(params: dict[str, str], key: str) -> list[str]:
+def _tie_cell(params: Params, key: str) -> list[str]:
     """``CELL/PORT`` from a tie parameter, as ``hilomap`` takes it, or nothing when it is not given."""
-    value = params.get(key, "").strip()
+    value = text_value(params.get(key)).strip()
     if not value:
         return []
     cell, _, port = value.partition("/")
@@ -140,13 +141,13 @@ def _tie_cell(params: dict[str, str], key: str) -> list[str]:
     return [cell, port]
 
 
-def _port_buffers(params: dict[str, str]) -> list[str]:
+def _port_buffers(params: Params) -> list[str]:
     """``insbuf`` with ``buffer_cell`` (``CELL/IN/OUT``, M29): a buffer wherever one port drives another.
 
     Without it Yosys writes ``assign out_a = out_b;``, OpenROAD writes the routed netlist back the same
     way, and a timer reading that netlist with the SPEF finds the shared net unannotated.
     """
-    value = params.get("buffer_cell", "").strip()
+    value = text_value(params.get("buffer_cell")).strip()
     if not value:
         return []
     parts = value.split("/")
@@ -224,13 +225,13 @@ puts "nirmaan-floating-outputs: [llength $nirmaan_floating]"
 puts "nirmaan-floating-drivers: [join $nirmaan_floating { }]"'''
 
 
-def timing_corners(params: dict[str, str]) -> list[tuple[str, list[Path]]]:
+def timing_corners(params: Params) -> list[tuple[str, list[Path]]]:
     """The run's timing corners (M34): none, or the base ``liberty`` as ``corner`` and one per ``liberty_<name>``."""
     extra = [(key[len(CORNER_LIBERTY):], pdk_paths(params, key)) for key in params
-             if key.startswith(CORNER_LIBERTY) and params[key].strip()]
+             if key.startswith(CORNER_LIBERTY) and text_value(params[key]).strip()]
     if not extra:
         return []
-    corners = [(params.get("corner", "").strip() or "typical", pdk_paths(params, "liberty")), *extra]
+    corners = [(text_value(params.get("corner")).strip() or "typical", pdk_paths(params, "liberty")), *extra]
     names = [name for name, _ in corners]
     for name in names:
         if not _TOKEN_RE.match(name):
@@ -266,7 +267,7 @@ def _sta_script(job: Job, lefs: bool = False) -> None:
               f"read_verilog {netlist}",
               f"link_design {_token(job.params, 'top')}",
               f"read_sdc {_design(job, 'sdc')}"]
-    if job.params.get("spef", "").strip():  # M29: and say how much of the design the SPEF annotates
+    if text_value(job.params.get("spef")).strip():  # M29: and say how much of the design the SPEF annotates
         # A SPEF comes from a routed block, whose clock tree is built: time it with propagated clocks.
         # M34: one SPEF (one RC corner) annotates every timing corner.
         script += [*([f"read_spef -corner {name} {_design(job, 'spef')}" for name, _ in corners]
@@ -313,7 +314,7 @@ def _sta_parse(run: RunRecord) -> EdaResult:
 
 def _sta_inputs(job: Job) -> str | None:
     """A netlist to time, or (M37) RTL to synthesize first: exactly one of them."""
-    netlist = job.params.get("netlist", "").strip()
+    netlist = text_value(job.params.get("netlist")).strip()
     if netlist and job.sources:
         return "give a netlist or sources, not both: the run times one design"
     if not netlist and not job.sources:
@@ -327,7 +328,7 @@ def _sta_environment(**inputs: str) -> Callable[[dict[str, str]], str | None]:
 
     def check(params: dict[str, str]) -> str | None:
         reasons = [r for r in (pdk(params),) if r]
-        if params.get("sources", "").strip() and shutil.which("yosys") is None:
+        if text_value(params.get("sources")).strip() and shutil.which("yosys") is None:
             reasons.append("needs yosys on PATH to synthesize sources, not found")
         return "; ".join(reasons) or None
 
@@ -341,24 +342,24 @@ def _stage(name: str, commands: list[str]) -> list[str]:
     return [f'puts "nirmaan-stage: {name}"', *commands, f'puts "nirmaan-stage-done: {name}"']
 
 
-def _cells(params: dict[str, str], key: str) -> list[str]:
-    names = [n.strip() for n in params.get(key, "").split(",") if n.strip()]
+def _cells(params: Params, key: str) -> list[str]:
+    names = [n.strip() for n in text_value(params.get(key)).split(",") if n.strip()]
     for name in names:
         if not _TOKEN_RE.match(name):
             raise ValueError(f"{key} must name cells, not {params.get(key)!r}")
     return names
 
 
-def _dont_use(params: dict[str, str]) -> list[str]:
+def _dont_use(params: Params) -> list[str]:
     """Cells repair and CTS must not insert (M29), as names or ``*`` patterns."""
-    names = [n.strip() for n in params.get("dont_use", "").split(",") if n.strip()]
+    names = [n.strip() for n in text_value(params.get("dont_use")).split(",") if n.strip()]
     for name in names:
         if not _TOKEN_RE.match(name.replace("*", "")):
             raise ValueError(f"dont_use must name cells, not {params.get('dont_use')!r}")
     return names
 
 
-def _source(params: dict[str, str], key: str) -> list[str]:
+def _source(params: Params, key: str) -> list[str]:
     """``source`` the PDK script a parameter names, when it is given (M29)."""
     return [f"source {_tcl(str(f))}" for f in pdk_paths(params, key)]
 
@@ -390,10 +391,10 @@ _SUPPLY_VOLTAGES = '''foreach net $nirmaan_supplies {
 }'''
 
 
-def _pnr_plan(params: dict[str, str]) -> list[str]:
+def _pnr_plan(params: Params) -> list[str]:
     """The stages this run executes: up to ``stop_after``; ``extract`` only with OpenRCX rules (M29)."""
-    extract = bool(params.get("rcx_rules", "").strip())
-    stop_after = params.get("stop_after", "").strip() or ("extract" if extract else "route")
+    extract = bool(text_value(params.get("rcx_rules")).strip())
+    stop_after = text_value(params.get("stop_after")).strip() or ("extract" if extract else "route")
     if stop_after not in PNR_STAGES:
         raise ValueError(f"stop_after must be one of {', '.join(PNR_STAGES)}, not {stop_after!r}")
     if stop_after == "extract" and not extract:
@@ -405,7 +406,7 @@ def _pnr_steps(job: Job) -> list[list[str]]:
     p = job.params
     plan = _pnr_plan(p)
     tap, endcap = _cells(p, "tap_cell"), _cells(p, "endcap_cell")
-    if tap and not p.get("tap_distance", "").strip():
+    if tap and not text_value(p.get("tap_distance")).strip():
         raise ValueError("tap_cell needs tap_distance (microns between tap columns, from the PDK)")
     script = ["set_thread_count [cpu_count]",  # M29: the detailed router is the long step
               *(f"read_lef {_tcl(str(f))}" for f in pdk_paths(p, "tech_lef") + pdk_paths(p, "lef")),
@@ -430,7 +431,7 @@ def _pnr_steps(job: Job) -> list[list[str]]:
         *power,
         f"place_pins -hor_layers {_layers(p, 'hor_layers')} -ver_layers {_layers(p, 'ver_layers')}",
         "report_design_area"])
-    density = f" -density {_number(p, 'place_density', '0')}" if p.get("place_density", "").strip() else ""
+    density = f" -density {_number(p, 'place_density', '0')}" if text_value(p.get("place_density")).strip() else ""
     if "place" in plan:
         script += _stage("place", [f"global_placement{density}",
                                    "estimate_parasitics -placement", "repair_design",
@@ -462,7 +463,7 @@ def _pnr_steps(job: Job) -> list[list[str]]:
         fill = [f"density_fill -rules {_tcl(str(pdk_paths(p, 'fill_rules')[0]))}",
                 'puts "nirmaan-fill-shapes: [llength [[ord::get_db_block] getFills]]"'] \
             if p.get("fill_rules", "").strip() else []
-        voltage = p.get("supply_voltage", "").strip()
+        voltage = text_value(p.get("supply_voltage")).strip()
         ir = []
         if voltage:  # IR drop: each power net at the supply voltage, each ground net at 0 V
             ir = [_SUPPLY_VOLTAGES.replace("SUPPLY_VOLTAGE", _number(p, "supply_voltage", "0")),
@@ -537,14 +538,14 @@ _PNR_PDK = needs_pdk(**LIBERTY, tech_lef="a technology LEF", lef="a cell LEF", s
                      hor_layers="horizontal pin layers", ver_layers="vertical pin layers")
 
 
-def _pnr_environment(params: dict[str, str]) -> str | None:
+def _pnr_environment(params: Params) -> str | None:
     """The PDK inputs, and (M29) layer RC whenever the flow reaches clock-tree synthesis."""
     reasons = [r for r in (_PNR_PDK(params),) if r]
     try:
         cts = "cts" in _pnr_plan(params)
     except ValueError:
         cts = False  # a bad stop_after is the run's own failure, recorded when it runs
-    if cts and not params.get("rc_tcl", "").strip():
+    if cts and not text_value(params.get("rc_tcl")).strip():
         reasons.append("needs the layer RC script for clock-tree synthesis (rc_tcl=PATH, absolute or under "
                        f"{PDK_ROOT_ENV}; no PDK is bundled), or stop_after=place")
     return "; ".join(reasons) or None
@@ -619,9 +620,9 @@ for kind, n in bad.items():
 '''
 
 
-def pv_checks(params: dict[str, str]) -> list[str]:
+def pv_checks(params: Params) -> list[str]:
     """The checks a ``pv.run`` makes: DRC with a DRC deck, LVS with an LVS deck and the cells' CDL."""
-    given = {k for k in ("drc_deck", "lvs_deck", "cdl") if params.get(k, "").strip()}
+    given = {k for k in ("drc_deck", "lvs_deck", "cdl") if text_value(params.get(k)).strip()}
     return [c for c, needs in (("drc", {"drc_deck"}), ("lvs", {"lvs_deck", "cdl"})) if needs <= given]
 
 
@@ -683,7 +684,7 @@ _PV_PDK = needs_pdk(tech_lef="a technology LEF", lef="a cell LEF", gds="the cell
                     klayout_tech="the PDK's KLayout technology (.lyt)")
 
 
-def _pv_environment(params: dict[str, str]) -> str | None:
+def _pv_environment(params: Params) -> str | None:
     """The PDK inputs, and at least one check: a DRC deck, or an LVS deck with the cells' CDL."""
     reasons = [r for r in (_PV_PDK(params),) if r]
     if not pv_checks(params):

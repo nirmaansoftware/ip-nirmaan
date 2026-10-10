@@ -96,7 +96,7 @@ def test_a_new_ip_plan_is_checked_recorded_and_feeds_gaps(nirmaan_org, fixed_clo
     assert report.status is ResultStatus.SUBMITTED, report.detail
     run = check_run(engine)
     assert run.succeeded and "3 of 3" in run.summary and "CNT-SYNTH" in run.summary
-    assert Path(run.params["spec"]).read_bytes() == (VPLAN / "requirements_spec.md").read_bytes()
+    assert Path(run.values("spec")[0]).read_bytes() == (VPLAN / "requirements_spec.md").read_bytes()
     assert engine.state.spec_requirements == {}  # nothing before approval
     review_and_approve(engine, "dv-plan")
     plan_art = engine.task(seat).artifacts[0]

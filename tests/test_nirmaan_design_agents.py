@@ -253,8 +253,8 @@ def test_rtl_that_passes_real_lint_and_simulation_goes_to_review(rtl_ready):
         assert art.digest == "sha256:" + hashlib.sha256(data).hexdigest() and art.derived_from == (micro,)
     runs = {engine.state.tool_runs[r].tool: engine.state.tool_runs[r] for r in report.tool_runs}
     assert set(runs) == {"lint.run", "simulator.run", "synth.run"} and all(r.succeeded for r in runs.values())
-    assert runs["lint.run"].params["sources"] == arts["rtl_source"].location
-    assert runs["simulator.run"].params["sources"] == f"{arts['rtl_source'].location},{arts['testbench'].location}"
+    assert runs["lint.run"].params["sources"] == (arts["rtl_source"].location,)
+    assert runs["simulator.run"].params["sources"] == (arts['rtl_source'].location, arts['testbench'].location)
     assert runs["simulator.run"].params["top"] == "counter_tb"
     assert unsatisfied_requirements(engine.state, task) == ["Independent review recorded"]
 

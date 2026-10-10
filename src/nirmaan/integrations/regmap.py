@@ -19,7 +19,7 @@ from nirmaan.integrations.eda import Backend, Job, RunRecord, register_backend
 from nirmaan.integrations.eda_parsers import EdaResult
 from nirmaan.integrations.firmware import _cosim_steps, cosim_bus, parse_fw_test
 from nirmaan.regmap import c_test, load_map, map_summary, validate
-from nirmaan.runtime.tools import ToolOutcome, register_binding
+from nirmaan.runtime.tools import Params, ToolOutcome, register_binding
 from nirmaan.work.engine import TaskEngine
 
 GENERATED_TEST = "regmap_test.c"
@@ -35,7 +35,7 @@ def _load(path: str):
 
 
 @register_binding("regmap.check")
-def check(params: dict[str, str], engine: TaskEngine) -> ToolOutcome:
+def check(params: Params, engine: TaskEngine) -> ToolOutcome:
     path = params.get("map", "")
     regmap, problems = _load(path)
     if problems:

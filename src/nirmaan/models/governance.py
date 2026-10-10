@@ -62,6 +62,10 @@ class AuthorityRule(BaseModel):
         default=False,
         description="Also requires sign-off from a second function (recorded, not inferred).",
     )
+    human_required: bool = Field(
+        default=False,
+        description="An explicitly recorded decision of this kind and criticality needs a person (M40).",
+    )
 
 
 class AuthorityVerdict(BaseModel):

@@ -20,7 +20,8 @@ OWN, DIV, CO = AuthorityScope.OWN_UNIT, AuthorityScope.DIVISION, AuthorityScope.
 
 
 def _matrix(decision: DecisionKind, scope: AuthorityScope, low: Level, med: Level, high: Level, crit: Level,
-            cross_functional_from: Criticality | None = None) -> list[AuthorityRule]:
+            cross_functional_from: Criticality | None = None,
+            human_from: Criticality | None = None) -> list[AuthorityRule]:
     return [
         AuthorityRule(
             decision=decision,
@@ -30,25 +31,31 @@ def _matrix(decision: DecisionKind, scope: AuthorityScope, low: Level, med: Leve
             cross_functional_review=(
                 cross_functional_from is not None and crit_level.rank >= cross_functional_from.rank
             ),
+            human_required=human_from is not None and crit_level.rank >= human_from.rank,
         )
         for crit_level, level in ((L, low), (M, med), (H, high), (C, crit))
     ]
 
 
 D = DecisionKind
+# M40: the last argument is the criticality from which only a person may record the decision
+# explicitly (``nirmaan decide``, MCP ``record_decision``). Gate approvals, waivers, and releases are
+# always a person's; any critical decision is too; below that an AI agent may record it, with the
+# authority of the role it acts as and the evidence P2 asks for.
 AUTHORITY: list[AuthorityRule] = [
     *_matrix(D.EXECUTE_TASK, OWN, Level.INTERN, Level.JUNIOR, Level.ENGINEER, Level.SENIOR),
     *_matrix(D.MODIFY_ARTIFACT, OWN, Level.INTERN, Level.JUNIOR, Level.ENGINEER, Level.SENIOR),
     *_matrix(D.REVIEW_ARTIFACT, DIV, Level.ENGINEER, Level.SENIOR, Level.SENIOR, Level.TECH_LEAD),
-    *_matrix(D.APPROVE_ARTIFACT, OWN, Level.SENIOR, Level.TECH_LEAD, Level.TECH_LEAD, Level.MANAGER),
-    *_matrix(D.APPROVE_GATE, OWN, Level.MANAGER, Level.MANAGER, Level.DIRECTOR, Level.VP),
+    *_matrix(D.APPROVE_ARTIFACT, OWN, Level.SENIOR, Level.TECH_LEAD, Level.TECH_LEAD, Level.MANAGER, human_from=C),
+    *_matrix(D.APPROVE_GATE, OWN, Level.MANAGER, Level.MANAGER, Level.DIRECTOR, Level.VP, human_from=L),
     *_matrix(D.CREATE_TASK, OWN, Level.TECH_LEAD, Level.TECH_LEAD, Level.MANAGER, Level.DIRECTOR),
     *_matrix(D.ASSIGN_TASK, OWN, Level.TECH_LEAD, Level.TECH_LEAD, Level.MANAGER, Level.DIRECTOR),
-    *_matrix(D.CANCEL_TASK, OWN, Level.TECH_LEAD, Level.MANAGER, Level.DIRECTOR, Level.VP),
-    *_matrix(D.ARCHITECTURE_DECISION, DIV, Level.SENIOR, Level.STAFF, Level.DIRECTOR, Level.EXECUTIVE, H),
-    *_matrix(D.CROSS_TEAM_DECISION, DIV, Level.MANAGER, Level.MANAGER, Level.DIRECTOR, Level.VP, H),
-    *_matrix(D.WAIVE_REQUIREMENT, CO, Level.DIRECTOR, Level.DIRECTOR, Level.VP, Level.EXECUTIVE, M),
-    *_matrix(D.RELEASE, CO, Level.VP, Level.VP, Level.EXECUTIVE, Level.EXECUTIVE, M),
+    *_matrix(D.CANCEL_TASK, OWN, Level.TECH_LEAD, Level.MANAGER, Level.DIRECTOR, Level.VP, human_from=C),
+    *_matrix(D.ARCHITECTURE_DECISION, DIV, Level.SENIOR, Level.STAFF, Level.DIRECTOR, Level.EXECUTIVE, H,
+             human_from=C),
+    *_matrix(D.CROSS_TEAM_DECISION, DIV, Level.MANAGER, Level.MANAGER, Level.DIRECTOR, Level.VP, H, human_from=C),
+    *_matrix(D.WAIVE_REQUIREMENT, CO, Level.DIRECTOR, Level.DIRECTOR, Level.VP, Level.EXECUTIVE, M, human_from=L),
+    *_matrix(D.RELEASE, CO, Level.VP, Level.VP, Level.EXECUTIVE, Level.EXECUTIVE, M, human_from=L),
 ]
 
 E = EscalationKind
@@ -119,6 +126,6 @@ CONSTITUTION: list[Principle] = [
               statement="No hidden state changes: every change goes through the engine and the audit trail."),
     Principle(id="P11", title="Auditability", enforcement=B, checks=("audit-chain-intact",),
               statement="Work must remain auditable: the audit trail is append-only and hash-chained."),
-    Principle(id="P12", title="Human gates", enforcement=B, checks=("human-gates",),
+    Principle(id="P12", title="Human gates", enforcement=B, checks=("human-gates", "human-decisions"),
               statement="Human approval can be required at configurable gates."),
 ]

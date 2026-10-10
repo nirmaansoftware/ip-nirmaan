@@ -211,7 +211,7 @@ def test_the_driver_passes_on_a_riscv_core_against_the_real_rtl(block, tmp_path)
     assert "FWTEST BUS write 0xe = 0xdeadbeef strobe 0xf -> SLVERR" in log
     assert "FWTEST BUS write 0x4 = 0xabababab strobe 0x4 -> OKAY" in log  # sb replicates the byte
     assert "picorv32.v" in log and "+define+NIRMAAN_DUT=axi4_lite_regs" in log
-    assert run.params["rtl"] == str(RTL) and outcome.data["result"]["metrics"]["text"] > 0
+    assert run.params["rtl"] == (str(RTL),) and outcome.data["result"]["metrics"]["text"] > 0
 
 
 @needs(*SOC_TOOLS, riscv=True)
@@ -242,9 +242,9 @@ def test_the_firmware_seat_runs_its_driver_on_a_riscv_core(block, tmp_path):
     runs = {block.state.tool_runs[r].tool: block.state.tool_runs[r] for r in report.tool_runs}
     assert set(runs) == {"fw.build", "fw.test", "fw.cross_build", "fw.soc_test"}
     assert all(r.succeeded for r in runs.values())
-    assert runs["fw.soc_test"].params["rtl"] == rtl.location  # the approved file
+    assert runs["fw.soc_test"].params["rtl"] == (rtl.location,)  # the approved file
     arts = {block.state.artifacts[a].location for a in task.artifacts}
-    assert set(runs["fw.soc_test"].params["sources"].split(",")) == arts
+    assert set(runs["fw.soc_test"].values("sources")) == arts
     assert unsatisfied_requirements(block.state, task) == ["Independent review recorded"]
 
     review = review_task(block, seat, ModelRuntime(MockLLM()))

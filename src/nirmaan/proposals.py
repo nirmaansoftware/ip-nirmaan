@@ -45,6 +45,8 @@ class Proposal:
     projects: int
     evidence: tuple[dict[str, Any], ...]
     status: str = "open"
+    #: Where the evidence comes from: failure records in projects (M33) or recorded evaluation runs (M42).
+    source: str = "failures"
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -127,6 +129,10 @@ def recurring_review_send_back(org: Organization, observed: Observed) -> list[Pr
     return proposals
 
 
+def proposal_status(states: Iterable[ProjectState], pid: str) -> str:
+    return _status(list(states), pid)
+
+
 def _status(states: list[ProjectState], pid: str) -> str:
     """The latest recorded decision on a proposal, across the projects read: adopted, rejected, or open."""
     status = "open"
@@ -154,8 +160,13 @@ def decide_proposal(engine: TaskEngine, proposal: Proposal, actor: Actor, adopt:
     if actor.kind is not ActorKind.HUMAN:
         raise ProposalError("only a human may decide a learning proposal: knowledge never changes on a "
                             "model's conclusion")
+    if proposal.source == "evaluation":  # rests on recorded evaluation runs, not on any project's records (M42)
+        return engine.record_decision(
+            actor, DecisionKind.CROSS_TEAM_DECISION, Criticality.MEDIUM,
+            statement=f"{_PREFIX} {proposal.id}: {'adopted' if adopt else 'rejected'}: {proposal.statement}",
+            rationale=reason)
     project = engine.state.project.id
-    mine = [e for e in proposal.evidence if e["project"] == project]
+    mine = [e for e in proposal.evidence if e.get("project") == project]
     if not mine:
         rests_on = ", ".join(sorted({e["project"] for e in proposal.evidence}))
         raise ProposalError(f"{proposal.id} rests on records in {rests_on}; record the decision in one of them")

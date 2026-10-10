@@ -377,7 +377,7 @@ def test_a_new_runtime_on_a_new_workflow_runs_concurrently_with_no_core_changes(
         def execute(self, packet, tools) -> WorkResult:
             run, _ = tools.invoke("status.read")  # inside the turn: the broker records it
             think()
-            notes = tuple({"kind": k, "title": f"{k} note"} for k in packet.task["expected_outputs"])
+            notes = tuple({"kind": k, "title": f"{k} note"} for k in packet.task.expected_outputs)
             return WorkResult(ResultStatus.SUBMITTED, uncertainty=0.2, artifacts=notes, tool_runs=(run,))
 
         def review(self, packet) -> ReviewResult:

@@ -43,8 +43,8 @@ decision task and per recorded `Decision`, sorted by ID:
 
 | Field | From a decision task | From a recorded `Decision` |
 |---|---|---|
-| question, context | task title and description | the statement |
-| alternatives | the task's declared `outcomes` | none recorded |
+| question, context | task title and description | the subject, else its task's title, else the statement (M40) |
+| alternatives | the task's declared `outcomes` | its `options` (M40) |
 | chosen | the recorded `outcome` (None while open) | the statement |
 | rationale | the summaries of the task's artifacts | `rationale` |
 | evidence | the task's evidence: ID, kind, substantiated | the cited evidence |

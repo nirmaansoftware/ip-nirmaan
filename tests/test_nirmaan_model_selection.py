@@ -122,7 +122,7 @@ def test_seat_needs_come_from_the_work(nirmaan_org, fixed_clock, regression):
     assert set(seat_needs(rtl)) == {"structured_output", "files"}
     triage = assemble(regression, tid(regression, "triage"))
     assert seat_needs(triage) == ("structured_output",)
-    declared = dataclasses.replace(triage, task={**triage.task, "model_needs": ["vision"]})
+    declared = triage.model_copy(update={"task": triage.task.model_copy(update={"model_needs": ("vision",)})})
     assert set(seat_needs(declared)) == {"structured_output", "vision"}
 
 

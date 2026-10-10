@@ -31,7 +31,7 @@ from pathlib import Path
 
 from nirmaan.integrations.eda import Backend, Job, RunRecord, register_backend
 from nirmaan.integrations.eda_parsers import Diagnostic, EdaResult
-from nirmaan.models import RegisterMap, list_values
+from nirmaan.models import RegisterMap, list_values, text_value
 from nirmaan.regmap import load_map, lower, validate
 
 #: The harness sources and the HAL header every driver includes.
@@ -258,7 +258,7 @@ _MACRO_RE = re.compile(r"^#define (\w+) (0x[0-9A-F]+u|\d+u)$", re.MULTILINE)
 
 
 def _map_path(job: Job) -> str:
-    return job.params.get("map", "").strip()
+    return text_value(job.params.get("map")).strip()
 
 
 def _job_map(job: Job) -> RegisterMap | None:
@@ -453,7 +453,7 @@ def cosim_buses() -> dict[str, Path]:
 
 def cosim_bus(job: Job) -> tuple[str, str | None]:
     """The bus the run drives (the ``bus`` parameter, else the map's, else the default), and why it cannot."""
-    given = job.params.get("bus", "").strip()
+    given = text_value(job.params.get("bus")).strip()
     regmap = _job_map(job) if not map_problem(job) else None
     if given and regmap and given != regmap.bus:
         return given, f"bus {given} contradicts the register map, whose bus is {regmap.bus}; nothing was simulated"

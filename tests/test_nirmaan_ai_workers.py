@@ -88,7 +88,7 @@ def test_root_cause_concludes_a_declared_outcome_from_triage_evidence(regression
     root = tid(regression, "root-cause")
     drive(regression, until=root, workspace=tmp_path)
     packet = assemble(regression, root)
-    assert any(e["task"] == triage and e["substantiated"] for e in packet.task["evidence"])
+    assert any(e.task == triage and e.substantiated for e in packet.task.evidence)
 
     report = run_task(regression, root, ModelRuntime(MockLLM()))
     task = regression.task(root)

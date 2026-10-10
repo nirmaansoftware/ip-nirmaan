@@ -3014,6 +3014,110 @@ One M29 test migrated (`test_unguarded_and_unsupported_assertions_are_listed`:
 an unused asserting macro asserts nothing, and a named property is inlined).
 The standard local run is 1465 passed, 7 skipped.
 
+### Milestone 40 - Recording explicit decisions from the CLI and over MCP (after Stage 6)
+
+Closes the M29 engineering records deferral. Design doc:
+`docs/DECISIONS_CLI_MCP.md`. No version bump.
+
+Key design points worth not re-deriving:
+- **One engine call per surface.** `nirmaan decide PROJECT TEXT --as ROLE
+  --kind KIND --criticality LEVEL [--subject Q | --task STAGE] [--option ...]
+  [--evidence ID ...] [--rationale R] [--supersedes dec-N] [--agent]` and the
+  MCP action `record_decision` both call `TaskEngine.record_decision`; one
+  `decision.record` audit entry, whose details now always carry
+  `criticality`, plus `options` and `supersedes` when given.
+- **`Decision` gains `subject`, `options`, `supersedes`** (all defaulted, so
+  saved projects load). Superseding is a WorkError unless the old decision
+  exists, is not already superseded, has the same kind, and the new
+  criticality is no lower; the old decision is never edited.
+- **Agents versus people is data:** `AuthorityRule.human_required`, set by the
+  matrix's `human_from` column in `company/governance.py`. Gate approvals,
+  waivers, and releases always need a person; every critical decision does;
+  the rest an agent may record with its role's authority. Enforced by the new
+  P12 check `human-decisions` in the engine, so it holds for the CLI's
+  `--agent` too, not only MCP.
+- **P2 tightened by one line:** a cited evidence ID must exist at every
+  criticality. A low or medium decision may still cite none.
+- **Views:** `DecisionRecord` gains `kind`, `criticality`, `supersedes`,
+  `superseded_by`; a recorded decision's question is its subject, else its
+  task's title, else its statement; alternatives are its options; status
+  `superseded` once replaced. The export prints both links.
+
+`tests/test_nirmaan_decisions_cli_mcp.py` (13), crown jewel
+`test_making_a_decision_human_only_is_one_row_of_data`.
+
+### Milestone 42 - Learning proposals from evaluation results (after Stage 6)
+
+Closes the M33 deferral "Proposals from evaluation results". Design doc:
+`docs/EVAL_PROPOSALS.md`. No version bump.
+
+Key design points worth not re-deriving:
+- **Recorded results only.** `eval_proposals.load_results(root)` reads every
+  `EvalResult` JSON under a directory (one per file, or a list as `eval run
+  --json` prints); replays and results whose audit chain failed are not read.
+  A run's ID is `ev-` plus a hash of case, runtime, start time, and case digest.
+  `nirmaan eval run` overwrites `<runtime>/<case>.json`, so a history is one
+  `--out` per run; the real #57 results were never committed, so the fixtures
+  (`tests/fixtures/eval_results_synthetic/`, runtimes `fixture-model-a`/`-b`)
+  are synthetic and labelled so in every file.
+- **Rules are a registry** (`register_eval_rule`) over an `EvalHistory`
+  (runs grouped by case and runtime, the thresholds, each case's capability
+  from the workflows). `recurring-eval-failure`: `min_failures` (2) of the
+  latest `within_runs` (5); suggests a different model (another runtime's
+  latest run passed: M31 selection), a procedure (no failing run reached
+  review: run the failed gate tools), or a check (a held-out judge caught what
+  the gates missed). `eval-pass-rate-regression`: two windows of `window` (4)
+  runs, a drop of at least `min_drop` (0.25), naming the versions in each.
+  Thresholds: `EvalProposalThresholds` (models), data in `company/learning.py`.
+- **The M33 `Proposal`** gains `source` (`failures` or `evaluation`); subject
+  `<case>@<runtime>`, `projects` 0. `decide_proposal` records an evaluation
+  proposal in any project the person names (it rests on files, not project
+  records); human only, authority matrix, adopting edits nothing.
+- `nirmaan learn [PROJECT...] [--evals DIR] [--cases DIR]`: projects optional
+  when `--evals` is given; each evaluation proposal prints every cited run.
+
+`tests/test_nirmaan_eval_proposals.py` (17), crown jewel
+`test_a_new_eval_rule_needs_no_core_changes`.
+
+### Milestone 39 - Typed values end to end, and the typed work packet (after Stage 6)
+
+The part of M28 that M28 deferred. Design doc: `docs/TYPED_VALUES.md`.
+
+- **Typed values** (`models/org.py`): `ParamValue = str | int | float |
+  tuple[str, ...]`; `ParamSpec.parse` is the one parser (text form, number, or
+  list; a list is several values only for `paths`; a comma in a path and a
+  boolean are still refused). `text_value`, `list_values`, and `param_matches`
+  read typed values and text saved before M39 alike.
+- **The broker** (`runtime/tools.py`): `check_params` returns typed values;
+  the probe, the binding, and the stored `ToolRun` (`params: dict[str,
+  ParamValue]`) see an `int`, a `float`, a tuple. Tools with no contract stay
+  untyped (lists comma-joined), so extension bindings written against text
+  keep working. An empty integer or number is not given. `nirmaan task tool`
+  takes a repeated `--param` as a list. The bindings (EDA runner, physical,
+  DFT, vplan) read numbers and lists through those readers; messages and
+  command lines are unchanged.
+- **Policy**: a requirement's fixed text parameters match a run by value
+  (`param_matches`), so `"0"` matches a stored `0.0` and a saved `"0"`.
+- **Compatibility, no migration**: a project saved before M39 loads as it is
+  (its text values are `ParamValue`s), verifies (the audit chain never hashed
+  run parameters), and re-saves byte for byte; `ToolRun.typed(spec)` parses
+  its text by the contract. Fixture `tests/fixtures/projects/m28-tool-runs.json`
+  was saved by v1.22.0 before the change.
+- **The typed work packet** (`runtime/context.py`): `WorkPacket` is a frozen
+  Pydantic model with `RoleCard`, `CompanyScope`, `DomainScope`,
+  `ProjectScope`, and `TaskScope` (artifacts, evidence, attempts, failed runs,
+  and reviews as views; requirements, assumptions, decisions, and memory as the
+  recorded models themselves), unknown keys forbidden. `prompt.py`,
+  `model.py`, and `selection.py` read attributes only.
+- **Prompts unchanged**: five golden prompts (triage work, root-cause work and
+  review, an RTL seat with approved upstream files, a repair with masked
+  Verilator output), rendered by main's dict packet, match byte for byte.
+
+Tests that compared stored lists with joined text now compare tuples; one
+extension backend test spreads a typed `lef` list into its command line.
+`tests/test_nirmaan_typed_values.py` (23), crown jewel
+`test_a_new_typed_tool_needs_no_core_changes`.
+
 ### Milestone 41 - The register map in `block-design`, bit fields, and an APB host harness (after Stage 6)
 
 Closes what M30 deferred. Design doc: `docs/REGISTER_MAP_ADOPTION.md`. No
@@ -3288,8 +3392,8 @@ verification plans, #49 RISC-V, #50 DFT, #51 the remaining RTL gates). The
 standard local run is 1424 tests with 3 skipped: the real OpenROAD tests, which
 run in CI's `physical-design` job. No live-model evaluation has run yet: this
 machine has no Anthropic credentials (`nirmaan eval run --runtime anthropic`
-once one is set). It ran after the release on the owner's plan through the claude-code runtime;
-see that entry below.
+once one is set). It ran after the release on the owner's plan through the claude-code runtime
+(#57); see that entry below.
 
 ---
 

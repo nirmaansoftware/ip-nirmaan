@@ -14,7 +14,8 @@ from rich.table import Table
 import nirmaan
 from nirmaan.company import COMPANY_NAME, build_organization
 from nirmaan.demos import DEMOS, demo as get_demo
-from nirmaan.models import Actor, ActorKind, EscalationKind, EvidenceKind, TaskKind, Verdict
+from nirmaan.models import (Actor, ActorKind, Criticality, DecisionKind, EscalationKind, EvidenceKind, TaskKind,
+                            Verdict)
 from nirmaan.orchestrator import Orchestrator, UnrecognizedRequirement
 from nirmaan.org import Organization, OrganizationError
 from nirmaan.views import org_tree, plan_tree
@@ -475,8 +476,35 @@ def decisions(project: str, as_json: bool = typer.Option(False, "--json"), root:
                              f"{', '.join(r.alternatives) or 'none recorded'}"), highlight=False, soft_wrap=True)
         if r.decided_by:
             console.print(escape(f"  decided by {r.decided_by} at {r.decided_at}"), highlight=False)
+        if r.kind:
+            links = [f"supersedes {r.supersedes}"] if r.supersedes else []
+            links += [f"superseded by {r.superseded_by}"] if r.superseded_by else []
+            console.print(escape(f"  {r.criticality} {r.kind}" + "".join(f"; {x}" for x in links)), highlight=False)
         for c in r.consequences:
             console.print(escape(f"  cancelled {c['task']}: {c['title']}"), highlight=False, soft_wrap=True)
+
+
+@app.command()
+def decide(
+    project: str,
+    statement: str = typer.Argument(..., help="The decision, as one sentence."),
+    role: str = typer.Option(..., "--as", help="Role ID deciding."),
+    kind: DecisionKind = typer.Option(..., "--kind", help="Sets, with --criticality, the authority required."),
+    criticality: Criticality = typer.Option(..., "--criticality"),
+    subject: str = typer.Option("", "--subject", help="The question decided."),
+    task: Optional[str] = typer.Option(None, "--task", help="The task the decision is about."),
+    option: List[str] = typer.Option([], "--option", help="An alternative considered (repeatable)."),
+    evidence: List[str] = typer.Option([], "--evidence", help="An evidence ID it rests on (repeatable)."),
+    rationale: str = typer.Option("", "--rationale"),
+    supersedes: Optional[str] = typer.Option(None, "--supersedes", help="A decision ID this one replaces."),
+    agent: bool = typer.Option(False, "--agent", help="Act as an AI agent rather than a human."),
+    root: Path = ROOT_OPTION,
+) -> None:
+    """Record an explicit engineering decision. The authority matrix and the constitution decide."""
+    _mutate(project, root, lambda e: e.record_decision(
+        _actor(role, agent), kind, criticality, statement, rationale, evidence=tuple(evidence),
+        task_id=_task_id(e, task) if task else None, subject=subject, options=tuple(option),
+        supersedes=supersedes).id)
 
 
 @app.command()
@@ -520,7 +548,9 @@ def costs(project: str, as_json: bool = typer.Option(False, "--json"), root: Pat
 
 @app.command()
 def learn(
-    projects: List[str],
+    projects: List[str] = typer.Argument(None, help="Projects whose failure records to read."),
+    evals: Optional[Path] = typer.Option(None, "--evals", help="Recorded evaluation results to read too (M42)."),
+    cases: Path = typer.Option(Path("evals"), "--cases", help="Evaluation case files, for each seat's capability."),
     decide: Optional[str] = typer.Option(None, "--decide", help="A proposal ID to decide."),
     in_project: Optional[str] = typer.Option(None, "--in", help="The project to record the decision in."),
     role: Optional[str] = typer.Option(None, "--as", help="Role ID deciding, as a human."),
@@ -529,11 +559,21 @@ def learn(
     as_json: bool = typer.Option(False, "--json"),
     root: Path = ROOT_OPTION,
 ) -> None:
-    """Skill changes proposed by failures that recur across projects; decide one as a person."""
+    """Skill changes proposed by failures that recur across projects or evaluation runs; decide one as a person."""
     from nirmaan.proposals import ProposalError, decide_proposal, learning_proposals
 
-    engines = {p: _load(p, root) for p in projects}
-    proposals = learning_proposals(_org(), [e.state for e in engines.values()])
+    if not projects and evals is None:
+        _fail("name projects, --evals DIR, or both")
+    engines = {p: _load(p, root) for p in projects or []}
+    proposals = learning_proposals(_org(), [e.state for e in engines.values()]) if engines else []
+    if evals is not None:
+        from nirmaan.eval_proposals import eval_proposals, load_results
+
+        try:
+            runs = load_results(evals)
+        except (ValueError, OSError) as exc:
+            _fail(f"cannot read evaluation results under {evals}: {exc}")
+        proposals += eval_proposals(_org(), runs, _cases(cases), states=[e.state for e in engines.values()])
     if decide:
         chosen = next((p for p in proposals if p.id == decide), None)
         if chosen is None or adopt is None or not role or not in_project:
@@ -555,9 +595,14 @@ def learn(
     if not proposals:
         console.print("No failure recurs often enough to propose a change.")
     for p in proposals:
-        console.print(escape(f"{p.id} [{p.status}] {p.statement}"), highlight=False, soft_wrap=True)
+        console.print(escape(f"{p.id} [{p.status}] [{p.source}] {p.statement}"), highlight=False, soft_wrap=True)
         console.print(escape(f"  for {', '.join(p.targets) or 'no providing skill'}: {p.suggestion}"),
                       highlight=False, soft_wrap=True)
+        for e in p.evidence if p.source == "evaluation" else ():
+            verdicts = "; ".join(f"{v['check']} {v['status']}: {v['summary']}" for v in e["verdicts"])
+            console.print(escape(f"  run {e['run']} {e['case']} on {e['runtime']} {e['version']} "
+                                 f"{e['started_at']}: {'passed' if e['passed'] else 'failed'} ({verdicts}) "
+                                 f"<- {e['file']}"), highlight=False, soft_wrap=True)
 
 
 @app.command()
@@ -714,11 +759,16 @@ def task_complete(project: str, task: str, role: str = AS_OPTION, agent: bool = 
 
 @task_app.command("tool")
 def task_tool(project: str, task: str, tool: str, role: str = AS_OPTION, agent: bool = AGENT_OPTION,
-              param: List[str] = typer.Option([], "--param", help="key=value"), root: Path = ROOT_OPTION):
-    """Invoke a tool through the broker and attach the run as evidence."""
+              param: List[str] = typer.Option([], "--param", help="key=value; repeat a key for a list"),
+              root: Path = ROOT_OPTION):
+    """Invoke a tool through the broker and attach the run as evidence. Values are typed by its contract."""
     from nirmaan.runtime import ToolBroker
 
-    params = dict(p.split("=", 1) for p in param)
+    given: dict[str, list[str]] = {}
+    for p in param:
+        key, _, value = p.partition("=")
+        given.setdefault(key, []).append(value)
+    params = {k: v[0] if len(v) == 1 else v for k, v in given.items()}
 
     def act(e: TaskEngine):
         actor = _actor(role, agent)

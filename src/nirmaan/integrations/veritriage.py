@@ -28,14 +28,14 @@ from veritriage.models import GenerationRequest, GenerationResponse, ProviderCap
 
 from nirmaan.events import TOPICS, OrgEvent
 from nirmaan.models import list_values
-from nirmaan.runtime.tools import ToolOutcome, register_binding
+from nirmaan.runtime.tools import Params, ToolOutcome, register_binding
 from nirmaan.work.engine import TaskEngine
 
 #: ``Event.source`` for everything IP Nirmaan publishes on the M18 bus.
 SOURCE = "nirmaan"
 
 
-def _services(params: dict[str, str]):
+def _services(params: Params):
     from veritriage.workspace import WorkspaceServices
 
     root = params.get("workspace")
@@ -43,7 +43,7 @@ def _services(params: dict[str, str]):
 
 
 @register_binding("veritriage.investigate")
-def investigate(params: dict[str, str], engine: TaskEngine) -> ToolOutcome:
+def investigate(params: Params, engine: TaskEngine) -> ToolOutcome:
     paths = [Path(p) for p in list_values(params.get("paths", ""))]
     if not paths:
         return ToolOutcome(False, "no artifact paths given")
@@ -65,7 +65,7 @@ def investigate(params: dict[str, str], engine: TaskEngine) -> ToolOutcome:
 
 
 @register_binding("veritriage.explain_log")
-def explain_log(params: dict[str, str], engine: TaskEngine) -> ToolOutcome:
+def explain_log(params: Params, engine: TaskEngine) -> ToolOutcome:
     path = Path(params.get("path", ""))
     if not path.is_file():
         return ToolOutcome(False, f"no such log: {path}")
@@ -75,7 +75,7 @@ def explain_log(params: dict[str, str], engine: TaskEngine) -> ToolOutcome:
 
 
 @register_binding("knowledge.search")
-def search(params: dict[str, str], engine: TaskEngine) -> ToolOutcome:
+def search(params: Params, engine: TaskEngine) -> ToolOutcome:
     hits = _services(params).search_knowledge(params.get("query", ""))
     return ToolOutcome(True, f"{len(hits)} knowledge hits",
                        references=tuple(f"{h.pack}:{h.id}" for h in hits[:20]),
