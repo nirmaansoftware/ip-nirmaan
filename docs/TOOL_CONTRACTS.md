@@ -69,8 +69,8 @@ whether this machine can run it, and its parameters.
 Stored projects (a `ToolRun`'s params stay `dict[str, str]`), tool results,
 backends' behaviour, the recorded-failure rule for missing inputs, workflows,
 policy semantics, and VeriTriage. Typed values end to end (a `ToolRun` storing
-real lists) and the typed work packet are the next part of M28, measured
-against the M27 evaluation cases.
+real lists) and the typed work packet are the next part of M28, done in M39
+(`docs/TYPED_VALUES.md`).
 
 ## Tests
 

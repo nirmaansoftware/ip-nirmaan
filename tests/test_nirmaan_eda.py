@@ -242,7 +242,7 @@ def test_a_failing_simulation_log_feeds_veritriage(bridge, tmp_path):
     triage, outcome = triage_simulation(ToolBroker(bridge), agent(holder(bridge, "veritriage.investigate")), run,
                                         workspace=str(tmp_path / "vt"))
     assert triage.tool == "veritriage.investigate" and triage.succeeded
-    assert triage.params["paths"] == run.references[0] and triage.references[0].startswith("ses-")
+    assert triage.params["paths"] == (run.references[0],) and triage.references[0].startswith("ses-")
     assert set(bridge.state.tool_runs) == {run.id, triage.id}  # two real runs, both on the record
 
 

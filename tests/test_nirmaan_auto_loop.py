@@ -117,7 +117,7 @@ class Desk:
 
     def execute(self, packet, tools) -> WorkResult:
         self.packets.append(packet)
-        notes = tuple({"kind": k, "title": f"{k} note"} for k in packet.task["expected_outputs"])
+        notes = tuple({"kind": k, "title": f"{k} note"} for k in packet.task.expected_outputs)
         return WorkResult(ResultStatus.SUBMITTED, uncertainty=0.2, artifacts=notes)
 
     def review(self, packet) -> ReviewResult:

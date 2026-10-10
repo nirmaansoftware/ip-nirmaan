@@ -276,7 +276,7 @@ def test_the_driver_passes_against_the_real_rtl(block, tmp_path):
     assert "FWTEST BUS read 0x5 -> 0x00000000 SLVERR" in log
     assert "FWTEST BUS write 0xe = 0xdeadbeef strobe 0xf -> SLVERR" in log
     assert "FWTEST BUS write 0x4 = 0x00ab0000 strobe 0x4 -> OKAY" in log
-    assert "verilator --cc --exe --build" in log and run.params["rtl"] == str(RTL)
+    assert "verilator --cc --exe --build" in log and run.params["rtl"] == (str(RTL),)
 
 
 @needs(*COSIM)
@@ -368,8 +368,8 @@ def test_the_firmware_seat_runs_its_driver_on_the_approved_rtl(block, tmp_path):
         assert art.derived_from == (spec,)
     runs = {block.state.tool_runs[r].tool: block.state.tool_runs[r] for r in report.tool_runs}
     assert set(runs) == {"fw.build", "fw.test"} and all(r.succeeded for r in runs.values())
-    assert runs["fw.test"].params["rtl"] == rtl.location  # the approved file, not a copy of the fixture
-    assert set(runs["fw.test"].params["sources"].split(",")) == {a.location for a in arts}
+    assert runs["fw.test"].params["rtl"] == (rtl.location,)  # the approved file, not a copy of the fixture
+    assert set(runs["fw.test"].values("sources")) == {a.location for a in arts}
     assert unsatisfied_requirements(block.state, task) == ["Independent review recorded"]
 
     reviewer = MockLLM()

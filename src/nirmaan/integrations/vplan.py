@@ -12,18 +12,15 @@ failing check is a recorded run with ``succeeded=False``. The rules live in
 
 from __future__ import annotations
 
-from nirmaan.runtime.tools import ToolOutcome, register_binding
+from nirmaan.models import list_values
+from nirmaan.runtime.tools import Params, ToolOutcome, register_binding
 from nirmaan.vplan import CHECK_TOOL, check_files
 from nirmaan.work.engine import TaskEngine
 
 
-def _paths(value: str) -> list[str]:
-    return [p.strip() for p in value.split(",") if p.strip()]
-
-
 @register_binding(CHECK_TOOL)
-def _check(params: dict[str, str], engine: TaskEngine) -> ToolOutcome:
-    plans, specs = _paths(params.get("plan", "")), _paths(params.get("spec", ""))
+def _check(params: Params, engine: TaskEngine) -> ToolOutcome:
+    plans, specs = list_values(params.get("plan")), list_values(params.get("spec"))
     if not plans:
         return ToolOutcome(False, "no plan file to check")
     if not specs:

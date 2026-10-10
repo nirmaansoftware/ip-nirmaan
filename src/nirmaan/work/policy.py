@@ -26,6 +26,7 @@ from nirmaan.models import (
     TaskKind,
     ToolStatus,
     Verdict,
+    param_matches,
 )
 from nirmaan.org import Organization
 from nirmaan.work.audit import verify_chain
@@ -133,7 +134,7 @@ def satisfies(state: ProjectState, ev, req) -> bool:
     if (req.tools or req.params) and ev.kind in (EvidenceKind.TOOL_RUN, EvidenceKind.VERITRIAGE_SESSION):
         run = state.tool_runs.get(ev.tool_run or "")
         return (run is not None and (not req.tools or run.tool in req.tools)
-                and all(run.params.get(k) == v for k, v in req.params))
+                and all(param_matches(run.params.get(k), v) for k, v in req.params))
     return True
 
 

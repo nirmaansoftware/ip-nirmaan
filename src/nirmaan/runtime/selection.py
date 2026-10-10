@@ -57,9 +57,9 @@ def llm_for(profile: ModelProfile) -> LLM:
 def seat_needs(packet: WorkPacket) -> tuple[str, ...]:
     """What a model must offer to serve this seat, derived from its work."""
     needs = ["structured_output"]
-    if any(not b.get("upstream") for req in packet.task["evidence_requirements"] for b in req["files"]):
+    if any(not b.upstream for req in packet.task.evidence_requirements for b in req.files):
         needs.append("files")
-    needs += [str(n) for n in packet.task.get("model_needs", [])]
+    needs += list(packet.task.model_needs)
     return tuple(dict.fromkeys(needs))
 
 

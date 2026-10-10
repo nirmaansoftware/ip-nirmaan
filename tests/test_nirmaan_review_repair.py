@@ -371,7 +371,7 @@ def test_a_reviewer_sends_rtl_back_and_the_repaired_rtl_is_approved(rtl_ready, t
     assert Path(submitted["rtl_source"].location).read_text() == REVISED
     runs = {engine.state.tool_runs[r].tool: engine.state.tool_runs[r] for r in second.tool_runs}
     assert all(r.succeeded for r in runs.values())  # every before-review check, again, on the new files
-    assert runs["lint.run"].params["sources"] == submitted["rtl_source"].location
+    assert runs["lint.run"].params["sources"] == (submitted["rtl_source"].location,)
 
     assert review_task(engine, rtl, ModelRuntime(MockLLM())).status is ResultStatus.SUBMITTED
     engine.approve(rtl, human(task.approver), "repaired after review")
@@ -444,8 +444,8 @@ def test_p6_holds_through_a_repair(units):
     assert {r.reviewer for r in engine.state.reviews.values() if r.task == seat} == {task.reviewer}
     assert task.owner != task.reviewer
     # The owner's packet is its own seat; the reviewer's packet is the reviewer's.
-    assert assemble(engine, seat).role["role"] == task.owner
-    assert assemble(engine, seat, role=task.reviewer).role["role"] == task.reviewer
+    assert assemble(engine, seat).role.role == task.owner
+    assert assemble(engine, seat, role=task.reviewer).role.role == task.reviewer
 
 
 # --- The laws ----------------------------------------------------------------------------------------

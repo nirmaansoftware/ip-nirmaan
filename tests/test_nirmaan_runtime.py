@@ -144,9 +144,9 @@ def test_a_failing_tool_is_a_recorded_failed_run(regression, tmp_path):
 def test_the_work_packet_keeps_knowledge_scopes_separate(regression, fixture_log, tmp_path):
     drive(regression, until=tid(regression, "root-cause"), workspace=tmp_path)
     packet = assemble(regression, tid(regression, "root-cause"))
-    assert {p["id"] for p in packet.company["constitution"]} == {f"P{i}" for i in range(1, 13)}
-    assert any("veritriage_pack:" in src for s in packet.domain["skills"] for src in s["knowledge_sources"])
-    assert packet.project["requirement"] == REGRESSION
-    assert packet.task["outcomes"] == ["rtl_bug", "testbench_bug", "infrastructure", "spec_ambiguity"]
-    assert packet.task["upstream_artifacts"]
+    assert {p.id for p in packet.company.constitution} == {f"P{i}" for i in range(1, 13)}
+    assert any("veritriage_pack:" in src for s in packet.domain.skills for src in s.knowledge_sources)
+    assert packet.project.requirement == REGRESSION
+    assert packet.task.outcomes == ("rtl_bug", "testbench_bug", "infrastructure", "spec_ambiguity")
+    assert packet.task.upstream_artifacts
     assert "veritriage.investigate" in packet.tools and "approval.grant" not in packet.tools

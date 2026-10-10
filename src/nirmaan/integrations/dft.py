@@ -46,6 +46,7 @@ from typing import Callable
 from nirmaan.integrations.dft_scan import SCAN_PORTS, Design, NetlistError, techmap_file
 from nirmaan.integrations.eda import Backend, Job, RunRecord, register_backend
 from nirmaan.integrations.eda_parsers import Diagnostic, EdaResult, parse_simulation, parse_yosys
+from nirmaan.models import text_value
 
 HELPER = Path(__file__).with_name("dft_scan.py")
 ATPG_HELPER = Path(__file__).with_name("dft_atpg.py")
@@ -212,18 +213,18 @@ def _insert_steps(job: Job) -> list[list[str]]:
         (work / stale).unlink(missing_ok=True)
     return [["yosys", "-s", "prep.ys"],
             _helper("stitch", DESIGN_JSON, "stitched.json", CHAIN_REPORT, str(job.top),
-                    job.params.get("chains") or "1", job.params.get("max_chain_length") or "0",
-                    job.params.get("cross_domains", "").strip() or "none"),
+                    text_value(job.params.get("chains")) or "1", text_value(job.params.get("max_chain_length")) or "0",
+                    text_value(job.params.get("cross_domains")).strip() or "none"),
             ["yosys", "-s", "stitch.ys"]]
 
 
 def _chain_params(job: Job) -> str | None:
     """Why ``chains`` or ``max_chain_length`` cannot be used as given, if so."""
     for name in ("chains", "max_chain_length"):
-        value = job.params.get(name, "").strip()
+        value = text_value(job.params.get(name)).strip()
         if value and not (value.isdigit() and int(value) > 0):
             return f"{name} must be a positive integer, not {value!r}"
-    cross = job.params.get("cross_domains", "").strip()
+    cross = text_value(job.params.get("cross_domains")).strip()
     if cross and cross != "lockup":
         return f"cross_domains must be 'lockup' (chains cross clock domains through lockup latches), not {cross!r}"
     return None
@@ -410,7 +411,8 @@ def atpg_grading_steps(job: Job, patterns: str, fault_model: str = "stuck-at") -
     for stale in (FAULTS, "faulty.json", "fault_netlist.v", "atpg_tb.v", "atpg.vvp"):
         (work / stale).unlink(missing_ok=True)
     return [atpg_helper("inject", DESIGN_JSON, patterns, "faulty.json", FAULTS, "atpg_tb.v", str(job.top),
-                        "--sample", job.params.get("fault_sample") or "0", "--seed", job.params.get("seed") or "1",
+                        "--sample", text_value(job.params.get("fault_sample")) or "0",
+                        "--seed", text_value(job.params.get("seed")) or "1",
                         "--model", fault_model),
             ["yosys", "-s", "fault.ys"],
             ["iverilog", "-g2012", "-o", "atpg.vvp", "-s", "nirmaan_atpg_tb", *job.sources, "fault_netlist.v",
@@ -419,13 +421,13 @@ def atpg_grading_steps(job: Job, patterns: str, fault_model: str = "stuck-at") -
 
 
 def _atpg_steps(job: Job, fault_model: str = "stuck-at") -> list[list[str]]:
-    given = job.params.get("patterns", "").strip()
+    given = text_value(job.params.get("patterns")).strip()
     steps = atpg_analysis_steps(job)
     if given:
         return steps + atpg_grading_steps(job, str(Path(given).resolve()), fault_model)
     (job.workdir / PATTERNS).unlink(missing_ok=True)
-    steps.append(atpg_helper("generate", DESIGN_JSON, PATTERNS, str(job.top), "--seed", job.params.get("seed") or "1",
-                             "--model", fault_model))
+    steps.append(atpg_helper("generate", DESIGN_JSON, PATTERNS, str(job.top),
+                             "--seed", text_value(job.params.get("seed")) or "1", "--model", fault_model))
     return steps + atpg_grading_steps(job, PATTERNS, fault_model)
 
 
@@ -436,14 +438,14 @@ def _transition_steps(job: Job) -> list[list[str]]:
 def _atpg_params(job: Job) -> str | None:
     """Why the ATPG parameters cannot be used as given, if so."""
     for name in ("fault_sample", "seed"):
-        value = job.params.get(name, "").strip()
+        value = text_value(job.params.get(name)).strip()
         if value and not value.isdigit():
             return f"{name} must be a non-negative integer, not {value!r}"
     for name, value in job.params.items():
         if name.startswith("min_"):
             try:
                 float(value)
-            except ValueError:
+            except (TypeError, ValueError):
                 return f"{name} {value!r} is not a number"
     return None
 
@@ -525,7 +527,7 @@ def parse_atpg(run: RunRecord) -> EdaResult:
         if isinstance(measured, bool) or not isinstance(measured, (int, float)):
             short.append(f"{metric} was not reported, so min_{metric} cannot be checked")
         elif measured < float(bound):
-            short.append(f"{metric} {measured} is below min_{metric} {bound}")
+            short.append(f"{metric} {measured} is below min_{metric} {text_value(bound)}")
     if short:
         return EdaResult(False, f"limit not met: {'; '.join(short)} (the tool reported: {summary})",
                          tuple(Diagnostic("error", m, "LIMIT") for m in short), metrics)
