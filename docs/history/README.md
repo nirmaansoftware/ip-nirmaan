@@ -89,6 +89,7 @@ The original preface of the section:
 - [M42-eval-proposals](M42-eval-proposals.md): Milestone 42 - Learning proposals from evaluation results (after Stage 6)
 - [release-v1.23.0](release-v1.23.0.md): v1.23.0 (2026-10-11) - the M34 to M42 batch
 - [M43-status-docs](M43-status-docs.md): Milestone 43 - Status documents that stop colliding and stop drifting
+- [M46-tests-ci-hardening](M46-tests-ci-hardening.md): Milestone 46 - Test guards, one copy of each test helper, and a hardened CI
 
 ## Before M43
 
