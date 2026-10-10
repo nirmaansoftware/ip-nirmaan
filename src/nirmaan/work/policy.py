@@ -188,8 +188,8 @@ def _decision_evidence(ctx: PolicyContext) -> list[str]:
         return []
     crit: Criticality = ctx.payload["criticality"]
     ids: list[str] = list(ctx.payload.get("evidence", ()))
-    if crit.rank < Criticality.HIGH.rank:
-        return []
+    if crit.rank < Criticality.HIGH.rank:  # M40: even a minor decision may not cite evidence never recorded
+        return [f"decision evidence {e} was never recorded" for e in ids if e not in ctx.state.evidence]
     if not ids:
         return [f"a {crit.value} decision needs evidence"]
     weak = [e for e in ids if e not in ctx.state.evidence or not ctx.state.evidence[e].substantiated]
@@ -355,6 +355,17 @@ def _chain(ctx: PolicyContext) -> list[str]:
     start, previous = ctx.payload.get("_chain_verified", (0, None))
     problems = verify_chain(ctx.state.audit, start, previous) if start else verify_chain(ctx.state.audit)
     return [f"audit trail broken: {p}" for p in problems]
+
+
+@register_check("human-decisions")
+def _human_decisions(ctx: PolicyContext) -> list[str]:
+    """M40: the authority matrix marks the decisions only a person may record."""
+    if ctx.action != "decision.record" or ctx.actor.kind is ActorKind.HUMAN:
+        return []
+    kind, crit = ctx.payload["kind"], ctx.payload["criticality"]
+    if not ctx.org.authority[(kind.value, crit.value)].human_required:
+        return []
+    return [f"a {crit.value} {kind.value} decision needs a person; {ctx.actor.kind.value} may not record it"]
 
 
 @register_check("human-gates")

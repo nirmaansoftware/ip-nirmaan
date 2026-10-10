@@ -14,7 +14,8 @@ from rich.table import Table
 import nirmaan
 from nirmaan.company import COMPANY_NAME, build_organization
 from nirmaan.demos import DEMOS, demo as get_demo
-from nirmaan.models import Actor, ActorKind, EscalationKind, EvidenceKind, TaskKind, Verdict
+from nirmaan.models import (Actor, ActorKind, Criticality, DecisionKind, EscalationKind, EvidenceKind, TaskKind,
+                            Verdict)
 from nirmaan.orchestrator import Orchestrator, UnrecognizedRequirement
 from nirmaan.org import Organization, OrganizationError
 from nirmaan.views import org_tree, plan_tree
@@ -475,8 +476,35 @@ def decisions(project: str, as_json: bool = typer.Option(False, "--json"), root:
                              f"{', '.join(r.alternatives) or 'none recorded'}"), highlight=False, soft_wrap=True)
         if r.decided_by:
             console.print(escape(f"  decided by {r.decided_by} at {r.decided_at}"), highlight=False)
+        if r.kind:
+            links = [f"supersedes {r.supersedes}"] if r.supersedes else []
+            links += [f"superseded by {r.superseded_by}"] if r.superseded_by else []
+            console.print(escape(f"  {r.criticality} {r.kind}" + "".join(f"; {x}" for x in links)), highlight=False)
         for c in r.consequences:
             console.print(escape(f"  cancelled {c['task']}: {c['title']}"), highlight=False, soft_wrap=True)
+
+
+@app.command()
+def decide(
+    project: str,
+    statement: str = typer.Argument(..., help="The decision, as one sentence."),
+    role: str = typer.Option(..., "--as", help="Role ID deciding."),
+    kind: DecisionKind = typer.Option(..., "--kind", help="Sets, with --criticality, the authority required."),
+    criticality: Criticality = typer.Option(..., "--criticality"),
+    subject: str = typer.Option("", "--subject", help="The question decided."),
+    task: Optional[str] = typer.Option(None, "--task", help="The task the decision is about."),
+    option: List[str] = typer.Option([], "--option", help="An alternative considered (repeatable)."),
+    evidence: List[str] = typer.Option([], "--evidence", help="An evidence ID it rests on (repeatable)."),
+    rationale: str = typer.Option("", "--rationale"),
+    supersedes: Optional[str] = typer.Option(None, "--supersedes", help="A decision ID this one replaces."),
+    agent: bool = typer.Option(False, "--agent", help="Act as an AI agent rather than a human."),
+    root: Path = ROOT_OPTION,
+) -> None:
+    """Record an explicit engineering decision. The authority matrix and the constitution decide."""
+    _mutate(project, root, lambda e: e.record_decision(
+        _actor(role, agent), kind, criticality, statement, rationale, evidence=tuple(evidence),
+        task_id=_task_id(e, task) if task else None, subject=subject, options=tuple(option),
+        supersedes=supersedes).id)
 
 
 @app.command()
