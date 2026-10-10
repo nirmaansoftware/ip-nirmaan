@@ -2,7 +2,7 @@
 
 An inventory of what IP Nirmaan is today, written for the structural review
 (`REVIEW_PLAN.md`). It describes the code as it stands on `main` at v1.20.0,
-read module by module. History and rationale stay in `context.md`; this file
+read module by module. History and rationale are in `docs/history/` (since M43); this file
 is the map.
 
 ## 1. One-paragraph summary
@@ -46,7 +46,7 @@ lenses beside it (waveform, engineering context, project model, design graph)
 and platform layers above it (workspace services, MCP, investigation
 orchestrator, collaboration, agents, learning, planning, conversation, AI
 providers, automation bus). Every layer is a registry; AST tests enforce the
-import direction. `context.md` section 3 is its full map. Nirmaan uses five of
+import direction. `docs/history/context-before-M43.md` section 3 is its full map. Nirmaan uses five of
 its surfaces: `WorkspaceServices` (investigations), the Knowledge Pack
 registry, the M17 LLM provider registry and grounding, the M18 automation
 registries, and the M15 design-graph provider (for M24 links).

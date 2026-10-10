@@ -1,8 +1,9 @@
 # CLAUDE.md
 
 Guidance for AI coding agents working in the IP Nirmaan repository. Before
-starting work, read `context.md` (what exists and why) and `docs/ROADMAP.md`
-(what comes next, and the resume checklist).
+starting work, read `context.md` (what exists now), `docs/ROADMAP.md` (what
+comes next, the reserved milestone numbers, and the resume checklist), and the
+`docs/history/` files of the milestones you touch (how it got here).
 
 ## How to work
 
@@ -40,7 +41,14 @@ observations on where LLM coding agents go wrong.
 - **Extension points are registries.** Add a crown-jewel test proving a new
   extension needs zero core changes.
 - **Milestones ship complete:** code, tests, a design doc in `docs/`, and a
-  `context.md` entry. Work on a feature branch, then open a PR.
+  history entry. Reserve the number in `docs/ROADMAP.md` ("Milestone numbers")
+  before cutting the branch. The milestone adds its own
+  `docs/history/MNN-<slug>.md` file and one line in `docs/history/README.md`;
+  it does not append to `context.md`, which holds current facts only (edit it
+  only when one changes). Counts in the roadmap are generated: run
+  `python scripts/status.py --write` after adding a workflow, tool, unit,
+  skill, or principle, never type them. See `docs/STATUS_DOCS.md`. Work on a
+  feature branch, then open a PR.
 - **Commit messages** end with the Co-Authored-By line from the session's
   attribution instructions. Never amend or force-push.
 
