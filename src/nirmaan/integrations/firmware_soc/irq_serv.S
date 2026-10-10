@@ -30,6 +30,14 @@ nirmaan_core_irq_set:
 2:  mv a0, a1
     ret
 
+/* int nirmaan_core_bus_error_set(unsigned on): SERV has no bus-error input (its Wishbone data bus has no
+ * err, and its one interrupt input carries the design's line), so it never traps on a bus error
+ * (docs/FIRMWARE_IRQ_TRAPS.md, section 4). */
+    .globl nirmaan_core_bus_error_set
+nirmaan_core_bus_error_set:
+    li a0, 0
+    ret
+
 /* The entry from the vector: save the caller-saved registers on the interrupted stack; an interrupt
  * (mcause bit 31) is dispatched and returns with mret, an exception is reported and ends the run. */
     .globl nirmaan_core_trap
