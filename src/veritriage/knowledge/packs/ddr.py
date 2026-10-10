@@ -8,7 +8,7 @@ interval.
 Note: threshold-margin analysis (how close a number is to a limit) is not
 expressible with today's presence-based clauses; these patterns fire on a
 checker/monitor already reporting the violation. Numeric-comparison clauses
-are a future matcher upgrade (context.md section 5.1).
+are a future matcher upgrade (docs/history/context-before-M43.md, section 5.1).
 """
 
 from __future__ import annotations
