@@ -25,6 +25,8 @@ import pytest
 from nirmaan_helpers import agent, drive, human, tid
 from test_nirmaan_design_agents import needs
 from test_nirmaan_firmware import answer, file, holder, joined, token, workspace
+from test_nirmaan_riscv_firmware import SOC_TOOLS
+from test_nirmaan_riscv_firmware import needs as needs_riscv
 
 from nirmaan.integrations.firmware import HARNESS, cosim_buses, register_cosim_bus, unregister_cosim_bus
 from nirmaan.models import Access, Assurance, RegisterMap, TaskStatus
@@ -237,6 +239,15 @@ def test_a_driver_that_writes_no_header_uses_the_generated_one(block, tmp_path):
     assert not without.succeeded and "apb_csr_map.h" in without.summary  # no map, no header
 
 
+@needs_riscv(*SOC_TOOLS, riscv=True)
+def test_the_generated_header_also_serves_the_risc_v_run(block, tmp_path):
+    """fw.soc_test takes the map too: the same driver, its header generated, on a core over the SoC's APB bridge."""
+    run, outcome = invoke(block, "fw.soc_test", {"sources": joined(*CSR_SOURCES), "rtl": str(CSR_RTL),
+                                                 "map": str(CSR_MAP)}, tmp_path)
+    assert run.succeeded, run.summary
+    assert outcome.data["result"]["metrics"]["passed"] == 4
+
+
 # --- The map judges APB RTL, fields included ------------------------------------------------
 
 
@@ -259,7 +270,7 @@ def test_the_map_passes_on_the_apb_rtl_that_implements_it(block, tmp_path, rtl, 
     names = [c["name"] for c in outcome.data["result"]["metrics"]["checks"]]
     expected = ["reset_values", "write_then_read_every_register", "byte_strobes", "unmapped_response"]
     if top == "apb_csr":
-        expected[2:2] = ["read_only_ignores_writes", "write_one_to_clear"]
+        expected[2:2] = ["write_one_to_clear", "read_only_ignores_writes"]
     assert names == expected
 
 

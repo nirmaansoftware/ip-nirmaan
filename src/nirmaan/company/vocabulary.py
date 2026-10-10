@@ -75,6 +75,8 @@ FEATURES: list[FeatureRule] = [
                           r"\bmbist\b")),
     FeatureRule(feature="firmware", skills=("embedded_firmware", "device_drivers"), patterns=(r"\bfirmware\b", r"\bdrivers?\b")),
     FeatureRule(feature="riscv", patterns=(r"\brisc[- ]?v\b", r"\brv32\w*")),
+    FeatureRule(feature="register_map", patterns=(r"\bregister maps?\b", r"\bregmaps?\b"),
+                description="A register map as data, approved, then judging the RTL and the driver (M41)"),
     FeatureRule(feature="verification_plan", patterns=(r"\bverification plan\b", r"\bv-?plan\b", r"\btest plan\b"),
                 description="A verification plan, written and checked before the testbench (M29)"),
     FeatureRule(feature="performance", skills=("performance_modeling",), patterns=(r"\bbandwidth\b", r"\blatency\b", r"\bthroughput\b")),

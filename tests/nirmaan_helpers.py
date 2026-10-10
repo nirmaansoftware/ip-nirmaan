@@ -167,9 +167,11 @@ def gated_submit(engine: TaskEngine, task_id: str, outcome: str | None = None,
         params = dict(req.params)
         for binding in req.files:
             if binding.upstream:  # M38: the approved upstream files, as the runtime fills them
-                params[binding.param] = ",".join(
+                value = ",".join(
                     a.location for k in binding.kinds for a in upstream_artifacts(engine.state, task)
                     if a.kind == k and a.assurance is Assurance.APPROVED and a.location)
+                if value or not binding.optional:  # M41: an optional input with nothing upstream is left out
+                    params[binding.param] = value
                 continue
             matched = [(path, entry) for k in binding.kinds for kind, path, entry in produced if kind == k]
             params[binding.param] = matched[0][1] if binding.entry else ",".join(p for p, _ in matched)

@@ -26,7 +26,8 @@ DELIVERABLE_FOLDERS: list[DeliverableFolder] = [
     DeliverableFolder(
         id="02_architecture", title="Architecture",
         description="Interfaces, IP architecture, and the architecture views the requirement called for.",
-        artifact_kinds=("architecture_spec", "ip_architecture_spec", "interface_spec", "interconnect_architecture",
+        artifact_kinds=("architecture_spec", "ip_architecture_spec", "interface_spec", "register_map",
+                        "interconnect_architecture",
                         "qos_architecture", "memory_architecture", "security_architecture", "power_architecture",
                         "performance_model", "software_architecture", "threat_model", "impact_analysis"),
         capabilities=("arch.system", "arch.ip", "arch.interface", "arch.interconnect", "arch.memory",

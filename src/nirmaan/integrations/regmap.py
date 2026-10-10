@@ -2,9 +2,10 @@
 
 ``regmap.check`` validates a map file. ``regmap.verify`` generates a test from
 the map (``nirmaan.regmap.c_test``) and runs it on the RTL through the
-AXI4-Lite co-simulation harness that ``fw.test`` uses (real VALID/READY
-handshakes on a Verilator model). A map for a bus with no harness is a
-recorded failed run that says so: nothing is simulated in its place.
+co-simulation harness that ``fw.test`` uses, with the manager for the map's bus
+(AXI4-Lite or, from M41, APB: real handshakes on a Verilator model). A map for
+a bus with no harness is a recorded failed run that says so: nothing is
+simulated in its place.
 """
 
 from __future__ import annotations
@@ -16,13 +17,11 @@ from pydantic import ValidationError
 
 from nirmaan.integrations.eda import Backend, Job, RunRecord, register_backend
 from nirmaan.integrations.eda_parsers import EdaResult
-from nirmaan.integrations.firmware import _cosim_steps, parse_fw_test
+from nirmaan.integrations.firmware import _cosim_steps, cosim_bus, parse_fw_test
 from nirmaan.regmap import c_test, load_map, map_summary, validate
 from nirmaan.runtime.tools import ToolOutcome, register_binding
 from nirmaan.work.engine import TaskEngine
 
-#: Buses the host co-simulation harness drives. APB is reached only through fw.soc_test (M29).
-HARNESSED_BUSES = ("axi4-lite",)
 GENERATED_TEST = "regmap_test.c"
 
 
@@ -48,11 +47,7 @@ def _verify_check(job: Job) -> str | None:
     regmap, problems = _load(job.params["map"])
     if problems:
         return "; ".join(problems)
-    if regmap.bus not in HARNESSED_BUSES:
-        return (f"no host co-simulation harness for a {regmap.bus} map (the host harness drives "
-                f"{', '.join(HARNESSED_BUSES)}; fw.soc_test reaches other buses through a RISC-V core); "
-                "nothing was simulated")
-    return None
+    return cosim_bus(job)[1]  # M41: the harness is the map's bus's, from the host harness registry
 
 
 def _verify_steps(job: Job) -> list[list[str]]:
@@ -68,4 +63,4 @@ def _verify_parse(run: RunRecord) -> EdaResult:
 register_backend(Backend("regmap-cosim", "regmap.verify", ("cc", "verilator", "make"), _verify_steps, _verify_parse,
                          ("map", "rtl"), files=("map",), check=_verify_check))
 
-__all__ = ["HARNESSED_BUSES", "check"]
+__all__ = ["check"]

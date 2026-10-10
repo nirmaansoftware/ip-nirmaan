@@ -106,6 +106,10 @@ PLAN_CHECKED = checked("The plan covers every requirement of the approved requir
                        FileInput(param="plan", kinds=("verification_plan",)),
                        FileInput(param="spec", kinds=("requirements_spec",), upstream=True))
 
+#: M41: the approved register map, when the plan has one (docs/REGISTER_MAP_ADOPTION.md). Optional: filled from
+#: the approved upstream map when there is one, left out when there is none, and never dodged when there is.
+APPROVED_MAP = FileInput(param="map", kinds=("register_map",), upstream=True, optional=True)
+
 _PROTOCOL_VARIANTS = (
     var("axi", "AXI interface", "axi", cond=when("axi")),
     var("ace", "ACE interface", "ace", cond=when("ace")),
@@ -513,6 +517,14 @@ BLOCK_DESIGN = WorkflowTemplate(
         st("interface-spec", "Interface specification", "Architecture", "arch.interface",
            depends_on=("requirements",), criticality=H, review=rv("arch.review"),
            outputs=("interface_spec",), evidence=(REVIEWED,)),
+        # M41: when the request asks for a register map, it is written from the approved interface spec as data,
+        # validated before review, and, once approved, judges the RTL and the driver before theirs.
+        st("register-map", "Register map", "Architecture", "arch.interface",
+           depends_on=("interface-spec",), when=when("register_map"), criticality=H, review=rv("arch.review"),
+           outputs=("register_map",),
+           evidence=(REVIEWED,
+                     checked("The register map is valid", "regmap.check",
+                             FileInput(param="map", kinds=("register_map",))))),
         st("microarchitecture", "Microarchitecture", "Architecture", "arch.microarchitecture",
            depends_on=("interface-spec",), criticality=H, review=rv("arch.review"),
            outputs=("microarchitecture_spec",), evidence=(REVIEWED,)),
@@ -529,7 +541,8 @@ BLOCK_DESIGN = WorkflowTemplate(
         # The RTL seat works from the approved interface spec as well as the microarchitecture: port names,
         # parameters, and responses are the spec's (found by the first live evaluation, which named ports freely).
         st("rtl-implementation", "RTL implementation and testbench", "RTL", "rtl.implement",
-           depends_on=("interface-spec", "microarchitecture"), criticality=H, review=rv("rtl.review"),
+           depends_on=("interface-spec", "register-map", "microarchitecture"), criticality=H,
+           review=rv("rtl.review"),
            outputs=("rtl_source", "testbench"),
            evidence=(REVIEWED,
                      checked("Lint-clean under the RTL lint rules", "lint.run",
@@ -546,7 +559,13 @@ BLOCK_DESIGN = WorkflowTemplate(
                              FileInput(param="sby", kinds=("formal_spec",)),
                              FileInput(param="sources", kinds=("rtl_source",)),
                              when_produced=("formal_spec",)),
-                     NOT_VACUOUS)),  # M27
+                     NOT_VACUOUS,  # M27
+                     # M41: the approved register map's generated test, over the map's bus, on the RTL.
+                     checked("The RTL implements the approved register map, in co-simulation", "regmap.verify",
+                             FileInput(param="map", kinds=("register_map",), upstream=True),
+                             FileInput(param="rtl", kinds=("rtl_source",)),
+                             FileInput(param="top", kinds=("rtl_source",), entry=True),
+                             when=when("register_map")))),
         # M25: when the request asks for test (DFT, scan chains), the scan netlist goes to review
         # only after real rule checks and a real chain simulation over it.
         st("dft", "Scan insertion", "Implementation", "dft.insert",
@@ -578,23 +597,25 @@ BLOCK_DESIGN = WorkflowTemplate(
                      checked("March C- passes on every memory in the approved RTL", "dft.mbist",
                              FileInput(param="sources", kinds=("rtl_source",), upstream=True)))),
         st("firmware", "Driver and driver tests", "Software", "fw.driver",
-           depends_on=("interface-spec", "rtl-implementation"), when=when("firmware"), criticality=M,
+           depends_on=("interface-spec", "register-map", "rtl-implementation"), when=when("firmware"), criticality=M,
            review=rv("sw.review"), outputs=("driver", "driver_test"),
            evidence=(REVIEWED,
                      checked("Driver builds clean under strict C flags", "fw.build",
-                             FileInput(param="sources", kinds=("driver",))),
+                             FileInput(param="sources", kinds=("driver",)), APPROVED_MAP),
                      checked("Driver tests pass against the approved RTL", "fw.test",
                              FileInput(param="sources", kinds=("driver", "driver_test")),
-                             FileInput(param="rtl", kinds=("rtl_source",), upstream=True)),
+                             FileInput(param="rtl", kinds=("rtl_source",), upstream=True), APPROVED_MAP),
                      # M27: when the request names RISC-V, the same tests also run as a bare-metal
                      # RV32I image on a RISC-V core whose loads and stores reach the approved RTL.
                      # M29: the image's code (text) must fit a budget: a quarter of the SoC's RAM.
                      checked("Driver and tests cross-build for bare-metal RV32I", "fw.cross_build",
-                             FileInput(param="sources", kinds=("driver", "driver_test")), when=when("riscv"),
+                             FileInput(param="sources", kinds=("driver", "driver_test")), APPROVED_MAP,
+                             when=when("riscv"),
                              params=(("max_text_bytes", "16384"),)),
                      checked("Driver tests pass on a RISC-V core against the approved RTL", "fw.soc_test",
                              FileInput(param="sources", kinds=("driver", "driver_test")),
-                             FileInput(param="rtl", kinds=("rtl_source",), upstream=True), when=when("riscv")))),
+                             FileInput(param="rtl", kinds=("rtl_source",), upstream=True), APPROVED_MAP,
+                             when=when("riscv")))),
     ),
 )
 

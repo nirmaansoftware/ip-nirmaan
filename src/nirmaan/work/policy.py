@@ -312,6 +312,8 @@ def _before_review(ctx: PolicyContext) -> list[str]:
         for binding in (b for b in req.files if b.upstream):
             approved = {art.location for art in upstream_artifacts(ctx.state, task)
                         if art.kind in binding.kinds and art.assurance is Assurance.APPROVED and art.location}
+            if binding.optional and not approved:
+                continue  # M41: nothing approved upstream, so the optional input asks for nothing
             if not any(ev.kind is not EvidenceKind.TOOL_RUN
                        or approved & set(ctx.state.tool_runs[ev.tool_run].values(binding.param))
                        for ev in met):

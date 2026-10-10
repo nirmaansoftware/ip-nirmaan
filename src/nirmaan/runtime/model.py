@@ -359,6 +359,8 @@ class ModelRuntime:
                              for a in packet.task["upstream_artifacts"]
                              if a["kind"] == kind and a.get("trusted")
                              and read_verified(a["location"], a["digest"])[0] is not None]
+                    if not paths and binding.get("optional"):
+                        continue  # M41: an optional input with nothing approved upstream is left out
                     missing = missing or (None if paths else f"no approved upstream {kinds} file")
                     files[binding["param"]] = paths
                     continue

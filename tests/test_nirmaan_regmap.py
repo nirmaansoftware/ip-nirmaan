@@ -145,8 +145,8 @@ def test_a_map_that_misstates_the_unmapped_response_fails(rtl_seat, tmp_path):
 @needs(*COSIM)
 def test_a_bus_with_no_harness_is_a_recorded_failure_not_a_simulation(rtl_seat, tmp_path):
     engine = rtl_seat[0]
-    run, _ = _verify(rtl_seat, tmp_path, regmap=_map(bus="apb"))
-    assert not run.succeeded and "harness" in run.summary and "apb" in run.summary
+    run, _ = _verify(rtl_seat, tmp_path, regmap=_map(bus="ahb"))  # M41: APB now has a harness
+    assert not run.succeeded and "harness" in run.summary and "ahb" in run.summary
     assert run.id in engine.state.tool_runs
 
 

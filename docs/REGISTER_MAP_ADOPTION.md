@@ -136,8 +136,8 @@ written over the masks, so field registers and plain registers share it:
 |---|---|
 | `reset_values` | Reads every register; the readable bits (all but `wo`) must equal the reset, reserved bits zero. A mismatch names the field (`CTRL.MODE`) or "reserved bits". |
 | `write_then_read_every_register` | Writes a pattern to every register with `rw` or `wo` bits, with `w1c` bits written 0, before reading any back; then each register with `rw` bits must read the pattern in its `rw` bits and its reset in `ro` and `w1c` bits. |
-| `read_only_ignores_writes` | For each register with `ro` bits: writes the inverse of the reset into them (other writable bits as read) and reads back the same value. |
 | `write_one_to_clear` | For each register with `w1c` bits: writing 0 to them leaves them; writing 1 clears them. |
+| `read_only_ignores_writes` | For each register with `ro` bits: writes the inverse of the reset into them (`rw` bits as read, `w1c` bits 0) and reads back the same value. |
 | `byte_strobes` | As in M30, on the first register whose 32 bits are all `rw`. |
 | `unmapped_response` | As in M30. |
 

@@ -42,7 +42,9 @@ from nirmaan.integrations.firmware import (
     _first,
     _plural,
     copy_rtl,
+    map_problem,
     parse_fw_test,
+    register_map_sources,
 )
 from nirmaan.models import list_values
 
@@ -222,6 +224,9 @@ def _core(job: Job) -> Core | None:
 
 
 def _core_check(job: Job) -> str | None:
+    problem = map_problem(job)  # M41: a map given must be usable
+    if problem:
+        return problem
     if _core(job):
         return None
     return f"unknown core {job.params['core']!r}; known cores: {', '.join(CORES)}"
@@ -233,8 +238,9 @@ def _image_steps(job: Job, soc: Path, out: Path, runtime: Path, march: str) -> l
     ``runtime`` is the core's part of the runtime (its trap entry), assembled with ``-march=<march>``.
     """
     prefix = toolchain() or RISCV_GCC[0].removesuffix("gcc")
-    sources = (*job.sources, *(str(soc / r) for r in RUNTIME))
-    steps, objects = _compile(prefix + "gcc", TARGET_FLAGS, sources, HARNESS, out, headers=False)
+    added, include = register_map_sources(job)  # M41: the header generated from a map, and the agreement unit
+    sources = (*job.sources, *added, *(str(soc / r) for r in RUNTIME))
+    steps, objects = _compile(prefix + "gcc", TARGET_FLAGS, sources, HARNESS, out, headers=False, include=include)
     crt0 = str(out / "crt0.o")
     core = str(out / "core.o")
     elf = str(out / "firmware.elf")
