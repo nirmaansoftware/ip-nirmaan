@@ -106,7 +106,7 @@ def test_the_cross_build_requirement_limits_the_code_size(block):
     cross = next(r for r in firmware.evidence_requirements if r.tools == ("fw.cross_build",))
     assert dict(cross.params) == {"max_text_bytes": "16384"}
     soc = next(r for r in firmware.evidence_requirements if r.tools == ("fw.soc_test",))
-    assert dict(soc.params) == {}  # the default core, as in M27
+    assert dict(soc.params) == {"require_irq": "auto"}  # the default core, as in M27; M35 adds require_irq
 
 
 def test_the_size_parser_reports_text_bytes():

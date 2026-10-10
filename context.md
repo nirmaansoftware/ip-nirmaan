@@ -2749,6 +2749,57 @@ Key design points worth not re-deriving:
 `test_a_new_proposal_rule_needs_no_core_changes`. The standard local run is
 1424 passed, 3 skipped.
 
+### Milestone 35 - Interrupts in host co-simulation, and precise bus-error traps (after Stage 6)
+
+Closes two of M29's deferred firmware items. Built in parallel with M34 and
+M36 to M38; no version bump. Design doc: `docs/FIRMWARE_IRQ_TRAPS.md`.
+
+Key design points worth not re-deriving:
+- **Host interrupts.** `fw.test` reads the top's ports (`top_module`,
+  `design_ports`, `rtl_files`, `IRQ_PORT` moved to `integrations/firmware.py`,
+  re-exported by `firmware_riscv.py`); an `irq` output adds `-CFLAGS
+  -DNIRMAAN_DUT_IRQ`. `axil_manager.cpp` implements `nirmaan_irq.h`: an
+  attached handler runs while `irq` is high, at the end of each `read32` and
+  `write32`, on each cycle of `nirmaan_irq_wait`, and on attach; never nested;
+  one cycle after each handler, and a 5,000,000-cycle limit, so a storm is a
+  failed run. It prints `FWTEST IRQ taken`. The M29 timer tests run unchanged.
+- **Bus-fault API** in `nirmaan_irq.h`: `nirmaan_bus_fault_attach` (returns 0
+  when the platform has no precise trap), `nirmaan_bus_fault_count`, and a
+  `nirmaan_bus_fault` record (offset, write, response, pc). Host: called
+  before the failing access returns, `pc` 0. Both print `FWTEST TRAP ...`.
+- **PicoRV32 is precise**: the SoC (`BERR_CTRL`/`BERR_INFO`/`BERR_ADDR` at
+  0x2000_0010 to 0x18) raises a bus-error line on the same edge as `mem_ready`;
+  it is `irq[4]` (`LATCHED_IRQ` 0xffff_ffe7), which PicoRV32 checks in fetch
+  before the next instruction runs. The trap entry reads `q1` and `q0` with
+  `getq`; the faulting pc is `q0 - 4`. Verified: the pc is the HAL's device
+  `lw`, and the following `STATUS` load had not run. HAL critical sections now
+  mask `irq[3]` only (`set_line` in `irq_picorv32.S`). Not restartable (the
+  load wrote its register); inside another handler the trap waits for
+  `retirq`. `Core.bus_error` (picorv32 True) adds
+  `+define+NIRMAAN_CORE_BUS_ERR`, connecting the wrapper's `bus_err`.
+- **SERV has none**: no Wishbone `err`, one interrupt input already taken by
+  `irq`, and the vendored core may not change. `nirmaan_core_bus_error_set`
+  returns 0 there; the fault test's trap checks fail saying why.
+- **Gate as data.** `require_irq` (`auto`/`yes`/`no`) and
+  `require_bus_error_trap` (`yes`/`no`) are declared on `fw.test` and
+  `fw.soc_test`; steps write `fw_require.json`, the parser counts
+  `irq_taken` and `bus_error_traps` (as `dft.atpg` does its limits). The
+  `block-design` firmware stage's `fw.test` and `fw.soc_test` requirements
+  carry `require_irq=auto`, or `yes` with the new `interrupts` feature; the
+  new `bus_errors` feature with `riscv` adds a `fw.soc_test` requirement with
+  `require_bus_error_trap=yes`.
+
+Fixture: `tests/fixtures/fw/axil_timer/axil_timer_fault_test.c` (per-access
+response codes; precise read and write traps; OKAY does not trap; detached).
+Tests: `tests/test_nirmaan_firmware_irq.py` (17), crown jewel
+`test_a_new_bus_error_core_needs_no_core_changes`. Two older assertions
+changed for the gate: M25's other-RTL policy test now passes
+`require_irq=auto`, and M29's soc requirement params are
+`{"require_irq": "auto"}`.
+
+Deferred: SERV traps, restartable bus errors, errors outside the device
+window, APB in the host harness, more than one interrupt line.
+
 ### Claude Code runtime, and the first live evaluation (after v1.22.0)
 
 A `claude-code` runtime (`runtime/claude_code.py`, `docs/CLAUDE_CODE_RUNTIME.md`)
@@ -2814,6 +2865,51 @@ Key design points worth not re-deriving:
 
 `tests/test_nirmaan_loop_concurrency.py` (14), crown jewel
 `test_a_new_runtime_on_a_new_workflow_runs_concurrently_with_no_core_changes`.
+
+### Milestone 38 - Checked plans on `new-ip` and `feature-addition`, and amending a recorded plan (after Stage 6)
+
+Closes three M29 deferrals. Design doc: `docs/VERIFICATION_PLAN_MORE.md`. No
+version bump.
+
+Key design points worth not re-deriving:
+- **The existing `dv-plan` stage became the checked one**, on every request
+  (not only on a request for a plan, as on `block-design`): `PLAN_CHECKED` in
+  `company/workflows.py` runs `vplan.check` over the plan and the approved
+  upstream `requirements_spec`. `feature-addition` `dv-plan` also depends on
+  `requirements-delta` directly. The M29 consumer records it on approval
+  unchanged, since it acts on plans whose stage checks them.
+- **Migrations, all listed in the doc (section 6):** `drive` writes a real,
+  tagged requirements spec (`tests/fixtures/vplan/requirements_spec.md`, with
+  digest) for every requirements stage and a real plan file
+  (`tests/fixtures/vplan/verification_plan.json`, item in `counter_tb.v`) for a
+  gated plan stage; it fills `upstream=True` bindings from approved upstream
+  files and passes `workdir` only to tools whose contract takes it. The export
+  `midway` fixture submits the plan file through `gated_submit`.
+- **Amendments: one current plan per project.** A plan version is a whole
+  file; against active records each entry is added, kept, or modified; an
+  optional top-level `retired: [{requirement|item, reason}]` retires (format
+  stays version 1). Every active record must be kept or retired; IDs are never
+  reused. `SpecRequirement` and `VerificationItem` gain `revision` and
+  `retired` (the reason). Engine: `amend_spec_requirement`,
+  `retire_spec_requirement` (refused while an active item proves it; takes
+  `backed_by`, the passing runs it had), `amend_verification_item`,
+  `retire_verification_item`; audit actions `trace.{requirement,item}.{amend,retire}`
+  carry the superseded record whole in `details["previous"]`.
+  `vplan.history(state, id, what)` reads the versions back.
+- **Same check, same approval.** `vplan.check` also applies
+  `amendment_problems` (the binding passes `engine.state`); the consumer
+  computes the changes and records them as the system actor with `plan`.
+  `nirmaan vplan import --amend` (`vplan.amend_plan`) goes through the engine
+  on a scratch engine first. Imports (plain or amend) run the seat's spec
+  check when a source is a recorded, digest-checked file that tags
+  requirements.
+- **Planned items in an import**: an unrecorded plain file name is planned,
+  attributed (actor rule and `plan`) to the source spec of the item's first
+  requirement, which must be a recorded file.
+- Coverage, `gaps`, the engineering graph, and export read active records only.
+
+`tests/test_nirmaan_verification_plan_more.py` (14), crown jewel
+`test_a_replan_stage_amending_the_plan_needs_no_core_changes`.
 
 ### Milestone 34 - Multi-corner timing, KLayout DRC and LVS, and metal fill (after Stage 6)
 

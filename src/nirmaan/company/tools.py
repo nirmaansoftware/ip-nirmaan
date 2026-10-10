@@ -64,6 +64,11 @@ PDK_REQUIRED = (_p("liberty", PATHS, "Liberty files, absolute or under pdk_root 
                 _p("pdk_root", PATH, "Where relative PDK paths resolve."))
 #: The RISC-V core a firmware image is built for and run on (M29; integrations/firmware_riscv.py CORES).
 CORE = _p("core", TEXT, "The RISC-V core: picorv32 (default), serv, or another registered core.")
+#: What a firmware run must show (M35; docs/FIRMWARE_IRQ_TRAPS.md, section 5).
+REQUIRE = (_p("require_irq", TEXT, "auto, yes, or no (default): fail unless the design's interrupt was taken; "
+                                   "auto asks it only of a design with an irq output."),
+           _p("require_bus_error_trap", TEXT, "yes or no (default): fail unless a bus error was delivered as a "
+                                              "precise trap."))
 NETLIST = (_p("netlist", PATH, "The gate-level netlist.", required=True),
            _p("sdc", PATH, "Timing constraints.", required=True))
 
@@ -226,14 +231,14 @@ TOOLS: list[ToolSpec] = [
     _tool("fw.test", "Firmware co-simulation", "software", EXE, AV,
           "Run a driver's tests against a Verilator model of the RTL, over real bus transactions.",
           (_p("sources", PATHS, "The driver and its tests.", required=True),
-           _p("rtl", PATHS, "The RTL to build the model from.", required=True), TOP, *RUNNER)),
+           _p("rtl", PATHS, "The RTL to build the model from.", required=True), TOP, *REQUIRE, *RUNNER)),
     _tool("fw.cross_build", "Firmware cross build", "software", EXE, AV,
           "Cross-compile a driver and its tests for bare-metal RV32I into a linked ELF, with its code size.",
           (_p("sources", PATHS, "C sources and headers.", required=True), CORE, *RUNNER)),
     _tool("fw.soc_test", "Firmware on a RISC-V core", "software", EXE, AV,
           "Run a driver's tests on a RISC-V core (PicoRV32 or SERV) whose loads and stores reach the RTL over its bus.",
           (_p("sources", PATHS, "The driver and its tests.", required=True),
-           _p("rtl", PATHS, "The RTL the core's bus reaches.", required=True), TOP, CORE, *RUNNER)),
+           _p("rtl", PATHS, "The RTL the core's bus reaches.", required=True), TOP, CORE, *REQUIRE, *RUNNER)),
     _tool("debugger.attach", "Debugger", "software", EXE, CO, "Attach to targets and models."),
     _tool("ci.configure", "CI configuration", "infrastructure", WR, CO, "Change CI pipelines."),
     _tool("farm.submit", "Compute farm", "infrastructure", EXE, CO, "Submit jobs to the compute farm."),

@@ -75,6 +75,9 @@ FEATURES: list[FeatureRule] = [
                           r"\bmbist\b")),
     FeatureRule(feature="firmware", skills=("embedded_firmware", "device_drivers"), patterns=(r"\bfirmware\b", r"\bdrivers?\b")),
     FeatureRule(feature="riscv", patterns=(r"\brisc[- ]?v\b", r"\brv32\w*")),
+    # M35: a request that asks for interrupts, or for bus errors to trap, makes the firmware gate require them.
+    FeatureRule(feature="interrupts", patterns=(r"\binterrupts?\b", r"\birqs?\b")),
+    FeatureRule(feature="bus_errors", patterns=(r"\bbus[- ]errors?\b", r"\bprecise traps?\b")),
     FeatureRule(feature="verification_plan", patterns=(r"\bverification plan\b", r"\bv-?plan\b", r"\btest plan\b"),
                 description="A verification plan, written and checked before the testbench (M29)"),
     FeatureRule(feature="performance", skills=("performance_modeling",), patterns=(r"\bbandwidth\b", r"\blatency\b", r"\bthroughput\b")),
