@@ -398,7 +398,7 @@ plus a scripted tmp git repo builder for the git provider tests.
   deepen `ChangedFile.modules` without touching anything downstream.
 * Interactive investigation visualization - the `InvestigationView`
   projection is the substrate; rendering interactivity is front-end work
-  (context.md 5.8).
+  (`docs/history/context-before-M43.md` section 5.8).
 * Requirement databases (DOORS) and review systems - future providers.
 * Any learning or reweighting from context - deterministic only.
 
