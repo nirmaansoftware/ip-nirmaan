@@ -94,7 +94,7 @@ new number. M1 to M42 are taken; see `docs/history/README.md`.
 
 | Number | Milestone | Status |
 |---|---|---|
-| M43 | Status documents that stop colliding and stop drifting | in progress (`m43/docs-structure`) |
+| M43 | Status documents that stop colliding and stop drifting | done (#70) |
 | M44 | An end-to-end factory project | reserved |
 | M45 | Live evaluation as recorded evidence | reserved |
 | M46 | Tests and CI hardening | reserved |
