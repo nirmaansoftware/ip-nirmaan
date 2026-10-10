@@ -2749,6 +2749,57 @@ Key design points worth not re-deriving:
 `test_a_new_proposal_rule_needs_no_core_changes`. The standard local run is
 1424 passed, 3 skipped.
 
+### Milestone 35 - Interrupts in host co-simulation, and precise bus-error traps (after Stage 6)
+
+Closes two of M29's deferred firmware items. Built in parallel with M34 and
+M36 to M38; no version bump. Design doc: `docs/FIRMWARE_IRQ_TRAPS.md`.
+
+Key design points worth not re-deriving:
+- **Host interrupts.** `fw.test` reads the top's ports (`top_module`,
+  `design_ports`, `rtl_files`, `IRQ_PORT` moved to `integrations/firmware.py`,
+  re-exported by `firmware_riscv.py`); an `irq` output adds `-CFLAGS
+  -DNIRMAAN_DUT_IRQ`. `axil_manager.cpp` implements `nirmaan_irq.h`: an
+  attached handler runs while `irq` is high, at the end of each `read32` and
+  `write32`, on each cycle of `nirmaan_irq_wait`, and on attach; never nested;
+  one cycle after each handler, and a 5,000,000-cycle limit, so a storm is a
+  failed run. It prints `FWTEST IRQ taken`. The M29 timer tests run unchanged.
+- **Bus-fault API** in `nirmaan_irq.h`: `nirmaan_bus_fault_attach` (returns 0
+  when the platform has no precise trap), `nirmaan_bus_fault_count`, and a
+  `nirmaan_bus_fault` record (offset, write, response, pc). Host: called
+  before the failing access returns, `pc` 0. Both print `FWTEST TRAP ...`.
+- **PicoRV32 is precise**: the SoC (`BERR_CTRL`/`BERR_INFO`/`BERR_ADDR` at
+  0x2000_0010 to 0x18) raises a bus-error line on the same edge as `mem_ready`;
+  it is `irq[4]` (`LATCHED_IRQ` 0xffff_ffe7), which PicoRV32 checks in fetch
+  before the next instruction runs. The trap entry reads `q1` and `q0` with
+  `getq`; the faulting pc is `q0 - 4`. Verified: the pc is the HAL's device
+  `lw`, and the following `STATUS` load had not run. HAL critical sections now
+  mask `irq[3]` only (`set_line` in `irq_picorv32.S`). Not restartable (the
+  load wrote its register); inside another handler the trap waits for
+  `retirq`. `Core.bus_error` (picorv32 True) adds
+  `+define+NIRMAAN_CORE_BUS_ERR`, connecting the wrapper's `bus_err`.
+- **SERV has none**: no Wishbone `err`, one interrupt input already taken by
+  `irq`, and the vendored core may not change. `nirmaan_core_bus_error_set`
+  returns 0 there; the fault test's trap checks fail saying why.
+- **Gate as data.** `require_irq` (`auto`/`yes`/`no`) and
+  `require_bus_error_trap` (`yes`/`no`) are declared on `fw.test` and
+  `fw.soc_test`; steps write `fw_require.json`, the parser counts
+  `irq_taken` and `bus_error_traps` (as `dft.atpg` does its limits). The
+  `block-design` firmware stage's `fw.test` and `fw.soc_test` requirements
+  carry `require_irq=auto`, or `yes` with the new `interrupts` feature; the
+  new `bus_errors` feature with `riscv` adds a `fw.soc_test` requirement with
+  `require_bus_error_trap=yes`.
+
+Fixture: `tests/fixtures/fw/axil_timer/axil_timer_fault_test.c` (per-access
+response codes; precise read and write traps; OKAY does not trap; detached).
+Tests: `tests/test_nirmaan_firmware_irq.py` (17), crown jewel
+`test_a_new_bus_error_core_needs_no_core_changes`. Two older assertions
+changed for the gate: M25's other-RTL policy test now passes
+`require_irq=auto`, and M29's soc requirement params are
+`{"require_irq": "auto"}`.
+
+Deferred: SERV traps, restartable bus errors, errors outside the device
+window, APB in the host harness, more than one interrupt line.
+
 ### Claude Code runtime, and the first live evaluation (after v1.22.0)
 
 A `claude-code` runtime (`runtime/claude_code.py`, `docs/CLAUDE_CODE_RUNTIME.md`)
@@ -2859,6 +2910,63 @@ Key design points worth not re-deriving:
 
 `tests/test_nirmaan_verification_plan_more.py` (14), crown jewel
 `test_a_replan_stage_amending_the_plan_needs_no_core_changes`.
+
+### Milestone 34 - Multi-corner timing, KLayout DRC and LVS, and metal fill (after Stage 6)
+
+Closes the four items M29 left open, on sky130hd in the `physical-design` CI
+job. Design doc: `docs/PD_FINAL.md`. No version bump.
+
+Key points worth not re-deriving:
+- **What the image has** (probed first): KLayout 0.30.12, and in
+  `platforms/sky130hd` a KLayout DRC deck, LVS deck, cell CDL, cell GDS, a
+  `.lyt` template, and `fill.json`; no Magic or Netgen; one Liberty corner
+  (tt); one OpenRCX model (one RC corner).
+- **Corners**: `sta.run` takes `liberty_<corner>` (a prefix parameter) per
+  corner and `corner` (the base `liberty`'s name, default `typical`); the
+  script uses `define_corners` and `read_liberty -corner` (the newer
+  `define_scene` form gave slightly different tt figures), reads the one SPEF
+  into every corner, and prints a `report_checks -format end` pair per corner
+  between `nirmaan-corner` markers. Parsed: `slack_by_corner`,
+  `timing_corners` (1 for a single-corner run).
+- **ss and ff Liberty** come from `fossi-foundation/ciel-releases`
+  `sky130-ff08c23d...` (`sky130_fd_sc_hd.tar.zst`, sha256 `69500f75...`;
+  open_pdks' assembled form of `google/skywater-pdk-libs-sky130_fd_sc_hd`,
+  which holds per-cell JSON only): `ss_100C_1v60` and `ff_n40C_1v95`, each
+  checked by sha256, cached by hash, copied into the platform's `lib/`.
+- **`pv.run` is AVAILABLE** (backend `klayout`, executables `klayout` and
+  `openroad`): CDL from the netlist (`write_cdl -masters`), Nirmaan's own
+  stream script (the `def2stream` method), the PDK's DRC deck, the PDK's LVS
+  deck, and two KLayout scripts that count the DRC database's items and the
+  LVS cross-reference's mismatches, so no deck text is parsed. Refused without
+  a DRC deck or an LVS deck with `cdl`.
+- **LVS needs `final_pg.v`**: `write_verilog` leaves supply pins out, so LVS
+  against `final.v` never matches; `pnr.run` now also writes
+  `write_verilog -include_pwr_gnd final_pg.v` (output `pg_netlist`).
+- **Fill**: `pnr.run` `fill_rules` runs `density_fill` in `route` after the
+  fillers; `fill_shapes` is parsed.
+- **Routing on met1 to met3 on sky130hd**: with met4, the deck found 3 `m3.6`
+  (met3 min area) islands at via2/via3 stacks that the router counted as 0.
+- **`min_<metric>`** limits in the runner (`eda._within_limits`), the mirror
+  of `max_`. Workflow: a `physical-verification` stage (`pd.signoff_checks`,
+  `pv.run` with `max_drc_violations=0`, `max_lvs_mismatches=0`,
+  `min_fill_shapes=1`) between `place-route` and `sta-signoff`, which now also
+  asks for `min_timing_corners=3`. `physical_verification_report` joins `04_rtl`.
+- **Real numbers** (CI run 37913292574, 100 MHz, SPEF): setup / hold slack ss
+  1.276 / 1.283, tt 4.428 / 0.629, ff 5.606 / 0.399 ns, the same through both
+  STA backends; DRC 0 and LVS match on the filled layout (12947 fill shapes);
+  a cell moved 1 nm gives 782 DRC violations (off-grid), a rewired `D` input
+  an LVS mismatch (2 nets), both recorded failed runs.
+- **Local OpenROAD on macOS arm64: not supported**, closed: no formula or
+  arm64 package, Rosetta not installed, the last `osx-64` conda build is from
+  2023, and a source build needs eight more Homebrew formulae on a shared
+  prefix. The real tests run in CI only.
+
+Fixtures: `opensta_corners.log`, `openroad_sky130_fill.log`, `klayout_pv.log`,
+`klayout_pv_drc.log`, `klayout_pv_lvs.log`. CI: the `physical-design` job went
+from 3.6 to 6.4 minutes, still inside the main jobs' time.
+`tests/test_nirmaan_physical.py`; crown jewel
+`test_physical_verification_needs_no_core_changes`; the M29 crown jewel's timer
+now reports `timing_corners`.
 
 ### Milestone 37 - Real STA on timing re-analysis, and antecedents of named properties and macros (after Stage 6)
 

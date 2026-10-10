@@ -9,6 +9,11 @@ Three backends on the M21 registry (``eda.register_backend``):
   ``openroad`` is installed (packaged OpenROAD builds ship no ``sta``).
 * ``openroad`` for ``pnr.run``: floorplan, placement, and routing in one
   OpenROAD session, stopping after ``stop_after``, with timing reported last.
+* ``klayout`` for ``pv.run`` (M34): the routed DEF streamed to GDS, the PDK's
+  DRC deck, and the PDK's LVS deck against the routed netlist, in KLayout.
+
+M34 also gives ``sta.run`` timing corners (a ``liberty_<corner>`` parameter per
+corner) and ``pnr.run`` metal fill (``fill_rules``).
 
 The PDK is an input, never bundled. A missing executable or a missing PDK input
 is a refusal with a reason (the probe), and no run is recorded; a missing
@@ -27,13 +32,23 @@ from typing import Callable
 
 from nirmaan.integrations.eda import Backend, EdaResult, Job, RunRecord, register_backend
 from nirmaan.integrations.eda_parsers import parse_yosys
-from nirmaan.integrations.pd_parsers import PNR_STAGES, VIOLATOR_REPORT_LIMIT, parse_openroad, parse_opensta
+from nirmaan.integrations.pd_parsers import (
+    PNR_STAGES,
+    PV_CHECKS,
+    VIOLATOR_REPORT_LIMIT,
+    parse_klayout,
+    parse_openroad,
+    parse_opensta,
+)
 from nirmaan.models import list_values
 
 #: Relative PDK paths resolve under this directory (or the ``pdk_root`` parameter).
 PDK_ROOT_ENV = "NIRMAAN_PDK_ROOT"
 #: PDK parameters that name files; every other PDK parameter is a setting (a site, layers).
-PDK_FILES = ("liberty", "tech_lef", "lef", "pdn_tcl", "rc_tcl", "rcx_rules")
+PDK_FILES = ("liberty", "tech_lef", "lef", "pdn_tcl", "rc_tcl", "rcx_rules",
+             "fill_rules", "gds", "klayout_tech", "drc_deck", "lvs_deck", "cdl")  # M34: fill and KLayout
+#: M34: ``liberty_<corner>`` names one timing corner's Liberty files.
+CORNER_LIBERTY = "liberty_"
 
 _TOKEN_RE = re.compile(r"^[A-Za-z0-9_.$]+$")
 
@@ -60,7 +75,8 @@ def needs_pdk(**inputs: str) -> Callable[[dict[str, str]], str | None]:
                 reasons.append(f"needs {label} ({how})")
             elif param in PDK_FILES:
                 reasons += [f"{param} not found: {p}" for p in pdk_paths(params, param) if not p.is_file()]
-        for param in (f for f in PDK_FILES if f not in inputs):  # an optional PDK file, when given, exists (M29)
+        optional = [f for f in PDK_FILES if f not in inputs] + [k for k in params if k.startswith(CORNER_LIBERTY)]
+        for param in optional:  # an optional PDK file, when given, exists (M29; corner Liberty files, M34)
             reasons += [f"{param} not found: {p}" for p in pdk_paths(params, param) if not p.is_file()]
         return "; ".join(reasons) or None
 
@@ -208,19 +224,56 @@ puts "nirmaan-floating-outputs: [llength $nirmaan_floating]"
 puts "nirmaan-floating-drivers: [join $nirmaan_floating { }]"'''
 
 
+def timing_corners(params: dict[str, str]) -> list[tuple[str, list[Path]]]:
+    """The run's timing corners (M34): none, or the base ``liberty`` as ``corner`` and one per ``liberty_<name>``."""
+    extra = [(key[len(CORNER_LIBERTY):], pdk_paths(params, key)) for key in params
+             if key.startswith(CORNER_LIBERTY) and params[key].strip()]
+    if not extra:
+        return []
+    corners = [(params.get("corner", "").strip() or "typical", pdk_paths(params, "liberty")), *extra]
+    names = [name for name, _ in corners]
+    for name in names:
+        if not _TOKEN_RE.match(name):
+            raise ValueError(f"a timing corner must be a plain name, not {name!r}")
+    if len(set(names)) != len(names):
+        raise ValueError(f"timing corners must differ: {', '.join(names)}")
+    return corners
+
+
+def _corner_reports(corners: list[tuple[str, list[Path]]]) -> list[str]:
+    """Worst setup and hold paths per corner (M34), between markers the parser reads."""
+    reports = []
+    for name, _ in corners:
+        reports += [f'puts "nirmaan-corner: {name}"',
+                    f"report_checks -path_delay max -scenes {name} -format end -digits 3",
+                    f"report_checks -path_delay min -scenes {name} -format end -digits 3",
+                    f'puts "nirmaan-corner-done: {name}"']
+    return reports
+
+
 def _sta_script(job: Job, lefs: bool = False) -> None:
     lef_files = pdk_paths(job.params, "tech_lef") + pdk_paths(job.params, "lef") if lefs else []
     netlist = _tcl(str(job.workdir / "netlist.v")) if job.sources else _design(job, "netlist")
+    corners = timing_corners(job.params)
+    # M34: corners are defined before the Liberty files are read, one set of files per corner. OpenSTA calls
+    # this form deprecated in favor of define_scene; it is still supported, and on the CI block it gives the
+    # single-corner figures exactly (docs/PD_FINAL.md).
+    libraries = ([f"define_corners {' '.join(name for name, _ in corners)}",
+                  *(f"read_liberty -corner {name} {_tcl(str(f))}" for name, files in corners for f in files)]
+                 if corners else [f"read_liberty {_tcl(str(p))}" for p in pdk_paths(job.params, "liberty")])
     script = [*(f"read_lef {_tcl(str(f))}" for f in lef_files),
-              *(f"read_liberty {_tcl(str(p))}" for p in pdk_paths(job.params, "liberty")),
+              *libraries,
               f"read_verilog {netlist}",
               f"link_design {_token(job.params, 'top')}",
               f"read_sdc {_design(job, 'sdc')}"]
     if job.params.get("spef", "").strip():  # M29: and say how much of the design the SPEF annotates
         # A SPEF comes from a routed block, whose clock tree is built: time it with propagated clocks.
-        script += [f"read_spef {_design(job, 'spef')}", "set_propagated_clock [all_clocks]",
+        # M34: one SPEF (one RC corner) annotates every timing corner.
+        script += [*([f"read_spef -corner {name} {_design(job, 'spef')}" for name, _ in corners]
+                     or [f"read_spef {_design(job, 'spef')}"]),
+                   "set_propagated_clock [all_clocks]",
                    "report_parasitic_annotation -report_unannotated", FLOATING_OUTPUTS]
-    script += _timing_reports()
+    script += [*_corner_reports(corners), *_timing_reports()]
     (job.workdir / "sta.tcl").write_text("\n".join(script) + "\n", encoding="utf-8")
 
 
@@ -405,6 +458,10 @@ def _pnr_steps(job: Job) -> list[list[str]]:
         if layers and len(_cells(p, "routing_layers")) != 2:
             raise ValueError("routing_layers must be LOWEST,HIGHEST")
         fillers = _cells(p, "filler_cells")
+        # M34: metal fill to the PDK's density rules, after the fillers, so the DEF pv.run checks is filled.
+        fill = [f"density_fill -rules {_tcl(str(pdk_paths(p, 'fill_rules')[0]))}",
+                'puts "nirmaan-fill-shapes: [llength [[ord::get_db_block] getFills]]"'] \
+            if p.get("fill_rules", "").strip() else []
         voltage = p.get("supply_voltage", "").strip()
         ir = []
         if voltage:  # IR drop: each power net at the supply voltage, each ground net at 0 V
@@ -417,6 +474,7 @@ def _pnr_steps(job: Job) -> list[list[str]]:
             *_SLACK_CHECKPOINT,
             "detailed_route -output_drc route_drc.rpt",
             *([f"filler_placement {{{' '.join(fillers)}}}"] if fillers else []),
+            *fill,
             "check_placement -verbose",
             "check_antennas",
             # Buffers, the clock tree, and fillers came after the grid's global connections: connect them too.
@@ -439,7 +497,8 @@ def _pnr_steps(job: Job) -> list[list[str]]:
     final = "route" if last == "extract" else last
     script.append(f"write_def {final}.def")
     if final == "route":
-        script.append("write_verilog final.v")
+        # M34: and the same netlist with every supply pin connected, the reference LVS compares against.
+        script += ["write_verilog final.v", "write_verilog -include_pwr_gnd final_pg.v"]
     (job.workdir / "pnr.tcl").write_text("\n".join(script) + "\n", encoding="utf-8")
     return [["openroad", "-no_init", "-no_splash", "-exit", "pnr.tcl"]]
 
@@ -456,7 +515,8 @@ def _pnr_parse(run: RunRecord) -> EdaResult:
     result = parse_openroad(run.log, run.returncode, planned[-1], planned)
     final = "route" if planned[-1] == "extract" else planned[-1]
     outputs = {kind: str(run.workdir / name) for kind, name in
-               (("def", f"{final}.def"), ("netlist", "final.v"), ("spef", "route.spef"))
+               (("def", f"{final}.def"), ("netlist", "final.v"), ("pg_netlist", "final_pg.v"),
+                ("spef", "route.spef"))
                if (run.workdir / name).is_file()}
     return EdaResult(result.passed, result.summary, result.diagnostics, {**result.metrics, "outputs": outputs})
 
@@ -492,3 +552,145 @@ def _pnr_environment(params: dict[str, str]) -> str | None:
 
 register_backend(Backend("openroad", "pnr.run", ("openroad",), _pnr_steps, _pnr_parse, ("netlist", "sdc", "top"),
                          files=("netlist", "sdc"), environment=_pnr_environment))
+
+
+# --- pv.run: KLayout DRC and LVS (M34) ----------------------------------------------------
+
+#: Streams a routed DEF to GDS with the cells' GDS merged in, as ORFS's def2stream does: read the DEF with
+#: the technology's LEF/DEF options, empty every cell but the top (keeping DEF vias and fill), read the cell
+#: GDS over them, and copy the top cell's tree into a new layout. A cell with no GDS stays empty and is counted.
+STREAM_SCRIPT = '''import re
+import pya
+
+tech = pya.Technology()
+tech.load(tech_file)
+layout = pya.Layout()
+layout.read(in_def, tech.load_layout_options)
+top = layout.cell(design_name)
+for cell in layout.each_cell():
+    if cell.cell_index() != top.cell_index() and not cell.name.startswith("VIA_") \\
+            and not cell.name.endswith("_DEF_FILL"):
+        cell.clear()
+for gds in in_gds.split():
+    layout.read(gds)
+out = pya.Layout()
+out.dbu = layout.dbu
+out.create_cell(design_name).copy_tree(layout.cell(design_name))
+empty = [c.name for c in out.each_cell() if c.is_empty()]
+print("nirmaan-gds-empty-cells: %d" % len(empty))
+for name in empty[:20]:
+    print("nirmaan-gds-empty-cell: " + name)
+with open(in_def) as f:
+    fills = re.search(r"^FILLS .*?^END FILLS", f.read(), re.S | re.M)
+print("nirmaan-gds-fill-shapes: %d" % (len(re.findall(r"RECT", fills.group(0))) if fills else 0))
+out.write(out_file)
+'''
+
+#: Counts the DRC report database's items, in total and per rule (category).
+DRC_COUNT_SCRIPT = '''import pya
+
+rdb = pya.ReportDatabase("")
+rdb.load(report_file)
+print("nirmaan-drc-violations: %d" % rdb.num_items())
+for category in rdb.each_category():
+    if category.num_items():
+        print("nirmaan-drc-rule: %s %d" % (category.name().replace(" ", "_"), category.num_items()))
+'''
+
+#: Counts the LVS cross-reference's mismatched circuits, nets, devices, pins, and subcircuits: what the
+#: comparison found, whatever text the deck prints.
+LVS_COUNT_SCRIPT = '''import pya
+
+lvs = pya.LayoutVsSchematic()
+lvs.read(lvsdb)
+xref = lvs.xref()
+X = pya.NetlistCrossReference
+bad = {"circuits": 0, "nets": 0, "devices": 0, "pins": 0, "subcircuits": 0}
+for pair in xref.each_circuit_pair():
+    a, b = pair.first(), pair.second()
+    print("nirmaan-lvs-circuit: %s %s %s" % (a.name if a else "-", b.name if b else "-", pair.status()))
+    if pair.status() in (X.Mismatch, X.NoMatch):
+        bad["circuits"] += 1
+    for kind, each in (("nets", xref.each_net_pair), ("devices", xref.each_device_pair),
+                       ("pins", xref.each_pin_pair), ("subcircuits", xref.each_subcircuit_pair)):
+        bad[kind] += sum(1 for p in each(pair) if p.status() in (X.Mismatch, X.NoMatch))
+for kind, n in bad.items():
+    print("nirmaan-lvs-mismatched-%s: %d" % (kind, n))
+'''
+
+
+def pv_checks(params: dict[str, str]) -> list[str]:
+    """The checks a ``pv.run`` makes: DRC with a DRC deck, LVS with an LVS deck and the cells' CDL."""
+    given = {k for k in ("drc_deck", "lvs_deck", "cdl") if params.get(k, "").strip()}
+    return [c for c, needs in (("drc", {"drc_deck"}), ("lvs", {"lvs_deck", "cdl"})) if needs <= given]
+
+
+def _klayout_tech(job: Job) -> Path:
+    """The PDK's KLayout technology with this run's LEF files, as ORFS fills in its template."""
+    template = pdk_paths(job.params, "klayout_tech")[0].read_text(encoding="utf-8")
+    lefs = "".join(f"<lef-files>{f}</lef-files>"
+                   for f in pdk_paths(job.params, "tech_lef") + pdk_paths(job.params, "lef"))
+    tech = job.workdir / "klayout.lyt"
+    tech.write_text(re.sub(r"<lef-files>.*?</lef-files>", lambda _: lefs, template, count=1, flags=re.S)
+                    if "<lef-files>" in template else template, encoding="utf-8")
+    return tech
+
+
+def _pv_steps(job: Job) -> list[list[str]]:
+    p, work = job.params, job.workdir
+    top = _token(p, "top")
+    checks = pv_checks(p)
+    for stale in ("layout.gds", "drc.lyrdb", "lvs.lvsdb", "netlist.cdl", "drc_count.py", "lvs_count.py"):
+        (work / stale).unlink(missing_ok=True)
+    (work / "stream.py").write_text(STREAM_SCRIPT, encoding="utf-8")
+    steps = []
+    if "lvs" in checks:  # the reference: a CDL of the routed netlist, the cells' CDL included before it
+        cdl = [*(f"read_lef {_tcl(str(f))}" for f in pdk_paths(p, "tech_lef") + pdk_paths(p, "lef")),
+               f"read_verilog {_design(job, 'netlist')}", f"link_design {top}",
+               f"write_cdl -masters {{{' '.join(_tcl(str(f)) for f in pdk_paths(p, 'cdl'))}}} netlist.cdl"]
+        (work / "cdl.tcl").write_text("\n".join(cdl) + "\n", encoding="utf-8")
+        (work / "reference.cdl").write_text("".join(f'.INCLUDE "{f}"\n' for f in pdk_paths(p, "cdl"))
+                                            + f'.INCLUDE "{work / "netlist.cdl"}"\n', encoding="utf-8")
+        steps.append(["openroad", "-no_init", "-no_splash", "-exit", "cdl.tcl"])
+    steps.append(["klayout", "-zz", "-rd", f"tech_file={_klayout_tech(job)}",
+                  "-rd", f"in_def={Path(job.params['def']).resolve()}",
+                  "-rd", f"in_gds={' '.join(str(f) for f in pdk_paths(p, 'gds'))}",
+                  "-rd", f"design_name={top}", "-rd", f"out_file={work / 'layout.gds'}", "-r", "stream.py"])
+    if "drc" in checks:
+        (work / "drc_count.py").write_text(DRC_COUNT_SCRIPT, encoding="utf-8")
+        steps += [["klayout", "-zz", "-rd", f"in_gds={work / 'layout.gds'}", "-rd", f"report_file={work / 'drc.lyrdb'}",
+                   "-r", str(pdk_paths(p, "drc_deck")[0])],
+                  ["klayout", "-zz", "-rd", f"report_file={work / 'drc.lyrdb'}", "-r", "drc_count.py"]]
+    if "lvs" in checks:
+        (work / "lvs_count.py").write_text(LVS_COUNT_SCRIPT, encoding="utf-8")
+        steps += [["klayout", "-b", "-rd", f"in_gds={work / 'layout.gds'}", "-rd", f"cdl_file={work / 'reference.cdl'}",
+                   "-rd", f"top_cell={top}", "-rd", f"report_file={work / 'lvs.lvsdb'}",
+                   "-rd", f"target_netlist={work / 'extracted.cir'}", "-r", str(pdk_paths(p, "lvs_deck")[0])],
+                  ["klayout", "-b", "-rd", f"lvsdb={work / 'lvs.lvsdb'}", "-r", "lvs_count.py"]]
+    return steps
+
+
+def _pv_parse(run: RunRecord) -> EdaResult:
+    checks = [c for c in PV_CHECKS if (run.workdir / f"{c}_count.py").is_file()]
+    result = parse_klayout(run.log, run.returncode, checks)
+    outputs = {kind: str(run.workdir / name) for kind, name in
+               (("gds", "layout.gds"), ("drc_report", "drc.lyrdb"), ("lvs_report", "lvs.lvsdb"))
+               if (run.workdir / name).is_file()}
+    return EdaResult(result.passed, result.summary, result.diagnostics, {**result.metrics, "outputs": outputs})
+
+
+_PV_PDK = needs_pdk(tech_lef="a technology LEF", lef="a cell LEF", gds="the cells' GDS",
+                    klayout_tech="the PDK's KLayout technology (.lyt)")
+
+
+def _pv_environment(params: dict[str, str]) -> str | None:
+    """The PDK inputs, and at least one check: a DRC deck, or an LVS deck with the cells' CDL."""
+    reasons = [r for r in (_PV_PDK(params),) if r]
+    if not pv_checks(params):
+        reasons.append("needs a check to run: drc_deck=PATH, or lvs_deck=PATH with cdl=PATH (the PDK's KLayout "
+                       f"decks and cell CDL, absolute or under {PDK_ROOT_ENV}; no PDK is bundled)")
+    return "; ".join(reasons) or None
+
+
+register_backend(Backend("klayout", "pv.run", ("klayout", "openroad"), _pv_steps, _pv_parse,
+                         ("def", "netlist", "top"), files=("def", "netlist"), environment=_pv_environment))

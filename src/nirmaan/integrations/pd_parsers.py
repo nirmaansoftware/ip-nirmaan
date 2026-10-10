@@ -6,6 +6,11 @@ documented ``report_checks``, ``report_worst_slack``, ``report_tns``, and
 OpenROAD ``[ERROR XXX-0000]`` message format, ``report_design_area``, the
 detailed router's violation count and wire length, and the
 ``nirmaan-stage`` markers the place-and-route script prints around each stage.
+
+M34 adds the per-corner ``report_checks -format end`` tables a multi-corner
+``sta.run`` prints between ``nirmaan-corner`` markers, the metal fill count, and
+``parse_klayout`` for ``pv.run``: the counts Nirmaan's own KLayout scripts print
+from the DRC report database and the LVS cross-reference.
 """
 
 from __future__ import annotations
@@ -37,6 +42,10 @@ _DRC_RE = re.compile(r"Number of violations = (?P<n>\d+)")
 _UNANNOTATED_RE = re.compile(r"^Found (?P<n>\d+) unannotated drivers")
 _FLOATING_RE = re.compile(r"^nirmaan-floating-outputs: (?P<n>\d+)")
 _STAGE_RE = re.compile(r"^nirmaan-stage(?P<done>-done)?: (?P<stage>\w+)")
+#: M34: one timing corner's reports, between these markers, as ``report_checks -format end`` tables.
+_CORNER_RE = re.compile(r"^nirmaan-corner(?P<done>-done)?: (?P<corner>\S+)")
+_END_GROUP_RE = re.compile(r"^(?P<kind>max_delay/setup|min_delay/hold) group")
+_END_ROW_RE = re.compile(r"(?:^|\s)(?P<slack>-?\d+(?:\.\d+)?) \((?:MET|VIOLATED)\)$")
 
 
 def _num(value: str | None) -> float | None:
@@ -127,6 +136,25 @@ def _annotation(lines: list[str]) -> dict[str, int | None]:
     return {"unannotated_drivers": unannotated, "floating_outputs": floating, "unannotated_nets": nets}
 
 
+def _corners(lines: list[str]) -> dict[str, dict[str, float | None]]:
+    """Worst setup and hold slack per timing corner (M34), from the tables each corner's section printed."""
+    corners: dict[str, dict[str, float | None]] = {}
+    current = check = None
+    for line in lines:
+        if m := _CORNER_RE.match(line):
+            current, check = (None if m["done"] else m["corner"]), None
+            if current:
+                corners[current] = {"setup": None, "hold": None}
+        elif current is None:
+            continue
+        elif m := _END_GROUP_RE.match(line):
+            check = "setup" if m["kind"].startswith("max") else "hold"
+        elif check and (m := _END_ROW_RE.search(line)):
+            slack, worst = float(m["slack"]), corners[current][check]
+            corners[current][check] = slack if worst is None else min(worst, slack)
+    return corners
+
+
 def _timing_met(t: dict[str, Any]) -> bool:
     hold = t["worst_hold_slack"]
     return (t["worst_slack"] is not None and t["worst_slack"] >= 0 and (hold is None or hold >= 0)
@@ -155,7 +183,12 @@ def parse_opensta(log: str, returncode: int) -> EdaResult:
     diags = _diagnostics(lines)
     errors = [d for d in diags if d.severity == "error"]
     timing = _timing(lines)
-    metrics = {**timing, **_annotation(lines), "exit_status": returncode}
+    corners = _corners(lines)
+    timed = [c for c, t in corners.items() if t["setup"] is not None and t["hold"] is not None]
+    metrics = {**timing, **_annotation(lines), "exit_status": returncode,
+               # M34: one corner unless the run defined corners; a corner counts only with setup and hold.
+               "slack_by_corner": corners,
+               "timing_corners": len(timed) if corners else int(timing["worst_slack"] is not None)}
     if errors or returncode != 0:
         summary = f"timing analysis failed: {_plural(len(errors), 'error')}{_first(errors)}"
         if not errors:
@@ -164,13 +197,20 @@ def parse_opensta(log: str, returncode: int) -> EdaResult:
     if timing["worst_slack"] is None:
         return EdaResult(False, "timing not met: no constrained timing paths (no worst slack reported)",
                          tuple(diags), metrics)
+    untimed = [c for c in corners if c not in timed]
+    if untimed:
+        return EdaResult(False, f"timing not met: no setup or hold paths reported in corner {', '.join(untimed)}",
+                         tuple(diags), metrics)
+    across = (f" across {len(corners)} corners ("
+              + ", ".join(f"{c} {t['setup']:.3f}/{t['hold']:.3f}" for c, t in corners.items()) + ")"
+              if corners else "")
     if _timing_met(timing):
-        return EdaResult(True, f"timing met: {_slacks(timing)}", tuple(diags), metrics)
+        return EdaResult(True, f"timing met: {_slacks(timing)}{across}", tuple(diags), metrics)
     violators = timing["violating_endpoints"]
     count = _plural(len(violators), "violating endpoint")
     if len(violators) >= VIOLATOR_REPORT_LIMIT:
         count = f"at least {count}"
-    summary = f"timing violated: {count}, {_slacks(timing)}"
+    summary = f"timing violated: {count}, {_slacks(timing)}{across}"
     if violators:
         v = violators[0]
         summary += f"; worst: {v['endpoint']} ({v['check']}) {v['slack']:.3f}"
@@ -193,6 +233,7 @@ _FILLERS_RE = re.compile(r"Placed (?P<n>\d+) filler instances")
 _ANTENNA_RE = re.compile(r"Found (?P<n>\d+) (?P<kind>net|pin) violations")
 _IR_NET_RE = re.compile(r"^Net\s*:\s*(?P<net>\S+)")
 _IR_WORST_RE = re.compile(r"^Worstcase IR drop\s*:\s*(?P<v>\S+)\s*V")
+_FILL_RE = re.compile(r"^nirmaan-fill-shapes: (?P<n>\d+)")  # M34: after density_fill
 
 
 def _sections(lines: list[str]) -> dict[str, list[str]]:
@@ -225,7 +266,7 @@ def _clock_tree(lines: list[str]) -> dict[str, Any]:
 
 
 def _signoff_checks(lines: list[str]) -> dict[str, Any]:
-    taps = endcaps = fillers = open_supply = None
+    taps = endcaps = fillers = open_supply = fill = None
     grids: list[str] = []
     supply_nets: list[str] = []
     antenna: dict[str, int] = {}
@@ -246,6 +287,8 @@ def _signoff_checks(lines: list[str]) -> dict[str, Any]:
             fillers = int(m["n"])
         elif m := _ANTENNA_RE.search(line):
             antenna[m["kind"]] = int(m["n"])
+        elif m := _FILL_RE.match(line):
+            fill = int(m["n"])
         elif m := _IR_NET_RE.match(line):
             ir_net = m["net"]
         elif (m := _IR_WORST_RE.match(line)) and ir_net:
@@ -253,7 +296,7 @@ def _signoff_checks(lines: list[str]) -> dict[str, Any]:
     return {"tap_cells": taps, "endcap_cells": endcaps, "power_grids": grids, "supply_nets": supply_nets,
             "unconnected_supply_pins": open_supply, "filler_cells": fillers,
             "antenna_net_violations": antenna.get("net"), "antenna_pin_violations": antenna.get("pin"),
-            "worst_ir_drop_v": ir, **_annotation(lines)}
+            "worst_ir_drop_v": ir, "fill_shapes": fill, **_annotation(lines)}
 
 
 def parse_openroad(log: str, returncode: int, stop_after: str = "route",
@@ -334,6 +377,8 @@ def parse_openroad(log: str, returncode: int, stop_after: str = "route",
             parts.append("power grid connected")
         elif routed:
             parts.append("no power grid")
+        if checks["fill_shapes"] is not None:
+            parts.append(f"metal fill {_plural(checks['fill_shapes'], 'shape')}")
         if metrics["clock_skew"] is not None:
             parts.append(f"clock skew {metrics['clock_skew']:.3f}")
         parts.append(_slacks(timing) + (" on extracted parasitics" if extracted else ""))
@@ -343,3 +388,87 @@ def parse_openroad(log: str, returncode: int, stop_after: str = "route",
         reasons.append(f"{stage} never finished")
     prefix = f"place and route failed in {stage}" if stage else "place and route failed"
     return EdaResult(False, f"{prefix}: {'; '.join(reasons)}", tuple(diags), metrics)
+
+
+# --- KLayout physical verification (M34) ------------------------------------------------
+
+#: Printed by Nirmaan's own KLayout scripts (``physical.py``): the stream, the DRC count, the LVS count.
+_GDS_EMPTY_RE = re.compile(r"^nirmaan-gds-empty-cells: (?P<n>\d+)")
+_GDS_EMPTY_CELL_RE = re.compile(r"^nirmaan-gds-empty-cell: (?P<cell>\S+)")
+_GDS_FILL_RE = re.compile(r"^nirmaan-gds-fill-shapes: (?P<n>\d+)")
+_DRC_TOTAL_RE = re.compile(r"^nirmaan-drc-violations: (?P<n>\d+)")
+_DRC_RULE_RE = re.compile(r"^nirmaan-drc-rule: (?P<rule>\S+) (?P<n>\d+)")
+_LVS_KIND_RE = re.compile(r"^nirmaan-lvs-mismatched-(?P<kind>\w+): (?P<n>\d+)")
+_LVS_CIRCUIT_RE = re.compile(r"^nirmaan-lvs-circuit: (?P<layout>\S+) (?P<schematic>\S+) (?P<status>\S+)")
+#: KLayout reports a script or deck failure as ``ERROR: ...`` (a deck's own ``ERROR : ...`` text is not one).
+_KLAYOUT_ERROR_RE = re.compile(r"^ERROR: (?P<msg>.*)$")
+#: The checks ``pv.run`` can run, in order.
+PV_CHECKS = ("drc", "lvs")
+
+
+def parse_klayout(log: str, returncode: int, checks: list[str] | tuple[str, ...] = PV_CHECKS) -> EdaResult:
+    """Pass means exit 0, no error, every layout cell has GDS, and each check run is clean.
+
+    DRC is clean when the report database holds no item; LVS when no circuit, net, device, pin, or
+    subcircuit pair of the cross-reference is a mismatch. A check that was run and printed no count fails.
+    """
+    lines = _lines(log)
+    diags = _diagnostics(lines) + [Diagnostic("error", m["msg"].strip()) for line in lines
+                                   if (m := _KLAYOUT_ERROR_RE.match(line))]
+    errors = [d for d in diags if d.severity == "error"]
+    empty = fill = drc = None
+    empty_cells: list[str] = []
+    rules: dict[str, int] = {}
+    lvs: dict[str, int] = {}
+    unmatched: list[str] = []
+    for line in lines:
+        if m := _GDS_EMPTY_RE.match(line):
+            empty = int(m["n"])
+        elif m := _GDS_EMPTY_CELL_RE.match(line):
+            empty_cells.append(m["cell"])
+        elif m := _GDS_FILL_RE.match(line):
+            fill = int(m["n"])
+        elif m := _DRC_TOTAL_RE.match(line):
+            drc = int(m["n"])
+        elif m := _DRC_RULE_RE.match(line):
+            rules[m["rule"]] = int(m["n"])
+        elif m := _LVS_KIND_RE.match(line):
+            lvs[m["kind"]] = int(m["n"])
+        elif (m := _LVS_CIRCUIT_RE.match(line)) and m["status"] in ("NoMatch", "Mismatch"):
+            unmatched.append(m["layout"] if m["layout"] != "-" else m["schematic"])
+    mismatches = sum(lvs.values()) if lvs else None
+    metrics: dict[str, Any] = {
+        "checks": list(checks), "gds_empty_cells": empty, "empty_cells": empty_cells, "fill_shapes": fill,
+        "drc_violations": drc, "drc_by_rule": dict(sorted(rules.items(), key=lambda r: (-r[1], r[0]))),
+        "lvs_mismatches": mismatches, "lvs_mismatched": lvs, "lvs_unmatched_circuits": unmatched,
+        "exit_status": returncode,
+    }
+    reasons = []
+    if errors:
+        reasons.append(f"{_plural(len(errors), 'error')}{_first(errors)}")
+    if returncode != 0 and not errors:
+        reasons.append(f"exit status {returncode}")
+    if empty is None:
+        reasons.append("no GDS written")
+    elif empty:
+        reasons.append(f"{_plural(empty, 'layout cell')} with no GDS ({', '.join(empty_cells[:3])})")
+    if "drc" in checks:
+        if drc is None:
+            reasons.append("no DRC count reported")
+        elif drc:
+            worst = ", ".join(f"{r} {n}" for r, n in list(metrics["drc_by_rule"].items())[:3])
+            reasons.append(f"{_plural(drc, 'DRC violation')} ({worst})")
+    if "lvs" in checks:
+        if mismatches is None:
+            reasons.append("no LVS comparison reported")
+        elif mismatches:
+            kinds = ", ".join(_plural(n, f"mismatched {k[:-1]}") for k, n in lvs.items() if n)
+            reasons.append(f"LVS mismatch: {kinds}" + (f"; unmatched {', '.join(unmatched)}" if unmatched else ""))
+    if reasons:
+        return EdaResult(False, f"physical verification failed: {'; '.join(reasons)}", tuple(diags), metrics)
+    parts = ["GDS written" + (f" with {_plural(fill, 'fill shape')}" if fill else "")]
+    if "drc" in checks:
+        parts.append("DRC clean")
+    if "lvs" in checks:
+        parts.append("LVS clean (layout matches the netlist)")
+    return EdaResult(True, f"physical verification passed: {', '.join(parts)}", tuple(diags), metrics)

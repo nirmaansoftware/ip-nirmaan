@@ -14,6 +14,9 @@
 * M29: power grid, taps, CTS, repair, fillers, antenna and IR checks, and
   OpenRCX extraction, for real on Nangate45 and sky130hd in CI, with signoff
   STA on the SPEF through OpenROAD's OpenSTA and standalone OpenSTA.
+* M34: timing corners (slow, typical, fast sky130hd Liberty), metal fill, and
+  DRC and LVS with the PDK's KLayout decks (``pv.run``), for real on sky130hd
+  in CI, with a broken layout and a broken netlist failing as recorded runs.
 * Real OpenSTA and OpenROAD tests skip without the tools and Nangate45; the CI
   physical-design job requires them.
 """
@@ -22,6 +25,7 @@ from __future__ import annotations
 
 import ast
 import os
+import re
 import shutil
 from pathlib import Path
 
@@ -32,7 +36,7 @@ from nirmaan_helpers import agent, tid
 from test_nirmaan_eda import holder, needs
 
 from nirmaan.integrations.eda import Backend, EdaResult, register_backend, unregister_backend
-from nirmaan.integrations.pd_parsers import VIOLATOR_REPORT_LIMIT, parse_openroad, parse_opensta
+from nirmaan.integrations.pd_parsers import VIOLATOR_REPORT_LIMIT, parse_klayout, parse_openroad, parse_opensta
 from nirmaan.integrations.physical import PDK_ROOT_ENV, needs_pdk
 from nirmaan.models import EvidenceKind, TaskKind, ToolStatus
 from nirmaan.orchestrator import Orchestrator
@@ -89,7 +93,7 @@ def fake_pdk(root: Path, rc: bool = False) -> dict[str, str]:
 
 
 def test_sta_and_pnr_have_real_bindings(nirmaan_org):
-    for tool in ("sta.run", "pnr.run"):
+    for tool in ("sta.run", "pnr.run", "pv.run"):  # M34: physical verification through KLayout
         assert nirmaan_org.tools[tool].status is ToolStatus.AVAILABLE, tool
         assert tool in available_bindings(), tool
 
@@ -114,12 +118,15 @@ def test_the_catalog_says_why_a_tool_cannot_run_here(monkeypatch, tmp_path):
 
 def test_the_logs_say_where_they_were_captured():
     logs = sorted(PD.glob("*.log"))
-    assert [p.name for p in logs] == ["openroad_error.log", "openroad_route.log", "openroad_signoff.log",
-                                      "opensta_met.log", "opensta_spef.log", "opensta_violated.log"]
+    assert [p.name for p in logs] == ["klayout_pv.log", "klayout_pv_drc.log", "klayout_pv_lvs.log",  # M34
+                                      "openroad_error.log", "openroad_route.log", "openroad_signoff.log",
+                                      "openroad_sky130_fill.log", "opensta_corners.log", "opensta_met.log",
+                                      "opensta_spef.log", "opensta_violated.log"]
     for log in logs:
         first, second = log.read_text(encoding="utf-8").splitlines()[:2]
         assert first.startswith("# CAPTURED:") and "CI run" in first, log
-        exe = "sta" if log.name == "opensta_spef.log" else "openroad"  # M29: standalone OpenSTA, built in CI
+        # M29: standalone OpenSTA, built in CI. M34: pv.run's first step writes the CDL in OpenROAD.
+        exe = "sta" if log.name in ("opensta_spef.log", "opensta_corners.log") else "openroad"
         assert second.startswith(f"$ {exe} -no_init -no_splash -exit "), log  # as eda.execute logs a step
 
 
@@ -225,6 +232,68 @@ def test_opensta_on_the_extracted_spef():
     line = next(ln for ln in log.splitlines() if ln.startswith("nirmaan-floating-drivers:"))
     dropped = line.replace(" VDD", "")
     assert parse_opensta(log.replace(line, dropped), 0).metrics["unannotated_nets"] == 1
+
+
+def test_opensta_reports_each_corner():
+    """M34: slow, typical, and fast sky130hd Liberty on one extracted SPEF, through standalone OpenSTA."""
+    result = parse_opensta(_text("opensta_corners.log"), 0)
+    assert result.passed, result.summary
+    m = result.metrics
+    assert m["slack_by_corner"] == {"tt": {"setup": 4.428, "hold": 0.629}, "ss": {"setup": 1.276, "hold": 1.283},
+                                    "ff": {"setup": 5.606, "hold": 0.399}}
+    assert m["timing_corners"] == 3 and m["unannotated_nets"] == 0
+    assert (m["worst_slack"], m["worst_hold_slack"]) == (1.276, 0.399)  # setup on ss, hold on ff
+    assert result.summary == ("timing met: worst setup slack 1.276, worst hold slack 0.399, TNS 0.000 across 3 "
+                              "corners (tt 4.428/0.629, ss 1.276/1.283, ff 5.606/0.399)")
+    # A corner whose section reports no path does not count, and fails the run.
+    log = _text("opensta_corners.log")
+    ff = log[log.index("nirmaan-corner: ff"):log.index("nirmaan-corner-done: ff")]
+    empty = parse_opensta(log.replace(ff, "nirmaan-corner: ff\nNo paths found.\n"), 0)
+    assert not empty.passed and empty.metrics["timing_corners"] == 2 and "corner ff" in empty.summary
+    assert parse_opensta(_text("opensta_met.log"), 0).metrics["timing_corners"] == 1  # one corner, as before
+
+
+def test_openroad_reports_metal_fill():
+    result = parse_openroad(_text("openroad_sky130_fill.log"), 0, "extract", SIGNOFF_STAGES)
+    assert result.passed, result.summary
+    m = result.metrics
+    assert m["fill_shapes"] == 12947 and m["drc_violations"] == 0 and m["unconnected_supply_pins"] == 0
+    assert (m["worst_slack"], m["worst_hold_slack"]) == (4.428, 0.629)
+    assert "metal fill 12947 shapes" in result.summary
+    assert parse_openroad(_text("openroad_signoff.log"), 0, "extract", SIGNOFF_STAGES).metrics["fill_shapes"] is None
+
+
+def test_klayout_drc_and_lvs_clean():
+    result = parse_klayout(_text("klayout_pv.log"), 0)
+    assert result.passed, result.summary
+    m = result.metrics
+    assert (m["gds_empty_cells"], m["fill_shapes"], m["drc_violations"], m["lvs_mismatches"]) == (0, 12947, 0, 0)
+    assert m["drc_by_rule"] == {} and m["lvs_unmatched_circuits"] == []
+    assert not result.errors  # the deck's own "ERROR : ..." text is not a tool error; none here anyway
+    assert result.summary == ("physical verification passed: GDS written with 12947 fill shapes, DRC clean, "
+                              "LVS clean (layout matches the netlist)")
+
+
+def test_klayout_broken_layout_and_netlist_fail():
+    drc = parse_klayout(_text("klayout_pv_drc.log"), 0)
+    assert not drc.passed and drc.metrics["drc_violations"] == 782 and drc.metrics["lvs_mismatches"] == 0
+    assert list(drc.metrics["drc_by_rule"])[:3] == ["licon_OFFGRID", "li_OFFGRID", "poly_OFFGRID"]
+    assert drc.summary == ("physical verification failed: 782 DRC violations (licon_OFFGRID 200, li_OFFGRID 172, "
+                           "poly_OFFGRID 138)")
+    lvs = parse_klayout(_text("klayout_pv_lvs.log"), 0)
+    assert not lvs.passed and lvs.metrics["drc_violations"] == 0
+    assert lvs.metrics["lvs_mismatched"] == {"circuits": 1, "nets": 2, "devices": 0, "pins": 0, "subcircuits": 1}
+    assert lvs.metrics["lvs_unmatched_circuits"] == ["axi4_lite_regs"]
+    assert "LVS mismatch: 1 mismatched circuit, 2 mismatched nets, 1 mismatched subcircuit" in lvs.summary
+    # A check that ran and printed no count, or a stream that left a cell empty, fails.
+    clean = _text("klayout_pv.log")
+    no_lvs = "\n".join(ln for ln in clean.splitlines() if not ln.startswith("nirmaan-lvs-"))
+    assert "no LVS comparison reported" in parse_klayout(no_lvs, 0).summary
+    assert parse_klayout(no_lvs, 0, ["drc"]).passed  # DRC only: no LVS asked for
+    empty = clean.replace("nirmaan-gds-empty-cells: 0", "nirmaan-gds-empty-cells: 1\nnirmaan-gds-empty-cell: X")
+    assert "1 layout cell with no GDS (X)" in parse_klayout(empty, 0).summary
+    crashed = parse_klayout(clean + "\nERROR: drc.lydrc:12: undefined method\n", 1)
+    assert not crashed.passed and crashed.errors[-1].message == "drc.lydrc:12: undefined method"
 
 
 def test_openroad_failure_names_the_stage():
@@ -422,13 +491,14 @@ def test_liberty_mapped_synthesis_without_a_liberty_is_refused(project, tmp_path
 def test_the_physical_implementation_workflow_plans_the_stages(project):
     assert project.state.project.workflows == ("physical-implementation",)
     tasks = {t.stage: t for t in project.state.tasks.values() if t.stage and t.kind is TaskKind.WORK}
-    order = ["timing-constraints", "synthesis", "floorplan", "place-route", "sta-signoff"]
+    order = ["timing-constraints", "synthesis", "floorplan", "place-route", "physical-verification", "sta-signoff"]
     assert set(order) <= set(tasks)
     for earlier, later in zip(order, order[1:]):
         assert tasks[earlier].id in tasks[later].depends_on, later
     tools = {stage: {t for r in tasks[stage].evidence_requirements for t in r.tools} for stage in order}
     assert tools["synthesis"] == {"synth.run"} and tools["floorplan"] == {"pnr.run"}
     assert tools["place-route"] == {"pnr.run"} and tools["sta-signoff"] == {"sta.run"}
+    assert tools["physical-verification"] == {"pv.run"}  # M34
     gates = [t for t in project.state.tasks.values() if t.kind is TaskKind.GATE and t.stage == "sta-signoff"]
     assert [g.gate for g in gates] == ["gate.implementation"] and tasks["sta-signoff"].id in gates[0].depends_on
 
@@ -439,11 +509,122 @@ def test_the_workflow_asks_for_power_and_extracted_parasitics_as_data(project):
     assert tasks["floorplan"].id in tasks["power-grid"].depends_on
     assert tasks["power-grid"].id in tasks["place-route"].depends_on
     limits = {stage: {k: v for r in tasks[stage].evidence_requirements for k, v in r.params}
-              for stage in ("power-grid", "place-route", "sta-signoff")}
+              for stage in ("power-grid", "place-route", "physical-verification", "sta-signoff")}
     assert limits == {"power-grid": {"max_unconnected_supply_pins": "0"},
                       "place-route": {"max_drc_violations": "0", "max_unconnected_supply_pins": "0"},
-                      "sta-signoff": {"max_unannotated_nets": "0"}}
+                      # M34: signoff DRC and LVS on the filled layout, and timing on at least three corners.
+                      "physical-verification": {"max_drc_violations": "0", "max_lvs_mismatches": "0",
+                                                "min_fill_shapes": "1"},
+                      "sta-signoff": {"max_unannotated_nets": "0", "min_timing_corners": "3"}}
     assert {t for r in tasks["power-grid"].evidence_requirements for t in r.tools} == {"pnr.run"}
+
+
+# --- M34: corners, fill, and physical verification, through stand-ins ------------------------
+
+
+def test_sta_defines_one_corner_per_liberty_and_reads_the_spef_into_each(project, tmp_path, monkeypatch):
+    bin_dir = tmp_path / "bin"
+    fake_tool(bin_dir, "sta", f"cat '{PD / 'opensta_met.log'}'")
+    only_on_path(monkeypatch, bin_dir)
+    pdk = fake_pdk(tmp_path / "pdk")
+    for corner in ("ss.lib", "ff.lib"):
+        (tmp_path / "pdk" / corner).write_text("stand-in\n", encoding="utf-8")
+    spef = tmp_path / "route.spef"
+    spef.write_text("*SPEF stand-in\n", encoding="utf-8")
+    params = {"netlist": str(AXI), "sdc": str(SDC), "top": TOP, "liberty": pdk["liberty"], "corner": "tt",
+              "liberty_ss": str(tmp_path / "pdk" / "ss.lib"), "liberty_ff": str(tmp_path / "pdk" / "ff.lib"),
+              "spef": str(spef)}
+    invoke(project, "sta.run", params, tmp_path / "w")
+    script = (tmp_path / "w" / "sta.tcl").read_text()
+    assert script.index("define_corners tt ss ff") < script.index(f'read_liberty -corner ss "{tmp_path}/pdk/ss.lib"')
+    assert f'read_liberty -corner tt "{pdk["liberty"]}"' in script
+    for corner in ("tt", "ss", "ff"):
+        assert f"read_spef -corner {corner} " in script, corner
+        assert f'puts "nirmaan-corner: {corner}"' in script
+        assert f"report_checks -path_delay max -scenes {corner} -format end" in script
+        assert f"report_checks -path_delay min -scenes {corner} -format end" in script
+    plain = invoke(project, "sta.run", {k: v for k, v in params.items() if not k.startswith("liberty_")},
+                   tmp_path / "one")
+    assert "define_corners" not in (tmp_path / "one" / "sta.tcl").read_text() and plain[0].succeeded
+    # The single-corner log reports one corner, so a three-corner limit fails it.
+    one, _ = invoke(project, "sta.run", {**params, "liberty_ss": "", "liberty_ff": "", "min_timing_corners": "3"},
+                    tmp_path / "limit")
+    assert not one.succeeded and "timing_corners 1 is below min_timing_corners 3" in one.summary, one.summary
+    with pytest.raises(ToolAccessDenied, match="liberty_ss not found: .*nowhere.lib"):
+        invoke(project, "sta.run", {**params, "liberty_ss": str(tmp_path / "nowhere.lib")}, tmp_path / "x")
+    clash, _ = invoke(project, "sta.run", {**params, "corner": "ss"}, tmp_path / "clash")
+    assert not clash.succeeded and "timing corners must differ" in clash.summary
+
+
+def test_pnr_fills_metal_and_writes_the_netlist_lvs_needs(project, tmp_path, monkeypatch):
+    bin_dir = tmp_path / "bin"
+    fake_tool(bin_dir, "openroad", f"cat '{PD / 'openroad_route.log'}'")
+    only_on_path(monkeypatch, bin_dir)
+    pdk = fake_pdk(tmp_path / "pdk", rc=True)
+    (tmp_path / "pdk" / "fill.json").write_text("{}\n", encoding="utf-8")
+    params = {"netlist": str(AXI), "sdc": str(SDC), "top": TOP, **pdk, **PNR_PDK,
+              "filler_cells": "FILL1", "fill_rules": str(tmp_path / "pdk" / "fill.json")}
+    invoke(project, "pnr.run", params, tmp_path / "w")
+    script = (tmp_path / "w" / "pnr.tcl").read_text()
+    route = script[script.index("nirmaan-stage: route"):script.index("nirmaan-stage-done: route")]
+    assert route.index("filler_placement") < route.index(f'density_fill -rules "{tmp_path}/pdk/fill.json"')
+    assert "nirmaan-fill-shapes" in route
+    assert "write_verilog final.v" in script and "write_verilog -include_pwr_gnd final_pg.v" in script
+    with pytest.raises(ToolAccessDenied, match="fill_rules not found"):
+        invoke(project, "pnr.run", {**params, "fill_rules": str(tmp_path / "none.json")}, tmp_path / "x")
+
+
+def fake_pv_pdk(root: Path, lvs: bool = True) -> dict[str, str]:
+    """Stand-in KLayout inputs: technology, cell GDS, a DRC deck, and (``lvs``) an LVS deck and cell CDL."""
+    pdk = fake_pdk(root)
+    names = {"gds": "cells.gds", "klayout_tech": "tech.lyt", "drc_deck": "drc.lydrc",
+             **({"lvs_deck": "lvs.lylvs", "cdl": "cells.cdl"} if lvs else {})}
+    for name in names.values():
+        (root / name).write_text("<lef-files>x</lef-files>\n" if name.endswith(".lyt") else "stand-in\n",
+                                 encoding="utf-8")
+    return {"tech_lef": pdk["tech_lef"], "lef": pdk["lef"], **{k: str(root / v) for k, v in names.items()}}
+
+
+def test_pv_runs_stream_drc_and_lvs_and_counts_them_itself(project, tmp_path, monkeypatch):
+    bin_dir = tmp_path / "bin"
+    fake_tool(bin_dir, "openroad", 'echo "argv: $*"')
+    fake_tool(bin_dir, "klayout", 'echo "argv: $*"')
+    only_on_path(monkeypatch, bin_dir)
+    layout = tmp_path / "route.def"
+    layout.write_text("stand-in\n", encoding="utf-8")
+    pdk = fake_pv_pdk(tmp_path / "pdk")
+    params = {"def": str(layout), "netlist": str(AXI), "top": TOP, **pdk}
+    run, outcome = invoke(project, "pv.run", params, tmp_path / "w")
+    # The stand-ins print no counts: a run that cannot show its counts is a recorded failed run.
+    assert not run.succeeded and run.id in project.state.tool_runs
+    assert "no GDS written" in run.summary and "no DRC count" in run.summary and "no LVS comparison" in run.summary
+    steps = outcome.data["commands"]
+    assert [s[0] for s in steps] == ["openroad", "klayout", "klayout", "klayout", "klayout", "klayout"]
+    assert steps[1][-1] == "stream.py" and steps[2][-1] == pdk["drc_deck"] and steps[3][-1] == "drc_count.py"
+    assert steps[4][-1] == pdk["lvs_deck"] and steps[5][-1] == "lvs_count.py"
+    work = tmp_path / "w"
+    tech = (work / "klayout.lyt").read_text()
+    assert f"<lef-files>{pdk['tech_lef']}</lef-files><lef-files>{pdk['lef']}</lef-files>" in tech
+    assert f'.INCLUDE "{pdk["cdl"]}"' in (work / "reference.cdl").read_text()
+    assert f'read_verilog "{AXI}"' in (work / "cdl.tcl").read_text()
+    drc_only, outcome = invoke(project, "pv.run", {**params, "lvs_deck": "", "cdl": ""}, tmp_path / "d")
+    assert [s[-1] for s in outcome.data["commands"]] == ["stream.py", pdk["drc_deck"], "drc_count.py"]
+    with pytest.raises(ToolAccessDenied, match="needs a check to run"):
+        invoke(project, "pv.run", {**params, "drc_deck": "", "lvs_deck": ""}, tmp_path / "none")
+    with pytest.raises(ToolAccessDenied, match="needs the cells' GDS"):
+        invoke(project, "pv.run", {**params, "gds": ""}, tmp_path / "nogds")
+
+
+def test_min_limits_fail_a_run_below_them_or_without_the_metric(project, tmp_path, monkeypatch):
+    """M34: ``min_<metric>`` is the runner's limit from below, as ``max_<metric>`` is from above."""
+    bin_dir = tmp_path / "bin"
+    fake_tool(bin_dir, "sta", f"cat '{PD / 'opensta_met.log'}'")
+    only_on_path(monkeypatch, bin_dir)
+    base = {"netlist": str(AXI), "sdc": str(SDC), "top": TOP, "liberty": str(TINY_LIB)}
+    met, _ = invoke(project, "sta.run", {**base, "min_timing_corners": "1"}, tmp_path / "a")
+    assert met.succeeded, met.summary
+    unknown, _ = invoke(project, "sta.run", {**base, "min_no_such_metric": "1"}, tmp_path / "b")
+    assert not unknown.succeeded and "no_such_metric was not reported" in unknown.summary
 
 
 # --- Crown jewel: a new PD backend needs zero core changes ---------------------------------
@@ -496,7 +677,7 @@ def test_signoff_on_extracted_parasitics_needs_no_core_changes(project, tmp_path
     fake_tool(bin_dir, "tinysta", 'if [ -n "$1" ]; then echo "annotated from $1"; fi; echo "tinysta: slack 1.0"')
 
     def parse(run) -> EdaResult:
-        metrics = {"unannotated_nets": 0} if "annotated from" in run.log else {}
+        metrics = {"unannotated_nets": 0, "timing_corners": 3} if "annotated from" in run.log else {}
         return EdaResult(run.returncode == 0, "timing met", metrics=metrics)
 
     register_backend(Backend("tinysta", "sta.run", ("tinysta",),
@@ -518,6 +699,40 @@ def test_signoff_on_extracted_parasitics_needs_no_core_changes(project, tmp_path
         assert req.description not in unsatisfied_requirements(project.state, project.task(signoff))
     finally:
         unregister_backend("sta.run", "tinysta")
+
+
+def test_physical_verification_needs_no_core_changes(project, tmp_path, monkeypatch):
+    """M34 crown jewel: a DRC and LVS tool the core has never heard of meets the physical-verification stage.
+
+    The stage asks for limits only (no DRC violation, no LVS mismatch, some fill), so any backend that
+    reports those metrics serves it, and one that does not report them cannot.
+    """
+    bin_dir = tmp_path / "bin"
+    fake_tool(bin_dir, "tinypv", 'echo "checked $1"; echo "tinypv: 0 drc, 0 lvs, 12 fill"')
+
+    def parse(run) -> EdaResult:
+        clean = run.returncode == 0 and "0 drc, 0 lvs" in run.log
+        metrics = {"drc_violations": 0, "lvs_mismatches": 0, "fill_shapes": 12} if clean else {}
+        return EdaResult(clean, "clean" if clean else "failed", metrics=metrics)
+
+    register_backend(Backend("tinypv", "pv.run", ("tinypv",), lambda job: [["tinypv", job.params["def"]]], parse,
+                             required=("def",), files=("def",)))
+    try:
+        only_on_path(monkeypatch, bin_dir)
+        layout = tmp_path / "route.def"
+        layout.write_text("stand-in\n", encoding="utf-8")
+        stage = tid(project, "physical-verification")
+        req = next(r for r in project.task(stage).evidence_requirements if r.tools == ("pv.run",))
+        params = {"def": str(layout), "netlist": str(AXI), "top": TOP, "backend": "tinypv", **dict(req.params)}
+        run, _ = invoke(project, "pv.run", params, tmp_path / "w", stage)
+        assert run.succeeded and f"checked {layout}" in Path(run.references[0]).read_text()
+        project.record_evidence(stage, agent(project.task(stage).owner), EvidenceKind.TOOL_RUN, run.summary,
+                                tool_run=run.id)
+        assert req.description not in unsatisfied_requirements(project.state, project.task(stage))
+        short, _ = invoke(project, "pv.run", {**params, "min_fill_shapes": "100"}, tmp_path / "w2", stage)
+        assert not short.succeeded and "fill_shapes 12 is below min_fill_shapes 100" in short.summary
+    finally:
+        unregister_backend("pv.run", "tinypv")
 
 
 # --- The import laws ----------------------------------------------------------------------
@@ -599,7 +814,7 @@ def test_real_openroad_places_and_routes_the_axi4_lite_block(project, tmp_path):
     assert metrics["drc_violations"] == 0 and metrics["wirelength_um"] > 0, run.summary
     assert metrics["utilization_pct"] > 0 and metrics["worst_slack"] > 0, run.summary
     assert run.succeeded, run.summary
-    assert set(metrics["outputs"]) == {"def", "netlist"}
+    assert set(metrics["outputs"]) == {"def", "netlist", "pg_netlist"}  # M34: the netlist LVS compares against
 
 
 @needs("openroad", "yosys")
@@ -644,7 +859,7 @@ def test_real_signoff_flow_connects_power_builds_the_clock_tree_and_extracts(pro
     assert m["clock_skew"] is not None and m["clock_insertion_delay"] is not None, run.summary
     assert set(m["slack_by_stage"]) == {"place", "cts", "route", "extract"}, m["slack_by_stage"]
     assert m["parasitics"] == "extracted" and m["worst_slack"] > 0 and m["unannotated_nets"] == 0, run.summary
-    assert set(m["outputs"]) == {"def", "netlist", "spef"} and run.succeeded, run.summary
+    assert set(m["outputs"]) == {"def", "netlist", "pg_netlist", "spef"} and run.succeeded, run.summary
 
     # Signoff STA on the routed netlist with the extracted SPEF, in a separate run: through OpenROAD's
     # embedded OpenSTA, and through standalone OpenSTA when it is installed (CI builds it, M29).
@@ -683,23 +898,42 @@ SKY130HD = {
 SKY130HD_PNR = {
     "site": "unithd", "hor_layers": "met3", "ver_layers": "met2",
     # Signals stop below met5, which carries the power straps: on met5 the router left shorts it never fixed.
-    "routing_layers": "met1,met4",
+    # M34: and below met4: with met4, the KLayout deck found three met3 islands under the minimum area
+    # (m3.6) where a via2 and a via3 stack, which the router's own DRC did not count.
+    "routing_layers": "met1,met3",
     # The probe buffers have met5 pins the router cannot reach below met4 (GRT-0029 when repair chose one).
     "dont_use": "sky130_fd_sc_hd__probe_p_*,sky130_fd_sc_hd__probec_p_*,sky130_fd_sc_hd__lpflow_*",
     "tap_cell": "sky130_fd_sc_hd__tapvpwrvgnd_1", "tap_distance": "14",
     "pdn_tcl": "sky130hd/pdn.tcl", "rc_tcl": "sky130hd/setRC.tcl", "rcx_rules": "sky130hd/rcx_patterns.rules",
     "filler_cells": "sky130_fd_sc_hd__fill_1,sky130_fd_sc_hd__fill_2,sky130_fd_sc_hd__fill_4,sky130_fd_sc_hd__fill_8",
     "supply_voltage": "1.8",
+    "fill_rules": "sky130hd/fill.json",  # M34: metal fill before signoff DRC
 }
+#: M34: the slow and fast corners, fetched by CI from the open_pdks build of the SkyWater library (pinned by
+#: sha256) into the platform's lib directory; the typical corner is the platform's own.
+SKY130HD_CORNERS = {"corner": "tt", "liberty_ss": "sky130hd/lib/sky130_fd_sc_hd__ss_100C_1v60.lib",
+                    "liberty_ff": "sky130hd/lib/sky130_fd_sc_hd__ff_n40C_1v95.lib"}
+#: M34: the platform's KLayout signoff inputs.
+SKY130HD_PV = {"gds": "sky130hd/gds/sky130_fd_sc_hd.gds", "klayout_tech": "sky130hd/sky130hd.lyt",
+               "drc_deck": "sky130hd/drc/sky130hd.lydrc", "lvs_deck": "sky130hd/lvs/sky130hd.lylvs",
+               "cdl": "sky130hd/cdl/sky130hd.cdl"}
 
 
-@needs("openroad", "yosys")
-def test_real_signoff_flow_on_sky130hd(project, tmp_path):
+def sky130hd(*extra: dict[str, str]) -> None:
+    """Skip without the sky130hd platform (and the inputs named), or fail when CI requires OpenROAD."""
     root = os.environ.get(PDK_ROOT_ENV, "")
-    if not (root and all((Path(root) / p).is_file() for p in SKY130HD.values())):
+    paths = [v for d in (SKY130HD, *extra) for k, v in d.items() if k != "corner"]
+    if not (root and all((Path(root) / p).is_file() for p in paths)):
+        reason = f"{PDK_ROOT_ENV} has no sky130hd platform with {', '.join(p for p in paths if not (Path(root) / p).is_file())}"
         if "openroad" in os.environ.get("NIRMAAN_REQUIRE_EDA", "").split():
-            pytest.fail(f"{PDK_ROOT_ENV} has no sky130hd platform")
-        pytest.skip(f"{PDK_ROOT_ENV} has no sky130hd platform")
+            pytest.fail(reason)
+        pytest.skip(reason)
+
+
+@needs("openroad", "yosys", "klayout")
+def test_real_signoff_flow_on_sky130hd(project, tmp_path):
+    """M29 signoff flow, and M34: metal fill, three timing corners, and KLayout DRC and LVS, clean and broken."""
+    sky130hd(SKY130HD_CORNERS, SKY130HD_PV)
     params = {"sources": str(AXI), "top": TOP, "backend": "yosys-liberty", "liberty": SKY130HD["liberty"],
               "tie_high": "sky130_fd_sc_hd__conb_1/HI", "tie_low": "sky130_fd_sc_hd__conb_1/LO",
               "buffer_cell": "sky130_fd_sc_hd__buf_4/A/X"}
@@ -713,3 +947,50 @@ def test_real_signoff_flow_on_sky130hd(project, tmp_path):
     assert m["stages_completed"] == ["floorplan", "place", "cts", "route", "extract", "timing"], run.summary
     assert m["drc_violations"] == 0 and m["unconnected_supply_pins"] == 0, run.summary
     assert m["parasitics"] == "extracted" and run.succeeded, run.summary
+    assert m["fill_shapes"] > 0, run.summary  # M34
+    out = m["outputs"]
+
+    # M34: signoff timing on the SPEF at the slow, typical, and fast corners, through both timers.
+    design = {"netlist": out["netlist"], "top": TOP, **SKY130HD, "sdc": str(SDC), "spef": out["spef"],
+              **SKY130HD_CORNERS, "max_unannotated_nets": "0", "min_timing_corners": "3"}
+    for backend in sta_backends():
+        sta, sta_outcome = invoke(project, "sta.run", {**design, "backend": backend}, tmp_path / f"corners_{backend}")
+        sm = sta_outcome.data["result"]["metrics"]
+        corners = sm["slack_by_corner"]
+        assert sm["timing_corners"] == 3 and set(corners) == {"ss", "tt", "ff"}, sta.summary
+        assert corners["ss"]["setup"] < corners["tt"]["setup"] < corners["ff"]["setup"], corners  # slow is slowest
+        assert corners["ff"]["hold"] < corners["tt"]["hold"], corners  # fast is the hold corner
+        assert sm["worst_slack"] == corners["ss"]["setup"] and sm["worst_hold_slack"] == corners["ff"]["hold"]
+        assert sta.succeeded, sta.summary
+
+    # M34: DRC and LVS with the platform's KLayout decks, on the filled layout, against the routed netlist.
+    pv = {"def": out["def"], "netlist": out["pg_netlist"], "top": TOP, "tech_lef": SKY130HD["tech_lef"],
+          "lef": SKY130HD["lef"], **SKY130HD_PV,
+          "max_drc_violations": "0", "max_lvs_mismatches": "0", "min_fill_shapes": "1"}
+    clean, clean_outcome = invoke(project, "pv.run", pv, tmp_path / "pv")
+    cm = clean_outcome.data["result"]["metrics"]
+    assert cm["drc_violations"] == 0 and cm["lvs_mismatches"] == 0 and cm["gds_empty_cells"] == 0, clean.summary
+    assert cm["fill_shapes"] == m["fill_shapes"] and clean.succeeded, clean.summary
+
+    # A cell moved 1 nm off the 5 nm manufacturing grid: its shapes are off grid and overlap its neighbour.
+    layout = Path(out["def"]).read_text(encoding="utf-8")
+    place = re.search(r"(- \S+ sky130_fd_sc_hd__dfxtp_\d \+ PLACED \( )(\d+) ", layout)
+    broken_def = tmp_path / "broken.def"
+    broken_def.write_text(layout[:place.start()] + place[1] + f"{int(place[2]) + 1} " + layout[place.end():],
+                          encoding="utf-8")
+    bad_drc, bad_outcome = invoke(project, "pv.run", {**pv, "def": str(broken_def)}, tmp_path / "pv_drc")
+    assert not bad_drc.succeeded and bad_drc.id in project.state.tool_runs
+    bm = bad_outcome.data["result"]["metrics"]
+    assert bm["drc_violations"] > 0 and any("OFFGRID" in r for r in bm["drc_by_rule"]), bad_drc.summary
+    assert "DRC violation" in bad_drc.summary
+
+    # A flip-flop's D input rewired to another net in the netlist: the layout no longer matches it.
+    pg = Path(out["pg_netlist"]).read_text(encoding="utf-8")
+    d_pins = list(re.finditer(r"\.D\((\w+)\)", pg))
+    broken_v = tmp_path / "broken.v"
+    broken_v.write_text(pg[:d_pins[0].start()] + f".D({d_pins[1][1]})" + pg[d_pins[0].end():], encoding="utf-8")
+    bad_lvs, lvs_outcome = invoke(project, "pv.run", {**pv, "netlist": str(broken_v)}, tmp_path / "pv_lvs")
+    lm = lvs_outcome.data["result"]["metrics"]
+    assert not bad_lvs.succeeded and bad_lvs.id in project.state.tool_runs
+    assert lm["lvs_mismatches"] > 0 and lm["drc_violations"] == 0, bad_lvs.summary
+    assert "LVS mismatch" in bad_lvs.summary
