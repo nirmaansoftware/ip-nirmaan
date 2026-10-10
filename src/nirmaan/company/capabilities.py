@@ -62,7 +62,7 @@ CAPABILITIES: list[Capability] = [
     _cap("arch.power", "Power architecture", E, "Power domains, states, and intent.", EX, ("power_architecture",)),
     _cap("arch.performance", "Performance architecture", A, "Bandwidth, latency, and throughput modeling.", EX, ("performance_model",)),
     _cap("arch.software", "Software architecture", E, "Hardware/software interface and programming model.", EX, ("software_architecture",)),
-    _cap("arch.interface", "Interface specification", E, "Specify a protocol interface: signals, channels, ordering, parameters.", PR, ("interface_spec",),
+    _cap("arch.interface", "Interface specification", E, "Specify a protocol interface: signals, channels, ordering, parameters.", PR, ("interface_spec", "register_map"),
          approved_inputs=True),
     _cap("arch.microarchitecture", "Microarchitecture", E, "Pipelines, buffers, arbitration, and datapaths at cycle level.", EX, ("microarchitecture_spec",),
          approved_inputs=True),

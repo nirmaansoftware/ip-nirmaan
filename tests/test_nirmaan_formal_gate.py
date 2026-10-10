@@ -341,7 +341,7 @@ def test_a_new_before_review_check_needs_no_core_changes(fixed_clock, tmp_path):
     flow = BLOCK_DESIGN.model_copy(update={
         "id": "headered-block", "intents": ("headered_block",),
         "stages": tuple(stage if s.id == stage.id else s for s in BLOCK_DESIGN.stages
-                        if s.id in ("requirements", "interface-spec", "microarchitecture", stage.id))})
+                        if s.id in ("requirements", "interface-spec", "register-map", "microarchitecture", stage.id))})
 
     @register_extension("test-header-check")
     def headers(b):

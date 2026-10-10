@@ -1,5 +1,8 @@
 # The register map as data (M30)
 
+M41 adopted the map in `block-design`, added bit fields, and gave the host
+co-simulation an APB manager: see `docs/REGISTER_MAP_ADOPTION.md`.
+
 The fourth structural-review milestone (`docs/architecture/target-state.md`
 section 5). The review's compiler principle,
 applied where it pays first: design intent that is only prose cannot be checked
@@ -58,7 +61,8 @@ Two tools, through the broker, with contracts:
   registers ignore writes; checks byte strobes on the first read/write
   register; and checks that unmapped and misaligned addresses answer with the
   declared response and change nothing. A map for a bus with no harness (APB
-  today) is a recorded failed run that says so; nothing is simulated.
+  at the time; M41 added an APB manager) is a recorded failed run that says so;
+  nothing is simulated.
 
 ## Where it is used in M30
 

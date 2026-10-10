@@ -217,7 +217,11 @@ SKILLS: list[Skill] = [
        fails=("Unprogrammable hardware features.",), valid=("Programming model covers every feature.",)),
     sk("interface_specification", "Interface specification", "architecture", "interface",
        provides=("arch.interface", "arch.review"), includes=("digital_design",),
-       procedures=("Specify signals, channels, parameters, ordering, and error responses.",),
+       procedures=("Specify signals, channels, parameters, ordering, and error responses.",
+                   "Write a register map as data (register_map.json, the nirmaan.models.RegisterMap format): block, "
+                   "bus (axi4-lite or apb), addr_width, data_width 32, unmapped response, and each register's name, "
+                   "offset, access (rw, ro, wo, w1c), reset, and optional fields (name, lsb, msb, access, reset), "
+                   "exactly as the interface spec states them."),
        tools=("regmap.check",),
        fails=("Unspecified error behaviour.", "Ambiguous ordering."),
        valid=("Every channel's ordering and error behaviour is specified.",)),
@@ -509,6 +513,9 @@ SKILLS: list[Skill] = [
        includes=("c_programming",), tools=("fw.build", "fw.test", "fw.cross_build", "fw.soc_test"),
        procedures=("Implement drivers from the programming model.",
                    "Write the register map header from the approved interface specification, never from the RTL.",
+                   "When an approved register map exists, include <block>_map.h and do not write it: the firmware "
+                   "tools generate it from the map (offsets, resets, field _SHIFT, _MASK, _RESET, _GET and _SET), "
+                   "and a header you write instead must agree with it.",
                    "Reach the hardware only through nirmaan_hal.h: hal->read32(ctx, offset, &value) and "
                    "hal->write32(ctx, offset, value, strobe) return the bus response (NIRMAAN_BUS_OKAY, "
                    "NIRMAAN_BUS_SLVERR, ...); return every error to the caller.",

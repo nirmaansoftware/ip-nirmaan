@@ -48,6 +48,11 @@ class FileInput(BaseModel):
         default=False,
         description="Fill from the approved upstream artifacts of these kinds (M25), not the task's own files.",
     )
+    optional: bool = Field(
+        default=False,
+        description="An upstream binding left out when no approved upstream file of these kinds exists (M41). "
+                    "When one exists, a passing run must still have used it.",
+    )
 
 
 class EvidenceRequirement(BaseModel):

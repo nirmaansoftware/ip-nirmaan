@@ -47,6 +47,8 @@ def _tool(id: str, name: str, category: str, risk: ToolRisk, status: ToolStatus,
 SOURCES = _p("sources", PATHS, "HDL source files.", required=True)
 TOP = _p("top", TEXT, "The top module.")
 TOP_REQUIRED = _p("top", TEXT, "The top module.", required=True)
+#: M41: the approved register map; the firmware tools generate <block>_map.h from it and check the driver's.
+FW_MAP = _p("map", PATH, "A register map (JSON): its header is generated, and the driver's must agree with it.")
 #: What the EDA runner itself reads, for every tool it runs (integrations/eda.py).
 RUNNER = (
     _p("backend", TEXT, "Which backend to use, when the tool has several."),
@@ -126,7 +128,8 @@ TOOLS: list[ToolSpec] = [
           "Validate a register map: alignment, overlaps, names, reset widths (M30).",
           (_p("map", PATH, "The register map (JSON).", required=True),)),
     _tool("regmap.verify", "Register map against RTL", "eda", EXE, AV,
-          "Run a test generated from the register map on the RTL, over the AXI4-Lite co-simulation harness (M30).",
+          "Run a test generated from the register map on the RTL, over the co-simulation harness for the map's "
+          "bus (M30; APB from M41).",
           (_p("map", PATH, "The register map (JSON).", required=True),
            _p("rtl", PATHS, "The RTL to check.", required=True), TOP, *RUNNER)),
     _tool("vplan.check", "Verification plan check", "verification", RD, AV,
@@ -232,18 +235,21 @@ TOOLS: list[ToolSpec] = [
     # Software and infrastructure.
     _tool("compiler.run", "Compiler toolchain", "software", EXE, CO, "Build firmware and software."),
     _tool("fw.build", "Firmware build", "software", EXE, AV, "Compile C firmware under strict warning flags.",
-          (_p("sources", PATHS, "C sources and headers.", required=True), *RUNNER)),
+          (_p("sources", PATHS, "C sources and headers.", required=True), FW_MAP, *RUNNER)),
     _tool("fw.test", "Firmware co-simulation", "software", EXE, AV,
           "Run a driver's tests against a Verilator model of the RTL, over real bus transactions.",
           (_p("sources", PATHS, "The driver and its tests.", required=True),
-           _p("rtl", PATHS, "The RTL to build the model from.", required=True), TOP, *REQUIRE, *RUNNER)),
+           _p("rtl", PATHS, "The RTL to build the model from.", required=True), TOP, *REQUIRE, FW_MAP,
+           _p("bus", TEXT, "The bus manager the harness drives (axi4-lite, apb); default: the map's, else "
+                           "axi4-lite (M41)."), *RUNNER)),
     _tool("fw.cross_build", "Firmware cross build", "software", EXE, AV,
           "Cross-compile a driver and its tests for bare-metal RV32I into a linked ELF, with its code size.",
-          (_p("sources", PATHS, "C sources and headers.", required=True), CORE, *RUNNER)),
+          (_p("sources", PATHS, "C sources and headers.", required=True), CORE, FW_MAP, *RUNNER)),
     _tool("fw.soc_test", "Firmware on a RISC-V core", "software", EXE, AV,
           "Run a driver's tests on a RISC-V core (PicoRV32 or SERV) whose loads and stores reach the RTL over its bus.",
           (_p("sources", PATHS, "The driver and its tests.", required=True),
-           _p("rtl", PATHS, "The RTL the core's bus reaches.", required=True), TOP, CORE, *REQUIRE, *RUNNER)),
+           _p("rtl", PATHS, "The RTL the core's bus reaches.", required=True), TOP, CORE, *REQUIRE, FW_MAP,
+           *RUNNER)),
     _tool("debugger.attach", "Debugger", "software", EXE, CO, "Attach to targets and models."),
     _tool("ci.configure", "CI configuration", "infrastructure", WR, CO, "Change CI pipelines."),
     _tool("farm.submit", "Compute farm", "infrastructure", EXE, CO, "Submit jobs to the compute farm."),

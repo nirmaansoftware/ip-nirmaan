@@ -97,7 +97,7 @@ def test_a_riscv_request_adds_the_soc_checks_and_others_do_not(block, nirmaan_or
     assert set(gated) == {"fw.build", "fw.test", "fw.cross_build", "fw.soc_test"}
     rtl = next(b for b in gated["fw.soc_test"].files if b.upstream)
     assert (rtl.param, rtl.kinds) == ("rtl", ("rtl_source",))
-    assert {b.kinds for b in gated["fw.cross_build"].files} == {("driver", "driver_test")}
+    assert {b.kinds for b in gated["fw.cross_build"].files if not b.optional} == {("driver", "driver_test")}
     # Without RISC-V in the request the seat's gate is exactly M25's.
     plain = Orchestrator(nirmaan_org, clock=fixed_clock).plan("Create an AXI4-Lite register block and its driver.")
     task = plain.task(tid(plain, "firmware"))
