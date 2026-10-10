@@ -43,7 +43,7 @@ The terminal and the ladder have a Replay button.
 - Constitution cards match `CONSTITUTION`, same IDs in the same order.
 - No em or en dashes, no hype words, no claims the project cannot back.
 
-The test count (1424 at v1.22.0, the standard run that deselects the SDK test) is not checked automatically. It is updated by hand at each version release, so between releases it can trail the suite (1430 after #57).
+The test count (1603 at v1.23.0, the standard run that deselects the SDK test) is not checked automatically. It is updated by hand at each version release, so between releases it can trail the suite (1430 after #57).
 
 ## Launch list
 

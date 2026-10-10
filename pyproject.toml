@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "ip-nirmaan"
-version = "1.22.0"
+version = "1.23.0"
 description = "IP Nirmaan: an organizational operating system for semiconductor engineering, with VeriTriage verification intelligence."
 readme = "README.md"
 requires-python = ">=3.11"
