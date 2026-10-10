@@ -36,8 +36,8 @@ from nirmaan.integrations.eda_parsers import (
     parse_verilator_lint,
     parse_yosys,
 )
-from nirmaan.models import list_values
-from nirmaan.runtime.tools import ToolOutcome, register_binding, unregister_binding
+from nirmaan.models import list_values, text_value
+from nirmaan.runtime.tools import Params, ToolOutcome, register_binding, unregister_binding
 from nirmaan.work.engine import TaskEngine
 
 if TYPE_CHECKING:
@@ -55,7 +55,7 @@ class Job:
     """One invocation: the parameters, resolved, and a working directory."""
 
     tool: str
-    params: dict[str, str]
+    params: Params
     workdir: Path
     sources: tuple[str, ...]
     top: str | None
@@ -90,7 +90,7 @@ class Backend:
     #: Parameters naming files (comma separated) that must exist before any step runs.
     files: tuple[str, ...] = ()
     #: Asked with the executables: why this machine's environment (a PDK) cannot serve the job, or None.
-    environment: Callable[[dict[str, str]], str | None] | None = None
+    environment: Callable[[Params], str | None] | None = None
     #: Asked before any step: why these inputs cannot be run as given (a recorded failed run), or None.
     check: Callable[[Job], str | None] | None = None
 
@@ -130,7 +130,7 @@ def _missing(backend: Backend) -> list[str]:
     return [exe for exe in backend.executables if shutil.which(exe) is None]
 
 
-def select_backend(tool: str, params: dict[str, str]) -> tuple[Backend | None, str]:
+def select_backend(tool: str, params: Params) -> tuple[Backend | None, str]:
     """The backend that will run, or None and the reason none can run here."""
     wanted = params.get("backend")
     candidates = [b for b in _BACKENDS.get(tool, []) if not wanted or b.name == wanted]
@@ -149,16 +149,16 @@ def select_backend(tool: str, params: dict[str, str]) -> tuple[Backend | None, s
     return None, f"{tool} cannot run here: {'; '.join(reasons)} (refused, never simulated)"
 
 
-def _probe(tool: str) -> Callable[[dict[str, str]], str | None]:
-    def probe(params: dict[str, str]) -> str | None:
+def _probe(tool: str) -> Callable[[Params], str | None]:
+    def probe(params: Params) -> str | None:
         backend, why = select_backend(tool, params)
         return None if backend else why
 
     return probe
 
 
-def _binding(tool: str) -> Callable[[dict[str, str], TaskEngine], ToolOutcome]:
-    def run(params: dict[str, str], engine: TaskEngine) -> ToolOutcome:
+def _binding(tool: str) -> Callable[[Params, TaskEngine], ToolOutcome]:
+    def run(params: Params, engine: TaskEngine) -> ToolOutcome:
         backend, why = select_backend(tool, params)
         if backend is None:  # the executable vanished after the probe
             return ToolOutcome(False, why)
@@ -167,9 +167,9 @@ def _binding(tool: str) -> Callable[[dict[str, str], TaskEngine], ToolOutcome]:
     return run
 
 
-def execute(backend: Backend, params: dict[str, str]) -> ToolOutcome:
+def execute(backend: Backend, params: Params) -> ToolOutcome:
     """Run the backend's steps for real, parse what they printed, and write both to disk."""
-    missing = [p for p in backend.required if not params.get(p, "").strip()]
+    missing = [p for p in backend.required if not text_value(params.get(p)).strip()]
     if missing:
         return ToolOutcome(False, f"{backend.name}: missing parameter {', '.join(missing)}")
     sources = tuple(str(Path(s).resolve()) for s in list_values(params.get("sources", "")))
@@ -234,7 +234,7 @@ def execute(backend: Backend, params: dict[str, str]) -> ToolOutcome:
                        references=(str(log_path), str(result_path)), data=record)
 
 
-def _within_limits(result: EdaResult, params: dict[str, str]) -> EdaResult:
+def _within_limits(result: EdaResult, params: Params) -> EdaResult:
     """Fail a passing result that breaks a ``max_<metric>`` limit, or whose metric was never measured."""
     over = []
     for key, limit in params.items():
@@ -243,13 +243,13 @@ def _within_limits(result: EdaResult, params: dict[str, str]) -> EdaResult:
         metric, measured = key[4:], result.metrics.get(key[4:])
         try:
             bound = float(limit)
-        except ValueError:
+        except (TypeError, ValueError):
             over.append(f"{key} {limit!r} is not a number")
             continue
         if isinstance(measured, bool) or not isinstance(measured, (int, float)):
             over.append(f"{metric} was not reported, so {key} cannot be checked")
         elif measured > bound:
-            over.append(f"{metric} {measured} exceeds {key} {limit}")
+            over.append(f"{metric} {measured} exceeds {key} {text_value(limit)}")
     if not over:
         return result
     diags = (*result.diagnostics, *(Diagnostic("error", m, "LIMIT") for m in over))

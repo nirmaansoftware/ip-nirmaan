@@ -714,11 +714,16 @@ def task_complete(project: str, task: str, role: str = AS_OPTION, agent: bool = 
 
 @task_app.command("tool")
 def task_tool(project: str, task: str, tool: str, role: str = AS_OPTION, agent: bool = AGENT_OPTION,
-              param: List[str] = typer.Option([], "--param", help="key=value"), root: Path = ROOT_OPTION):
-    """Invoke a tool through the broker and attach the run as evidence."""
+              param: List[str] = typer.Option([], "--param", help="key=value; repeat a key for a list"),
+              root: Path = ROOT_OPTION):
+    """Invoke a tool through the broker and attach the run as evidence. Values are typed by its contract."""
     from nirmaan.runtime import ToolBroker
 
-    params = dict(p.split("=", 1) for p in param)
+    given: dict[str, list[str]] = {}
+    for p in param:
+        key, _, value = p.partition("=")
+        given.setdefault(key, []).append(value)
+    params = {k: v[0] if len(v) == 1 else v for k, v in given.items()}
 
     def act(e: TaskEngine):
         actor = _actor(role, agent)

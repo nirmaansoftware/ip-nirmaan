@@ -7,7 +7,9 @@ a record of responsibility and authority, not a prompt.
 
 from __future__ import annotations
 
+import re
 from enum import Enum
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -238,10 +240,17 @@ class ParamKind(str, Enum):
     TEXT = "text"
     #: One file path.
     PATH = "path"
-    #: Several file paths. Stored comma-joined, so no element may contain a comma.
+    #: Several file paths, a tuple (M39). Its text form joins them with commas, so no element may contain one.
     PATHS = "paths"
     INTEGER = "integer"
     NUMBER = "number"
+
+
+#: A parameter value as a binding receives it and a ToolRun stores it (M39): text for text and path, a tuple
+#: for paths, an int for integer, a float for number. A run saved before M39 stores text, also a ParamValue.
+ParamValue = str | int | float | tuple[str, ...]
+
+_INTEGER = re.compile(r"^-?\d+$")
 
 
 class ParamSpec(BaseModel):
@@ -265,10 +274,81 @@ class ParamSpec(BaseModel):
     def covers(self, param: str) -> bool:
         return param.startswith(self.name) if self.prefix else param == self.name
 
+    def parse(self, raw: Any, param: str | None = None) -> ParamValue | None:
+        """``raw`` as this kind's type (M39), or ValueError saying why; None for an empty integer or number.
 
-def list_values(value: str) -> list[str]:
-    """The elements of a stored list parameter (comma-joined), without blanks."""
-    return [part.strip() for part in value.split(",") if part.strip()]
+        ``raw`` is a value's text form (the CLI, a task input, a workflow's fixed parameters), a number, or a
+        list. A list is several values only for ``paths``; for another kind a one-element list is its element.
+        """
+        name = param or self.name
+        if isinstance(raw, (list, tuple)):
+            items = [str(v) for v in raw]
+            commas = [v for v in items if "," in v]
+            if commas:
+                raise ValueError(f"{name}: {', '.join(repr(v) for v in commas)} contains a comma, "
+                                 "so it cannot be told apart from two paths")
+            if self.kind is ParamKind.PATHS:
+                return tuple(list_values(tuple(items)))
+            if len(items) > 1:
+                raise ValueError(f"{name} takes one {'path' if self.kind is ParamKind.PATH else 'value'}, not a list")
+            raw = items[0] if items else ""
+        if self.kind is ParamKind.PATHS:
+            return tuple(list_values(raw))
+        if self.kind in (ParamKind.TEXT, ParamKind.PATH):
+            return str(raw)
+        if isinstance(raw, str) and not raw.strip():
+            return None
+        if self.kind is ParamKind.INTEGER:
+            if isinstance(raw, int) and not isinstance(raw, bool):
+                return raw
+            if isinstance(raw, str) and _INTEGER.match(raw.strip()):
+                return int(raw.strip())
+            raise ValueError(f"{name} must be a whole number, not {raw!r}")
+        try:
+            if isinstance(raw, bool) or not isinstance(raw, (int, float, str)):
+                raise ValueError(raw)
+            return float(raw)
+        except ValueError:
+            raise ValueError(f"{name} must be a number, not {raw!r}") from None
+
+
+def list_values(value: Any) -> list[str]:
+    """A parameter's elements, without blanks: a tuple's, or a saved text value's (comma-joined)."""
+    if value is None:
+        return []
+    parts = value if isinstance(value, (list, tuple)) else text_value(value).split(",")
+    return [str(part).strip() for part in parts if str(part).strip()]
+
+
+def text_value(value: Any) -> str:
+    """A parameter value's text form (M39): a tuple joined with commas, ``40`` for 40.0; "" for None.
+
+    For a value of the kind's type, :meth:`ParamSpec.parse` of this text gives the value back.
+    """
+    if value is None:
+        return ""
+    if isinstance(value, (list, tuple)):
+        return ",".join(str(v) for v in value)
+    if isinstance(value, float):
+        return str(int(value)) if value.is_integer() else repr(value)
+    return str(value)
+
+
+def param_matches(stored: Any, wanted: str) -> bool:
+    """Whether a run's stored value is the value a requirement's fixed text names (M39).
+
+    Compared by value: ``"60"`` matches 60, ``"a.v,b.v"`` matches ``("a.v", "b.v")``, text matches as text.
+    """
+    if stored is None:
+        return False
+    if isinstance(stored, (list, tuple)):
+        return list_values(stored) == list_values(wanted)
+    if isinstance(stored, (int, float)) and not isinstance(stored, bool):
+        try:
+            return float(wanted) == stored
+        except ValueError:
+            return False
+    return stored == wanted
 
 
 class ToolSpec(BaseModel):
