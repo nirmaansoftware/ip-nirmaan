@@ -152,8 +152,10 @@ NEW_FILES = ["context.md", "CLAUDE.md", "docs/ROADMAP.md", "docs/STATUS_DOCS.md"
              "scripts/status.py", "site/stats.json"]
 
 
-@pytest.mark.parametrize(
-    "path", NEW_FILES + sorted(str(p.relative_to(ROOT)) for p in HISTORY.glob("*.md")))
-def test_no_dashes_in_status_documents(path: str) -> None:
-    text = (ROOT / path).read_text(encoding="utf-8")
-    assert "—" not in text and "–" not in text, path
+DASHES = {chr(0x2014), chr(0x2013)}  # em dash, en dash
+
+
+def test_no_dashes_in_status_documents() -> None:
+    paths = [ROOT / p for p in NEW_FILES] + sorted(HISTORY.glob("*.md"))
+    dashed = [str(p.relative_to(ROOT)) for p in paths if DASHES & set(p.read_text(encoding="utf-8"))]
+    assert dashed == []

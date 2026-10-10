@@ -1,7 +1,8 @@
 """The landing page (site/) may not claim more than the code can back.
 
-* Every stat tile matches what the organization and the Knowledge Pack
-  registry actually report.
+* Every stat tile shows what site/stats.json says. That file is the release
+  snapshot scripts/status.py generates from the code (M43), so adding a
+  workflow or a skill breaks no test here; the page catches up at release.
 * The constitution cards are the constitution: same IDs, same order.
 * The copy follows the brief's rules: no dashes, no hype words, no claims the
   project cannot substantiate.
@@ -12,34 +13,25 @@
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
 import pytest
 
-from nirmaan.company import CONSTITUTION, build_organization
-from veritriage.knowledge.registry import available_packs
+from nirmaan.company import CONSTITUTION
 
 SITE = Path(__file__).resolve().parent.parent / "site"
 HTML = (SITE / "index.html").read_text(encoding="utf-8")
 
 
-def _stat(label: str) -> int:
-    match = re.search(
-        r'data-count="(\d+)">\d+</span><span class="stat__label">' + re.escape(label), HTML
-    )
-    assert match, f"no stat tile labelled {label!r}"
-    return int(match.group(1))
-
-
-def test_stat_tiles_match_the_organization() -> None:
-    stats = build_organization().stats()
-    assert _stat("organizational units") == stats["units"]
-    assert _stat("roles, from intern to CEO") == stats["roles"]
-    assert _stat("engineering skills") == stats["skills"]
-    assert _stat("engineering workflows") == stats["workflows"]
-    assert _stat("constitution principles") == stats["principles"]
-    assert _stat("verification knowledge packs") == len(available_packs())
+def test_stat_tiles_match_stats_json() -> None:
+    stats = json.loads((SITE / "stats.json").read_text(encoding="utf-8"))
+    tiles = re.findall(r'data-stat="(\w+)" data-count="(\d+)">(\d+)<', HTML)
+    assert [key for key, _, _ in tiles] == [
+        "units", "roles", "skills", "workflows", "principles", "knowledge_packs", "tests"]
+    for key, count, shown in tiles:
+        assert int(count) == int(shown) == stats[key], key
 
 
 def test_stat_tiles_show_their_final_value_without_javascript() -> None:

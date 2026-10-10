@@ -1,0 +1,12 @@
+{
+  "version": "1.23.0",
+  "units": 207,
+  "roles": 685,
+  "skills": 140,
+  "workflows": 9,
+  "principles": 12,
+  "tools_available": 35,
+  "tools_contract_only": 17,
+  "knowledge_packs": 42,
+  "tests": 1611
+}
