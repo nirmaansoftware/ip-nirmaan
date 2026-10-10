@@ -1,6 +1,6 @@
 # IP Nirmaan roadmap
 
-The plan for what comes after v1.22.0. Read this together with `context.md`
+The plan for what comes after v1.23.0. Read this together with `context.md`
 (what exists and why) and `CLAUDE.md` (how to work here). Each stage ships the
 way every milestone has:
 - a design doc approved before code,
@@ -8,7 +8,7 @@ way every milestone has:
 - a `context.md` entry,
 - a PR merged into `main`.
 
-## Where we are (v1.22.0, 2026-10-09)
+## Where we are (v1.23.0, 2026-10-11)
 
 | Built | Not yet |
 |---|---|
@@ -39,30 +39,27 @@ way every milestone has:
 | First live evaluation: Claude Opus 5.5 passed all four RTL cases, judged by held-out checks, through a `claude-code` runtime on the owner's plan; it found that the RTL seat lacked the interface spec (fixed) (#57) | Formal proofs written by the seat; more cases |
 | IP Nirmaan over MCP; organizational events on the M18 bus (M22) | |
 | CI on Python 3.11 and 3.12, plus a dash check (Stage 0) | |
-| 1430 tests; CLI `nirmaan`; HTML dashboard; landing page live at https://ip.nirmaan.online | |
+| 1603 tests; CLI `nirmaan`; HTML dashboard; landing page live at https://ip.nirmaan.online | |
 
-## Resume checklist (after the folder rename)
+## Resume checklist
 
-The owner is renaming the working folder from `~/Documents/veritriage` to a new
-name inside `~/Documents` and restarting the session. The editable install
-records absolute paths, so rebuild the venv first:
-
-```
-cd ~/Documents/<new-folder-name>
-rm -rf .venv && python3.11 -m venv .venv && .venv/bin/pip install -e ".[ai,dev]"
-git remote -v                       # expect https://github.com/nirmaansoftware/ip-nirmaan.git
-PYTHONPYCACHEPREFIX=/tmp/nirmaan-pycache .venv/bin/python -m pytest -q \
-  --deselect tests/test_ai_boundary.py::test_missing_sdk_raises_clean_error
-```
-
-Expect 1430 passing (3 skipped: OpenROAD is not installed locally; the CI `physical-design` job runs those three). The folder is still in iCloud, so the eviction hangs
-described in `context.md` section 4 still apply. If imports stall, pre-read the tree:
+The owner's checkout in `~/Documents` is synced by iCloud, where git can fail
+with `mmap failed` and imports can stall on evicted files. Work in a clone
+outside iCloud (any local path):
 
 ```
-find src tests -flags +dataless -type f -print0 | xargs -0 cat > /dev/null
+git clone https://github.com/nirmaansoftware/ip-nirmaan.git && cd ip-nirmaan
+python3.11 -m venv .venv && .venv/bin/pip install -e ".[ai,dev]"
+NIRMAAN_REQUIRE_EDA="verilator iverilog vvp yosys cc make sby yices-smt2 riscv64-elf-gcc" \
+  .venv/bin/python -m pytest -q --deselect tests/test_ai_boundary.py::test_missing_sdk_raises_clean_error
 ```
 
-Then continue with **Stage 0** below.
+The EDA tools come from Homebrew (`verilator`, `icarus-verilog`, `yosys`,
+`sby`, `yices2`, `riscv64-elf-gcc`). Expect 1603 passed and 7 skipped: the real
+OpenROAD, OpenSTA, and KLayout tests, which run only in CI's `physical-design`
+job (macOS arm64 is not supported for them, M34).
+
+Then pick up the "Not yet" column above.
 
 ---
 
@@ -110,8 +107,8 @@ there, so agent output can be checked rather than trusted.
 
 ## Stage 2 (M21): Real design tools, through open-source EDA
 
-**Status: done**, except the optional `sta.run` (OpenSTA), which stays
-`CONTRACT_ONLY`. Design doc: `docs/EDA_TOOLS.md`. The "in CI" half of Done-when
+**Status: done.** `sta.run` (OpenSTA), optional here, later became
+`AVAILABLE` and runs for real in CI's `physical-design` job (M27, #38). Design doc: `docs/EDA_TOOLS.md`. The "in CI" half of Done-when
 depends on the Stage 0 workflow installing `verilator iverilog yosys` (apt)
 and setting `NIRMAAN_REQUIRE_EDA`; locally all five bindings, formal included,
 were exercised against the real tools.

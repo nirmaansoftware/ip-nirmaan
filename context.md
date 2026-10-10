@@ -12,7 +12,7 @@ Repo: https://github.com/nirmaansoftware/ip-nirmaan (public, Apache-2.0; renamed
 to the `nirmaansoftware` account on 2026-09-28; GitHub redirects the old URLs,
 and `patel-om` keeps push access as a collaborator)
 Local path: `/Users/ompatel/Documents/veritriage`
-Current version: **1.22.0** (distribution `ip-nirmaan`; packages `nirmaan` and `veritriage`)
+Current version: **1.23.0** (distribution `ip-nirmaan`; packages `nirmaan` and `veritriage`)
 Portfolio: removed from `/Users/ompatel/Documents/Om Portfolio` at the user's
 request after M19 (card and sample pages deleted).
 
@@ -1112,9 +1112,10 @@ Not deployed yet: hosting and the `ip` CNAME are the owner's call. See
 ### Continuous integration (side work, Stage 0) - `.github/workflows/ci.yml`
 
 GitHub Actions runs the full suite on Python 3.11 and 3.12 for every PR and
-every push to `main`, installing with `pip install -e ".[ai,dev]"`. CI runs
-`test_missing_sdk_raises_clean_error` too; it is deselected only locally, where
-iCloud eviction stalls the `anthropic` import. A second job runs
+every push to `main`, installing with `pip install -e ".[ai,dev]"`. Because the
+`ai` extra installs `anthropic`, `test_missing_sdk_raises_clean_error` skips in
+CI (it covers the missing-SDK path); locally it is deselected, where iCloud
+eviction stalls the `anthropic` import. A second job runs
 `scripts/check_dashes.py`, which fails on U+2014 or U+2013 in any tracked text
 file except the vendored nirmaan.online files (`site/nirmaan.css`,
 `site/site.js`, `site/hero.js`). The README carries the CI badge.
@@ -2611,6 +2612,21 @@ jobs. Tests: `tests/test_nirmaan_physical.py`; crown jewel
 crown jewel now meets the M29 limits.
 
 
+
+### v1.23.0 (2026-10-11) - the M34 to M42 batch
+
+One version bump for nine milestones built in parallel and merged as #62 (M34
+PD final), #58 (M35 host interrupts and traps), #61 (M36 loop concurrency and
+budget), #59 (M37 STA on reanalysis, named antecedents), #60 (M38 plan
+amendments), #66 (M39 typed values), #64 (M40 decisions from CLI and MCP), #67
+(M41 register map adoption), and #63 (M42 proposals from evaluation results).
+The standard local run is 1603 passed, 7 skipped (the real OpenROAD, OpenSTA,
+and KLayout tests, which run in CI's `physical-design` job). Merging M39 after
+M37 and M41 needed their dict-style packet reads rewritten for the typed packet,
+and every parameter read through `text_value`; see the merge commits on #66 and
+#67. A principal-engineer review of the whole effort since v1.16.1 was written
+at this point; its recommendations are the input to the next milestone.
+
 ---
 
 ### Milestone 30 - The register map as data
@@ -3418,7 +3434,7 @@ once one is set). It ran after the release on the owner's plan through the claud
   renamed to **VeriTriage** at M2/M3 boundary (GitHub redirect preserved
   from the rename). After M19 the user renamed the PROJECT, first to "Nirmaan IP"
   (repo `nirmaan-ip`, v1.16.0) and then, to match the `ipnirmaan.com` domain, to
-  **IP Nirmaan** (repo `patel-om/ip-nirmaan`, distribution `ip-nirmaan`, v1.22.0).
+  **IP Nirmaan** (repo `patel-om/ip-nirmaan`, distribution `ip-nirmaan`, v1.23.0).
   On 2026-09-28 the repo was transferred to `nirmaansoftware/ip-nirmaan`.
   The `nirmaan` package and CLI keep their short name by the user's choice. VeriTriage
   was deliberately NOT renamed: it is the verification engine inside Nirmaan
