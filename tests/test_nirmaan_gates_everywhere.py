@@ -93,7 +93,8 @@ def test_every_rtl_workflow_carries_the_block_design_gates():
     from nirmaan.company.workflows import BLOCK_DESIGN, RTL_GATES, WORKFLOWS
 
     block = BLOCK_DESIGN.stage("rtl-implementation")
-    assert block.evidence[1:] == RTL_GATES  # one set of checks, the same everywhere
+    # One set of checks, the same everywhere; block-design adds the register map's when one is approved (M41).
+    assert block.evidence[1:-1] == RTL_GATES and block.evidence[-1].tools == ("regmap.verify",)
     flows = {wf.id: wf for wf in WORKFLOWS}
     for workflow, stage, _ in FLOWS.values():
         rtl = flows[workflow].stage(stage.split(".")[0])

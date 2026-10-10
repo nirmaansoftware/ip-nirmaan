@@ -98,7 +98,7 @@ def test_every_stage_that_produces_rtl_is_gated():
     from nirmaan.company.workflows import RTL_GATES, WORKFLOWS
 
     ungated = [(wf.id, st.id) for wf in WORKFLOWS for st in wf.stages
-               if "rtl_source" in st.outputs and st.evidence[1:] != RTL_GATES]
+               if "rtl_source" in st.outputs and st.evidence[1:1 + len(RTL_GATES)] != RTL_GATES]  # M41: extras after
     assert ungated == []
 
 
