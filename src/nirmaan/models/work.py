@@ -345,6 +345,9 @@ class Decision(BaseModel):
     made_by: str
     task: str | None = None
     evidence: tuple[str, ...] = ()
+    subject: str = ""  # M40: the question decided; empty when the task's title is the question
+    options: tuple[str, ...] = ()  # M40: the alternatives considered
+    supersedes: str | None = None  # M40: the earlier decision this one replaces; that one is kept
 
 
 class MemoryScope(str, Enum):

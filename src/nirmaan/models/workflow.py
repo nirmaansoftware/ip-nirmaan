@@ -81,10 +81,16 @@ class EvidenceRequirement(BaseModel):
         default_factory=lambda: Condition(),
         description="Planned only when the request's features meet this condition (M27). Default: always.",
     )
+    when_upstream: tuple[str, ...] = Field(
+        default=(),
+        description="Applies only when the task builds on an upstream artifact of one of these kinds, as on one "
+                    "branch of a decision (M37). Empty: always.",
+    )
 
-    def applies(self, kinds) -> bool:
-        """Whether the requirement binds work that produced artifacts of these ``kinds``."""
-        return not self.when_produced or any(k in self.when_produced for k in kinds)
+    def applies(self, kinds, upstream=()) -> bool:
+        """Whether the requirement binds work that produced artifacts of these ``kinds``, built on ``upstream`` kinds."""
+        return ((not self.when_produced or any(k in self.when_produced for k in kinds))
+                and (not self.when_upstream or any(k in self.when_upstream for k in upstream)))
 
 
 class ReviewRequirement(BaseModel):

@@ -214,7 +214,7 @@ def _insert_steps(job: Job) -> list[list[str]]:
     return [["yosys", "-s", "prep.ys"],
             _helper("stitch", DESIGN_JSON, "stitched.json", CHAIN_REPORT, str(job.top),
                     text_value(job.params.get("chains")) or "1", text_value(job.params.get("max_chain_length")) or "0",
-                    job.params.get("cross_domains", "").strip() or "none"),
+                    text_value(job.params.get("cross_domains")).strip() or "none"),
             ["yosys", "-s", "stitch.ys"]]
 
 
@@ -224,7 +224,7 @@ def _chain_params(job: Job) -> str | None:
         value = text_value(job.params.get(name)).strip()
         if value and not (value.isdigit() and int(value) > 0):
             return f"{name} must be a positive integer, not {value!r}"
-    cross = job.params.get("cross_domains", "").strip()
+    cross = text_value(job.params.get("cross_domains")).strip()
     if cross and cross != "lockup":
         return f"cross_domains must be 'lockup' (chains cross clock domains through lockup latches), not {cross!r}"
     return None
@@ -421,7 +421,7 @@ def atpg_grading_steps(job: Job, patterns: str, fault_model: str = "stuck-at") -
 
 
 def _atpg_steps(job: Job, fault_model: str = "stuck-at") -> list[list[str]]:
-    given = job.params.get("patterns", "").strip()
+    given = text_value(job.params.get("patterns")).strip()
     steps = atpg_analysis_steps(job)
     if given:
         return steps + atpg_grading_steps(job, str(Path(given).resolve()), fault_model)

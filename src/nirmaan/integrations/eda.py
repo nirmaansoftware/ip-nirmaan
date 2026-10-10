@@ -27,7 +27,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable
 
-from nirmaan.integrations.eda_antecedents import DERIVED, derive
+from nirmaan.integrations.eda_antecedents import DERIVED, Definitions, definitions, derive
 from nirmaan.integrations.eda_parsers import (
     Diagnostic,
     EdaResult,
@@ -353,6 +353,11 @@ def _hdl_files(sby: Path) -> list[tuple[str, Path]]:
     return files
 
 
+def _definitions(sby: Path) -> Definitions:
+    """The macros and named properties of every Verilog file the setup reads (M37): one may use another's."""
+    return definitions(path.read_text(encoding="utf-8", errors="replace") for _, path in _hdl_files(sby))
+
+
 def _sby_cover(job: Job) -> list[list[str]]:
     """Run the seat's own setup in cover mode (M27), from a copy written into the run's directory.
 
@@ -365,8 +370,9 @@ def _sby_cover(job: Job) -> list[list[str]]:
     """
     sby = Path(job.params["sby"]).resolve()
     copies, sites = {}, []
+    defs = _definitions(sby)
     for name, path in _hdl_files(sby):
-        derivation = derive(path.read_text(encoding="utf-8", errors="replace"), name)
+        derivation = derive(path.read_text(encoding="utf-8", errors="replace"), name, defs)
         copy = job.workdir / "antecedents" / name
         copy.parent.mkdir(parents=True, exist_ok=True)
         copy.write_text(derivation.text, encoding="utf-8")
@@ -407,8 +413,9 @@ def _sby_cover_check(job: Job) -> str | None:
     unread = _sby_reads(job)
     if unread:
         return unread
+    defs = _definitions(sby.resolve())
     underived = [s for name, path in _hdl_files(sby.resolve())
-                 for s in derive(path.read_text(encoding="utf-8", errors="replace"), name).underived]
+                 for s in derive(path.read_text(encoding="utf-8", errors="replace"), name, defs).underived]
     if underived:
         listed = "; ".join(f"{s.where} ({s.reason})" for s in underived)
         return (f"cannot derive the antecedent of {len(underived)} assertion{'s' if len(underived) > 1 else ''}: "

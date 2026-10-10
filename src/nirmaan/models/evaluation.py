@@ -108,3 +108,17 @@ class EvalResult(BaseModel):
     input_tokens: int = 0
     output_tokens: int = 0
     cost_usd: float | None = None
+
+
+class EvalProposalThresholds(BaseModel):
+    """When recorded evaluation runs propose a change (M42). Company data: ``company/learning.py``."""
+
+    model_config = ConfigDict(frozen=True)
+
+    #: A recurring failure: at least ``min_failures`` failed among the latest ``within_runs`` runs of a case.
+    min_failures: int = Field(default=2, ge=1)
+    within_runs: int = Field(default=5, ge=1)
+    #: A regression: the pass rate over the latest ``window`` runs is at least ``min_drop`` below
+    #: the rate over the ``window`` runs before them.
+    window: int = Field(default=4, ge=1)
+    min_drop: float = Field(default=0.25, gt=0.0, le=1.0)

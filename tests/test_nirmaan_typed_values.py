@@ -224,9 +224,14 @@ def test_a_project_saved_before_typed_values_loads_and_verifies(tmp_path, nirmaa
     assert runs["lint.run"].params["timeout"] == "30"  # stored text is read as stored
     assert runs["lint.run"].values("sources") == ["/nonexistent/m39/a.v", "/nonexistent/m39/b.v"]
     assert len(runs["veritriage.investigate"].values("paths")) == 2
-    # Saving it again writes the same bytes: nothing was migrated in place.
+    # Saving it again migrates nothing in place: the runs' stored values and the audit chain are written back
+    # exactly as they were. Fields added to other records since the fixture was saved (M37's `when_upstream`
+    # on a requirement, say) appear at their defaults, and a second round trip writes the same bytes.
     path = store.save(state)
-    assert path.read_text() == OLD_PROJECT.read_text()
+    saved, old = json.loads(path.read_text()), json.loads(OLD_PROJECT.read_text())
+    assert saved["tool_runs"] == old["tool_runs"]
+    assert saved["audit"] == old["audit"]
+    assert store.save(store.load(project)).read_text() == path.read_text()
 
 
 def test_a_saved_run_reads_typed_by_its_contract(tmp_path, nirmaan_org):

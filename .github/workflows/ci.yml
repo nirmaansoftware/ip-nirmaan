@@ -111,6 +111,24 @@ jobs:
         run: |
           echo /opt/opensta/bin >> "$GITHUB_PATH"
           /opt/opensta/bin/sta -version
+      # M37: a timing-closure project's RTL fix passes its RTL gates (lint and
+      # simulation) before re-analysis times it. The image's Ubuntu 22.04 Icarus
+      # (11) prints no "$finish called" line, so Verilator, Icarus, and vvp come
+      # from the same pinned OSS CAD Suite the test job uses, as wrappers, so the
+      # image's own Yosys stays first. See docs/STA_AND_ANTECEDENTS.md.
+      - name: RTL gate tools (OSS CAD Suite 2026-09-28)
+        shell: bash  # the container's default sh has no ${var//-/}
+        env:
+          OSS_CAD_SUITE: "2026-09-28"
+        run: |
+          curl -sSfL "https://github.com/YosysHQ/oss-cad-suite-build/releases/download/${OSS_CAD_SUITE}/oss-cad-suite-linux-x64-${OSS_CAD_SUITE//-/}.tgz" | tar -xz -C "$RUNNER_TEMP"
+          mkdir -p "$RUNNER_TEMP/gate-bin"
+          for tool in verilator iverilog vvp; do
+            printf '#!/bin/sh\nexec "%s/oss-cad-suite/bin/%s" "$@"\n' "$RUNNER_TEMP" "$tool" > "$RUNNER_TEMP/gate-bin/$tool"
+            chmod +x "$RUNNER_TEMP/gate-bin/$tool"
+          done
+          echo "$RUNNER_TEMP/gate-bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/gate-bin/verilator" --version && "$RUNNER_TEMP/gate-bin/iverilog" -V | head -1
       # M34: the slow and fast sky130hd corners (the image ships typical only), from the
       # open_pdks build of the SkyWater library, pinned by release and sha256, cached by
       # hash, and put beside the platform's typical Liberty. See docs/PD_FINAL.md.
@@ -152,10 +170,11 @@ jobs:
         run: uv pip install -e ".[dev]"
       - name: Test
         # openroad, yosys, (M29) sta, and (M34) klayout are required, so the real STA,
-        # place-and-route, and physical verification tests fail rather than skip.
+        # place-and-route, and physical verification tests fail rather than skip; (M37)
+        # so are the RTL gate tools.
         env:
-          NIRMAAN_REQUIRE_EDA: yosys openroad sta klayout
-        run: python -m pytest -q -rs tests/test_nirmaan_physical.py --basetemp="$RUNNER_TEMP/pd"
+          NIRMAAN_REQUIRE_EDA: yosys openroad sta klayout verilator iverilog vvp
+        run: python -m pytest -q -rs tests/test_nirmaan_physical.py tests/test_nirmaan_sta_antecedents.py --basetemp="$RUNNER_TEMP/pd"
       - name: Keep the tool logs
         if: always()
         uses: actions/upload-artifact@v4

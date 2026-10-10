@@ -194,11 +194,14 @@ def _task(packet: WorkPacket, mode: str, cites: list[Citable], tools: tuple[Tool
         if kinds:
             tools_named += f"; run by the platform over your {', '.join(kinds)} files"
         if upstream:
-            tools_named += f", with the approved {', '.join(upstream)}"
+            tools_named += (f", with the approved {', '.join(upstream)}" if kinds
+                            else f"; run by the platform over the approved {', '.join(upstream)}")
         if req.before_review:
             tools_named += "; must be met before review"
         if req.when_produced:
             tools_named += f"; applies only if you produce a {' or '.join(req.when_produced)} file"
+        if req.when_upstream:
+            tools_named += f"; applies only to work built on a {' or '.join(req.when_upstream)}"
         accepts = ", ".join(k.value for k in req.accepts)
         lines.append(f"Evidence requirement: {req.description} (accepts: {accepts}{tools_named})")
     lines.append(f"Permitted tools: {', '.join(packet.tools) or 'none'}")

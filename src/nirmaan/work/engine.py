@@ -807,20 +807,45 @@ class TaskEngine:
         evidence: tuple[str, ...] = (),
         task_id: str | None = None,
         subject_unit: str | None = None,
+        subject: str = "",
+        options: tuple[str, ...] = (),
+        supersedes: str | None = None,
     ) -> Decision:
         verdict = self._authority.check(actor.role, kind, criticality, subject_unit)
         if not verdict.allowed:
             hint = f"; escalate to {verdict.escalate_to}" if verdict.escalate_to else ""
             raise AuthorityError(f"{verdict.reason}{hint}")
+        if task_id is not None:
+            self.task(task_id)
+        if supersedes is not None:
+            self._check_supersedes(supersedes, kind, criticality)
         warnings = self._check("decision.record", actor, self._state.tasks.get(task_id or ""),
-                               criticality=criticality, evidence=evidence)
+                               criticality=criticality, evidence=evidence, kind=kind)
         dec_id = f"dec-{len(self._state.decisions) + 1:03d}"
         decisions = dict(self._state.decisions)
         decisions[dec_id] = Decision(id=dec_id, kind=kind, criticality=criticality, statement=statement,
-                                     rationale=rationale, made_by=actor.role, task=task_id, evidence=evidence)
+                                     rationale=rationale, made_by=actor.role, task=task_id, evidence=evidence,
+                                     subject=subject, options=options, supersedes=supersedes)
+        details: dict[str, Any] = {"decision": dec_id, "kind": kind.value, "criticality": criticality.value}
+        details |= {"options": list(options)} if options else {}
+        details |= {"supersedes": supersedes} if supersedes else {}
         self._commit(actor, "decision.record", task_id or dec_id, reason=statement, warnings=warnings,
-                     details={"decision": dec_id, "kind": kind.value}, decisions=decisions)
+                     details=details, decisions=decisions)
         return decisions[dec_id]
+
+    def _check_supersedes(self, old_id: str, kind: DecisionKind, criticality: Criticality) -> None:
+        """M40: a decision replaces one of its own kind, at no lower criticality, that nothing replaced yet."""
+        old = self._state.decisions.get(old_id)
+        if old is None:
+            raise WorkError(f"no decision {old_id} to supersede")
+        later = next((d.id for d in self._state.decisions.values() if d.supersedes == old_id), None)
+        if later is not None:
+            raise WorkError(f"{old_id} is already superseded by {later}; supersede {later} instead")
+        if old.kind is not kind:
+            raise WorkError(f"{old_id} is a {old.kind.value} decision; a {kind.value} decision cannot supersede it "
+                            "(the kind must match)")
+        if criticality.rank < old.criticality.rank:
+            raise WorkError(f"{old_id} is {old.criticality.value}; superseding it needs at least that criticality")
 
     def record_model_call(self, task_id: str, actor: Actor, call: dict[str, Any]) -> ModelCall:
         """Record one model call a seat made (M31): who, which model, and the usage it reported."""
