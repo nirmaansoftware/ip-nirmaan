@@ -70,6 +70,7 @@ testable in-process, so Nirmaan carries its own. No MCP SDK dependency is added.
 | `block_task` | action | `TaskEngine.block` |
 | `escalate_task` | action | `TaskEngine.escalate` |
 | `resolve_escalation` | action | `TaskEngine.resolve_escalation` |
+| `record_decision` | action | `TaskEngine.record_decision` (M40; human-only kinds are refused, see `docs/DECISIONS_CLI_MCP.md`) |
 
 Task IDs may be given short (`microarchitecture`) or qualified
 (`<project>:microarchitecture`), as in the CLI.

@@ -6,8 +6,9 @@
  * store that the SoC's bridge turns into a transfer on the real RTL's bus
  * (AXI4-Lite or APB). The response code the HAL returns is the one the RTL
  * gave: the bridge latches BRESP, RRESP, or PSLVERR into the STATUS register,
- * and the HAL reads it right after the access (neither core has a bus-error
- * input to trap on; docs/RISCV_NEXT.md, section 3).
+ * and the HAL reads it right after the access. With a bus-fault handler
+ * attached, on a core that supports it, the same error also traps precisely
+ * (docs/FIRMWARE_IRQ_TRAPS.md, section 4).
  *
  * A strobe is issued as the store a CPU would use for it: a word store for
  * 0xF, a halfword store for 0x3 or 0xC, a byte store for one lane. Any other
@@ -20,7 +21,10 @@
  * overwrite STATUS (docs/RISCV_NEXT.md, section 2).
  *
  * The interrupt API of nirmaan_irq.h is here too: the core's trap entry
- * (irq_<core>.S) calls nirmaan_irq_dispatch, which runs the attached handler.
+ * (irq_<core>.S) calls nirmaan_irq_dispatch, which runs the attached handler,
+ * and nirmaan_bus_fault_dispatch for a bus-error trap. Each prints a line the
+ * gate counts (FWTEST IRQ, FWTEST TRAP). A line of output is printed with the
+ * design's interrupt off, so an interrupt's line never lands inside another.
  */
 #include <stdio.h>
 
@@ -96,6 +100,8 @@ static unsigned soc_write32(void *ctx, uint32_t offset, uint32_t value, uint8_t 
 
 /* --- Interrupts (nirmaan_irq.h) ------------------------------------------------------------ */
 
+static void put(const char *text);
+
 static nirmaan_irq_handler irq_handler;
 static void *irq_ctx;
 static volatile unsigned irq_handled;
@@ -122,15 +128,65 @@ unsigned nirmaan_irq_wait(unsigned seen, uint32_t cycles) {
 
 void nirmaan_irq_dispatch(void) {
     irq_handled = irq_handled + 1u;
+    put("FWTEST IRQ taken\n");
     if (irq_handler != NULL) {
         irq_handler(irq_ctx);
     }
 }
 
+/* --- Bus errors as traps (nirmaan_irq.h) --------------------------------------------------- */
+
+static nirmaan_bus_fault_handler fault_handler;
+static void *fault_ctx;
+static volatile unsigned faults_delivered;
+
+int nirmaan_bus_fault_attach(nirmaan_bus_fault_handler handler, void *ctx) {
+    (void)nirmaan_core_bus_error_set(0u);
+    NIRMAAN_SOC_BERR_CTRL = 0u;
+    NIRMAAN_SOC_BERR_INFO = NIRMAAN_SOC_BERR_PENDING;
+    fault_handler = NULL;
+    fault_ctx = NULL;
+    if ((NIRMAAN_SOC_BERR_CTRL & NIRMAAN_SOC_BERR_WIRED) == 0u || !nirmaan_core_bus_error_set(0u)) {
+        return 0; /* the core has no bus-error line: no precise trap here */
+    }
+    if (handler != NULL) {
+        fault_handler = handler;
+        fault_ctx = ctx;
+        NIRMAAN_SOC_BERR_CTRL = NIRMAAN_SOC_BERR_TRAP;
+        (void)nirmaan_core_bus_error_set(1u);
+    }
+    return 1;
+}
+
+unsigned nirmaan_bus_fault_count(void) {
+    return faults_delivered;
+}
+
+void nirmaan_bus_fault_dispatch(uint32_t pc) {
+    static const char *const names[4] = {"OKAY", "EXOKAY", "SLVERR", "DECERR"};
+    char line[96];
+    uint32_t info = NIRMAAN_SOC_BERR_INFO;
+    nirmaan_bus_fault fault;
+    fault.offset = NIRMAAN_SOC_BERR_ADDR;
+    fault.write = (info & NIRMAAN_SOC_BERR_WRITE) != 0u;
+    fault.response = (info >> 2) & 3u;
+    fault.pc = pc;
+    faults_delivered = faults_delivered + 1u;
+    snprintf(line, sizeof line, "FWTEST TRAP bus-error %s 0x%lx %s at pc 0x%08lx\n", fault.write ? "write" : "read",
+             (unsigned long)fault.offset, names[fault.response], (unsigned long)pc);
+    put(line);
+    if (fault_handler != NULL) {
+        fault_handler(&fault, fault_ctx);
+    }
+    NIRMAAN_SOC_BERR_INFO = NIRMAAN_SOC_BERR_PENDING;
+}
+
 static void put(const char *text) {
+    unsigned on = nirmaan_core_irq_set(0u);
     while (*text != '\0') {
         NIRMAAN_SOC_CONSOLE = (uint32_t)(unsigned char)*text++;
     }
+    (void)nirmaan_core_irq_set(on);
 }
 
 void nirmaan_test_result(const char *name, int ok, const char *detail) {

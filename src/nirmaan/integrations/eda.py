@@ -11,6 +11,7 @@ A failing tool (lint errors, a failing test, a counterexample, a missing
 source, a timeout) is a recorded run with ``succeeded=False``, never an
 exception. A ``max_<metric>`` parameter is a limit on the parsed metric of that
 name: a run over it, or one whose backend did not report the metric, fails.
+A ``min_<metric>`` parameter (M34) is the same limit from below.
 Simulation logs reach VeriTriage through :func:`triage_simulation`, which invokes ``veritriage.investigate`` through the same broker. This module
 never imports VeriTriage.
 """
@@ -26,7 +27,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable
 
-from nirmaan.integrations.eda_antecedents import DERIVED, derive
+from nirmaan.integrations.eda_antecedents import DERIVED, Definitions, definitions, derive
 from nirmaan.integrations.eda_parsers import (
     Diagnostic,
     EdaResult,
@@ -235,10 +236,12 @@ def execute(backend: Backend, params: dict[str, str]) -> ToolOutcome:
 
 
 def _within_limits(result: EdaResult, params: dict[str, str]) -> EdaResult:
-    """Fail a passing result that breaks a ``max_<metric>`` limit, or whose metric was never measured."""
+    """Fail a passing result that breaks a ``max_<metric>`` or (M34) ``min_<metric>`` limit, or whose metric
+    was never measured."""
     over = []
     for key, limit in params.items():
-        if not key.startswith("max_") or not result.passed:
+        bound_kind = key[:4]
+        if bound_kind not in ("max_", "min_") or not result.passed:
             continue
         metric, measured = key[4:], result.metrics.get(key[4:])
         try:
@@ -248,8 +251,10 @@ def _within_limits(result: EdaResult, params: dict[str, str]) -> EdaResult:
             continue
         if isinstance(measured, bool) or not isinstance(measured, (int, float)):
             over.append(f"{metric} was not reported, so {key} cannot be checked")
-        elif measured > bound:
+        elif bound_kind == "max_" and measured > bound:
             over.append(f"{metric} {measured} exceeds {key} {limit}")
+        elif bound_kind == "min_" and measured < bound:
+            over.append(f"{metric} {measured} is below {key} {limit}")
     if not over:
         return result
     diags = (*result.diagnostics, *(Diagnostic("error", m, "LIMIT") for m in over))
@@ -348,6 +353,11 @@ def _hdl_files(sby: Path) -> list[tuple[str, Path]]:
     return files
 
 
+def _definitions(sby: Path) -> Definitions:
+    """The macros and named properties of every Verilog file the setup reads (M37): one may use another's."""
+    return definitions(path.read_text(encoding="utf-8", errors="replace") for _, path in _hdl_files(sby))
+
+
 def _sby_cover(job: Job) -> list[list[str]]:
     """Run the seat's own setup in cover mode (M27), from a copy written into the run's directory.
 
@@ -360,8 +370,9 @@ def _sby_cover(job: Job) -> list[list[str]]:
     """
     sby = Path(job.params["sby"]).resolve()
     copies, sites = {}, []
+    defs = _definitions(sby)
     for name, path in _hdl_files(sby):
-        derivation = derive(path.read_text(encoding="utf-8", errors="replace"), name)
+        derivation = derive(path.read_text(encoding="utf-8", errors="replace"), name, defs)
         copy = job.workdir / "antecedents" / name
         copy.parent.mkdir(parents=True, exist_ok=True)
         copy.write_text(derivation.text, encoding="utf-8")
@@ -402,8 +413,9 @@ def _sby_cover_check(job: Job) -> str | None:
     unread = _sby_reads(job)
     if unread:
         return unread
+    defs = _definitions(sby.resolve())
     underived = [s for name, path in _hdl_files(sby.resolve())
-                 for s in derive(path.read_text(encoding="utf-8", errors="replace"), name).underived]
+                 for s in derive(path.read_text(encoding="utf-8", errors="replace"), name, defs).underived]
     if underived:
         listed = "; ".join(f"{s.where} ({s.reason})" for s in underived)
         return (f"cannot derive the antecedent of {len(underived)} assertion{'s' if len(underived) > 1 else ''}: "

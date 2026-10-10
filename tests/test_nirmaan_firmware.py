@@ -420,6 +420,7 @@ def test_a_co_simulation_against_other_rtl_does_not_open_review(block, tmp_path)
     build, _ = broker.invoke(owner, "fw.build", {"sources": joined(*copies[:3]), "workdir": str(tmp_path / "b")},
                              seat)
     test, _ = broker.invoke(owner, "fw.test", {"sources": joined(*copies), "rtl": str(elsewhere),
+                                               "require_irq": "auto",  # as the gate asks (M35)
                                                "workdir": str(tmp_path / "t")}, seat)
     assert build.succeeded and test.succeeded
     for run in (build, test):
