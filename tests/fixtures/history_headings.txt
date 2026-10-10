@@ -1,0 +1,67 @@
+Milestone 1 (v0.1.0) - `f8f5698` - originally named TraceIQ
+Milestone 2 (v0.2.0) - `1985e5f`
+Milestone 3 (v0.3.0) - `47b1f57`
+Milestone 4 (v0.4.0) - `675c8d0`
+Milestone 5 (v0.5.0) - `8df1652` - architecture, initially thin content
+Milestone 5 follow-up (v0.5.1) - `6d59aad` - knowledge base breadth
+Milestone 6 (v0.6.0) - Waveform Intelligence Engine
+Milestone 7 (v0.7.0) - Engineering Context Engine
+Milestone 8 (v0.8.0) - Verification Workspace & MCP Platform
+Milestone 9 (v0.9.0) - Investigation Orchestrator
+Milestone 10 (v1.0.0) - Collaborative Investigation Platform
+Knowledge Base Expansion program (post-1.0, content-only)
+Clause expressiveness upgrade (v1.5.0) - the one sanctioned matcher change
+Native formal-result ingestion (v1.6.0) - the last 5.1 knowledge item
+Milestone 11 (v1.7.0) - Verification Project Intelligence (manifest-first)
+Milestone 12 (v1.8.0) - Agent Framework and Coordinator
+Milestone 13 (v1.9.0) - Learning Engine
+Milestone 14 (v1.10.0) - Planning Engine
+Milestone 15 (v1.11.0) - Design Intelligence
+Milestone 16 (v1.12.0) - Conversation Engine
+Milestone 17 (v1.13.0) - Generative AI providers
+Milestone 18 (v1.14.0) - Automation Engine
+Milestone 19 (v1.15.0) - IP Nirmaan: the Organizational Operating System
+Landing page (side work, 2026-09-28) - `site/` for ip.nirmaan.online
+Continuous integration (side work, Stage 0) - `.github/workflows/ci.yml`
+Milestone 20 - AI workers in verification seats (roadmap Stage 1)
+Milestone 21 - Real design tools through open-source EDA (roadmap Stage 2)
+Milestone 22 - IP Nirmaan over MCP, and organizational events (roadmap Stage 3)
+Milestone 23 fixtures - AXI4-Lite reference design (roadmap Stage 4)
+Milestone 23 - Architecture and RTL agents (roadmap Stage 4)
+Milestone 23 (part) - The project deliverable export (roadmap Stage 4)
+Milestone 25 (part) - Physical design through OpenSTA and OpenROAD (roadmap Stage 6)
+Milestone 25 (firmware part) - A driver run on the approved RTL (roadmap Stage 6)
+Milestone 24 - The cross-domain engineering graph (roadmap Stage 5)
+Milestone 25 (DFT part) - Design for test through Yosys and Icarus (roadmap Stage 6)
+Milestone 26 - The repair loop (post-roadmap)
+Milestone 26 (blocks) - FIFO, arbiter, and APB register block on the design flow (post-roadmap)
+Milestone 26 (formal gate) - Synthesis and formal before review, formal in CI (after Stage 6)
+Milestone 27 - Repair after review, and retry limits per stage (after Stage 6)
+Milestone 27 (physical design) - OpenROAD and OpenSTA run for real in CI (after Stage 6)
+Milestone 27 (gates everywhere) - The design gates on every RTL workflow, and non-vacuous proofs (after Stage 6)
+Milestone 27 (RISC-V firmware) - the driver on a core against the RTL (after Stage 6)
+Milestone 27 (DFT) - ATPG, multiple scan chains, and MBIST (after Stage 6)
+Milestone 27 (seat evaluation) - Structural review, and seat evaluation
+Milestone 28 - Tool contracts (structural review, milestone 2)
+Milestone 29 (verification plan) - Plans loaded from a file, and a plan seat (after Stage 6)
+Milestone 29 - An unattended owner and reviewer loop in one command (after Stage 6)
+Milestone 29 (engineering records) - Decisions and failures, as views (structural review, milestone 3)
+Milestone 29 (gates) - The RTL gates on the remaining workflows, and automatic antecedent covers (after Stage 6)
+Milestone 29 (DFT) - Transition ATPG, lockup latches, and an MBIST stage (after Stage 6)
+Milestone 29 (RISC-V) - interrupts, a second core, a code-size gate, and APB (after Stage 6)
+Milestone 29 (PD signoff) - Power grid, CTS, extraction, and signoff STA on the SPEF (after Stage 6)
+v1.23.0 (2026-10-11) - the M34 to M42 batch
+Milestone 30 - The register map as data
+Milestone 31 - Model selection by capability, and every model call counted
+Milestone 32 - Scalable state: hidden edits impossible, chains verified once
+Milestone 33 - Learning proposals: recurring failures propose, a person decides
+Milestone 35 - Interrupts in host co-simulation, and precise bus-error traps (after Stage 6)
+Claude Code runtime, and the first live evaluation (after v1.22.0)
+Milestone 36 - Concurrent tasks and a project wide call budget in the unattended loop (after Stage 6)
+Milestone 38 - Checked plans on `new-ip` and `feature-addition`, and amending a recorded plan (after Stage 6)
+Milestone 34 - Multi-corner timing, KLayout DRC and LVS, and metal fill (after Stage 6)
+Milestone 37 - Real STA on timing re-analysis, and antecedents of named properties and macros (after Stage 6)
+Milestone 40 - Recording explicit decisions from the CLI and over MCP (after Stage 6)
+Milestone 42 - Learning proposals from evaluation results (after Stage 6)
+Milestone 39 - Typed values end to end, and the typed work packet (after Stage 6)
+Milestone 41 - The register map in `block-design`, bit fields, and an APB host harness (after Stage 6)
