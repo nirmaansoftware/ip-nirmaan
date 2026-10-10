@@ -10,10 +10,11 @@ crown-jewel architecture test at the bottom of this file).
 
 from __future__ import annotations
 
-import ast
 from pathlib import Path
 
 import pytest
+
+from laws import imports
 
 import veritriage.agents.coordinator as coordinator_module
 from veritriage.agents import (
@@ -80,18 +81,6 @@ def context(outcome):
         reasoning=outcome.report.reasoning,
         knowledge=outcome.report.knowledge,
     )
-
-
-def _imports(path: Path) -> set[str]:
-    tree = ast.parse(path.read_text(encoding="utf-8"))
-    found: set[str] = set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            found.update(alias.name for alias in node.names)
-        elif isinstance(node, ast.ImportFrom) and node.module:
-            found.add(node.module)
-            found.update(f"{node.module}.{alias.name}" for alias in node.names)
-    return found
 
 
 # --- The registry -----------------------------------------------------------
@@ -513,7 +502,7 @@ def test_agents_never_import_extraction_layers():
         "veritriage.pipeline",
     )
     for path in (SRC / "veritriage" / "agents").rglob("*.py"):
-        imported = _imports(path)
+        imported = imports(path)
         for module in banned:
             assert module not in imported, f"{path.name} imports {module}"
 
@@ -541,7 +530,7 @@ def test_core_unchanged_by_agents():
         "history",
     ):
         for path in (SRC / "veritriage" / package).rglob("*.py"):
-            assert "veritriage.agents" not in _imports(path), path
+            assert "veritriage.agents" not in imports(path), path
 
 
 def test_reasoning_has_no_agent_dependency():
@@ -552,7 +541,7 @@ def test_reasoning_has_no_agent_dependency():
 
 def test_agent_vocabulary_is_plain_data():
     """models/agents.py stays import-light like every other report vocabulary."""
-    imported = _imports(SRC / "veritriage" / "models" / "agents.py")
+    imported = imports(SRC / "veritriage" / "models" / "agents.py")
     assert not any(
         m.startswith("veritriage.") and not m.startswith("veritriage.models")
         for m in imported

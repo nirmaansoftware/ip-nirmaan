@@ -21,11 +21,11 @@ from test_nirmaan_design_agents import (  # noqa: F401  (block and rtl_ready are
     answer,
     block,
     counter_files,
-    needs,
     rtl_ready,
     token,
     upstream,
 )
+from laws import needs
 
 import nirmaan
 from nirmaan.cli import app

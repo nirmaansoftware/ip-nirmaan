@@ -9,7 +9,8 @@ from __future__ import annotations
 
 import pytest
 
-from nirmaan_helpers import GATE_TOOLS, agent, approve_gate, drive, human, needs, tid, work
+from nirmaan_helpers import GATE_TOOLS, agent, approve_gate, drive, human, tid, work
+from laws import needs
 
 from nirmaan.models import (
     Assurance,

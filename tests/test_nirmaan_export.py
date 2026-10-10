@@ -14,14 +14,13 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
-import shutil
 from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
 
 from nirmaan_helpers import GATE_TOOLS, agent, drive, gated_submit, tid
+from laws import needs
 
 from nirmaan.company.deliverables import DELIVERABLE_FOLDERS
 from nirmaan.export import (
@@ -40,13 +39,6 @@ from nirmaan.work import ProjectStore
 RTL = Path(__file__).parent / "fixtures" / "rtl"
 COUNTER = RTL / "counter.v"
 BRIDGE = "Create a 4-port AXI-to-NoC bridge."
-
-
-def _needs(*executables: str):
-    required = set(os.environ.get("NIRMAAN_REQUIRE_EDA", "").replace(",", " ").split())
-    missing = [e for e in executables if shutil.which(e) is None]
-    skip = bool(missing) and not required.intersection(missing)
-    return pytest.mark.skipif(skip, reason=f"not on PATH: {', '.join(missing)}")
 
 
 @pytest.fixture()
@@ -89,6 +81,7 @@ def _sidecars(root: Path) -> dict[str, dict]:
 # --- The folder table drives the layout -----------------------------------------------------
 
 
+@needs(*GATE_TOOLS)  # M46: the fixture drives gated RTL work, so real lint runs
 def test_the_folder_table_drives_the_layout(midway, tmp_path):
     out = tmp_path / "out"
     export_project(midway.org, midway.state, out)
@@ -120,6 +113,7 @@ def test_a_table_that_claims_a_kind_twice_is_refused():
 # --- Honesty ---------------------------------------------------------------------------------
 
 
+@needs(*GATE_TOOLS)  # M46: the fixture drives gated RTL work, so real lint runs
 def test_assurance_is_preserved_and_labelled_never_raised(midway, tmp_path):
     out = tmp_path / "out"
     export_project(midway.org, midway.state, out)
@@ -138,6 +132,7 @@ def test_assurance_is_preserved_and_labelled_never_raised(midway, tmp_path):
     assert "EXECUTED" in line and "not verified" in line
 
 
+@needs(*GATE_TOOLS)  # M46: the fixture drives gated RTL work, so real lint runs
 def test_the_sidecar_carries_provenance_and_hashes(midway, tmp_path):
     out = tmp_path / "out"
     export_project(midway.org, midway.state, out)
@@ -158,6 +153,7 @@ def test_the_sidecar_carries_provenance_and_hashes(midway, tmp_path):
     assert "matches the digest recorded" in data["location"]["note"]
 
 
+@needs(*GATE_TOOLS)  # M46: the fixture drives gated RTL work, so real lint runs
 def test_a_location_that_changed_since_recording_is_flagged(midway, tmp_path):
     art = next(a for a in midway.state.artifacts.values() if a.kind == "verification_plan")
     Path(art.location).write_text("# Verification plan\n\nQuietly edited.\n", encoding="utf-8")
@@ -168,6 +164,7 @@ def test_a_location_that_changed_since_recording_is_flagged(midway, tmp_path):
     assert data["hashes"]["recorded_digest"] == art.digest != "sha256:" + data["hashes"]["location_sha256"]
 
 
+@needs(*GATE_TOOLS)  # M46: the fixture drives gated RTL work, so real lint runs
 def test_missing_deliverables_are_reported_not_filled(midway, tmp_path):
     out = tmp_path / "out"
     report = export_project(midway.org, midway.state, out)
@@ -184,6 +181,7 @@ def test_missing_deliverables_are_reported_not_filled(midway, tmp_path):
     assert not any(m.task in produced for m in report.missing)
 
 
+@needs(*GATE_TOOLS)  # M46: the fixture drives gated RTL work, so real lint runs
 def test_signoff_shows_only_what_the_engine_recorded(midway, tmp_path):
     out = tmp_path / "out"
     export_project(midway.org, midway.state, out)
@@ -201,6 +199,7 @@ def test_signoff_shows_only_what_the_engine_recorded(midway, tmp_path):
     assert "Not signed off" in text
 
 
+@needs(*GATE_TOOLS)  # M46: the fixture drives gated RTL work, so real lint runs
 def test_a_tampered_audit_chain_is_exported_loudly(midway, tmp_path):
     root = tmp_path / "store"
     path = ProjectStore(root).save(midway.state)
@@ -220,6 +219,7 @@ def test_a_tampered_audit_chain_is_exported_loudly(midway, tmp_path):
     assert chain["verify_chain"]["intact"] is False and chain["verify_chain"]["problems"]
 
 
+@needs(*GATE_TOOLS)  # M46: the fixture drives gated RTL work, so real lint runs
 def test_an_intact_chain_is_reported_intact(midway, tmp_path):
     out = tmp_path / "out"
     report = export_project(midway.org, midway.state, out)
@@ -231,6 +231,7 @@ def test_an_intact_chain_is_reported_intact(midway, tmp_path):
     assert len(chain["entries"]) == len(midway.state.audit)
 
 
+@needs(*GATE_TOOLS)  # M46: the fixture drives gated RTL work, so real lint runs
 def test_the_evidence_folder_holds_trace_reviews_and_tool_runs(midway, tmp_path):
     out = tmp_path / "out"
     export_project(midway.org, midway.state, out)
@@ -246,6 +247,7 @@ def test_the_evidence_folder_holds_trace_reviews_and_tool_runs(midway, tmp_path)
 # --- Determinism and read-only ---------------------------------------------------------------
 
 
+@needs(*GATE_TOOLS)  # M46: the fixture drives gated RTL work, so real lint runs
 def test_the_export_is_deterministic(midway, tmp_path):
     export_project(midway.org, midway.state, tmp_path / "a")
     export_project(midway.org, midway.state, tmp_path / "b")
@@ -253,6 +255,7 @@ def test_the_export_is_deterministic(midway, tmp_path):
     assert first == second and len(first) > 20
 
 
+@needs(*GATE_TOOLS)  # M46: the fixture drives gated RTL work, so real lint runs
 def test_a_saved_and_reloaded_state_exports_identically(midway, tmp_path):
     export_project(midway.org, midway.state, tmp_path / "a")
     ProjectStore(tmp_path / "store").save(midway.state)
@@ -261,6 +264,7 @@ def test_a_saved_and_reloaded_state_exports_identically(midway, tmp_path):
     assert _tree(tmp_path / "a") == _tree(tmp_path / "b")
 
 
+@needs(*GATE_TOOLS)  # M46: the fixture drives gated RTL work, so real lint runs
 def test_the_export_refuses_a_non_empty_directory(midway, tmp_path):
     out = tmp_path / "out"
     out.mkdir()
@@ -269,6 +273,7 @@ def test_the_export_refuses_a_non_empty_directory(midway, tmp_path):
         export_project(midway.org, midway.state, out)
 
 
+@needs(*GATE_TOOLS)  # M46: the fixture drives gated RTL work, so real lint runs
 def test_the_cli_export_changes_nothing(midway, tmp_path):
     from nirmaan.cli import app
 
@@ -285,6 +290,7 @@ def test_the_cli_export_changes_nothing(midway, tmp_path):
     assert (tmp_path / "out" / "INDEX.md").is_file()
 
 
+@needs(*GATE_TOOLS)  # M46: the fixture drives gated RTL work, so real lint runs
 def test_the_cli_exports_a_broken_chain_and_says_so(midway, tmp_path):
     from nirmaan.cli import app
 
@@ -302,7 +308,7 @@ def test_the_cli_exports_a_broken_chain_and_says_so(midway, tmp_path):
 # --- Real tool runs --------------------------------------------------------------------------
 
 
-@_needs("verilator", *GATE_TOOLS)  # M27: the RTL stage before it is gated
+@needs("verilator", *GATE_TOOLS)  # M27: the RTL stage before it is gated
 def test_a_real_lint_runs_log_and_result_are_copied(bridge, tmp_path):
     lint = tid(bridge, "rtl-lint")
     drive(bridge, until=lint)
@@ -358,6 +364,7 @@ def test_the_export_names_no_folder_and_no_organization_vocabulary(nirmaan_org):
 # --- Crown jewel -----------------------------------------------------------------------------
 
 
+@needs(*GATE_TOOLS)  # M46: the fixture drives gated RTL work, so real lint runs
 def test_a_new_folder_or_a_remap_needs_zero_core_changes(midway, tmp_path):
     """Software gets its own folder and lint moves under verification: two table edits, no code."""
     docs = next(f for f in folders() if "driver" in f.artifact_kinds)

@@ -14,7 +14,6 @@ AXI4-Lite demo runs the real tools. No test calls a model API.
 
 from __future__ import annotations
 
-import ast
 import json
 import sys
 import types
@@ -30,10 +29,10 @@ from test_nirmaan_engineering_graph import (  # noqa: F401  (fake_eda and axi ar
     axi,
     axi_files,
     fake_eda,
-    needs,
     run_rtl_seat,
     token,
 )
+from laws import imports, needs
 
 from nirmaan import engineering, vplan
 from nirmaan.company.traceability import ItemKind
@@ -548,19 +547,9 @@ def test_a_plan_seat_against_a_new_spec_kind_with_a_new_item_kind_needs_no_core_
 # --- Laws ---------------------------------------------------------------------------------------
 
 
-def _imports(path: Path) -> set[str]:
-    found = set()
-    for node in ast.walk(ast.parse(path.read_text())):
-        if isinstance(node, ast.Import):
-            found |= {a.name for a in node.names}
-        elif isinstance(node, ast.ImportFrom) and node.module:
-            found.add(node.module)
-    return found
-
-
 def test_the_import_laws_hold():
     for path in (SRC / "vplan.py", SRC / "integrations" / "vplan.py"):
-        assert not any(m == "veritriage" or m.startswith("veritriage.") for m in _imports(path)), path
+        assert not any(m == "veritriage" or m.startswith("veritriage.") for m in imports(path)), path
     # The runtime, the engine, and the policy name no plan kind, capability, stage, or tool.
     names = ("verification_plan", "vplan", "dv.plan", "dv-plan", "interface_spec")
     for path in [*sorted((SRC / "runtime").glob("*.py")), SRC / "work" / "engine.py", SRC / "work" / "policy.py",

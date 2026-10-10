@@ -16,8 +16,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
-import shutil
 import sys
 import types
 from pathlib import Path
@@ -26,6 +24,7 @@ import pytest
 from typer.testing import CliRunner
 
 from nirmaan_helpers import agent, drive, human, tid
+from laws import needs
 
 from nirmaan import engineering
 from nirmaan.company.traceability import ItemKind, LinkKind
@@ -43,14 +42,6 @@ AXI = Path(__file__).parent / "fixtures" / "rtl" / "axi4_lite"
 AXI_BLOCK = "Create an AXI4-Lite register block."
 RTL_FILE = "axi4_lite_regs.v"
 TB_FILE = "axi4_lite_regs_tb.v"
-
-
-def needs(*executables: str):
-    """Skip without the executables, except those CI names in NIRMAAN_REQUIRE_EDA (then it fails)."""
-    required = set(os.environ.get("NIRMAAN_REQUIRE_EDA", "").replace(",", " ").split())
-    missing = [e for e in executables if shutil.which(e) is None]
-    skip = bool(missing) and not required.intersection(missing)
-    return pytest.mark.skipif(skip, reason=f"not on PATH: {', '.join(missing)}")
 
 
 def token(art_id: str) -> str:

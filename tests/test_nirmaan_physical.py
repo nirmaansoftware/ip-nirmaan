@@ -33,7 +33,8 @@ import pytest
 from typer.testing import CliRunner
 
 from nirmaan_helpers import agent, tid
-from test_nirmaan_eda import holder, needs
+from test_nirmaan_eda import holder
+from laws import needs
 
 from nirmaan.integrations.eda import Backend, EdaResult, register_backend, unregister_backend
 from nirmaan.integrations.pd_parsers import VIOLATOR_REPORT_LIMIT, parse_klayout, parse_openroad, parse_opensta

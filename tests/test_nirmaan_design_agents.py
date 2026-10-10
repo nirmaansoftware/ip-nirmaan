@@ -12,14 +12,13 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 import re
-import shutil
 from pathlib import Path
 
 import pytest
 
 from nirmaan_helpers import agent, drive, human, tid
+from laws import needs
 
 from nirmaan.models import (
     Assurance,
@@ -50,14 +49,6 @@ RTL = FIXTURES / "rtl"
 AXI = RTL / "axi4_lite"
 COUNTER_BLOCK = "Create a 4-bit wrapping counter."
 AXI_BLOCK = "Create an AXI4-Lite register block."
-
-
-def needs(*executables: str):
-    """Skip without the executables, except those CI names in NIRMAAN_REQUIRE_EDA (then it fails)."""
-    required = set(os.environ.get("NIRMAAN_REQUIRE_EDA", "").replace(",", " ").split())
-    missing = [e for e in executables if shutil.which(e) is None]
-    skip = bool(missing) and not required.intersection(missing)
-    return pytest.mark.skipif(skip, reason=f"not on PATH: {', '.join(missing)}")
 
 
 def token(art_id: str) -> str:

@@ -17,7 +17,8 @@ from pathlib import Path
 import pytest
 
 from nirmaan_helpers import drive, human, tid
-from test_nirmaan_design_agents import answer, file, needs, token, upstream, with_workspace
+from test_nirmaan_design_agents import answer, file, token, upstream, with_workspace
+from laws import needs
 
 from nirmaan.models import Assurance, EvidenceKind, TaskStatus
 from nirmaan.orchestrator import Orchestrator

@@ -18,7 +18,7 @@ import pytest
 from typer.testing import CliRunner
 
 from nirmaan_helpers import human, tid
-from test_nirmaan_design_agents import needs
+from laws import needs
 
 from nirmaan.cli import app
 from nirmaan.models import RegisterMap, Unmapped

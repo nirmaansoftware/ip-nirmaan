@@ -23,13 +23,13 @@ from pathlib import Path
 
 import pytest
 
-from test_nirmaan_firmware import COSIM, DRIVER, RTL, TESTS, WITH_DRIVER, invoke, joined, needs
+from test_nirmaan_firmware import COSIM, DRIVER, RTL, TESTS, WITH_DRIVER, invoke, joined
 from test_nirmaan_riscv_firmware import ON_RISCV, SOC_TOOLS
-from test_nirmaan_riscv_firmware import needs as needs_riscv
 from test_nirmaan_riscv_next import TIMER, TIMER_CHECKS, TIMER_FW, TIMER_RTL, WRAPPER, broken_timer, checks_of
+from laws import needs
 
 from nirmaan.integrations.firmware import parse_fw_test
-from nirmaan.integrations.firmware_riscv import CORES, SOC, Core, register_core, toolchain, unregister_core
+from nirmaan.integrations.firmware_riscv import CORES, RISCV_GCC, SOC, Core, register_core, toolchain, unregister_core
 from nirmaan.orchestrator import Orchestrator
 
 FAULT = (*TIMER[:3], TIMER_FW / "axil_timer_fault_test.c")
@@ -236,7 +236,7 @@ def assert_precise(run, outcome, workdir: Path):
             assert function in ("store", "soc_write32") and mnemonic in ("sw", "sh", "sb"), trap
 
 
-@needs_riscv(*SOC_TOOLS, riscv=True)
+@needs(*SOC_TOOLS, any_of=RISCV_GCC)
 def test_a_bus_error_traps_precisely_on_picorv32(riscv, tmp_path):
     run, outcome = soc(riscv, FAULT, TIMER_RTL, tmp_path, require_bus_error_trap="yes")
     assert run.succeeded, run.summary
@@ -245,7 +245,7 @@ def test_a_bus_error_traps_precisely_on_picorv32(riscv, tmp_path):
     assert_precise(run, outcome, tmp_path)
 
 
-@needs_riscv(*SOC_TOOLS, riscv=True)
+@needs(*SOC_TOOLS, any_of=RISCV_GCC)
 def test_serv_says_it_has_no_precise_trap(riscv, tmp_path):
     run, outcome = soc(riscv, FAULT, TIMER_RTL, tmp_path, core="serv", require_bus_error_trap="yes")
     assert not run.succeeded
@@ -256,7 +256,7 @@ def test_serv_says_it_has_no_precise_trap(riscv, tmp_path):
     assert "NIRMAAN_CORE_BUS_ERR" not in log_of(run)
 
 
-@needs_riscv(*SOC_TOOLS, riscv=True)
+@needs(*SOC_TOOLS, any_of=RISCV_GCC)
 def test_interrupts_still_work_with_the_bus_error_line_on_picorv32(riscv, tmp_path):
     run, outcome = soc(riscv, TIMER, TIMER_RTL, tmp_path, require_irq="yes")
     assert run.succeeded, run.summary
@@ -281,7 +281,7 @@ def test_a_design_that_hides_its_errors_fails_the_trap_checks(block, tmp_path):
 # --- Crown jewel: a core with a bus-error line is data ----------------------------------------
 
 
-@needs_riscv(*SOC_TOOLS, riscv=True)
+@needs(*SOC_TOOLS, any_of=RISCV_GCC)
 def test_a_new_bus_error_core_needs_no_core_changes(riscv, tmp_path):
     """M29's third core, given a bus-error input, registered with bus_error=True: precise traps on it."""
     wrapper = tmp_path / "third" / "core_picorv32_barrel.v"

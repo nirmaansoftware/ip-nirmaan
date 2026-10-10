@@ -20,10 +20,11 @@ from pathlib import Path
 import pytest
 
 from nirmaan_helpers import GATE_TOOLS, agent, drive, human, tid
-from test_nirmaan_design_agents import answer, counter_files, file, needs, token, upstream, with_workspace
+from test_nirmaan_design_agents import answer, counter_files, file, token, upstream, with_workspace
 from test_nirmaan_formal_gate import runs_of
 from test_nirmaan_gates_everywhere import broker_owner  # noqa: F401 (a fixture)
 from test_nirmaan_physical import PD, TINY_LIB, fake_tool, invoke, nangate45, only_on_path
+from laws import needs
 
 from nirmaan.integrations.eda_antecedents import definitions, derive
 from nirmaan.models import Assurance, EvidenceKind, MemoryScope, TaskStatus

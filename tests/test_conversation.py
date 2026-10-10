@@ -10,10 +10,11 @@ crown-jewel architecture test at the bottom of this file).
 
 from __future__ import annotations
 
-import ast
 from pathlib import Path
 
 import pytest
+
+from laws import imports
 
 import veritriage.conversation.engine as engine_module
 from veritriage.conversation import (
@@ -41,18 +42,6 @@ from veritriage.workspace import WorkspaceServices
 
 # .../src/veritriage/conversation/engine.py -> parents[2] is the src/ root.
 SRC = Path(engine_module.__file__).parents[2]
-
-
-def _imports(path: Path) -> set[str]:
-    tree = ast.parse(path.read_text(encoding="utf-8"))
-    found: set[str] = set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            found.update(alias.name for alias in node.names)
-        elif isinstance(node, ast.ImportFrom) and node.module:
-            found.add(node.module)
-            found.update(f"{node.module}.{alias.name}" for alias in node.names)
-    return found
 
 
 @pytest.fixture()
@@ -396,7 +385,7 @@ def test_no_ai_in_conversation():
 def test_conversation_never_imports_the_workspace():
     """The workspace exposes conversation, not the reverse."""
     for path in (SRC / "veritriage" / "conversation").rglob("*.py"):
-        imported = _imports(path)
+        imported = imports(path)
         for banned in (
             "veritriage.workspace",
             "veritriage.pipeline",
@@ -434,11 +423,11 @@ def test_core_unchanged_by_conversation():
         "history",
     ):
         for path in (SRC / "veritriage" / package).rglob("*.py"):
-            assert "veritriage.conversation" not in _imports(path), path
+            assert "veritriage.conversation" not in imports(path), path
 
 
 def test_conversation_vocabulary_is_plain_data():
-    imported = _imports(SRC / "veritriage" / "models" / "conversation.py")
+    imported = imports(SRC / "veritriage" / "models" / "conversation.py")
     assert not any(
         m.startswith("veritriage.") and not m.startswith("veritriage.models")
         for m in imported

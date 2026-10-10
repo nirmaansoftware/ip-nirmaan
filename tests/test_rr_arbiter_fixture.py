@@ -16,7 +16,8 @@ from pathlib import Path
 
 import pytest
 
-from test_nirmaan_eda import BRIDGE, invoke, needs
+from test_nirmaan_eda import BRIDGE, invoke
+from laws import needs
 
 from nirmaan.orchestrator import Orchestrator
 

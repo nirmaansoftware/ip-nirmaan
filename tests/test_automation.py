@@ -10,10 +10,11 @@ bottom of this file).
 
 from __future__ import annotations
 
-import ast
 from pathlib import Path
 
 import pytest
+
+from laws import imports
 
 import veritriage.automation.bus as bus_module
 from veritriage.automation import (
@@ -42,18 +43,6 @@ from veritriage.workspace import WorkspaceServices
 
 # .../src/veritriage/automation/bus.py -> parents[2] is the src/ root.
 SRC = Path(bus_module.__file__).parents[2]
-
-
-def _imports(path: Path) -> set[str]:
-    tree = ast.parse(path.read_text(encoding="utf-8"))
-    found: set[str] = set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            found.update(alias.name for alias in node.names)
-        elif isinstance(node, ast.ImportFrom) and node.module:
-            found.add(node.module)
-            found.update(f"{node.module}.{alias.name}" for alias in node.names)
-    return found
 
 
 @pytest.fixture()
@@ -300,14 +289,14 @@ def test_automation_never_executes_anything():
         text = path.read_text(encoding="utf-8")
         for term in banned_calls:
             assert term not in text, f"{path.name} may execute or perform I/O ({term})"
-        leaked = banned_modules & _imports(path)
+        leaked = banned_modules & imports(path)
         assert not leaked, f"{path.name} imports {leaked}"
 
 
 def test_automation_imports_only_models():
     """The package decides; it needs nothing but the vocabulary to decide with."""
     for path in (SRC / "veritriage" / "automation").rglob("*.py"):
-        for module in _imports(path):
+        for module in imports(path):
             if not module.startswith("veritriage."):
                 continue
             assert module.startswith("veritriage.models") or module.startswith(
@@ -383,11 +372,11 @@ def test_core_unchanged_by_automation():
         "orchestrator",
     ):
         for path in (SRC / "veritriage" / package).rglob("*.py"):
-            assert "veritriage.automation" not in _imports(path), path
+            assert "veritriage.automation" not in imports(path), path
 
 
 def test_automation_vocabulary_is_plain_data():
-    imported = _imports(SRC / "veritriage" / "models" / "automation.py")
+    imported = imports(SRC / "veritriage" / "models" / "automation.py")
     assert not any(
         m.startswith("veritriage.") and not m.startswith("veritriage.models")
         for m in imported
@@ -399,7 +388,7 @@ def test_automation_does_not_duplicate_the_m9_orchestrator():
     from veritriage.orchestrator import InvestigationStep
 
     for path in (SRC / "veritriage" / "automation").rglob("*.py"):
-        assert "veritriage.orchestrator" not in _imports(path), path
+        assert "veritriage.orchestrator" not in imports(path), path
     # And M9's step registry is untouched.
     assert InvestigationStep.__module__ == "veritriage.orchestrator.steps"
 

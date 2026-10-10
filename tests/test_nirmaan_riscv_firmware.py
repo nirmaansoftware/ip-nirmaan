@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import ast
 import hashlib
-import os
 import re
 import shutil
 from pathlib import Path
@@ -38,6 +37,7 @@ from test_nirmaan_firmware import (
     workspace,
     wrong_driver,
 )
+from laws import needs
 
 from nirmaan.integrations.eda import Backend, register_backend, select_backend, unregister_backend
 from nirmaan.integrations.firmware import STRICT_FLAGS
@@ -61,16 +61,6 @@ EXPECTED_CHECKS = {"reset_values", "write_then_read_every_register", "byte_lane_
 
 #: The vendored core, byte for byte as released upstream (YosysHQ/picorv32 at ef203c2).
 PICORV32_SHA256 = "0836050971b3c6cdd28ac3b1e5719a67fb645161912bef1e472e63995ceb0622"
-
-
-def needs(*executables: str, riscv: bool = False):
-    """Skip without the executables (and, with ``riscv``, any RISC-V GCC), unless CI requires them."""
-    required = set(os.environ.get("NIRMAAN_REQUIRE_EDA", "").replace(",", " ").split())
-    missing = [e for e in executables if shutil.which(e) is None]
-    if riscv and not any(shutil.which(g) for g in RISCV_GCC):
-        missing.append(RISCV_GCC[0])
-    skip = bool(missing) and not required.intersection(missing)
-    return pytest.mark.skipif(skip, reason=f"not on PATH: {', '.join(missing)}")
 
 
 SOC_TOOLS = ("verilator", "make")
@@ -172,7 +162,7 @@ def test_a_missing_toolchain_is_refused_with_a_reason(block, tmp_path, monkeypat
 # --- Real tools ----------------------------------------------------------------------------
 
 
-@needs(riscv=True)
+@needs(any_of=RISCV_GCC)
 def test_the_driver_and_its_tests_cross_build_for_rv32i(block, tmp_path):
     run, outcome = invoke(block, "fw.cross_build", {"sources": joined(*DRIVER, TESTS)}, tmp_path)
     assert run.succeeded, run.summary
@@ -190,7 +180,7 @@ def test_the_driver_and_its_tests_cross_build_for_rv32i(block, tmp_path):
     assert metrics["compiled"] == 6
 
 
-@needs(riscv=True)
+@needs(any_of=RISCV_GCC)
 def test_a_strict_warning_fails_the_cross_build_as_a_recorded_run(block, tmp_path):
     lax = tmp_path / "lax.c"
     lax.write_text("int twice(int a) {\n    int unused = 3;\n    return 2 * a;\n}\n")
@@ -199,7 +189,7 @@ def test_a_strict_warning_fails_the_cross_build_as_a_recorded_run(block, tmp_pat
     assert [d["code"] for d in outcome.data["result"]["diagnostics"]] == ["-Wunused-variable"]
 
 
-@needs(*SOC_TOOLS, riscv=True)
+@needs(*SOC_TOOLS, any_of=RISCV_GCC)
 def test_the_driver_passes_on_a_riscv_core_against_the_real_rtl(block, tmp_path):
     run, outcome = invoke(block, "fw.soc_test", {"sources": joined(*DRIVER, TESTS), "rtl": str(RTL)}, tmp_path)
     assert run.succeeded, run.summary
@@ -214,7 +204,7 @@ def test_the_driver_passes_on_a_riscv_core_against_the_real_rtl(block, tmp_path)
     assert run.params["rtl"] == (str(RTL),) and outcome.data["result"]["metrics"]["text"] > 0
 
 
-@needs(*SOC_TOOLS, riscv=True)
+@needs(*SOC_TOOLS, any_of=RISCV_GCC)
 def test_a_wrong_driver_fails_on_the_core_as_a_recorded_run(block, tmp_path):
     run, outcome = invoke(block, "fw.soc_test", {"sources": joined(*wrong_driver(tmp_path)), "rtl": str(RTL)},
                           tmp_path / "w")
@@ -227,7 +217,7 @@ def test_a_wrong_driver_fails_on_the_core_as_a_recorded_run(block, tmp_path):
 # --- The seat: the M25 flow, plus the cross build and the run on the core --------------------
 
 
-@needs(*SOC_TOOLS, "cc", "iverilog", "vvp", "yosys", riscv=True)
+@needs(*SOC_TOOLS, "cc", "iverilog", "vvp", "yosys", any_of=RISCV_GCC)
 def test_the_firmware_seat_runs_its_driver_on_a_riscv_core(block, tmp_path):
     design_the_block(block, tmp_path)
     seat = tid(block, "firmware")
