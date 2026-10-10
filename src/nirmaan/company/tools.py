@@ -145,8 +145,13 @@ TOOLS: list[ToolSpec] = [
            _p("tie_low", TEXT, "Tie-low cell as CELL/PORT (backend yosys-liberty)."),
            _p("buffer_cell", TEXT, "Buffer as CELL/IN/OUT, inserted where one port drives another "
                                    "(backend yosys-liberty)."), *RUNNER)),
-    _tool("sta.run", "Static timing", "eda", EXE, AV, "Static timing of a netlist under an SDC (OpenSTA).",
-          (*NETLIST, _p("spef", PATH, "Parasitics (SPEF), as pnr.run extracts them."), TOP_REQUIRED, *PDK_REQUIRED,
+    _tool("sta.run", "Static timing", "eda", EXE, AV,
+          "Static timing of a netlist under an SDC (OpenSTA); given RTL instead, synthesized to the Liberty first "
+          "(M37).",
+          (_p("netlist", PATH, "The gate-level netlist; or give sources."),
+           _p("sources", PATHS, "RTL to synthesize to the Liberty and time, instead of a netlist (M37)."),
+           _p("sdc", PATH, "Timing constraints.", required=True),
+           _p("spef", PATH, "Parasitics (SPEF), as pnr.run extracts them."), TOP_REQUIRED, *PDK_REQUIRED,
            _p("tech_lef", PATHS, "Technology LEF (backend openroad-sta)."),
            _p("lef", PATHS, "Cell LEF files (backend openroad-sta)."),
            # M34: timing corners (docs/PD_FINAL.md).

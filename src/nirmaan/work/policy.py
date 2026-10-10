@@ -111,11 +111,19 @@ def unsatisfied_requirements(state: ProjectState, task: Task) -> list[str]:
     """Evidence requirements on the task not met by substantiated evidence."""
     attached = [state.evidence[e] for e in task.evidence if e in state.evidence]
     produced = {state.artifacts[a].kind for a in task.artifacts if a in state.artifacts}
+    upstream = upstream_kinds(state, task)
     return [
         req.description
         for req in task.evidence_requirements
-        if req.applies(produced) and not any(satisfies(state, ev, req) for ev in attached)
+        if req.applies(produced, upstream) and not any(satisfies(state, ev, req) for ev in attached)
     ]
+
+
+def upstream_kinds(state: ProjectState, task: Task) -> set[str]:
+    """The kinds of the artifacts a task builds on, when one of its requirements asks (M37)."""
+    if not any(req.when_upstream for req in task.evidence_requirements):
+        return set()
+    return {art.kind for art in upstream_artifacts(state, task)}
 
 
 def satisfies(state: ProjectState, ev, req) -> bool:
@@ -304,7 +312,8 @@ def _before_review(ctx: PolicyContext) -> list[str]:
     attached = [ctx.state.evidence[e] for e in task.evidence if e in ctx.state.evidence]
     problems = []
     kinds = {draft.get("kind") for draft in ctx.payload.get("artifacts", ())}
-    for req in (r for r in task.evidence_requirements if r.before_review and r.applies(kinds)):
+    upstream = upstream_kinds(ctx.state, task)
+    for req in (r for r in task.evidence_requirements if r.before_review and r.applies(kinds, upstream)):
         met = [ev for ev in attached if satisfies(ctx.state, ev, req)]
         if not met:
             problems.append(f"{task.id} cannot go to review: {req.description!r} is not met")

@@ -106,6 +106,12 @@ PLAN_CHECKED = checked("The plan covers every requirement of the approved requir
                        FileInput(param="plan", kinds=("verification_plan",)),
                        FileInput(param="spec", kinds=("requirements_spec",), upstream=True))
 
+#: M37: on the RTL branch, re-analysis is a real STA run over the approved fixed RTL (synthesized to the PDK's
+#: Liberty, then timed under the task's SDC), before review; no attestation meets it (docs/STA_AND_ANTECEDENTS.md).
+RETIMED = checked("Timing met on the fixed RTL: synthesized to the target library, then timed under the task's SDC",
+                  "sta.run", FileInput(param="sources", kinds=("rtl_source",), upstream=True),
+                  when_upstream=("rtl_source",))
+
 #: M41: the approved register map, when the plan has one (docs/REGISTER_MAP_ADOPTION.md). Optional: filled from
 #: the approved upstream map when there is one, left out when there is none, and never dodged when there is.
 APPROVED_MAP = FileInput(param="map", kinds=("register_map",), upstream=True, optional=True)
@@ -497,7 +503,8 @@ TIMING_CLOSURE = WorkflowTemplate(
         st("reanalysis", "Re-analysis", "Implementation", "sta.analyze",
            depends_on=("rtl-fix", "constraint-fix", "pd-fix"), criticality=H, review=rv("sta.review"),
            gate="gate.implementation", outputs=("timing_report",),
-           evidence=(REVIEWED, ran("Clean timing report", "sta.run"))),
+           evidence=(REVIEWED, RETIMED,  # M37
+                     ran("Clean timing report", "sta.run", when_upstream=("constraints", "layout")))),
     ),
 )
 
