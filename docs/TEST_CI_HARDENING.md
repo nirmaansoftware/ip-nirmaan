@@ -99,16 +99,25 @@ the runner image, so tests that need only those run there.
 ## 5. CI time
 
 Measured from the GitHub API (job start to job end, queue time excluded).
-"Before" is the mean of the last 10 successful runs on `main` (be26485 and
-the nine before it). "After" is this PR's runs.
+"Before" is the mean of the last 10 successful CI runs before M46 (5 pushes to
+`main` and 5 pull requests, ending at be26485). "After" is this PR's two runs.
 
 | | Wall (first job start to last job end) | Job time summed |
 |---|---|---|
 | Before (10 runs) | 520 s (8.7 min) | 1302 s (21.7 min) |
-| After, cold cache | 575 s (9.6 min) | 1041 s (17.4 min) |
-| After, warm cache (run 38081906567's successor) | measured next | measured next |
+| After, cold cache (run 38081906567) | 575 s (9.6 min) | 1041 s (17.4 min) |
+| After, warm cache (run 38082661168) | 577 s (9.6 min) | 1142 s (19.0 min) |
 
-AFTER_NOTE
+Job time fell by 12 to 20 percent: the second full real-EDA run (5 to 9
+minutes) became a 2.5 minute `no-tools` run. Wall time did not fall. It is
+bounded by the single real-EDA `pytest` run in `test`, whose Test step took
+277 to 571 s across the 10 baseline runs and 500 and 517 s in the two runs
+here, so the difference is within runner variance. The cached tarball
+restores in 20 to 30 s, about what the download took, so caching buys
+reliability (no repeat of run 37923805038's "tar: Error is not recoverable"),
+not speed. Shortening the wall time would mean splitting the real-EDA suite
+across runners or adding pytest-xdist. Both are deferred, because the suite's
+module-level registries (M36) are not yet proven safe under xdist.
 
 ## 6. Required checks: the owner's call
 
