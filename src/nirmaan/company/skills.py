@@ -222,7 +222,7 @@ SKILLS: list[Skill] = [
                    "bus (axi4-lite or apb), addr_width, data_width 32, unmapped response, and each register's name, "
                    "offset, access (rw, ro, wo, w1c), reset, and optional fields (name, lsb, msb, access, reset), "
                    "exactly as the interface spec states them."),
-       tools=("regmap.check",),
+       tools=("regmap.check", "spec.check"),
        fails=("Unspecified error behaviour.", "Ambiguous ordering."),
        valid=("Every channel's ordering and error behaviour is specified.",)),
     sk("rtl_microarchitecture", "RTL microarchitecture", "architecture", "microarchitecture",

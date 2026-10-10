@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 from typing import List, Optional
 
@@ -549,7 +550,8 @@ def costs(project: str, as_json: bool = typer.Option(False, "--json"), root: Pat
 @app.command()
 def learn(
     projects: List[str] = typer.Argument(None, help="Projects whose failure records to read."),
-    evals: Optional[Path] = typer.Option(None, "--evals", help="Recorded evaluation results to read too (M42)."),
+    evals: List[Path] = typer.Option(None, "--evals", help="Recorded evaluation results or run records to read "
+                                                           "too (M42, M45); may be given more than once."),
     cases: Path = typer.Option(Path("evals"), "--cases", help="Evaluation case files, for each seat's capability."),
     decide: Optional[str] = typer.Option(None, "--decide", help="A proposal ID to decide."),
     in_project: Optional[str] = typer.Option(None, "--in", help="The project to record the decision in."),
@@ -562,17 +564,19 @@ def learn(
     """Skill changes proposed by failures that recur across projects or evaluation runs; decide one as a person."""
     from nirmaan.proposals import ProposalError, decide_proposal, learning_proposals
 
-    if not projects and evals is None:
+    if not projects and not evals:
         _fail("name projects, --evals DIR, or both")
     engines = {p: _load(p, root) for p in projects or []}
     proposals = learning_proposals(_org(), [e.state for e in engines.values()]) if engines else []
-    if evals is not None:
+    if evals:
         from nirmaan.eval_proposals import eval_proposals, load_results
 
-        try:
-            runs = load_results(evals)
-        except (ValueError, OSError) as exc:
-            _fail(f"cannot read evaluation results under {evals}: {exc}")
+        runs = []
+        for folder in evals:
+            try:
+                runs += load_results(folder)
+            except (ValueError, OSError) as exc:
+                _fail(f"cannot read evaluation results under {folder}: {exc}")
         proposals += eval_proposals(_org(), runs, _cases(cases), states=[e.state for e in engines.values()])
     if decide:
         chosen = next((p for p in proposals if p.id == decide), None)
@@ -602,7 +606,7 @@ def learn(
             verdicts = "; ".join(f"{v['check']} {v['status']}: {v['summary']}" for v in e["verdicts"])
             console.print(escape(f"  run {e['run']} {e['case']} on {e['runtime']} {e['version']} "
                                  f"{e['started_at']}: {'passed' if e['passed'] else 'failed'} ({verdicts}) "
-                                 f"<- {e['file']}"), highlight=False, soft_wrap=True)
+                                 f"source {e['source']} <- {e['file']}"), highlight=False, soft_wrap=True)
 
 
 @app.command()
@@ -1024,15 +1028,19 @@ def eval_run(
     case_ids: List[str] = typer.Argument(None, help="Case IDs to run (default: every case)."),
     runtime: Optional[str] = typer.Option(None, "--runtime", help="Registered runtime ID to put in the seat."),
     replay: bool = typer.Option(False, "--replay", help="Replay each case's reference answer instead."),
+    trials: Optional[int] = typer.Option(None, "--trials", min=1,
+                                         help="Trials per case (default: 5 with --runtime, 1 with --replay)."),
+    seats: Optional[str] = typer.Option(None, "--seats",
+                                        help="Comma-separated case groups or seat stages to run, e.g. rtl,spec."),
     attempts: Optional[int] = typer.Option(None, "--attempts", min=1, help="Attempts when a submission is refused."),
     cases: Path = CASES_OPTION,
     repo: Path = typer.Option(Path("."), "--repo", help="Root that case file paths are relative to."),
-    out: Path = typer.Option(Path(".nirmaan") / "evals", "--out", help="Where result records are written."),
+    out: Optional[Path] = typer.Option(None, "--out", help="Where the run record is written (default: "
+                                                           "evals/results for a runtime, .nirmaan/evals for a replay)."),
     as_json: bool = typer.Option(False, "--json"),
 ) -> None:
-    """Run evaluation cases. Exits 1 when any case fails."""
-    from nirmaan.evals import EvalError, run_case, write_result
-    from nirmaan.runtime import get_runtime
+    """Run evaluation cases and write a run record (M45). Exits 1 when any trial fails."""
+    from nirmaan.evals import LIVE_TRIALS, EvalError, record_run, select_cases
 
     if replay == (runtime is not None):
         _fail("choose one: --runtime ID (a model in the seat) or --replay (the reference answer)")
@@ -1040,31 +1048,118 @@ def eval_run(
     unknown = [c for c in case_ids or [] if c not in known]
     if unknown:
         _fail(f"unknown case {', '.join(unknown)}; known: {', '.join(known) or 'none'}")
-    try:
-        agent = get_runtime(runtime) if runtime else None
-    except KeyError as exc:
-        _fail(str(exc.args[0]))
+    chosen = select_cases([known[c] for c in case_ids or list(known)],
+                          [x.strip() for x in (seats or "").split(",") if x.strip()])
+    if not chosen:
+        _fail(f"no case matches --seats {seats}")
+    if runtime is not None:
+        from nirmaan.runtime import available_runtimes
+
+        if runtime not in available_runtimes():
+            _fail(f"Unknown runtime {runtime!r}. Registered: {', '.join(available_runtimes())}")
+    trials = trials or (LIVE_TRIALS if runtime else 1)
+    if runtime and trials < LIVE_TRIALS and not as_json:
+        console.print(f"note: fewer than {LIVE_TRIALS} trials per case; the intervals below will be wide, and "
+                      f"the convention for a model is --trials {LIVE_TRIALS}", highlight=False, soft_wrap=True)
+    out = out or (repo / "evals" / "results" if runtime else Path(".nirmaan") / "evals")
     results = []
-    for case_id in case_ids or list(known):
-        try:
-            result = run_case(_org(), known[case_id], agent, repo=repo, attempts=attempts)
-        except EvalError as exc:
-            _fail(str(exc))
-        path = write_result(result, out)
+
+    def show(trial, path: Path) -> None:
+        result = trial.result
         results.append(result)
-        if not as_json:
-            passed = sum(s.status.value == "passed" for s in result.scores)
-            console.print(escape(f"{'PASS' if result.passed else 'FAIL'} {result.case} [{result.runtime}]: "
-                                 f"{result.seat_status}, {passed}/{len(result.scores)} held-out checks passed "
-                                 f"({result.duration_s}s) -> {path}"), highlight=False, soft_wrap=True)
-            for score in result.scores:
-                console.print(f"  {score.status.value}: {escape(score.name)}: {escape(score.summary)}",
-                              highlight=False, soft_wrap=True)
-            if not result.submitted and result.detail:
-                console.print(f"  {escape(result.detail)}", highlight=False, soft_wrap=True)
+        if as_json:
+            return
+        passed = sum(s.status.value == "passed" for s in result.scores)
+        console.print(escape(f"{'PASS' if result.passed else 'FAIL'} {result.case} [{result.runtime}] trial "
+                             f"{trial.trial}/{trials}: {result.seat_status}, {passed}/{len(result.scores)} held-out "
+                             f"checks passed ({result.duration_s}s) -> {path}"), highlight=False, soft_wrap=True)
+        for score in result.scores:
+            console.print(f"  {score.status.value}: {escape(score.name)}: {escape(score.summary)}",
+                          highlight=False, soft_wrap=True)
+        if not result.submitted and result.detail:
+            console.print(f"  {escape(result.detail)}", highlight=False, soft_wrap=True)
+
+    try:
+        path = record_run(_org(), chosen, runtime, trials=trials, repo=repo, out=out, attempts=attempts,
+                          command=" ".join(["nirmaan", *sys.argv[1:]]), on_trial=show)
+    except EvalError as exc:
+        _fail(str(exc))
     if as_json:
         typer.echo(json.dumps([r.model_dump(mode="json") for r in results], indent=2))
+    else:
+        summary = json.loads((path / "summary.json").read_text(encoding="utf-8"))
+        _print_summary(summary)
+        console.print(escape(f"run record: {path}"), highlight=False, soft_wrap=True)
     if not all(r.passed for r in results):
+        raise typer.Exit(1)
+
+
+def _print_summary(summary: dict, indent: str = "") -> None:
+    from nirmaan.evals import rate_text
+
+    for label in ("seats", "cases"):
+        for name, entry in summary[label].items():
+            console.print(escape(f"{indent}{name}: {rate_text(entry)}"), highlight=False, soft_wrap=True)
+    t = summary["totals"]
+    cost = "unknown" if t["cost_usd"] is None else f"{t['cost_usd']:.2f} USD"
+    console.print(escape(f"{indent}{t['trials']} trials, {t['model_calls']} model calls, {t['input_tokens']} input "
+                         f"and {t['output_tokens']} output tokens, cost {cost}, {t['duration_s']}s"),
+                  highlight=False, soft_wrap=True)
+
+
+@eval_app.command("history")
+def eval_history(
+    results: Path = typer.Option(Path("evals") / "results", "--results", help="Directory of run records."),
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
+    """Every recorded run, oldest first: runtime, model, trials, and pass rates per seat and per case."""
+    from nirmaan.evals import load_records
+
+    try:
+        records = load_records(results) if results.is_dir() else []
+    except (OSError, ValueError) as exc:
+        _fail(f"cannot read run records under {results}: {exc}")
+    if as_json:
+        typer.echo(json.dumps([{**r.manifest.model_dump(mode="json"), "path": str(r.path), "summary": r.summary()}
+                               for r in records], indent=2))
+        return
+    if not records:
+        console.print(escape(f"no run records under {results}"), highlight=False)
+        return
+    for r in records:
+        m = r.manifest
+        kind = "replay" if m.replay else f"{m.runtime}, model {m.model}"
+        console.print(escape(f"{m.id}  ({kind}, version {m.nirmaan_version}, {m.started_at:%Y-%m-%d %H:%M}, "
+                             f"{m.trials} trials per case)"), highlight=False, soft_wrap=True)
+        _print_summary(r.summary(), indent="  ")
+
+
+@eval_app.command("rejudge")
+def eval_rejudge(
+    record: Path = typer.Argument(..., help="A run record directory."),
+    cases: Path = CASES_OPTION,
+    repo: Path = typer.Option(Path("."), "--repo", help="Root that case file paths are relative to."),
+) -> None:
+    """Replay a record's answers through the real gates and judges; exits 1 when any verdict differs."""
+    from nirmaan.evals import EvalError, load_record, rejudge
+
+    try:
+        loaded = load_record(record)
+    except (OSError, ValueError) as exc:
+        _fail(f"cannot read the run record {record}: {exc}")
+    try:
+        outcomes = rejudge(_org(), loaded, {c.id: c for c in _cases(cases)}, repo=repo)
+    except EvalError as exc:
+        _fail(str(exc))
+    for o in outcomes:
+        head = f"{o.trial.result.case} trial {o.trial.trial}"
+        if o.same:
+            console.print(escape(f"same {head}: passed={o.trial.result.passed}"), highlight=False, soft_wrap=True)
+        else:
+            console.print(escape(f"DIFFERS {head}: {'; '.join(o.differences)}"), highlight=False, soft_wrap=True)
+    same = sum(o.same for o in outcomes)
+    console.print(f"{same} of {len(outcomes)} trials reproduced", highlight=False)
+    if same != len(outcomes):
         raise typer.Exit(1)
 
 

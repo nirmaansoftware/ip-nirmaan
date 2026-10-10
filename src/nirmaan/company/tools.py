@@ -136,6 +136,12 @@ TOOLS: list[ToolSpec] = [
           "A verification plan is valid and covers exactly the requirements its approved spec tags (M29).",
           (_p("plan", PATHS, "The verification plan file or files to check.", required=True),
            _p("spec", PATHS, "The approved spec file or files the plan must cover.", required=True))),
+    _tool("spec.check", "Specification check", "verification", RD, AV,
+          "A specification tags every requirement it must carry, each saying what it must, and names every port "
+          "and parameter it must (M45).",
+          (_p("spec", PATHS, "The specification file or files to check.", required=True),
+           _p("checks", PATH, "The checks file (nirmaan.spec-checks): requirement IDs with terms, and names.",
+              required=True))),
     _tool("equivalence.run", "Equivalence checker", "eda", EXE, CO, "Logic equivalence checking."),
     _tool("cdc.run", "CDC/RDC analyzer", "eda", EXE, CO, "Structural and functional crossing analysis."),
     # Implementation EDA.

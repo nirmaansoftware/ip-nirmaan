@@ -248,8 +248,8 @@ def test_a_new_case_or_scorer_needs_zero_core_changes(fixed_clock, tmp_path):
         unregister_scorer("reads-back")
     assert ran.exit_code == 0, ran.output
     assert "PASS tmp/reads-back [replay]" in ran.output
-    [written] = list(out.rglob("*.json"))
-    assert json.loads(written.read_text())["scores"][0]["status"] == "passed"
+    [written] = list(out.rglob("trial-*.json"))  # M45: a run record, one file per trial
+    assert json.loads(written.read_text())["result"]["scores"][0]["status"] == "passed"
 
 
 def test_the_cli_refuses_an_unclear_request_and_fails_a_failing_case(tmp_path):

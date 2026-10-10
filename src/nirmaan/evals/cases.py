@@ -18,10 +18,24 @@ def load_case(path: Path | str) -> EvalCase:
     return EvalCase.model_validate_json(Path(path).read_text(encoding="utf-8"))
 
 
+def is_data_file(path: Path) -> bool:
+    """A JSON file that carries a ``format`` (a run record, a checks file): data a case uses, never a case (M45)."""
+    try:
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
+    except ValueError:
+        return False
+    return isinstance(data, dict) and "format" in data
+
+
 def load_cases(root: Path | str) -> list[EvalCase]:
-    """Every ``*.json`` case under ``root``, by ID. Two cases with one ID are an error."""
+    """Every ``*.json`` case under ``root``, by ID. Two cases with one ID are an error.
+
+    Files with a ``format`` field (run records, checks files) are data, not cases, and are skipped.
+    """
     cases: dict[str, EvalCase] = {}
     for path in sorted(Path(root).rglob("*.json")):
+        if is_data_file(path):
+            continue
         case = load_case(path)
         if case.id in cases:
             raise EvalError(f"two cases are named {case.id!r}; the second is {path}")
