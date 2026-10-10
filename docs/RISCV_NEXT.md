@@ -143,6 +143,11 @@ names the failing check.
 
 ## 3. Precise bus-error traps: not done, and why STATUS stays
 
+M35 (`docs/FIRMWARE_IRQ_TRAPS.md`) later found a precise path on PicoRV32:
+the line is raised with `mem_ready`, and PicoRV32 checks pending lines
+before the next instruction runs. SERV still has none. This section records
+the M29 reasoning as it was.
+
 The request was to map SLVERR to a precise trap if feasible. It is not, on
 either core here, and a trap that is not precise would be worse than the
 status register:

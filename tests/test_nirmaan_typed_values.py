@@ -308,6 +308,7 @@ def test_the_packet_is_typed_all_the_way_down(regression, fixture_log, tmp_path)
 def _normalize(text: str, *roots: Path, mask_logs: bool = False) -> str:
     for root in roots:
         text = text.replace(str(root), "<" + ("fixtures" if root == FIXTURES else "tmp") + ">")
+    text = re.sub(r"prj-[0-9a-f]{10}", "prj-<id>", text)  # the ID follows the organization's fingerprint
     if mask_logs:
         text = re.sub(r"(?m)^\| .*$", "| <log>", text)  # the installed Verilator's own words
         text = re.sub(r"(?m)first: .*$", "first: <diagnostic>", text)

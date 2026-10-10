@@ -225,7 +225,32 @@ model selection and accounting (#53), scalable state (#54), learning proposals
 (#55). The owner then delegated the remaining decisions (2026-10-09): numbering kept
 in the repo's style (seat evaluation and engineering records are parts of the
 M27 and M29 batches; M28 and M30 to M33 are the review's own); released as
-v1.22.0; the live-model evaluation could not run (no Anthropic credentials on
-this machine); #45 left to its session with the contract additions it needs
+v1.22.0; the live-model evaluation first could not run (no API credits), then
+ran on the owner's plan (below); #45 left to its session with the contract additions it needs
 posted on it. Deferred pieces are listed in each
 milestone's `context.md` entry.
+
+## Task complete (2026-10-10)
+
+**Status: COMPLETE.** Nothing in this review is left open.
+
+| Item | Result |
+|---|---|
+| Seven review milestones | Merged: #37, #41, #48, #52, #53, #54, #55 |
+| Release | v1.22.0 (#56, 032cb08) |
+| First live evaluation | Done (#57, da21eef): Claude Opus 5.5 passed all four RTL cases on the first attempt, judged by held-out checks |
+| How it ran | A `claude-code` runtime runs seats through `claude -p` on the owner's Claude plan. The owner declined to buy API credits, which a subscription does not include |
+| What it found | The RTL seat lacked the interface spec, so ports were misnamed and both judges failed. The `block-design` RTL stage now depends on `interface-spec` too, and the case passed |
+| #45 | Another session's PR; left to it, with its 13 missing contract parameters posted |
+| Test suite | 1430 passed, 3 skipped (the real OpenROAD tests, which run in CI's `physical-design` job); main CI green |
+
+**The landing page's test count.** https://ip.nirmaan.online is built from
+`site/` and redeploys on every merge to `main`. Its "automated tests" stat is a
+number written by hand into `site/index.html`, and it is updated at version
+releases, not with every PR. It reads 1424 (set at v1.22.0) while the suite is
+1430 after #57. The next version release brings it up to date.
+
+**Housekeeping for the owner:**
+- Revoke the API key pasted into the session.
+- Run `git pull` in `~/Documents/IP Nirmaan` before working locally; it is far behind `main`.
+- The stash of pre-review leftovers there can be dropped.

@@ -9,13 +9,13 @@ Rules:
 Answer with one JSON object and nothing else:
 {"verdict": "approve" or "request_changes", "comments": string, "uncertainty": number}
 
-TASK: Review the submitted work of task prj-92ecb568dc:root-cause independently.
+TASK: Review the submitted work of task prj-<id>:root-cause independently.
 
 CITE ONLY THESE ARTIFACTS, using the token exactly as written:
-  [evidence:prj-92ecb568dc.triage.e1]  veritriage_session: VeriTriage classified axi_timeout.log as timeout (85% confidence, 5 evidence nodes); top hypothesis: Likely RTL bug
+  [evidence:prj-<id>.triage.e1]  veritriage_session: VeriTriage classified axi_timeout.log as timeout (85% confidence, 5 evidence nodes); top hypothesis: Likely RTL bug
   [run:run-0001]  VeriTriage classified axi_timeout.log as timeout (85% confidence, 5 evidence nodes); top hypothesis: Likely RTL bug
-  [evidence:prj-92ecb568dc.change-correlation.e1]  document: Commit range and touched modules
-  [evidence:prj-92ecb568dc.root-cause.e1]  veritriage_session: VeriTriage classified axi_timeout.log as timeout (85% confidence, 5 evidence nodes); top hypothesis: Likely RTL bug
+  [evidence:prj-<id>.change-correlation.e1]  document: Commit range and touched modules
+  [evidence:prj-<id>.root-cause.e1]  veritriage_session: VeriTriage classified axi_timeout.log as timeout (85% confidence, 5 evidence nodes); top hypothesis: Likely RTL bug
 
 ## Company
 - Company: IP Nirmaan
@@ -47,7 +47,7 @@ CITE ONLY THESE ARTIFACTS, using the token exactly as written:
 - Features: recent_change
 
 ## Task
-- Task prj-92ecb568dc:root-cause: Root-cause analysis (decision, in_review)
+- Task prj-<id>:root-cause: Root-cause analysis (decision, in_review)
 - Your seat: Debug Tech Lead (verification.debug.tech_lead)
 - The work under review was produced by verification.debug.root_cause.senior; you are a different seat.
 - Expected outputs: root_cause_analysis
@@ -56,8 +56,8 @@ CITE ONLY THESE ARTIFACTS, using the token exactly as written:
 - Permitted tools: project.read, status.read, artifact.read, trace.read, escalation.raise, spec.read, knowledge.search, git.read, code.search, veritriage.investigate, veritriage.explain_log, review.create, approval.grant, task.create, task.assign, git.write
 - Upstream artifact Triage report (mock) (triage_report, verified): Deterministic triage report grounded in [run:run-0001].
 - Upstream artifact Correlate with recent RTL commits (impact_analysis) (impact_analysis, verified)
-- Artifact under review: Root cause analysis (mock) (root_cause_analysis): Deterministic root cause analysis grounded in [run:run-0001] and [evidence:prj-92ecb568dc.triage.e1].
-- Evidence [evidence:prj-92ecb568dc.triage.e1] on prj-92ecb568dc:triage: veritriage_session, substantiated, tool run [run:run-0001]: VeriTriage classified axi_timeout.log as timeout (85% confidence, 5 evidence nodes); top hypothesis: Likely RTL bug
-- Evidence [evidence:prj-92ecb568dc.change-correlation.e1] on prj-92ecb568dc:change-correlation: document, substantiated: Commit range and touched modules
-- Evidence [evidence:prj-92ecb568dc.root-cause.e1] on prj-92ecb568dc:root-cause: veritriage_session, substantiated, tool run [run:run-0001]: VeriTriage classified axi_timeout.log as timeout (85% confidence, 5 evidence nodes); top hypothesis: Likely RTL bug
+- Artifact under review: Root cause analysis (mock) (root_cause_analysis): Deterministic root cause analysis grounded in [run:run-0001] and [evidence:prj-<id>.triage.e1].
+- Evidence [evidence:prj-<id>.triage.e1] on prj-<id>:triage: veritriage_session, substantiated, tool run [run:run-0001]: VeriTriage classified axi_timeout.log as timeout (85% confidence, 5 evidence nodes); top hypothesis: Likely RTL bug
+- Evidence [evidence:prj-<id>.change-correlation.e1] on prj-<id>:change-correlation: document, substantiated: Commit range and touched modules
+- Evidence [evidence:prj-<id>.root-cause.e1] on prj-<id>:root-cause: veritriage_session, substantiated, tool run [run:run-0001]: VeriTriage classified axi_timeout.log as timeout (85% confidence, 5 evidence nodes); top hypothesis: Likely RTL bug
 - Escalation path: verification.debug.tech_lead -> verification.debug.manager -> verification.vp -> exec.cto -> exec.ceo -> exec.board

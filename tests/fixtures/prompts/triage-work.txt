@@ -21,7 +21,7 @@ artifact's. "entry" names what a tool starts from, such as the top module. The p
 the files and runs the checks your task's evidence requirements name over them; you cannot run
 or report those checks yourself.
 
-TASK: Produce triage_report for task prj-92ecb568dc:triage.
+TASK: Produce triage_report for task prj-<id>:triage.
 
 CITE ONLY THESE ARTIFACTS, using the token exactly as written:
   [run:run-0001]  veritriage.investigate: VeriTriage classified axi_timeout.log as timeout (85% confidence, 5 evidence nodes); top hypothesis: Likely RTL bug
@@ -53,7 +53,7 @@ CITE ONLY THESE ARTIFACTS, using the token exactly as written:
 - Features: recent_change
 
 ## Task
-- Task prj-92ecb568dc:triage: Failure triage (VeriTriage) (work, ready)
+- Task prj-<id>:triage: Failure triage (VeriTriage) (work, ready)
 - Your seat: Regression Intelligence Engineer (verification.debug.intelligence.engineer)
 - Expected outputs: triage_report
 - Evidence requirement: VeriTriage investigation of the failing artifacts (accepts: veritriage_session; tools: veritriage.investigate)

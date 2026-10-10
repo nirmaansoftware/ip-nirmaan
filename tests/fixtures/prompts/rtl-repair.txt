@@ -21,19 +21,19 @@ artifact's. "entry" names what a tool starts from, such as the top module. The p
 the files and runs the checks your task's evidence requirements name over them; you cannot run
 or report those checks yourself.
 
-TASK: Produce rtl_source, testbench for task prj-f9e4426ad3:rtl-implementation.
+TASK: Produce rtl_source, testbench for task prj-<id>:rtl-implementation.
 
 CITE ONLY THESE ARTIFACTS, using the token exactly as written:
-  [evidence:prj-f9e4426ad3.interface-spec.e1]  review_record: Independent review by architecture.interface.ace.staff: looks right
-  [evidence:prj-f9e4426ad3.microarchitecture.e1]  review_record: Independent review by design.rtl.architecture.staff: looks right
-  [evidence:prj-f9e4426ad3.rtl-implementation.e1]  tool_run: verilator-lint: lint failed: 0 errors, 1 warning; first: <diagnostic>
+  [evidence:prj-<id>.interface-spec.e1]  review_record: Independent review by architecture.interface.ace.staff: looks right
+  [evidence:prj-<id>.microarchitecture.e1]  review_record: Independent review by design.rtl.architecture.staff: looks right
+  [evidence:prj-<id>.rtl-implementation.e1]  tool_run: verilator-lint: lint failed: 0 errors, 1 warning; first: <diagnostic>
   [run:run-0001]  verilator-lint: lint failed: 0 errors, 1 warning; first: <diagnostic>
-  [evidence:prj-f9e4426ad3.rtl-implementation.e2]  tool_run: icarus: simulation passed: $finish reached at time 130000, 0 errors
+  [evidence:prj-<id>.rtl-implementation.e2]  tool_run: icarus: simulation passed: $finish reached at time 130000, 0 errors
   [run:run-0002]  icarus: simulation passed: $finish reached at time 130000, 0 errors
-  [evidence:prj-f9e4426ad3.rtl-implementation.e3]  tool_run: yosys: synthesis passed: 15 cells, 4 flip-flops, 0 latches, 0 warnings
+  [evidence:prj-<id>.rtl-implementation.e3]  tool_run: yosys: synthesis passed: 15 cells, 4 flip-flops, 0 latches, 0 warnings
   [run:run-0003]  yosys: synthesis passed: 15 cells, 4 flip-flops, 0 latches, 0 warnings
-  [artifact:prj-f9e4426ad3.interface-spec.a1]  interface_spec: Interface specification (interface_spec) (approved)
-  [artifact:prj-f9e4426ad3.microarchitecture.a1]  microarchitecture_spec: Microarchitecture (microarchitecture_spec) (approved)
+  [artifact:prj-<id>.interface-spec.a1]  interface_spec: Interface specification (interface_spec) (approved)
+  [artifact:prj-<id>.microarchitecture.a1]  microarchitecture_spec: Microarchitecture (microarchitecture_spec) (approved)
 
 ## Company
 - Company: IP Nirmaan
@@ -66,7 +66,7 @@ CITE ONLY THESE ARTIFACTS, using the token exactly as written:
 - Intent: block_design
 
 ## Task
-- Task prj-f9e4426ad3:rtl-implementation: RTL implementation and testbench (work, in_progress)
+- Task prj-<id>:rtl-implementation: RTL implementation and testbench (work, in_progress)
 - Your seat: Senior RTL Architect (design.rtl.architecture.senior)
 - Expected outputs: rtl_source, testbench
 - Evidence requirement: Independent review recorded (accepts: review_record)
@@ -76,16 +76,16 @@ CITE ONLY THESE ARTIFACTS, using the token exactly as written:
 - Evidence requirement: Formal properties are proven (accepts: tool_run; tools: formal.run; run by the platform over your formal_spec, rtl_source files; must be met before review; applies only if you produce a formal_spec file)
 - Evidence requirement: The proof is not vacuous: every cover is reached (accepts: tool_run; tools: formal.cover; run by the platform over your formal_spec, rtl_source files; must be met before review; applies only if you produce a formal_spec file)
 - Permitted tools: project.read, status.read, artifact.read, trace.read, escalation.raise, spec.read, knowledge.search, git.read, code.search, review.create, git.write, lint.run, simulator.run, synth.run, formal.run, formal.cover, regmap.check, regmap.verify, git.merge
-- Upstream artifact [artifact:prj-f9e4426ad3.interface-spec.a1] Interface specification (interface_spec) (interface_spec, approved)
-- Upstream artifact [artifact:prj-f9e4426ad3.microarchitecture.a1] Microarchitecture (microarchitecture_spec) (microarchitecture_spec, approved)
-- Evidence [evidence:prj-f9e4426ad3.interface-spec.e1] on prj-f9e4426ad3:interface-spec: review_record, substantiated: Independent review by architecture.interface.ace.staff: looks right
-- Evidence [evidence:prj-f9e4426ad3.microarchitecture.e1] on prj-f9e4426ad3:microarchitecture: review_record, substantiated: Independent review by design.rtl.architecture.staff: looks right
-- Evidence [evidence:prj-f9e4426ad3.rtl-implementation.e1] on prj-f9e4426ad3:rtl-implementation: tool_run, NOT substantiated, tool run [run:run-0001]: verilator-lint: lint failed: 0 errors, 1 warning; first: <diagnostic>
-- Evidence [evidence:prj-f9e4426ad3.rtl-implementation.e2] on prj-f9e4426ad3:rtl-implementation: tool_run, substantiated, tool run [run:run-0002]: icarus: simulation passed: $finish reached at time 130000, 0 errors
-- Evidence [evidence:prj-f9e4426ad3.rtl-implementation.e3] on prj-f9e4426ad3:rtl-implementation: tool_run, substantiated, tool run [run:run-0003]: yosys: synthesis passed: 15 cells, 4 flip-flops, 0 latches, 0 warnings
+- Upstream artifact [artifact:prj-<id>.interface-spec.a1] Interface specification (interface_spec) (interface_spec, approved)
+- Upstream artifact [artifact:prj-<id>.microarchitecture.a1] Microarchitecture (microarchitecture_spec) (microarchitecture_spec, approved)
+- Evidence [evidence:prj-<id>.interface-spec.e1] on prj-<id>:interface-spec: review_record, substantiated: Independent review by architecture.interface.ace.staff: looks right
+- Evidence [evidence:prj-<id>.microarchitecture.e1] on prj-<id>:microarchitecture: review_record, substantiated: Independent review by design.rtl.architecture.staff: looks right
+- Evidence [evidence:prj-<id>.rtl-implementation.e1] on prj-<id>:rtl-implementation: tool_run, NOT substantiated, tool run [run:run-0001]: verilator-lint: lint failed: 0 errors, 1 warning; first: <diagnostic>
+- Evidence [evidence:prj-<id>.rtl-implementation.e2] on prj-<id>:rtl-implementation: tool_run, substantiated, tool run [run:run-0002]: icarus: simulation passed: $finish reached at time 130000, 0 errors
+- Evidence [evidence:prj-<id>.rtl-implementation.e3] on prj-<id>:rtl-implementation: tool_run, substantiated, tool run [run:run-0003]: yosys: synthesis passed: 15 cells, 4 flip-flops, 0 latches, 0 warnings
 - Repair: your previous attempt 1 was refused and nothing from it counts. Fix what failed and answer again in full; files from a refused attempt are never reviewed.
-- Attempt 1 was refused: Refused by the constitution: [P9] prj-f9e4426ad3:rtl-implementation cannot go to review: 'Lint-clean under the RTL lint rules' is not met
-- Failed run [run:run-0001] lint.run, evidence [evidence:prj-f9e4426ad3.rtl-implementation.e1]: verilator-lint: lint failed: 0 errors, 1 warning; first: <diagnostic>
+- Attempt 1 was refused: Refused by the constitution: [P9] prj-<id>:rtl-implementation cannot go to review: 'Lint-clean under the RTL lint rules' is not met
+- Failed run [run:run-0001] lint.run, evidence [evidence:prj-<id>.rtl-implementation.e1]: verilator-lint: lint failed: 0 errors, 1 warning; first: <diagnostic>
 - Log excerpt of [run:run-0001] (first 3 of 3 notable lines):
 | <log>
 | <log>

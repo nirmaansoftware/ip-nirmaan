@@ -36,13 +36,20 @@ from nirmaan.integrations.eda import Backend, Job, RunRecord, register_backend
 from nirmaan.integrations.eda_parsers import Diagnostic, EdaResult
 from nirmaan.integrations.firmware import (
     HARNESS,
+    IRQ_PORT,
     STRICT_FLAGS,
     _c_diagnostics,
     _compile,
     _first,
     _plural,
     copy_rtl,
+    design_ports,
     parse_fw_test,
+    read_requirements,
+    require_problem,
+    rtl_files,
+    top_module,
+    write_requirements,
 )
 from nirmaan.models import list_values
 from nirmaan.runtime.tools import Params
@@ -75,6 +82,10 @@ class Core:
     first, then the core's own. ``runtime`` is the assembly file that defines
     ``nirmaan_core_init``, ``nirmaan_core_irq_set``, and ``nirmaan_core_trap``
     (entered from the vector at 0x10), assembled with ``-march=<march>``.
+
+    ``bus_error`` (M35, docs/FIRMWARE_IRQ_TRAPS.md) says the wrapper has a
+    ``bus_err`` input that traps precisely; the runtime file then also makes
+    ``nirmaan_core_bus_error_set`` enable it. The SoC connects it only then.
     """
 
     name: str
@@ -82,6 +93,7 @@ class Core:
     verilog: tuple[Path, ...]
     runtime: Path
     march: str = "rv32i"
+    bus_error: bool = False
 
 
 #: SERV 1.4.0's ``rtl/``, as ``serv_rf_top`` uses it (``firmware_soc/serv/``, unmodified).
@@ -106,7 +118,7 @@ def unregister_core(name: str) -> None:
 
 
 register_core(Core("picorv32", "nirmaan_core_picorv32", (SOC / "core_picorv32.v", SOC / "picorv32.v"),
-                   SOC / "irq_picorv32.S"))
+                   SOC / "irq_picorv32.S", bus_error=True))
 register_core(Core("serv", "nirmaan_core_serv", (SOC / "core_serv.v", *(SOC / "serv" / f for f in SERV_FILES)),
                    SOC / "irq_serv.S", "rv32i_zicsr"))
 
@@ -138,10 +150,6 @@ def unregister_bus(name: str) -> None:
 
 register_bus(Bus("axi4-lite", "nirmaan_bridge_axil", SOC / "bridge_axil.v", ("s_axil_awaddr", "s_axil_araddr")))
 register_bus(Bus("apb", "nirmaan_bridge_apb", SOC / "bridge_apb.v", ("psel", "penable", "paddr")))
-
-#: The port that carries a design's interrupt to the core (active high, level sensitive).
-IRQ_PORT = "irq"
-
 
 def toolchain() -> str | None:
     """The prefix of the first RISC-V GCC on PATH whose objcopy and size are there too, or None."""
@@ -205,9 +213,9 @@ def parse_cross_build(log: str, returncodes: tuple[int, ...]) -> EdaResult:
                       "exit_statuses": list(returncodes)})
 
 
-def parse_soc_test(log: str, returncodes: tuple[int, ...]) -> EdaResult:
+def parse_soc_test(log: str, returncodes: tuple[int, ...], require: dict[str, bool] | None = None) -> EdaResult:
     """The fw.test verdict (every check passed, the firmware finished), plus the image's code size."""
-    result = parse_fw_test(log, returncodes, what="SoC run")
+    result = parse_fw_test(log, returncodes, what="SoC run", require=require)
     size = _size(log)
     summary = result.summary
     if result.passed and size:
@@ -252,65 +260,22 @@ def _cross_build_steps(job: Job) -> list[list[str]]:
     return _image_steps(job, SOC, job.workdir / "rv32", core.runtime, core.march)
 
 
-_MODULE_RE = re.compile(r"^\s*module\s+([A-Za-z_]\w*)", re.MULTILINE)
-
-
-def top_module(rtl: list[str]) -> str | None:
-    """The one module the RTL declares that no other module instantiates, or None if not exactly one."""
-    text = "\n".join(Path(f).read_text(encoding="utf-8", errors="replace") for f in rtl if Path(f).is_file())
-    text = re.sub(r"//[^\n]*|/\*.*?\*/", "", text, flags=re.DOTALL)
-    declared = list(dict.fromkeys(_MODULE_RE.findall(text)))
-    bodies = re.sub(r"\bmodule\s+[A-Za-z_]\w*", "", text)
-    tops = [m for m in declared if not re.search(rf"\b{m}\b\s*(?:#\s*\(|[A-Za-z_]\w*\s*\()", bodies)]
-    return tops[0] if len(tops) == 1 else None
-
-
-def design_ports(rtl: list[str], top: str) -> set[str]:
-    """The port names in the header of module ``top``, ANSI or not, or an empty set if it is not there."""
-    text = "\n".join(Path(f).read_text(encoding="utf-8", errors="replace") for f in rtl if Path(f).is_file())
-    text = re.sub(r"//[^\n]*|/\*.*?\*/", "", text, flags=re.DOTALL)
-    m = re.search(rf"\bmodule\s+{re.escape(top)}\b\s*", text)
-    if not m:
-        return set()
-    rest = text[m.end():]
-    if rest.startswith("#"):  # skip the parameter list
-        rest = rest[_closing(rest, rest.index("(")) + 1:].lstrip()
-    if not rest.startswith("("):
-        return set()
-    header = re.sub(r"\[[^\]]*\]", " ", rest[1:_closing(rest, 0)])
-    return {words[-1] for item in header.split(",") if (words := re.findall(r"[A-Za-z_]\w*", item))}
-
-
-def _closing(text: str, start: int) -> int:
-    """The index of the parenthesis that closes the one at ``start``."""
-    depth = 0
-    for i in range(start, len(text)):
-        depth += {"(": 1, ")": -1}.get(text[i], 0)
-        if depth == 0:
-            return i
-    return len(text)
-
-
 def bus_of(ports: set[str]) -> Bus | None:
     """The first registered bus whose identifying ports the design declares."""
     return next((b for b in BUSES.values() if set(b.ports) <= ports), None)
-
-
-def _rtl_files(job: Job) -> list[str]:
-    return [str(Path(s).resolve()) for s in list_values(job.params["rtl"])]
 
 
 def _soc_check(job: Job) -> str | None:
     problem = _core_check(job)
     if problem:
         return problem
-    top = job.top or top_module(_rtl_files(job))
+    top = job.top or top_module(rtl_files(job))
     if not top:
         return "cannot tell the design's top module from the RTL; name it with top="
-    if not bus_of(design_ports(_rtl_files(job), top)):
+    if not bus_of(design_ports(rtl_files(job), top)):
         known = "; ".join(f"{b.name} needs {', '.join(b.ports)}" for b in BUSES.values())
         return f"the design {top} has no bus the SoC knows ({known})"
-    return None
+    return require_problem(job)
 
 
 def _local(path: Path, soc: Path, workdir: Path) -> str:
@@ -330,9 +295,10 @@ def _soc_steps(job: Job) -> list[list[str]]:
     the SoC sources, the core's, and the RTL are copied, byte for byte, into the
     working directory first. The run records the paths it was given.
     """
-    top = job.top or top_module(_rtl_files(job))
-    ports = design_ports(_rtl_files(job), top)
+    top = job.top or top_module(rtl_files(job))
+    ports = design_ports(rtl_files(job), top)
     core, bus = _core(job), bus_of(ports)
+    write_requirements(job, ports)
     soc = job.workdir / "soc_src"
     shutil.copytree(SOC, soc, dirs_exist_ok=True)
     rtl = copy_rtl(job)
@@ -343,7 +309,8 @@ def _soc_steps(job: Job) -> list[list[str]]:
     steps.append([prefix + "objcopy", "-O", "verilog", str(out / "firmware.elf"), image])
     model = job.workdir / "soc"
     defines = [f"+define+NIRMAAN_CORE={core.module}", f"+define+NIRMAAN_BRIDGE={bus.module}",
-               f"+define+NIRMAAN_DUT={top}", *(["+define+NIRMAAN_DUT_IRQ"] if IRQ_PORT in ports else [])]
+               f"+define+NIRMAAN_DUT={top}", *(["+define+NIRMAAN_DUT_IRQ"] if IRQ_PORT in ports else []),
+               *(["+define+NIRMAAN_CORE_BUS_ERR"] if core.bus_error else [])]
     steps.append(["verilator", "--cc", "--exe", "--build", "-j", "0", "-Wno-fatal", "--prefix", MODEL,
                   "--top-module", "nirmaan_soc", "-Mdir", str(model), *defines,
                   str(soc / "nirmaan_soc.v"), _local(bus.verilog, soc, job.workdir),
@@ -357,7 +324,7 @@ def _parse_cross(run: RunRecord) -> EdaResult:
 
 
 def _parse_soc(run: RunRecord) -> EdaResult:
-    return parse_soc_test(run.log, run.returncodes)
+    return parse_soc_test(run.log, run.returncodes, read_requirements(run.workdir))
 
 
 register_backend(Backend("rv32-gcc", "fw.cross_build", (), _cross_build_steps, _parse_cross,

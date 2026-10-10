@@ -21,12 +21,12 @@ artifact's. "entry" names what a tool starts from, such as the top module. The p
 the files and runs the checks your task's evidence requirements name over them; you cannot run
 or report those checks yourself.
 
-TASK: Produce root_cause_analysis for task prj-92ecb568dc:root-cause and conclude exactly one outcome: rtl_bug, testbench_bug, infrastructure, spec_ambiguity.
+TASK: Produce root_cause_analysis for task prj-<id>:root-cause and conclude exactly one outcome: rtl_bug, testbench_bug, infrastructure, spec_ambiguity.
 
 CITE ONLY THESE ARTIFACTS, using the token exactly as written:
-  [evidence:prj-92ecb568dc.triage.e1]  veritriage_session: VeriTriage classified axi_timeout.log as timeout (85% confidence, 5 evidence nodes); top hypothesis: Likely RTL bug
+  [evidence:prj-<id>.triage.e1]  veritriage_session: VeriTriage classified axi_timeout.log as timeout (85% confidence, 5 evidence nodes); top hypothesis: Likely RTL bug
   [run:run-0001]  VeriTriage classified axi_timeout.log as timeout (85% confidence, 5 evidence nodes); top hypothesis: Likely RTL bug
-  [evidence:prj-92ecb568dc.change-correlation.e1]  document: Commit range and touched modules
+  [evidence:prj-<id>.change-correlation.e1]  document: Commit range and touched modules
 
 ## Company
 - Company: IP Nirmaan
@@ -58,7 +58,7 @@ CITE ONLY THESE ARTIFACTS, using the token exactly as written:
 - Features: recent_change
 
 ## Task
-- Task prj-92ecb568dc:root-cause: Root-cause analysis (decision, ready)
+- Task prj-<id>:root-cause: Root-cause analysis (decision, ready)
 - Your seat: Senior Root Cause Engineer (verification.debug.root_cause.senior)
 - Expected outputs: root_cause_analysis
 - Outcomes (conclude exactly one): rtl_bug, testbench_bug, infrastructure, spec_ambiguity
@@ -66,6 +66,6 @@ CITE ONLY THESE ARTIFACTS, using the token exactly as written:
 - Permitted tools: project.read, status.read, artifact.read, trace.read, escalation.raise, spec.read, knowledge.search, git.read, code.search, veritriage.investigate, veritriage.explain_log, review.create, git.write
 - Upstream artifact Triage report (mock) (triage_report, verified): Deterministic triage report grounded in [run:run-0001].
 - Upstream artifact Correlate with recent RTL commits (impact_analysis) (impact_analysis, verified)
-- Evidence [evidence:prj-92ecb568dc.triage.e1] on prj-92ecb568dc:triage: veritriage_session, substantiated, tool run [run:run-0001]: VeriTriage classified axi_timeout.log as timeout (85% confidence, 5 evidence nodes); top hypothesis: Likely RTL bug
-- Evidence [evidence:prj-92ecb568dc.change-correlation.e1] on prj-92ecb568dc:change-correlation: document, substantiated: Commit range and touched modules
+- Evidence [evidence:prj-<id>.triage.e1] on prj-<id>:triage: veritriage_session, substantiated, tool run [run:run-0001]: VeriTriage classified axi_timeout.log as timeout (85% confidence, 5 evidence nodes); top hypothesis: Likely RTL bug
+- Evidence [evidence:prj-<id>.change-correlation.e1] on prj-<id>:change-correlation: document, substantiated: Commit range and touched modules
 - Escalation path: verification.debug.tech_lead -> verification.debug.manager -> verification.vp -> exec.cto -> exec.ceo -> exec.board

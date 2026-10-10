@@ -8,6 +8,10 @@
 //     misalignment), which stay masked, so those still trap;
 //   * irq[3] is level sensitive (LATCHED_IRQ bit 3 clear): an interrupt that
 //     is not acknowledged is taken again on return;
+//   * bus_err is irq[4] (M35, docs/FIRMWARE_IRQ_TRAPS.md), level sensitive too:
+//     the SoC raises it with mem_ready for a device access that got an error,
+//     and PicoRV32 checks its pending lines before the next instruction runs,
+//     so the trap is taken right after the faulting load or store;
 //   * the core enters the runtime at 0x10 with the return address in q0
 //     (ENABLE_IRQ_QREGS), and returns with retirq.
 // The SoC's memory interface is PicoRV32's own, so this is a pass-through.
@@ -22,7 +26,8 @@ module nirmaan_core_picorv32 (
     output wire [31:0] mem_wdata,
     output wire [3:0]  mem_wstrb,
     input  wire [31:0] mem_rdata,
-    input  wire        irq
+    input  wire        irq,
+    input  wire        bus_err
 );
     /* verilator lint_off PINCONNECTEMPTY */
     picorv32 #(
@@ -30,7 +35,7 @@ module nirmaan_core_picorv32 (
         .ENABLE_IRQ(1),
         .ENABLE_IRQ_QREGS(1),
         .ENABLE_IRQ_TIMER(0),
-        .LATCHED_IRQ(32'hffff_fff7),
+        .LATCHED_IRQ(32'hffff_ffe7),
         .PROGADDR_IRQ(32'h0000_0010)
     ) cpu (
         .clk(clk), .resetn(resetn), .trap(trap),
@@ -39,7 +44,7 @@ module nirmaan_core_picorv32 (
         .mem_la_read(), .mem_la_write(), .mem_la_addr(), .mem_la_wdata(), .mem_la_wstrb(),
         .pcpi_valid(), .pcpi_insn(), .pcpi_rs1(), .pcpi_rs2(),
         .pcpi_wr(1'b0), .pcpi_rd(32'b0), .pcpi_wait(1'b0), .pcpi_ready(1'b0),
-        .irq({28'b0, irq, 3'b0}), .eoi(),
+        .irq({27'b0, bus_err, irq, 3'b0}), .eoi(),
         .trace_valid(), .trace_data()
     );
     /* verilator lint_on PINCONNECTEMPTY */
