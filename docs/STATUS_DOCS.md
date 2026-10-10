@@ -144,8 +144,9 @@ test suite runs the same checks, so CI needs no extra step.
 - **No CI job for the release snapshot.** The site's numbers trail the code
   between releases by design. A scheduled check could warn when they are far
   behind; nobody asked for it.
-- **Older docs that cite "`context.md` section 5.x"** (the VeriTriage-era
-  design docs) are left as written; that section is now in
-  `docs/history/context-before-M43.md`. The source comment in
+- **Older docs that cited the VeriTriage-era future work of the old
+  `context.md`** (the VeriTriage-era design docs) were left as written here;
+  that section is now in `docs/history/context-before-M43.md`, and M47
+  repointed them to it. The source comment in
   `knowledge/packs/ddr.py` and `docs/architecture/current-state.md` are updated.
 - **Version and tags.** M43 bumps no version.

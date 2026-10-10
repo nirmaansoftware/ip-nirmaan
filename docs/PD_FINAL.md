@@ -212,6 +212,7 @@ place-route
 `max_<metric>`: a run below the bound, or one that never reported the metric,
 fails. `dft.atpg` already checked its own `min_` limits; the runner's check
 agrees with it and runs only on a passing result, so nothing there changes.
+(M47 removed `dft.atpg`'s own copy; the runner's check is now the only one.)
 `physical_verification_report` joins the `04_rtl` deliverable folder.
 
 ---
