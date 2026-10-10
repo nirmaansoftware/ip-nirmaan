@@ -278,6 +278,24 @@ def test_the_cli_imports_and_exports(axi, tmp_path):
     assert json.loads(printed.output) == json.loads(good.read_text())
 
 
+def test_cli_output_does_not_depend_on_the_path_length(axi, tmp_path):
+    """M46: the console wrapped a long path's line so "line 3:" broke in two; the suite fixes the width."""
+    from nirmaan.cli import app
+
+    engine, rtl = axi
+    root = tmp_path / "store"
+    ProjectStore(root).save(engine.state)
+    bad = dump({**import_doc(engine, rtl), "version": 2})
+    role = importer(engine, rtl).role
+    for length in range(1, 81):  # every wrap position a console 80 columns wide can hit
+        path = tmp_path / ("d" * length) / "bad.json"
+        path.parent.mkdir()
+        path.write_text(bad)
+        refused = CliRunner().invoke(app, ["vplan", "import", engine.state.project.id, str(path),
+                                           "--as", role, "--root", str(root)])
+        assert refused.exit_code == 1 and f"{path}: line 3:" in refused.output, length
+
+
 # --- The verification-plan seat -------------------------------------------------------------
 
 
