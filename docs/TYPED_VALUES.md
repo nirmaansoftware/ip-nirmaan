@@ -37,6 +37,7 @@ and its probe receive them: `timeout` is an `int`, `utilization` a `float`,
 typed: a list is comma-joined and anything else is text, exactly as in M28,
 so an extension's binding written against text keeps working.
 An ill-typed value is refused before any probe, binding, or record, as in M28.
+An empty integer or number (`timeout=`) is treated as not given.
 
 **From the CLI and task inputs.** Both stay text where they are written (a
 task input is a `MemoryEntry`, whose value is text), and become typed at the
@@ -81,15 +82,16 @@ scope a typed model:
 
 `prompt.py`, `model.py`, and `selection.py` read attributes. Nothing reads the
 packet as a dict, and the packet carries no dict except the ones whose keys are
-data (a project's parameters, a role's skill proficiencies).
+data (a project's parameters, a role's skill proficiencies and capabilities).
 
 **Prompts are unchanged.** `tests/fixtures/prompts/` holds prompts rendered by
 the dict packet before this change: a triage seat's work prompt (with its
 pre-flight VeriTriage run), a root-cause work and review prompt (evidence from
 upstream tasks), an RTL seat's prompt (approved upstream files with content),
 and a repair prompt (a refused attempt's failed runs, with the log lines
-masked, since they come from the installed Verilator). The typed packet renders
-each byte for byte.
+masked, since they come from the installed Verilator; project IDs are
+normalized, since they follow the organization's fingerprint). The typed packet
+renders each byte for byte.
 
 ## What does not change
 
