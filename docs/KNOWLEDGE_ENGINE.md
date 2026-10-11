@@ -8,8 +8,8 @@ specification references. Deterministic code matches that knowledge against
 the Evidence Graph before any AI runs; the LLM becomes an explanation layer
 over conclusions that already exist, never the source of technical truth.
 
-The knowledge base ships with **42 packs, 92 deterministic failure
-patterns, 90 debug playbooks, 90 concepts, and 15 protocol state machines**
+The knowledge base ships with **44 packs, 100 deterministic failure
+patterns, 98 debug playbooks, 98 concepts, and 17 protocol state machines**
 (`veritriage knowledge` prints the current count), grown across four content
 tiers after v1.0.0 with no change to the clause matcher, the Knowledge Graph,
 reasoning, or the report: proof that the registry architecture scales on

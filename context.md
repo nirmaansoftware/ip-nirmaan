@@ -44,9 +44,10 @@ OpenROAD, KLayout in CI). Seats are evaluated by cases whose judges are real
 tool runs (`evals/`). Model calls are selected by capability and recorded with
 tokens and cost.
 
-**VeriTriage** (`src/veritriage/`, M1 to M18) is the verification-intelligence
-engine inside it. Parsers turn logs, waveforms, and manifests into an Evidence
-Graph; rules, Knowledge Packs, and a reasoning pipeline explain failures over
+**VeriTriage** (`src/veritriage/`, M1 to M18, plus its own platform
+completion milestone, `docs/history/M19-b-veritriage-platform-completion.md`)
+is the verification-intelligence engine inside it. Parsers turn logs,
+waveforms, and manifests into an Evidence Graph; rules, Knowledge Packs, and a reasoning pipeline explain failures over
 it, with lenses (waveform, engineering context, project model, design graph)
 and platform layers (workspace services, MCP, orchestration, collaboration,
 agents, learning, planning, conversation, AI providers, automation) above it.
@@ -122,8 +123,11 @@ rules/           Graph-native deterministic classification rules.
 reasoning/       Selection, signals, hypotheses, recommendations, ai.py (legacy
                  AI review); no knowledge or history dependency.
 knowledge/       Knowledge Pack schema, registry, built-in packs, matcher, engine.
+references/      ReferenceResolver registry; an offline catalogue turns cited specs
+                 into links at the report boundary. No network, by test.
 waveform/        Format adapters (the only format-aware code) and detectors.
-engineering/     Context providers (the only git call site), impact, ownership.
+engineering/     Context providers (the only git call site), impact, ownership, and
+                 regression_diff (what landed since the last green run).
 project/         The Project Model and its providers; never enters the graph.
 design/          The Design Graph, derived from the Project Model, never source.
 workspace/       WorkspaceServices: the public API every client uses.

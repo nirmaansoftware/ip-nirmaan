@@ -28,6 +28,7 @@ from veritriage.agents import AgentCoordinator, build_agent_context
 from veritriage.design import build_design_graph, build_design_view
 from veritriage.planning import Planner, PlanningContext
 from veritriage.graph.builder import GraphBuilder
+from veritriage.feedback.reweight import reweight_recommendations
 from veritriage.graph.graph import EvidenceGraph
 from veritriage.knowledge import KnowledgeEngine, knowledge_reasoning_rules
 from veritriage.models import AnalysisReport, LearningContext, LogSummary, Severity
@@ -183,6 +184,14 @@ def analyze(
     # is a second opinion, not a stage of the pipeline's conclusion path. It
     # reads the report and the graph and writes only report.agents.
     report.learning = learning
+    # Feedback closes the loop M4 opened: engineer votes reorder the advice
+    # this run produced. A reorder only, and only when a learning context was
+    # recalled, so the deterministic conclusions above are untouched and a
+    # platform without a learning store behaves exactly as it did before.
+    if learning is not None and learning.recommendation_weights:
+        report.reasoning.recommendations = reweight_recommendations(
+            report.reasoning.recommendations, learning.recommendation_weights
+        )
     if agents:
         assessment = AgentCoordinator(
             calibration=learning.calibration if learning is not None else None

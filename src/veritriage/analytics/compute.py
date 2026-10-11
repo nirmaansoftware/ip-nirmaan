@@ -7,6 +7,8 @@ from collections import defaultdict
 
 from veritriage.analytics.models import AnalyticsReport, Counter, DailyPoint, FailureCluster
 from veritriage.history.record import RegressionRecord
+from veritriage.learning.corpus import Corpus
+from veritriage.learning.learners.gaps import compute_rule_gaps
 from veritriage.similarity import cosine
 from veritriage.storage import RegressionStore
 
@@ -23,6 +25,9 @@ class RegressionAnalytics:
 
     def compute(self) -> AnalyticsReport:
         records = self._store.all_records()
+        # The same aggregation the rule-gap learner persists, computed here
+        # directly from history so the dashboard needs no learning store.
+        gaps = compute_rule_gaps(Corpus(records, self._store.all_feedback()))
         failures = [r for r in records if r.is_failure]
 
         modules: TallyCounter[str] = TallyCounter()
@@ -62,6 +67,7 @@ class RegressionAnalytics:
 
         n_fail = len(failures)
         return AnalyticsReport(
+            rule_gaps=gaps,
             total_runs=len(records),
             total_failures=n_fail,
             unknown_failures=sum(

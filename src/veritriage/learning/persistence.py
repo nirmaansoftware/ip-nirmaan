@@ -27,6 +27,7 @@ from veritriage.models import (
     ProjectProfile,
     ProtocolStatistics,
     RecommendationOutcome,
+    RuleGap,
 )
 
 #: Artifact kind -> the model that reconstructs it. A learner shipping a new
@@ -39,6 +40,7 @@ ARTIFACT_TYPES: dict[str, type[LearningArtifact]] = {
     "protocol_statistics": ProtocolStatistics,
     "recommendation_outcome": RecommendationOutcome,
     "hypothesis_history": HypothesisHistory,
+    "rule_gap": RuleGap,
 }
 
 _SCHEMA = """

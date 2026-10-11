@@ -42,6 +42,7 @@ The original preface of the section:
 - [M17-generative-ai](M17-generative-ai.md): Milestone 17 (v1.13.0) - Generative AI providers
 - [M18-automation-engine](M18-automation-engine.md): Milestone 18 (v1.14.0) - Automation Engine
 - [M19-organizational-os](M19-organizational-os.md): Milestone 19 (v1.15.0) - IP Nirmaan: the Organizational Operating System
+- [M19-b-veritriage-platform-completion](M19-b-veritriage-platform-completion.md): VeriTriage milestone 19 (2026-09-05, PR #4, merged after v1.24.0) - Platform Completion: OCP and Wishbone packs, reference resolution, the feedback loop, cross-regression diffing
 - [M19-side-1-landing-page](M19-side-1-landing-page.md): Landing page (side work, 2026-09-28) - `site/` for ip.nirmaan.online
 - [M19-side-2-continuous-integration](M19-side-2-continuous-integration.md): Continuous integration (side work, Stage 0) - `.github/workflows/ci.yml`
 - [M20-ai-workers](M20-ai-workers.md): Milestone 20 - AI workers in verification seats (roadmap Stage 1)
