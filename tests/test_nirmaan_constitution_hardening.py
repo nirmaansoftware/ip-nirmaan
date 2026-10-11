@@ -42,7 +42,7 @@ from nirmaan.work import ProjectStore, TaskEngine
 from nirmaan.work.engine import AuthorityError, WorkError
 from nirmaan.work.policy import PolicyViolationError
 
-from laws import imports
+from laws import imports, needs
 from nirmaan_helpers import drive, human, tid
 
 FIX = Path(__file__).parent / "fixtures" / "rtl"
@@ -95,6 +95,7 @@ def _lint(engine: TaskEngine, task_id: str):
 # --- C2: evidence is about this task and this submission --------------------------------------
 
 
+@needs("verilator")  # the probe's lint run is real
 def test_a_run_of_another_task_cannot_back_this_one(probe):
     run = _lint(probe, tid(probe, "linta"))
     b = tid(probe, "lintb")
@@ -106,6 +107,7 @@ def test_a_run_of_another_task_cannot_back_this_one(probe):
     assert probe.task(b).status is TaskStatus.IN_PROGRESS
 
 
+@needs("verilator")  # the probe's lint run is real
 def test_the_model_runtime_drops_runs_of_other_tasks(probe):
     """The mock model names every run its prompt shows, upstream ones included; only this task's count."""
     a, c = tid(probe, "linta"), tid(probe, "lintc")
@@ -124,6 +126,7 @@ def test_the_model_runtime_drops_runs_of_other_tasks(probe):
     assert probe.task(c).status is not TaskStatus.COMPLETED  # its own lint had no sources, so it failed
 
 
+@needs("verilator")  # the probe's lint run is real
 def test_a_sent_back_submissions_evidence_does_not_verify_the_next(probe):
     t = tid(probe, "rev")
     owner, reviewer = ai(probe.task(t).owner), ai(probe.task(t).reviewer)
@@ -209,6 +212,7 @@ def test_a_run_nobody_executed_cannot_be_recorded(probe):
     assert "run-9999" not in probe.state.tool_runs
 
 
+@needs("verilator")  # the probe's lint run is real
 def test_a_recorded_run_cannot_be_replaced(probe):
     from nirmaan.work.engine import BROKER_SEAL
 
