@@ -321,7 +321,7 @@ def test_march_c_minus_fails_each_injected_fault(engine, tmp_path, top):
 def test_the_dft_stage_requires_real_coverage_before_review(engine):
     dft = engine.task(tid(engine, "dft"))
     gated = {t: r for r in dft.evidence_requirements if r.before_review for t in r.tools}
-    assert sorted(gated) == ["dft.atpg", "dft.check", "dft.scan_sim"]
+    assert sorted(gated) == ["dft.atpg", "dft.check", "dft.scan_insert", "dft.scan_sim"]  # M44: insert first
     assert dict(gated["dft.atpg"].params) == {"min_test_coverage": "90"}
     skills = engine.org.skills
     assert "dft.atpg" in skills["atpg"].tools and "dft.mbist" in skills["mbist"].tools
