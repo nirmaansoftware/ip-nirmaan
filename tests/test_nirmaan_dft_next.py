@@ -18,8 +18,9 @@ from pathlib import Path
 import pytest
 
 from nirmaan_helpers import agent, drive, human, tid
-from test_nirmaan_dft import COUNTER, RTL, _cell, _netlist, holder, invoke, needs
+from test_nirmaan_dft import COUNTER, RTL, _cell, _netlist, holder, invoke
 from test_nirmaan_dft_advanced import ATPG_DEMO, BLOCKS, RAM, TWO_CLOCKS, _flops, insert
+from laws import needs
 
 from nirmaan.integrations.dft_atpg import build_model
 from nirmaan.integrations.dft_scan import Design, stitch

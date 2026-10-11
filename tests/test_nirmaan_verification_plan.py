@@ -14,7 +14,6 @@ AXI4-Lite demo runs the real tools. No test calls a model API.
 
 from __future__ import annotations
 
-import ast
 import json
 import sys
 import types
@@ -30,10 +29,10 @@ from test_nirmaan_engineering_graph import (  # noqa: F401  (fake_eda and axi ar
     axi,
     axi_files,
     fake_eda,
-    needs,
     run_rtl_seat,
     token,
 )
+from laws import imports, needs
 
 from nirmaan import engineering, vplan
 from nirmaan.company.traceability import ItemKind
@@ -276,6 +275,24 @@ def test_the_cli_imports_and_exports(axi, tmp_path):
     assert out.read_text() == good.read_text()
     printed = CliRunner().invoke(app, ["vplan", "export", project, "--root", str(root)])
     assert json.loads(printed.output) == json.loads(good.read_text())
+
+
+def test_cli_output_does_not_depend_on_the_path_length(axi, tmp_path):
+    """M46: the console wrapped a long path's line so "line 3:" broke in two; the suite fixes the width."""
+    from nirmaan.cli import app
+
+    engine, rtl = axi
+    root = tmp_path / "store"
+    ProjectStore(root).save(engine.state)
+    bad = dump({**import_doc(engine, rtl), "version": 2})
+    role = importer(engine, rtl).role
+    for length in range(1, 81):  # every wrap position a console 80 columns wide can hit
+        path = tmp_path / ("d" * length) / "bad.json"
+        path.parent.mkdir()
+        path.write_text(bad)
+        refused = CliRunner().invoke(app, ["vplan", "import", engine.state.project.id, str(path),
+                                           "--as", role, "--root", str(root)])
+        assert refused.exit_code == 1 and f"{path}: line 3:" in refused.output, length
 
 
 # --- The verification-plan seat -------------------------------------------------------------
@@ -530,19 +547,9 @@ def test_a_plan_seat_against_a_new_spec_kind_with_a_new_item_kind_needs_no_core_
 # --- Laws ---------------------------------------------------------------------------------------
 
 
-def _imports(path: Path) -> set[str]:
-    found = set()
-    for node in ast.walk(ast.parse(path.read_text())):
-        if isinstance(node, ast.Import):
-            found |= {a.name for a in node.names}
-        elif isinstance(node, ast.ImportFrom) and node.module:
-            found.add(node.module)
-    return found
-
-
 def test_the_import_laws_hold():
     for path in (SRC / "vplan.py", SRC / "integrations" / "vplan.py"):
-        assert not any(m == "veritriage" or m.startswith("veritriage.") for m in _imports(path)), path
+        assert not any(m == "veritriage" or m.startswith("veritriage.") for m in imports(path)), path
     # The runtime, the engine, and the policy name no plan kind, capability, stage, or tool.
     names = ("verification_plan", "vplan", "dv.plan", "dv-plan", "interface_spec")
     for path in [*sorted((SRC / "runtime").glob("*.py")), SRC / "work" / "engine.py", SRC / "work" / "policy.py",

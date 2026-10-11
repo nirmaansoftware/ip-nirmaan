@@ -18,7 +18,8 @@ from pathlib import Path
 import pytest
 
 from nirmaan_helpers import agent, tid
-from test_nirmaan_dft import AXI, COUNTER, RTL, _cell, _netlist, holder, invoke, needs
+from test_nirmaan_dft import AXI, COUNTER, RTL, _cell, _netlist, holder, invoke
+from laws import needs
 
 from nirmaan.integrations.dft_atpg import CaptureModel, generate
 from nirmaan.integrations.dft_scan import Design, NetlistError, stitch

@@ -58,7 +58,6 @@ TESTBENCH = "scan_tb.v"
 TB_TOP = "nirmaan_scan_tb"
 PATTERNS = "patterns.json"
 FAULTS = "faults.json"
-ATPG_CONFIG = "atpg_config.json"
 MBIST_CONTROLLER = "nirmaan_mbist.v"
 
 _HELPER_ERROR_RE = re.compile(r"^DFT-ERROR:\s*(?P<msg>.*)$", re.M)
@@ -404,8 +403,6 @@ def atpg_analysis_steps(job: Job) -> list[list[str]]:
 def atpg_grading_steps(job: Job, patterns: str, fault_model: str = "stuck-at") -> list[list[str]]:
     """Grade ``patterns`` by fault simulation: the fault netlist, Yosys writes it, Icarus runs both machines."""
     work = job.workdir
-    limits = {k[4:]: v for k, v in job.params.items() if k.startswith("min_")}
-    (work / ATPG_CONFIG).write_text(json.dumps({"min": limits}) + "\n", encoding="utf-8")
     script = ["read_json faulty.json", "hierarchy -check -top nirmaan_faulty", "check -assert",
               "write_verilog -noattr fault_netlist.v"]
     (work / "fault.ys").write_text("\n".join(script) + "\n", encoding="utf-8")
@@ -442,12 +439,6 @@ def _atpg_params(job: Job) -> str | None:
         value = text_value(job.params.get(name)).strip()
         if value and not value.isdigit():
             return f"{name} must be a non-negative integer, not {value!r}"
-    for name, value in job.params.items():
-        if name.startswith("min_"):
-            try:
-                float(value)
-            except (TypeError, ValueError):
-                return f"{name} {value!r} is not a number"
     return None
 
 
@@ -521,17 +512,6 @@ def parse_atpg(run: RunRecord) -> EdaResult:
                f"{undetectable} proven undetectable, {metrics['faults_undetected']} undetected), "
                f"{_plural(metrics['patterns'], 'pattern pair' if transition else 'pattern')}"
                f"{', launch on capture,' if transition else ''} over {_plural(doc['chains'], 'chain')}{sample}")
-    limits = (_json(run.workdir / ATPG_CONFIG) or {}).get("min", {})
-    short = []
-    for metric, bound in sorted(limits.items()):
-        measured = metrics.get(metric)
-        if isinstance(measured, bool) or not isinstance(measured, (int, float)):
-            short.append(f"{metric} was not reported, so min_{metric} cannot be checked")
-        elif measured < float(bound):
-            short.append(f"{metric} {measured} is below min_{metric} {text_value(bound)}")
-    if short:
-        return EdaResult(False, f"limit not met: {'; '.join(short)} (the tool reported: {summary})",
-                         tuple(Diagnostic("error", m, "LIMIT") for m in short), metrics)
     return EdaResult(True, summary, (), metrics)
 
 

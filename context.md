@@ -187,13 +187,18 @@ deselected test imports the `anthropic` SDK and can stall while iCloud
 downloads it; run it separately when the venv is local. `python3
 scripts/check_dashes.py` must also pass.
 
-**CI** (`.github/workflows/ci.yml`), on every PR and push to `main`:
-- `test` on Python 3.11 and 3.12 (ubuntu-24.04): apt Verilator, Icarus,
-  Yosys; SymbiYosys and Yices from a pinned OSS CAD Suite; the RISC-V GCC;
-  the full suite with the tools required.
+**CI** (`.github/workflows/ci.yml`), on every PR and push to `main`; actions
+pinned by SHA, runners `ubuntu-24.04`, older PR runs cancelled (M46,
+`docs/TEST_CI_HARDENING.md`):
+- `test` on Python 3.12: apt Verilator, Icarus, Yosys; SymbiYosys and Yices
+  from the pinned, cached OSS CAD Suite (`.github/actions/oss-cad-suite`);
+  the RISC-V GCC; the full suite with the tools required.
+- `no-tools` on Python 3.11: no EDA tool and no `anthropic`; the full suite,
+  where every test passes or skips.
 - `physical-design`: in a pinned OpenROAD-flow-scripts image, standalone
   OpenSTA (cached), the sky130hd corner libraries (pinned by sha256), and the
   physical design and STA tests on Nangate45 and sky130hd.
+- `test-union`: fails if a test was skipped in every job.
 - `dashes`: `scripts/check_dashes.py`.
 
 **Counts.** `python scripts/status.py` prints the counts; `--check` fails on

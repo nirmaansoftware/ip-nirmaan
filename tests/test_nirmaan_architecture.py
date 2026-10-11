@@ -18,6 +18,8 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
+from laws import imports
+
 import nirmaan
 from nirmaan.models import (
     Capability,
@@ -44,37 +46,26 @@ SRC = NIRMAAN.parent
 REPO = SRC.parent
 
 
-def _imports(path: Path) -> set[str]:
-    tree = ast.parse(path.read_text(encoding="utf-8"))
-    found: set[str] = set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            found.update(alias.name for alias in node.names)
-        elif isinstance(node, ast.ImportFrom) and node.module:
-            found.add(node.module)
-    return found
-
-
 def _sources(root: Path) -> list[Path]:
     return sorted(p for p in root.rglob("*.py") if "__pycache__" not in p.parts)
 
 
 def test_veritriage_never_imports_nirmaan():
     for path in _sources(SRC / "veritriage"):
-        assert not any(m == "nirmaan" or m.startswith("nirmaan.") for m in _imports(path)), path
+        assert not any(m == "nirmaan" or m.startswith("nirmaan.") for m in imports(path)), path
 
 
 def test_only_the_bridge_imports_veritriage():
     bridge = NIRMAAN / "integrations" / "veritriage.py"
     for path in _sources(NIRMAAN):
-        uses = any(m == "veritriage" or m.startswith("veritriage.") for m in _imports(path))
+        uses = any(m == "veritriage" or m.startswith("veritriage.") for m in imports(path))
         assert uses == (path == bridge), path
 
 
 def test_the_vocabulary_is_plain_data():
     allowed = {"__future__", "enum", "datetime", "typing", "pydantic"}
     for path in _sources(NIRMAAN / "models"):
-        for module in _imports(path):
+        for module in imports(path):
             assert module.split(".")[0] in allowed or module.startswith("nirmaan.models"), (path, module)
 
 

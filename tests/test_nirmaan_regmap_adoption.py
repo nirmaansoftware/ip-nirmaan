@@ -23,12 +23,12 @@ from pathlib import Path
 import pytest
 
 from nirmaan_helpers import agent, drive, human, tid
-from test_nirmaan_design_agents import needs
 from test_nirmaan_firmware import answer, file, holder, joined, token, workspace
 from test_nirmaan_riscv_firmware import SOC_TOOLS
-from test_nirmaan_riscv_firmware import needs as needs_riscv
+from laws import needs
 
 from nirmaan.integrations.firmware import HARNESS, cosim_buses, register_cosim_bus, unregister_cosim_bus
+from nirmaan.integrations.firmware_riscv import RISCV_GCC
 from nirmaan.models import Access, Assurance, RegisterMap, TaskStatus
 from nirmaan.orchestrator import Orchestrator
 from nirmaan.regmap import c_test, load_map, lower, validate
@@ -239,7 +239,7 @@ def test_a_driver_that_writes_no_header_uses_the_generated_one(block, tmp_path):
     assert not without.succeeded and "apb_csr_map.h" in without.summary  # no map, no header
 
 
-@needs_riscv(*SOC_TOOLS, riscv=True)
+@needs(*SOC_TOOLS, any_of=RISCV_GCC)
 def test_the_generated_header_also_serves_the_risc_v_run(block, tmp_path):
     """fw.soc_test takes the map too: the same driver, its header generated, on a core over the SoC's APB bridge."""
     run, outcome = invoke(block, "fw.soc_test", {"sources": joined(*CSR_SOURCES), "rtl": str(CSR_RTL),

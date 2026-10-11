@@ -19,7 +19,8 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from nirmaan_helpers import drive, human, needs, tid
+from nirmaan_helpers import drive, human, tid
+from laws import needs
 
 from nirmaan.models import (
     Actor,

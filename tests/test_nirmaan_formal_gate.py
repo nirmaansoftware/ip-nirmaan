@@ -25,11 +25,11 @@ from test_nirmaan_design_agents import (
     answer,
     counter_files,
     file,
-    needs,
     token,
     upstream,
     with_workspace,
 )
+from laws import needs
 
 from nirmaan.integrations.eda import Backend, EdaResult, register_backend, unregister_backend
 from nirmaan.models import Assurance, EvidenceKind, TaskStatus

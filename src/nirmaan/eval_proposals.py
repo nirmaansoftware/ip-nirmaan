@@ -31,10 +31,12 @@ class EvalRun:
     id: str
     path: str
     result: EvalResult
+    #: Where the run came from (M45): ``record:<record ID>`` for a trial of a run record, ``file`` otherwise.
+    source: str = "file"
 
     def evidence(self) -> dict[str, Any]:
         r = self.result
-        return {"run": self.id, "file": self.path, "case": r.case, "runtime": r.runtime, "version": r.version,
+        return {"run": self.id, "file": self.path, "source": self.source, "case": r.case, "runtime": r.runtime, "version": r.version,
                 "started_at": r.started_at.isoformat(), "case_digest": r.case_digest, "passed": r.passed,
                 "submitted": r.submitted, "seat_status": r.seat_status,
                 "failed_gates": [{"tool": g.tool, "run": g.run, "summary": g.summary}
@@ -44,17 +46,33 @@ class EvalRun:
                 "detail": r.detail}
 
 
-def run_id(result: EvalResult) -> str:
-    """A stable ID for one run: its case, runtime, start time, and case digest."""
+def run_id(result: EvalResult, trial: str = "") -> str:
+    """A stable ID for one run: its case, runtime, start time, and case digest (and, M45, its record trial)."""
     key = f"{result.case}|{result.runtime}|{result.started_at.isoformat()}|{result.case_digest}"
+    key += f"|{trial}" if trial else ""
     return "ev-" + hashlib.sha256(key.encode("utf-8")).hexdigest()[:10]
 
 
+#: M45 run records: a trial carries a result; a manifest or summary carries none.
+_TRIAL, _NOT_RESULTS = "nirmaan.eval-trial", ("nirmaan.eval-run", "nirmaan.eval-summary")
+
+
 def load_results(root: Path | str) -> list[EvalRun]:
-    """Every recorded result under ``root``: one per file, or a list per file. The same run read twice is one."""
+    """Every recorded result under ``root``: one per file, a list per file, or a run record's trials (M45).
+
+    The same run read twice is one. Each run is labelled with its source: ``record:<record ID>`` for a
+    trial of a run record, ``file`` for a plain result file (such as the synthetic fixtures).
+    """
     runs: dict[str, EvalRun] = {}
     for path in sorted(Path(root).rglob("*.json")):
         data = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(data, dict) and data.get("format") in _NOT_RESULTS:
+            continue
+        if isinstance(data, dict) and data.get("format") == _TRIAL:
+            result = EvalResult.model_validate(data["result"])
+            rid = run_id(result, f"{data['record']}#{data['trial']}")
+            runs.setdefault(rid, EvalRun(rid, str(path), result, f"record:{data['record']}"))
+            continue
         for item in data if isinstance(data, list) else [data]:
             result = EvalResult.model_validate(item)
             runs.setdefault(run_id(result), EvalRun(run_id(result), str(path), result))

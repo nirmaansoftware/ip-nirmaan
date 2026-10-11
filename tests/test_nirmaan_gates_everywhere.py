@@ -23,12 +23,12 @@ from test_nirmaan_design_agents import (
     RTL,
     answer,
     counter_files,
-    needs,
     token,
     upstream,
     with_workspace,
 )
 from test_nirmaan_formal_gate import COUNTER, COUNTER_SBY, FORMAL, runs_of, sby_file
+from laws import needs
 
 from nirmaan.integrations.eda_parsers import parse_sby_cover
 from nirmaan.models import Assurance, DecisionKind, EscalationKind, EvidenceKind, TaskStatus

@@ -426,7 +426,7 @@ underneath it and is a later milestone, not this one.
 
 - Full waveform rendering or a value viewer (this is a metadata engine).
 - Numeric-threshold / performance observations that would need a new
-  `EvidenceClause` variant (that is the matcher change context.md 5.1 wants
+  `EvidenceClause` variant (that is the matcher change `docs/history/context-before-M43.md` section 5.1 wants
   confirmed separately; M6 stays additive).
 - FSDB/FST/WLF adapters (documented as the next adapters; the architecture test
   proves they need no core change).
@@ -443,7 +443,7 @@ underneath it and is a later milestone, not this one.
 3. Additive edits: `graph/builder.py`, `models/report.py` (schema "6"),
    `pipeline.py`, `reports/html.py`, `cli/main.py`.
 4. Tests + fixtures per section 8.
-5. Docs: this file finalized, `README.md` roadmap tick, `context.md` M6 entry +
-   section 3 map update, light `ARCHITECTURE.md` pass.
+5. Docs: this file finalized, `README.md` roadmap tick, the M6 entry (now
+   `docs/history/M06-waveform-engine.md`) + the architecture map update, light `ARCHITECTURE.md` pass.
 6. Full suite green (target: current 161 plus the new M6 tests), no em/en
    dashes, then a single milestone commit.

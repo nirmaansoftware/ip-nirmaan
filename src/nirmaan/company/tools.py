@@ -136,6 +136,12 @@ TOOLS: list[ToolSpec] = [
           "A verification plan is valid and covers exactly the requirements its approved spec tags (M29).",
           (_p("plan", PATHS, "The verification plan file or files to check.", required=True),
            _p("spec", PATHS, "The approved spec file or files the plan must cover.", required=True))),
+    _tool("spec.check", "Specification check", "verification", RD, AV,
+          "A specification tags every requirement it must carry, each saying what it must, and names every port "
+          "and parameter it must (M45).",
+          (_p("spec", PATHS, "The specification file or files to check.", required=True),
+           _p("checks", PATH, "The checks file (nirmaan.spec-checks): requirement IDs with terms, and names.",
+              required=True))),
     _tool("equivalence.run", "Equivalence checker", "eda", EXE, CO, "Logic equivalence checking."),
     _tool("cdc.run", "CDC/RDC analyzer", "eda", EXE, CO, "Structural and functional crossing analysis."),
     # Implementation EDA.
@@ -209,7 +215,7 @@ TOOLS: list[ToolSpec] = [
     _tool("dft.run", "DFT tools", "eda", EXE, CO, "ATPG, MBIST, and commercial scan flows."),
     _tool("dft.scan_insert", "Scan insertion", "eda", EXE, AV, "Mux-D scan flops stitched into one chain.",
           (SOURCES, TOP_REQUIRED, _p("chains", INT, "Number of scan chains (default 1)."),
-           _p("max_chain_length", INT, "Longest chain allowed; 0 for no limit (default)."),
+           _p("max_chain_length", INT, "Longest chain allowed, a positive integer; omit it for no limit (the default)."),
            _p("cross_domains", TEXT, "'lockup': chains may cross clock domains, with a lockup latch at each crossing "
               "(M29)."), *RUNNER)),
     _tool("dft.check", "DFT rule check", "eda", EXE, AV, "Testability rules over the synthesized netlist.",
