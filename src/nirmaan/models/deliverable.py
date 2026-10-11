@@ -36,3 +36,6 @@ class DeliverableFolder(BaseModel):
         default=(), description="Fallback: artifacts whose kind no folder names, by their task's capability."
     )
     sections: tuple[ExportSection, ...] = ()
+    tool_runs: tuple[str, ...] = Field(
+        default=(), description="Tools whose recorded runs this folder lists, pass or fail, with their files (M44)."
+    )

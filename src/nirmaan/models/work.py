@@ -12,7 +12,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_serializer
 
 from nirmaan.models.frozen import deep_frozen
 from nirmaan.models.governance import Criticality, DecisionKind, EscalationKind
@@ -261,8 +261,18 @@ class ToolRun(BaseModel):
     succeeded: bool
     summary: str
     references: tuple[str, ...] = ()
+    outputs: dict[str, str] = Field(
+        default_factory=dict, description="The files the run wrote, by output name (M44), e.g. a netlist.")
 
-    _freeze = field_validator("params", mode="after")(lambda v: deep_frozen(v))
+    _freeze = field_validator("params", "outputs", mode="after")(lambda v: deep_frozen(v))
+
+    @model_serializer(mode="wrap")
+    def _without_empty_outputs(self, handler):
+        """A run that wrote nothing it names saves as before M44, so older projects round-trip unchanged."""
+        data = handler(self)
+        if isinstance(data, dict) and not data.get("outputs"):
+            data.pop("outputs", None)
+        return data
 
     def values(self, param: str) -> list[str]:
         """A parameter's elements (a tuple, or comma-joined text saved before M39); empty if not given."""

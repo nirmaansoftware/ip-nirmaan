@@ -234,8 +234,12 @@ def execute(backend: Backend, params: Params) -> ToolOutcome:
     }
     result_path = workdir / f"{backend.name}.result.json"
     result_path.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
+    # M44: what the run wrote, by name: its log, and the files its backend reports under ``outputs``.
+    reported = result.metrics.get("outputs")
+    outputs = {"log": str(log_path), **{str(k): str(v) for k, v in (reported or {}).items()
+                                        if isinstance(reported, dict) and v and Path(str(v)).is_file()}}
     return ToolOutcome(result.passed, f"{backend.name}: {result.summary}",
-                       references=(str(log_path), str(result_path)), data=record)
+                       references=(str(log_path), str(result_path)), data=record, outputs=outputs)
 
 
 def _within_limits(result: EdaResult, params: Params) -> EdaResult:

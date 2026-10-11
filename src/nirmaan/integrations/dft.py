@@ -291,7 +291,8 @@ def parse_scan_insert(run: RunRecord) -> EdaResult:
         metrics.update(chain_length=report["length"], chains=len(lengths), chain_lengths=lengths, lockups=lockups,
                        flops=report["flops"], clock=report["clock"], clocks=report["clocks"], ports=report["ports"],
                        order=[f["flop"] for f in report["order"]], scan_netlist=str(netlist),
-                       chain_report=str(run.workdir / CHAIN_REPORT))
+                       chain_report=str(run.workdir / CHAIN_REPORT),
+                       outputs={"scan_netlist": str(netlist), "chain_report": str(run.workdir / CHAIN_REPORT)})
         clocks = "; ".join(f"{c['edge']} {c['port']}" for c in report["clocks"])
         if report.get("cross_domains"):
             clocks += f"; across clock domains, {lockups} lockup latch{'es' if lockups != 1 else ''}"

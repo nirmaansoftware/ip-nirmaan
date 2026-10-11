@@ -116,6 +116,19 @@ RETIMED = checked("Timing met on the fixed RTL: synthesized to the target librar
 #: the approved upstream map when there is one, left out when there is none, and never dodged when there is.
 APPROVED_MAP = FileInput(param="map", kinds=("register_map",), upstream=True, optional=True)
 
+#: M29 and M34: the limits a physical run counts only if made with (a limit on a metric the run never reported
+#: fails it). One constant per set, shared by `physical-implementation` and the layout stages of `block-design`
+#: (M44), so the two cannot drift.
+ROUTED_LIMITS = (("max_drc_violations", "0"), ("max_unconnected_supply_pins", "0"))
+PV_LIMITS = (("max_drc_violations", "0"), ("max_lvs_mismatches", "0"), ("min_fill_shapes", "1"))
+SIGNOFF_LIMITS = (("max_unannotated_nets", "0"), ("min_timing_corners", "3"))
+
+
+def approved(param: str, *kinds: str) -> FileInput:
+    """A tool parameter filled from the approved upstream artifacts of these kinds."""
+    return FileInput(param=param, kinds=kinds, upstream=True)
+
+
 _PROTOCOL_VARIANTS = (
     var("axi", "AXI interface", "axi", cond=when("axi")),
     var("ace", "ACE interface", "ace", cond=when("ace")),
@@ -510,6 +523,9 @@ TIMING_CLOSURE = WorkflowTemplate(
 
 # --- 8. Small, self-contained block design (M23) -------------------------------------
 
+#: M44: the layout stages, planned when the request asks for a layout.
+LAYOUT = when("layout")
+
 BLOCK_DESIGN = WorkflowTemplate(
     id="block-design",
     name="Block design",
@@ -580,6 +596,10 @@ BLOCK_DESIGN = WorkflowTemplate(
            review=rv("dft.review"),
            outputs=("dft_netlist",),
            evidence=(REVIEWED,
+                     # M44: the scan netlist is the file a scan insertion over the approved RTL wrote, and the
+                     # checks below run over it.
+                     checked("Scan inserted into the approved RTL", "dft.scan_insert",
+                             approved("sources", "rtl_source"), yields=(("dft_netlist", "scan_netlist"),)),
                      checked("Testability rules hold and every flop is on the chain", "dft.check",
                              FileInput(param="sources", kinds=("dft_netlist",)),
                              FileInput(param="top", kinds=("dft_netlist",), entry=True)),
@@ -639,6 +659,56 @@ BLOCK_DESIGN = WorkflowTemplate(
                              FileInput(param="sources", kinds=("driver", "driver_test")),
                              FileInput(param="rtl", kinds=("rtl_source",), upstream=True), APPROVED_MAP,
                              params=(("require_bus_error_trap", "yes"),), when=when(all_of=("riscv", "bus_errors"))))),
+        # M44: when the request asks for a layout, the approved RTL goes through physical design in this project
+        # (docs/FACTORY_E2E.md). Every design input is an approved upstream artifact, never a typed path; the
+        # PDK and the top module are task inputs. Each tool's output that the next stage needs is yielded as
+        # this stage's artifact, the very file the passing run wrote.
+        st("timing-constraints", "Timing constraints (SDC)", "Implementation", "sta.constraints",
+           depends_on=("rtl-implementation",), when=LAYOUT, criticality=M, review=rv("sta.review"),
+           outputs=("constraints",),
+           evidence=(REVIEWED,
+                     checked("The constraints time the approved RTL, synthesized to the target library", "sta.run",
+                             FileInput(param="sdc", kinds=("constraints",)), approved("sources", "rtl_source")))),
+        st("synthesis", "Synthesis to the target library", "Implementation", "synth.run",
+           depends_on=("rtl-implementation",), when=LAYOUT, criticality=M, review=rv("sta.review"),
+           outputs=("netlist", "synthesis_report"),
+           evidence=(REVIEWED,
+                     checked("The approved RTL, mapped to the target library", "synth.run",
+                             approved("sources", "rtl_source"), params=(("backend", "yosys-liberty"),),
+                             yields=(("netlist", "netlist"), ("synthesis_report", "log"))))),
+        st("floorplan", "Floorplan", "Implementation", "pd.floorplan", depends_on=("synthesis", "timing-constraints"),
+           when=LAYOUT, criticality=M, review=rv("pd.review"), outputs=("floorplan",),
+           evidence=(REVIEWED,
+                     checked("The approved netlist floorplanned, with utilization reported", "pnr.run",
+                             approved("netlist", "netlist"), approved("sdc", "constraints"),
+                             params=(("stop_after", "floorplan"),), yields=(("floorplan", "def"),)))),
+        # The power grid is built and checked here: its supply-pin count is measured only after routing.
+        st("place-route", "Power grid, placement, clock tree, routing, and extraction", "Implementation",
+           "pd.place_route", depends_on=("synthesis", "timing-constraints", "floorplan"), when=LAYOUT,
+           criticality=H, review=rv("pd.review"),
+           outputs=("layout", "routed_netlist", "power_netlist", "parasitics"),
+           evidence=(REVIEWED,
+                     checked("The approved netlist placed, clock tree built, routed, and extracted, with every "
+                             "supply pin connected and no DRC violation", "pnr.run",
+                             approved("netlist", "netlist"), approved("sdc", "constraints"),
+                             params=(("stop_after", "extract"), *ROUTED_LIMITS),
+                             yields=(("layout", "def"), ("routed_netlist", "netlist"),
+                                     ("power_netlist", "pg_netlist"), ("parasitics", "spef"))))),
+        st("physical-verification", "DRC and LVS", "Signoff", "pd.signoff_checks", depends_on=("place-route",),
+           when=LAYOUT, criticality=H, review=rv("pd.review"), outputs=("gds", "physical_verification_report"),
+           evidence=(REVIEWED,
+                     checked("DRC and LVS clean on the approved, filled layout, with the PDK's decks", "pv.run",
+                             approved("def", "layout"), approved("netlist", "power_netlist"), params=PV_LIMITS,
+                             yields=(("gds", "gds"), ("physical_verification_report", "log"))))),
+        st("sta-signoff", "STA signoff", "Signoff", "sta.analyze",
+           depends_on=("place-route", "physical-verification", "timing-constraints"), when=LAYOUT, criticality=H,
+           review=rv("sta.review"), gate="gate.implementation", outputs=("timing_report",),
+           evidence=(REVIEWED,
+                     checked("Signoff timing on the approved routed netlist and its extracted parasitics, across "
+                             "slow, typical, and fast corners", "sta.run",
+                             approved("netlist", "routed_netlist"), approved("spef", "parasitics"),
+                             approved("sdc", "constraints"), params=SIGNOFF_LIMITS,
+                             yields=(("timing_report", "log"),)))),
     ),
 )
 
@@ -669,20 +739,17 @@ PHYSICAL_IMPLEMENTATION = WorkflowTemplate(
         st("place-route", "Placement, clock tree, and routing", "Implementation", "pd.place_route",
            depends_on=("floorplan", "power-grid"), criticality=H, review=rv("pd.review"), outputs=("layout",),
            evidence=(REVIEWED, ran("Placed, clock tree built, and routed, with clock skew, DRC count, and "
-                                   "wirelength reported", "pnr.run",
-                                   params=(("max_drc_violations", "0"), ("max_unconnected_supply_pins", "0"))))),
+                                   "wirelength reported", "pnr.run", params=ROUTED_LIMITS))),
         # M34: DRC and LVS with the PDK's decks on the filled layout, and timing on at least three corners
         # (docs/PD_FINAL.md). As in M29, a run counts only if made with these limits.
         st("physical-verification", "DRC and LVS", "Signoff", "pd.signoff_checks", depends_on=("place-route",),
            criticality=H, review=rv("pd.review"), outputs=("physical_verification_report",),
            evidence=(REVIEWED, ran("DRC and LVS clean on the filled layout, with the PDK's decks", "pv.run",
-                                   params=(("max_drc_violations", "0"), ("max_lvs_mismatches", "0"),
-                                           ("min_fill_shapes", "1"))))),
+                                   params=PV_LIMITS))),
         st("sta-signoff", "STA signoff", "Signoff", "sta.analyze", depends_on=("place-route", "physical-verification"),
            criticality=H, review=rv("sta.review"), gate="gate.implementation", outputs=("timing_report",),
            evidence=(REVIEWED, ran("Signoff timing on the routed netlist with extracted parasitics (SPEF), "
-                                   "across slow, typical, and fast corners", "sta.run",
-                                   params=(("max_unannotated_nets", "0"), ("min_timing_corners", "3"))))),
+                                   "across slow, typical, and fast corners", "sta.run", params=SIGNOFF_LIMITS))),
     ),
 )
 

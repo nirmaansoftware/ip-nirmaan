@@ -69,7 +69,10 @@ def validate_folders(table: list[DeliverableFolder]) -> None:
         if not re.fullmatch(r"[A-Za-z0-9._-]+", folder.id) or folder.id in (".", ".."):
             raise ExportError(f"folder ID {folder.id!r} is not a plain directory name")
         claims = (("folder", (folder.id,)), ("artifact kind", folder.artifact_kinds),
-                  ("capability", folder.capabilities), ("section", tuple(s.value for s in folder.sections)))
+                  ("capability", folder.capabilities), ("section", tuple(s.value for s in folder.sections)),
+                  ("tool", folder.tool_runs))
+        if folder.tool_runs and ExportSection.TOOL_RUNS in folder.sections:
+            raise ExportError(f"{folder.id} lists every tool run already; it cannot also list some by tool")
         for what, values in claims:
             for value in values:
                 if (what, value) in seen:
@@ -302,9 +305,13 @@ def _trace(state: ProjectState, w: _Writer, folder: DeliverableFolder, exported:
     return ["requirement_trace.json", "requirement_trace.md"]
 
 
-def _tool_runs(state: ProjectState, w: _Writer, folder: DeliverableFolder) -> list[str]:
+def _tool_runs(state: ProjectState, w: _Writer, folder: DeliverableFolder,
+               tools: tuple[str, ...] | None = None) -> list[str]:
+    """Every recorded run (or, M44, every run of ``tools``), with its referenced files copied."""
     written = []
     for run in sorted(state.tool_runs.values(), key=lambda r: r.id):
+        if tools is not None and run.tool not in tools:
+            continue
         base = f"{folder.id}/tool_runs/{_safe(run.id)}"
         refs, used = [], set()
         for index, ref in enumerate(run.references):
@@ -432,6 +439,8 @@ def export_project(org: Organization, state: ProjectState, out: Path,
                 section_files[folder.id] += _signoff(org, state, w, folder, problems)
             elif section in _SECTION_WRITERS:
                 section_files[folder.id] += _SECTION_WRITERS[section](org, state, w, folder)
+        if folder.tool_runs:  # M44: the runs of the folder's tools, e.g. the lint runs that gated the RTL
+            section_files[folder.id] += _tool_runs(state, w, folder, folder.tool_runs)
     gates = _gates(org, state)
     report.gates, report.signed_off = len(gates), sum(1 for g in gates if g["signed_off"])
 
@@ -459,7 +468,9 @@ def _folder_readme(folder: DeliverableFolder, arts: list[Artifact], exported: di
     if folder.description:
         lines += [folder.description, ""]
     lines += [f"Collects artifact kinds: {', '.join(folder.artifact_kinds) or 'none'}.",
-              f"Also collects, by task capability: {', '.join(folder.capabilities) or 'none'}.", "",
+              f"Also collects, by task capability: {', '.join(folder.capabilities) or 'none'}.",
+              *([f"Lists the recorded runs of: {', '.join(folder.tool_runs)}, pass or fail."]
+                if folder.tool_runs else []), "",
               f"## Present ({len(arts)})", ""]
     lines += [_artifact_line(a, exported[a.id].split("/", 1)[1]) for a in arts] or \
              ["Nothing has been produced for this folder."]

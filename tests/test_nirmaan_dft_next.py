@@ -171,7 +171,8 @@ def test_the_seat_data_names_the_new_tool_stage_and_checks(nirmaan_org, fixed_cl
         "Create a 4-bit wrapping counter with scan chains and at-speed test.")
     dft = at_speed.task(tid(at_speed, "dft"))
     gated = {t: r for r in dft.evidence_requirements if r.before_review for t in r.tools}
-    assert sorted(gated) == ["dft.atpg", "dft.atpg_transition", "dft.check", "dft.scan_sim"]
+    assert sorted(gated) == ["dft.atpg", "dft.atpg_transition", "dft.check", "dft.scan_insert",  # M44
+                            "dft.scan_sim"]
     assert dict(gated["dft.atpg_transition"].params) == {"min_test_coverage": "80"}
     plain = Orchestrator(nirmaan_org, clock=fixed_clock).plan("Create a 4-bit wrapping counter with scan chains.")
     plain_dft = plain.task(tid(plain, "dft"))
