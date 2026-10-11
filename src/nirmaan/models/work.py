@@ -17,8 +17,8 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_serial
 from nirmaan.models.frozen import deep_frozen
 from nirmaan.models.governance import Criticality, DecisionKind, EscalationKind
 from nirmaan.models.modelcall import ModelCall
-from nirmaan.models.org import ActorKind, ParamValue, ToolSpec, list_values
-from nirmaan.models.workflow import EvidenceKind, EvidenceRequirement, OnFailure
+from nirmaan.models.org import ActorKind, ParamValue, ToolSpec, list_values, text_value
+from nirmaan.models.workflow import Bound, EvidenceKind, EvidenceRequirement
 
 
 class Actor(BaseModel):
@@ -201,9 +201,8 @@ class Task(BaseModel):
     outcome: str | None = Field(default=None, description="Recorded decision outcome.")
     artifacts: tuple[str, ...] = ()
     evidence: tuple[str, ...] = ()
+    #: Failures reported so far; how many may be retried is resolved from the stage and capability (M48).
     attempts: int = 0
-    max_retries: int = 1
-    on_failure: OnFailure = OnFailure.RETRY_THEN_ESCALATE
     blocked_reason: str | None = None
     status_before_escalation: TaskStatus | None = None
 
@@ -263,16 +262,32 @@ class ToolRun(BaseModel):
     references: tuple[str, ...] = ()
     outputs: dict[str, str] = Field(
         default_factory=dict, description="The files the run wrote, by output name (M44), e.g. a netlist.")
+    bounds: tuple[Bound, ...] | None = Field(
+        default=None,
+        description="The metric bounds the broker checked the run against (M48). None: saved before M48, when "
+                    "every max_/min_ parameter the run carried was a bound.")
 
     _freeze = field_validator("params", "outputs", mode="after")(lambda v: deep_frozen(v))
 
     @model_serializer(mode="wrap")
     def _without_empty_outputs(self, handler):
-        """A run that wrote nothing it names saves as before M44, so older projects round-trip unchanged."""
+        """A run that wrote nothing it names, saved before M48, saves as it was, so older projects round-trip."""
         data = handler(self)
         if isinstance(data, dict) and not data.get("outputs"):
             data.pop("outputs", None)
+        if isinstance(data, dict) and data.get("bounds", ()) is None:
+            data.pop("bounds", None)
         return data
+
+    def checked_against(self, bound: Bound) -> bool:
+        """Whether the run was checked against this bound: recorded since M48, a parameter before (section 3 of
+        docs/UNIFIED_APPLICABILITY.md)."""
+        if self.bounds is not None:
+            return bound in self.bounds
+        try:
+            return float(text_value(self.params.get(bound.label))) == bound.value
+        except ValueError:
+            return False
 
     def values(self, param: str) -> list[str]:
         """A parameter's elements (a tuple, or comma-joined text saved before M39); empty if not given."""

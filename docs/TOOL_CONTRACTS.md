@@ -15,7 +15,9 @@ parameter contract, checked by the broker before anything runs.
 
 - `ParamKind`: `text`, `path`, `paths`, `integer`, `number`.
 - `ParamSpec`: `name`, `kind`, `required` (default false), `description`,
-  and `prefix` (true for a family such as `max_<metric>`).
+  and `prefix` (true for a family such as `liberty_<corner>`; until M48 also
+  the `max_<metric>` and `min_<metric>` bounds, now `EvidenceRequirement.bounds`,
+  docs/UNIFIED_APPLICABILITY.md).
 - `ToolSpec.params: tuple[ParamSpec, ...] | None`. `None` means the tool
   declares no contract and takes parameters as given, which keeps tools added
   by extensions (and every existing test that adds one) working unchanged.
@@ -25,7 +27,7 @@ parameter contract, checked by the broker before anything runs.
 
 **The catalog** (`company/tools.py`): every tool with a binding declares its
 contract. EDA tools share the runner's parameters (`backend`, `workdir`,
-`timeout`, `max_<metric>`); each tool adds its own (`sources`, `top`, `sby`,
+`timeout`; `max_<metric>` until M48); each tool adds its own (`sources`, `top`, `sby`,
 the PDK files, the OpenROAD settings, `rtl`, `paths`, `query`, ...), taken from
 what its backends actually read.
 

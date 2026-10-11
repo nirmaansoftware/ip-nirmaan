@@ -235,9 +235,12 @@ def test_a_new_stage_gets_review_repair_with_no_core_changes(units):
 
 def test_the_stage_overrides_the_capability_and_the_cli_overrides_the_stage(units):
     engine, seat, _ = units
-    assert limits(engine, seat) == (2, 2)  # attempts from the capability; rounds from the stage (not 3)
-    assert limits(engine, seat, attempts=4, review_rounds=1) == (4, 1)
-    assert limits(engine, tid(engine, "brief")) == (1, 1)  # neither sets anything
+    def pair(budget):
+        return budget.attempts, budget.review_rounds
+
+    assert pair(limits(engine, seat)) == (2, 2)  # attempts from the capability; rounds from the stage (not 3)
+    assert pair(limits(engine, seat, attempts=4, review_rounds=1)) == (4, 1)
+    assert pair(limits(engine, tid(engine, "brief"))) == (1, 1)  # neither sets anything
     with pytest.raises(Exception, match="at least 1"):
         limits(engine, seat, review_rounds=0)
 
@@ -454,7 +457,7 @@ def test_the_runtime_names_no_seat_stage_or_tool_and_keeps_the_import_laws():
 
 
 def test_no_shipped_capability_or_stage_sets_a_limit(nirmaan_org):
-    assert {c.max_attempts for c in nirmaan_org.capabilities.values()} == {1}
-    assert {c.max_review_rounds for c in nirmaan_org.capabilities.values()} == {1}
+    assert {c.limits.attempts for c in nirmaan_org.capabilities.values()} == {None}  # the default, 1 (M48)
+    assert {c.limits.review_rounds for c in nirmaan_org.capabilities.values()} == {None}
     stages = [s for w in nirmaan_org.workflows.values() for s in w.stages]
-    assert {s.max_attempts for s in stages} == {None} and {s.max_review_rounds for s in stages} == {None}
+    assert {s.limits.attempts for s in stages} == {None} and {s.limits.review_rounds for s in stages} == {None}

@@ -24,10 +24,12 @@ import shutil
 import tempfile
 from pathlib import Path
 
+from nirmaan.applicability import Facts, applies
 from nirmaan.models import (
     Actor,
     ActorKind,
     Assurance,
+    ConditionPhase,
     EvidenceKind,
     ReviewState,
     TaskKind,
@@ -105,8 +107,10 @@ def work(engine: TaskEngine, task_id: str, outcome: str | None = None, workspace
     engine.start(task_id, owner)
     if task.kind is TaskKind.DECISION:
         outcome = outcome or task.outcomes[0]
-    upstream = upstream_kinds(engine.state, task)  # M37: a requirement may apply on one branch only
-    if any(r.before_review and r.applies(r.when_produced, upstream) for r in task.evidence_requirements):
+    # M37: a requirement may apply on one branch only. M48: the files are not produced yet, so a clause on what
+    # the task produces excludes nothing.
+    facts = Facts(ConditionPhase.RUN, upstream=upstream_kinds(engine.state, task))
+    if any(r.before_review and applies(r.when, facts) for r in task.evidence_requirements):
         gated_submit(engine, task_id, outcome, workspace)
     else:
         produced = []

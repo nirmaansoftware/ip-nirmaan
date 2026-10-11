@@ -226,8 +226,8 @@ def test_a_project_saved_before_typed_values_loads_and_verifies(tmp_path, nirmaa
     assert runs["lint.run"].values("sources") == ["/nonexistent/m39/a.v", "/nonexistent/m39/b.v"]
     assert len(runs["veritriage.investigate"].values("paths")) == 2
     # Saving it again migrates nothing in place: the runs' stored values and the audit chain are written back
-    # exactly as they were. Fields added to other records since the fixture was saved (M37's `when_upstream`
-    # on a requirement, say) appear at their defaults, and a second round trip writes the same bytes.
+    # exactly as they were. Other records are written in their current form (M48: a requirement's conditions
+    # as one tuple of clauses, say), and a second round trip writes the same bytes.
     path = store.save(state)
     saved, old = json.loads(path.read_text()), json.loads(OLD_PROJECT.read_text())
     assert saved["tool_runs"] == old["tool_runs"]
@@ -239,10 +239,11 @@ def test_a_saved_run_reads_typed_by_its_contract(tmp_path, nirmaan_org):
     store, project = _old_store(tmp_path)
     runs = {r.tool: r for r in store.load(project).tool_runs.values()}
     lint = runs["lint.run"].typed(nirmaan_org.tools["lint.run"])
+    # M48: a bound saved as a parameter is no longer in the contract, so it reads as the text it was stored as.
     assert lint == {"sources": ("/nonexistent/m39/a.v", "/nonexistent/m39/b.v"), "top": "a", "timeout": 30,
-                    "max_warnings": 0.0}
+                    "max_warnings": "0"}
     atpg = runs["dft.atpg"].typed(nirmaan_org.tools["dft.atpg"])
-    assert atpg["seed"] == 7 and atpg["min_test_coverage"] == 90.5 and len(atpg["sources"]) == 2
+    assert atpg["seed"] == 7 and atpg["min_test_coverage"] == "90.5" and len(atpg["sources"]) == 2
     # A value that no longer parses stays as it was stored, rather than vanishing.
     odd = ToolRun(id="run-9", tool="lint.run", actor="x", task=None, params={"timeout": "soon"},
                   succeeded=False, summary="saved long ago")

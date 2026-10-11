@@ -41,8 +41,9 @@ def engine(nirmaan_org, fixed_clock):
     return Orchestrator(nirmaan_org, clock=fixed_clock).plan("Create a 4-bit wrapping counter with scan chains.")
 
 
-def transition(engine, sources: str, top: str, workdir: Path, **params: str):
-    run, outcome = invoke(engine, "dft.atpg_transition", {"sources": sources, "top": top, **params}, workdir)
+def transition(engine, sources: str, top: str, workdir: Path, bounds=(), **params: str):
+    run, outcome = invoke(engine, "dft.atpg_transition", {"sources": sources, "top": top, **params}, workdir,
+                          bounds=bounds)
     return run, outcome.data["result"]["metrics"] if outcome.data else {}
 
 
@@ -173,7 +174,7 @@ def test_the_seat_data_names_the_new_tool_stage_and_checks(nirmaan_org, fixed_cl
     gated = {t: r for r in dft.evidence_requirements if r.before_review for t in r.tools}
     assert sorted(gated) == ["dft.atpg", "dft.atpg_transition", "dft.check", "dft.scan_insert",  # M44
                             "dft.scan_sim"]
-    assert dict(gated["dft.atpg_transition"].params) == {"min_test_coverage": "80"}
+    assert [str(b) for b in gated["dft.atpg_transition"].bounds] == ["test_coverage>=80"]  # M48: a bound
     plain = Orchestrator(nirmaan_org, clock=fixed_clock).plan("Create a 4-bit wrapping counter with scan chains.")
     plain_dft = plain.task(tid(plain, "dft"))
     assert "dft.atpg_transition" not in {t for r in plain_dft.evidence_requirements for t in r.tools}
@@ -201,7 +202,7 @@ def test_the_mbist_stage_is_planned_for_a_block_with_memory(nirmaan_org, fixed_c
 def test_real_transition_coverage_is_measured_by_fault_simulation(engine, tmp_path, block, chains, floor):
     source, top = (ATPG_DEMO, "atpg_demo") if block == "atpg_demo" else BLOCKS[block]
     scan = insert(engine, source, top, tmp_path / "insert", chains=chains)["scan_netlist"]
-    run, metrics = transition(engine, scan, top, tmp_path / "atpg", min_test_coverage=str(floor))
+    run, metrics = transition(engine, scan, top, tmp_path / "atpg", bounds=(f"test_coverage>={floor}",))
     assert run.succeeded, run.summary
     total = metrics["faults_total"]
     assert total == metrics["faults_detected"] + metrics["faults_undetectable"] + metrics["faults_undetected"]
@@ -263,8 +264,8 @@ def test_a_broken_pattern_pair_is_refused(engine, tmp_path):
 @needs("yosys", "iverilog", "vvp")
 def test_atpg_runs_across_capture_edges_and_transition_atpg_refuses_them(engine, tmp_path):
     scan = insert(engine, TWO_CLOCKS, "two_clocks", tmp_path / "insert")["scan_netlist"]
-    run, outcome = invoke(engine, "dft.atpg", {"sources": scan, "top": "two_clocks", "min_test_coverage": "90"},
-                          tmp_path / "atpg")
+    run, outcome = invoke(engine, "dft.atpg", {"sources": scan, "top": "two_clocks"}, tmp_path / "atpg",
+                          bounds=("test_coverage>=90",))
     assert run.succeeded, run.summary
     metrics = outcome.data["result"]["metrics"]
     assert metrics["claims_not_detected"] == 0 and metrics["response_errors"] == 0

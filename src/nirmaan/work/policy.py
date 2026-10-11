@@ -13,10 +13,12 @@ from collections.abc import MutableMapping
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
+from nirmaan.applicability import Facts, applies, binding_wanted
 from nirmaan.models import (
     Actor,
     ActorKind,
     Assurance,
+    ConditionPhase,
     Criticality,
     Enforcement,
     EscalationKind,
@@ -114,29 +116,36 @@ def unsatisfied_requirements(state: ProjectState, task: Task) -> list[str]:
     """Evidence requirements on the task not met by substantiated evidence."""
     attached = [state.evidence[e] for e in task.evidence if e in state.evidence]
     produced = {state.artifacts[a].kind for a in task.artifacts if a in state.artifacts}
-    upstream = upstream_kinds(state, task)
+    facts = run_facts(state, task, produced)
     return [
         req.description
         for req in task.evidence_requirements
-        if req.applies(produced, upstream) and not any(satisfies(state, ev, req) for ev in attached)
+        if applies(req.when, facts) and not any(satisfies(state, ev, req) for ev in attached)
     ]
 
 
+def run_facts(state: ProjectState, task: Task, produced) -> Facts:
+    """What the policy knows of a task at run time (M48): the kinds it produced and, only if a clause asks,
+    the kinds it builds on (M37)."""
+    return Facts(ConditionPhase.RUN, {"state": state, "task": task}, produced=produced,
+                 upstream=lambda: upstream_kinds(state, task))
+
+
 def upstream_kinds(state: ProjectState, task: Task) -> set[str]:
-    """The kinds of the artifacts a task builds on, when one of its requirements asks (M37)."""
-    if not any(req.when_upstream for req in task.evidence_requirements):
-        return set()
+    """The kinds of the artifacts a task builds on (M37)."""
     return {art.kind for art in upstream_artifacts(state, task)}
 
 
 def satisfies(state: ProjectState, ev, req) -> bool:
-    """Substantiated, of an accepted kind, and (if tool-backed) from a named tool run with the fixed params."""
+    """Substantiated, of an accepted kind, and (if tool-backed) from a named tool run with the fixed params,
+    checked against every bound (M48)."""
     if not ev.substantiated or ev.kind not in req.accepts:
         return False
-    if (req.tools or req.params) and ev.kind in (EvidenceKind.TOOL_RUN, EvidenceKind.VERITRIAGE_SESSION):
+    if (req.tools or req.params or req.bounds) and ev.kind in (EvidenceKind.TOOL_RUN, EvidenceKind.VERITRIAGE_SESSION):
         run = state.tool_runs.get(ev.tool_run or "")
         return (run is not None and (not req.tools or run.tool in req.tools)
-                and all(param_matches(run.params.get(k), v) for k, v in req.params))
+                and all(param_matches(run.params.get(k), v) for k, v in req.params)
+                and all(run.checked_against(b) for b in req.bounds))
     return True
 
 
@@ -315,17 +324,19 @@ def _before_review(ctx: PolicyContext) -> list[str]:
     attached = [ctx.state.evidence[e] for e in task.evidence if e in ctx.state.evidence]
     problems = []
     kinds = {draft.get("kind") for draft in ctx.payload.get("artifacts", ())}
-    upstream = upstream_kinds(ctx.state, task)
-    for req in (r for r in task.evidence_requirements if r.before_review and r.applies(kinds, upstream)):
+    facts = run_facts(ctx.state, task, kinds)
+    for req in (r for r in task.evidence_requirements if r.before_review and applies(r.when, facts)):
         met = [ev for ev in attached if satisfies(ctx.state, ev, req)]
         if not met:
             problems.append(f"{task.id} cannot go to review: {req.description!r} is not met")
             continue
         inputs = {}  # the approved upstream files each upstream binding asks a run to have used
+        available = ([art for art in upstream_artifacts(ctx.state, task)
+                      if art.assurance is Assurance.APPROVED and art.location]
+                     if any(b.upstream for b in req.files) else [])
         for binding in (b for b in req.files if b.upstream):
-            approved = {art.location for art in upstream_artifacts(ctx.state, task)
-                        if art.kind in binding.kinds and art.assurance is Assurance.APPROVED and art.location}
-            if binding.optional and not approved:
+            approved = {art.location for art in available if art.kind in binding.kinds}
+            if not binding_wanted(binding, Facts(ConditionPhase.RUN, inputs={art.kind for art in available})):
                 continue  # M41: nothing approved upstream, so the optional input asks for nothing
             inputs[binding.param] = approved
             if not any(ev.kind is not EvidenceKind.TOOL_RUN

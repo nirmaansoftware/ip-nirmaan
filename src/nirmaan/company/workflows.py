@@ -10,12 +10,14 @@ paths are cancelled, visibly, when the decision is recorded).
 from __future__ import annotations
 
 from nirmaan.models import (
+    Bound,
     Condition,
     Criticality,
     EvidenceKind,
     EvidenceRequirement,
     FileInput,
     Level,
+    Limits,
     OnFailure,
     ReviewRequirement,
     StageTemplate,
@@ -33,6 +35,24 @@ def rv(capability: str, level: Level = Level.SENIOR) -> ReviewRequirement:
 
 def when(*any_of: str, all_of: tuple[str, ...] = (), none_of: tuple[str, ...] = ()) -> Condition:
     return Condition(any_of=any_of, all_of=all_of, none_of=none_of)
+
+
+def produced(*kinds: str) -> Condition:
+    """A run-time clause (M48): applies only when the task produced an artifact of one of these kinds."""
+    return Condition(on="produced", any_of=kinds)
+
+
+def built_on(*kinds: str) -> Condition:
+    """A run-time clause (M48): applies only when the task builds on an upstream artifact of one of these kinds."""
+    return Condition(on="upstream", any_of=kinds)
+
+
+def at_most(metric: str, value: float) -> Bound:
+    return Bound(metric=metric, op="max", value=value)
+
+
+def at_least(metric: str, value: float) -> Bound:
+    return Bound(metric=metric, op="min", value=value)
 
 
 def var(key: str, title: str, *skills: str, cond: Condition | None = None) -> Variant:
@@ -74,7 +94,7 @@ def st(id: str, title: str, phase: str, capability: str, **kw) -> StageTemplate:
 NOT_VACUOUS = checked("The proof is not vacuous: every cover is reached", "formal.cover",
                       FileInput(param="sby", kinds=("formal_spec",)),
                       FileInput(param="sources", kinds=("rtl_source",)),
-                      when_produced=("formal_spec",))
+                      when=(produced("formal_spec"),))
 
 #: M27: the checks produced RTL passes before review on the new-ip, feature-addition, and rtl-change RTL
 #: stages, the same ones block-design's RTL stage carries: real lint and simulation, synthesis with no
@@ -90,11 +110,11 @@ RTL_GATES = (
     checked("Synthesizes with Yosys, with no latches", "synth.run",
             FileInput(param="sources", kinds=("rtl_source",)),
             FileInput(param="top", kinds=("rtl_source",), entry=True),
-            params=(("max_latches", "0"),)),
+            bounds=(at_most("latches", 0),)),
     checked("Formal properties are proven", "formal.run",
             FileInput(param="sby", kinds=("formal_spec",)),
             FileInput(param="sources", kinds=("rtl_source",)),
-            when_produced=("formal_spec",)),
+            when=(produced("formal_spec"),)),
     NOT_VACUOUS,
 )
 
@@ -110,18 +130,18 @@ PLAN_CHECKED = checked("The plan covers every requirement of the approved requir
 #: Liberty, then timed under the task's SDC), before review; no attestation meets it (docs/STA_AND_ANTECEDENTS.md).
 RETIMED = checked("Timing met on the fixed RTL: synthesized to the target library, then timed under the task's SDC",
                   "sta.run", FileInput(param="sources", kinds=("rtl_source",), upstream=True),
-                  when_upstream=("rtl_source",))
+                  when=(built_on("rtl_source"),))
 
 #: M41: the approved register map, when the plan has one (docs/REGISTER_MAP_ADOPTION.md). Optional: filled from
 #: the approved upstream map when there is one, left out when there is none, and never dodged when there is.
 APPROVED_MAP = FileInput(param="map", kinds=("register_map",), upstream=True, optional=True)
 
-#: M29 and M34: the limits a physical run counts only if made with (a limit on a metric the run never reported
+#: M29 and M34: the bounds a physical run counts only if checked against (M48: bounds, not parameters; a bound
 #: fails it). One constant per set, shared by `physical-implementation` and the layout stages of `block-design`
 #: (M44), so the two cannot drift.
-ROUTED_LIMITS = (("max_drc_violations", "0"), ("max_unconnected_supply_pins", "0"))
-PV_LIMITS = (("max_drc_violations", "0"), ("max_lvs_mismatches", "0"), ("min_fill_shapes", "1"))
-SIGNOFF_LIMITS = (("max_unannotated_nets", "0"), ("min_timing_corners", "3"))
+ROUTED_LIMITS = (at_most("drc_violations", 0), at_most("unconnected_supply_pins", 0))
+PV_LIMITS = (at_most("drc_violations", 0), at_most("lvs_mismatches", 0), at_least("fill_shapes", 1))
+SIGNOFF_LIMITS = (at_most("unannotated_nets", 0), at_least("timing_corners", 3))
 
 
 def approved(param: str, *kinds: str) -> FileInput:
@@ -454,7 +474,7 @@ REGRESSION_INVESTIGATION = WorkflowTemplate(
            depends_on=("rtl-fix", "tb-fix", "infra-fix", "spec-clarification"), criticality=H,
            review=rv("dv.review"), outputs=("regression_report",),
            evidence=(dv_ran("Failing test passes; no new failures in regression", "regression.run", "test.run"),),
-           on_failure=OnFailure.RETRY_THEN_ESCALATE, max_retries=2),
+           limits=Limits(on_failure=OnFailure.RETRY_THEN_ESCALATE, retries=2)),
     ),
 )
 
@@ -517,7 +537,7 @@ TIMING_CLOSURE = WorkflowTemplate(
            depends_on=("rtl-fix", "constraint-fix", "pd-fix"), criticality=H, review=rv("sta.review"),
            gate="gate.implementation", outputs=("timing_report",),
            evidence=(REVIEWED, RETIMED,  # M37
-                     ran("Clean timing report", "sta.run", when_upstream=("constraints", "layout")))),
+                     ran("Clean timing report", "sta.run", when=(built_on("constraints", "layout"),)))),
     ),
 )
 
@@ -577,18 +597,18 @@ BLOCK_DESIGN = WorkflowTemplate(
                      checked("Synthesizes with Yosys, with no latches", "synth.run",
                              FileInput(param="sources", kinds=("rtl_source",)),
                              FileInput(param="top", kinds=("rtl_source",), entry=True),
-                             params=(("max_latches", "0"),)),
+                             bounds=(at_most("latches", 0),)),
                      checked("Formal properties are proven", "formal.run",
                              FileInput(param="sby", kinds=("formal_spec",)),
                              FileInput(param="sources", kinds=("rtl_source",)),
-                             when_produced=("formal_spec",)),
+                             when=(produced("formal_spec"),)),
                      NOT_VACUOUS,  # M27
                      # M41: the approved register map's generated test, over the map's bus, on the RTL.
                      checked("The RTL implements the approved register map, in co-simulation", "regmap.verify",
                              FileInput(param="map", kinds=("register_map",), upstream=True),
                              FileInput(param="rtl", kinds=("rtl_source",)),
                              FileInput(param="top", kinds=("rtl_source",), entry=True),
-                             when=when("register_map")))),
+                             when=(when("register_map"),)))),
         # M25: when the request asks for test (DFT, scan chains), the scan netlist goes to review
         # only after real rule checks and a real chain simulation over it.
         st("dft", "Scan insertion", "Implementation", "dft.insert",
@@ -610,12 +630,12 @@ BLOCK_DESIGN = WorkflowTemplate(
                      checked("ATPG reaches 90% stuck-at test coverage in fault simulation", "dft.atpg",
                              FileInput(param="sources", kinds=("dft_netlist",)),
                              FileInput(param="top", kinds=("dft_netlist",), entry=True),
-                             params=(("min_test_coverage", "90"),)),
+                             bounds=(at_least("test_coverage", 90),)),
                      # M29: at-speed test asks for transition coverage too (launch on capture).
                      checked("Transition ATPG reaches 80% test coverage in fault simulation", "dft.atpg_transition",
                              FileInput(param="sources", kinds=("dft_netlist",)),
                              FileInput(param="top", kinds=("dft_netlist",), entry=True),
-                             params=(("min_test_coverage", "80"),), when=when("at_speed")))),
+                             bounds=(at_least("test_coverage", 80),), when=(when("at_speed"),)))),
         # M29: a block with memory gets March C- on every memory of the approved RTL before review.
         st("mbist", "Memory BIST", "Implementation", "dft.mbist",
            depends_on=("rtl-implementation",), when=when("memory"), skills=("mbist",), criticality=M,
@@ -634,31 +654,32 @@ BLOCK_DESIGN = WorkflowTemplate(
                      checked("Driver tests pass against the approved RTL", "fw.test",
                              FileInput(param="sources", kinds=("driver", "driver_test")),
                              FileInput(param="rtl", kinds=("rtl_source",), upstream=True), APPROVED_MAP,
-                             params=(("require_irq", "auto"),), when=when(none_of=("interrupts",))),
+                             params=(("require_irq", "auto"),), when=(when(none_of=("interrupts",)),)),
                      checked("Driver tests pass against the approved RTL, the interrupt taken", "fw.test",
                              FileInput(param="sources", kinds=("driver", "driver_test")),
                              FileInput(param="rtl", kinds=("rtl_source",), upstream=True), APPROVED_MAP,
-                             params=(("require_irq", "yes"),), when=when("interrupts")),
+                             params=(("require_irq", "yes"),), when=(when("interrupts"),)),
                      # M27: when the request names RISC-V, the same tests also run as a bare-metal
                      # RV32I image on a RISC-V core whose loads and stores reach the approved RTL.
                      # M29: the image's code (text) must fit a budget: a quarter of the SoC's RAM.
                      checked("Driver and tests cross-build for bare-metal RV32I", "fw.cross_build",
                              FileInput(param="sources", kinds=("driver", "driver_test")), APPROVED_MAP,
-                             when=when("riscv"),
-                             params=(("max_text_bytes", "16384"),)),
+                             when=(when("riscv"),),
+                             bounds=(at_most("text_bytes", 16384),)),
                      checked("Driver tests pass on a RISC-V core against the approved RTL", "fw.soc_test",
                              FileInput(param="sources", kinds=("driver", "driver_test")),
                              FileInput(param="rtl", kinds=("rtl_source",), upstream=True), APPROVED_MAP,
-                             params=(("require_irq", "auto"),), when=when("riscv", none_of=("interrupts",))),
+                             params=(("require_irq", "auto"),), when=(when("riscv", none_of=("interrupts",)),)),
                      checked("Driver tests pass on a RISC-V core against the approved RTL, the interrupt taken",
                              "fw.soc_test", FileInput(param="sources", kinds=("driver", "driver_test")),
                              FileInput(param="rtl", kinds=("rtl_source",), upstream=True), APPROVED_MAP,
-                             params=(("require_irq", "yes"),), when=when(all_of=("riscv", "interrupts"))),
+                             params=(("require_irq", "yes"),), when=(when(all_of=("riscv", "interrupts")),)),
                      # M35: asked for, a bus error must trap precisely on the default core (PicoRV32).
                      checked("A bus error traps precisely on the RISC-V core", "fw.soc_test",
                              FileInput(param="sources", kinds=("driver", "driver_test")),
                              FileInput(param="rtl", kinds=("rtl_source",), upstream=True), APPROVED_MAP,
-                             params=(("require_bus_error_trap", "yes"),), when=when(all_of=("riscv", "bus_errors"))))),
+                             params=(("require_bus_error_trap", "yes"),),
+                             when=(when(all_of=("riscv", "bus_errors")),)))),
         # M44: when the request asks for a layout, the approved RTL goes through physical design in this project
         # (docs/FACTORY_E2E.md). Every design input is an approved upstream artifact, never a typed path; the
         # PDK and the top module are task inputs. Each tool's output that the next stage needs is yielded as
@@ -691,14 +712,14 @@ BLOCK_DESIGN = WorkflowTemplate(
                      checked("The approved netlist placed, clock tree built, routed, and extracted, with every "
                              "supply pin connected and no DRC violation", "pnr.run",
                              approved("netlist", "netlist"), approved("sdc", "constraints"),
-                             params=(("stop_after", "extract"), *ROUTED_LIMITS),
+                             params=(("stop_after", "extract"),), bounds=ROUTED_LIMITS,
                              yields=(("layout", "def"), ("routed_netlist", "netlist"),
                                      ("power_netlist", "pg_netlist"), ("parasitics", "spef"))))),
         st("physical-verification", "DRC and LVS", "Signoff", "pd.signoff_checks", depends_on=("place-route",),
            when=LAYOUT, criticality=H, review=rv("pd.review"), outputs=("gds", "physical_verification_report"),
            evidence=(REVIEWED,
                      checked("DRC and LVS clean on the approved, filled layout, with the PDK's decks", "pv.run",
-                             approved("def", "layout"), approved("netlist", "power_netlist"), params=PV_LIMITS,
+                             approved("def", "layout"), approved("netlist", "power_netlist"), bounds=PV_LIMITS,
                              yields=(("gds", "gds"), ("physical_verification_report", "log"))))),
         st("sta-signoff", "STA signoff", "Signoff", "sta.analyze",
            depends_on=("place-route", "physical-verification", "timing-constraints"), when=LAYOUT, criticality=H,
@@ -707,7 +728,7 @@ BLOCK_DESIGN = WorkflowTemplate(
                      checked("Signoff timing on the approved routed netlist and its extracted parasitics, across "
                              "slow, typical, and fast corners", "sta.run",
                              approved("netlist", "routed_netlist"), approved("spef", "parasitics"),
-                             approved("sdc", "constraints"), params=SIGNOFF_LIMITS,
+                             approved("sdc", "constraints"), bounds=SIGNOFF_LIMITS,
                              yields=(("timing_report", "log"),)))),
     ),
 )
@@ -735,21 +756,21 @@ PHYSICAL_IMPLEMENTATION = WorkflowTemplate(
         st("power-grid", "Power grid", "Implementation", "pd.power_plan", depends_on=("floorplan",), criticality=M,
            review=rv("pd.review"), outputs=("power_grid",),
            evidence=(REVIEWED, ran("Power grid built, with every cell supply pin connected", "pnr.run",
-                                   params=(("max_unconnected_supply_pins", "0"),)))),
+                                   bounds=(at_most("unconnected_supply_pins", 0),)))),
         st("place-route", "Placement, clock tree, and routing", "Implementation", "pd.place_route",
            depends_on=("floorplan", "power-grid"), criticality=H, review=rv("pd.review"), outputs=("layout",),
            evidence=(REVIEWED, ran("Placed, clock tree built, and routed, with clock skew, DRC count, and "
-                                   "wirelength reported", "pnr.run", params=ROUTED_LIMITS))),
+                                   "wirelength reported", "pnr.run", bounds=ROUTED_LIMITS))),
         # M34: DRC and LVS with the PDK's decks on the filled layout, and timing on at least three corners
         # (docs/PD_FINAL.md). As in M29, a run counts only if made with these limits.
         st("physical-verification", "DRC and LVS", "Signoff", "pd.signoff_checks", depends_on=("place-route",),
            criticality=H, review=rv("pd.review"), outputs=("physical_verification_report",),
            evidence=(REVIEWED, ran("DRC and LVS clean on the filled layout, with the PDK's decks", "pv.run",
-                                   params=PV_LIMITS))),
+                                   bounds=PV_LIMITS))),
         st("sta-signoff", "STA signoff", "Signoff", "sta.analyze", depends_on=("place-route", "physical-verification"),
            criticality=H, review=rv("sta.review"), gate="gate.implementation", outputs=("timing_report",),
            evidence=(REVIEWED, ran("Signoff timing on the routed netlist with extracted parasitics (SPEF), "
-                                   "across slow, typical, and fast corners", "sta.run", params=SIGNOFF_LIMITS))),
+                                   "across slow, typical, and fast corners", "sta.run", bounds=SIGNOFF_LIMITS))),
     ),
 )
 

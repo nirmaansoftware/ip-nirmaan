@@ -23,13 +23,14 @@ from __future__ import annotations
 from collections.abc import MutableMapping
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, NamedTuple, Protocol, Sequence
+from typing import Any, Callable, Protocol, Sequence
 
-from nirmaan.models import Actor, ActorKind, EscalationKind, EvidenceKind, TaskStatus, Verdict
+from nirmaan.models import Actor, ActorKind, Bound, EscalationKind, EvidenceKind, Limits, TaskStatus, Verdict
 from nirmaan.registry import Registry
 from nirmaan.runtime.context import WorkPacket, assemble
 from nirmaan.runtime.tools import ToolBroker, ToolOutcome
 from nirmaan.work.engine import TaskEngine, WorkError
+from nirmaan.work.limits import limits_for
 from nirmaan.work.policy import PolicyContext, PolicyEngine, PolicyViolationError
 
 
@@ -93,8 +94,10 @@ class ToolHandle:
     def __init__(self, broker: ToolBroker, actor: Actor, task_id: str) -> None:
         self._broker, self._actor, self._task = broker, actor, task_id
 
-    def invoke(self, tool_id: str, **params: str | Sequence[str]) -> tuple[str, ToolOutcome]:
-        run, outcome = self._broker.invoke(self._actor, tool_id, params, self._task)
+    def invoke(self, tool_id: str, bounds: Sequence[Bound] = (),
+               **params: str | Sequence[str]) -> tuple[str, ToolOutcome]:
+        """Run a tool as the task's seat; ``bounds`` are the metric bounds the run is checked against (M48)."""
+        run, outcome = self._broker.invoke(self._actor, tool_id, params, self._task, bounds=bounds)
         return run.id, outcome
 
     def declared(self, tool_id: str, inputs: dict[str, str]) -> dict[str, str]:
@@ -185,27 +188,13 @@ class RunReport:
     attempts: list[dict[str, Any]] = field(default_factory=list)
 
 
-class Limits(NamedTuple):
-    """A task's budget (M27): attempts per review round (M26), and review rounds."""
-
-    attempts: int
-    review_rounds: int
-
-
 def limits(engine: TaskEngine, task_id: str, attempts: int | None = None,
            review_rounds: int | None = None) -> Limits:
-    """Each limit from the override, else the task's workflow stage, else its capability, else 1."""
-    task = engine.task(task_id)
-    workflow = engine.org.workflows.get(task.workflow or "")
-    stage = workflow.stage(task.stage) if workflow and task.stage else None
-    capability = engine.org.capabilities.get(task.capability or "")
-    chosen = []
-    for name, override in (("max_attempts", attempts), ("max_review_rounds", review_rounds)):
+    """The task's limits (M48: one resolver): the override, else its stage, else its capability, else 1."""
+    for name, override in (("attempts", attempts), ("review_rounds", review_rounds)):
         if override is not None and override < 1:
-            raise WorkError(f"{name.removeprefix('max_').replace('_', ' ')} must be at least 1, got {override}")
-        value = override if override is not None else getattr(stage, name, None)
-        chosen.append(value if value is not None else getattr(capability, name, 1))
-    return Limits(*chosen)
+            raise WorkError(f"{name.replace('_', ' ')} must be at least 1, got {override}")
+    return limits_for(engine.org, engine.task(task_id), Limits(attempts=attempts, review_rounds=review_rounds))
 
 
 def _spent(engine: TaskEngine, task_id: str) -> tuple[list, list]:

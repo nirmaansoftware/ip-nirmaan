@@ -246,11 +246,12 @@ def _vocabulary(org: "Organization") -> list[str]:
             if intent not in intents:
                 issues.append(f"workflow {wf.id}: unknown intent {intent}")
         for stage in wf.stages:
-            conds = [stage.when, *(v.when for v in stage.variants)]
-            for cond in conds:
-                for f in (*cond.all_of, *cond.any_of, *cond.none_of):
-                    if f not in features:
-                        issues.append(f"workflow {wf.id} stage {stage.id}: unknown feature {f}")
+            where = f"workflow {wf.id} stage {stage.id}"
+            for cond in (stage.when, *(v.when for v in stage.variants)):
+                issues += _condition_issues(where, cond, features, plan_only=True)
+            for req in stage.evidence:
+                for cond in req.when:
+                    issues += _condition_issues(where, cond, features, plan_only=False)
     for intent in intents:
         if not any(intent in wf.intents for wf in org.workflows.values()):
             issues.append(f"intent {intent}: no workflow serves it")
@@ -262,3 +263,19 @@ def _vocabulary(org: "Organization") -> list[str]:
             if intent not in intents:
                 issues.append(f"assumption {rule.id}: unknown intent {intent}")
     return issues
+
+
+def _condition_issues(where: str, cond, features, plan_only: bool) -> list[str]:
+    """A clause names a registered condition kind (M48), of the plan phase where only that can be decided, and
+    a features clause names declared features."""
+    from nirmaan.applicability import condition_kind
+    from nirmaan.models import ConditionPhase
+
+    kind = condition_kind(cond.on)
+    if kind is None:
+        return [f"{where}: unknown condition kind {cond.on}"]
+    if plan_only and kind.phase is not ConditionPhase.PLAN:
+        return [f"{where}: a stage or variant condition must be decided at plan time, not on run-phase {cond.on}"]
+    if cond.on != "features":
+        return []
+    return [f"{where}: unknown feature {f}" for f in (*cond.all_of, *cond.any_of, *cond.none_of) if f not in features]

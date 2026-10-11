@@ -10,7 +10,9 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from nirmaan.models.limits import Limits, migrate_limits
 
 
 class Function(str, Enum):
@@ -187,14 +189,17 @@ class Capability(BaseModel):
     model_needs: tuple[str, ...] = Field(
         default=(), description="What a model must offer to serve this work, beyond what the work implies (M31).",
     )
-    max_attempts: int = Field(
-        default=1, ge=1,
-        description="Attempts per review round when the engine refuses a submission (M26); 1 means no repair.",
+    limits: Limits = Field(
+        default_factory=Limits,
+        description="Attempts per review round (M26), review rounds (M27), and retries (M48) for this work; a "
+                    "stage overrides them. Unset fields fall to the default, 1.",
     )
-    max_review_rounds: int = Field(
-        default=1, ge=1,
-        description="Submissions that may go to independent review (M27); 1 means no repair after review.",
-    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _old_limits(cls, data):
+        """``max_attempts`` and ``max_review_rounds``, as data written before M48 set them."""
+        return migrate_limits(data)
 
 
 class Skill(BaseModel):
@@ -256,7 +261,7 @@ class ParamSpec(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    name: str = Field(description="The parameter, or with prefix=True the start of a family, e.g. 'max_'.")
+    name: str = Field(description="The parameter, or with prefix=True the start of a family, e.g. 'liberty_'.")
     kind: ParamKind = ParamKind.TEXT
     required: bool = Field(
         default=False,
@@ -267,7 +272,7 @@ class ParamSpec(BaseModel):
 
     @property
     def label(self) -> str:
-        return f"{self.name}<metric>" if self.prefix else self.name
+        return f"{self.name}<name>" if self.prefix else self.name
 
     def covers(self, param: str) -> bool:
         return param.startswith(self.name) if self.prefix else param == self.name

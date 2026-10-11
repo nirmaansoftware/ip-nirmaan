@@ -764,9 +764,16 @@ def task_complete(project: str, task: str, role: str = AS_OPTION, agent: bool = 
 @task_app.command("tool")
 def task_tool(project: str, task: str, tool: str, role: str = AS_OPTION, agent: bool = AGENT_OPTION,
               param: List[str] = typer.Option([], "--param", help="key=value; repeat a key for a list"),
+              bound: List[str] = typer.Option([], "--bound", help="metric<=value or metric>=value (M48); repeatable"),
               root: Path = ROOT_OPTION):
     """Invoke a tool through the broker and attach the run as evidence. Values are typed by its contract."""
+    from nirmaan.models import Bound
     from nirmaan.runtime import ToolBroker
+
+    try:
+        bounds = tuple(Bound.parse(b) for b in bound)
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc), param_hint="--bound") from None
 
     given: dict[str, list[str]] = {}
     for p in param:
@@ -777,7 +784,7 @@ def task_tool(project: str, task: str, tool: str, role: str = AS_OPTION, agent: 
     def act(e: TaskEngine):
         actor = _actor(role, agent)
         tid = _task_id(e, task)
-        run, outcome = ToolBroker(e).invoke(actor, tool, params, tid)
+        run, outcome = ToolBroker(e).invoke(actor, tool, params, tid, bounds=bounds)
         kind = EvidenceKind.VERITRIAGE_SESSION if tool == "veritriage.investigate" else EvidenceKind.TOOL_RUN
         ev = e.record_evidence(tid, actor, kind, run.summary,
                                reference=run.references[0] if run.references else None, tool_run=run.id)

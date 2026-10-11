@@ -75,7 +75,7 @@ LAYOUT_INPUTS = {
 SCAN = {"chains": "8"}
 #: For the tests of the hand-off alone: ATPG graded on a sample of the faults, recorded as such in the run.
 QUICK_SCAN = {**SCAN, "fault_sample": "64"}
-QUICK = {"dft.atpg": {"min_test_coverage": "90", "fault_sample": "64"}}
+QUICK = {"dft.atpg": {"fault_sample": "64"}}
 
 
 @pytest.fixture()
@@ -191,8 +191,10 @@ def _scan_by_hand(engine, tmp_path: Path, source: str):
     broker = ToolBroker(engine)
 
     def run(tool: str, sources: str, name: str, **extra: str):
+        # M48: checked against the bounds the stage's requirement sets for this tool, as the seat's runs are.
+        bounds = next((r.bounds for r in engine.task(seat).evidence_requirements if tool in r.tools), ())
         done, outcome = broker.invoke(owner, tool, {"sources": sources, "top": TOP,
-                                                    "workdir": str(tmp_path / name), **extra}, seat)
+                                                    "workdir": str(tmp_path / name), **extra}, seat, bounds=bounds)
         engine.record_evidence(seat, owner, EvidenceKind.TOOL_RUN, done.summary,
                                reference=done.references[0], tool_run=done.id)
         return done, outcome

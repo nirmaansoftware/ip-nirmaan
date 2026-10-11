@@ -32,7 +32,16 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol, Sequence
 
-from nirmaan.models import EscalationKind, EvidenceKind, EvidenceRequirement, MemoryScope, Verdict
+from nirmaan.applicability import Facts, applies, binding_wanted
+from nirmaan.models import (
+    Bound,
+    ConditionPhase,
+    EscalationKind,
+    EvidenceKind,
+    EvidenceRequirement,
+    MemoryScope,
+    Verdict,
+)
 from nirmaan.runtime.base import (
     EscalationRequest,
     ResultStatus,
@@ -173,9 +182,12 @@ def _inputs(packet: WorkPacket) -> dict[str, str]:
     }
 
 
-def _builds_on(packet: WorkPacket, req: EvidenceRequirement) -> bool:
-    """Whether the task builds on an upstream artifact of a kind the requirement is scoped to (M37)."""
-    return not req.when_upstream or any(a.kind in req.when_upstream for a in packet.task.upstream_artifacts)
+def _facts(packet: WorkPacket, produced: list[dict[str, Any]] | None = None) -> Facts:
+    """What the runtime knows at run time (M48): the kinds the task builds on (M37) and, once the answer is in,
+    the kinds it produced. Before the answer the produced kinds are unknown, so they exclude nothing."""
+    known = {"produced": [f["kind"] for f in produced]} if produced is not None else {}
+    return Facts(ConditionPhase.RUN, {"packet": packet},
+                 upstream=lambda: [a.kind for a in packet.task.upstream_artifacts], **known)
 
 
 def _grounded(art: dict[str, Any], prompt: WorkPrompt, stripped: list[str]) -> dict[str, Any] | None:
@@ -243,15 +255,16 @@ class ModelRuntime:
 
         A requirement over the task's own files waits for them: it runs after the answer.
         """
-        wanted: dict[str, dict[str, str]] = {}
+        wanted: dict[str, tuple[dict[str, str], tuple[Bound, ...]]] = {}
+        facts = _facts(packet)
         for req in packet.task.evidence_requirements:
-            if _TOOL_BACKED & set(req.accepts) and not req.files and _builds_on(packet, req):
+            if _TOOL_BACKED & set(req.accepts) and not req.files and applies(req.when, facts):
                 for tool in req.tools:
-                    wanted.setdefault(tool, dict(req.params))
+                    wanted.setdefault(tool, (dict(req.params), req.bounds))
         notes = []
-        for tool, fixed in wanted.items():
+        for tool, (fixed, bounds) in wanted.items():
             try:
-                run_id, outcome = tools.invoke(tool, **{**tools.declared(tool, params), **fixed})
+                run_id, outcome = tools.invoke(tool, bounds=bounds, **{**tools.declared(tool, params), **fixed})
             except ToolAccessDenied as exc:
                 notes.append(ToolNote(tool, None, False, str(exc)))
             else:
@@ -349,26 +362,25 @@ class ModelRuntime:
         """
         notes: list[ToolNote] = []
         blocked: list[str] = []
-        seen: dict[tuple[str, tuple[tuple[str, str], ...]], ToolNote] = {}
-        wrote: dict[tuple[str, tuple[tuple[str, str], ...]], dict[str, str]] = {}  # what each passing run wrote
+        seen: dict[tuple, ToolNote] = {}  # by tool, parameters, and bounds
+        wrote: dict[tuple, dict[str, str]] = {}  # what each passing run wrote
         made_with: dict[str, dict] = {}  # M44: a yielded file's location -> the parameters of the run that wrote it
         for req in packet.task.evidence_requirements:
             if not req.files or not _TOOL_BACKED & set(req.accepts):
                 continue
-            if req.when_produced and not any(f["kind"] in req.when_produced for f in produced):
-                continue  # a conditional check whose files were not produced: not run, not claimed
-            if not _builds_on(packet, req):
-                continue  # scoped to work built on other kinds (M37): not run, not claimed
+            if not applies(req.when, _facts(packet, produced)):
+                continue  # a conditional check (M26, M37, M48) that does not apply here: not run, not claimed
             files: dict[str, str | list[str]] = {}
             missing = None
             for binding in req.files:
                 kinds = " or ".join(binding.kinds)
                 if binding.upstream:  # approved upstream files only, bytes as recorded
-                    paths = [a.location for kind in binding.kinds
+                    found = [(a.kind, a.location) for kind in binding.kinds
                              for a in packet.task.upstream_artifacts
                              if a.kind == kind and a.trusted and a.location
                              and read_verified(a.location, a.digest)[0] is not None]
-                    if not paths and binding.optional:
+                    paths = [location for _, location in found]
+                    if not binding_wanted(binding, Facts(ConditionPhase.RUN, inputs={kind for kind, _ in found})):
                         continue  # M41: an optional input with nothing approved upstream is left out
                     missing = missing or (None if paths else f"no approved upstream {kinds} file")
                     files[binding.param] = paths
@@ -390,10 +402,10 @@ class ModelRuntime:
                     notes.append(ToolNote(tool, None, False, missing))
                     continue
                 params = {**tools.declared(tool, inputs), **dict(req.params), **files}
-                key = (tool, tuple(sorted((k, str(v)) for k, v in params.items())))
+                key = (tool, tuple(sorted((k, str(v)) for k, v in params.items())), req.bounds)
                 if key not in seen:
                     try:
-                        run_id, outcome = tools.invoke(tool, **params)
+                        run_id, outcome = tools.invoke(tool, bounds=req.bounds, **params)
                     except ToolAccessDenied as exc:
                         seen[key] = ToolNote(tool, None, False, str(exc))
                     else:

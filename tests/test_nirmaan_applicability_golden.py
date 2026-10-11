@@ -62,28 +62,31 @@ REQUESTS = (
 
 
 def _applies(req, produced, upstream) -> bool:
-    return req.applies(produced, upstream)
+    from nirmaan.applicability import Facts, applies
+    from nirmaan.models import ConditionPhase
+
+    return applies(req.when, Facts(ConditionPhase.RUN, produced=produced, upstream=upstream))
 
 
 def _fixed(req) -> list[str]:
-    return [f"{k}={v}" for k, v in req.params if k[:4] not in ("max_", "min_")]
+    return [f"{k}={v}" for k, v in req.params]
 
 
 def _bounds(req) -> list[str]:
-    return [f"{k[4:]}{'<=' if k[:4] == 'max_' else '>='}{_num(v)}" for k, v in req.params if k[:4] in ("max_", "min_")]
+    return [f"{b.metric}{'<=' if b.op == 'max' else '>='}{_num(b.value)}" for b in req.bounds]
 
 
 def _limits(engine, task) -> str:
     from nirmaan.runtime import limits
 
     budget = limits(engine, task.id)
-    return (f"retries={task.max_retries} on_failure={task.on_failure.value} attempts={budget.attempts} "
+    return (f"retries={budget.retries} on_failure={budget.on_failure.value} attempts={budget.attempts} "
             f"review_rounds={budget.review_rounds}")
 
 
 def _condition_kinds(req) -> set[str]:
     """Every artifact kind a requirement's run-time conditions name."""
-    return {*req.when_produced, *req.when_upstream}
+    return {k for c in req.when if c.on != "features" for k in (*c.all_of, *c.any_of, *c.none_of)}
 
 
 # --- The snapshot ---------------------------------------------------------------------------------------

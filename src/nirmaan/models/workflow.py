@@ -8,12 +8,15 @@ nothing in it names a department or a person, only capabilities.
 
 from __future__ import annotations
 
+import re
 from enum import Enum
+from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from nirmaan.models.governance import Criticality
-from nirmaan.models.org import Level
+from nirmaan.models.limits import Limits, migrate_limits
+from nirmaan.models.org import Level, text_value
 
 
 class EvidenceKind(str, Enum):
@@ -51,8 +54,105 @@ class FileInput(BaseModel):
     optional: bool = Field(
         default=False,
         description="An upstream binding left out when no approved upstream file of these kinds exists (M41). "
-                    "When one exists, a passing run must still have used it.",
+                    "When one exists, a passing run must still have used it. Per parameter, not a condition on "
+                    "the requirement; decided by the one evaluator over the available inputs (M48).",
     )
+
+
+class ConditionPhase(str, Enum):
+    """When a condition kind's facts are known (M48)."""
+
+    #: From the request, when the work is planned (its features, say).
+    PLAN = "plan"
+    #: From the work, when it runs or is submitted (the kinds it produced, say).
+    RUN = "run"
+
+
+class Condition(BaseModel):
+    """When something applies: a test over one set of facts (M48: one condition type).
+
+    ``on`` names a registered condition kind (``nirmaan.applicability``): the
+    request's ``features`` (the default, and the only kind before M48), the
+    kinds the task ``produced``, the kinds it builds on (``upstream``), the
+    approved upstream files available to it (``inputs``), or any kind an
+    extension registers. The kind declares its phase.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    on: str = Field(default="features", description="The condition kind whose facts this tests.")
+    all_of: tuple[str, ...] = ()
+    any_of: tuple[str, ...] = ()
+    none_of: tuple[str, ...] = ()
+
+    def holds(self, facts: frozenset[str] | set[str]) -> bool:
+        return (
+            all(f in facts for f in self.all_of)
+            and (not self.any_of or any(f in facts for f in self.any_of))
+            and not any(f in facts for f in self.none_of)
+        )
+
+    @property
+    def is_unconditional(self) -> bool:
+        return not (self.all_of or self.any_of or self.none_of)
+
+
+_BOUND_TEXT = re.compile(r"^\s*([A-Za-z_][\w.]*)\s*(<=|>=)\s*(\S+)\s*$")
+
+
+class Bound(BaseModel):
+    """A limit on a metric a tool run reports (M48), e.g. latches <= 0.
+
+    A passing run fails when the metric breaks it, or was never reported.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    metric: str
+    op: Literal["max", "min"]
+    value: float
+
+    @property
+    def label(self) -> str:
+        """How failures name it, as they did when bounds were ``max_``/``min_`` parameters."""
+        return f"{self.op}_{self.metric}"
+
+    def __str__(self) -> str:
+        return f"{self.metric}{'<=' if self.op == 'max' else '>='}{text_value(self.value)}"
+
+    @classmethod
+    def parse(cls, text: str) -> "Bound":
+        """``metric<=value`` or ``metric>=value``, the one text form (the CLI's ``--bound``)."""
+        match = _BOUND_TEXT.match(text)
+        if not match:
+            raise ValueError(f"a bound reads metric<=value or metric>=value, not {text!r}")
+        try:
+            value = float(match[3])
+        except ValueError:
+            raise ValueError(f"the bound {text!r} needs a number") from None
+        return cls(metric=match[1], op="max" if match[2] == "<=" else "min", value=value)
+
+    def problem(self, metrics: dict[str, Any]) -> str | None:
+        """Why a passing run with these metrics breaks this bound, or None."""
+        measured = metrics.get(self.metric)
+        if isinstance(measured, bool) or not isinstance(measured, (int, float)):
+            return f"{self.metric} was not reported, so {self.label} cannot be checked"
+        if self.op == "max" and measured > self.value:
+            return f"{self.metric} {measured} exceeds {self.label} {text_value(self.value)}"
+        if self.op == "min" and measured < self.value:
+            return f"{self.metric} {measured} is below {self.label} {text_value(self.value)}"
+        return None
+
+
+def _legacy_bound(key: str, value: Any) -> Bound | None:
+    """A fixed ``max_<metric>``/``min_<metric>`` parameter, as data written before M48 set a bound."""
+    if key[:4] not in ("max_", "min_") or len(key) == 4:
+        return None
+    try:
+        number = float(text_value(value))
+    except ValueError:
+        return None
+    return Bound(metric=key[4:], op=key[:3], value=number)
 
 
 class EvidenceRequirement(BaseModel):
@@ -78,18 +178,13 @@ class EvidenceRequirement(BaseModel):
         default=(),
         description="Fixed tool parameters (M26); a run counts only if it was made with every one of them.",
     )
-    when_produced: tuple[str, ...] = Field(
+    bounds: tuple[Bound, ...] = Field(
         default=(),
-        description="Applies only when the task produced an artifact of one of these kinds (M26). Empty: always.",
+        description="Limits on the metrics a run reports (M48); a run counts only if it was checked against each.",
     )
-    when: "Condition" = Field(
-        default_factory=lambda: Condition(),
-        description="Planned only when the request's features meet this condition (M27). Default: always.",
-    )
-    when_upstream: tuple[str, ...] = Field(
+    when: tuple[Condition, ...] = Field(
         default=(),
-        description="Applies only when the task builds on an upstream artifact of one of these kinds, as on one "
-                    "branch of a decision (M37). Empty: always.",
+        description="Applies only when every clause holds, each decided in its kind's phase (M48). Empty: always.",
     )
     yields: tuple[tuple[str, str], ...] = Field(
         default=(),
@@ -97,10 +192,35 @@ class EvidenceRequirement(BaseModel):
                     "run's output name) pairs: such an artifact must be the very file a passing run wrote.",
     )
 
-    def applies(self, kinds, upstream=()) -> bool:
-        """Whether the requirement binds work that produced artifacts of these ``kinds``, built on ``upstream`` kinds."""
-        return ((not self.when_produced or any(k in self.when_produced for k in kinds))
-                and (not self.when_upstream or any(k in self.when_upstream for k in upstream)))
+    @model_validator(mode="before")
+    @classmethod
+    def _old_form(cls, data: Any) -> Any:
+        """Data written before M48: one ``when``, ``when_produced``, ``when_upstream``, and bound parameters.
+
+        They become clauses (features, then produced, then upstream) and bounds
+        (docs/UNIFIED_APPLICABILITY.md, section 3).
+        """
+        if not isinstance(data, dict):
+            return data
+        data = dict(data)
+        when = data.get("when", ())
+        clauses = [when] if isinstance(when, (Condition, dict)) else list(when or ())
+        for field, on in (("when_produced", "produced"), ("when_upstream", "upstream")):
+            kinds = tuple(data.pop(field, ()) or ())
+            if kinds:
+                clauses.append(Condition(on=on, any_of=kinds))
+        data["when"] = tuple(c for c in clauses
+                             if not (Condition.model_validate(c) if isinstance(c, dict) else c).is_unconditional)
+        params, bounds = [], list(data.get("bounds", ()) or ())
+        for key, value in data.get("params", ()) or ():
+            bound = _legacy_bound(key, value)
+            if bound is None:
+                params.append((key, value))
+            else:
+                bounds.append(bound)
+        if len(params) != len(data.get("params", ()) or ()):
+            data["params"], data["bounds"] = tuple(params), tuple(bounds)
+        return data
 
 
 class ReviewRequirement(BaseModel):
@@ -109,30 +229,6 @@ class ReviewRequirement(BaseModel):
     capability: str = Field(description="Review capability the reviewer must hold.")
     min_level: Level = Level.SENIOR
     independent: bool = Field(default=True, description="Reviewer may not be the owner.")
-
-
-class Condition(BaseModel):
-    """When a stage (or variant) applies, in terms of requirement features."""
-
-    model_config = ConfigDict(frozen=True)
-
-    all_of: tuple[str, ...] = ()
-    any_of: tuple[str, ...] = ()
-    none_of: tuple[str, ...] = ()
-
-    def holds(self, features: frozenset[str] | set[str]) -> bool:
-        return (
-            all(f in features for f in self.all_of)
-            and (not self.any_of or any(f in features for f in self.any_of))
-            and not any(f in features for f in self.none_of)
-        )
-
-    @property
-    def is_unconditional(self) -> bool:
-        return not (self.all_of or self.any_of or self.none_of)
-
-
-EvidenceRequirement.model_rebuild()
 
 
 class Variant(BaseModel):
@@ -144,12 +240,6 @@ class Variant(BaseModel):
     title: str
     when: Condition = Condition()
     skills: tuple[str, ...] = Field(default=(), description="Extra skills that refine routing.")
-
-
-class OnFailure(str, Enum):
-    RETRY_THEN_ESCALATE = "retry_then_escalate"
-    ESCALATE = "escalate"
-    FAIL = "fail"
 
 
 class StageTemplate(BaseModel):
@@ -169,11 +259,8 @@ class StageTemplate(BaseModel):
     gate: str | None = Field(default=None, description="Gate ID this stage closes.")
     outputs: tuple[str, ...] = ()
     evidence: tuple[EvidenceRequirement, ...] = ()
-    max_retries: int = Field(default=1, ge=0)
-    on_failure: OnFailure = OnFailure.RETRY_THEN_ESCALATE
-    #: Overrides the capability's limits for this stage (M27); None inherits them.
-    max_attempts: int | None = Field(default=None, ge=1)
-    max_review_rounds: int | None = Field(default=None, ge=1)
+    #: Overrides the capability's limits for this stage (M27, M48); a field left None inherits them.
+    limits: Limits = Field(default_factory=Limits)
     #: Continuity of ownership: this stage is owned by whoever owns that stage
     #: (e.g. "merge" by the author of the change), if they hold the capability.
     owner_from: str | None = None
@@ -183,6 +270,12 @@ class StageTemplate(BaseModel):
     #: candidate branch; the stages on untaken branches are cancelled when the
     #: decision is recorded.
     branch: tuple[str, str] | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _old_limits(cls, data: Any) -> Any:
+        """``max_retries``, ``on_failure``, ``max_attempts`` and ``max_review_rounds``, as written before M48."""
+        return migrate_limits(data)
 
 
 class WorkflowTemplate(BaseModel):

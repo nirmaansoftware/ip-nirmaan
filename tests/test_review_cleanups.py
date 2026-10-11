@@ -5,7 +5,8 @@
   Nirmaan).
 * ``max_chain_length``: its contract says what the engine does (0 is refused;
   omitting it means no limit), as ``docs/DFT_ADVANCED.md`` specifies.
-* ``min_`` bounds are checked in one place, ``eda._within_limits``.
+* ``min_`` bounds are checked in one place: ``eda._within_limits`` then, the
+  broker's ``within_bounds`` since M48.
 * No tracked doc cites a ``context.md`` section or entry that no longer exists.
 
 See docs/history/M47-review-cleanups.md.
@@ -75,11 +76,13 @@ def test_max_chain_length_contract_matches_the_engine(tmp_path):
 # --- 3. min_ bounds in one place ------------------------------------------------------------
 
 
-def test_min_bounds_are_checked_only_by_the_runner():
+def test_min_bounds_are_checked_in_one_place():
+    """M48 moved the one place from the EDA runner to the broker, over a requirement's bounds."""
     from nirmaan.integrations import dft, eda
+    from nirmaan.runtime import tools
 
-    assert "min_" not in inspect.getsource(dft)
-    assert "min_" in inspect.getsource(eda._within_limits)
+    assert "min_" not in inspect.getsource(dft) and "min_" not in inspect.getsource(eda)
+    assert "problem(" in inspect.getsource(tools.within_bounds)
 
 
 # --- 4. No stale context.md references --------------------------------------------------------

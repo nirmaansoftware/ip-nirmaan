@@ -18,8 +18,11 @@ import re
 from datetime import datetime, timezone
 from typing import Callable
 
+from nirmaan.applicability import Facts, applies
 from nirmaan.models import (
     ApprovalState,
+    Condition,
+    ConditionPhase,
     Criticality,
     Project,
     ProjectState,
@@ -61,6 +64,7 @@ class Orchestrator:
         self._org = org
         self._router = Router(org)
         self._clock = clock or (lambda: datetime.now(timezone.utc))
+        self._sources: dict = {}
 
     @property
     def router(self) -> Router:
@@ -101,6 +105,7 @@ class Orchestrator:
             gate_overrides=overrides,
             created_at=self._clock(),
         )
+        self._sources = {"analysis": analysis, "requirement": requirement}  # what a plan-time condition may read
         tasks = self._tasks(pid, requirement.id, project.name, analysis, workflows, overrides)
         state = ProjectState(project=project, tasks=tasks)
         engine = TaskEngine(org, state, clock=self._clock)
@@ -136,10 +141,10 @@ class Orchestrator:
         for wf in workflows:
             prefix = "" if len(workflows) == 1 else f"{wf.id}."
             for stage in wf.stages:
-                if not stage.when.holds(features):
+                if not self._holds((stage.when,), features):
                     continue
                 variants: list[Variant | None] = (
-                    [v for v in stage.variants if v.when.holds(features)] if stage.variants else [None]
+                    [v for v in stage.variants if self._holds((v.when,), features)] if stage.variants else [None]
                 )
                 if not variants:
                     continue
@@ -245,16 +250,21 @@ class Orchestrator:
             depends_on=tuple(depends), requirement=req_id, capability=stage.capability, skills=skills,
             owner=owner.chosen, reviewer=reviewer.chosen if reviewer else None, approver=approver, unit=unit,
             escalation_path=_chain(org, owner.chosen), owner_routing=owner, reviewer_routing=reviewer,
-            criticality=stage.criticality, risk=_risk(stage, variant, observed, assumed, owner, reviewer),
+            criticality=stage.criticality,
+            risk=_risk(stage, variant, lambda c: self._holds((c,), observed), assumed, owner, reviewer),
             inputs=tuple(dict.fromkeys(o for d in stage.depends_on for o in _outputs(wf, d))),
             expected_outputs=stage.outputs,
-            evidence_requirements=tuple(r for r in stage.evidence if r.when.holds(observed | set(assumed))),
-            outcomes=stage.outcomes, branch=branch, max_retries=stage.max_retries, on_failure=stage.on_failure,
+            evidence_requirements=tuple(r for r in stage.evidence if self._holds(r.when, observed | set(assumed))),
+            outcomes=stage.outcomes, branch=branch,
             review_state=ReviewState.PENDING if stage.review else ReviewState.NOT_REQUIRED,
             approval_state=ApprovalState.PENDING if stage.review else ApprovalState.NOT_REQUIRED,
             status=TaskStatus.BLOCKED if unstaffed else TaskStatus.PLANNED,
             blocked_reason=unstaffed,
         )
+
+    def _holds(self, conditions: tuple[Condition, ...], features: set[str]) -> bool:
+        """Whether the plan-time clauses hold for the request with these features (M48: the one evaluator)."""
+        return applies(conditions, Facts(ConditionPhase.PLAN, self._sources, features=features))
 
     def _gate_task(self, pid, req_id, wf, stage: StageTemplate, ids, tasks, overrides, prefix) -> Task:
         org = self._org
@@ -284,13 +294,14 @@ def _outputs(wf: WorkflowTemplate, stage_id: str) -> tuple[str, ...]:
     return stage.outputs if stage else ()
 
 
-def _risk(stage: StageTemplate, variant: Variant | None, observed: set[str], assumed: dict, owner,
-          reviewer: RoutingDecision | None = None) -> str:
+def _risk(stage: StageTemplate, variant: Variant | None, observed: Callable[[Condition], bool], assumed: dict,
+          owner, reviewer: RoutingDecision | None = None) -> str:
+    """``observed`` says whether a stage condition holds over the observed features alone."""
     notes: list[str] = []
     for cond in (stage.when, variant.when if variant else None):
         if cond is None or cond.is_unconditional:
             continue
-        if not cond.holds(observed):
+        if not observed(cond):
             reasons = sorted({assumed[f].id for f in (*cond.all_of, *cond.any_of) if f in assumed})
             if reasons:
                 notes.append(f"exists only under assumption {', '.join(reasons)}")

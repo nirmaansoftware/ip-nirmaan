@@ -16,8 +16,8 @@ M29 (docs/RISCV_NEXT.md) makes the core and the bus data. ``core=`` picks one
 of :data:`CORES` (PicoRV32 or SERV, both vendored unmodified, ISC; a new one
 is a :func:`register_core` call), and the design's ports pick one of
 :data:`BUSES` (AXI4-Lite or APB). A design with an ``irq`` output has it
-wired to the core's interrupt input. ``text_bytes`` is reported for M26's
-generic ``max_text_bytes`` limit.
+wired to the core's interrupt input. ``text_bytes`` is reported for a
+bound on it (M48: ``text_bytes<=16384`` in the gate).
 
 A run either happened, with its log and parsed result on disk, or the broker
 refused it and said why. A compile or link error, a failed check, a CPU trap,
@@ -182,7 +182,7 @@ def _size(log: str) -> dict[str, int]:
     for line in log.splitlines():
         if m := _SIZE_RE.match(line):
             text, data, bss = int(m["text"]), int(m["data"]), int(m["bss"])
-            # text_bytes is text under the name the max_text_bytes limit reads (M29).
+            # text_bytes is text under the name a text_bytes bound reads (M29, M48).
             return {"text": text, "data": data, "bss": bss, "image_bytes": text + data, "text_bytes": text}
     return {}
 

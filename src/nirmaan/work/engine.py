@@ -56,6 +56,7 @@ from nirmaan.models.frozen import FrozenDict, FrozenList, deep_frozen
 from nirmaan.registry import Registry
 from nirmaan.work import audit
 from nirmaan.work.frozen import CONTAINER_FIELDS, freeze_state
+from nirmaan.work.limits import limits_for
 from nirmaan.work.policy import (
     PolicyContext,
     PolicyEngine,
@@ -531,13 +532,14 @@ class TaskEngine:
         if task.status not in (S.IN_PROGRESS, S.CHANGES_REQUESTED):
             raise TransitionError(f"{task_id} is {task.status.value}; only active work can fail")
         attempts = task.attempts + 1
-        retry = task.on_failure is not OnFailure.FAIL and attempts <= task.max_retries
+        budget = limits_for(self._org, task)  # M48: the stage's, else the capability's, else the default
+        retry = budget.on_failure is not OnFailure.FAIL and attempts <= budget.retries
         status = S.READY if retry else S.FAILED
         warnings = self._check("task.fail", actor, task)
         self._commit(actor, "task.fail", task_id, reason=reason, warnings=warnings,
                      details={"attempt": attempts, "retry": retry},
                      tasks=self._with_task(task, status=status, attempts=attempts))
-        if not retry and task.on_failure is not OnFailure.FAIL:
+        if not retry and budget.on_failure is not OnFailure.FAIL:
             self.escalate(
                 task_id, actor if actor.kind is not ActorKind.SYSTEM else Actor(role=task.owner),
                 EscalationKind.TECHNICAL,

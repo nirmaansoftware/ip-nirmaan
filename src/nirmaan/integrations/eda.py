@@ -9,9 +9,9 @@ parsed result are on disk, or the broker refused it.
 
 A failing tool (lint errors, a failing test, a counterexample, a missing
 source, a timeout) is a recorded run with ``succeeded=False``, never an
-exception. A ``max_<metric>`` parameter is a limit on the parsed metric of that
-name: a run over it, or one whose backend did not report the metric, fails.
-A ``min_<metric>`` parameter (M34) is the same limit from below.
+exception. The parsed metrics go back with the outcome, and the broker checks
+them against a requirement's bounds (M48); a parameter is only ever a
+parameter, whatever its name.
 Simulation logs reach VeriTriage through :func:`triage_simulation`, which invokes ``veritriage.investigate`` through the same broker. This module
 never imports VeriTriage.
 """
@@ -222,7 +222,6 @@ def execute(backend: Backend, params: Params) -> ToolOutcome:
     result = backend.parse(RunRecord(log, tuple(codes), workdir))
     if timed_out:
         result = EdaResult(False, f"timed out after {timeout}s in {timed_out}", result.diagnostics, result.metrics)
-    result = _within_limits(result, params)
     record = {
         "tool": backend.tool,
         "backend": backend.name,
@@ -239,34 +238,8 @@ def execute(backend: Backend, params: Params) -> ToolOutcome:
     outputs = {"log": str(log_path), **{str(k): str(v) for k, v in (reported or {}).items()
                                         if isinstance(reported, dict) and v and Path(str(v)).is_file()}}
     return ToolOutcome(result.passed, f"{backend.name}: {result.summary}",
-                       references=(str(log_path), str(result_path)), data=record, outputs=outputs)
-
-
-def _within_limits(result: EdaResult, params: Params) -> EdaResult:
-    """Fail a passing result that breaks a ``max_<metric>`` or (M34) ``min_<metric>`` limit, or whose metric
-    was never measured."""
-    over = []
-    for key, limit in params.items():
-        bound_kind = key[:4]
-        if bound_kind not in ("max_", "min_") or not result.passed:
-            continue
-        metric, measured = key[4:], result.metrics.get(key[4:])
-        try:
-            bound = float(limit)
-        except (TypeError, ValueError):
-            over.append(f"{key} {limit!r} is not a number")
-            continue
-        if isinstance(measured, bool) or not isinstance(measured, (int, float)):
-            over.append(f"{metric} was not reported, so {key} cannot be checked")
-        elif bound_kind == "max_" and measured > bound:
-            over.append(f"{metric} {measured} exceeds {key} {text_value(limit)}")
-        elif bound_kind == "min_" and measured < bound:
-            over.append(f"{metric} {measured} is below {key} {text_value(limit)}")
-    if not over:
-        return result
-    diags = (*result.diagnostics, *(Diagnostic("error", m, "LIMIT") for m in over))
-    return EdaResult(False, f"limit not met: {'; '.join(over)} (the tool reported: {result.summary})",
-                     diags, result.metrics)
+                       references=(str(log_path), str(result_path)), data=record, outputs=outputs,
+                       metrics=dict(result.metrics))
 
 
 def triage_simulation(broker: ToolBroker, actor: Actor, run: ToolRun, task_id: str | None = None,

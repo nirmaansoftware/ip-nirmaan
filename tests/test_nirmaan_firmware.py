@@ -28,7 +28,7 @@ from laws import needs
 
 from nirmaan.integrations.eda import Backend, register_backend, select_backend, unregister_backend
 from nirmaan.integrations.firmware import HARNESS, STRICT_FLAGS, parse_c_build, parse_fw_test
-from nirmaan.models import Assurance, EvidenceKind, MemoryScope, ReviewState, TaskStatus, ToolStatus
+from nirmaan.models import Assurance, Bound, EvidenceKind, MemoryScope, ReviewState, TaskStatus, ToolStatus
 from nirmaan.orchestrator import Orchestrator
 from nirmaan.org import AuthorityService
 from nirmaan.runtime import MockLLM, ModelRuntime, ResultStatus, ToolAccessDenied, ToolBroker, review_task, run_task
@@ -74,8 +74,10 @@ def holder(engine, tool: str) -> str:
     raise AssertionError(f"no role may use {tool}")
 
 
-def invoke(engine, tool: str, params: dict[str, str], workdir: Path, task: str | None = None):
-    return ToolBroker(engine).invoke(agent(holder(engine, tool)), tool, {"workdir": str(workdir), **params}, task)
+def invoke(engine, tool: str, params: dict[str, str], workdir: Path, task: str | None = None, bounds=()):
+    """``bounds`` as ``Bound`` records or their text form, e.g. ``("text_bytes<=4096",)`` (M48)."""
+    return ToolBroker(engine).invoke(agent(holder(engine, tool)), tool, {"workdir": str(workdir), **params}, task,
+                                     bounds=tuple(b if isinstance(b, Bound) else Bound.parse(b) for b in bounds))
 
 
 # --- The catalog and the seat, as data -----------------------------------------------------

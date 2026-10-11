@@ -32,7 +32,7 @@ from test_nirmaan_design_agents import (
 from laws import needs
 
 from nirmaan.integrations.eda import Backend, EdaResult, register_backend, unregister_backend
-from nirmaan.models import Assurance, EvidenceKind, TaskStatus
+from nirmaan.models import Assurance, Bound, Condition, EvidenceKind, TaskStatus
 from nirmaan.orchestrator import Orchestrator
 from nirmaan.runtime import (
     MockLLM,
@@ -99,11 +99,12 @@ def test_the_rtl_stage_checks_synthesis_always_and_formal_when_a_setup_is_produc
     engine = Orchestrator(nirmaan_org, clock=fixed_clock).plan(AXI_BLOCK)
     rtl = tid(engine, "rtl-implementation")
     synth, formal = requirement(engine, rtl, SYNTH), requirement(engine, rtl, FORMAL)
-    assert synth.before_review and synth.tools == ("synth.run",) and synth.when_produced == ()
-    assert dict(synth.params) == {"max_latches": "0"}
+    assert synth.before_review and synth.tools == ("synth.run",) and synth.when == ()
+    assert synth.params == () and synth.bounds == (Bound(metric="latches", op="max", value=0),)  # M48
     assert [(b.param, b.kinds, b.entry) for b in synth.files] == [("sources", ("rtl_source",), False),
                                                                   ("top", ("rtl_source",), True)]
-    assert formal.before_review and formal.tools == ("formal.run",) and formal.when_produced == ("formal_spec",)
+    assert formal.before_review and formal.tools == ("formal.run",) and formal.when == (
+        Condition(on="produced", any_of=("formal_spec",)),)
     assert [(b.param, b.kinds) for b in formal.files] == [("sby", ("formal_spec",)), ("sources", ("rtl_source",))]
     # Before anything is produced, the conditional requirement is not among the unmet ones.
     assert FORMAL not in unsatisfied_requirements(engine.state, engine.task(rtl))
@@ -133,7 +134,7 @@ def test_a_latch_hidden_from_lint_cannot_reach_review(counter_rtl):
     assert runs["lint.run"].succeeded and runs["simulator.run"].succeeded
     synth = runs["synth.run"]
     assert not synth.succeeded and "latches 1 exceeds max_latches 0" in synth.summary
-    assert synth.params["max_latches"] == 0.0  # typed by the contract (M39)
+    assert "max_latches" not in synth.params and synth.bounds == (Bound(metric="latches", op="max", value=0),)  # M48
     ev = next(engine.state.evidence[e] for e in report.evidence if engine.state.evidence[e].tool_run == synth.id)
     assert not ev.substantiated  # the failure is on the record
     task = engine.task(rtl)
@@ -264,17 +265,17 @@ def test_a_claimed_formal_pass_without_a_run_is_refused(counter_rtl, monkeypatch
 
 
 @needs("yosys")
-def test_a_synthesis_run_without_the_fixed_parameters_does_not_count(counter_rtl, tmp_path):
-    """A person synthesizes by hand without the latch limit: a real run, but not this requirement's."""
+def test_a_synthesis_run_without_the_bounds_does_not_count(counter_rtl, tmp_path):
+    """A person synthesizes by hand without the latch bound: a real run, but not this requirement's."""
     engine, rtl, _ = counter_rtl
     owner = human(engine.task(rtl).owner)
     engine.start(rtl, owner)
     req = requirement(engine, rtl, SYNTH)
     base = {"sources": str(RTL / "counter.v"), "top": "counter"}
     verdicts = []
-    for extra in ({}, {"max_latches": "0"}):
-        run, _ = ToolBroker(engine).invoke(owner, "synth.run", {**base, **extra, "workdir": str(tmp_path / str(extra))},
-                                           rtl)
+    for n, bounds in enumerate(((), (Bound(metric="latches", op="max", value=0),))):
+        run, _ = ToolBroker(engine).invoke(owner, "synth.run", {**base, "workdir": str(tmp_path / str(n))}, rtl,
+                                           bounds=bounds)
         assert run.succeeded, run.summary
         ev = engine.record_evidence(rtl, owner, EvidenceKind.TOOL_RUN, run.summary, tool_run=run.id)
         verdicts.append(satisfies(engine.state, ev, req))
@@ -292,11 +293,12 @@ def test_a_limit_on_a_metric_the_backend_does_not_report_fails(counter_rtl, tmp_
                              lambda run: EdaResult(True, "done", (), {"cells": 3}), ("sources",)))
     try:
         params = {"sources": str(RTL / "counter.v"), "backend": "metricless", "workdir": str(tmp_path)}
-        run, _ = ToolBroker(engine).invoke(owner, "synth.run", {**params, "max_cells": "3"}, rtl)
+        broker = ToolBroker(engine)
+        run, _ = broker.invoke(owner, "synth.run", params, rtl, bounds=(Bound.parse("cells<=3"),))
         assert run.succeeded, run.summary
-        run, _ = ToolBroker(engine).invoke(owner, "synth.run", {**params, "max_cells": "2"}, rtl)
+        run, _ = broker.invoke(owner, "synth.run", params, rtl, bounds=(Bound.parse("cells<=2"),))
         assert not run.succeeded and "cells 3 exceeds max_cells 2" in run.summary
-        run, _ = ToolBroker(engine).invoke(owner, "synth.run", {**params, "max_widgets": "0"}, rtl)
+        run, _ = broker.invoke(owner, "synth.run", params, rtl, bounds=(Bound.parse("widgets<=0"),))
         assert not run.succeeded and "widgets was not reported" in run.summary
     finally:
         unregister_backend("synth.run", "metricless")
@@ -337,7 +339,8 @@ def test_a_new_before_review_check_needs_no_core_changes(fixed_clock, tmp_path):
         gate("Every RTL file carries the licence header", "header.check",
              FileInput(param="sources", kinds=("rtl_source",)), params=(("marker", "SPDX-License-Identifier"),)),
         gate("Every lint waiver is signed", "waiver.check",
-             FileInput(param="waivers", kinds=("lint_waiver",)), when_produced=("lint_waiver",)))})
+             FileInput(param="waivers", kinds=("lint_waiver",)),
+             when=(Condition(on="produced", any_of=("lint_waiver",)),)))})
     flow = BLOCK_DESIGN.model_copy(update={
         "id": "headered-block", "intents": ("headered_block",),
         "stages": tuple(stage if s.id == stage.id else s for s in BLOCK_DESIGN.stages

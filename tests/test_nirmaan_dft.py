@@ -22,7 +22,7 @@ from laws import needs
 
 from nirmaan.integrations.dft import DftRule, register_rule, rules, unregister_rule
 from nirmaan.integrations.dft_scan import SCAN_CELL, Design, NetlistError, stitch, techmap_file
-from nirmaan.models import Assurance, EvidenceKind, ReviewState, TaskStatus, ToolStatus, Verdict
+from nirmaan.models import Assurance, Bound, EvidenceKind, ReviewState, TaskStatus, ToolStatus, Verdict
 from nirmaan.orchestrator import Orchestrator
 from nirmaan.org import AuthorityService
 from nirmaan.runtime import MockLLM, ModelRuntime, ResultStatus, review_task, run_task
@@ -51,8 +51,10 @@ def holder(engine, tool: str) -> str:
     raise AssertionError(f"no role may use {tool}")
 
 
-def invoke(engine, tool: str, params: dict[str, str], workdir: Path, task: str | None = None):
-    return ToolBroker(engine).invoke(agent(holder(engine, tool)), tool, {"workdir": str(workdir), **params}, task)
+def invoke(engine, tool: str, params: dict[str, str], workdir: Path, task: str | None = None, bounds=()):
+    """``bounds`` as ``Bound`` records or their text form, e.g. ``("drc_violations<=0",)`` (M48)."""
+    return ToolBroker(engine).invoke(agent(holder(engine, tool)), tool, {"workdir": str(workdir), **params}, task,
+                                     bounds=tuple(b if isinstance(b, Bound) else Bound.parse(b) for b in bounds))
 
 
 def insert(engine, source: Path, top: str, workdir: Path):
@@ -291,9 +293,10 @@ def test_a_scan_netlist_reaches_review_only_after_real_checks(engine, tmp_path):
     broker = ToolBroker(engine)
 
     def run(tool: str, sources: str, workdir: str):
-        extra = {"min_test_coverage": "90"} if tool == "dft.atpg" else {}  # the stage's requirement (M27)
+        # The stage's requirement's bounds (M27; a field since M48).
+        bounds = next((r.bounds for r in engine.task(seat).evidence_requirements if tool in r.tools), ())
         done, outcome = broker.invoke(owner, tool, {"sources": sources, "top": "counter",
-                                                    "workdir": str(tmp_path / workdir), **extra}, seat)
+                                                    "workdir": str(tmp_path / workdir)}, seat, bounds=bounds)
         engine.record_evidence(seat, owner, EvidenceKind.TOOL_RUN, done.summary,
                                reference=done.references[0], tool_run=done.id)
         return done, outcome
