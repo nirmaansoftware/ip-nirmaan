@@ -73,8 +73,10 @@ def test_reanalysis_needs_a_real_sta_run_over_the_fixed_rtl_on_the_rtl_branch():
     assert clean.when == (Condition(on="upstream", any_of=("constraints", "layout")),)
     on_rtl = Facts(ConditionPhase.RUN, produced=(), upstream=("rtl_source",))
     assert not applies(clean.when, on_rtl) and applies(retimed.when, on_rtl)
-    assert clean.applies((), ("constraints",)) and not retimed.applies((), ("constraints",))
-    assert not retimed.applies(())  # a requirement scoped to upstream kinds never applies blind
+    on_constraints = Facts(ConditionPhase.RUN, produced=(), upstream=("constraints",))
+    assert applies(clean.when, on_constraints) and not applies(retimed.when, on_constraints)
+    # A requirement scoped to upstream kinds never applies blind: nothing upstream is a known empty set.
+    assert not applies(retimed.when, Facts(ConditionPhase.RUN, produced=(), upstream=()))
 
 
 @needs(*GATE_TOOLS)

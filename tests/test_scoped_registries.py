@@ -43,6 +43,7 @@ INVENTORY = {
     "nirmaan.regmap": {"_LOWERINGS": "regmap.lowerings"},
     "nirmaan.engineering": {"_LINK_OVERLAY": "engineering.link_kinds", "_ITEM_OVERLAY": "engineering.item_kinds"},
     "nirmaan.export": {"_OVERLAY": "export.folders", "_SECTION_WRITERS": "export.section_writers"},
+    "nirmaan.applicability": {"_KINDS": "applicability.kinds"},  # M48, a Registry from the start
 }
 
 

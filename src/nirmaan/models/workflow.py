@@ -8,7 +8,6 @@ nothing in it names a department or a person, only capabilities.
 
 from __future__ import annotations
 
-import re
 from enum import Enum
 from typing import Any, Literal
 
@@ -97,9 +96,6 @@ class Condition(BaseModel):
         return not (self.all_of or self.any_of or self.none_of)
 
 
-_BOUND_TEXT = re.compile(r"^\s*([A-Za-z_][\w.]*)\s*(<=|>=)\s*(\S+)\s*$")
-
-
 class Bound(BaseModel):
     """A limit on a metric a tool run reports (M48), e.g. latches <= 0.
 
@@ -123,14 +119,14 @@ class Bound(BaseModel):
     @classmethod
     def parse(cls, text: str) -> "Bound":
         """``metric<=value`` or ``metric>=value``, the one text form (the CLI's ``--bound``)."""
-        match = _BOUND_TEXT.match(text)
-        if not match:
-            raise ValueError(f"a bound reads metric<=value or metric>=value, not {text!r}")
-        try:
-            value = float(match[3])
-        except ValueError:
-            raise ValueError(f"the bound {text!r} needs a number") from None
-        return cls(metric=match[1], op="max" if match[2] == "<=" else "min", value=value)
+        for sign, op in (("<=", "max"), (">=", "min")):
+            metric, found, value = text.partition(sign)
+            if found and metric.strip().isidentifier():
+                try:
+                    return cls(metric=metric.strip(), op=op, value=float(value))
+                except ValueError:
+                    raise ValueError(f"the bound {text!r} needs a number") from None
+        raise ValueError(f"a bound reads metric<=value or metric>=value, not {text!r}")
 
     def problem(self, metrics: dict[str, Any]) -> str | None:
         """Why a passing run with these metrics breaks this bound, or None."""
