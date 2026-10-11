@@ -95,6 +95,7 @@ The original preface of the section:
 - [M47-review-cleanups](M47-review-cleanups.md): Milestone 47 - Small cleanups found by the principal-engineer review
 - [M48-unified-applicability](M48-unified-applicability.md): Milestone 48 - Unified applicability, bounds, and limits: one condition type and evaluator, bounds as a field, one limits model
 - [M49-scoped-registries](M49-scoped-registries.md): Milestone 49 - Scoped registries: one context object, a default instance, and scopes that layer over it
+- [M51-persistence-integrity](M51-persistence-integrity.md): Milestone 51 - Persistence integrity: planning never overwrites a project, sealed and atomic saves
 - [release-v1.24.0](release-v1.24.0.md): v1.24.0 (2026-10-12) - the plan from the principal-engineer review
 
 ## Before M43

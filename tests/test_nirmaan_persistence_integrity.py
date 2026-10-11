@@ -349,3 +349,9 @@ def test_list_shows_each_project_s_records_status(nirmaan_org, tmp_path):
     listing = store.list()
     assert listing.integrity[pid].status == "broken"
     assert "BROKEN" in _cli("projects", "--root", str(tmp_path)).output
+
+
+def test_a_new_state_is_already_in_the_current_schema():
+    from nirmaan.models import ProjectState
+
+    assert ProjectState.model_fields["schema_version"].default == store_module.SCHEMA_VERSION
