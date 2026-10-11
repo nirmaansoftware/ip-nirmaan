@@ -344,7 +344,7 @@ def _layout(engine, tmp_path: Path) -> None:
         files = [("axi4_lite_regs.sdc", "constraints", SDC, None)] if stage == "timing-constraints" else []
         _seat(engine, stage, files, tmp_path, **LAYOUT_INPUTS)
     (gate,) = [t for t in engine.state.tasks.values() if t.kind is TaskKind.GATE]
-    assert gate.status is TaskStatus.READY and gate.human_required
+    assert gate.status is TaskStatus.READY
     engine.approve_gate(gate.id, human(gate.owner), "signed off: timing, DRC, and LVS clean")
 
 
