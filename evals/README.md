@@ -8,12 +8,20 @@ with deterministic tool runs it never saw. Design: `docs/SEAT_EVALUATION.md`.
 nirmaan eval list
 nirmaan eval run --replay                      # the reference answers: proves the cases and their judges
 nirmaan eval run rtl/axi4-lite-regs --runtime anthropic --attempts 2   # a live model (needs the ai extra and credentials)
-NIRMAAN_CLAUDE_CODE=/path/to/claude nirmaan eval run --runtime claude-code   # a live model on your Claude plan
+NIRMAAN_CLAUDE_CODE=/path/to/claude nirmaan eval run --runtime claude-code --trials 5 --seats rtl,spec,firmware
+nirmaan eval history                           # every committed run record, with pass rates and intervals
+nirmaan eval rejudge evals/results/<record>    # replay a record's answers through the real judges
 ```
 
 Run from the repository root (case paths are relative to it, or pass
-`--repo`). Results are written to `.nirmaan/evals/<runtime>/<case>.json`
-(`--out` to change), and the command exits 1 when any case fails.
+`--repo`). Each run writes a run record (M45, `docs/LIVE_EVAL_EVIDENCE.md`):
+a live run under `evals/results/<date>-<runtime>-<model>/`, which is
+committed, and a replay under `.nirmaan/evals/`, which is not (`--out` to
+change). The command exits 1 when any trial fails.
+
+Cases live in groups (`rtl/`, `spec/`, `firmware/`); `--seats` selects by group
+or by seat stage. A JSON file with a `format` field (a run record, a checks
+file such as `spec/axi4_lite/interface_checks.json`) is data, never a case.
 
 ## Fields
 

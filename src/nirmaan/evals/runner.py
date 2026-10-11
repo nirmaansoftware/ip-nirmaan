@@ -32,6 +32,7 @@ from nirmaan.evals.scorers import ScoreContext, scorer_spec
 from nirmaan.models import (
     Actor,
     ActorKind,
+    CaseFile,
     EvalCase,
     EvalResult,
     GateRun,
@@ -113,6 +114,16 @@ def _fix_upstream(engine: TaskEngine, case: EvalCase, task: Task, repo: Path, sa
         return Actor(role=role, kind=ActorKind.SYSTEM, name=FIXTURE)
 
     files = case.upstream.get(task.stage or "", ())
+    if files and any(r.before_review for r in task.evidence_requirements):
+        # M45: a stage with checks before review is fixed through them, never by a submission alone: the
+        # reference files go through the unchanged run_task, so its gates run for real on them.
+        engine.remember(MemoryScope.TASK, task.id, "input.workspace",
+                        str(sandbox / "upstream" / _UNSAFE.sub("_", task.id)), actor(task.owner))
+        fixed = [(Path(f.path).name, f.kind, resolve(repo, f.path).read_text(encoding="utf-8"), f.entry)
+                 for f in files]
+        run_task(engine, task.id, ModelRuntime(ReplayLLM(fixed), runtime_id=FIXTURE))
+        _review_fixture(engine, case, task, files, actor)
+        return
     drafts = []
     for f in files:
         name = Path(f.path).name
@@ -128,6 +139,12 @@ def _fix_upstream(engine: TaskEngine, case: EvalCase, task: Task, repo: Path, sa
         raise EvalError(f"{task.id} produces nothing the harness can stand in for")
     engine.start(task.id, actor(task.owner))
     engine.submit(task.id, actor(task.owner), drafts, notes=f"evaluation fixture for {case.id}")
+    _review_fixture(engine, case, task, files, actor)
+
+
+def _review_fixture(engine: TaskEngine, case: EvalCase, task: Task, files: Sequence[CaseFile],
+                    actor: Callable[[str | None], Actor]) -> None:
+    """Review and approve a fixed upstream stage as the fixture; refuse when it is not complete after that."""
     if engine.task(task.id).status is TaskStatus.IN_REVIEW:
         named = ", ".join(f.path for f in files) or "the request"
         engine.review(task.id, actor(task.reviewer), Verdict.APPROVE,
@@ -178,14 +195,22 @@ def run_case(org: Organization, case: EvalCase, runtime: AgentRuntime | None = N
              attempts: int | None = None, sandbox: Path | None = None,
              clock: Callable[[], datetime] | None = None) -> EvalResult:
     """Evaluate one seat on one case. ``runtime=None`` replays the case's reference answer."""
+    replay = runtime is None
+    seat_runtime = runtime or ModelRuntime(replay_llm(case, repo), runtime_id=REPLAY)
+    return evaluate(org, case, seat_runtime, replay=replay, repo=repo, attempts=attempts, sandbox=sandbox,
+                    clock=clock)[0]
+
+
+def evaluate(org: Organization, case: EvalCase, seat_runtime: AgentRuntime, *, replay: bool, repo: Path,
+             attempts: int | None = None, sandbox: Path | None = None,
+             clock: Callable[[], datetime] | None = None) -> tuple[EvalResult, TaskEngine]:
+    """``run_case`` with the runtime given and the replay flag stated, returning the sandbox engine too (M45)."""
     problems = validate_case(org, case, repo)
     if problems:
         raise EvalError(f"case {case.id} cannot run: {'; '.join(problems)}")
     started_at, started = (clock or (lambda: datetime.now(timezone.utc)))(), time.monotonic()
     sandbox = Path(sandbox) if sandbox else Path(tempfile.mkdtemp(prefix="nirmaan-eval-"))
     sandbox.mkdir(parents=True, exist_ok=True)
-    replay = runtime is None
-    seat_runtime = runtime or ModelRuntime(replay_llm(case, repo), runtime_id=REPLAY)
 
     engine = Orchestrator(org, clock=clock).plan(case.request)
     seat = _prepare(engine, case, repo, sandbox)
@@ -216,7 +241,7 @@ def run_case(org: Organization, case: EvalCase, runtime: AgentRuntime | None = N
         detail=detail, audit_ok=not verify_chain(engine.state.audit), sandbox=str(sandbox),
         model_calls=spend.calls, input_tokens=spend.input_tokens, output_tokens=spend.output_tokens,
         cost_usd=None if spend.unknown_cost_calls else spend.cost_usd,
-    )
+    ), engine
 
 
 def write_result(result: EvalResult, out: Path) -> Path:

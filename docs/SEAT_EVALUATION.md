@@ -142,6 +142,15 @@ depended only on the microarchitecture. The stage now depends on both, and the
 same case passed. Scripted answers could never have shown this; a held-out judge
 on a real model did, which is what this milestone was for.
 
+## Recorded runs, trials, and more seats (M45)
+
+Since M45 every `nirmaan eval run` writes a run record (raw answers, prompt and
+packet hashes, judge runs, accounting), runs each case `--trials N` times (5 by
+default for a model) with Wilson intervals per case and per seat, and can be
+re-judged with `nirmaan eval rejudge`. A spec seat case and a firmware seat case
+join the four RTL cases. The table above was never recorded as data; the next
+live batch is. See `docs/LIVE_EVAL_EVIDENCE.md`.
+
 ## Limits and what comes next
 
 - The reference testbench encodes the fixture's choices (SLVERR on unmapped

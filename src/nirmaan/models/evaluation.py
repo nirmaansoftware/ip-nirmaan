@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -108,6 +109,73 @@ class EvalResult(BaseModel):
     input_tokens: int = 0
     output_tokens: int = 0
     cost_usd: float | None = None
+
+
+class RecordedAnswer(BaseModel):
+    """One raw model answer in a trial (M45), with what it answered and what it cost, as reported."""
+
+    model_config = ConfigDict(frozen=True)
+
+    mode: str = Field(description="'work' or 'review'.")
+    provider: str | None = None
+    model: str | None = None
+    prompt_sha256: str = Field(description="sha256 over the prompt as sent: system part, a NUL, the user part.")
+    packet_sha256: str = Field(description="sha256 over the work packet the prompt carries, before rendering.")
+    text: str = ""
+    error: str | None = None
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    cache_read_tokens: int | None = None
+    cache_write_tokens: int | None = None
+
+
+class JudgeRun(BaseModel):
+    """A tool run behind a judge verdict, as the sandbox recorded it (M45)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    check: str
+    run: str
+    tool: str
+    succeeded: bool
+    summary: str = ""
+    params: dict[str, Any] = Field(default_factory=dict)
+
+
+class EvalTrial(BaseModel):
+    """One case run once, as a run record keeps it (M45): the result, the raw answers, and the judge runs."""
+
+    model_config = ConfigDict(frozen=True)
+
+    format: Literal["nirmaan.eval-trial"] = "nirmaan.eval-trial"
+    version: int = 1
+    record: str = Field(description="The run record's ID (its directory name).")
+    trial: int = Field(ge=1)
+    stage: str = Field(description="The workflow stage whose seat was evaluated.")
+    model: str | None = Field(default=None, description="The model the answers report.")
+    result: EvalResult
+    answers: tuple[RecordedAnswer, ...] = ()
+    judge_runs: tuple[JudgeRun, ...] = ()
+
+
+class EvalRunManifest(BaseModel):
+    """What one ``nirmaan eval run`` was (M45): runtime, model, version, trials, cases, and the command."""
+
+    model_config = ConfigDict(frozen=True)
+
+    format: Literal["nirmaan.eval-run"] = "nirmaan.eval-run"
+    version: int = 1
+    id: str
+    runtime: str
+    model: str | None = None
+    replay: bool
+    nirmaan_version: str
+    started_at: datetime
+    finished_at: datetime
+    trials: int = Field(ge=1)
+    cases: tuple[str, ...]
+    seats: tuple[str, ...]
+    command: str = ""
 
 
 class EvalProposalThresholds(BaseModel):

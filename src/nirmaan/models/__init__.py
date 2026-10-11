@@ -12,8 +12,12 @@ from nirmaan.models.evaluation import (
     EvalCase,
     EvalProposalThresholds,
     EvalResult,
+    EvalRunManifest,
+    EvalTrial,
     GateRun,
     HeldOutCheck,
+    JudgeRun,
+    RecordedAnswer,
     Score,
     ScoreStatus,
 )
