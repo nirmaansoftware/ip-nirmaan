@@ -190,6 +190,7 @@ def _synth_parse(run: RunRecord) -> EdaResult:
             pass
     netlist = run.workdir / "netlist.v"
     metrics["netlist"] = str(netlist) if netlist.is_file() else None
+    metrics["outputs"] = {"netlist": metrics["netlist"]} if metrics["netlist"] else {}  # M44: what it wrote
     passed = result.passed and metrics["netlist"] is not None
     summary = result.summary if passed or not result.passed else "synthesis failed: no netlist written"
     return EdaResult(passed, summary, result.diagnostics, metrics)

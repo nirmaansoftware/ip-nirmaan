@@ -261,8 +261,10 @@ class ToolRun(BaseModel):
     succeeded: bool
     summary: str
     references: tuple[str, ...] = ()
+    outputs: dict[str, str] = Field(
+        default_factory=dict, description="The files the run wrote, by output name (M44), e.g. a netlist.")
 
-    _freeze = field_validator("params", mode="after")(lambda v: deep_frozen(v))
+    _freeze = field_validator("params", "outputs", mode="after")(lambda v: deep_frozen(v))
 
     def values(self, param: str) -> list[str]:
         """A parameter's elements (a tuple, or comma-joined text saved before M39); empty if not given."""

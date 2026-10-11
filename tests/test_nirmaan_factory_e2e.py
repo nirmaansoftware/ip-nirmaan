@@ -70,6 +70,11 @@ LAYOUT_INPUTS = {
     "timeout": "900", "tie_high": "sky130_fd_sc_hd__conb_1/HI", "tie_low": "sky130_fd_sc_hd__conb_1/LO",
     "buffer_cell": "sky130_fd_sc_hd__buf_4/A/X",
 }
+#: Scan as the DFT lead sets it: eight balanced chains (one 206-flop chain takes ATPG over ten minutes).
+SCAN = {"chains": "8"}
+#: For the tests of the hand-off alone: ATPG graded on a sample of the faults, recorded as such in the run.
+QUICK_SCAN = {**SCAN, "fault_sample": "64"}
+QUICK = {"dft.atpg": {"min_test_coverage": "90", "fault_sample": "64"}}
 
 
 @pytest.fixture()
@@ -191,7 +196,7 @@ def _scan_by_hand(engine, tmp_path: Path, source: str):
                                reference=done.references[0], tool_run=done.id)
         return done, outcome
 
-    insert, outcome = run("dft.scan_insert", source, "insert")
+    insert, outcome = run("dft.scan_insert", source, "insert", chains="8")
     assert insert.succeeded, insert.summary
     netlist = outcome.data["result"]["metrics"]["scan_netlist"]
     assert insert.outputs["scan_netlist"] == netlist  # the run records what it wrote
@@ -207,16 +212,14 @@ def test_a_yielded_artifact_must_be_the_file_the_passing_run_wrote(line, tmp_pat
     copy.parent.mkdir()
     shutil.copy(netlist, copy)
     for tool in ("dft.check", "dft.scan_sim", "dft.atpg"):
-        extra = {"min_test_coverage": "90"} if tool == "dft.atpg" else {}
-        checked, _ = run(tool, str(copy), f"copy-{tool}", **extra)
+        checked, _ = run(tool, str(copy), f"copy-{tool}", **QUICK.get(tool, {}))
         assert checked.succeeded, checked.summary
     draft = {"kind": "dft_netlist", "title": "scan.v", "summary": "Scan netlist."}
     # Checked, but not the file a scan insertion over the approved RTL wrote: it does not open review.
     with pytest.raises(PolicyViolationError, match="no passing run .* wrote"):
         line.submit(seat, owner, [{**draft, "location": str(copy)}])
     for tool in ("dft.check", "dft.scan_sim", "dft.atpg"):
-        extra = {"min_test_coverage": "90"} if tool == "dft.atpg" else {}
-        checked, _ = run(tool, netlist, tool, **extra)
+        checked, _ = run(tool, netlist, tool, **QUICK.get(tool, {}))
         assert checked.succeeded, checked.summary
     line.submit(seat, owner, [{**draft, "location": netlist}])
     assert line.task(seat).status is TaskStatus.IN_REVIEW
@@ -230,8 +233,7 @@ def test_a_yielded_artifact_must_come_from_the_approved_upstream(line, tmp_path)
     shutil.copy(AXI / "axi4_lite_regs.v", unapproved)  # the same bytes, but not the approved artifact
     seat, owner, run, netlist = _scan_by_hand(line, tmp_path, str(unapproved))
     for tool in ("dft.check", "dft.scan_sim", "dft.atpg"):
-        extra = {"min_test_coverage": "90"} if tool == "dft.atpg" else {}
-        run(tool, netlist, tool, **extra)
+        run(tool, netlist, tool, **QUICK.get(tool, {}))
     with pytest.raises(PolicyViolationError, match="approved upstream rtl_source"):
         line.submit(seat, owner, [{"kind": "dft_netlist", "title": "scan.v", "location": netlist}])
 
@@ -240,7 +242,7 @@ def test_a_yielded_artifact_must_come_from_the_approved_upstream(line, tmp_path)
 def test_the_runtime_records_what_a_passing_run_wrote_as_the_tasks_artifacts(line, tmp_path):
     _drive_to(line, "dft", tmp_path)
     seat = tid(line, "dft")
-    _inputs(line, seat, top=TOP)
+    _inputs(line, seat, top=TOP, **QUICK_SCAN)
     report = run_task(line, seat, ModelRuntime(MockLLM(script=[answer()])))  # the seat writes nothing
     assert report.status is ResultStatus.SUBMITTED, report.detail
     runs = {line.state.tool_runs[r].tool: line.state.tool_runs[r] for r in report.tool_runs}
@@ -259,8 +261,9 @@ def test_the_runtime_records_what_a_passing_run_wrote_as_the_tasks_artifacts(lin
 @needs(*FRONT_TOOLS)
 def test_without_the_pd_tools_the_layout_stages_block(line, tmp_path, monkeypatch):
     """No timer here: the constraints seat is BLOCKED, and nothing is recorded as run."""
-    _drive_to(line, "timing-constraints", tmp_path)
+    _drive_to(line, "dft", tmp_path)  # the RTL is approved: the layout's first stage is READY
     seat = tid(line, "timing-constraints")
+    assert line.task(seat).status is TaskStatus.READY
     _inputs(line, seat, **LAYOUT_INPUTS)
     rtl = _approved(line, "rtl-implementation", "rtl_source")
     only_on_path(monkeypatch, tmp_path / "empty")  # no sta, no openroad, no yosys
@@ -311,8 +314,9 @@ def _requirements(engine, tmp_path: Path) -> None:
     assert engine.task(seat).status is TaskStatus.COMPLETED
 
 
-def _front_end(engine, tmp_path: Path, rtl: Path, until: str | None = None) -> None:
+def _front_end(engine, tmp_path: Path, rtl: Path, until: str | None = None, scan: dict | None = None) -> None:
     """Requirements to the driver (and scan), each stage by its seat, reviewed, and approved by a person."""
+    scan = SCAN if scan is None else scan
     stages = [
         ("interface-spec", [("interface_spec.md", "interface_spec", AXI / "interface_spec.md", None)], {}),
         ("register-map", [("register_map.json", "register_map", AXI / "register_map.json", None)], {}),
@@ -322,7 +326,7 @@ def _front_end(engine, tmp_path: Path, rtl: Path, until: str | None = None) -> N
                                 ("axi4_lite_regs_tb.v", "testbench", AXI / "axi4_lite_regs_tb.v",
                                  "axi4_lite_regs_tb"),
                                 ("axi4_lite_regs.sby", "formal_spec", AXI / "axi4_lite_regs.sby", None)], {}),
-        ("dft", [], {"top": TOP}),
+        ("dft", [], {"top": TOP, **scan}),
         ("firmware", [(p.name, "driver", p, None) for p in (FW / "axi4_lite_regs_map.h",
                                                              FW / "axi4_lite_regs_drv.h", FW / "axi4_lite_regs_drv.c")]
          + [("axi4_lite_regs_test.c", "driver_test", FW / "axi4_lite_regs_test.c", None)], {}),
@@ -498,11 +502,12 @@ def test_a_new_tool_output_and_a_folder_of_its_runs_need_no_core_changes(fixed_c
                 id="bundle", name="Bundle", description="Bundle a brief.", intents=("bundle",),
                 stages=(
                     StageTemplate(id="brief", title="Brief", phase="Requirements", capability="req.analyze",
-                                  criticality=Criticality.MEDIUM, outputs=("requirements_spec",)),
+                                  criticality=Criticality.MEDIUM, outputs=("requirements_spec",),
+                                  review=ReviewRequirement(capability="req.review")),
                     StageTemplate(
                         id="pack", title="Pack", phase="Requirements", capability="doc.bundle",
                         depends_on=("brief",), criticality=Criticality.MEDIUM, outputs=("bundle",),
-                        review=ReviewRequirement(capability="req.review"),
+                        review=ReviewRequirement(capability="arch.review"),
                         evidence=(EvidenceRequirement(
                             description="Packed from the approved brief", accepts=(EvidenceKind.TOOL_RUN,),
                             tools=("bundle.pack",), before_review=True, yields=(("bundle", "bundle"),),
@@ -521,6 +526,8 @@ def test_a_new_tool_output_and_a_folder_of_its_runs_need_no_core_changes(fixed_c
         spec.write_text("# Brief\n")
         engine.submit(brief, owner, [{"kind": "requirements_spec", "title": "brief.md", "location": str(spec),
                                       "digest": "sha256:" + hashlib.sha256(spec.read_bytes()).hexdigest()}])
+        engine.review(brief, human(engine.task(brief).reviewer), Verdict.APPROVE, "a brief")
+        engine.approve(brief, human(engine.task(brief).approver))
         assert engine.task(brief).status is TaskStatus.COMPLETED
         _inputs(engine, seat, workdir=str(tmp_path / "pack"))
         report = run_task(engine, seat, ModelRuntime(MockLLM(script=[answer()])))

@@ -80,6 +80,9 @@ FEATURES: list[FeatureRule] = [
     # M35: a request that asks for interrupts, or for bus errors to trap, makes the firmware gate require them.
     FeatureRule(feature="interrupts", patterns=(r"\binterrupts?\b", r"\birqs?\b")),
     FeatureRule(feature="bus_errors", patterns=(r"\bbus[- ]errors?\b", r"\bprecise traps?\b")),
+    # M44: a request for a layout takes the block's approved RTL through physical design in the same project.
+    FeatureRule(feature="layout", patterns=(r"(?<!register )(?<!memory )\blayouts?\b", r"\bgds(ii)?\b"),
+                description="A layout of the block, from its approved RTL, in the same project (M44)"),
     FeatureRule(feature="verification_plan", patterns=(r"\bverification plan\b", r"\bv-?plan\b", r"\btest plan\b"),
                 description="A verification plan, written and checked before the testbench (M29)"),
     FeatureRule(feature="performance", skills=("performance_modeling",), patterns=(r"\bbandwidth\b", r"\blatency\b", r"\bthroughput\b")),

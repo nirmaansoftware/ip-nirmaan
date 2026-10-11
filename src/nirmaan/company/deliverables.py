@@ -7,7 +7,10 @@ itself, so adding a folder or moving a kind is an edit here (or a
 ``register_folder`` overlay), never a code change.
 
 Implementation views (netlist, timing, power, layout) travel with the RTL they
-were built from until physical design gets a folder of its own.
+were built from until physical design gets a folder of its own. A folder may
+also list the recorded runs of named tools (M44): the formal and lint folders
+hold the runs that gated the RTL, since no RTL workflow writes a report
+artifact for them.
 """
 
 from __future__ import annotations
@@ -44,7 +47,8 @@ DELIVERABLE_FOLDERS: list[DeliverableFolder] = [
         description="RTL, power intent, quality, and the implementation views built from the RTL.",
         artifact_kinds=("rtl_source", "power_intent", "quality_report", "constraints", "netlist", "synthesis_report",
                         "timing_report", "power_report", "dft_netlist", "mbist_configuration", "floorplan",
-                        "power_grid", "layout", "physical_verification_report", "ip_package", "merge_record"),
+                        "power_grid", "layout", "routed_netlist", "power_netlist", "parasitics", "gds",
+                        "physical_verification_report", "ip_package", "merge_record"),
         capabilities=("rtl.implement", "rtl.cdc_design", "rtl.power_intent", "rtl.quality", "rtl.integrate",
                       "scm.merge", "synth.run", "sta.analyze", "sta.constraints", "power.analyze", "dft.insert",
                       "dft.mbist", "pd.floorplan", "pd.power_plan", "pd.place_route", "pd.signoff_checks"),
@@ -65,12 +69,14 @@ DELIVERABLE_FOLDERS: list[DeliverableFolder] = [
         description="Property proofs and equivalence results.",
         artifact_kinds=("formal_report", "equivalence_report"),
         capabilities=("formal.prove", "formal.equivalence"),
+        tool_runs=("formal.run", "formal.cover"),  # M44: the proofs that gated the RTL, with their logs
     ),
     DeliverableFolder(
         id="07_lint", title="Lint",
         description="Lint and coding-standard results with dispositioned waivers.",
         artifact_kinds=("lint_report",),
         capabilities=("rtl.lint",),
+        tool_runs=("lint.run",),  # M44: the lint runs that gated the RTL, with their logs
     ),
     DeliverableFolder(
         id="08_documentation", title="Documentation",

@@ -268,7 +268,8 @@ def test_the_dft_stage_is_planned_only_when_test_is_asked_for(engine, nirmaan_or
     assert dft.capability == "dft.insert" and dft.expected_outputs == ("dft_netlist",)
     assert dft.owner.startswith("implementation.dft.engineering.scan.")
     gated = [r for r in dft.evidence_requirements if r.before_review]
-    assert sorted(t for r in gated for t in r.tools) == ["dft.atpg", "dft.check", "dft.scan_sim"]
+    # M44: the scan netlist is first inserted into the approved RTL, by a run the engine holds it to.
+    assert sorted(t for r in gated for t in r.tools) == ["dft.atpg", "dft.check", "dft.scan_insert", "dft.scan_sim"]
     plain = Orchestrator(nirmaan_org, clock=fixed_clock).plan("Create a 4-bit wrapping counter.")
     assert "dft" not in [t.stage for t in plain.state.tasks.values()]
 

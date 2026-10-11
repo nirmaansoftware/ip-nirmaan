@@ -15,4 +15,11 @@
 
 #define AXIL_REGS_RESET_VALUE 0x00000000u
 
+/* The offsets under the names the approved register map generates (M44: the driver
+ * is built with the map in the end-to-end project, which checks these). */
+#define AXI4_LITE_REGS_REG0_OFFSET 0x0u
+#define AXI4_LITE_REGS_REG1_OFFSET 0x4u
+#define AXI4_LITE_REGS_REG2_OFFSET 0x8u
+#define AXI4_LITE_REGS_REG3_OFFSET 0xCu
+
 #endif /* AXI4_LITE_REGS_MAP_H */

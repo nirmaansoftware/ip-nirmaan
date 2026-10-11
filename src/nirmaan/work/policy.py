@@ -319,16 +319,27 @@ def _before_review(ctx: PolicyContext) -> list[str]:
         if not met:
             problems.append(f"{task.id} cannot go to review: {req.description!r} is not met")
             continue
+        inputs = {}  # the approved upstream files each upstream binding asks a run to have used
         for binding in (b for b in req.files if b.upstream):
             approved = {art.location for art in upstream_artifacts(ctx.state, task)
                         if art.kind in binding.kinds and art.assurance is Assurance.APPROVED and art.location}
             if binding.optional and not approved:
                 continue  # M41: nothing approved upstream, so the optional input asks for nothing
+            inputs[binding.param] = approved
             if not any(ev.kind is not EvidenceKind.TOOL_RUN
                        or approved & set(ctx.state.tool_runs[ev.tool_run].values(binding.param))
                        for ev in met):
                 problems.append(f"{task.id} cannot go to review: no passing run for {req.description!r} "
                                 f"used an approved upstream {' or '.join(binding.kinds)} file")
+        # M44: a file the requirement yields is the very file one passing run wrote, over the approved inputs.
+        runs = [ctx.state.tool_runs[ev.tool_run] for ev in met if ev.kind is EvidenceKind.TOOL_RUN]
+        runs = [r for r in runs if all(approved & set(r.values(param)) for param, approved in inputs.items())]
+        for draft in ctx.payload.get("artifacts", ()):
+            names = [name for kind, name in req.yields if kind == draft.get("kind")]
+            location = draft.get("location")
+            if names and not any(location and r.outputs.get(name) == location for r in runs for name in names):
+                problems.append(f"{task.id} cannot go to review: no passing run for {req.description!r} over the "
+                                f"approved inputs wrote {location or 'the ' + str(draft.get('kind'))}")
         for binding in (b for b in req.files if not b.entry and not b.upstream):
             for draft in ctx.payload.get("artifacts", ()):
                 location = draft.get("location")

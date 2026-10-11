@@ -91,6 +91,11 @@ class EvidenceRequirement(BaseModel):
         description="Applies only when the task builds on an upstream artifact of one of these kinds, as on one "
                     "branch of a decision (M37). Empty: always.",
     )
+    yields: tuple[tuple[str, str], ...] = Field(
+        default=(),
+        description="Files a passing run writes that become the task's artifacts (M44), as (artifact kind, the "
+                    "run's output name) pairs: such an artifact must be the very file a passing run wrote.",
+    )
 
     def applies(self, kinds, upstream=()) -> bool:
         """Whether the requirement binds work that produced artifacts of these ``kinds``, built on ``upstream`` kinds."""

@@ -32,6 +32,8 @@ class ToolOutcome:
     summary: str
     references: tuple[str, ...] = ()
     data: dict[str, Any] = field(default_factory=dict)
+    #: The files the run wrote, by output name (M44): what a requirement's ``yields`` can make an artifact.
+    outputs: dict[str, str] = field(default_factory=dict)
 
 
 #: A call's parameters as the broker checked them: typed by the tool's contract (M39).
@@ -163,6 +165,7 @@ class ToolBroker:
             succeeded=outcome.succeeded,
             summary=outcome.summary,
             references=outcome.references,
+            outputs=dict(outcome.outputs),
         )
         self._engine.record_tool_run(run, actor)
         return run, outcome

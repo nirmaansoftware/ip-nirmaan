@@ -42,7 +42,7 @@ from nirmaan.runtime.base import (
     register_runtime,
 )
 from nirmaan.runtime.context import WorkPacket
-from nirmaan.runtime.files import read_verified, split_files, write_file
+from nirmaan.runtime.files import digest, read_verified, split_files, write_file
 from nirmaan.runtime.prompt import ToolNote, WorkPrompt, render_work_prompt
 from nirmaan.runtime.tools import ToolAccessDenied
 from nirmaan.runtime.writer import outside_writer
@@ -350,6 +350,8 @@ class ModelRuntime:
         notes: list[ToolNote] = []
         blocked: list[str] = []
         seen: dict[tuple[str, tuple[tuple[str, str], ...]], ToolNote] = {}
+        wrote: dict[tuple[str, tuple[tuple[str, str], ...]], dict[str, str]] = {}  # what each passing run wrote
+        made_with: dict[str, dict] = {}  # M44: a yielded file's location -> the parameters of the run that wrote it
         for req in packet.task.evidence_requirements:
             if not req.files or not _TOOL_BACKED & set(req.accepts):
                 continue
@@ -373,7 +375,9 @@ class ModelRuntime:
                     continue
                 matched = [f for kind in binding.kinds for f in produced if f["kind"] == kind]
                 if binding.entry:
-                    entry = matched[0]["entry"] if matched else None
+                    # M44: a file a run wrote has the entry that run was given.
+                    entry = (matched[0]["entry"] or made_with.get(matched[0]["location"], {}).get(binding.param)
+                             if matched else None)
                     missing = missing or (None if entry else f"no {kinds} file declares an entry")
                     files[binding.param] = entry or ""
                 else:
@@ -394,12 +398,39 @@ class ModelRuntime:
                         seen[key] = ToolNote(tool, None, False, str(exc))
                     else:
                         seen[key] = ToolNote(tool, run_id, outcome.succeeded, outcome.summary)
+                        wrote[key] = dict(outcome.outputs) if outcome.succeeded else {}
                     notes.append(seen[key])
                 if seen[key].run is None:
                     refusals.append(seen[key].summary)
+                elif req.yields and seen[key].succeeded:
+                    yielded = self._yielded(packet, req, seen[key], wrote.get(key, {}), files, produced)
+                    produced += yielded  # later requirements check them as the task's own files
+                    made_with.update((f["location"], params) for f in yielded)
             if req.before_review and refusals and len(refusals) == len(req.tools):
                 blocked += [r for r in refusals if r not in blocked]
         return tuple(notes), blocked
+
+    @staticmethod
+    def _yielded(packet: WorkPacket, req: EvidenceRequirement, note: ToolNote, outputs: dict[str, str],
+                 files: dict[str, str | list[str]], produced: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """The files a passing run wrote that the requirement yields (M44), as drafts of the task's artifacts.
+
+        Each is the run's own file, with its digest, derived from the approved upstream files the run used;
+        nothing in it is the model's.
+        """
+        used = {p for b in req.files if b.upstream for p in files.get(b.param, ())}
+        derived = tuple(a.id for a in packet.task.upstream_artifacts if a.location in used)
+        have = {f["location"] for f in produced}
+        drafts = []
+        for kind, name in req.yields:
+            location = outputs.get(name)
+            if not location or location in have:
+                continue
+            drafts.append({"kind": kind, "title": Path(location).name, "location": location, "entry": None,
+                           "digest": digest(Path(location).read_bytes()),
+                           "summary": f"The {name} {note.tool} wrote in run {note.run}: {note.summary}",
+                           **({"derived_from": derived} if derived else {})})
+        return drafts
 
     # --- Review ------------------------------------------------------------------------
 
