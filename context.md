@@ -15,7 +15,7 @@ workflows, tools, tests) are not written here; they are generated into the
 Repo: https://github.com/nirmaansoftware/ip-nirmaan (public, Apache-2.0).
 Earlier names `veritriage` and `nirmaan-ip`; transferred from `patel-om` to
 `nirmaansoftware` on 2026-09-28. GitHub redirects the old URLs.
-Current version: **1.23.0** (distribution `ip-nirmaan`; packages `nirmaan` and
+Current version: **1.24.0** (distribution `ip-nirmaan`; packages `nirmaan` and
 `veritriage`; CLIs `nirmaan` and `veritriage`).
 Landing page: https://ip.nirmaan.online (`site/`).
 
@@ -208,7 +208,7 @@ unit, skill, or principle; `--release` refreshes the test count,
 
 **Releases.** Bump `pyproject.toml` and the version line above, run
 `scripts/status.py --release`, add `docs/history/release-vX.Y.Z.md` and its
-index line, and tag. No GitHub releases exist yet; v1.23.0 is tagged.
+index line, and tag. No GitHub releases exist yet; v1.23.0 and v1.24.0 are tagged.
 
 **Live models.** No Anthropic API credits are bought. The `claude-code` runtime
 runs seats through `claude -p` on the owner's Claude plan; the default seat is
