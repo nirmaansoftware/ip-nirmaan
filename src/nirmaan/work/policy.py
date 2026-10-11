@@ -20,7 +20,6 @@ from nirmaan.models import (
     Assurance,
     ConditionPhase,
     Criticality,
-    DecisionKind,
     Enforcement,
     EscalationKind,
     EscalationState,
@@ -392,21 +391,17 @@ def _chain(ctx: PolicyContext) -> list[str]:
     return [f"audit trail broken: {p}" for p in problems]
 
 
-#: M50: the engine actions that take a decision the authority matrix lists, at the task's criticality.
-_ACTION_DECISIONS = {"task.approve": DecisionKind.APPROVE_ARTIFACT, "gate.approve": DecisionKind.APPROVE_GATE,
-                     "task.cancel": DecisionKind.CANCEL_TASK}
-
-
 @register_check("human-decisions")
 def _human_decisions(ctx: PolicyContext) -> list[str]:
-    """The authority matrix marks the decisions only a person may take: recorded explicitly (M40), or taken by
-    approving work, signing a gate, or cancelling a task (M50)."""
+    """The authority matrix marks the decisions only a person may take: recorded explicitly (M40), or taken by an
+    engine action that names the decision it takes (M50: approving work, signing a gate, cancelling a task), at
+    the task's criticality."""
     if ctx.actor.kind is ActorKind.HUMAN:
         return []
     if ctx.action == "decision.record":
         kind, crit, verb = ctx.payload["kind"], ctx.payload["criticality"], "record"
-    elif ctx.action in _ACTION_DECISIONS and ctx.task is not None:
-        kind, crit, verb = _ACTION_DECISIONS[ctx.action], ctx.task.criticality, "take"
+    elif ctx.payload.get("decision") is not None and ctx.task is not None:
+        kind, crit, verb = ctx.payload["decision"], ctx.task.criticality, "take"
     else:
         return []
     if not ctx.org.authority[(kind.value, crit.value)].human_required:

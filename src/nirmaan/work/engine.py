@@ -479,7 +479,7 @@ class TaskEngine:
         if task.review_state is ReviewState.PENDING or task.review_state is ReviewState.CHANGES_REQUESTED:
             raise TransitionError(f"{task_id} has no passing independent review yet")
         self._authorize(actor, DecisionKind.APPROVE_ARTIFACT, task)
-        warnings = self._check("task.approve", actor, task)
+        warnings = self._check("task.approve", actor, task, decision=DecisionKind.APPROVE_ARTIFACT)
         consequences = [_APPROVAL_CONSUMERS[art.kind](self, art)  # M29: each may refuse, before anything commits
                         for art in (self._state.artifacts[a] for a in task.artifacts)
                         if art.kind in _APPROVAL_CONSUMERS]
@@ -529,7 +529,7 @@ class TaskEngine:
                       f"{gate.name} needs {gate.min_level.display_name} or above")
         verdict = self._authority.check(actor.role, DecisionKind.APPROVE_GATE, task.criticality)
         self._require(verdict.allowed, verdict.reason)
-        warnings = self._check("gate.approve", actor, task)
+        warnings = self._check("gate.approve", actor, task, decision=DecisionKind.APPROVE_GATE)
         self._commit(actor, "gate.approve", task_id, reason=note, warnings=warnings,
                      details={"gate": task.gate, "human": actor.kind is ActorKind.HUMAN},
                      tasks=self._with_task(task, status=S.COMPLETED, approval_state=ApprovalState.GRANTED))
@@ -587,7 +587,7 @@ class TaskEngine:
     def cancel(self, task_id: str, actor: Actor, reason: str) -> Task:
         task = self.task(task_id)
         self._authorize(actor, DecisionKind.CANCEL_TASK, task)
-        warnings = self._check("task.cancel", actor, task)
+        warnings = self._check("task.cancel", actor, task, decision=DecisionKind.CANCEL_TASK)
         self._commit(actor, "task.cancel", task_id, reason=reason, warnings=warnings,
                      tasks=self._with_task(task, status=S.CANCELLED))
         self.refresh()
