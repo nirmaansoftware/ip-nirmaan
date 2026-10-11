@@ -58,7 +58,7 @@ snapshot, refreshed by `python scripts/status.py --release`.
 | Skills | 140 | `skills`, every PR |
 | Workflows | 9 | `workflows`, every PR |
 | Constitution principles | 12 | `principles`, every PR |
-| Tools `AVAILABLE` | 35 | `tools_available`, every PR |
+| Tools `AVAILABLE` | 36 | `tools_available`, every PR |
 | Tools `CONTRACT_ONLY` | 17 | `tools_contract_only`, every PR |
 | Verification knowledge packs | 42 | `knowledge_packs`, every PR |
 | Tests collected | 1611 | `tests`, at release (v1.23.0) |

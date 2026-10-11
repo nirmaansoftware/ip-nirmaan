@@ -130,6 +130,8 @@ a temporary directory.
 
 ## Deferred
 
-- A run history kept by `nirmaan eval run` itself (today: one `--out` per run).
-- Committing raw live results, so real runs can be inputs without a rerun.
+- A run history kept by `nirmaan eval run` itself, and committed raw live
+  results: done in M45 (`docs/LIVE_EVAL_EVIDENCE.md`). `load_results` reads run
+  records too, labelling each run `record:<record ID>` or `file`, and
+  `nirmaan learn --evals` may be given more than once.
 - Rules across cases (a seat failing several cases on one judge kind).
