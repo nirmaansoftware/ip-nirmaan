@@ -20,7 +20,7 @@ How the call is kept honest and clean:
   API-equivalent estimate, not a charge.
 
 The executable is ``NIRMAAN_CLAUDE_CODE`` or ``claude`` on PATH; the model is
-``NIRMAAN_CLAUDE_CODE_MODEL`` or Claude Opus 5.5. With no executable, the seat
+``NIRMAAN_CLAUDE_CODE_MODEL`` or the model profiles' ``DEFAULT_MODEL`` (Claude Opus 5.5). With no executable, the seat
 declines and nothing is called or counted.
 """
 
@@ -32,11 +32,11 @@ import shutil
 import subprocess
 import tempfile
 
+from nirmaan.company.model_profiles import DEFAULT_MODEL
 from nirmaan.runtime.base import register_runtime
 from nirmaan.runtime.model import NO_CALL, Completion, ModelRuntime
 from nirmaan.runtime.prompt import WorkPrompt
 
-DEFAULT_MODEL = "claude-opus-5-5"
 DEFAULT_TIMEOUT = 1800
 PROVIDER = "claude-code"
 _CREDENTIAL_VARS = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN")

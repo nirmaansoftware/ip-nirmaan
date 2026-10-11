@@ -209,7 +209,7 @@ TOOLS: list[ToolSpec] = [
     _tool("dft.run", "DFT tools", "eda", EXE, CO, "ATPG, MBIST, and commercial scan flows."),
     _tool("dft.scan_insert", "Scan insertion", "eda", EXE, AV, "Mux-D scan flops stitched into one chain.",
           (SOURCES, TOP_REQUIRED, _p("chains", INT, "Number of scan chains (default 1)."),
-           _p("max_chain_length", INT, "Longest chain allowed; 0 for no limit (default)."),
+           _p("max_chain_length", INT, "Longest chain allowed, a positive integer; omit it for no limit (the default)."),
            _p("cross_domains", TEXT, "'lockup': chains may cross clock domains, with a lockup latch at each crossing "
               "(M29)."), *RUNNER)),
     _tool("dft.check", "DFT rule check", "eda", EXE, AV, "Testability rules over the synthesized netlist.",
