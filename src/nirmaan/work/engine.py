@@ -111,6 +111,11 @@ def unregister_approval_consumer(kind: str) -> None:
     _APPROVAL_CONSUMERS.pop(kind, None)
 
 
+#: M50: what the tool broker hands ``record_tool_run``, so a run is recorded only where a tool was invoked.
+#: Only ``nirmaan.runtime.tools`` imports it (a law test reads the imports of every source file).
+BROKER_SEAL = object()
+
+
 def system_actor(org: Organization, name: str = "nirmaan-engine") -> Actor:
     head = org.head_of(org.root.id)
     return Actor(role=head.id if head else next(iter(org.roles)), kind=ActorKind.SYSTEM, name=name)
@@ -413,7 +418,7 @@ class TaskEngine:
         evidence = dict(self._state.evidence)
         task_evidence = list(task.evidence)
         if verdict is Verdict.APPROVE:
-            ev_id = f"{task_id}#e{len(task_evidence) + 1}"
+            ev_id = self._next_evidence_id(task_id)
             evidence[ev_id] = Evidence(
                 id=ev_id, kind=EvidenceKind.REVIEW_RECORD, task=task_id,
                 description=f"Independent review by {actor.role}: {comments or 'approved'}",
@@ -424,10 +429,12 @@ class TaskEngine:
         updates: dict[str, Any] = {}
         if status is S.CHANGES_REQUESTED:
             # The submission sent back stops counting now (M27): its files leave the task's artifacts.
-            attempt = self._supersede(task, reviews, review_id, comments)
-            details.update(superseded=attempt.id, artifacts=list(task.artifacts))
+            # M50: so does its evidence, which is about those files: the next submission starts with none.
+            attempt = self._supersede(task, reviews, review_id, comments, tuple(task_evidence))
+            details.update(superseded=attempt.id, artifacts=list(task.artifacts), evidence=list(task_evidence))
             updates = {"attempts": {**self._state.attempts, attempt.id: attempt},
                        "artifacts": {k: v for k, v in self._state.artifacts.items() if k not in task.artifacts}}
+            task_evidence = []
             task_changes: dict[str, Any] = {"artifacts": ()}
         else:
             task_changes = {}
@@ -444,8 +451,9 @@ class TaskEngine:
         self._promote_if_verified(task_id)
         return self.task(task_id)
 
-    def _supersede(self, task: Task, reviews: dict[str, ReviewRecord], review_id: str, comments: str) -> Attempt:
-        """The submission a review sent back, as an Attempt naming every review of it (M27)."""
+    def _supersede(self, task: Task, reviews: dict[str, ReviewRecord], review_id: str, comments: str,
+                   evidence: tuple[str, ...]) -> Attempt:
+        """The submission a review sent back, as an Attempt naming every review of it (M27) and its evidence (M50)."""
         earlier = {r for a in self._state.attempts.values() if a.task == task.id for r in a.reviews}
         of_it = tuple(r.id for r in reviews.values() if r.task == task.id and r.id not in earlier)
         kept = tuple(self._state.artifacts[a] for a in task.artifacts if a in self._state.artifacts)
@@ -454,6 +462,8 @@ class TaskEngine:
         return Attempt(
             id=f"{task.id}#t{number}", task=task.id, number=number,
             actor=kept[0].produced_by if kept else task.owner or "", artifacts=kept, reviews=of_it,
+            evidence=evidence, tool_runs=tuple(dict.fromkeys(
+                self._state.evidence[e].tool_run for e in evidence if self._state.evidence[e].tool_run)),
             refusal=f"changes requested by {reviewer} in {review_id}: {comments or 'no comments'}",
         )
 
@@ -467,7 +477,7 @@ class TaskEngine:
         if task.review_state is ReviewState.PENDING or task.review_state is ReviewState.CHANGES_REQUESTED:
             raise TransitionError(f"{task_id} has no passing independent review yet")
         self._authorize(actor, DecisionKind.APPROVE_ARTIFACT, task)
-        warnings = self._check("task.approve", actor, task)
+        warnings = self._check("task.approve", actor, task, decision=DecisionKind.APPROVE_ARTIFACT)
         consequences = [_APPROVAL_CONSUMERS[art.kind](self, art)  # M29: each may refuse, before anything commits
                         for art in (self._state.artifacts[a] for a in task.artifacts)
                         if art.kind in _APPROVAL_CONSUMERS]
@@ -517,7 +527,7 @@ class TaskEngine:
                       f"{gate.name} needs {gate.min_level.display_name} or above")
         verdict = self._authority.check(actor.role, DecisionKind.APPROVE_GATE, task.criticality)
         self._require(verdict.allowed, verdict.reason)
-        warnings = self._check("gate.approve", actor, task)
+        warnings = self._check("gate.approve", actor, task, decision=DecisionKind.APPROVE_GATE)
         self._commit(actor, "gate.approve", task_id, reason=note, warnings=warnings,
                      details={"gate": task.gate, "human": actor.kind is ActorKind.HUMAN},
                      tasks=self._with_task(task, status=S.COMPLETED, approval_state=ApprovalState.GRANTED))
@@ -575,7 +585,7 @@ class TaskEngine:
     def cancel(self, task_id: str, actor: Actor, reason: str) -> Task:
         task = self.task(task_id)
         self._authorize(actor, DecisionKind.CANCEL_TASK, task)
-        warnings = self._check("task.cancel", actor, task)
+        warnings = self._check("task.cancel", actor, task, decision=DecisionKind.CANCEL_TASK)
         self._commit(actor, "task.cancel", task_id, reason=reason, warnings=warnings,
                      tasks=self._with_task(task, status=S.CANCELLED))
         self.refresh()
@@ -600,8 +610,14 @@ class TaskEngine:
 
     # --- Evidence and tools ------------------------------------------------------------
 
-    def record_tool_run(self, run: ToolRun, actor: Actor) -> ToolRun:
-        """Only the tool broker calls this, after it actually invoked the tool."""
+    def record_tool_run(self, run: ToolRun, actor: Actor, seal: object = None) -> ToolRun:
+        """Only the tool broker calls this, after it actually invoked the tool; it passes ``BROKER_SEAL`` (M50)."""
+        if seal is not BROKER_SEAL:
+            raise WorkError(f"{run.id} was not handed over by the tool broker; only a brokered run is recorded")
+        if run.id in self._state.tool_runs:
+            raise WorkError(f"{run.id} is already recorded; a run is never replaced")
+        if run.task is not None:
+            self.task(run.task)
         tool = self._org.tools.get(run.tool)
         if tool is None or tool.status is not ToolStatus.AVAILABLE:
             raise WorkError(f"{run.tool} cannot have run: it is not executable")
@@ -626,14 +642,21 @@ class TaskEngine:
         warnings = self._check("evidence.record", actor, task, kind=kind, tool_run=tool_run)
         substantiated = False
         if kind in (EvidenceKind.TOOL_RUN, EvidenceKind.VERITRIAGE_SESSION):
-            substantiated = self._state.tool_runs[tool_run].succeeded
+            substantiated = self._state.tool_runs[tool_run].succeeded  # P5 refused a run of another task
         elif kind is EvidenceKind.HUMAN_ATTESTATION:
             substantiated = actor.kind is ActorKind.HUMAN
         elif kind is EvidenceKind.DOCUMENT:
-            substantiated = reference is not None and reference in self._state.artifacts
+            # M50: a document backs a claim only when another task produced it and the organization approved it.
+            art = self._state.artifacts.get(reference or "")
+            substantiated = art is not None and art.task != task_id and art.assurance is Assurance.APPROVED
         elif kind is EvidenceKind.REVIEW_RECORD:
-            substantiated = reference is not None and reference in self._state.reviews
-        ev_id = f"{task_id}#e{len(task.evidence) + 1}"
+            # M50: only an approval of this task's current submission is a review record.
+            review = self._state.reviews.get(reference or "")
+            substantiated = (review is not None and review.task == task_id and review.verdict is Verdict.APPROVE
+                             and latest_verdicts(self._state, task_id).get(review.reviewer) is Verdict.APPROVE
+                             and review.id not in {r for a in self._state.attempts.values()
+                                                   if a.task == task_id for r in a.reviews})
+        ev_id = self._next_evidence_id(task_id)
         evidence = dict(self._state.evidence)
         evidence[ev_id] = Evidence(
             id=ev_id, kind=kind, description=description, task=task_id, recorded_by=actor.label,
@@ -653,6 +676,10 @@ class TaskEngine:
             # Submitted work that needed only evidence now has it.
             self.complete(task_id, self.system)
         return self._state.evidence[ev_id]
+
+    def _next_evidence_id(self, task_id: str) -> str:
+        """The task's next evidence ID, numbered past evidence a sent-back submission took with it (M50)."""
+        return f"{task_id}#e{1 + sum(1 for ev in self._state.evidence.values() if ev.task == task_id)}"
 
     def _promote_if_verified(self, task_id: str) -> None:
         task = self.task(task_id)
@@ -686,6 +713,10 @@ class TaskEngine:
         target_role: str | None = None,
     ) -> Escalation:
         task = self.task(task_id) if task_id else None
+        if task is not None:
+            self._require(self._has_stake(actor, task),
+                          f"{actor.role} has no stake in {task_id} (neither its owner, reviewer, approver, "
+                          "manager, nor an escalation target on it), so may not escalate it")
         target = target_role or route_escalation(self._org, actor.role, kind)
         if target is None:
             raise WorkError(f"{actor.role} has nobody to escalate {kind.value} to")
@@ -1058,6 +1089,17 @@ class TaskEngine:
                     )
 
     # --- Helpers ---------------------------------------------------------------------------
+
+    def _has_stake(self, actor: Actor, task: Task) -> bool:
+        """Whether ``actor`` may escalate, and so freeze, ``task`` (M50)."""
+        if actor.kind is ActorKind.SYSTEM or actor.role in (task.owner, task.reviewer, task.approver):
+            return True
+        if actor.role in task.escalation_path or self._manages(actor, task):
+            return True
+        if any(r.task == task.id and r.reviewer == actor.role for r in self._state.reviews.values()):
+            return True
+        return any(e.task == task.id and actor.role in {e.target_role, *(r.id for r in
+                   self._org.escalation_chain(e.target_role))} for e in self._state.escalations.values())
 
     def _manages(self, actor: Actor, task: Task) -> bool:
         return task.owner is not None and actor.role in {r.id for r in self._org.line_chain(task.owner)}

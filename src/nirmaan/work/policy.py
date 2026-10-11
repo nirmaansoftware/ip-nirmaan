@@ -227,6 +227,11 @@ def _no_fabrication(ctx: PolicyContext) -> list[str]:
             return [f"{task.id} submitted with no artifacts: nothing was produced"]
     if ctx.action == "runtime.result" and ctx.payload.get("claims_completion") and not ctx.payload.get("artifacts"):
         return ["an agent claimed completion without producing an artifact"]
+    if ctx.action == "task.complete" and task.kind in (TaskKind.WORK, TaskKind.DECISION):  # M50
+        problems = [f"{task.id} cannot complete: nothing was produced"] if not task.artifacts else []
+        if task.kind is TaskKind.DECISION and task.outcome is None:
+            problems.append(f"{task.id} is a decision with no outcome; it cannot complete")
+        return problems
     return []
 
 
@@ -248,6 +253,8 @@ def _tool_claims(ctx: PolicyContext) -> list[str]:
         return [f"{run.tool} is not an executable tool"]
     if kind is EvidenceKind.VERITRIAGE_SESSION and not run.tool.startswith("veritriage."):
         return [f"run {run_id} is not a VeriTriage run"]
+    if ctx.task is not None and run.task != ctx.task.id:  # M50: a run backs only the task it was made for
+        return [f"run {run_id} was made for {run.task or 'no task'}, not {ctx.task.id}: it ran nothing for this task"]
     return []
 
 
@@ -386,13 +393,20 @@ def _chain(ctx: PolicyContext) -> list[str]:
 
 @register_check("human-decisions")
 def _human_decisions(ctx: PolicyContext) -> list[str]:
-    """M40: the authority matrix marks the decisions only a person may record."""
-    if ctx.action != "decision.record" or ctx.actor.kind is ActorKind.HUMAN:
+    """The authority matrix marks the decisions only a person may take: recorded explicitly (M40), or taken by an
+    engine action that names the decision it takes (M50: approving work, signing a gate, cancelling a task), at
+    the task's criticality."""
+    if ctx.actor.kind is ActorKind.HUMAN:
         return []
-    kind, crit = ctx.payload["kind"], ctx.payload["criticality"]
+    if ctx.action == "decision.record":
+        kind, crit, verb = ctx.payload["kind"], ctx.payload["criticality"], "record"
+    elif ctx.payload.get("decision") is not None and ctx.task is not None:
+        kind, crit, verb = ctx.payload["decision"], ctx.task.criticality, "take"
+    else:
+        return []
     if not ctx.org.authority[(kind.value, crit.value)].human_required:
         return []
-    return [f"a {crit.value} {kind.value} decision needs a person; {ctx.actor.kind.value} may not record it"]
+    return [f"a {crit.value} {kind.value} decision needs a person; {ctx.actor.kind.value} may not {verb} it"]
 
 
 @register_check("human-gates")

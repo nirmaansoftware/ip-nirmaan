@@ -25,7 +25,7 @@ from nirmaan.orchestrator import Orchestrator
 from nirmaan.registry import Registries
 from nirmaan.work import ProjectStore
 
-from nirmaan_helpers import drive, human, tid
+from nirmaan_helpers import drive, human, mcp_session, tid
 
 
 @pytest.fixture()
@@ -42,10 +42,10 @@ def server(nirmaan_org, tmp_path, bridge):
 
 
 def _call(server, name, **arguments):
-    """One tools/call over the wire; returns (payload, is_error)."""
+    """One tools/call over the wire, in the session of the role it names; returns (payload, is_error)."""
     line = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "tools/call",
                        "params": {"name": name, "arguments": arguments}})
-    result = server.handle_line(line)["result"]
+    result = mcp_session(server, arguments.get("role")).handle_line(line)["result"]
     text = result["content"][0]["text"]
     return (text if result["isError"] else json.loads(text)), result["isError"]
 
@@ -187,7 +187,7 @@ def test_events_are_derived_from_the_audit_trail(nirmaan_org, fixed_clock, bridg
     assert all(e["kind"] == "external" and e["source"] == "nirmaan" for e in recorded)
 
 
-def test_task_completion_and_gate_approval_over_mcp_publish_events(server):
+def test_task_completion_over_mcp_publishes_events(server):
     plan = _plan(server)
     project, req = plan["project"], _task(plan, "requirements")
     _ok(server, "start_task", project=project, task="requirements", role=req["owner"])
@@ -200,11 +200,11 @@ def test_task_completion_and_gate_approval_over_mcp_publish_events(server):
 
     gate = _task(plan, "requirements.gate")
     assert _ok(server, "show_plan", project=project)["plan"]
-    passed = _ok(server, "approve_task", project=project, task="requirements.gate", role=gate["owner"])
-    assert passed["task"]["status"] == "completed"
-    assert [e["topic"] for e in passed["events"]] == ["gate.approved"]
+    # M50: a gate is a person's (the authority matrix), so an agent cannot sign one over MCP; nothing is published.
+    message, is_error = _call(server, "approve_task", project=project, task="requirements.gate", role=gate["owner"])
+    assert is_error and "[P12]" in message
     recent = _ok(server, "organization_events")
-    assert [e["payload"]["topic"] for e in recent] == ["task.completed", "gate.approved"]
+    assert [e["payload"]["topic"] for e in recent] == ["task.completed"]
 
 
 def test_escalation_over_mcp_reaches_the_bus_and_the_shipped_rule_reacts(server):

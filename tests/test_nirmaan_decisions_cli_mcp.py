@@ -18,7 +18,7 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from nirmaan_helpers import drive, tid
+from nirmaan_helpers import drive, mcp_session, tid
 
 import nirmaan
 from nirmaan.cli import app
@@ -70,9 +70,10 @@ def _server(org, root, tmp_path):
 
 
 def _call(server, name, **arguments):
+    """In the session of the role it names (M50: one session is one role)."""
     line = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "tools/call",
                        "params": {"name": name, "arguments": arguments}})
-    result = server.handle_line(line)["result"]
+    result = mcp_session(server, arguments.get("role")).handle_line(line)["result"]
     text = result["content"][0]["text"]
     return (text if result["isError"] else json.loads(text)), result["isError"]
 

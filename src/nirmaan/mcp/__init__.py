@@ -5,14 +5,14 @@ A separate tool table from VeriTriage's (``veritriage.mcp``); serve it with
 """
 
 from nirmaan.mcp.server import NirmaanMcpServer
-from nirmaan.mcp.tools import McpContext, ToolSpec, call_tool, list_tools, register_tool, unregister_tool
+from nirmaan.mcp.tools import McpContext, McpIdentityError, ToolSpec, call_tool, list_tools, register_tool, unregister_tool
 
-__all__ = ["McpContext", "NirmaanMcpServer", "ToolSpec", "call_tool", "list_tools", "register_tool",
+__all__ = ["McpContext", "McpIdentityError", "NirmaanMcpServer", "ToolSpec", "call_tool", "list_tools", "register_tool",
            "unregister_tool"]
 
 
-def serve(root: str = ".nirmaan") -> None:
-    """Serve the tool table on stdin/stdout until EOF."""
+def serve(root: str = ".nirmaan", role: str | None = None) -> None:
+    """Serve the tool table on stdin/stdout until EOF, as one agent in ``role`` if given (M50)."""
     from pathlib import Path
 
-    NirmaanMcpServer(McpContext.default(Path(root))).serve_forever()
+    NirmaanMcpServer(McpContext.default(Path(root), role)).serve_forever()

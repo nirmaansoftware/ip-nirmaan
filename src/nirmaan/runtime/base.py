@@ -100,6 +100,11 @@ class ToolHandle:
         run, outcome = self._broker.invoke(self._actor, tool_id, params, self._task, bounds=bounds)
         return run.id, outcome
 
+    def foreign(self, run_id: str) -> bool:
+        """Whether ``run_id`` is a recorded run made for another task (M50): it can back nothing here."""
+        run = self._broker.recorded(run_id)
+        return run is not None and run.task != self._task
+
     def declared(self, tool_id: str, inputs: dict[str, str]) -> dict[str, str]:
         """The task inputs the tool's contract declares (M28): a tool is handed only what it takes."""
         return self._broker.declared_inputs(tool_id, inputs)

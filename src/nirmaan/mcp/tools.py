@@ -8,7 +8,11 @@ returns JSON-serializable data. ``server.py`` is one thin stdio transport.
 Every action goes through the task engine, exactly as ``nirmaan task ...``
 does: the state machine, the authority matrix, and the constitution run, one
 audit entry records the change, and a refusal saves nothing. The caller is
-always an AI agent; there is no way to act as a human over MCP. After each
+always an AI agent; there is no way to act as a human over MCP. A session is
+one agent in one role (M50): the role configured when the server starts
+(``nirmaan mcp --role``, or ``NIRMAAN_MCP_ROLE``), else the first role an
+action of the session succeeds as. A call naming any other role is refused,
+so one client cannot own, review, and approve the same work. After each
 action the organizational events it caused (derived from the audit entries it
 appended) are published to the M18 bus through the bridge.
 
@@ -17,6 +21,7 @@ Adding a tool is one ``register_tool`` call (crown-jewel tested).
 
 from __future__ import annotations
 
+import os
 from collections.abc import MutableMapping
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -43,13 +48,20 @@ class McpContext:
     store: ProjectStore
     publish: Publisher = field(default=lambda events: [])
     recent_events: Callable[[int], list] = field(default=lambda limit: [])
+    #: The one role this session acts as (M50): configured at launch, else bound by its first successful action.
+    role: str | None = None
 
     @classmethod
-    def default(cls, root: Path = Path(".nirmaan")) -> "McpContext":
+    def default(cls, root: Path = Path(".nirmaan"), role: str | None = None) -> "McpContext":
         from nirmaan.integrations.veritriage import AutomationBridge
 
         bridge = AutomationBridge()
-        return cls(build_organization(), ProjectStore(root), bridge.publish, bridge.recent)
+        return cls(build_organization(), ProjectStore(root), bridge.publish, bridge.recent,
+                   role=role or os.environ.get("NIRMAAN_MCP_ROLE") or None)
+
+
+class McpIdentityError(PermissionError):
+    """A call named a role other than the one its session acts as (M50). Nothing ran."""
 
 
 @dataclass(frozen=True)
@@ -110,7 +122,9 @@ def _schema(properties: dict[str, Any], required: list[str]) -> dict[str, Any]:
 
 _PROJECT = {"project": {"type": "string", "description": "Project ID (a unique prefix is enough)."}}
 _TASK = {"task": {"type": "string", "description": "Task ID, short ('microarchitecture') or '<project>:<stage>'."}}
-_ROLE = {"role": {"type": "string", "description": "Role ID acting. The caller always acts as an AI agent."}}
+_ROLE = {"role": {"type": "string", "description": (
+    "Role ID acting, always as an AI agent. A session acts as one role: the one it was started with, else the "
+    "first one it acts as; naming another is refused. May be omitted once the session has a role.")}}
 
 
 def _load(ctx: McpContext, project: str) -> TaskEngine:
@@ -121,8 +135,16 @@ def _task_id(engine: TaskEngine, task: str) -> str:
     return task if ":" in task else f"{engine.state.project.id}:{task}"
 
 
-def _actor(arguments: dict[str, Any]) -> Actor:
-    return Actor(role=str(arguments["role"]), kind=ActorKind.AI_AGENT, name="mcp")
+def _actor(ctx: McpContext, arguments: dict[str, Any]) -> Actor:
+    """The session's agent (M50): its one role, which a call may repeat but never change."""
+    asked = arguments.get("role")
+    if ctx.role is not None and asked is not None and str(asked) != ctx.role:
+        raise McpIdentityError(f"this MCP session acts as {ctx.role}; it may not act as {asked}. One session is "
+                               "one agent in one role: start another session, configured for that role, instead")
+    role = ctx.role or (str(asked) if asked else None)
+    if role is None:
+        raise McpIdentityError("this MCP session has no role yet: name the role it acts as")
+    return Actor(role=role, kind=ActorKind.AI_AGENT, name="mcp")
 
 
 def _task_view(engine: TaskEngine, task_id: str) -> dict[str, Any]:
@@ -139,7 +161,9 @@ def _act(ctx: McpContext, arguments: dict[str, Any], action: Callable[[TaskEngin
     task_id = _task_id(engine, str(arguments["task"])) if "task" in arguments else None
     if task_id is not None:
         engine.task(task_id)  # unknown task: refused before anything runs
-    result = action(engine, task_id, _actor(arguments))
+    actor = _actor(ctx, arguments)
+    result = action(engine, task_id, actor)
+    ctx.role = actor.role  # the session is this role from now on (M50)
     ctx.store.save(engine.state)
     events = org_events(engine.state, since=before)
     out: dict[str, Any] = {"result": result}
@@ -216,7 +240,7 @@ def _decisions(ctx: McpContext, arguments: dict[str, Any]) -> list:
         "evidence": {"type": "array", "items": {"type": "string"}, "description": "Evidence IDs it rests on."},
         "rationale": {"type": "string"},
         "supersedes": {"type": "string", "description": "A decision ID this one replaces."},
-    }, ["project", "role", "kind", "criticality", "statement"]),
+    }, ["project", "kind", "criticality", "statement"]),
 )
 def _record_decision(ctx: McpContext, arguments: dict[str, Any]) -> dict:
     def act(e: TaskEngine, t: str | None, a: Actor):
@@ -321,7 +345,7 @@ def _organization_events(ctx: McpContext, arguments: dict[str, Any]) -> list:
 
 
 @register_tool("start_task", "Start a READY task, as its owner.", _schema({**_PROJECT, **_TASK, **_ROLE},
-                                                                           ["project", "task", "role"]))
+                                                                           ["project", "task"]))
 def _start_task(ctx: McpContext, arguments: dict[str, Any]) -> dict:
     return _act(ctx, arguments, lambda e, t, a: e.start(t, a).status.value)
 
@@ -337,7 +361,7 @@ def _start_task(ctx: McpContext, arguments: dict[str, Any]) -> dict:
             "required": ["kind", "title"]}},
         "notes": {"type": "string"},
         "outcome": {"type": "string", "description": "Required for decision tasks."},
-    }, ["project", "task", "role", "artifacts"]),
+    }, ["project", "task", "artifacts"]),
 )
 def _submit_task(ctx: McpContext, arguments: dict[str, Any]) -> dict:
     drafts = [{"kind": a["kind"], "title": a["title"], "location": a.get("location")} for a in arguments["artifacts"]]
@@ -354,7 +378,7 @@ def _submit_task(ctx: McpContext, arguments: dict[str, Any]) -> dict:
         "description": {"type": "string"},
         "kind": {"type": "string", "enum": [k.value for k in EvidenceKind]},
         "reference": {"type": "string", "description": "Artifact or review ID (short or qualified)."},
-    }, ["project", "task", "role", "description", "kind"]),
+    }, ["project", "task", "description", "kind"]),
 )
 def _record_evidence(ctx: McpContext, arguments: dict[str, Any]) -> dict:
     def act(e: TaskEngine, t: str, a: Actor):
@@ -372,7 +396,7 @@ def _record_evidence(ctx: McpContext, arguments: dict[str, Any]) -> dict:
     "Independently review submitted work, as its reviewer.",
     _schema({**_PROJECT, **_TASK, **_ROLE,
              "verdict": {"type": "string", "enum": [v.value for v in Verdict]},
-             "comments": {"type": "string"}}, ["project", "task", "role", "verdict"]),
+             "comments": {"type": "string"}}, ["project", "task", "verdict"]),
 )
 def _review_task(ctx: McpContext, arguments: dict[str, Any]) -> dict:
     verdict = Verdict(arguments["verdict"])
@@ -382,23 +406,23 @@ def _review_task(ctx: McpContext, arguments: dict[str, Any]) -> dict:
 
 @register_tool(
     "approve_task",
-    "Approve reviewed work, or approve a gate. Gates that require a human cannot be approved "
-    "over MCP; a person approves them with the CLI.",
-    _schema({**_PROJECT, **_TASK, **_ROLE, "note": {"type": "string"}}, ["project", "task", "role"]),
+    "Approve reviewed work. Where the authority matrix asks for a person (critical work, and every gate) the "
+    "constitution refuses an agent (P12); a person approves with the CLI.",
+    _schema({**_PROJECT, **_TASK, **_ROLE, "note": {"type": "string"}}, ["project", "task"]),
 )
 def _approve_task(ctx: McpContext, arguments: dict[str, Any]) -> dict:
     return _act(ctx, arguments, lambda e, t, a: e.approve(t, a, str(arguments.get("note", ""))).status.value)
 
 
 @register_tool("complete_task", "Complete a task whose work is approved or needs no review.",
-               _schema({**_PROJECT, **_TASK, **_ROLE}, ["project", "task", "role"]))
+               _schema({**_PROJECT, **_TASK, **_ROLE}, ["project", "task"]))
 def _complete_task(ctx: McpContext, arguments: dict[str, Any]) -> dict:
     return _act(ctx, arguments, lambda e, t, a: e.complete(t, a).status.value)
 
 
 @register_tool("block_task", "Mark a task blocked, with the reason, as its owner or a manager.",
                _schema({**_PROJECT, **_TASK, **_ROLE, "reason": {"type": "string"}},
-                       ["project", "task", "role", "reason"]))
+                       ["project", "task", "reason"]))
 def _block_task(ctx: McpContext, arguments: dict[str, Any]) -> dict:
     return _act(ctx, arguments, lambda e, t, a: e.block(t, a, str(arguments["reason"])).status.value)
 
@@ -412,7 +436,7 @@ def _block_task(ctx: McpContext, arguments: dict[str, Any]) -> dict:
         "kind": {"type": "string", "enum": [k.value for k in EscalationKind]},
         "question": {"type": "string", "description": "The blocking question."},
         "options": {"type": "array", "items": {"type": "string"}, "description": "Recommended options."},
-    }, ["project", "task", "role", "reason"]),
+    }, ["project", "task", "reason"]),
 )
 def _escalate_task(ctx: McpContext, arguments: dict[str, Any]) -> dict:
     kind = EscalationKind(arguments.get("kind", EscalationKind.TECHNICAL.value))
@@ -429,11 +453,11 @@ def _escalate_task(ctx: McpContext, arguments: dict[str, Any]) -> dict:
     "resolve_escalation",
     "Resolve an open escalation, as its target or someone above it.",
     _schema({**_PROJECT, **_ROLE, "escalation": {"type": "string"}, "resolution": {"type": "string"}},
-            ["project", "role", "escalation", "resolution"]),
+            ["project", "escalation", "resolution"]),
 )
 def _resolve_escalation(ctx: McpContext, arguments: dict[str, Any]) -> dict:
     return _act(ctx, arguments, lambda e, t, a: e.resolve_escalation(
         str(arguments["escalation"]), a, str(arguments["resolution"])).state.value)
 
 
-__all__ = ["McpContext", "ToolSpec", "call_tool", "list_tools", "register_tool", "unregister_tool"]
+__all__ = ["McpContext", "McpIdentityError", "ToolSpec", "call_tool", "list_tools", "register_tool", "unregister_tool"]

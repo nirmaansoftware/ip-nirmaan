@@ -172,7 +172,7 @@ For a review: `{"verdict": "approve" | "request_changes", "comments": "...", "un
 | Cited a token the prompt declared | Kept. |
 | Cited anything else | Stripped from the prose; listed in the run's notes. |
 | Wrote an artifact with no surviving citation | Artifact dropped. If none remain, P4 refuses the completion. |
-| Listed a tool run in `tool_runs` | Passed to the engine unfiltered. A real run becomes evidence; a run that never happened is refused by P5. |
+| Listed a tool run in `tool_runs` | A run made for another task (an upstream one the prompt cited) is dropped, with a note (M50). Any other run goes to the engine: a real run of this task becomes evidence; a run that never happened is refused by P5. |
 | Made a claim | Recorded as `CLAIM` evidence, which satisfies nothing. |
 | Omitted `uncertainty` | Refused by P3. |
 | Asked to escalate | Routed up the owner's real escalation chain. |
