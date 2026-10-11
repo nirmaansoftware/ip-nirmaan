@@ -380,13 +380,11 @@ class TaskEngine:
         attempt = Attempt(id=attempt_id, task=task_id, number=number, actor=actor.label, refusal=refusal,
                           tool_runs=tuple(tool_runs), evidence=tuple(evidence), artifacts=kept)
         warnings = self._check("task.attempt", actor, task)
-        # M50: the refused attempt's evidence goes with it, so it can never verify a later attempt's files.
         self._commit(
             actor, "task.attempt", task_id, reason=refusal, warnings=warnings,
             details={"attempt": attempt_id, "artifacts": [a.location or a.title for a in kept],
                      "tool_runs": list(tool_runs), "evidence": list(evidence)},
             attempts={**self._state.attempts, attempt_id: attempt},
-            tasks=self._with_task(task, evidence=tuple(e for e in task.evidence if e not in evidence)),
         )
         return attempt
 

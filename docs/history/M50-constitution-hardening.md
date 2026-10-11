@@ -11,8 +11,8 @@ first and failing on v1.24.0.
 run made for another task; the model runtime drops such runs a model names
 (the mock model named every upstream run its prompt cited). A review that sends
 work back now takes the submission's evidence with its files onto the
-superseded `Attempt`, and a refused M26 attempt does the same, so neither can
-verify a later submission; evidence IDs keep counting. DOCUMENT evidence
+superseded `Attempt`, so it cannot verify the next submission; evidence IDs
+keep counting. DOCUMENT evidence
 counts only for an approved artifact of another task, and REVIEW_RECORD only
 for an approval of this task's current submission.
 
@@ -44,4 +44,5 @@ test now shows the refusal.
 
 **Deferred.** `--auto-gate` and MCP `auto_gates` no longer let an agent sign a
 gate, but removing them waits for the parallel persistence work on the plan
-command. The other audit A findings are outside this milestone.
+command. A refused M26 attempt's evidence still stays on the task (the repair
+prompt cites it). The other audit A findings are outside this milestone.

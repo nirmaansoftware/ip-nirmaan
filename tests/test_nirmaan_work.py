@@ -192,7 +192,11 @@ def test_human_gates_are_configurable_per_project(nirmaan_org, fixed_clock):
     engine = Orchestrator(nirmaan_org, clock=fixed_clock).plan(BRIDGE, gate_overrides={"gate.architecture": False})
     gate = tid(engine, "microarchitecture.gate")
     drive(engine, until=gate)
-    engine.approve_gate(gate, agent(engine.task(gate).owner))
+    assert not engine.task(gate).human_required  # the override is recorded on the gate
+    # M50: the authority matrix still asks for a person at every gate, so the override lets no agent sign.
+    with pytest.raises(PolicyViolationError, match=r"\[P12\]"):
+        engine.approve_gate(gate, agent(engine.task(gate).owner))
+    engine.approve_gate(gate, human(engine.task(gate).owner))
     assert engine.task(gate).status is TaskStatus.COMPLETED
 
 

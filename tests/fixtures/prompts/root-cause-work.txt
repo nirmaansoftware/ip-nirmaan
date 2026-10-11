@@ -26,7 +26,8 @@ TASK: Produce root_cause_analysis for task prj-<id>:root-cause and conclude exac
 CITE ONLY THESE ARTIFACTS, using the token exactly as written:
   [evidence:prj-<id>.triage.e1]  veritriage_session: VeriTriage classified axi_timeout.log as timeout (85% confidence, 5 evidence nodes); top hypothesis: Likely RTL bug
   [run:run-0001]  VeriTriage classified axi_timeout.log as timeout (85% confidence, 5 evidence nodes); top hypothesis: Likely RTL bug
-  [evidence:prj-<id>.change-correlation.e1]  document: Commit range and touched modules
+  [evidence:prj-<id>.change-correlation.e1]  review_record: Independent review by design.rtl.architecture.senior: looks right
+  [artifact:prj-<id>.change-correlation.a1]  impact_analysis: Correlate with recent RTL commits (impact_analysis) (approved)
 
 ## Company
 - Company: IP Nirmaan
@@ -65,7 +66,7 @@ CITE ONLY THESE ARTIFACTS, using the token exactly as written:
 - Evidence requirement: Independent review recorded (accepts: review_record)
 - Permitted tools: project.read, status.read, artifact.read, trace.read, escalation.raise, spec.read, knowledge.search, git.read, code.search, veritriage.investigate, veritriage.explain_log, review.create, git.write
 - Upstream artifact Triage report (mock) (triage_report, verified): Deterministic triage report grounded in [run:run-0001].
-- Upstream artifact Correlate with recent RTL commits (impact_analysis) (impact_analysis, verified)
+- Upstream artifact [artifact:prj-<id>.change-correlation.a1] Correlate with recent RTL commits (impact_analysis) (impact_analysis, approved)
 - Evidence [evidence:prj-<id>.triage.e1] on prj-<id>:triage: veritriage_session, substantiated, tool run [run:run-0001]: VeriTriage classified axi_timeout.log as timeout (85% confidence, 5 evidence nodes); top hypothesis: Likely RTL bug
-- Evidence [evidence:prj-<id>.change-correlation.e1] on prj-<id>:change-correlation: document, substantiated: Commit range and touched modules
+- Evidence [evidence:prj-<id>.change-correlation.e1] on prj-<id>:change-correlation: review_record, substantiated: Independent review by design.rtl.architecture.senior: looks right
 - Escalation path: verification.debug.tech_lead -> verification.debug.manager -> verification.vp -> exec.cto -> exec.ceo -> exec.board

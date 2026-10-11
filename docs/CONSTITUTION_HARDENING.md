@@ -25,7 +25,7 @@ evidence on the task. Four ways in, all reachable over MCP:
 |---|---|---|
 | A passing run of another task backs this one (`run.task` was never compared) | P5 (`tool-claims-need-runs`) refuses a TOOL_RUN or VERITRIAGE_SESSION record whose run was made for another task | `test_a_run_of_another_task_cannot_back_this_one` |
 | The model runtime passed every run ID a model named to the engine; the mock model itself names the upstream runs its prompt cites | `ModelRuntime` drops a named run that was recorded for another task, with the note "dropped runs not made for this task"; a run that was never recorded still goes to the engine, where P5 refuses it as before | `test_the_model_runtime_drops_runs_of_other_tasks` |
-| A review that sends work back removed the artifacts but kept `task.evidence`, so the resubmitted file was verified by a run that never saw it | The superseded submission's evidence leaves the task with its files and is kept on its `Attempt` (`evidence`, and the runs it cited in `tool_runs`); a refused M26 attempt takes the evidence its step recorded the same way. Evidence IDs keep counting past moved evidence, so none is reused | `test_a_sent_back_submissions_evidence_does_not_verify_the_next` |
+| A review that sends work back removed the artifacts but kept `task.evidence`, so the resubmitted file was verified by a run that never saw it | The superseded submission's evidence leaves the task with its files and is kept on its `Attempt` (`evidence`, and the runs it cited in `tool_runs`). Evidence IDs keep counting past moved evidence, so none is reused | `test_a_sent_back_submissions_evidence_does_not_verify_the_next` |
 | DOCUMENT evidence was substantiated by any artifact in the project, including the owner's own just-submitted one | DOCUMENT is substantiated only by an artifact of another task that the organization approved | `test_an_owner_cannot_substantiate_its_own_work_with_its_own_document`, `test_a_document_counts_only_when_another_task_produced_it_and_it_was_approved` |
 | REVIEW_RECORD evidence was substantiated by any review: a `request_changes` one, a superseded one, or another task's | REVIEW_RECORD is substantiated only by an `approve` review of this task's current submission, still that reviewer's latest verdict | `test_only_an_approval_of_this_submission_is_a_review_record` |
 
@@ -155,3 +155,11 @@ no outcome, is refused. Tests: `test_work_with_nothing_produced_cannot_complete`
   outside this change; C3, H3, and M3 are the parallel persistence work.
 - Removing `--auto-gate` and `auto_gates` (section 3).
 - An identity for people: a CLI `--as ROLE` is still whoever runs the command.
+- Evidence recorded during a refused M26 attempt stays on the task, as M26
+  designed ("the evidence stands"), so the repair prompt can cite the failed
+  run. A failed run satisfies nothing; a passing run of a refused attempt can
+  still meet a requirement with no file binding for the next attempt. Binding
+  each evidence record to the submission it was recorded for would close that
+  too, and would change the M26 repair prompt; it is left for a follow-up.
+- A downstream model seat's prompt shows (golden `root-cause-*.txt`) that it
+  no longer gets the upstream VeriTriage run recorded as its own evidence.
