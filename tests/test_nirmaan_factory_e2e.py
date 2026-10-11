@@ -27,7 +27,8 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from nirmaan_helpers import human, needs, tid
+from laws import imports, needs
+from nirmaan_helpers import human, tid
 from test_nirmaan_design_agents import answer, file, token
 from test_nirmaan_physical import (
     SKY130HD,
@@ -557,10 +558,8 @@ def test_the_changed_modules_keep_the_import_laws_and_name_nothing():
     src = Path(__file__).parents[1] / "src" / "nirmaan"
     for path in (src / "runtime" / "model.py", src / "runtime" / "tools.py", src / "work" / "policy.py",
                  src / "export.py", src / "models" / "workflow.py", src / "models" / "deliverable.py"):
+        assert not any(n.startswith("veritriage") for n in imports(path)), path
         tree = ast.parse(path.read_text())
-        names = [a.name for n in ast.walk(tree) if isinstance(n, ast.Import) for a in n.names]
-        names += [n.module or "" for n in ast.walk(tree) if isinstance(n, ast.ImportFrom)]
-        assert not any(n.startswith("veritriage") for n in names), path
         constants = {n.value for n in ast.walk(tree) if isinstance(n, ast.Constant) and isinstance(n.value, str)}
         for word in ("netlist", "scan_netlist", "layout", "06_formal", "07_lint", "lint.run", "pnr.run"):
             assert word not in constants, (path, word)

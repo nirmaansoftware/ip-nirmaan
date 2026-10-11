@@ -181,8 +181,23 @@ The line surfaced these; each fix is generic (section 3 and 4):
    (`upstream_artifacts`), so a stage that needs the SDC and the routed netlist
    must depend on both stages. The layout stages declare every stage whose
    artifacts they bind; the rule stands and is documented here.
-5. Further findings from the first CI runs are listed in
-   `docs/history/M44-factory-e2e.md`.
+5. **The AXI4-Lite reference driver had never met its register map.** M41
+   adopted register maps on APB only; the AXI driver's map header named its
+   offsets `AXIL_REGS_*`, so with the approved map the strict build failed
+   ("does not define AXI4_LITE_REGS_REG0_OFFSET"). The fixture header now also
+   defines the offsets under the names the map generates.
+6. **ATPG on one 206-flop chain takes over ten minutes** in fault simulation
+   (800 s measured locally), past the runner's 300 s default. The line asks for
+   eight chains as a DFT task input (127 s, 100% stuck-at coverage, 2476 of
+   2476 faults); that is a design choice of the person running the line, not a
+   change to the stage's data.
+7. **A run that wrote nothing would have changed every saved project**: a new
+   `outputs` field serialized as `{}` broke the byte-for-byte round trip of a
+   project saved before it (M39's test). An empty `outputs` is now left out
+   when saving.
+8. **`synth.run`'s `flip_flops` metric reads 0 on a Liberty-mapped netlist**
+   (it counts Yosys's generic flop cells, and the mapped netlist has library
+   flops). Reported here, not changed: nothing gates on it.
 
 ## 7. Deferred
 
