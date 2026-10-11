@@ -178,7 +178,9 @@ refused (`AuthorityError`), and nothing is recorded.
 The budget lives on the audit trail rather than in a new field, for three
 reasons: it is already persisted in project state; it is hash chained, so
 raising the budget by editing the file breaks P11 and is detected; and it says
-who decided and why. `nirmaan.work.budget.budget(state)` reads the latest
+who decided and why. (Erasing the recorded calls to reset the spend was not
+detected until M51 sealed every record to the chain on save; see
+`docs/PERSISTENCE_INTEGRITY.md`.) `nirmaan.work.budget.budget(state)` reads the latest
 `budget.set` entry.
 
 ### Spending it

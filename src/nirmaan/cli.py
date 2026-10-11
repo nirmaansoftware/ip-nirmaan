@@ -30,6 +30,7 @@ from nirmaan.work import (
     verify_chain,
     why_blocked,
 )
+from nirmaan.work.store import PRE_SEALING, ProjectExistsError
 
 app = typer.Typer(
     name="nirmaan",
@@ -285,9 +286,14 @@ def plan(
     as_json: bool = typer.Option(False, "--json"),
     human_gate: List[str] = typer.Option([], "--human-gate", help="Require a human at this gate ID."),
     auto_gate: List[str] = typer.Option([], "--auto-gate", help="Allow a non-human at this gate ID."),
+    replace: bool = typer.Option(False, "--replace", help="Archive a saved project of the same ID, then save."),
     root: Path = ROOT_OPTION,
 ) -> None:
-    """Turn a requirement into an organization-driven execution plan."""
+    """Turn a requirement into an organization-driven execution plan.
+
+    A saved project is never overwritten: planning the same requirement again is refused unless --replace,
+    which first moves the old project to <root>/archive/projects.
+    """
     org = _org()
     overrides = {g: True for g in human_gate} | {g: False for g in auto_gate}
     try:
@@ -295,8 +301,7 @@ def plan(
     except UnrecognizedRequirement as exc:
         _fail(str(exc))
     if save:
-        path = ProjectStore(root).save(engine.state)
-        _err.print(f"saved {engine.state.project.id} -> {path}")
+        _create(ProjectStore(root), engine, replace)
     if as_json:
         console.print(json.dumps(engine.state.model_dump(mode="json"), indent=2), highlight=False)
     else:
@@ -308,31 +313,67 @@ def demo(
     key: str = typer.Argument("all", help="Demo number, or 'all'."),
     detail: bool = typer.Option(False, "--detail"),
     save: bool = typer.Option(False, "--save/--no-save"),
+    replace: bool = typer.Option(False, "--replace", help="With --save: archive a saved project first."),
     root: Path = ROOT_OPTION,
 ) -> None:
     """Plan the built-in demonstration requirements."""
     org = _org()
     chosen = DEMOS if key == "all" else (get_demo(key),)
-    for d in chosen:
+    engines = [(d, Orchestrator(org).plan(d.requirement)) for d in chosen]
+    store = ProjectStore(root)
+    if save and not replace:  # refuse before saving any, so "all" never saves half
+        for _d, engine in engines:
+            if store.exists(engine.state.project.id):
+                _create(store, engine, replace)
+    for d, engine in engines:
         console.rule(f"Demo {d.key}: {d.title}")
-        engine = Orchestrator(org).plan(d.requirement)
         if save:
-            ProjectStore(root).save(engine.state)
+            _create(store, engine, replace)
         _print_lines(plan_tree(org, engine.state, detail))
+
+
+def _create(store: ProjectStore, engine: TaskEngine, replace: bool) -> None:
+    """Save a newly planned project, never over a saved one unless ``replace`` (which archives it)."""
+    try:
+        path, archived = store.create(engine.state, replace=replace)
+    except ProjectExistsError as exc:
+        _fail(str(exc))
+    if archived is not None:
+        _err.print(f"archived the previous {engine.state.project.id} -> {archived}")
+    _err.print(f"saved {engine.state.project.id} -> {path}")
 
 
 # --- Projects ----------------------------------------------------------------------------
 
 
-def _load(project: str, root: Path) -> TaskEngine:
-    try:
-        state = ProjectStore(root).load(project)
-    except (KeyError, ValueError) as exc:
-        _fail(str(exc))
+UNVERIFIED_OPTION = typer.Option(False, "--unverified",
+                                 help="Show a project whose records failed verification, marked as such.")
+
+
+def _load(project: str, root: Path, unverified: bool = False) -> TaskEngine:
+    """A saved project, refused if its audit chain or seal fails, unless a read-only view passes ``unverified``."""
+    state, integrity = _read(project, root, unverified)
+    if not integrity.verified:
+        console.print(f"[bold red]UNVERIFIED PROJECT RECORDS: {escape(integrity.describe())}. Nothing shown "
+                      "here can be trusted as recorded.[/bold red]")
+    elif integrity.status == PRE_SEALING:
+        _err.print(f"[yellow]note: {escape(integrity.describe())}[/yellow]")
     org = _org()
     if state.project.organization_fingerprint != org.fingerprint:
         _err.print("[yellow]note: the organization changed since this project was planned[/yellow]")
     return TaskEngine(org, state)
+
+
+def _read(project: str, root: Path, unverified: bool):
+    """The saved state and its integrity, for a view that prints the integrity itself."""
+    try:
+        state, integrity = ProjectStore(root).read(project)
+    except (KeyError, ValueError) as exc:
+        _fail(str(exc))
+    if not integrity.verified and not unverified:
+        _fail(f"Project {project} failed audit verification: {integrity.problems[0]} "
+              "(a read-only view can show it with --unverified)")
+    return state, integrity
 
 
 def _task_id(engine: TaskEngine, task: str) -> str:
@@ -345,28 +386,42 @@ def projects(root: Path = ROOT_OPTION) -> None:
     table = Table(title="Projects")
     for col in ("ID", "Name", "Intent", "Tasks", "Progress"):
         table.add_column(col)
-    for state in ProjectStore(root).list():
+    table.add_column("Records")
+    listing = ProjectStore(root).list()
+    for state in listing:
         report = status_report(_org(), state)
+        checked = listing.integrity[state.project.id]
+        records = "[bold red]BROKEN[/bold red]" if not checked.verified else checked.status
         table.add_row(state.project.id, state.project.name, report.intent or "-", str(report.tasks),
-                      f"{report.progress:.0%}")
+                      f"{report.progress:.0%}", records)
     console.print(table)
+    for bad in listing.unreadable:
+        console.print(f"[bold red]unreadable: {escape(str(bad.path))}: {escape(bad.reason)}[/bold red]")
+    if listing.unreadable:
+        raise typer.Exit(1)
 
 
 @app.command()
-def show(project: str, detail: bool = typer.Option(False, "--detail"), root: Path = ROOT_OPTION) -> None:
+def show(project: str, detail: bool = typer.Option(False, "--detail"), unverified: bool = UNVERIFIED_OPTION,
+         root: Path = ROOT_OPTION) -> None:
     """A saved project's plan tree with current statuses."""
-    engine = _load(project, root)
+    engine = _load(project, root, unverified)
     _print_lines(plan_tree(engine.org, engine.state, detail))
 
 
 @app.command()
-def status(project: str, as_json: bool = typer.Option(False, "--json"), root: Path = ROOT_OPTION) -> None:
+def status(project: str, as_json: bool = typer.Option(False, "--json"), unverified: bool = UNVERIFIED_OPTION,
+           root: Path = ROOT_OPTION) -> None:
     """The manager's view: progress, blockers, escalations, reviews, gates, risks."""
-    engine = _load(project, root)
-    report = status_report(engine.org, engine.state)
-    if as_json:
-        console.print_json(json.dumps(report.to_dict()))
+    if as_json:  # the JSON carries the records' status itself, so nothing else is printed on stdout
+        state, integrity = _read(project, root, unverified)
+        data = status_report(_org(), state).to_dict()
+        data["records"] = {"status": integrity.status, "detail": integrity.describe(),
+                           "problems": list(integrity.problems)}
+        console.print_json(json.dumps(data))
         return
+    engine = _load(project, root, unverified)
+    report = status_report(engine.org, engine.state)
     console.print(f"[bold]{escape(report.name)}[/bold]  {report.progress:.0%} complete  ({report.tasks} tasks)")
     console.print("By status: " + ", ".join(f"{k}={v}" for k, v in report.by_status.items()))
     console.print("Assurance: " + ", ".join(f"{k}={v}" for k, v in report.assurance.items()))
@@ -404,9 +459,10 @@ def trace(project: str, output: Optional[Path] = typer.Option(None, "-o", "--out
 
 
 @app.command()
-def audit(project: str, tail: int = typer.Option(20, "--tail"), root: Path = ROOT_OPTION) -> None:
+def audit(project: str, tail: int = typer.Option(20, "--tail"), unverified: bool = UNVERIFIED_OPTION,
+          root: Path = ROOT_OPTION) -> None:
     """The hash-chained audit trail, verified."""
-    state = _load(project, root).state
+    state = _load(project, root, unverified).state
     problems = verify_chain(state.audit)
     verdict = "[green]intact[/green]" if not problems else f"[red]BROKEN: {escape(problems[0])}[/red]"
     console.print(f"{len(state.audit)} entries, chain {verdict}")
@@ -432,12 +488,15 @@ def export_cmd(project: str, out: Path = typer.Option(..., "--out", help="A new 
     from nirmaan.export import ExportError, export_project
 
     try:
-        state = ProjectStore(root).load(project, verify=False)  # the export reports a broken chain itself
-        report = export_project(_org(), state, out)
+        state, integrity = ProjectStore(root).read(project)  # the export reports a failed chain or seal itself
+        report = export_project(_org(), state, out, records=integrity)
     except (KeyError, ValueError, ExportError) as exc:
         _fail(str(exc))
     if report.chain_problems:
         console.print(f"[bold red]AUDIT CHAIN FAILED VERIFICATION: {escape(report.chain_problems[0])}[/bold red]")
+    if report.record_problems:
+        console.print(f"[bold red]PROJECT RECORDS FAILED VERIFICATION: {escape(report.record_problems[0])}"
+                      "[/bold red]")
     console.print(f"Wrote {len(report.files)} files to {escape(str(out))}: {report.artifacts} artifacts, "
                   f"{len(report.missing)} missing, {report.signed_off} of {report.gates} gates signed off")
 

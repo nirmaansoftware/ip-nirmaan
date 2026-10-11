@@ -33,6 +33,7 @@ from nirmaan.models import (
 from nirmaan.org import Organization
 from nirmaan.registry import Registry
 from nirmaan.work.audit import verify_chain
+from nirmaan.work.store import Integrity
 from nirmaan.work.trace import untraced_requirements
 
 
@@ -117,6 +118,10 @@ class ExportReport:
     not_required: list[MissingDeliverable] = field(default_factory=list)
     unfiled: list[str] = field(default_factory=list)
     chain_problems: list[str] = field(default_factory=list)
+    #: M51: what the store found wrong with the saved records (the seal), beyond the chain.
+    record_problems: list[str] = field(default_factory=list)
+    #: M51: how the store described the saved records, when the state came from a store.
+    records: str = ""
     gates: int = 0
     signed_off: int = 0
 
@@ -390,14 +395,21 @@ def _signoff(org: Organization, state: ProjectState, w: _Writer, folder: Deliver
 
 
 def export_project(org: Organization, state: ProjectState, out: Path,
-                   table: list[DeliverableFolder] | None = None) -> ExportReport:
-    """Write the deliverable tree for ``state`` into ``out`` (new or empty). Changes no state."""
+                   table: list[DeliverableFolder] | None = None, records: Integrity | None = None) -> ExportReport:
+    """Write the deliverable tree for ``state`` into ``out`` (new or empty). Changes no state.
+
+    ``records`` is what the store verified about the saved file (M51); the index states it, loudly when the
+    records failed their seal.
+    """
     table = sorted(table, key=lambda f: f.id) if table is not None else folders()
     validate_folders(table)
     out = Path(out)
     if out.exists() and (not out.is_dir() or any(out.iterdir())):
         raise ExportError(f"{out} exists and is not empty; export into a new or empty directory")
     report = ExportReport(out=out, chain_problems=verify_chain(state.audit))
+    if records is not None:
+        report.record_problems = [p for p in records.problems if p not in report.chain_problems]
+        report.records = records.describe()
     w = _Writer(out, report)
     problems = report.chain_problems
 
@@ -496,6 +508,11 @@ def _index(state: ProjectState, table: list[DeliverableFolder], placed: dict[str
     else:
         head = state.audit[-1].hash if state.audit else "none"
         lines += [f"Audit chain: intact, {len(state.audit)} entries, head `{head}`.", ""]
+    if report.record_problems:
+        lines += [f"**PROJECT RECORDS FAILED VERIFICATION: {report.record_problems[0]}. Nothing in this export "
+                  "can be trusted as recorded.**", ""]
+    elif report.records:
+        lines += [f"Project records: {report.records}.", ""]
     lines += [
         f"- Project: `{project.id}`, planned {project.created_at.isoformat()}",
         f"- Requirement `{req.id}`: {req.text}",

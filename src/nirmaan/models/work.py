@@ -493,4 +493,6 @@ class ProjectState(BaseModel):
     verification_items: dict[str, VerificationItem] = Field(default_factory=dict)
     attempts: dict[str, Attempt] = Field(default_factory=dict)
     model_calls: dict[str, ModelCall] = Field(default_factory=dict)
-    schema_version: str = "1"
+    #: The saved file's format (M51): "1" before sealing, "2" sealed. A state read from an older file keeps the
+    #: version it was read with; the store always writes the current one (``nirmaan.work.store.SCHEMA_VERSION``).
+    schema_version: str = "2"

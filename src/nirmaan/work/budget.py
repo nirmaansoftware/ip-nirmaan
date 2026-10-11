@@ -6,6 +6,8 @@ trail; the latest such entry is the budget. So it persists with the project,
 says who decided and why, and cannot be raised by editing the file without
 breaking the hash chain (P11). The spend is read from the recorded
 ``ModelCall``s, so every model call from any command counts against it.
+Erasing them from the file to reset the spend is detected on load too: the
+store seals every record to the chain (M51, ``docs/PERSISTENCE_INTEGRITY.md``).
 """
 
 from __future__ import annotations
