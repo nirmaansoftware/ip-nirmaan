@@ -46,7 +46,7 @@ DECISIONS = ("task.approve", "gate.approve", "escalation.resolve", "task.unblock
 
 
 @pytest.fixture()
-def fan_org():
+def fan_org(registries):
     """Three independent stages (a, b, c), one behind a (d), and one behind b's human gate (e).
 
     Every stage reads the project status as evidence, so each task runs a real tool (``status.read``,
@@ -62,9 +62,9 @@ def fan_org():
         StageTemplate,
         WorkflowTemplate,
     )
-    from nirmaan.org import register_extension, unregister_extension
+    from nirmaan.org import register_extension
 
-    @register_extension("test-loop-fan-out")
+    @register_extension("test-loop-fan-out")  # in the test's own registry scope (M49): no unregister
     def fan(b):
         read = EvidenceRequirement(description="Project status read", accepts=(EvidenceKind.TOOL_RUN,),
                                    tools=("status.read",))
@@ -85,10 +85,7 @@ def fan_org():
             ),
         )
 
-    try:
-        yield builder().build()
-    finally:
-        unregister_extension("test-loop-fan-out")
+    return builder().build()
 
 
 def plan(org, clock) -> TaskEngine:
