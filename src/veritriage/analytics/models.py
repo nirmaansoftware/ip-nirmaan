@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
+from veritriage.models import RuleGap
+
 
 class Counter(BaseModel):
     """One labeled count with its share of the relevant total."""
@@ -53,6 +55,11 @@ class AnalyticsReport(BaseModel):
     )
     daily: list[DailyPoint] = Field(default_factory=list)
     clusters: list[FailureCluster] = Field(default_factory=list)
+    rule_gaps: list[RuleGap] = Field(
+        default_factory=list,
+        description="Signatures engineers repeatedly judged incorrect: the platform is "
+        "reliably wrong here and a rule or pack pattern is missing.",
+    )
     heatmap: dict[str, dict[str, int]] = Field(
         default_factory=dict, description="module -> failure category -> count."
     )

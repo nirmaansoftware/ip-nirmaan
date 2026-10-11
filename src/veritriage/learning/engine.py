@@ -20,6 +20,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Sequence
 
+from veritriage.feedback.reweight import recommendation_weights
 from veritriage.learning.calibration import calibration_map
 from veritriage.learning.corpus import Corpus
 from veritriage.learning.persistence import LearningStore
@@ -33,6 +34,7 @@ from veritriage.models import (
     LearningStatistics,
     ProjectProfile,
     RecommendationOutcome,
+    RuleGap,
 )
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
@@ -103,6 +105,15 @@ class LearningEngine:
             and a.usefulness >= 0.5
         ]
         common.sort(key=lambda a: (-a.useful_votes, a.action))
+        # Every rated outcome, not only the helpful ones: reordering advice
+        # needs to know what wasted time as much as what helped.
+        rated = [
+            a
+            for a in self._store.by_kind("recommendation_outcome")
+            if isinstance(a, RecommendationOutcome)
+        ]
+        gaps = [a for a in self._store.by_kind("rule_gap") if isinstance(a, RuleGap)]
+        gaps.sort(key=lambda a: (-a.times_incorrect, a.signature))
 
         hints: list[LearningHint] = []
         if profile is not None and profile.observations > 0:
@@ -150,6 +161,8 @@ class LearningEngine:
             agent_reliability=sorted(reliability, key=lambda a: a.agent_id),
             project_profile=profile,
             common_recommendations=common[:MAX_COMMON_RECOMMENDATIONS],
+            recommendation_weights=recommendation_weights(rated),
+            rule_gaps=gaps,
             calibration=calibration_map(reliability),
         )
 

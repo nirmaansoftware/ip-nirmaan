@@ -1,0 +1,11 @@
+Chronologic VCS simulator copyright 1991-2025
+UVM_INFO @ 0: reporter [RNTST] Running test ocp_dma_burst_test...
+UVM_INFO /tb/env.sv(41) @ 0: uvm_test_top.env [ENV] build complete
+UVM_INFO /tb/master.sv(48) @ 1200000: uvm_test_top.env.mst [OCP] OCP request presented, MCmd=WR MAddr=0x0000_8040 MThreadID=1
+UVM_WARNING /tb/master.sv(52) @ 1300000: uvm_test_top.env.mst [OCP] OCP request pending, MCmd held stable, SCmdAccept low
+UVM_WARNING /tb/master.sv(52) @ 4000000: uvm_test_top.env.mst [OCP] OCP request pending for 2700 ns, no slave acceptance
+UVM_ERROR /tb/watchdog.sv(18) @ 9000000: uvm_test_top.env.wdog [WDOG] Watchdog timeout hit: OCP request stuck, SCmdAccept never asserted
+UVM_FATAL /tb/watchdog.sv(22) @ 9000000: uvm_test_top.env.wdog [WDOG] Timeout, ending simulation
+--- UVM Report Summary ---
+UVM_ERROR :   1
+UVM_FATAL :   1

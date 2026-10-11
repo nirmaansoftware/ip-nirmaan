@@ -26,6 +26,7 @@ from veritriage.knowledge.packs import (  # noqa: F401
     low_power,
     mipi,
     noc,
+    ocp,
     pcie,
     performance,
     reset,
@@ -47,5 +48,6 @@ from veritriage.knowledge.packs import (  # noqa: F401
     uvm_phasing,
     uvm_ral,
     uvm_tlm,
+    wishbone,
     x_propagation,
 )

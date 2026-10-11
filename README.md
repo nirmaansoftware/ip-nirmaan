@@ -35,7 +35,7 @@ IP Nirmaan is bigger than verification, and it builds on VeriTriage's
 verification technology rather than replacing it:
 
 * VeriTriage investigations are real, evidence-producing tools inside Nirmaan's task engine.
-* VeriTriage's 42 Knowledge Packs are the domain knowledge that Nirmaan's skills cite.
+* VeriTriage's 44 Knowledge Packs are the domain knowledge that Nirmaan's skills cite.
 * VeriTriage never depends on Nirmaan, so it stays usable as a standalone verification tool.
 
 ## VeriTriage: the verification engine
@@ -45,13 +45,13 @@ raw verification artifacts (simulation logs, compile logs, coverage summaries,
 test metadata) into a normalized **Evidence Graph**, a deterministic failure
 classification with confidence and evidence, an engineering-grade HTML report,
 and suggested next debugging steps - in one command. A **Verification
-Knowledge Engine** ships 42 pluggable Knowledge Packs across six domains
+Knowledge Engine** ships 44 pluggable Knowledge Packs across six domains
 (interconnect, CPU/ISA, memory, serial IO, coherency, and methodology):
-AMBA AXI/APB/AHB/ACE/AXI-Stream, CHI, TileLink, NoC, PCIe, CXL, UCIe, DDR,
-HBM, USB, Ethernet, MIPI, I2C/I3C, SPI, UART, JTAG, UVM methodology with
+AMBA AXI/APB/AHB/ACE/AXI-Stream, CHI, TileLink, OCP, Wishbone, NoC, PCIe,
+CXL, UCIe, DDR, HBM, USB, Ethernet, MIPI, I2C/I3C, SPI, UART, JTAG, UVM methodology with
 RAL/phasing/TLM, SVA, formal, low power, DFT, X-propagation, CDC, reset,
-coherency, security, performance, and RISC-V depth (92 deterministic failure
-patterns, 90 debug playbooks, 15 protocol state machines total) that match the
+coherency, security, performance, and RISC-V depth (100 deterministic failure
+patterns, 98 debug playbooks, 17 protocol state machines total) that match the
 evidence against known failure patterns, project it onto protocol state
 machines to show where progress stopped, and attach deterministic debug
 playbooks with real specification references. An **Agent Framework** then puts
@@ -164,7 +164,11 @@ render rather than reason, how grounding is enforced instead of requested, and
 why one vendor registry serves both agent narration and every renderer, and
 [docs/AUTOMATION_ENGINE.md](docs/AUTOMATION_ENGINE.md) for the Automation
 Engine: why automation decides rather than executes, why events are immutable,
-and how CI, schedulers, and chat clients plug in as event producers.
+and how CI, schedulers, and chat clients plug in as event producers, and
+[docs/PLATFORM_COMPLETION.md](docs/PLATFORM_COMPLETION.md) for Platform
+Completion: the feedback loop that turns engineer verdicts into rule gaps and
+reordered advice, offline reference resolution, cross-regression commit
+diffing, and why the knowledge stage is no longer quadratic in pattern count.
 
 ## Installation
 
