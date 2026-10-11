@@ -20,12 +20,9 @@ for real and is recorded on approval.
 from __future__ import annotations
 
 import hashlib
-import os
 import shutil
 import tempfile
 from pathlib import Path
-
-import pytest
 
 from nirmaan.models import (
     Actor,
@@ -66,14 +63,6 @@ def _workdir(task_id: str, workspace: Path | None) -> Path:
     root = Path(workspace or tempfile.mkdtemp(prefix="nirmaan-drive-")) / task_id.replace(":", "_")
     root.mkdir(parents=True, exist_ok=True)
     return root
-
-
-def needs(*executables: str):
-    """Skip without the executables, except those CI names in NIRMAAN_REQUIRE_EDA (then it fails)."""
-    required = set(os.environ.get("NIRMAAN_REQUIRE_EDA", "").replace(",", " ").split())
-    missing = [e for e in executables if shutil.which(e) is None]
-    skip = bool(missing) and not required.intersection(missing)
-    return pytest.mark.skipif(skip, reason=f"not on PATH: {', '.join(missing)}")
 
 
 def human(role: str) -> Actor:

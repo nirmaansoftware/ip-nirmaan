@@ -24,7 +24,7 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from test_nirmaan_design_agents import needs
+from laws import needs
 
 import nirmaan
 from nirmaan.cli import app

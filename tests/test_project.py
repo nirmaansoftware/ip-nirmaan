@@ -10,11 +10,12 @@ provider (the crown-jewel architecture test at the bottom of this file).
 
 from __future__ import annotations
 
-import ast
 import inspect
 from pathlib import Path
 
 import pytest
+
+from laws import imports
 
 import veritriage.project.inference as inference_module
 import veritriage.project.insights as insights_module
@@ -189,18 +190,6 @@ def test_services_build_load_and_summarize(tmp_path, project_root):
 # --- Architecture guards ----------------------------------------------------
 
 
-def _imports(path: Path) -> set[str]:
-    tree = ast.parse(path.read_text(encoding="utf-8"))
-    found: set[str] = set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            found.update(alias.name for alias in node.names)
-        elif isinstance(node, ast.ImportFrom) and node.module:
-            found.add(node.module)
-            found.update(f"{node.module}.{alias.name}" for alias in node.names)
-    return found
-
-
 def test_project_never_enters_the_evidence_graph(project_root, fixture_log):
     # No project ArtifactType, and the graph is identical with and without a model.
     assert not any("project" in t.value for t in ArtifactType)
@@ -231,7 +220,7 @@ def test_core_unchanged_by_project():
     # Nothing in the intelligence core below the pipeline imports the project layer.
     for package in ("graph", "parsers", "rules", "reasoning", "knowledge", "waveform", "history"):
         for path in (SRC / "veritriage" / package).rglob("*.py"):
-            assert "veritriage.project" not in _imports(path), path
+            assert "veritriage.project" not in imports(path), path
     # And the knowledge engine (which project consumes) never imports project back.
     for path in (SRC / "veritriage" / "knowledge").rglob("*.py"):
         assert "veritriage.project" not in path.read_text(encoding="utf-8"), path

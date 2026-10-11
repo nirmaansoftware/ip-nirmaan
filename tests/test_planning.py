@@ -10,10 +10,11 @@ adds steps; and, above all, a brand-new step source needs only a registration
 
 from __future__ import annotations
 
-import ast
 from pathlib import Path
 
 import pytest
+
+from laws import imports
 
 import veritriage.planning.engine as engine_module
 from veritriage.feedback import FeedbackRecord
@@ -46,18 +47,6 @@ BUILT_IN = {
     "knowledge-playbooks",
     "reasoning-recommendations",
 }
-
-
-def _imports(path: Path) -> set[str]:
-    tree = ast.parse(path.read_text(encoding="utf-8"))
-    found: set[str] = set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            found.update(alias.name for alias in node.names)
-        elif isinstance(node, ast.ImportFrom) and node.module:
-            found.add(node.module)
-            found.update(f"{node.module}.{alias.name}" for alias in node.names)
-    return found
 
 
 @pytest.fixture()
@@ -463,7 +452,7 @@ def test_planning_never_executes_anything():
         text = path.read_text(encoding="utf-8")
         for term in banned_calls:
             assert term not in text, f"{path.name} may perform I/O ({term})"
-        leaked = banned_modules & _imports(path)
+        leaked = banned_modules & imports(path)
         assert not leaked, f"{path.name} imports {leaked}"
 
 
@@ -487,7 +476,7 @@ def test_planning_never_imports_extraction_or_engine_layers():
         "veritriage.orchestrator",
     )
     for path in (SRC / "veritriage" / "planning").rglob("*.py"):
-        imported = _imports(path)
+        imported = imports(path)
         for module in banned:
             assert module not in imported, f"{path.name} imports {module}"
 
@@ -508,11 +497,11 @@ def test_core_unchanged_by_planning():
         "orchestrator",
     ):
         for path in (SRC / "veritriage" / package).rglob("*.py"):
-            assert "veritriage.planning" not in _imports(path), path
+            assert "veritriage.planning" not in imports(path), path
 
 
 def test_planning_vocabulary_is_plain_data():
-    imported = _imports(SRC / "veritriage" / "models" / "planning.py")
+    imported = imports(SRC / "veritriage" / "models" / "planning.py")
     assert not any(
         m.startswith("veritriage.") and not m.startswith("veritriage.models")
         for m in imported

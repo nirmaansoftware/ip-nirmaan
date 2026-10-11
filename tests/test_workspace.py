@@ -10,13 +10,14 @@ architecture test at the bottom of this file).
 
 from __future__ import annotations
 
-import ast
 import io
 import json
 from pathlib import Path
 
 import pytest
 import pydantic
+
+from laws import imports
 
 import veritriage.workspace.services as services_module
 from veritriage.graph.model import ArtifactType
@@ -334,35 +335,21 @@ def test_mcp_errors_are_contained(services):
 # --- Architecture guards ----------------------------------------------------
 
 
-def _imports(path: Path) -> set[str]:
-    """Every module and imported name a file actually imports (AST, so prose
-    in comments and docstrings can name modules without tripping guards)."""
-    tree = ast.parse(path.read_text(encoding="utf-8"))
-    found: set[str] = set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            found.update(alias.name for alias in node.names)
-        elif isinstance(node, ast.ImportFrom) and node.module:
-            found.add(node.module)
-            found.update(f"{node.module}.{alias.name}" for alias in node.names)
-    return found
-
-
 def test_cli_and_mcp_share_services():
     # Both clients import the workspace; neither imports the pipeline or any
     # parser/provider module directly.
-    cli_imports = _imports(SRC / "veritriage" / "cli" / "main.py")
+    cli_imports = imports(SRC / "veritriage" / "cli" / "main.py")
     assert any(m.startswith("veritriage.workspace") for m in cli_imports)
     assert not any(m.startswith("veritriage.pipeline") for m in cli_imports)
     for path in (SRC / "veritriage" / "mcp").rglob("*.py"):
-        imports = _imports(path)
-        assert not any(m.startswith("veritriage.pipeline") for m in imports), path.name
-        assert not any(m.startswith("veritriage.parsers") for m in imports), path.name
+        imported = imports(path)
+        assert not any(m.startswith("veritriage.pipeline") for m in imported), path.name
+        assert not any(m.startswith("veritriage.parsers") for m in imported), path.name
         assert not any(
-            m.startswith("veritriage.engineering") for m in imports
+            m.startswith("veritriage.engineering") for m in imported
         ), path.name
         if path.name != "__init__.py":
-            assert any(m.startswith("veritriage.workspace") for m in imports), path.name
+            assert any(m.startswith("veritriage.workspace") for m in imported), path.name
 
 
 def test_public_api_never_exposes_raw_parser_objects():
@@ -370,8 +357,7 @@ def test_public_api_never_exposes_raw_parser_objects():
     # imported; AST import analysis ignores prose that merely names them.
     banned = ("ParseResult", "Parser", "WaveformAdapter", "ContextProvider")
     for name in ("services.py", "navigation.py", "search.py", "session.py", "persistence.py"):
-        imports = _imports(SRC / "veritriage" / "workspace" / name)
-        for imported in imports:
+        for imported in imports(SRC / "veritriage" / "workspace" / name):
             leaf = imported.rsplit(".", maxsplit=1)[-1]
             assert leaf not in banned, f"workspace/{name} imports {imported}"
 

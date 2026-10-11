@@ -12,13 +12,13 @@
 
 from __future__ import annotations
 
-import os
 import shutil
 from pathlib import Path
 
 import pytest
 
 from nirmaan_helpers import GATE_TOOLS, agent, drive, tid
+from laws import needs
 
 from nirmaan.integrations.eda import (
     Backend,
@@ -43,14 +43,6 @@ BRIDGE = "Create a 4-port AXI-to-NoC bridge."
 
 def _text(name: str) -> str:
     return (EDA / name).read_text(encoding="utf-8")
-
-
-def needs(*executables: str):
-    """Skip without the executables, except those CI names in NIRMAAN_REQUIRE_EDA (then it fails)."""
-    required = set(os.environ.get("NIRMAAN_REQUIRE_EDA", "").replace(",", " ").split())
-    missing = [e for e in executables if shutil.which(e) is None]
-    skip = bool(missing) and not required.intersection(missing)
-    return pytest.mark.skipif(skip, reason=f"not on PATH: {', '.join(missing)}")
 
 
 @pytest.fixture()

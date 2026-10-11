@@ -9,6 +9,21 @@ import pytest
 FIXTURES = Path(__file__).parent / "fixtures"
 
 
+@pytest.fixture(autouse=True, scope="session")
+def _wide_cli_consoles():
+    """M46: one fixed, wide width for the CLIs' rich consoles.
+
+    A console takes its width from COLUMNS or the terminal (else 80) and wraps
+    output to fit, so an assertion on CLI output passed or failed with the
+    terminal and the temp path length. Fixed here, it depends on neither.
+    """
+    from nirmaan import cli as nirmaan_cli
+    from veritriage.cli import main as veritriage_cli
+
+    for console in (nirmaan_cli.console, nirmaan_cli._err, veritriage_cli.console, veritriage_cli._err):
+        console.width = 1000
+
+
 @pytest.fixture()
 def fixture_log():
     """Return a resolver for a named fixture log."""

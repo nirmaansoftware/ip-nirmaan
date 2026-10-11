@@ -14,9 +14,7 @@ from __future__ import annotations
 import ast
 import hashlib
 import json
-import os
 import re
-import shutil
 import sys
 from pathlib import Path
 
@@ -24,6 +22,7 @@ import pytest
 from typer.testing import CliRunner
 
 from nirmaan_helpers import agent, drive, human, tid
+from laws import needs
 
 from nirmaan.models import Assurance, EvidenceKind, MemoryScope, ReviewState, TaskStatus
 from nirmaan.orchestrator import Orchestrator
@@ -41,14 +40,6 @@ COSIM = ("cc", "verilator", "make")
 GOOD = (RTL / "counter.v").read_text()
 LINT_BROKEN = GOOD.replace("count <= count + 4'd1;", "count <= count + 5'd1;")  # a width warning; simulates fine
 SIM_BROKEN = GOOD.replace("count <= count + 4'd1;", "count <= count + 4'd2;")  # lint-clean; counts wrong
-
-
-def needs(*executables: str):
-    """Skip without the executables, except those CI names in NIRMAAN_REQUIRE_EDA (then it fails)."""
-    required = set(os.environ.get("NIRMAAN_REQUIRE_EDA", "").replace(",", " ").split())
-    missing = [e for e in executables if shutil.which(e) is None]
-    skip = bool(missing) and not required.intersection(missing)
-    return pytest.mark.skipif(skip, reason=f"not on PATH: {', '.join(missing)}")
 
 
 def token(kind: str, record_id: str) -> str:

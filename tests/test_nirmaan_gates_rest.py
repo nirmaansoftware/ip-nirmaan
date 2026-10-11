@@ -18,7 +18,7 @@ from pathlib import Path
 import pytest
 
 from nirmaan_helpers import GATE_TOOLS, drive, human, tid
-from test_nirmaan_design_agents import RTL, answer, counter_files, needs, token, upstream, with_workspace
+from test_nirmaan_design_agents import RTL, answer, counter_files, token, upstream, with_workspace
 from test_nirmaan_formal_gate import COUNTER, COUNTER_SBY, FORMAL, runs_of, sby_file
 from test_nirmaan_gates_everywhere import (  # noqa: F401 (broker_owner is a fixture)
     ALL_CHECKS,
@@ -29,6 +29,7 @@ from test_nirmaan_gates_everywhere import (  # noqa: F401 (broker_owner is a fix
     broker_owner,
     with_formal,
 )
+from laws import needs
 
 from nirmaan.integrations.eda_antecedents import derive
 from nirmaan.integrations.eda_parsers import parse_sby_cover

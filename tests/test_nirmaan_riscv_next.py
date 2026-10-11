@@ -22,11 +22,13 @@ from pathlib import Path
 import pytest
 
 from test_nirmaan_firmware import DRIVER, FIXTURES, RTL, TESTS, invoke, joined
-from test_nirmaan_riscv_firmware import CROSS, EXPECTED_CHECKS, ON_RISCV, SOC_TOOLS, needs
+from test_nirmaan_riscv_firmware import CROSS, EXPECTED_CHECKS, ON_RISCV, SOC_TOOLS
+from laws import needs
 
 from nirmaan.integrations.firmware_riscv import (
     BUSES,
     CORES,
+    RISCV_GCC,
     SERV_FILES,
     SOC,
     Core,
@@ -143,7 +145,7 @@ def test_the_soc_names_no_design_no_core_and_no_bus():
 # --- Refusals and recorded failures ---------------------------------------------------------
 
 
-@needs(*SOC_TOOLS, riscv=True)
+@needs(*SOC_TOOLS, any_of=RISCV_GCC)
 def test_an_unknown_core_and_an_unknown_bus_are_recorded_failed_runs(block, tmp_path):
     run, _ = soc_run(block, (*DRIVER, TESTS), RTL, tmp_path / "core", core="vexriscv")
     assert not run.succeeded and run.id in block.state.tool_runs
@@ -156,7 +158,7 @@ def test_an_unknown_core_and_an_unknown_bus_are_recorded_failed_runs(block, tmp_
     assert "s_axil_awaddr" in run.summary and "psel" in run.summary
 
 
-@needs(riscv=True)
+@needs(any_of=RISCV_GCC)
 def test_an_oversized_image_is_refused_as_a_recorded_failed_run(block, tmp_path):
     params = {"sources": joined(*DRIVER, TESTS), "max_text_bytes": "4096"}
     run, outcome = invoke(block, "fw.cross_build", params, tmp_path)
@@ -170,7 +172,7 @@ def test_an_oversized_image_is_refused_as_a_recorded_failed_run(block, tmp_path)
 # --- Real runs, on both cores ----------------------------------------------------------------
 
 
-@needs(*SOC_TOOLS, riscv=True)
+@needs(*SOC_TOOLS, any_of=RISCV_GCC)
 @BOTH
 def test_the_register_driver_passes_on_each_core(block, tmp_path, core):
     run, outcome = soc_run(block, (*DRIVER, TESTS), RTL, tmp_path, core=core)
@@ -184,7 +186,7 @@ def test_the_register_driver_passes_on_each_core(block, tmp_path, core):
         assert name in log
 
 
-@needs(*SOC_TOOLS, riscv=True)
+@needs(*SOC_TOOLS, any_of=RISCV_GCC)
 @BOTH
 def test_the_interrupt_fires_is_acknowledged_and_masked_on_each_core(block, tmp_path, core):
     run, outcome = soc_run(block, TIMER, TIMER_RTL, tmp_path, core=core)
@@ -197,7 +199,7 @@ def test_the_interrupt_fires_is_acknowledged_and_masked_on_each_core(block, tmp_
     assert "FWTEST BUS write 0x8 = 0x00000005 strobe 0xf -> SLVERR" in log  # COUNT is read only
 
 
-@needs(*SOC_TOOLS, riscv=True)
+@needs(*SOC_TOOLS, any_of=RISCV_GCC)
 @BOTH
 @pytest.mark.parametrize("irq, failing", [
     ("1'b0", {"interrupt_fires_and_is_handled", "interrupt_is_acknowledged_by_a_register_write",
@@ -213,7 +215,7 @@ def test_a_broken_irq_is_caught_on_each_core(block, tmp_path, core, irq, failing
     assert sorted(failing)[0] in run.summary or any(name in run.summary for name in failing)
 
 
-@needs(*SOC_TOOLS, riscv=True)
+@needs(*SOC_TOOLS, any_of=RISCV_GCC)
 @BOTH
 def test_the_apb_driver_passes_against_the_apb_rtl_on_each_core(block, tmp_path, core):
     run, outcome = soc_run(block, APB, APB_RTL, tmp_path, core=core)
@@ -226,7 +228,7 @@ def test_the_apb_driver_passes_against_the_apb_rtl_on_each_core(block, tmp_path,
     assert "FWTEST BUS write 0x10 = 0xdeadbeef strobe 0xf -> SLVERR" in log
 
 
-@needs(*SOC_TOOLS, riscv=True)
+@needs(*SOC_TOOLS, any_of=RISCV_GCC)
 def test_the_apb_driver_fails_against_the_wrong_map(block, tmp_path):
     wrong = tmp_path / "wrong"
     wrong.mkdir()
@@ -267,7 +269,7 @@ endmodule
 """
 
 
-@needs(*SOC_TOOLS, riscv=True)
+@needs(*SOC_TOOLS, any_of=RISCV_GCC)
 def test_a_new_core_needs_no_core_changes(block, tmp_path):
     """A core the SoC has never seen: its wrapper and its runtime file, registered as data."""
     wrapper = tmp_path / "third" / "core_picorv32_barrel.v"

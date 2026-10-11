@@ -17,7 +17,8 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from nirmaan_helpers import agent, drive, human, tid
+from nirmaan_helpers import GATE_TOOLS, agent, drive, human, tid
+from laws import needs
 
 import nirmaan
 from nirmaan.cli import app
@@ -45,6 +46,7 @@ def decided(nirmaan_org, fixed_clock, tmp_path):
 # --- Decisions -----------------------------------------------------------------------------
 
 
+@needs(*GATE_TOOLS)  # M46: the fixture drives gated RTL work, so real lint runs
 def test_a_decision_task_is_a_full_decision_record(decided):
     engine = decided
     root = engine.task(tid(engine, "root-cause"))
@@ -78,6 +80,7 @@ def test_an_open_decision_has_no_choice_and_a_recorded_decision_appears(nirmaan_
 # --- Failures ------------------------------------------------------------------------------
 
 
+@needs(*GATE_TOOLS)  # M46: the fixture drives gated RTL work, so real lint runs
 def test_a_failed_check_is_recorded_and_resolved_by_a_later_pass(decided):
     engine = decided
     task = engine.task(tid(engine, "triage"))
@@ -130,6 +133,7 @@ def test_review_block_failure_and_escalation_are_classified(nirmaan_org, fixed_c
     assert "SLVERR" in by[FailureCategory.ESCALATED].resolution
 
 
+@needs(*GATE_TOOLS)  # M46: the fixture drives gated RTL work, so real lint runs
 def test_the_summary_counts_failures_across_projects(decided, nirmaan_org, fixed_clock):
     other = Orchestrator(nirmaan_org, clock=fixed_clock).plan(REGRESSION + " It failed again overnight.")
     assert other.state.project.id != decided.state.project.id  # the ID derives from the request and clock
@@ -144,12 +148,14 @@ def test_the_summary_counts_failures_across_projects(decided, nirmaan_org, fixed
 # --- Reads, surfaces, and laws --------------------------------------------------------------
 
 
+@needs(*GATE_TOOLS)  # M46: the fixture drives gated RTL work, so real lint runs
 def test_the_views_are_reads(decided):
     before, audit = state_fingerprint(decided.state), len(decided.state.audit)
     decision_records(decided.state), failure_records(decided.state), failure_summary([decided.state])
     assert state_fingerprint(decided.state) == before and len(decided.state.audit) == audit
 
 
+@needs(*GATE_TOOLS)  # M46: the fixture drives gated RTL work, so real lint runs
 def test_the_export_carries_both_and_stays_deterministic(nirmaan_org, decided, tmp_path):
     store = ProjectStore(tmp_path / "store")
     store.save(decided.state)
@@ -164,6 +170,7 @@ def test_the_export_carries_both_and_stays_deterministic(nirmaan_org, decided, t
     assert any(d["chosen"] == "rtl_bug" for d in data["decisions"])
 
 
+@needs(*GATE_TOOLS)  # M46: the fixture drives gated RTL work, so real lint runs
 def test_cli_and_mcp_return_the_same_records(nirmaan_org, decided, tmp_path):
     from nirmaan.integrations.veritriage import AutomationBridge
     from nirmaan.mcp import McpContext, NirmaanMcpServer

@@ -14,7 +14,6 @@ No test calls a model API.
 
 from __future__ import annotations
 
-import ast
 import json
 import sys
 import types
@@ -32,7 +31,6 @@ from test_nirmaan_engineering_graph import (  # noqa: F401  (fake_eda and axi ar
     axi,
     axi_files,
     fake_eda,
-    needs,
     run_rtl_seat,
     token,
 )
@@ -46,6 +44,7 @@ from test_nirmaan_verification_plan import (
     run_seat,
     spec_id,
 )
+from laws import imports, needs
 
 from nirmaan import engineering, vplan
 from nirmaan.company.traceability import ItemKind
@@ -477,19 +476,9 @@ def test_a_replan_stage_amending_the_plan_needs_no_core_changes(fixed_clock, tmp
 # --- 6. Laws ----------------------------------------------------------------------------------------
 
 
-def _imports(path: Path) -> set[str]:
-    found = set()
-    for node in ast.walk(ast.parse(path.read_text())):
-        if isinstance(node, ast.Import):
-            found |= {a.name for a in node.names}
-        elif isinstance(node, ast.ImportFrom) and node.module:
-            found.add(node.module)
-    return found
-
-
 def test_the_import_laws_hold():
     for path in (SRC / "vplan.py", SRC / "integrations" / "vplan.py", SRC / "engineering.py"):
-        assert not any(m == "veritriage" or m.startswith("veritriage.") for m in _imports(path)), path
+        assert not any(m == "veritriage" or m.startswith("veritriage.") for m in imports(path)), path
     names = ("verification_plan", "vplan", "dv.plan", "dv-plan", "requirements_spec", "interface_spec")
     for path in [*sorted((SRC / "runtime").glob("*.py")), SRC / "work" / "engine.py", SRC / "work" / "policy.py",
                  *sorted((SRC / "orchestrator").glob("*.py"))]:
