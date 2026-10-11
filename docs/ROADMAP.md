@@ -1,6 +1,6 @@
 # IP Nirmaan roadmap
 
-The plan for what comes after v1.23.0. Read this together with `context.md`
+The plan for what comes after v1.24.0. Read this together with `context.md`
 (what exists now), `docs/history/` (how it got here, one file per milestone),
 and `CLAUDE.md` (how to work here). Each milestone ships:
 - a number reserved in "Milestone numbers" below, before its branch is cut,
@@ -10,7 +10,7 @@ and `CLAUDE.md` (how to work here). Each milestone ships:
   (never an entry appended to `context.md`),
 - a PR merged into `main`.
 
-## Where we are (v1.23.0, 2026-10-11)
+## Where we are (v1.24.0, 2026-10-12)
 
 | Built | Not yet |
 |---|---|
@@ -61,7 +61,7 @@ snapshot, refreshed by `python scripts/status.py --release`.
 | Tools `AVAILABLE` | 36 | `tools_available`, every PR |
 | Tools `CONTRACT_ONLY` | 17 | `tools_contract_only`, every PR |
 | Verification knowledge packs | 42 | `knowledge_packs`, every PR |
-| Tests collected | 1611 | `tests`, at release (v1.23.0) |
+| Tests collected | 1710 | `tests`, at release (v1.24.0) |
 <!-- status:end -->
 
 ## Resume checklist
@@ -95,23 +95,30 @@ new number. M1 to M42 are taken; see `docs/history/README.md`.
 | Number | Milestone | Status |
 |---|---|---|
 | M43 | Status documents that stop colliding and stop drifting | done (#70) |
-| M44 | An end-to-end factory project | reserved |
-| M45 | Live evaluation as recorded evidence | reserved |
-| M46 | Tests and CI hardening | reserved |
-| M47 | Small cleanups | reserved |
-| M48 | Unified applicability and limits | reserved |
-| M49 | Scoped registries | reserved |
+| M44 | An end-to-end factory project | done (#74) |
+| M45 | Live evaluation as recorded evidence | done (#73) |
+| M46 | Tests and CI hardening | done (#71) |
+| M47 | Small cleanups | done (#72) |
+| M48 | Unified applicability and limits | done (#76) |
+| M49 | Scoped registries | done (#75) |
 
 ## Next milestones
 
-From the principal-engineer review of v1.16.1 to v1.23.0 (its section 7).
+M43 to M49, the plan from the principal-engineer review of v1.16.1 to v1.23.0,
+are done (see the registry above and `docs/history/release-v1.24.0.md`). What is
+still open, with no numbers reserved yet:
 
-- **M44, an end-to-end factory project:** a request through `block-design`, then `physical-implementation` on the approved RTL, then an export with all ten folders filled, in the PD CI job, so the factory claim is proven on one project rather than on fixtures.
-- **M45, live evaluation as recorded evidence:** commit raw `EvalResult` files for every live run, several runs per case and model, a run history kept by `nirmaan eval run`, and real results fed to the M42 proposals.
-- **M46, tests and CI hardening:** guard the Verilator fixtures, make CLI assertions width-independent, a no-tools job, cached CAD Suite and pip, pinned actions, and required checks.
-- **M47, small cleanups:** one model-ID source, the `max_chain_length=0` contract, and the stale facts the review listed.
-- **M48, unified applicability and limits:** one predicate type for `when`, `when_produced`, `when_upstream`, and optional inputs, metric bounds on the evidence requirement, and retries folded into attempts and review rounds.
-- **M49, scoped registries:** a `Registry` owned by an organization or a context, with the module-level functions as its default instance.
+- **The first recorded live evaluation batch.** The owner's call, on the owner's
+  plan: the command and its expected usage are in `docs/LIVE_EVAL_EVIDENCE.md`.
+  Until it runs, every seat result in the repository is scripted.
+- **A required-checks ruleset** on `main` (the owner's call): the exact settings
+  are in `docs/TEST_CI_HARDENING.md` section 6.
+- **The contract-only tools** that keep `new-ip` partly attestation-based:
+  coverage, CDC, power, regression, and equivalence (17 tools in all).
+- **The factory line's deferred steps** (M44): laying out the scan-inserted
+  netlist, and PDK profiles as project data.
+- **Scoping follow-ups** (M49): moving the remaining tests off global
+  `unregister_*` cleanup, and scoping VeriTriage's own registries.
 
 ---
 
