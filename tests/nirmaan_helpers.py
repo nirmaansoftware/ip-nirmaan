@@ -1,11 +1,12 @@
 """Test helpers for IP Nirmaan: drive a project forward the honest way.
 
-``drive`` moves tasks through the engine exactly as people would: owners start
-and submit, independent reviewers review, authorized approvers approve, gate
-owners (as humans when a gate requires it) sign off. Evidence is attached only
-in forms the engine can substantiate: human attestations, the task's own
-document artifact, or a real VeriTriage run. Nothing is faked, so a project
-that completes under ``drive`` completed under the real rules.
+``drive`` moves tasks through the engine exactly as people would: agent owners
+start and submit, independent agent reviewers review, and people approve work
+and sign gates (M50: the authority matrix asks for a person at every gate and at
+critical work, so ``drive`` approves as one throughout). Evidence is attached
+only in forms the engine can substantiate: human attestations, the review
+itself, or a real VeriTriage run. Nothing is faked, so a project that completes
+under ``drive`` completed under the real rules.
 
 A task with before-review checks (M23, M26, M27) is worked in the gated order:
 real files are written, every check runs for real over them through the
@@ -88,8 +89,6 @@ def attach_evidence(engine: TaskEngine, task_id: str, workspace: Path | None = N
             continue  # recorded by the review itself
         if "human_attestation" in kinds:
             engine.record_evidence(task_id, owner, EvidenceKind.HUMAN_ATTESTATION, f"attested: {req.description}")
-        elif "document" in kinds and task.artifacts:
-            engine.record_evidence(task_id, owner, EvidenceKind.DOCUMENT, req.description, reference=task.artifacts[0])
         elif "veritriage_session" in kinds:
             run, _ = ToolBroker(engine).invoke(
                 owner, "veritriage.investigate",
@@ -131,7 +130,7 @@ def work(engine: TaskEngine, task_id: str, outcome: str | None = None, workspace
         return
     if task.review_state is not ReviewState.NOT_REQUIRED:
         engine.review(task_id, agent(task.reviewer), Verdict.APPROVE, "looks right")
-        engine.approve(task_id, agent(task.approver))
+        engine.approve(task_id, human(task.approver))
     else:
         missing = unsatisfied_requirements(engine.state, engine.task(task_id))
         raise AssertionError(f"{task_id} cannot complete: {missing}")
@@ -183,7 +182,7 @@ def gated_submit(engine: TaskEngine, task_id: str, outcome: str | None = None,
 
 def approve_gate(engine: TaskEngine, task_id: str) -> None:
     task = engine.task(task_id)
-    engine.approve_gate(task_id, human(task.owner) if task.human_required else agent(task.owner))
+    engine.approve_gate(task_id, human(task.owner))  # M50: a gate is always a person's
 
 
 def drive(engine: TaskEngine, until: str | None = None, outcomes: dict[str, str] | None = None,
@@ -202,3 +201,17 @@ def drive(engine: TaskEngine, until: str | None = None, outcomes: dict[str, str]
             approve_gate(engine, task.id)
         else:
             work(engine, task.id, outcomes.get(task.stage or ""), workspace)
+
+
+def mcp_session(server, role: str | None):
+    """M50: an MCP session is one agent in one role, so a test acting as several roles opens a session for each,
+    on the same store and bus. With no role, the server itself."""
+    if role is None:
+        return server
+    from nirmaan.mcp import McpContext, NirmaanMcpServer
+
+    sessions = server.__dict__.setdefault("_sessions_by_role", {})
+    if role not in sessions:
+        ctx = server._ctx
+        sessions[role] = NirmaanMcpServer(McpContext(ctx.org, ctx.store, ctx.publish, ctx.recent_events, role=role))
+    return sessions[role]

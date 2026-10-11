@@ -32,8 +32,9 @@ matrix, and a constitution). A requirement is analyzed against declared
 vocabulary and planned into an owned, reviewed, gated task graph. A task
 engine is the only way state changes: it enforces a lifecycle, the authority
 matrix, and the constitution, and hash-chains every change into an audit
-trail. The assurance ladder is PLANNED < EXECUTED < VERIFIED < APPROVED, and a
-human approves the gates marked human-required.
+trail. The assurance ladder is PLANNED < EXECUTED < VERIFIED < APPROVED. A
+person signs every gate and approves critical work (the authority matrix's
+`human_required`, M50), and an MCP session acts as one role.
 
 Workers (people, scripted runtimes, or language-model seats) act only through
 the engine, and tools act only through a broker that records real runs. Open

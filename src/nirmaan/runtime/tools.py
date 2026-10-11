@@ -26,7 +26,7 @@ from typing import Any, Callable, Sequence
 from nirmaan.models import Actor, Bound, ParamKind, ParamSpec, ParamValue, ToolRun, ToolSpec, ToolStatus, text_value
 from nirmaan.org import AuthorityService
 from nirmaan.registry import Registry
-from nirmaan.work.engine import TaskEngine
+from nirmaan.work.engine import BROKER_SEAL, TaskEngine
 
 
 @dataclass(frozen=True)
@@ -143,6 +143,10 @@ class ToolBroker:
         tool = self._engine.org.tools.get(tool_id)
         return dict(inputs) if tool is None else declared_inputs(tool, inputs)
 
+    def recorded(self, run_id: str) -> ToolRun | None:
+        """A run already recorded in the project, if any."""
+        return self._engine.state.tool_runs.get(run_id)
+
     def invoke(self, actor: Actor, tool_id: str, params: dict[str, ParamInput] | None = None,
                task_id: str | None = None, bounds: Sequence[Bound] = ()) -> tuple[ToolRun, ToolOutcome]:
         """Run a tool for ``actor``; a passing run is then checked against ``bounds`` (M48)."""
@@ -176,7 +180,7 @@ class ToolBroker:
             outputs=dict(outcome.outputs),
             bounds=bounds,
         )
-        self._engine.record_tool_run(run, actor)
+        self._engine.record_tool_run(run, actor, seal=BROKER_SEAL)
         return run, outcome
 
 

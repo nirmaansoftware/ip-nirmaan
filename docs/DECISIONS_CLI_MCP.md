@@ -70,7 +70,10 @@ agent acting as a director still cannot record a critical architecture
 decision.
 
 Because the rule is in the engine, it holds for every caller, not only MCP:
-`nirmaan decide --agent` is refused the same way.
+`nirmaan decide --agent` is refused the same way. Since M50 it also holds when
+the decision is taken rather than recorded: approving work (`approve_artifact`),
+signing a gate (`approve_gate`), and cancelling a task (`cancel_task`), at the
+task's criticality (`docs/CONSTITUTION_HARDENING.md`).
 
 ## Surfaces
 

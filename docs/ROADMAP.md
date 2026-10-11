@@ -101,6 +101,7 @@ new number. M1 to M42 are taken; see `docs/history/README.md`.
 | M47 | Small cleanups | done (#72) |
 | M48 | Unified applicability and limits | done (#76) |
 | M49 | Scoped registries | done (#75) |
+| M50 | Constitution hardening (audit A: C2, M1, H1, L2, M2) | done (this PR) |
 
 ## Next milestones
 

@@ -96,6 +96,7 @@ The original preface of the section:
 - [M48-unified-applicability](M48-unified-applicability.md): Milestone 48 - Unified applicability, bounds, and limits: one condition type and evaluator, bounds as a field, one limits model
 - [M49-scoped-registries](M49-scoped-registries.md): Milestone 49 - Scoped registries: one context object, a default instance, and scopes that layer over it
 - [release-v1.24.0](release-v1.24.0.md): v1.24.0 (2026-10-12) - the plan from the principal-engineer review
+- [M50-constitution-hardening](M50-constitution-hardening.md): Milestone 50 - Constitution hardening: evidence about this task and submission, brokered runs only, people approve where the matrix says, one MCP session is one role
 
 ## Before M43
 

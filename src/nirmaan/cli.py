@@ -667,11 +667,13 @@ def vplan_export(project: str, out: Optional[Path] = typer.Option(None, "--out",
 
 
 @app.command()
-def mcp(root: Path = ROOT_OPTION) -> None:
+def mcp(root: Path = ROOT_OPTION,
+        role: Optional[str] = typer.Option(None, "--role", help="The one role this session acts as (M50); "
+                                           "default NIRMAAN_MCP_ROLE, else the first role it acts as.")) -> None:
     """Serve IP Nirmaan over MCP (stdio): plan, status, why, and task actions."""
     from nirmaan.mcp import serve
 
-    serve(str(root))
+    serve(str(root), role)
 
 
 # --- Task lifecycle ----------------------------------------------------------------------
