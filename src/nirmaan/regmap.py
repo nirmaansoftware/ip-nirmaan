@@ -18,10 +18,12 @@ share every check, and read-only and write-1-to-clear bits get their own.
 from __future__ import annotations
 
 import re
+from collections.abc import MutableMapping
 from pathlib import Path
 from typing import Callable
 
 from nirmaan.models import Access, BitField, Register, RegisterMap, Unmapped
+from nirmaan.registry import Registry
 
 _C_IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 _RESPONSE = {Unmapped.OKAY: "NIRMAAN_BUS_OKAY", Unmapped.SLVERR: "NIRMAAN_BUS_SLVERR",
@@ -103,7 +105,7 @@ def _field_problems(reg: Register, width: int) -> list[str]:
 # --- Lowerings ------------------------------------------------------------------------------
 
 Lowering = Callable[[RegisterMap], str]
-_LOWERINGS: dict[str, Lowering] = {}
+_LOWERINGS: MutableMapping[str, Lowering] = Registry("regmap.lowerings")
 
 
 def register_lowering(name: str) -> Callable[[Lowering], Lowering]:

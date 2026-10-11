@@ -39,6 +39,7 @@ from __future__ import annotations
 import json
 import re
 import sys
+from collections.abc import MutableMapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
@@ -47,6 +48,7 @@ from nirmaan.integrations.dft_scan import SCAN_PORTS, Design, NetlistError, tech
 from nirmaan.integrations.eda import Backend, Job, RunRecord, register_backend
 from nirmaan.integrations.eda_parsers import Diagnostic, EdaResult, parse_simulation, parse_yosys
 from nirmaan.models import text_value
+from nirmaan.registry import Registry
 
 HELPER = Path(__file__).with_name("dft_scan.py")
 ATPG_HELPER = Path(__file__).with_name("dft_atpg.py")
@@ -89,7 +91,7 @@ class DftRule:
     applies: Callable[[Design], bool] | None = None
 
 
-_RULES: dict[str, DftRule] = {}
+_RULES: MutableMapping[str, DftRule] = Registry("dft.rules")
 
 
 def register_rule(rule: DftRule) -> DftRule:

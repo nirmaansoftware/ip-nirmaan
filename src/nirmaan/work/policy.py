@@ -9,6 +9,7 @@ trail. Checks are pure functions of the proposed action and the current state;
 
 from __future__ import annotations
 
+from collections.abc import MutableMapping
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
@@ -29,6 +30,7 @@ from nirmaan.models import (
     param_matches,
 )
 from nirmaan.org import Organization
+from nirmaan.registry import Registry
 from nirmaan.work.audit import verify_chain
 
 
@@ -58,7 +60,7 @@ class PolicyViolationError(PermissionError):
 
 
 Check = Callable[[PolicyContext], list[str]]
-_CHECKS: dict[str, Check] = {}
+_CHECKS: MutableMapping[str, Check] = Registry("policy.checks")
 
 
 def register_check(check_id: str) -> Callable[[Check], Check]:

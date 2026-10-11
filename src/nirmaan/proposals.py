@@ -15,12 +15,14 @@ data, changed by a person in a pull request, with the decision as its reason.
 from __future__ import annotations
 
 import hashlib
+from collections.abc import MutableMapping
 from dataclasses import asdict, dataclass
 from typing import Any, Callable, Iterable
 
 from nirmaan.models import Actor, ActorKind, Criticality, Decision, DecisionKind, ProjectState
 from nirmaan.org import Organization
 from nirmaan.records import FailureCategory, FailureRecord, failure_records
+from nirmaan.registry import Registry
 from nirmaan.work import TaskEngine
 
 #: A rule needs the same failure in at least this many different tasks: one occurrence proposes nothing.
@@ -54,7 +56,7 @@ class Proposal:
 
 Observed = list[tuple[ProjectState, FailureRecord]]
 Rule = Callable[[Organization, Observed], list[Proposal]]
-_RULES: dict[str, Rule] = {}
+_RULES: MutableMapping[str, Rule] = Registry("proposals.rules")
 
 
 def register_proposal_rule(rule_id: str) -> Callable[[Rule], Rule]:

@@ -20,11 +20,13 @@ in a review seat, ``review``), registered with ``@register_runtime``.
 
 from __future__ import annotations
 
+from collections.abc import MutableMapping
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, NamedTuple, Protocol, Sequence
 
 from nirmaan.models import Actor, ActorKind, EscalationKind, EvidenceKind, TaskStatus, Verdict
+from nirmaan.registry import Registry
 from nirmaan.runtime.context import WorkPacket, assemble
 from nirmaan.runtime.tools import ToolBroker, ToolOutcome
 from nirmaan.work.engine import TaskEngine, WorkError
@@ -108,7 +110,7 @@ class AgentRuntime(Protocol):
     def execute(self, packet: WorkPacket, tools: ToolHandle) -> WorkResult: ...
 
 
-_RUNTIMES: dict[str, Callable[[], AgentRuntime]] = {}
+_RUNTIMES: MutableMapping[str, Callable[[], AgentRuntime]] = Registry("runtime.runtimes")
 
 
 def register_runtime(runtime_id: str) -> Callable[[Callable[[], AgentRuntime]], Callable[[], AgentRuntime]]:

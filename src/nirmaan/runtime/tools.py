@@ -18,11 +18,13 @@ keeps one text form.
 
 from __future__ import annotations
 
+from collections.abc import MutableMapping
 from dataclasses import dataclass, field
 from typing import Any, Callable, Sequence
 
 from nirmaan.models import Actor, ParamKind, ParamSpec, ParamValue, ToolRun, ToolSpec, ToolStatus, text_value
 from nirmaan.org import AuthorityService
+from nirmaan.registry import Registry
 from nirmaan.work.engine import TaskEngine
 
 
@@ -41,8 +43,8 @@ Params = dict[str, ParamValue]
 Binding = Callable[[Params, TaskEngine], ToolOutcome]
 #: Asked before every invocation: None when the binding can run here, else why not.
 Probe = Callable[[Params], str | None]
-_BINDINGS: dict[str, Binding] = {}
-_PROBES: dict[str, Probe] = {}
+_BINDINGS: MutableMapping[str, Binding] = Registry("runtime.bindings")
+_PROBES: MutableMapping[str, Probe] = Registry("runtime.probes")
 
 
 def register_binding(tool_id: str, probe: Probe | None = None) -> Callable[[Binding], Binding]:

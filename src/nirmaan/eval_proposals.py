@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import MutableMapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Iterable
@@ -20,6 +21,7 @@ from typing import Any, Callable, Iterable
 from nirmaan.models import EvalCase, EvalProposalThresholds, EvalResult, ProjectState
 from nirmaan.org import Organization
 from nirmaan.proposals import Proposal, proposal_id, proposal_status, providers
+from nirmaan.registry import Registry
 
 SOURCE = "evaluation"
 
@@ -103,7 +105,7 @@ class EvalHistory:
 
 
 EvalRule = Callable[[Organization, EvalHistory], list[Proposal]]
-_RULES: dict[str, EvalRule] = {}
+_RULES: MutableMapping[str, EvalRule] = Registry("eval_proposals.rules")
 
 
 def register_eval_rule(rule_id: str) -> Callable[[EvalRule], EvalRule]:

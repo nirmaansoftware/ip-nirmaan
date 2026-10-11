@@ -18,18 +18,20 @@ See docs/ENGINEERING_GRAPH.md.
 from __future__ import annotations
 
 import hashlib
+from collections.abc import MutableMapping
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 from nirmaan.company import traceability
 from nirmaan.company.traceability import ItemKind, LinkKind
 from nirmaan.models import Artifact, EvidenceKind, ProjectState, ToolRun, VerificationItem, list_values
+from nirmaan.registry import Registry
 from nirmaan.work.trace import trace_graph
 
 # --- The kind tables, as registries -------------------------------------------------------
 
-_LINK_OVERLAY: dict[str, LinkKind] = {}
-_ITEM_OVERLAY: dict[str, ItemKind] = {}
+_LINK_OVERLAY: MutableMapping[str, LinkKind] = Registry("engineering.link_kinds")
+_ITEM_OVERLAY: MutableMapping[str, ItemKind] = Registry("engineering.item_kinds")
 
 
 def register_link_kind(kind: LinkKind) -> None:
