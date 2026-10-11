@@ -16,6 +16,7 @@ A batch of one runs inline, in the calling thread, with no writer.
 
 from __future__ import annotations
 
+import contextvars
 import copy
 import threading
 from contextlib import contextmanager
@@ -121,7 +122,9 @@ def together(bodies: Sequence[Callable[[], T]], jobs: int = 1) -> list[T]:
             _local.seat = None
             writer._finish(index)
 
-    threads = [threading.Thread(target=work, args=(i,), daemon=True) for i in range(len(bodies))]
+    # Each thread runs in its own copy of the caller's context, so it sees the caller's registry scope (M49).
+    threads = [threading.Thread(target=contextvars.copy_context().run, args=(work, i), daemon=True)
+               for i in range(len(bodies))]
     for thread in threads:
         thread.start()
     try:

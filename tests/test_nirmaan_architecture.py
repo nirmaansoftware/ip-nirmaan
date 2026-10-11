@@ -117,36 +117,37 @@ def test_a_new_engineering_domain_needs_only_an_extension(fixed_clock):
     produces is owned, independently reviewed, gated, and escalatable.
     """
     from nirmaan.company import builder
-    from nirmaan.org import register_extension, unregister_extension
+    from nirmaan.org import register_extension
+    from nirmaan.registry import Registries
 
-    @register_extension("test-photonics")
-    def photonics(b):
-        b.add(
-            ToolSpec(id="photonics.sim", name="Photonic simulator", category="eda", risk=ToolRisk.EXECUTE),
-            Capability(id="photonics.design", name="Photonic design", kind=CapabilityKind.EXECUTION,
-                       description="Design waveguides and modulators.", produces=("photonic_layout",)),
-            Capability(id="photonics.review", name="Photonic review", kind=CapabilityKind.REVIEW,
-                       description="Review photonic designs."),
-            Skill(id="silicon_photonics", name="Silicon photonics", domain="photonics",
-                  provides=("photonics.design", "photonics.review"), tools=("photonics.sim",),
-                  validation_criteria=("Insertion loss is within budget.",)),
-            OrgUnit(id="design.photonics", name="Photonics Design", kind=UnitKind.TEAM,
-                    function=Function.ENGINEERING, parent="design", noun="Photonics Engineer",
-                    skills=("silicon_photonics",)),
-            IntentRule(intent="photonic_block", patterns=(r"\bwaveguide|\bphotonic",), priority=5),
-            FeatureRule(feature="optical", patterns=(r"\boptical|\bphotonic",), skills=("silicon_photonics",)),
-            WorkflowTemplate(
-                id="photonic-block", name="Photonic block", description="Design a photonic block.",
-                intents=("photonic_block",),
-                stages=(
-                    StageTemplate(id="design", title="Photonic design", phase="Photonics",
-                                  capability="photonics.design", criticality=Criticality.HIGH,
-                                  review=ReviewRequirement(capability="photonics.review", min_level=Level.SENIOR)),
+    with Registries.scoped():  # M49: registered for this test only, no unregister
+        @register_extension("test-photonics")
+        def photonics(b):
+            b.add(
+                ToolSpec(id="photonics.sim", name="Photonic simulator", category="eda", risk=ToolRisk.EXECUTE),
+                Capability(id="photonics.design", name="Photonic design", kind=CapabilityKind.EXECUTION,
+                           description="Design waveguides and modulators.", produces=("photonic_layout",)),
+                Capability(id="photonics.review", name="Photonic review", kind=CapabilityKind.REVIEW,
+                           description="Review photonic designs."),
+                Skill(id="silicon_photonics", name="Silicon photonics", domain="photonics",
+                      provides=("photonics.design", "photonics.review"), tools=("photonics.sim",),
+                      validation_criteria=("Insertion loss is within budget.",)),
+                OrgUnit(id="design.photonics", name="Photonics Design", kind=UnitKind.TEAM,
+                        function=Function.ENGINEERING, parent="design", noun="Photonics Engineer",
+                        skills=("silicon_photonics",)),
+                IntentRule(intent="photonic_block", patterns=(r"\bwaveguide|\bphotonic",), priority=5),
+                FeatureRule(feature="optical", patterns=(r"\boptical|\bphotonic",), skills=("silicon_photonics",)),
+                WorkflowTemplate(
+                    id="photonic-block", name="Photonic block", description="Design a photonic block.",
+                    intents=("photonic_block",),
+                    stages=(
+                        StageTemplate(id="design", title="Photonic design", phase="Photonics",
+                                      capability="photonics.design", criticality=Criticality.HIGH,
+                                      review=ReviewRequirement(capability="photonics.review", min_level=Level.SENIOR)),
+                    ),
                 ),
-            ),
-        )
+            )
 
-    try:
         org = builder().build()
         engine = Orchestrator(org, clock=fixed_clock).plan("Design a photonic ring modulator.")
         task = next(t for t in engine.state.tasks.values() if t.kind is TaskKind.WORK)
@@ -154,8 +155,6 @@ def test_a_new_engineering_domain_needs_only_an_extension(fixed_clock):
         assert task.reviewer != task.owner and task.approver == "design.photonics.tech_lead"
         assert task.escalation_path[0] == org.roles[task.owner].escalates_to
         assert "photonics.sim" in org.tools_of(task.owner)
-    finally:
-        unregister_extension("test-photonics")
     assert "design.photonics" not in builder().build().units
 
 

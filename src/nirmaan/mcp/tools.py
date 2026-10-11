@@ -17,6 +17,7 @@ Adding a tool is one ``register_tool`` call (crown-jewel tested).
 
 from __future__ import annotations
 
+from collections.abc import MutableMapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
@@ -26,6 +27,7 @@ from nirmaan.events import org_events
 from nirmaan.models import Actor, ActorKind, Criticality, DecisionKind, EscalationKind, EvidenceKind, Verdict
 from nirmaan.orchestrator import Orchestrator
 from nirmaan.org import Organization
+from nirmaan.registry import Registry
 from nirmaan.views import plan_tree
 from nirmaan.work import ProjectStore, TaskEngine, status_report, verify_chain, why_blocked
 
@@ -58,7 +60,7 @@ class ToolSpec:
     handler: Handler
 
 
-_TOOLS: dict[str, ToolSpec] = {}
+_TOOLS: MutableMapping[str, ToolSpec] = Registry("mcp.tools")
 
 
 def register_tool(name: str, description: str, input_schema: dict[str, Any]) -> Callable[[Handler], Handler]:

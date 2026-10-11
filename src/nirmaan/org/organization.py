@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import MutableMapping
 from functools import cached_property
 from pathlib import Path
 from typing import Any, Callable, Iterable
@@ -48,6 +49,7 @@ from nirmaan.models import (
     UnitStatus,
     WorkflowTemplate,
 )
+from nirmaan.registry import Registry
 
 #: The individual-contributor ladder every leaf unit carries unless it overrides.
 DEFAULT_LADDER: tuple[Level, ...] = (Level.SENIOR, Level.ENGINEER, Level.JUNIOR, Level.INTERN)
@@ -105,7 +107,7 @@ class CompanyDefinition(BaseModel):
 
 Extension = Callable[["OrganizationBuilder"], None]
 
-_EXTENSIONS: dict[str, Extension] = {}
+_EXTENSIONS: MutableMapping[str, Extension] = Registry("org.extensions")
 
 
 def register_extension(name: str) -> Callable[[Extension], Extension]:

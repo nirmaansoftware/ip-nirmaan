@@ -19,9 +19,10 @@ import pytest
 
 from nirmaan.events import TOPICS, org_events
 from nirmaan.integrations.veritriage import AutomationBridge
-from nirmaan.mcp import McpContext, NirmaanMcpServer, list_tools, register_tool, unregister_tool
+from nirmaan.mcp import McpContext, NirmaanMcpServer, list_tools, register_tool
 from nirmaan.models import EscalationKind, TaskStatus
 from nirmaan.orchestrator import Orchestrator
+from nirmaan.registry import Registries
 from nirmaan.work import ProjectStore
 
 from nirmaan_helpers import drive, human, tid
@@ -262,15 +263,19 @@ def test_external_events_do_not_fire_verification_rules(bridge):
 
 
 def test_a_new_mcp_tool_needs_only_registration(server):
-    """A new question over MCP is one registration: no transport, context, or engine change."""
+    """A new question over MCP is one registration: no transport, context, or engine change.
 
-    @register_tool("open_escalation_count", "How many escalations are open in a project.",
-                   {"type": "object", "properties": {"project": {"type": "string"}}, "required": ["project"]})
-    def _count(ctx, arguments):
-        state = ctx.store.load(arguments["project"])
-        return {"open": sum(1 for e in state.escalations.values() if e.state.value == "open")}
+    Registered in a scope (M49), so it is gone when the scope ends, with no unregister.
+    """
 
-    try:
+    with Registries.scoped():
+
+        @register_tool("open_escalation_count", "How many escalations are open in a project.",
+                       {"type": "object", "properties": {"project": {"type": "string"}}, "required": ["project"]})
+        def _count(ctx, arguments):
+            state = ctx.store.load(arguments["project"])
+            return {"open": sum(1 for e in state.escalations.values() if e.state.value == "open")}
+
         plan = _plan(server)
         req = _task(plan, "requirements")
         _ok(server, "escalate_task", project=plan["project"], task="requirements", role=req["owner"], reason="why")
@@ -279,8 +284,6 @@ def test_a_new_mcp_tool_needs_only_registration(server):
         assert _ok(server, "open_escalation_count", project=plan["project"]) == {"open": 1}
         with pytest.raises(ValueError):
             register_tool("open_escalation_count", "dup", {})(lambda c, a: None)
-    finally:
-        unregister_tool("open_escalation_count")
     assert "open_escalation_count" not in {t.name for t in list_tools()}
 
 

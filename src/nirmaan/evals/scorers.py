@@ -8,12 +8,14 @@ judge by reading text alone.
 
 from __future__ import annotations
 
+from collections.abc import MutableMapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
 from nirmaan.evals.cases import resolve
 from nirmaan.models import Artifact, HeldOutCheck, Score, ScoreStatus, Task
+from nirmaan.registry import Registry
 from nirmaan.runtime import ToolAccessDenied, ToolHandle
 from nirmaan.work import TaskEngine
 
@@ -41,7 +43,7 @@ class ScorerSpec:
     requires_tool: bool = False
 
 
-_SCORERS: dict[str, ScorerSpec] = {}
+_SCORERS: MutableMapping[str, ScorerSpec] = Registry("evals.scorers")
 
 
 def register_scorer(scorer_id: str, requires_tool: bool = False) -> Callable[[Scorer], Scorer]:

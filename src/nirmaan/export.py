@@ -13,6 +13,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from collections.abc import MutableMapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
@@ -30,6 +31,7 @@ from nirmaan.models import (
     TaskStatus,
 )
 from nirmaan.org import Organization
+from nirmaan.registry import Registry
 from nirmaan.work.audit import verify_chain
 from nirmaan.work.trace import untraced_requirements
 
@@ -40,7 +42,7 @@ class ExportError(Exception):
 
 # --- The folder table, as a registry ----------------------------------------------------------
 
-_OVERLAY: dict[str, DeliverableFolder] = {}
+_OVERLAY: MutableMapping[str, DeliverableFolder] = Registry("export.folders")
 
 
 def register_folder(folder: DeliverableFolder) -> None:
@@ -76,7 +78,7 @@ def validate_folders(table: list[DeliverableFolder]) -> None:
 
 
 #: Writers for sections that live outside this module: (org, state, writer, folder) -> files written.
-_SECTION_WRITERS: dict[ExportSection, Callable[..., list[str]]] = {}
+_SECTION_WRITERS: MutableMapping[ExportSection, Callable[..., list[str]]] = Registry("export.section_writers")
 
 
 def register_section_writer(section: ExportSection, writer: Callable[..., list[str]]) -> None:

@@ -53,3 +53,12 @@ def fixed_clock():
     from datetime import datetime, timezone
 
     return lambda: datetime(2026, 9, 28, 12, 0, tzinfo=timezone.utc)
+
+
+@pytest.fixture()
+def registries():
+    """M49: a fresh registry scope for one test; what it registers is gone when the test ends."""
+    from nirmaan.registry import Registries
+
+    with Registries.scoped() as scope:
+        yield scope

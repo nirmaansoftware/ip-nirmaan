@@ -12,19 +12,23 @@ it rejects is listed with the reason. The ``auto`` runtime selects per call.
 from __future__ import annotations
 
 import dataclasses
+from collections.abc import MutableMapping
 from dataclasses import dataclass, field
 from typing import Any, Callable, Iterable, Sequence
 
 from nirmaan.company.model_profiles import PROFILES
 from nirmaan.models import ModelProfile
+from nirmaan.registry import Registry
 from nirmaan.runtime.base import register_runtime
 from nirmaan.runtime.context import WorkPacket
 from nirmaan.runtime.model import LLM, NO_CALL, Completion, MockLLM, ModelRuntime, RegistryLLM
 from nirmaan.runtime.prompt import WorkPrompt
 
-_PROFILES: dict[str, ModelProfile] = {p.id: p for p in PROFILES}
+_PROFILES: MutableMapping[str, ModelProfile] = Registry("runtime.model_profiles")
+_PROFILES.update({p.id: p for p in PROFILES})
 #: Providers served by something other than the M17 registry. Everything else is ``RegistryLLM(provider)``.
-_LLM_FACTORIES: dict[str, Callable[[ModelProfile], LLM]] = {"mock-llm": lambda p: MockLLM(model=p.model)}
+_LLM_FACTORIES: MutableMapping[str, Callable[[ModelProfile], LLM]] = Registry("runtime.llm_factories")
+_LLM_FACTORIES["mock-llm"] = lambda p: MockLLM(model=p.model)
 
 
 def register_model_profile(profile: ModelProfile) -> ModelProfile:

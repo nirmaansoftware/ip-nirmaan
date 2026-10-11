@@ -27,11 +27,13 @@ from __future__ import annotations
 import json
 import re
 import shutil
+from collections.abc import MutableMapping
 from pathlib import Path
 
 from nirmaan.integrations.eda import Backend, Job, RunRecord, register_backend
 from nirmaan.integrations.eda_parsers import Diagnostic, EdaResult
 from nirmaan.models import RegisterMap, list_values, text_value
+from nirmaan.registry import Registry
 from nirmaan.regmap import load_map, lower, validate
 
 #: The harness sources and the HAL header every driver includes.
@@ -431,7 +433,7 @@ def read_requirements(workdir: Path) -> dict[str, bool] | None:
 # --- The host co-simulation's bus managers (M41) -----------------------------------------------
 
 #: Bus name to the manager source that implements ``nirmaan_hal`` over that bus on the model.
-_COSIM_BUSES: dict[str, Path] = {}
+_COSIM_BUSES: MutableMapping[str, Path] = Registry("firmware.cosim_buses")
 #: The bus when neither the ``bus`` parameter nor a ``map`` names one (every M25 call).
 DEFAULT_BUS = "axi4-lite"
 
