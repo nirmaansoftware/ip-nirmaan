@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import MutableMapping
 from datetime import datetime, timezone
 from typing import Any, Callable
 
@@ -52,6 +53,7 @@ from nirmaan.models import (
 )
 from nirmaan.org import AuthorityService, Organization, route_escalation
 from nirmaan.models.frozen import FrozenDict, FrozenList, deep_frozen
+from nirmaan.registry import Registry
 from nirmaan.work import audit
 from nirmaan.work.frozen import CONTAINER_FIELDS, freeze_state
 from nirmaan.work.policy import (
@@ -96,7 +98,7 @@ class AuthorityError(WorkError):
 #: artifact before the approval commits; it refuses by raising (and then nothing changes), or returns
 #: what to record once the approval has committed. The engine names no kind.
 ApprovalConsumer = Callable[["TaskEngine", Artifact], Callable[[], None]]
-_APPROVAL_CONSUMERS: dict[str, ApprovalConsumer] = {}
+_APPROVAL_CONSUMERS: MutableMapping[str, ApprovalConsumer] = Registry("engine.approval_consumers")
 
 
 def register_approval_consumer(kind: str, consumer: ApprovalConsumer) -> None:

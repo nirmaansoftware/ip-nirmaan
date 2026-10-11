@@ -154,7 +154,11 @@ the lock makes a late write safe, not meaningful to a run already reading.
 * scoped registrations vanish when the scope ends, and a scope cannot remove
   or replace a default;
 * an import made inside a scope registers in the defaults;
-* every registry listed in section 1 is a `Registry` (no plain dict left);
+* a registry whose function replaces (folders) replaces within the scope
+  only, and a backend registered in a scope leaves the defaults' list alone;
+* every registry listed in section 1 is a `Registry`, and no module with a
+  `register_*` function keeps an empty module-level dict or set;
+* the `registries` fixture gives a test its own scope;
 * concurrency: under `loop(..., jobs=4)`, a scoped extension adds a principle
   whose scoped policy check is run from several worker threads, while another
   thread keeps registering and removing in the defaults; the run succeeds and

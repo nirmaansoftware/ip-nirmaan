@@ -408,7 +408,7 @@ def test_the_writer_names_nothing_and_keeps_the_import_laws(nirmaan_org):
     src = Path(__file__).parent.parent / "src" / "nirmaan"
     stages = {s.id for w in nirmaan_org.workflows.values() for s in w.stages}
     names = {*nirmaan_org.tools, *nirmaan_org.roles, *nirmaan_org.gates, *nirmaan_org.capabilities}
-    for path, allowed in ((src / "runtime" / "writer.py", ("__future__", "contextlib", "copy", "threading", "typing")),
+    for path, allowed in ((src / "runtime" / "writer.py", ("__future__", "contextlib", "contextvars", "copy", "threading", "typing")),
                           (src / "work" / "budget.py", ("__future__", "dataclasses", "nirmaan.models"))):
         text = path.read_text()
         quoted = set(re.findall(r"[\"']([A-Za-z0-9_.\-]+)[\"']", text))

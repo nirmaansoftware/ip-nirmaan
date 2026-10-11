@@ -23,6 +23,7 @@ import shlex
 import shutil
 import subprocess
 import tempfile
+from collections.abc import MutableMapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable
@@ -38,6 +39,7 @@ from nirmaan.integrations.eda_parsers import (
     parse_yosys,
 )
 from nirmaan.models import list_values, text_value
+from nirmaan.registry import Registry
 from nirmaan.runtime.tools import Params, ToolOutcome, register_binding, unregister_binding
 from nirmaan.work.engine import TaskEngine
 
@@ -96,8 +98,9 @@ class Backend:
     check: Callable[[Job], str | None] | None = None
 
 
-_BACKENDS: dict[str, list[Backend]] = {}
-_BOUND: set[str] = set()
+_BACKENDS: MutableMapping[str, list[Backend]] = Registry("eda.backends")
+#: Tools whose broker binding a backend created (a registry of ``True``, so a scope has its own).
+_BOUND: MutableMapping[str, bool] = Registry("eda.bound")
 
 #: Tools whose runs produce a simulation log VeriTriage can investigate.
 SIMULATION_TOOLS = ("simulator.run", "test.run")
@@ -105,13 +108,13 @@ SIMULATION_TOOLS = ("simulator.run", "test.run")
 
 def register_backend(backend: Backend) -> Backend:
     """Add a backend. The first one for a tool also binds the tool in the broker."""
-    backends = _BACKENDS.setdefault(backend.tool, [])
+    backends = _BACKENDS.get(backend.tool, [])
     if any(b.name == backend.name for b in backends):
         raise ValueError(f"{backend.tool} already has a backend named {backend.name!r}")
-    backends.append(backend)
+    _BACKENDS[backend.tool] = [*backends, backend]  # a new list: in a scope, the defaults' list is left alone
     if backend.tool not in _BOUND:
         register_binding(backend.tool, probe=_probe(backend.tool))(_binding(backend.tool))
-        _BOUND.add(backend.tool)
+        _BOUND[backend.tool] = True
     return backend
 
 
@@ -120,7 +123,7 @@ def unregister_backend(tool: str, name: str) -> None:
     _BACKENDS[tool] = backends
     if not backends and tool in _BOUND:
         unregister_binding(tool)
-        _BOUND.discard(tool)
+        _BOUND.pop(tool, None)
 
 
 def backends_for(tool: str) -> list[Backend]:

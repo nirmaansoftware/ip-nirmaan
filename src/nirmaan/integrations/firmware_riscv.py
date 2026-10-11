@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import re
 import shutil
+from collections.abc import MutableMapping
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -54,6 +55,7 @@ from nirmaan.integrations.firmware import (
     write_requirements,
 )
 from nirmaan.models import list_values
+from nirmaan.registry import Registry
 from nirmaan.runtime.tools import Params
 
 #: The SoC: the core, the bridge, the clock, and the firmware runtime.
@@ -104,7 +106,7 @@ SERV_FILES = ("serv_rf_top.v", "serv_rf_ram_if.v", "serv_rf_ram.v", "serv_top.v"
               "serv_rf_if.v", "serv_mem_if.v", "serv_csr.v", "serv_compdec.v", "serv_aligner.v", "serv_debug.v")
 
 #: The cores ``core=`` can name; the first is the default.
-CORES: dict[str, Core] = {}
+CORES: MutableMapping[str, Core] = Registry("firmware.cores")
 
 
 def register_core(core: Core) -> Core:
@@ -136,7 +138,7 @@ class Bus:
 
 
 #: The buses the SoC bridges to, tried in order.
-BUSES: dict[str, Bus] = {}
+BUSES: MutableMapping[str, Bus] = Registry("firmware.buses")
 
 
 def register_bus(bus: Bus) -> Bus:
