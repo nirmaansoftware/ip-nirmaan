@@ -15,7 +15,7 @@ only what is genuinely missing.
 
 Local `main` was about 40 commits behind `origin/main` (v1.18.0 locally,
 v1.20.0 on GitHub), and its working tree held stale uncommitted leftovers
-(`context.md` M23 entry, `docs/DELIVERABLE_EXPORT.md`, and `docs/ROADMAP.md`
+(the M23 entry, now `docs/history/M23-c-deliverable-export.md`, `docs/DELIVERABLE_EXPORT.md`, and `docs/ROADMAP.md`
 emptied to zero bytes), all of which are already merged upstream. They were
 stashed, not deleted (`git stash list`: "pre-review leftovers on main"), and
 this branch was rebuilt on `origin/main` (acbe52b, v1.20.0). Local `main`
@@ -72,8 +72,8 @@ retried. Stage commits stage only this review's files (never `git add -A`).
   full suite result, `evals/README.md`, `docs/SEAT_EVALUATION.md`,
   `context.md` entry, ROADMAP bullet, PR.
 - **After Stage 4.** Full suite: 1130 passed, 2 skipped (OpenSTA, OpenROAD).
-  Docs written: `docs/SEAT_EVALUATION.md`, `evals/README.md`, `context.md`
-  M27 entry, ROADMAP row and milestone list. iCloud evicted even freshly
+  Docs written: `docs/SEAT_EVALUATION.md`, `evals/README.md`, the M27
+  entry (now `docs/history/M27-f-seat-evaluation.md`), ROADMAP row and milestone list. iCloud evicted even freshly
   written docs mid-run; `brctl download <file>` forces them back when
   `cat` times out.
 - **After Stage 5.** PR #37 open, CI green. The iCloud folder became
@@ -228,7 +228,7 @@ M27 and M29 batches; M28 and M30 to M33 are the review's own); released as
 v1.22.0; the live-model evaluation first could not run (no API credits), then
 ran on the owner's plan (below); #45 left to its session with the contract additions it needs
 posted on it. Deferred pieces are listed in each
-milestone's `context.md` entry.
+milestone's file under `docs/history/`.
 
 ## Task complete (2026-10-10)
 

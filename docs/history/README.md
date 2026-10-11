@@ -90,6 +90,7 @@ The original preface of the section:
 - [release-v1.23.0](release-v1.23.0.md): v1.23.0 (2026-10-11) - the M34 to M42 batch
 - [M43-status-docs](M43-status-docs.md): Milestone 43 - Status documents that stop colliding and stop drifting
 - [M45-live-eval-evidence](M45-live-eval-evidence.md): Milestone 45 - Live evaluation as recorded, repeatable evidence
+- [M47-review-cleanups](M47-review-cleanups.md): Milestone 47 - Small cleanups found by the principal-engineer review
 
 ## Before M43
 

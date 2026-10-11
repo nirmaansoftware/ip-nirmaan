@@ -26,6 +26,7 @@ from pathlib import Path
 from veritriage.ai import BaseProvider, register_llm_provider
 from veritriage.models import GenerationRequest, GenerationResponse, ProviderCapabilities
 
+from nirmaan.company.model_profiles import DEFAULT_MODEL
 from nirmaan.events import TOPICS, OrgEvent
 from nirmaan.models import list_values
 from nirmaan.runtime.tools import Params, ToolOutcome, register_binding
@@ -303,7 +304,7 @@ class AnthropicProvider(BaseProvider):
     """
 
     name = "anthropic"
-    model = "claude-opus-5-5"
+    model = DEFAULT_MODEL
 
     def capabilities(self) -> ProviderCapabilities:
         return ProviderCapabilities(name=self.name, version=self.model, generates=True, deterministic=False,

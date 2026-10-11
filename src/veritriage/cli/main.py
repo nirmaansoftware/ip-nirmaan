@@ -14,6 +14,7 @@ from rich.table import Table
 import veritriage
 from veritriage.models import AnalysisReport, Severity
 from veritriage.reasoning import AIReasoner, AIReasoningError
+from veritriage.reasoning.ai import DEFAULT_MODEL
 from veritriage.parsers import available_parsers
 from veritriage.reports import HtmlReportGenerator
 from veritriage.utils import write_json
@@ -56,7 +57,7 @@ def analyze(
         False, "--ai/--no-ai", help="Also run the AI review stage (requires 'pip install ip-nirmaan[ai]')."
     ),
     ai_model: str = typer.Option(
-        "claude-opus-4-8", "--ai-model", help="Claude model to use for the AI review."
+        DEFAULT_MODEL, "--ai-model", help="Claude model to use for the AI review."
     ),
     history: bool = typer.Option(
         True,
