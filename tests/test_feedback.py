@@ -254,7 +254,7 @@ def test_feedback_reorders_advice_without_touching_any_conclusion(
 
 
 def test_platform_without_learning_produces_the_original_order(tmp_path, fixture_log):
-    """No learning context means the pre-M19 recommendation order, exactly."""
+    """No learning context means the pre-feedback recommendation order, exactly."""
     services = WorkspaceServices(session_root=tmp_path / "s")
     assert services.recall_learning() is None
     session = services.investigate([fixture_log("uvm_scoreboard.log")])

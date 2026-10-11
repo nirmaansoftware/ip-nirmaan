@@ -18,6 +18,8 @@ from pathlib import Path
 import pytest
 import pydantic
 
+from laws import imports
+
 import veritriage.collab.model as model_module
 from veritriage.collab import (
     BundleFormatError,
@@ -38,18 +40,6 @@ from veritriage.workspace import WorkspaceServices
 
 # .../src/veritriage/collab/model.py -> parents[2] is the src/ root.
 SRC = Path(model_module.__file__).parents[2]
-
-
-def _imports(path: Path) -> set[str]:
-    """Every module imported anywhere in the file (including inside functions)."""
-    tree = ast.parse(path.read_text(encoding="utf-8"))
-    found: set[str] = set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            found.update(a.name for a in node.names)
-        elif isinstance(node, ast.ImportFrom) and node.module:
-            found.add(node.module)
-    return found
 
 
 def _module_imports(path: Path) -> set[str]:
@@ -281,7 +271,7 @@ def test_report_renders_collaboration_section(services, session, tmp_path):
 def test_collab_never_bypasses_services():
     allowed = ("veritriage.workspace", "veritriage.models", "veritriage.collab")
     for path in (SRC / "veritriage" / "collab").rglob("*.py"):
-        for module in _imports(path):
+        for module in imports(path):
             if module.startswith("veritriage"):
                 assert module.startswith(allowed), f"{path.name} imports {module}"
     # Clients reach bundles through services: no module-level collab import

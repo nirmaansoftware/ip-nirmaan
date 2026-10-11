@@ -1,0 +1,23 @@
+{
+  "format": "nirmaan.spec-checks",
+  "version": 1,
+  "requirements": [
+    {"id": "AXIL-ORDER", "terms": ["address", "data"]},
+    {"id": "AXIL-WSTRB", "terms": ["wstrb"]},
+    {"id": "AXIL-SLVERR", "terms": ["SLVERR"]},
+    {"id": "AXIL-LATENCY", "terms": ["2"]},
+    {"id": "AXIL-B2B", "terms": ["next"]},
+    {"id": "AXIL-RESET", "terms": ["reset"]},
+    {"id": "AXIL-SYNTH", "terms": ["latch"]},
+    {"id": "AXIL-FORMAL", "terms": ["formal"]}
+  ],
+  "names": [
+    "ADDR_WIDTH", "DATA_WIDTH", "aclk", "aresetn",
+    "s_axil_awaddr", "s_axil_awvalid", "s_axil_awready",
+    "s_axil_wdata", "s_axil_wstrb", "s_axil_wvalid", "s_axil_wready",
+    "s_axil_bresp", "s_axil_bvalid", "s_axil_bready",
+    "s_axil_araddr", "s_axil_arvalid", "s_axil_arready",
+    "s_axil_rdata", "s_axil_rresp", "s_axil_rvalid", "s_axil_rready",
+    "REG0", "REG1", "REG2", "REG3"
+  ]
+}

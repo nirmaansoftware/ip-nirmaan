@@ -1,0 +1,1940 @@
+{
+  "artifacts": {},
+  "attempts": {},
+  "audit": [
+    {
+      "action": "project.create",
+      "actor": "nirmaan-orchestrator@exec.ceo",
+      "actor_kind": "system",
+      "at": "2026-09-28T12:00:00Z",
+      "details": {
+        "tasks": 12,
+        "workflows": [
+          "regression-investigation"
+        ]
+      },
+      "hash": "4a0afe40a08b9ee824eb3fd2cce78ccc99275cdcc52082be7c5bbf70e3963679",
+      "previous_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "reason": "planned from requirement req-806f63ac9b",
+      "sequence": 0,
+      "subject": "prj-92ecb568dc"
+    },
+    {
+      "action": "task.status",
+      "actor": "nirmaan-engine@exec.ceo",
+      "actor_kind": "system",
+      "at": "2026-09-28T12:00:00Z",
+      "details": {
+        "from": "planned",
+        "to": "ready"
+      },
+      "hash": "82a5fb79fc8a00fbe95ff7b9e119b6be3097bfd27e3c50df5a04b3d296d2873f",
+      "previous_hash": "4a0afe40a08b9ee824eb3fd2cce78ccc99275cdcc52082be7c5bbf70e3963679",
+      "reason": "all dependencies satisfied",
+      "sequence": 1,
+      "subject": "prj-92ecb568dc:triage"
+    },
+    {
+      "action": "task.status",
+      "actor": "nirmaan-engine@exec.ceo",
+      "actor_kind": "system",
+      "at": "2026-09-28T12:00:00Z",
+      "details": {
+        "from": "planned",
+        "to": "ready"
+      },
+      "hash": "fd19add951e45aaf4dfc0322bd1625de57d2fca9890932348b2954e71612b6ab",
+      "previous_hash": "82a5fb79fc8a00fbe95ff7b9e119b6be3097bfd27e3c50df5a04b3d296d2873f",
+      "reason": "roll-up of child tasks",
+      "sequence": 2,
+      "subject": "prj-92ecb568dc:ws.debug"
+    },
+    {
+      "action": "task.status",
+      "actor": "nirmaan-engine@exec.ceo",
+      "actor_kind": "system",
+      "at": "2026-09-28T12:00:00Z",
+      "details": {
+        "from": "planned",
+        "to": "ready"
+      },
+      "hash": "8ed3ab151e12194c0b82e2b6cc736de7bbe4a7cddf2eb9b122ef0afc0e4cf2b7",
+      "previous_hash": "fd19add951e45aaf4dfc0322bd1625de57d2fca9890932348b2954e71612b6ab",
+      "reason": "roll-up of child tasks",
+      "sequence": 3,
+      "subject": "prj-92ecb568dc:program"
+    },
+    {
+      "action": "tool.run",
+      "actor": "fixture@verification.debug.intelligence.engineer",
+      "actor_kind": "human",
+      "at": "2026-09-28T12:00:00Z",
+      "details": {
+        "run": "run-0001",
+        "succeeded": true,
+        "tool": "veritriage.investigate"
+      },
+      "hash": "1aa075d5c58b45ada6aeb13b8aad553e00ba306e671dc21b734086073743709f",
+      "previous_hash": "8ed3ab151e12194c0b82e2b6cc736de7bbe4a7cddf2eb9b122ef0afc0e4cf2b7",
+      "reason": "VeriTriage classified axi_timeout.log, apb_pready_stuck.log as timeout (85% confidence, 9 evidence nodes); top hypothesis: Likely RTL bug",
+      "sequence": 4,
+      "subject": "prj-92ecb568dc:triage"
+    },
+    {
+      "action": "evidence.record",
+      "actor": "fixture@verification.debug.intelligence.engineer",
+      "actor_kind": "human",
+      "at": "2026-09-28T12:00:00Z",
+      "details": {
+        "evidence": "prj-92ecb568dc:triage#e1",
+        "kind": "veritriage_session",
+        "substantiated": true
+      },
+      "hash": "4cec5fe5e858f8f8f8b6f8022186d6d2950464dfccd4b2bcd7258e0dc18658ae",
+      "previous_hash": "1aa075d5c58b45ada6aeb13b8aad553e00ba306e671dc21b734086073743709f",
+      "reason": "VeriTriage classified axi_timeout.log, apb_pready_stuck.log as timeout (85% confidence, 9 evidence nodes); top hypothesis: Likely RTL bug",
+      "sequence": 5,
+      "subject": "prj-92ecb568dc:triage"
+    },
+    {
+      "action": "tool.run",
+      "actor": "fixture@design.integration.packaging.engineer",
+      "actor_kind": "human",
+      "at": "2026-09-28T12:00:00Z",
+      "details": {
+        "run": "run-0002",
+        "succeeded": false,
+        "tool": "lint.run"
+      },
+      "hash": "c2a9df0c012cc7c60c15e9a1ff8bcd48c30af7884c8e8bbd15c80f9eeb9462ca",
+      "previous_hash": "4cec5fe5e858f8f8f8b6f8022186d6d2950464dfccd4b2bcd7258e0dc18658ae",
+      "reason": "verilator-lint: not found: /nonexistent/m39/a.v, /nonexistent/m39/b.v",
+      "sequence": 6,
+      "subject": "prj-92ecb568dc"
+    },
+    {
+      "action": "tool.run",
+      "actor": "fixture@implementation.dft.engineering.atpg.engineer",
+      "actor_kind": "human",
+      "at": "2026-09-28T12:00:00Z",
+      "details": {
+        "run": "run-0003",
+        "succeeded": false,
+        "tool": "dft.atpg"
+      },
+      "hash": "d81b2054ad5c702d3688ed1fd55a44a0b2ca0db19712d3a10b2b1efeed3e84a5",
+      "previous_hash": "c2a9df0c012cc7c60c15e9a1ff8bcd48c30af7884c8e8bbd15c80f9eeb9462ca",
+      "reason": "icarus-atpg: not found: /nonexistent/m39/a.v, /nonexistent/m39/b.v",
+      "sequence": 7,
+      "subject": "prj-92ecb568dc"
+    },
+    {
+      "action": "tool.run",
+      "actor": "fixture@architecture.interface.ace.engineer",
+      "actor_kind": "human",
+      "at": "2026-09-28T12:00:00Z",
+      "details": {
+        "run": "run-0004",
+        "succeeded": true,
+        "tool": "project.read"
+      },
+      "hash": "8984ddcf55b088dc2184981c0e5f0c0909b03c36fba55b147c60cfc44e3fc372",
+      "previous_hash": "d81b2054ad5c702d3688ed1fd55a44a0b2ca0db19712d3a10b2b1efeed3e84a5",
+      "reason": "Failure triage (VeriTriage) [ready]",
+      "sequence": 8,
+      "subject": "prj-92ecb568dc"
+    }
+  ],
+  "decisions": {},
+  "escalations": {},
+  "evidence": {
+    "prj-92ecb568dc:triage#e1": {
+      "description": "VeriTriage classified axi_timeout.log, apb_pready_stuck.log as timeout (85% confidence, 9 evidence nodes); top hypothesis: Likely RTL bug",
+      "id": "prj-92ecb568dc:triage#e1",
+      "kind": "veritriage_session",
+      "recorded_by": "fixture@verification.debug.intelligence.engineer",
+      "reference": "ses-5baff6db8775",
+      "substantiated": true,
+      "task": "prj-92ecb568dc:triage",
+      "tool_run": "run-0001"
+    }
+  },
+  "memory": [],
+  "model_calls": {},
+  "project": {
+    "analysis": {
+      "assumptions": [],
+      "feature_evidence": {
+        "recent_change": [
+          "recent RTL commit",
+          "introduced by"
+        ]
+      },
+      "features": [
+        "recent_change"
+      ],
+      "intent": "regression_investigation",
+      "intent_evidence": [
+        "regression_investigation: 'regression failure'"
+      ],
+      "parameters": {},
+      "requirement_id": "req-806f63ac9b",
+      "unrecognized": false
+    },
+    "created_at": "2026-09-28T12:00:00Z",
+    "gate_overrides": {},
+    "id": "prj-92ecb568dc",
+    "name": "Investigate a regression failure introduced by a recent RTL commit",
+    "organization_fingerprint": "org-d06ab37126c71060",
+    "program": "ip-nirmaan-portfolio",
+    "requirement": {
+      "id": "req-806f63ac9b",
+      "submitted_by": "owner",
+      "text": "Investigate a regression failure introduced by a recent RTL commit."
+    },
+    "workflows": [
+      "regression-investigation"
+    ]
+  },
+  "reviews": {},
+  "schema_version": "1",
+  "spec_requirements": {},
+  "tasks": {
+    "prj-92ecb568dc:change-correlation": {
+      "approval_state": "not_required",
+      "approver": null,
+      "artifacts": [],
+      "attempts": 0,
+      "blocked_reason": null,
+      "branch": null,
+      "capability": "rtl.impact",
+      "criticality": "medium",
+      "depends_on": [
+        "prj-92ecb568dc:triage"
+      ],
+      "description": "",
+      "escalation_path": [
+        "design.rtl.architecture.senior",
+        "design.rtl.architecture.staff",
+        "design.rtl.architecture.manager",
+        "design.rtl.director",
+        "design.vp",
+        "exec.cto",
+        "exec.ceo",
+        "exec.board"
+      ],
+      "escalation_state": "none",
+      "evidence": [],
+      "evidence_requirements": [
+        {
+          "accepts": [
+            "document",
+            "review_record"
+          ],
+          "before_review": false,
+          "description": "Commit range and touched modules",
+          "files": [],
+          "params": [],
+          "tools": [],
+          "when": {
+            "all_of": [],
+            "any_of": [],
+            "none_of": []
+          },
+          "when_produced": []
+        }
+      ],
+      "expected_outputs": [
+        "impact_analysis"
+      ],
+      "gate": null,
+      "human_required": false,
+      "id": "prj-92ecb568dc:change-correlation",
+      "inputs": [
+        "triage_report"
+      ],
+      "kind": "work",
+      "max_retries": 1,
+      "on_failure": "retry_then_escalate",
+      "outcome": null,
+      "outcomes": [],
+      "owner": "design.rtl.architecture.engineer",
+      "owner_routing": {
+        "candidates": [
+          {
+            "reasons": [
+              "knows change_impact_analysis (from the requirement)",
+              "rtl.impact is a specialty of RTL Architecture",
+              "its unit specializes in change_impact_analysis",
+              "Engineer vs Engineer wanted"
+            ],
+            "role": "design.rtl.architecture.engineer",
+            "score": 2.5
+          },
+          {
+            "reasons": [
+              "knows change_impact_analysis (from the requirement)",
+              "rtl.impact is a specialty of Code Review",
+              "its unit specializes in change_impact_analysis",
+              "Engineer vs Engineer wanted"
+            ],
+            "role": "design.rtl.quality.review.engineer",
+            "score": 2.5
+          },
+          {
+            "reasons": [
+              "knows change_impact_analysis (from the requirement)",
+              "rtl.impact is a specialty of RTL Architecture",
+              "its unit specializes in change_impact_analysis",
+              "Senior Engineer vs Engineer wanted"
+            ],
+            "role": "design.rtl.architecture.senior",
+            "score": 1.5
+          },
+          {
+            "reasons": [
+              "knows change_impact_analysis (from the requirement)",
+              "rtl.impact is a specialty of Code Review",
+              "its unit specializes in change_impact_analysis",
+              "Senior Engineer vs Engineer wanted"
+            ],
+            "role": "design.rtl.quality.review.senior",
+            "score": 1.5
+          },
+          {
+            "reasons": [
+              "knows change_impact_analysis (from the requirement)",
+              "rtl.impact is a specialty of RTL Architecture",
+              "its unit specializes in change_impact_analysis",
+              "Tech Lead vs Engineer wanted"
+            ],
+            "role": "design.rtl.architecture.tech_lead",
+            "score": 0.5
+          }
+        ],
+        "capability": "rtl.impact",
+        "chosen": "design.rtl.architecture.engineer",
+        "rationale": "best-scoring owner of 6: knows change_impact_analysis (from the requirement); rtl.impact is a specialty of RTL Architecture; its unit specializes in change_impact_analysis; Engineer vs Engineer wanted"
+      },
+      "parent": "prj-92ecb568dc:ws.debug",
+      "phase": "Debug",
+      "priority": 10,
+      "project": "prj-92ecb568dc",
+      "requirement": "req-806f63ac9b",
+      "review_state": "not_required",
+      "reviewer": null,
+      "reviewer_routing": null,
+      "risk": "",
+      "skills": [],
+      "stage": "change-correlation",
+      "status": "planned",
+      "status_before_escalation": null,
+      "title": "Correlate with recent RTL commits",
+      "unit": "design.rtl.architecture",
+      "workflow": "regression-investigation"
+    },
+    "prj-92ecb568dc:infra-fix": {
+      "approval_state": "not_required",
+      "approver": null,
+      "artifacts": [],
+      "attempts": 0,
+      "blocked_reason": null,
+      "branch": [
+        "prj-92ecb568dc:root-cause",
+        "infrastructure"
+      ],
+      "capability": "infra.regression",
+      "criticality": "medium",
+      "depends_on": [
+        "prj-92ecb568dc:root-cause"
+      ],
+      "description": "",
+      "escalation_path": [
+        "infrastructure.eda.regression.senior",
+        "infrastructure.eda.tech_lead",
+        "infrastructure.eda.manager",
+        "infrastructure.vp",
+        "exec.coo",
+        "exec.ceo",
+        "exec.board"
+      ],
+      "escalation_state": "none",
+      "evidence": [],
+      "evidence_requirements": [
+        {
+          "accepts": [
+            "tool_run",
+            "human_attestation"
+          ],
+          "before_review": false,
+          "description": "Infrastructure change verified",
+          "files": [],
+          "params": [],
+          "tools": [
+            "farm.submit",
+            "ci.configure"
+          ],
+          "when": {
+            "all_of": [],
+            "any_of": [],
+            "none_of": []
+          },
+          "when_produced": []
+        }
+      ],
+      "expected_outputs": [
+        "regression_infrastructure"
+      ],
+      "gate": null,
+      "human_required": false,
+      "id": "prj-92ecb568dc:infra-fix",
+      "inputs": [
+        "root_cause_analysis"
+      ],
+      "kind": "work",
+      "max_retries": 1,
+      "on_failure": "retry_then_escalate",
+      "outcome": null,
+      "outcomes": [],
+      "owner": "infrastructure.eda.regression.engineer",
+      "owner_routing": {
+        "candidates": [
+          {
+            "reasons": [
+              "infra.regression is a specialty of Regression Infrastructure",
+              "Engineer vs Engineer wanted"
+            ],
+            "role": "infrastructure.eda.regression.engineer",
+            "score": 1.5
+          },
+          {
+            "reasons": [
+              "infra.regression is a specialty of Regression Infrastructure",
+              "Senior Engineer vs Engineer wanted"
+            ],
+            "role": "infrastructure.eda.regression.senior",
+            "score": 0.5
+          }
+        ],
+        "capability": "infra.regression",
+        "chosen": "infrastructure.eda.regression.engineer",
+        "rationale": "best-scoring owner of 2: infra.regression is a specialty of Regression Infrastructure; Engineer vs Engineer wanted"
+      },
+      "parent": "prj-92ecb568dc:ws.fix",
+      "phase": "Fix",
+      "priority": 30,
+      "project": "prj-92ecb568dc",
+      "requirement": "req-806f63ac9b",
+      "review_state": "not_required",
+      "reviewer": null,
+      "reviewer_routing": null,
+      "risk": "",
+      "skills": [],
+      "stage": "infra-fix",
+      "status": "planned",
+      "status_before_escalation": null,
+      "title": "Infrastructure fix",
+      "unit": "infrastructure.eda.regression",
+      "workflow": "regression-investigation"
+    },
+    "prj-92ecb568dc:program": {
+      "approval_state": "not_required",
+      "approver": null,
+      "artifacts": [],
+      "attempts": 0,
+      "blocked_reason": null,
+      "branch": null,
+      "capability": "program.plan",
+      "criticality": "high",
+      "depends_on": [],
+      "description": "Own the plan, the critical path, and the risks; report status.",
+      "escalation_path": [
+        "product.programs.tech_lead",
+        "product.programs.manager",
+        "exec.cpo",
+        "exec.ceo",
+        "exec.board"
+      ],
+      "escalation_state": "none",
+      "evidence": [],
+      "evidence_requirements": [],
+      "expected_outputs": [],
+      "gate": null,
+      "human_required": false,
+      "id": "prj-92ecb568dc:program",
+      "inputs": [],
+      "kind": "program",
+      "max_retries": 1,
+      "on_failure": "retry_then_escalate",
+      "outcome": null,
+      "outcomes": [],
+      "owner": "product.programs.tpm.senior",
+      "owner_routing": {
+        "candidates": [
+          {
+            "reasons": [
+              "program.plan is a specialty of Technical Program Management",
+              "Senior Engineer vs Senior Engineer wanted"
+            ],
+            "role": "product.programs.tpm.senior",
+            "score": 1.5
+          },
+          {
+            "reasons": [
+              "program.plan is a specialty of Technical Program Management",
+              "Engineer vs Senior Engineer wanted"
+            ],
+            "role": "product.programs.tpm.engineer",
+            "score": 0.5
+          },
+          {
+            "reasons": [
+              "Executive vs Senior Engineer wanted"
+            ],
+            "role": "exec.chief_of_staff",
+            "score": -5.0
+          },
+          {
+            "reasons": [
+              "Executive vs Senior Engineer wanted"
+            ],
+            "role": "exec.coo",
+            "score": -5.0
+          },
+          {
+            "reasons": [
+              "Executive vs Senior Engineer wanted"
+            ],
+            "role": "exec.cpo",
+            "score": -5.0
+          }
+        ],
+        "capability": "program.plan",
+        "chosen": "product.programs.tpm.senior",
+        "rationale": "best-scoring owner of 5: program.plan is a specialty of Technical Program Management; Senior Engineer vs Senior Engineer wanted"
+      },
+      "parent": null,
+      "phase": "Program",
+      "priority": 0,
+      "project": "prj-92ecb568dc",
+      "requirement": "req-806f63ac9b",
+      "review_state": "not_required",
+      "reviewer": null,
+      "reviewer_routing": null,
+      "risk": "",
+      "skills": [],
+      "stage": null,
+      "status": "ready",
+      "status_before_escalation": null,
+      "title": "Program: Investigate a regression failure introduced by a recent RTL commit",
+      "unit": "product.programs.tpm",
+      "workflow": null
+    },
+    "prj-92ecb568dc:root-cause": {
+      "approval_state": "pending",
+      "approver": "verification.debug.tech_lead",
+      "artifacts": [],
+      "attempts": 0,
+      "blocked_reason": null,
+      "branch": null,
+      "capability": "debug.root_cause",
+      "criticality": "high",
+      "depends_on": [
+        "prj-92ecb568dc:triage",
+        "prj-92ecb568dc:change-correlation"
+      ],
+      "description": "",
+      "escalation_path": [
+        "verification.debug.tech_lead",
+        "verification.debug.manager",
+        "verification.vp",
+        "exec.cto",
+        "exec.ceo",
+        "exec.board"
+      ],
+      "escalation_state": "none",
+      "evidence": [],
+      "evidence_requirements": [
+        {
+          "accepts": [
+            "review_record"
+          ],
+          "before_review": false,
+          "description": "Independent review recorded",
+          "files": [],
+          "params": [],
+          "tools": [],
+          "when": {
+            "all_of": [],
+            "any_of": [],
+            "none_of": []
+          },
+          "when_produced": []
+        }
+      ],
+      "expected_outputs": [
+        "root_cause_analysis"
+      ],
+      "gate": null,
+      "human_required": false,
+      "id": "prj-92ecb568dc:root-cause",
+      "inputs": [
+        "triage_report",
+        "impact_analysis"
+      ],
+      "kind": "decision",
+      "max_retries": 1,
+      "on_failure": "retry_then_escalate",
+      "outcome": null,
+      "outcomes": [
+        "rtl_bug",
+        "testbench_bug",
+        "infrastructure",
+        "spec_ambiguity"
+      ],
+      "owner": "verification.debug.root_cause.senior",
+      "owner_routing": {
+        "candidates": [
+          {
+            "reasons": [
+              "holds root_cause_analysis",
+              "debug.root_cause is a specialty of Root Cause",
+              "Senior Engineer vs Senior Engineer wanted"
+            ],
+            "role": "verification.debug.root_cause.senior",
+            "score": 4.5
+          },
+          {
+            "reasons": [
+              "holds root_cause_analysis",
+              "knows regression_intelligence (from the requirement)",
+              "debug.root_cause is a specialty of Debug",
+              "its unit specializes in regression_intelligence",
+              "Senior Engineer vs Senior Engineer wanted"
+            ],
+            "role": "verification.debug.intelligence.senior",
+            "score": 4.0
+          },
+          {
+            "reasons": [
+              "holds root_cause_analysis",
+              "debug.root_cause is a specialty of Root Cause",
+              "Engineer vs Senior Engineer wanted"
+            ],
+            "role": "verification.debug.root_cause.engineer",
+            "score": 3.5
+          },
+          {
+            "reasons": [
+              "holds root_cause_analysis",
+              "debug.root_cause is a specialty of Debug",
+              "Tech Lead vs Senior Engineer wanted"
+            ],
+            "role": "verification.debug.tech_lead",
+            "score": 3.5
+          },
+          {
+            "reasons": [
+              "holds root_cause_analysis",
+              "debug.root_cause is a specialty of Waveform Analysis",
+              "Senior Engineer vs Senior Engineer wanted"
+            ],
+            "role": "verification.debug.waveforms.senior",
+            "score": 3.5
+          }
+        ],
+        "capability": "debug.root_cause",
+        "chosen": "verification.debug.root_cause.senior",
+        "rationale": "best-scoring owner of 11: holds root_cause_analysis; debug.root_cause is a specialty of Root Cause; Senior Engineer vs Senior Engineer wanted"
+      },
+      "parent": "prj-92ecb568dc:ws.debug",
+      "phase": "Debug",
+      "priority": 20,
+      "project": "prj-92ecb568dc",
+      "requirement": "req-806f63ac9b",
+      "review_state": "pending",
+      "reviewer": "verification.debug.tech_lead",
+      "reviewer_routing": {
+        "candidates": [
+          {
+            "reasons": [
+              "in the owner's escalation chain",
+              "same team",
+              "holds root_cause_analysis",
+              "senior to the owner"
+            ],
+            "role": "verification.debug.tech_lead",
+            "score": 5.45
+          },
+          {
+            "reasons": [
+              "same team",
+              "holds root_cause_analysis",
+              "knows regression_intelligence (from the requirement)"
+            ],
+            "role": "verification.debug.intelligence.senior",
+            "score": 2.71
+          },
+          {
+            "reasons": [
+              "same team",
+              "holds root_cause_analysis"
+            ],
+            "role": "verification.debug.logs.senior",
+            "score": 1.96
+          },
+          {
+            "reasons": [
+              "same team",
+              "holds root_cause_analysis"
+            ],
+            "role": "verification.debug.triage.senior",
+            "score": 1.96
+          },
+          {
+            "reasons": [
+              "same team",
+              "holds root_cause_analysis"
+            ],
+            "role": "verification.debug.waveforms.senior",
+            "score": 1.96
+          }
+        ],
+        "capability": "debug.review",
+        "chosen": "verification.debug.tech_lead",
+        "rationale": "best-scoring reviewer of 5: in the owner's escalation chain; same team; holds root_cause_analysis; senior to the owner"
+      },
+      "risk": "",
+      "skills": [
+        "root_cause_analysis"
+      ],
+      "stage": "root-cause",
+      "status": "planned",
+      "status_before_escalation": null,
+      "title": "Root-cause analysis",
+      "unit": "verification.debug.root_cause",
+      "workflow": "regression-investigation"
+    },
+    "prj-92ecb568dc:rtl-fix": {
+      "approval_state": "pending",
+      "approver": "design.rtl.architecture.staff",
+      "artifacts": [],
+      "attempts": 0,
+      "blocked_reason": null,
+      "branch": [
+        "prj-92ecb568dc:root-cause",
+        "rtl_bug"
+      ],
+      "capability": "rtl.implement",
+      "criticality": "high",
+      "depends_on": [
+        "prj-92ecb568dc:root-cause"
+      ],
+      "description": "",
+      "escalation_path": [
+        "design.rtl.architecture.staff",
+        "design.rtl.architecture.manager",
+        "design.rtl.director",
+        "design.vp",
+        "exec.cto",
+        "exec.ceo",
+        "exec.board"
+      ],
+      "escalation_state": "none",
+      "evidence": [],
+      "evidence_requirements": [
+        {
+          "accepts": [
+            "review_record"
+          ],
+          "before_review": false,
+          "description": "Independent review recorded",
+          "files": [],
+          "params": [],
+          "tools": [],
+          "when": {
+            "all_of": [],
+            "any_of": [],
+            "none_of": []
+          },
+          "when_produced": []
+        },
+        {
+          "accepts": [
+            "tool_run"
+          ],
+          "before_review": true,
+          "description": "Lint-clean under the RTL lint rules",
+          "files": [
+            {
+              "entry": false,
+              "kinds": [
+                "rtl_source"
+              ],
+              "param": "sources",
+              "upstream": false
+            }
+          ],
+          "params": [],
+          "tools": [
+            "lint.run"
+          ],
+          "when": {
+            "all_of": [],
+            "any_of": [],
+            "none_of": []
+          },
+          "when_produced": []
+        },
+        {
+          "accepts": [
+            "tool_run"
+          ],
+          "before_review": true,
+          "description": "Self-checking simulation passes",
+          "files": [
+            {
+              "entry": false,
+              "kinds": [
+                "rtl_source",
+                "testbench"
+              ],
+              "param": "sources",
+              "upstream": false
+            },
+            {
+              "entry": true,
+              "kinds": [
+                "testbench"
+              ],
+              "param": "top",
+              "upstream": false
+            }
+          ],
+          "params": [],
+          "tools": [
+            "simulator.run"
+          ],
+          "when": {
+            "all_of": [],
+            "any_of": [],
+            "none_of": []
+          },
+          "when_produced": []
+        },
+        {
+          "accepts": [
+            "tool_run"
+          ],
+          "before_review": true,
+          "description": "Synthesizes with Yosys, with no latches",
+          "files": [
+            {
+              "entry": false,
+              "kinds": [
+                "rtl_source"
+              ],
+              "param": "sources",
+              "upstream": false
+            },
+            {
+              "entry": true,
+              "kinds": [
+                "rtl_source"
+              ],
+              "param": "top",
+              "upstream": false
+            }
+          ],
+          "params": [
+            [
+              "max_latches",
+              "0"
+            ]
+          ],
+          "tools": [
+            "synth.run"
+          ],
+          "when": {
+            "all_of": [],
+            "any_of": [],
+            "none_of": []
+          },
+          "when_produced": []
+        },
+        {
+          "accepts": [
+            "tool_run"
+          ],
+          "before_review": true,
+          "description": "Formal properties are proven",
+          "files": [
+            {
+              "entry": false,
+              "kinds": [
+                "formal_spec"
+              ],
+              "param": "sby",
+              "upstream": false
+            },
+            {
+              "entry": false,
+              "kinds": [
+                "rtl_source"
+              ],
+              "param": "sources",
+              "upstream": false
+            }
+          ],
+          "params": [],
+          "tools": [
+            "formal.run"
+          ],
+          "when": {
+            "all_of": [],
+            "any_of": [],
+            "none_of": []
+          },
+          "when_produced": [
+            "formal_spec"
+          ]
+        },
+        {
+          "accepts": [
+            "tool_run"
+          ],
+          "before_review": true,
+          "description": "The proof is not vacuous: every cover is reached",
+          "files": [
+            {
+              "entry": false,
+              "kinds": [
+                "formal_spec"
+              ],
+              "param": "sby",
+              "upstream": false
+            },
+            {
+              "entry": false,
+              "kinds": [
+                "rtl_source"
+              ],
+              "param": "sources",
+              "upstream": false
+            }
+          ],
+          "params": [],
+          "tools": [
+            "formal.cover"
+          ],
+          "when": {
+            "all_of": [],
+            "any_of": [],
+            "none_of": []
+          },
+          "when_produced": [
+            "formal_spec"
+          ]
+        }
+      ],
+      "expected_outputs": [
+        "rtl_source",
+        "testbench"
+      ],
+      "gate": null,
+      "human_required": false,
+      "id": "prj-92ecb568dc:rtl-fix",
+      "inputs": [
+        "root_cause_analysis"
+      ],
+      "kind": "work",
+      "max_retries": 1,
+      "on_failure": "retry_then_escalate",
+      "outcome": null,
+      "outcomes": [],
+      "owner": "design.rtl.architecture.senior",
+      "owner_routing": {
+        "candidates": [
+          {
+            "reasons": [
+              "knows change_impact_analysis (from the requirement)",
+              "rtl.implement is a specialty of RTL Engineering",
+              "its unit specializes in change_impact_analysis",
+              "Senior Engineer vs Senior Engineer wanted"
+            ],
+            "role": "design.rtl.architecture.senior",
+            "score": 2.0
+          },
+          {
+            "reasons": [
+              "knows change_impact_analysis (from the requirement)",
+              "rtl.implement is a specialty of RTL Engineering",
+              "its unit specializes in change_impact_analysis",
+              "Senior Engineer vs Senior Engineer wanted"
+            ],
+            "role": "design.rtl.quality.review.senior",
+            "score": 1.5
+          },
+          {
+            "reasons": [
+              "knows change_impact_analysis (from the requirement)",
+              "rtl.implement is a specialty of RTL Engineering",
+              "its unit specializes in change_impact_analysis",
+              "Engineer vs Senior Engineer wanted"
+            ],
+            "role": "design.rtl.architecture.engineer",
+            "score": 1.0
+          },
+          {
+            "reasons": [
+              "knows change_impact_analysis (from the requirement)",
+              "rtl.implement is a specialty of RTL Engineering",
+              "its unit specializes in change_impact_analysis",
+              "Tech Lead vs Senior Engineer wanted"
+            ],
+            "role": "design.rtl.architecture.tech_lead",
+            "score": 1.0
+          },
+          {
+            "reasons": [
+              "rtl.implement is a specialty of RTL Engineering",
+              "Senior Engineer vs Senior Engineer wanted"
+            ],
+            "role": "design.rtl.automation.senior",
+            "score": 1.0
+          }
+        ],
+        "capability": "rtl.implement",
+        "chosen": "design.rtl.architecture.senior",
+        "rationale": "best-scoring owner of 43: knows change_impact_analysis (from the requirement); rtl.implement is a specialty of RTL Engineering; its unit specializes in change_impact_analysis; Senior Engineer vs Senior Engineer wanted"
+      },
+      "parent": "prj-92ecb568dc:ws.fix",
+      "phase": "Fix",
+      "priority": 30,
+      "project": "prj-92ecb568dc",
+      "requirement": "req-806f63ac9b",
+      "review_state": "pending",
+      "reviewer": "design.rtl.architecture.staff",
+      "reviewer_routing": {
+        "candidates": [
+          {
+            "reasons": [
+              "in the owner's escalation chain",
+              "same team",
+              "knows change_impact_analysis (from the requirement)",
+              "senior to the owner"
+            ],
+            "role": "design.rtl.architecture.staff",
+            "score": 5.195
+          },
+          {
+            "reasons": [
+              "same team",
+              "knows change_impact_analysis (from the requirement)",
+              "senior to the owner"
+            ],
+            "role": "design.rtl.architecture.tech_lead",
+            "score": 2.2
+          },
+          {
+            "reasons": [
+              "same team",
+              "knows change_impact_analysis (from the requirement)"
+            ],
+            "role": "design.rtl.quality.review.senior",
+            "score": 1.71
+          },
+          {
+            "reasons": [
+              "same team",
+              "senior to the owner"
+            ],
+            "role": "design.rtl.automation.tech_lead",
+            "score": 1.45
+          },
+          {
+            "reasons": [
+              "same team",
+              "senior to the owner"
+            ],
+            "role": "design.rtl.cdc.tech_lead",
+            "score": 1.45
+          }
+        ],
+        "capability": "rtl.review",
+        "chosen": "design.rtl.architecture.staff",
+        "rationale": "best-scoring reviewer of 25: in the owner's escalation chain; same team; knows change_impact_analysis (from the requirement); senior to the owner"
+      },
+      "risk": "",
+      "skills": [],
+      "stage": "rtl-fix",
+      "status": "planned",
+      "status_before_escalation": null,
+      "title": "RTL fix",
+      "unit": "design.rtl.architecture",
+      "workflow": "regression-investigation"
+    },
+    "prj-92ecb568dc:spec-clarification": {
+      "approval_state": "pending",
+      "approver": "product.management.tech_lead",
+      "artifacts": [],
+      "attempts": 0,
+      "blocked_reason": null,
+      "branch": [
+        "prj-92ecb568dc:root-cause",
+        "spec_ambiguity"
+      ],
+      "capability": "req.analyze",
+      "criticality": "high",
+      "depends_on": [
+        "prj-92ecb568dc:root-cause"
+      ],
+      "description": "",
+      "escalation_path": [
+        "product.management.tech_lead",
+        "product.management.manager",
+        "exec.cpo",
+        "exec.ceo",
+        "exec.board"
+      ],
+      "escalation_state": "none",
+      "evidence": [],
+      "evidence_requirements": [
+        {
+          "accepts": [
+            "review_record"
+          ],
+          "before_review": false,
+          "description": "Independent review recorded",
+          "files": [],
+          "params": [],
+          "tools": [],
+          "when": {
+            "all_of": [],
+            "any_of": [],
+            "none_of": []
+          },
+          "when_produced": []
+        }
+      ],
+      "expected_outputs": [
+        "requirements_spec"
+      ],
+      "gate": null,
+      "human_required": false,
+      "id": "prj-92ecb568dc:spec-clarification",
+      "inputs": [
+        "root_cause_analysis"
+      ],
+      "kind": "work",
+      "max_retries": 1,
+      "on_failure": "retry_then_escalate",
+      "outcome": null,
+      "outcomes": [],
+      "owner": "product.management.customer.senior",
+      "owner_routing": {
+        "candidates": [
+          {
+            "reasons": [
+              "req.analyze is a specialty of Customer Requirements",
+              "Senior Engineer vs Senior Engineer wanted"
+            ],
+            "role": "product.management.customer.senior",
+            "score": 1.5
+          },
+          {
+            "reasons": [
+              "req.analyze is a specialty of Requirements Management",
+              "Senior Engineer vs Senior Engineer wanted"
+            ],
+            "role": "product.management.requirements.senior",
+            "score": 1.5
+          },
+          {
+            "reasons": [
+              "req.analyze is a specialty of Product Management",
+              "Senior Engineer vs Senior Engineer wanted"
+            ],
+            "role": "product.management.competitive.senior",
+            "score": 1.0
+          },
+          {
+            "reasons": [
+              "req.analyze is a specialty of Product Management",
+              "Senior Engineer vs Senior Engineer wanted"
+            ],
+            "role": "product.management.features.senior",
+            "score": 1.0
+          },
+          {
+            "reasons": [
+              "req.analyze is a specialty of Product Management",
+              "Senior Engineer vs Senior Engineer wanted"
+            ],
+            "role": "product.management.roadmap.senior",
+            "score": 1.0
+          }
+        ],
+        "capability": "req.analyze",
+        "chosen": "product.management.customer.senior",
+        "rationale": "best-scoring owner of 13: req.analyze is a specialty of Customer Requirements; Senior Engineer vs Senior Engineer wanted"
+      },
+      "parent": "prj-92ecb568dc:ws.fix",
+      "phase": "Fix",
+      "priority": 30,
+      "project": "prj-92ecb568dc",
+      "requirement": "req-806f63ac9b",
+      "review_state": "pending",
+      "reviewer": "product.management.tech_lead",
+      "reviewer_routing": {
+        "candidates": [
+          {
+            "reasons": [
+              "in the owner's escalation chain",
+              "same team",
+              "senior to the owner"
+            ],
+            "role": "product.management.tech_lead",
+            "score": 4.45
+          },
+          {
+            "reasons": [
+              "same team"
+            ],
+            "role": "product.management.competitive.senior",
+            "score": 0.96
+          },
+          {
+            "reasons": [
+              "same team"
+            ],
+            "role": "product.management.features.senior",
+            "score": 0.96
+          },
+          {
+            "reasons": [
+              "same team"
+            ],
+            "role": "product.management.requirements.senior",
+            "score": 0.96
+          },
+          {
+            "reasons": [
+              "same team"
+            ],
+            "role": "product.management.roadmap.senior",
+            "score": 0.96
+          }
+        ],
+        "capability": "req.review",
+        "chosen": "product.management.tech_lead",
+        "rationale": "best-scoring reviewer of 6: in the owner's escalation chain; same team; senior to the owner"
+      },
+      "risk": "",
+      "skills": [],
+      "stage": "spec-clarification",
+      "status": "planned",
+      "status_before_escalation": null,
+      "title": "Specification clarification",
+      "unit": "product.management.customer",
+      "workflow": "regression-investigation"
+    },
+    "prj-92ecb568dc:tb-fix": {
+      "approval_state": "pending",
+      "approver": "verification.simulation.tech_lead",
+      "artifacts": [],
+      "attempts": 0,
+      "blocked_reason": null,
+      "branch": [
+        "prj-92ecb568dc:root-cause",
+        "testbench_bug"
+      ],
+      "capability": "dv.testbench",
+      "criticality": "medium",
+      "depends_on": [
+        "prj-92ecb568dc:root-cause"
+      ],
+      "description": "",
+      "escalation_path": [
+        "verification.simulation.testbench.senior",
+        "verification.simulation.tech_lead",
+        "verification.simulation.manager",
+        "verification.vp",
+        "exec.cto",
+        "exec.ceo",
+        "exec.board"
+      ],
+      "escalation_state": "none",
+      "evidence": [],
+      "evidence_requirements": [
+        {
+          "accepts": [
+            "review_record"
+          ],
+          "before_review": false,
+          "description": "Independent review recorded",
+          "files": [],
+          "params": [],
+          "tools": [],
+          "when": {
+            "all_of": [],
+            "any_of": [],
+            "none_of": []
+          },
+          "when_produced": []
+        }
+      ],
+      "expected_outputs": [
+        "testbench"
+      ],
+      "gate": null,
+      "human_required": false,
+      "id": "prj-92ecb568dc:tb-fix",
+      "inputs": [
+        "root_cause_analysis"
+      ],
+      "kind": "work",
+      "max_retries": 1,
+      "on_failure": "retry_then_escalate",
+      "outcome": null,
+      "outcomes": [],
+      "owner": "verification.simulation.testbench.engineer",
+      "owner_routing": {
+        "candidates": [
+          {
+            "reasons": [
+              "dv.testbench is a specialty of Testbench",
+              "Engineer vs Engineer wanted"
+            ],
+            "role": "verification.simulation.testbench.engineer",
+            "score": 1.5
+          },
+          {
+            "reasons": [
+              "dv.testbench is a specialty of UVM",
+              "Engineer vs Engineer wanted"
+            ],
+            "role": "verification.simulation.uvm.engineer",
+            "score": 1.5
+          },
+          {
+            "reasons": [
+              "dv.testbench is a specialty of Simulation",
+              "Engineer vs Engineer wanted"
+            ],
+            "role": "verification.simulation.regression.engineer",
+            "score": 1.0
+          },
+          {
+            "reasons": [
+              "dv.testbench is a specialty of Simulation",
+              "Engineer vs Engineer wanted"
+            ],
+            "role": "verification.simulation.systemverilog.engineer",
+            "score": 1.0
+          },
+          {
+            "reasons": [
+              "dv.testbench is a specialty of Simulation",
+              "Engineer vs Engineer wanted"
+            ],
+            "role": "verification.simulation.vip.engineer",
+            "score": 1.0
+          }
+        ],
+        "capability": "dv.testbench",
+        "chosen": "verification.simulation.testbench.engineer",
+        "rationale": "best-scoring owner of 15: dv.testbench is a specialty of Testbench; Engineer vs Engineer wanted"
+      },
+      "parent": "prj-92ecb568dc:ws.fix",
+      "phase": "Fix",
+      "priority": 30,
+      "project": "prj-92ecb568dc",
+      "requirement": "req-806f63ac9b",
+      "review_state": "pending",
+      "reviewer": "verification.simulation.testbench.senior",
+      "reviewer_routing": {
+        "candidates": [
+          {
+            "reasons": [
+              "in the owner's escalation chain",
+              "same team",
+              "senior to the owner"
+            ],
+            "role": "verification.simulation.testbench.senior",
+            "score": 4.46
+          },
+          {
+            "reasons": [
+              "in the owner's escalation chain",
+              "same team",
+              "senior to the owner"
+            ],
+            "role": "verification.simulation.tech_lead",
+            "score": 4.35
+          },
+          {
+            "reasons": [
+              "same team",
+              "senior to the owner"
+            ],
+            "role": "verification.simulation.regression.senior",
+            "score": 1.46
+          },
+          {
+            "reasons": [
+              "same team",
+              "senior to the owner"
+            ],
+            "role": "verification.simulation.systemverilog.senior",
+            "score": 1.46
+          },
+          {
+            "reasons": [
+              "same team",
+              "senior to the owner"
+            ],
+            "role": "verification.simulation.uvm.senior",
+            "score": 1.46
+          }
+        ],
+        "capability": "dv.review",
+        "chosen": "verification.simulation.testbench.senior",
+        "rationale": "best-scoring reviewer of 33: in the owner's escalation chain; same team; senior to the owner"
+      },
+      "risk": "",
+      "skills": [],
+      "stage": "tb-fix",
+      "status": "planned",
+      "status_before_escalation": null,
+      "title": "Testbench fix",
+      "unit": "verification.simulation.testbench",
+      "workflow": "regression-investigation"
+    },
+    "prj-92ecb568dc:triage": {
+      "approval_state": "not_required",
+      "approver": null,
+      "artifacts": [],
+      "attempts": 0,
+      "blocked_reason": null,
+      "branch": null,
+      "capability": "debug.triage",
+      "criticality": "medium",
+      "depends_on": [],
+      "description": "",
+      "escalation_path": [
+        "verification.debug.intelligence.senior",
+        "verification.debug.tech_lead",
+        "verification.debug.manager",
+        "verification.vp",
+        "exec.cto",
+        "exec.ceo",
+        "exec.board"
+      ],
+      "escalation_state": "none",
+      "evidence": [
+        "prj-92ecb568dc:triage#e1"
+      ],
+      "evidence_requirements": [
+        {
+          "accepts": [
+            "veritriage_session"
+          ],
+          "before_review": false,
+          "description": "VeriTriage investigation of the failing artifacts",
+          "files": [],
+          "params": [],
+          "tools": [
+            "veritriage.investigate"
+          ],
+          "when": {
+            "all_of": [],
+            "any_of": [],
+            "none_of": []
+          },
+          "when_produced": []
+        }
+      ],
+      "expected_outputs": [
+        "triage_report"
+      ],
+      "gate": null,
+      "human_required": false,
+      "id": "prj-92ecb568dc:triage",
+      "inputs": [],
+      "kind": "work",
+      "max_retries": 1,
+      "on_failure": "retry_then_escalate",
+      "outcome": null,
+      "outcomes": [],
+      "owner": "verification.debug.intelligence.engineer",
+      "owner_routing": {
+        "candidates": [
+          {
+            "reasons": [
+              "knows regression_intelligence (from the requirement)",
+              "debug.triage is a specialty of Regression Intelligence",
+              "its unit specializes in regression_intelligence",
+              "Engineer vs Engineer wanted"
+            ],
+            "role": "verification.debug.intelligence.engineer",
+            "score": 2.5
+          },
+          {
+            "reasons": [
+              "knows regression_intelligence (from the requirement)",
+              "debug.triage is a specialty of Regression Intelligence",
+              "its unit specializes in regression_intelligence",
+              "Junior Engineer vs Engineer wanted"
+            ],
+            "role": "verification.debug.intelligence.junior",
+            "score": 1.5
+          },
+          {
+            "reasons": [
+              "knows regression_intelligence (from the requirement)",
+              "debug.triage is a specialty of Regression Intelligence",
+              "its unit specializes in regression_intelligence",
+              "Senior Engineer vs Engineer wanted"
+            ],
+            "role": "verification.debug.intelligence.senior",
+            "score": 1.5
+          },
+          {
+            "reasons": [
+              "debug.triage is a specialty of Log Analysis",
+              "Engineer vs Engineer wanted"
+            ],
+            "role": "verification.debug.logs.engineer",
+            "score": 1.5
+          },
+          {
+            "reasons": [
+              "debug.triage is a specialty of Failure Triage",
+              "Engineer vs Engineer wanted"
+            ],
+            "role": "verification.debug.triage.engineer",
+            "score": 1.5
+          }
+        ],
+        "capability": "debug.triage",
+        "chosen": "verification.debug.intelligence.engineer",
+        "rationale": "best-scoring owner of 9: knows regression_intelligence (from the requirement); debug.triage is a specialty of Regression Intelligence; its unit specializes in regression_intelligence; Engineer vs Engineer wanted"
+      },
+      "parent": "prj-92ecb568dc:ws.debug",
+      "phase": "Debug",
+      "priority": 0,
+      "project": "prj-92ecb568dc",
+      "requirement": "req-806f63ac9b",
+      "review_state": "not_required",
+      "reviewer": null,
+      "reviewer_routing": null,
+      "risk": "",
+      "skills": [],
+      "stage": "triage",
+      "status": "ready",
+      "status_before_escalation": null,
+      "title": "Failure triage (VeriTriage)",
+      "unit": "verification.debug.intelligence",
+      "workflow": "regression-investigation"
+    },
+    "prj-92ecb568dc:verify-fix": {
+      "approval_state": "pending",
+      "approver": "verification.simulation.tech_lead",
+      "artifacts": [],
+      "attempts": 0,
+      "blocked_reason": null,
+      "branch": null,
+      "capability": "dv.regression",
+      "criticality": "high",
+      "depends_on": [
+        "prj-92ecb568dc:rtl-fix",
+        "prj-92ecb568dc:tb-fix",
+        "prj-92ecb568dc:infra-fix",
+        "prj-92ecb568dc:spec-clarification"
+      ],
+      "description": "",
+      "escalation_path": [
+        "verification.simulation.tech_lead",
+        "verification.simulation.manager",
+        "verification.vp",
+        "exec.cto",
+        "exec.ceo",
+        "exec.board"
+      ],
+      "escalation_state": "none",
+      "evidence": [],
+      "evidence_requirements": [
+        {
+          "accepts": [
+            "tool_run",
+            "veritriage_session",
+            "human_attestation"
+          ],
+          "before_review": false,
+          "description": "Failing test passes; no new failures in regression",
+          "files": [],
+          "params": [],
+          "tools": [
+            "regression.run",
+            "test.run",
+            "veritriage.investigate"
+          ],
+          "when": {
+            "all_of": [],
+            "any_of": [],
+            "none_of": []
+          },
+          "when_produced": []
+        }
+      ],
+      "expected_outputs": [
+        "regression_report"
+      ],
+      "gate": null,
+      "human_required": false,
+      "id": "prj-92ecb568dc:verify-fix",
+      "inputs": [
+        "rtl_source",
+        "testbench",
+        "regression_infrastructure",
+        "requirements_spec"
+      ],
+      "kind": "work",
+      "max_retries": 2,
+      "on_failure": "retry_then_escalate",
+      "outcome": null,
+      "outcomes": [],
+      "owner": "verification.simulation.regression.senior",
+      "owner_routing": {
+        "candidates": [
+          {
+            "reasons": [
+              "dv.regression is a specialty of Regression",
+              "Senior Engineer vs Senior Engineer wanted"
+            ],
+            "role": "verification.simulation.regression.senior",
+            "score": 1.5
+          },
+          {
+            "reasons": [
+              "dv.regression is a specialty of Regression",
+              "Engineer vs Senior Engineer wanted"
+            ],
+            "role": "verification.simulation.regression.engineer",
+            "score": 0.5
+          }
+        ],
+        "capability": "dv.regression",
+        "chosen": "verification.simulation.regression.senior",
+        "rationale": "best-scoring owner of 2: dv.regression is a specialty of Regression; Senior Engineer vs Senior Engineer wanted"
+      },
+      "parent": "prj-92ecb568dc:ws.verification",
+      "phase": "Verification",
+      "priority": 40,
+      "project": "prj-92ecb568dc",
+      "requirement": "req-806f63ac9b",
+      "review_state": "pending",
+      "reviewer": "verification.simulation.tech_lead",
+      "reviewer_routing": {
+        "candidates": [
+          {
+            "reasons": [
+              "in the owner's escalation chain",
+              "same team",
+              "senior to the owner"
+            ],
+            "role": "verification.simulation.tech_lead",
+            "score": 4.45
+          },
+          {
+            "reasons": [
+              "same team"
+            ],
+            "role": "verification.simulation.systemverilog.senior",
+            "score": 0.96
+          },
+          {
+            "reasons": [
+              "same team"
+            ],
+            "role": "verification.simulation.testbench.senior",
+            "score": 0.96
+          },
+          {
+            "reasons": [
+              "same team"
+            ],
+            "role": "verification.simulation.uvm.senior",
+            "score": 0.96
+          },
+          {
+            "reasons": [
+              "same team"
+            ],
+            "role": "verification.simulation.vip.senior",
+            "score": 0.96
+          }
+        ],
+        "capability": "dv.review",
+        "chosen": "verification.simulation.tech_lead",
+        "rationale": "best-scoring reviewer of 32: in the owner's escalation chain; same team; senior to the owner"
+      },
+      "risk": "",
+      "skills": [],
+      "stage": "verify-fix",
+      "status": "planned",
+      "status_before_escalation": null,
+      "title": "Re-run and confirm the fix",
+      "unit": "verification.simulation.regression",
+      "workflow": "regression-investigation"
+    },
+    "prj-92ecb568dc:ws.debug": {
+      "approval_state": "not_required",
+      "approver": null,
+      "artifacts": [],
+      "attempts": 0,
+      "blocked_reason": null,
+      "branch": null,
+      "capability": "mgmt.plan",
+      "criticality": "high",
+      "depends_on": [],
+      "description": "Plan, delegate, track, and verify completion of debug work.",
+      "escalation_path": [
+        "verification.vp",
+        "exec.cto",
+        "exec.ceo",
+        "exec.board"
+      ],
+      "escalation_state": "none",
+      "evidence": [],
+      "evidence_requirements": [],
+      "expected_outputs": [],
+      "gate": null,
+      "human_required": false,
+      "id": "prj-92ecb568dc:ws.debug",
+      "inputs": [],
+      "kind": "workstream",
+      "max_retries": 1,
+      "on_failure": "retry_then_escalate",
+      "outcome": null,
+      "outcomes": [],
+      "owner": "verification.debug.manager",
+      "owner_routing": {
+        "candidates": [
+          {
+            "reasons": [
+              "unit head"
+            ],
+            "role": "verification.debug.manager",
+            "score": 1.0
+          }
+        ],
+        "capability": "mgmt.plan",
+        "chosen": "verification.debug.manager",
+        "rationale": "head of Debug, the narrowest unit containing this work"
+      },
+      "parent": "prj-92ecb568dc:program",
+      "phase": "Debug",
+      "priority": 0,
+      "project": "prj-92ecb568dc",
+      "requirement": "req-806f63ac9b",
+      "review_state": "not_required",
+      "reviewer": null,
+      "reviewer_routing": null,
+      "risk": "",
+      "skills": [],
+      "stage": null,
+      "status": "ready",
+      "status_before_escalation": null,
+      "title": "Debug workstream",
+      "unit": "verification.debug",
+      "workflow": null
+    },
+    "prj-92ecb568dc:ws.fix": {
+      "approval_state": "not_required",
+      "approver": null,
+      "artifacts": [],
+      "attempts": 0,
+      "blocked_reason": null,
+      "branch": null,
+      "capability": "mgmt.plan",
+      "criticality": "high",
+      "depends_on": [],
+      "description": "Plan, delegate, track, and verify completion of fix work.",
+      "escalation_path": [
+        "verification.vp",
+        "exec.cto",
+        "exec.ceo",
+        "exec.board"
+      ],
+      "escalation_state": "none",
+      "evidence": [],
+      "evidence_requirements": [],
+      "expected_outputs": [],
+      "gate": null,
+      "human_required": false,
+      "id": "prj-92ecb568dc:ws.fix",
+      "inputs": [],
+      "kind": "workstream",
+      "max_retries": 1,
+      "on_failure": "retry_then_escalate",
+      "outcome": null,
+      "outcomes": [],
+      "owner": "verification.debug.manager",
+      "owner_routing": {
+        "candidates": [
+          {
+            "reasons": [
+              "unit head"
+            ],
+            "role": "verification.debug.manager",
+            "score": 1.0
+          }
+        ],
+        "capability": "mgmt.plan",
+        "chosen": "verification.debug.manager",
+        "rationale": "head of Debug, the narrowest unit containing this work"
+      },
+      "parent": "prj-92ecb568dc:program",
+      "phase": "Fix",
+      "priority": 0,
+      "project": "prj-92ecb568dc",
+      "requirement": "req-806f63ac9b",
+      "review_state": "not_required",
+      "reviewer": null,
+      "reviewer_routing": null,
+      "risk": "",
+      "skills": [],
+      "stage": null,
+      "status": "planned",
+      "status_before_escalation": null,
+      "title": "Fix workstream",
+      "unit": "verification.debug",
+      "workflow": null
+    },
+    "prj-92ecb568dc:ws.verification": {
+      "approval_state": "not_required",
+      "approver": null,
+      "artifacts": [],
+      "attempts": 0,
+      "blocked_reason": null,
+      "branch": null,
+      "capability": "mgmt.plan",
+      "criticality": "high",
+      "depends_on": [],
+      "description": "Plan, delegate, track, and verify completion of verification work.",
+      "escalation_path": [
+        "verification.vp",
+        "exec.cto",
+        "exec.ceo",
+        "exec.board"
+      ],
+      "escalation_state": "none",
+      "evidence": [],
+      "evidence_requirements": [],
+      "expected_outputs": [],
+      "gate": null,
+      "human_required": false,
+      "id": "prj-92ecb568dc:ws.verification",
+      "inputs": [],
+      "kind": "workstream",
+      "max_retries": 1,
+      "on_failure": "retry_then_escalate",
+      "outcome": null,
+      "outcomes": [],
+      "owner": "verification.simulation.manager",
+      "owner_routing": {
+        "candidates": [
+          {
+            "reasons": [
+              "unit head"
+            ],
+            "role": "verification.simulation.manager",
+            "score": 1.0
+          }
+        ],
+        "capability": "mgmt.plan",
+        "chosen": "verification.simulation.manager",
+        "rationale": "head of Simulation, the narrowest unit containing this work"
+      },
+      "parent": "prj-92ecb568dc:program",
+      "phase": "Verification",
+      "priority": 0,
+      "project": "prj-92ecb568dc",
+      "requirement": "req-806f63ac9b",
+      "review_state": "not_required",
+      "reviewer": null,
+      "reviewer_routing": null,
+      "risk": "",
+      "skills": [],
+      "stage": null,
+      "status": "planned",
+      "status_before_escalation": null,
+      "title": "Verification workstream",
+      "unit": "verification.simulation",
+      "workflow": null
+    }
+  },
+  "tool_runs": {
+    "run-0001": {
+      "actor": "fixture@verification.debug.intelligence.engineer",
+      "id": "run-0001",
+      "params": {
+        "paths": "tests/fixtures/axi_timeout.log,tests/fixtures/apb_pready_stuck.log",
+        "workspace": "/tmp/m39-fixture-vt"
+      },
+      "references": [
+        "ses-5baff6db8775"
+      ],
+      "succeeded": true,
+      "summary": "VeriTriage classified axi_timeout.log, apb_pready_stuck.log as timeout (85% confidence, 9 evidence nodes); top hypothesis: Likely RTL bug",
+      "task": "prj-92ecb568dc:triage",
+      "tool": "veritriage.investigate"
+    },
+    "run-0002": {
+      "actor": "fixture@design.integration.packaging.engineer",
+      "id": "run-0002",
+      "params": {
+        "max_warnings": "0",
+        "sources": "/nonexistent/m39/a.v,/nonexistent/m39/b.v",
+        "timeout": "30",
+        "top": "a"
+      },
+      "references": [],
+      "succeeded": false,
+      "summary": "verilator-lint: not found: /nonexistent/m39/a.v, /nonexistent/m39/b.v",
+      "task": null,
+      "tool": "lint.run"
+    },
+    "run-0003": {
+      "actor": "fixture@implementation.dft.engineering.atpg.engineer",
+      "id": "run-0003",
+      "params": {
+        "fault_sample": "0",
+        "min_test_coverage": "90.5",
+        "seed": "7",
+        "sources": "/nonexistent/m39/a.v,/nonexistent/m39/b.v",
+        "top": "a"
+      },
+      "references": [],
+      "succeeded": false,
+      "summary": "icarus-atpg: not found: /nonexistent/m39/a.v, /nonexistent/m39/b.v",
+      "task": null,
+      "tool": "dft.atpg"
+    },
+    "run-0004": {
+      "actor": "fixture@architecture.interface.ace.engineer",
+      "id": "run-0004",
+      "params": {
+        "task": "prj-92ecb568dc:triage"
+      },
+      "references": [],
+      "succeeded": true,
+      "summary": "Failure triage (VeriTriage) [ready]",
+      "task": null,
+      "tool": "project.read"
+    }
+  },
+  "verification_items": {}
+}

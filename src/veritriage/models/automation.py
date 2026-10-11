@@ -42,6 +42,11 @@ class EventKind(str, Enum):
     #: Supplied by a caller (a CI job, a cron entry someone else owns). The
     #: platform never sleeps, spawns, or polls for this.
     SCHEDULE_TICK = "schedule_tick"
+    #: Published by a system beside VeriTriage, through that system's own
+    #: integration. ``Event.source`` names the publisher and ``payload["topic"]``
+    #: names what happened in the publisher's vocabulary. VeriTriage never
+    #: interprets either: only triggers someone registers do.
+    EXTERNAL = "external"
 
     @property
     def display_name(self) -> str:

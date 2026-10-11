@@ -1,0 +1,36 @@
+{
+  "id": "rtl/apb-regs",
+  "request": "Create an APB register block with four 32-bit registers.",
+  "seat": "rtl-implementation",
+  "expected_behavior": "RTL for module apb_regs (APB4, ADDR_WIDTH 8, DATA_WIDTH 32, zero wait states) with four registers at 0x0 to 0xC, and a self-checking testbench, following the approved interface specification and microarchitecture, gated by lint, simulation, and synthesis (and formal, when a .sby is written) before review.",
+  "constraints": [
+    "Work only from the approved interface specification and microarchitecture.",
+    "Lint-clean under Verilator -Wall with no waivers.",
+    "Synthesizes with no latches."
+  ],
+  "known_failure_modes": [
+    "Unmapped addresses (misaligned, or 0x10 and above) answered without PSLVERR, or a write to them changing a register.",
+    "pstrb ignored or applied to the wrong byte lanes.",
+    "A write taking effect in the setup phase, invisible at the ports to a weak testbench.",
+    "A self-written testbench too weak to notice the above; the held-out reference testbench judges instead."
+  ],
+  "upstream": {
+    "interface-spec": [{"path": "tests/fixtures/rtl/apb_regs/interface_spec.md", "kind": "interface_spec"}],
+    "microarchitecture": [{"path": "tests/fixtures/rtl/apb_regs/microarchitecture.md", "kind": "microarchitecture_spec"}]
+  },
+  "reference": [
+    {"path": "tests/fixtures/rtl/apb_regs/apb_regs.v", "kind": "rtl_source", "entry": "apb_regs"},
+    {"path": "tests/fixtures/rtl/apb_regs/apb_regs_tb.v", "kind": "testbench", "entry": "apb_regs_tb"},
+    {"path": "tests/fixtures/rtl/apb_regs/apb_regs.sby", "kind": "formal_spec"}
+  ],
+  "held_out": [
+    {
+      "name": "The reference testbench passes on the seat's RTL",
+      "scorer": "held-out-run",
+      "tool": "simulator.run",
+      "seat_files": {"sources": ["rtl_source"]},
+      "case_files": {"sources": ["tests/fixtures/rtl/apb_regs/apb_regs_tb.v"]},
+      "params": {"top": "apb_regs_tb"}
+    }
+  ]
+}

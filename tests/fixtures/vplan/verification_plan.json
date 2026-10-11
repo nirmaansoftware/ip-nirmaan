@@ -1,0 +1,37 @@
+{
+  "format": "nirmaan.vplan",
+  "version": 1,
+  "requirements": [
+    {
+      "id": "CNT-COUNT",
+      "text": "While `en` is high the count advances by one each clock and wraps to zero after `LIMIT`.",
+      "source": "requirements_spec.md",
+      "section": "1"
+    },
+    {
+      "id": "CNT-RESET",
+      "text": "The count resets to zero while `rst` is high.",
+      "source": "requirements_spec.md",
+      "section": "1"
+    },
+    {
+      "id": "CNT-SYNTH",
+      "text": "The design synthesizes with no latches.",
+      "source": "requirements_spec.md",
+      "section": "2"
+    }
+  ],
+  "items": [
+    {
+      "id": "tb-count",
+      "kind": "test",
+      "file": "counter_tb.v",
+      "name": "counter_tb: PASS",
+      "proves": [
+        "CNT-COUNT",
+        "CNT-RESET"
+      ],
+      "rationale": "The self-checking testbench compares the count on every cycle, from reset, through a wrap."
+    }
+  ]
+}

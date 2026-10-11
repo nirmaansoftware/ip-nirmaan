@@ -1,0 +1,54 @@
+{
+  "id": "firmware/axi4-lite-driver",
+  "request": "Create an AXI4-Lite register block and its driver.",
+  "seat": "firmware",
+  "expected_behavior": "A C driver for axi4_lite_regs (axi4_lite_regs_map.h, axi4_lite_regs_drv.h, axi4_lite_regs_drv.c) written to the approved programming interface, and a test program that drives it through nirmaan_hal. The work reaches review only after the driver builds under strict C flags and the seat's tests pass against the approved RTL in co-simulation.",
+  "constraints": [
+    "Work only from the approved interface specification, the driver programming interface, and the approved RTL.",
+    "Reach the hardware only through nirmaan_hal.h.",
+    "Builds clean under -std=c11 -Wall -Wextra -Werror -pedantic."
+  ],
+  "known_failure_modes": [
+    "A register offset copied wrong in the map header, so one index aliases another; a test that only reads reset values does not notice.",
+    "A bus error swallowed, retried, or turned into a success.",
+    "last_response not updated on every transfer, or kept sticky after an error.",
+    "write_byte sending all strobe bits, so it clears the other bytes.",
+    "Function names or status codes that differ from the programming interface, so other software cannot call the driver."
+  ],
+  "upstream": {
+    "interface-spec": [
+      {"path": "tests/fixtures/rtl/axi4_lite/interface_spec.md", "kind": "interface_spec"},
+      {"path": "evals/firmware/axi4_lite/driver_api.md", "kind": "interface_spec"}
+    ],
+    "microarchitecture": [{"path": "tests/fixtures/rtl/axi4_lite/microarchitecture.md", "kind": "microarchitecture_spec"}],
+    "rtl-implementation": [
+      {"path": "tests/fixtures/rtl/axi4_lite/axi4_lite_regs.v", "kind": "rtl_source", "entry": "axi4_lite_regs"},
+      {"path": "tests/fixtures/rtl/axi4_lite/axi4_lite_regs_tb.v", "kind": "testbench", "entry": "axi4_lite_regs_tb"}
+    ]
+  },
+  "reference": [
+    {"path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_map.h", "kind": "driver"},
+    {"path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_drv.h", "kind": "driver"},
+    {"path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_drv.c", "kind": "driver"},
+    {"path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_test.c", "kind": "driver_test"}
+  ],
+  "held_out": [
+    {
+      "name": "The driver alone builds under strict C flags",
+      "scorer": "held-out-run",
+      "tool": "fw.build",
+      "seat_files": {"sources": ["driver"]}
+    },
+    {
+      "name": "A held-out test program passes on the driver against the approved RTL",
+      "scorer": "held-out-run",
+      "tool": "fw.test",
+      "seat_files": {"sources": ["driver"]},
+      "case_files": {
+        "sources": ["evals/firmware/axi4_lite/held_out_test.c"],
+        "rtl": ["tests/fixtures/rtl/axi4_lite/axi4_lite_regs.v"]
+      },
+      "params": {"top": "axi4_lite_regs"}
+    }
+  ]
+}

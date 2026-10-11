@@ -1,0 +1,293 @@
+# CAPTURED: sta.run (opensta, standalone OpenSTA e983e15b built in CI) on the routed AXI4-Lite netlist with the extracted SPEF (M29); in openroad/orfs:26Q3-687-gc63a606f9, Nangate45, CI run 37632069804. Unedited below this line.
+$ sta -no_init -no_splash -exit sta.tcl
+Found 221 unannotated drivers.
+ VDD
+ VSS
+ _1979_/QN
+ _1980_/QN
+ _1981_/QN
+ _1982_/QN
+ _1983_/QN
+ _1984_/QN
+ _1985_/QN
+ _1986_/QN
+ _1987_/QN
+ _1988_/QN
+ _1989_/QN
+ _1990_/QN
+ _1991_/QN
+ _1992_/QN
+ _1993_/QN
+ _1994_/QN
+ _1995_/QN
+ _1996_/QN
+ _1997_/QN
+ _1998_/QN
+ _1999_/QN
+ _2000_/QN
+ _2001_/QN
+ _2002_/QN
+ _2003_/QN
+ _2004_/QN
+ _2005_/QN
+ _2006_/QN
+ _2007_/QN
+ _2008_/QN
+ _2009_/QN
+ _2010_/QN
+ _2011_/QN
+ _2012_/QN
+ _2014_/QN
+ _2015_/QN
+ _2016_/QN
+ _2017_/QN
+ _2018_/QN
+ _2019_/QN
+ _2020_/QN
+ _2021_/QN
+ _2022_/QN
+ _2023_/QN
+ _2024_/QN
+ _2025_/QN
+ _2026_/QN
+ _2027_/QN
+ _2028_/QN
+ _2029_/QN
+ _2030_/QN
+ _2031_/QN
+ _2032_/QN
+ _2033_/QN
+ _2034_/QN
+ _2035_/QN
+ _2036_/QN
+ _2037_/QN
+ _2038_/QN
+ _2039_/QN
+ _2040_/QN
+ _2041_/QN
+ _2042_/QN
+ _2043_/QN
+ _2044_/QN
+ _2045_/QN
+ _2046_/QN
+ _2047_/QN
+ _2048_/QN
+ _2049_/QN
+ _2050_/QN
+ _2051_/QN
+ _2052_/QN
+ _2053_/QN
+ _2054_/QN
+ _2055_/QN
+ _2056_/QN
+ _2057_/QN
+ _2058_/QN
+ _2059_/QN
+ _2060_/QN
+ _2061_/QN
+ _2062_/QN
+ _2063_/QN
+ _2064_/QN
+ _2065_/QN
+ _2066_/QN
+ _2067_/QN
+ _2068_/QN
+ _2069_/QN
+ _2070_/QN
+ _2071_/QN
+ _2072_/QN
+ _2073_/QN
+ _2074_/QN
+ _2075_/QN
+ _2076_/QN
+ _2077_/QN
+ _2078_/QN
+ _2079_/QN
+ _2080_/QN
+ _2081_/QN
+ _2082_/QN
+ _2083_/QN
+ _2084_/QN
+ _2085_/QN
+ _2086_/QN
+ _2087_/QN
+ _2088_/QN
+ _2089_/QN
+ _2090_/QN
+ _2091_/QN
+ _2092_/QN
+ _2093_/QN
+ _2094_/QN
+ _2095_/QN
+ _2096_/QN
+ _2097_/QN
+ _2098_/QN
+ _2099_/QN
+ _2100_/QN
+ _2101_/QN
+ _2102_/QN
+ _2103_/QN
+ _2104_/QN
+ _2105_/QN
+ _2106_/QN
+ _2107_/QN
+ _2108_/QN
+ _2109_/QN
+ _2110_/QN
+ _2111_/QN
+ _2112_/QN
+ _2113_/QN
+ _2114_/QN
+ _2115_/QN
+ _2116_/QN
+ _2117_/QN
+ _2118_/QN
+ _2119_/QN
+ _2120_/QN
+ _2121_/QN
+ _2122_/QN
+ _2123_/QN
+ _2124_/QN
+ _2125_/QN
+ _2126_/QN
+ _2127_/QN
+ _2128_/QN
+ _2129_/QN
+ _2130_/QN
+ _2131_/QN
+ _2132_/QN
+ _2133_/QN
+ _2134_/QN
+ _2135_/QN
+ _2136_/QN
+ _2137_/QN
+ _2138_/QN
+ _2139_/QN
+ _2140_/QN
+ _2141_/QN
+ _2142_/QN
+ _2143_/QN
+ _2144_/QN
+ _2145_/QN
+ _2146_/QN
+ _2147_/QN
+ _2148_/QN
+ _2149_/QN
+ _2150_/QN
+ _2151_/QN
+ _2152_/QN
+ _2153_/QN
+ _2154_/QN
+ _2155_/QN
+ _2156_/QN
+ _2157_/QN
+ _2158_/QN
+ _2159_/QN
+ _2160_/QN
+ _2161_/QN
+ _2162_/QN
+ _2163_/QN
+ _2164_/QN
+ _2165_/QN
+ _2166_/QN
+ _2167_/QN
+ _2168_/QN
+ _2169_/QN
+ _2170_/QN
+ _2171_/QN
+ _2172_/QN
+ _2173_/QN
+ _2174_/QN
+ _2175_/QN
+ _2176_/QN
+ _2177_/QN
+ _2178_/QN
+ _2179_/QN
+ _2180_/QN
+ _2181_/QN
+ _2182_/QN
+ _2183_/QN
+ _2184_/QN
+ clkload0/ZN
+ clkload1/ZN
+ clkload10/ZN
+ clkload11/ZN
+ clkload12/ZN
+ clkload13/ZN
+ clkload2/ZN
+ clkload3/ZN
+ clkload4/ZN
+ clkload5/ZN
+ clkload6/ZN
+ clkload7/Z
+ clkload8/ZN
+ clkload9/Z
+Found 0 partially unannotated drivers.
+nirmaan-floating-outputs: 221
+nirmaan-floating-drivers: _1979_/QN _1980_/QN _1981_/QN _1982_/QN _1983_/QN _1984_/QN _1985_/QN _1986_/QN _1987_/QN _1988_/QN _1989_/QN _1990_/QN _1991_/QN _1992_/QN _1993_/QN _1994_/QN _1995_/QN _1996_/QN _1997_/QN _1998_/QN _1999_/QN _2000_/QN _2001_/QN _2002_/QN _2003_/QN _2004_/QN _2005_/QN _2006_/QN _2007_/QN _2008_/QN _2009_/QN _2010_/QN _2011_/QN _2012_/QN _2014_/QN _2015_/QN _2016_/QN _2017_/QN _2018_/QN _2019_/QN _2020_/QN _2021_/QN _2022_/QN _2023_/QN _2024_/QN _2025_/QN _2026_/QN _2027_/QN _2028_/QN _2029_/QN _2030_/QN _2031_/QN _2032_/QN _2033_/QN _2034_/QN _2035_/QN _2036_/QN _2037_/QN _2038_/QN _2039_/QN _2040_/QN _2041_/QN _2042_/QN _2043_/QN _2044_/QN _2045_/QN _2046_/QN _2047_/QN _2048_/QN _2049_/QN _2050_/QN _2051_/QN _2052_/QN _2053_/QN _2054_/QN _2055_/QN _2056_/QN _2057_/QN _2058_/QN _2059_/QN _2060_/QN _2061_/QN _2062_/QN _2063_/QN _2064_/QN _2065_/QN _2066_/QN _2067_/QN _2068_/QN _2069_/QN _2070_/QN _2071_/QN _2072_/QN _2073_/QN _2074_/QN _2075_/QN _2076_/QN _2077_/QN _2078_/QN _2079_/QN _2080_/QN _2081_/QN _2082_/QN _2083_/QN _2084_/QN _2085_/QN _2086_/QN _2087_/QN _2088_/QN _2089_/QN _2090_/QN _2091_/QN _2092_/QN _2093_/QN _2094_/QN _2095_/QN _2096_/QN _2097_/QN _2098_/QN _2099_/QN _2100_/QN _2101_/QN _2102_/QN _2103_/QN _2104_/QN _2105_/QN _2106_/QN _2107_/QN _2108_/QN _2109_/QN _2110_/QN _2111_/QN _2112_/QN _2113_/QN _2114_/QN _2115_/QN _2116_/QN _2117_/QN _2118_/QN _2119_/QN _2120_/QN _2121_/QN _2122_/QN _2123_/QN _2124_/QN _2125_/QN _2126_/QN _2127_/QN _2128_/QN _2129_/QN _2130_/QN _2131_/QN _2132_/QN _2133_/QN _2134_/QN _2135_/QN _2136_/QN _2137_/QN _2138_/QN _2139_/QN _2140_/QN _2141_/QN _2142_/QN _2143_/QN _2144_/QN _2145_/QN _2146_/QN _2147_/QN _2148_/QN _2149_/QN _2150_/QN _2151_/QN _2152_/QN _2153_/QN _2154_/QN _2155_/QN _2156_/QN _2157_/QN _2158_/QN _2159_/QN _2160_/QN _2161_/QN _2162_/QN _2163_/QN _2164_/QN _2165_/QN _2166_/QN _2167_/QN _2168_/QN _2169_/QN _2170_/QN _2171_/QN _2172_/QN _2173_/QN _2174_/QN _2175_/QN _2176_/QN _2177_/QN _2178_/QN _2179_/QN _2180_/QN _2181_/QN _2182_/QN _2183_/QN _2184_/QN clkload0/ZN clkload1/ZN clkload10/ZN clkload11/ZN clkload12/ZN clkload13/ZN clkload2/ZN clkload3/ZN clkload4/ZN clkload5/ZN clkload6/ZN clkload7/Z clkload8/ZN clkload9/Z VDD VSS
+Startpoint: _2148_ (rising edge-triggered flip-flop clocked by aclk)
+Endpoint: s_axil_wready (output port clocked by aclk)
+Path Group: aclk
+Path Type: max
+
+   Delay     Time   Description
+-----------------------------------------------------------
+   0.000    0.000   clock aclk (rise edge)
+   0.107    0.107   clock network delay (propagated)
+   0.000    0.107 ^ _2148_/CK (DFF_X1)
+   0.091    0.198 ^ _2148_/Q (DFF_X1)
+   0.128    0.326 ^ _2230_/Z (BUF_X1)
+   0.152    0.478 ^ fanout12/Z (BUF_X2)
+   0.038    0.516 v _1397_/ZN (NOR2_X1)
+   0.035    0.551 v _2427_/Z (BUF_X1)
+   0.000    0.551 v s_axil_wready (out)
+            0.551   data arrival time
+
+  10.000   10.000   clock aclk (rise edge)
+   0.000   10.000   clock network delay (propagated)
+   0.000   10.000   clock reconvergence pessimism
+  -2.000    8.000   output external delay
+            8.000   data required time
+-----------------------------------------------------------
+            8.000   data required time
+           -0.551   data arrival time
+-----------------------------------------------------------
+            7.449   slack (MET)
+
+
+Startpoint: _1980_ (rising edge-triggered flip-flop clocked by aclk)
+Endpoint: _1980_ (rising edge-triggered flip-flop clocked by aclk)
+Path Group: aclk
+Path Type: min
+
+   Delay     Time   Description
+-----------------------------------------------------------
+   0.000    0.000   clock aclk (rise edge)
+   0.107    0.107   clock network delay (propagated)
+   0.000    0.107 ^ _1980_/CK (DFF_X1)
+   0.086    0.193 v _1980_/Q (DFF_X1)
+   0.025    0.218 v _2209_/Z (BUF_X1)
+   0.011    0.229 ^ _1328_/ZN (INV_X1)
+   0.013    0.243 v _1934_/ZN (AOI21_X1)
+   0.025    0.267 v _2628_/Z (BUF_X1)
+   0.000    0.267 v _1980_/D (DFF_X1)
+            0.267   data arrival time
+
+   0.000    0.000   clock aclk (rise edge)
+   0.107    0.107   clock network delay (propagated)
+   0.000    0.107   clock reconvergence pessimism
+            0.107 ^ _1980_/CK (DFF_X1)
+   0.005    0.112   library hold time
+            0.112   data required time
+-----------------------------------------------------------
+            0.112   data required time
+           -0.267   data arrival time
+-----------------------------------------------------------
+            0.155   slack (MET)
+
+
+No paths found.
+worst slack max 7.449
+worst slack min 0.155
+tns max 0.000
+wns max 0.000

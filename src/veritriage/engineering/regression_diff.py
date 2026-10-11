@@ -1,6 +1,7 @@
 """Cross-regression diffing: what changed since the last run that passed.
 
-Section 5.6 of the project context, and the question a verification engineer
+Item 5.6 of the VeriTriage-era future work (now kept in
+``docs/history/context-before-M43.md``), and the question a verification engineer
 asks before any other one: it worked yesterday, what landed since?
 
 Both halves of the answer already existed and had never been introduced. The

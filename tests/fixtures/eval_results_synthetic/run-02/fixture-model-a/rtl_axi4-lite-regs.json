@@ -1,0 +1,40 @@
+{
+  "attempts": 1,
+  "audit_ok": true,
+  "case": "rtl/axi4-lite-regs",
+  "case_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "cost_usd": null,
+  "detail": "SYNTHETIC TEST FIXTURE (M42): not a real evaluation run",
+  "duration_s": 1.0,
+  "gate_runs": [
+    {
+      "run": "gate-002",
+      "succeeded": true,
+      "summary": "lint clean",
+      "tool": "fixture.lint"
+    }
+  ],
+  "input_tokens": 0,
+  "model_calls": 1,
+  "output_tokens": 0,
+  "passed": false,
+  "replay": false,
+  "runtime": "fixture-model-a",
+  "sandbox": "SYNTHETIC TEST FIXTURE (M42): not a real evaluation run",
+  "scores": [
+    {
+      "name": "reference testbench",
+      "runs": [
+        "run-002"
+      ],
+      "scorer": "held-out-run",
+      "status": "failed",
+      "summary": "s_axil_awaddr not found: ports named without the s_axil_ prefix"
+    }
+  ],
+  "seat": "t-rtl",
+  "seat_status": "in_review",
+  "started_at": "2026-10-02T09:00:00Z",
+  "submitted": true,
+  "version": "1.22.0"
+}

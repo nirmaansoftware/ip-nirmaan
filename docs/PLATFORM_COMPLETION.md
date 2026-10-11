@@ -1,7 +1,13 @@
-# Platform Completion (Milestone 19)
+# Platform Completion (VeriTriage milestone 19)
+
+Written 2026-09-05 as VeriTriage's own milestone 19, and merged after
+v1.24.0. In this repository's numbering M19 became the Nirmaan
+organizational OS, so the history entry is
+`docs/history/M19-b-veritriage-platform-completion.md`.
 
 The milestone with no new subsystem. Every previous one added a layer;
-this one closes the four items `context.md` section 5 had been carrying as
+this one closes the four items the VeriTriage-era future-work list (now
+kept in `docs/history/context-before-M43.md`) had been carrying as
 "designed, not built", and fixes a performance bug that had been hiding
 behind them.
 

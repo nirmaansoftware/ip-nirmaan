@@ -1,0 +1,20 @@
+{
+  "block": "apb_csr",
+  "bus": "apb",
+  "addr_width": 4,
+  "data_width": 32,
+  "unmapped": "slverr",
+  "registers": [
+    {"name": "CTRL", "offset": 0, "reset": 4, "fields": [
+      {"name": "ENABLE", "lsb": 0, "access": "rw", "reset": 0},
+      {"name": "MODE", "msb": 3, "lsb": 1, "access": "rw", "reset": 2}
+    ]},
+    {"name": "SCRATCH", "offset": 4, "access": "rw", "reset": 0},
+    {"name": "STATUS", "offset": 8, "reset": 4609, "fields": [
+      {"name": "RESET_DONE", "lsb": 0, "access": "w1c", "reset": 1,
+       "description": "set by reset, cleared by writing 1"},
+      {"name": "VERSION", "msb": 15, "lsb": 8, "access": "ro", "reset": 18}
+    ]},
+    {"name": "ID", "offset": 12, "access": "ro", "reset": 1095778883}
+  ]
+}

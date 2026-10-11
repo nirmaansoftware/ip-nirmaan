@@ -64,6 +64,8 @@ class Interface(BaseModel):
     protocol_id: str | None = None
     signals: tuple[str, ...] = ()
     direction: str | None = None
+    #: The module whose ports form this interface, when a provider read them (M24).
+    module: str | None = None
 
 
 class ClockDomain(BaseModel):

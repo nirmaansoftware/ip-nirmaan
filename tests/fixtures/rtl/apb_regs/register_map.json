@@ -1,0 +1,13 @@
+{
+  "block": "apb_regs",
+  "bus": "apb",
+  "addr_width": 8,
+  "data_width": 32,
+  "unmapped": "slverr",
+  "registers": [
+    {"name": "REG0", "offset": 0, "access": "rw", "reset": 0},
+    {"name": "REG1", "offset": 4, "access": "rw", "reset": 0},
+    {"name": "REG2", "offset": 8, "access": "rw", "reset": 0},
+    {"name": "REG3", "offset": 12, "access": "rw", "reset": 0}
+  ]
+}

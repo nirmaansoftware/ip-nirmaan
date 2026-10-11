@@ -120,6 +120,7 @@ def load_manifest(path: Path) -> ProjectModel:
                 protocol_id=_str(f.get("protocol")),
                 signals=_tuple(f.get("signals")),
                 direction=_str(f.get("direction")),
+                module=_str(f.get("module")),
             )
             for f in dut_raw.get("interfaces", [])
         ),

@@ -13,7 +13,7 @@ matters most:
   alongside the deterministic result; it can never alter the graph, the
   signals, the hypothesis ranking, or the recommendations.
 
-The dependency is optional (``pip install veritriage[ai]``); without it the
+The dependency is optional (``pip install ip-nirmaan[ai]``); without it the
 reasoning pipeline is complete and deterministic.
 """
 
@@ -24,7 +24,8 @@ import json
 from veritriage.graph.graph import EvidenceGraph
 from veritriage.models import AIReview, ReasoningResult
 
-_DEFAULT_MODEL = "claude-opus-4-8"
+# Equal to Nirmaan's model profile (M47); a test keeps the two in sync.
+DEFAULT_MODEL = "claude-opus-5-5"
 
 _SYSTEM_PROMPT = """\
 You are an experienced CPU Design Verification engineer reviewing a
@@ -100,7 +101,7 @@ def build_ai_payload(graph: EvidenceGraph, result: ReasoningResult) -> dict:
 class AIReasoner:
     """Runs the optional AI review over a completed deterministic result."""
 
-    def __init__(self, model: str = _DEFAULT_MODEL) -> None:
+    def __init__(self, model: str = DEFAULT_MODEL) -> None:
         self.model = model
 
     @staticmethod
@@ -123,7 +124,7 @@ class AIReasoner:
         except ImportError as exc:
             raise AIReasoningError(
                 "AI review requested but the 'anthropic' package is not installed. "
-                "Install with: pip install veritriage[ai]"
+                "Install with: pip install ip-nirmaan[ai]"
             ) from exc
 
         payload = build_ai_payload(graph, result)

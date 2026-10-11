@@ -2,8 +2,9 @@
 
 ``Reference.uri`` has existed since Milestone 5 as a hook with nothing behind
 it: packs cite a specification by name and section, and the report prints the
-citation as text. Section 5.2 of the project context names the two things
-that would use the hook, and they pull in opposite directions.
+citation as text. Item 5.2 of the VeriTriage-era future work (now kept in
+``docs/history/context-before-M43.md``) names the two things that would use
+the hook, and they pull in opposite directions.
 
 A company wants its internal spec database or wiki to answer, and that
 adapter cannot ship here: it is site-specific and often behind

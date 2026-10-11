@@ -1,0 +1,246 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# M46: a newer push to a pull request cancels its older run; runs on main always finish.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# M46: actions are pinned by commit SHA, with the release in a comment. The OSS CAD Suite
+# comes from the local `oss-cad-suite` action (pinned, sha256-checked, cached by version).
+# See docs/TEST_CI_HARDENING.md.
+jobs:
+  test:
+    # The full suite with every EDA tool required, once, on Python 3.12 (M46). The
+    # `no-tools` job covers 3.11, and `test-union` checks that no test ran in no job.
+    # 24.04 ships Verilator 5, which the `--binary` simulation backend needs.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      # M27: the driver cross-compiled for RV32I and run on PicoRV32 against the
+      # RTL. Ubuntu's multilib GCC includes rv32i/ilp32; the SoC runtime carries
+      # its own small libc, so no picolibc. See docs/RISCV_FIRMWARE.md.
+      - name: Install open-source EDA tools and the RISC-V cross compiler
+        run: |
+          sudo apt-get update && sudo apt-get install -y verilator iverilog yosys gcc-riscv64-unknown-elf
+          riscv64-unknown-elf-gcc --version | head -1
+          riscv64-unknown-elf-gcc -print-multi-lib | grep rv32i/ilp32
+      # M26: formal in CI. apt has no `sby`, so SymbiYosys and Yices come from the
+      # pinned OSS CAD Suite, as wrappers, so the suite's own Verilator, Icarus, and
+      # Yosys never replace apt's for the other tests; a proof runs the suite's
+      # matched Yosys and yosys-smtbmc. See docs/FORMAL_GATE.md.
+      - name: SymbiYosys and Yices (OSS CAD Suite 2026-09-28)
+        uses: ./.github/actions/oss-cad-suite
+        with:
+          tools: sby yices-smt2
+      - name: Tool versions
+        run: |
+          which verilator iverilog yosys sby yices-smt2
+          yosys -V && verilator --version && sby --version && yices-smt2 --version | head -1
+      - name: Install
+        run: pip install -e ".[ai,dev]"
+      - name: Test
+        # A real-tool test whose executable is named here fails instead of
+        # skipping. `cc` and `make` build the firmware and its co-simulation
+        # (M25); `sby` and `yices-smt2` run formal (M26); the RISC-V GCC builds
+        # the image PicoRV32 runs against the RTL (M27).
+        env:
+          NIRMAAN_REQUIRE_EDA: verilator iverilog vvp yosys cc make sby yices-smt2 riscv64-unknown-elf-gcc
+        run: python -m pytest -q -rs --junitxml="$RUNNER_TEMP/junit/test.xml"
+      - name: Keep the test report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: junit-test
+          path: ${{ runner.temp }}/junit
+
+  # M46: the suite on Python 3.11 with no EDA tool installed and without the `ai`
+  # extra, so every real-tool test must skip (never error) when its tool is absent,
+  # and the missing-SDK test runs here for real.
+  no-tools:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install
+        run: pip install -e ".[dev]"
+      - name: No EDA tool and no SDK
+        run: |
+          for tool in verilator iverilog vvp yosys sby yices-smt2 riscv64-unknown-elf-gcc riscv64-elf-gcc openroad sta klayout; do
+            if command -v "$tool"; then echo "unexpected on PATH: $tool"; exit 1; fi
+          done
+          if python -c "import anthropic" 2>/dev/null; then echo "anthropic is installed"; exit 1; fi
+      - name: Test
+        run: python -m pytest -q -rs --junitxml="$RUNNER_TEMP/junit/no-tools.xml"
+      - name: Keep the test report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: junit-no-tools
+          path: ${{ runner.temp }}/junit
+
+  # M27: physical design for real. OpenROAD (with its embedded OpenSTA), a
+  # matched Yosys, and the Nangate45 platform files all come from one pinned
+  # OpenROAD-flow-scripts image, so the job runs inside it. Only the physical
+  # design tests run here; the main test job stays as it was. See
+  # docs/PHYSICAL_DESIGN.md.
+  physical-design:
+    runs-on: ubuntu-24.04
+    container:
+      image: openroad/orfs:26Q3-687-gc63a606f9@sha256:2e5bf6fe865e102ca2313aba1d849da50f5973bc91c4212a2f68e7d905a39c8f
+    env:
+      NIRMAAN_PDK_ROOT: /OpenROAD-flow-scripts/flow/platforms
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
+        with:
+          python-version: "3.12"
+          activate-environment: true
+          enable-cache: true
+          cache-dependency-glob: pyproject.toml
+      - name: Tools on PATH
+        run: |
+          echo /OpenROAD-flow-scripts/tools/install/OpenROAD/bin >> "$GITHUB_PATH"
+          echo /OpenROAD-flow-scripts/tools/install/yosys/bin >> "$GITHUB_PATH"
+      - name: Tool versions
+        run: |
+          # The image ships no standalone sta; the next steps build one (M29).
+          which openroad yosys
+          openroad -version && yosys -V
+          ls "$NIRMAAN_PDK_ROOT/nangate45/lib/NangateOpenCellLibrary_typical.lib"
+      # M29: standalone OpenSTA, built from the commit the image's OpenROAD embeds
+      # (OpenROAD c487fc70, src/sta), with the compilers and libraries the image
+      # already has; cached by commit. See docs/PD_SIGNOFF.md.
+      - name: Cache standalone OpenSTA
+        id: opensta
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: /opt/opensta
+          key: opensta-e983e15b2cb346badf8f23725fd3914d25312c44-orfs-26Q3-687
+      - name: Build standalone OpenSTA
+        if: steps.opensta.outputs.cache-hit != 'true'
+        env:
+          OPENSTA: e983e15b2cb346badf8f23725fd3914d25312c44
+        run: |
+          git init -q "$RUNNER_TEMP/OpenSTA" && cd "$RUNNER_TEMP/OpenSTA"
+          git fetch -q --depth 1 https://github.com/The-OpenROAD-Project/OpenSTA.git "$OPENSTA"
+          git checkout -q FETCH_HEAD
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DCUDD_DIR=/usr/local 2>&1 | tail -20
+          cmake --build build -j "$(nproc)" --target sta 2>&1 | tail -40
+          mkdir -p /opt/opensta/bin && cp build/sta /opt/opensta/bin/sta
+      - name: Standalone OpenSTA on PATH
+        run: |
+          echo /opt/opensta/bin >> "$GITHUB_PATH"
+          /opt/opensta/bin/sta -version
+      # M37: a timing-closure project's RTL fix passes its RTL gates (lint and
+      # simulation) before re-analysis times it. The image's Ubuntu 22.04 Icarus
+      # (11) prints no "$finish called" line, so Verilator, Icarus, and vvp come
+      # from the same pinned OSS CAD Suite the test job uses, as wrappers, so the
+      # image's own Yosys stays first. See docs/STA_AND_ANTECEDENTS.md. M44: the factory project's RTL stage also
+      # proves its properties, so SymbiYosys and Yices come from the same suite (docs/FACTORY_E2E.md).
+      - name: RTL gate tools (OSS CAD Suite 2026-09-28)
+        uses: ./.github/actions/oss-cad-suite
+        with:
+          tools: verilator iverilog vvp sby yices-smt2
+      - name: RTL gate tool versions
+        run: verilator --version && iverilog -V | head -1
+      # M34: the slow and fast sky130hd corners (the image ships typical only), from the
+      # open_pdks build of the SkyWater library, pinned by release and sha256, cached by
+      # hash, and put beside the platform's typical Liberty. See docs/PD_FINAL.md.
+      - name: Cache the sky130hd corner libraries
+        id: corners
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: /opt/sky130hd-corners
+          key: sky130hd-corners-9b24f0db-fb61d91c
+      - name: Fetch the sky130hd corner libraries
+        if: steps.corners.outputs.cache-hit != 'true'
+        env:
+          RELEASE: sky130-ff08c23db8359afce3f134c454e7930586d0641c
+        run: |
+          curl -sSfL -o "$RUNNER_TEMP/hd.tar.zst" \
+            "https://github.com/fossi-foundation/ciel-releases/releases/download/$RELEASE/sky130_fd_sc_hd.tar.zst"
+          echo "69500f75f639989fb2c01b5fa7347aa5972e80238abb4460a7304fa8de405977  $RUNNER_TEMP/hd.tar.zst" | sha256sum -c
+          uv pip install zstandard
+          mkdir -p /opt/sky130hd-corners
+          python - "$RUNNER_TEMP/hd.tar.zst" /opt/sky130hd-corners <<'PY'
+          import sys, tarfile, zstandard
+          wanted = {f"sky130A/libs.ref/sky130_fd_sc_hd/lib/sky130_fd_sc_hd__{c}.lib" for c in ("ss_100C_1v60", "ff_n40C_1v95")}
+          with open(sys.argv[1], "rb") as f, tarfile.open(fileobj=zstandard.ZstdDecompressor().stream_reader(f), mode="r|") as tar:
+              for member in tar:
+                  if member.name in wanted and member.isfile():
+                      member.name = member.name.rsplit("/", 1)[1]
+                      tar.extract(member, sys.argv[2], filter="data")
+          PY
+      - name: Corner libraries into the platform
+        run: |
+          cd /opt/sky130hd-corners
+          sha256sum -c <<'SUMS'
+          9b24f0db3967ac67b4cae1f74bb480fd47922d18d0ed577e3c121739b412c361  sky130_fd_sc_hd__ss_100C_1v60.lib
+          fb61d91c55a7f85b1989e8149d040b13ba5e7f5478f5bf0c3c16c5da30720139  sky130_fd_sc_hd__ff_n40C_1v95.lib
+          SUMS
+          cp sky130_fd_sc_hd__*.lib "$NIRMAAN_PDK_ROOT/sky130hd/lib/"
+          klayout -v
+      - name: Install
+        run: uv pip install -e ".[dev]"
+      - name: Test
+        # openroad, yosys, (M29) sta, and (M34) klayout are required, so the real STA,
+        # place-and-route, and physical verification tests fail rather than skip; (M37)
+        # so are the RTL gate tools; (M44) and formal and the C toolchain the driver co-simulation
+        # builds with, for the end-to-end factory project.
+        env:
+          NIRMAAN_REQUIRE_EDA: yosys openroad sta klayout verilator iverilog vvp sby yices-smt2 cc make
+        run: >-
+          python -m pytest -q -rs tests/test_nirmaan_physical.py tests/test_nirmaan_sta_antecedents.py
+          tests/test_nirmaan_factory_e2e.py
+          --basetemp="$RUNNER_TEMP/pd" --junitxml="$RUNNER_TEMP/junit/physical-design.xml"
+      - name: Keep the tool logs
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: pd-logs
+          path: ${{ runner.temp }}/pd
+      - name: Keep the test report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: junit-physical-design
+          path: ${{ runner.temp }}/junit
+
+  # M46: the jobs split the suite (real EDA on 3.12, no tools on 3.11, physical design
+  # in its image), so this fails if any test was skipped in every job that collected it.
+  test-union:
+    needs: [test, no-tools, physical-design]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: junit-*
+          path: reports
+          merge-multiple: true
+      - name: Every test ran in at least one job
+        run: python3 scripts/check_test_union.py reports/*.xml
+
+  dashes:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+      - name: No em or en dashes in tracked text files
+        run: python scripts/check_dashes.py

@@ -145,6 +145,11 @@ class GenerationResponse(BaseModel):
     model: str | None = None
     failed: bool = False
     error: str | None = None
+    #: Token usage, when the provider reports it; None means not reported (never guessed).
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    cache_read_tokens: int | None = None
+    cache_write_tokens: int | None = None
 
 
 class GeneratedView(BaseModel):

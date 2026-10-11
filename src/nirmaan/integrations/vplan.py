@@ -1,0 +1,29 @@
+"""``vplan.check`` behind the tool broker (M29): a verification plan checked against its approved spec.
+
+An in-process tool, so it runs on every machine: ``plan`` is the plan file (or
+files) the seat wrote, ``spec`` the approved upstream spec file (or files) the
+stage names. It passes only when each plan is valid in the ``nirmaan.vplan``
+format and covers exactly the requirements the specs tag, quoting each, and
+(M38) is a valid next version of the project's recorded plan: every active
+record kept or retired with a reason, no retired ID reused. A
+failing check is a recorded run with ``succeeded=False``. The rules live in
+``nirmaan.vplan``; see docs/VERIFICATION_PLAN.md.
+"""
+
+from __future__ import annotations
+
+from nirmaan.models import list_values
+from nirmaan.runtime.tools import Params, ToolOutcome, register_binding
+from nirmaan.vplan import CHECK_TOOL, check_files
+from nirmaan.work.engine import TaskEngine
+
+
+@register_binding(CHECK_TOOL)
+def _check(params: Params, engine: TaskEngine) -> ToolOutcome:
+    plans, specs = list_values(params.get("plan")), list_values(params.get("spec"))
+    if not plans:
+        return ToolOutcome(False, "no plan file to check")
+    if not specs:
+        return ToolOutcome(False, "no approved spec file to check the plan against")
+    passed, summary = check_files(plans, specs, engine.state)  # M38: also a valid next version of the plan
+    return ToolOutcome(passed, summary, tuple(plans))

@@ -10,10 +10,11 @@ the bottom of this file).
 
 from __future__ import annotations
 
-import ast
 from pathlib import Path
 
 import pytest
+
+from laws import imports
 
 import veritriage.design.model as design_model_module
 from veritriage.design import (
@@ -49,18 +50,6 @@ BUILT_IN = {
     "verification",
     "verification-assets",
 }
-
-
-def _imports(path: Path) -> set[str]:
-    tree = ast.parse(path.read_text(encoding="utf-8"))
-    found: set[str] = set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            found.update(alias.name for alias in node.names)
-        elif isinstance(node, ast.ImportFrom) and node.module:
-            found.add(node.module)
-            found.update(f"{node.module}.{alias.name}" for alias in node.names)
-    return found
 
 
 @pytest.fixture()
@@ -117,14 +106,14 @@ def test_design_never_reads_source():
         text = path.read_text(encoding="utf-8")
         for term in banned_calls:
             assert term not in text, f"{path.name} performs I/O ({term})"
-        leaked = banned_modules & _imports(path)
+        leaked = banned_modules & imports(path)
         assert not leaked, f"{path.name} imports {leaked}"
 
 
 def test_design_never_imports_a_provider():
     """Only a ProjectProvider may touch a source language. That law is M11's."""
     for path in (SRC / "veritriage" / "design").rglob("*.py"):
-        imported = _imports(path)
+        imported = imports(path)
         assert "veritriage.project.providers" not in imported, path
         for banned in ("veritriage.parsers", "veritriage.workspace", "veritriage.pipeline"):
             assert banned not in imported, f"{path.name} imports {banned}"
@@ -397,11 +386,11 @@ def test_core_unchanged_by_design():
         "history",
     ):
         for path in (SRC / "veritriage" / package).rglob("*.py"):
-            assert "veritriage.design" not in _imports(path), path
+            assert "veritriage.design" not in imports(path), path
 
 
 def test_design_vocabulary_is_plain_data():
-    imported = _imports(SRC / "veritriage" / "models" / "design.py")
+    imported = imports(SRC / "veritriage" / "models" / "design.py")
     assert not any(
         m.startswith("veritriage.") and not m.startswith("veritriage.models")
         for m in imported

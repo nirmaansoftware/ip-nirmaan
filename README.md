@@ -1,4 +1,44 @@
-# VeriTriage
+# IP Nirmaan
+
+[![CI](https://github.com/nirmaansoftware/ip-nirmaan/actions/workflows/ci.yml/badge.svg)](https://github.com/nirmaansoftware/ip-nirmaan/actions/workflows/ci.yml)
+
+Website: https://ip.nirmaan.online
+
+**An AI-native semiconductor IP company, as software.** IP Nirmaan is an
+organizational operating system for semiconductor engineering. Give it a
+requirement ("Create a 4-port AXI-to-NoC bridge") and a machine-readable
+company plans the work: divisions, teams, and roles from Intern to CEO, with
+skills, authority, gates, and a 12-article constitution. Every task gets an
+owner, an independent reviewer, an authorized approver, evidence requirements,
+and an escalation path, and each routing decision records why it was made.
+
+```
+nirmaan plan "Create a 4-port AXI-to-NoC bridge." --detail
+nirmaan demo all
+nirmaan why <project> microarchitecture
+```
+
+The task engine keeps planned, executed, verified, and approved distinct, and
+it makes a fake tool run or a self-approval impossible. Language models will
+power workers who fill seats in the organization. They get no special access
+and cannot mark their own work verified. Design:
+[docs/NIRMAAN_ORG_OS.md](docs/NIRMAAN_ORG_OS.md).
+
+## The platform
+
+| Component | What it is | Entry point |
+|---|---|---|
+| **IP Nirmaan organizational OS** (`src/nirmaan/`) | The company as data, the task engine, the orchestrator, and the agent runtime interface | `nirmaan` |
+| **VeriTriage** (`src/veritriage/`) | The verification-intelligence engine: evidence graphs, knowledge packs, reasoning, regression memory | `veritriage` |
+
+IP Nirmaan is bigger than verification, and it builds on VeriTriage's
+verification technology rather than replacing it:
+
+* VeriTriage investigations are real, evidence-producing tools inside Nirmaan's task engine.
+* VeriTriage's 44 Knowledge Packs are the domain knowledge that Nirmaan's skills cite.
+* VeriTriage never depends on Nirmaan, so it stays usable as a standalone verification tool.
+
+## VeriTriage: the verification engine
 
 **Verification intelligence for semiconductor regression debug.** VeriTriage turns
 raw verification artifacts (simulation logs, compile logs, coverage summaries,
@@ -8,8 +48,7 @@ and suggested next debugging steps - in one command. A **Verification
 Knowledge Engine** ships 44 pluggable Knowledge Packs across six domains
 (interconnect, CPU/ISA, memory, serial IO, coherency, and methodology):
 AMBA AXI/APB/AHB/ACE/AXI-Stream, CHI, TileLink, OCP, Wishbone, NoC, PCIe,
-CXL, UCIe, DDR,
-HBM, USB, Ethernet, MIPI, I2C/I3C, SPI, UART, JTAG, UVM methodology with
+CXL, UCIe, DDR, HBM, USB, Ethernet, MIPI, I2C/I3C, SPI, UART, JTAG, UVM methodology with
 RAL/phasing/TLM, SVA, formal, low power, DFT, X-propagation, CDC, reset,
 coherency, security, performance, and RISC-V depth (100 deterministic failure
 patterns, 98 debug playbooks, 17 protocol state machines total) that match the
@@ -44,7 +83,7 @@ them, and requests follow-up work. It observes and decides; it never executes.
 veritriage analyze simulation.log coverage.txt test_metadata.json
 ```
 
-## Why
+### Why VeriTriage
 
 Today's debug flow after a regression failure is manual: open the log, grep for
 errors, open the waveform, inspect signals, form a hypothesis. VeriTriage
@@ -342,9 +381,8 @@ since v1.8.0 the `Agent` / `ReasoningProvider` contracts, since v1.9.0 the
 `Learner` / `LearningArtifact` contracts, since v1.10.0 the `StepSource` /
 `DebugPlan` contracts, since v1.11.0 the `StructureExtractor` / `DesignGraph`
 contracts, since v1.12.0 the `Question` / `Answer` / `QuestionHandler`
-contracts, since v1.13.0 the `LLMProvider` / `Prompt` contracts, since v1.14.0 the
-`Event` / `Trigger` / `AutomationRule` contracts, and since v1.15.0 the
-`ReferenceResolver` contract) is frozen; future
+contracts, since v1.13.0 the `LLMProvider` / `Prompt` contracts, and since v1.14.0 the
+`Event` / `Trigger` / `AutomationRule` contracts) is frozen; future
 work is integrations over existing seams: AI providers (Claude, GPT, Gemini,
 local models, MCP-hosted reasoners) as `ReasoningProvider` implementations
 behind the M12 seam -> a VS Code

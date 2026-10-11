@@ -1,0 +1,13 @@
+{
+  "block": "axi4_lite_regs",
+  "bus": "axi4-lite",
+  "addr_width": 4,
+  "data_width": 32,
+  "unmapped": "slverr",
+  "registers": [
+    {"name": "REG0", "offset": 0, "access": "rw", "reset": 0},
+    {"name": "REG1", "offset": 4, "access": "rw", "reset": 0},
+    {"name": "REG2", "offset": 8, "access": "rw", "reset": 0},
+    {"name": "REG3", "offset": 12, "access": "rw", "reset": 0}
+  ]
+}

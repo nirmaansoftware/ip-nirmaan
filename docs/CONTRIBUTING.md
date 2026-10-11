@@ -1,4 +1,4 @@
-# Contributing to VeriTriage
+# Contributing to IP Nirmaan
 
 ## Setup
 

@@ -27,3 +27,4 @@ report.html
 # Analysis outputs and local regression database
 out*/
 .veritriage/
+.nirmaan/

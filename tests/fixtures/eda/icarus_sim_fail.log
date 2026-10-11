@@ -1,0 +1,9 @@
+ERROR: counter_tb_fail.v:23: cycle 9: count is 9, expected 0
+       Time: 100000  Scope: counter_tb_fail
+ERROR: counter_tb_fail.v:23: cycle 10: count is 0, expected 1
+       Time: 110000  Scope: counter_tb_fail
+ERROR: counter_tb_fail.v:23: cycle 11: count is 1, expected 2
+       Time: 120000  Scope: counter_tb_fail
+ERROR: counter_tb_fail.v:23: cycle 12: count is 2, expected 3
+       Time: 130000  Scope: counter_tb_fail
+counter_tb_fail.v:25: $finish called at 130000 (1ps)

@@ -10,11 +10,12 @@ registration (the crown-jewel architecture test at the bottom of this file).
 
 from __future__ import annotations
 
-import ast
 from pathlib import Path
 
 import pytest
 import pydantic
+
+from laws import imports
 
 import veritriage.orchestrator.engine as engine_module
 from veritriage.models import PlanStep, StepStatus
@@ -42,17 +43,6 @@ SRC = Path(engine_module.__file__).parents[2]
 @pytest.fixture()
 def services(tmp_path):
     return WorkspaceServices(session_root=tmp_path / "sessions", db=tmp_path / "reg.db")
-
-
-def _imports(path: Path) -> set[str]:
-    tree = ast.parse(path.read_text(encoding="utf-8"))
-    found: set[str] = set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            found.update(alias.name for alias in node.names)
-        elif isinstance(node, ast.ImportFrom) and node.module:
-            found.add(node.module)
-    return found
 
 
 # --- Plans and profiles -----------------------------------------------------
@@ -344,7 +334,7 @@ def test_orchestrator_never_bypasses_services():
     # providers, and adapters are unimportable here.
     allowed_prefixes = ("veritriage.workspace", "veritriage.models", "veritriage.orchestrator")
     for path in (SRC / "veritriage" / "orchestrator").rglob("*.py"):
-        for module in _imports(path):
+        for module in imports(path):
             if module.startswith("veritriage"):
                 assert module.startswith(allowed_prefixes), f"{path.name} imports {module}"
 
@@ -380,8 +370,7 @@ def test_no_ai_in_orchestrator():
 def test_orchestration_vocabulary_is_plain_data():
     # The models vocabulary stays layer-neutral: no graph, engine, or
     # workspace import in the orchestration models.
-    imports = _imports(SRC / "veritriage" / "models" / "orchestration.py")
-    for module in imports:
+    for module in imports(SRC / "veritriage" / "models" / "orchestration.py"):
         assert not module.startswith("veritriage.") or module.startswith(
             "veritriage.models"
         ), f"models/orchestration.py imports {module}"

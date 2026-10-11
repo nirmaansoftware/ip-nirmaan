@@ -1,0 +1,32 @@
+{
+  "id": "spec/axi4-lite-interface",
+  "request": "Create an AXI4-Lite register block.",
+  "seat": "interface-spec",
+  "expected_behavior": "A Markdown interface specification for axi4_lite_regs that restates every requirement of the approved requirements spec in the section where it belongs, each ending with its [req:ID] tag exactly once, and names the parameters, every s_axil_* port, and the four registers, so the microarchitecture, RTL, and verification plan seats can work from it.",
+  "constraints": [
+    "Work only from the approved requirements specification.",
+    "Carry every tagged requirement, with its tag, exactly once.",
+    "Name ports, parameters, and registers exactly as the requirements do."
+  ],
+  "known_failure_modes": [
+    "A requirement dropped, or its tag dropped or changed, so the verification plan cannot trace to it.",
+    "Ports named without the s_axil_ prefix (the failure #57 found one stage later, in the RTL).",
+    "The unmapped-address policy changed (DECERR instead of SLVERR) or left unstated.",
+    "A tag repeated on several lines, which makes the requirement ambiguous to trace."
+  ],
+  "upstream": {
+    "requirements": [{"path": "evals/spec/axi4_lite/requirements.md", "kind": "requirements_spec"}]
+  },
+  "reference": [
+    {"path": "tests/fixtures/rtl/axi4_lite/interface_spec.md", "kind": "interface_spec"}
+  ],
+  "held_out": [
+    {
+      "name": "Every requirement is carried with its tag and its terms, and every port and parameter is named",
+      "scorer": "held-out-run",
+      "tool": "spec.check",
+      "seat_files": {"spec": ["interface_spec"]},
+      "case_files": {"checks": ["evals/spec/axi4_lite/interface_checks.json"]}
+    }
+  ]
+}

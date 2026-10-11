@@ -1,0 +1,327 @@
+# IP Nirmaan roadmap
+
+The plan for what comes after v1.24.0. Read this together with `context.md`
+(what exists now), `docs/history/` (how it got here, one file per milestone),
+and `CLAUDE.md` (how to work here). Each milestone ships:
+- a number reserved in "Milestone numbers" below, before its branch is cut,
+- a design doc approved before code,
+- the implementation with a crown-jewel extension test,
+- its own `docs/history/MNN-<slug>.md` entry and a line in `docs/history/README.md`
+  (never an entry appended to `context.md`),
+- a PR merged into `main`.
+
+## Where we are (v1.24.0, 2026-10-12)
+
+| Built | Not yet |
+|---|---|
+| Organization model: units, derived roles, skills, authority, a constitution (counts below) | `sta.run`, `pnr.run`, and `pv.run` on the development machine: not supported on macOS arm64 (no package, no Rosetta; M34), so they run in CI only (M27; standalone OpenSTA and sky130hd: M29; KLayout: M34) |
+| Planner: requirement to owned, reviewed, gated task graph, over the workflows counted below | RC corners (one OpenRCX model ships), front-end DRC rules (off in the shipped deck) (power grid, CTS, and extracted parasitics into signoff STA: M29; three timing corners, KLayout DRC and LVS, and metal fill: M34) |
+| Task engine: lifecycle, reviews, approvals, human gates, hash-chained audit | Transition-fault ATPG, lockup latches across clock domains, a memory stage for MBIST (stuck-at ATPG, multiple chains, and March C- MBIST: M27); precise bus-error traps on SERV (RV32I on PicoRV32: M27; interrupts, SERV as a second core, a code-size gate, and APB: M29; interrupts in host co-simulation and precise bus-error traps on PicoRV32: M35) |
+| VeriTriage as a real, evidence-producing tool (`veritriage.investigate`) | Tool runs in parallel in the unattended loop, and authority over spend in the authority matrix (one command drives owner, review, and repair to the human approval: M29; concurrent tasks and a project wide call budget: M36) |
+| AI workers in three verification seats, off by default, on Opus 5.5 (M20) | Real STA on the constraint and physical branches of `timing-closure` `reanalysis`; named properties in `formal.run` itself (Yosys rejects the declaration) (the RTL gates on every RTL stage and automatic antecedent covers: M29; a real `sta.run` on the RTL branch of `reanalysis`, and antecedents of named properties and macros: M37) |
+| Design agents: spec, microarchitecture, and RTL seats; RTL gated on real lint and simulation; the AXI4-Lite register block end to end (M23) | |
+| `nirmaan export`: the numbered `01_requirement` to `10_signoff` deliverable tree (M23) | Verification plans: YAML or spreadsheet readers, non-Markdown requirement tags, several independent plans per project (checked plans on `new-ip` and `feature-addition`, and amending a recorded plan: M38) |
+| Engineering graph: artifacts linked to Design Graph nodes from their real bytes; `nirmaan gaps` names every requirement not backed by a passing run (M24) | |
+| DFT: real mux-D scan insertion, testability rules, and chain simulation through Yosys and Icarus (M25); multiple chains per clock domain, stuck-at ATPG graded by Icarus fault simulation, and March C- MBIST (M27); transition ATPG, lockup latches across clock domains, and an MBIST stage (M29) | |
+| Firmware: a driver built strict and run against the approved RTL through a Verilator model (M25); on a RISC-V request, also cross-built for RV32I and run on PicoRV32 or SERV against the RTL, with interrupts, APB, and a code-size limit (M27, M29) | |
+| Physical design: OpenSTA and OpenROAD bindings and a `physical-implementation` workflow (M25), run for real in CI on Nangate45: STA, and place and route to 0 DRC (M27) | |
+| Real lint, simulation, synthesis, and formal via open-source EDA (M21) | |
+| Synthesis (no latches) and formal (when the seat writes a `.sby`) before review; formal in CI via the OSS CAD Suite (M26) | |
+| A bounded repair loop: failed before-review checks go back to the seat as evidence, opt-in per capability or `--attempts` (M26) | |
+| Repair after review: a sent-back submission is superseded and the seat reruns with the findings; retry limits per stage and a budget across runs, with escalation when spent (M27) | |
+| The design gates on every RTL workflow (`new-ip`, `feature-addition`, `rtl-change`), and proofs that must reach every cover (M27) | |
+| A synchronous FIFO, a round-robin arbiter, and an APB register block, each with proofs and designed end to end by agents (M26) | |
+| Seat evaluation: cases as data, judged by real tool runs including held-out reference testbenches; `nirmaan eval` (M27) | Formal proofs written by the seat; more cases |
+| Tool contracts: every bound tool declares its parameters, and the broker refuses undeclared or ill-typed ones before running; `nirmaan org tool` (M28); typed values end to end and the typed work packet (M39) | |
+| Engineering records: decisions (alternatives, choice, rationale, evidence, consequences) and classified failures, as views; `nirmaan decisions` / `failures` (M29) | Recording explicit decisions from the CLI or MCP: done in M40 (`nirmaan decide`, MCP `record_decision`); cross-functional sign-off on a decision |
+| The register map as data: validated, lowered (C header, spec table), and judging RTL through a generated co-simulation test; `nirmaan regmap` (M30) | Done in M41: adopted in `block-design`, bit fields, an APB host harness. Next: adoption on `new-ip` |
+| Model selection by capability (`auto` runtime) and every model call recorded with tokens and cost; `nirmaan costs` (M31) | |
+| Scalable state: an engine operation costs the same on a large project (0.25 ms at 5,000 runs, from 95 ms); state cannot be edited in place (M32) | An append-only store, if saves ever dominate |
+| Learning proposals: failures recurring across projects propose skill changes, citing every record; a person adopts or rejects as a recorded decision; `nirmaan learn` (M33); proposals from recorded evaluation results, with thresholds as data, `nirmaan learn --evals DIR` (M42) | A run history kept by `nirmaan eval run` itself; committed raw live results |
+| First live evaluation: Claude Opus 5.5 passed all four RTL cases, judged by held-out checks, through a `claude-code` runtime on the owner's plan; it found that the RTL seat lacked the interface spec (fixed) (#57) | Formal proofs written by the seat; more cases |
+| IP Nirmaan over MCP; organizational events on the M18 bus (M22) | |
+| CI on Python 3.11 and 3.12, plus a dash check (Stage 0) | |
+| CLI `nirmaan`; HTML dashboard; landing page live at https://ip.nirmaan.online | |
+
+### Counts
+
+Generated from the code by `scripts/status.py` (`docs/STATUS_DOCS.md`); do not
+edit by hand. A test fails on every PR whose structural counts differ from this
+block: run `python scripts/status.py --write`. The test count is a release
+snapshot, refreshed by `python scripts/status.py --release`.
+
+<!-- status:begin (generated by scripts/status.py --write; do not edit by hand) -->
+| Count | Value | Key, checked |
+|---|---|---|
+| Organizational units | 207 | `units`, every PR |
+| Derived roles | 685 | `roles`, every PR |
+| Skills | 140 | `skills`, every PR |
+| Workflows | 9 | `workflows`, every PR |
+| Constitution principles | 12 | `principles`, every PR |
+| Tools `AVAILABLE` | 36 | `tools_available`, every PR |
+| Tools `CONTRACT_ONLY` | 17 | `tools_contract_only`, every PR |
+| Verification knowledge packs | 44 | `knowledge_packs`, every PR |
+| Tests collected | 1710 | `tests`, at release (v1.24.0) |
+<!-- status:end -->
+
+## Resume checklist
+
+The owner's checkout in `~/Documents` is synced by iCloud, where git can fail
+with `mmap failed` and imports can stall on evicted files. Work in a clone
+outside iCloud (any local path):
+
+```
+git clone https://github.com/nirmaansoftware/ip-nirmaan.git && cd ip-nirmaan
+python3.11 -m venv .venv && .venv/bin/pip install -e ".[ai,dev]"
+NIRMAAN_REQUIRE_EDA="verilator iverilog vvp yosys cc make sby yices-smt2 riscv64-elf-gcc" \
+  .venv/bin/python -m pytest -q --deselect tests/test_ai_boundary.py::test_missing_sdk_raises_clean_error
+```
+
+The EDA tools come from Homebrew (`verilator`, `icarus-verilog`, `yosys`,
+`sby`, `yices2`, `riscv64-elf-gcc`). Expect everything to pass except 7 skips:
+the real OpenROAD, OpenSTA, and KLayout tests, which run only in CI's
+`physical-design` job (macOS arm64 is not supported for them, M34).
+
+Then take the next reserved milestone below, or the "Not yet" column above.
+
+## Milestone numbers
+
+Reserve the number here before cutting a branch: add the row on `main` (or in
+the milestone's first commit, if no other branch is open), then branch as
+`mNN/<slug>`. A number is never reused. Parts of one batch share its number and
+take a letter in their history file (`M27-c-gates-everywhere.md`) instead of a
+new number. M1 to M42 are taken; see `docs/history/README.md`.
+
+| Number | Milestone | Status |
+|---|---|---|
+| M43 | Status documents that stop colliding and stop drifting | done (#70) |
+| M44 | An end-to-end factory project | done (#74) |
+| M45 | Live evaluation as recorded evidence | done (#73) |
+| M46 | Tests and CI hardening | done (#71) |
+| M47 | Small cleanups | done (#72) |
+| M48 | Unified applicability and limits | done (#76) |
+| M49 | Scoped registries | done (#75) |
+
+## Next milestones
+
+M43 to M49, the plan from the principal-engineer review of v1.16.1 to v1.23.0,
+are done (see the registry above and `docs/history/release-v1.24.0.md`). What is
+still open, with no numbers reserved yet:
+
+- **The first recorded live evaluation batch.** The owner's call, on the owner's
+  plan: the command and its expected usage are in `docs/LIVE_EVAL_EVIDENCE.md`.
+  Until it runs, every seat result in the repository is scripted.
+- **A required-checks ruleset** on `main` (the owner's call): the exact settings
+  are in `docs/TEST_CI_HARDENING.md` section 6.
+- **The contract-only tools** that keep `new-ip` partly attestation-based:
+  coverage, CDC, power, regression, and equivalence (17 tools in all).
+- **The factory line's deferred steps** (M44): laying out the scan-inserted
+  netlist, and PDK profiles as project data.
+- **Scoping follow-ups** (M49): moving the remaining tests off global
+  `unregister_*` cleanup, and scoping VeriTriage's own registries.
+
+---
+
+## Stages 0 to 6 (historical summary)
+
+Every stage below is done. They are kept as the record of what was planned and
+why; what each milestone actually built, and what it deferred, is in its own
+file under `docs/history/`.
+
+## Stage 0: Continuous integration (DONE)
+
+**Status:** done. `.github/workflows/ci.yml` runs the suite on Python 3.11 and
+3.12, and `scripts/check_dashes.py` runs as a separate job. See
+`docs/history/M19-side-2-continuous-integration.md`.
+
+**Why:** every PR so far was verified only on one laptop with iCloud trouble.
+CI makes "tests pass" a public, repeatable fact, which fits the project's own
+"evidence or it did not happen" rule.
+
+**Scope:**
+- A GitHub Actions workflow running the full suite on Python 3.11 and 3.12 for every PR and push to `main`.
+- An extra CI step that fails on em or en dashes in tracked text files.
+- The README badge.
+
+**Done when:** a PR shows a green check, and a deliberately broken test turns it red.
+
+## Stage 1 (M20): The first AI workers, in verification seats (DONE)
+
+**Status:** done on branch `m20/ai-workers`. Design: `docs/AI_WORKERS.md`
+(the provider is exposed through the bridge). History:
+`docs/history/M20-ai-workers.md`. Try it: `nirmaan run <project> triage --runtime mock-llm
+--input paths=<log>`.
+
+**Why:** the organization plans and enforces, but nobody works. Verification is
+the right first department because VeriTriage already produces real evidence
+there, so agent output can be checked rather than trusted.
+
+**Scope:**
+- **A model-backed `AgentRuntime`** that goes through the M17 LLM provider registry (`veritriage.ai`), so one vendor registry still serves the whole platform. It stays off by default, and the null runtime remains the default seat.
+  - Only the bridge module may import `veritriage`. Either expose the provider through `integrations/veritriage.py`, or give the runtime its own thin adapter. Decide this in the design doc.
+  - Check the `claude-api` skill for current model IDs and API usage before writing it; do not work from memory.
+- **Seat three roles:** failure triage (runs `veritriage.investigate`), root cause (reads the triage evidence and concludes one of the declared outcomes), and debug review (an independent reviewer, a different seat and model call).
+- **Work packets become prompts.** Only the packet's four scopes (company, domain, project, task) are rendered, and every artifact must cite evidence IDs. Reuse M17's grounding enforcement idea: strip citations the packet did not contain.
+- **A `nirmaan run PROJECT TASK --runtime <id>` command**, with a `--dry-run` that shows the exact prompt.
+- **A deterministic `MockLLM` runtime for tests**, so the suite never calls an API.
+
+**Done when:**
+- Demo 4 ("Investigate a regression failure...") runs triage, root cause, and review with agents, on fixture logs, ending at a human approval.
+- A test proves an agent citing a tool run that never happened is refused (P5), and that an agent cannot review its own output (P6).
+- Nothing changes for users who never configure a model.
+
+## Stage 2 (M21): Real design tools, through open-source EDA
+
+**Status: done.** `sta.run` (OpenSTA), optional here, later became
+`AVAILABLE` and runs for real in CI's `physical-design` job (M27, #38). Design doc: `docs/EDA_TOOLS.md`. The "in CI" half of Done-when
+depends on the Stage 0 workflow installing `verilator iverilog yosys` (apt)
+and setting `NIRMAAN_REQUIRE_EDA`; locally all five bindings, formal included,
+were exercised against the real tools.
+
+**Why:** most evidence requirements (lint, simulation, formal, synthesis,
+timing) can today only be met by a human attesting. Open-source EDA can make
+them real without licenses.
+
+**Scope:** broker bindings, each one moving a tool from `CONTRACT_ONLY` to `AVAILABLE`:
+
+| Tool ID | Open-source backend |
+|---|---|
+| `lint.run` | Verilator `--lint-only` |
+| `simulator.run` / `test.run` | Verilator or Icarus Verilog |
+| `synth.run` | Yosys |
+| `formal.run` | SymbiYosys |
+| `sta.run` | OpenSTA (optional, later) |
+
+Rules for each binding:
+- It only works when its executable is found on `PATH`; otherwise the tool stays refused and says why.
+- Its output is parsed into a structured result, and failures are recorded runs, never exceptions.
+- Simulation logs feed straight into `veritriage.investigate`.
+
+**Done when:** a tiny fixture RTL module (checked into `tests/fixtures/rtl/`) passes a real `lint.run` and `synth.run` in CI. Its evidence substantiates the RTL lint requirement with no human attestation. A crown-jewel test adds a fake tool binding with zero core changes.
+
+## Stage 3 (M22): IP Nirmaan over MCP, and events
+
+**Status: done (M22).** Design and decisions in `docs/NIRMAAN_MCP.md`; history in `docs/history/M22-nirmaan-mcp-events.md`.
+
+**Scope:**
+- A separate MCP tool table for Nirmaan (plan, status, why, task actions). It must not be added to VeriTriage's table, which would break the import law.
+- Publish organizational events (task completed, gate approved, escalation raised) to the M18 event bus through the bridge, so VeriTriage automation rules can react.
+
+**Done when:** Claude Code or Cursor can plan a project and ask "why is this blocked?" over MCP.
+
+## Stage 4 (M23): Architecture and RTL agents (spec Phase 6)
+
+**Status: done (M23).** Design: `docs/DESIGN_AGENTS.md`; history: the M23
+files in `docs/history/`. Approved-inputs-only seats, files in model answers as
+artifacts with a digest, and RTL gated on real lint and simulation before
+review. `test_the_axi4_lite_register_block_is_designed_by_agents` runs the
+AXI4-Lite register block end to end against the fixture set in
+`tests/fixtures/rtl/axi4_lite/`, locally and in CI.
+
+**Why:** with real tools in place (Stage 2), design work can be verified, not just claimed.
+
+**Scope:**
+- Agents for interface specification, microarchitecture, and RTL implementation, each working from approved upstream artifacts only.
+- RTL agents must pass real lint and simulation (Stage 2) before review.
+- Start with small, self-contained blocks. The first IP is an AXI4-Lite register block (four 32-bit registers behind the five AXI4-Lite channels); a FIFO, a round-robin arbiter, and an APB register block follow as later blocks on the same workflow.
+
+**Done when:** "Create an AXI4-Lite register block" produces an interface spec, a microarchitecture, RTL, a testbench, and a passing simulation, reviewed and approved through the engine, with every claim backed by a recorded tool run.
+
+**Status:** the project deliverable export lands as part of M23: `nirmaan export PROJECT --out DIR` writes the numbered tree (`01_requirement/` to `10_signoff/`) from recorded state, never raising assurance, listing missing deliverables as missing, and flagging a broken audit chain. See `docs/DELIVERABLE_EXPORT.md`.
+
+## Stage 5 (M24): The cross-domain engineering graph (spec Phase 8) (DONE)
+
+**Status: done (M24).** Design: `docs/ENGINEERING_GRAPH.md`; history:
+`docs/history/M24-engineering-graph.md`. The single query is
+`nirmaan.engineering.unbacked_requirements(state)`, also `nirmaan gaps PROJECT`
+and `09_evidence/requirement_gaps.md` in the export.
+`test_stage5_demo_on_the_axi4_lite_flow` shows it on the AXI4-Lite flow.
+
+**Scope:**
+- Link trace-graph artifacts to VeriTriage Design Graph nodes: an RTL artifact to its module, a test to the interface it covers.
+- Requirement-to-coverage traceability: which requirement each coverage point proves.
+
+**Done when:** "which requirements are not yet backed by passing verification evidence?" is a single query.
+
+## Stage 6 (M25+): Physical design, DFT, firmware (spec Phase 7)
+
+**Status: DFT, firmware, and physical design done and real** (physical design
+runs in CI since M27). Details for each part follow.
+
+**Physical design part:** bindings built in M25, run for real in CI since M27
+(the `physical-design` job, in a pinned OpenROAD-flow-scripts image, on
+Nangate45); on the development machine they refuse, since OpenROAD is not
+installed there. What follows is the M25 state. `sta.run` (OpenSTA) and `pnr.run` (OpenROAD: one staged run, floorplan,
+place, route, then timing) are `AVAILABLE` and refuse, with a reason, where the
+executable or the PDK inputs are missing; neither tool is installed on the
+development machine or in CI. `synth.run` gained a Liberty-mapped backend that
+writes the netlist. The `physical-implementation` workflow plans constraints,
+synthesis, floorplan, place and route, and STA signoff. Parser tests read
+labelled synthetic samples. Next: run on a machine with OpenROAD and sky130,
+replace the samples with captured logs, then CTS, power grid, and parasitic
+extraction. Design doc: `docs/PHYSICAL_DESIGN.md`.
+
+- OpenROAD bindings for floorplan, place, route, and timing.
+- DFT and firmware agents.
+- **DFT status (M25, done):** `dft.scan_insert` (Yosys: mux-D scan, one chain), `dft.check` (testability rules as a registry), and `dft.scan_sim` (Icarus: shift and capture through the chain) are real; the `block-design` workflow gains a `dft` stage gated on both checks before review. ATPG, multiple chains, and MBIST are deferred. See `docs/DFT.md`.
+- This is the largest stage. Scope it only after Stage 4 has proven that agent work holds up under review.
+
+**Firmware status (M25, firmware part):** done. Design: `docs/FIRMWARE.md`. `fw.build` (strict C11) and `fw.test` (the driver's own tests run against a Verilator model of the approved RTL, over real AXI4-Lite transactions) gate a firmware seat's driver before review; `test_the_firmware_seat_runs_its_driver_on_the_approved_rtl` runs it end to end on the AXI4-Lite block, locally and in CI.
+
+## After Stage 6
+
+- **Repair loop (M26):** a seat whose files fail their before-review checks is asked again, bounded by a capability's `max_attempts` (default 1, so off) or `nirmaan run --attempts N`, with the failed runs as citable evidence and log excerpts; refused attempts are recorded as `Attempt`s and never count. See `docs/REPAIR_LOOP.md`.
+- **More blocks (M26):** a synchronous FIFO, a round-robin arbiter, and an APB4 register block (PSLVERR for unmapped addresses, as the AXI4-Lite block's SLVERR), each with real RTL, testbenches, and proofs, and each designed end to end by agents on `block-design` with no core change. See `docs/IP_BLOCKS.md`.
+- **Formal gate (M26, done):** the `block-design` RTL stage goes to review only after real synthesis with no latches and, when the seat writes a `.sby`, a real SymbiYosys proof over the submitted RTL; CI installs `sby` and `yices-smt2` from a pinned OSS CAD Suite and runs formal instead of skipping it. See `docs/FORMAL_GATE.md`.
+- **Repair after review (M27):** a submission a reviewer sends back is superseded into an `Attempt` (out of export, links, and approval), and the owner is run again with the review as a citable `[review:...]` record and the sent-back files; `max_attempts` and a new `max_review_rounds` are data on a capability or a workflow stage (CLI, then stage, then capability, then 1), counted from state across runs, and an exhausted budget escalates. See `docs/REVIEW_REPAIR.md`.
+- **Real physical design runs (M27):** a `physical-design` CI job, in the pinned `openroad/orfs:26Q3-687-gc63a606f9` image, runs Nangate45-mapped synthesis, STA (through OpenROAD's embedded OpenSTA, a new `openroad-sta` backend), and place and route on the AXI4-Lite block for real: timing met at 100 MHz and violated at 5 GHz, routed with 0 DRC and 10783 um of wire. The first run's breakages are fixed, and the parser fixtures are captured logs, not synthetic ones. See `docs/PHYSICAL_DESIGN.md` sections 8 and 10.
+- **Gates everywhere (M27, done):** the `new-ip`, `feature-addition`, and `rtl-change` RTL stages carry the `block-design` gates as data (approved inputs, now seen through gates; lint, simulation, synthesis with no latches, formal when a `.sby` is written), and a proof counts only if a cover run over the same setup reaches every cover (`formal.cover`); the fixture proofs carry real covers. See `docs/GATES_EVERYWHERE.md`.
+- **DFT: ATPG, multiple chains, MBIST (M27):** `dft.scan_insert` takes `chains` and `max_chain_length` and cuts balanced chains per clock domain (`scan_in[k]` to `scan_out[k]`); `dft.atpg` generates stuck-at patterns (random, then PODEM) and measures coverage by an Icarus fault simulation through the scan protocol, refusing a pattern set whose claims or expected responses the simulation does not bear out; `dft.mbist` runs a generated March C- controller against a memory. The `block-design` `dft` stage now also needs 90% test coverage before review. See `docs/DFT_ADVANCED.md`.
+- **RISC-V firmware (M27, done):** `fw.cross_build` compiles the driver and its tests strictly for bare-metal RV32I into an ELF with its code size, and `fw.soc_test` runs it on PicoRV32 (vendored, ISC) in one Verilator model with the approved RTL, so the driver's register accesses are CPU loads and stores on the real AXI4-Lite bus (SLVERR reaches the driver through a status register). A request that names RISC-V gates the firmware seat on both, through the new generic `EvidenceRequirement.when`; CI installs `gcc-riscv64-unknown-elf`. See `docs/RISCV_FIRMWARE.md`.
+- **Verification plans (M29):** `nirmaan vplan import` and `export` load and save requirements and the items that prove them in a small versioned JSON format, all or nothing through the task engine, with line-level reasons; on a request for a plan, a `block-design` `dv-plan` seat writes one from the approved interface spec, a real `vplan.check` holds it to the spec's tagged requirements before review, and approval records it, so `nirmaan gaps` answers from the seat's plan. Neither ever makes anything backed. See `docs/VERIFICATION_PLAN.md`.
+
+- **Verification plans, more (M38):** the `new-ip` and `feature-addition` `dv-plan` stages are checked plans: `vplan.check` holds the plan to the approved requirements spec before review and approval records it, so `nirmaan gaps` answers from it; a later plan version (a re-plan stage, or `nirmaan vplan import --amend`) adds, modifies, and retires requirements and items with a reason through the same check and approval, the superseded versions kept on the audit trail; an import may plan items whose files are not recorded yet. See `docs/VERIFICATION_PLAN_MORE.md`.
+- **Real STA on re-analysis, named-property and macro antecedents (M37, done):** on the RTL branch, `timing-closure` `reanalysis` needs a real `sta.run` over the approved fix (synthesized to the Liberty, then timed under the task's SDC), before review, scoped by the new `when_upstream`; without a timer the task is BLOCKED. The cover run inlines named properties and expands asserting macros, refusing what it cannot with a line and a reason. See `docs/STA_AND_ANTECEDENTS.md`.
+- **Learning proposals (M33, done):** a view over failure records proposes skill changes with full provenance; only a human decision, through the authority matrix, adopts one, and adopting edits no skill by itself. This completes the structural review's milestones. See `docs/LEARNING_PROPOSALS.md`.
+- **Scalable state (M32, done):** P10 by construction (read-only containers) and identity, P11 verified once then per new entry; per-operation cost no longer grows with the project. See `docs/SCALABLE_STATE.md`.
+- **Model selection and accounting (M31, done):** a seat's needs are derived from its work; `select_model` picks the cheapest profile that serves them or refuses with reasons; every model call is recorded by the engine with the provider's reported tokens and the profile's price, unknowns kept unknown. See `docs/MODEL_SELECTION.md`.
+- **Register map as data (M30, done):** a `RegisterMap` is validated, lowered through a registry (a C header that compiles strict, and the spec's own table), and turned into a test that `regmap.verify` runs on the RTL through the AXI4-Lite co-simulation harness; the AXI4-Lite evaluation case uses it as a second held-out judge. See `docs/REGISTER_MAP.md`.
+- **Engineering records (M29, done):** `nirmaan decisions` reads every decision task as a decision record (alternatives, choice, rationale, evidence, who and when, the branches it cancelled), and `nirmaan failures` classifies failed runs, refused or sent-back submissions, blocks, failures, and escalations with whether each was resolved, across projects too; both are in the export. Views only: nothing stored or inferred. See `docs/ENGINEERING_RECORDS.md`.
+- **Tool contracts (M28, first part, done):** every tool with a binding declares its parameters (name, kind, required); the broker refuses an undeclared or ill-typed parameter, or a path containing a comma, before anything runs, and the runtime hands each tool only the inputs it declares. See `docs/TOOL_CONTRACTS.md`.
+- **Seat evaluation (M27, done):** `evals/` cases fix a seat's upstream to reference documents and judge its work with held-out checks the seat never sees (the reference testbench on its RTL), each a recorded tool run; `nirmaan eval run (--runtime ID | --replay)`. See `docs/SEAT_EVALUATION.md`.
+- **Unattended owner and reviewer loop (M29):** `nirmaan drive PROJECT [TASK] --runtime ID --reviewer-runtime ID` runs the owner seat (with its attempts), the independent reviewer seat, and the repair after a change request, until a person must act (an approval or a gate), a limit escalates, or the work is blocked or declined; it never approves or crosses a gate, decides each step from state (so it resumes by being run again), audits every step as `loop.step`, starts a step only if its worst case fits `--max-calls`, and prints the plan with `--dry-run`. With no TASK it drives every ready task in dependency order. See `docs/AUTO_LOOP.md`.
+- **Gates on the rest, antecedent covers (M29):** every stage that produces RTL now carries `RTL_GATES` (adding `parameter-change` `rtl-change`, the `regression-investigation` and `timing-closure` `rtl-fix` stages, and `new-ip` `cdc-design`, whose capability now needs approved inputs and whose skill may run the gate tools); STA stays in `reanalysis`, not before review. The `formal.cover` run also derives a cover for every assertion's antecedent in a copy of the RTL (wrapping each procedural assertion so Yosys gives the cover its exact path condition), so an assertion that is never checked fails the proof; forms it cannot derive are refused with their line. See `docs/GATES_REST.md`.
+- **DFT next steps (M29):** `dft.atpg_transition` generates slow-to-rise and slow-to-fall pattern pairs (launch on capture, over two time frames) and measures coverage by an Icarus fault simulation with a one-cycle delay at each site, active only in the at-speed cycle; `dft.scan_insert` takes `cross_domains=lockup` and puts a lockup latch on each clock crossing, which `dft.check` requires and `dft.scan_sim` proves with skewed clocks; stuck-at ATPG now covers designs that capture on both edges; a request for a block with memory plans an `mbist` stage that runs March C- on every memory of the approved RTL (including a declared, measured 2-cycle read latency) before review. See `docs/DFT_NEXT.md`.
+- **RISC-V next (M29):** a design's `irq` output reaches the core (PicoRV32 `irq[3]`, SERV `i_timer_irq`, both entering at 0x10), with an interrupt API (`nirmaan_irq.h`) and an AXI4-Lite timer fixture whose tests prove the interrupt fires, is acknowledged by a register write, and stays silent when masked, and fail on broken IRQs; SERV 1.4.0 (vendored, ISC) runs the same SoC, firmware, and tests as PicoRV32, chosen by `core=` (`register_core`); an APB bridge chosen from the design's ports drives `apb_regs.v` from firmware; the gate limits code size with `max_text_bytes` 16384. Precise bus-error traps are not feasible on either core, so `STATUS` stays. See `docs/RISCV_NEXT.md`.
+- **PD signoff (M29):** `pnr.run` adds tap and endcap cells, the PDK's power grid, repair after placement, clock-tree synthesis with repair, fillers, antenna, power-grid, and IR checks, and OpenRCX extraction to a SPEF, each enabled by its PDK input; signoff STA on that SPEF is workflow data (`max_unannotated_nets=0`), with a new `power-grid` stage; CI builds standalone OpenSTA and runs the full flow on Nangate45 and sky130hd (0 DRC, every supply pin connected, extracted slack reported). Multi-corner timing is not available: both platforms ship one corner. See `docs/PD_SIGNOFF.md`.
+- **Host interrupts and precise bus-error traps (M35):** `fw.test` implements `nirmaan_irq.h` from the design's own `irq`, so the M29 timer tests run in host co-simulation and catch the same broken IRQs; a bus-fault handler is called precisely, before the failing access returns on the host and at the instruction boundary right after the faulting load or store on PicoRV32 (`irq[4]` raised with `mem_ready`, pc checked against the image), while SERV says it has none; `require_irq` and `require_bus_error_trap` make both gate data. See `docs/FIRMWARE_IRQ_TRAPS.md`.
+- **Concurrent tasks and a project call budget (M36):** `nirmaan drive --jobs N` works the independent ready tasks as one batch: model calls run in parallel, while every read and write of state happens in one writer's turn, passed round the batch in plan order, so the final state and the audit chain are the same for any `--jobs`. `nirmaan budget PROJECT --calls N [--cost-usd X] --as ROLE --reason TEXT` records a person's budget on the audit trail (`budget.set`); every invocation reads it back, spends it as M31 records model calls, reserves each step's worst case before it starts, and stops with an audited `loop.stop` when it is spent. See `docs/LOOP_CONCURRENCY.md`.
+- **PD final (M34, done):** `sta.run` times every `liberty_<corner>` on the SPEF (sky130hd ss, tt, ff, pinned by sha256 from the open_pdks build), `pnr.run` adds metal fill and a netlist with supply pins, and `pv.run` is now real: the routed DEF streamed to GDS and checked with the PDK's KLayout DRC and LVS decks, counted by Nirmaan; the workflow adds a `physical-verification` stage and `min_timing_corners=3` (new `min_` limits). DRC 0 and LVS clean on the AXI4-Lite block; broken layouts and netlists fail as recorded runs. Local OpenROAD on macOS arm64 is closed as not supported. See `docs/PD_FINAL.md`.
+- **Recording explicit decisions (M40):** `nirmaan decide PROJECT TEXT --as ROLE --kind KIND --criticality LEVEL` and the MCP tool `record_decision` record a decision with its subject or task, the options considered, the evidence it rests on, and the decision it supersedes (kept, and shown as superseded); the authority matrix sets the level each kind and criticality needs, P2 refuses missing or (when important) unsubstantiated evidence, and a new `human_required` column refuses an AI agent gate approvals, waivers, releases, and any critical decision. `nirmaan decisions` and the export show the links. See `docs/DECISIONS_CLI_MCP.md`.
+- **Proposals from evaluation results (M42):** `nirmaan learn --evals DIR` reads recorded `EvalResult` files (never a model call) and, per case and runtime, proposes when a seat fails at least 2 of its latest 5 runs or its pass rate drops by a quarter between two windows of 4 (company data in `company/learning.py`); each proposal cites every run, file, and judge verdict and suggests a different model, a procedure, or a new check from the evidence; a person decides as in M33 and adopting edits nothing. See `docs/EVAL_PROPOSALS.md`.
+- **Typed values and the typed work packet (M39, done):** a tool's parameters are parsed once, by its contract, at the broker, and the binding and the stored `ToolRun` see an `int`, a `float`, or a tuple of paths; projects saved before M39 load, verify, and read typed with no migration. The work packet is a frozen typed model, and prompts are byte-identical (golden tests). See `docs/TYPED_VALUES.md`.
+- **Register map adopted, bit fields, APB harness (M41):** a request for a register map plans a `register-map` stage on `block-design`; the approved map judges the RTL (`regmap.verify`, over the map's bus) and the driver (a header generated from the map, and an agreement unit) before review, through optional upstream inputs (`FileInput.optional`). Fields (`rw`, `ro`, `wo`, `w1c`) are validated, lowered to field macros and accessors, and checked in co-simulation; `fw.test` picks its bus manager from a registry, with APB beside AXI4-Lite. See `docs/REGISTER_MAP_ADOPTION.md`.
+
+## Structural review milestones (from 2026-09-29)
+
+The structural review (`docs/architecture/`) found the engine the brief asked
+for already exists and ordered the real gaps. All of them are done (v1.22.0,
+with typed values in M39), in this order, each measured against the evaluation
+cases: seat evaluation (an M27 part), M28 typed tool contracts and work packet, M29 engineering records (decision records, artifact supersession,
+failure categories), M30 a register-map IR checked against the RTL, M31
+capability-based model selection with cost accounting, M32 scalable state,
+M33 learning proposals through reviewed tasks. Details and reasons:
+`docs/architecture/target-state.md` section 5.
+
+## Side work (any time; owner-driven)
+
+- **Landing page**: live at https://ip.nirmaan.online since 2026-09-28 (Vercel project `ip-nirmaan` in the Nirmaan team, deploys on every merge to `main`; DNS is a CNAME at Hostinger). See `site/README.md`.
+- **Moving the repo out of iCloud** would remove the test hangs entirely. The owner has chosen to keep it in `~/Documents` for now.
+- **The PyPI name** `ip-nirmaan`: publishing an initial release would reserve it. Needs the owner's explicit go-ahead.
+
+## Principles that do not change
+
+- VeriTriage stays standalone and never imports Nirmaan.
+- The organization is data; routing never names a domain.
+- Nothing is marked verified or approved without evidence the engine can substantiate.
+- A human approves the gates marked human-required.

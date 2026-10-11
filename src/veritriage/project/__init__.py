@@ -72,7 +72,9 @@ def _input_fingerprint(root: Path) -> str:
     if root.is_file():
         candidates = [root]
     elif root.is_dir():
-        candidates = sorted(root.glob("*.vproj.json"))
+        candidates = sorted(root.glob("*.vproj.json")) + sorted(
+            p for suffix in ("*.v", "*.sv") for p in root.glob(suffix)  # the RTL provider's sources (M24)
+        )
     for path in candidates:
         hasher.update(path.name.encode("utf-8"))
         hasher.update(path.read_bytes())

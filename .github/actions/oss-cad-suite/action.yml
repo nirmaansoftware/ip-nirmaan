@@ -1,0 +1,38 @@
+# M46: the pinned YosysHQ OSS CAD Suite, fetched once per version and cached, then
+# checked by sha256 on every use. Only the named tools go on PATH, as wrappers, so the
+# suite never replaces a job's other tools (apt's or an image's). The suite's own `sby`
+# launcher puts the suite's `bin` first for its own process. See docs/TEST_CI_HARDENING.md.
+name: OSS CAD Suite tools
+description: Put wrappers for named OSS CAD Suite tools on PATH, from a cached, pinned tarball.
+inputs:
+  tools:
+    description: Space-separated tool names to wrap (for example "sby yices-smt2").
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Cache the OSS CAD Suite tarball
+      id: tarball
+      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      with:
+        path: /tmp/oss-cad-suite.tgz
+        key: oss-cad-suite-linux-x64-2026-09-28-6d04cf3e
+    - name: Fetch the OSS CAD Suite tarball
+      if: steps.tarball.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        curl -sSfL --retry 5 --retry-all-errors -o /tmp/oss-cad-suite.tgz \
+          https://github.com/YosysHQ/oss-cad-suite-build/releases/download/2026-09-28/oss-cad-suite-linux-x64-20260928.tgz
+    - name: Check, unpack, and wrap the tools
+      shell: bash
+      env:
+        TOOLS: ${{ inputs.tools }}
+      run: |
+        echo "6d04cf3e36c45d4eacbe2fa07f3860b9a86f503c2b725bdee4d02e54defbf80d  /tmp/oss-cad-suite.tgz" | sha256sum -c
+        tar -xzf /tmp/oss-cad-suite.tgz -C "$RUNNER_TEMP"
+        mkdir -p "$RUNNER_TEMP/cad-bin"
+        for tool in $TOOLS; do
+          printf '#!/bin/sh\nexec "%s/oss-cad-suite/bin/%s" "$@"\n' "$RUNNER_TEMP" "$tool" > "$RUNNER_TEMP/cad-bin/$tool"
+          chmod +x "$RUNNER_TEMP/cad-bin/$tool"
+        done
+        echo "$RUNNER_TEMP/cad-bin" >> "$GITHUB_PATH"

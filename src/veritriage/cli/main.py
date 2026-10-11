@@ -14,6 +14,7 @@ from rich.table import Table
 import veritriage
 from veritriage.models import AnalysisReport, Severity
 from veritriage.reasoning import AIReasoner, AIReasoningError
+from veritriage.reasoning.ai import DEFAULT_MODEL
 from veritriage.parsers import available_parsers
 from veritriage.reports import HtmlReportGenerator
 from veritriage.utils import write_json
@@ -29,7 +30,7 @@ DEFAULT_DB = Path(".veritriage") / "regressions.db"
 
 app = typer.Typer(
     name="veritriage",
-    help="VeriTriage - turn verification artifacts into evidence-backed root-cause reports.",
+    help="VeriTriage, the IP Nirmaan verification engine - turn verification artifacts into evidence-backed root-cause reports.",
     no_args_is_help=True,
     add_completion=False,
 )
@@ -53,10 +54,10 @@ def analyze(
         None, "--parser", help="Force one registered parser for every artifact instead of auto-detecting."
     ),
     ai: bool = typer.Option(
-        False, "--ai/--no-ai", help="Also run the AI review stage (requires 'pip install veritriage[ai]')."
+        False, "--ai/--no-ai", help="Also run the AI review stage (requires 'pip install ip-nirmaan[ai]')."
     ),
     ai_model: str = typer.Option(
-        "claude-opus-4-8", "--ai-model", help="Claude model to use for the AI review."
+        DEFAULT_MODEL, "--ai-model", help="Claude model to use for the AI review."
     ),
     history: bool = typer.Option(
         True,

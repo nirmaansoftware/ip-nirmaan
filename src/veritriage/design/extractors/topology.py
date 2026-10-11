@@ -137,6 +137,17 @@ class InterfaceExtractor(StructureExtractor):
                         ),
                     )
                 )
+            if interface.module:
+                graph.add_edge(
+                    DesignEdge(
+                        source_id=interface_id,
+                        target_id=make_node_id(NodeKind.MODULE, interface.module),
+                        relation=DesignRelation.CONNECTS,
+                        rationale=(
+                            f"dut.interfaces[{interface.name}].module declares {interface.module}"
+                        ),
+                    )
+                )
             # An interface named after the modules it joins connects them, and
             # two modules on one interface communicate. Both are declared by the
             # naming convention the manifest already uses (e.g. "cpu_l2").
