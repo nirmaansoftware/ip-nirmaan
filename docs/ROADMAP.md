@@ -60,7 +60,7 @@ snapshot, refreshed by `python scripts/status.py --release`.
 | Constitution principles | 12 | `principles`, every PR |
 | Tools `AVAILABLE` | 36 | `tools_available`, every PR |
 | Tools `CONTRACT_ONLY` | 17 | `tools_contract_only`, every PR |
-| Verification knowledge packs | 42 | `knowledge_packs`, every PR |
+| Verification knowledge packs | 44 | `knowledge_packs`, every PR |
 | Tests collected | 1710 | `tests`, at release (v1.24.0) |
 <!-- status:end -->
 

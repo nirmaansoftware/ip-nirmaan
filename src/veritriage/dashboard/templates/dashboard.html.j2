@@ -187,6 +187,38 @@
     </div>
   </section>
 
+  {% if a.rule_gaps %}
+  <section>
+    <h2>Needs a New Rule</h2>
+    <div class="card">
+      <p class="detail" style="margin-top: 0;">
+        Signatures engineers overruled more than once. The platform is not
+        uncertain here, it is reliably wrong, which usually means a missing
+        rule or Knowledge Pack pattern rather than a bad ranking.
+      </p>
+      {% for g in a.rule_gaps %}
+      <div class="cluster">
+        <div class="head">
+          <span class="chip"><span class="dot critical"></span>{{ g.classification | replace("_", " ") | title }}</span>
+          <span style="color: var(--ink-2); font-size: 13px;">
+            overruled {{ g.times_incorrect }} of {{ g.times_judged }} judged
+          </span>
+        </div>
+        <p class="detail">
+          signature: <code>{{ g.signature }}</code>
+          {% if g.typical_modules %} · modules: {{ g.typical_modules | join(", ") }}{% endif %}
+        </p>
+        {% if g.reported_root_causes %}
+        <p class="detail">
+          engineers reported: {{ g.reported_root_causes | join("; ") }}
+        </p>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
   {% if a.clusters %}
   <section>
     <h2>Failure Clusters</h2>

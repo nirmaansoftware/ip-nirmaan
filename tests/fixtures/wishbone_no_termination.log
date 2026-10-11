@@ -1,0 +1,10 @@
+Chronologic VCS simulator copyright 1991-2025
+UVM_INFO @ 0: reporter [RNTST] Running test wb_peripheral_test...
+UVM_INFO /tb/env.sv(41) @ 0: uvm_test_top.env [ENV] build complete
+UVM_INFO /tb/master.sv(44) @ 800000: uvm_test_top.env.mst [WB] Wishbone bus cycle open, CYC asserted, ADR_O=0x0000_3100
+UVM_WARNING /tb/master.sv(49) @ 900000: uvm_test_top.env.mst [WB] Wishbone cycle pending, STB asserted, awaiting termination
+UVM_ERROR /tb/watchdog.sv(18) @ 7500000: uvm_test_top.env.wdog [WDOG] Watchdog timeout hit: Wishbone phase stuck, ACK never asserted
+UVM_FATAL /tb/watchdog.sv(22) @ 7500000: uvm_test_top.env.wdog [WDOG] Timeout, ending simulation
+--- UVM Report Summary ---
+UVM_ERROR :   1
+UVM_FATAL :   1
