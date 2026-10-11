@@ -156,20 +156,27 @@ def _act(ctx: McpContext, arguments: dict[str, Any], action: Callable[[TaskEngin
 @register_tool(
     "plan_project",
     "Turn a requirement into an organization-driven execution plan: owners, independent "
-    "reviewers, approvers, gates, and evidence requirements. The plan is saved; every task "
-    "starts PLANNED or READY (planning never claims anything was done).",
+    "reviewers, approvers, gates, and evidence requirements. The plan is saved unless save is false; every task "
+    "starts PLANNED or READY (planning never claims anything was done). A saved project of the same ID is never "
+    "overwritten: that is refused unless replace is true, which archives the old project first.",
     _schema({
         "requirement": {"type": "string", "description": "e.g. 'Create a 4-port AXI-to-NoC bridge.'"},
         "human_gates": {"type": "array", "items": {"type": "string"}, "description": "Gate IDs to require a human at."},
         "auto_gates": {"type": "array", "items": {"type": "string"}, "description": "Gate IDs a non-human may approve."},
+        "save": {"type": "boolean", "description": "Save the plan (default true). False only shows it."},
+        "replace": {"type": "boolean",
+                    "description": "Archive a saved project of the same ID, then save (default false)."},
     }, ["requirement"]),
 )
 def _plan_project(ctx: McpContext, arguments: dict[str, Any]) -> dict:
     overrides = {g: True for g in arguments.get("human_gates", [])} | {g: False for g in arguments.get("auto_gates", [])}
     engine = Orchestrator(ctx.org).plan(str(arguments["requirement"]), gate_overrides=overrides)
-    ctx.store.save(engine.state)
+    save = arguments.get("save", True) is not False
+    archived = ctx.store.create(engine.state, replace=arguments.get("replace") is True)[1] if save else None
     project = engine.state.project
     return {
+        "saved": save,
+        "archived": str(archived) if archived else None,
         "project": project.id,
         "name": project.name,
         "intent": project.analysis.intent,
@@ -240,10 +247,13 @@ def _failures(ctx: McpContext, arguments: dict[str, Any]) -> dict:
 @register_tool("list_projects", "Saved projects, with intent and progress.", _schema({}, []))
 def _list_projects(ctx: McpContext, arguments: dict[str, Any]) -> list:
     out = []
-    for state in ctx.store.list():
+    listing = ctx.store.list()
+    for state in listing:
         report = status_report(ctx.org, state)
         out.append({"project": state.project.id, "name": state.project.name, "intent": report.intent,
-                    "tasks": report.tasks, "progress": report.progress})
+                    "tasks": report.tasks, "progress": report.progress,
+                    "records": listing.integrity[state.project.id].status})
+    out += [{"unreadable": str(bad.path), "reason": bad.reason} for bad in listing.unreadable]
     return out
 
 
