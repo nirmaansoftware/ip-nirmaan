@@ -18,11 +18,12 @@ keeps one text form.
 
 from __future__ import annotations
 
+import dataclasses
 from collections.abc import MutableMapping
 from dataclasses import dataclass, field
 from typing import Any, Callable, Sequence
 
-from nirmaan.models import Actor, ParamKind, ParamSpec, ParamValue, ToolRun, ToolSpec, ToolStatus, text_value
+from nirmaan.models import Actor, Bound, ParamKind, ParamSpec, ParamValue, ToolRun, ToolSpec, ToolStatus, text_value
 from nirmaan.org import AuthorityService
 from nirmaan.registry import Registry
 from nirmaan.work.engine import TaskEngine
@@ -36,6 +37,8 @@ class ToolOutcome:
     data: dict[str, Any] = field(default_factory=dict)
     #: The files the run wrote, by output name (M44): what a requirement's ``yields`` can make an artifact.
     outputs: dict[str, str] = field(default_factory=dict)
+    #: What the run measured, by name (M48): what a requirement's ``bounds`` are checked against.
+    metrics: dict[str, Any] = field(default_factory=dict)
 
 
 #: A call's parameters as the broker checked them: typed by the tool's contract (M39).
@@ -141,7 +144,8 @@ class ToolBroker:
         return dict(inputs) if tool is None else declared_inputs(tool, inputs)
 
     def invoke(self, actor: Actor, tool_id: str, params: dict[str, ParamInput] | None = None,
-               task_id: str | None = None) -> tuple[ToolRun, ToolOutcome]:
+               task_id: str | None = None, bounds: Sequence[Bound] = ()) -> tuple[ToolRun, ToolOutcome]:
+        """Run a tool for ``actor``; a passing run is then checked against ``bounds`` (M48)."""
         allowed, why = self._authority.may_use_tool(actor.role, tool_id)
         if not allowed:
             raise ToolAccessDenied(why)
@@ -158,6 +162,8 @@ class ToolBroker:
             outcome = binding(params, self._engine)
         except Exception as exc:  # a failing tool is a recorded, failed run
             outcome = ToolOutcome(succeeded=False, summary=f"{type(exc).__name__}: {exc}")
+        bounds = tuple(bounds)
+        outcome = within_bounds(outcome, bounds)
         run = ToolRun(
             id=f"run-{len(self._engine.state.tool_runs) + 1:04d}",
             tool=tool_id,
@@ -168,9 +174,26 @@ class ToolBroker:
             summary=outcome.summary,
             references=outcome.references,
             outputs=dict(outcome.outputs),
+            bounds=bounds,
         )
         self._engine.record_tool_run(run, actor)
         return run, outcome
+
+
+def within_bounds(outcome: ToolOutcome, bounds: Sequence[Bound]) -> ToolOutcome:
+    """Fail a passing outcome that breaks a bound on a metric it reported, or never reported that metric.
+
+    Before M48 the EDA runner read every ``max_<metric>`` and ``min_<metric>``
+    parameter this way; now the bounds are the requirement's own field, and any
+    tool that reports metrics can be bounded.
+    """
+    if not outcome.succeeded or not bounds:
+        return outcome
+    broken = [problem for problem in (b.problem(outcome.metrics) for b in bounds) if problem]
+    if not broken:
+        return outcome
+    return dataclasses.replace(outcome, succeeded=False,
+                               summary=f"limit not met: {'; '.join(broken)} (the tool reported: {outcome.summary})")
 
 
 # --- Platform bindings: Nirmaan's own read tools --------------------------------------

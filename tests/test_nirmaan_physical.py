@@ -39,7 +39,7 @@ from laws import needs
 from nirmaan.integrations.eda import Backend, EdaResult, register_backend, unregister_backend
 from nirmaan.integrations.pd_parsers import VIOLATOR_REPORT_LIMIT, parse_klayout, parse_openroad, parse_opensta
 from nirmaan.integrations.physical import PDK_ROOT_ENV, needs_pdk
-from nirmaan.models import EvidenceKind, TaskKind, ToolStatus
+from nirmaan.models import Bound, EvidenceKind, TaskKind, ToolStatus
 from nirmaan.orchestrator import Orchestrator
 from nirmaan.runtime import ToolAccessDenied, ToolBroker, available_bindings, unavailable_reason
 from nirmaan.work.policy import unsatisfied_requirements
@@ -63,8 +63,10 @@ def project(nirmaan_org, fixed_clock):
     return Orchestrator(nirmaan_org, clock=fixed_clock).plan(PNR_REQUEST)
 
 
-def invoke(engine, tool: str, params: dict[str, str], workdir: Path, task: str | None = None):
-    return ToolBroker(engine).invoke(agent(holder(engine, tool)), tool, {"workdir": str(workdir), **params}, task)
+def invoke(engine, tool: str, params: dict[str, str], workdir: Path, task: str | None = None, bounds=()):
+    """``bounds`` as ``Bound`` records or their text form, e.g. ``("drc_violations<=0",)`` (M48)."""
+    return ToolBroker(engine).invoke(agent(holder(engine, tool)), tool, {"workdir": str(workdir), **params}, task,
+                                     bounds=tuple(b if isinstance(b, Bound) else Bound.parse(b) for b in bounds))
 
 
 def fake_tool(bin_dir: Path, name: str, body: str) -> Path:
@@ -505,18 +507,18 @@ def test_the_physical_implementation_workflow_plans_the_stages(project):
 
 
 def test_the_workflow_asks_for_power_and_extracted_parasitics_as_data(project):
-    """M29: a power-grid stage, and limits a run counts only if made with (a metric it never reported fails)."""
+    """M29: a power-grid stage, and bounds a run counts only if checked against (a metric it never reported
+    fails). M48: bounds are their own field, not parameters."""
     tasks = {t.stage: t for t in project.state.tasks.values() if t.stage and t.kind is TaskKind.WORK}
     assert tasks["floorplan"].id in tasks["power-grid"].depends_on
     assert tasks["power-grid"].id in tasks["place-route"].depends_on
-    limits = {stage: {k: v for r in tasks[stage].evidence_requirements for k, v in r.params}
+    limits = {stage: {str(b) for r in tasks[stage].evidence_requirements for b in r.bounds}
               for stage in ("power-grid", "place-route", "physical-verification", "sta-signoff")}
-    assert limits == {"power-grid": {"max_unconnected_supply_pins": "0"},
-                      "place-route": {"max_drc_violations": "0", "max_unconnected_supply_pins": "0"},
+    assert limits == {"power-grid": {"unconnected_supply_pins<=0"},
+                      "place-route": {"drc_violations<=0", "unconnected_supply_pins<=0"},
                       # M34: signoff DRC and LVS on the filled layout, and timing on at least three corners.
-                      "physical-verification": {"max_drc_violations": "0", "max_lvs_mismatches": "0",
-                                                "min_fill_shapes": "1"},
-                      "sta-signoff": {"max_unannotated_nets": "0", "min_timing_corners": "3"}}
+                      "physical-verification": {"drc_violations<=0", "lvs_mismatches<=0", "fill_shapes>=1"},
+                      "sta-signoff": {"unannotated_nets<=0", "timing_corners>=3"}}
     assert {t for r in tasks["power-grid"].evidence_requirements for t in r.tools} == {"pnr.run"}
 
 
@@ -548,8 +550,8 @@ def test_sta_defines_one_corner_per_liberty_and_reads_the_spef_into_each(project
                    tmp_path / "one")
     assert "define_corners" not in (tmp_path / "one" / "sta.tcl").read_text() and plain[0].succeeded
     # The single-corner log reports one corner, so a three-corner limit fails it.
-    one, _ = invoke(project, "sta.run", {**params, "liberty_ss": "", "liberty_ff": "", "min_timing_corners": "3"},
-                    tmp_path / "limit")
+    one, _ = invoke(project, "sta.run", {**params, "liberty_ss": "", "liberty_ff": ""}, tmp_path / "limit",
+                    bounds=("timing_corners>=3",))
     assert not one.succeeded and "timing_corners 1 is below min_timing_corners 3" in one.summary, one.summary
     with pytest.raises(ToolAccessDenied, match="liberty_ss not found: .*nowhere.lib"):
         invoke(project, "sta.run", {**params, "liberty_ss": str(tmp_path / "nowhere.lib")}, tmp_path / "x")
@@ -616,15 +618,15 @@ def test_pv_runs_stream_drc_and_lvs_and_counts_them_itself(project, tmp_path, mo
         invoke(project, "pv.run", {**params, "gds": ""}, tmp_path / "nogds")
 
 
-def test_min_limits_fail_a_run_below_them_or_without_the_metric(project, tmp_path, monkeypatch):
-    """M34: ``min_<metric>`` is the runner's limit from below, as ``max_<metric>`` is from above."""
+def test_min_bounds_fail_a_run_below_them_or_without_the_metric(project, tmp_path, monkeypatch):
+    """M34: a bound from below, as from above (M48: ``metric>=value``, a bound, not a parameter)."""
     bin_dir = tmp_path / "bin"
     fake_tool(bin_dir, "sta", f"cat '{PD / 'opensta_met.log'}'")
     only_on_path(monkeypatch, bin_dir)
     base = {"netlist": str(AXI), "sdc": str(SDC), "top": TOP, "liberty": str(TINY_LIB)}
-    met, _ = invoke(project, "sta.run", {**base, "min_timing_corners": "1"}, tmp_path / "a")
+    met, _ = invoke(project, "sta.run", base, tmp_path / "a", bounds=("timing_corners>=1",))
     assert met.succeeded, met.summary
-    unknown, _ = invoke(project, "sta.run", {**base, "min_no_such_metric": "1"}, tmp_path / "b")
+    unknown, _ = invoke(project, "sta.run", base, tmp_path / "b", bounds=("no_such_metric>=1",))
     assert not unknown.succeeded and "no_such_metric was not reported" in unknown.summary
 
 
@@ -654,8 +656,8 @@ def test_a_new_pd_backend_needs_no_core_changes(project, tmp_path, monkeypatch):
         assert project.state.tool_runs == {}
         lef = fake_pdk(tmp_path / "pdk")["lef"]
         place_route = tid(project, "place-route")
-        limits = {"max_drc_violations": "0", "max_unconnected_supply_pins": "0"}  # as the workflow names them
-        run, _ = invoke(project, "pnr.run", {**params, "lef": lef, **limits}, tmp_path / "w2", place_route)
+        limits = ("drc_violations<=0", "unconnected_supply_pins<=0")  # as the workflow names them
+        run, _ = invoke(project, "pnr.run", {**params, "lef": lef}, tmp_path / "w2", place_route, bounds=limits)
         assert run.succeeded and run.summary == "tinyroute: routed clean"
         assert f"routed {AXI} with {lef}" in Path(run.references[0]).read_text()  # it really ran
         owner = agent(project.task(place_route).owner)
@@ -671,7 +673,7 @@ def test_a_new_pd_backend_needs_no_core_changes(project, tmp_path, monkeypatch):
 def test_signoff_on_extracted_parasitics_needs_no_core_changes(project, tmp_path, monkeypatch):
     """M29 crown jewel: a timer the core has never heard of meets sta-signoff only when it reads a SPEF.
 
-    Nothing in the core names SPEF: the stage asks for ``max_unannotated_nets=0``, and a run that never
+    Nothing in the core names SPEF: the stage asks for ``unannotated_nets<=0``, and a run that never
     reports the metric fails the limit.
     """
     bin_dir = tmp_path / "bin"
@@ -690,11 +692,12 @@ def test_signoff_on_extracted_parasitics_needs_no_core_changes(project, tmp_path
         req = next(r for r in project.task(signoff).evidence_requirements if r.tools == ("sta.run",))
         owner = agent(project.task(signoff).owner)
         base = {"netlist": str(AXI), "backend": "tinysta", **dict(req.params)}
-        estimated, _ = invoke(project, "sta.run", base, tmp_path / "est", signoff)
+        estimated, _ = invoke(project, "sta.run", base, tmp_path / "est", signoff, bounds=req.bounds)
         assert not estimated.succeeded and "unannotated_nets was not reported" in estimated.summary
         spef = tmp_path / "route.spef"
         spef.write_text("*SPEF stand-in\n", encoding="utf-8")
-        extracted, _ = invoke(project, "sta.run", {**base, "spef": str(spef)}, tmp_path / "ext", signoff)
+        extracted, _ = invoke(project, "sta.run", {**base, "spef": str(spef)}, tmp_path / "ext", signoff,
+                              bounds=req.bounds)
         assert extracted.succeeded, extracted.summary
         project.record_evidence(signoff, owner, EvidenceKind.TOOL_RUN, extracted.summary, tool_run=extracted.id)
         assert req.description not in unsatisfied_requirements(project.state, project.task(signoff))
@@ -725,12 +728,13 @@ def test_physical_verification_needs_no_core_changes(project, tmp_path, monkeypa
         stage = tid(project, "physical-verification")
         req = next(r for r in project.task(stage).evidence_requirements if r.tools == ("pv.run",))
         params = {"def": str(layout), "netlist": str(AXI), "top": TOP, "backend": "tinypv", **dict(req.params)}
-        run, _ = invoke(project, "pv.run", params, tmp_path / "w", stage)
+        run, _ = invoke(project, "pv.run", params, tmp_path / "w", stage, bounds=req.bounds)
         assert run.succeeded and f"checked {layout}" in Path(run.references[0]).read_text()
         project.record_evidence(stage, agent(project.task(stage).owner), EvidenceKind.TOOL_RUN, run.summary,
                                 tool_run=run.id)
         assert req.description not in unsatisfied_requirements(project.state, project.task(stage))
-        short, _ = invoke(project, "pv.run", {**params, "min_fill_shapes": "100"}, tmp_path / "w2", stage)
+        short, _ = invoke(project, "pv.run", params, tmp_path / "w2", stage,
+                          bounds=(*req.bounds, Bound.parse("fill_shapes>=100")))
         assert not short.succeeded and "fill_shapes 12 is below min_fill_shapes 100" in short.summary
     finally:
         unregister_backend("pv.run", "tinypv")
@@ -953,9 +957,10 @@ def test_real_signoff_flow_on_sky130hd(project, tmp_path):
 
     # M34: signoff timing on the SPEF at the slow, typical, and fast corners, through both timers.
     design = {"netlist": out["netlist"], "top": TOP, **SKY130HD, "sdc": str(SDC), "spef": out["spef"],
-              **SKY130HD_CORNERS, "max_unannotated_nets": "0", "min_timing_corners": "3"}
+              **SKY130HD_CORNERS}
     for backend in sta_backends():
-        sta, sta_outcome = invoke(project, "sta.run", {**design, "backend": backend}, tmp_path / f"corners_{backend}")
+        sta, sta_outcome = invoke(project, "sta.run", {**design, "backend": backend}, tmp_path / f"corners_{backend}",
+                                  bounds=("unannotated_nets<=0", "timing_corners>=3"))
         sm = sta_outcome.data["result"]["metrics"]
         corners = sm["slack_by_corner"]
         assert sm["timing_corners"] == 3 and set(corners) == {"ss", "tt", "ff"}, sta.summary
@@ -966,9 +971,9 @@ def test_real_signoff_flow_on_sky130hd(project, tmp_path):
 
     # M34: DRC and LVS with the platform's KLayout decks, on the filled layout, against the routed netlist.
     pv = {"def": out["def"], "netlist": out["pg_netlist"], "top": TOP, "tech_lef": SKY130HD["tech_lef"],
-          "lef": SKY130HD["lef"], **SKY130HD_PV,
-          "max_drc_violations": "0", "max_lvs_mismatches": "0", "min_fill_shapes": "1"}
-    clean, clean_outcome = invoke(project, "pv.run", pv, tmp_path / "pv")
+          "lef": SKY130HD["lef"], **SKY130HD_PV}
+    signoff = ("drc_violations<=0", "lvs_mismatches<=0", "fill_shapes>=1")
+    clean, clean_outcome = invoke(project, "pv.run", pv, tmp_path / "pv", bounds=signoff)
     cm = clean_outcome.data["result"]["metrics"]
     assert cm["drc_violations"] == 0 and cm["lvs_mismatches"] == 0 and cm["gds_empty_cells"] == 0, clean.summary
     assert cm["fill_shapes"] == m["fill_shapes"] and clean.succeeded, clean.summary
@@ -979,7 +984,8 @@ def test_real_signoff_flow_on_sky130hd(project, tmp_path):
     broken_def = tmp_path / "broken.def"
     broken_def.write_text(layout[:place.start()] + place[1] + f"{int(place[2]) + 1} " + layout[place.end():],
                           encoding="utf-8")
-    bad_drc, bad_outcome = invoke(project, "pv.run", {**pv, "def": str(broken_def)}, tmp_path / "pv_drc")
+    bad_drc, bad_outcome = invoke(project, "pv.run", {**pv, "def": str(broken_def)}, tmp_path / "pv_drc",
+                                  bounds=signoff)
     assert not bad_drc.succeeded and bad_drc.id in project.state.tool_runs
     bm = bad_outcome.data["result"]["metrics"]
     assert bm["drc_violations"] > 0 and any("OFFGRID" in r for r in bm["drc_by_rule"]), bad_drc.summary
@@ -990,7 +996,8 @@ def test_real_signoff_flow_on_sky130hd(project, tmp_path):
     d_pins = list(re.finditer(r"\.D\((\w+)\)", pg))
     broken_v = tmp_path / "broken.v"
     broken_v.write_text(pg[:d_pins[0].start()] + f".D({d_pins[1][1]})" + pg[d_pins[0].end():], encoding="utf-8")
-    bad_lvs, lvs_outcome = invoke(project, "pv.run", {**pv, "netlist": str(broken_v)}, tmp_path / "pv_lvs")
+    bad_lvs, lvs_outcome = invoke(project, "pv.run", {**pv, "netlist": str(broken_v)}, tmp_path / "pv_lvs",
+                                  bounds=signoff)
     lm = lvs_outcome.data["result"]["metrics"]
     assert not bad_lvs.succeeded and bad_lvs.id in project.state.tool_runs
     assert lm["lvs_mismatches"] > 0 and lm["drc_violations"] == 0, bad_lvs.summary

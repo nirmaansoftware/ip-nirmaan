@@ -53,8 +53,8 @@ def insert(engine, source: Path, top: str, workdir: Path, **params: str) -> dict
     return outcome.data["result"]["metrics"]
 
 
-def atpg(engine, sources: str, top: str, workdir: Path, **params: str):
-    run, outcome = invoke(engine, "dft.atpg", {"sources": sources, "top": top, **params}, workdir)
+def atpg(engine, sources: str, top: str, workdir: Path, bounds=(), **params: str):
+    run, outcome = invoke(engine, "dft.atpg", {"sources": sources, "top": top, **params}, workdir, bounds=bounds)
     return run, outcome.data["result"]["metrics"] if outcome.data else {}
 
 
@@ -219,7 +219,7 @@ def _scan(engine, block: str, workdir: Path, **params: str) -> tuple[str, str]:
 @needs("yosys", "iverilog", "vvp")
 def test_real_atpg_coverage_is_measured_by_fault_simulation(engine, tmp_path):
     scan, top = _scan(engine, "counter", tmp_path / "insert")
-    run, metrics = atpg(engine, scan, top, tmp_path / "atpg", min_test_coverage="100")
+    run, metrics = atpg(engine, scan, top, tmp_path / "atpg", bounds=("test_coverage>=100",))
     assert run.succeeded, run.summary
     total = metrics["faults_total"]
     assert total == metrics["faults_detected"] + metrics["faults_undetectable"] + metrics["faults_undetected"]
@@ -234,7 +234,7 @@ def test_real_atpg_coverage_is_measured_by_fault_simulation(engine, tmp_path):
 @pytest.mark.parametrize("block,chains", [("rr_arbiter", "2"), ("sync_fifo", "4")])
 def test_real_atpg_on_multi_chain_blocks(engine, tmp_path, block, chains):
     scan, top = _scan(engine, block, tmp_path / "insert", chains=chains)
-    run, metrics = atpg(engine, scan, top, tmp_path / "atpg", min_test_coverage="95")
+    run, metrics = atpg(engine, scan, top, tmp_path / "atpg", bounds=("test_coverage>=95",))
     assert run.succeeded, run.summary
     assert metrics["chains"] == int(chains) and metrics["claims_not_detected"] == 0
 
@@ -247,7 +247,7 @@ def test_an_undetectable_fault_is_classified_and_the_threshold_is_data(engine, t
     faults = {f["name"]: f for f in metrics["fault_list"]}
     assert faults["spare/SA0"]["class"] == faults["spare/SA1"]["class"] == "undetectable"
     assert metrics["faults_undetectable"] >= 2 and metrics["test_coverage"] > metrics["fault_coverage"]
-    below, _ = atpg(engine, scan, top, tmp_path / "strict", min_fault_coverage="100")
+    below, _ = atpg(engine, scan, top, tmp_path / "strict", bounds=("fault_coverage>=100",))
     assert not below.succeeded and "fault_coverage" in below.summary and "min_fault_coverage 100" in below.summary
 
 
@@ -323,7 +323,7 @@ def test_the_dft_stage_requires_real_coverage_before_review(engine):
     dft = engine.task(tid(engine, "dft"))
     gated = {t: r for r in dft.evidence_requirements if r.before_review for t in r.tools}
     assert sorted(gated) == ["dft.atpg", "dft.check", "dft.scan_insert", "dft.scan_sim"]  # M44: insert first
-    assert dict(gated["dft.atpg"].params) == {"min_test_coverage": "90"}
+    assert gated["dft.atpg"].params == () and [str(b) for b in gated["dft.atpg"].bounds] == ["test_coverage>=90"]
     skills = engine.org.skills
     assert "dft.atpg" in skills["atpg"].tools and "dft.mbist" in skills["mbist"].tools
     assert "dft.atpg" in skills["scan_design"].tools

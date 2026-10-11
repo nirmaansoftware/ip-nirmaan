@@ -106,7 +106,7 @@ def broken_timer(tmp_path: Path, irq: str) -> Path:
 def test_the_cross_build_requirement_limits_the_code_size(block):
     firmware = block.task(next(t for t in block.state.tasks if block.state.tasks[t].stage == "firmware"))
     cross = next(r for r in firmware.evidence_requirements if r.tools == ("fw.cross_build",))
-    assert dict(cross.params) == {"max_text_bytes": "16384"}
+    assert cross.params == () and [str(b) for b in cross.bounds] == ["text_bytes<=16384"]  # M48: a bound
     soc = next(r for r in firmware.evidence_requirements if r.tools == ("fw.soc_test",))
     assert dict(soc.params) == {"require_irq": "auto"}  # the default core, as in M27; M35 adds require_irq
 
@@ -160,12 +160,12 @@ def test_an_unknown_core_and_an_unknown_bus_are_recorded_failed_runs(block, tmp_
 
 @needs(any_of=RISCV_GCC)
 def test_an_oversized_image_is_refused_as_a_recorded_failed_run(block, tmp_path):
-    params = {"sources": joined(*DRIVER, TESTS), "max_text_bytes": "4096"}
-    run, outcome = invoke(block, "fw.cross_build", params, tmp_path)
+    params = {"sources": joined(*DRIVER, TESTS)}
+    run, outcome = invoke(block, "fw.cross_build", params, tmp_path, bounds=("text_bytes<=4096",))
     assert not run.succeeded and run.id in block.state.tool_runs
     measured = outcome.data["result"]["metrics"]["text_bytes"]
     assert measured > 4096 and f"text_bytes {measured} exceeds max_text_bytes 4096" in run.summary
-    fits, _ = invoke(block, "fw.cross_build", {**params, "max_text_bytes": "16384"}, tmp_path / "fits")
+    fits, _ = invoke(block, "fw.cross_build", params, tmp_path / "fits", bounds=("text_bytes<=16384",))
     assert fits.succeeded, fits.summary
 
 
@@ -310,4 +310,4 @@ def test_the_new_modules_keep_the_import_laws():
     assert not any(m.split(".")[0] == "veritriage" for m in imported)
     assert "nirmaan.integrations.veritriage" not in imported
     runtime = "".join(p.read_text() for p in (src / "nirmaan" / "runtime").glob("*.py"))
-    assert not re.search(r"\b(?:serv|picorv32|max_text_bytes|apb)\b", runtime)  # the runtime names no core or bus
+    assert not re.search(r"\b(?:serv|picorv32|text_bytes|apb)\b", runtime)  # the runtime names no core or bus

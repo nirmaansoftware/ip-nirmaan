@@ -54,8 +54,6 @@ RUNNER = (
     _p("backend", TEXT, "Which backend to use, when the tool has several."),
     _p("workdir", PATH, "The run's working directory; a new temporary one by default."),
     _p("timeout", INT, "Seconds before the run is stopped (default 300)."),
-    _p("max_", NUM, "Fail a passing run whose parsed metric of that name exceeds this, or was not reported.",
-       prefix=True),
 )
 PDK = (
     _p("liberty", PATHS, "Liberty files, absolute or under pdk_root / NIRMAAN_PDK_ROOT (backend yosys-liberty)."),
@@ -163,9 +161,7 @@ TOOLS: list[ToolSpec] = [
            # M34: timing corners (docs/PD_FINAL.md).
            _p("liberty_", PATHS, "One timing corner's Liberty files, e.g. liberty_ss; with any, the run times every "
                                  "corner.", prefix=True),
-           _p("corner", TEXT, "The name of the corner the base liberty files time (default typical)."),
-           _p("min_", NUM, "Fail a passing run whose parsed metric of that name is below this, e.g. "
-                           "min_timing_corners.", prefix=True), *RUNNER)),
+           _p("corner", TEXT, "The name of the corner the base liberty files time (default typical)."), *RUNNER)),
     _tool("pnr.run", "Place and route", "eda", EXE, AV,
           "Floorplan, power grid, placement, clock tree, routing, and extraction in one staged run, with timing "
           "(OpenROAD).",
@@ -209,9 +205,7 @@ TOOLS: list[ToolSpec] = [
            _p("drc_deck", PATH, "The PDK's KLayout DRC deck; enables DRC."),
            _p("lvs_deck", PATH, "The PDK's KLayout LVS deck; enables LVS with cdl."),
            _p("cdl", PATHS, "The cells' CDL netlists, for LVS."),
-           _p("pdk_root", PATH, "Where relative PDK paths resolve."),
-           _p("min_", NUM, "Fail a passing run whose parsed metric of that name is below this, e.g. "
-                           "min_fill_shapes.", prefix=True), *RUNNER)),
+           _p("pdk_root", PATH, "Where relative PDK paths resolve."), *RUNNER)),
     _tool("dft.run", "DFT tools", "eda", EXE, CO, "ATPG, MBIST, and commercial scan flows."),
     _tool("dft.scan_insert", "Scan insertion", "eda", EXE, AV, "Mux-D scan flops stitched into one chain.",
           (SOURCES, TOP_REQUIRED, _p("chains", INT, "Number of scan chains (default 1)."),
@@ -225,17 +219,13 @@ TOOLS: list[ToolSpec] = [
     _tool("dft.atpg", "ATPG", "eda", EXE, AV, "Stuck-at patterns, with coverage measured by fault simulation.",
           (SOURCES, TOP_REQUIRED, _p("patterns", PATH, "Patterns to grade instead of generating them."),
            _p("fault_sample", INT, "Grade a sample of this many faults; 0 for all (default)."),
-           _p("seed", INT, "Random seed (default 1)."),
-           _p("min_", NUM, "Fail unless the graded metric of that name reaches this, e.g. min_test_coverage.",
-              prefix=True), *RUNNER)),
+           _p("seed", INT, "Random seed (default 1)."), *RUNNER)),
     _tool("dft.atpg_transition", "Transition ATPG", "eda", EXE, AV,
           "Slow-to-rise and slow-to-fall pattern pairs (launch on capture), with coverage measured by fault "
           "simulation.",
           (SOURCES, TOP_REQUIRED, _p("patterns", PATH, "Patterns to grade instead of generating them."),
            _p("fault_sample", INT, "Grade a sample of this many faults; 0 for all (default)."),
-           _p("seed", INT, "Random seed (default 1)."),
-           _p("min_", NUM, "Fail unless the graded metric of that name reaches this, e.g. min_test_coverage.",
-              prefix=True), *RUNNER)),
+           _p("seed", INT, "Random seed (default 1)."), *RUNNER)),
     _tool("dft.mbist", "Memory BIST", "eda", EXE, AV, "A March C- controller run against the memory in simulation.",
           (SOURCES, TOP, *RUNNER)),
     # Software and infrastructure.

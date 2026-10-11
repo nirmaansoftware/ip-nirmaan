@@ -93,6 +93,7 @@ The original preface of the section:
 - [M45-live-eval-evidence](M45-live-eval-evidence.md): Milestone 45 - Live evaluation as recorded, repeatable evidence
 - [M46-tests-ci-hardening](M46-tests-ci-hardening.md): Milestone 46 - Test guards, one copy of each test helper, and a hardened CI
 - [M47-review-cleanups](M47-review-cleanups.md): Milestone 47 - Small cleanups found by the principal-engineer review
+- [M48-unified-applicability](M48-unified-applicability.md): Milestone 48 - Unified applicability, bounds, and limits: one condition type and evaluator, bounds as a field, one limits model
 - [M49-scoped-registries](M49-scoped-registries.md): Milestone 49 - Scoped registries: one context object, a default instance, and scopes that layer over it
 
 ## Before M43

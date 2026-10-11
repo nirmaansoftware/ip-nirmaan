@@ -129,7 +129,7 @@ def test_the_runtime_passes_a_tool_only_its_declared_inputs(rtl_ready):
     for run in runs:
         declared = {p.name for p in engine.org.tools[run.tool].params}
         assert "workspace" not in run.params and "bogus" not in run.params, run
-        assert set(run.params) <= declared or all(k.startswith("max_") for k in set(run.params) - declared), run
+        assert set(run.params) <= declared, run  # M48: a bound is no parameter, so nothing is outside
 
 
 # --- Crown jewel and discovery -------------------------------------------------------------
@@ -183,7 +183,7 @@ def test_a_new_tool_contract_needs_no_core_changes(fixed_clock):
 def test_the_cli_shows_a_tool_contract():
     result = CliRunner().invoke(app, ["org", "tool", "pnr.run"])
     assert result.exit_code == 0, result.output
-    for text in ("netlist", "required", "stop_after", "max_<metric>", "paths"):
+    for text in ("netlist", "required", "stop_after", "paths"):
         assert text in result.output, text
     unknown = CliRunner().invoke(app, ["org", "tool", "no.such.tool"])
     assert unknown.exit_code != 0

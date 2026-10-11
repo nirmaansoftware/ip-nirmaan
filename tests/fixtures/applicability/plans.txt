@@ -1,0 +1,1385 @@
+## Create a 4-bit wrapping counter.
+intent=block_design features= workflows=block-design
+- interface-spec [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- microarchitecture [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- program [program] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- requirements [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- rtl-implementation [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
+    * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
+    * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+- ws.architecture [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.requirements [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.rtl [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+
+## Create an APB register block, with a register map, and its driver.
+intent=block_design features=apb,firmware,register_map,registers workflows=block-design
+- firmware [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Driver builds clean under strict C flags | accepts=tool_run | tools=fw.build | before-review | files=sources<-driver map<-register_map[upstream][optional] | applies always
+    * Driver tests pass against the approved RTL | accepts=tool_run | tools=fw.test | before-review | files=sources<-driver|driver_test rtl<-rtl_source[upstream] map<-register_map[upstream][optional] | fixed=require_irq=auto | applies always
+- interface-spec [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- microarchitecture [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- program [program] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- register-map [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * The register map is valid | accepts=tool_run | tools=regmap.check | before-review | files=map<-register_map | applies always
+- requirements [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- rtl-implementation [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
+    * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
+    * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * The RTL implements the approved register map, in co-simulation | accepts=tool_run | tools=regmap.verify | before-review | files=map<-register_map[upstream] rtl<-rtl_source top<-rtl_source[entry] | applies always
+- ws.architecture [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.requirements [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.rtl [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.software [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+
+## Create an APB register block and its driver.
+intent=block_design features=apb,firmware,registers workflows=block-design
+- firmware [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Driver builds clean under strict C flags | accepts=tool_run | tools=fw.build | before-review | files=sources<-driver map<-register_map[upstream][optional] | applies always
+    * Driver tests pass against the approved RTL | accepts=tool_run | tools=fw.test | before-review | files=sources<-driver|driver_test rtl<-rtl_source[upstream] map<-register_map[upstream][optional] | fixed=require_irq=auto | applies always
+- interface-spec [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- microarchitecture [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- program [program] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- requirements [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- rtl-implementation [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
+    * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
+    * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+- ws.architecture [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.requirements [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.rtl [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.software [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+
+## Create an APB register block with four 32-bit registers.
+intent=block_design features=apb,registers workflows=block-design
+- interface-spec [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- microarchitecture [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- program [program] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- requirements [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- rtl-implementation [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
+    * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
+    * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+- ws.architecture [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.requirements [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.rtl [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+
+## Build an N-way round-robin arbiter.
+intent=block_design features=arbitration workflows=block-design
+- interface-spec [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- microarchitecture [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- program [program] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- requirements [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- rtl-implementation [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
+    * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
+    * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+- ws.architecture [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.requirements [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.rtl [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+
+## Create a 4-bit wrapping counter with scan chains and at-speed test.
+intent=block_design features=at_speed,dft workflows=block-design
+- dft [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Scan inserted into the approved RTL | accepts=tool_run | tools=dft.scan_insert | before-review | files=sources<-rtl_source[upstream] | yields=dft_netlist:scan_netlist | applies always
+    * Testability rules hold and every flop is on the chain | accepts=tool_run | tools=dft.check | before-review | files=sources<-dft_netlist top<-dft_netlist[entry] | applies always
+    * The scan chain shifts and captures in simulation | accepts=tool_run | tools=dft.scan_sim | before-review | files=sources<-dft_netlist top<-dft_netlist[entry] | applies always
+    * ATPG reaches 90% stuck-at test coverage in fault simulation | accepts=tool_run | tools=dft.atpg | before-review | files=sources<-dft_netlist top<-dft_netlist[entry] | fixed=test_coverage>=90 | applies always
+    * Transition ATPG reaches 80% test coverage in fault simulation | accepts=tool_run | tools=dft.atpg_transition | before-review | files=sources<-dft_netlist top<-dft_netlist[entry] | fixed=test_coverage>=80 | applies always
+- interface-spec [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- microarchitecture [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- program [program] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- requirements [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- rtl-implementation [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
+    * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
+    * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+- ws.architecture [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.implementation [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.requirements [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.rtl [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+
+## Create an AXI4-Lite register block with a register map, a driver, scan chains, and a layout on sky130hd.
+intent=block_design features=axi,dft,firmware,layout,register_map,registers workflows=block-design
+- dft [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Scan inserted into the approved RTL | accepts=tool_run | tools=dft.scan_insert | before-review | files=sources<-rtl_source[upstream] | yields=dft_netlist:scan_netlist | applies always
+    * Testability rules hold and every flop is on the chain | accepts=tool_run | tools=dft.check | before-review | files=sources<-dft_netlist top<-dft_netlist[entry] | applies always
+    * The scan chain shifts and captures in simulation | accepts=tool_run | tools=dft.scan_sim | before-review | files=sources<-dft_netlist top<-dft_netlist[entry] | applies always
+    * ATPG reaches 90% stuck-at test coverage in fault simulation | accepts=tool_run | tools=dft.atpg | before-review | files=sources<-dft_netlist top<-dft_netlist[entry] | fixed=test_coverage>=90 | applies always
+- firmware [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Driver builds clean under strict C flags | accepts=tool_run | tools=fw.build | before-review | files=sources<-driver map<-register_map[upstream][optional] | applies always
+    * Driver tests pass against the approved RTL | accepts=tool_run | tools=fw.test | before-review | files=sources<-driver|driver_test rtl<-rtl_source[upstream] map<-register_map[upstream][optional] | fixed=require_irq=auto | applies always
+- floorplan [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * The approved netlist floorplanned, with utilization reported | accepts=tool_run | tools=pnr.run | before-review | files=netlist<-netlist[upstream] sdc<-constraints[upstream] | fixed=stop_after=floorplan | yields=floorplan:def | applies always
+- interface-spec [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- microarchitecture [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- physical-verification [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * DRC and LVS clean on the approved, filled layout, with the PDK's decks | accepts=tool_run | tools=pv.run | before-review | files=def<-layout[upstream] netlist<-power_netlist[upstream] | fixed=drc_violations<=0,lvs_mismatches<=0,fill_shapes>=1 | yields=gds:gds,physical_verification_report:log | applies always
+- place-route [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * The approved netlist placed, clock tree built, routed, and extracted, with every supply pin connected and no DRC violation | accepts=tool_run | tools=pnr.run | before-review | files=netlist<-netlist[upstream] sdc<-constraints[upstream] | fixed=stop_after=extract,drc_violations<=0,unconnected_supply_pins<=0 | yields=layout:def,routed_netlist:netlist,power_netlist:pg_netlist,parasitics:spef | applies always
+- program [program] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- register-map [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * The register map is valid | accepts=tool_run | tools=regmap.check | before-review | files=map<-register_map | applies always
+- requirements [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- rtl-implementation [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
+    * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
+    * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * The RTL implements the approved register map, in co-simulation | accepts=tool_run | tools=regmap.verify | before-review | files=map<-register_map[upstream] rtl<-rtl_source top<-rtl_source[entry] | applies always
+- sta-signoff [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Signoff timing on the approved routed netlist and its extracted parasitics, across slow, typical, and fast corners | accepts=tool_run | tools=sta.run | before-review | files=netlist<-routed_netlist[upstream] spef<-parasitics[upstream] sdc<-constraints[upstream] | fixed=unannotated_nets<=0,timing_corners>=3 | yields=timing_report:log | applies always
+- sta-signoff.gate [gate] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- synthesis [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * The approved RTL, mapped to the target library | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source[upstream] | fixed=backend=yosys-liberty | yields=netlist:netlist,synthesis_report:log | applies always
+- timing-constraints [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * The constraints time the approved RTL, synthesized to the target library | accepts=tool_run | tools=sta.run | before-review | files=sdc<-constraints sources<-rtl_source[upstream] | applies always
+- ws.architecture [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.implementation [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.requirements [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.rtl [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.signoff [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.software [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+
+## Create an AXI4-Lite register block with an interrupt and its driver for a RISC-V core, reporting bus errors as precise traps.
+intent=block_design features=axi,bus_errors,firmware,interrupts,registers,riscv workflows=block-design
+- firmware [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Driver builds clean under strict C flags | accepts=tool_run | tools=fw.build | before-review | files=sources<-driver map<-register_map[upstream][optional] | applies always
+    * Driver tests pass against the approved RTL, the interrupt taken | accepts=tool_run | tools=fw.test | before-review | files=sources<-driver|driver_test rtl<-rtl_source[upstream] map<-register_map[upstream][optional] | fixed=require_irq=yes | applies always
+    * Driver and tests cross-build for bare-metal RV32I | accepts=tool_run | tools=fw.cross_build | before-review | files=sources<-driver|driver_test map<-register_map[upstream][optional] | fixed=text_bytes<=16384 | applies always
+    * Driver tests pass on a RISC-V core against the approved RTL, the interrupt taken | accepts=tool_run | tools=fw.soc_test | before-review | files=sources<-driver|driver_test rtl<-rtl_source[upstream] map<-register_map[upstream][optional] | fixed=require_irq=yes | applies always
+    * A bus error traps precisely on the RISC-V core | accepts=tool_run | tools=fw.soc_test | before-review | files=sources<-driver|driver_test rtl<-rtl_source[upstream] map<-register_map[upstream][optional] | fixed=require_bus_error_trap=yes | applies always
+- interface-spec [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- microarchitecture [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- program [program] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- requirements [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- rtl-implementation [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
+    * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
+    * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+- ws.architecture [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.requirements [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.rtl [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.software [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+
+## Create an AXI4-Lite register block with a register map and a driver.
+intent=block_design features=axi,firmware,register_map,registers workflows=block-design
+- firmware [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Driver builds clean under strict C flags | accepts=tool_run | tools=fw.build | before-review | files=sources<-driver map<-register_map[upstream][optional] | applies always
+    * Driver tests pass against the approved RTL | accepts=tool_run | tools=fw.test | before-review | files=sources<-driver|driver_test rtl<-rtl_source[upstream] map<-register_map[upstream][optional] | fixed=require_irq=auto | applies always
+- interface-spec [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- microarchitecture [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- program [program] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- register-map [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * The register map is valid | accepts=tool_run | tools=regmap.check | before-review | files=map<-register_map | applies always
+- requirements [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- rtl-implementation [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
+    * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
+    * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * The RTL implements the approved register map, in co-simulation | accepts=tool_run | tools=regmap.verify | before-review | files=map<-register_map[upstream] rtl<-rtl_source top<-rtl_source[entry] | applies always
+- ws.architecture [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.requirements [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.rtl [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.software [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+
+## Create an AXI4-Lite register block and its driver for a RISC-V core.
+intent=block_design features=axi,firmware,registers,riscv workflows=block-design
+- firmware [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Driver builds clean under strict C flags | accepts=tool_run | tools=fw.build | before-review | files=sources<-driver map<-register_map[upstream][optional] | applies always
+    * Driver tests pass against the approved RTL | accepts=tool_run | tools=fw.test | before-review | files=sources<-driver|driver_test rtl<-rtl_source[upstream] map<-register_map[upstream][optional] | fixed=require_irq=auto | applies always
+    * Driver and tests cross-build for bare-metal RV32I | accepts=tool_run | tools=fw.cross_build | before-review | files=sources<-driver|driver_test map<-register_map[upstream][optional] | fixed=text_bytes<=16384 | applies always
+    * Driver tests pass on a RISC-V core against the approved RTL | accepts=tool_run | tools=fw.soc_test | before-review | files=sources<-driver|driver_test rtl<-rtl_source[upstream] map<-register_map[upstream][optional] | fixed=require_irq=auto | applies always
+- interface-spec [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- microarchitecture [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- program [program] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- requirements [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- rtl-implementation [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
+    * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
+    * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+- ws.architecture [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.requirements [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.rtl [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.software [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+
+## Create an AXI4-Lite register block.
+intent=block_design features=axi,registers workflows=block-design
+- interface-spec [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- microarchitecture [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- program [program] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- requirements [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- rtl-implementation [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
+    * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
+    * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+- ws.architecture [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.requirements [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.rtl [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+
+## Create an AXI4-Lite register block with a verification plan.
+intent=block_design features=axi,registers,verification_plan workflows=block-design
+- dv-plan [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * The plan covers every requirement of the approved interface spec | accepts=tool_run | tools=vplan.check | before-review | files=plan<-verification_plan spec<-interface_spec[upstream] | applies always
+- interface-spec [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- microarchitecture [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- program [program] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- requirements [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- rtl-implementation [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
+    * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
+    * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+- ws.architecture [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.requirements [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.rtl [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.verification [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+
+## Create a parameterizable synchronous FIFO.
+intent=block_design features=configurable workflows=block-design
+- interface-spec [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- microarchitecture [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- program [program] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- requirements [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- rtl-implementation [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
+    * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
+    * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+- ws.architecture [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.requirements [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.rtl [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+
+## Create a 4-bit wrapping counter with scan chains.
+intent=block_design features=dft workflows=block-design
+- dft [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Scan inserted into the approved RTL | accepts=tool_run | tools=dft.scan_insert | before-review | files=sources<-rtl_source[upstream] | yields=dft_netlist:scan_netlist | applies always
+    * Testability rules hold and every flop is on the chain | accepts=tool_run | tools=dft.check | before-review | files=sources<-dft_netlist top<-dft_netlist[entry] | applies always
+    * The scan chain shifts and captures in simulation | accepts=tool_run | tools=dft.scan_sim | before-review | files=sources<-dft_netlist top<-dft_netlist[entry] | applies always
+    * ATPG reaches 90% stuck-at test coverage in fault simulation | accepts=tool_run | tools=dft.atpg | before-review | files=sources<-dft_netlist top<-dft_netlist[entry] | fixed=test_coverage>=90 | applies always
+- interface-spec [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- microarchitecture [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- program [program] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- requirements [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- rtl-implementation [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
+    * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
+    * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+- ws.architecture [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.implementation [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.requirements [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.rtl [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+
+## Create a register file backed by a synchronous RAM.
+intent=block_design features=memory,registers workflows=block-design
+- interface-spec [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- mbist [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * March C- passes on every memory in the approved RTL | accepts=tool_run | tools=dft.mbist | before-review | files=sources<-rtl_source[upstream] | applies always
+- microarchitecture [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- program [program] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- requirements [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- rtl-implementation [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
+    * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
+    * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+- ws.architecture [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.implementation [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.requirements [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.rtl [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+
+## Create a register file backed by a synchronous RAM, with scan chains and memory BIST.
+intent=block_design features=dft,memory,registers workflows=block-design
+- dft [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Scan inserted into the approved RTL | accepts=tool_run | tools=dft.scan_insert | before-review | files=sources<-rtl_source[upstream] | yields=dft_netlist:scan_netlist | applies always
+    * Testability rules hold and every flop is on the chain | accepts=tool_run | tools=dft.check | before-review | files=sources<-dft_netlist top<-dft_netlist[entry] | applies always
+    * The scan chain shifts and captures in simulation | accepts=tool_run | tools=dft.scan_sim | before-review | files=sources<-dft_netlist top<-dft_netlist[entry] | applies always
+    * ATPG reaches 90% stuck-at test coverage in fault simulation | accepts=tool_run | tools=dft.atpg | before-review | files=sources<-dft_netlist top<-dft_netlist[entry] | fixed=test_coverage>=90 | applies always
+- interface-spec [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- mbist [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * March C- passes on every memory in the approved RTL | accepts=tool_run | tools=dft.mbist | before-review | files=sources<-rtl_source[upstream] | applies always
+- microarchitecture [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- program [program] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- requirements [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- rtl-implementation [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
+    * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
+    * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+- ws.architecture [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.implementation [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.requirements [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.rtl [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+
+## Add QoS arbitration to an existing NoC router.
+intent=feature_addition features=arbitration,cdc,existing_design,noc,qos workflows=feature-addition
+- assertions [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- coverage [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Merged coverage | accepts=tool_run,veritriage_session,human_attestation | tools=coverage.read,veritriage.investigate | applies always
+- coverage.gate [gate] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- docs [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- dv-plan [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * The plan covers every requirement of the approved requirements spec | accepts=tool_run | tools=vplan.check | before-review | files=plan<-verification_plan spec<-requirements_spec[upstream] | applies always
+- formal [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Proof results | accepts=tool_run,human_attestation | tools=formal.run | applies always
+- impact [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- merge [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- merge.gate [gate] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- microarchitecture [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- microarchitecture.gate [gate] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- performance-model [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- program [program] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- qos-architecture [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- regression [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Regression results with failures triaged | accepts=tool_run,veritriage_session,human_attestation | tools=regression.run,veritriage.investigate | applies always
+- requirements-delta [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- rtl-change.arbitration [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
+    * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
+    * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+- rtl-change.control [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
+    * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
+    * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+- rtl-change.noc [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
+    * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
+    * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+- rtl-lint [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Lint run | accepts=tool_run,human_attestation | tools=lint.run | applies always
+- tests [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Feature tests executed | accepts=tool_run,veritriage_session,human_attestation | tools=test.run,regression.run,veritriage.investigate | applies always
+- timing [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Timing report | accepts=tool_run,human_attestation | tools=sta.run | applies always
+- ws.architecture [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.documentation [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.formal [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.implementation [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.integration [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.requirements [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.rtl [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.verification [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+
+## Design a configurable 4-port AXI-to-NoC bridge supporting 256-bit data, 40-bit address and QoS arbitration.
+intent=new_ip features=arbitration,axi,cdc,configurable,multi_port,noc,qos,registers workflows=new-ip
+- assertions.axi [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- assertions.intent [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- assertions.noc [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- cdc-design [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
+    * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
+    * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+- cdc-verification [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * CDC/RDC analysis with waivers reviewed | accepts=tool_run,human_attestation | tools=cdc.run | applies always
+- coverage [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Merged coverage report | accepts=tool_run,veritriage_session,human_attestation | tools=coverage.read,veritriage.investigate | applies always
+- directed-tests [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Directed tests executed | accepts=tool_run,veritriage_session,human_attestation | tools=test.run,veritriage.investigate | applies always
+- documentation.integration [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- documentation.user [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- driver [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- dv-environment [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Environment smoke test runs | accepts=tool_run,veritriage_session,human_attestation | tools=simulator.run,test.run,veritriage.investigate | applies always
+- dv-plan [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * The plan covers every requirement of the approved requirements spec | accepts=tool_run | tools=vplan.check | before-review | files=plan<-verification_plan spec<-requirements_spec[upstream] | applies always
+- formal [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Proof results with vacuity and bounds | accepts=tool_run,human_attestation | tools=formal.run | applies always
+- integration [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- interface-spec.axi [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- interface-spec.noc [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- ip-architecture [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- microarchitecture [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- microarchitecture.gate [gate] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- noc-integration [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- program [program] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- qos-architecture [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- random-tests [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Random tests executed | accepts=tool_run,veritriage_session,human_attestation | tools=test.run,regression.run,veritriage.investigate | applies always
+- register-docs [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- regression [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Regression results, failures triaged through VeriTriage | accepts=tool_run,veritriage_session,human_attestation | tools=regression.run,veritriage.investigate | applies always
+- release [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- release.gate [gate] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- requirements [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- requirements.gate [gate] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- rtl-implementation.arbitration [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
+    * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
+    * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+- rtl-implementation.axi [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
+    * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
+    * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+- rtl-implementation.buffers [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
+    * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
+    * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+- rtl-implementation.control [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
+    * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
+    * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+- rtl-implementation.noc [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
+    * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
+    * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+- rtl-lint [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Lint run with waivers dispositioned | accepts=tool_run,human_attestation | tools=lint.run | applies always
+- rtl-quality [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- rtl-quality.gate [gate] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- sta [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Timing report across corners | accepts=tool_run,human_attestation | tools=sta.run | applies always
+- sta.gate [gate] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- synthesis [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Synthesis QoR report | accepts=tool_run,human_attestation | tools=synth.run | applies always
+- timing-constraints [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- traceability [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Requirement-to-evidence matrix | accepts=document,review_record | tools=- | applies always
+- verification-signoff [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Coverage, regression, and formal evidence | accepts=tool_run,veritriage_session,human_attestation | tools=coverage.read,regression.run,formal.run,veritriage.investigate | applies always
+- verification-signoff.gate [gate] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- vip.axi [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- ws.architecture [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.cdc-rdc [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.documentation [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.formal [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.implementation [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.integration [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.requirements [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.rtl [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.signoff [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.software [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.verification [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+
+## Create a 4-port AXI-to-NoC bridge with two clock domains.
+intent=new_ip features=axi,cdc,multi_port,noc,registers workflows=new-ip
+- assertions.axi [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- assertions.intent [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- assertions.noc [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- cdc-design [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
+    * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
+    * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+- cdc-verification [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * CDC/RDC analysis with waivers reviewed | accepts=tool_run,human_attestation | tools=cdc.run | applies always
+- coverage [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Merged coverage report | accepts=tool_run,veritriage_session,human_attestation | tools=coverage.read,veritriage.investigate | applies always
+- directed-tests [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Directed tests executed | accepts=tool_run,veritriage_session,human_attestation | tools=test.run,veritriage.investigate | applies always
+- documentation.integration [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- documentation.user [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- driver [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- dv-environment [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Environment smoke test runs | accepts=tool_run,veritriage_session,human_attestation | tools=simulator.run,test.run,veritriage.investigate | applies always
+- dv-plan [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * The plan covers every requirement of the approved requirements spec | accepts=tool_run | tools=vplan.check | before-review | files=plan<-verification_plan spec<-requirements_spec[upstream] | applies always
+- formal [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Proof results with vacuity and bounds | accepts=tool_run,human_attestation | tools=formal.run | applies always
+- integration [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- interface-spec.axi [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- interface-spec.noc [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- ip-architecture [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- microarchitecture [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- microarchitecture.gate [gate] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- noc-integration [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- program [program] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- random-tests [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Random tests executed | accepts=tool_run,veritriage_session,human_attestation | tools=test.run,regression.run,veritriage.investigate | applies always
+- register-docs [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- regression [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Regression results, failures triaged through VeriTriage | accepts=tool_run,veritriage_session,human_attestation | tools=regression.run,veritriage.investigate | applies always
+- release [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- release.gate [gate] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- requirements [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- requirements.gate [gate] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- rtl-implementation.arbitration [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
+    * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
+    * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+- rtl-implementation.axi [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
+    * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
+    * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+- rtl-implementation.buffers [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
+    * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
+    * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+- rtl-implementation.control [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
+    * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
+    * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+- rtl-implementation.noc [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
+    * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
+    * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+- rtl-lint [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Lint run with waivers dispositioned | accepts=tool_run,human_attestation | tools=lint.run | applies always
+- rtl-quality [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- rtl-quality.gate [gate] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- sta [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Timing report across corners | accepts=tool_run,human_attestation | tools=sta.run | applies always
+- sta.gate [gate] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- synthesis [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Synthesis QoR report | accepts=tool_run,human_attestation | tools=synth.run | applies always
+- timing-constraints [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- traceability [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Requirement-to-evidence matrix | accepts=document,review_record | tools=- | applies always
+- verification-signoff [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Coverage, regression, and formal evidence | accepts=tool_run,veritriage_session,human_attestation | tools=coverage.read,regression.run,formal.run,veritriage.investigate | applies always
+- verification-signoff.gate [gate] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- vip.axi [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- ws.architecture [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.cdc-rdc [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.documentation [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.formal [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.implementation [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.integration [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.requirements [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.rtl [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.signoff [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.software [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.verification [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+
+## Design a single-clock 4-port AXI-to-NoC bridge.
+intent=new_ip features=axi,multi_port,noc,registers,single_clock workflows=new-ip
+- assertions.axi [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- assertions.intent [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- assertions.noc [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- coverage [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Merged coverage report | accepts=tool_run,veritriage_session,human_attestation | tools=coverage.read,veritriage.investigate | applies always
+- directed-tests [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Directed tests executed | accepts=tool_run,veritriage_session,human_attestation | tools=test.run,veritriage.investigate | applies always
+- documentation.integration [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- documentation.user [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- driver [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- dv-environment [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Environment smoke test runs | accepts=tool_run,veritriage_session,human_attestation | tools=simulator.run,test.run,veritriage.investigate | applies always
+- dv-plan [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * The plan covers every requirement of the approved requirements spec | accepts=tool_run | tools=vplan.check | before-review | files=plan<-verification_plan spec<-requirements_spec[upstream] | applies always
+- formal [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Proof results with vacuity and bounds | accepts=tool_run,human_attestation | tools=formal.run | applies always
+- integration [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- interface-spec.axi [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- interface-spec.noc [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- ip-architecture [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- microarchitecture [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- microarchitecture.gate [gate] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- noc-integration [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- program [program] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- random-tests [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Random tests executed | accepts=tool_run,veritriage_session,human_attestation | tools=test.run,regression.run,veritriage.investigate | applies always
+- register-docs [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- regression [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Regression results, failures triaged through VeriTriage | accepts=tool_run,veritriage_session,human_attestation | tools=regression.run,veritriage.investigate | applies always
+- release [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- release.gate [gate] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- requirements [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- requirements.gate [gate] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- rtl-implementation.arbitration [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
+    * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
+    * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+- rtl-implementation.axi [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
+    * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
+    * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+- rtl-implementation.buffers [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
+    * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
+    * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+- rtl-implementation.control [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
+    * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
+    * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+- rtl-implementation.noc [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
+    * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
+    * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+- rtl-lint [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Lint run with waivers dispositioned | accepts=tool_run,human_attestation | tools=lint.run | applies always
+- rtl-quality [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- rtl-quality.gate [gate] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- sta [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Timing report across corners | accepts=tool_run,human_attestation | tools=sta.run | applies always
+- sta.gate [gate] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- synthesis [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Synthesis QoR report | accepts=tool_run,human_attestation | tools=synth.run | applies always
+- timing-constraints [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- traceability [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Requirement-to-evidence matrix | accepts=document,review_record | tools=- | applies always
+- verification-signoff [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Coverage, regression, and formal evidence | accepts=tool_run,veritriage_session,human_attestation | tools=coverage.read,regression.run,formal.run,veritriage.investigate | applies always
+- verification-signoff.gate [gate] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- vip.axi [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- ws.architecture [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.documentation [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.formal [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.implementation [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.integration [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.requirements [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.rtl [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.signoff [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.software [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.verification [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+
+## Design a low-power PCIe controller with scan chains, secure boot, and firmware.
+intent=new_ip features=cdc,dft,firmware,low_power,pcie,security workflows=new-ip
+- assertions.intent [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- cdc-design [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
+    * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
+    * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+- cdc-verification [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * CDC/RDC analysis with waivers reviewed | accepts=tool_run,human_attestation | tools=cdc.run | applies always
+- coverage [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Merged coverage report | accepts=tool_run,veritriage_session,human_attestation | tools=coverage.read,veritriage.investigate | applies always
+- dft [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- directed-tests [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Directed tests executed | accepts=tool_run,veritriage_session,human_attestation | tools=test.run,veritriage.investigate | applies always
+- documentation.integration [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- documentation.user [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- driver [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- dv-environment [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Environment smoke test runs | accepts=tool_run,veritriage_session,human_attestation | tools=simulator.run,test.run,veritriage.investigate | applies always
+- dv-plan [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * The plan covers every requirement of the approved requirements spec | accepts=tool_run | tools=vplan.check | before-review | files=plan<-verification_plan spec<-requirements_spec[upstream] | applies always
+- formal [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Proof results with vacuity and bounds | accepts=tool_run,human_attestation | tools=formal.run | applies always
+- integration [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- interface-spec.pcie [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- ip-architecture [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- microarchitecture [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- microarchitecture.gate [gate] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- power-analysis [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Power report with stated activity | accepts=tool_run,human_attestation | tools=power.run | applies always
+- power-architecture [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- power-intent [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- program [program] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- random-tests [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Random tests executed | accepts=tool_run,veritriage_session,human_attestation | tools=test.run,regression.run,veritriage.investigate | applies always
+- regression [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Regression results, failures triaged through VeriTriage | accepts=tool_run,veritriage_session,human_attestation | tools=regression.run,veritriage.investigate | applies always
+- release [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- release.gate [gate] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- requirements [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- requirements.gate [gate] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- rtl-implementation.control [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
+    * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
+    * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+- rtl-implementation.pcie [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
+    * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
+    * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+- rtl-lint [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Lint run with waivers dispositioned | accepts=tool_run,human_attestation | tools=lint.run | applies always
+- rtl-quality [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- rtl-quality.gate [gate] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- security-architecture [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- security-verification [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- sta [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Timing report across corners | accepts=tool_run,human_attestation | tools=sta.run | applies always
+- sta.gate [gate] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- synthesis [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Synthesis QoR report | accepts=tool_run,human_attestation | tools=synth.run | applies always
+- timing-constraints [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- traceability [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Requirement-to-evidence matrix | accepts=document,review_record | tools=- | applies always
+- verification-signoff [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Coverage, regression, and formal evidence | accepts=tool_run,veritriage_session,human_attestation | tools=coverage.read,regression.run,formal.run,veritriage.investigate | applies always
+- verification-signoff.gate [gate] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- vip.pcie [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- ws.architecture [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.cdc-rdc [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.documentation [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.formal [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.implementation [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.integration [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.requirements [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.rtl [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.signoff [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.software [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.verification [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+
+## Design a photonic block.
+intent=new_ip features=cdc workflows=new-ip
+- assertions.intent [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- cdc-design [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
+    * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
+    * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+- cdc-verification [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * CDC/RDC analysis with waivers reviewed | accepts=tool_run,human_attestation | tools=cdc.run | applies always
+- coverage [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Merged coverage report | accepts=tool_run,veritriage_session,human_attestation | tools=coverage.read,veritriage.investigate | applies always
+- directed-tests [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Directed tests executed | accepts=tool_run,veritriage_session,human_attestation | tools=test.run,veritriage.investigate | applies always
+- documentation.integration [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- documentation.user [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- dv-environment [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Environment smoke test runs | accepts=tool_run,veritriage_session,human_attestation | tools=simulator.run,test.run,veritriage.investigate | applies always
+- dv-plan [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * The plan covers every requirement of the approved requirements spec | accepts=tool_run | tools=vplan.check | before-review | files=plan<-verification_plan spec<-requirements_spec[upstream] | applies always
+- formal [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Proof results with vacuity and bounds | accepts=tool_run,human_attestation | tools=formal.run | applies always
+- integration [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- ip-architecture [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- microarchitecture [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- microarchitecture.gate [gate] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- program [program] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- random-tests [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Random tests executed | accepts=tool_run,veritriage_session,human_attestation | tools=test.run,regression.run,veritriage.investigate | applies always
+- regression [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Regression results, failures triaged through VeriTriage | accepts=tool_run,veritriage_session,human_attestation | tools=regression.run,veritriage.investigate | applies always
+- release [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- release.gate [gate] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- requirements [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- requirements.gate [gate] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- rtl-implementation.control [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
+    * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
+    * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+- rtl-lint [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Lint run with waivers dispositioned | accepts=tool_run,human_attestation | tools=lint.run | applies always
+- rtl-quality [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- rtl-quality.gate [gate] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- sta [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Timing report across corners | accepts=tool_run,human_attestation | tools=sta.run | applies always
+- sta.gate [gate] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- synthesis [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Synthesis QoR report | accepts=tool_run,human_attestation | tools=synth.run | applies always
+- timing-constraints [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- traceability [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Requirement-to-evidence matrix | accepts=document,review_record | tools=- | applies always
+- verification-signoff [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Coverage, regression, and formal evidence | accepts=tool_run,veritriage_session,human_attestation | tools=coverage.read,regression.run,formal.run,veritriage.investigate | applies always
+- verification-signoff.gate [gate] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.architecture [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.cdc-rdc [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.documentation [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.formal [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.implementation [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.integration [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.requirements [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.rtl [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.signoff [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.verification [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+
+## Change the data width of the timer from 32 to 64 bits.
+intent=parameter_change features=cdc,existing_design,width_change workflows=parameter-change
+- cdc-recheck [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * CDC run | accepts=tool_run,human_attestation | tools=cdc.run | applies always
+- coverage [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Merged coverage | accepts=tool_run,veritriage_session,human_attestation | tools=coverage.read,veritriage.investigate | applies always
+- coverage.gate [gate] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- docs [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- impact [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- merge [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- merge.gate [gate] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- microarchitecture [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- microarchitecture.gate [gate] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- program [program] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- regression [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Regression results | accepts=tool_run,veritriage_session,human_attestation | tools=regression.run,veritriage.investigate | applies always
+- rtl-change.buffers [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
+    * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
+    * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+- rtl-change.datapath [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
+    * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
+    * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+- rtl-lint [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Lint run | accepts=tool_run,human_attestation | tools=lint.run | applies always
+- tb-update [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- timing [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Timing report | accepts=tool_run,human_attestation | tools=sta.run | applies always
+- ws.architecture [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.cdc-rdc [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.documentation [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.implementation [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.integration [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.rtl [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.verification [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+
+## Change the AXI data width of the bridge from 64 to 128 bits.
+intent=parameter_change features=axi,cdc,existing_design,width_change workflows=parameter-change
+- cdc-recheck [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * CDC run | accepts=tool_run,human_attestation | tools=cdc.run | applies always
+- coverage [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Merged coverage | accepts=tool_run,veritriage_session,human_attestation | tools=coverage.read,veritriage.investigate | applies always
+- coverage.gate [gate] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- docs [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- impact [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- interface-update.axi [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- merge [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- merge.gate [gate] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- microarchitecture [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- microarchitecture.gate [gate] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- program [program] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- regression [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Regression results | accepts=tool_run,veritriage_session,human_attestation | tools=regression.run,veritriage.investigate | applies always
+- rtl-change.axi [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
+    * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
+    * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+- rtl-change.buffers [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
+    * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
+    * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+- rtl-change.datapath [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
+    * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
+    * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+- rtl-lint [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Lint run | accepts=tool_run,human_attestation | tools=lint.run | applies always
+- tb-update [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- timing [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Timing report | accepts=tool_run,human_attestation | tools=sta.run | applies always
+- ws.architecture [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.cdc-rdc [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.documentation [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.implementation [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.integration [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.rtl [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.verification [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+
+## Place and route the AXI4-Lite register block.
+intent=physical_implementation features=axi,registers workflows=physical-implementation
+- floorplan [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Floorplan run with utilization reported | accepts=tool_run,human_attestation | tools=pnr.run | applies always
+- physical-verification [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * DRC and LVS clean on the filled layout, with the PDK's decks | accepts=tool_run,human_attestation | tools=pv.run | fixed=drc_violations<=0,lvs_mismatches<=0,fill_shapes>=1 | applies always
+- place-route [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Placed, clock tree built, and routed, with clock skew, DRC count, and wirelength reported | accepts=tool_run,human_attestation | tools=pnr.run | fixed=drc_violations<=0,unconnected_supply_pins<=0 | applies always
+- power-grid [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Power grid built, with every cell supply pin connected | accepts=tool_run,human_attestation | tools=pnr.run | fixed=unconnected_supply_pins<=0 | applies always
+- program [program] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- sta-signoff [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Signoff timing on the routed netlist with extracted parasitics (SPEF), across slow, typical, and fast corners | accepts=tool_run,human_attestation | tools=sta.run | fixed=unannotated_nets<=0,timing_corners>=3 | applies always
+- sta-signoff.gate [gate] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- synthesis [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Netlist mapped to the target library | accepts=tool_run,human_attestation | tools=synth.run | applies always
+- timing-constraints [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- ws.implementation [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.signoff [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+
+## Investigate a regression failure introduced by a recent RTL commit.
+intent=regression_investigation features=recent_change workflows=regression-investigation
+- change-correlation [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Commit range and touched modules | accepts=document,review_record | tools=- | applies always
+- infra-fix [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Infrastructure change verified | accepts=tool_run,human_attestation | tools=farm.submit,ci.configure | applies always
+- program [program] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- root-cause [decision] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- rtl-fix [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
+    * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
+    * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+- spec-clarification [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- tb-fix [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- triage [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * VeriTriage investigation of the failing artifacts | accepts=veritriage_session | tools=veritriage.investigate | applies always
+- verify-fix [work] retries=2 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Failing test passes; no new failures in regression | accepts=tool_run,veritriage_session,human_attestation | tools=regression.run,test.run,veritriage.investigate | applies always
+- ws.debug [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.fix [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.verification [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+
+## Investigate why the regression tests started failing.
+intent=regression_investigation features= workflows=regression-investigation
+- infra-fix [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Infrastructure change verified | accepts=tool_run,human_attestation | tools=farm.submit,ci.configure | applies always
+- program [program] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- root-cause [decision] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- rtl-fix [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
+    * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
+    * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+- spec-clarification [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- tb-fix [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- triage [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * VeriTriage investigation of the failing artifacts | accepts=veritriage_session | tools=veritriage.investigate | applies always
+- verify-fix [work] retries=2 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Failing test passes; no new failures in regression | accepts=tool_run,veritriage_session,human_attestation | tools=regression.run,test.run,veritriage.investigate | applies always
+- ws.debug [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.fix [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.verification [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+
+## An RTL fix to the arbiter.
+intent=rtl_change features=arbitration,existing_design workflows=rtl-change
+- change [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
+    * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
+    * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+- impact [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- merge [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- merge.gate [gate] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- program [program] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- regression [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Regression results | accepts=tool_run,veritriage_session,human_attestation | tools=regression.run,veritriage.investigate | applies always
+- targeted [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Targeted tests | accepts=tool_run,veritriage_session,human_attestation | tools=test.run,veritriage.investigate | applies always
+- ws.integration [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.rtl [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.verification [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+
+## Prepare the bridge for sign-off.
+intent=signoff_preparation features=cdc workflows=signoff-preparation
+- cdc-closure [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Clean or waived CDC | accepts=tool_run,human_attestation | tools=cdc.run | applies always
+- closure-report [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Regression, coverage, and formal evidence | accepts=tool_run,veritriage_session,human_attestation | tools=coverage.read,regression.run,formal.run,veritriage.investigate | applies always
+- closure-report.gate [gate] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- coverage-closure [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Merged coverage with reviewed exclusions | accepts=tool_run,veritriage_session,human_attestation | tools=coverage.read,veritriage.investigate | applies always
+- formal-closure [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Proof status with bounds | accepts=tool_run,human_attestation | tools=formal.run | applies always
+- plan-audit [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Requirement-to-plan matrix | accepts=document,review_record | tools=- | applies always
+- program [program] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- regression-health [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Every open failure investigated | accepts=veritriage_session,human_attestation | tools=veritriage.investigate | applies always
+- waiver-audit [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Every waiver has an approved rationale | accepts=document,review_record | tools=- | applies always
+- ws.cdc-rdc [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.formal [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.signoff [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.verification [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+
+## Prepare the single-clock timer for sign-off.
+intent=signoff_preparation features=single_clock workflows=signoff-preparation
+- closure-report [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Regression, coverage, and formal evidence | accepts=tool_run,veritriage_session,human_attestation | tools=coverage.read,regression.run,formal.run,veritriage.investigate | applies always
+- closure-report.gate [gate] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- coverage-closure [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Merged coverage with reviewed exclusions | accepts=tool_run,veritriage_session,human_attestation | tools=coverage.read,veritriage.investigate | applies always
+- formal-closure [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Proof status with bounds | accepts=tool_run,human_attestation | tools=formal.run | applies always
+- plan-audit [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Requirement-to-plan matrix | accepts=document,review_record | tools=- | applies always
+- program [program] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- regression-health [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Every open failure investigated | accepts=veritriage_session,human_attestation | tools=veritriage.investigate | applies always
+- waiver-audit [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Every waiver has an approved rationale | accepts=document,review_record | tools=- | applies always
+- ws.formal [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.signoff [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.verification [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+
+## Close timing on the timer: negative slack on the count path.
+intent=timing_closure features= workflows=timing-closure
+- classify [decision] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- constraint-fix [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- pd-fix [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- program [program] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- reanalysis [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Timing met on the fixed RTL: synthesized to the target library, then timed under the task's SDC | accepts=tool_run | tools=sta.run | before-review | files=sources<-rtl_source[upstream] | applies produced=any upstream=rtl_source
+    * Clean timing report | accepts=tool_run,human_attestation | tools=sta.run | applies produced=any upstream=constraints,layout
+- reanalysis.gate [gate] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- rtl-fix [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
+    * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
+    * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+- sta-analysis [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Timing report with failing paths | accepts=tool_run,human_attestation | tools=sta.run | applies always
+- ws.fix [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.implementation [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1

@@ -31,7 +31,7 @@ from test_nirmaan_formal_gate import COUNTER, COUNTER_SBY, FORMAL, runs_of, sby_
 from laws import needs
 
 from nirmaan.integrations.eda_parsers import parse_sby_cover
-from nirmaan.models import Assurance, DecisionKind, EscalationKind, EvidenceKind, TaskStatus
+from nirmaan.models import Assurance, Condition, DecisionKind, EscalationKind, EvidenceKind, TaskStatus
 from nirmaan.orchestrator import Orchestrator
 from nirmaan.org import AuthorityService
 from nirmaan.runtime import (
@@ -102,7 +102,8 @@ def test_every_rtl_workflow_carries_the_block_design_gates():
         assert rtl.evidence[1:] == RTL_GATES, workflow
         assert set(rtl.outputs) == {"rtl_source", "testbench"}
     cover = next(r for r in RTL_GATES if r.description == NOT_VACUOUS)
-    assert cover.before_review and cover.tools == ("formal.cover",) and cover.when_produced == ("formal_spec",)
+    assert cover.before_review and cover.tools == ("formal.cover",) and cover.when == (
+        Condition(on="produced", any_of=("formal_spec",)),)
     assert [(b.param, b.kinds) for b in cover.files] == [("sby", ("formal_spec",)), ("sources", ("rtl_source",))]
 
 

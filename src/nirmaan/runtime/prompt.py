@@ -19,6 +19,8 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+
+from nirmaan.applicability import describe
 from nirmaan.runtime.context import ArtifactView, AttemptView, ReviewView, WorkPacket
 
 SCOPES = ("Company", "Domain", "Project", "Task")
@@ -198,10 +200,8 @@ def _task(packet: WorkPacket, mode: str, cites: list[Citable], tools: tuple[Tool
                             else f"; run by the platform over the approved {', '.join(upstream)}")
         if req.before_review:
             tools_named += "; must be met before review"
-        if req.when_produced:
-            tools_named += f"; applies only if you produce a {' or '.join(req.when_produced)} file"
-        if req.when_upstream:
-            tools_named += f"; applies only to work built on a {' or '.join(req.when_upstream)}"
+        for said in describe(req.when):  # M48: each clause in its kind's words
+            tools_named += f"; {said}"
         accepts = ", ".join(k.value for k in req.accepts)
         lines.append(f"Evidence requirement: {req.description} (accepts: {accepts}{tools_named})")
     lines.append(f"Permitted tools: {', '.join(packet.tools) or 'none'}")

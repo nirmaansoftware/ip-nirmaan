@@ -40,6 +40,7 @@ now a `Registry` with the name in the first column.
 | `engineering.item_kinds` | `engineering.py` `_ITEM_OVERLAY` | verification item kinds over the declared table | `item_kinds` |
 | `export.folders` | `export.py` `_OVERLAY` | deliverable folders over the declared table | `folders` |
 | `export.section_writers` | `export.py` `_SECTION_WRITERS` | writers for sections that live outside `export.py` | `export_project` |
+| `applicability.kinds` | `applicability.py` `_KINDS` (M48, new) | condition kinds a `Condition.on` can name | `applies`, `validate` |
 
 (`firmware.register_map_sources` is not a registry; its name only starts with
 `register_`.)

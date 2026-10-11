@@ -27,7 +27,8 @@ from test_nirmaan_physical import PD, TINY_LIB, fake_tool, invoke, nangate45, on
 from laws import needs
 
 from nirmaan.integrations.eda_antecedents import definitions, derive
-from nirmaan.models import Assurance, EvidenceKind, MemoryScope, TaskStatus
+from nirmaan.applicability import Facts, applies
+from nirmaan.models import Assurance, Condition, ConditionPhase, EvidenceKind, MemoryScope, TaskStatus
 from nirmaan.orchestrator import Orchestrator
 from nirmaan.runtime import MockLLM, ModelRuntime, ResultStatus, ToolAccessDenied, ToolBroker, review_task, run_task
 from nirmaan.work.policy import unsatisfied_requirements
@@ -66,12 +67,16 @@ def test_reanalysis_needs_a_real_sta_run_over_the_fixed_rtl_on_the_rtl_branch():
     assert retimed.accepts == (K.TOOL_RUN,) and retimed.tools == ("sta.run",) and retimed.before_review
     (binding,) = retimed.files
     assert binding.param == "sources" and binding.kinds == ("rtl_source",) and binding.upstream
-    assert retimed.when_upstream == ("rtl_source",)
+    assert retimed.when == (Condition(on="upstream", any_of=("rtl_source",)),)
     clean = by[CLEAN]  # the attestation stays only where no RTL was fixed
-    assert K.HUMAN_ATTESTATION in clean.accepts and set(clean.when_upstream) == {"constraints", "layout"}
-    assert not clean.applies((), ("rtl_source",)) and retimed.applies((), ("rtl_source",))
-    assert clean.applies((), ("constraints",)) and not retimed.applies((), ("constraints",))
-    assert not retimed.applies(())  # a requirement scoped to upstream kinds never applies blind
+    assert K.HUMAN_ATTESTATION in clean.accepts
+    assert clean.when == (Condition(on="upstream", any_of=("constraints", "layout")),)
+    on_rtl = Facts(ConditionPhase.RUN, produced=(), upstream=("rtl_source",))
+    assert not applies(clean.when, on_rtl) and applies(retimed.when, on_rtl)
+    on_constraints = Facts(ConditionPhase.RUN, produced=(), upstream=("constraints",))
+    assert applies(clean.when, on_constraints) and not applies(retimed.when, on_constraints)
+    # A requirement scoped to upstream kinds never applies blind: nothing upstream is a known empty set.
+    assert not applies(retimed.when, Facts(ConditionPhase.RUN, produced=(), upstream=()))
 
 
 @needs(*GATE_TOOLS)
@@ -431,7 +436,7 @@ def test_a_new_workflow_scopes_a_requirement_to_one_branch_with_no_core_changes(
     from nirmaan.org import register_extension, unregister_extension
 
     signed = EvidenceRequirement(description="Impact signed off by a person", accepts=(K.HUMAN_ATTESTATION,),
-                                 when_upstream=("impact_analysis",))
+                                 when=(Condition(on="upstream", any_of=("impact_analysis",)),))
     flow = WorkflowTemplate(
         id="test-branch-scoped", name="Branch scoped", description="One check, on one branch only.",
         intents=("branch_scoped",),

@@ -92,7 +92,7 @@ def attempts_of(engine, task_id: str) -> list:
 
 
 def test_no_shipped_capability_turns_repair_on(nirmaan_org):
-    assert {c.max_attempts for c in nirmaan_org.capabilities.values()} == {1}
+    assert {c.limits.attempts for c in nirmaan_org.capabilities.values()} == {None}  # the default, 1 (M48)
 
 
 @needs("verilator", "yosys")

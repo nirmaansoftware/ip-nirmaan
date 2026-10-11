@@ -24,10 +24,12 @@ import shutil
 import tempfile
 from pathlib import Path
 
+from nirmaan.applicability import Facts, applies
 from nirmaan.models import (
     Actor,
     ActorKind,
     Assurance,
+    ConditionPhase,
     EvidenceKind,
     ReviewState,
     TaskKind,
@@ -105,8 +107,10 @@ def work(engine: TaskEngine, task_id: str, outcome: str | None = None, workspace
     engine.start(task_id, owner)
     if task.kind is TaskKind.DECISION:
         outcome = outcome or task.outcomes[0]
-    upstream = upstream_kinds(engine.state, task)  # M37: a requirement may apply on one branch only
-    if any(r.before_review and r.applies(r.when_produced, upstream) for r in task.evidence_requirements):
+    # M37: a requirement may apply on one branch only. M48: the files are not produced yet, so a clause on what
+    # the task produces excludes nothing.
+    facts = Facts(ConditionPhase.RUN, upstream=upstream_kinds(engine.state, task))
+    if any(r.before_review and applies(r.when, facts) for r in task.evidence_requirements):
         gated_submit(engine, task_id, outcome, workspace)
     else:
         produced = []
@@ -153,8 +157,8 @@ def gated_submit(engine: TaskEngine, task_id: str, outcome: str | None = None,
         produced.append((kind, str(root / Path(name).name), entry))
     kinds = {kind for kind, _, _ in produced}
     broker = ToolBroker(engine)
-    upstream = upstream_kinds(engine.state, task)
-    for req in (r for r in task.evidence_requirements if r.before_review and r.applies(kinds, upstream)):
+    facts = Facts(ConditionPhase.RUN, produced=kinds, upstream=upstream_kinds(engine.state, task))
+    for req in (r for r in task.evidence_requirements if r.before_review and applies(r.when, facts)):
         params = dict(req.params)
         for binding in req.files:
             if binding.upstream:  # M38: the approved upstream files, as the runtime fills them
@@ -170,7 +174,7 @@ def gated_submit(engine: TaskEngine, task_id: str, outcome: str | None = None,
             contract = engine.org.tools[tool].params
             takes = contract is None or any(p.name == "workdir" for p in contract)
             workdir = {"workdir": str(root / tool)} if takes else {}  # an in-process check takes none
-            run, _ = broker.invoke(owner, tool, {**params, **workdir}, task_id)
+            run, _ = broker.invoke(owner, tool, {**params, **workdir}, task_id, bounds=req.bounds)
             engine.record_evidence(task_id, owner, EvidenceKind.TOOL_RUN, run.summary,
                                    reference=run.references[0] if run.references else None, tool_run=run.id)
     drafts = [_draft(kind, Path(path)) for kind, path, _ in produced]
