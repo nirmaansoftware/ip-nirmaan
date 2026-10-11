@@ -1,0 +1,18 @@
+[tasks]
+bad
+good
+
+[options]
+mode prove
+depth 4
+
+[engines]
+smtbmc
+
+[script]
+bad: read -formal -DBAD m.v
+good: read -formal m.v
+prep -top m
+
+[files]
+m.v

@@ -52,8 +52,8 @@ FW_MAP = _p("map", PATH, "A register map (JSON): its header is generated, and th
 #: What the EDA runner itself reads, for every tool it runs (integrations/eda.py).
 RUNNER = (
     _p("backend", TEXT, "Which backend to use, when the tool has several."),
-    _p("workdir", PATH, "The run's working directory; a new temporary one by default."),
-    _p("timeout", INT, "Seconds before the run is stopped (default 300)."),
+    _p("workdir", PATH, "Where the run's own new directory is made; the system's temporary directory by default."),
+    _p("timeout", INT, "Seconds the whole run may take, every step together; at least 1 (default 300)."),
 )
 PDK = (
     _p("liberty", PATHS, "Liberty files, absolute or under pdk_root / NIRMAAN_PDK_ROOT (backend yosys-liberty)."),
