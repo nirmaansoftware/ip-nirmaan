@@ -101,6 +101,7 @@ The original preface of the section:
 - [M50-constitution-hardening](M50-constitution-hardening.md): Milestone 50 - Constitution hardening: evidence about this task and submission, brokered runs only, people approve where the matrix says, one MCP session is one role
 - [M52-runtime-loop-fixes](M52-runtime-loop-fixes.md): Milestone 52 - Runtime and loop fixes: a runtime's submission is final, a bad answer is a refused attempt, evidence bound to its submission
 - [M53-gate-integrity](M53-gate-integrity.md): Milestone 53 - Gate integrity: verdicts the work under test cannot forge
+- [M54-demo-surfaces](M54-demo-surfaces.md): Milestone 54 - Demo surfaces: the landing page states only what the engine does, CLI output a person can read
 
 ## Before M43
 
