@@ -73,3 +73,26 @@ def test_missing_sdk_raises_clean_error(fixture_log):
     outcome = analyze(fixture_log("uvm_assertion.log"))
     with pytest.raises(AIReasoningError, match="not installed"):
         AIReasoner().review(outcome.graph, outcome.report.reasoning)
+
+
+def test_missing_credentials_raise_clean_error(fixture_log, monkeypatch):
+    """The SDK reports missing credentials as a TypeError; the CLI must see one clean AIReasoningError."""
+    import sys
+    import types
+
+    fake = types.ModuleType("anthropic")
+
+    class APIError(Exception):
+        pass
+
+    class Anthropic:
+        class messages:
+            @staticmethod
+            def create(**_):
+                raise TypeError('"Could not resolve authentication method. Expected either api_key or auth_token"')
+
+    fake.APIError, fake.Anthropic = APIError, Anthropic
+    monkeypatch.setitem(sys.modules, "anthropic", fake)
+    outcome = analyze(fixture_log("uvm_assertion.log"))
+    with pytest.raises(AIReasoningError, match="no Anthropic credentials"):
+        AIReasoner().review(outcome.graph, outcome.report.reasoning)

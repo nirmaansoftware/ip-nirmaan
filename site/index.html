@@ -149,7 +149,7 @@
         <p class="eyebrow">Real output</p>
         <h2 class="section__title display" id="plan-title">One sentence in. A whole plan&nbsp;out.</h2>
       </div>
-      <p class="section__text">What <code>nirmaan plan</code> prints for a 4-port AXI-to-NoC bridge, trimmed. Every task has an owner, and every gate names the human who approves it.</p>
+      <p class="section__text">What <code>nirmaan plan</code> prints for a 4-port AXI-to-NoC bridge, trimmed. Every task has an owner, and every gate waits for a person&rsquo;s sign-off.</p>
     </div>
     <figure class="term" data-term>
         <div class="term__bar">
@@ -221,15 +221,15 @@
           </li>
           <li class="rung" style="--r:1">
             <span class="rung__state">executed</span>
-            <span class="rung__need">A recorded tool run</span>
+            <span class="rung__need">Submitted by its owner</span>
           </li>
           <li class="rung" style="--r:2">
             <span class="rung__state">verified</span>
-            <span class="rung__need">An independent review</span>
+            <span class="rung__need">All required checks recorded</span>
           </li>
           <li class="rung" style="--r:3">
             <span class="rung__state">approved</span>
-            <span class="rung__need">A named human's sign-off</span>
+            <span class="rung__need">An authorized sign-off</span>
           </li>
         </ol>
         <div class="ladder__track" aria-hidden="true"><span class="ladder__token"></span></div>
@@ -371,7 +371,7 @@
         <p class="eyebrow">The company constitution</p>
         <h2 class="section__title display" id="constitution-title">Twelve principles the engine&nbsp;enforces.</h2>
       </div>
-      <p class="section__text">Each one is a blocking check: an action that breaks it is refused, and the refusal is written to the audit trail.</p>
+      <p class="section__text">Each one is a blocking check: an action that breaks it is refused before it changes anything. When an AI worker&rsquo;s submission is refused, the attempt and the reason are recorded.</p>
     </div>
 
     <ol class="principles articles" role="list" aria-label="The twelve principles">
@@ -493,15 +493,15 @@
     <div class="status">
         <section class="status__col status__col--now" data-reveal style="--d:0">
           <h3><span class="mark" aria-hidden="true"></span>Working today</h3>
-          <p>The organization model, planning, routing, reviews, gates, the audit trail, and real VeriTriage investigations. AI workers fill design, RTL, and verification seats, and open-source tools check every submission (lint, simulation, synthesis, formal proofs) before a person reviews it. On a small block, place and route, three-corner timing, DRC, and LVS run for real in CI. A first live evaluation of Claude Opus 5.5 passed all four RTL cases, judged by held-out checks.</p>
+          <p>The organization model, planning, routing, reviews, gates, the audit trail, and real VeriTriage investigations. AI workers fill design, RTL, and verification seats, and open-source tools check every submission (lint, simulation, synthesis, formal proofs) before a person reviews it. On a small block, place and route, three-corner timing, DRC, and LVS run for real in CI. In the tests, the AI workers&rsquo; answers are scripted; one early live run of Claude Opus 5.5 passed all four RTL cases, judged by held-out checks, but was not recorded as data.</p>
         </section>
         <section class="status__col status__col--next" data-reveal style="--d:1">
           <h3><span class="mark" aria-hidden="true"></span>Next</h3>
-          <p>Formal proofs written by the AI workers, more evaluation cases, and physical design beyond small blocks.</p>
+          <p>Recorded, repeated live evaluations that anyone can re-judge, formal proofs written by the AI workers, and physical design beyond small blocks.</p>
         </section>
         <section class="status__col status__col--not" data-reveal style="--d:2">
           <h3><span class="mark" aria-hidden="true"></span>Not yet</h3>
-          <p>No customer has received IP from the system, and nothing has been taped out. The blocks it has designed end to end so far (a register block, a FIFO, an arbiter) are small reference blocks that prove the flow.</p>
+          <p>No customer has received IP from the system, and nothing has been taped out. The reference blocks that run through the whole flow (a register block, a FIFO, an arbiter) prove the flow and its checks, not yet a model designing them unaided.</p>
         </section>
       </div>
   </div>

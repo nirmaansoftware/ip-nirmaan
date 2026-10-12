@@ -76,6 +76,17 @@ def _fail(message: str) -> None:
     raise typer.Exit(1)
 
 
+def _message(exc: Exception) -> str:
+    """An exception's text; a KeyError's ``str`` would wrap it in quotes."""
+    return str(exc.args[0]) if isinstance(exc, KeyError) and exc.args else str(exc)
+
+
+def _fields(item: dict) -> str:
+    """A status record as one readable line: its values, labelled, without JSON punctuation."""
+    return "  ".join(f"{k}: {', '.join(map(str, v)) if isinstance(v, (list, tuple)) else v}"
+                     for k, v in item.items() if v not in (None, "", [], ()))
+
+
 def _print_lines(lines: list[str]) -> None:
     for line in lines:
         console.print(escape(line), highlight=False, soft_wrap=True)
@@ -252,9 +263,9 @@ def workflows(workflow_id: Optional[str] = typer.Argument(None)) -> None:
             _fail(f"Unknown workflow {workflow_id!r}")
         console.print(f"[bold]{escape(wf.name)}[/bold]: {escape(wf.description)}")
         for stage in wf.stages:
-            cond = "" if stage.when.is_unconditional else f"  when {stage.when.model_dump(exclude_defaults=True)}"
+            cond = "" if stage.when.is_unconditional else "  when " + _fields(stage.when.model_dump(exclude_defaults=True))
             gate = f"  gate={stage.gate}" if stage.gate else ""
-            console.print(f"  {stage.id:24} {stage.capability:24} after {list(stage.depends_on)}{cond}{gate}")
+            console.print(f"  {stage.id:24} {stage.capability:24} after {', '.join(stage.depends_on) or 'nothing'}{cond}{gate}")
         return
     for wf in org.workflows.values():
         console.print(f"{wf.id:26} {len(wf.stages):3} stages  intents={','.join(wf.intents)}  {escape(wf.name)}")
@@ -368,7 +379,7 @@ def _read(project: str, root: Path, unverified: bool):
     try:
         state, integrity = ProjectStore(root).read(project)
     except (KeyError, ValueError) as exc:
-        _fail(str(exc))
+        _fail(_message(exc))
     if not integrity.verified and not unverified:
         _fail(f"Project {project} failed audit verification: {integrity.problems[0]} "
               "(a read-only view can show it with --unverified)")
@@ -428,7 +439,7 @@ def status(project: str, as_json: bool = typer.Option(False, "--json"), unverifi
         items = getattr(report, section)
         console.print(f"\n[bold]{section.replace('_', ' ').title()}[/bold] ({len(items)})")
         for item in items:
-            console.print("  " + escape(json.dumps(item)))
+            console.print("  " + escape(_fields(item)))
 
 
 @app.command()
@@ -490,7 +501,7 @@ def export_cmd(project: str, out: Path = typer.Option(..., "--out", help="A new 
         state, integrity = ProjectStore(root).read(project)  # the export reports a failed chain or seal itself
         report = export_project(_org(), state, out, records=integrity)
     except (KeyError, ValueError, ExportError) as exc:
-        _fail(str(exc))
+        _fail(_message(exc))
     if report.chain_problems:
         console.print(f"[bold red]AUDIT CHAIN FAILED VERIFICATION: {escape(report.chain_problems[0])}[/bold red]")
     if report.record_problems:
@@ -510,8 +521,12 @@ def gaps(project: str, as_json: bool = typer.Option(False, "--json"), root: Path
     if as_json:
         typer.echo(json.dumps([r.to_dict() for r in coverage], indent=2))
     else:
-        console.print(f"{len(coverage) - len(unbacked)} of {len(coverage)} recorded requirements are backed "
-                      "by passing, cited tool runs.")
+        if not coverage:
+            console.print("No requirements are recorded yet (import a verification plan with "
+                          "`nirmaan vplan import`).")
+        else:
+            console.print(f"{len(coverage) - len(unbacked)} of {len(coverage)} recorded requirements are backed "
+                          "by passing, cited tool runs.")
         for req in unbacked:
             console.print(f"\n[bold]{escape(req.requirement)}[/bold] {escape(req.text)}")
             for reason in req.reasons:
@@ -858,8 +873,13 @@ def task_escalate(project: str, task: str, reason: str, role: str = AS_OPTION, a
                   kind: EscalationKind = typer.Option(EscalationKind.TECHNICAL, "--kind"),
                   question: str = typer.Option("", "--question"),
                   option: List[str] = typer.Option([], "--option"), root: Path = ROOT_OPTION):
-    _mutate(project, root, lambda e: e.escalate(_task_id(e, task), _actor(role, agent), kind, reason,
-                                                blocking_question=question, recommended_options=tuple(option)))
+    _mutate(project, root, lambda e: _escalation_line(
+        e.escalate(_task_id(e, task), _actor(role, agent), kind, reason,
+                   blocking_question=question, recommended_options=tuple(option))))
+
+
+def _escalation_line(esc) -> str:
+    return f"{esc.id} {esc.kind.value} -> {esc.target_role}: {esc.reason} ({esc.state.value})"
 
 
 @task_app.command("resolve")

@@ -1,6 +1,6 @@
 # The driver on a RISC-V core, against the real RTL (Milestone 27)
 
-Status: design for the owner's review, implemented on branch
+Status: implemented and merged; built on branch
 `m27/riscv-firmware`. It continues the firmware part of Stage 6
 (`docs/FIRMWARE.md`, M25) and closes the first item that document deferred: a
 RISC-V cross compile in CI, and the driver run on a processor against the RTL.
@@ -118,11 +118,18 @@ The run's output is in M25's format, so `parse_soc_test` is M25's
 `parse_fw_test` (with the run named "SoC run") plus the code size:
 
 ```
-FWTEST BUS read 0x5 -> 0x00000000 SLVERR
-FWTEST PASS unmapped_read_reports_slverr
-FWTEST BUS write 0x4 = 0xabababab strobe 0x4 -> OKAY
-FWTEST SUMMARY 6 passed, 0 failed, 59734 cycles
+FWTEST:<nonce> BUS read 0x5 -> 0x00000000 SLVERR
+FWTEST:<nonce> PASS unmapped_read_reports_slverr
+FWTEST:<nonce> BUS write 0x4 = 0xabababab strobe 0x4 -> OKAY
+FWTEST:<nonce> SUMMARY 6 passed, 0 failed, 59734 cycles
+FWTEST:<nonce> END 20 bus transfers
 ```
+
+Since M53 (`docs/GATE_INTEGRITY.md`) the SoC prefixes the records with the
+run's nonce, which the firmware cannot read: BUS and END come from the SoC's
+own Verilog, and the runtime writes PASS, FAIL, IRQ, TRAP, and SUMMARY through
+the `REPORT` register (`0x2000_001C`). Text written to `CONSOLE` is never a
+record.
 
 Every outcome is a recorded run: a compile or link error, a Verilator error, a
 failed check, a CPU trap (illegal instruction, misaligned access, `ebreak`), a
@@ -192,8 +199,8 @@ returns the same code; the driver would not change.
   for `0x3` or `0xC`, `sb` for one lane. Any other pattern is one `sb` per
   lane, returning the first response that is not OKAY. A zero strobe issues
   nothing and returns SLVERR: the HAL cannot make that request, and says so.
-* `nirmaan_test_result`: formats the M25 `FWTEST PASS` or `FWTEST FAIL` line
-  and writes it to `CONSOLE`.
+* `nirmaan_test_result`: formats the M25 `PASS` or `FAIL` record and writes
+  it to `REPORT` (M53; it wrote to `CONSOLE` before).
 * `nirmaan_soc_main` (called by `crt0.S`): runs `nirmaan_fw_test`, prints the
   summary with `CYCLES`, and writes `EXIT` 0 only when at least one check
   passed and none failed.

@@ -1,6 +1,6 @@
 # Design for Test, advanced (Milestone 27)
 
-Status: design for the owner's review, implemented on branch `m27/dft-plus`.
+Status: implemented and merged; built on branch `m27/dft-plus`.
 It extends `docs/DFT.md` (M25: mux-D scan, one chain, the rule registry, and
 chain simulation) with the three items M25 deferred: multiple scan chains,
 stuck-at ATPG with fault coverage measured by real fault simulation, and

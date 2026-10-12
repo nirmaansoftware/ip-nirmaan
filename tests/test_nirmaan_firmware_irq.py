@@ -73,14 +73,18 @@ def firmware_requirements(engine):
 
 # --- The parser (no tool needed) --------------------------------------------------------------
 
-HOST_LOG = """\
-FWTEST BUS write 0x0 = 0x00000003 strobe 0xf -> OKAY
-FWTEST IRQ taken
-FWTEST BUS read 0x5 -> 0x00000000 SLVERR
-FWTEST TRAP bus-error read 0x5 SLVERR
-FWTEST TRAP bus-error write 0xe SLVERR at pc 0x000004c4
-FWTEST PASS interrupt_fires_and_is_handled
-FWTEST SUMMARY 1 passed, 0 failed, 40 cycles
+#: M53: the harness's records carry the run's nonce, which the runner's echo shows it passed.
+NONCE = "5eed5eed5eed5eed5eed5eed5eed5eed"
+HOST_LOG = f"""\
+$ Vdut +nirmaan_nonce={NONCE}
+FWTEST:{NONCE} BUS write 0x0 = 0x00000003 strobe 0xf -> OKAY
+FWTEST:{NONCE} IRQ taken
+FWTEST:{NONCE} BUS read 0x5 -> 0x00000000 SLVERR
+FWTEST:{NONCE} TRAP bus-error read 0x5 SLVERR
+FWTEST:{NONCE} TRAP bus-error write 0xe SLVERR at pc 0x000004c4
+FWTEST:{NONCE} PASS interrupt_fires_and_is_handled
+FWTEST:{NONCE} SUMMARY 1 passed, 0 failed, 40 cycles
+FWTEST:{NONCE} END 2 bus transfers
 """
 
 
@@ -95,7 +99,9 @@ def test_the_parser_counts_interrupts_taken_and_traps_delivered():
 
 
 def test_a_required_interrupt_or_trap_that_never_happened_fails_the_run(tmp_path):
-    quiet = "FWTEST PASS reset_values\nFWTEST SUMMARY 1 passed, 0 failed, 10 cycles\n"
+    quiet = (f"$ Vdut +nirmaan_nonce={NONCE}\nFWTEST:{NONCE} BUS read 0x0 -> 0x00000000 OKAY\n"
+             f"FWTEST:{NONCE} PASS reset_values\nFWTEST:{NONCE} SUMMARY 1 passed, 0 failed, 10 cycles\n"
+             f"FWTEST:{NONCE} END 1 bus transfers\n")
     assert parse_fw_test(quiet, (0,), require={"irq": False, "bus_error_trap": False}).passed
     result = parse_fw_test(quiet, (0,), require={"irq": True, "bus_error_trap": False})
     assert not result.passed and "require_irq" in result.summary and "no interrupt was taken" in result.summary
@@ -143,8 +149,8 @@ def test_the_timer_interrupt_fires_is_acknowledged_and_masked_in_host_cosim(bloc
     assert "-DNIRMAAN_DUT_IRQ" in log
     # Taken twice: once on expiry, once on unmasking the pending expiry; never while masked.
     assert outcome.data["result"]["metrics"]["irq_taken"] == 2
-    assert "FWTEST BUS write 0xc = 0x00000001 strobe 0xf -> OKAY" in log  # the W1C acknowledgement, on the RTL
-    assert "FWTEST BUS write 0x8 = 0x00000005 strobe 0xf -> SLVERR" in log
+    assert " BUS write 0xc = 0x00000001 strobe 0xf -> OKAY" in log  # the W1C acknowledgement, on the RTL
+    assert " BUS write 0x8 = 0x00000005 strobe 0xf -> SLVERR" in log
 
 
 @needs(*COSIM)
@@ -175,7 +181,7 @@ def test_the_wrong_timer_driver_fails_in_host_cosim(block, tmp_path):
     assert {n for n, ok in checks_of(outcome).items() if not ok} == {
         "interrupt_fires_and_is_handled", "interrupt_is_acknowledged_by_a_register_write",
         "unmasking_a_pending_interrupt_fires_it"}
-    assert "FWTEST BUS write 0x0 = 0x00000005 strobe 0xf -> OKAY" in log_of(run)  # EN and the wrong IE bit
+    assert " BUS write 0x0 = 0x00000005 strobe 0xf -> OKAY" in log_of(run)  # EN and the wrong IE bit
 
 
 @needs(*COSIM)
@@ -205,9 +211,9 @@ def test_bus_errors_are_reported_per_access_and_trap_precisely_in_host_cosim(blo
     assert traps_of(outcome) == TRAPS
     assert all(t["pc"] is None for t in outcome.data["result"]["metrics"]["traps"])
     # Each trap line follows the transfer that caused it, before any other transfer.
-    lines = [line for line in log_of(run).splitlines() if line.startswith(("FWTEST BUS", "FWTEST TRAP"))]
+    lines = [line for line in log_of(run).splitlines() if line.split(" ", 1)[-1].startswith(("BUS", "TRAP"))]
     for i, line in enumerate(lines):
-        if line.startswith("FWTEST TRAP"):
+        if line.split(" ", 1)[-1].startswith("TRAP"):
             assert lines[i - 1].endswith("SLVERR"), lines[i - 1]
 
 

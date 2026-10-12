@@ -16,6 +16,7 @@
 #define NIRMAAN_SOC_CONSOLE (*(volatile uint32_t *)0x20000004u) /* write: one character */
 #define NIRMAAN_SOC_EXIT (*(volatile uint32_t *)0x20000008u)    /* write: end the run with this code */
 #define NIRMAAN_SOC_CYCLES (*(volatile uint32_t *)0x2000000Cu)  /* read: cycles since reset */
+#define NIRMAAN_SOC_REPORT (*(volatile uint32_t *)0x2000001Cu)  /* write: one character of a record (M53) */
 
 /* Bus errors as traps (docs/FIRMWARE_IRQ_TRAPS.md, section 4). */
 #define NIRMAAN_SOC_BERR_CTRL (*(volatile uint32_t *)0x20000010u) /* bit 0 TRAP; bit 1 WIRED (read only) */

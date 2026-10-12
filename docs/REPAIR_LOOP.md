@@ -1,6 +1,6 @@
 # The repair loop (Milestone 26)
 
-Status: design for the owner's review, implemented on branch
+Status: implemented and merged; built on branch
 `m26/repair-loop`. This is post-roadmap work (see `docs/ROADMAP.md`, "After
 Stage 6"). Prose here is free of em and en dashes per the standing style law.
 

@@ -5,13 +5,16 @@
 // device transfer from the bus bridge. This file only clocks the model until
 // the firmware writes EXIT, and says so when it never does:
 //
-//   FWTEST ERROR the CPU trapped after <n> cycles
-//   FWTEST ERROR the firmware did not finish within <n> cycles
+//   FWTEST:<nonce> ERROR the CPU trapped after <n> cycles
+//   FWTEST:<nonce> ERROR the firmware did not finish within <n> cycles
+//
+// (M53) <nonce> is the run's, from +nirmaan_nonce=<hex>, as the SoC's own records carry it.
 //
 // The exit status is the code the firmware wrote to EXIT, or 2 when it trapped
 // or never finished.
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 
 #include "Vsoc.h"
 #include "verilated.h"
@@ -21,6 +24,10 @@ const unsigned long kMaxCycles = 5000000;  // far above any driver test; a hang 
 }
 
 int main(int argc, char **argv) {
+    const char *nonce = "none";
+    for (int i = 1; i < argc; ++i) {
+        if (std::strncmp(argv[i], "+nirmaan_nonce=", 15) == 0) nonce = argv[i] + 15;
+    }
     VerilatedContext *context = new VerilatedContext;
     context->commandArgs(argc, argv);
     Vsoc *soc = new Vsoc{context};
@@ -44,10 +51,10 @@ int main(int argc, char **argv) {
     if (soc->done) {
         status = static_cast<int>(soc->exit_code);
     } else if (soc->trap) {
-        std::printf("FWTEST ERROR the CPU trapped after %lu cycles (illegal instruction, misaligned access, "
-                    "or ebreak)\n", cycles);
+        std::printf("FWTEST:%s ERROR the CPU trapped after %lu cycles (illegal instruction, misaligned access, "
+                    "or ebreak)\n", nonce, cycles);
     } else if (!context->gotFinish()) {
-        std::printf("FWTEST ERROR the firmware did not finish within %lu cycles\n", cycles);
+        std::printf("FWTEST:%s ERROR the firmware did not finish within %lu cycles\n", nonce, cycles);
     }
     std::fflush(stdout);
     soc->final();

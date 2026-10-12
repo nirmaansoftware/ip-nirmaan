@@ -1,7 +1,9 @@
 """The tool catalog: capability-based permissions over honest implementations.
 
-``AVAILABLE`` means a real binding exists in this repository and an
-invocation executes. ``CONTRACT_ONLY`` means the organization plans around the
+``AVAILABLE`` means a real implementation exists in this repository: a
+broker binding that executes, or (for :data:`ENGINE_OPERATIONS`) an operation
+of the task engine itself, which the authority service permits by this
+capability and the broker never runs (M53). ``CONTRACT_ONLY`` means the organization plans around the
 tool but nothing here can run it, and the broker refuses rather than pretends:
 no agent can ever claim a CDC or equivalence run happened.
 
@@ -52,8 +54,8 @@ FW_MAP = _p("map", PATH, "A register map (JSON): its header is generated, and th
 #: What the EDA runner itself reads, for every tool it runs (integrations/eda.py).
 RUNNER = (
     _p("backend", TEXT, "Which backend to use, when the tool has several."),
-    _p("workdir", PATH, "The run's working directory; a new temporary one by default."),
-    _p("timeout", INT, "Seconds before the run is stopped (default 300)."),
+    _p("workdir", PATH, "Where the run's own new directory is made; the system's temporary directory by default."),
+    _p("timeout", INT, "Seconds the whole run may take, every step together; at least 1 (default 300)."),
 )
 PDK = (
     _p("liberty", PATHS, "Liberty files, absolute or under pdk_root / NIRMAAN_PDK_ROOT (backend yosys-liberty)."),
@@ -72,6 +74,12 @@ REQUIRE = (_p("require_irq", TEXT, "auto, yes, or no (default): fail unless the 
 NETLIST = (_p("netlist", PATH, "The gate-level netlist.", required=True),
            _p("sdc", PATH, "Timing constraints.", required=True))
 
+
+#: AVAILABLE capabilities the task engine performs itself (raising an escalation, creating, assigning, or
+#: cancelling a task, recording a review, granting an approval). They have no broker binding: the authority
+#: service checks them, and invoking one through the broker is refused as having no implementation there.
+ENGINE_OPERATIONS = ("escalation.raise", "task.create", "task.assign", "task.cancel", "review.create",
+                     "approval.grant")
 
 TOOLS: list[ToolSpec] = [
     # Platform operations, implemented by Nirmaan itself.

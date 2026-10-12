@@ -148,6 +148,13 @@ class AIReasoner:
             )
         except anthropic.APIError as exc:
             raise AIReasoningError(f"Anthropic API call failed: {exc}") from exc
+        except TypeError as exc:
+            # The SDK reports missing credentials as a TypeError when the request is built.
+            if "authentication" not in str(exc):
+                raise
+            raise AIReasoningError(
+                "no Anthropic credentials (set ANTHROPIC_API_KEY or run `ant auth login`)"
+            ) from exc
 
         text = "".join(block.text for block in response.content if block.type == "text").strip()
         if not text:

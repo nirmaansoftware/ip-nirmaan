@@ -1,6 +1,6 @@
 # The Design Gates on Every RTL Workflow, and Proofs That Are Not Vacuous (Milestone 27)
 
-Status: design for the owner's review, implemented on branch
+Status: implemented and merged; built on branch
 `m27/gates-everywhere`. This closes the "Not yet" cell of the "Where we are"
 table in `docs/ROADMAP.md` that read "Approved-inputs, synthesis, and formal
 gating on the `new-ip`, `feature-addition`, and `rtl-change` RTL stages;

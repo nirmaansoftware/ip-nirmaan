@@ -100,6 +100,8 @@ The original preface of the section:
 - [release-v1.24.0](release-v1.24.0.md): v1.24.0 (2026-10-12) - the plan from the principal-engineer review
 - [M50-constitution-hardening](M50-constitution-hardening.md): Milestone 50 - Constitution hardening: evidence about this task and submission, brokered runs only, people approve where the matrix says, one MCP session is one role
 - [M52-runtime-loop-fixes](M52-runtime-loop-fixes.md): Milestone 52 - Runtime and loop fixes: a runtime's submission is final, a bad answer is a refused attempt, evidence bound to its submission
+- [M53-gate-integrity](M53-gate-integrity.md): Milestone 53 - Gate integrity: verdicts the work under test cannot forge
+- [M54-demo-surfaces](M54-demo-surfaces.md): Milestone 54 - Demo surfaces: the landing page states only what the engine does, CLI output a person can read
 - [M55-veritriage-audit-fixes](M55-veritriage-audit-fixes.md): Milestone 55 - VeriTriage audit fixes: a stale project cache is rebuilt, the RTL provider reads less into SystemVerilog, Wishbone and OCP concepts stay on their protocols
 
 ## Before M43

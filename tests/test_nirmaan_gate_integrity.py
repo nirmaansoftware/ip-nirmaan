@@ -1,0 +1,428 @@
+"""Milestone 53: gate integrity (docs/GATE_INTEGRITY.md).
+
+Each test here is an audit probe (audit B, 2026-10) turned into a check that
+failed before M53: a real run whose pass did not mean what its gate claims.
+
+* A simulation passes only on the testbench's own verdict, which carries the
+  run's nonce; the design under test may not end the run or read the nonce.
+* A bounded proof is reported as bounded, and the formal gate asks for a proof.
+* A firmware verdict is the harness's, tagged with the run's nonce, and its
+  counts must agree with what the harness saw on the bus.
+* A run has its own directory and environment, and its timeout stops every
+  process it started, across all of its steps.
+"""
+
+from __future__ import annotations
+
+import os
+import subprocess
+import threading
+import time
+from pathlib import Path
+
+import pytest
+
+from laws import needs
+
+from nirmaan.integrations.eda import Backend, EdaResult, RunRecord, execute, select_backend
+from nirmaan.integrations import firmware_riscv, regmap  # noqa: F401  (they register their backends)
+from nirmaan.integrations.eda_parsers import parse_simulation
+from nirmaan.integrations.firmware import parse_fw_test
+from nirmaan.runtime.tools import unavailable_reason, within_bounds
+
+FIXTURES = Path(__file__).parent / "fixtures"
+RTL = FIXTURES / "rtl"
+GI = FIXTURES / "gate_integrity"
+AXIL = RTL / "axi4_lite"
+NONCE = "0123456789abcdef0123456789abcdef"
+SIMULATORS = pytest.mark.parametrize("backend", [
+    pytest.param("icarus", marks=needs("iverilog", "vvp")),
+    pytest.param("verilator-sim", marks=needs("verilator")),
+])
+
+
+def sim(sources, top: str, backend: str, **extra):
+    """A simulator.run through the real backend, as the broker runs it."""
+    chosen, why = select_backend("simulator.run", {"backend": backend})
+    assert chosen, why
+    return execute(chosen, {"sources": ",".join(str(s) for s in sources), "top": top, "backend": backend, **extra})
+
+
+def broken_axil(tmp_path: Path, finish: bool) -> Path:
+    """The audit's F14 design: reads always return zero, and (with ``finish``) it ends every simulation at time 0."""
+    text = (AXIL / "axi4_lite_regs.v").read_text()
+    for reg in ("reg0", "reg1", "reg2", "reg3"):
+        text = text.replace(f"s_axil_rdata <= {reg};", "s_axil_rdata <= {DATA_WIDTH{1'b0}};")
+    if finish:
+        text = text.replace("endmodule", "    // synthesis translate_off\n    initial $finish;\n"
+                                         "    // synthesis translate_on\nendmodule")
+    out = tmp_path / ("finish" if finish else "plain") / "axi4_lite_regs.v"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(text)
+    return out
+
+
+# --- F14: the design cannot end the run, and a pass needs the testbench's verdict -------------------
+
+
+@SIMULATORS
+def test_rtl_that_ends_the_simulation_fails_the_reference_testbench(tmp_path, backend):
+    plain = sim([broken_axil(tmp_path, False), AXIL / "axi4_lite_regs_tb.v"], "axi4_lite_regs_tb", backend)
+    assert not plain.succeeded  # the reference testbench catches the zero reads
+    ended = sim([broken_axil(tmp_path, True), AXIL / "axi4_lite_regs_tb.v"], "axi4_lite_regs_tb", backend)
+    assert not ended.succeeded, ended.summary
+    assert "axi4_lite_regs.v uses $finish" in ended.summary and "nothing was simulated" in ended.summary
+
+
+@SIMULATORS
+def test_the_fixed_rtl_passes_the_reference_testbench_with_its_checks_counted(backend):
+    run = sim([AXIL / "axi4_lite_regs.v", AXIL / "axi4_lite_regs_tb.v"], "axi4_lite_regs_tb", backend)
+    assert run.succeeded and "298 checks passed" in run.summary, run.summary
+    assert run.metrics["checks"] == 298 and run.metrics["checks_failed"] == 0
+
+
+@SIMULATORS
+def test_a_design_cannot_read_the_nonce(tmp_path, backend):
+    rtl = tmp_path / "spy.v"
+    rtl.write_text("module spy; reg [8*64-1:0] n; initial if ($value$plusargs(\"nirmaan_nonce=%s\", n))\n"
+                   "  $display(\"NIRMAAN-SIM %0s 1 passed, 0 failed\", n); endmodule\n")
+    tb = tmp_path / "tb.v"
+    tb.write_text("module tb; spy s(); initial #1 $finish; endmodule\n")
+    run = sim([rtl, tb], "tb", backend)
+    assert not run.succeeded and "spy.v uses $value$plusargs" in run.summary
+
+
+# --- F1, F2: words are not a verdict; $finish is the simulator's own line ------------------------------
+
+
+@SIMULATORS
+def test_a_testbench_that_reports_failure_in_words_fails(backend):
+    run = sim([GI / "tb_display_fail.v"], "tb_display_fail", backend)
+    assert not run.succeeded and "printed no verdict" in run.summary, run.summary
+
+
+@needs("iverilog", "vvp")
+def test_a_printed_finish_line_is_not_a_finish():
+    run = sim([GI / "tb_fake_finish.v"], "tb_fake_finish", "icarus")
+    assert not run.succeeded and "$finish never reached" in run.summary, run.summary
+
+
+@needs("iverilog", "vvp")
+def test_finish_with_an_argument_is_a_finish_on_icarus():
+    result = parse_simulation("$ vvp -n sim.vvp +nirmaan_nonce=" + NONCE + "\n"
+                              f"NIRMAAN-SIM {NONCE} 1 passed, 0 failed\ntb.v:4: $finish(2) called at 0 (1s)\n",
+                              (0, 0), nonce=NONCE)
+    assert result.passed and result.metrics["finished"], result.summary
+
+
+def _log(*lines: str) -> str:
+    return "\n".join(["$ vvp -n sim.vvp +nirmaan_nonce=" + NONCE, *lines, "tb.v:9: $finish called at 50 (1s)"]) + "\n"
+
+
+def test_the_verdict_must_carry_the_runs_nonce_and_a_passing_check():
+    ok = parse_simulation(_log(f"NIRMAAN-SIM {NONCE} 3 passed, 0 failed"), (0, 0), nonce=NONCE)
+    assert ok.passed and ok.summary.startswith("simulation passed: 3 checks passed")
+    for lines, why in (((), "printed no verdict"),
+                       ((f"NIRMAAN-SIM {'f' * 32} 3 passed, 0 failed",), "without this run's nonce"),
+                       ((f"NIRMAAN-SIM {NONCE} 0 passed, 0 failed",), "no check passed"),
+                       ((f"NIRMAAN-SIM {NONCE} 2 passed, 1 failed",), "1 of 3 checks failed"),
+                       ((f"NIRMAAN-SIM {NONCE} 2 passed, 0 failed",) * 2, "2 verdicts")):
+        result = parse_simulation(_log(*lines), (0, 0), nonce=NONCE)
+        assert not result.passed and why in result.summary, (lines, result.summary)
+
+
+# --- F3, F16, F22, F9: the runner ------------------------------------------------------------------
+
+
+def _shell(name: str, *scripts: str) -> Backend:
+    """A backend whose steps are shell scripts: a stand-in for any tool, run by the real runner."""
+    return Backend(name, "lint.run", ("sh",), lambda job: [["sh", "-c", s] for s in scripts],
+                   lambda run: EdaResult(bool(run.returncodes) and run.returncode == 0, "ran"), ("sources",))
+
+
+def test_a_timeout_below_one_second_is_refused():
+    for bad in ("0", "-5"):
+        reason = unavailable_reason("lint.run", {"sources": str(RTL / "counter.v"), "timeout": bad})
+        assert reason and "timeout must be at least 1 second" in reason and "nothing ran" in reason
+        outcome = execute(_shell("t", "true"), {"sources": str(RTL / "counter.v"), "timeout": bad})
+        assert not outcome.succeeded and "at least 1 second" in outcome.summary
+
+
+def _alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    return subprocess.run(["ps", "-o", "stat=", "-p", str(pid)], capture_output=True, text=True).stdout.strip()[:1] \
+        not in ("", "Z")
+
+
+def test_a_timeout_stops_every_process_the_step_started(tmp_path):
+    backend = _shell("orphans", "sleep 300 & echo $! > child.pid; wait")
+    started = time.monotonic()
+    outcome = execute(backend, {"sources": str(RTL / "counter.v"), "timeout": "1", "workdir": str(tmp_path)})
+    assert not outcome.succeeded and "timed out after 1s" in outcome.summary
+    assert time.monotonic() - started < 15
+    child = int((Path(outcome.references[0]).parent / "child.pid").read_text())
+    time.sleep(0.2)
+    assert not _alive(child), "the step's own child outlived the timeout"
+
+
+def test_the_timeout_covers_the_whole_run(tmp_path):
+    backend = _shell("steps", "sleep 0.8", "sleep 0.8", "sleep 0.8")
+    outcome = execute(backend, {"sources": str(RTL / "counter.v"), "timeout": "2", "workdir": str(tmp_path)})
+    assert not outcome.succeeded and "timed out after 2s" in outcome.summary, outcome.summary
+    assert outcome.data["exit_statuses"] == [0, 0]  # the third step ran out of the run's time
+
+
+def test_a_run_never_works_in_the_given_directory(tmp_path):
+    keep = tmp_path / "stat.json"
+    keep.write_text("not the run's")
+    outcome = execute(_shell("del", "rm -f stat.json; echo $PWD"), {"sources": str(RTL / "counter.v"),
+                                                                    "workdir": str(tmp_path)})
+    assert outcome.succeeded and keep.read_text() == "not the run's"
+    run_dir = Path(outcome.references[0]).parent
+    assert run_dir.parent == tmp_path.resolve() and run_dir.name.startswith("nirmaan-del-")
+    fresh = tmp_path / "fresh"
+    first = execute(_shell("one", "true"), {"sources": str(RTL / "counter.v"), "workdir": str(fresh)})
+    again = execute(_shell("two", "true"), {"sources": str(RTL / "counter.v"), "workdir": str(fresh)})
+    assert Path(first.references[0]).parent == fresh.resolve()  # a new, empty directory is the run's own
+    assert Path(again.references[0]).parent.parent == fresh.resolve()  # a used one is not reused
+
+
+def test_a_tool_run_sees_no_credential(tmp_path, monkeypatch):
+    secret = "sk-test-0123456789abcdefghij"
+    monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", secret)
+    monkeypatch.setenv("SOME_API_KEY", secret + "x")
+    outcome = execute(_shell("env", "env; echo printed=" + secret),
+                      {"sources": str(RTL / "counter.v"), "workdir": str(tmp_path)})
+    log = Path(outcome.references[0]).read_text()
+    assert "CLAUDE_CODE_OAUTH_TOKEN" not in log.replace("[CLAUDE_CODE_OAUTH_TOKEN redacted]", "")
+    assert "SOME_API_KEY" not in log and secret not in log
+    assert "printed=[CLAUDE_CODE_OAUTH_TOKEN redacted]" in log  # a value printed anyway never reaches the record
+
+
+@needs("verilator")
+def test_two_builds_at_once_in_one_workdir_are_isolated(tmp_path):
+    """The parallel-run flake: two Verilator builds at once, given the same directory, both pass."""
+    results = {}
+
+    def build(key: str) -> None:
+        results[key] = sim([RTL / "counter.v", RTL / "counter_tb.v"], "counter_tb", "verilator-sim",
+                           workdir=str(tmp_path))
+
+    threads = [threading.Thread(target=build, args=(k,)) for k in ("a", "b")]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert all(r.succeeded for r in results.values()), [r.summary for r in results.values()]
+    dirs = {Path(r.references[0]).parent for r in results.values()}
+    assert len(dirs) == 2 and all(tmp_path.resolve() in (d, d.parent) for d in dirs)
+
+
+# --- F15, F17: a bounded check is not a proof ----------------------------------------------------------
+
+
+@needs("sby", "yosys", "yices-smt2")
+def test_bmc_is_reported_as_bounded_and_does_not_meet_the_formal_gate():
+    from nirmaan.company.workflows import RTL_GATES
+
+    gate = next(r for r in RTL_GATES if r.tools == ("formal.run",))
+    formal, _ = select_backend("formal.run", {})
+    bmc = execute(formal, {"sby": str(GI / "late_bmc.sby"), "sources": str(GI / "late.v")})
+    assert bmc.succeeded and "no counterexample within 3 steps" in bmc.summary and "proven" not in bmc.summary
+    assert bmc.metrics["mode"] == "bmc" and bmc.metrics["depth"] == 3 and bmc.metrics["proven"] == 0
+    judged = within_bounds(bmc, gate.bounds)
+    assert not judged.succeeded and "proven" in judged.summary
+    prove = execute(formal, {"sby": str(GI / "late_prove.sby"), "sources": str(GI / "late.v")})
+    assert not prove.succeeded  # the same false assertion, in prove mode
+    counter = execute(formal, {"sby": str(RTL / "counter.sby")})
+    assert counter.succeeded and counter.metrics["proven"] == 1 and within_bounds(counter, gate.bounds).succeeded
+
+
+@needs("sby", "yosys")
+def test_a_multi_task_setup_is_refused_with_a_reason():
+    formal, _ = select_backend("formal.run", {})
+    run = execute(formal, {"sby": str(GI / "tasks.sby")})
+    assert not run.succeeded and "declares [tasks]" in run.summary and "nothing ran" in run.summary
+
+
+@needs("sby", "yosys", "yices-smt2")
+def test_a_formal_timeout_leaves_no_solver_running():
+    formal, _ = select_backend("formal.run", {})
+    run = execute(formal, {"sby": str(GI / "hard.sby"), "timeout": "3"})
+    assert not run.succeeded and "timed out after 3s" in run.summary
+    time.sleep(0.5)
+    run_dir = str(Path(run.references[0]).parent)
+    left = subprocess.run(["ps", "-axo", "command="], capture_output=True, text=True).stdout
+    assert not [line for line in left.splitlines() if run_dir in line and "grep" not in line]
+
+
+
+# --- F4: the firmware verdict is the harness's ----------------------------------------------------------
+
+FW = FIXTURES / "fw" / "axi4_lite"
+AXIL_RTL = AXIL / "axi4_lite_regs.v"
+FW_TOOLS = ("cc", "verilator", "make")
+
+
+def fw(tool: str, sources, **extra):
+    chosen, why = select_backend(tool, {})
+    assert chosen, why
+    return execute(chosen, {"sources": ",".join(str(s) for s in sources), "rtl": str(AXIL_RTL),
+                            "top": "axi4_lite_regs", **extra})
+
+
+@needs(*FW_TOOLS)
+@pytest.mark.parametrize("test, why", [
+    ("fake_test.c", "without this run's nonce"),       # prints a passing summary, then exit(0): 0 transfers
+    ("mismatch_test.c", "without this run's nonce"),   # one real check, two printed PASS lines
+    ("early_exit_test.c", "printed no summary"),       # one real check, then exit(0) before the harness reports
+    ("no_bus_test.c", "3 checks passed on 0 bus transfers"),
+])
+def test_code_under_test_cannot_make_the_firmware_verdict(test, why):
+    run = fw("fw.test", [GI / test])
+    assert not run.succeeded and why in run.summary, run.summary
+
+
+@needs(*FW_TOOLS)
+def test_the_real_driver_tests_still_pass_on_the_harness_verdict():
+    driver = [FW / "axi4_lite_regs_drv.c", FW / "axi4_lite_regs_drv.h", FW / "axi4_lite_regs_map.h"]
+    for test in (FW / "axi4_lite_regs_test.c", Path("evals/firmware/axi4_lite/held_out_test.c").resolve()):
+        run = fw("fw.test", [*driver, test])
+        assert run.succeeded, run.summary
+        log = Path(run.references[0]).read_text()
+        nonce = log.split("+nirmaan_nonce=", 1)[1].split()[0]
+        assert f"FWTEST:{nonce} END {run.metrics['bus_transfers']} bus transfers" in log
+        assert "+nirmaan_nonce=" not in log.split(f"FWTEST:{nonce}", 1)[1]  # the program never printed it
+
+
+@needs("verilator", "make", any_of=("riscv64-unknown-elf-gcc", "riscv64-elf-gcc"))
+def test_firmware_console_text_is_never_a_record_on_the_soc():
+    run = fw("fw.soc_test", [GI / "console_forge_test.c"])
+    assert not run.succeeded and "FWTEST PASS forged_on_the_console" in run.summary, run.summary
+
+
+def _fw_log(*records: str, nonce: str = NONCE) -> str:
+    return "\n".join(["$ cosim/Vdut +nirmaan_nonce=" + nonce, *(f"FWTEST:{nonce} {r}" for r in records)]) + "\n"
+
+
+def test_the_harness_counts_must_agree_with_its_records():
+    good = ("BUS read 0x0 -> 0x00000000 OKAY", "PASS reset", "SUMMARY 1 passed, 0 failed, 9 cycles",
+            "END 1 bus transfers")
+    assert parse_fw_test(_fw_log(*good), (0, 0)).passed
+    for records, why in (
+        ((*good[:2], "SUMMARY 2 passed, 0 failed, 9 cycles", good[3]), "counted 2 passed"),
+        ((*good[:3], "END 4 bus transfers"), "counted 4 bus transfers"),
+        (good[:3], "printed no summary"),  # no END: the harness never finished
+    ):
+        result = parse_fw_test(_fw_log(*records), (0, 0))
+        assert not result.passed and why in result.summary, (records, result.summary)
+    other = parse_fw_test(_fw_log(*good) + f"FWTEST:{'f' * 32} PASS another\n", (0, 0))
+    assert not other.passed and "without this run's nonce" in other.summary
+
+
+# --- The low findings ------------------------------------------------------------------------------------
+
+
+@needs("yosys", "iverilog", "vvp")
+def test_mbist_fails_on_a_simulator_error_a_bad_exit_or_a_missing_memory():
+    from nirmaan.integrations.dft import parse_mbist
+
+    chosen, _ = select_backend("dft.mbist", {})
+    run = execute(chosen, {"sources": str(RTL / "mbist" / "sync_ram.v"), "top": "sync_ram"})
+    assert run.succeeded, run.summary
+    log_path = Path(run.references[0])
+    log, codes = log_path.read_text(), tuple(run.data["exit_statuses"])
+
+    def parse(text: str, statuses=codes):
+        return parse_mbist(RunRecord(text, statuses, log_path.parent))
+
+    assert parse(log).passed
+    assert not parse(log + "ERROR: sync_ram.v:9: the model's own check failed\n").passed
+    assert not parse(log, (*codes[:-1], 1)).passed
+    gen = next(line for line in log.splitlines() if line.startswith("DFT-MBIST-GEN:"))
+    doubled = log.replace(gen, gen + "\n" + gen.replace("sync_ram", "other_ram"))
+    result = parse(doubled)
+    assert not result.passed and "2 controllers were generated for 1 memories" in result.summary
+
+
+def test_pv_with_half_an_lvs_setup_is_refused():
+    from nirmaan.integrations.physical import _pv_environment
+
+    for half in ({"lvs_deck": "/pdk/lvs.lylvs"}, {"cdl": "/pdk/cells.cdl"}):
+        why = _pv_environment({"drc_deck": "/pdk/drc.lydrc", **half})
+        assert why and "LVS needs both lvs_deck and cdl" in why, why
+
+
+def test_partial_klayout_and_opensta_reports_fail():
+    from nirmaan.integrations.pd_parsers import parse_klayout, parse_opensta
+
+    pv = (FIXTURES / "pd" / "klayout_pv.log").read_text()
+    assert parse_klayout(pv, 0).passed
+    cut = "".join(line for line in pv.splitlines(keepends=True) if not line.startswith("nirmaan-lvs-mismatched-pins"))
+    result = parse_klayout(cut, 0)
+    assert not result.passed and "pins" in result.summary
+    sta = (FIXTURES / "pd" / "opensta_met.log").read_text()
+    assert parse_opensta(sta, 0).passed
+    for gone in ("worst slack min", "tns", "wns"):
+        partial = "".join(line for line in sta.splitlines(keepends=True) if not line.startswith(gone))
+        result = parse_opensta(partial, 0)
+        assert not result.passed and "incomplete" in result.summary, (gone, result.summary)
+
+
+def test_spec_check_with_nothing_to_check_fails(tmp_path):
+    from nirmaan.integrations.spec_check import check_spec
+
+    checks = tmp_path / "empty.json"
+    checks.write_text('{"format": "nirmaan.spec-checks"}')
+    spec = tmp_path / "spec.md"
+    spec.write_text("# A spec\n")
+    passed, summary = check_spec([str(spec)], str(checks))
+    assert not passed and "lists no requirement and no name" in summary
+
+
+def test_veritriage_refuses_a_directory_cleanly(tmp_path):
+    from nirmaan.integrations.veritriage import investigate
+
+    outcome = investigate({"paths": str(tmp_path)}, None)
+    assert not outcome.succeeded and "not a file" in outcome.summary
+
+
+def test_engine_operations_are_marked_as_such(nirmaan_org):
+    from nirmaan.company.tools import ENGINE_OPERATIONS
+    from nirmaan.models import ToolStatus
+    from nirmaan.runtime.tools import available_bindings
+
+    bound = set(available_bindings())
+    available = {t for t, spec in nirmaan_org.tools.items() if spec.status is ToolStatus.AVAILABLE}
+    assert available - bound == set(ENGINE_OPERATIONS)
+    assert set(ENGINE_OPERATIONS) == {"escalation.raise", "task.create", "task.assign", "task.cancel",
+                                      "review.create", "approval.grant"}
+
+
+def test_one_riscv_gcc_definition():
+    """fw.build's riscv-gcc backend finds RISC-V GCC as fw.cross_build does, and builds for the same ISA."""
+    from nirmaan.integrations.eda import backends_for
+    from nirmaan.integrations.firmware_riscv import RISCV_GCC, TARGET_FLAGS, toolchain
+
+    riscv = next(b for b in backends_for("fw.build") if b.name == "riscv-gcc")
+    assert riscv.executables == () and riscv.environment is not None
+    assert RISCV_GCC == ("riscv64-unknown-elf-gcc", "riscv64-elf-gcc") and "-march=rv32i" in TARGET_FLAGS
+    why = riscv.environment({})
+    assert (why is None) == (toolchain() is not None)
+
+
+def test_ci_pipes_fail_and_live_eval_is_pinned_and_keeps_the_token_away():
+    root = Path(__file__).parent.parent
+    ci = (root / ".github" / "workflows" / "ci.yml").read_text()
+    for block in ci.split("- name:")[1:]:
+        if "| tail" in block:
+            assert "set -o pipefail" in block, block.splitlines()[0]
+    live = (root / ".github" / "workflows" / "live-eval.yml").read_text()
+    assert "uses: ./.github/actions/oss-cad-suite" in live and "oss-cad-suite-build/releases" not in live
+    assert "npm install -g @anthropic-ai/claude-code@" in live
+    steps = live.split("- name:")[1:]
+    with_token = [b.splitlines()[0].strip() for b in steps if "secrets.CLAUDE_CODE_OAUTH_TOKEN" in b]
+    assert with_token == ["Gate on the secret", "Run the live evaluation"]

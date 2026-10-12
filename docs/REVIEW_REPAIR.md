@@ -1,6 +1,6 @@
 # Repair after review, and retry limits per stage (Milestone 27)
 
-Status: design for the owner's review, implemented on branch
+Status: implemented and merged; built on branch
 `m27/review-repair`. This is post-roadmap work (see `docs/ROADMAP.md`, "After
 Stage 6"). Prose here is free of em and en dashes per the standing style law.
 

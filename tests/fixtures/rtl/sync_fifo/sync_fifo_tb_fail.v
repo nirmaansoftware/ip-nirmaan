@@ -122,6 +122,7 @@ module sync_fifo_tb_fail;
     integer      i;
     integer      seed = 26;
     integer      direct_errors = 0;
+    reg [8*64-1:0] nonce;  // the run's nonce (+nirmaan_nonce=), for the verdict line
 
     sync_fifo_tb_lane #(.DEPTH(8), .WIDTH(8)) lane8 (
         .clk(clk), .rst_n(rst_n), .wr_en(wr_en), .rd_en(rd_en), .wr_data(wr_data[7:0]));
@@ -198,6 +199,10 @@ module sync_fifo_tb_fail;
         end
         if (lane8.errors + lane5.errors + direct_errors == 0)
             $display("sync_fifo_tb_fail: PASS (%0d checks)", lane8.checks + lane5.checks);
+        // The verdict the gate reads (docs/GATE_INTEGRITY.md): the run's nonce, then the counts.
+        if (!$value$plusargs("nirmaan_nonce=%s", nonce))
+            nonce = "none";
+        $display("NIRMAAN-SIM %0s %0d passed, %0d failed", nonce, (lane8.checks + lane5.checks > lane8.errors + lane5.errors + direct_errors ? lane8.checks + lane5.checks - (lane8.errors + lane5.errors + direct_errors) : 0), (lane8.errors + lane5.errors + direct_errors));
         $finish;
     end
 endmodule

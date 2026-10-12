@@ -186,8 +186,8 @@ def test_the_apb_driver_passes_on_the_apb_rtl_in_the_host_harness(block, tmp_pat
     assert len(checks) == 6 and all(checks.values())
     log = Path(run.references[0]).read_text()
     assert "apb_manager.cpp" in log
-    assert "FWTEST BUS read 0x5 -> 0x00000000 SLVERR" in log  # the RTL's own PSLVERR
-    assert "FWTEST BUS write 0x4 = 0x00ab0000 strobe 0x4 -> OKAY" in log
+    assert " BUS read 0x5 -> 0x00000000 SLVERR" in log  # the RTL's own PSLVERR
+    assert " BUS write 0x4 = 0x00ab0000 strobe 0x4 -> OKAY" in log
 
 
 def _wrong_apb_driver(tmp_path: Path) -> tuple[Path, ...]:
