@@ -202,9 +202,39 @@ def limits(engine: TaskEngine, task_id: str, attempts: int | None = None,
     return limits_for(engine.org, engine.task(task_id), Limits(attempts=attempts, review_rounds=review_rounds))
 
 
+#: How an escalation raised because a task's limits are spent begins (M27); a person resolving one grants more (M52).
+EXHAUSTED = "repair budget exhausted"
+
+
+def _granted(engine: TaskEngine, task_id: str) -> int:
+    """How many of the task's submissions a person forgave by resolving a spent-budget escalation (M52).
+
+    Resolving it is the recorded human decision to go on, so the limits count afresh from there. Only a
+    person's resolution grants: an agent in the target seat may resolve it, but cannot buy itself more tries.
+    """
+    spent = {e.id for e in engine.state.escalations.values() if e.task == task_id and e.reason.startswith(EXHAUSTED)}
+    if not spent:
+        return 0
+    seen = granted = 0
+    for entry in engine.state.audit:
+        if entry.subject != task_id:
+            continue
+        if entry.action == "task.attempt" or (entry.action == "task.review" and "superseded" in entry.details):
+            seen += 1
+        elif (entry.action == "escalation.resolve" and entry.actor_kind is ActorKind.HUMAN
+              and entry.details.get("escalation") in spent):
+            granted = seen
+    return granted
+
+
 def _spent(engine: TaskEngine, task_id: str) -> tuple[list, list]:
-    """The task's superseded submissions, and this round's refused attempts, from state (M27)."""
-    records = sorted((a for a in engine.state.attempts.values() if a.task == task_id), key=lambda a: a.number)
+    """The task's superseded submissions, and this round's refused attempts, from state (M27).
+
+    Submissions a person's resolution forgave (M52) are not counted.
+    """
+    granted = _granted(engine, task_id)
+    records = sorted((a for a in engine.state.attempts.values() if a.task == task_id and a.number > granted),
+                     key=lambda a: a.number)
     sent_back = [a for a in records if a.reviews]
     since = sent_back[-1].number if sent_back else 0
     return sent_back, [a for a in records if not a.reviews and a.number > since]
@@ -215,7 +245,7 @@ def exhausted(engine: TaskEngine, task_id: str, budget: Limits) -> str | None:
     sent_back, refused = _spent(engine, task_id)
     if len(sent_back) >= budget.review_rounds:
         return f"{len(sent_back)} of {budget.review_rounds} review rounds were sent back"
-    if refused and len(refused) >= budget.attempts:  # with a limit of 1, M26 records no attempt
+    if refused and len(refused) >= budget.attempts:
         return f"{len(refused)} of {budget.attempts} attempts were refused in this review round"
     return None
 
@@ -227,7 +257,7 @@ def _exhausted(engine: TaskEngine, task_id: str, actor: Actor, budget: Limits) -
         return None
     sent_back, refused = _spent(engine, task_id)
     esc = engine.escalate(
-        task_id, actor, EscalationKind.TECHNICAL, reason=f"repair budget exhausted: {reason}",
+        task_id, actor, EscalationKind.TECHNICAL, reason=f"{EXHAUSTED}: {reason}",
         attempted_actions=tuple(f"{a.id}: {a.refusal}" for a in (*sent_back, *refused)),
         blocking_question="How should this task proceed?",
         recommended_options=("Allow more attempts or review rounds", "Reassign", "Change approach",
@@ -241,11 +271,12 @@ def run_task(engine: TaskEngine, task_id: str, runtime: AgentRuntime,
              review_rounds: int | None = None) -> RunReport:
     """Hand one task to a runtime and apply its result through the engine.
 
-    When the engine refuses a submission and the attempt limit allows (M26),
-    the refused attempt is recorded and the same seat is asked again, with the
-    refused attempts in its packet. A task a review sent back is worked again
-    with the review's findings (M27) while review rounds remain. The counts
-    live in state, so each limit covers every run; an exhausted one escalates.
+    When the engine refuses a submission, the refused attempt is recorded (M52:
+    with any limit, so a limit of 1 is spent too) and, while the attempt limit
+    allows (M26), the same seat is asked again, with the refused attempts in its
+    packet. A task a review sent back is worked again with the review's findings
+    (M27) while review rounds remain. The counts live in state, so each limit
+    covers every run; an exhausted one escalates.
     """
     task = engine.task(task_id)
     if task.owner is None:
@@ -276,7 +307,7 @@ def run_task(engine: TaskEngine, task_id: str, runtime: AgentRuntime,
         step, refusal = _apply(engine, task_id, actor, result, f"attempt {number} of {limit}" if limit > 1 else "")
         entry: dict[str, Any] = {"number": number, "status": step.status.value, "detail": step.detail,
                                  "tool_runs": step.tool_runs, "evidence": step.evidence, "attempt": None}
-        if refusal is not None and limit > 1:
+        if refusal is not None:
             entry["attempt"] = engine.record_attempt(task_id, actor, list(result.artifacts), refusal,
                                                      tuple(step.tool_runs), tuple(step.evidence)).id
             refused.append(entry["attempt"])
@@ -295,27 +326,48 @@ def run_task(engine: TaskEngine, task_id: str, runtime: AgentRuntime,
     return report
 
 
+def _refused(report: RunReport, notes: str, refusal: str) -> tuple[RunReport, str]:
+    report.status = ResultStatus.REFUSED
+    report.detail = "; ".join(p for p in (notes, f"submission refused: {refusal}") if p)
+    return report, refusal
+
+
 def _apply(engine: TaskEngine, task_id: str, actor: Actor, result: WorkResult,
            attempt: str) -> tuple[RunReport, str | None]:
-    """Apply one runtime result through the engine; also return the engine's refusal, if any."""
-    _record_calls(engine, task_id, actor, result.model_calls)  # the calls happened, whatever follows
-    PolicyEngine(engine.org).enforce(PolicyContext(
-        engine.org, engine.state, "runtime.result", actor, engine.task(task_id),
-        {"uncertainty": result.uncertainty, "artifacts": result.artifacts,
-         "claims_completion": result.status is ResultStatus.SUBMITTED},
-    ))
-    report = RunReport(task_id, result.status, result.notes, tool_runs=list(result.tool_runs))
+    """Apply one runtime result through the engine; also return the engine's refusal, if any.
 
+    M52: an answer the constitution refuses (no uncertainty, nothing left after grounding, a run that never
+    happened) is a refused attempt like a refused submission, never an error that stops the caller: the runs
+    that did happen are recorded first, and the limits decide what comes next.
+    """
+    _record_calls(engine, task_id, actor, result.model_calls)  # the calls happened, whatever follows
+    report = RunReport(task_id, result.status, result.notes, tool_runs=list(result.tool_runs))
+    problems: list[str] = []
     for run_id in result.tool_runs:
         run = engine.state.tool_runs.get(run_id)
         kind_ = EvidenceKind.VERITRIAGE_SESSION if run and run.tool == "veritriage.investigate" else EvidenceKind.TOOL_RUN
-        ev = engine.record_evidence(task_id, actor, kind_, run.summary if run else run_id,
-                                    reference=(run.references[0] if run and run.references else None),
-                                    tool_run=run_id)
+        try:
+            ev = engine.record_evidence(task_id, actor, kind_, run.summary if run else run_id,
+                                        reference=(run.references[0] if run and run.references else None),
+                                        tool_run=run_id)
+        except PolicyViolationError as exc:  # P5: the answer named a run that never happened here
+            problems.append(str(exc))
+            continue
         report.evidence.append(ev.id)
     for claim in result.claims:
         ev = engine.record_evidence(task_id, actor, EvidenceKind.CLAIM, claim)
         report.evidence.append(ev.id)
+    report.tool_runs = [r for r in result.tool_runs if r in engine.state.tool_runs]
+    try:
+        PolicyEngine(engine.org).enforce(PolicyContext(
+            engine.org, engine.state, "runtime.result", actor, engine.task(task_id),
+            {"uncertainty": result.uncertainty, "artifacts": result.artifacts,
+             "claims_completion": result.status is ResultStatus.SUBMITTED},
+        ))
+    except PolicyViolationError as exc:
+        problems.insert(0, str(exc))
+    if problems:
+        return _refused(report, result.notes, "; ".join(problems))
 
     if result.status is ResultStatus.NEEDS_ESCALATION and result.escalation:
         req = result.escalation
@@ -329,13 +381,12 @@ def _apply(engine: TaskEngine, task_id: str, actor: Actor, result: WorkResult,
     elif result.status is ResultStatus.SUBMITTED:
         notes = "; ".join(p for p in (attempt, result.notes) if p)
         try:
-            engine.submit(task_id, actor, list(result.artifacts), notes=notes, outcome=result.outcome)
+            # M52: final, so a task with no review completes on it or the submission is refused.
+            engine.submit(task_id, actor, list(result.artifacts), notes=notes, outcome=result.outcome, final=True)
         except PolicyViolationError as exc:
             # The runs recorded above really happened (a failed lint is a fact worth keeping), so a
             # refused submission is reported rather than raised: the caller can save the evidence.
-            report.status = ResultStatus.REFUSED
-            report.detail = "; ".join(p for p in (result.notes, f"submission refused: {exc}") if p)
-            return report, str(exc)
+            return _refused(report, result.notes, str(exc))
     return report, None
 
 

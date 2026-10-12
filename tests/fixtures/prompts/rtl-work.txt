@@ -28,6 +28,7 @@ CITE ONLY THESE ARTIFACTS, using the token exactly as written:
   [evidence:prj-<id>.microarchitecture.e1]  review_record: Independent review by design.rtl.architecture.staff: looks right
   [artifact:prj-<id>.interface-spec.a1]  interface_spec: Interface specification (interface_spec) (approved)
   [artifact:prj-<id>.microarchitecture.a1]  microarchitecture_spec: Microarchitecture (microarchitecture_spec) (approved)
+  [requirement:req-83359f354b]  the project requirement: Create a 4-bit wrapping counter.
 
 ## Company
 - Company: IP Nirmaan

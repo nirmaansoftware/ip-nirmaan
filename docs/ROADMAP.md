@@ -103,7 +103,8 @@ new number. M1 to M42 are taken; see `docs/history/README.md`.
 | M49 | Scoped registries | done (#75) |
 | M50 | Constitution hardening (audit A: C2, M1, H1, L2, M2) | done (#78) |
 | M51 | Persistence integrity (audit findings C3, H3, M3, L6, B1) | done (#79) |
-| M53 | Gate integrity (audit B: F1 to F22) | done (this PR) |
+| M52 | Runtime and loop fixes (audit A: C1, H2, M4, M5, M6, L1, L4, L5; audit C: H3) | done (#81) |
+| M53 | Gate integrity (audit B: F1 to F22) | done (#80) |
 
 ## Next milestones
 

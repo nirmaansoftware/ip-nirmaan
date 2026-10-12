@@ -96,19 +96,23 @@ def test_no_shipped_capability_turns_repair_on(nirmaan_org):
 
 
 @needs("verilator", "yosys")
-def test_one_attempt_behaves_exactly_as_before(rtl_ready):
+def test_one_attempt_makes_one_call_and_records_the_refusal(rtl_ready):
+    """M52: with a limit of 1 the run is still one call, and the refusal is an Attempt, so the limit is spent."""
     engine, rtl, cite = rtl_ready
     llm = MockLLM(script=[counter(cite, LINT_BROKEN), counter(cite)])
     report = run_task(engine, rtl, ModelRuntime(llm))
 
     assert report.status is ResultStatus.REFUSED and "P9" in report.detail
-    assert len(llm.calls) == 1 and "attempts were refused" not in report.detail
-    assert [a["attempt"] for a in report.attempts] == [None]
-    assert engine.state.attempts == {}
-    assert "task.attempt" not in {e.action for e in engine.state.audit}
+    assert len(llm.calls) == 1 and "all 1 attempts were refused" in report.detail
+    (attempt,) = attempts_of(engine, rtl)
+    assert [a["attempt"] for a in report.attempts] == [attempt.id]
+    assert [e.details["attempt"] for e in engine.state.audit if e.action == "task.attempt"] == [attempt.id]
     task = engine.task(rtl)
     assert task.status is TaskStatus.IN_PROGRESS and task.artifacts == ()
+    assert not set(attempt.evidence) & set(task.evidence)  # its evidence went with it
     assert "Repair" not in llm.calls[0].render()
+    assert run_task(engine, rtl, ModelRuntime(llm)).status is ResultStatus.NEEDS_ESCALATION
+    assert len(llm.calls) == 1
 
 
 # --- RTL: failed lint, repaired ---------------------------------------------------------------
@@ -199,7 +203,7 @@ def test_exhausting_the_attempts_stays_refused_and_lists_every_attempt(rtl_ready
 
     # A passing lint of attempt 1 does not carry attempt 2's files to review, even by hand.
     drafts = [{k: getattr(a, k) for k in ("kind", "title", "summary", "location", "digest")} for a in second.artifacts]
-    with pytest.raises(PolicyViolationError, match="no passing run .* covers"):
+    with pytest.raises(PolicyViolationError, match="cannot go to review"):  # M52: its evidence left with it
         engine.submit(rtl, agent(task.owner), drafts)
     assert engine.task(rtl).artifacts == ()
 

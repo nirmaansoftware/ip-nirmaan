@@ -264,8 +264,8 @@ def test_a_model_claiming_a_run_that_never_happened_is_refused(rtl_ready, monkey
     _no_tools(monkeypatch, tmp_path)
     cite = token(upstream(engine, "microarchitecture"))
     lie = answer(*counter_files(cite), tool_runs=["run-0042"], claims=["lint and simulation passed"])
-    with pytest.raises(PolicyViolationError, match="P5"):
-        run_task(engine, rtl, ModelRuntime(MockLLM(script=[lie])))
+    report = run_task(engine, rtl, ModelRuntime(MockLLM(script=[lie])))  # M52: refused, not raised
+    assert report.status is ResultStatus.REFUSED and "[P5]" in report.detail
     assert "run-0042" not in engine.state.tool_runs
     task = engine.task(rtl)
     assert task.status is TaskStatus.IN_PROGRESS and task.artifacts == ()
@@ -425,8 +425,9 @@ def test_a_new_design_seat_needs_no_core_changes(fixed_clock, tmp_path):
         assert report.status is ResultStatus.REFUSED and engine.task(seat).status is TaskStatus.IN_PROGRESS
 
         clean = json.dumps({"registers": [{"name": "CTRL", "offset": 0}, {"name": "LOAD", "offset": 4}]})
+        # M52: the refusal spent the attempt limit, so the retry asks for one more
         report = run_task(engine, seat, ModelRuntime(MockLLM(script=[
-            answer(file("regs.json", "register_map", clean + "\n", cite))])))
+            answer(file("regs.json", "register_map", clean + "\n", cite))])), attempts=2)
         assert report.status is ResultStatus.SUBMITTED, report.detail
         assert engine.task(seat).status is TaskStatus.IN_REVIEW
         review_task(engine, seat, ModelRuntime(MockLLM()))

@@ -44,7 +44,6 @@ from nirmaan.runtime import (
     review_task,
     run_task,
 )
-from nirmaan.work import PolicyViolationError
 from nirmaan.work.policy import satisfies, unsatisfied_requirements
 
 COUNTER = (RTL / "counter.v").read_text()
@@ -257,8 +256,8 @@ def test_a_claimed_formal_pass_without_a_run_is_refused(counter_rtl, monkeypatch
     monkeypatch.setenv("PATH", str(empty))
     lie = answer(*counter_files(cite), sby_file(cite), tool_runs=["run-0077"],
                  claims=["formal proof passed: every property proven"])
-    with pytest.raises(PolicyViolationError, match="P5"):
-        run_task(engine, rtl, ModelRuntime(MockLLM(script=[lie])))
+    report = run_task(engine, rtl, ModelRuntime(MockLLM(script=[lie])))  # M52: refused, not raised
+    assert report.status is ResultStatus.REFUSED and "[P5]" in report.detail
     assert "run-0077" not in engine.state.tool_runs
     assert not any(r.tool == "formal.run" for r in engine.state.tool_runs.values())
     assert engine.task(rtl).artifacts == ()
@@ -373,11 +372,12 @@ def test_a_new_before_review_check_needs_no_core_changes(fixed_clock, tmp_path):
 
         headed = {**src, "content": "// SPDX-License-Identifier: Apache-2.0\n" + src["content"]}
         unsigned = file("lint.waiver", "lint_waiver", "WIDTH on line 3: intended.\n", cite)
-        report = run_task(engine, rtl, ModelRuntime(MockLLM(script=[answer(headed, tb, unsigned)])))
+        # M52: the refusal spent the attempt limit, so the retry asks for one more
+        report = run_task(engine, rtl, ModelRuntime(MockLLM(script=[answer(headed, tb, unsigned)])), attempts=2)
         assert report.status is ResultStatus.REFUSED and "waiver is signed" in report.detail
 
         signed = {**unsigned, "content": unsigned["content"] + "approved-by: lead\n"}
-        report = run_task(engine, rtl, ModelRuntime(MockLLM(script=[answer(headed, tb, signed)])))
+        report = run_task(engine, rtl, ModelRuntime(MockLLM(script=[answer(headed, tb, signed)])), attempts=3)
         assert report.status is ResultStatus.SUBMITTED, report.detail
         header_run = runs_of(engine, report)["header.check"]
         assert header_run.params["marker"] == "SPDX-License-Identifier"

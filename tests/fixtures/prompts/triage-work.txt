@@ -25,6 +25,7 @@ TASK: Produce triage_report for task prj-<id>:triage.
 
 CITE ONLY THESE ARTIFACTS, using the token exactly as written:
   [run:run-0001]  veritriage.investigate: VeriTriage classified axi_timeout.log as timeout (85% confidence, 5 evidence nodes); top hypothesis: Likely RTL bug
+  [requirement:req-806f63ac9b]  the project requirement: Investigate a regression failure introduced by a recent RTL commit.
 
 ## Company
 - Company: IP Nirmaan

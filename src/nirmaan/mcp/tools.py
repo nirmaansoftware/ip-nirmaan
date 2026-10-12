@@ -186,14 +186,13 @@ def _act(ctx: McpContext, arguments: dict[str, Any], action: Callable[[TaskEngin
     _schema({
         "requirement": {"type": "string", "description": "e.g. 'Create a 4-port AXI-to-NoC bridge.'"},
         "human_gates": {"type": "array", "items": {"type": "string"}, "description": "Gate IDs to require a human at."},
-        "auto_gates": {"type": "array", "items": {"type": "string"}, "description": "Gate IDs a non-human may approve."},
         "save": {"type": "boolean", "description": "Save the plan (default true). False only shows it."},
         "replace": {"type": "boolean",
                     "description": "Archive a saved project of the same ID, then save (default false)."},
     }, ["requirement"]),
 )
 def _plan_project(ctx: McpContext, arguments: dict[str, Any]) -> dict:
-    overrides = {g: True for g in arguments.get("human_gates", [])} | {g: False for g in arguments.get("auto_gates", [])}
+    overrides = {g: True for g in arguments.get("human_gates", [])}  # M52: gates are only made stricter
     engine = Orchestrator(ctx.org).plan(str(arguments["requirement"]), gate_overrides=overrides)
     save = arguments.get("save", True) is not False
     archived = ctx.store.create(engine.state, replace=arguments.get("replace") is True)[1] if save else None

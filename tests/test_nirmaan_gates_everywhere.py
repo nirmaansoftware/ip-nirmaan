@@ -418,7 +418,8 @@ def test_a_fourth_workflow_is_gated_with_no_core_changes(fixed_clock, tmp_path):
                                 "    /* verilator lint_on LATCH */\n    assign wrap = en && wrap_l;\n")
         report = run_task(engine, rtl, ModelRuntime(MockLLM(script=[answer(*counter_files(cite, latch))])))
         assert report.status is ResultStatus.REFUSED and SYNTH in report.detail
-        report = run_task(engine, rtl, ModelRuntime(MockLLM(script=[answer(*counter_files(cite))])))
+        # M52: the refusal spent the attempt limit, so the retry asks for one more
+        report = run_task(engine, rtl, ModelRuntime(MockLLM(script=[answer(*counter_files(cite))])), attempts=2)
         assert report.status is ResultStatus.SUBMITTED, report.detail
     finally:
         unregister_extension("test-gated-parameter-change")

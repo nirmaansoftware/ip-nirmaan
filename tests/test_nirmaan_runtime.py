@@ -26,7 +26,7 @@ from nirmaan.runtime import (
     available_runtimes,
     run_task,
 )
-from nirmaan.work import PolicyViolationError, trace_graph
+from nirmaan.work import trace_graph
 
 REGRESSION = "Investigate a regression failure introduced by a recent RTL commit."
 
@@ -86,21 +86,21 @@ def test_agents_cannot_cite_runs_that_never_happened(regression):
         ResultStatus.SUBMITTED, uncertainty=0.0, tool_runs=("run-0042",),
         artifacts=({"kind": "triage_report", "title": "x"},),
     ))
-    with pytest.raises(PolicyViolationError, match="P5"):
-        run_task(regression, triage, runtime)
+    report = run_task(regression, triage, runtime)  # M52: refused, not raised
+    assert report.status is ResultStatus.REFUSED and "[P5]" in report.detail
 
 
 def test_uncertainty_must_be_declared(regression):
     runtime = ScriptedRuntime(WorkResult(ResultStatus.SUBMITTED, uncertainty=None,
                                          artifacts=({"kind": "triage_report", "title": "x"},)))
-    with pytest.raises(PolicyViolationError, match="P3"):
-        run_task(regression, tid(regression, "triage"), runtime)
+    report = run_task(regression, tid(regression, "triage"), runtime)  # M52: refused, not raised
+    assert report.status is ResultStatus.REFUSED and "[P3]" in report.detail
 
 
 def test_completion_without_output_is_refused(regression):
     runtime = ScriptedRuntime(WorkResult(ResultStatus.SUBMITTED, uncertainty=0.5))
-    with pytest.raises(PolicyViolationError, match="P4"):
-        run_task(regression, tid(regression, "triage"), runtime)
+    report = run_task(regression, tid(regression, "triage"), runtime)  # M52: refused, not raised
+    assert report.status is ResultStatus.REFUSED and "[P4]" in report.detail
 
 
 def test_an_uncertain_agent_escalates_up_the_real_chain(regression):

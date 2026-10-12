@@ -160,8 +160,9 @@ Both counts are read from `state.attempts`, which `nirmaan run` saves:
 
 So `--attempts 3` over two runs is three attempts in all, and the total over a
 task is at most `max_attempts x max_review_rounds` model answers that reach
-the engine. With `max_attempts` 1 no refused attempt is recorded (M26 law 3),
-so each run is one try, exactly as in M23 and M26.
+the engine. Until M52, with `max_attempts` 1 no refused attempt was recorded,
+so each run was one more try with no end; now that refusal is recorded and
+spends the limit (`docs/RUNTIME_LOOP_FIXES.md` section 2).
 
 ### Exhaustion
 
@@ -173,9 +174,11 @@ so each run is one try, exactly as in M23 and M26.
 
 The escalation names every superseded submission and refused attempt, asks
 "How should this task proceed?", and offers raising the limit, reassigning,
-changing the approach, or cancelling. Resolving it restores the task's status
-but not the budget: the limit applies to the total, and the way to allow more
-is a higher limit (a flag for one run, or the stage's data).
+changing the approach, or cancelling. Resolving it restores the task's status.
+Since M52 a person's resolution also grants a fresh budget: the limits count
+only the submissions made after it (`docs/RUNTIME_LOOP_FIXES.md` section 6). An
+agent's resolution grants nothing, and a higher limit (a flag for one run, or
+the stage's data) still allows more without one.
 
 With the default of one round, running the owner on a task a reviewer sent
 back now escalates instead of starting fresh: the review is heard by a manager
@@ -250,7 +253,8 @@ re-run with the finding, and the second table is approved alone.
 * An unattended owner and reviewer loop (`run`, `review`, `run`, ...) in one
   command. Each step is its own invocation today.
 * Resetting a budget when an escalation is resolved. A higher limit is the
-  explicit way to allow more.
+  explicit way to allow more. (Built in M52: a person's resolution grants a
+  fresh budget.)
 * File-level signoff (M26's deferral stands): a passing run over a superseded
   file stays on the task as evidence. Review opens only with passing runs over
   the submitted files, so this lets nothing through today.

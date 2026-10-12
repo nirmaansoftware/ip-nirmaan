@@ -401,14 +401,16 @@ def test_spent_attempts_escalate_after_the_refusals(nirmaan_org, fixed_clock):
     assert "2 of 2 attempts" in engine.state.escalations[report.steps[-1].escalation].reason
 
 
-def test_with_one_attempt_a_refusal_stops_the_loop_rather_than_asking_forever(nirmaan_org, fixed_clock):
+def test_with_one_attempt_a_refusal_escalates_rather_than_asking_forever(nirmaan_org, fixed_clock):
+    """M52: the refusal is recorded with any limit, so a limit of 1 is spent and the next step escalates."""
     engine = Orchestrator(nirmaan_org, clock=fixed_clock).plan(AXI_BLOCK)
     rtl = tid(engine, "rtl-implementation")
     drive(engine, until=rtl)
     llm = MockLLM()
     report = loop(engine, ModelRuntime(llm), ModelRuntime(MockLLM()), rtl)
-    assert report.stops == {rtl: Stop.REFUSED} and len(llm.calls) == 1
-    assert engine.task(rtl).status is TaskStatus.IN_PROGRESS
+    assert [(s.status, s.calls) for s in report.steps] == [("refused", 1), ("needs_escalation", 0)]
+    assert report.stops == {rtl: Stop.ESCALATED} and len(llm.calls) == 1
+    assert engine.task(rtl).status is TaskStatus.ESCALATED
 
 
 def test_a_seat_that_declines_stops_the_loop(axi_spec):

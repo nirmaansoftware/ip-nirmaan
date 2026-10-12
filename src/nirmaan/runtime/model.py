@@ -114,8 +114,9 @@ class MockLLM:
     """A deterministic stand-in for a model. Scriptable; never touches a network.
 
     With no script it answers from the prompt alone: it cites the prompt's own
-    tokens, chooses the first declared outcome, and approves a review only when
-    it has evidence to cite. Scripted replies (text or a :class:`Completion`)
+    tokens (the project requirement only when nothing else is citable, M52),
+    chooses the first declared outcome, and approves a review only when it has
+    a declared record to cite. Scripted replies (text or a :class:`Completion`)
     are returned in order, which is how tests play a hostile or broken model.
     """
 
@@ -132,7 +133,8 @@ class MockLLM:
             reply = self._script.pop(0)
             return reply if isinstance(reply, Completion) else Completion(reply, self._model)
         runs = [c for c in prompt.citations if c.kind == "run"]
-        tokens = [c.token for c in (*runs, *(c for c in prompt.citations if c.kind != "run"))][:2]
+        others = [c for c in prompt.citations if c.kind not in ("run", "requirement")]
+        tokens = [c.token for c in (*runs, *others)][:2] or [c.token for c in prompt.citations][:1]
         if prompt.mode == "review":
             if not tokens:
                 return Completion(json.dumps({"verdict": "request_changes", "comments": "No evidence to judge.",
@@ -184,11 +186,13 @@ def _inputs(packet: WorkPacket) -> dict[str, str]:
 
 
 def _facts(packet: WorkPacket, produced: list[dict[str, Any]] | None = None) -> Facts:
-    """What the runtime knows at run time (M48): the kinds the task builds on (M37) and, once the answer is in,
-    the kinds it produced. Before the answer the produced kinds are unknown, so they exclude nothing."""
+    """What the runtime knows at run time (M48): the kinds the task builds on (M37), the kinds of the approved
+    upstream files available to it (M52), and, once the answer is in, the kinds it produced. Before the answer the
+    produced kinds are unknown, so they exclude nothing."""
     known = {"produced": [f["kind"] for f in produced]} if produced is not None else {}
     return Facts(ConditionPhase.RUN, {"packet": packet},
-                 upstream=lambda: [a.kind for a in packet.task.upstream_artifacts], **known)
+                 upstream=lambda: [a.kind for a in packet.task.upstream_artifacts],
+                 inputs=lambda: [a.kind for a in packet.task.upstream_artifacts if a.trusted and a.location], **known)
 
 
 def _grounded(art: dict[str, Any], prompt: WorkPrompt, stripped: list[str]) -> dict[str, Any] | None:
@@ -256,14 +260,16 @@ class ModelRuntime:
 
         A requirement over the task's own files waits for them: it runs after the answer.
         """
-        wanted: dict[str, tuple[dict[str, str], tuple[Bound, ...]]] = {}
+        # M52: one run per distinct tool, fixed parameters, and bounds, as postflight keys its runs.
+        wanted: dict[tuple, tuple[str, dict[str, str], tuple[Bound, ...]]] = {}
         facts = _facts(packet)
         for req in packet.task.evidence_requirements:
             if _TOOL_BACKED & set(req.accepts) and not req.files and applies(req.when, facts):
                 for tool in req.tools:
-                    wanted.setdefault(tool, (dict(req.params), req.bounds))
+                    key = (tool, tuple(sorted((k, str(v)) for k, v in req.params)), req.bounds)
+                    wanted.setdefault(key, (tool, dict(req.params), req.bounds))
         notes = []
-        for tool, (fixed, bounds) in wanted.items():
+        for tool, fixed, bounds in wanted.values():
             try:
                 run_id, outcome = tools.invoke(tool, bounds=bounds, **{**tools.declared(tool, params), **fixed})
             except ToolAccessDenied as exc:

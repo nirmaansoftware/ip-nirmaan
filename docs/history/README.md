@@ -99,6 +99,7 @@ The original preface of the section:
 - [M51-persistence-integrity](M51-persistence-integrity.md): Milestone 51 - Persistence integrity: planning never overwrites a project, sealed and atomic saves
 - [release-v1.24.0](release-v1.24.0.md): v1.24.0 (2026-10-12) - the plan from the principal-engineer review
 - [M50-constitution-hardening](M50-constitution-hardening.md): Milestone 50 - Constitution hardening: evidence about this task and submission, brokered runs only, people approve where the matrix says, one MCP session is one role
+- [M52-runtime-loop-fixes](M52-runtime-loop-fixes.md): Milestone 52 - Runtime and loop fixes: a runtime's submission is final, a bad answer is a refused attempt, evidence bound to its submission
 - [M53-gate-integrity](M53-gate-integrity.md): Milestone 53 - Gate integrity: verdicts the work under test cannot forge
 
 ## Before M43

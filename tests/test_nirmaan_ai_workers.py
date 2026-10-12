@@ -134,8 +134,8 @@ def test_an_agent_citing_a_run_that_never_happened_is_refused(regression):
     lie = _work(artifacts=[{"kind": "triage_report", "title": "RTL bug",
                             "summary": "Triage [run:run-0001] was inconclusive; the simulator proved it [run:run-0042]."}],
                 tool_runs=["run-0042"])
-    with pytest.raises(PolicyViolationError, match="P5"):
-        run_task(regression, triage, ModelRuntime(MockLLM(script=[lie])))
+    report = run_task(regression, triage, ModelRuntime(MockLLM(script=[lie])))  # M52: refused, not raised
+    assert report.status is ResultStatus.REFUSED and "[P5]" in report.detail
     assert set(regression.state.tool_runs) == {"run-0001"}
     assert not regression.task(triage).artifacts
 
@@ -168,14 +168,14 @@ def test_an_uncited_artifact_is_dropped_and_completion_refused(regression, fixtu
     triage = tid(regression, "triage")
     _inputs(regression, triage, fixture_log, tmp_path)
     text = _work(artifacts=[{"kind": "triage_report", "title": "Trust me", "summary": "It is an RTL bug."}])
-    with pytest.raises(PolicyViolationError, match="P4"):
-        run_task(regression, triage, ModelRuntime(MockLLM(script=[text])))
+    report = run_task(regression, triage, ModelRuntime(MockLLM(script=[text])))  # M52: refused, not raised
+    assert report.status is ResultStatus.REFUSED and "[P4]" in report.detail
 
 
 def test_undeclared_uncertainty_is_refused(regression):
     text = json.dumps({"artifacts": [{"kind": "triage_report", "title": "x", "summary": "y"}]})
-    with pytest.raises(PolicyViolationError, match="P3"):
-        run_task(regression, tid(regression, "triage"), ModelRuntime(MockLLM(script=[text])))
+    report = run_task(regression, tid(regression, "triage"), ModelRuntime(MockLLM(script=[text])))  # M52: refused, not raised
+    assert report.status is ResultStatus.REFUSED and "[P3]" in report.detail
 
 
 @pytest.mark.parametrize("reply", [Completion(text="", error="APIConnectionError: offline"),
