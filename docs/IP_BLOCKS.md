@@ -1,6 +1,6 @@
 # More IP blocks on the design flow (Milestone 26, blocks part)
 
-Status: implemented on branch `m26/more-blocks`, for the owner's review. Prose
+Status: implemented on branch `m26/more-blocks`, merged. Prose
 here is free of em and en dashes per the standing style law.
 
 M23 proved the design-agent flow (`docs/DESIGN_AGENTS.md`) on one block, the

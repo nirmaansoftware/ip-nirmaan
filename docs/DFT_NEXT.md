@@ -1,6 +1,6 @@
 # Design for Test, next steps (Milestone 29)
 
-Status: design for the owner's review, implemented on branch `m29/dft-next`.
+Status: implemented and merged; built on branch `m29/dft-next`.
 It extends `docs/DFT.md` (M25) and `docs/DFT_ADVANCED.md` (M27) with three
 items M27 deferred: transition (at-speed) fault ATPG, lockup latches on chains
 that cross clock domains (and ATPG across capture edges), and an MBIST stage

@@ -1,6 +1,6 @@
 # Formal and Synthesis Before Review, and Formal in CI (Milestone 26)
 
-Status: design for the owner's review, implemented on branch `m26/formal-gate`.
+Status: implemented and merged; built on branch `m26/formal-gate`.
 This closes two items from the "Where we are" table in `docs/ROADMAP.md`:
 "Formal and synthesis as before-review checks" and "formal in CI". Prose here
 is free of em and en dashes per the standing style law.

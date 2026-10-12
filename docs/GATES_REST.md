@@ -1,6 +1,6 @@
 # The RTL Gates on the Remaining Workflows, and Automatic Antecedent Covers (Milestone 29)
 
-Status: design for the owner's review, implemented on branch
+Status: implemented and merged; built on branch
 `m29/gates-rest`. This closes the "Not yet" cell of the "Where we are" table in
 `docs/ROADMAP.md` that read "The same RTL gates on `parameter-change` and the
 fix stages; automatic antecedent covers", and the first two items deferred in

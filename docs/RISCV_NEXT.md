@@ -1,6 +1,6 @@
 # Interrupts, a second core, a code-size gate, and APB in the RISC-V loop (Milestone 29)
 
-Status: design for the owner's review, implemented on branch
+Status: implemented and merged; built on branch
 `m29/riscv-next`. It continues `docs/RISCV_FIRMWARE.md` (M27) and closes four
 of the items that document deferred: interrupts from the design to the core,
 another core, a code-size budget in the gate, and an APB bridge. Prose here is

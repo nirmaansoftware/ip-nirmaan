@@ -1,4 +1,4 @@
-"""Milestone 26: three more blocks designed by agents, end to end.
+"""Milestone 26: three more blocks through the agent flow, end to end, with scripted seat answers.
 
 The M23 flow proved on the AXI4-Lite register block now runs on a synchronous
 FIFO, a round-robin arbiter, and an APB register block. For each, a plain

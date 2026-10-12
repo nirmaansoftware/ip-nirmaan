@@ -1,6 +1,6 @@
 # Design for Test (Milestone 25, DFT part)
 
-Status: design for the owner's review, implemented on branch `m25/dft`. This is
+Status: implemented and merged; built on branch `m25/dft`. This is
 the DFT part of Stage 6 of `docs/ROADMAP.md`; physical design and firmware are
 built in parallel. Prose here is free of em and en dashes per the standing style
 law.

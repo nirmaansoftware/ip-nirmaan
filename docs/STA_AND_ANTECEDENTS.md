@@ -1,6 +1,6 @@
 # Real STA on Timing Re-analysis, and Antecedents of Named Properties and Macros (Milestone 37)
 
-Status: design for the owner's review, implemented on branch
+Status: implemented and merged; built on branch
 `m37/sta-and-antecedents`. This closes the "Not yet" cell of the "Where we are"
 table in `docs/ROADMAP.md` that read "A real `sta.run` (not an attestation) on
 `timing-closure` `reanalysis`; antecedents of named properties and macros", and
