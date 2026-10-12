@@ -26,7 +26,7 @@ def uvm_pack() -> KnowledgePack:
     return KnowledgePack(
         id="uvm",
         name="UVM methodology",
-        version="1.0.0",
+        version="1.0.1",  # M55: a playbook or concept id no longer repeats a pattern id
         domain="methodology",
         summary="UVM phasing, objections, and scoreboard failure modes.",
         concepts=[
@@ -121,7 +121,7 @@ def uvm_pack() -> KnowledgePack:
                 ],
                 ownership="testbench",
                 suggested_signals=["uvm objection trace", "sequencer/driver handshake"],
-                playbook_id="uvm.phase-timeout",
+                playbook_id="uvm.phase-timeout-debug",
                 confidence_modifiers={"rtl_bug": 0.06, "testbench_issue": 0.06},
                 references=[
                     Reference(source=_UVM_REF, section="9.3.1", note="Phase timeout semantics."),
@@ -141,7 +141,7 @@ def uvm_pack() -> KnowledgePack:
                 ],
             ),
             DebugPlaybook(
-                id="uvm.phase-timeout",
+                id="uvm.phase-timeout-debug",
                 name="UVM phase timeout",
                 steps=[
                     PlaybookStep(action="Print the objection trace at timeout", detail="+UVM_OBJECTION_TRACE names the component that never dropped."),

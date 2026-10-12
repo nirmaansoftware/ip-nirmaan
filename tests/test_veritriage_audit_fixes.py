@@ -136,3 +136,15 @@ def test_the_ai_install_hint_keeps_its_extra():
     # Rich read "[ai]" as markup and printed "pip install ip-nirmaan", which installs no SDK.
     result = runner.invoke(app, ["analyze", "--help"])
     assert "ip-nirmaan[ai]" in result.output
+
+
+def test_every_knowledge_id_names_one_item():
+    # The Knowledge Graph keys nodes by bare id, so a concept and a pattern (or a
+    # pattern and its playbook) sharing one id collapse into a self-loop.
+    from collections import Counter
+
+    from veritriage.knowledge.registry import load_packs
+
+    ids = Counter(item.id for pack in load_packs() for items in (
+        pack.concepts, pack.patterns, pack.playbooks, pack.state_machines) for item in items)
+    assert [i for i, n in ids.items() if n > 1] == []

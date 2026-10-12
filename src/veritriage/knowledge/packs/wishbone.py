@@ -31,7 +31,7 @@ def wishbone_pack() -> KnowledgePack:
     return KnowledgePack(
         id="wishbone",
         name="Wishbone B4",
-        version="1.0.1",  # M55: generic concept markers scoped to the protocol
+        version="1.0.1",  # M55: concept markers scoped to the protocol; ids unique
         domain="protocol",
         summary=(
             "Wishbone cycle framing, the exclusive ACK/ERR/RTY termination rule, "
@@ -115,7 +115,7 @@ def wishbone_pack() -> KnowledgePack:
         ],
         state_machines=[
             StateMachine(
-                id="wishbone.cycle",
+                id="wishbone.bus-cycle",
                 name="Wishbone bus cycle",
                 states=[
                     ProtocolState(

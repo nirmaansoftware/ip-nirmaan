@@ -32,7 +32,7 @@ def ocp_pack() -> KnowledgePack:
     return KnowledgePack(
         id="ocp",
         name="Open Core Protocol",
-        version="1.0.1",  # M55: generic concept markers scoped to the protocol
+        version="1.0.1",  # M55: concept markers scoped to the protocol; ids unique
         domain="protocol",
         summary=(
             "OCP request/response handshakes, SResp error codes, burst-length "
@@ -207,7 +207,7 @@ def ocp_pack() -> KnowledgePack:
                 ],
                 ownership="testbench",
                 suggested_signals=["SResp", "MAddr", "MCmd"],
-                playbook_id="ocp.response-error",
+                playbook_id="ocp.response-error-debug",
                 confidence_modifiers={"testbench_issue": 0.08, "rtl_bug": 0.05},
                 references=[Reference(source=_SPEC, section="4.5", note="SResp encoding.")],
             ),
@@ -308,7 +308,7 @@ def ocp_pack() -> KnowledgePack:
                 ],
             ),
             DebugPlaybook(
-                id="ocp.response-error",
+                id="ocp.response-error-debug",
                 name="OCP error response investigation",
                 steps=[
                     PlaybookStep(
