@@ -103,6 +103,7 @@ The original preface of the section:
 - [M53-gate-integrity](M53-gate-integrity.md): Milestone 53 - Gate integrity: verdicts the work under test cannot forge
 - [M54-demo-surfaces](M54-demo-surfaces.md): Milestone 54 - Demo surfaces: the landing page states only what the engine does, CLI output a person can read
 - [M55-veritriage-audit-fixes](M55-veritriage-audit-fixes.md): Milestone 55 - VeriTriage audit fixes: a stale project cache is rebuilt, the RTL provider reads less into SystemVerilog, Wishbone and OCP concepts stay on their protocols
+- [release-v1.25.0](release-v1.25.0.md): v1.25.0 (2026-10-12) - the four audits of v1.24.0, closed
 
 ## Before M43
 
