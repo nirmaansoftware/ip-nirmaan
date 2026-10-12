@@ -104,6 +104,7 @@ new number. M1 to M42 are taken; see `docs/history/README.md`.
 | M50 | Constitution hardening (audit A: C2, M1, H1, L2, M2) | done (#78) |
 | M51 | Persistence integrity (audit findings C3, H3, M3, L6, B1) | done (#79) |
 | M52 | Runtime and loop fixes (audit A: C1, H2, M4, M5, M6, L1, L4, L5; audit C: H3) | done (this PR) |
+| M55 | VeriTriage audit fixes (audit D: H1, M1, M2, M3, L3, L6, L9, L15) | done (this PR) |
 
 ## Next milestones
 
