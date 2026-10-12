@@ -1,6 +1,6 @@
 """Design for test through open-source EDA: scan, rule checks, chain simulation, ATPG, and MBIST.
 
-Five tools, each an M21 backend behind the tool broker:
+Six tools, each an M21 backend behind the tool broker:
 
 * ``dft.scan_insert`` (Yosys): synthesize, turn every flop into a mux-D scan
   flop with a techmap, and stitch balanced chains (``chains``,

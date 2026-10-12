@@ -82,11 +82,12 @@ Steps, one process each, never through a shell:
 directories of the sources, then the harness directory that holds
 `nirmaan_hal.h`.
 
-The `riscv-gcc` backend runs the same steps with
-`riscv64-unknown-elf-gcc -march=rv32imac_zicsr -mabi=ilp32 -ffreestanding`.
-It is refused with its reason unless a machine has that compiler; it is
-registered to show that a cross target is one registry entry, and it is never
-chosen unless asked for by `backend=riscv-gcc` or the host compiler is absent.
+The `riscv-gcc` backend runs the same steps with the RISC-V GCC that
+`fw.cross_build` finds (`riscv64-unknown-elf-gcc` or `riscv64-elf-gcc`) and its
+flags (`-march=rv32i -mabi=ilp32 -ffreestanding`); since M53 it is registered
+by `firmware_riscv.py`, from the one RISC-V GCC definition. It is refused with
+its reason unless a machine has that compiler, and it is never chosen unless
+asked for by `backend=riscv-gcc` or the host compiler is absent.
 M27 adds a full RV32I image build and a run on a RISC-V core
 (`docs/RISCV_FIRMWARE.md`).
 
@@ -130,14 +131,18 @@ channels, with 32-bit data. It:
   rising edge where both are high;
 * gives up after 1000 cycles without a handshake, with `FWTEST ERROR bus
   timeout`, a failed run rather than a hang;
-* prints one line per bus transfer and one per check, then a summary.
+* prints one line per bus transfer and one per check, then a summary and
+  the transfers it counted. Since M53 every line carries the run's nonce
+  (`+nirmaan_nonce=`, taken out of argv before any test code runs), and the
+  verdict comes from these lines only: see `docs/GATE_INTEGRITY.md`.
 
 ```
-FWTEST BUS write 0x8 = 0x0123abcd strobe 0xf -> OKAY
-FWTEST BUS read 0x5 -> 0x00000000 SLVERR
-FWTEST PASS unmapped_read_reports_slverr
-FWTEST FAIL write_then_read_every_register: REG1 read 0x0123abcd (status 0), wrote 0x5a5a5a5a
-FWTEST SUMMARY 5 passed, 1 failed, 41 cycles
+FWTEST:<nonce> BUS write 0x8 = 0x0123abcd strobe 0xf -> OKAY
+FWTEST:<nonce> BUS read 0x5 -> 0x00000000 SLVERR
+FWTEST:<nonce> PASS unmapped_read_reports_slverr
+FWTEST:<nonce> FAIL write_then_read_every_register: REG1 read 0x0123abcd (status 0), wrote 0x5a5a5a5a
+FWTEST:<nonce> SUMMARY 5 passed, 1 failed, 41 cycles
+FWTEST:<nonce> END 12 bus transfers
 ```
 
 The exit status is 0 only when at least one check passed and none failed, so

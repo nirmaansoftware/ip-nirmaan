@@ -158,6 +158,11 @@ The prompt tells the seat: "applies only if you produce a formal_spec file".
   any claimed run.
 * An unknown status (a timeout, an engine error) is a failing run; only
   SymbiYosys's `DONE (PASS)` with exit status 0 passes (M21's parser).
+* M53 (`docs/GATE_INTEGRITY.md`): a pass in `mode bmc` is reported as "no
+  counterexample within N steps", with metrics `mode`, `depth`, and
+  `proven = 0`. "Formal properties are proven" carries the bound
+  `proven >= 1`, so only a `mode prove` setup meets it. A setup with `[tasks]`
+  is refused with a reason.
 
 ---
 

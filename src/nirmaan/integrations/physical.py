@@ -1,6 +1,6 @@
 """Physical design behind the tool broker: OpenSTA and OpenROAD, or an honest refusal.
 
-Three backends on the M21 registry (``eda.register_backend``):
+Five backends on the M21 registry (``eda.register_backend``):
 
 * ``yosys-liberty`` for ``synth.run``: synthesis mapped to a Liberty library,
   writing the gate-level ``netlist.v`` that STA and place-and-route consume.
