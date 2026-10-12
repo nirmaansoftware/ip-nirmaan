@@ -54,7 +54,7 @@ def analyze(
         None, "--parser", help="Force one registered parser for every artifact instead of auto-detecting."
     ),
     ai: bool = typer.Option(
-        False, "--ai/--no-ai", help="Also run the AI review stage (requires 'pip install ip-nirmaan[ai]')."
+        False, "--ai/--no-ai", help="Also run the AI review stage (requires 'pip install ip-nirmaan\\[ai]')."
     ),
     ai_model: str = typer.Option(
         DEFAULT_MODEL, "--ai-model", help="Claude model to use for the AI review."

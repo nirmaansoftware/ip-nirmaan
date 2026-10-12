@@ -127,3 +127,12 @@ def test_no_wishbone_or_ocp_concept_on_another_protocol(name):
 @pytest.mark.parametrize("name", sorted(OWN_CONCEPTS))
 def test_wishbone_and_ocp_fixtures_keep_their_concepts(name):
     assert _concepts(FIXTURES / name, ("wishbone", "ocp")) == OWN_CONCEPTS[name]
+
+
+# --- Small items ---------------------------------------------------------------
+
+
+def test_the_ai_install_hint_keeps_its_extra():
+    # Rich read "[ai]" as markup and printed "pip install ip-nirmaan", which installs no SDK.
+    result = runner.invoke(app, ["analyze", "--help"])
+    assert "ip-nirmaan[ai]" in result.output
