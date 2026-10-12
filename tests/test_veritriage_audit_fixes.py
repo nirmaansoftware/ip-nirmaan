@@ -13,6 +13,7 @@ import json
 from typer.testing import CliRunner
 
 from veritriage.cli.main import app
+from veritriage.project.providers.rtl import parse_rtl
 from veritriage.workspace import WorkspaceServices
 
 runner = CliRunner()
@@ -53,3 +54,40 @@ def test_analyze_reports_the_modules_of_the_edited_rtl(tmp_path, fixture_log, mo
     assert modules() == ["leaf_a", "top"]
     _top(rtl, "leaf_b")
     assert modules() == ["leaf_b", "top"]
+
+
+# --- M1: a virtual interface is a handle, not a declaration -------------------
+
+
+def test_a_virtual_interface_in_a_class_does_not_hide_the_next_module():
+    parsed = parse_rtl("""
+package tb_pkg;
+  class drv;
+    virtual interface axi_if vif;
+    virtual axi_if vif2;
+  endclass
+endpackage
+module top(input clk);
+  child u_child (.clk(clk));
+endmodule
+interface real_if; logic a; endinterface
+""", "tb.sv")
+    assert dict(parsed.defined) == {"top": "tb.sv"}
+    assert dict(parsed.parents) == {"child": "top"}
+    assert list(parsed.interfaces) == ["real_if"]
+
+
+# --- M2: a function's return type is not a module instance --------------------
+
+
+def test_a_function_returning_a_user_type_is_not_an_instance():
+    parsed = parse_rtl("""
+module top(input clk);
+  function automatic my_t compute(input int x);
+    return x;
+  endfunction
+  function pkg::word_t pick(input int x); return x; endfunction
+  leaf u_leaf (.clk(clk));
+endmodule
+""", "top.sv")
+    assert dict(parsed.parents) == {"leaf": "top"}
