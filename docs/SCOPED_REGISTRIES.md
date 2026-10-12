@@ -140,6 +140,9 @@ is current. Import-time registration is process-wide by definition.
 Each `Registries` has a lock. Writes and removals take it; iteration takes a
 snapshot of the merged keys under it, so a reader iterating while another
 thread registers never sees "dictionary changed size during iteration".
+`items()` and `values()` snapshot the entries themselves, keys with values,
+under each layer's lock (M52), so a value removed between reading the keys and
+reading the values cannot raise `KeyError`.
 Single-key lookups are plain dict reads (atomic under the GIL) and take no
 lock. Registration is still expected at import time or before a run starts;
 the lock makes a late write safe, not meaningful to a run already reading.

@@ -142,7 +142,9 @@ not fit as a requirement condition, because it is genuinely per parameter:
 
 So the flag stays, and its test goes through the one evaluator as the clause
 `Condition(on="inputs", any_of=binding.kinds)`. The `inputs` kind is also
-usable in a requirement's `when`.
+usable in a requirement's `when`: every requirement reader (the policy's
+`run_facts` and the runtime's facts) supplies the kinds of the approved,
+located upstream artifacts available to the task (M52).
 
 ### 2.3 Bounds as a structured field
 
@@ -208,10 +210,14 @@ fields keeps working and a saved project migrates on load:
 - `when_produced` and `when_upstream` become `produced` and `upstream` clauses,
   after the feature clause, in that order (the prompt renders them in the same
   order as before);
-- a fixed parameter named `max_<metric>` or `min_<metric>` becomes a `Bound`.
-  Before M48 the runner read every such parameter as a bound, so the bound is
-  what it did. A real input named `max_` fixed on a requirement would lose its
-  input role; no workflow and no saved fixture ever fixed one;
+- in a saved project written before M48, a fixed parameter named
+  `max_<metric>` or `min_<metric>` becomes a `Bound`. Before M48 the runner
+  read every such parameter as a bound, so the bound is what it did. M52
+  narrowed this to old data: the store converts only in a schema version "1"
+  file, and only a requirement saved with no `bounds` key
+  (`nirmaan.models.workflow.legacy_requirement`). A requirement built today
+  keeps every parameter, so `dft.scan_insert`'s real `max_chain_length` stays
+  an input;
 - `max_retries`, `on_failure`, `max_attempts` and `max_review_rounds` become
   `limits` fields.
 

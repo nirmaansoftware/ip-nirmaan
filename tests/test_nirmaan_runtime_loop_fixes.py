@@ -36,7 +36,6 @@ from nirmaan_helpers import agent, drive, human, tid
 from nirmaan.company import builder
 from nirmaan.company.workflows import REVIEWED, ran, rv, st
 from nirmaan.models import (
-    ActorKind,
     Condition,
     EvidenceKind,
     EvidenceRequirement,

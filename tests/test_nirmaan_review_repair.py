@@ -274,11 +274,11 @@ def test_exhausted_review_rounds_escalate_through_the_owners_route(units):
     assert [a.id for a in superseded(engine, seat)] == [a.split(": ")[0] for a in esc.attempted_actions]
     assert engine.state.audit[-1].action == "escalation.raise"
 
-    # Resolving restores the task, not the budget: the limit covers the total.
+    # M52: a person resolving it grants a fresh budget, so the owner works again.
     engine.resolve_escalation(esc.id, human(esc.target_role), "one more round")
     assert engine.task(seat).status is TaskStatus.CHANGES_REQUESTED
-    assert run_task(engine, seat, ModelRuntime(owner)).status is ResultStatus.NEEDS_ESCALATION
-    assert len(owner.calls) == 2
+    assert run_task(engine, seat, ModelRuntime(owner)).status is not ResultStatus.NEEDS_ESCALATION
+    assert len(owner.calls) > 2  # a model call, not an escalation with none
 
 
 # --- The budget persists across runs ---------------------------------------------------------------
@@ -325,9 +325,11 @@ def test_the_attempt_budget_persists_across_nirmaan_runs(rtl_ready, tmp_path, mo
     loaded = TaskEngine(build_organization(), state)
     loaded.resolve_escalation(esc.id, human(esc.target_role), "allow one more")
     ProjectStore(root).save(loaded.state)
-    output, state = run("--attempts", "3")  # the limit covers the total: one more attempt
-    assert sorted(a.number for a in state.attempts.values()) == [1, 2, 3]
-    assert "refused" in output and "attempt 1" not in output
+    output, state = run("--attempts", "2")  # M52: the person's resolution granted a fresh budget
+    assert sorted(a.number for a in state.attempts.values()) == [1, 2, 3, 4]
+    assert "attempt 2: refused" in output
+    output, state = run("--attempts", "2")  # and only one: it is spent again
+    assert "escalation:" in output and len(state.attempts) == 4
 
 
 # --- RTL: a reviewer sends real, checked work back ---------------------------------------------

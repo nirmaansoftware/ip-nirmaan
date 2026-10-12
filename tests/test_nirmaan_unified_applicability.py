@@ -48,10 +48,13 @@ REGRESSION = "Investigate a regression failure introduced by a recent RTL commit
 
 
 def test_an_old_form_requirement_builds_the_new_form():
-    req = EvidenceRequirement(
-        description="old", accepts=(EvidenceKind.TOOL_RUN,), tools=("synth.run",),
-        when=Condition(any_of=("at_speed",)), when_produced=("formal_spec",), when_upstream=("rtl_source", "layout"),
-        params=(("max_latches", "0"), ("stop_after", "route"), ("min_fill_shapes", "1")))
+    from nirmaan.models.workflow import legacy_requirement
+
+    saved = {"description": "old", "accepts": ["tool_run"], "tools": ["synth.run"],
+             "when": {"any_of": ["at_speed"]}, "when_produced": ["formal_spec"],
+             "when_upstream": ["rtl_source", "layout"],
+             "params": [["max_latches", "0"], ["stop_after", "route"], ["min_fill_shapes", "1"]]}
+    req = EvidenceRequirement.model_validate(legacy_requirement(saved))  # M52: as the store reads a "1" file
     assert req.when == (Condition(any_of=("at_speed",)), Condition(on="produced", any_of=("formal_spec",)),
                         Condition(on="upstream", any_of=("rtl_source", "layout")))
     assert req.params == (("stop_after", "route"),)

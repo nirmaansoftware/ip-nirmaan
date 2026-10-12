@@ -16,6 +16,7 @@ CITE ONLY THESE ARTIFACTS, using the token exactly as written:
   [run:run-0001]  VeriTriage classified axi_timeout.log as timeout (85% confidence, 5 evidence nodes); top hypothesis: Likely RTL bug
   [evidence:prj-<id>.change-correlation.e1]  review_record: Independent review by design.rtl.architecture.senior: looks right
   [artifact:prj-<id>.change-correlation.a1]  impact_analysis: Correlate with recent RTL commits (impact_analysis) (approved)
+  [requirement:req-806f63ac9b]  the project requirement: Investigate a regression failure introduced by a recent RTL commit.
 
 ## Company
 - Company: IP Nirmaan

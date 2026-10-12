@@ -167,8 +167,9 @@ def _citations(packet: WorkPacket, tools: tuple[ToolNote, ...]) -> list[Citable]
     for attempt in packet.task.attempts:  # M52: a refused attempt's failed runs stay citable; they back nothing
         for failed in attempt.failed_runs:
             if failed.evidence:
+                label = f"refused attempt {attempt.number}, failed: {failed.summary}"
                 found.setdefault(failed.evidence, Citable("evidence", _UNSAFE.sub(".", failed.evidence),
-                                                          failed.evidence, f"failed run of attempt {attempt.number}"))
+                                                          failed.evidence, label))
             found.setdefault(failed.run, Citable("run", failed.run, failed.run, f"{failed.tool}: {failed.summary}"))
     requirement = packet.project.requirement_id
     if requirement:  # M52: the record every task traces to, so even a first stage has something to ground in

@@ -93,17 +93,18 @@ And from a step's result:
 
 | Step result | Loop |
 |---|---|
-| owner `submitted` | continue (the task is now in review, or completed if it needs none) |
+| owner `submitted` | continue (the task is now in review, or completed if it needs none; M52: a runtime's submission is final, so the engine refuses one that would leave the task in progress, and the loop stops if one ever does) |
 | owner `needs_escalation` | stop: `escalated` (the model asked, or a limit is spent) |
 | owner `blocked` | stop: `blocked` (a check that must pass cannot run here) |
 | owner `declined` | stop: `declined` |
-| owner `refused` | continue only if the next owner step would escalate (the attempt limit is spent, so it costs no call); else stop: `refused`. With an attempt limit of 1, M26 records no attempt, so asking again would never end: the loop stops |
+| owner `refused` | continue only if the next owner step would escalate (the attempt limit is spent, so it costs no call); else stop: `refused`. Since M52 every refusal is recorded, so with an attempt limit of 1 the next step escalates |
 | reviewer `submitted` | continue (the verdict moved the task) |
 | reviewer `declined` | stop: `declined` (no verdict, or a verdict with nothing cited) |
 
 A step the engine refuses outright (a policy violation, for example P8 on an
-unapproved input) raises, as `nirmaan run` does: the CLI reports it, and the
-steps before it are already saved.
+unapproved input) raises, as `nirmaan run` does: the CLI saves what the step
+did (M52) and reports it, and the steps before it are already saved. A model
+answer the constitution refuses is not such a step: it is a refused attempt.
 
 ---
 

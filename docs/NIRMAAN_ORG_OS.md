@@ -317,7 +317,7 @@ nirmaan org skills | skill ID | tools | stats        catalogs
 nirmaan org validate | export [-o FILE]              integrity; the machine-readable company
 nirmaan workflows [ID] | policies                     registries
 nirmaan analyze "REQUIREMENT"                         how the organization reads it
-nirmaan plan "REQUIREMENT" [--detail] [--human-gate G] [--auto-gate G]
+nirmaan plan "REQUIREMENT" [--detail] [--human-gate G] [--replace]
 nirmaan demo [N|all] [--detail]                       the demonstration requirements
 nirmaan projects | show P | status P | why P TASK | trace P | audit P | dashboard P
 nirmaan task start|submit|review|approve|evidence|attest|tool|complete|escalate|resolve P TASK --as ROLE [--agent]

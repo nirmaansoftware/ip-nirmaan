@@ -40,9 +40,11 @@ adds:
 3. **Only a refusal is repaired.** The constitution refusing the submission
    (a failed before-review check, or an answer with no file to check) starts
    another attempt. A tool the broker refuses (`blocked`), an
-   answer that is not JSON (`declined`), an escalation, and a run the model
-   invented (P5, raised) end the loop exactly as before. A missing tool is not
-   something a model can fix.
+   answer that is not JSON (`declined`), and an escalation end the loop
+   exactly as before. A missing tool is not something a model can fix. Since
+   M52 an answer the constitution refuses (a run the model invented, P5; no
+   uncertainty, P3; nothing left after grounding, P4) is a refused attempt
+   too, not an error (`docs/RUNTIME_LOOP_FIXES.md`).
 4. **Every attempt is audited.** Each refused attempt is a `task.attempt` audit
    entry naming its files, runs, evidence, and the engine's reason; the one
    that passes is the ordinary `task.submit` entry.
@@ -84,8 +86,10 @@ run_task
   all refused                                refused, every attempt listed
 ```
 
-With a limit of 1 the loop runs once and records no `Attempt`: the result, the
-state, and the audit trail are identical to M23's.
+With a limit of 1 the loop runs once. Until M52 it recorded no `Attempt`, so
+the limit was never spent and every later run tried again; now every refusal
+is an `Attempt`, so with a limit of 1 the next run escalates
+(`docs/RUNTIME_LOOP_FIXES.md` section 2).
 
 M23 already gives every execution its own directory
 (`<workspace>/<task>/<attempt>/`), so a later attempt never overwrites the
@@ -162,12 +166,12 @@ counter test:
 
 | Situation | Result | Task |
 |---|---|---|
-| Limit 1, checks fail | `refused`, as in M23 | `in_progress`; no `Attempt` recorded |
+| Limit 1, checks fail | `refused`, as in M23 | `in_progress`; `Attempt` 1 recorded (M52), so the next run escalates |
 | Attempt n fails, n < limit | the loop continues | `in_progress`; `Attempt` n recorded and audited |
 | A later attempt passes | `submitted`; report lists every attempt | `in_review`, with only that attempt's files |
 | Every attempt fails | `refused`; the detail names every attempt | `in_progress`; every `Attempt` recorded |
 | The broker refuses a before-review tool | `blocked`, no retry | `blocked` |
-| The model invents a run | P5 raises, as in M20 | `in_progress` |
+| The model invents a run | `refused` with the P5 reason (M52; it raised before) | `in_progress`; `Attempt` recorded |
 
 `RunReport.attempts` lists each attempt: its number, its result, its detail,
 its runs and evidence, and (for a refused one) its `Attempt` ID. `nirmaan run`
@@ -197,8 +201,8 @@ second passes: it reaches review with only the second file.
    (it does see the failed run, which is the task's evidence).
 2. Attempt 2's prompt carries the failed run's evidence and run tokens and a
    bounded excerpt of its log.
-3. With a limit of 1 the result, state, and audit are as in M23: one model
-   call, no `Attempt`, no `task.attempt` entry.
+3. With a limit of 1 there is one model call and (M52) one `Attempt`, so the
+   next run escalates instead of asking again.
 4. Exhausting the limit leaves `refused`, every attempt listed and audited;
    an attempt's files, submitted by hand, are still refused by P9.
 5. A tool the broker refuses is `blocked`, with one model call and no retry.
