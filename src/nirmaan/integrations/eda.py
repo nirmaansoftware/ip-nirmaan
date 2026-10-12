@@ -14,15 +14,27 @@ them against a requirement's bounds (M48); a parameter is only ever a
 parameter, whatever its name.
 Simulation logs reach VeriTriage through :func:`triage_simulation`, which invokes ``veritriage.investigate`` through the same broker. This module
 never imports VeriTriage.
+
+M53 (docs/GATE_INTEGRITY.md): each run gets its own new directory, under
+``workdir`` when one is given; its steps see an environment with no
+credential in it. The timeout covers the
+whole run, and stops every process a step started, not only the first. A
+simulation passes only on the testbench's own verdict, which carries a nonce
+the run passed in.
 """
 
 from __future__ import annotations
 
 import json
+import os
+import re
+import secrets
 import shlex
 import shutil
+import signal
 import subprocess
 import tempfile
+import time
 from collections.abc import MutableMapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -48,6 +60,16 @@ if TYPE_CHECKING:
     from nirmaan.runtime.tools import ToolBroker
 
 DEFAULT_TIMEOUT = 300
+
+#: Environment variables no tool run sees (M53): code a seat wrote runs in these steps, and what it prints
+#: lands in logs and records, so a credential in its environment could be copied out.
+SECRET_ENV_RE = re.compile(r"TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL|API_?KEY|PRIVATE_KEY|^ANTHROPIC_", re.IGNORECASE)
+#: A value shorter than this is not redacted from what a run printed: it would match ordinary text.
+_REDACT_MIN = 16
+
+#: How a run passes its nonce to the program that reports the verdict (M53): a simulator plusarg.
+NONCE_ARG = "+nirmaan_nonce="
+_NONCE_ECHO_RE = re.compile(r"^\$ .*" + re.escape(NONCE_ARG) + r"(?P<nonce>[0-9a-f]+)\b", re.MULTILINE)
 
 #: The files a cover run derives antecedent covers in (M29).
 HDL_SUFFIXES = (".v", ".sv", ".vh", ".svh")
@@ -153,8 +175,23 @@ def select_backend(tool: str, params: Params) -> tuple[Backend | None, str]:
     return None, f"{tool} cannot run here: {'; '.join(reasons)} (refused, never simulated)"
 
 
+def timeout_problem(params: Params) -> str | None:
+    """Why the ``timeout`` given cannot bound a run (M53), or None."""
+    given = text_value(params.get("timeout")).strip()
+    if not given:
+        return None
+    try:
+        seconds = int(given)
+    except ValueError:
+        return f"timeout must be a whole number of seconds, not {given!r}"
+    return None if seconds >= 1 else f"timeout must be at least 1 second, not {seconds}"
+
+
 def _probe(tool: str) -> Callable[[Params], str | None]:
     def probe(params: Params) -> str | None:
+        too_short = timeout_problem(params)
+        if too_short:
+            return f"{tool}: {too_short} (refused, nothing ran)"
         backend, why = select_backend(tool, params)
         return None if backend else why
 
@@ -182,46 +219,42 @@ def execute(backend: Backend, params: Params) -> ToolOutcome:
     absent = [f for f in files if not Path(f).is_file()]
     if absent:
         return ToolOutcome(False, f"{backend.name}: not found: {', '.join(absent)}")
-    workdir = Path(params["workdir"]) if params.get("workdir") else Path(tempfile.mkdtemp(prefix="nirmaan-eda-"))
-    workdir.mkdir(parents=True, exist_ok=True)
-    workdir = workdir.resolve()
+    too_short = timeout_problem(params)
+    if too_short:
+        return ToolOutcome(False, f"{backend.name}: {too_short}")
+    workdir = run_directory(backend.name, params.get("workdir"))
     job = Job(backend.tool, params, workdir, sources, params.get("top") or None)
     problem = backend.check(job) if backend.check else None
     if problem:
         return ToolOutcome(False, f"{backend.name}: {problem}")
-    timeout = int(params.get("timeout") or DEFAULT_TIMEOUT)
+    timeout = int(text_value(params.get("timeout")).strip() or DEFAULT_TIMEOUT)
 
     chunks: list[str] = []
     codes: list[int] = []
     commands: list[list[str]] = []
     timed_out = None
     cwd = backend.cwd(job) if backend.cwd else workdir
+    env = run_environment(workdir)
+    deadline = time.monotonic() + timeout  # M53: one deadline for the whole run, not one per step
     for argv in backend.steps(job):
         commands.append(argv)
         chunks.append(f"$ {shlex.join(argv)}\n")
-        try:
-            proc = subprocess.run(argv, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                  text=True, errors="replace", timeout=timeout)
-        except subprocess.TimeoutExpired as exc:
-            out = exc.output.decode(errors="replace") if isinstance(exc.output, bytes) else (exc.output or "")
-            chunks.append(out)
+        output, code = _run_step(argv, cwd, env, deadline)
+        chunks.append(output)
+        if code is None:
             timed_out = argv[0]
             break
-        except OSError as exc:  # not executable, vanished mid-run
-            chunks.append(f"{type(exc).__name__}: {exc}\n")
-            codes.append(-1)
+        codes.append(code)
+        if code != 0:
             break
-        chunks.append(proc.stdout)
-        codes.append(proc.returncode)
-        if proc.returncode != 0:
-            break
-    log = "".join(chunks)
+    log = redact("".join(chunks))
     log_path = workdir / f"{backend.name}.log"
     log_path.write_text(log, encoding="utf-8")
 
     result = backend.parse(RunRecord(log, tuple(codes), workdir))
     if timed_out:
         result = EdaResult(False, f"timed out after {timeout}s in {timed_out}", result.diagnostics, result.metrics)
+    result = EdaResult(result.passed, redact(result.summary), result.diagnostics, result.metrics)
     record = {
         "tool": backend.tool,
         "backend": backend.name,
@@ -240,6 +273,137 @@ def execute(backend: Backend, params: Params) -> ToolOutcome:
     return ToolOutcome(result.passed, f"{backend.name}: {result.summary}",
                        references=(str(log_path), str(result_path)), data=record, outputs=outputs,
                        metrics=dict(result.metrics))
+
+
+#: The file a run claims an empty ``workdir`` with (M53), so a second run there gets a directory of its own.
+RUN_CLAIM = ".nirmaan-run"
+
+
+def run_directory(name: str, under: object = None) -> Path:
+    """The directory one run works in (M53).
+
+    Without ``under``, a new one in the system's temporary directory. With it, ``under``
+    itself when it is new or empty and this run claims it first (an exclusive create of
+    :data:`RUN_CLAIM`); otherwise a new directory inside it. So a run never deletes or
+    overwrites a file it did not put there, and two runs given the same directory, at
+    once or one after the other, never share one.
+    """
+    root = Path(text_value(under).strip()) if text_value(under).strip() else None
+    if root is None:
+        return Path(tempfile.mkdtemp(prefix=f"nirmaan-{name}-")).resolve()
+    root.mkdir(parents=True, exist_ok=True)
+    if not any(root.iterdir()):
+        try:
+            os.close(os.open(root / RUN_CLAIM, os.O_CREAT | os.O_EXCL | os.O_WRONLY))
+            return root.resolve()
+        except FileExistsError:
+            pass
+    return Path(tempfile.mkdtemp(prefix=f"nirmaan-{name}-", dir=root)).resolve()
+
+
+def run_environment(workdir: Path) -> dict[str, str]:
+    """What a run's steps see (M53): this process's environment with no credential in it.
+
+    ``TMPDIR`` is left as it is: pointed into the run's directory, Yosys's ABC step hung in the
+    OpenROAD-flow-scripts image (docs/GATE_INTEGRITY.md, section 4).
+    """
+    return {k: v for k, v in os.environ.items() if not SECRET_ENV_RE.search(k)}
+
+
+def redact(text: str) -> str:
+    """``text`` with the value of every credential in this process's environment replaced (M53)."""
+    for key, value in os.environ.items():
+        if SECRET_ENV_RE.search(key) and len(value) >= _REDACT_MIN and value in text:
+            text = text.replace(value, f"[{key} redacted]")
+    return text
+
+
+def _descendants(root: int) -> set[int]:
+    """Every live process below ``root``, from one ``ps`` snapshot."""
+    try:
+        listing = subprocess.run(["ps", "-axo", "pid=,ppid="], capture_output=True, text=True).stdout
+    except OSError:  # no ps (a minimal container): the step's own process group is still killed
+        return set()
+    children: dict[int, list[int]] = {}
+    for line in listing.splitlines():
+        fields = line.split()
+        if len(fields) == 2 and fields[0].isdigit() and fields[1].isdigit():
+            children.setdefault(int(fields[1]), []).append(int(fields[0]))
+    found, todo = set(), [root]
+    while todo:
+        for child in children.get(todo.pop(), ()):
+            if child not in found:
+                found.add(child)
+                todo.append(child)
+    return found
+
+
+def _signal(pid: int, sig: int, group: bool = False) -> None:
+    try:
+        (os.killpg if group else os.kill)(pid, sig)
+    except (ProcessLookupError, PermissionError):
+        pass
+
+
+def _stop_tree(proc: subprocess.Popen) -> None:
+    """Stop a step and every process it started (M53).
+
+    The step leads a new process group, but a tool may put its own children in
+    groups of their own (``sby`` does, for each solver). So the whole tree is
+    frozen first, while every process still has its parent, then killed with
+    every group in it.
+    """
+    frozen: set[int] = set()
+    for _ in range(3):  # a process forked while the tree was being frozen is caught on the next pass
+        found = ({proc.pid} | _descendants(proc.pid)) - frozen
+        if not found:
+            break
+        for pid in found:
+            _signal(pid, signal.SIGSTOP)
+        frozen |= found
+    groups = set()
+    for pid in frozen:
+        try:
+            groups.add(os.getpgid(pid))
+        except (ProcessLookupError, PermissionError):
+            pass
+    for group in groups - {os.getpgrp()}:
+        _signal(group, signal.SIGKILL, group=True)
+    for pid in frozen:
+        _signal(pid, signal.SIGKILL)
+
+
+def _run_step(argv: list[str], cwd: Path, env: dict[str, str], deadline: float) -> tuple[str, int | None]:
+    """Run one step in its own process group; its output and exit status, or None when the deadline passed."""
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        return "", None
+    try:
+        proc = subprocess.Popen(argv, cwd=cwd, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                text=True, errors="replace", start_new_session=True)
+    except OSError as exc:  # not executable, vanished mid-run
+        return f"{type(exc).__name__}: {exc}\n", -1
+    try:
+        output, _ = proc.communicate(timeout=remaining)
+    except subprocess.TimeoutExpired:
+        _stop_tree(proc)
+        try:
+            output, _ = proc.communicate(timeout=10)
+        except subprocess.TimeoutExpired:  # a process outside the group still holds the output open
+            output = ""
+        return output or "", None
+    return output or "", proc.returncode
+
+
+def new_nonce() -> str:
+    """A fresh nonce for one run (M53): the program under test cannot know it, so cannot print it."""
+    return secrets.token_hex(16)
+
+
+def run_nonce(log: str) -> str | None:
+    """The nonce the run passed, read from the runner's own echo of the step that took it."""
+    found = _NONCE_ECHO_RE.search(log)
+    return found["nonce"] if found else None
 
 
 def triage_simulation(broker: ToolBroker, actor: Actor, run: ToolRun, task_id: str | None = None,
@@ -262,13 +426,44 @@ def _verilator_lint(job: Job) -> list[list[str]]:
 
 def _icarus(job: Job) -> list[list[str]]:
     return [["iverilog", "-g2012", "-o", "sim.vvp", "-s", str(job.top), *job.sources],
-            ["vvp", "-n", "sim.vvp"]]
+            ["vvp", "-n", "sim.vvp", NONCE_ARG + new_nonce()]]
 
 
 def _verilator_sim(job: Job) -> list[list[str]]:
     return [["verilator", "--binary", "-Wno-fatal", "-j", "0", "--top-module", str(job.top),
              "-Mdir", "obj", *job.sources],
-            [str(job.workdir / "obj" / f"V{job.top}")]]
+            [str(job.workdir / "obj" / f"V{job.top}"), NONCE_ARG + new_nonce()]]
+
+
+#: What only the testbench, the file that declares the top module, may use (M53, docs/GATE_INTEGRITY.md).
+#: A design that ends the run, or reads the run's nonce, could stand in for the testbench's verdict.
+TESTBENCH_ONLY = ("$finish", "$stop", "$exit", "$value$plusargs", "$test$plusargs", "$fopen", "$system", "$c",
+                  "DPI")
+_TESTBENCH_ONLY_RE = re.compile(r"(?<![\w$])(?:" + "|".join(re.escape(t) for t in TESTBENCH_ONLY) + r")(?![\w$])")
+_COMMENT_RE = re.compile(r"//[^\n]*|/\*.*?\*/", re.DOTALL)
+
+
+def testbench_only_problem(job: Job) -> str | None:
+    """Why a simulation's sources cannot be judged by their testbench's verdict (M53), or None.
+
+    The file that declares the top module is the testbench. No other file may end
+    the simulation, read a plusarg, open a file, or reach outside the language.
+    """
+    top = re.compile(rf"\bmodule\s+{re.escape(str(job.top))}\b")
+    found = []
+    for source in job.sources:
+        text = _COMMENT_RE.sub("", Path(source).read_text(encoding="utf-8", errors="replace"))
+        if top.search(text):
+            continue
+        used = sorted(set(_TESTBENCH_ONLY_RE.findall(text)))
+        if used:
+            found.append(f"{Path(source).name} uses {', '.join(used)}")
+        if "`" in text and "``" in text:
+            found.append(f"{Path(source).name} pastes tokens (``), which could build any of them")
+    if not found:
+        return None
+    return (f"only the testbench (the file that declares {job.top}) may end the simulation or read its "
+            f"arguments, and {'; '.join(found)}; nothing was simulated")
 
 
 def _yosys(job: Job) -> list[list[str]]:
@@ -284,13 +479,46 @@ def _yosys_parse(run: RunRecord) -> EdaResult:
     return parse_yosys(run.log, run.returncode, stat.read_text(encoding="utf-8") if stat.is_file() else None)
 
 
+#: sby's depth when ``[options]`` names none.
+SBY_DEFAULT_DEPTH = 20
+#: Where a ``formal.run`` records the mode and depth it ran, for the parser (M53).
+FORMAL_OPTIONS = "formal_options.json"
+
+
+def sby_options(sby: Path) -> dict[str, object]:
+    """The ``mode`` and ``depth`` a single-task setup runs with."""
+    mode, depth = None, SBY_DEFAULT_DEPTH
+    for section, line in _sby_sections(sby):
+        words = line.split()
+        if section == "options" and len(words) >= 2 and words[0] == "mode":
+            mode = words[1]
+        elif section == "options" and len(words) >= 2 and words[0] == "depth" and words[1].isdigit():
+            depth = int(words[1])
+    return {"mode": mode, "depth": depth}
+
+
 def _sby(job: Job) -> list[list[str]]:
-    return [["sby", "-f", "-d", str(job.workdir / "sby"), str(Path(job.params["sby"]).resolve())]]
+    sby = Path(job.params["sby"]).resolve()
+    (job.workdir / FORMAL_OPTIONS).write_text(json.dumps(sby_options(sby)) + "\n", encoding="utf-8")
+    return [["sby", "-f", "-d", str(job.workdir / "sby"), str(sby)]]
 
 
 def _sby_dir(job: Job) -> Path:
     """sby resolves its [files] against the directory it runs in: the .sby file's own."""
     return Path(job.params["sby"]).resolve().parent
+
+
+def _sby_tasks(job: Job) -> str | None:
+    """A setup with ``[tasks]`` runs one task per invocation, so none of them would be the one judged (M53)."""
+    sby = Path(job.params["sby"]).resolve()
+    if any(section == "tasks" for section, _ in _sby_sections(sby)):
+        return f"{sby.name} declares [tasks]; formal runs single-task setups only (refused, nothing ran)"
+    return None
+
+
+def _sby_check(job: Job) -> str | None:
+    """``formal.run`` takes a single-task setup, over the sources it is given."""
+    return _sby_tasks(job) or _sby_reads(job)
 
 
 def _sby_reads(job: Job) -> str | None:
@@ -408,11 +636,13 @@ def _lint_parse(run: RunRecord) -> EdaResult:
 
 
 def _sim_parse(run: RunRecord) -> EdaResult:
-    return parse_simulation(run.log, run.returncodes)
+    return parse_simulation(run.log, run.returncodes, nonce=run_nonce(run.log) or "")
 
 
 def _sby_parse(run: RunRecord) -> EdaResult:
-    return parse_sby(run.log, run.returncode)
+    options = run.workdir / FORMAL_OPTIONS
+    ran = json.loads(options.read_text(encoding="utf-8")) if options.is_file() else {}
+    return parse_sby(run.log, run.returncode, mode=ran.get("mode"), depth=ran.get("depth"))
 
 
 def _sby_cover_parse(run: RunRecord) -> EdaResult:
@@ -423,10 +653,12 @@ def _sby_cover_parse(run: RunRecord) -> EdaResult:
 
 register_backend(Backend("verilator-lint", "lint.run", ("verilator",), _verilator_lint, _lint_parse))
 for _tool in SIMULATION_TOOLS:
-    register_backend(Backend("icarus", _tool, ("iverilog", "vvp"), _icarus, _sim_parse, ("sources", "top")))
-    register_backend(Backend("verilator-sim", _tool, ("verilator",), _verilator_sim, _sim_parse, ("sources", "top")))
+    register_backend(Backend("icarus", _tool, ("iverilog", "vvp"), _icarus, _sim_parse, ("sources", "top"),
+                             check=testbench_only_problem))
+    register_backend(Backend("verilator-sim", _tool, ("verilator",), _verilator_sim, _sim_parse, ("sources", "top"),
+                             check=testbench_only_problem))
 register_backend(Backend("yosys", "synth.run", ("yosys",), _yosys, _yosys_parse, ("sources", "top")))
 register_backend(Backend("symbiyosys", "formal.run", ("sby", "yosys"), _sby, _sby_parse, ("sby",), _sby_dir,
-                         check=_sby_reads))
+                         check=_sby_check))
 register_backend(Backend("symbiyosys-cover", "formal.cover", ("sby", "yosys"), _sby_cover, _sby_cover_parse,
                          ("sby",), check=_sby_cover_check))

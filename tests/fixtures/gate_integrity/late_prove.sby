@@ -1,0 +1,13 @@
+[options]
+mode prove
+depth 3
+
+[engines]
+smtbmc
+
+[script]
+read -formal late.v
+prep -top late
+
+[files]
+late.v

@@ -179,7 +179,7 @@ def test_the_register_driver_passes_on_each_core(block, tmp_path, core):
     assert run.succeeded, run.summary
     assert checks_of(outcome) == dict.fromkeys(EXPECTED_CHECKS, True)
     log = Path(run.references[0]).read_text()
-    assert "FWTEST BUS read 0x5 -> 0x00000000 SLVERR" in log  # the RTL's own decode
+    assert " BUS read 0x5 -> 0x00000000 SLVERR" in log  # the RTL's own decode
     assert f"+define+NIRMAAN_CORE=nirmaan_core_{core}" in log
     assert "+define+NIRMAAN_BRIDGE=nirmaan_bridge_axil" in log and "NIRMAAN_DUT_IRQ" not in log
     for name in (p.name for p in CORES[core].verilog):
@@ -195,8 +195,8 @@ def test_the_interrupt_fires_is_acknowledged_and_masked_on_each_core(block, tmp_
     log = Path(run.references[0]).read_text()
     assert "+define+NIRMAAN_DUT_IRQ" in log
     # The acknowledgement is a register write: the W1C to STATUS, on the RTL.
-    assert "FWTEST BUS write 0xc = 0x00000001 strobe 0xf -> OKAY" in log
-    assert "FWTEST BUS write 0x8 = 0x00000005 strobe 0xf -> SLVERR" in log  # COUNT is read only
+    assert " BUS write 0xc = 0x00000001 strobe 0xf -> OKAY" in log
+    assert " BUS write 0x8 = 0x00000005 strobe 0xf -> SLVERR" in log  # COUNT is read only
 
 
 @needs(*SOC_TOOLS, any_of=RISCV_GCC)
@@ -224,8 +224,8 @@ def test_the_apb_driver_passes_against_the_apb_rtl_on_each_core(block, tmp_path,
     log = Path(run.references[0]).read_text()
     assert "+define+NIRMAAN_BRIDGE=nirmaan_bridge_apb" in log and "bridge_apb.v" in log
     # PSLVERR from the RTL's own decode reaches the driver as SLVERR.
-    assert "FWTEST BUS read 0x5 -> 0x00000000 SLVERR" in log
-    assert "FWTEST BUS write 0x10 = 0xdeadbeef strobe 0xf -> SLVERR" in log
+    assert " BUS read 0x5 -> 0x00000000 SLVERR" in log
+    assert " BUS write 0x10 = 0xdeadbeef strobe 0xf -> SLVERR" in log
 
 
 @needs(*SOC_TOOLS, any_of=RISCV_GCC)

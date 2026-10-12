@@ -135,6 +135,7 @@ jobs:
         env:
           OPENSTA: e983e15b2cb346badf8f23725fd3914d25312c44
         run: |
+          set -o pipefail  # M53: a failing cmake is not hidden by the tail that shortens its log
           git init -q "$RUNNER_TEMP/OpenSTA" && cd "$RUNNER_TEMP/OpenSTA"
           git fetch -q --depth 1 https://github.com/The-OpenROAD-Project/OpenSTA.git "$OPENSTA"
           git checkout -q FETCH_HEAD

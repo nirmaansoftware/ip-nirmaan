@@ -22,9 +22,12 @@
  *
  * The interrupt API of nirmaan_irq.h is here too: the core's trap entry
  * (irq_<core>.S) calls nirmaan_irq_dispatch, which runs the attached handler,
- * and nirmaan_bus_fault_dispatch for a bus-error trap. Each prints a line the
- * gate counts (FWTEST IRQ, FWTEST TRAP). A line of output is printed with the
- * design's interrupt off, so an interrupt's line never lands inside another.
+ * and nirmaan_bus_fault_dispatch for a bus-error trap. Each prints a record the
+ * gate counts (IRQ, TRAP). A record is printed with the design's interrupt off,
+ * so an interrupt's record never lands inside another.
+ *
+ * M53 (docs/GATE_INTEGRITY.md): records go through the REPORT register, which the
+ * SoC prefixes with the run's nonce; text written to CONSOLE is never a record.
  */
 #include <stdio.h>
 
@@ -128,7 +131,7 @@ unsigned nirmaan_irq_wait(unsigned seen, uint32_t cycles) {
 
 void nirmaan_irq_dispatch(void) {
     irq_handled = irq_handled + 1u;
-    put("FWTEST IRQ taken\n");
+    put("IRQ taken\n");
     if (irq_handler != NULL) {
         irq_handler(irq_ctx);
     }
@@ -172,7 +175,7 @@ void nirmaan_bus_fault_dispatch(uint32_t pc) {
     fault.response = (info >> 2) & 3u;
     fault.pc = pc;
     faults_delivered = faults_delivered + 1u;
-    snprintf(line, sizeof line, "FWTEST TRAP bus-error %s 0x%lx %s at pc 0x%08lx\n", fault.write ? "write" : "read",
+    snprintf(line, sizeof line, "TRAP bus-error %s 0x%lx %s at pc 0x%08lx\n", fault.write ? "write" : "read",
              (unsigned long)fault.offset, names[fault.response], (unsigned long)pc);
     put(line);
     if (fault_handler != NULL) {
@@ -181,10 +184,11 @@ void nirmaan_bus_fault_dispatch(uint32_t pc) {
     NIRMAAN_SOC_BERR_INFO = NIRMAAN_SOC_BERR_PENDING;
 }
 
+/* One record the gate reads, through REPORT: the SoC starts each line with the run's nonce (M53). */
 static void put(const char *text) {
     unsigned on = nirmaan_core_irq_set(0u);
     while (*text != '\0') {
-        NIRMAAN_SOC_CONSOLE = (uint32_t)(unsigned char)*text++;
+        NIRMAAN_SOC_REPORT = (uint32_t)(unsigned char)*text++;
     }
     (void)nirmaan_core_irq_set(on);
 }
@@ -193,10 +197,10 @@ void nirmaan_test_result(const char *name, int ok, const char *detail) {
     char line[256];
     if (ok) {
         ++passed;
-        snprintf(line, sizeof line, "FWTEST PASS %s\n", name != NULL ? name : "(unnamed)");
+        snprintf(line, sizeof line, "PASS %s\n", name != NULL ? name : "(unnamed)");
     } else {
         ++failed;
-        snprintf(line, sizeof line, "FWTEST FAIL %s: %s\n", name != NULL ? name : "(unnamed)",
+        snprintf(line, sizeof line, "FAIL %s: %s\n", name != NULL ? name : "(unnamed)",
                  detail != NULL ? detail : "check failed");
     }
     put(line);
@@ -207,9 +211,9 @@ void nirmaan_soc_main(void) {
     char line[96];
     nirmaan_fw_test(&hal);
     if (passed == 0u && failed == 0u) {
-        put("FWTEST ERROR the tests reported no checks\n");
+        put("ERROR the tests reported no checks\n");
     }
-    snprintf(line, sizeof line, "FWTEST SUMMARY %u passed, %u failed, %lu cycles\n", passed, failed,
+    snprintf(line, sizeof line, "SUMMARY %u passed, %u failed, %lu cycles\n", passed, failed,
              (unsigned long)NIRMAAN_SOC_CYCLES);
     put(line);
     NIRMAAN_SOC_EXIT = (passed > 0u && failed == 0u) ? 0u : 1u;
@@ -219,7 +223,7 @@ void nirmaan_soc_main(void) {
 
 void nirmaan_soc_trapped(uint32_t cause, uint32_t pc) {
     char line[96];
-    snprintf(line, sizeof line, "FWTEST ERROR the CPU trapped: cause %lu at 0x%08lx\n", (unsigned long)cause,
+    snprintf(line, sizeof line, "ERROR the CPU trapped: cause %lu at 0x%08lx\n", (unsigned long)cause,
              (unsigned long)pc);
     put(line);
     NIRMAAN_SOC_EXIT = 2u;

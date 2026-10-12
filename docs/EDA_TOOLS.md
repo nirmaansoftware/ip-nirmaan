@@ -42,6 +42,12 @@ nirmaan org tools          # the five tools now show a binding
    (severity, file, line, code, message), and metrics (cell counts, proof
    status). The raw log and the structured result are both written to disk and
    cited by the run.
+   M53 (`docs/GATE_INTEGRITY.md`): a simulation passes only on the
+   testbench's own verdict line, `NIRMAAN-SIM <nonce> <n> passed, <m>
+   failed`, with the nonce the run passed as `+nirmaan_nonce=` and `n > 0`,
+   `m = 0`; only the file declaring the top module may end the run or read
+   plusargs. `formal.run` reports a `bmc` setup as "no counterexample within N
+   steps", never as proven.
 4. **Simulation logs feed VeriTriage.** A simulation run's log path is its
    first reference, and `triage_simulation()` hands it to
    `veritriage.investigate` through the same broker, as its own recorded run.
@@ -117,9 +123,9 @@ All values are strings, as for every brokered tool.
 | `sources` | lint, simulator, test, synth | Comma-separated Verilog or SystemVerilog files (required) |
 | `top` | lint, simulator, test, synth | Top module (required for simulation and synthesis; optional for lint) |
 | `sby` | formal | Path to a `.sby` file (required); its `[files]` are resolved by `sby` |
-| `workdir` | all | Where logs and outputs go; a fresh temporary directory when absent |
+| `workdir` | all | Where the run works: this directory when it is new or empty, else a new directory inside it (M53); a fresh temporary directory when absent |
 | `backend` | all | Force one backend by name |
-| `timeout` | all | Seconds per step (default 300) |
+| `timeout` | all | Seconds for the whole run, every step together, at least 1 (default 300); it stops every process the run started (M53) |
 
 ---
 

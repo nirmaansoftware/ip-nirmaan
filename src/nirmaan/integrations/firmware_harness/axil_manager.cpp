@@ -6,13 +6,18 @@
 // nirmaan_hal bus with real handshakes on the model, runs the driver's tests,
 // and prints one line per bus transfer and per check:
 //
-//   FWTEST BUS write 0x4 = 0x12345678 strobe 0xf -> OKAY
-//   FWTEST IRQ taken
-//   FWTEST TRAP bus-error read 0x5 SLVERR
-//   FWTEST PASS <name>
-//   FWTEST FAIL <name>: <detail>
-//   FWTEST ERROR <why the run could not continue>
-//   FWTEST SUMMARY <passed> passed, <failed> failed, <cycles> cycles
+//   FWTEST:<nonce> BUS write 0x4 = 0x12345678 strobe 0xf -> OKAY
+//   FWTEST:<nonce> IRQ taken
+//   FWTEST:<nonce> TRAP bus-error read 0x5 SLVERR
+//   FWTEST:<nonce> PASS <name>
+//   FWTEST:<nonce> FAIL <name>: <detail>
+//   FWTEST:<nonce> ERROR <why the run could not continue>
+//   FWTEST:<nonce> SUMMARY <passed> passed, <failed> failed, <cycles> cycles
+//   FWTEST:<nonce> END <transfers> bus transfers
+//
+// M53 (harness_report.h, docs/GATE_INTEGRITY.md): the nonce is the run's, passed
+// as +nirmaan_nonce=<hex> and taken out of argv before the tests run, so code
+// under test cannot print a line the gate counts.
 //
 // It also implements nirmaan_irq.h (docs/FIRMWARE_IRQ_TRAPS.md). When the
 // build defines NIRMAAN_DUT_IRQ (the design has an irq output), an attached
@@ -30,6 +35,7 @@
 #include "verilated.h"
 #include "nirmaan_hal.h"
 #include "nirmaan_irq.h"
+#include "harness_report.h"
 
 namespace {
 
@@ -55,8 +61,8 @@ unsigned g_fault_count = 0;
 
 void tick() {
     if (g_cycles >= kMaxCycles) {
-        std::printf("FWTEST ERROR the tests did not finish within %lu cycles\n", kMaxCycles);
-        std::printf("FWTEST SUMMARY %u passed, %u failed, %lu cycles\n", g_passed, g_failed + 1, g_cycles);
+        report("ERROR the tests did not finish within %lu cycles", kMaxCycles);
+        report_end(g_passed, g_failed + 1, g_cycles);
         g_dut->final();
         std::exit(3);
     }
@@ -78,7 +84,7 @@ void deliver_irq() {
         if (!g_dut->irq) return;
         g_in_irq = true;
         ++g_irq_count;
-        std::printf("FWTEST IRQ taken\n");
+        report("IRQ taken");
         g_irq_handler(g_irq_ctx);
         g_in_irq = false;
         tick();
@@ -92,16 +98,16 @@ void deliver_fault(bool write, uint32_t offset, unsigned resp) {
     const nirmaan_bus_fault fault = {offset, write ? 1u : 0u, resp, 0u};
     g_in_fault = true;
     ++g_fault_count;
-    std::printf("FWTEST TRAP bus-error %s 0x%x %s\n", write ? "write" : "read", static_cast<unsigned>(offset),
+    report("TRAP bus-error %s 0x%x %s", write ? "write" : "read", static_cast<unsigned>(offset),
                 kResp[resp]);
     g_fault_handler(&fault, g_fault_ctx);
     g_in_fault = false;
 }
 
 [[noreturn]] void give_up(const char *what, uint32_t offset) {
-    std::printf("FWTEST ERROR bus timeout: no %s handshake for offset 0x%x within %u cycles\n",
+    report("ERROR bus timeout: no %s handshake for offset 0x%x within %u cycles",
                 what, static_cast<unsigned>(offset), kMaxWait);
-    std::printf("FWTEST SUMMARY %u passed, %u failed, %lu cycles\n", g_passed, g_failed + 1, g_cycles);
+    report_end(g_passed, g_failed + 1, g_cycles);
     g_dut->final();
     std::exit(3);
 }
@@ -135,7 +141,8 @@ unsigned bus_write(void *, uint32_t offset, uint32_t value, uint8_t strobe) {
         tick();
     }
     g_dut->s_axil_bready = 0;
-    std::printf("FWTEST BUS write 0x%x = 0x%08x strobe 0x%x -> %s\n", static_cast<unsigned>(offset),
+    ++g_transfers;
+    report("BUS write 0x%x = 0x%08x strobe 0x%x -> %s", static_cast<unsigned>(offset),
                 static_cast<unsigned>(value), static_cast<unsigned>(strobe), kResp[resp]);
     deliver_fault(true, offset, resp);
     deliver_irq();
@@ -169,7 +176,8 @@ unsigned bus_read(void *, uint32_t offset, uint32_t *value) {
     }
     g_dut->s_axil_rready = 0;
     if (value) *value = data;
-    std::printf("FWTEST BUS read 0x%x -> 0x%08x %s\n", static_cast<unsigned>(offset),
+    ++g_transfers;
+    report("BUS read 0x%x -> 0x%08x %s", static_cast<unsigned>(offset),
                 static_cast<unsigned>(data), kResp[resp]);
     deliver_fault(false, offset, resp);
     deliver_irq();
@@ -206,15 +214,16 @@ extern "C" unsigned nirmaan_bus_fault_count(void) { return g_fault_count; }
 extern "C" void nirmaan_test_result(const char *name, int passed, const char *detail) {
     if (passed) {
         ++g_passed;
-        std::printf("FWTEST PASS %s\n", name ? name : "(unnamed)");
+        report("PASS %s", name ? name : "(unnamed)");
     } else {
         ++g_failed;
-        std::printf("FWTEST FAIL %s: %s\n", name ? name : "(unnamed)", detail ? detail : "check failed");
+        report("FAIL %s: %s", name ? name : "(unnamed)", detail ? detail : "check failed");
     }
 }
 
 int main(int argc, char **argv) {
     g_context = new VerilatedContext;
+    argc = take_nonce(argc, argv);  // before any test code runs
     g_context->commandArgs(argc, argv);
     g_dut = new Vdut{g_context};
 
@@ -231,8 +240,8 @@ int main(int argc, char **argv) {
     const nirmaan_hal hal = {nullptr, bus_read, bus_write};
     nirmaan_fw_test(&hal);
 
-    if (g_passed == 0 && g_failed == 0) std::printf("FWTEST ERROR the tests reported no checks\n");
-    std::printf("FWTEST SUMMARY %u passed, %u failed, %lu cycles\n", g_passed, g_failed, g_cycles);
+    if (g_passed == 0 && g_failed == 0) report("ERROR the tests reported no checks");
+    report_end(g_passed, g_failed, g_cycles);
     g_dut->final();
     delete g_dut;
     delete g_context;

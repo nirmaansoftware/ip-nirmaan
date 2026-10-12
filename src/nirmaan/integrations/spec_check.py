@@ -38,6 +38,8 @@ def load_checks(path: str) -> tuple[list[tuple[str, list[str]]], list[str]]:
 def check_spec(spec_paths: list[str], checks_path: str) -> tuple[bool, str]:
     """The ``spec.check`` run: (passed, summary)."""
     requirements, names = load_checks(checks_path)
+    if not requirements and not names:  # M53: a check of nothing passes nothing
+        return False, f"{Path(checks_path).name} lists no requirement and no name: there is nothing to check"
     texts = {Path(p).name: Path(p).read_text(encoding="utf-8") for p in spec_paths}
     tagged: dict[str, list[str]] = {}
     for text in texts.values():

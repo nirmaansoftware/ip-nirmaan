@@ -26,6 +26,7 @@ module apb_regs_tb;
 
     integer errors = 0;
     integer checks = 0;
+    reg [8*64-1:0] nonce;  // the run's nonce (+nirmaan_nonce=), for the verdict line
     integer i;
     reg        err;
     reg [31:0] data;
@@ -212,6 +213,10 @@ module apb_regs_tb;
 
         if (errors == 0)
             $display("apb_regs_tb: PASS (%0d checks)", checks);
+        // The verdict the gate reads (docs/GATE_INTEGRITY.md): the run's nonce, then the counts.
+        if (!$value$plusargs("nirmaan_nonce=%s", nonce))
+            nonce = "none";
+        $display("NIRMAAN-SIM %0s %0d passed, %0d failed", nonce, (checks > errors ? checks - errors : 0), errors);
         $finish;
     end
 endmodule

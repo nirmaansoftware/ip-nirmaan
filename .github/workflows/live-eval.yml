@@ -32,25 +32,22 @@ jobs:
       - name: Install open-source EDA tools
         if: steps.gate.outputs.enabled == 'true'
         run: sudo apt-get update && sudo apt-get install -y verilator iverilog yosys
-      # The same pinned OSS CAD Suite as ci.yml, for a seat that writes a proof.
+      # M53: the same pinned, sha256-checked OSS CAD Suite as ci.yml, for a seat that writes a proof.
       - name: Install SymbiYosys and Yices (OSS CAD Suite 2026-09-28)
         if: steps.gate.outputs.enabled == 'true'
-        env:
-          OSS_CAD_SUITE: "2026-09-28"
-        run: |
-          curl -sSfL "https://github.com/YosysHQ/oss-cad-suite-build/releases/download/${OSS_CAD_SUITE}/oss-cad-suite-linux-x64-${OSS_CAD_SUITE//-/}.tgz" | tar -xz -C "$RUNNER_TEMP"
-          mkdir -p "$RUNNER_TEMP/formal-bin"
-          for tool in sby yices-smt2; do
-            printf '#!/bin/sh\nexec "%s/oss-cad-suite/bin/%s" "$@"\n' "$RUNNER_TEMP" "$tool" > "$RUNNER_TEMP/formal-bin/$tool"
-            chmod +x "$RUNNER_TEMP/formal-bin/$tool"
-          done
-          echo "$RUNNER_TEMP/formal-bin" >> "$GITHUB_PATH"
+        uses: ./.github/actions/oss-cad-suite
+        with:
+          tools: sby yices-smt2
+      # M53: a pinned Claude Code, so a run records the client it used.
       - name: Install Claude Code
         if: steps.gate.outputs.enabled == 'true'
-        run: npm install -g @anthropic-ai/claude-code && claude --version
+        run: npm install -g @anthropic-ai/claude-code@2.1.283 && claude --version
       - name: Install
         if: steps.gate.outputs.enabled == 'true'
         run: pip install -e ".[dev]"
+      # M53: the token reaches only this step and the gate. Every tool run inside it (the gates compile and
+      # run model-written code) gets an environment with no credential in it, and anything a run prints
+      # that matches a credential is redacted before it reaches a log or the record (docs/GATE_INTEGRITY.md).
       - name: Run the live evaluation
         id: run
         if: steps.gate.outputs.enabled == 'true'

@@ -63,9 +63,12 @@ module weak_tb;
         .s_axil_araddr(4'd0), .s_axil_arvalid(1'b0), .s_axil_arready(arready),
         .s_axil_rdata(rdata), .s_axil_rresp(rresp), .s_axil_rvalid(rvalid), .s_axil_rready(1'b0)
     );
+    reg [8*64-1:0] nonce;
     initial begin
         #20 aresetn = 1'b1;
-        #50 $display("weak_tb: PASS");
+        #50 if (!$value$plusargs("nirmaan_nonce=%s", nonce)) nonce = "none";
+        // M53: one weak check, reported in the verdict the gate reads; it never reads a register.
+        $display("NIRMAAN-SIM %0s %0d passed, %0d failed", nonce, bvalid === 1'b0, bvalid !== 1'b0);
         $finish;
     end
 endmodule

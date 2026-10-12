@@ -117,23 +117,49 @@ _ICARUS_COMPILE_RE = re.compile(
     r"^(?P<file>[^\s:]+):(?P<line>\d+):\s*(?:(?P<sev>error|warning):\s*)?(?P<msg>.*)$"
 )
 _ICARUS_BARE_ERROR_RE = re.compile(r"^error:\s*(?P<msg>.*)$")
-_ICARUS_FINISH_RE = re.compile(r"\$finish called at (?P<time>\d+)")
-_VERILATOR_FINISH_RE = re.compile(r"(?:Verilog \$finish|\$finish at (?P<time>[^\s;]+))")
+# M53: anchored to the simulators' own formats. Icarus: "tb.v:31: $finish called at 120 (1ps)", and
+# "$finish(2) called at" for $finish with an argument; Verilator: "- tb.v:31: Verilog $finish", then
+# "- Verilator: $finish at 120ps; walltime ...". Icarus's "$stop called at" is not a finish.
+_ICARUS_FINISH_RE = re.compile(r"^\S+:\d+: \$finish(?:\(\d\))? called at (?P<time>\d+)")
+_ICARUS_STOP_RE = re.compile(r"^\S+:\d+: \$stop(?:\(\d\))? called at (?P<time>\d+)")
+_VERILATOR_FINISH_RE = re.compile(r"^- (?:\S+:\d+: Verilog \$finish|Verilator: \$finish at (?P<time>[^\s;]+))")
+#: M53: the testbench's verdict, printed once just before $finish (docs/GATE_INTEGRITY.md):
+#: ``NIRMAAN-SIM <nonce> <passed> passed, <failed> failed``, with the nonce the run passed as a plusarg.
+_VERDICT_RE = re.compile(r"^NIRMAAN-SIM (?P<nonce>\S+) (?P<passed>\d+) passed, (?P<failed>\d+) failed$")
 
 
-def parse_simulation(log: str, returncodes: tuple[int, ...]) -> EdaResult:
-    """Pass means every step exited 0, no error or fatal message, and $finish was reached."""
+def parse_simulation(log: str, returncodes: tuple[int, ...], nonce: str | None = None) -> EdaResult:
+    """Pass means every step exited 0, no error or fatal message, and $finish was reached.
+
+    With ``nonce`` (M53, every ``simulator.run`` and ``test.run``), the testbench must also
+    have printed its verdict exactly once, carrying that nonce, with at least one check
+    passed and none failed: a run that ends before its checks, or a testbench that reports
+    a failure only in words, proves nothing and fails. A verdict line with another nonce
+    was not printed by this run's testbench, and fails the run too.
+    """
     diags: list[Diagnostic] = []
     finished = False
     end_time: str | None = None
+    verdicts: list[tuple[int, int]] = []
+    forged = 0
     for raw in log.splitlines():
         line = raw.strip()
         if not line or line.startswith("$ "):  # the runner's own command echo
             continue
-        if m := _ICARUS_FINISH_RE.search(line):
+        if m := _VERDICT_RE.match(line):
+            if nonce is not None and m["nonce"] == nonce:
+                verdicts.append((int(m["passed"]), int(m["failed"])))
+            else:
+                forged += 1
+            continue
+        if m := _ICARUS_STOP_RE.match(line):
+            diags.append(Diagnostic("error", f"$stop at time {m['time']}: the simulation stopped, it did not finish",
+                                    "STOP"))
+            continue
+        if m := _ICARUS_FINISH_RE.match(line):
             finished, end_time = True, m["time"]
             continue
-        if m := _VERILATOR_FINISH_RE.search(line):
+        if m := _VERILATOR_FINISH_RE.match(line):
             finished = True
             end_time = m["time"] or end_time
             continue
@@ -155,12 +181,29 @@ def parse_simulation(log: str, returncodes: tuple[int, ...]) -> EdaResult:
         if m and (m["sev"] or "error" in m["msg"].lower()):
             sev = m["sev"] or "error"
             diags.append(Diagnostic(sev, m["msg"].strip(), "", m["file"], _int(m["line"])))
+    if forged:
+        diags.append(Diagnostic("error", f"{_plural(forged, 'verdict line')} without this run's nonce: "
+                                         "not printed by this run's testbench", "VERDICT"))
+    checks = failed = None
+    verdict_problem = None
+    if nonce is not None:
+        if not verdicts:
+            verdict_problem = "the testbench printed no verdict (NIRMAAN-SIM <nonce> <n> passed, <m> failed)"
+        elif len(verdicts) > 1:
+            verdict_problem = f"the testbench printed {len(verdicts)} verdicts, not one"
+        else:
+            checks, failed = verdicts[0]
+            if failed:
+                verdict_problem = f"the testbench reports {failed} of {checks + failed} checks failed"
+            elif not checks:
+                verdict_problem = "the testbench reports no check passed: a test that checks nothing proves nothing"
     errors = [d for d in diags if d.severity == "error"]
     exit_ok = bool(returncodes) and all(rc == 0 for rc in returncodes)
-    passed = exit_ok and not errors and finished
+    passed = exit_ok and not errors and finished and verdict_problem is None
     if passed:
         at = f" at time {end_time}" if end_time else ""
-        summary = f"simulation passed: $finish reached{at}, 0 errors"
+        counted = f"{_plural(checks, 'check')} passed, " if checks is not None else ""
+        summary = f"simulation passed: {counted}$finish reached{at}, 0 errors"
     else:
         reasons = []
         if errors:
@@ -169,10 +212,13 @@ def parse_simulation(log: str, returncodes: tuple[int, ...]) -> EdaResult:
             reasons.append(f"exit status {returncodes[-1] if returncodes else 'none'}")
         if not finished:
             reasons.append("$finish never reached")
+        if verdict_problem:
+            reasons.append(verdict_problem)
         summary = f"simulation failed: {', '.join(reasons)}{_first(errors)}"
     return EdaResult(passed, summary, tuple(diags), {
         "errors": len(errors), "warnings": len(diags) - len(errors),
         "finished": finished, "end_time": end_time, "exit_statuses": list(returncodes),
+        "checks": checks, "checks_failed": failed,
     })
 
 
@@ -229,8 +275,14 @@ _SBY_TRACE_RE = re.compile(r"summary:\s+counterexample trace(?: \[(?P<kind>\w+)\
 _SBY_ERROR_RE = re.compile(r"\bERROR:\s*(?P<msg>.*)$")
 
 
-def parse_sby(log: str, returncode: int) -> EdaResult:
-    """Pass means SymbiYosys reported DONE (PASS)."""
+def parse_sby(log: str, returncode: int, mode: str | None = None, depth: int | None = None) -> EdaResult:
+    """Pass means SymbiYosys reported DONE (PASS).
+
+    M53: what a pass means depends on the setup's ``mode``. In ``prove`` mode every
+    assertion is proven for all time; in ``bmc`` mode no counterexample exists within
+    ``depth`` steps, which is not a proof, and the summary says so. ``proven`` is 1
+    only for a passing proof, so a requirement can ask for one with a bound (M48).
+    """
     status = "UNKNOWN"
     diags: list[Diagnostic] = []
     traces: list[str] = []
@@ -250,15 +302,23 @@ def parse_sby(log: str, returncode: int) -> EdaResult:
         elif m := _SBY_ERROR_RE.search(line):
             diags.append(Diagnostic("error", m["msg"].strip()))
     passed = status == "PASS" and returncode == 0
-    if passed:
+    proven = passed and mode in (None, "prove")
+    if passed and mode == "bmc":
+        summary = (f"formal passed: no counterexample within {depth} steps "
+                   "(a bounded model check, not a proof)")
+    elif passed and not proven:
+        summary = f"formal passed in {mode} mode (not a proof of the assertions)"
+    elif passed:
         summary = "formal passed: every property proven"
     elif status == "UNKNOWN" and not diags:
         last = next((ln.strip() for ln in reversed(log.splitlines()) if ln.strip()), "no output")
         summary = f"formal did not finish (exit status {returncode}): {last}"
     else:
         summary = f"formal {status.lower()}: {_plural(len(diags), 'error')}{_first(diags)}"
-    return EdaResult(passed, summary, tuple(diags),
-                     {"status": status, "exit_status": returncode, "traces": traces})
+    metrics: dict[str, Any] = {"status": status, "exit_status": returncode, "traces": traces}
+    if mode is not None:
+        metrics.update(mode=mode, depth=depth, proven=int(proven))
+    return EdaResult(passed, summary, tuple(diags), metrics)
 
 
 # SBY 21:59:10 [c] engine_0: ##   0:00:00  Reached cover statement in step 2 at c: c.v:6.13-6.29 (_witness_.x)
