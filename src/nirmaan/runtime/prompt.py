@@ -164,6 +164,17 @@ def _citations(packet: WorkPacket, tools: tuple[ToolNote, ...]) -> list[Citable]
         if art.trusted:
             found.setdefault(art.id, Citable("artifact", _UNSAFE.sub(".", art.id), art.id,
                                              f"{art.kind}: {art.title} (approved)"))
+    for attempt in packet.task.attempts:  # M52: a refused attempt's failed runs stay citable; they back nothing
+        for failed in attempt.failed_runs:
+            if failed.evidence:
+                label = f"refused attempt {attempt.number}, failed: {failed.summary}"
+                found.setdefault(failed.evidence, Citable("evidence", _UNSAFE.sub(".", failed.evidence),
+                                                          failed.evidence, label))
+            found.setdefault(failed.run, Citable("run", failed.run, failed.run, f"{failed.tool}: {failed.summary}"))
+    requirement = packet.project.requirement_id
+    if requirement:  # M52: the record every task traces to, so even a first stage has something to ground in
+        found.setdefault(requirement, Citable("requirement", _UNSAFE.sub(".", requirement), requirement,
+                                              f"the project requirement: {packet.project.requirement}"))
     return list(found.values())
 
 

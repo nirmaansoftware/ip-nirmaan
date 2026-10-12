@@ -276,6 +276,10 @@ def _drive(engine: TaskEngine, task_id: str, owner: AgentRuntime, reviewer: Agen
             return Stop.DECLINED
         if run.status is ResultStatus.REFUSED and owner_calls(engine, task_id, attempts, review_rounds) > 0:
             return Stop.REFUSED  # asking again would ask the model again, not escalate
+        if seat == OWNER and run.status is ResultStatus.SUBMITTED and engine.task(task_id).status is TaskStatus.IN_PROGRESS:
+            # M52: a submission that left the work in progress made no progress the loop can see (a runtime's
+            # submission is final, so the engine refuses one that would): stop rather than ask again.
+            return Stop.REFUSED
 
 
 def _step(engine: TaskEngine, task_id: str, seat: str, task: Any, owner: AgentRuntime, reviewer: AgentRuntime,

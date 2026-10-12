@@ -303,8 +303,14 @@ class TaskEngine:
         artifacts: list[dict[str, Any]],
         notes: str = "",
         outcome: str | None = None,
+        final: bool = False,
     ) -> Task:
-        """The owner hands in work. Artifacts become EXECUTED, never more."""
+        """The owner hands in work. Artifacts become EXECUTED, never more.
+
+        ``final`` (M52): nothing will be recorded after this submission, as when a runtime submits, so a task with
+        no review must complete on it or the submission is refused. A person may submit first and record the
+        evidence after; that submission is not final.
+        """
         task = self.task(task_id)
         self._require(actor.role == task.owner, f"only the owner ({task.owner}) submits {task_id}")
         if task.status is not S.IN_PROGRESS:
@@ -314,7 +320,7 @@ class TaskEngine:
                 raise WorkError(f"{task_id} is a decision; outcome must be one of {list(task.outcomes)}")
         elif outcome is not None:
             raise WorkError(f"{task_id} is not a decision task")
-        warnings = self._check("task.submit", actor, task, artifacts=artifacts)
+        warnings = self._check("task.submit", actor, task, artifacts=artifacts, final=final)
 
         new_artifacts = dict(self._state.artifacts)
         ids = list(task.artifacts)
@@ -361,7 +367,11 @@ class TaskEngine:
         tool_runs: tuple[str, ...] = (),
         evidence: tuple[str, ...] = (),
     ) -> Attempt:
-        """Keep a refused submission on the record (M26). Its files never become the task's artifacts."""
+        """Keep a refused submission on the record (M26). Its files never become the task's artifacts.
+
+        M52: nor does its evidence stay the task's. Each evidence record belongs to the submission it was
+        recorded for, so the attempt takes its own with it; the repair prompt reads them from the attempt.
+        """
         task = self.task(task_id)
         self._require(actor.role == task.owner, f"only the owner ({task.owner}) records attempts on {task_id}")
         if task.status is not S.IN_PROGRESS:
@@ -385,6 +395,7 @@ class TaskEngine:
             details={"attempt": attempt_id, "artifacts": [a.location or a.title for a in kept],
                      "tool_runs": list(tool_runs), "evidence": list(evidence)},
             attempts={**self._state.attempts, attempt_id: attempt},
+            tasks=self._with_task(task, evidence=tuple(e for e in task.evidence if e not in evidence)),
         )
         return attempt
 
@@ -642,7 +653,10 @@ class TaskEngine:
         warnings = self._check("evidence.record", actor, task, kind=kind, tool_run=tool_run)
         substantiated = False
         if kind in (EvidenceKind.TOOL_RUN, EvidenceKind.VERITRIAGE_SESSION):
-            substantiated = self._state.tool_runs[tool_run].succeeded  # P5 refused a run of another task
+            # P5 refused a run of another task. M52: a run bound to an earlier submission (a refused attempt, or
+            # one a review sent back) was about other files, so it backs nothing now.
+            spent = {r for a in self._state.attempts.values() if a.task == task_id for r in a.tool_runs}
+            substantiated = self._state.tool_runs[tool_run].succeeded and tool_run not in spent
         elif kind is EvidenceKind.HUMAN_ATTESTATION:
             substantiated = actor.kind is ActorKind.HUMAN
         elif kind is EvidenceKind.DOCUMENT:

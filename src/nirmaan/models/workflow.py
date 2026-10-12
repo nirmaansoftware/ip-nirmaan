@@ -151,6 +151,24 @@ def _legacy_bound(key: str, value: Any) -> Bound | None:
     return Bound(metric=key[4:], op=key[:3], value=number)
 
 
+def legacy_requirement(data: dict[str, Any]) -> dict[str, Any]:
+    """A requirement as saved before M48 (it has no ``bounds``): each ``max_``/``min_`` parameter becomes a bound.
+
+    M52: only a reader of old saved data calls this (the store, for a schema version "1" file). A requirement
+    built today keeps every parameter it names, so a real input such as ``max_chain_length`` stays an input.
+    """
+    if "bounds" in data:
+        return data
+    params, bounds = [], []
+    for key, value in data.get("params", ()) or ():
+        bound = _legacy_bound(key, value)
+        if bound is None:
+            params.append((key, value))
+        else:
+            bounds.append(bound.model_dump(mode="json"))
+    return {**data, "params": params, "bounds": bounds} if bounds else data
+
+
 class EvidenceRequirement(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -191,10 +209,10 @@ class EvidenceRequirement(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def _old_form(cls, data: Any) -> Any:
-        """Data written before M48: one ``when``, ``when_produced``, ``when_upstream``, and bound parameters.
+        """Data written before M48: one ``when``, ``when_produced``, and ``when_upstream``.
 
-        They become clauses (features, then produced, then upstream) and bounds
-        (docs/UNIFIED_APPLICABILITY.md, section 3).
+        They become clauses (features, then produced, then upstream) (docs/UNIFIED_APPLICABILITY.md,
+        section 3). Bound parameters are converted only in old saved data (``legacy_requirement``, M52).
         """
         if not isinstance(data, dict):
             return data
@@ -207,15 +225,6 @@ class EvidenceRequirement(BaseModel):
                 clauses.append(Condition(on=on, any_of=kinds))
         data["when"] = tuple(c for c in clauses
                              if not (Condition.model_validate(c) if isinstance(c, dict) else c).is_unconditional)
-        params, bounds = [], list(data.get("bounds", ()) or ())
-        for key, value in data.get("params", ()) or ():
-            bound = _legacy_bound(key, value)
-            if bound is None:
-                params.append((key, value))
-            else:
-                bounds.append(bound)
-        if len(params) != len(data.get("params", ()) or ()):
-            data["params"], data["bounds"] = tuple(params), tuple(bounds)
         return data
 
 

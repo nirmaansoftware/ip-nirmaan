@@ -65,12 +65,13 @@ def seat_answer(path: str, kind: str, content: str, cite: str, entry: str | None
 
 
 def run_seat(engine, stage: str, cites: str, path: str, kind: str, content: str, tmp_path: Path,
-             entry: str | None = None):
+             entry: str | None = None, attempts: int | None = None):
     seat = tid(engine, stage)
     engine.remember(MemoryScope.TASK, seat, "input.workspace", str(tmp_path / stage),
                     human(engine.task(seat).owner))
     cite = token(engine.task(tid(engine, cites)).artifacts[0])
-    return run_task(engine, seat, ModelRuntime(MockLLM(script=[seat_answer(path, kind, content, cite, entry)])))
+    return run_task(engine, seat, ModelRuntime(MockLLM(script=[seat_answer(path, kind, content, cite, entry)])),
+                    attempts=attempts)
 
 
 def review_and_approve(engine, stage: str) -> None:
@@ -532,7 +533,7 @@ def test_a_plan_seat_against_a_new_spec_kind_with_a_new_item_kind_needs_no_core_
 
         engineering.register_item_kind(ItemKind("warning-free", ("fw.build",), "a strict, warning-free build"))
         report = run_seat(engine, "test-list", "software-spec", "plan.json", "verification_plan", dump(plan),
-                          tmp_path)
+                          tmp_path, attempts=2)
         assert report.status is ResultStatus.SUBMITTED, report.detail
         review_and_approve(engine, "test-list")
         spec_art = engine.task(tid(engine, "software-spec")).artifacts[0]

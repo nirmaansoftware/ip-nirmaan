@@ -451,7 +451,7 @@ def test_a_replan_stage_amending_the_plan_needs_no_core_changes(fixed_clock, tmp
         plan2["retired"] = [{"requirement": "TMR-CLEAN", "reason": "The spec no longer requires it."},
                             {"item": "build-clean", "reason": "Its requirement is retired."}]
         report = run_seat(engine, "test-list-update", "spec-update", "plan.json", "verification_plan",
-                          dump(plan2), tmp_path)
+                          dump(plan2), tmp_path, attempts=2)
         assert report.status is ResultStatus.SUBMITTED, report.detail
         review_and_approve(engine, "test-list-update")
 

@@ -364,7 +364,9 @@ def test_a_new_workflow_with_the_gates_refuses_a_never_checked_assertion_with_no
         bad = answer(*counter_files(cite, with_formal(COUNTER, NEVER_CHECKED)), sby_file(cite))
         report = run_task(engine, fix, ModelRuntime(MockLLM(script=[bad])))
         assert report.status is ResultStatus.REFUSED and NOT_VACUOUS in report.detail
-        report = run_task(engine, fix, ModelRuntime(MockLLM(script=[answer(*counter_files(cite), sby_file(cite))])))
+        # M52: the refusal spent the attempt limit, so the retry asks for one more
+        report = run_task(engine, fix, ModelRuntime(MockLLM(script=[answer(*counter_files(cite), sby_file(cite))])),
+                          attempts=2)
         assert report.status is ResultStatus.SUBMITTED, report.detail
     finally:
         unregister_extension("test-guarded-fix")

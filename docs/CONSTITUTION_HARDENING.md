@@ -77,9 +77,8 @@ already said ("Gate approvals, waivers, and releases are always a person's").
 `GateSpec.human_required`, the per-project `--human-gate`/`--auto-gate`
 overrides, and the older `human-gates` check still run, but the matrix is now
 the stricter rule, so `--auto-gate` (and MCP `plan_project`'s `auto_gates`) no
-longer lets an agent sign anything. Removing those options is deferred: the
-plan command and `plan_project` are being changed by the parallel persistence
-work.
+longer lets an agent sign anything. M52 removed both options
+(`docs/RUNTIME_LOOP_FIXES.md` section 8).
 
 ## 4. MCP identity: one session is one agent in one role
 
@@ -153,7 +152,7 @@ no outcome, is refused. Tests: `test_work_with_nothing_produced_cannot_complete`
 
 - The other audit A findings (C1, C3, H2, H3, M3 to M6, L1, L3 to L6) are
   outside this change; C3, H3, and M3 are the parallel persistence work.
-- Removing `--auto-gate` and `auto_gates` (section 3).
+- Removing `--auto-gate` and `auto_gates` (section 3). Done in M52.
 - An identity for people: a CLI `--as ROLE` is still whoever runs the command.
 - Evidence recorded during a refused M26 attempt stays on the task, as M26
   designed ("the evidence stands"), so the repair prompt can cite the failed
@@ -161,5 +160,6 @@ no outcome, is refused. Tests: `test_work_with_nothing_produced_cannot_complete`
   still meet a requirement with no file binding for the next attempt. Binding
   each evidence record to the submission it was recorded for would close that
   too, and would change the M26 repair prompt; it is left for a follow-up.
+  Done in M52 (`docs/RUNTIME_LOOP_FIXES.md` section 5).
 - A downstream model seat's prompt shows (golden `root-cause-*.txt`) that it
   no longer gets the upstream VeriTriage run recorded as its own evidence.

@@ -93,6 +93,8 @@ class DomainScope(_View):
 class ProjectScope(_View):
     id: str
     requirement: str
+    #: The requirement's record ID (M52): the record every task traces to, so every seat may cite it.
+    requirement_id: str = ""
     intent: str | None
     features: tuple[str, ...]
     parameters: dict[str, int]
@@ -229,13 +231,16 @@ def assemble(engine: TaskEngine, task_id: str, role: str | None = None) -> WorkP
     ))
 
     upstream = []
-    for art in upstream_artifacts(state, task):  # M27: seen through gates
+    built_on = upstream_artifacts(state, task)  # M27: seen through gates
+    for art in built_on:
         approved = art.assurance is Assurance.APPROVED
         upstream.append(_artifact(art, trusted=approved, content=approved))
+    # M52: the upstream evidence is the evidence of the tasks whose artifacts it builds on, so through gates too.
+    sources = dict.fromkeys((*(art.task for art in built_on), task_id))
     evidence = tuple(
         EvidenceView(id=ev.id, task=ev.task, kind=ev.kind.value, description=ev.description,
                      substantiated=ev.substantiated, tool_run=ev.tool_run, reference=ev.reference)
-        for source in (*task.depends_on, task_id)
+        for source in sources
         for ev in (state.evidence[e] for e in state.tasks[source].evidence)
     )
     attempts = tuple(
@@ -266,6 +271,7 @@ def assemble(engine: TaskEngine, task_id: str, role: str | None = None) -> WorkP
         project=ProjectScope(
             id=state.project.id,
             requirement=state.project.requirement.text,
+            requirement_id=state.project.requirement.id,
             intent=analysis.intent,
             features=tuple(analysis.features),
             parameters=dict(analysis.parameters),
