@@ -224,7 +224,7 @@ def test_the_fw_test_parser_fails_what_did_not_really_pass():
 
 def test_missing_tools_are_refused_with_a_reason(block, tmp_path, monkeypatch):
     monkeypatch.setenv("PATH", str(tmp_path))  # nothing on PATH
-    with pytest.raises(ToolAccessDenied, match=r"host-cc needs cc.*riscv-gcc needs riscv64-unknown-elf-gcc"):
+    with pytest.raises(ToolAccessDenied, match=r"host-cc needs cc.*riscv-gcc: no RISC-V GCC on PATH"):
         invoke(block, "fw.build", {"sources": joined(*DRIVER)}, tmp_path)
     with pytest.raises(ToolAccessDenied, match=r"verilator-cosim needs cc, verilator, make.*never simulated"):
         invoke(block, "fw.test", {"sources": joined(*DRIVER, TESTS), "rtl": str(RTL)}, tmp_path)
@@ -234,7 +234,7 @@ def test_missing_tools_are_refused_with_a_reason(block, tmp_path, monkeypatch):
 def test_the_cross_compiler_backend_is_refused_when_absent(tmp_path, monkeypatch):
     monkeypatch.setenv("PATH", str(tmp_path))
     backend, why = select_backend("fw.build", {"backend": "riscv-gcc"})
-    assert backend is None and "riscv-gcc needs riscv64-unknown-elf-gcc" in why
+    assert backend is None and "riscv-gcc: no RISC-V GCC on PATH (riscv64-unknown-elf-gcc or riscv64-elf-gcc" in why
 
 
 # --- Real tools ----------------------------------------------------------------------------

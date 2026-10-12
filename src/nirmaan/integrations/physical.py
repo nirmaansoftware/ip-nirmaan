@@ -688,6 +688,9 @@ _PV_PDK = needs_pdk(tech_lef="a technology LEF", lef="a cell LEF", gds="the cell
 def _pv_environment(params: Params) -> str | None:
     """The PDK inputs, and at least one check: a DRC deck, or an LVS deck with the cells' CDL."""
     reasons = [r for r in (_PV_PDK(params),) if r]
+    lvs = [k for k in ("lvs_deck", "cdl") if text_value(params.get(k)).strip()]
+    if len(lvs) == 1:  # M53: half an LVS setup is refused, never silently dropped
+        reasons.append(f"LVS needs both lvs_deck and cdl, and only {lvs[0]} was given (refused, nothing ran)")
     if not pv_checks(params):
         reasons.append("needs a check to run: drc_deck=PATH, or lvs_deck=PATH with cdl=PATH (the PDK's KLayout "
                        f"decks and cell CDL, absolute or under {PDK_ROOT_ENV}; no PDK is bundled)")

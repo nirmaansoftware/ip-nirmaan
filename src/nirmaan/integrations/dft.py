@@ -583,6 +583,17 @@ def parse_mbist(run: RunRecord) -> EdaResult:
         return EdaResult(False, f"MBIST did not run: {reason}", tuple(errors or [Diagnostic("error", reason)]),
                          metrics)
     memories, problems, failures = [], [], []
+    # M53: the pass path checks what the failure path does: every exit status, every simulator error, and
+    # one result line for each controller the helper generated.
+    if any(rc != 0 for rc in run.returncodes) or len(run.returncodes) < 4:
+        problems.append(f"a step exited with status {run.returncode} ({len(run.returncodes)} of 4 steps ran)")
+    sim_log = "".join(f"$ {c}\n{t}" for c, t in _sections(run.log) if c.startswith(("iverilog", "vvp")))
+    sim_errors = parse_simulation(sim_log, run.returncodes[2:]).errors
+    if sim_errors:
+        problems.append(f"the simulation reported {len(sim_errors)} error(s); first: {sim_errors[0].message}")
+    generated = len(_MBIST_GEN_RE.findall(run.log))
+    if generated != len(lines):
+        problems.append(f"{generated} controllers were generated for {len(lines)} memories reported")
     for found in lines:
         one, wrong, failure = _one_memory(found)
         memories.append(one)

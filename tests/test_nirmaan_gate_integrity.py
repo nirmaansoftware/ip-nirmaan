@@ -24,7 +24,7 @@ import pytest
 
 from laws import needs
 
-from nirmaan.integrations.eda import Backend, EdaResult, execute, select_backend
+from nirmaan.integrations.eda import Backend, EdaResult, RunRecord, execute, select_backend
 from nirmaan.integrations import firmware_riscv, regmap  # noqa: F401  (they register their backends)
 from nirmaan.integrations.eda_parsers import parse_simulation
 from nirmaan.integrations.firmware import parse_fw_test
@@ -323,3 +323,108 @@ def test_the_harness_counts_must_agree_with_its_records():
         assert not result.passed and why in result.summary, (records, result.summary)
     other = parse_fw_test(_fw_log(*good) + f"FWTEST:{'f' * 32} PASS another\n", (0, 0))
     assert not other.passed and "without this run's nonce" in other.summary
+
+
+# --- The low findings ------------------------------------------------------------------------------------
+
+
+@needs("yosys", "iverilog", "vvp")
+def test_mbist_fails_on_a_simulator_error_a_bad_exit_or_a_missing_memory():
+    from nirmaan.integrations.dft import parse_mbist
+
+    chosen, _ = select_backend("dft.mbist", {})
+    run = execute(chosen, {"sources": str(RTL / "mbist" / "sync_ram.v"), "top": "sync_ram"})
+    assert run.succeeded, run.summary
+    log_path = Path(run.references[0])
+    log, codes = log_path.read_text(), tuple(run.data["exit_statuses"])
+
+    def parse(text: str, statuses=codes):
+        return parse_mbist(RunRecord(text, statuses, log_path.parent))
+
+    assert parse(log).passed
+    assert not parse(log + "ERROR: sync_ram.v:9: the model's own check failed\n").passed
+    assert not parse(log, (*codes[:-1], 1)).passed
+    gen = next(line for line in log.splitlines() if line.startswith("DFT-MBIST-GEN:"))
+    doubled = log.replace(gen, gen + "\n" + gen.replace("sync_ram", "other_ram"))
+    result = parse(doubled)
+    assert not result.passed and "2 controllers were generated for 1 memories" in result.summary
+
+
+def test_pv_with_half_an_lvs_setup_is_refused():
+    from nirmaan.integrations.physical import _pv_environment
+
+    for half in ({"lvs_deck": "/pdk/lvs.lylvs"}, {"cdl": "/pdk/cells.cdl"}):
+        why = _pv_environment({"drc_deck": "/pdk/drc.lydrc", **half})
+        assert why and "LVS needs both lvs_deck and cdl" in why, why
+
+
+def test_partial_klayout_and_opensta_reports_fail():
+    from nirmaan.integrations.pd_parsers import parse_klayout, parse_opensta
+
+    pv = (FIXTURES / "pd" / "klayout_pv.log").read_text()
+    assert parse_klayout(pv, 0).passed
+    cut = "".join(line for line in pv.splitlines(keepends=True) if not line.startswith("nirmaan-lvs-mismatched-pins"))
+    result = parse_klayout(cut, 0)
+    assert not result.passed and "pins" in result.summary
+    sta = (FIXTURES / "pd" / "opensta_met.log").read_text()
+    assert parse_opensta(sta, 0).passed
+    for gone in ("worst slack min", "tns", "wns"):
+        partial = "".join(line for line in sta.splitlines(keepends=True) if not line.startswith(gone))
+        result = parse_opensta(partial, 0)
+        assert not result.passed and "incomplete" in result.summary, (gone, result.summary)
+
+
+def test_spec_check_with_nothing_to_check_fails(tmp_path):
+    from nirmaan.integrations.spec_check import check_spec
+
+    checks = tmp_path / "empty.json"
+    checks.write_text('{"format": "nirmaan.spec-checks"}')
+    spec = tmp_path / "spec.md"
+    spec.write_text("# A spec\n")
+    passed, summary = check_spec([str(spec)], str(checks))
+    assert not passed and "lists no requirement and no name" in summary
+
+
+def test_veritriage_refuses_a_directory_cleanly(tmp_path):
+    from nirmaan.integrations.veritriage import investigate
+
+    outcome = investigate({"paths": str(tmp_path)}, None)
+    assert not outcome.succeeded and "not a file" in outcome.summary
+
+
+def test_engine_operations_are_marked_as_such(nirmaan_org):
+    from nirmaan.company.tools import ENGINE_OPERATIONS
+    from nirmaan.models import ToolStatus
+    from nirmaan.runtime.tools import available_bindings
+
+    bound = set(available_bindings())
+    available = {t for t, spec in nirmaan_org.tools.items() if spec.status is ToolStatus.AVAILABLE}
+    assert available - bound == set(ENGINE_OPERATIONS)
+    assert set(ENGINE_OPERATIONS) == {"escalation.raise", "task.create", "task.assign", "task.cancel",
+                                      "review.create", "approval.grant"}
+
+
+def test_one_riscv_gcc_definition():
+    """fw.build's riscv-gcc backend finds RISC-V GCC as fw.cross_build does, and builds for the same ISA."""
+    from nirmaan.integrations.eda import backends_for
+    from nirmaan.integrations.firmware_riscv import RISCV_GCC, TARGET_FLAGS, toolchain
+
+    riscv = next(b for b in backends_for("fw.build") if b.name == "riscv-gcc")
+    assert riscv.executables == () and riscv.environment is not None
+    assert RISCV_GCC == ("riscv64-unknown-elf-gcc", "riscv64-elf-gcc") and "-march=rv32i" in TARGET_FLAGS
+    why = riscv.environment({})
+    assert (why is None) == (toolchain() is not None)
+
+
+def test_ci_pipes_fail_and_live_eval_is_pinned_and_keeps_the_token_away():
+    root = Path(__file__).parent.parent
+    ci = (root / ".github" / "workflows" / "ci.yml").read_text()
+    for block in ci.split("- name:")[1:]:
+        if "| tail" in block:
+            assert "set -o pipefail" in block, block.splitlines()[0]
+    live = (root / ".github" / "workflows" / "live-eval.yml").read_text()
+    assert "uses: ./.github/actions/oss-cad-suite" in live and "oss-cad-suite-build/releases" not in live
+    assert "npm install -g @anthropic-ai/claude-code@" in live
+    steps = live.split("- name:")[1:]
+    with_token = [b.splitlines()[0].strip() for b in steps if "secrets.CLAUDE_CODE_OAUTH_TOKEN" in b]
+    assert with_token == ["Gate on the secret", "Run the live evaluation"]

@@ -546,8 +546,6 @@ register_cosim_bus("apb", HARNESS / "apb_manager.cpp")
 
 register_backend(Backend("host-cc", "fw.build", ("cc",), build_steps("cc"), _parse_build, files=("map",),
                          check=map_problem))
-register_backend(Backend("riscv-gcc", "fw.build", ("riscv64-unknown-elf-gcc",),
-                         build_steps("riscv64-unknown-elf-gcc", "-march=rv32imac_zicsr", "-mabi=ilp32",
-                                     "-ffreestanding"), _parse_build, files=("map",), check=map_problem))
+# fw.build's riscv-gcc backend is registered by firmware_riscv.py, from the one RISC-V GCC definition (M53).
 register_backend(Backend("verilator-cosim", "fw.test", ("cc", "verilator", "make"), _cosim_steps, _parse_cosim,
                          ("sources", "rtl"), files=("map",), check=_cosim_check))
