@@ -28,8 +28,8 @@ CITE ONLY THESE ARTIFACTS, using the token exactly as written:
   [evidence:prj-<id>.microarchitecture.e1]  review_record: Independent review by design.rtl.architecture.staff: looks right
   [evidence:prj-<id>.rtl-implementation.e1]  tool_run: verilator-lint: lint failed: 0 errors, 1 warning; first: <diagnostic>
   [run:run-0001]  verilator-lint: lint failed: 0 errors, 1 warning; first: <diagnostic>
-  [evidence:prj-<id>.rtl-implementation.e2]  tool_run: icarus: simulation passed: $finish reached at time 130000, 0 errors
-  [run:run-0002]  icarus: simulation passed: $finish reached at time 130000, 0 errors
+  [evidence:prj-<id>.rtl-implementation.e2]  tool_run: icarus: simulation passed: 12 checks passed, $finish reached at time 130000, 0 errors
+  [run:run-0002]  icarus: simulation passed: 12 checks passed, $finish reached at time 130000, 0 errors
   [evidence:prj-<id>.rtl-implementation.e3]  tool_run: yosys: synthesis passed: 15 cells, 4 flip-flops, 0 latches, 0 warnings
   [run:run-0003]  yosys: synthesis passed: 15 cells, 4 flip-flops, 0 latches, 0 warnings
   [artifact:prj-<id>.interface-spec.a1]  interface_spec: Interface specification (interface_spec) (approved)
@@ -81,7 +81,7 @@ CITE ONLY THESE ARTIFACTS, using the token exactly as written:
 - Evidence [evidence:prj-<id>.interface-spec.e1] on prj-<id>:interface-spec: review_record, substantiated: Independent review by architecture.interface.ace.staff: looks right
 - Evidence [evidence:prj-<id>.microarchitecture.e1] on prj-<id>:microarchitecture: review_record, substantiated: Independent review by design.rtl.architecture.staff: looks right
 - Evidence [evidence:prj-<id>.rtl-implementation.e1] on prj-<id>:rtl-implementation: tool_run, NOT substantiated, tool run [run:run-0001]: verilator-lint: lint failed: 0 errors, 1 warning; first: <diagnostic>
-- Evidence [evidence:prj-<id>.rtl-implementation.e2] on prj-<id>:rtl-implementation: tool_run, substantiated, tool run [run:run-0002]: icarus: simulation passed: $finish reached at time 130000, 0 errors
+- Evidence [evidence:prj-<id>.rtl-implementation.e2] on prj-<id>:rtl-implementation: tool_run, substantiated, tool run [run:run-0002]: icarus: simulation passed: 12 checks passed, $finish reached at time 130000, 0 errors
 - Evidence [evidence:prj-<id>.rtl-implementation.e3] on prj-<id>:rtl-implementation: tool_run, substantiated, tool run [run:run-0003]: yosys: synthesis passed: 15 cells, 4 flip-flops, 0 latches, 0 warnings
 - Repair: your previous attempt 1 was refused and nothing from it counts. Fix what failed and answer again in full; files from a refused attempt are never reviewed.
 - Attempt 1 was refused: Refused by the constitution: [P9] prj-<id>:rtl-implementation cannot go to review: 'Lint-clean under the RTL lint rules' is not met
@@ -132,7 +132,7 @@ module counter #(
 `endif
 endmodule
 === END FILE ===
-- Content of refused file counter_tb.v (sha256:ee514f3dd04e603d67b0325a66b2977de03a7c3c6bee2e84e631f3d6ed086105):
+- Content of refused file counter_tb.v (sha256:7e4bf585278b4066b78c44ae83344619950c25596b9f989eab40aeda41c416f5):
 === FILE: counter_tb.v ===
 // Self-checking testbench for counter.v: counts to LIMIT, wraps, and finishes.
 `timescale 1ns / 1ps
@@ -143,6 +143,8 @@ module counter_tb;
     wire [3:0] count;
     wire wrap;
     integer errors = 0;
+    integer checks = 0;
+    reg [8*64-1:0] nonce;  // the run's nonce (+nirmaan_nonce=), for the verdict line
     integer i;
 
     counter #(.LIMIT(4'd9)) dut (.clk(clk), .rst(rst), .en(en), .count(count), .wrap(wrap));
@@ -155,6 +157,7 @@ module counter_tb;
         en = 1'b1;
         for (i = 1; i <= 12; i = i + 1) begin
             @(negedge clk);
+            checks = checks + 1;
             if (count !== i % 10) begin
                 $display("ERROR: cycle %0d: count is %0d, expected %0d", i, count, i % 10);
                 errors = errors + 1;
@@ -162,6 +165,10 @@ module counter_tb;
         end
         if (errors == 0)
             $display("counter_tb: PASS");
+        // The verdict the gate reads (docs/GATE_INTEGRITY.md): the run's nonce, then the counts.
+        if (!$value$plusargs("nirmaan_nonce=%s", nonce))
+            nonce = "none";
+        $display("NIRMAAN-SIM %0s %0d passed, %0d failed", nonce, (checks > errors ? checks - errors : 0), errors);
         $finish;
     end
 endmodule

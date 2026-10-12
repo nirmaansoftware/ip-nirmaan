@@ -183,6 +183,11 @@ def test_a_run_never_works_in_the_given_directory(tmp_path):
     assert outcome.succeeded and keep.read_text() == "not the run's"
     run_dir = Path(outcome.references[0]).parent
     assert run_dir.parent == tmp_path.resolve() and run_dir.name.startswith("nirmaan-del-")
+    fresh = tmp_path / "fresh"
+    first = execute(_shell("one", "true"), {"sources": str(RTL / "counter.v"), "workdir": str(fresh)})
+    again = execute(_shell("two", "true"), {"sources": str(RTL / "counter.v"), "workdir": str(fresh)})
+    assert Path(first.references[0]).parent == fresh.resolve()  # a new, empty directory is the run's own
+    assert Path(again.references[0]).parent.parent == fresh.resolve()  # a used one is not reused
 
 
 def test_a_tool_run_sees_no_credential_and_has_its_own_temporary_directory(tmp_path, monkeypatch):
@@ -215,7 +220,7 @@ def test_two_builds_at_once_in_one_workdir_are_isolated(tmp_path):
         t.join()
     assert all(r.succeeded for r in results.values()), [r.summary for r in results.values()]
     dirs = {Path(r.references[0]).parent for r in results.values()}
-    assert len(dirs) == 2 and all(d.parent == tmp_path.resolve() for d in dirs)
+    assert len(dirs) == 2 and all(tmp_path.resolve() in (d, d.parent) for d in dirs)
 
 
 # --- F15, F17: a bounded check is not a proof ----------------------------------------------------------

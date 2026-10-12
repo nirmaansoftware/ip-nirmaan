@@ -39,7 +39,7 @@ from test_nirmaan_firmware import (
 )
 from laws import needs
 
-from nirmaan.integrations.eda import Backend, register_backend, select_backend, unregister_backend
+from nirmaan.integrations.eda import NONCE_ARG, Backend, new_nonce, register_backend, select_backend, unregister_backend
 from nirmaan.integrations.firmware import STRICT_FLAGS
 from nirmaan.integrations.firmware_riscv import (
     RISCV_GCC,
@@ -124,13 +124,14 @@ def test_the_cross_build_parser_reports_code_size():
 
 
 def test_the_soc_parser_reads_checks_and_names_the_soc():
-    log = CROSS + ("$ soc/Vsoc +firmware=rv32/firmware.hex\nFWTEST BUS read 0x5 -> 0x00000000 SLVERR\n"
-                   "FWTEST PASS unmapped_read_reports_slverr\nFWTEST SUMMARY 1 passed, 0 failed, 900 cycles\n")
+    n = "5eed5eed5eed5eed5eed5eed5eed5eed"  # M53: the run's nonce, as the runner's echo shows it passed
+    log = CROSS + (f"$ soc/Vsoc +firmware=rv32/firmware.hex +nirmaan_nonce={n}\n"
+                   f"FWTEST:{n} BUS read 0x5 -> 0x00000000 SLVERR\nFWTEST:{n} PASS unmapped_read_reports_slverr\n"
+                   f"FWTEST:{n} SUMMARY 1 passed, 0 failed, 900 cycles\nFWTEST:{n} END 1 bus transfers\n")
     result = parse_soc_test(log, (0, 0, 0, 0, 0, 0, 0))
     assert result.passed and result.metrics["text"] == 9332
     assert result.summary.startswith("SoC run passed: 1 check, 0 failed (900 cycles, 1 bus transfer)")
-    trapped = log.replace("FWTEST SUMMARY 1 passed, 0 failed, 900 cycles",
-                          "FWTEST ERROR the CPU trapped after 77 cycles")
+    trapped = log.replace("SUMMARY 1 passed, 0 failed, 900 cycles", "ERROR the CPU trapped after 77 cycles")
     assert not parse_soc_test(trapped, (0, 0, 0, 0, 0, 0, 2)).passed
 
 
@@ -197,9 +198,9 @@ def test_the_driver_passes_on_a_riscv_core_against_the_real_rtl(block, tmp_path)
     assert checks == dict.fromkeys(EXPECTED_CHECKS, True)
     log = Path(run.references[0]).read_text()
     # The CPU's own loads and stores, on the RTL: SLVERR from its decode, byte lanes from byte stores.
-    assert "FWTEST BUS read 0x5 -> 0x00000000 SLVERR" in log
-    assert "FWTEST BUS write 0xe = 0xdeadbeef strobe 0xf -> SLVERR" in log
-    assert "FWTEST BUS write 0x4 = 0xabababab strobe 0x4 -> OKAY" in log  # sb replicates the byte
+    assert " BUS read 0x5 -> 0x00000000 SLVERR" in log
+    assert " BUS write 0xe = 0xdeadbeef strobe 0xf -> SLVERR" in log
+    assert " BUS write 0x4 = 0xabababab strobe 0x4 -> OKAY" in log  # sb replicates the byte
     assert "picorv32.v" in log and "+define+NIRMAAN_DUT=axi4_lite_regs" in log
     assert run.params["rtl"] == (str(RTL),) and outcome.data["result"]["metrics"]["text"] > 0
 
@@ -256,12 +257,13 @@ def test_a_new_soc_backend_needs_no_core_changes(block, tmp_path, monkeypatch):
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     sim = bin_dir / "other-rv-sim"
-    sim.write_text('#!/bin/sh\necho "FWTEST BUS read 0x0 -> 0x00000000 OKAY"\necho "FWTEST PASS ran_with_$1"\n'
-                   'echo "FWTEST SUMMARY 1 passed, 0 failed, 10 cycles"\n')
+    sim.write_text('#!/bin/sh\nn="${2#+nirmaan_nonce=}"\necho "FWTEST:$n BUS read 0x0 -> 0x00000000 OKAY"\n'
+                   'echo "FWTEST:$n PASS ran_with_$1"\necho "FWTEST:$n SUMMARY 1 passed, 0 failed, 10 cycles"\n'
+                   'echo "FWTEST:$n END 1 bus transfers"\n')
     sim.chmod(0o755)
 
     def steps(job):
-        return [["other-rv-sim", Path(job.sources[0]).name]]
+        return [["other-rv-sim", Path(job.sources[0]).name, NONCE_ARG + new_nonce()]]  # M53: the records' nonce
 
     register_backend(Backend("other-core", "fw.soc_test", ("other-rv-sim",), steps,
                              lambda run: parse_soc_test(run.log, run.returncodes), ("sources", "rtl")))
@@ -272,7 +274,7 @@ def test_a_new_soc_backend_needs_no_core_changes(block, tmp_path, monkeypatch):
         monkeypatch.setenv("PATH", f"{bin_dir}:{Path(shutil.which('sh')).parent}")
         run, _ = invoke(block, "fw.soc_test", params, tmp_path / "w2", tid(block, "firmware"))
         assert run.succeeded and run.summary.startswith("other-core: SoC run passed: 1 check")
-        assert "FWTEST PASS ran_with_axi4_lite_regs_map.h" in Path(run.references[0]).read_text()  # it really ran
+        assert " PASS ran_with_axi4_lite_regs_map.h" in Path(run.references[0]).read_text()  # it really ran
     finally:
         unregister_backend("fw.soc_test", "other-core")
 

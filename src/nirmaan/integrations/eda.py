@@ -275,15 +275,29 @@ def execute(backend: Backend, params: Params) -> ToolOutcome:
                        metrics=dict(result.metrics))
 
 
-def run_directory(name: str, under: object = None) -> Path:
-    """A new directory for one run (M53): under ``under`` when given, else in the system's temporary directory.
+#: The file a run claims an empty ``workdir`` with (M53), so a second run there gets a directory of its own.
+RUN_CLAIM = ".nirmaan-run"
 
-    A run never works in the given directory itself, so its steps cannot delete or
-    overwrite a file there, and two runs given the same directory cannot collide.
+
+def run_directory(name: str, under: object = None) -> Path:
+    """The directory one run works in (M53).
+
+    Without ``under``, a new one in the system's temporary directory. With it, ``under``
+    itself when it is new or empty and this run claims it first (an exclusive create of
+    :data:`RUN_CLAIM`); otherwise a new directory inside it. So a run never deletes or
+    overwrites a file it did not put there, and two runs given the same directory, at
+    once or one after the other, never share one.
     """
     root = Path(text_value(under).strip()) if text_value(under).strip() else None
-    if root is not None:
-        root.mkdir(parents=True, exist_ok=True)
+    if root is None:
+        return Path(tempfile.mkdtemp(prefix=f"nirmaan-{name}-")).resolve()
+    root.mkdir(parents=True, exist_ok=True)
+    if not any(root.iterdir()):
+        try:
+            os.close(os.open(root / RUN_CLAIM, os.O_CREAT | os.O_EXCL | os.O_WRONLY))
+            return root.resolve()
+        except FileExistsError:
+            pass
     return Path(tempfile.mkdtemp(prefix=f"nirmaan-{name}-", dir=root)).resolve()
 
 
