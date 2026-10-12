@@ -1,6 +1,6 @@
 # An unattended owner and reviewer loop (Milestone 29)
 
-Status: design for the owner's review, implemented on branch `m29/auto-loop`.
+Status: implemented and merged; built on branch `m29/auto-loop`.
 This is post-roadmap work (see `docs/ROADMAP.md`, "After Stage 6"). Prose here
 is free of em and en dashes per the standing style law.
 

@@ -1,6 +1,6 @@
 # Interrupts in host co-simulation, and precise bus-error traps (Milestone 35)
 
-Status: design for the owner's review, implemented on branch `m35/host-irq`.
+Status: implemented and merged; built on branch `m35/host-irq`.
 It continues `docs/FIRMWARE.md` (M25, the host co-simulation `fw.test`) and
 `docs/RISCV_NEXT.md` (M29, interrupts on the SoC), and closes two items M29
 deferred: interrupts in `fw.test`, and precise bus-error traps. Prose here is

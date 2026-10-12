@@ -1,6 +1,6 @@
 # Firmware against the real RTL (Milestone 25, firmware part)
 
-Status: design for the owner's review, implemented on branch `m25/firmware`.
+Status: implemented and merged; built on branch `m25/firmware`.
 This is the firmware part of Stage 6 of `docs/ROADMAP.md`; physical design
 and DFT are separate parts of the same stage. Prose here is free of em and en
 dashes per the standing style law.

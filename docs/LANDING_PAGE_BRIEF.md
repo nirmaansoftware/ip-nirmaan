@@ -77,9 +77,9 @@ One short section. VeriTriage is the verification-intelligence engine inside IP 
 
 ### Status and roadmap
 Be honest and specific:
-- **Working today:** the organization model, planning, routing, reviews, gates, the audit trail, and real VeriTriage investigations. AI workers fill design, RTL, and verification seats, and open-source tools check every submission before a person reviews it. On a small block, place and route, three-corner timing, DRC, and LVS run for real in CI. A first live evaluation of Claude Opus 5.5 passed all four RTL cases, judged by held-out checks.
-- **Next:** formal proofs written by the AI workers, more evaluation cases, and physical design beyond small blocks.
-- **Not yet:** no customer has received IP from the system and nothing has been taped out. The blocks designed end to end so far (a register block, a FIFO, an arbiter) are small reference blocks that prove the flow.
+- **Working today:** the organization model, planning, routing, reviews, gates, the audit trail, and real VeriTriage investigations. AI workers fill design, RTL, and verification seats, and open-source tools check every submission before a person reviews it. On a small block, place and route, three-corner timing, DRC, and LVS run for real in CI. In the tests, the AI workers' answers are scripted; one early live run of Claude Opus 5.5 passed all four RTL cases, judged by held-out checks, but was not recorded as data.
+- **Next:** recorded, repeated live evaluations that anyone can re-judge, formal proofs written by the AI workers, and physical design beyond small blocks.
+- **Not yet:** no customer has received IP from the system and nothing has been taped out. The reference blocks that run through the whole flow (a register block, a FIFO, an arbiter) prove the flow and its checks, not yet a model designing them unaided.
 
 ### Footer
 "Talk to us", a link back to `nirmaan.online`, privacy and terms, and "Built by Om Patel".

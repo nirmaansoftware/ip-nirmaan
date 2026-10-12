@@ -1,6 +1,6 @@
 # AI Workers in Verification Seats (Milestone 20)
 
-Status: design for the owner's review, implemented on branch `m20/ai-workers`.
+Status: implemented and merged; built on branch `m20/ai-workers`.
 This is Stage 1 of `docs/ROADMAP.md`. Prose here is free of em and en dashes
 per the standing style law.
 

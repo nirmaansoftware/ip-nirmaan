@@ -1,6 +1,6 @@
 # Concurrent tasks and a project wide call budget (Milestone 36)
 
-Status: design for the owner's review, implemented on branch
+Status: implemented and merged; built on branch
 `m36/loop-concurrency`. This is post-roadmap work (see `docs/ROADMAP.md`,
 "After Stage 6"). Prose here is free of em and en dashes per the standing style
 law.

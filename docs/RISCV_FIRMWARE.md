@@ -1,6 +1,6 @@
 # The driver on a RISC-V core, against the real RTL (Milestone 27)
 
-Status: design for the owner's review, implemented on branch
+Status: implemented and merged; built on branch
 `m27/riscv-firmware`. It continues the firmware part of Stage 6
 (`docs/FIRMWARE.md`, M25) and closes the first item that document deferred: a
 RISC-V cross compile in CI, and the driver run on a processor against the RTL.

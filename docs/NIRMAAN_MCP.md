@@ -61,6 +61,8 @@ testable in-process, so Nirmaan carries its own. No MCP SDK dependency is added.
 | `why_blocked` | read | The dependency and evidence chain for one task, as lines and as a tree |
 | `audit_trail` | read | The hash-chained audit trail, verified |
 | `organization_events` | read | Organizational events on the bus, and what automation decided |
+| `decisions` | read | Why each choice was made: decision tasks and recorded decisions, read from the record |
+| `failures` | read | What went wrong and whether it was resolved: failed runs, refused submissions, blocks, escalations |
 | `start_task` | action | `TaskEngine.start` |
 | `submit_task` | action | `TaskEngine.submit` (artifacts become EXECUTED, never more) |
 | `record_evidence` | action | `TaskEngine.record_evidence` (the engine decides whether it is substantiated) |

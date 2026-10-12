@@ -1,6 +1,6 @@
 # Architecture and RTL Agents (Milestone 23)
 
-Status: design for the owner's review, implemented on branch
+Status: implemented and merged; built on branch
 `m23/design-agents`. This is Stage 4 of `docs/ROADMAP.md`. Prose here is free
 of em and en dashes per the standing style law.
 
