@@ -51,6 +51,9 @@ def investigate(params: Params, engine: TaskEngine) -> ToolOutcome:
     missing = [str(p) for p in paths if not p.exists()]
     if missing:
         return ToolOutcome(False, f"artifacts not found: {', '.join(missing)}")
+    folders = [str(p) for p in paths if not p.is_file()]
+    if folders:  # M53: the pipeline reads files; a directory is refused with a reason
+        return ToolOutcome(False, f"not a file (give the log files themselves): {', '.join(folders)}")
     services = _services(params)
     session = services.investigate(paths, record_history=False, automate=False, learn=False)
     services.save(session)

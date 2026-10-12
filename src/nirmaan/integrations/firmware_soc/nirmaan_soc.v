@@ -23,6 +23,7 @@
 //   0x2000_0014  BERR_INFO (R, W1C) bit 0 PENDING (write 1 to clear), bit 1 WRITE,
 //                bits 3:2 the response of the first error since PENDING cleared
 //   0x2000_0018  BERR_ADDR (read) the bus offset of that access
+//   0x2000_001C  REPORT  (write) one character of a record the gate reads (M53)
 // Anything else reads zero and ignores writes.
 //
 // The bus-error line (docs/FIRMWARE_IRQ_TRAPS.md, section 4) is PENDING. It
@@ -31,8 +32,14 @@
 // core only when the build defines NIRMAAN_CORE_BUS_ERR.
 //
 // Every device transfer is logged, in the fw.test format:
-//   FWTEST BUS write 0x4 = 0xabababab strobe 0x4 -> OKAY
-//   FWTEST BUS read 0x5 -> 0x00000000 SLVERR
+//   FWTEST:<nonce> BUS write 0x4 = 0xabababab strobe 0x4 -> OKAY
+//   FWTEST:<nonce> BUS read 0x5 -> 0x00000000 SLVERR
+//
+// M53 (docs/GATE_INTEGRITY.md): the nonce is the run's (+nirmaan_nonce=<hex>),
+// which the firmware cannot read. The SoC starts each line written to REPORT
+// with "FWTEST:<nonce> ", while CONSOLE text is printed as it is, so a printf in
+// the firmware cannot make a record. On EXIT the SoC prints the transfers it
+// counted itself: FWTEST:<nonce> END <transfers> bus transfers.
 `timescale 1ns / 1ps
 module nirmaan_soc #(
     parameter integer RAM_BYTES = 65536,
@@ -66,11 +73,14 @@ module nirmaan_soc #(
     // --- RAM, loaded from the firmware image ----------------------------------------------
     reg [7:0] ram [0:RAM_BYTES-1];
     reg [8*4096-1:0] image;  // the image path, up to 4096 characters
+    reg [8*80-1:0] nonce;    // the run's nonce, for the records the gate reads (M53)
     initial begin
+        if (!$value$plusargs("nirmaan_nonce=%s", nonce))
+            nonce = "none";
         if ($value$plusargs("firmware=%s", image))
             $readmemh(image, ram);
         else begin
-            $display("FWTEST ERROR no +firmware=<image.hex> given");
+            $display("FWTEST:%0s ERROR no +firmware=<image.hex> given", nonce);
             $finish;
         end
     end
@@ -111,6 +121,8 @@ module nirmaan_soc #(
     reg        berr_write;  // BERR_INFO.WRITE
     reg [1:0]  berr_resp;   // BERR_INFO response
     reg [9:0]  berr_offset; // BERR_ADDR
+    reg        report_bol;  // REPORT: the next character starts a record
+    reg [31:0] transfers;   // device transfers, counted here (M53)
 
     function [8*6-1:0] resp_name(input [1:0] r);
         case (r)
@@ -136,6 +148,8 @@ module nirmaan_soc #(
             berr_write <= 1'b0;
             berr_resp <= 2'd0;
             berr_offset <= 10'd0;
+            report_bol <= 1'b1;
+            transfers <= 32'd0;
         end else begin
             cycles <= cycles + 32'd1;
             mem_ready <= 1'b0;
@@ -164,8 +178,15 @@ module nirmaan_soc #(
                         if (in_ctl && ctl == 3'd3) mem_rdata <= cycles;
                         if (in_ctl && ctl == 3'd1 && mem_wstrb[0]) $write("%c", mem_wdata[7:0]);
                         if (in_ctl && ctl == 3'd2 && |mem_wstrb) begin
+                            $display("FWTEST:%0s END %0d bus transfers", nonce, transfers);
                             done <= 1'b1;
                             exit_code <= mem_wdata;
+                        end
+                        if (in_ctl && ctl == 3'd7 && mem_wstrb[0]) begin
+                            if (report_bol)
+                                $write("FWTEST:%0s ", nonce);
+                            $write("%c", mem_wdata[7:0]);
+                            report_bol <= mem_wdata[7:0] == 8'h0a;
                         end
                         if (in_ctl && ctl == 3'd4) mem_rdata <= {30'b0, BERR_WIRED, berr_trap};
                         if (in_ctl && ctl == 3'd4 && mem_wstrb[0]) berr_trap <= mem_wdata[0];
@@ -187,15 +208,17 @@ module nirmaan_soc #(
                         mem_rdata <= dev_rdata;
                         mem_ready <= 1'b1;
                         state <= IDLE;
+                        transfers <= transfers + 32'd1;
                         if (dev_write)
-                            $display("FWTEST BUS write 0x%0x = 0x%08x strobe 0x%0x -> %0s", dev_offset, dev_wdata,
-                                     dev_wstrb, resp_name(dev_resp));
+                            $display("FWTEST:%0s BUS write 0x%0x = 0x%08x strobe 0x%0x -> %0s", nonce, dev_offset,
+                                     dev_wdata, dev_wstrb, resp_name(dev_resp));
                         else
-                            $display("FWTEST BUS read 0x%0x -> 0x%08x %0s", dev_offset, dev_rdata,
+                            $display("FWTEST:%0s BUS read 0x%0x -> 0x%08x %0s", nonce, dev_offset, dev_rdata,
                                      resp_name(dev_resp));
                     end else if (waited == MAX_WAIT) begin
-                        $display("FWTEST ERROR bus timeout: no %0s handshake for offset 0x%0x within %0d cycles",
-                                 dev_write ? "write" : "read", dev_offset, MAX_WAIT);
+                        $display("FWTEST:%0s ERROR bus timeout: no %0s handshake for offset 0x%0x within %0d cycles",
+                                 nonce, dev_write ? "write" : "read", dev_offset, MAX_WAIT);
+                        $display("FWTEST:%0s END %0d bus transfers", nonce, transfers);
                         done <= 1'b1;
                         exit_code <= 32'd3;
                     end

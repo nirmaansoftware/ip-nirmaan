@@ -176,13 +176,16 @@ def test_the_c_build_parser_passes_only_a_clean_build():
     assert not parse_c_build("$ cc -c a.c\n", (1,)).passed  # a failing exit status alone fails
 
 
-PASSING = """\
-$ Vdut
-FWTEST BUS read 0x0 -> 0x00000000 OKAY
-FWTEST PASS reset_values
-FWTEST BUS read 0x5 -> 0x00000000 SLVERR
-FWTEST PASS unmapped_read_reports_slverr
-FWTEST SUMMARY 2 passed, 0 failed, 12 cycles
+#: M53: the harness's records carry the run's nonce, which the runner's echo shows it passed.
+NONCE = "5eed5eed5eed5eed5eed5eed5eed5eed"
+PASSING = f"""\
+$ Vdut +nirmaan_nonce={NONCE}
+FWTEST:{NONCE} BUS read 0x0 -> 0x00000000 OKAY
+FWTEST:{NONCE} PASS reset_values
+FWTEST:{NONCE} BUS read 0x5 -> 0x00000000 SLVERR
+FWTEST:{NONCE} PASS unmapped_read_reports_slverr
+FWTEST:{NONCE} SUMMARY 2 passed, 0 failed, 12 cycles
+FWTEST:{NONCE} END 2 bus transfers
 """
 
 
@@ -192,7 +195,7 @@ def test_the_fw_test_parser_reads_checks():
     assert result.metrics["checks"] == [{"name": "reset_values", "passed": True, "detail": ""},
                                         {"name": "unmapped_read_reports_slverr", "passed": True, "detail": ""}]
 
-    failing = PASSING.replace("FWTEST PASS reset_values", "FWTEST FAIL reset_values: REG0 read 0x1")
+    failing = PASSING.replace("PASS reset_values", "FAIL reset_values: REG0 read 0x1")
     failing = failing.replace("2 passed, 0 failed", "1 passed, 1 failed")
     result = parse_fw_test(failing, (0, 0, 1))
     assert not result.passed and result.errors[0].code == "reset_values"
@@ -200,14 +203,16 @@ def test_the_fw_test_parser_reads_checks():
 
 
 def test_the_fw_test_parser_fails_what_did_not_really_pass():
-    silent = "$ Vdut\nFWTEST ERROR the tests reported no checks\nFWTEST SUMMARY 0 passed, 0 failed, 5 cycles\n"
+    silent = (f"$ Vdut +nirmaan_nonce={NONCE}\nFWTEST:{NONCE} ERROR the tests reported no checks\n"
+              f"FWTEST:{NONCE} SUMMARY 0 passed, 0 failed, 5 cycles\nFWTEST:{NONCE} END 0 bus transfers\n")
     assert not parse_fw_test(silent, (0, 0, 1)).passed
-    hang = ("$ Vdut\nFWTEST ERROR bus timeout: no write response handshake for offset 0x0 within 1000 cycles\n"
-            "FWTEST SUMMARY 0 passed, 1 failed, 1004 cycles\n")
+    hang = (f"$ Vdut +nirmaan_nonce={NONCE}\n"
+            f"FWTEST:{NONCE} ERROR bus timeout: no write response handshake for offset 0x0 within 1000 cycles\n"
+            f"FWTEST:{NONCE} SUMMARY 0 passed, 1 failed, 1004 cycles\nFWTEST:{NONCE} END 0 bus transfers\n")
     result = parse_fw_test(hang, (0, 0, 3))
     assert not result.passed and "bus timeout" in result.summary
     # An exit status of 0 without a summary is not a pass: the harness never finished.
-    assert not parse_fw_test("$ Vdut\nFWTEST PASS reset_values\n", (0, 0, 0)).passed
+    assert not parse_fw_test(f"$ Vdut +nirmaan_nonce={NONCE}\nFWTEST:{NONCE} PASS reset_values\n", (0, 0, 0)).passed
     build = "$ verilator --cc x.v\n%Error: x.v:3:1: syntax error, unexpected endmodule\n"
     result = parse_fw_test(build, (0, 1))
     assert not result.passed and result.summary.startswith("build failed before co-simulation")
@@ -219,7 +224,7 @@ def test_the_fw_test_parser_fails_what_did_not_really_pass():
 
 def test_missing_tools_are_refused_with_a_reason(block, tmp_path, monkeypatch):
     monkeypatch.setenv("PATH", str(tmp_path))  # nothing on PATH
-    with pytest.raises(ToolAccessDenied, match=r"host-cc needs cc.*riscv-gcc needs riscv64-unknown-elf-gcc"):
+    with pytest.raises(ToolAccessDenied, match=r"host-cc needs cc.*riscv-gcc: no RISC-V GCC on PATH"):
         invoke(block, "fw.build", {"sources": joined(*DRIVER)}, tmp_path)
     with pytest.raises(ToolAccessDenied, match=r"verilator-cosim needs cc, verilator, make.*never simulated"):
         invoke(block, "fw.test", {"sources": joined(*DRIVER, TESTS), "rtl": str(RTL)}, tmp_path)
@@ -229,7 +234,7 @@ def test_missing_tools_are_refused_with_a_reason(block, tmp_path, monkeypatch):
 def test_the_cross_compiler_backend_is_refused_when_absent(tmp_path, monkeypatch):
     monkeypatch.setenv("PATH", str(tmp_path))
     backend, why = select_backend("fw.build", {"backend": "riscv-gcc"})
-    assert backend is None and "riscv-gcc needs riscv64-unknown-elf-gcc" in why
+    assert backend is None and "riscv-gcc: no RISC-V GCC on PATH (riscv64-unknown-elf-gcc or riscv64-elf-gcc" in why
 
 
 # --- Real tools ----------------------------------------------------------------------------
@@ -267,9 +272,9 @@ def test_the_driver_passes_against_the_real_rtl(block, tmp_path):
                       "bad_index_is_refused_by_the_driver": True}
     log = Path(run.references[0]).read_text()
     # Real transactions on the model: the SLVERR came from the RTL's own decode.
-    assert "FWTEST BUS read 0x5 -> 0x00000000 SLVERR" in log
-    assert "FWTEST BUS write 0xe = 0xdeadbeef strobe 0xf -> SLVERR" in log
-    assert "FWTEST BUS write 0x4 = 0x00ab0000 strobe 0x4 -> OKAY" in log
+    assert " BUS read 0x5 -> 0x00000000 SLVERR" in log
+    assert " BUS write 0xe = 0xdeadbeef strobe 0xf -> SLVERR" in log
+    assert " BUS write 0x4 = 0x00ab0000 strobe 0x4 -> OKAY" in log
     assert "verilator --cc --exe --build" in log and run.params["rtl"] == (str(RTL),)
 
 

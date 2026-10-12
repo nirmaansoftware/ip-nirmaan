@@ -114,7 +114,8 @@ RTL_GATES = (
     checked("Formal properties are proven", "formal.run",
             FileInput(param="sby", kinds=("formal_spec",)),
             FileInput(param="sources", kinds=("rtl_source",)),
-            when=(produced("formal_spec"),)),
+            when=(produced("formal_spec"),),
+            bounds=(at_least("proven", 1),)),  # M53: a proof, not a bounded check (docs/GATE_INTEGRITY.md)
     NOT_VACUOUS,
 )
 
@@ -602,7 +603,8 @@ BLOCK_DESIGN = WorkflowTemplate(
                      checked("Formal properties are proven", "formal.run",
                              FileInput(param="sby", kinds=("formal_spec",)),
                              FileInput(param="sources", kinds=("rtl_source",)),
-                             when=(produced("formal_spec"),)),
+                             when=(produced("formal_spec"),),
+                             bounds=(at_least("proven", 1),)),  # M53: a proof, not a bounded check
                      NOT_VACUOUS,  # M27
                      # M41: the approved register map's generated test, over the map's bus, on the RTL.
                      checked("The RTL implements the approved register map, in co-simulation", "regmap.verify",

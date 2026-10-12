@@ -281,7 +281,15 @@ SKILLS: list[Skill] = [
        tools=("git.write", "lint.run", "simulator.run", "synth.run", "formal.run", "formal.cover",
               "regmap.check", "regmap.verify"),
        standards=("NIP-STD-020 RTL Coding Standard",),
-       procedures=("Implement from the microarchitecture spec.", "Keep lint clean.", "Write design-intent assertions."),
+       procedures=("Implement from the microarchitecture spec.", "Keep lint clean.", "Write design-intent assertions.",
+                   # M53 (docs/GATE_INTEGRITY.md): the simulation gate passes only on the testbench's own verdict.
+                   "Write a self-checking testbench: report every failed check with $error (or $fatal), never "
+                   "with $display alone, and count the checks that pass.",
+                   "End the testbench with its verdict, printed once just before $finish: read the run's nonce "
+                   "with $value$plusargs(\"nirmaan_nonce=%s\", nonce) into a reg [8*64-1:0], then "
+                   "$display(\"NIRMAAN-SIM %0s %0d passed, %0d failed\", nonce, passed, failed). A run with no "
+                   "verdict, no passing check, or a failed check fails.",
+                   "Only the testbench may call $finish, $stop, or read plusargs; the RTL never ends a simulation."),
        fails=("Spec deviations without a recorded decision.", "Latches.", "Reset gaps."),
        valid=("RTL is lint-clean, reviewed, and traceable to the microarchitecture.",),
        examples=("AXI slave interface with outstanding-transaction tracking.",)),
@@ -521,6 +529,8 @@ SKILLS: list[Skill] = [
                    "NIRMAAN_BUS_SLVERR, ...); return every error to the caller.",
                    "Write driver tests in C: define void nirmaan_fw_test(const nirmaan_hal *hal) and report "
                    "each check with nirmaan_test_result(name, passed, detail).",
+                   "Report only through nirmaan_test_result: never print FWTEST lines, and never exit from a test "
+                   "or a driver; the harness reports the verdict from what it saw on the bus (M53).",
                    "Test reset values, every register written then read back (write all before reading any), "
                    "byte-lane writes, and the error response for an unmapped access."),
        constraints=("C11 that compiles with -Wall -Wextra -Werror -pedantic.",

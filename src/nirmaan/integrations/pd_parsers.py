@@ -35,6 +35,7 @@ _SLACK_RE = re.compile(r"^(?P<slack>-?\d+(?:\.\d+)?)\s+slack \((?P<state>MET|VIO
 _WORST_RE = re.compile(r"^worst slack(?:\s+(?P<kind>max|min))?\s+(?P<value>\S+)")
 _TNS_RE = re.compile(r"^tns(?:\s+(?:max|min))?\s+(?P<value>\S+)")
 _WNS_RE = re.compile(r"^wns(?:\s+(?:max|min))?\s+(?P<value>\S+)")
+_HOLD_LINE_RE = re.compile(r"^worst slack min\s+\S+")
 _AREA_RE = re.compile(r"^Design area (?P<area>[\d.]+) um?\^2 (?P<util>[\d.]+)% utilization")
 _WIRELENGTH_RE = re.compile(r"Total wire length = (?P<um>[\d.]+) um")
 _DRC_RE = re.compile(r"Number of violations = (?P<n>\d+)")
@@ -197,6 +198,10 @@ def parse_opensta(log: str, returncode: int) -> EdaResult:
     if timing["worst_slack"] is None:
         return EdaResult(False, "timing not met: no constrained timing paths (no worst slack reported)",
                          tuple(diags), metrics)
+    missing = [what for what, pattern in (("worst hold slack", _HOLD_LINE_RE), ("TNS", _TNS_RE), ("WNS", _WNS_RE))
+               if not any(pattern.match(line) for line in lines)]
+    if missing:  # M53: the script asks for each; a report without one was cut short
+        return EdaResult(False, f"timing report incomplete: no {', '.join(missing)} reported", tuple(diags), metrics)
     untimed = [c for c in corners if c not in timed]
     if untimed:
         return EdaResult(False, f"timing not met: no setup or hold paths reported in corner {', '.join(untimed)}",
@@ -404,6 +409,8 @@ _LVS_CIRCUIT_RE = re.compile(r"^nirmaan-lvs-circuit: (?P<layout>\S+) (?P<schemat
 _KLAYOUT_ERROR_RE = re.compile(r"^ERROR: (?P<msg>.*)$")
 #: The checks ``pv.run`` can run, in order.
 PV_CHECKS = ("drc", "lvs")
+#: What the LVS count script reports, every one of them (M53).
+LVS_KINDS = ("circuits", "nets", "devices", "pins", "subcircuits")
 
 
 def parse_klayout(log: str, returncode: int, checks: list[str] | tuple[str, ...] = PV_CHECKS) -> EdaResult:
@@ -459,8 +466,11 @@ def parse_klayout(log: str, returncode: int, checks: list[str] | tuple[str, ...]
             worst = ", ".join(f"{r} {n}" for r, n in list(metrics["drc_by_rule"].items())[:3])
             reasons.append(f"{_plural(drc, 'DRC violation')} ({worst})")
     if "lvs" in checks:
+        unreported = [k for k in LVS_KINDS if k not in lvs]
         if mismatches is None:
             reasons.append("no LVS comparison reported")
+        elif unreported:  # M53: a report cut short is not a clean one
+            reasons.append(f"the LVS report is incomplete: no count of mismatched {', '.join(unreported)}")
         elif mismatches:
             kinds = ", ".join(_plural(n, f"mismatched {k[:-1]}") for k, n in lvs.items() if n)
             reasons.append(f"LVS mismatch: {kinds}" + (f"; unmatched {', '.join(unmatched)}" if unmatched else ""))

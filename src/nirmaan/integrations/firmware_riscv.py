@@ -33,7 +33,7 @@ from collections.abc import MutableMapping
 from dataclasses import dataclass
 from pathlib import Path
 
-from nirmaan.integrations.eda import Backend, Job, RunRecord, register_backend
+from nirmaan.integrations.eda import NONCE_ARG, Backend, Job, RunRecord, new_nonce, register_backend
 from nirmaan.integrations.eda_parsers import Diagnostic, EdaResult
 from nirmaan.integrations.firmware import (
     HARNESS,
@@ -42,7 +42,9 @@ from nirmaan.integrations.firmware import (
     _c_diagnostics,
     _compile,
     _first,
+    _parse_build,
     _plural,
+    build_steps,
     copy_rtl,
     design_ports,
     map_problem,
@@ -323,7 +325,7 @@ def _soc_steps(job: Job) -> list[list[str]]:
                   "--top-module", "nirmaan_soc", "-Mdir", str(model), *defines,
                   str(soc / "nirmaan_soc.v"), _local(bus.verilog, soc, job.workdir),
                   *(_local(v, soc, job.workdir) for v in core.verilog), *rtl, str(soc / "soc_main.cpp")])
-    steps.append([str(model / MODEL), f"+firmware={image}"])
+    steps.append([str(model / MODEL), f"+firmware={image}", NONCE_ARG + new_nonce()])  # M53: for the records
     return steps
 
 
@@ -335,6 +337,14 @@ def _parse_soc(run: RunRecord) -> EdaResult:
     return parse_soc_test(run.log, run.returncodes, read_requirements(run.workdir))
 
 
+def _riscv_build_steps(job: Job) -> list[list[str]]:
+    """``fw.build`` with RISC-V GCC: the strict compile, for the ISA the SoC runs (M53: one GCC definition)."""
+    prefix = toolchain() or RISCV_GCC[0].removesuffix("gcc")
+    return build_steps(prefix + "gcc", *TARGET_FLAGS)(job)
+
+
+register_backend(Backend("riscv-gcc", "fw.build", (), _riscv_build_steps, _parse_build, files=("map",),
+                         environment=_needs_toolchain, check=map_problem))
 register_backend(Backend("rv32-gcc", "fw.cross_build", (), _cross_build_steps, _parse_cross,
                          environment=_needs_toolchain, check=_core_check))
 register_backend(Backend("picorv32-verilator", "fw.soc_test", ("verilator", "make"), _soc_steps, _parse_soc,

@@ -12,7 +12,7 @@ intent=block_design features= workflows=block-design
     * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
     * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
     * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
-    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | fixed=proven>=1 | applies produced=formal_spec upstream=any
     * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
 - ws.architecture [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
 - ws.requirements [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
@@ -39,7 +39,7 @@ intent=block_design features=apb,firmware,register_map,registers workflows=block
     * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
     * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
     * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
-    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | fixed=proven>=1 | applies produced=formal_spec upstream=any
     * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
     * The RTL implements the approved register map, in co-simulation | accepts=tool_run | tools=regmap.verify | before-review | files=map<-register_map[upstream] rtl<-rtl_source top<-rtl_source[entry] | applies always
 - ws.architecture [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
@@ -65,7 +65,7 @@ intent=block_design features=apb,firmware,registers workflows=block-design
     * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
     * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
     * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
-    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | fixed=proven>=1 | applies produced=formal_spec upstream=any
     * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
 - ws.architecture [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
 - ws.requirements [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
@@ -86,7 +86,7 @@ intent=block_design features=apb,registers workflows=block-design
     * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
     * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
     * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
-    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | fixed=proven>=1 | applies produced=formal_spec upstream=any
     * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
 - ws.architecture [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
 - ws.requirements [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
@@ -106,7 +106,7 @@ intent=block_design features=arbitration workflows=block-design
     * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
     * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
     * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
-    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | fixed=proven>=1 | applies produced=formal_spec upstream=any
     * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
 - ws.architecture [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
 - ws.requirements [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
@@ -133,7 +133,7 @@ intent=block_design features=at_speed,dft workflows=block-design
     * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
     * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
     * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
-    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | fixed=proven>=1 | applies produced=formal_spec upstream=any
     * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
 - ws.architecture [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
 - ws.implementation [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
@@ -176,7 +176,7 @@ intent=block_design features=axi,dft,firmware,layout,register_map,registers work
     * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
     * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
     * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
-    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | fixed=proven>=1 | applies produced=formal_spec upstream=any
     * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
     * The RTL implements the approved register map, in co-simulation | accepts=tool_run | tools=regmap.verify | before-review | files=map<-register_map[upstream] rtl<-rtl_source top<-rtl_source[entry] | applies always
 - sta-signoff [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
@@ -217,7 +217,7 @@ intent=block_design features=axi,bus_errors,firmware,interrupts,registers,riscv 
     * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
     * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
     * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
-    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | fixed=proven>=1 | applies produced=formal_spec upstream=any
     * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
 - ws.architecture [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
 - ws.requirements [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
@@ -245,7 +245,7 @@ intent=block_design features=axi,firmware,register_map,registers workflows=block
     * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
     * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
     * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
-    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | fixed=proven>=1 | applies produced=formal_spec upstream=any
     * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
     * The RTL implements the approved register map, in co-simulation | accepts=tool_run | tools=regmap.verify | before-review | files=map<-register_map[upstream] rtl<-rtl_source top<-rtl_source[entry] | applies always
 - ws.architecture [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
@@ -273,7 +273,7 @@ intent=block_design features=axi,firmware,registers,riscv workflows=block-design
     * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
     * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
     * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
-    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | fixed=proven>=1 | applies produced=formal_spec upstream=any
     * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
 - ws.architecture [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
 - ws.requirements [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
@@ -294,7 +294,7 @@ intent=block_design features=axi,registers workflows=block-design
     * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
     * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
     * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
-    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | fixed=proven>=1 | applies produced=formal_spec upstream=any
     * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
 - ws.architecture [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
 - ws.requirements [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
@@ -317,7 +317,7 @@ intent=block_design features=axi,registers,verification_plan workflows=block-des
     * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
     * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
     * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
-    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | fixed=proven>=1 | applies produced=formal_spec upstream=any
     * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
 - ws.architecture [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
 - ws.requirements [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
@@ -338,7 +338,7 @@ intent=block_design features=configurable workflows=block-design
     * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
     * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
     * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
-    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | fixed=proven>=1 | applies produced=formal_spec upstream=any
     * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
 - ws.architecture [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
 - ws.requirements [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
@@ -364,7 +364,7 @@ intent=block_design features=dft workflows=block-design
     * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
     * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
     * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
-    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | fixed=proven>=1 | applies produced=formal_spec upstream=any
     * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
 - ws.architecture [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
 - ws.implementation [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
@@ -388,7 +388,7 @@ intent=block_design features=memory,registers workflows=block-design
     * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
     * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
     * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
-    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | fixed=proven>=1 | applies produced=formal_spec upstream=any
     * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
 - ws.architecture [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
 - ws.implementation [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
@@ -418,7 +418,7 @@ intent=block_design features=dft,memory,registers workflows=block-design
     * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
     * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
     * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
-    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | fixed=proven>=1 | applies produced=formal_spec upstream=any
     * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
 - ws.architecture [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
 - ws.implementation [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
@@ -463,21 +463,21 @@ intent=feature_addition features=arbitration,cdc,existing_design,noc,qos workflo
     * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
     * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
     * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
-    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | fixed=proven>=1 | applies produced=formal_spec upstream=any
     * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
 - rtl-change.control [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
     * Independent review recorded | accepts=review_record | tools=- | applies always
     * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
     * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
     * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
-    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | fixed=proven>=1 | applies produced=formal_spec upstream=any
     * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
 - rtl-change.noc [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
     * Independent review recorded | accepts=review_record | tools=- | applies always
     * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
     * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
     * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
-    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | fixed=proven>=1 | applies produced=formal_spec upstream=any
     * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
 - rtl-lint [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
     * Lint run | accepts=tool_run,human_attestation | tools=lint.run | applies always
@@ -509,7 +509,7 @@ intent=new_ip features=arbitration,axi,cdc,configurable,multi_port,noc,qos,regis
     * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
     * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
     * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
-    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | fixed=proven>=1 | applies produced=formal_spec upstream=any
     * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
 - cdc-verification [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
     * Independent review recorded | accepts=review_record | tools=- | applies always
@@ -569,35 +569,35 @@ intent=new_ip features=arbitration,axi,cdc,configurable,multi_port,noc,qos,regis
     * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
     * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
     * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
-    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | fixed=proven>=1 | applies produced=formal_spec upstream=any
     * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
 - rtl-implementation.axi [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
     * Independent review recorded | accepts=review_record | tools=- | applies always
     * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
     * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
     * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
-    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | fixed=proven>=1 | applies produced=formal_spec upstream=any
     * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
 - rtl-implementation.buffers [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
     * Independent review recorded | accepts=review_record | tools=- | applies always
     * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
     * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
     * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
-    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | fixed=proven>=1 | applies produced=formal_spec upstream=any
     * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
 - rtl-implementation.control [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
     * Independent review recorded | accepts=review_record | tools=- | applies always
     * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
     * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
     * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
-    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | fixed=proven>=1 | applies produced=formal_spec upstream=any
     * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
 - rtl-implementation.noc [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
     * Independent review recorded | accepts=review_record | tools=- | applies always
     * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
     * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
     * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
-    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | fixed=proven>=1 | applies produced=formal_spec upstream=any
     * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
 - rtl-lint [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
     * Lint run with waivers dispositioned | accepts=tool_run,human_attestation | tools=lint.run | applies always
@@ -645,7 +645,7 @@ intent=new_ip features=axi,cdc,multi_port,noc,registers workflows=new-ip
     * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
     * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
     * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
-    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | fixed=proven>=1 | applies produced=formal_spec upstream=any
     * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
 - cdc-verification [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
     * Independent review recorded | accepts=review_record | tools=- | applies always
@@ -703,35 +703,35 @@ intent=new_ip features=axi,cdc,multi_port,noc,registers workflows=new-ip
     * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
     * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
     * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
-    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | fixed=proven>=1 | applies produced=formal_spec upstream=any
     * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
 - rtl-implementation.axi [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
     * Independent review recorded | accepts=review_record | tools=- | applies always
     * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
     * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
     * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
-    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | fixed=proven>=1 | applies produced=formal_spec upstream=any
     * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
 - rtl-implementation.buffers [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
     * Independent review recorded | accepts=review_record | tools=- | applies always
     * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
     * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
     * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
-    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | fixed=proven>=1 | applies produced=formal_spec upstream=any
     * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
 - rtl-implementation.control [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
     * Independent review recorded | accepts=review_record | tools=- | applies always
     * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
     * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
     * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
-    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | fixed=proven>=1 | applies produced=formal_spec upstream=any
     * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
 - rtl-implementation.noc [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
     * Independent review recorded | accepts=review_record | tools=- | applies always
     * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
     * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
     * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
-    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | fixed=proven>=1 | applies produced=formal_spec upstream=any
     * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
 - rtl-lint [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
     * Lint run with waivers dispositioned | accepts=tool_run,human_attestation | tools=lint.run | applies always
@@ -827,35 +827,35 @@ intent=new_ip features=axi,multi_port,noc,registers,single_clock workflows=new-i
     * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
     * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
     * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
-    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | fixed=proven>=1 | applies produced=formal_spec upstream=any
     * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
 - rtl-implementation.axi [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
     * Independent review recorded | accepts=review_record | tools=- | applies always
     * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
     * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
     * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
-    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | fixed=proven>=1 | applies produced=formal_spec upstream=any
     * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
 - rtl-implementation.buffers [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
     * Independent review recorded | accepts=review_record | tools=- | applies always
     * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
     * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
     * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
-    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | fixed=proven>=1 | applies produced=formal_spec upstream=any
     * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
 - rtl-implementation.control [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
     * Independent review recorded | accepts=review_record | tools=- | applies always
     * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
     * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
     * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
-    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | fixed=proven>=1 | applies produced=formal_spec upstream=any
     * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
 - rtl-implementation.noc [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
     * Independent review recorded | accepts=review_record | tools=- | applies always
     * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
     * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
     * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
-    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | fixed=proven>=1 | applies produced=formal_spec upstream=any
     * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
 - rtl-lint [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
     * Lint run with waivers dispositioned | accepts=tool_run,human_attestation | tools=lint.run | applies always
@@ -898,7 +898,7 @@ intent=new_ip features=cdc,dft,firmware,low_power,pcie,security workflows=new-ip
     * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
     * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
     * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
-    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | fixed=proven>=1 | applies produced=formal_spec upstream=any
     * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
 - cdc-verification [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
     * Independent review recorded | accepts=review_record | tools=- | applies always
@@ -958,14 +958,14 @@ intent=new_ip features=cdc,dft,firmware,low_power,pcie,security workflows=new-ip
     * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
     * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
     * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
-    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | fixed=proven>=1 | applies produced=formal_spec upstream=any
     * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
 - rtl-implementation.pcie [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
     * Independent review recorded | accepts=review_record | tools=- | applies always
     * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
     * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
     * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
-    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | fixed=proven>=1 | applies produced=formal_spec upstream=any
     * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
 - rtl-lint [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
     * Lint run with waivers dispositioned | accepts=tool_run,human_attestation | tools=lint.run | applies always
@@ -1013,7 +1013,7 @@ intent=new_ip features=cdc workflows=new-ip
     * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
     * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
     * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
-    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | fixed=proven>=1 | applies produced=formal_spec upstream=any
     * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
 - cdc-verification [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
     * Independent review recorded | accepts=review_record | tools=- | applies always
@@ -1061,7 +1061,7 @@ intent=new_ip features=cdc workflows=new-ip
     * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
     * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
     * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
-    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | fixed=proven>=1 | applies produced=formal_spec upstream=any
     * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
 - rtl-lint [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
     * Lint run with waivers dispositioned | accepts=tool_run,human_attestation | tools=lint.run | applies always
@@ -1120,14 +1120,14 @@ intent=parameter_change features=cdc,existing_design,width_change workflows=para
     * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
     * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
     * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
-    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | fixed=proven>=1 | applies produced=formal_spec upstream=any
     * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
 - rtl-change.datapath [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
     * Independent review recorded | accepts=review_record | tools=- | applies always
     * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
     * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
     * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
-    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | fixed=proven>=1 | applies produced=formal_spec upstream=any
     * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
 - rtl-lint [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
     * Lint run | accepts=tool_run,human_attestation | tools=lint.run | applies always
@@ -1173,21 +1173,21 @@ intent=parameter_change features=axi,cdc,existing_design,width_change workflows=
     * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
     * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
     * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
-    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | fixed=proven>=1 | applies produced=formal_spec upstream=any
     * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
 - rtl-change.buffers [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
     * Independent review recorded | accepts=review_record | tools=- | applies always
     * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
     * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
     * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
-    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | fixed=proven>=1 | applies produced=formal_spec upstream=any
     * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
 - rtl-change.datapath [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
     * Independent review recorded | accepts=review_record | tools=- | applies always
     * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
     * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
     * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
-    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | fixed=proven>=1 | applies produced=formal_spec upstream=any
     * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
 - rtl-lint [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
     * Lint run | accepts=tool_run,human_attestation | tools=lint.run | applies always
@@ -1244,7 +1244,7 @@ intent=regression_investigation features=recent_change workflows=regression-inve
     * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
     * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
     * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
-    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | fixed=proven>=1 | applies produced=formal_spec upstream=any
     * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
 - spec-clarification [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
     * Independent review recorded | accepts=review_record | tools=- | applies always
@@ -1270,7 +1270,7 @@ intent=regression_investigation features= workflows=regression-investigation
     * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
     * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
     * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
-    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | fixed=proven>=1 | applies produced=formal_spec upstream=any
     * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
 - spec-clarification [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
     * Independent review recorded | accepts=review_record | tools=- | applies always
@@ -1291,7 +1291,7 @@ intent=rtl_change features=arbitration,existing_design workflows=rtl-change
     * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
     * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
     * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
-    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | fixed=proven>=1 | applies produced=formal_spec upstream=any
     * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
 - impact [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
     * Independent review recorded | accepts=review_record | tools=- | applies always
@@ -1377,7 +1377,7 @@ intent=timing_closure features= workflows=timing-closure
     * Lint-clean under the RTL lint rules | accepts=tool_run | tools=lint.run | before-review | files=sources<-rtl_source | applies always
     * Self-checking simulation passes | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source|testbench top<-testbench[entry] | applies always
     * Synthesizes with Yosys, with no latches | accepts=tool_run | tools=synth.run | before-review | files=sources<-rtl_source top<-rtl_source[entry] | fixed=latches<=0 | applies always
-    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
+    * Formal properties are proven | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source | fixed=proven>=1 | applies produced=formal_spec upstream=any
     * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source | applies produced=formal_spec upstream=any
 - sta-analysis [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
     * Timing report with failing paths | accepts=tool_run,human_attestation | tools=sta.run | applies always

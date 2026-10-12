@@ -1,0 +1,13 @@
+[options]
+mode bmc
+depth 3
+
+[engines]
+smtbmc yices
+
+[script]
+read -formal hard.v
+prep -top hard
+
+[files]
+hard.v
