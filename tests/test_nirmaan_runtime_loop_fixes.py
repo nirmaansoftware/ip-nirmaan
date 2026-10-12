@@ -119,6 +119,7 @@ def test_unmet_evidence_on_a_task_with_no_review_escalates_instead_of_resubmitti
     assert "1 of 1 attempts" in engine.state.escalations[report.steps[-1].escalation].reason
 
 
+@needs("verilator")  # the lint tool must be executable for its failed run to exist
 def test_the_attempt_limit_bounds_the_retries_and_the_repair_prompt_cites_the_failed_run(probe):
     engine = probe
     seat = tid(engine, "linta")
@@ -419,6 +420,6 @@ def test_no_option_claims_to_let_an_agent_sign_a_gate(tmp_path):
     from nirmaan.mcp.tools import list_tools
 
     result = CliRunner().invoke(app, ["plan", AXI_BLOCK, "--auto-gate", "gate.requirements", "--root", str(tmp_path)])
-    assert result.exit_code != 0 and "--auto-gate" in result.output
+    assert result.exit_code == 2 and not (tmp_path / "projects").exists()  # a usage error: no such option
     plan_project = next(s for s in list_tools() if s.name == "plan_project")
     assert "auto_gates" not in plan_project.input_schema["properties"]
