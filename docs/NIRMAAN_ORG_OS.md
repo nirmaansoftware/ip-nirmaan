@@ -206,7 +206,7 @@ operation that fails any check changes nothing.
 | P9 Signoff needs evidence | approval and completion need every evidence requirement met |
 | P10 No hidden state changes | state changed outside the engine is detected by fingerprint and refused |
 | P11 Auditability | the audit trail must verify as an intact hash chain |
-| P12 Human gates | gates marked human-required refuse non-human approvers (configurable per project) |
+| P12 Human gates | gates marked human-required refuse non-human approvers; the authority matrix's `human_required` refuses a non-human who records a decision (M40) or takes one by approving, signing a gate, or cancelling (M50), so every gate and all critical work is a person's |
 
 Decision stages branch. Root-cause analysis concludes `rtl_bug`,
 `testbench_bug`, `infrastructure`, or `spec_ambiguity`. Recording the outcome

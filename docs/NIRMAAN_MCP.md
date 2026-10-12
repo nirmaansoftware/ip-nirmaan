@@ -90,7 +90,16 @@ to act as a human: an MCP host is a model, and letting it claim to be a person
 would be exactly the faked work the constitution forbids. The consequences are
 the right ones and come from the engine, not from this layer: a gate that
 requires a human (`P12`) is refused over MCP, and a human attestation recorded
-over MCP is stored unsubstantiated. A person approves those with the CLI.
+over MCP is stored unsubstantiated. A person approves those with the CLI. Since
+M50 the authority matrix's `human_required` also covers approving, signing a
+gate, and cancelling, so no gate and no critical work is approved over MCP.
+
+**One session is one role (M50).** A session acts as the role it was started
+with (`nirmaan mcp --role ROLE` or `NIRMAAN_MCP_ROLE`), else as the role of its
+first action the engine accepts. A call naming any other role is refused
+(`McpIdentityError`) before anything runs, and `role` may be omitted once the
+session has one. So one client cannot submit, review, and approve the same
+task. See `docs/CONSTITUTION_HARDENING.md` section 4.
 
 The table has no write path of its own. `test_the_engine_is_the_only_writer`
 (M19) already forbids constructing a `ProjectState` or assigning `._state`

@@ -9,8 +9,9 @@ work packet, never from a role, skill, or stage name:
 * it renders the packet's four scopes into a :class:`WorkPrompt` and asks an
   :class:`LLM`;
 * it strips every citation the prompt did not declare (M17 grounding, through
-  the bridge), drops artifacts left with no citation, and passes the tool runs
-  the model says it relied on to the engine unfiltered, where P5 judges them;
+  the bridge), drops artifacts left with no citation, drops the tool runs the
+  model names that were made for another task (M50), and passes the rest to
+  the engine, where P5 judges them;
 * files in the answer (M23) are written with a digest, and the tools of any
   evidence requirement over the task's own files run on them afterwards (with
   any approved upstream file the requirement names, M25). When such a check
@@ -290,8 +291,13 @@ class ModelRuntime:
         remarks += [f"{n.tool} not run: {n.summary}" for n in notes if n.run is None]
         common = dict(uncertainty=_uncertainty(data.get("uncertainty")),
                       claims=tuple(str(c) for c in data.get("claims") or []))
-        # Declared runs go to the engine unfiltered: a run that never happened is P5's to refuse.
+        # A run that never happened goes to the engine, where P5 refuses it; a real run made for another task
+        # (an upstream one the prompt cited, say) is about other work, so it is dropped here (M50).
         declared = [str(r) for r in data.get("tool_runs") or []]
+        foreign = [r for r in declared if tools.foreign(r)]
+        declared = [r for r in declared if r not in foreign]
+        if foreign:
+            remarks.append(f"dropped runs not made for this task: {', '.join(foreign)}")
         runs = [n.run for n in notes if n.run]
         escalation = data.get("escalation")
         if isinstance(escalation, dict) and escalation:

@@ -453,7 +453,8 @@ REGRESSION_INVESTIGATION = WorkflowTemplate(
            evidence=(EvidenceRequirement(description="VeriTriage investigation of the failing artifacts",
                                          accepts=(K.VERITRIAGE_SESSION,), tools=("veritriage.investigate",)),)),
         st("change-correlation", "Correlate with recent RTL commits", "Debug", "rtl.impact",
-           depends_on=("triage",), when=when("recent_change"), criticality=M, outputs=("impact_analysis",),
+           depends_on=("triage",), when=when("recent_change"), criticality=M, review=rv("rtl.review"),  # M50
+           outputs=("impact_analysis",),
            evidence=(documented("Commit range and touched modules"),)),
         st("root-cause", "Root-cause analysis", "Debug", "debug.root_cause",
            depends_on=("triage", "change-correlation"), skills=("root_cause_analysis",), criticality=H, review=rv("debug.review"),

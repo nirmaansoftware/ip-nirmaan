@@ -98,6 +98,7 @@ The original preface of the section:
 - [M49-scoped-registries](M49-scoped-registries.md): Milestone 49 - Scoped registries: one context object, a default instance, and scopes that layer over it
 - [M51-persistence-integrity](M51-persistence-integrity.md): Milestone 51 - Persistence integrity: planning never overwrites a project, sealed and atomic saves
 - [release-v1.24.0](release-v1.24.0.md): v1.24.0 (2026-10-12) - the plan from the principal-engineer review
+- [M50-constitution-hardening](M50-constitution-hardening.md): Milestone 50 - Constitution hardening: evidence about this task and submission, brokered runs only, people approve where the matrix says, one MCP session is one role
 
 ## Before M43
 
