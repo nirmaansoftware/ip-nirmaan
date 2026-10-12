@@ -9,10 +9,13 @@ and the small items after them.
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
 from veritriage.cli.main import app
+from veritriage.pipeline import analyze
 from veritriage.project.providers.rtl import parse_rtl
 from veritriage.workspace import WorkspaceServices
 
@@ -91,3 +94,36 @@ module top(input clk);
 endmodule
 """, "top.sv")
     assert dict(parsed.parents) == {"leaf": "top"}
+
+
+# --- M3: Wishbone and OCP concepts stay on Wishbone and OCP evidence ----------
+
+FIXTURES = Path(__file__).parent / "fixtures"
+
+#: The concepts the real Wishbone and OCP fixtures carried before M55, unchanged.
+OWN_CONCEPTS = {
+    "ocp_burst_length_mismatch.log": {"ocp.bursts", "ocp.handshake"},
+    "ocp_request_not_accepted.log": {"ocp.handshake"},
+    "ocp_response_error.log": {"ocp.handshake", "ocp.sresp"},
+    "ocp_thread_ordering.log": {"ocp.handshake", "ocp.threads"},
+    "wishbone_cyc_stb_violation.log": {"wishbone.cycle", "wishbone.pipelined", "wishbone.termination"},
+    "wishbone_err_ignored.log": {"wishbone.cycle", "wishbone.termination"},
+    "wishbone_no_termination.log": {"wishbone.cycle", "wishbone.termination"},
+    "wishbone_rty_livelock.log": {"wishbone.termination"},
+}
+
+
+def _concepts(log: Path, packs: tuple[str, ...]) -> set[str]:
+    knowledge = analyze(log).report.knowledge
+    return {c.concept_id for c in knowledge.concepts if c.pack in packs} if knowledge else set()
+
+
+@pytest.mark.parametrize("name", sorted(p.name for p in FIXTURES.glob("*.log")
+                                        if not p.name.startswith(("wishbone_", "ocp_"))))
+def test_no_wishbone_or_ocp_concept_on_another_protocol(name):
+    assert _concepts(FIXTURES / name, ("wishbone", "ocp")) == set()
+
+
+@pytest.mark.parametrize("name", sorted(OWN_CONCEPTS))
+def test_wishbone_and_ocp_fixtures_keep_their_concepts(name):
+    assert _concepts(FIXTURES / name, ("wishbone", "ocp")) == OWN_CONCEPTS[name]

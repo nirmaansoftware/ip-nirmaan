@@ -32,7 +32,7 @@ def ocp_pack() -> KnowledgePack:
     return KnowledgePack(
         id="ocp",
         name="Open Core Protocol",
-        version="1.0.0",
+        version="1.0.1",  # M55: generic concept markers scoped to the protocol
         domain="protocol",
         summary=(
             "OCP request/response handshakes, SResp error codes, burst-length "
@@ -82,7 +82,8 @@ def ocp_pack() -> KnowledgePack:
                     "An out-of-order response inside one thread is a protocol "
                     "violation even when every individual transfer looks correct."
                 ),
-                markers=[r"\bmthreadid\b", r"\bsthreadid\b", r"\bthread\b.*\bocp\b", r"out.of.order"],
+                markers=[r"\bmthreadid\b", r"\bsthreadid\b", r"\bthread\b.*\bocp\b",
+                         r"\bocp\b.*out.of.order"],  # "out of order" alone fits any ordering bug
                 references=[Reference(source=_SPEC, section="4.9", note="Threads and concurrency.")],
             ),
             Concept(
