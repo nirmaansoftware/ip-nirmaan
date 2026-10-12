@@ -290,7 +290,7 @@ def test_waveform_parser_emits_provenanced_evidence(fixture_log):
 def test_pipeline_analyzes_a_waveform_artifact(fixture_log):
     outcome = analyze(fixture_log("axi_handshake_stall.wave.json"))
     report = outcome.report
-    assert report.schema_version == "13"
+    assert report.schema_version == "14"
     assert report.waveform is not None
     kinds = {o.kind for o in report.waveform.observations}
     assert "handshake_incomplete" in kinds

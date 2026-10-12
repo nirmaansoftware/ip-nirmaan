@@ -36,7 +36,7 @@ def test_analyze_writes_json_graph_and_html(fixture_log, tmp_path):
     assert result.exit_code == 1, result.output
 
     data = json.loads((tmp_path / "analysis.json").read_text())
-    assert data["schema_version"] == "13"
+    assert data["schema_version"] == "14"
     assert data["classification"]["category"] == "testbench_failure"
     assert data["classification"]["confidence"] == 80
     assert data["classification"]["evidence"]

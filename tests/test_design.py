@@ -313,7 +313,7 @@ def test_failing_scopes_reads_the_evidence_graph(fixture_log):
 
 def test_report_carries_design_context_and_bumps_the_schema(fixture_log, project):
     outcome = analyze(fixture_log("uvm_scoreboard.log"), project=project)
-    assert outcome.report.schema_version == "13"
+    assert outcome.report.schema_version == "14"
     design = outcome.report.design
     assert design is not None
     assert design.node_count > 0 and design.edge_count > 0

@@ -433,7 +433,7 @@ def test_ai_vocabulary_is_plain_data():
 
 def test_no_report_schema_change_for_ai(outcome):
     """Generated prose is a view, never a report field."""
-    assert outcome.report.schema_version == "13"
+    assert outcome.report.schema_version == "14"
     assert not hasattr(outcome.report, "generated")
 
 

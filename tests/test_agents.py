@@ -120,7 +120,7 @@ def test_unknown_agent_raises_with_the_registered_list():
 
 
 def test_assessment_reaches_the_report_and_bumps_the_schema(outcome):
-    assert outcome.report.schema_version == "13"
+    assert outcome.report.schema_version == "14"
     assert outcome.report.agents is not None
     assert outcome.report.agents.findings
 

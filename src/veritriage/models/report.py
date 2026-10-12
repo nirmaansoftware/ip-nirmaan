@@ -83,10 +83,12 @@ class AnalysisReport(BaseModel):
 
     Serialized verbatim to ``analysis.json`` and rendered to HTML. Fields are
     additive across versions; ``schema_version`` bumps on breaking changes.
-    Version 2 introduces multi-artifact input and the Evidence Graph.
+    Version 2 introduces multi-artifact input and the Evidence Graph. Version 14
+    marks the reference ``uri`` and the ``learning`` ``rule_gaps`` and
+    ``recommendation_weights`` fields.
     """
 
-    schema_version: str = "13"
+    schema_version: str = "14"
     generated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     input_files: list[str] = Field(description="Paths of the analyzed artifacts, as given on the CLI.")
     parser_names: list[str] = Field(description="Parsers used, one per input artifact.")
