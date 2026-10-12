@@ -60,6 +60,15 @@ class ProjectStore:
         return ProjectModel.model_validate_json(path.read_text(encoding="utf-8"))
 
     def load_for_root(self, root: Path) -> ProjectModel | None:
-        """The cached model last built for ``root``, or None."""
+        """The cached model last built for ``root``, or None when absent or stale.
+
+        Stale means the sources under ``root`` no longer hash to the model's
+        ``input_fingerprint`` (an edited ``.v`` file, say), so the caller rebuilds.
+        """
+        from veritriage.project import _input_fingerprint  # the package imports this module
+
         project_id = self._index().get(str(Path(root)))
-        return self.load(project_id) if project_id else None
+        model = self.load(project_id) if project_id else None
+        if model is None or model.input_fingerprint != _input_fingerprint(Path(root)):
+            return None
+        return model

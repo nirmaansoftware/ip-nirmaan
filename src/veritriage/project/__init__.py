@@ -64,8 +64,9 @@ __all__ = [
 def _input_fingerprint(root: Path) -> str:
     """A digest of the source a model was built from, for staleness checks.
 
-    In the manifest-first increment the source is the set of ``*.vproj.json``
-    files under (or at) the root; hashing their bytes is enough to detect drift.
+    The source is the ``*.vproj.json`` manifests and the ``.v``/``.sv`` files
+    directly under the root (or the root file itself); hashing their bytes is
+    enough to detect drift, and ``ProjectStore.load_for_root`` compares it.
     """
     hasher = hashlib.sha256()
     candidates: list[Path] = []
