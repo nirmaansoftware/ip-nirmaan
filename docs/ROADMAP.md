@@ -1,6 +1,6 @@
 # IP Nirmaan roadmap
 
-The plan for what comes after v1.24.0. Read this together with `context.md`
+The plan for what comes after v1.25.0. Read this together with `context.md`
 (what exists now), `docs/history/` (how it got here, one file per milestone),
 and `CLAUDE.md` (how to work here). Each milestone ships:
 - a number reserved in "Milestone numbers" below, before its branch is cut,
@@ -10,7 +10,7 @@ and `CLAUDE.md` (how to work here). Each milestone ships:
   (never an entry appended to `context.md`),
 - a PR merged into `main`.
 
-## Where we are (v1.24.0, 2026-10-12)
+## Where we are (v1.25.0, 2026-10-12)
 
 | Built | Not yet |
 |---|---|
@@ -61,7 +61,7 @@ snapshot, refreshed by `python scripts/status.py --release`.
 | Tools `AVAILABLE` | 36 | `tools_available`, every PR |
 | Tools `CONTRACT_ONLY` | 17 | `tools_contract_only`, every PR |
 | Verification knowledge packs | 44 | `knowledge_packs`, every PR |
-| Tests collected | 1710 | `tests`, at release (v1.24.0) |
+| Tests collected | 1987 | `tests`, at release (v1.25.0) |
 <!-- status:end -->
 
 ## Resume checklist
@@ -106,12 +106,13 @@ new number. M1 to M42 are taken; see `docs/history/README.md`.
 | M52 | Runtime and loop fixes (audit A: C1, H2, M4, M5, M6, L1, L4, L5; audit C: H3) | done (#81) |
 | M53 | Gate integrity (audit B: F1 to F22) | done (#80) |
 | M54 | Demo surfaces (audit C: H0, H1, H2, H4, M1, L11, L12) | done (#83) |
-| M55 | VeriTriage audit fixes (audit D: H1, M1, M2, M3, L3, L6, L9, L15) | done (this PR) |
+| M55 | VeriTriage audit fixes (audit D: H1, M1, M2, M3, L3, L6, L9, L15) | done (#82) |
 
 ## Next milestones
 
-M43 to M49, the plan from the principal-engineer review of v1.16.1 to v1.23.0,
-are done (see the registry above and `docs/history/release-v1.24.0.md`). What is
+M43 to M49 (the plan from the principal-engineer review, v1.24.0) and M50 to M55
+(the four audits of v1.24.0, v1.25.0) are done (see the registry above and
+`docs/history/release-v1.25.0.md`). What is
 still open, with no numbers reserved yet:
 
 - **The first recorded live evaluation batch.** The owner's call, on the owner's
@@ -119,6 +120,8 @@ still open, with no numbers reserved yet:
   Until it runs, every seat result in the repository is scripted.
 - **A required-checks ruleset** on `main` (the owner's call): the exact settings
   are in `docs/TEST_CI_HARDENING.md` section 6.
+- **A Content-Security-Policy header** for the site (`site/vercel.json`; HSTS,
+  nosniff, frame-deny, referrer, and permissions policies are already set).
 - **The contract-only tools** that keep `new-ip` partly attestation-based:
   coverage, CDC, power, regression, and equivalence (17 tools in all).
 - **The factory line's deferred steps** (M44): laying out the scan-inserted

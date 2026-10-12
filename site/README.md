@@ -58,26 +58,28 @@ release. The test count is every test pytest collects, CI-only ones included.
 
 Nirmaan runs every website through its launch list
 ([`docs/engineering/list.md`](https://github.com/nirmaansoftware/Nirmaan/blob/main/docs/engineering/list.md)
-in `nirmaansoftware/Nirmaan`). Last run 2026-09-28, before first deploy:
+in `nirmaansoftware/Nirmaan`). Full run 2026-09-28, before first deploy. Re-checked on the live site 2026-10-12
+(items 1 to 11, 15, 16, 20); items 12 to 14 are the Lighthouse results of the
+first run, not re-run since (only the page copy changed):
 
 | # | Item | Result |
 |---|---|---|
 | 1 | Privacy policy | PASS: footer links to nirmaan.online/privacy.html, which covers this site. This page loads nothing from third parties |
 | 2 | Terms & conditions | PASS: footer links to nirmaan.online/terms.html; the code is under Apache-2.0 |
 | 3 | Frontend secrets | PASS: none; the page has no keys at all |
-| 4 | HTTPS | Vercel enforces it; check with `curl -I` after deploy |
-| 5 | Cookie banner | N/A: no cookies and no storage |
+| 4 | HTTPS | PASS: Vercel enforces it; HSTS, frame-deny, and referrer headers served. No Content-Security-Policy yet |
+| 5 | Cookie banner | N/A: no cookies. The theme choice is kept in `localStorage` (disclosed in the privacy policy) |
 | 6 | Meta titles / descriptions | PASS: title, description, canonical, `og:url` |
 | 7 | Social preview image | PASS: `og-image.png`, 1200x630, with alt text |
 | 8 | Favicon | PASS: `favicon.svg` (light and dark) and `apple-touch-icon.png` |
 | 9 | Sitemap and robots.txt | PASS |
 | 10 | Image alt text | PASS: no `<img>`; the graph SVG has a title, glyphs are `aria-hidden` |
-| 11 | Image compression | PASS: largest file is the 52 KB preview image |
+| 11 | Image compression | PASS: the largest image is the 77 KB preview; the largest font is 90 KB |
 | 12 | Page load speed | FIXED: the first live run scored 79 (LCP 3.6 s): Google Fonts blocked the first paint and the terminal hid the plan until printed. Fonts are now self-hosted and preloaded, and the plan is painted from the first frame (printing only lights it). Lighthouse mobile: performance 99, LCP 2.3 s, CLS 0.006, TBT 0 ms |
 | 13 | Color contrast | PASS: Lighthouse accessibility 100 |
 | 14 | Mobile responsiveness | PASS: checked at a true 390 px viewport |
 | 15 | Custom 404 page | PASS: `404.html` (Vercel serves it with status 404) |
-| 16 | Broken links | PASS |
+| 16 | Broken links | PASS: every link on the live page returns 200 |
 | 17 | Form validation | N/A: no forms |
 | 18 | Spam protection | N/A: no forms |
 | 19 | Analytics | None, per the brief ("no tracking"). Open for the owner to revisit |
