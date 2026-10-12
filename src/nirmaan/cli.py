@@ -285,7 +285,6 @@ def plan(
     save: bool = typer.Option(True, "--save/--no-save"),
     as_json: bool = typer.Option(False, "--json"),
     human_gate: List[str] = typer.Option([], "--human-gate", help="Require a human at this gate ID."),
-    auto_gate: List[str] = typer.Option([], "--auto-gate", help="Allow a non-human at this gate ID."),
     replace: bool = typer.Option(False, "--replace", help="Archive a saved project of the same ID, then save."),
     root: Path = ROOT_OPTION,
 ) -> None:
@@ -295,7 +294,7 @@ def plan(
     which first moves the old project to <root>/archive/projects.
     """
     org = _org()
-    overrides = {g: True for g in human_gate} | {g: False for g in auto_gate}
+    overrides = {g: True for g in human_gate}  # M52: a gate is only ever made stricter (M50: always a person's)
     try:
         engine = Orchestrator(org).plan(requirement, gate_overrides=overrides)
     except UnrecognizedRequirement as exc:
@@ -915,6 +914,7 @@ def run_cmd(
         report = review_task(engine, tid, agent) if review else run_task(engine, tid, agent, attempts=attempts,
                                                                     review_rounds=review_rounds)
     except (WorkError, PolicyViolationError, PermissionError) as exc:
+        ProjectStore(root).save(engine.state)  # M52: what happened before the error (a model call) is kept
         _fail(str(exc))
     ProjectStore(root).save(engine.state)
     console.print(f"{report.task}: {report.status.value}", highlight=False)
@@ -1010,11 +1010,15 @@ def drive_cmd(
                     _fail(f"--input must be key=value, got {spec!r}")
                 engine.remember(MemoryScope.TASK, tid, f"input.{key}", value, _actor(target.owner, False))
         store = ProjectStore(root)
-        report = loop(engine, owner, reviewer, tid, max_calls, attempts, review_rounds,
-                      on_step=lambda e: store.save(e.state), jobs=jobs)
+        before = len(engine.state.audit)
+        try:
+            report = loop(engine, owner, reviewer, tid, max_calls, attempts, review_rounds,
+                          on_step=lambda e: store.save(e.state), jobs=jobs)
+        finally:  # M52: what the steps did (a model call, a start) is saved even when one fails
+            if len(engine.state.audit) != before:
+                store.save(engine.state)
     except (WorkError, PolicyViolationError, PermissionError) as exc:
         _fail(str(exc))
-    store.save(engine.state)
     for step in report.steps:
         say(f"step {step.number}: {step.task} {step.seat} {step.role} on {step.runtime}: {step.status} "
             f"({step.calls} call{'' if step.calls == 1 else 's'})")

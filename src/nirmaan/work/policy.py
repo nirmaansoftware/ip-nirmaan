@@ -25,6 +25,7 @@ from nirmaan.models import (
     EscalationState,
     EvidenceKind,
     ProjectState,
+    ReviewState,
     Task,
     TaskKind,
     ToolStatus,
@@ -126,9 +127,11 @@ def unsatisfied_requirements(state: ProjectState, task: Task) -> list[str]:
 
 def run_facts(state: ProjectState, task: Task, produced) -> Facts:
     """What the policy knows of a task at run time (M48): the kinds it produced and, only if a clause asks,
-    the kinds it builds on (M37)."""
+    the kinds it builds on (M37) and the kinds of the approved upstream files available to it (M52)."""
     return Facts(ConditionPhase.RUN, {"state": state, "task": task}, produced=produced,
-                 upstream=lambda: upstream_kinds(state, task))
+                 upstream=lambda: upstream_kinds(state, task),
+                 inputs=lambda: {art.kind for art in upstream_artifacts(state, task)
+                                 if art.assurance is Assurance.APPROVED and art.location})
 
 
 def upstream_kinds(state: ProjectState, task: Task) -> set[str]:
@@ -324,7 +327,11 @@ def _approved_inputs(ctx: PolicyContext) -> list[str]:
 
 @register_check("evidence-before-review")
 def _before_review(ctx: PolicyContext) -> list[str]:
-    """A requirement marked before_review is met, over the very files submitted, at submission."""
+    """A requirement marked before_review is met, over the very files submitted, at submission.
+
+    M52: a ``final`` submission (a runtime's: it records every run before it submits) of a task with no review
+    is its completion, so every requirement must be met by it; otherwise it is refused, never left pending.
+    """
     task = ctx.task
     if task is None or ctx.action != "task.submit":
         return []
@@ -332,6 +339,11 @@ def _before_review(ctx: PolicyContext) -> list[str]:
     problems = []
     kinds = {draft.get("kind") for draft in ctx.payload.get("artifacts", ())}
     facts = run_facts(ctx.state, task, kinds)
+    if ctx.payload.get("final") and task.review_state is ReviewState.NOT_REQUIRED:
+        problems += [f"{task.id} cannot complete on this submission: {req.description!r} is not met"
+                     for req in task.evidence_requirements
+                     if not req.before_review and applies(req.when, facts)
+                     and not any(satisfies(ctx.state, ev, req) for ev in attached)]
     for req in (r for r in task.evidence_requirements if r.before_review and applies(r.when, facts)):
         met = [ev for ev in attached if satisfies(ctx.state, ev, req)]
         if not met:

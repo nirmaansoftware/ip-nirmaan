@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any
 
 from nirmaan.models import ProjectState
+from nirmaan.models.workflow import legacy_requirement
 from nirmaan.work.audit import GENESIS, verify_chain
 
 DEFAULT_ROOT = Path(".nirmaan")
@@ -153,6 +154,21 @@ def _write_atomically(target: Path, text: str) -> None:
         os.close(dir_fd)
 
 
+def _pre_m48(data: dict[str, Any]) -> dict[str, Any]:
+    """A schema version "1" file may predate M48: its requirements with no ``bounds`` read ``max_``/``min_``
+    parameters as bounds (M52: only here, never for data built today). A sealed file is returned as it is."""
+    if str(data.get("schema_version", "1")) != "1" or not isinstance(data.get("tasks"), dict):
+        return data
+    tasks = {}
+    for key, task in data["tasks"].items():
+        reqs = task.get("evidence_requirements") if isinstance(task, dict) else None
+        if isinstance(reqs, list):
+            task = {**task, "evidence_requirements": [legacy_requirement(r) if isinstance(r, dict) else r
+                                                      for r in reqs]}
+        tasks[key] = task
+    return {**data, "tasks": tasks}
+
+
 class ProjectStore:
     def __init__(self, root: Path = DEFAULT_ROOT) -> None:
         self._root = Path(root)
@@ -240,7 +256,7 @@ class ProjectStore:
         if not isinstance(data, dict):
             raise ValueError(f"{path} is not a saved project")
         status, problems, sealed_from = _check_seal(data)
-        state = ProjectState.model_validate({k: v for k, v in data.items() if k != "seal"})
+        state = ProjectState.model_validate(_pre_m48({k: v for k, v in data.items() if k != "seal"}))
         problems = verify_chain(state.audit) + problems
         return state, Integrity(BROKEN if problems else status, tuple(problems), sealed_from)
 

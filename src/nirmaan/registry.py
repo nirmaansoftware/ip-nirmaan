@@ -99,6 +99,17 @@ class Registries:
                 keys.update(dict.fromkeys(scope._layers.get(name, ())))
         return list(keys)
 
+    def entries(self, name: str) -> list[tuple[Any, Any]]:
+        """A snapshot of the entries, keys in ``keys`` order, each layer read under its lock (M52).
+
+        Reading keys first and values after let a value removed in between raise KeyError.
+        """
+        found: dict[Any, Any] = {}
+        for scope in reversed(self._chain()):
+            with scope._lock:
+                found.update(scope._layers.get(name, {}))
+        return list(found.items())
+
     def write(self, name: str, key: Any, value: Any) -> None:
         with self._lock:
             self._layers.setdefault(name, {})[key] = value
@@ -151,6 +162,13 @@ class Registry(MutableMapping):
 
     def __len__(self) -> int:
         return len(Registries.current().keys(self.name))
+
+    def items(self) -> list[tuple[Any, Any]]:  # type: ignore[override]
+        """A snapshot, safe while another thread registers or removes entries (M52)."""
+        return Registries.current().entries(self.name)
+
+    def values(self) -> list[Any]:  # type: ignore[override]
+        return [value for _, value in self.items()]
 
     def __contains__(self, key: object) -> bool:
         try:
