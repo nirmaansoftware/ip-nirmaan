@@ -36,7 +36,7 @@ def test_analyze_writes_json_graph_and_html(fixture_log, tmp_path):
     assert result.exit_code == 1, result.output
 
     data = json.loads((tmp_path / "analysis.json").read_text())
-    assert data["schema_version"] == "13"
+    assert data["schema_version"] == "14"
     assert data["classification"]["category"] == "testbench_failure"
     assert data["classification"]["confidence"] == 80
     assert data["classification"]["evidence"]
@@ -115,7 +115,9 @@ def test_analyze_clean_log_exits_zero(fixture_log, tmp_path):
 
 
 def test_analyze_missing_file_errors(tmp_path):
-    result = runner.invoke(app, ["analyze", str(tmp_path / "nope.log"), "-o", str(tmp_path)])
+    result = runner.invoke(
+        app, ["analyze", str(tmp_path / "nope.log"), "-o", str(tmp_path), "--db", str(tmp_path / "r.db")]
+    )
     assert result.exit_code == 2
 
 

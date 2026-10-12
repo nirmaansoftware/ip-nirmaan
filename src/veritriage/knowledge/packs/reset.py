@@ -26,7 +26,7 @@ def reset_pack() -> KnowledgePack:
     return KnowledgePack(
         id="reset-clocking",
         name="Reset sequencing and clocking",
-        version="1.0.0",
+        version="1.0.1",  # M55: a playbook or concept id no longer repeats a pattern id
         domain="clocking",
         summary="Reset ordering, X propagation, and oscillation/iteration-limit signatures.",
         concepts=[
@@ -43,7 +43,7 @@ def reset_pack() -> KnowledgePack:
                 references=[Reference(source=_CDC_REF, note="Asynchronous reset synchronization.")],
             ),
             Concept(
-                id="reset.x-propagation",
+                id="reset.x-propagation-after-reset",
                 name="X propagation",
                 summary=(
                     "Uninitialized or reset-skipped state drives X into downstream "

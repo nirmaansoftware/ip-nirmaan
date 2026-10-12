@@ -37,11 +37,16 @@ SUFFIXES = (".v", ".sv")
 MIN_BUNDLE = 3
 
 _NOISE = re.compile(r'"(?:\\.|[^"\\\n])*"|//[^\n]*|/\*.*?\*/', re.S)
-_UNIT = re.compile(r"\b(module|macromodule|interface)\s+(?:(?:automatic|static)\s+)?([A-Za-z_]\w*)(.*?)"
+#: A unit is a module or interface declaration. ``virtual interface`` (a handle in a
+#: class) is matched first and skipped, so it never opens a unit.
+_UNIT = re.compile(r"\bvirtual\s+interface\b|"
+                   r"\b(module|macromodule|interface)\s+(?:(?:automatic|static)\s+)?([A-Za-z_]\w*)(.*?)"
                    r"\bend(?:module|interface)\b", re.S)
 _IDENT = re.compile(r"[A-Za-z_]\w*")
 _INSTANCE = re.compile(r"([A-Za-z_]\w*)\s*")
 _NAMED = re.compile(r"\.\s*([A-Za-z_]\w*)\s*\(")
+#: A function's return type sits where an instance's module type would.
+_RETURN_TYPE = re.compile(r"\b(?:function|task)\s+(?:(?:automatic|static)\s+)?([A-Za-z_]\w*)")
 
 #: Words that can open a statement shaped like ``word word (``, and are never a module type.
 _KEYWORDS = frozenset("""
@@ -148,11 +153,12 @@ def _instances(parent: str, body: str, parsed: _Parsed) -> None:
     for i, ch in enumerate(body):
         depth[i] = level
         level += 1 if ch == "(" else -1 if ch == ")" else 0
+    return_types = {m.start(1) for m in _RETURN_TYPE.finditer(body)}
     for match in _INSTANCE.finditer(body):
         start = match.start()
         kind = match.group(1)
-        if depth[start] != 0 or kind in _KEYWORDS or (start and (body[start - 1].isalnum() or
-                                                                 body[start - 1] in "_$.'`")):
+        if depth[start] != 0 or kind in _KEYWORDS or start in return_types or (
+                start and (body[start - 1].isalnum() or body[start - 1] in "_$.'`:")):
             continue
         pos = match.end()
         if body.startswith("#", pos):
@@ -181,6 +187,8 @@ def parse_rtl(text: str, source_file: str, parsed: _Parsed | None = None) -> _Pa
     parsed = parsed or _Parsed()
     for unit in _UNIT.finditer(_strip(text)):
         keyword, name, rest = unit.groups()
+        if keyword is None:  # a virtual interface handle
+            continue
         header_end = _header_end(rest)
         header, body = rest[:header_end], rest[header_end + 1:]
         if keyword == "interface":

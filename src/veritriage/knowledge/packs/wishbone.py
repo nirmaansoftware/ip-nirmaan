@@ -31,7 +31,7 @@ def wishbone_pack() -> KnowledgePack:
     return KnowledgePack(
         id="wishbone",
         name="Wishbone B4",
-        version="1.0.0",
+        version="1.0.1",  # M55: concept markers scoped to the protocol; ids unique
         domain="protocol",
         summary=(
             "Wishbone cycle framing, the exclusive ACK/ERR/RTY termination rule, "
@@ -62,7 +62,11 @@ def wishbone_pack() -> KnowledgePack:
                     "one is a protocol violation that different masters resolve "
                     "differently, which makes it a portability bug as well."
                 ),
-                markers=[r"\back\b", r"\berr\b.*wishbone", r"\brty\b", r"terminat"],
+                markers=[
+                    # ACK and "terminated" are generic words (I2C, USB, AXI-Stream): scoped.
+                    r"\back_[io]\b", r"wishbone.*\back\b", r"\berr\b.*wishbone", r"\brty\b",
+                    r"wishbone.*terminat",
+                ],
                 references=[
                     Reference(source=_SPEC, section="3.1.4", note="Termination signals are mutually exclusive.")
                 ],
@@ -77,7 +81,10 @@ def wishbone_pack() -> KnowledgePack:
                     "the count of accepted STBs; any drift is a lost or duplicated "
                     "transfer."
                 ),
-                markers=[r"\bstall\b", r"pipelined", r"outstanding"],
+                markers=[
+                    # "outstanding" and "stall" fit any bus (AXI, CXL, TileLink): scoped.
+                    r"\bstall_[io]\b", r"wishbone.*(?:\bstall\b|pipelined|outstanding)",
+                ],
                 references=[
                     Reference(source=_SPEC, section="3.1.5", note="Pipelined cycle behaviour.")
                 ],
@@ -108,7 +115,7 @@ def wishbone_pack() -> KnowledgePack:
         ],
         state_machines=[
             StateMachine(
-                id="wishbone.cycle",
+                id="wishbone.bus-cycle",
                 name="Wishbone bus cycle",
                 states=[
                     ProtocolState(

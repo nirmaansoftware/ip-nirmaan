@@ -140,7 +140,7 @@ def test_lifecycle_projection_finds_where_progress_stopped(project_root, fixture
 def test_pipeline_attaches_project_context_and_bumps_schema(project_root, fixture_log):
     model = build_project_model(project_root)
     outcome = analyze(fixture_log("uvm_assertion.log"), project=model)
-    assert outcome.report.schema_version == "13"
+    assert outcome.report.schema_version == "14"
     assert outcome.report.project is not None
     assert [p.protocol_id for p in outcome.report.project.identified_protocols] == ["axi"]
 

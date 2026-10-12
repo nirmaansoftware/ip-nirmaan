@@ -458,7 +458,7 @@ def test_report_renders_the_automation_section(workspace, tmp_path):
 
 def test_schema_bumped_for_automation(workspace):
     _, session = workspace
-    assert session.report.schema_version == "13"
+    assert session.report.schema_version == "14"
 
 
 # --- MCP --------------------------------------------------------------------

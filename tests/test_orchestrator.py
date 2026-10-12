@@ -130,7 +130,7 @@ def test_trace_structure_is_deterministic(services, fixture_log):
     assert first.session_id == second.session_id
 
 
-def test_attribution_names_every_contributing_subsystem(services, fixture_log):
+def test_attribution_names_every_contributing_subsystem(services, fixture_log, tmp_path):
     session = run_profile(
         services,
         "full-investigation",
@@ -139,6 +139,7 @@ def test_attribution_names_every_contributing_subsystem(services, fixture_log):
             fixture_log("axi_handshake_stall.wave.json"),
             fixture_log("change_context.engctx.json"),
         ],
+        output_dir=tmp_path / "report",  # not the default .veritriage/ in the checkout
     )
     by_name = {a.subsystem: a for a in session.trace.attribution}
     assert {"knowledge", "waveform", "engineering", "reasoning", "ownership"} <= set(by_name)

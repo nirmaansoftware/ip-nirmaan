@@ -32,7 +32,7 @@ def ocp_pack() -> KnowledgePack:
     return KnowledgePack(
         id="ocp",
         name="Open Core Protocol",
-        version="1.0.0",
+        version="1.0.1",  # M55: concept markers scoped to the protocol; ids unique
         domain="protocol",
         summary=(
             "OCP request/response handshakes, SResp error codes, burst-length "
@@ -82,7 +82,8 @@ def ocp_pack() -> KnowledgePack:
                     "An out-of-order response inside one thread is a protocol "
                     "violation even when every individual transfer looks correct."
                 ),
-                markers=[r"\bmthreadid\b", r"\bsthreadid\b", r"\bthread\b.*\bocp\b", r"out.of.order"],
+                markers=[r"\bmthreadid\b", r"\bsthreadid\b", r"\bthread\b.*\bocp\b",
+                         r"\bocp\b.*out.of.order"],  # "out of order" alone fits any ordering bug
                 references=[Reference(source=_SPEC, section="4.9", note="Threads and concurrency.")],
             ),
             Concept(
@@ -206,7 +207,7 @@ def ocp_pack() -> KnowledgePack:
                 ],
                 ownership="testbench",
                 suggested_signals=["SResp", "MAddr", "MCmd"],
-                playbook_id="ocp.response-error",
+                playbook_id="ocp.response-error-debug",
                 confidence_modifiers={"testbench_issue": 0.08, "rtl_bug": 0.05},
                 references=[Reference(source=_SPEC, section="4.5", note="SResp encoding.")],
             ),
@@ -307,7 +308,7 @@ def ocp_pack() -> KnowledgePack:
                 ],
             ),
             DebugPlaybook(
-                id="ocp.response-error",
+                id="ocp.response-error-debug",
                 name="OCP error response investigation",
                 steps=[
                     PlaybookStep(
