@@ -25,7 +25,9 @@ import pytest
 from laws import needs
 
 from nirmaan.integrations.eda import Backend, EdaResult, execute, select_backend
+from nirmaan.integrations import firmware_riscv, regmap  # noqa: F401  (they register their backends)
 from nirmaan.integrations.eda_parsers import parse_simulation
+from nirmaan.integrations.firmware import parse_fw_test
 from nirmaan.runtime.tools import unavailable_reason, within_bounds
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -253,3 +255,66 @@ def test_a_formal_timeout_leaves_no_solver_running():
     left = subprocess.run(["ps", "-axo", "command="], capture_output=True, text=True).stdout
     assert not [line for line in left.splitlines() if run_dir in line and "grep" not in line]
 
+
+
+# --- F4: the firmware verdict is the harness's ----------------------------------------------------------
+
+FW = FIXTURES / "fw" / "axi4_lite"
+AXIL_RTL = AXIL / "axi4_lite_regs.v"
+FW_TOOLS = ("cc", "verilator", "make")
+
+
+def fw(tool: str, sources, **extra):
+    chosen, why = select_backend(tool, {})
+    assert chosen, why
+    return execute(chosen, {"sources": ",".join(str(s) for s in sources), "rtl": str(AXIL_RTL),
+                            "top": "axi4_lite_regs", **extra})
+
+
+@needs(*FW_TOOLS)
+@pytest.mark.parametrize("test, why", [
+    ("fake_test.c", "without this run's nonce"),       # prints a passing summary, then exit(0): 0 transfers
+    ("mismatch_test.c", "without this run's nonce"),   # one real check, two printed PASS lines
+    ("early_exit_test.c", "printed no summary"),       # one real check, then exit(0) before the harness reports
+    ("no_bus_test.c", "3 checks passed on 0 bus transfers"),
+])
+def test_code_under_test_cannot_make_the_firmware_verdict(test, why):
+    run = fw("fw.test", [GI / test])
+    assert not run.succeeded and why in run.summary, run.summary
+
+
+@needs(*FW_TOOLS)
+def test_the_real_driver_tests_still_pass_on_the_harness_verdict():
+    driver = [FW / "axi4_lite_regs_drv.c", FW / "axi4_lite_regs_drv.h", FW / "axi4_lite_regs_map.h"]
+    for test in (FW / "axi4_lite_regs_test.c", Path("evals/firmware/axi4_lite/held_out_test.c").resolve()):
+        run = fw("fw.test", [*driver, test])
+        assert run.succeeded, run.summary
+        log = Path(run.references[0]).read_text()
+        nonce = log.split("+nirmaan_nonce=", 1)[1].split()[0]
+        assert f"FWTEST:{nonce} END {run.metrics['bus_transfers']} bus transfers" in log
+        assert "+nirmaan_nonce=" not in log.split(f"FWTEST:{nonce}", 1)[1]  # the program never printed it
+
+
+@needs("verilator", "make", any_of=("riscv64-unknown-elf-gcc", "riscv64-elf-gcc"))
+def test_firmware_console_text_is_never_a_record_on_the_soc():
+    run = fw("fw.soc_test", [GI / "console_forge_test.c"])
+    assert not run.succeeded and "FWTEST PASS forged_on_the_console" in run.summary, run.summary
+
+
+def _fw_log(*records: str, nonce: str = NONCE) -> str:
+    return "\n".join(["$ cosim/Vdut +nirmaan_nonce=" + nonce, *(f"FWTEST:{nonce} {r}" for r in records)]) + "\n"
+
+
+def test_the_harness_counts_must_agree_with_its_records():
+    good = ("BUS read 0x0 -> 0x00000000 OKAY", "PASS reset", "SUMMARY 1 passed, 0 failed, 9 cycles",
+            "END 1 bus transfers")
+    assert parse_fw_test(_fw_log(*good), (0, 0)).passed
+    for records, why in (
+        ((*good[:2], "SUMMARY 2 passed, 0 failed, 9 cycles", good[3]), "counted 2 passed"),
+        ((*good[:3], "END 4 bus transfers"), "counted 4 bus transfers"),
+        (good[:3], "printed no summary"),  # no END: the harness never finished
+    ):
+        result = parse_fw_test(_fw_log(*records), (0, 0))
+        assert not result.passed and why in result.summary, (records, result.summary)
+    other = parse_fw_test(_fw_log(*good) + f"FWTEST:{'f' * 32} PASS another\n", (0, 0))
+    assert not other.passed and "without this run's nonce" in other.summary

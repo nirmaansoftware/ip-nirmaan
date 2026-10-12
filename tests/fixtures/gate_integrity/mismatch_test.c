@@ -1,3 +1,4 @@
+/* M53 probe (audit B, F4): one real check, and two passing lines printed by the test itself. */
 #include <stdio.h>
 #include "nirmaan_hal.h"
 void nirmaan_fw_test(const nirmaan_hal *hal) {

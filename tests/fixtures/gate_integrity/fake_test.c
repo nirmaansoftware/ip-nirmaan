@@ -1,3 +1,4 @@
+/* M53 probe (audit B, F4): prints a passing summary and exits, with no bus transfer. */
 #include <stdio.h>
 #include <stdlib.h>
 #include "nirmaan_hal.h"

@@ -30,7 +30,7 @@ import shutil
 from collections.abc import MutableMapping
 from pathlib import Path
 
-from nirmaan.integrations.eda import Backend, Job, RunRecord, register_backend
+from nirmaan.integrations.eda import NONCE_ARG, Backend, Job, RunRecord, new_nonce, register_backend, run_nonce
 from nirmaan.integrations.eda_parsers import Diagnostic, EdaResult
 from nirmaan.models import RegisterMap, list_values, text_value
 from nirmaan.registry import Registry
@@ -131,22 +131,34 @@ def parse_c_build(log: str, returncodes: tuple[int, ...]) -> EdaResult:
 
 # --- Parsing: the co-simulation -------------------------------------------------------------
 
-_CHECK_RE = re.compile(r"^FWTEST (?P<verdict>PASS|FAIL) (?P<name>\S+?)(?::\s*(?P<detail>.*))?$")
-_TRAP_RE = re.compile(r"^FWTEST TRAP bus-error (?P<access>read|write) 0x(?P<offset>[0-9a-fA-F]+) (?P<resp>\w+)"
+_CHECK_RE = re.compile(r"^(?P<verdict>PASS|FAIL) (?P<name>\S+?)(?::\s*(?P<detail>.*))?$")
+_TRAP_RE = re.compile(r"^TRAP bus-error (?P<access>read|write) 0x(?P<offset>[0-9a-fA-F]+) (?P<resp>\w+)"
                       r"(?: at pc 0x(?P<pc>[0-9a-fA-F]+))?$")
-_SUMMARY_RE = re.compile(r"^FWTEST SUMMARY (?P<passed>\d+) passed, (?P<failed>\d+) failed, (?P<cycles>\d+) cycles$")
+_SUMMARY_RE = re.compile(r"^SUMMARY (?P<passed>\d+) passed, (?P<failed>\d+) failed, (?P<cycles>\d+) cycles$")
+_END_RE = re.compile(r"^END (?P<transfers>\d+) bus transfers?$")
+#: M53: a line the gate counts carries the run's nonce: ``FWTEST:<nonce> <record>``. Any other line that
+#: starts like one (``FWTEST ...``, or another nonce) was printed by code under test, and fails the run.
+_TAGGED_RE = re.compile(r"FWTEST:(?P<nonce>[0-9A-Za-z]+) (?P<record>.*)$")
+_CLAIM_RE = re.compile(r"FWTEST\b")
 
 
 def parse_fw_test(log: str, returncodes: tuple[int, ...], what: str = "co-simulation",
-                  require: dict[str, bool] | None = None) -> EdaResult:
+                  require: dict[str, bool] | None = None, nonce: str | None = None) -> EdaResult:
     """Pass means the build and the run exited 0, the harness finished, and every check passed.
 
     At least one check must have passed: tests that report nothing prove nothing.
     ``what`` names the run in the summary (M27's SoC run shares this parser).
     ``require`` (M35) may ask for at least one interrupt taken (``irq``) and one
     bus-error trap delivered (``bus_error_trap``), counted from the platform's
-    ``FWTEST IRQ`` and ``FWTEST TRAP`` lines.
+    ``IRQ`` and ``TRAP`` records.
+
+    M53 (docs/GATE_INTEGRITY.md): only records tagged with the run's ``nonce``
+    (by default the one the runner's echo shows it passed) count. Anything else
+    that claims to be a record fails the run. The harness's own summary and
+    transfer count must agree with the records, and the run needs at least one
+    real bus transfer for each passing check.
     """
+    nonce = nonce or run_nonce(log)
     checks: list[dict[str, object]] = []
     harness: list[Diagnostic] = []
     build: list[Diagnostic] = []
@@ -154,27 +166,37 @@ def parse_fw_test(log: str, returncodes: tuple[int, ...], what: str = "co-simula
     irqs = 0
     traps: list[dict[str, object]] = []
     cycles: int | None = None
-    finished = False
+    summary_counts: tuple[int, int] | None = None
+    ended: int | None = None
+    forged: list[str] = []
     for raw in log.splitlines():
         line = raw.strip()
         if not line or line.startswith("$ "):
             continue
-        if line.startswith("FWTEST BUS "):
-            transfers += 1
-        elif line.startswith("FWTEST IRQ "):
-            irqs += 1
-        elif m := _TRAP_RE.match(line):
-            traps.append({"access": m["access"], "offset": int(m["offset"], 16), "response": m["resp"],
-                          "pc": int(m["pc"], 16) if m["pc"] else None})
-        elif m := _CHECK_RE.match(line):
-            ok = m["verdict"] == "PASS"
-            checks.append({"name": m["name"], "passed": ok, "detail": (m["detail"] or "").strip()})
-            if not ok:
-                harness.append(Diagnostic("error", (m["detail"] or "check failed").strip(), m["name"]))
-        elif line.startswith("FWTEST ERROR "):
-            harness.append(Diagnostic("error", line.removeprefix("FWTEST ERROR ").strip(), "harness"))
-        elif m := _SUMMARY_RE.match(line):
-            finished, cycles = True, int(m["cycles"])
+        tagged = _TAGGED_RE.search(line)
+        if tagged and nonce and tagged["nonce"] == nonce:
+            record = tagged["record"].strip()
+            if record.startswith("BUS "):
+                transfers += 1
+            elif record.startswith("IRQ "):
+                irqs += 1
+            elif m := _TRAP_RE.match(record):
+                traps.append({"access": m["access"], "offset": int(m["offset"], 16), "response": m["resp"],
+                              "pc": int(m["pc"], 16) if m["pc"] else None})
+            elif m := _CHECK_RE.match(record):
+                ok = m["verdict"] == "PASS"
+                checks.append({"name": m["name"], "passed": ok, "detail": (m["detail"] or "").strip()})
+                if not ok:
+                    harness.append(Diagnostic("error", (m["detail"] or "check failed").strip(), m["name"]))
+            elif record.startswith("ERROR "):
+                harness.append(Diagnostic("error", record.removeprefix("ERROR ").strip(), "harness"))
+            elif m := _SUMMARY_RE.match(record):
+                summary_counts, cycles = (int(m["passed"]), int(m["failed"])), int(m["cycles"])
+            elif m := _END_RE.match(record):
+                ended = int(m["transfers"])
+            continue
+        if _CLAIM_RE.search(line):
+            forged.append(line)
         elif m := _VERILATOR_ERROR_RE.match(line):
             if not m["msg"].startswith(_VERILATOR_NOISE):
                 build.append(Diagnostic("error", m["msg"].strip(), m["code"] or "", m["file"] or "",
@@ -186,7 +208,24 @@ def parse_fw_test(log: str, returncodes: tuple[int, ...], what: str = "co-simula
             build.append(Diagnostic("error", line, "link"))
     passed_checks = sum(1 for c in checks if c["passed"])
     failed_checks = len(checks) - passed_checks
-    ran = bool(checks or harness or finished)
+    finished = summary_counts is not None and ended is not None
+    if forged:
+        harness.append(Diagnostic("error", f"{_plural(len(forged), 'line')} claiming to be the harness's, without "
+                                           f"this run's nonce, printed by the code under test: {forged[0][:120]}",
+                                  "FORGED"))
+    if finished and not harness:
+        if summary_counts != (passed_checks, failed_checks):
+            harness.append(Diagnostic("error", f"the harness counted {summary_counts[0]} passed and "
+                                               f"{summary_counts[1]} failed, but reported {passed_checks} and "
+                                               f"{failed_checks}", "COUNTS"))
+        if ended != transfers:
+            harness.append(Diagnostic("error", f"the harness counted {ended} bus transfers, but reported "
+                                               f"{transfers}", "COUNTS"))
+    if passed_checks > transfers:  # a check that refuses a bad argument needs no transfer; most checks do
+        harness.append(Diagnostic("error", f"{_plural(passed_checks, 'check')} passed on "
+                                           f"{_plural(transfers, 'bus transfer')}: at least one real transfer per "
+                                           "passing check is required", "NO-TRANSFER"))
+    ran = bool(checks or harness or finished or summary_counts or ended is not None)
     status = returncodes[-1] if returncodes else -1
     exited_clean = bool(returncodes) and all(c == 0 for c in returncodes)
     passed = exited_clean and finished and passed_checks > 0 and not failed_checks and not harness and not build
@@ -494,7 +533,7 @@ def _cosim_steps(job: Job) -> list[list[str]]:
     steps.append(["verilator", "--cc", "--exe", "--build", "-j", "0", "-Wno-fatal", "--prefix", MODEL,
                   "-Mdir", str(model), *job.top_args("--top-module"), *rtl, str(harness / manager.name),
                   *objects, "-CFLAGS", f"-I{harness}", *irq])
-    steps.append([str(model / MODEL)])
+    steps.append([str(model / MODEL), NONCE_ARG + new_nonce()])  # M53: the harness tags its lines with it
     return steps
 
 

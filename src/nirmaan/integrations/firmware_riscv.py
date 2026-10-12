@@ -33,7 +33,7 @@ from collections.abc import MutableMapping
 from dataclasses import dataclass
 from pathlib import Path
 
-from nirmaan.integrations.eda import Backend, Job, RunRecord, register_backend
+from nirmaan.integrations.eda import NONCE_ARG, Backend, Job, RunRecord, new_nonce, register_backend
 from nirmaan.integrations.eda_parsers import Diagnostic, EdaResult
 from nirmaan.integrations.firmware import (
     HARNESS,
@@ -323,7 +323,7 @@ def _soc_steps(job: Job) -> list[list[str]]:
                   "--top-module", "nirmaan_soc", "-Mdir", str(model), *defines,
                   str(soc / "nirmaan_soc.v"), _local(bus.verilog, soc, job.workdir),
                   *(_local(v, soc, job.workdir) for v in core.verilog), *rtl, str(soc / "soc_main.cpp")])
-    steps.append([str(model / MODEL), f"+firmware={image}"])
+    steps.append([str(model / MODEL), f"+firmware={image}", NONCE_ARG + new_nonce()])  # M53: for the records
     return steps
 
 
