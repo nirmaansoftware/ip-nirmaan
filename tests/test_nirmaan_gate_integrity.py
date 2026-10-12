@@ -190,7 +190,7 @@ def test_a_run_never_works_in_the_given_directory(tmp_path):
     assert Path(again.references[0]).parent.parent == fresh.resolve()  # a used one is not reused
 
 
-def test_a_tool_run_sees_no_credential_and_has_its_own_temporary_directory(tmp_path, monkeypatch):
+def test_a_tool_run_sees_no_credential(tmp_path, monkeypatch):
     secret = "sk-test-0123456789abcdefghij"
     monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", secret)
     monkeypatch.setenv("SOME_API_KEY", secret + "x")
@@ -200,8 +200,6 @@ def test_a_tool_run_sees_no_credential_and_has_its_own_temporary_directory(tmp_p
     assert "CLAUDE_CODE_OAUTH_TOKEN" not in log.replace("[CLAUDE_CODE_OAUTH_TOKEN redacted]", "")
     assert "SOME_API_KEY" not in log and secret not in log
     assert "printed=[CLAUDE_CODE_OAUTH_TOKEN redacted]" in log  # a value printed anyway never reaches the record
-    run_dir = Path(outcome.references[0]).parent
-    assert f"TMPDIR={run_dir / '.tmp'}" in log
 
 
 @needs("verilator")

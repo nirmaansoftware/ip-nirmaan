@@ -16,8 +16,8 @@ Simulation logs reach VeriTriage through :func:`triage_simulation`, which invoke
 never imports VeriTriage.
 
 M53 (docs/GATE_INTEGRITY.md): each run gets its own new directory, under
-``workdir`` when one is given, and its own temporary directory inside it; its
-steps see an environment with no credential in it. The timeout covers the
+``workdir`` when one is given; its steps see an environment with no
+credential in it. The timeout covers the
 whole run, and stops every process a step started, not only the first. A
 simulation passes only on the testbench's own verdict, which carries a nonce
 the run passed in.
@@ -302,16 +302,12 @@ def run_directory(name: str, under: object = None) -> Path:
 
 
 def run_environment(workdir: Path) -> dict[str, str]:
-    """What a run's steps see (M53): this process's environment with no credential, and a private TMPDIR.
+    """What a run's steps see (M53): this process's environment with no credential in it.
 
-    The private temporary directory keeps compilers' and simulators' scratch files (and caches
-    such as macOS's ``xcrun_db``) apart from every other run on the machine, and goes with the run.
+    ``TMPDIR`` is left as it is: pointed into the run's directory, Yosys's ABC step hung in the
+    OpenROAD-flow-scripts image (docs/GATE_INTEGRITY.md, section 4).
     """
-    env = {k: v for k, v in os.environ.items() if not SECRET_ENV_RE.search(k)}
-    scratch = workdir / ".tmp"
-    scratch.mkdir(exist_ok=True)
-    env.update(TMPDIR=str(scratch), TMP=str(scratch), TEMP=str(scratch))
-    return env
+    return {k: v for k, v in os.environ.items() if not SECRET_ENV_RE.search(k)}
 
 
 def redact(text: str) -> str:
@@ -324,7 +320,10 @@ def redact(text: str) -> str:
 
 def _descendants(root: int) -> set[int]:
     """Every live process below ``root``, from one ``ps`` snapshot."""
-    listing = subprocess.run(["ps", "-axo", "pid=,ppid="], capture_output=True, text=True).stdout
+    try:
+        listing = subprocess.run(["ps", "-axo", "pid=,ppid="], capture_output=True, text=True).stdout
+    except OSError:  # no ps (a minimal container): the step's own process group is still killed
+        return set()
     children: dict[int, list[int]] = {}
     for line in listing.splitlines():
         fields = line.split()

@@ -158,9 +158,10 @@ test code out of process is the complete answer and is deferred.
   a new directory inside it. Steps that remove fixed names (`stat.json`,
   `netlist.v`, `layout.gds`) can no longer touch a file the run did not write,
   and two runs given the same directory never share one.
-* **A private temporary directory.** `TMPDIR`, `TMP`, and `TEMP` point into
-  the run's directory, so compilers' scratch files and caches such as macOS's
-  `xcrun_db` are not shared with other runs.
+* **`TMPDIR` is left alone.** A private `TMPDIR` inside each run's directory
+  was tried, to keep compilers' scratch files and caches such as macOS's
+  `xcrun_db` apart; in the OpenROAD-flow-scripts image Yosys's ABC step then
+  hung until the timeout, so it was taken out (deferred, section 6).
 * **No credential in a run.** Steps get this process's environment without any
   variable whose name looks like a credential (`TOKEN`, `SECRET`, `PASSWORD`,
   `API_KEY`, `PRIVATE_KEY`, `ANTHROPIC_*`, ...). Anything a run prints that
@@ -174,8 +175,9 @@ started at once in one working directory reproduce exactly that signature on
 `main` (`cat: ...verilator_deplist.tmp: No such file or directory`, then the
 link fails): `test_two_builds_at_once_in_one_workdir_are_isolated` fails there
 and passes here. Inside the suite each test has its own `tmp_path`, so the
-remaining shared state between two suites was machine-wide: the shared
-`TMPDIR` (now per run), and solvers orphaned by earlier timeouts (now killed).
+remaining shared state between two suites was machine-wide: solvers orphaned
+by earlier timeouts (now killed), and the shared `TMPDIR` (left shared; see
+above).
 The machine's `TMPDIR` also held about 35,000 run directories (8.8 GB) from
 runs without a `workdir`, with the disk 98% full; that leak is listed below.
 
@@ -215,6 +217,8 @@ anyway is redacted from logs and from the uploaded record.
   is to pass the token to `nirmaan` through a file it reads and deletes, and
   hand it only to the `claude` subprocess, or to run tool steps as another
   user. Not done here; the runtime is outside this milestone's scope.
+* **A per-run `TMPDIR`**, once the ABC hang it caused in the
+  OpenROAD-flow-scripts image is understood.
 * **Leaked run directories.** A run with no `workdir` keeps its directory (its
   log is the run's reference). Nothing removes them; a retention policy is a
   product decision.

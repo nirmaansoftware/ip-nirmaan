@@ -28,7 +28,7 @@ check (F4).
 
 **The runner.** One deadline per run, a timeout that freezes and kills the
 whole process tree (F16; `sby`'s solvers no longer survive), `timeout >= 1`
-(F3), a run's own directory under `workdir` (F22) and its own `TMPDIR`, and no
+(F3), a run's own directory under `workdir` (F22), and no
 credential in a step's environment, with any credential value redacted from
 logs and records (F9). Two Verilator builds in one directory reproduced the
 parallel-run flake on `main`; they now pass.

@@ -211,7 +211,7 @@ on the testbench's `NIRMAAN-SIM <nonce> <n> passed, <m> failed` line (the
 nonce comes in as `+nirmaan_nonce=`), and only the testbench file may end the
 run or read plusargs. Firmware verdicts come from nonce-tagged harness
 records whose counts must agree. `formal.run` in `mode bmc` is never
-"proven". Each run has its own directory, `TMPDIR`, no credentials, and one
+"proven". Each run has its own directory, no credentials, and one
 deadline that kills the whole process tree.
 
 **Counts.** `python scripts/status.py` prints the counts; `--check` fails on
