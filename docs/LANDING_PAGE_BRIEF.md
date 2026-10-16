@@ -12,7 +12,7 @@ up to the builder.
 | **Brand** | **IP Nirmaan**, always written that way. The command-line tool is `nirmaan`; the verification engine is **VeriTriage**. |
 | **Source** | https://github.com/nirmaansoftware/ip-nirmaan (public, Apache-2.0) |
 | **Stage** | Early and open source: a working foundation, not a commercial product. A small number of design partners may work with it under written terms. The page must read that way. |
-| **Owner** | Om Patel. Contact details are for the owner to supply; do not invent an email address or a form endpoint. |
+| **Owner** | Nirmaan, the company (founder decision, 2026-10-16: the company name, not a person). Contact details are for the owner to supply; do not invent an email address or a form endpoint. |
 
 ## 2. Who the page is for
 
@@ -85,7 +85,7 @@ Be honest and specific:
 After Status. Follows `council/records/2026-10-16-commercial-model-and-design-partners.md`, which holds the exact copy. No price. No partner is named without their written consent. One call to action, "Talk to us". Status says "We have no design partners yet." until one has signed.
 
 ### Footer
-"Talk to us", a link back to `nirmaan.online`, privacy and terms, and "Built by Om Patel".
+"Talk to us", a link back to `nirmaan.online`, privacy and terms, and "Built by Nirmaan".
 
 ## 5. Rules the copy must follow
 
