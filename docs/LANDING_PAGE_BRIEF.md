@@ -11,7 +11,7 @@ up to the builder.
 | **URL** | `ip.nirmaan.online`, a subdomain of the owner's existing software-services company site (`nirmaan.online`). |
 | **Brand** | **IP Nirmaan**, always written that way. The command-line tool is `nirmaan`; the verification engine is **VeriTriage**. |
 | **Source** | https://github.com/nirmaansoftware/ip-nirmaan (public, Apache-2.0) |
-| **Stage** | Early and open source: a working foundation, not a commercial product. The page must read that way. |
+| **Stage** | Early and open source: a working foundation, not a commercial product. A small number of design partners may work with it under written terms. The page must read that way. |
 | **Owner** | Om Patel. Contact details are for the owner to supply; do not invent an email address or a form endpoint. |
 
 ## 2. Who the page is for
@@ -55,17 +55,17 @@ Requirement -> Analyze -> Route to roles -> Review and gate -> Deliverable
 One or two sentences per step. Example requirement: "Create a 4-port AXI-to-NoC bridge."
 
 ### What the organization looks like
-Stat tiles, using these exact numbers (from v1.16.1):
+Stat tiles, using these exact numbers (from `site/stats.json`, v1.25.0):
 
 | Number | Label |
 |---|---|
 | 207 | organizational units |
 | 685 | roles, from intern to CEO |
 | 140 | engineering skills |
-| 7 | engineering workflows |
+| 9 | engineering workflows |
 | 12 | constitution principles |
-| 42 | verification knowledge packs |
-| 853 | automated tests |
+| 44 | verification knowledge packs |
+| 1987 | automated tests |
 
 A simplified org chart helps here: Product, Architecture, Design Engineering, Verification, Silicon Implementation, Software, Security, Infrastructure, Documentation, Quality.
 
@@ -77,9 +77,12 @@ One short section. VeriTriage is the verification-intelligence engine inside IP 
 
 ### Status and roadmap
 Be honest and specific:
-- **Working today:** the organization model, planning, routing, reviews, gates, the audit trail, and real VeriTriage investigations. AI workers fill design, RTL, and verification seats, and open-source tools check every submission before a person reviews it. On a small block, place and route, three-corner timing, DRC, and LVS run for real in CI. In the tests, the AI workers' answers are scripted; one early live run of Claude Opus 5.5 passed all four RTL cases, judged by held-out checks, but was not recorded as data.
+- **Working today:** the organization model, planning, routing, reviews, gates, the audit trail, and real VeriTriage investigations. AI workers can take design, RTL, and verification seats. They are off by default. Open-source tools check every RTL submission (lint, simulation, synthesis, and formal proofs when the work includes them) before a person reviews it. On a small block, place and route, three-corner timing, DRC, and LVS run for real in CI. In the tests, the AI workers' answers are scripted; one early live run of Claude Opus 5.5 passed all four RTL cases, judged by held-out checks, but was not recorded as data.
 - **Next:** recorded, repeated live evaluations that anyone can re-judge, formal proofs written by the AI workers, and physical design beyond small blocks.
 - **Not yet:** no customer has received IP from the system and nothing has been taped out. The reference blocks that run through the whole flow (a register block, a FIFO, an arbiter) prove the flow and its checks, not yet a model designing them unaided.
+
+### Design partners
+After Status. Follows `council/records/2026-10-16-commercial-model-and-design-partners.md`, which holds the exact copy. No price. No partner is named without their written consent. One call to action, "Talk to us". Status says "We have no design partners yet." until one has signed.
 
 ### Footer
 "Talk to us", a link back to `nirmaan.online`, privacy and terms, and "Built by Om Patel".

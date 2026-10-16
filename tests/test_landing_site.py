@@ -141,3 +141,13 @@ def test_the_site_does_not_send_visitors_to_github() -> None:
     # Owner decision: the repository is the factory, not the storefront.
     for name in ("index.html", "404.html"):
         assert "github.com" not in (SITE / name).read_text(encoding="utf-8").lower(), name
+
+
+def test_partner_offer_stays_early_and_unpriced() -> None:
+    # Council record 2026-10-16: the design-partner offer shows no price and
+    # claims no partner until one has signed.
+    section = HTML.split('id="partners"', 1)[1].split('class="cta-band"', 1)[0]
+    assert "early" in section.lower()
+    for mark in ("\u20b9", "$", "usd", "lakh"):
+        assert mark not in section.lower(), mark
+    assert "We have no design partners yet." in HTML

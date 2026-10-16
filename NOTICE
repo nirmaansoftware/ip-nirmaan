@@ -1,0 +1,12 @@
+IP Nirmaan
+Copyright 2026 Om Patel
+
+Licensed under the Apache License, Version 2.0. See LICENSE.
+
+This product includes third-party files under their own licences:
+- SERV, Copyright 2019 Olof Kindgren, ISC licence:
+  src/nirmaan/integrations/firmware_soc/serv/ (see LICENSE there).
+- PicoRV32, Copyright (C) 2015 Claire Xenia Wolf, ISC-style licence:
+  src/nirmaan/integrations/firmware_soc/picorv32.v (notice in the file header).
+- Fonts under the SIL Open Font License: site/assets/fonts/
+  (see the OFL-*.txt files there).
