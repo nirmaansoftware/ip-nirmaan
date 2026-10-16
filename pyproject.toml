@@ -9,7 +9,7 @@ description = "IP Nirmaan: an organizational operating system for semiconductor 
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "Apache-2.0" }
-authors = [{ name = "Om Patel", email = "patel2om002@gmail.com" }]
+authors = [{ name = "Nirmaan", email = "nirmaansoftware@gmail.com" }]
 keywords = ["eda", "semiconductor", "ip", "verification", "rtl", "uvm", "systemverilog", "agents", "workflow", "root-cause"]
 classifiers = [
   "Development Status :: 3 - Alpha",

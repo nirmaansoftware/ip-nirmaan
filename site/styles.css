@@ -226,6 +226,8 @@
   /* ---- Status ---- */
   .status { display: grid; gap: var(--s3); grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr)); }
   .status + .actions { margin-top: var(--s5); }
+  .footer__source a { color: inherit; text-underline-offset: 0.2em; padding-block: 0.6rem; margin-block: -0.6rem; }
+  .footer__source a:hover { color: var(--blue); }
   .status__col { padding-top: var(--s3); border-top: 2px solid var(--ink); }
   .status__col h3 { display: flex; align-items: center; gap: 0.6em; margin-bottom: var(--s2); }
   .status__col p { color: var(--ink-2); }

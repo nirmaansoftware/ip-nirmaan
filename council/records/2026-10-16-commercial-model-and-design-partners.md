@@ -361,3 +361,14 @@ requires. Two claims overstated it and were corrected above, in changes 4 and 6:
 Every other new claim was checked and is true: every recorded run's files are
 exported, pass or fail; VeriTriage runs without a model; its parsers read VCS,
 Questa, Xcelium and UVM logs.
+
+## Founder decisions (2026-10-16, after the meeting)
+
+- Merged the changes above.
+- **GitHub link:** confirmed. One line in the footer of the page and the 404:
+  "Open source under Apache-2.0. Source on GitHub." A test keeps it to that one
+  footer link.
+- **Copyright holder:** the company, Nirmaan, in NOTICE and in pyproject.toml.
+- **Spending:** none for now. Gates that need money (counsel for gate 6, a
+  commercial AI account for gates 7 and 9, a private runner for gate 5) stay
+  open, so no partner work starts until they pass. Development continues.

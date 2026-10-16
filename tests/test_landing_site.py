@@ -137,10 +137,15 @@ def test_shared_components_come_from_nirmaan_online() -> None:
         assert (SITE / name).is_file(), name
 
 
-def test_the_site_does_not_send_visitors_to_github() -> None:
-    # Owner decision: the repository is the factory, not the storefront.
+def test_github_is_one_quiet_footer_link() -> None:
+    # Founder decision 2026-10-16 (council record of that date): the source is
+    # linked once, in the footer, never from the hero, the navigation or a
+    # call to action.
     for name in ("index.html", "404.html"):
-        assert "github.com" not in (SITE / name).read_text(encoding="utf-8").lower(), name
+        page = (SITE / name).read_text(encoding="utf-8")
+        assert page.lower().count("github.com") == 1, name
+        footer = page.split('class="footer__base', 1)[1]
+        assert "github.com/nirmaansoftware/ip-nirmaan" in footer, name
 
 
 def test_partner_offer_stays_early_and_unpriced() -> None:

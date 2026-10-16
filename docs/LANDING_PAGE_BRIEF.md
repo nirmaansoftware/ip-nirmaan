@@ -36,7 +36,7 @@ On the page (2026-09-28) the hero headline reads **"Chip IP, built as software."
 
 ### Hero
 - Tagline, the one-sentence pitch, and two buttons: **Talk to us** (the nirmaan.online contact page) and **See how it works** (scrolls down).
-- The page does not link to GitHub or advertise the source (owner decision, 2026-09-28): the repository is the factory, not the storefront.
+- The page links to the source once, in the footer ("Open source under Apache-2.0. Source on GitHub."), never from the hero, the navigation or a call to action (founder decision, 2026-10-16, replacing the 2026-09-28 decision not to link it).
 - One visual: an excerpt of a real plan tree (sample in section 6), styled as a terminal.
 
 ### The idea
