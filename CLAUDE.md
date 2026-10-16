@@ -52,6 +52,12 @@ observations on where LLM coding agents go wrong.
 - **Commit messages** end with the Co-Authored-By line from the session's
   attribution instructions. Never amend or force-push.
 
+## Business and product decisions
+
+Pricing, launches, naming, public pages and legal questions about IP Nirmaan
+go to the council: `council/README.md` (the `council-meeting` skill runs a
+meeting). It is separate from the product's own engineering decisions.
+
 ## Running tests
 
 The repo may sit in iCloud-synced `~/Documents`, where evicted files make
