@@ -31,6 +31,9 @@ sense.
 | [qa-evidence](qa-evidence.md) | Every claim against the code and recorded evidence |
 | [brand-content](brand-content.md) | Positioning, naming, public copy |
 | [site-engineer](site-engineer.md) | ip.nirmaan.online: performance, accessibility, SEO |
+| [legal-counsel](legal-counsel.md) | Drafts agreements for a qualified lawyer to review (legal-compliance flags, counsel drafts) |
+| [tax-accounts](tax-accounts.md) | GST, export of services, TDS and invoices, for a chartered accountant |
+| [partnerships](partnerships.md) | Finding and recruiting design partners and first customers |
 
 Add a seat by adding a file in the same format and a row here.
 
