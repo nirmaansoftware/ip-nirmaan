@@ -236,6 +236,17 @@
 
 
 /* Motion: only under html.motion (set in <head>), as on nirmaan.online. */
+/* Touch: small text links get an invisible hit area of at least 44px, so they
+   are easy to tap without changing how the page looks. */
+@media (pointer: coarse) {
+  .brand, .footer__col a, .footer__social a, .footer__top { position: relative; }
+  .brand::after, .footer__col a::after, .footer__social a::after, .footer__top::after {
+    content: ""; position: absolute; inset: -0.75rem -0.5rem;
+  }
+  .footer__col ul { gap: 0.75rem; }
+  .footer__social { gap: 1.5rem; }
+}
+
 @layer motion {
   /* ---- Terminal: motion.js prints it line by line ---- */
   /* The plan is painted in full from the first frame, in the terminal's dim
