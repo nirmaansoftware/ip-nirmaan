@@ -13,9 +13,10 @@ per call, as a state machine that survives restarts:
     skip    already finished on this head (ready, auto-merge, founder wait);
     wait    the required CI is not finished on the head (no model call);
     review  both keys, through scripts/pr_review.py unchanged;
-    merge   both keys passed: `gh pr merge --auto --merge` only when the
-            review App posts the checks and the repository allows auto-merge,
-            otherwise a "ready" comment. A founder-class pull request waits for
+    merge   both keys passed: `gh pr merge --auto --merge` with the gh login
+            when the review App posts the checks; a "ready" comment in a dry
+            run or when GitHub answers that auto-merge is not allowed; any other
+            merge error stops. A founder-class pull request waits for
             the founder's GitHub approval and is never merged by the loop;
     fix     a key failed: a separate fresh `claude -p` fixer in a clean
             worktree of the head, Edit and Write only inside it; the loop (never
@@ -49,6 +50,9 @@ import review_map  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 MARK = "nirmaan-pr-loop"
+# GitHub's answer to `gh pr merge --auto` when the repository's "Allow
+# auto-merge" setting is off.
+AUTO_MERGE_OFF = re.compile(r"auto[- ]?merge is not (allowed|enabled)", re.I)
 
 LOOP = {
     "authors": ["patel-om"],
@@ -471,15 +475,25 @@ class Loop:
                 self._say(n, f"<!-- {MARK} ready head={head} founder={','.join(classes)} -->\n"
                              f"### Automated loop: both keys passed on `{sha7}`\n\n{body}\n\n_Agent review only._")
             return {"outcome": "founder-wait"}
-        if o["post"] == "app" and o["github"].get_repo_settings()["allow_auto_merge"]:
-            o["run_gh"](["pr", "merge", str(n), "--repo", cfg["repo"], "--auto", "--merge", "--match-head-commit", head])
+        # The review App's token never sees the "Allow auto-merge" setting, so the
+        # loop does not read it: it asks for auto-merge with the gh login and reads
+        # GitHub's answer. "Not allowed" means the setting is off: ready, as before.
+        why = "the review App is not configured (dry run)" if o["post"] != "app" else None
+        if why is None:
+            try:
+                o["run_gh"](["pr", "merge", str(n), "--repo", cfg["repo"], "--auto", "--merge", "--match-head-commit", head])
+            except subprocess.CalledProcessError as exc:
+                detail = " ".join(f"{exc.stderr or ''} {exc.output or ''} {exc}".split())
+                if not AUTO_MERGE_OFF.search(detail):
+                    return self._stop(ctx, head, f"gh pr merge --auto failed: {detail[:500]}")
+                why = "the repository does not allow auto-merge"
+        if why is None:
             self._log(ctx, "auto-merge")
             self._say(n, f"<!-- {MARK} auto-merge head={head} -->\n### Automated loop: both keys passed on `{sha7}`\n\n"
                          "Auto-merge is on for this pull request: GitHub merges it with a merge commit once every required "
                          "check passes on this head.\n\n_Agent review only._")
             st["done"] = {"head": head, "outcome": "auto-merge"}
         else:
-            why = "the review App is not configured (dry run)" if o["post"] != "app" else "the repository does not allow auto-merge"
             self._log(ctx, "ready", why=why)
             self._say(n, f"<!-- {MARK} ready head={head} -->\n### Automated loop: ready\n\nBoth keys passed on `{sha7}`, "
                          f"waiting for the founder's merge settings: {why}. The founder merges this pull request.\n\n_Agent review only._")
