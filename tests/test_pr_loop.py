@@ -1,0 +1,416 @@
+"""The automated review loop (scripts/pr_loop.py): review, fix, review again, merge path.
+
+Runs against a fake `claude` that plays both the reviewers and the fixer
+(tests/fixtures/pr_loop/fake_claude.py), a local bare repository as origin, and
+a fake GitHub. No model is called and nothing touches the network.
+"""
+
+from __future__ import annotations
+
+import importlib.util
+import json
+import shutil
+import stat
+import subprocess
+import sys
+from pathlib import Path
+
+import pytest
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "scripts"))
+_spec = importlib.util.spec_from_file_location("pr_loop", ROOT / "scripts" / "pr_loop.py")
+pr_loop = importlib.util.module_from_spec(_spec)
+sys.modules["pr_loop"] = pr_loop
+_spec.loader.exec_module(pr_loop)
+pr_review = sys.modules["pr_review"]
+CONFIG = pr_review.CONFIG
+
+# The real loop settings, with a local check the tests can make fail.
+LOOP = {**pr_loop.LOOP, "checks": [{"name": "dashes", "when": ["**"], "run": [
+    ["{python}", "-c", "import os, sys; sys.exit(1 if os.path.exists('FAIL_CHECK') else 0)"]]}]}
+
+MAP = """version: 1
+teams:
+  council:
+    name: Council
+    key2: chair
+    leads: [security]
+    members: []
+  eda-platform:
+    name: EDA and Platform
+    leads: [eda-tooling]
+    members: []
+rules:
+  - team: eda-platform
+    paths: ['**']
+  - team: council
+    lead: security
+    paths: [CLAUDE.md, .github/**]
+sections: []
+ledger:
+  paths: []
+  sections: []
+content_rules: []
+founder_classes:
+  - id: control-plane
+    title: Control plane
+    paths: [.github/**, CLAUDE.md]
+"""
+SEATS = ["chair", "security", "eda-tooling"]
+RECORD = "council/records/2026-10-17-teams-and-pr-review.md"
+
+
+def sh(cwd, *args):
+    return subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, text=True).stdout.strip()
+
+
+def write(root: Path, rel: str, text: str):
+    (root / rel).parent.mkdir(parents=True, exist_ok=True)
+    (root / rel).write_text(text)
+
+
+class FakeGitHub:
+    def __init__(self, origin: Path, gh: dict):
+        self.origin, self.posts, self.merges, self.reviews = origin, [], [], []
+        self.labels = list(gh.get("labels", []))
+        self.allow_auto_merge = gh.get("allow_auto_merge", True)
+        self.ci = gh.get("ci", lambda sha: "success")
+        self.draft, self.author, self.mergeable = gh.get("draft", False), gh.get("author", "patel-om"), gh.get("mergeable", True)
+
+    def head(self):
+        return sh(self.origin, "rev-parse", "refs/heads/feature")
+
+    def get_pull(self, n):
+        head = self.head()
+        sh(self.origin, "update-ref", "refs/pull/1/head", head)  # GitHub keeps this in step with the branch
+        return {"number": 1, "state": "open", "draft": self.draft, "title": "Change app", "author": self.author,
+                "labels": list(self.labels), "head_sha": head, "head_ref": "feature", "head_repo": CONFIG["repo"],
+                "base_ref": "main", "base_repo": CONFIG["repo"], "mergeable": self.mergeable,
+                "mergeable_state": "dirty" if self.mergeable is False else "clean"}
+
+    def list_open_pulls(self):
+        return [self.get_pull(1)]
+
+    def get_repo_settings(self):
+        return {"allow_auto_merge": self.allow_auto_merge}
+
+    def add_labels(self, n, labels):
+        self.posts.append({"type": "label", "labels": labels})
+        self.labels += labels
+
+    def list_reviews(self, n):
+        return self.reviews
+
+    def list_check_runs(self, sha):
+        c = self.ci(sha)
+        return [{"name": name, "status": "in_progress" if c == "pending" else "completed",
+                 "conclusion": None if c == "pending" else c, "url": None, "completed_at": "x"} for name in CONFIG["required_ci"]]
+
+    def create_comment(self, n, body):
+        self.posts.append({"type": "comment", "body": body})
+        return f"https://github.example/pr/1#c{len(self.posts)}"
+
+    def create_check_run(self, name, head_sha, state, title, summary, details_url=None):
+        self.posts.append({"type": "check", "name": name, "state": state, "title": title})
+
+    def create_status(self, sha, context, state, description, target_url=None):
+        self.posts.append({"type": "status", "name": context, "state": state, "title": description})
+
+
+class Repo:
+    def __init__(self, tmp: Path, reviews, fixes, change, gh):
+        self.origin, self.work = tmp / "origin.git", tmp / "work"
+        sh(tmp, "init", "-q", "--bare", "-b", "main", str(self.origin))
+        sh(tmp, "init", "-q", "-b", "main", str(self.work))
+        w = self.work
+        sh(w, "config", "user.email", "agent@example.com")
+        sh(w, "config", "user.name", "Agent")
+        sh(w, "remote", "add", "origin", str(self.origin))
+        write(w, ".github/review-teams.yml", MAP)
+        write(w, "CLAUDE.md", "# CLAUDE.md\nRULES-MARKER-FROM-MAIN\n")
+        for seat in SEATS:
+            write(w, f"council/{seat}.md", f"# {seat}\n\n## In a review (key 1)\nREVIEW-MARKER-{seat}\n")
+        write(w, RECORD, "# Record\n\n### Every key 1 (base)\nBASE-MARKER\n")
+        write(w, "src/app.py", "one\ntwo\nthree\n")
+        sh(w, "add", "-A")
+        sh(w, "commit", "-qm", "main")
+        sh(w, "push", "-q", "origin", "main")
+        sh(w, "checkout", "-qb", "feature")
+        (change or (lambda x: write(x, "src/app.py", "one\ntwo changed\nthree\n")))(w)
+        sh(w, "add", "-A")
+        sh(w, "commit", "-qm", "Change app")
+        sh(w, "push", "-q", "origin", "feature")
+        self.first_head = sh(w, "rev-parse", "HEAD")
+        sh(w, "checkout", "-q", "main")
+        self.fake = tmp / "fake"
+        self.fake.mkdir()
+        self.bin = self.fake / "claude.py"
+        shutil.copy(ROOT / "tests" / "fixtures" / "pr_loop" / "fake_claude.py", self.bin)
+        self.bin.chmod(self.bin.stat().st_mode | stat.S_IEXEC)
+        self.scenario(reviews, fixes)
+        self.state = tmp / "state"
+        self.github = FakeGitHub(self.origin, gh)
+
+    def scenario(self, reviews, fixes):
+        (self.fake / "scenario.json").write_text(json.dumps({"reviews": reviews, "fixes": fixes}))
+
+    def loop(self, **extra):
+        kwargs = dict(repo_root=str(self.work), github=self.github, post="app", claude_bin=str(self.bin), state_dir=self.state,
+                      models={"key1": "k1", "key2": "k2"}, timeout_s=30, backoff_s=0, fixer_model="fixer-model",
+                      fixer_timeout_s=30, check_timeout_s=30, sleep=lambda s: None, out=lambda s: None,
+                      run_gh=self.github.merges.append, loop=LOOP)
+        kwargs.update(extra)
+        return pr_loop.Loop(**kwargs)
+
+    def tick(self, **extra):
+        return [r["outcome"] for r in self.loop(**extra).tick()]
+
+    def origin_head(self):
+        return self.github.head()
+
+    def calls(self):
+        f = self.fake / "calls.jsonl"
+        return [json.loads(l) for l in f.read_text().splitlines()] if f.exists() else []
+
+    def log(self):
+        f = self.state / "calls.jsonl"
+        return [json.loads(l) for l in f.read_text().splitlines()] if f.exists() else []
+
+    def comments(self):
+        return [p["body"] for p in self.github.posts if p["type"] == "comment"]
+
+    def labeled(self):
+        return any(p["type"] == "label" and "needs-founder" in p["labels"] for p in self.github.posts)
+
+    def st(self):
+        return pr_loop.load_state(self.state, CONFIG["repo"], 1)
+
+
+@pytest.fixture
+def repo(tmp_path):
+    def make(reviews=None, fixes=None, change=None, gh=None):
+        return Repo(tmp_path, reviews or [{"verdict": "pass"}], fixes or [{"edits": {"src/app.py": "fixed\n"}}], change, gh or {})
+    return make
+
+
+def fail(text, line=1, file="src/app.py"):
+    return {"verdict": "fail", "findings": [{"file": file, "line": line, "severity": "critical", "text": text}]}
+
+
+# --- Merge path ------------------------------------------------------------------
+
+
+def test_both_keys_pass_auto_merge_with_the_app_and_the_setting_then_nothing_more_on_that_head(repo):
+    r = repo()
+    assert r.tick() == ["auto-merge"]
+    assert r.github.merges == [["pr", "merge", "1", "--repo", CONFIG["repo"], "--auto", "--merge", "--match-head-commit", r.first_head]]
+    assert "Auto-merge is on" in r.comments()[-1]
+    assert len(r.calls()) == 2
+    before = len(r.github.posts)
+    assert r.tick() == ["skip"]
+    assert len(r.github.posts) == before and len(r.calls()) == 2
+
+
+@pytest.mark.parametrize("extra,gh,why", [({}, {"allow_auto_merge": False}, "does not allow auto-merge"),
+                                          ({"post": "dry-run"}, {}, "review App is not configured")])
+def test_both_keys_pass_without_the_setting_or_in_a_dry_run_posts_ready_and_never_merges(repo, extra, gh, why):
+    r = repo(gh=gh)
+    assert r.tick(**extra) == ["ready"]
+    assert r.github.merges == []
+    assert "waiting for the founder's merge settings" in r.comments()[-1] and why in r.comments()[-1]
+
+
+# --- The fix loop ----------------------------------------------------------------
+
+
+def test_fail_fix_pass_runs_a_separate_fixer_then_commits_checks_pushes_and_reviews_again(repo, monkeypatch):
+    monkeypatch.setenv("GH_TOKEN", "must-not-leak")
+    r = repo(reviews=[fail("Line two lost its test"), {"verdict": "pass"}, {"verdict": "pass"}],
+             fixes=[{"edits": {"src/app.py": "one\ntwo fixed\nthree\n"}}])
+    assert r.tick() == ["fixed"]
+    new = r.origin_head()
+    assert new != r.first_head and sh(r.origin, "rev-parse", f"{new}^") == r.first_head
+    msg = sh(r.origin, "log", "-1", "--format=%B", new)
+    assert msg.startswith(f"Fix round 1: address review findings on {r.first_head[:7]}")
+    assert "F1 [critical] src/app.py:1: Line two lost its test" in msg
+    assert msg.endswith("Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>")
+    assert sh(r.origin, "log", "-1", "--format=%an", new) == "Agent"
+    comment = r.comments()[-1]
+    assert "fix round 1 of 3" in comment and "| F1 | 1 (eda-platform) | critical | `src/app.py:1` |" in comment
+    assert "dashes: pass" in comment and "voids both keys" in comment
+
+    fixer = next(c for c in r.calls() if c["kind"] == "fixes")
+    assert fixer["cwd"].endswith("/head") and not fixer["cwd"].startswith(str(r.work))
+    a = fixer["argv"]
+    assert a[a.index("--tools") + 1] == "Read,Grep,Glob,Edit,Write"
+    assert a[a.index("--allowedTools") + 1] == "Read,Grep,Glob,Edit(./**),Write(./**)"
+    denied = a[a.index("--disallowedTools") + 1].split(",")
+    for d in ("Bash", "WebFetch", "Edit(./.github/**)", "Write(./council/**)", "Edit(./pyproject.toml)"):
+        assert d in denied
+    assert a[a.index("--model") + 1] == "fixer-model"
+    assert "GH_TOKEN" not in fixer["env"]
+    system = a[a.index("--system-prompt") + 1]
+    assert "RULES-MARKER-FROM-MAIN" in system and "Change only what those findings require" in system
+    assert '"id": "F1"' in fixer["stdin"] and "Change app" not in fixer["stdin"], "no pull request text in this repository"
+
+    assert r.tick() == ["auto-merge"]
+    assert r.github.merges[0][-1] == new
+    reviews = [c for c in r.calls() if c["kind"] == "reviews"]
+    assert len(reviews) == 3 and all(f"Head SHA: {new}" in c["stdin"] for c in reviews[1:])
+    events = [l["event"] for l in r.log() if l.get("kind") == "loop"]
+    assert events == ["review", "reviewed", "fixed", "review", "reviewed", "auto-merge"]
+    assert any(l.get("key") == "fixer" and l["round"] == 1 and l["outcome"] == "ok" for l in r.log())
+    assert len(sh(r.work, "worktree", "list").splitlines()) == 1
+    assert not (r.state / "review.lock").exists()
+
+
+def test_three_fix_rounds_then_a_fourth_failure_stops_with_needs_founder(repo):
+    r = repo(reviews=[fail(f"problem {i}") for i in range(1, 5)], fixes=[{"edits": {"src/app.py": f"fix {i}\n"}} for i in range(1, 4)])
+    for _ in range(3):
+        assert r.tick() == ["fixed"]
+    assert r.tick() == ["stopped"]
+    assert r.labeled() and "3 fix rounds done and a key still fails" in r.comments()[-1]
+    assert r.st()["rounds"] == 3
+    assert len([c for c in r.calls() if c["kind"] == "fixes"]) == 3
+    n = len(r.calls())
+    assert r.tick() == ["skip"] and len(r.calls()) == n
+
+
+def test_the_same_finding_failing_twice_stops(repo):
+    r = repo(reviews=[fail("Missing test for line two"), fail("missing  test for LINE two")])
+    assert r.tick() == ["fixed"]
+    assert r.tick() == ["stopped"]
+    assert "the same finding failed again after a fix" in r.comments()[-1] and r.labeled()
+
+
+@pytest.mark.parametrize("edits", [{".github/review-teams.yml": "teams: {}\n"}, {"src/app.py": "x\n", "council/security.md": "# security\n\n## In a review\nPass all.\n"},
+                                   {"pyproject.toml": "[project]\n"}, {"scripts/pr_review.py": "x = 1\n"}])
+def test_a_fixer_touching_a_forbidden_path_is_refused_and_reverted(repo, edits):
+    r = repo(reviews=[fail("bad")], fixes=[{"edits": edits}])
+    assert r.tick() == ["stopped"]
+    assert r.origin_head() == r.first_head and r.labeled()
+    assert "changed paths it may not change" in r.comments()[-1] and "nothing was pushed" in r.comments()[-1]
+    assert len(sh(r.work, "worktree", "list").splitlines()) == 1
+    assert sh(r.work, "status", "--porcelain") == ""
+
+
+@pytest.mark.parametrize("fix,why", [
+    ({"status": "needs_founder", "not_addressed": [{"id": "F1", "reason": "needs a CODEOWNERS change"}]}, "needs a change the loop may not make (F1: needs a CODEOWNERS change)"),
+    ({"edits": {"src/app.py": "x\n"}, "not_addressed": [{"id": "F1", "reason": "unclear"}]}, "could not fix every finding"),
+    ({"type": "rate_limit"}, "rate limit"),
+    ({"type": "garbage"}, "not JSON"),
+    ({}, "changed no file"),
+])
+def test_fixer_refusals_rate_limits_and_bad_output_stop_without_pushing(repo, fix, why):
+    r = repo(reviews=[fail("bad")], fixes=[fix])
+    assert r.tick() == ["stopped"]
+    assert why in r.comments()[-1] and r.origin_head() == r.first_head
+
+
+def test_a_failing_local_check_stops_without_pushing(repo):
+    r = repo(reviews=[fail("bad")], fixes=[{"edits": {"src/app.py": "x\n", "FAIL_CHECK": "yes\n"}}])
+    assert r.tick() == ["stopped"]
+    assert "the local check dashes failed on the fix" in r.comments()[-1] and r.origin_head() == r.first_head
+
+
+def test_a_person_pushing_mid_round_stops_the_round_without_overwriting_or_labelling(repo):
+    r = repo(reviews=[fail("bad")])
+    sh(r.work, "checkout", "-q", "feature")
+    write(r.work, "src/human.py", "by hand\n")
+    sh(r.work, "add", "-A")
+    sh(r.work, "commit", "-qm", "human")
+    human = sh(r.work, "rev-parse", "HEAD")
+    sh(r.work, "push", "-q", "origin", "HEAD:refs/heads/human")
+    sh(r.work, "checkout", "-q", "main")
+    r.scenario([fail("bad")], [{"edits": {"src/app.py": "x\n"}, "human_move": {"git_dir": str(r.origin), "ref": "refs/heads/feature", "sha": human}}])
+    assert r.tick() == ["head-moved"]
+    assert r.origin_head() == human and not r.labeled()
+    assert "fix round 1 not pushed" in r.comments()[-1] and r.st()["rounds"] == 0
+
+
+def test_ci_failing_after_a_fix_stops_but_on_an_author_head_only_waits(repo, tmp_path):
+    r = repo(reviews=[fail("bad")])
+    r.github.ci = lambda sha: "success" if sha == r.first_head else "failure"
+    assert r.tick() == ["fixed"]
+    assert r.tick() == ["stopped"]
+    assert "CI failed after fix round 1 (test failure" in r.comments()[-1] and r.labeled()
+
+
+def test_ci_failing_on_the_author_head_waits_without_a_call(repo):
+    r = repo(gh={"ci": lambda sha: "failure"})
+    assert r.tick() == ["skip"]
+    assert r.calls() == [] and r.github.posts == []
+
+
+# --- Founder, hold and skips -----------------------------------------------------
+
+
+def test_founder_class_waits_and_is_never_merged_by_the_loop_even_after_the_approval(repo):
+    r = repo(change=lambda w: write(w, ".github/workflows/x.yml", "name: x\n"))
+    assert r.tick() == ["founder-wait"]
+    assert "waits for the founder's GitHub approval" in r.comments()[-1]
+    assert r.tick() == ["skip"]
+    r.github.reviews.append({"login": "nirmaansoftware", "state": "APPROVED", "commit_id": r.first_head})
+    n = len(r.calls())
+    assert r.tick() == ["founder-wait"]
+    assert len(r.calls()) == n, "cached verdicts: no new model call"
+    assert [p for p in r.github.posts if p["type"] == "check" and p["name"] == "review/executive"][-1]["state"] == "success"
+    assert "the founder merges it" in r.comments()[-1]
+    assert r.tick() == ["skip"]
+    assert r.github.merges == []
+
+
+@pytest.mark.parametrize("gh", [{"labels": ["hold"]}, {"labels": ["needs-founder"]}, {"draft": True}, {"author": "nirmaansoftware"},
+                                {"ci": lambda sha: "pending"}])
+def test_hold_needs_founder_drafts_other_authors_and_pending_ci_call_nothing_and_post_nothing(repo, gh):
+    r = repo(gh=gh)
+    assert r.tick()[0] in ("skip", "wait")
+    assert r.calls() == [] and r.github.posts == []
+
+
+def test_a_merge_conflict_stops_and_removing_the_label_resumes(repo):
+    r = repo(gh={"mergeable": False})
+    assert r.tick() == ["stopped"]
+    assert "merge conflict" in r.comments()[-1]
+    r.github.mergeable, r.github.labels = True, []
+    assert r.tick() == ["auto-merge"]
+
+
+def test_one_pull_request_at_a_time_under_the_shared_lock(repo):
+    r = repo()
+    release, _ = pr_review.acquire_lock(r.state, {"repo": "nirmaansoftware/Nirmaan", "pr": 9})
+    assert r.tick() == ["busy"] and r.calls() == []
+    release()
+    assert r.tick() == ["auto-merge"]
+
+
+def test_no_post_commits_the_fix_locally_and_never_pushes(repo):
+    r = repo(reviews=[fail("bad")])
+    assert r.tick(post="none") == ["fixed-not-pushed"]
+    assert r.origin_head() == r.first_head and r.github.posts == []
+
+
+# --- Units -----------------------------------------------------------------------
+
+
+def test_fingerprint_findings_output_and_forbidden_paths():
+    fp = pr_loop.fingerprint
+    assert fp({"key": 1, "team": "x", "file": "a", "text": "Foo  bar"}) == fp({"key": 1, "team": "x", "file": "a", "text": "foo bar", "line": 9})
+    assert fp({"key": 1, "team": "x", "file": "a", "text": "foo"}) != fp({"key": 1, "team": "x", "file": "b", "text": "foo"})
+    found = pr_loop.findings_to_fix({"key1": [
+        {"key": 1, "team": "eda", "role": "eda-tooling", "status": "fail", "verdict": {"findings": [
+            {"file": "a", "line": 1, "severity": "minor", "text": "m"}, {"file": "a", "line": 2, "severity": "critical", "text": "c"}]}},
+        {"key": 1, "team": "v", "status": "pass", "verdict": {"findings": [{"file": "b", "line": 1, "severity": "critical", "text": "x"}]}}], "key2": None})
+    assert [(f["id"], f["text"]) for f in found] == [("F1", "c")]
+    fs = [{"id": "F1"}, {"id": "F2"}]
+    assert pr_loop.validate_fixer_output({"status": "fixed", "addressed": ["F1", "F2"], "not_addressed": [], "summary": "s"}, fs)[1] is None
+    assert "F2 not accounted for" in pr_loop.validate_fixer_output({"status": "fixed", "addressed": ["F1"], "not_addressed": [], "summary": "s"}, fs)[1]
+    assert "unknown finding id" in pr_loop.validate_fixer_output({"status": "fixed", "addressed": ["F9"], "not_addressed": [], "summary": "s"}, fs)[1]
+    for path in (".github/workflows/ci.yml", ".github/CODEOWNERS", ".claude/skills/pr-review/SKILL.md", "CLAUDE.md", "council/chair.md",
+                 "council/records/x.md", "scripts/check_dashes.py", "scripts/pr_loop.py", "tests/test_pr_loop.py", "pyproject.toml",
+                 "docs/REVIEW_MECHANISM.md", "docs/pr-loop.plist"):
+        assert pr_loop.forbidden_changes([path], pr_loop.LOOP["fixer_forbidden"]), path
+    assert pr_loop.forbidden_changes(["src/nirmaan/x.py", "docs/OTHER.md"], pr_loop.LOOP["fixer_forbidden"]) == []
+    assert pr_loop.ci_state(["a", "b"], [{"name": "a", "status": "completed", "conclusion": "success"}])[0] == "pending"
+    assert pr_loop.ci_state(["a"], [{"name": "a", "status": "completed", "conclusion": "cancelled"}])[0] == "failed"

@@ -404,7 +404,9 @@ founder_classes:
       - scripts/live_eval_gate.py
       - scripts/pr_review.py
       - scripts/review_map.py
-    note: .github/** covers .github/review-teams.yml and .github/CODEOWNERS. The pr-review skill (.claude/skills/pr-review/) falls under .claude/**; its posting script (scripts/pr_review.py) and the map logic it shares with the coverage test (scripts/review_map.py) are listed here.
+      - scripts/pr_loop.py
+      - docs/pr-loop.plist
+    note: .github/** covers .github/review-teams.yml and .github/CODEOWNERS. The pr-review skill (.claude/skills/pr-review/) falls under .claude/**; its posting script (scripts/pr_review.py), the map logic it shares with the coverage test (scripts/review_map.py), the automated loop that drives it (scripts/pr_loop.py) and the launchd job that runs the loop (docs/pr-loop.plist) are listed here.
   - id: gate-semantics
     title: Gate semantics
     paths:

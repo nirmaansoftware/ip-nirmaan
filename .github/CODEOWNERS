@@ -17,6 +17,8 @@
 /scripts/live_eval_gate.py @nirmaansoftware
 /scripts/pr_review.py @nirmaansoftware
 /scripts/review_map.py @nirmaansoftware
+/scripts/pr_loop.py @nirmaansoftware
+/docs/pr-loop.plist @nirmaansoftware
 
 # 2. Gate semantics (the gate scripts are listed under 1)
 /src/nirmaan/integrations/eda.py @nirmaansoftware

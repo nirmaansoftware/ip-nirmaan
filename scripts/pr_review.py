@@ -541,11 +541,28 @@ class GitHub:
                 break
         return out
 
-    def get_pull(self, n: int) -> dict:
-        p = self._get(f"/pulls/{n}")
-        return {"state": p["state"], "author": (p.get("user") or {}).get("login"), "labels": [l["name"] for l in p.get("labels", [])],
+    @staticmethod
+    def _pull(p) -> dict:
+        return {"number": p["number"], "state": p["state"], "draft": bool(p.get("draft")), "title": p.get("title") or "",
+                "author": (p.get("user") or {}).get("login"), "labels": [l["name"] for l in p.get("labels", [])],
                 "head_sha": p["head"]["sha"], "head_ref": p["head"]["ref"], "head_repo": (p["head"].get("repo") or {}).get("full_name"),
-                "base_ref": p["base"]["ref"], "base_repo": p["base"]["repo"]["full_name"]}
+                "base_ref": p["base"]["ref"], "base_repo": p["base"]["repo"]["full_name"],
+                # Only on a single pull request read; None while GitHub is still computing it.
+                "mergeable": p.get("mergeable"), "mergeable_state": p.get("mergeable_state")}
+
+    def get_pull(self, n: int) -> dict:
+        return self._pull(self._get(f"/pulls/{n}"))
+
+    def list_open_pulls(self) -> list[dict]:
+        """Open pull requests, oldest first (used by the automated loop, scripts/pr_loop.py)."""
+        return [self._pull(p) for p in self._paged("/pulls?state=open&sort=created&direction=asc")]
+
+    def get_repo_settings(self) -> dict:
+        """The repository's "Allow auto-merge" setting."""
+        return {"allow_auto_merge": self._get("").get("allow_auto_merge") is True}
+
+    def add_labels(self, n: int, labels: list[str]):
+        self._post(f"/issues/{n}/labels", {"labels": labels})
 
     def list_reviews(self, n: int) -> list[dict]:
         return [{"login": (r.get("user") or {}).get("login"), "state": r["state"], "commit_id": r.get("commit_id")} for r in self._paged(f"/pulls/{n}/reviews")]
@@ -592,11 +609,17 @@ def defaults(env=None) -> dict:
 
 def run_review(repo_root, pr: int, github, post: str, claude_bin: str, state_dir: Path, models: dict,
                timeout_s: float, backoff_s: float, config: dict = CONFIG, fresh: bool = False,
-               caller_branch: str | None = None, in_claude_session: bool = False, sleep=time.sleep, out=print) -> dict:
-    """The whole review. `post` is "app", "dry-run" or "none"."""
+               caller_branch: str | None = None, in_claude_session: bool = False, sleep=time.sleep, out=print,
+               held_lock: bool = False) -> dict:
+    """The whole review. `post` is "app", "dry-run" or "none". The automated loop
+    (scripts/pr_loop.py) passes held_lock=True: it holds the shared lock for the
+    review and the fix round together."""
     cfg = config
     state_dir = Path(state_dir)
-    release, holder = acquire_lock(state_dir, {"repo": cfg["repo"], "pr": pr})
+    if held_lock:
+        release, holder = (lambda: None), None
+    else:
+        release, holder = acquire_lock(state_dir, {"repo": cfg["repo"], "pr": pr})
     if release is None:
         who = f"{holder.get('repo')} #{holder.get('pr')}, pid {holder.get('pid')}" if holder else "unknown holder"
         out(f"pr-review: another review is running ({who}). Try again when it finishes.")
