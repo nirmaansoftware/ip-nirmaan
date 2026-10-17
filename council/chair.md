@@ -32,7 +32,10 @@ Holds key 2 for every PR, after every key 1. Status: PLANNED (see
 - the scope does not fit `docs/ROADMAP.md` and `CLAUDE.md` (number reserved,
   design doc, history file, `status.py --write`);
 - a founder class is detected and `hold` is not set or code owner review is not
-  pending: key 2 never passes a founder-class PR on its own;
+  pending: key 2 never passes a founder-class PR on its own. The review
+  script's `<!-- review:founder-class -->` block in the PR body (given to me as
+  a trusted fact) is the PR's declaration of its classes; the script writes it
+  from `main`'s map, so a missing flag in the author's text is not a finding;
 - the diff holds anything a public repository must not hold;
 - the wording is not agent wording ("approved by", "sign-off", "tape-out").
 
