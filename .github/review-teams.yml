@@ -78,6 +78,8 @@ rules:
       - tests/test_nirmaan_*.py
       - tests/test_scoped_registries.py
       - tests/test_review_teams.py
+      - tests/test_pr_review.py
+      - tests/fixtures/pr_review/**
       - tests/test_review_cleanups.py
       - tests/fixtures/applicability/**
       - tests/fixtures/projects/**
@@ -400,7 +402,9 @@ founder_classes:
       - council/**
       - scripts/check_*.py
       - scripts/live_eval_gate.py
-    note: .github/** covers .github/review-teams.yml and .github/CODEOWNERS. The pr-review skill (.claude/skills/pr-review/) falls under .claude/**; its posting script joins this class when rollout R5 adds it.
+      - scripts/pr_review.py
+      - scripts/review_map.py
+    note: .github/** covers .github/review-teams.yml and .github/CODEOWNERS. The pr-review skill (.claude/skills/pr-review/) falls under .claude/**; its posting script (scripts/pr_review.py) and the map logic it shares with the coverage test (scripts/review_map.py) are listed here.
   - id: gate-semantics
     title: Gate semantics
     paths:

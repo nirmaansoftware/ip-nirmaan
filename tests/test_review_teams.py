@@ -15,6 +15,7 @@ than guess. The pull request review script (rollout R5) will reuse this logic.
 
 from __future__ import annotations
 
+import importlib.util
 import re
 import subprocess
 from pathlib import Path
@@ -33,170 +34,17 @@ FOUNDER = "@nirmaansoftware"
 PENDING_SEATS = {"dft-engineer", "physical-design-engineer", "firmware-engineer"}
 
 
-# --- A loader for the YAML subset the map uses -----------------------------------
+# --- The loader and ownership rules, shared with scripts/pr_review.py -------------
 
-
-class MapSyntaxError(ValueError):
-    pass
-
-
-def _strip_comment(line: str) -> str:
-    quote = None
-    for i, ch in enumerate(line):
-        if quote:
-            if ch == quote:
-                quote = None
-        elif ch in "'\"":
-            quote = ch
-        elif ch == "#" and (i == 0 or line[i - 1] in " \t"):
-            return line[:i].rstrip()
-    return line.rstrip()
-
-
-def _split_flow(body: str) -> list[str]:
-    items, current, quote = [], "", None
-    for ch in body:
-        if quote:
-            current += ch
-            if ch == quote:
-                quote = None
-        elif ch in "'\"":
-            quote = ch
-            current += ch
-        elif ch == ",":
-            items.append(current.strip())
-            current = ""
-        else:
-            current += ch
-    if current.strip():
-        items.append(current.strip())
-    return items
-
-
-def _scalar(text: str, number: int):
-    text = text.strip()
-    if text.startswith("["):
-        if not text.endswith("]"):
-            raise MapSyntaxError(f"line {number}: unclosed flow list")
-        return [_scalar(item, number) for item in _split_flow(text[1:-1])]
-    if text.startswith("'"):
-        if not text.endswith("'") or len(text) < 2:
-            raise MapSyntaxError(f"line {number}: unclosed quote")
-        return text[1:-1].replace("''", "'")
-    if text.startswith('"'):
-        if not text.endswith('"') or len(text) < 2 or "\\" in text:
-            raise MapSyntaxError(f"line {number}: use single quotes for escapes")
-        return text[1:-1]
-    if not text or text[0] in "*&!{|>%@`-?:," or ": " in text or " #" in text:
-        raise MapSyntaxError(f"line {number}: quote this scalar: {text!r}")
-    if text.isdigit():
-        return int(text)
-    if text in ("true", "false", "null", "~", "yes", "no", "on", "off"):
-        raise MapSyntaxError(f"line {number}: quote {text!r} or avoid it")
-    return text
-
-
-def load_map(text: str):
-    lines = []
-    for number, raw in enumerate(text.splitlines(), start=1):
-        if "\t" in raw:
-            raise MapSyntaxError(f"line {number}: tab")
-        stripped = _strip_comment(raw)
-        if stripped.strip():
-            lines.append((len(stripped) - len(stripped.lstrip(" ")), stripped.strip(), number))
-
-    def key_value(content: str, number: int):
-        match = re.fullmatch(r"([A-Za-z0-9_-]+):(?: (.*))?", content)
-        if not match:
-            raise MapSyntaxError(f"line {number}: expected 'key: value', got {content!r}")
-        return match.group(1), match.group(2)
-
-    def block(i: int, indent: int):
-        if lines[i][1].startswith("- ") or lines[i][1] == "-":
-            return seq(i, indent)
-        return mapping(i, indent)
-
-    def child(i: int, indent: int, number: int):
-        if i < len(lines) and lines[i][0] > indent:
-            return block(i, lines[i][0])
-        raise MapSyntaxError(f"line {number}: empty value")
-
-    def mapping(i: int, indent: int):
-        out = {}
-        while i < len(lines) and lines[i][0] == indent and not lines[i][1].startswith("- "):
-            _, content, number = lines[i]
-            key, rest = key_value(content, number)
-            if key in out:
-                raise MapSyntaxError(f"line {number}: duplicate key {key!r}")
-            if rest is None or rest == "":
-                out[key], i = child(i + 1, indent, number)
-            else:
-                out[key], i = _scalar(rest, number), i + 1
-        if i < len(lines) and lines[i][0] > indent:
-            raise MapSyntaxError(f"line {lines[i][2]}: unexpected indentation")
-        return out, i
-
-    def seq(i: int, indent: int):
-        out = []
-        while i < len(lines) and lines[i][0] == indent and lines[i][1].startswith("- "):
-            _, content, number = lines[i]
-            rest = content[2:]
-            if re.match(r"[A-Za-z0-9_-]+:( |$)", rest):
-                lines[i] = (indent + 2, rest, number)  # the item is a map
-                item, i = mapping(i, indent + 2)
-            else:
-                item, i = _scalar(rest, number), i + 1
-            out.append(item)
-        if i < len(lines) and lines[i][0] > indent:
-            raise MapSyntaxError(f"line {lines[i][2]}: unexpected indentation")
-        return out, i
-
-    if not lines:
-        return {}
-    value, end = block(0, lines[0][0])
-    if end != len(lines):
-        raise MapSyntaxError(f"line {lines[end][2]}: unexpected content")
-    return value
-
-
-# --- Globs and ownership --------------------------------------------------------------
-
-
-def glob_regex(glob: str) -> re.Pattern:
-    out, i = "", 0
-    while i < len(glob):
-        if glob.startswith("**/", i):
-            out, i = out + "(?:.*/)?", i + 3
-        elif glob.startswith("**", i):
-            out, i = out + ".*", i + 2
-        elif glob[i] == "*":
-            out, i = out + "[^/]*", i + 1
-        elif glob[i] == "?":
-            out, i = out + "[^/]", i + 1
-        else:
-            out, i = out + re.escape(glob[i]), i + 1
-    return re.compile(out)
-
-
-def matches(glob: str, path: str) -> bool:
-    return glob_regex(glob).fullmatch(path) is not None
-
-
-def winning_rule(teams_map: dict, path: str):
-    """The index of the last rule with a glob that matches the path, or None."""
-    found = None
-    for index, rule in enumerate(teams_map["rules"]):
-        if any(matches(glob, path) for glob in rule["paths"]):
-            found = index
-    return found
-
-
-def owning_teams(teams_map: dict, path: str) -> set[str]:
-    index = winning_rule(teams_map, path)
-    if index is None:
-        return set()
-    rule = teams_map["rules"][index]
-    return {rule["team"], *rule.get("co_owners", [])}
+_spec = importlib.util.spec_from_file_location("review_map", ROOT / "scripts" / "review_map.py")
+review_map = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(review_map)
+MapSyntaxError = review_map.MapSyntaxError
+load_map = review_map.load_map
+glob_regex = review_map.glob_regex
+matches = review_map.matches
+winning_rule = review_map.winning_rule
+owning_teams = review_map.owning_teams
 
 
 def tracked_files() -> list[str]:
