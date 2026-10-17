@@ -10,11 +10,18 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+# The workflow token can read the repository and nothing else, so no job (and no step a
+# pull request adds) can post a status, comment, or push with it. Every job has a
+# timeout well above its measured time (docs/TEST_CI_HARDENING.md section 7).
+permissions:
+  contents: read
+
 # M46: actions are pinned by commit SHA, with the release in a comment. The OSS CAD Suite
 # comes from the local `oss-cad-suite` action (pinned, sha256-checked, cached by version).
 # See docs/TEST_CI_HARDENING.md.
 jobs:
   test:
+    timeout-minutes: 45
     # The full suite with every EDA tool required, once, on Python 3.12 (M46). The
     # `no-tools` job covers 3.11, and `test-union` checks that no test ran in no job.
     # 24.04 ships Verilator 5, which the `--binary` simulation backend needs.
@@ -68,6 +75,7 @@ jobs:
   # and the missing-SDK test runs here for real.
   no-tools:
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
@@ -99,6 +107,7 @@ jobs:
   # docs/PHYSICAL_DESIGN.md.
   physical-design:
     runs-on: ubuntu-24.04
+    timeout-minutes: 60
     container:
       image: openroad/orfs:26Q3-687-gc63a606f9@sha256:2e5bf6fe865e102ca2313aba1d849da50f5973bc91c4212a2f68e7d905a39c8f
     env:
@@ -226,6 +235,7 @@ jobs:
   test-union:
     needs: [test, no-tools, physical-design]
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
@@ -238,6 +248,7 @@ jobs:
 
   dashes:
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
