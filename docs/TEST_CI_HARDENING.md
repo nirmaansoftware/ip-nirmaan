@@ -161,3 +161,32 @@ above, each from GitHub Actions. Leave the bypass list empty, or add the
 repository admin role if the owner wants an emergency override. If a later
 milestone renames a job or adds one (M44, M45), update the list to match:
 a required check that never reports blocks every merge.
+
+## 7. Permissions and timeouts (2026-10-17)
+
+Added after M46, as rollout step R2 of the council record
+`council/records/2026-10-17-teams-and-pr-review.md`, before any review status
+can be required:
+
+- **Read-only token.** Every workflow declares `permissions: contents: read` at
+  the top. `live-eval.yml` already did; `ci.yml` had no block, so its token had
+  the repository's default scope. A step that a pull request adds can no
+  longer post a commit status, comment or push with the workflow token.
+- **Timeouts.** Every job sets `timeout-minutes` (the default is six hours).
+  The ten most recent successful CI runs took at most 779 s (`test`), 117 s
+  (`no-tools`), 794 s (`physical-design`), 8 s (`test-union`) and 8 s
+  (`dashes`). The limits are 45, 20, 60, 10 and 10 minutes, room for a cold
+  cache (the standalone OpenSTA build) and a slow runner. `live-eval` keeps
+  300.
+- **Tests** (`tests/test_ci.py`): every workflow has exactly that top-level
+  block and no write permission; every job has a timeout; no file under
+  `.github/` uses `pull_request_target` or expands `github.event.*` or
+  `github.head_ref` inside `run:`; container images are pinned by digest;
+  the five required jobs run on every pull request with no path or branch
+  filter and no job-level `if:`. A synthetic bad workflow proves each check
+  fires. Action pinning by SHA was already tested (section 4).
+
+Not done here: moving a plan token secret to an environment only `main` can
+use. The repository has no Actions secret today (`CLAUDE_CODE_OAUTH_TOKEN` is
+not set), so the live evaluation stays off; creating the secret and the
+environment is the owner's account action.
