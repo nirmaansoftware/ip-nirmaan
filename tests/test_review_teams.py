@@ -345,6 +345,20 @@ def test_only_the_three_approved_seats_may_wait_for_their_files(teams_map):
         ("LICENSE", {"business"}),
         ("src/nirmaan/company/org_chart.py", {"eda-platform"}),
         ("docs/ROADMAP.md", {"eda-platform"}),
+        # Claimed from the catch-all in the leads' review (2026-10-17).
+        ("docs/PD_SIGNOFF.md", {"silicon-design"}),
+        ("docs/RISCV_NEXT.md", {"silicon-design"}),
+        ("src/nirmaan/models/regmap.py", {"silicon-design"}),
+        ("docs/GATES_EVERYWHERE.md", {"verification"}),
+        ("docs/VERITRIAGE_AUDIT_FIXES.md", {"verification"}),
+        ("tests/test_parsers.py", {"verification"}),
+        ("tests/fixtures/axi_timeout.log", {"verification"}),
+        ("tests/test_design.py", {"verification", "silicon-design"}),
+        ("tests/test_nirmaan_dft.py", {"silicon-design"}),
+        ("tests/test_nirmaan_eda.py", {"eda-platform"}),
+        ("tests/fixtures/history_headings.txt", {"eda-platform"}),
+        ("site/assets/fonts/archivo.woff2", {"product-site", "business"}),
+        ("docs/REVIEW_MECHANISM.md", {"council"}),
     ],
 )
 def test_the_council_records_rows(teams_map, path, teams):
