@@ -102,7 +102,8 @@ sees it.
 * `tests/test_sync_fifo_fixture.py`, `tests/test_rr_arbiter_fixture.py`,
   `tests/test_apb_regs_fixture.py`: through the broker, as
   `tests/test_axi4_lite_fixture.py` does: completeness, Verilator lint (`-Wall`,
-  no waivers), simulation under Icarus and Verilator, the wrong testbench as a
+  no waivers, and at `DEPTH` 5 as well: `test_real_lint_is_clean_at_depth5`
+  passes under Verilator in CI), simulation under Icarus and Verilator, the wrong testbench as a
   recorded failed run, Yosys synthesis with no latches, and formal (skips
   without `sby`).
 * `tests/test_nirmaan_more_blocks.py`: natural requests plan `block-design`;

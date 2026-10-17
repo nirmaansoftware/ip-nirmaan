@@ -47,6 +47,14 @@ def test_real_lint_is_clean(bridge, tmp_path):
     assert run.succeeded and "lint clean" in run.summary, run.summary
 
 
+@pytest.mark.skip(reason="slow on the development machine")
+@needs("verilator")
+def test_real_lint_is_clean_at_depth5(bridge, tmp_path):
+    params = {"sources": str(RTL), "top": TOP, "parameters": "DEPTH=5"}
+    run, _ = invoke(bridge, "lint.run", params, tmp_path)
+    assert run.succeeded and "lint clean" in run.summary, run.summary
+
+
 @pytest.mark.parametrize("backend", [
     pytest.param("icarus", marks=needs("iverilog", "vvp")),
     pytest.param("verilator-sim", marks=needs("verilator")),
