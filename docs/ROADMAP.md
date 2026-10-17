@@ -84,6 +84,7 @@ the real OpenROAD, OpenSTA, and KLayout tests, which run only in CI's
 
 Then take the next reserved milestone below, or the "Not yet" column above.
 
+<!-- review:milestone-numbers:begin (ledger: changes here add no review team; see .github/review-teams.yml) -->
 ## Milestone numbers
 
 Reserve the number here before cutting a branch: add the row on `main` (or in
@@ -108,6 +109,9 @@ new number. M1 to M42 are taken; see `docs/history/README.md`.
 | M54 | Demo surfaces (audit C: H0, H1, H2, H4, M1, L11, L12) | done (#83) |
 | M55 | VeriTriage audit fixes (audit D: H1, M1, M2, M3, L3, L6, L9, L15) | done (#82) |
 
+<!-- review:milestone-numbers:end -->
+
+<!-- review:roadmap-scope:begin (scope and ordering: Product and Site reviews changes here; see .github/review-teams.yml) -->
 ## Next milestones
 
 M43 to M49 (the plan from the principal-engineer review, v1.24.0) and M50 to M55
@@ -128,6 +132,7 @@ still open, with no numbers reserved yet:
   netlist, and PDK profiles as project data.
 - **Scoping follow-ups** (M49): moving the remaining tests off global
   `unregister_*` cleanup, and scoping VeriTriage's own registries.
+<!-- review:roadmap-scope:end -->
 
 ---
 
@@ -322,11 +327,13 @@ capability-based model selection with cost accounting, M32 scalable state,
 M33 learning proposals through reviewed tasks. Details and reasons:
 `docs/architecture/target-state.md` section 5.
 
+<!-- review:roadmap-scope:begin (scope and ordering: Product and Site reviews changes here; see .github/review-teams.yml) -->
 ## Side work (any time; owner-driven)
 
 - **Landing page**: live at https://ip.nirmaan.online since 2026-09-28 (Vercel project `ip-nirmaan` in the Nirmaan team, deploys on every merge to `main`; DNS is a CNAME at Hostinger). See `site/README.md`.
 - **Moving the repo out of iCloud** would remove the test hangs entirely. The owner has chosen to keep it in `~/Documents` for now.
 - **The PyPI name** `ip-nirmaan`: publishing an initial release would reserve it. Needs the owner's explicit go-ahead.
+<!-- review:roadmap-scope:end -->
 
 ## Principles that do not change
 
