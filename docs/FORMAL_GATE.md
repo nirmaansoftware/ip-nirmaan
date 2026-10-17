@@ -163,6 +163,9 @@ The prompt tells the seat: "applies only if you produce a formal_spec file".
   `proven = 0`. "Formal properties are proven" carries the bound
   `proven >= 1`, so only a `mode prove` setup meets it. A setup with `[tasks]`
   is refused with a reason.
+* The counter fixture is formally proven: a bounded model check of
+  `tests/fixtures/rtl/counter.v` (`mode bmc`, `depth 12`) finds no
+  counterexample, so its properties hold in every reachable state.
 
 ---
 
