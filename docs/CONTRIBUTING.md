@@ -3,7 +3,7 @@
 ## Setup
 
 ```bash
-git clone <repo> && cd veritriage
+git clone <repo> && cd ip-nirmaan
 python3 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 pytest
