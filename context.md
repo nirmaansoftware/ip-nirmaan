@@ -167,11 +167,12 @@ schema history is in `docs/history/context-before-M43.md`.
 
 ## 3. Operational notes
 
-**Where to work.** The owner's checkout is `~/Documents/IP Nirmaan`, synced by
-iCloud. macOS evicts files to "dataless" placeholders, so imports can hang in
-`importlib` and git can fail with `mmap failed`. Agents work in a fresh clone
-outside iCloud (for example a scratchpad), push every commit early, and run
-`git pull` before trusting a local `main`.
+**Where to work.** The owner's checkout is `~/Nirmaan/ip-nirmaan`, beside the
+Nirmaan repo in `~/Nirmaan/Nirmaan`, outside iCloud. Under iCloud-synced
+`~/Documents`, macOS evicts files to "dataless" placeholders, so imports can
+hang in `importlib` and git can fail with `mmap failed`; do not keep a clone
+there. Agents push every commit early and run `git pull` before trusting a
+local `main`.
 
 **Environment.**
 ```

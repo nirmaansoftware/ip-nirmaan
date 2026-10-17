@@ -103,8 +103,8 @@ optional when the RTL has exactly one module that nothing else instantiates),
 Steps:
 
 1. Copy `firmware_soc/` and the RTL into the working directory, byte for byte
-   (Verilator's `--build` runs make, which cannot take the space in
-   `~/Documents/IP Nirmaan`; M25 does the same). The run records the paths it
+   (Verilator's `--build` runs make, which cannot take a space in
+   a path; M25 does the same). The run records the paths it
    was given.
 2. The `fw.cross_build` steps, then `<prefix>objcopy -O verilog` to the RAM
    image.
