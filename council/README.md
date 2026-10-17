@@ -22,6 +22,9 @@ sense.
 | [product-lead](product-lead.md) | Scope, launch status, design partners, roadmap |
 | [verification-lead](verification-lead.md) | VeriTriage, regression debug, coverage, formal |
 | [design-architect](design-architect.md) | RTL, microarchitecture, protocols, IP blocks |
+| [dft-engineer](dft-engineer.md) | Scan, ATPG, MBIST, and what a test coverage number rests on |
+| [physical-design-engineer](physical-design-engineer.md) | Synthesis to a library, place and route, STA, DRC and LVS on open PDKs |
+| [firmware-engineer](firmware-engineer.md) | Drivers, the register map as firmware sees it, RISC-V SoC runs |
 | [eda-tooling](eda-tooling.md) | The open-source EDA flow and CI, and what each run proves |
 | [ai-engineer](ai-engineer.md) | Model seats, providers, evaluation, AI cost |
 | [market-research](market-research.md) | Who buys, what they pay today, competitors |
@@ -36,6 +39,29 @@ sense.
 | [partnerships](partnerships.md) | Finding and recruiting design partners and first customers |
 
 Add a seat by adding a file in the same format and a row here.
+
+## Teams (pull request review)
+
+The same seats review pull requests in teams. Decided in
+[the 2026-10-17 council record](records/2026-10-17-teams-and-pr-review.md); how
+the review runs is in `docs/REVIEW_MECHANISM.md` (PLANNED: until the GitHub App
+and the ruleset are live, a review status is a convention and the founder
+merges every pull request). Each lead's seat file holds its key-1 checklist
+under "In a review".
+
+| Team | Key 1 (lead) | Members (no key) |
+|---|---|---|
+| Council | chair holds key 2 for every PR; key 1 on Council paths: security (control files), qa-evidence (records, seat files) | |
+| Silicon Design | design-architect | dft-engineer, physical-design-engineer, firmware-engineer |
+| Verification | verification-lead | qa-evidence |
+| EDA and Platform | eda-tooling (also the catch-all owner) | security, ai-engineer |
+| Product and Site | product-lead | site-engineer, brand-content, market-research |
+| Business | legal-compliance (licences, notices, third-party code and text); finance-licensing (prices, commercial terms, spend) | legal-counsel, tax-accounts, partnerships |
+
+One key-1 verdict per owning team; members' checklists run inside the lead's
+review and are cited in it. A key is an agent review: never a person's
+decision, a release, or a claim that a design is ready to be made in silicon.
+Six founder classes (council record, section 2) also wait for the founder.
 
 ## When to call a meeting
 
