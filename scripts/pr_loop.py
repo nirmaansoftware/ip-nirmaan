@@ -249,23 +249,12 @@ def _save_state(state_dir, repo: str, st: dict):
     path.write_text(json.dumps(st, indent=2))
 
 
-PENDING = {"missing", "queued", "in_progress", "pending", "waiting", "requested"}
-
-
 def ci_state(required: list[str], runs: list[dict]) -> tuple[str, str]:
-    """("green" | "pending" | "failed", text). Missing or running is pending;
-    any conclusion other than success is a failure."""
-    jobs = []
-    for name in required:
-        mine = sorted((r for r in runs if r["name"] == name), key=lambda r: str(r.get("completed_at") or ""), reverse=True)
-        jobs.append((name, "missing" if not mine else (mine[0]["conclusion"] if mine[0]["status"] == "completed" else mine[0]["status"])))
-    failed = [f"{n} {s}" for n, s in jobs if s != "success" and s not in PENDING]
-    if failed:
-        return "failed", ", ".join(failed)
-    pending = [f"{n} {s}" for n, s in jobs if s != "success"]
-    if pending:
-        return "pending", ", ".join(pending)
-    return "green", "all required CI green"
+    """("green" | "pending" | "failed", text), read as the review reads it
+    (pr_review.required_ci): the newest run of each job counts, and a run still
+    in progress is pending; any other conclusion than success is a failure."""
+    ci = pr_review.required_ci(required, runs)
+    return ci["state"], ci["text"]
 
 
 def _run_commands(commands, cwd, extra_env, variables, timeout_s) -> tuple[bool, str]:
@@ -440,6 +429,10 @@ class Loop:
                 return self._stop(ctx, head, f"the review exited {r['exit']}")
             if r.get("waiting"):
                 return {"outcome": "wait", "reason": r["waiting"]}
+            if r.get("ci_failed"):
+                if st["last_fix_head"] == head:
+                    return self._stop(ctx, head, f"CI failed after fix round {st['rounds']} ({r['ci_failed']})")
+                return {"outcome": "skip", "reason": f"{r['ci_failed']}; the author fixes it"}
             if r.get("deferred"):
                 return self._stop(ctx, head, f"review deferred: {r['deferred']}")
             keys = [*(r.get("key1") or []), *([r["key2"]] if r.get("key2") else [])]

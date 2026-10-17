@@ -17,6 +17,9 @@ In order, and fail closed at every step (pending or failure, never success):
    classes, sections and content hits from main's .github/review-teams.yml,
    never the pull request's copy (scripts/review_map.py).
 5. Waits for the five CI checks to be green on the head; no model call before.
+   The newest run of each job counts, and a run in progress means waiting.
+   A job that finished without success posts "CI failed; review not run"
+   (action_required, never green) on both checks.
 6. Key 1: a fresh `claude -p` per owning team lead, with the lead's seat file
    and the base checklist from main. Key 2: the chair's seat file plus every
    owning lead's seat file, given key 1's results. Read, Grep and Glob only; no
@@ -27,7 +30,8 @@ In order, and fail closed at every step (pending or failure, never success):
    the head). A failed call, a timeout or a rate limit gets one backoff retry,
    then the key is "review deferred".
 8. Checks the head has not moved before every post, then posts one comment per
-   key and the checks review/team-lead and review/executive. review/executive
+   key and the checks review/team-lead and review/executive (not again when
+   the App's latest one for that key, team and head says the same). review/executive
    passes only with key 2 passing, no `hold` label, and for a founder-class
    pull request the founder's approval of this head SHA.
 
@@ -43,6 +47,7 @@ holds the lock, 4 refused, 5 the head moved (nothing posted).
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import os
 import re
@@ -78,6 +83,9 @@ CONFIG = {
     "include_pr_text": False,
     "max_diff_bytes": 200_000,
     "check_names": {"key1": "review/team-lead", "key2": "review/executive"},
+    # The review App's slug: its comments are by "<slug>[bot]" and its check
+    # runs carry this app slug. Used to skip reposting an identical result.
+    "review_app_slug": "nirmaan-review",
 }
 
 # Environment variables the review App (tracker T21) provides.
@@ -303,7 +311,56 @@ def user_prompt(ctx: dict) -> str:
     return s + "\n\nReturn the JSON object now."
 
 
+# --- CI ------------------------------------------------------------------------------
+
+# States of a check run that has not finished yet (plus "missing").
+CI_WAITING = {"missing", "queued", "in_progress", "pending", "waiting", "requested"}
+
+
+def _newest_first_key(run: dict):
+    # By start time, then id (a rerun gets a new, higher id). A run in progress
+    # has no completed_at, so completion time would rank an older finished run
+    # above a rerun still running.
+    return (str(run.get("started_at") or ""), int(run.get("id") or 0))
+
+
+def required_ci(required: list[str], runs: list[dict]) -> dict:
+    """The required CI jobs on one head. Per job name the newest run counts, and
+    any run of that name not yet completed wins (CI is never green while a rerun
+    runs). state is "failed" when a job finished without success, "pending" when
+    one is running or missing, else "green"."""
+    jobs = []
+    for name in required:
+        mine = sorted((r for r in runs if r["name"] == name), key=_newest_first_key, reverse=True)
+        run = next((r for r in mine if r.get("status") != "completed"), mine[0] if mine else None)
+        conclusion = "missing" if run is None else (run.get("conclusion") if run.get("status") == "completed" else run.get("status"))
+        jobs.append({"name": name, "conclusion": conclusion, "url": run.get("url") if run else None})
+    failed = [j for j in jobs if j["conclusion"] != "success" and j["conclusion"] not in CI_WAITING]
+    pending = [j for j in jobs if j["conclusion"] != "success" and j["conclusion"] in CI_WAITING]
+    text = lambda js: ", ".join(f"{j['name']} {j['conclusion']}" for j in js)  # noqa: E731
+    if failed:
+        return {"state": "failed", "jobs": jobs, "failed": failed, "text": text(failed)}
+    if pending:
+        return {"state": "pending", "jobs": jobs, "failed": [], "text": text(pending)}
+    return {"state": "green", "jobs": jobs, "failed": [], "text": "all required CI green"}
+
+
 # --- Comment -------------------------------------------------------------------------
+
+MARK = "nirmaan-pr-review"
+REUSED_NOTE = "Verdict reused from an earlier run on the same head and main commits; no new model call."
+
+
+def comment_marker(r: dict, ctx: dict) -> str:
+    """The marker that opens a review comment. Its digest covers everything the
+    comment says except the "verdict reused" note, so a rerun with the same
+    verdict on the same head finds its earlier comment and does not post again."""
+    notes = [n for n in r.get("notes", []) if n != REUSED_NOTE]
+    payload = {"main": ctx["main_sha"], "base": ctx["base_sha"], "status": r["status"], "reason": r.get("reason"),
+               "model": r.get("model"), "verdict": r.get("verdict"), "notes": notes,
+               "founder": list(ctx["classification"]["founder"]), "dry_run": bool(ctx.get("dry_run"))}
+    digest = hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()[:16]
+    return f"<!-- {MARK} key={r['key']} team={r.get('team') or 'council-chair'} head={ctx['head_sha']} digest={digest} -->"
 
 
 def _cell(s, limit: int = 600) -> str:
@@ -316,7 +373,7 @@ def render_comment(r: dict, ctx: dict) -> str:
     word = {"pass": "PASS", "fail": "FAIL"}.get(r["status"], "PENDING: review deferred")
     founder = ", ".join(ctx["classification"]["founder"]) or "none"
     lines = [
-        f"<!-- nirmaan-pr-review key={r['key']} team={r.get('team') or 'council-chair'} head={ctx['head_sha']} -->",
+        comment_marker(r, ctx),
         f"### Agent review: key {r['key']}, {r['team_name']}",
         "",
         "| | |",
@@ -365,9 +422,16 @@ def short(text: str) -> str:
 # --- Lock and call log (shared with Nirmaan's script: same directory, same protocol) ---
 
 
-def acquire_lock(state_dir: Path, owner: dict):
-    """An atomic mkdir of <state>/review.lock with owner.json inside. A lock whose
-    pid is gone is stale and removed once. Returns a release function or the holder."""
+# A lock folder with no readable owner file is stale once it is this old (the
+# process died between the mkdir and writing its owner file).
+OWNERLESS_LOCK_STALE_S = 30 * 60
+
+
+def acquire_lock(state_dir: Path, owner: dict, stale_s: float = OWNERLESS_LOCK_STALE_S):
+    """An atomic mkdir of <state>/review.lock with owner.json inside, written whole
+    (a temporary file renamed inside the lock folder), so a reader never sees half
+    of it. A lock whose pid is gone is stale and removed once; so is one with no
+    readable owner file older than stale_s. Returns a release function or the holder."""
     state_dir.mkdir(parents=True, exist_ok=True)
     lock = state_dir / "review.lock"
     for _ in range(2):
@@ -378,11 +442,23 @@ def acquire_lock(state_dir: Path, owner: dict):
                 held = json.loads((lock / "owner.json").read_text())
             except (OSError, ValueError):
                 held = None
-            if held and isinstance(held.get("pid"), int) and not _pid_alive(held["pid"]):
+            if not isinstance(held, dict):
+                held = None
+            has_pid = bool(held) and isinstance(held.get("pid"), int) and not isinstance(held.get("pid"), bool)
+            dead = has_pid and not _pid_alive(held["pid"])
+            ownerless_and_old = False
+            if not has_pid:
+                try:
+                    ownerless_and_old = time.time() - lock.stat().st_mtime > stale_s
+                except OSError:
+                    ownerless_and_old = True  # removed meanwhile: try again
+            if dead or ownerless_and_old:
                 _rmtree(lock)
                 continue
             return None, held
-        (lock / "owner.json").write_text(json.dumps({**owner, "pid": os.getpid(), "started": _now()}))
+        tmp = lock / f".owner.{os.getpid()}.{secrets.token_hex(4)}.tmp"
+        tmp.write_text(json.dumps({**owner, "pid": os.getpid(), "started": _now()}))
+        os.replace(tmp, lock / "owner.json")
         return (lambda: _rmtree(lock)), None
     return None, None
 
@@ -568,8 +644,14 @@ class GitHub:
         return [{"login": (r.get("user") or {}).get("login"), "state": r["state"], "commit_id": r.get("commit_id")} for r in self._paged(f"/pulls/{n}/reviews")]
 
     def list_check_runs(self, sha: str) -> list[dict]:
-        return [{"name": c["name"], "status": c["status"], "conclusion": c.get("conclusion"), "url": c.get("html_url"),
-                 "completed_at": c.get("completed_at")} for c in self._paged(f"/commits/{sha}/check-runs", "check_runs")]
+        return [{"id": c.get("id"), "name": c["name"], "status": c["status"], "conclusion": c.get("conclusion"), "url": c.get("html_url"),
+                 "app": (c.get("app") or {}).get("slug"), "title": (c.get("output") or {}).get("title"),
+                 "started_at": c.get("started_at"), "completed_at": c.get("completed_at")}
+                for c in self._paged(f"/commits/{sha}/check-runs", "check_runs")]
+
+    def list_comments(self, n: int) -> list[dict]:
+        return [{"body": c.get("body") or "", "url": c.get("html_url"), "author": (c.get("user") or {}).get("login")}
+                for c in self._paged(f"/issues/{n}/comments")]
 
     def create_comment(self, n: int, body: str) -> str:
         return self._post(f"/issues/{n}/comments", {"body": body})["html_url"]
@@ -581,7 +663,9 @@ class GitHub:
         if state == "pending":
             body["status"] = "in_progress"
         else:
-            body.update(status="completed", conclusion="success" if state == "success" else "failure")
+            # action_required: terminal, and (unlike neutral) never satisfies a
+            # required check. Used when CI failed and no review ran.
+            body.update(status="completed", conclusion=state if state in ("success", "action_required") else "failure")
         self._post("/check-runs", body)
 
     def create_status(self, sha, context, state, description, target_url=None):
@@ -625,10 +709,11 @@ def run_review(repo_root, pr: int, github, post: str, claude_bin: str, state_dir
         out(f"pr-review: another review is running ({who}). Try again when it finishes.")
         return {"exit": EXIT_BUSY}
     worktrees: list[str] = []
+    roots: list[Path] = []
     posted: list[dict] = []
     try:
         return _review(repo_root, pr, github, post, claude_bin, state_dir, models, timeout_s, backoff_s, cfg, fresh,
-                       caller_branch, in_claude_session, sleep, out, worktrees, posted)
+                       caller_branch, in_claude_session, sleep, out, worktrees, posted, roots)
     except HeadMoved as exc:
         out(f"pr-review: {exc}. Nothing more was posted; run again on the new head.")
         return {"exit": EXIT_HEAD_MOVED, "posted": posted}
@@ -638,6 +723,9 @@ def run_review(repo_root, pr: int, github, post: str, claude_bin: str, state_dir
                 _git(repo_root, "worktree", "remove", "--force", d)
             except subprocess.CalledProcessError:
                 _rmtree(Path(d))
+        # The per-run parent folder too, or an empty one is left for every run.
+        for root in roots:
+            _rmtree(root)
         try:
             _git(repo_root, "worktree", "prune")
         except subprocess.CalledProcessError:
@@ -646,7 +734,7 @@ def run_review(repo_root, pr: int, github, post: str, claude_bin: str, state_dir
 
 
 def _review(repo_root, pr, github, post, claude_bin, state_dir, models, timeout_s, backoff_s, cfg, fresh,
-            caller_branch, in_claude_session, sleep, out, worktrees, posted):
+            caller_branch, in_claude_session, sleep, out, worktrees, posted, roots):
     pull = github.get_pull(pr)
 
     def refuse(why):
@@ -676,6 +764,7 @@ def _review(repo_root, pr, github, post, claude_bin, state_dir, models, timeout_
     base_sha = _git(repo_root, "merge-base", main_sha, head).strip()
     (state_dir / "worktrees").mkdir(parents=True, exist_ok=True)
     root = Path(tempfile.mkdtemp(prefix=f"{cfg['repo'].replace('/', '_')}-{pr}-", dir=state_dir / "worktrees"))
+    roots.append(root)
     head_dir, main_dir = str(root / "head"), str(root / "main")
     for d, sha in ((head_dir, head), (main_dir, main_sha)):
         _git(repo_root, "worktree", "add", "--quiet", "--detach", d, sha)
@@ -689,12 +778,34 @@ def _review(repo_root, pr, github, post, claude_bin, state_dir, models, timeout_
         if now != head:
             raise HeadMoved(f"the head moved from {head[:7]} to {now[:7]} during the review")
 
+    # What the review App already posted on this head, read once per run.
+    app_slug = cfg.get("review_app_slug")
+    seen: dict = {}
+
+    def head_runs():
+        if "runs" not in seen:
+            seen["runs"] = github.list_check_runs(head)
+        return seen["runs"]
+
+    def marker_key(text):
+        return re.sub(r" digest=[0-9a-f]+ -->$", " -->", (text or "").split("\n")[0])
+
     def comment(body):
         check_head()
         if post == "none":
             out(f"----- comment (not posted)\n{body}")
             posted.append({"type": "comment", "body": body})
             return None
+        if post == "app" and app_slug:
+            # The App's latest comment for this key, team and head; the same
+            # digest means the same result, so it is linked, not posted again.
+            if "comments" not in seen:
+                seen["comments"] = [c for c in github.list_comments(pr) if c.get("author") == f"{app_slug}[bot]"]
+            same_key = [c for c in seen["comments"] if marker_key(c.get("body")) == marker_key(body)]
+            if same_key and (same_key[-1].get("body") or "").split("\n")[0] == body.split("\n")[0]:
+                out(f"pr-review: the same result is already posted for this key and head ({same_key[-1].get('url')}); not posted again.")
+                posted.append({"type": "comment", "body": body, "url": same_key[-1].get("url"), "reused": True})
+                return same_key[-1].get("url")
         url = github.create_comment(pr, body)
         posted.append({"type": "comment", "body": body, "url": url})
         return url
@@ -705,9 +816,17 @@ def _review(repo_root, pr, github, post, claude_bin, state_dir, models, timeout_
         if post == "none":
             out(f"----- check {name}: {state}: {desc} (not posted)")
         elif post == "app":
+            # Not again when the App's latest run of this check on this head
+            # already says the same.
+            want = ("in_progress", None) if state == "pending" else ("completed", state if state in ("success", "action_required") else "failure")
+            mine = sorted((r for r in head_runs() if r["name"] == name and r.get("app") == app_slug), key=_newest_first_key, reverse=True)
+            if mine and (mine[0].get("status"), mine[0].get("conclusion")) == want and mine[0].get("title") == desc:
+                out(f'pr-review: check {name} already says "{desc}" on this head; not posted again.')
+                posted.append({"type": "check", "name": name, "state": state, "description": desc, "reused": True})
+                return
             github.create_check_run(name, head, state, desc, f"{desc}\n\nAgent review." + (f" Comment: {details_url}" if details_url else ""), details_url)
         else:
-            state = "failure" if state == "failure" else "pending"
+            state = "failure" if state in ("failure", "action_required") else "pending"
             name, desc = f"dry-run/{name}", short(f"dry run: {description}")
             github.create_status(head, name, state, desc, details_url)
         posted.append({"type": "check", "name": name, "state": state, "description": desc})
@@ -735,15 +854,18 @@ def _review(repo_root, pr, github, post, claude_bin, state_dir, models, timeout_
     out(f"pr-review: #{pr} head {head[:7]}; key 1: {', '.join(k['name'] + ' (' + k['lead'] + ')' for k in classification['keys'])}; "
         f"founder classes: {', '.join(classification['founder']) or 'none'}")
 
-    runs = github.list_check_runs(head)
-    ci = []
-    for name in cfg["required_ci"]:
-        mine = sorted((r for r in runs if r["name"] == name), key=lambda r: str(r.get("completed_at") or ""), reverse=True)
-        conclusion = "missing" if not mine else (mine[0]["conclusion"] if mine[0]["status"] == "completed" else mine[0]["status"])
-        ci.append({"name": name, "conclusion": conclusion, "url": mine[0].get("url") if mine else None})
-    not_green = [c for c in ci if c["conclusion"] != "success"]
-    if not_green:
-        why = f"waiting for CI on {head[:7]}: " + ", ".join(f"{c['name']} {c['conclusion']}" for c in not_green)
+    ci_now = required_ci(cfg["required_ci"], head_runs())
+    if ci_now["state"] == "failed":
+        # Terminal, not "waiting". action_required is never green, and no review
+        # ran, so neither key says pass or fail.
+        why = f"CI failed on {head[:7]}: {ci_now['text']}; review not run"
+        check("key1", "action_required", why, ci_now["failed"][0].get("url"))
+        check("key2", "action_required", why, ci_now["failed"][0].get("url"))
+        out(f"pr-review: {why}. No model was called.")
+        return {"exit": EXIT_OK, "ci_failed": why, "posted": posted}
+    ci = ci_now["jobs"]
+    if ci_now["state"] == "pending":
+        why = f"waiting for CI on {head[:7]}: {ci_now['text']}"
         check("key1", "pending", why)
         check("key2", "pending", why)
         out(f"pr-review: {why}. No model was called.")
@@ -790,7 +912,7 @@ def _review(repo_root, pr, github, post, claude_bin, state_dir, models, timeout_
         if not fresh and cache.exists():
             cached = json.loads(cache.read_text())
             log_call(state_dir, {"repo": cfg["repo"], "pr": pr, "head": head, "key": key, "team": team, "model": model, "attempt": 0, "outcome": "reused"})
-            cached["notes"] = cached.get("notes", []) + ["Verdict reused from an earlier run on the same head and main commits; no new model call."]
+            cached["notes"] = cached.get("notes", []) + [REUSED_NOTE]
             return cached
         args = claude_args(model, system, [main_dir])
         result = None
