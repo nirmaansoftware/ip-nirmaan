@@ -201,6 +201,7 @@
   .section { padding-block: var(--section); }
   .section + .section { border-top: 1px solid var(--line); }
   .section--tight { padding-block: calc(var(--section) * 0.6); }
+  .section--tint { background: var(--paper-2); }
 
   .section__head {
     display: grid; gap: var(--s3);
@@ -805,7 +806,7 @@
     transition: background-color 0.35s, color 0.35s, border-color 0.35s, transform 0.5s var(--ease-out);
   }
   .is-reached .stamp { background: var(--blue-wash); border-color: var(--blue); color: var(--blue); }
-  .stamp--approve::after { content: "you approve"; margin-left: 0.2rem; padding-left: 0.5rem; border-left: 1px solid currentColor; }
+  .stamp--approve::after { content: "you approve"; margin-left: 0.2rem; padding-left: 0.5rem; border-left: 1px solid currentColor; opacity: 0.75; }
   .journey__to { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: baseline; gap: var(--s2) var(--s4); margin-top: clamp(2.5rem, 1.5rem + 3vw, 4rem); padding-top: var(--s4); border-top: 1px solid var(--line-2); font-size: var(--fs-lede); color: var(--ink-2); }
   .journey__to b { color: var(--ink); font-weight: 600; }
   @media (max-width: 40rem) { .journey__to { grid-template-columns: 1fr; } }
@@ -1460,6 +1461,12 @@
       view-transition-name: dock;
     }
     .dock.is-shown { transform: none; }
+    /* No frosted blur on phones: re-blurring what's underneath on every
+       scroll frame made scrolling stutter. A near-solid bar instead. */
+    .nav, .dock {
+      -webkit-backdrop-filter: none; backdrop-filter: none;
+      background: color-mix(in srgb, var(--paper) 97%, transparent);
+    }
     .dock__cta { flex: 1; min-height: 3.25rem; }
     .dock__link {
       display: inline-grid; place-items: center; min-height: 3.25rem; padding: 0 1.1rem;
@@ -1597,7 +1604,7 @@
 
   /* Journey stamps press in as the line reaches each step. */
   /* Scale only: dimming the text would drop it below AA contrast. */
-  .motion .timeline--journey li:not(.is-reached) .stamp { transform: scale(0.92); }
+  .motion .timeline--journey li:not(.is-reached) .stamp { transform: scale(0.92); opacity: 0.55; }
 
   /* Problem → system scene, pinned and scrubbed by scroll (site.js sets
      .is-pinned, --t on each [data-at] element, and each order's status). */
@@ -1728,6 +1735,171 @@
 
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
+  }
+}
+
+/* ============ PRODUCTS: hub and Nirmaan Outreach ============ */
+@layer pages {
+  /* Products hub: one card per product; the whole card is the link. */
+  .product-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr)); gap: var(--s3); }
+  .product-card {
+    position: relative; display: grid; align-content: start; gap: var(--s2);
+    padding: clamp(1.5rem, 1rem + 2vw, 2.5rem);
+    border: 1px solid var(--line); background: var(--paper);
+    transition: border-color 0.3s var(--ease-out);
+  }
+  .product-card:hover { border-color: var(--ink); }
+  .product-card:has(a:focus-visible) { outline: 2px solid var(--blue); outline-offset: 3px; }
+  .product-card__top { display: flex; align-items: center; justify-content: space-between; gap: var(--s2); }
+  .product-card__top .eyebrow { margin: 0; }
+  .product-card__glyph { width: 3rem; height: 3rem; }
+  .product-card__name { font-size: var(--fs-h2); margin-top: var(--s3); }
+  .product-card__name a { color: inherit; text-decoration: none; }
+  .product-card__name a:focus-visible { outline: none; }
+  .product-card__name a::before { content: ""; position: absolute; inset: 0; }
+  .product-card__tagline { font-weight: 600; font-size: var(--fs-lede); line-height: 1.35; }
+  .product-card__text { color: var(--ink-2); }
+  .product-card__more { margin-top: var(--s2); font-size: var(--fs-mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--blue); }
+
+  /* Shared bits on the product page */
+  .mk-split {
+    display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    gap: var(--s5) clamp(2rem, 6vw, 6rem); align-items: start;
+  }
+  .mk-split .section__text { margin-top: var(--s3); color: var(--ink-2); }
+  @media (max-width: 60rem) { .mk-split { grid-template-columns: 1fr; } }
+
+  /* The problem */
+  .mk-problems { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s3); margin-top: var(--s5); }
+  .mk-problem { display: grid; gap: var(--s1); align-content: start; padding-top: var(--s3); border-top: 2px solid var(--ink); }
+  .mk-problem__title { font-family: var(--display); font-weight: 800; font-size: var(--fs-h3); letter-spacing: -0.02em; }
+  .mk-problem p:last-child { color: var(--ink-2); }
+  .mk-answer { margin-top: var(--s6); max-width: 24ch; font-size: var(--fs-h2); line-height: 1.05; }
+  .mk-answer .accent { color: var(--blue); }
+  @media (max-width: 48rem) { .mk-problems { grid-template-columns: 1fr; } }
+
+  /* The demo: a scripted "campaign console" with seven beats. Without JS every
+     beat renders, one after another; tour.js stacks them and plays them. */
+  .tour { margin-top: var(--s5); border: 1px solid var(--line); background: var(--paper); }
+  .tour__bar { display: flex; align-items: center; justify-content: space-between; gap: var(--s2); padding: var(--s1); border-bottom: 1px solid var(--line); }
+  html:not(.js) .tour__bar, html:not(.js) .tour__progress { display: none; }
+  .tour__steps { display: flex; gap: 0.25rem; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+  .tour__steps::-webkit-scrollbar { display: none; }
+  @media (max-width: 48rem) {
+    .tour__steps { -webkit-mask-image: linear-gradient(90deg, #000 80%, transparent); mask-image: linear-gradient(90deg, #000 80%, transparent); }
+  }
+  .tour__controls { display: flex; flex: none; gap: 0.25rem; }
+  .tour__step, .tour__ctrl {
+    flex: none; min-height: 2.75rem; padding: 0 0.9rem;
+    border: 1px solid transparent; background: none; color: var(--ink-2);
+    font: 500 var(--fs-small)/1 var(--body); white-space: nowrap; cursor: pointer;
+  }
+  .tour__step .mono { margin-right: 0.35rem; font-size: var(--fs-mono); color: var(--ink-3); }
+  .tour__step:hover, .tour__ctrl:hover { color: var(--ink); }
+  .tour__step[aria-selected="true"] { color: var(--ink); border-color: var(--ink); }
+  .tour__step[aria-selected="true"] .mono { color: var(--blue); }
+  .tour__step:focus-visible, .tour__ctrl:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+  .tour__ctrl { min-width: 5.5rem; border-color: var(--line-2); font-family: var(--mono); font-size: var(--fs-mono); letter-spacing: 0.12em; text-transform: uppercase; }
+  .tour__progress { height: 2px; background: var(--line); }
+  .tour__progress span { display: block; height: 100%; background: var(--blue); transform-origin: left; transform: scaleX(var(--p, 0)); transition: transform 0.6s var(--ease-out); }
+  .tour__stage { display: grid; gap: var(--s6); padding: clamp(1.25rem, 0.75rem + 2vw, 2.5rem); }
+  .tour.is-ready .tour__stage { grid-template-areas: "beat"; }
+  .tour.is-ready .tour__beat { grid-area: beat; }
+  .tour.is-ready .tour__beat:not(.is-active) { visibility: hidden; }
+  .tour__beat { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: var(--s4) var(--s5); align-items: center; }
+  .tour__caption { display: grid; gap: var(--s2); align-content: start; }
+  .tour__title { font-family: var(--display); font-weight: 800; font-size: var(--fs-h3); letter-spacing: -0.02em; line-height: 1.1; }
+  .tour__title .mono { display: block; margin-bottom: 0.6rem; font-weight: 400; font-size: var(--fs-mono); letter-spacing: 0.12em; color: var(--blue); }
+  .tour__caption p { color: var(--ink-2); }
+  .tour__note { margin-top: var(--s4); font-size: var(--fs-mono); letter-spacing: 0.08em; color: var(--ink-2); }
+  .tour__note + .tour { margin-top: var(--s2); }
+  @media (max-width: 60rem) { .tour__beat { grid-template-columns: 1fr; align-items: start; align-content: start; } }
+
+  .console { min-width: 0; border: 1px solid var(--line-2); background: var(--paper-2); font-size: var(--fs-small); }
+  .console__bar { display: flex; align-items: center; gap: 0.4rem; padding: 0.6rem 0.9rem; border-bottom: 1px solid var(--line); }
+  .console__bar b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 400; font-size: var(--fs-mono); letter-spacing: 0.08em; color: var(--ink-2); }
+  .console__body { display: grid; gap: 0.7rem; padding: 1.1rem 1.2rem 1.3rem; }
+  .console__label { font-size: var(--fs-mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-2); }
+  .console__input { padding: 0.8rem 0.9rem; border: 1px solid var(--ink); background: var(--paper); }
+  .console__rows li { display: flex; justify-content: space-between; align-items: center; gap: var(--s2); padding: 0.55rem 0; border-top: 1px solid var(--line); }
+  .console__rows li:first-child { border-top: 0; }
+  .console__rows .mono { font-size: var(--fs-mono); color: var(--ink-2); white-space: nowrap; }
+  .console__rows--queue li:has(.console__sub) { padding-top: 0; border-top: 0; }
+  .console__sub { font-size: 0.8125rem; color: var(--ink-2); }
+  .console__note, .console__verdict { color: var(--ink-2); }
+  .console__note b, .console__verdict b { color: var(--ink); }
+  .console__signals { display: grid; gap: 0.45rem; }
+  .console__signals li { display: flex; align-items: center; gap: 0.6rem; }
+  .console__signals li::before { content: ""; flex: none; width: 0.6rem; height: 0.6rem; background: var(--blue); }
+  .console__signals li.is-no { color: var(--ink-2); }
+  .console__signals li.is-no::before { background: var(--line-2); }
+  .console__mail p { line-height: 1.5; }
+  .console__meta { overflow-wrap: anywhere; font-size: var(--fs-mono); color: var(--ink-2); }
+  .console__subject { font-weight: 700; }
+  .console__mail mark { padding: 0.05em 0.15em; background: var(--blue-wash); color: inherit; }
+  .console__optout { font-size: 0.8125rem; color: var(--ink-2); }
+  .console__chip { padding: 0.3rem 0.5rem; border: 1px solid var(--ink); font-size: 0.6875rem; letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; }
+  .console__chip.is-done { border-color: var(--blue); background: var(--blue); color: var(--blue-ink); }
+  .console__reply { display: grid; gap: 0.3rem; padding: 0.8rem 0.9rem; border-left: 3px solid var(--ink); background: var(--paper); }
+  .console__events { display: grid; gap: 0.35rem; padding-left: 1rem; }
+  .console__events li { display: flex; align-items: center; gap: 0.6rem; color: var(--ink-2); }
+  .console__events li::before { content: "→"; color: var(--ink-2); }
+  .console__events li.is-blue { color: var(--blue); }
+  .console__bars { display: grid; gap: 0.6rem; }
+  .console__bars li { display: grid; grid-template-columns: 8rem minmax(0, 1fr); align-items: center; gap: var(--s2); }
+  .console__bars i { display: block; height: 0.8rem; background: var(--blue); transform-origin: left; transform: scaleX(var(--w)); }
+  @media (max-width: 30rem) { .console__rows li { flex-wrap: wrap; gap: 0.25rem var(--s2); } .console__bars li { grid-template-columns: 6.5rem minmax(0, 1fr); } }
+
+  /* What it does */
+  .mk-features { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; margin-top: var(--s5); border: 1px solid var(--line); background: var(--line); }
+  .mk-feature { display: grid; gap: 0.6rem; align-content: start; padding: clamp(1.25rem, 1rem + 1.2vw, 2rem); background: var(--paper); }
+  .mk-feature__glyph { width: 2.25rem; height: 2.25rem; margin-bottom: 0.6rem; }
+  .mk-feature__title { font-family: var(--display); font-weight: 800; font-size: 1.25rem; letter-spacing: -0.02em; line-height: 1.15; }
+  .mk-feature p { font-size: var(--fs-small); color: var(--ink-2); }
+  @media (max-width: 60rem) { .mk-features { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 40rem) { .mk-features { grid-template-columns: 1fr; } }
+
+  /* Price */
+  .mk-price .care-card__price + .care-card__price { margin-top: calc(var(--s2) * -1); }
+  .mk-price__early { font-weight: 600; color: var(--blue); }
+  .mk-price .btn { align-self: start; }
+  .section--tint .price-note { color: var(--ink-2); }
+
+  /* Guard rails and audience */
+  .mk-guards { border-top: 1px solid var(--line); }
+  .mk-guards li { position: relative; padding: 1rem 0 1rem 2rem; border-bottom: 1px solid var(--line); }
+  .mk-guards li::before { content: ""; position: absolute; left: 0; top: 1.4rem; width: 0.75rem; height: 0.75rem; background: var(--blue); }
+  .mk-audience { display: flex; flex-wrap: wrap; align-content: start; gap: 0.6rem; }
+  .mk-audience li { padding: 0.8rem 1.1rem; border: 1px solid var(--ink); font-weight: 600; }
+
+  /* Getting started */
+  .mk-setup { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--s3); margin-top: var(--s5); }
+  .mk-step { display: grid; gap: var(--s1); align-content: start; padding: var(--s3); border: 1px solid var(--line); background: var(--paper); }
+  .mk-step__n { font-size: var(--fs-mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--blue); }
+  .mk-step__title { font-family: var(--display); font-weight: 800; font-size: 1.375rem; letter-spacing: -0.02em; }
+  .mk-step p:last-child { font-size: var(--fs-small); color: var(--ink-2); }
+  @media (max-width: 60rem) { .mk-setup { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 40rem) { .mk-setup { grid-template-columns: 1fr; } }
+}
+
+/* The demo's entrance motion: only with html.motion (JS on, no reduced motion). */
+@layer motion {
+  .motion .tour.is-ready .tour__beat.is-active [data-i] { animation: tour-in 0.55s var(--ease-out) both; animation-delay: calc(var(--i) * 0.32s); }
+  .motion .tour.is-ready .tour__beat.is-active .console__bars i { animation: tour-bar 0.9s var(--ease-out) both; animation-delay: 0.6s; }
+  @keyframes tour-in { from { opacity: 0; transform: translateY(0.5rem); } }
+  @keyframes tour-bar { from { transform: scaleX(0); } }
+}
+
+/* Touch: small text links get an invisible hit area of at least 44px, so they
+   are easy to tap without changing how the page looks. */
+@layer components {
+  @media (pointer: coarse) {
+    .brand, .crumbs a, .footer__col a, .footer__social a, .footer__top { position: relative; }
+    .brand::after, .crumbs a::after, .footer__col a::after, .footer__social a::after, .footer__top::after {
+      content: ""; position: absolute; inset: -0.75rem -0.5rem;
+    }
+    .footer__col ul { gap: 0.75rem; }
+    .footer__social { gap: var(--s4); }
   }
 }
 

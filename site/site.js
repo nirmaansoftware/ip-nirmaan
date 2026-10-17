@@ -10,7 +10,8 @@
     5. Scroll scenes, all driven from one rAF-throttled scroll loop:
          [data-scene="stack"]     layer tower builds as you scroll (pinned); on
                                   narrower screens the layer you're reading lights up
-         [data-scene="rail"]      services track moves sideways (pinned, all widths)
+         [data-scene="rail"]      services track moves sideways (pinned on every
+                                  screen tall enough; phones get a shorter stretch)
          [data-scene="line"]      process timeline fills as it passes
          [data-scene="spy"]       process index highlights the step in view
          [data-scene="build"]     problem → system story, scrubbed by scroll (pinned)
@@ -310,8 +311,13 @@
     });
   });
 
-  /* Services rail: vertical scroll drives the track sideways, on every screen
-     tall enough to hold it (phones included), not only wide ones. */
+  /* Services rail: vertical scroll drives the track sideways, pinned in place,
+     on every screen that can hold it. On a desktop the pinned stretch is as
+     long as the track (1px down = 1px across). On a phone that would be about
+     three screens of thumb scroll, which felt like the page had frozen and let
+     a flick carry straight past it, so there the stretch is capped at about
+     one screen and the same travel is scrubbed across it. */
+  var phoneRail = window.matchMedia('(max-width: 48rem)');
   function canPinRail() { return !reduceMotion.matches && window.innerHeight >= 520; }
   $$('[data-scene="rail"]').forEach(function (el) {
     var viewport = el.querySelector('[data-rail-viewport]');
@@ -327,8 +333,11 @@
         if (!pin) { el.style.setProperty('--rail', '0'); return; }
         distance = Math.max(0, track.scrollWidth - viewport.clientWidth);
         el.style.setProperty('--rail-distance', distance + 'px');
-        // Pinned height = one screen + the sideways distance, so 1px down = 1px across.
-        el.style.height = (el.querySelector('.rail__sticky').offsetHeight + distance) + 'px';
+        // Pinned height = one screen + the scroll stretch. Desktop: the sideways
+        // distance (1px down = 1px across). Phone: capped at ~one screen.
+        var screenH = el.querySelector('.rail__sticky').offsetHeight;
+        var stretch = phoneRail.matches ? Math.min(distance, Math.round(screenH * 1.1)) : distance;
+        el.style.height = (screenH + stretch) + 'px';
       },
       update: function () {
         if (canPinRail()) { el.style.setProperty('--rail', pinProgress(el).toFixed(4)); return; }
@@ -481,8 +490,19 @@
   }
 
   window.addEventListener('scroll', schedule, { passive: true });
-  window.addEventListener('resize', relayout);
+  // Phone browsers fire resize whenever the address bar hides or shows while
+  // scrolling. Re-laying out then (resetting the rail's height mid-scroll)
+  // made the page stutter and jump, so on touch screens only a width change
+  // counts. With a mouse, a height change is a real window resize.
+  var finePointer = window.matchMedia('(pointer: fine)');
+  var lastWidth = window.innerWidth;
+  window.addEventListener('resize', function () {
+    if (window.innerWidth === lastWidth && !finePointer.matches) return schedule();
+    lastWidth = window.innerWidth;
+    relayout();
+  });
   wide.addEventListener('change', relayout);
+  phoneRail.addEventListener('change', relayout);
   reduceMotion.addEventListener('change', relayout);
   // Web fonts change card widths, which changes the rail's travel distance.
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(relayout);
