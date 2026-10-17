@@ -143,7 +143,7 @@ def test_shared_components_come_from_nirmaan_online() -> None:
 # site.js, hero.js). site/README.md records the same commit. To update them,
 # change Nirmaan first, copy the three files from the new commit, and change
 # this commit and these hashes together.
-VENDORED_SOURCE_COMMIT = "3ec99c96a8d8b30b0345088efcfaffbe2b1eef6c"
+VENDORED_SOURCE_COMMIT = "6655f013517b766ecd979f618c75201c0428f93c"
 VENDORED_SHA256 = {
     "nirmaan.css": "0b2654089eabd45809cb37a91fda2098c3beb24b7db84140064c6e0967b2d72d",
     "site.js": "000caeb5771cd62ef84f7377542b52119693d8b293cdf38876a43fd3a9e3134a",
