@@ -1,0 +1,334 @@
+# Review teams: who reviews which files in a pull request.
+#
+# Decided in council/records/2026-10-17-teams-and-pr-review.md (section 1, and
+# the founder classes in section 2). How the review runs:
+# docs/REVIEW_MECHANISM.md. Status: PLANNED. Nothing reads this file to post a
+# review status yet; until the GitHub App and the ruleset are live, a review
+# status is a convention and the founder merges every pull request.
+#
+# Rules are read from main, never from the pull request's head.
+#
+# How a file is mapped:
+# - Path rules are globs on the path from the repository root. "*" matches
+#   within one directory, "**" matches any number of directories (also none).
+# - The last rule in "rules" that matches a file wins (as in CODEOWNERS), so
+#   the list runs from general to specific and "**" (the catch-all) comes
+#   first. The winning rule gives the owning team, which holds key 1, and its
+#   co-owners, which also hold key 1.
+# - A pull request's owning teams are every team the winning rules of its
+#   changed files name, plus the teams that sections and content rules add.
+# - Ledger files and sections add no owning team when the pull request also
+#   changes other paths.
+#
+# tests/test_review_teams.py checks this file against `git ls-files`: every
+# tracked file maps to a team, every glob wins at least one tracked file (no
+# dead rule), every seat named here has a file in council/, every marker
+# below exists in its file, and .github/CODEOWNERS equals the founder class
+# path globs.
+
+version: 1
+
+teams:
+  council:
+    name: Council
+    key2: chair
+    leads: [security, qa-evidence]
+    members: []
+    note: security leads control files; qa-evidence leads records and seat files.
+  silicon-design:
+    name: Silicon Design
+    leads: [design-architect]
+    members: [dft-engineer, physical-design-engineer, firmware-engineer]
+  verification:
+    name: Verification
+    leads: [verification-lead]
+    members: [qa-evidence]
+    note: key 1 on any gate change, whichever team opened the pull request.
+  eda-platform:
+    name: EDA and Platform
+    leads: [eda-tooling]
+    members: [security, ai-engineer]
+    note: owns every file no other rule matches (the catch-all).
+  product-site:
+    name: Product and Site
+    leads: [product-lead]
+    members: [site-engineer, brand-content, market-research]
+  business:
+    name: Business
+    leads: [legal-compliance, finance-licensing]
+    members: [legal-counsel, tax-accounts, partnerships]
+    note: legal-compliance leads licences, notices and third-party code and text; finance-licensing leads prices, commercial terms and spend.
+
+rules:
+  # Catch-all: every file no later rule matches.
+  - team: eda-platform
+    paths: ['**']
+
+  # EDA and Platform.
+  - team: eda-platform
+    paths:
+      - .github/**
+      - scripts/**
+      - pyproject.toml
+      - src/nirmaan/integrations/eda*.py
+      - tests/fixtures/eda/**
+      - tests/test_ci.py
+      - tests/test_status_docs.py
+      - docs/TEST_CI_HARDENING.md
+      - src/nirmaan/runtime/**
+      - src/nirmaan/mcp/**
+      - docs/CLAUDE_CODE_RUNTIME.md
+      - docs/NIRMAAN_MCP.md
+  - team: eda-platform
+    co_owners: [product-site]
+    paths: [scripts/status.py]
+
+  # Gate files: Verification reviews every gate change.
+  - team: eda-platform
+    co_owners: [verification]
+    paths:
+      - src/nirmaan/integrations/eda.py
+      - src/nirmaan/work/policy.py
+      - src/nirmaan/work/engine.py
+      - src/nirmaan/runtime/tools.py
+      - src/nirmaan/company/workflows.py
+      - scripts/check_*.py
+      - scripts/live_eval_gate.py
+
+  # Verification.
+  - team: verification
+    paths:
+      - src/veritriage/**
+      - src/nirmaan/evals/**
+      - src/nirmaan/vplan.py
+      - src/nirmaan/integrations/vplan.py
+      - src/nirmaan/integrations/veritriage.py
+      - src/nirmaan/eval_proposals.py
+      - evals/**
+      - tests/fixtures/gate_integrity/**
+      - tests/fixtures/vplan/**
+      - tests/fixtures/eval_results_synthetic/**
+      - tests/test_nirmaan_gate_integrity.py
+      - tests/test_nirmaan_formal_gate.py
+      - tests/test_nirmaan_gates_*.py
+      - tests/test_nirmaan_evals.py
+      - tests/test_nirmaan_eval_proposals.py
+      - tests/test_nirmaan_live_eval.py
+      - tests/test_nirmaan_verification_plan*.py
+      - tests/test_veritriage_*.py
+      - docs/VERIFICATION_PLAN*.md
+      - docs/FORMAL_GATE.md
+      - docs/GATE_INTEGRITY.md
+      - docs/LIVE_EVAL_EVIDENCE.md
+  - team: verification
+    co_owners: [silicon-design]
+    paths:
+      - src/veritriage/design/**
+      - evals/rtl/**
+      - evals/firmware/**
+      - evals/spec/**
+
+  # Silicon Design.
+  - team: silicon-design
+    paths:
+      - tests/fixtures/fw/**
+      - tests/fixtures/pd/**
+      - src/nirmaan/integrations/dft*.py
+      - src/nirmaan/integrations/firmware*.py
+      - src/nirmaan/integrations/regmap.py
+      - src/nirmaan/integrations/spec_check.py
+      - src/nirmaan/integrations/firmware_soc/**
+      - src/nirmaan/integrations/firmware_harness/**
+      - src/nirmaan/regmap.py
+      - docs/IP_BLOCKS.md
+      - docs/DESIGN_AGENTS.md
+      - docs/DESIGN_INTELLIGENCE.md
+      - docs/DFT*.md
+      - docs/PHYSICAL_DESIGN.md
+      - docs/*FIRMWARE*.md
+      - docs/REGISTER_MAP*.md
+      - tests/test_nirmaan_dft*.py
+      - tests/test_nirmaan_firmware*.py
+      - tests/test_nirmaan_riscv_*.py
+      - tests/test_nirmaan_physical.py
+      - tests/test_nirmaan_regmap*.py
+      - tests/test_nirmaan_sta_antecedents.py
+      - tests/test_nirmaan_design_agents.py
+      - tests/test_nirmaan_more_blocks.py
+      - tests/test_apb_regs_fixture.py
+      - tests/test_axi4_lite_fixture.py
+      - tests/test_rr_arbiter_fixture.py
+      - tests/test_sync_fifo_fixture.py
+  - team: silicon-design
+    co_owners: [verification]
+    paths: [tests/fixtures/rtl/**]
+  - team: silicon-design
+    co_owners: [eda-platform]
+    paths:
+      - src/nirmaan/integrations/physical.py
+      - src/nirmaan/integrations/pd_parsers.py
+  # Vendored third-party cores (ISC): Business checks the licence and NOTICE.
+  - team: silicon-design
+    co_owners: [business]
+    paths:
+      - src/nirmaan/integrations/firmware_soc/serv/**
+      - src/nirmaan/integrations/firmware_soc/picorv32.v
+
+  # Product and Site.
+  - team: product-site
+    paths:
+      - site/**
+      - README.md
+      - docs/LANDING_PAGE_BRIEF.md
+      - tests/test_landing_site.py
+
+  # Business (legal-compliance leads these).
+  - team: business
+    lead: legal-compliance
+    paths:
+      - LICENSE
+      - NOTICE
+      - '**/LICENSE*'
+      - site/assets/fonts/OFL-*.txt
+
+  # Council: rules, seats and records. Every Council path is founder class.
+  - team: council
+    lead: qa-evidence
+    paths: [council/**]
+  - team: council
+    lead: security
+    paths:
+      - CLAUDE.md
+      - .claude/**
+      - .github/review-teams.yml
+  - team: business
+    lead: finance-licensing
+    paths: ['council/records/*commercial*']
+
+# Parts of a file a path rule cannot see. Each pair of marker comments in the
+# file bounds one section; a pull request that changes lines inside it adds
+# these teams.
+sections:
+  - id: partners
+    file: site/index.html
+    begin: '<!-- review:partners:begin'
+    end: '<!-- review:partners:end -->'
+    team: product-site
+    co_owners: [business]
+    founder_class: public-names-and-claims
+  - id: roadmap-scope
+    file: docs/ROADMAP.md
+    begin: '<!-- review:roadmap-scope:begin'
+    end: '<!-- review:roadmap-scope:end -->'
+    team: product-site
+
+# Ledger: files and sections every milestone updates. They add no owning team
+# when the pull request also changes other paths. CI (tests/test_status_docs.py)
+# covers their consistency.
+ledger:
+  paths:
+    - context.md
+    - docs/history/**
+    - site/stats.json
+  sections:
+    - file: docs/ROADMAP.md
+      begin: '<!-- review:milestone-numbers:begin'
+      end: '<!-- review:milestone-numbers:end -->'
+    - file: docs/ROADMAP.md
+      begin: '<!-- status:begin'
+      end: '<!-- status:end -->'
+  note: site/stats.json counts as ledger only when it equals the output of scripts/status.py --release.
+
+# Content rules: a diff line that matches adds a team. Patterns are Python
+# regular expressions over added or removed lines; "in" limits a rule to some
+# paths. Each example must match its pattern (the test checks).
+content_rules:
+  - id: commercial-wording
+    adds: business
+    lead: finance-licensing
+    pattern: '(?i)\b(price|pricing|discount|royalt(y|ies)|payment|invoice|GST|TDS|tax)\b'
+    example: 'Royalty: 2 percent of net sales'
+  - id: currency-amount
+    adds: business
+    lead: finance-licensing
+    pattern: '(?i)(\$|\bUSD\b|\bINR\b|\bRs\.?|\bEUR\b|₹|€)\s?\d'
+    example: 'from USD 4000 a year'
+  - id: partner-or-client
+    adds: business
+    lead: finance-licensing
+    pattern: '(?i)\b(design partner|client|customer)s?\b'
+    in: [site/**, README.md, docs/LANDING_PAGE_BRIEF.md]
+    example: 'Our first design partner is'
+  - id: gate-limit
+    adds: verification
+    pattern: '\b(max|min)_[a-z0-9_]+\b|\bwhen_produced\b|_fail\.v\b|\bNIRMAAN_REQUIRE_EDA\b'
+    in: [src/**, evals/**, tests/fixtures/**, .github/**]
+    example: 'max_unannotated_nets=0'
+
+# Founder classes: a pull request in any of these also waits for the founder.
+# Path globs go to .github/CODEOWNERS (the test keeps the two equal), so code
+# owner review can enforce them once the ruleset requires it. Content triggers
+# set a "hold" label from the key-1 script (planned, rollout R5); agents can
+# remove labels, so that part is a convention.
+founder_classes:
+  - id: control-plane
+    title: Control plane
+    paths:
+      - .github/**
+      - .claude/**
+      - CLAUDE.md
+      - council/**
+      - scripts/check_*.py
+      - scripts/live_eval_gate.py
+    note: .github/** covers .github/review-teams.yml and .github/CODEOWNERS. The pr-review skill (.claude/skills/pr-review/) falls under .claude/**; its posting script joins this class when rollout R5 adds it.
+  - id: gate-semantics
+    title: Gate semantics
+    paths:
+      - src/nirmaan/integrations/eda.py
+      - src/nirmaan/work/policy.py
+      - src/nirmaan/work/engine.py
+      - src/nirmaan/runtime/tools.py
+      - src/nirmaan/company/workflows.py
+      - scripts/check_*.py
+      - scripts/live_eval_gate.py
+    content:
+      - pattern: '\bNIRMAAN_REQUIRE_EDA\b'
+        example: 'NIRMAAN_REQUIRE_EDA: "1"'
+      - pattern: '\b(no-tools|physical-design|test-union|dashes)\b'
+        in: [.github/workflows/**]
+        example: '  test-union:'
+  - id: licence-and-third-party
+    title: Licence and third-party
+    paths:
+      - LICENSE
+      - NOTICE
+      - '**/LICENSE*'
+      - site/assets/fonts/OFL-*.txt
+      - src/nirmaan/integrations/firmware_soc/serv/**
+      - src/nirmaan/integrations/firmware_soc/picorv32.v
+    content:
+      - pattern: '^\s*(license|classifiers|dependencies)\s*='
+        in: [pyproject.toml]
+        example: 'license = { text = "Apache-2.0" }'
+      - pattern: '(?i)SPDX-License-Identifier|\bcopyright\s+(\(c\)\s*)?\d{4}'
+        example: '// SPDX-License-Identifier: ISC'
+    note: A pyproject.toml change is founder class only when it touches the licence field, classifiers or dependencies, so pyproject.toml is not a path glob here.
+  - id: commercial
+    title: Commercial
+    content:
+      - pattern: '(?i)\b(price|pricing|discount|rate card|royalt(y|ies)|payment|invoice|GST|TDS|tax)\b'
+        example: 'a 20 percent discount'
+      - pattern: '(?i)(\$|\bUSD\b|\bINR\b|\bRs\.?|\bEUR\b|₹|€)\s?\d'
+        example: 'Rs. 50000'
+    note: Also anything that adds spend (a paid tool, runner or service), which a key-1 review flags.
+  - id: public-names-and-claims
+    title: Public names and claims
+    sections: [partners]
+    content:
+      - pattern: '(?i)<meta\b|<title>'
+        in: [site/**]
+        example: '<meta name="description" content="x">'
+    note: On site/** or README.md, a new or changed public name, a named client, partner or person, launch status lines, or a new capability, performance or compliance claim in the hero or meta tags. Ordinary copy edits are not in this class.
+  - id: export-control
+    title: Export-control sensitive content
+    note: Flagged by legal-compliance in its review; the scope is to be confirmed by counsel. No path or pattern detects it.
