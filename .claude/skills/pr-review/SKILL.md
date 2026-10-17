@@ -58,6 +58,10 @@ The author fixes and pushes; the new head voids both keys; run the skill again
 from a session that did not write the fix. A founder-class pull request also
 needs the founder's GitHub approval on the current head; the script keeps
 `review/executive` pending until it exists. A `hold` label keeps it pending.
+The automated loop (`scripts/pr_loop.py`, "Automated loop" in
+`docs/REVIEW_MECHANISM.md`) does this on its own: a separate fixer process,
+checks, push, and both keys again, at most three rounds before it labels the
+pull request `needs-founder`.
 
 ## Where things are
 

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  The automated pull request loop for nirmaansoftware/ip-nirmaan, run by
+  launchd every 5 minutes on the founder's Mac. Install and remove:
+  docs/REVIEW_MECHANISM.md ("Automated loop"). Each run updates a dedicated
+  clone to origin/main and runs main's copy of the loop once with that clone's
+  virtual environment; launchd never starts a second run while one is going,
+  and the loop's lock is shared with Nirmaan. It uses the Mac's own `claude`
+  login (the plan) and `gh` login. No secret is stored here or in GitHub Actions.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>online.nirmaan.ip-pr-loop</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/zsh</string>
+    <string>-lc</string>
+    <string>mkdir -p "$HOME/.nirmaan/pr-review" &amp;&amp; cd "$HOME/.nirmaan/pr-loop/ip-nirmaan" &amp;&amp; git fetch --quiet origin main &amp;&amp; git -c core.hooksPath=/dev/null reset --quiet --hard origin/main &amp;&amp; .venv/bin/python scripts/pr_loop.py --once &gt;&gt; "$HOME/.nirmaan/pr-review/ip-loop.log" 2&gt;&amp;1</string>
+  </array>
+  <key>StartInterval</key>
+  <integer>300</integer>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>ProcessType</key>
+  <string>Background</string>
+  <key>LowPriorityIO</key>
+  <true/>
+</dict>
+</plist>
