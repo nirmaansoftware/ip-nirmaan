@@ -58,6 +58,15 @@ Pricing, launches, naming, public pages and legal questions about IP Nirmaan
 go to the council: `council/README.md` (the `council-meeting` skill runs a
 meeting). It is separate from the product's own engineering decisions.
 
+## Pull request review
+
+Pull requests are reviewed by teams of council seats (key 1 per owning team,
+then the chair as key 2); see `docs/REVIEW_MECHANISM.md` and the teams in
+`council/README.md`. It is PLANNED: until the GitHub App and the ruleset are
+live, a review status is a convention and the founder merges every pull request.
+An agent review is never a sign-off or an approval by a person. A session never
+reviews or posts a review status for a pull request it wrote.
+
 ## Running tests
 
 The repo may sit in iCloud-synced `~/Documents`, where evicted files make
