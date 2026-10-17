@@ -13,6 +13,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from pathlib import Path
@@ -135,6 +136,47 @@ def test_shared_components_come_from_nirmaan_online() -> None:
         assert 'src="/site.js"' in text, name
     for name in VENDORED:
         assert (SITE / name).is_file(), name
+
+
+# The vendored files are byte for byte the files of one named Nirmaan commit
+# (nirmaansoftware/Nirmaan, website/src/static/: styles.css as nirmaan.css,
+# site.js, hero.js). site/README.md records the same commit. To update them,
+# change Nirmaan first, copy the three files from the new commit, and change
+# this commit and these hashes together.
+VENDORED_SOURCE_COMMIT = "3ec99c96a8d8b30b0345088efcfaffbe2b1eef6c"
+VENDORED_SHA256 = {
+    "nirmaan.css": "0b2654089eabd45809cb37a91fda2098c3beb24b7db84140064c6e0967b2d72d",
+    "site.js": "000caeb5771cd62ef84f7377542b52119693d8b293cdf38876a43fd3a9e3134a",
+    "hero.js": "2d37c298d19a488e2a7d86b123f94da86929726915f72e6846d703bd479984e0",
+}
+
+
+def _sha256(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+@pytest.mark.parametrize("name", sorted(VENDORED))
+def test_vendored_file_is_the_pinned_nirmaan_commit(name: str) -> None:
+    assert set(VENDORED_SHA256) == VENDORED
+    actual = _sha256((SITE / name).read_bytes())
+    assert actual == VENDORED_SHA256[name], (
+        f"site/{name} is not Nirmaan {VENDORED_SOURCE_COMMIT}'s copy; "
+        "change Nirmaan first, then copy the file unchanged and update the pin"
+    )
+
+
+def test_vendored_commit_is_recorded_in_the_readme() -> None:
+    readme = (SITE / "README.md").read_text(encoding="utf-8")
+    assert VENDORED_SOURCE_COMMIT in readme
+
+
+@pytest.mark.parametrize("name", sorted(VENDORED))
+def test_vendored_pin_catches_a_one_byte_change(name: str) -> None:
+    data = bytearray((SITE / name).read_bytes())
+    for index in (0, len(data) // 2, len(data) - 1):
+        changed = bytearray(data)
+        changed[index] ^= 0x01
+        assert _sha256(bytes(changed)) != VENDORED_SHA256[name], index
 
 
 def test_github_is_one_quiet_footer_link() -> None:
