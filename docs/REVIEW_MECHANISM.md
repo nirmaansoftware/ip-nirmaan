@@ -74,7 +74,10 @@ a pull request it wrote, and the script refuses when a Claude Code session has
 the branch checked out. In order:
 
 1. **One review at a time** across Nirmaan and IP Nirmaan: a lock in
-   `~/.nirmaan/pr-review/`, shared with Nirmaan's script.
+   `~/.nirmaan/pr-review/`, shared with Nirmaan's script. The lock is a folder
+   (`review.lock`) with an owner file written whole (a temporary file renamed
+   inside it). A lock whose process is gone is cleared, and so is one with no
+   readable owner file that is older than 30 minutes.
 2. **Eligibility.** Open, targets `main`, a branch in this repository (never a
    fork), authored by `patel-om` or `nirmaansoftware`; otherwise it refuses and
    posts nothing.
@@ -85,9 +88,15 @@ the branch checked out. In order:
    `.github/review-teams.yml` (`scripts/review_map.py`, the same logic as the
    coverage test). Seat files, the base checklist (council record, section 3)
    and the script itself come from `main` too.
-5. **CI first.** Until `test`, `no-tools`, `physical-design`, `test-union`
-   and `dashes` are green on the head, both checks stay pending and no model is
-   called.
+5. **CI first.** For each of `test`, `no-tools`, `physical-design`,
+   `test-union` and `dashes` the newest run on the head counts (by start time,
+   then run id), and a run still in progress, such as a rerun, always means
+   waiting: an older success never counts while a newer run exists. While a
+   job runs or is missing, both checks stay pending ("waiting for CI"). When a
+   job finished without success, both checks are posted as `action_required`
+   with the title "CI failed on <sha>; review not run" (terminal, and never
+   green: a required check is satisfied only by success, neutral or skipped).
+   No model is called in either case.
 6. **Key 1, then key 2.** Key 1 is one fresh `claude -p` process per owning
    team lead: the base checklist, the lead's seat file and the "In a review"
    sections of the team's members. Key 2 runs only when every key 1 passed:
@@ -112,9 +121,14 @@ the branch checked out. In order:
     verdict, findings, checks run, what was not run) and the checks
     `review/team-lead` and `review/executive`. `review/executive` passes only
     with key 2 passing, no `hold` label, and for a founder-class pull request
-    the founder's latest review approving this head SHA.
+    the founder's latest review approving this head SHA. A comment or check
+    run is not posted again when the App's latest one for that key, team and
+    head already says the same (a rerun that reused its cached verdicts); the
+    comment's marker carries a digest of the result for this.
 11. **Records.** Every model call (tokens, duration, outcome) is logged in
-    `~/.nirmaan/pr-review/calls.jsonl`, outside the repository.
+    `~/.nirmaan/pr-review/calls.jsonl`, outside the repository. Each run's
+    worktrees, and the per-run folder that holds them under
+    `~/.nirmaan/pr-review/worktrees`, are removed when it ends.
 
 **Posting identity.** The review App posts the check runs with a short-lived
 installation token scoped to this repository, from these environment

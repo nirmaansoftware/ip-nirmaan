@@ -107,6 +107,9 @@ class FakeGitHub:
         return [{"name": name, "status": "in_progress" if c == "pending" else "completed",
                  "conclusion": None if c == "pending" else c, "url": None, "completed_at": "x"} for name in CONFIG["required_ci"]]
 
+    def list_comments(self, n):
+        return []
+
     def create_comment(self, n, body):
         self.posts.append({"type": "comment", "body": body})
         return f"https://github.example/pr/1#c{len(self.posts)}"
@@ -414,3 +417,21 @@ def test_fingerprint_findings_output_and_forbidden_paths():
     assert pr_loop.forbidden_changes(["src/nirmaan/x.py", "docs/OTHER.md"], pr_loop.LOOP["fixer_forbidden"]) == []
     assert pr_loop.ci_state(["a", "b"], [{"name": "a", "status": "completed", "conclusion": "success"}])[0] == "pending"
     assert pr_loop.ci_state(["a"], [{"name": "a", "status": "completed", "conclusion": "cancelled"}])[0] == "failed"
+
+
+def test_ci_state_takes_the_newest_run_and_a_rerun_in_progress_is_pending():
+    def run(i, started, status, conclusion, completed):
+        return {"id": i, "name": "a", "status": status, "conclusion": conclusion, "started_at": started, "completed_at": completed}
+    req = ["a"]
+    # A rerun has no completed_at while it runs; an older success must not win.
+    assert pr_loop.ci_state(req, [run(1, "2026-10-17T00:00:00Z", "completed", "success", "2026-10-17T00:05:00Z"),
+                                  run(2, "2026-10-17T01:00:00Z", "in_progress", None, None)])[0] == "pending"
+    assert pr_loop.ci_state(req, [run(2, "2026-10-17T01:00:00Z", "queued", None, None),
+                                  run(1, "2026-10-17T00:00:00Z", "completed", "failure", "2026-10-17T00:05:00Z")])[0] == "pending"
+    # Newest by start time (then id), not by completion time.
+    assert pr_loop.ci_state(req, [run(1, "2026-10-17T00:00:00Z", "completed", "success", "2026-10-17T02:00:00Z"),
+                                  run(2, "2026-10-17T01:00:00Z", "completed", "failure", "2026-10-17T01:05:00Z")])[0] == "failed"
+    assert pr_loop.ci_state(req, [run(1, "2026-10-17T00:00:00Z", "completed", "failure", "2026-10-17T02:00:00Z"),
+                                  run(2, "2026-10-17T01:00:00Z", "completed", "success", "2026-10-17T01:05:00Z")])[0] == "green"
+    assert pr_loop.ci_state(req, [run(5, "2026-10-17T00:00:00Z", "completed", "failure", None),
+                                  run(6, "2026-10-17T00:00:00Z", "completed", "success", None)])[0] == "green", "same start: higher id"

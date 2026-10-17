@@ -126,13 +126,24 @@ class FakeGitHub:
         return [{**r, "commit_id": self.head if r["commit_id"] == "HEAD" else r["commit_id"]} for r in self.gh.get("reviews", [])]
 
     def list_check_runs(self, sha):
-        if "check_runs" in self.gh:
-            return self.gh["check_runs"]
-        return [{"name": n, "status": "completed", "conclusion": "success", "url": f"https://ci/{n}", "completed_at": "x"} for n in CONFIG["required_ci"]]
+        """CI runs, plus the check runs the review App posted on this head (as GitHub lists them)."""
+        ci = self.gh["check_runs"] if "check_runs" in self.gh else [
+            {"id": i + 1, "name": n, "status": "completed", "conclusion": "success", "url": f"https://ci/{n}",
+             "started_at": "2026-10-16T23:50:00Z", "completed_at": "2026-10-17T00:00:00Z", "app": "github-actions"}
+            for i, n in enumerate(CONFIG["required_ci"])]
+        mine = [{"id": 1000 + i, "name": c["name"], "status": "in_progress" if c["state"] == "pending" else "completed",
+                 "conclusion": None if c["state"] == "pending" else c["state"], "title": c["title"],
+                 "app": CONFIG["review_app_slug"], "started_at": "2026-10-17T00:10:00Z"}
+                for i, c in enumerate(p for p in self.posts if p["type"] == "check")]
+        return [*ci, *mine]
+
+    def list_comments(self, n):
+        return [{"body": c["body"], "url": f"https://github.example/pr/1#c{i + 1}", "author": f"{CONFIG['review_app_slug']}[bot]"}
+                for i, c in enumerate(p for p in self.posts if p["type"] == "comment")]
 
     def create_comment(self, n, body):
         self.posts.append({"type": "comment", "body": body})
-        return f"https://github.example/pr/1#c{len(self.posts)}"
+        return f"https://github.example/pr/1#c{len([p for p in self.posts if p['type'] == 'comment'])}"
 
     def create_check_run(self, name, head_sha, state, title, summary, details_url=None):
         self.posts.append({"type": "check", "name": name, "state": state, "title": title})
@@ -340,6 +351,55 @@ def test_pass_with_a_critical_finding_is_recorded_as_fail(repo):
     assert r.check("review/executive")["state"] == "pending"
 
 
+def ci_run(name, **extra):
+    return {"id": 1, "name": name, "status": "completed", "conclusion": "success", "url": f"https://ci/{name}",
+            "started_at": "2026-10-17T00:00:00Z", "completed_at": "2026-10-17T00:05:00Z", "app": "github-actions", **extra}
+
+
+def green_except(name, runs):
+    return [*(ci_run(n) for n in CONFIG["required_ci"] if n != name), *runs]
+
+
+def test_ci_that_finished_and_failed_is_action_required_not_waiting(repo):
+    r = repo(gh={"check_runs": green_except("test", [ci_run("test", conclusion="failure")])})
+    result = r.run()
+    assert result["exit"] == pr_review.EXIT_OK
+    assert result.get("ci_failed") and not result.get("waiting")
+    assert r.calls() == [], "no model call"
+    for name in ("review/team-lead", "review/executive"):
+        c = r.check(name)
+        assert c["state"] == "action_required", "terminal, and a conclusion that never satisfies a required check"
+        assert c["title"].startswith(f"CI failed on {r.head[:7]}: test failure; review not run")
+        assert "waiting" not in c["title"]
+    r.no_success()
+
+
+def test_a_ci_rerun_in_progress_beats_an_older_success(repo):
+    runs = green_except("test", [
+        ci_run("test", id=10),
+        ci_run("test", id=11, status="in_progress", conclusion=None, started_at="2026-10-17T01:00:00Z", completed_at=None),
+    ])
+    r = repo(gh={"check_runs": runs})
+    result = r.run()
+    assert r.calls() == [], "never green while a newer run is in progress"
+    assert "test in_progress" in result["waiting"]
+    r.no_success()
+
+
+@pytest.mark.parametrize("older, newer, expect", [("success", "failure", "ci_failed"), ("failure", "success", "reviewed")])
+def test_the_newest_completed_ci_run_decides(repo, older, newer, expect):
+    runs = green_except("test", [
+        ci_run("test", id=10, conclusion=older, started_at="2026-10-17T00:00:00Z", completed_at="2026-10-17T02:00:00Z"),
+        ci_run("test", id=11, conclusion=newer, started_at="2026-10-17T01:00:00Z", completed_at="2026-10-17T01:05:00Z"),
+    ])
+    r = repo(gh={"check_runs": runs})
+    result = r.run()
+    if expect == "ci_failed":
+        assert result.get("ci_failed") and r.calls() == []
+    else:
+        assert r.check("review/team-lead")["state"] == "success"
+
+
 def test_ci_not_green_waits_without_a_model_call(repo):
     r = repo(gh={"check_runs": [{"name": "test", "status": "completed", "conclusion": "success", "completed_at": "x"}]})
     r.run()
@@ -460,6 +520,62 @@ def test_lock_is_shared_and_a_dead_holder_is_cleared(repo):
     (r.state / "review.lock").mkdir()
     (r.state / "review.lock" / "owner.json").write_text(json.dumps({"repo": "x", "pr": 1, "pid": 999999}))
     assert r.run()["exit"] == pr_review.EXIT_OK
+
+
+def test_a_rerun_with_the_same_cached_verdicts_posts_nothing_again(repo):
+    r = repo(responses=[{"type": "verdict", "verdict": "fail", "findings": [{"file": "src/app.py", "line": 2, "severity": "critical", "text": "no test"}]}])
+    r.run()
+    first = len(r.github.posts)
+    assert len(r.comments()) == 1
+    result = r.run()
+    assert len(r.calls()) == 1, "the verdict was reused"
+    assert len(r.github.posts) == first, "no second comment or check run"
+    assert result["key1"][0]["url"] == "https://github.example/pr/1#c1", "the earlier comment is linked"
+    r.run(fresh=True)
+    assert len(r.calls()) == 2
+    assert len(r.github.posts) == first, "an identical fresh verdict is not posted again either"
+
+
+def test_a_changed_result_on_the_same_head_is_still_posted(repo):
+    gh = {"reviews": []}
+    r = repo(change=lambda w: write(w, ".github/workflows/x.yml", "name: x\n"), gh=gh)
+    r.run()
+    assert r.check("review/executive")["state"] == "pending"
+    before = len(r.comments())
+    gh["reviews"].append({"login": "nirmaansoftware", "state": "APPROVED", "commit_id": "HEAD"})
+    r.run()
+    assert len(r.calls()) == 2, "cached verdicts, no new call"
+    assert len(r.comments()) == before + 1, "key 2 comment posted again (its founder note changed); key 1 not repeated"
+    assert r.check("review/executive")["state"] == "success"
+    assert len([p for p in r.github.posts if p["type"] == "check" and p["name"] == "review/team-lead"]) == 1
+
+
+@pytest.mark.parametrize("gh", [{}, {"check_runs": []}])
+def test_the_per_run_worktree_folder_is_removed(repo, gh):
+    r = repo(gh=gh)
+    r.run()
+    assert list((r.state / "worktrees").iterdir()) == [], "no empty per-run folder left"
+
+
+def test_an_ownerless_lock_is_stale_after_30_minutes_and_the_owner_file_is_written_whole(repo):
+    r = repo()
+    lock = r.state / "review.lock"
+    lock.mkdir(parents=True)
+    release, holder = pr_review.acquire_lock(r.state, {"repo": "x", "pr": 1})
+    assert release is None, "a fresh lock without its owner file may still be being written"
+    old = __import__("time").time() - 31 * 60
+    os.utime(lock, (old, old))
+    release, holder = pr_review.acquire_lock(r.state, {"repo": "x", "pr": 2})
+    assert release is not None, "an ownerless lock older than 30 minutes is cleared"
+    assert [p.name for p in lock.iterdir()] == ["owner.json"], "no temporary owner file left behind"
+    owner = json.loads((lock / "owner.json").read_text())
+    assert owner["pid"] == os.getpid() and owner["pr"] == 2
+    release()
+    assert not lock.exists()
+    lock.mkdir()
+    (lock / "owner.json").write_text('{"repo": "x", "pid"')
+    os.utime(lock, (old, old))
+    assert pr_review.acquire_lock(r.state, {"repo": "x", "pr": 3})[0] is not None, "an unreadable owner file in an old lock is stale too"
 
 
 def test_a_rerun_on_the_same_head_reuses_verdicts(repo):
