@@ -102,8 +102,7 @@ Steps:
 
 1. Copy the harness (`axil_manager.cpp`, `nirmaan_hal.h`) and the RTL into the
    working directory. `make`, which Verilator's `--build` drives, cannot handle
-   a path with a space in it, and this repository lives under
-   `~/Documents/IP Nirmaan`. The copies are byte for byte; the run records the
+   a path with a space in it, and a checkout can live under one. The copies are byte for byte; the run records the
    original paths it was given.
 2. Compile each C file under the strict flags, as `fw.build` does.
 3. `verilator --cc --exe --build -j 0 -Wno-fatal --prefix Vdut -Mdir cosim
