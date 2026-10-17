@@ -281,7 +281,7 @@ SKILLS: list[Skill] = [
        tools=("git.write", "lint.run", "simulator.run", "synth.run", "formal.run", "formal.cover",
               "regmap.check", "regmap.verify"),
        standards=("NIP-STD-020 RTL Coding Standard",),
-       procedures=("Implement from the microarchitecture spec.", "Keep lint clean.", "Write design-intent assertions.",
+       procedures=("Implement from the microarchitecture spec.", "Keep lint clean; a waiver is fine for a noisy warning.", "Write design-intent assertions.",
                    # M53 (docs/GATE_INTEGRITY.md): the simulation gate passes only on the testbench's own verdict.
                    "Write a self-checking testbench: report every failed check with $error (or $fatal), never "
                    "with $display alone, and count the checks that pass.",

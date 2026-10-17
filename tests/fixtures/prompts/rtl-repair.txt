@@ -50,7 +50,7 @@ CITE ONLY THESE ARTIFACTS, using the token exactly as written:
 ## Domain
 - Skill RTL design (rtl_design)
 - RTL design procedure: Implement from the microarchitecture spec.
-- RTL design procedure: Keep lint clean.
+- RTL design procedure: Keep lint clean; a waiver is fine for a noisy warning.
 - RTL design procedure: Write design-intent assertions.
 - RTL design procedure: Write a self-checking testbench: report every failed check with $error (or $fatal), never with $display alone, and count the checks that pass.
 - RTL design procedure: End the testbench with its verdict, printed once just before $finish: read the run's nonce with $value$plusargs("nirmaan_nonce=%s", nonce) into a reg [8*64-1:0], then $display("NIRMAAN-SIM %0s %0d passed, %0d failed", nonce, passed, failed). A run with no verdict, no passing check, or a failed check fails.

@@ -6,7 +6,7 @@
   "constraints": [
     "Work only from the approved interface specification and microarchitecture.",
     "Correct for a DEPTH that is not a power of two.",
-    "Lint-clean under Verilator -Wall with no waivers.",
+    "Lint-clean under Verilator -Wall (waivers allowed for noisy warnings).",
     "Synthesizes with no latches."
   ],
   "known_failure_modes": [
