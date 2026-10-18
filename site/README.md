@@ -78,7 +78,7 @@ first run, not re-run since (only the page copy changed):
 | 10 | Image alt text | PASS: no `<img>`; the graph SVG has a title, glyphs are `aria-hidden` |
 | 11 | Image compression | PASS: the largest image is the 77 KB preview; the largest font is 90 KB |
 | 12 | Page load speed | FIXED: the first live run scored 79 (LCP 3.6 s): Google Fonts blocked the first paint and the terminal hid the plan until printed. Fonts are now self-hosted and preloaded, and the plan is painted from the first frame (printing only lights it). Lighthouse mobile: performance 99, LCP 2.3 s, CLS 0.006, TBT 0 ms |
-| 13 | Color contrast | PASS: Lighthouse accessibility 100. Re-checked 2026-10-18 after the `bac3965` sync (see below) |
+| 13 | Color contrast | PASS: Lighthouse accessibility 100 (before the `bac3965` sync; see the note below for the sync) |
 | 14 | Mobile responsiveness | PASS: checked at a true 390 px viewport |
 | 15 | Custom 404 page | PASS: `404.html` (Vercel serves it with status 404) |
 | 16 | Broken links | PASS: every link on the live page returns 200 |
