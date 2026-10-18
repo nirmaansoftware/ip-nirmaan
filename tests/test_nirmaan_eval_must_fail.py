@@ -294,3 +294,20 @@ def test_the_evidence_loader_refuses_an_attestation(nirmaan_org, fixed_clock, tm
     trial_file.write_text(json.dumps(data))
     with pytest.raises(EvalError, match=r"carries a human attestation \(ev-0007\)"):
         load_evidence(path)
+
+
+# --- The six shipped cases name their skills -----------------------------------------------
+
+
+def test_the_shipped_cases_name_the_skills_they_judge(nirmaan_org):
+    named = {c.id: c.skills for c in load_cases(EVALS)}
+    assert named == {
+        "firmware/axi4-lite-driver": ("device_drivers",),
+        "rtl/apb-regs": ("rtl_design", "apb"),
+        "rtl/axi4-lite-regs": ("rtl_design", "axi"),
+        "rtl/rr-arbiter": ("rtl_design",),
+        "rtl/sync-fifo": ("rtl_design",),
+        "spec/axi4-lite-interface": ("interface_specification",),
+    }
+    for case in load_cases(EVALS):
+        assert validate_case(nirmaan_org, case, REPO) == [], case.id
