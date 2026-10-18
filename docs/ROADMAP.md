@@ -136,6 +136,10 @@ still open, with no numbers reserved yet:
   netlist, and PDK profiles as project data.
 - **Scoping follow-ups** (M49): moving the remaining tests off global
   `unregister_*` cleanup, and scoping VeriTriage's own registries.
+- **Market learnings backlog** (council record 2026-10-18): items B1 to B28
+  in `docs/MARKET_LEARNINGS.md`, starting with tool versions in run records
+  and the reproduce script (B3 to B5). Design-partner readiness still needs
+  gates 5 to 19 of the 2026-10-16 record.
 <!-- review:roadmap-scope:end -->
 
 ---
