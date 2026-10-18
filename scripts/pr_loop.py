@@ -104,10 +104,13 @@ LOOP = {
     ],
     # Checks the loop runs on the fix commit, in the worktree, with the
     # token-free environment plus `env`. {python} is this interpreter.
+    # "select": "related_tests" appends the test files related to the changed
+    # paths (related_tests) to the last command, or nothing (the whole suite)
+    # when they cannot be told; CI runs the whole suite either way.
     "checks": [
         {"name": "dashes", "when": ["**"], "run": [["{python}", "scripts/check_dashes.py"]]},
         {"name": "test", "when": ["src/**", "tests/**", "evals/**", "scripts/**", "site/**"], "env": {"PYTHONPATH": "src"},
-         "run": [["{python}", "-m", "pytest", "-q", "-x", "-p", "no:cacheprovider"]]},
+         "select": "related_tests", "run": [["{python}", "-m", "pytest", "-q", "-x", "-p", "no:cacheprovider"]]},
     ],
 }
 
@@ -313,6 +316,70 @@ def _applies(entry: dict, changed: list[str]) -> bool:
     return any(review_map.matches(g, p) for p in changed for g in entry["when"])
 
 
+# The import-law tests run for every change under src/ (tests/test_laws.py).
+LAW_TESTS = ["tests/test_laws.py"]
+
+
+def _imports_leaf(text: str, package: str, leaf: str) -> bool:
+    """`from <package> import ... <leaf> ...`, on one line or in parentheses."""
+    for m in re.finditer(rf"^\s*from\s+{re.escape(package)}\s+import\s+(\([^)]*\)|[^\n]*)", text, re.MULTILINE):
+        if re.search(rf"\b{re.escape(leaf)}\b", m.group(1)):
+            return True
+    return False
+
+
+def related_tests(root, changed: list[str]) -> list[str] | None:
+    """The test files a fix round's local check runs, from the changed paths (the
+    full suite stays with CI). None means the whole suite: a changed file no test
+    is known to use, a change every test sees (tests/conftest.py), or nothing left
+    to run.
+
+    - tests/test_*.py: that file (a deleted one is skipped).
+    - src/...: tests that import the module (`import a.b.c`, `a.b.c` in the text,
+      or `from a.b import c`), or whose name ends in `_<module>`; failing that,
+      tests that import its package (below the top level); plus the import-law
+      tests.
+    - tests/<helper>.py and scripts/<name>.py: tests that import it or name its file.
+    - anything else (fixtures, evals/, site/): tests that name its file.
+    """
+    root = Path(root)
+    tests = sorted(p.relative_to(root).as_posix() for p in (root / "tests").glob("test_*.py"))
+    texts = {t: (root / t).read_text(encoding="utf-8", errors="replace") for t in tests}
+    chosen: set[str] = set()
+    for path in changed:
+        rel = Path(path)
+        if path == "tests/conftest.py":
+            return None
+        if rel.parent.as_posix() == "tests" and rel.name.startswith("test_") and rel.suffix == ".py":
+            if path in texts:
+                chosen.add(path)
+            continue
+        if rel.parts[0] == "src" and rel.suffix == ".py" and len(rel.parts) >= 2:
+            parts = list(rel.with_suffix("").parts[1:])
+            if parts[-1] == "__init__":
+                parts.pop()
+            module, leaf, package = ".".join(parts), parts[-1], ".".join(parts[:-1])
+            hits = {t for t, text in texts.items()
+                    if re.search(rf"\b{re.escape(module)}\b", text) or (package and _imports_leaf(text, package, leaf))
+                    or Path(t).stem == f"test_{leaf}" or Path(t).stem.endswith(f"_{leaf}")}
+            if not hits and package.count(".") >= 1:
+                # A module its package re-exports: the tests that import the package
+                # (never just the top-level one, which is every test).
+                hits = {t for t, text in texts.items() if re.search(rf"\b{re.escape(package)}\b", text)}
+            if hits:
+                hits.update(t for t in LAW_TESTS if t in texts)
+        elif rel.suffix == ".py" and rel.parent.as_posix() in ("tests", "scripts"):
+            stem = rel.stem
+            hits = {t for t, text in texts.items()
+                    if f"{stem}.py" in text or re.search(rf"^\s*(import\s+{re.escape(stem)}\b|from\s+{re.escape(stem)}\s+import\b)", text, re.MULTILINE)}
+        else:
+            hits = {t for t, text in texts.items() if path in text or rel.name in text}
+        if not hits:
+            return None
+        chosen |= hits
+    return sorted(chosen) or None
+
+
 def _worktree_changes(path: str) -> list[str]:
     parts = [p for p in _git(path, "status", "--porcelain=v1", "-z", "--untracked-files=all").split("\0") if p]
     out, i = [], 0
@@ -349,8 +416,12 @@ class Loop:
         self.out = o.get("out") or print
         self.state_dir = Path(o["state_dir"])
 
-    # The whole pass: a pull request the loop is fixing first; the pass ends
-    # after the first one that ran a review or a fix (one at a time).
+    # The whole pass: one step for every pull request, so one waiting for CI, or
+    # one that just ran a review or a fix, never holds up the others. A pull
+    # request the loop is fixing goes first, then by number. The steps run one
+    # after another and each review or fix round holds the shared lock, so
+    # reviews still run one at a time (a lock held elsewhere makes that pull
+    # request "busy" and the pass goes on).
     def tick(self, only_pr: int | None = None) -> list[dict]:
         pulls = [p for p in self.o["github"].list_open_pulls() if not only_pr or p["number"] == only_pr]
 
@@ -358,13 +429,7 @@ class Loop:
             s = load_state(self.state_dir, self.cfg["repo"], p["number"])
             return 0 if s["last_fix_head"] and not s["done"] and not s["stopped"] else 1
         pulls.sort(key=lambda p: (in_flight(p), p["number"]))
-        results = []
-        for p in pulls:
-            r = self.step(p)
-            results.append({"pr": p["number"], **r})
-            if r["outcome"] not in ("skip", "wait", "updated"):
-                break
-        return results
+        return [{"pr": p["number"], **self.step(p)} for p in pulls]
 
     def step(self, listed: dict) -> dict:
         cfg, lc, o = self.cfg, self.lc, self.o
@@ -684,10 +749,19 @@ class Loop:
         for c in lc["checks"]:
             if not _applies(c, commit_changed):
                 continue
-            ok, detail = _run_commands(c["run"], wt, c.get("env"), {"python": sys.executable, "main": main_sha, "head": new}, o["check_timeout_s"])
+            run, name = c["run"], c["name"]
+            if c.get("select") == "related_tests":
+                # Only the tests related to the changed files; CI runs the whole suite.
+                selected = related_tests(wt, commit_changed)
+                if selected is not None:
+                    run = [*run[:-1], [*run[-1], *selected]]
+                    name = f"{name} ({len(selected)} related file{'' if len(selected) == 1 else 's'})"
+                else:
+                    name = f"{name} (whole suite)"
+            ok, detail = _run_commands(run, wt, c.get("env"), {"python": sys.executable, "main": main_sha, "head": new}, o["check_timeout_s"])
             if not ok:
-                return self._stop(ctx, head, f"fix round {rnd}: the local check {c['name']} failed on the fix ({detail}); nothing was pushed")
-            ran.append(c["name"])
+                return self._stop(ctx, head, f"fix round {rnd}: the local check {name} failed on the fix ({detail}); nothing was pushed")
+            ran.append(name)
 
         now = o["github"].get_pull(n)["head_sha"]
         if now != head:

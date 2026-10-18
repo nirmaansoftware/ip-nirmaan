@@ -238,12 +238,12 @@ class Repo:
     def st(self):
         return pr_loop.load_state(self.state, CONFIG["repo"], 1)
 
-    def advance_main(self, rel="src/other.py"):
+    def advance_main(self, rel="src/other.py", text=None):
         """A new commit on main in origin, so the branch is really behind."""
         w = self.work
         sh(w, "checkout", "-q", "main")
         sh(w, "pull", "-q", "origin", "main")
-        write(w, rel, f"main moved {len(sh(w, 'rev-list', 'HEAD').split())}\n")
+        write(w, rel, text if text is not None else f"main moved {len(sh(w, 'rev-list', 'HEAD').split())}\n")
         sh(w, "add", "-A")
         sh(w, "commit", "-qm", "main moves")
         sh(w, "push", "-q", "origin", "main")
@@ -679,6 +679,162 @@ def test_no_post_never_updates_a_branch(repo):
     assert r.github.updates == [] and r.origin_head() == r.first_head
 
 
+# --- Verdict carry-over -----------------------------------------------------------
+
+
+def _reviewed_then_updated(r, edit=None):
+    """Main moves during the review (`edit` runs on main), so the loop updates the
+    branch with a merge of main. Returns the new head."""
+    moved = []
+
+    def when():
+        if not moved and len(r.calls()) >= 2:
+            moved.append(1)
+            (edit or r.advance_main)()
+        return False
+    r.github.behind_when = when
+    assert r.tick() == ["updated"]
+    assert len(r.calls()) == 2, "both keys ran on the old head"
+    r.github.behind_when = None
+    return r.origin_head()
+
+
+def test_only_main_moved_so_the_updated_head_carries_both_verdicts_over_with_no_model_call(repo):
+    r = repo()
+    new = _reviewed_then_updated(r)
+    assert new != r.first_head
+    assert r.tick() == ["auto-merge"]
+    assert len(r.calls()) == 2, "no new model call"
+    assert r.github.merges[0][-1] == new
+    assert len([l for l in r.log() if l.get("outcome") == "carried" and l.get("head") == new]) == 2
+    k1 = next(c for c in r.comments() if c.startswith("<!-- nirmaan-pr-review key=1 ") and f"head={new}" in c)
+    assert f"carried over from head {r.first_head[:7]}" in k1 and "same diff (patch-id)" in k1
+
+
+def test_the_same_head_with_main_moved_carries_the_verdicts_over_on_a_rerun(repo):
+    r = repo(gh={"merge_error": "GraphQL: Head branch was modified. (enablePullRequestAutoMerge)"})
+    assert r.tick() == ["stopped"]
+    assert len(r.calls()) == 2
+    r.advance_main()
+    r.github.behind = False  # the ruleset does not require up-to-date branches
+    r.github.merge_error, r.github.labels = None, []
+    assert r.tick() == ["auto-merge"]
+    assert len(r.calls()) == 2, "main moved, so the exact cache missed; the verdicts were carried over"
+
+
+def test_a_file_of_the_diff_changed_on_main_is_reviewed_again(repo):
+    r = repo()
+    new = _reviewed_then_updated(r, lambda: r.advance_main("src/app.py", "one\ntwo\nthree\nfour\n"))
+    assert "two changed" in sh(r.origin, "show", f"{new}:src/app.py") and "four" in sh(r.origin, "show", f"{new}:src/app.py")
+    assert r.tick() == ["auto-merge"]
+    assert len(r.calls()) == 4 and not any("carried over" in c for c in r.comments())
+
+
+def test_a_review_rule_changed_on_main_a_seat_file_is_reviewed_again(repo):
+    r = repo()
+    _reviewed_then_updated(r, lambda: r.advance_main("council/eda-tooling.md", "# eda-tooling\nSEAT-MARKER-eda-tooling\n\n## In a review (key 1)\nA new rule.\n"))
+    assert r.tick() == ["auto-merge"]
+    assert len(r.calls()) == 4
+
+
+def test_a_changed_pull_request_text_is_reviewed_again(repo):
+    r = repo()
+    _reviewed_then_updated(r)
+    r.github.body = "Changes line two, and claims more now."
+    assert r.tick() == ["auto-merge"]
+    assert len(r.calls()) == 4
+
+
+def test_a_new_commit_in_the_pull_request_is_never_carried_over(repo):
+    r = repo(reviews=[fail("Line two lost its test"), {"verdict": "pass"}], fixes=[{"edits": {"src/app.py": "one\ntwo fixed\nthree\n"}}])
+    assert r.tick() == ["fixed"]
+    assert r.tick() == ["auto-merge"]
+    assert len([c for c in r.calls() if c["kind"] == "reviews"]) == 3
+    assert not any(l.get("outcome") == "carried" for l in r.log())
+
+
+# --- Every pull request each pass ---------------------------------------------------
+
+
+def test_one_pass_steps_every_pull_request_and_a_review_fix_wait_or_busy_lock_never_ends_it(repo):
+    r = repo()
+    loop = r.loop()
+    pulls = [{"number": n} for n in (6, 5, 4, 3, 2, 1)]
+    loop.o["github"] = type("G", (), {"list_open_pulls": lambda self: pulls})()
+    # Pull request 3 is in a fix round, so it goes first; the rest by number.
+    pr_loop._save_state(r.state, CONFIG["repo"], {"pr": 3, "rounds": 1, "seen": {}, "last_fix_head": "abc", "done": None, "stopped": None})
+    outcome = {1: "auto-merge", 2: "wait", 3: "fixed", 4: "busy", 5: "updated", 6: "stopped"}
+    seen = []
+
+    def step(p):
+        seen.append(p["number"])
+        return {"outcome": outcome[p["number"]]}
+    loop.step = step
+    results = loop.tick()
+    assert seen == [3, 1, 2, 4, 5, 6]
+    assert [f"{x['pr']}:{x['outcome']}" for x in results] == ["3:fixed", "1:auto-merge", "2:wait", "4:busy", "5:updated", "6:stopped"]
+
+
+# --- Related tests for the fixer's local check --------------------------------------
+
+
+def _tree(root: Path, files: dict[str, str]):
+    for rel, text in files.items():
+        write(root, rel, text)
+
+
+def test_related_tests_map_changed_files_to_the_tests_that_use_them(tmp_path):
+    _tree(tmp_path, {
+        "src/nirmaan/alpha.py": "x = 1\n",
+        "src/nirmaan/beta/core.py": "y = 2\n",
+        "src/nirmaan/beta/__init__.py": "",
+        "src/nirmaan/lonely.py": "z = 3\n",
+        "src/nirmaan/gamma/inner.py": "w = 4\n",
+        "tests/test_gamma_pkg.py": "from nirmaan.gamma import W\n",
+        "scripts/check_union.py": "",
+        "tests/conftest.py": "",
+        "tests/laws.py": "",
+        "tests/test_laws.py": "import laws\n",
+        "tests/test_alpha_use.py": "from nirmaan.alpha import x\n",
+        "tests/test_multi.py": "from nirmaan import (\n    other,\n    alpha,\n)\n",
+        "tests/test_beta.py": "import nirmaan.beta.core\n",
+        "tests/test_nirmaan_core.py": "pass\n",
+        "tests/test_union.py": 'SCRIPT = ROOT / "scripts" / "check_union.py"\n',
+        "tests/test_fixture_user.py": 'fixture_log("sample.log")\n',
+        "tests/fixtures/eda/sample.log": "log\n",
+        "tests/test_other.py": "pass\n",
+    })
+    rel = pr_loop.related_tests
+    assert rel(tmp_path, ["src/nirmaan/alpha.py"]) == ["tests/test_alpha_use.py", "tests/test_laws.py", "tests/test_multi.py"]
+    assert rel(tmp_path, ["src/nirmaan/beta/core.py"]) == ["tests/test_beta.py", "tests/test_laws.py", "tests/test_nirmaan_core.py"]
+    assert rel(tmp_path, ["src/nirmaan/gamma/inner.py"]) == ["tests/test_gamma_pkg.py", "tests/test_laws.py"], "re-exported by its package"
+    assert rel(tmp_path, ["tests/test_other.py"]) == ["tests/test_other.py"]
+    assert rel(tmp_path, ["scripts/check_union.py"]) == ["tests/test_union.py"]
+    assert rel(tmp_path, ["tests/fixtures/eda/sample.log"]) == ["tests/test_fixture_user.py"]
+    assert rel(tmp_path, ["tests/laws.py"]) == ["tests/test_laws.py"]
+    assert rel(tmp_path, ["tests/test_other.py", "tests/test_gone.py"]) == ["tests/test_other.py"], "a deleted test file is not run"
+    # No test is known to cover it, or it reaches every test: the whole suite.
+    assert rel(tmp_path, ["tests/conftest.py"]) is None
+    assert rel(tmp_path, ["src/nirmaan/lonely.py"]) is None
+    assert rel(tmp_path, ["tests/test_other.py", "src/nirmaan/lonely.py"]) is None
+    assert rel(tmp_path, ["tests/test_gone.py"]) is None
+
+
+def test_the_fixers_test_check_runs_only_the_related_tests(repo, tmp_path):
+    record = tmp_path / "pytest-args.json"
+    loop = {**LOOP, "checks": [{"name": "test", "when": ["src/**", "tests/**"], "select": "related_tests", "env": {"RECORD": str(record)},
+                                "run": [["{python}", "-c", "import json, os, sys; json.dump(sys.argv[1:], open(os.environ['RECORD'], 'w'))"]]}]}
+
+    def change(w):
+        write(w, "src/app.py", "one\ntwo changed\nthree\n")
+        write(w, "tests/test_app.py", "from app import one\n")
+        write(w, "tests/test_unrelated.py", "pass\n")
+    r = repo(reviews=[fail("Line two lost its test"), {"verdict": "pass"}], fixes=[{"edits": {"src/app.py": "one\ntwo fixed\nthree\n"}}], change=change)
+    assert r.tick(loop=loop) == ["fixed"]
+    assert json.loads(record.read_text()) == ["tests/test_app.py"]
+    assert "test (1 related file): pass" in r.comments()[-1]
+
+
 # --- The plist -------------------------------------------------------------------
 
 
@@ -691,6 +847,7 @@ def test_the_plist_reads_its_settings_from_the_sourced_env_file_and_holds_none_i
     cmd = _re.search(r"<string>(mkdir[^<]*)</string>", plist).group(1)
     assert cmd.index("pr-loop/env") < cmd.index("pr_loop.py"), "sourced before the loop starts"
     assert "ip-loop.log" in cmd
+    assert _re.search(r"<key>StartInterval</key>\s*<integer>60</integer>", plist), "a pass every minute"
 
 
 # --- Units -----------------------------------------------------------------------

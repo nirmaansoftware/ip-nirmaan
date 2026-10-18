@@ -95,6 +95,9 @@ CONFIG = {
     # The review App's slug: its comments are by "<slug>[bot]" and its check
     # runs carry this app slug. Used to skip reposting an identical result.
     "review_app_slug": "nirmaan-review",
+    # What the review reads from main besides the diff: a change to any of these
+    # on main voids a carried-over verdict (run_review, carry-over).
+    "carry_over_void_paths": [".github/review-teams.yml", "council/", "scripts/pr_review.py", "scripts/review_map.py", ".claude/skills/pr-review/"],
 }
 
 # Environment variables the review App (tracker T21) provides.
@@ -478,6 +481,19 @@ def required_ci(required: list[str], runs: list[dict]) -> dict:
 
 MARK = "nirmaan-pr-review"
 REUSED_NOTE = "Verdict reused from an earlier run on the same head and main commits; no new model call."
+
+
+def carried_note(reviewed: dict) -> str:
+    """Said in a comment whose verdict was carried over to a new head (or a new
+    main) from the head a model last reviewed (run_review, carry-over)."""
+    return (f"Verdict carried over from head {reviewed['head'][:7]} (reviewed with main {reviewed['main'][:7]}): same diff (patch-id), "
+            "same PR text, and no file of the diff and no review rule changed on main since; no new model call.")
+
+
+def pr_text_digest(title, body) -> str:
+    """A short digest of the pull request title and body, for the carry-over: a
+    verdict is carried over only for the same text."""
+    return hashlib.sha256(json.dumps({"title": str(title or ""), "body": str(body or "")}).encode()).hexdigest()[:16]
 
 
 def comment_marker(r: dict, ctx: dict) -> str:
@@ -1063,6 +1079,56 @@ def _review(repo_root, pr, github, post, claude_bin, state_dir, models, timeout_
               "diff_truncated": truncated, "max_diff_bytes": cfg["max_diff_bytes"]}
     cache_dir = state_dir / "verdicts" / cfg["repo"].replace("/", "_") / f"pr-{pr}"
 
+    # Carry-over: when only main moved (an update merged main into the branch, or
+    # main moved under the same head), the last verdict of a key, team and lead is
+    # reused if the pull request's own diff is the same (patch-id of
+    # merge-base..head), the title and body digest is the same, no file of the
+    # diff changed on main since that verdict's merge base, and none of the
+    # review's inputs (carry_over_void_paths: the map, the council, these
+    # scripts, the skill) changed on main since that verdict's main. Its
+    # citations are validated again at this head. Key 2 and the proxy are carried
+    # only while no key in this run called a model, since they get key 1's results.
+    try:
+        patch = subprocess.run(["git", "patch-id", "--stable"], cwd=repo_root, input=diff, check=True, capture_output=True, text=True).stdout.split()
+        patch_id = patch[0] if patch else None
+    except (subprocess.CalledProcessError, OSError):
+        patch_id = None
+    text_digest = pr_text_digest(pull.get("title"), pull.get("body"))
+    pr_paths = sorted({p for f in files for p in ([f["old"], f["path"]] if f["old"] else [f["path"]])})
+    model_called: list[bool] = []
+
+    def changed_on_main_since(since, paths):
+        try:
+            out_ = _git(repo_root, "diff", "--no-ext-diff", "--name-only", "-z", since, main_sha, "--", *(f":(literal){p}" for p in paths))
+        except subprocess.CalledProcessError:
+            return None
+        return [p for p in out_.split("\0") if p]
+
+    def carry_file(key, team, lead):
+        return cache_dir / f"carry-k{key}-{team or 'chair'}-{lead}.json"
+
+    def carried(key, team, lead):
+        void = cfg.get("carry_over_void_paths") or []
+        if fresh or model_called or not patch_id or not pr_paths or not void:
+            return None
+        try:
+            c = json.loads(carry_file(key, team, lead).read_text())
+        except (OSError, ValueError):
+            return None
+        if c.get("patch_id") != patch_id or c.get("text_digest") != text_digest or not (c.get("result") or {}).get("verdict"):
+            return None
+        if changed_on_main_since(c["base_sha"], pr_paths) != [] or changed_on_main_since(c["main_sha"], void) != []:
+            return None
+        verdict, error, notes = validate_verdict({**c["result"]["verdict"], "sha": head}, head, line_exists, proxy=key == "proxy")
+        if error:
+            return None
+        return c, {**c["result"], "status": verdict["verdict"], "verdict": verdict, "notes": [*notes, carried_note(c["reviewed"])]}
+
+    def save_carry(key, team, lead, reviewed, result):
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        carry_file(key, team, lead).write_text(json.dumps({"reviewed": reviewed, "head_sha": head, "base_sha": base_sha, "main_sha": main_sha,
+                                                           "patch_id": patch_id, "text_digest": text_digest, "result": result}))
+
     def review(key, team, lead, model, system, user):
         # The Founder Proxy is key "proxy" here: same cache, retry, validation and log.
         proxy = key == "proxy"
@@ -1072,6 +1138,15 @@ def _review(repo_root, pr, github, post, claude_bin, state_dir, models, timeout_
             log_call(state_dir, {"repo": cfg["repo"], "pr": pr, "head": head, "key": key, "team": team, "model": model, "attempt": 0, "outcome": "reused"})
             cached["notes"] = cached.get("notes", []) + [REUSED_NOTE]
             return cached
+        carry = carried(key, team, lead)
+        if carry:
+            record, done = carry
+            log_call(state_dir, {"repo": cfg["repo"], "pr": pr, "head": head, "key": key, "team": team, "model": model, "attempt": 0,
+                                 "outcome": "carried", "from_head": record["reviewed"]["head"]})
+            save_carry(key, team, lead, record["reviewed"], record["result"])
+            cache.write_text(json.dumps(done))
+            return done
+        model_called.append(True)
         args = claude_args(model, system, [main_dir], schema=PROXY_VERDICT_SCHEMA if proxy else None)
         result = None
         for attempt in (1, 2):
@@ -1096,6 +1171,7 @@ def _review(repo_root, pr, github, post, claude_bin, state_dir, models, timeout_
         done = {"status": verdict["verdict"], "verdict": verdict, "notes": notes, "model": result.get("reported_model") or model}
         cache_dir.mkdir(parents=True, exist_ok=True)
         cache.write_text(json.dumps(done))
+        save_carry(key, team, lead, {"head": head, "main": main_sha}, done)
         return done
 
     teams = teams_map["teams"]
