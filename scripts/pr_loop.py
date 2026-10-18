@@ -14,9 +14,10 @@ per call, as a state machine that survives restarts:
     wait    the required CI is not finished on the head (no model call);
     review  both keys, through scripts/pr_review.py unchanged;
     merge   both keys passed: `gh pr merge --auto --merge` with the gh login
-            when the review App posts the checks; a "ready" comment in a dry
-            run or when GitHub answers that auto-merge is not allowed; any other
-            merge error stops. A founder-class pull request waits for
+            when the review App posts the checks and the repository's
+            allow_auto_merge field (read with gh) is true; a "ready" comment in
+            a dry run or when it is false; the field unreadable or any merge
+            error stops. A founder-class pull request waits for
             the founder's GitHub approval and is never merged by the loop;
     fix     a key failed: a separate fresh `claude -p` fixer in a clean
             worktree of the head, Edit and Write only inside it; the loop (never
@@ -50,9 +51,27 @@ import review_map  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 MARK = "nirmaan-pr-loop"
-# GitHub's answer to `gh pr merge --auto` when the repository's "Allow
-# auto-merge" setting is off.
-AUTO_MERGE_OFF = re.compile(r"auto[- ]?merge is not (allowed|enabled)", re.I)
+
+def run_gh(args: list[str]) -> str:
+    """gh with the gh login; its standard output (the merge step reads the
+    auto-merge setting from it). A non-zero exit raises CalledProcessError."""
+    return subprocess.run(["gh", *args], check=True, capture_output=True, text=True, timeout=300).stdout
+
+
+def _gh_failure(exc) -> str:
+    """A failed gh call, classified by what it is (gh missing, a timeout, or its
+    exit code) with its output after; _stop redacts it before posting."""
+    if isinstance(exc, FileNotFoundError):
+        kind = "gh not found"
+    elif isinstance(exc, subprocess.TimeoutExpired):
+        kind = "gh timed out"
+    elif isinstance(exc, subprocess.CalledProcessError):
+        kind = f"exit {exc.returncode}"
+    else:
+        kind = type(exc).__name__
+    detail = " ".join(f"{getattr(exc, 'stderr', None) or ''} {getattr(exc, 'output', None) or ''}".split()) or str(exc)
+    return f"({kind}): {detail[:500]}"
+
 
 LOOP = {
     "authors": ["patel-om"],
@@ -366,8 +385,11 @@ class Loop:
             return None
         return self.o["github"].create_comment(n, body)
 
-    def _stop(self, ctx, head, reason):
+    def _stop(self, ctx, head, why):
         n, st, lc = ctx["n"], ctx["st"], self.lc
+        # Reasons can carry gh or git error text: redacted before it is logged,
+        # saved or posted.
+        reason = pr_review.redact(why)
         self.out(f"pr-loop: #{n} stopped: {reason}")
         st["stopped"] = {"head": head, "reason": reason, "at": _now(), "labeled": False}
         _save_state(self.state_dir, self.cfg["repo"], st)
@@ -475,18 +497,26 @@ class Loop:
                 self._say(n, f"<!-- {MARK} ready head={head} founder={','.join(classes)} -->\n"
                              f"### Automated loop: both keys passed on `{sha7}`\n\n{body}\n\n_Agent review only._")
             return {"outcome": "founder-wait"}
-        # The review App's token never sees the "Allow auto-merge" setting, so the
-        # loop does not read it: it asks for auto-merge with the gh login and reads
-        # GitHub's answer. "Not allowed" means the setting is off: ready, as before.
+        # The repository's "Allow auto-merge" setting decides between auto-merge
+        # and "ready": read with the gh login (`allow_auto_merge`, a field, never
+        # the wording of an error). Off: ready. On: `gh pr merge --auto`, and any
+        # failure of it stops the loop (fails safe). The setting unreadable, or an
+        # answer other than true or false: stop as well.
         why = "the review App is not configured (dry run)" if o["post"] != "app" else None
         if why is None:
             try:
-                o["run_gh"](["pr", "merge", str(n), "--repo", cfg["repo"], "--auto", "--merge", "--match-head-commit", head])
-            except subprocess.CalledProcessError as exc:
-                detail = " ".join(f"{exc.stderr or ''} {exc.output or ''} {exc}".split())
-                if not AUTO_MERGE_OFF.search(detail):
-                    return self._stop(ctx, head, f"gh pr merge --auto failed: {detail[:500]}")
+                allowed = str(o["run_gh"](["api", f"repos/{cfg['repo']}", "--jq", ".allow_auto_merge"]) or "").strip()
+            except (subprocess.SubprocessError, OSError) as exc:
+                return self._stop(ctx, head, f"could not read the repository's auto-merge setting {_gh_failure(exc)}")
+            if allowed == "false":
                 why = "the repository does not allow auto-merge"
+            elif allowed != "true":
+                return self._stop(ctx, head, f"could not read the repository's auto-merge setting (gh answered \"{allowed[:40]}\", not true or false)")
+        if why is None:
+            try:
+                o["run_gh"](["pr", "merge", str(n), "--repo", cfg["repo"], "--auto", "--merge", "--match-head-commit", head])
+            except (subprocess.SubprocessError, OSError) as exc:
+                return self._stop(ctx, head, f"gh pr merge --auto failed {_gh_failure(exc)}")
         if why is None:
             self._log(ctx, "auto-merge")
             self._say(n, f"<!-- {MARK} auto-merge head={head} -->\n### Automated loop: both keys passed on `{sha7}`\n\n"
@@ -709,7 +739,7 @@ def main(argv: list[str]) -> int:
                 return 4
         loop = Loop(repo_root=str(repo_root), github=github, post=post, caller_branch=caller_branch,
                     in_claude_session=bool(os.environ.get("CLAUDECODE")),
-                    run_gh=lambda args: subprocess.run(["gh", *args], check=True, capture_output=True, text=True),
+                    run_gh=run_gh,
                     **loop_defaults())
         results = loop.tick(only_pr)
         print(f"pr-loop: {_now()} {post}: " + (", ".join(f"#{r['pr']} {r['outcome']}" for r in results) or "no open pull requests"))

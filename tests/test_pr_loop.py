@@ -72,7 +72,8 @@ def write(root: Path, rel: str, text: str):
 
 class FakeGitHub:
     def __init__(self, origin: Path, gh: dict):
-        self.origin, self.posts, self.merges, self.reviews = origin, [], [], []
+        self.origin, self.posts, self.merges, self.reviews, self.api_calls = origin, [], [], [], []
+        self.auto_merge_allowed, self.settings_error = gh.get("auto_merge_allowed", "true"), gh.get("settings_error")
         self.labels = list(gh.get("labels", []))
         self.merge_error, self.body = gh.get("merge_error"), "Changes line two."
         self.ci = gh.get("ci", lambda sha: "success")
@@ -97,9 +98,16 @@ class FakeGitHub:
         self.body = body
 
     def run_gh(self, args):
-        """`gh pr merge` with the gh login: records the call, and fails the way the
-        loop's real runner does (CalledProcessError, message on stderr) when the
-        test sets merge_error."""
+        """gh with the gh login. `gh api repos/<repo>` answers the repository's
+        allow_auto_merge field (or fails when the test sets settings_error);
+        `gh pr merge` records the call, and fails the way the loop's real runner
+        does (CalledProcessError, message on stderr) when the test sets
+        merge_error."""
+        if args[0] == "api":
+            self.api_calls.append(args)
+            if self.settings_error:
+                raise subprocess.CalledProcessError(1, ["gh", *args], output="", stderr=self.settings_error)
+            return f"{self.auto_merge_allowed}\n"
         self.merges.append(args)
         if self.merge_error:
             raise subprocess.CalledProcessError(1, ["gh", *args], output="", stderr=self.merge_error)
@@ -216,6 +224,7 @@ def fail(text, line=1, file="src/app.py"):
 def test_both_keys_pass_auto_merge_with_the_app_and_the_setting_then_nothing_more_on_that_head(repo):
     r = repo()
     assert r.tick() == ["auto-merge"]
+    assert r.github.api_calls == [["api", f"repos/{CONFIG['repo']}", "--jq", ".allow_auto_merge"]]
     assert r.github.merges == [["pr", "merge", "1", "--repo", CONFIG["repo"], "--auto", "--merge", "--match-head-commit", r.first_head]]
     assert "Auto-merge is on" in r.comments()[-1]
     assert len(r.calls()) == 2
@@ -224,15 +233,22 @@ def test_both_keys_pass_auto_merge_with_the_app_and_the_setting_then_nothing_mor
     assert len(r.github.posts) == before and len(r.calls()) == 2
 
 
-def test_both_keys_pass_and_github_says_auto_merge_is_not_allowed_posts_ready_without_a_stop(repo):
-    r = repo(gh={"merge_error": "GraphQL: Pull request Auto merge is not allowed for this repository (enablePullRequestAutoMerge)"})
+def test_both_keys_pass_and_the_setting_is_off_posts_ready_without_a_merge_call_or_a_stop(repo):
+    r = repo(gh={"auto_merge_allowed": "false"})
     assert r.tick() == ["ready"]
-    assert r.github.merges == [["pr", "merge", "1", "--repo", CONFIG["repo"], "--auto", "--merge", "--match-head-commit", r.first_head]], \
-        "the loop tries the merge itself; no settings read"
+    assert r.github.api_calls == [["api", f"repos/{CONFIG['repo']}", "--jq", ".allow_auto_merge"]], "the setting is read with the gh login"
+    assert r.github.merges == [], "no merge is asked for when the setting is off"
     assert "waiting for the founder's merge settings" in r.comments()[-1] and "does not allow auto-merge" in r.comments()[-1]
     assert not r.labeled()
     assert r.tick() == ["skip"]
+
+
+def test_the_merge_decision_does_not_depend_on_gh_error_wording_a_not_allowed_message_stops(repo):
+    r = repo(gh={"merge_error": "GraphQL: Pull request Auto merge is not allowed for this repository (enablePullRequestAutoMerge)"})
+    assert r.tick() == ["stopped"]
     assert len(r.github.merges) == 1
+    assert r.labeled(), "fails safe: needs-founder, never ready and never merged"
+    assert not any("Auto-merge is on" in c or "### Automated loop: ready" in c for c in r.comments())
 
 
 def test_both_keys_pass_and_any_other_merge_error_stops_with_needs_founder(repo):
@@ -241,14 +257,47 @@ def test_both_keys_pass_and_any_other_merge_error_stops_with_needs_founder(repo)
     assert len(r.github.merges) == 1
     assert r.labeled()
     last = r.comments()[-1]
-    assert "Automated loop stopped" in last and "gh pr merge --auto failed" in last and "Head branch was modified" in last
+    assert "Automated loop stopped" in last and "gh pr merge --auto failed (exit 1)" in last and "Head branch was modified" in last
     assert not any("Auto-merge is on" in c or "### Automated loop: ready" in c for c in r.comments())
+
+
+@pytest.mark.parametrize("gh", [{"settings_error": "gh: Not Found (HTTP 404)"}, {"auto_merge_allowed": "null"}])
+def test_an_unreadable_auto_merge_setting_stops_with_needs_founder_and_no_merge_call(repo, gh):
+    r = repo(gh=gh)
+    assert r.tick() == ["stopped"]
+    assert r.github.merges == []
+    assert r.labeled()
+    assert "could not read the repository's auto-merge setting" in r.comments()[-1]
+
+
+def test_gh_error_text_is_redacted_before_it_is_posted_or_saved(repo):
+    token = "ghs_" + "A1b2" * 9
+    pat = "github_pat_" + "x9" * 30
+    r = repo(gh={"merge_error": f"fatal: https://x-access-token:{token}@github.com/o/r.git refused; Authorization: Bearer {pat}; header token {token}"})
+    assert r.tick() == ["stopped"]
+    last = r.comments()[-1]
+    assert token not in last and pat not in last and "x-access-token:" not in last
+    assert "[redacted]" in last
+    assert token not in json.dumps(r.st()), "the state file keeps the redacted reason too"
+    assert token not in json.dumps(r.log())
+
+
+def test_the_real_gh_runner_returns_standard_output_so_the_setting_can_be_read(monkeypatch):
+    seen = {}
+
+    def fake_run(cmd, **kw):
+        seen["cmd"], seen["kw"] = cmd, kw
+        return subprocess.CompletedProcess(cmd, 0, stdout="true\n", stderr="")
+    monkeypatch.setattr(pr_loop.subprocess, "run", fake_run)
+    assert pr_loop.run_gh(["api", "repos/o/r", "--jq", ".allow_auto_merge"]) == "true\n"
+    assert seen["cmd"] == ["gh", "api", "repos/o/r", "--jq", ".allow_auto_merge"]
+    assert seen["kw"]["check"] is True and seen["kw"]["timeout"] == 300
 
 
 def test_a_dry_run_posts_ready_and_never_calls_gh(repo):
     r = repo()
     assert r.tick(post="dry-run") == ["ready"]
-    assert r.github.merges == []
+    assert r.github.merges == [] and r.github.api_calls == []
     assert "waiting for the founder's merge settings" in r.comments()[-1] and "review App is not configured" in r.comments()[-1]
 
 

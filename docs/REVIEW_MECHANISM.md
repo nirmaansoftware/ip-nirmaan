@@ -34,7 +34,9 @@ comment. A review whose SHA differs from the head is void.
    founder's own code owner review on GitHub. The review script declares the
    classes it detects: before the keys run it writes a
    `<!-- review:founder-class -->` block at the top of the PR body, rewrites it
-   when the classes change and removes it when none is left. The keys treat
+   when the classes change and removes it when none is left. Every other copy
+   of the block, and any lone open or close marker without its pair, is
+   removed, so the only markers left are the script's own. The keys treat
    that block as the PR's flag.
 5. **Merge.** Automatic once every required check passes (after the ruleset
    and auto-merge are turned on).
@@ -130,13 +132,22 @@ the branch checked out. In order:
     head already says the same (a rerun that reused its cached verdicts); the
     comment's marker carries a digest of the result for this.
 11. **Records.** Every model call (tokens, duration, outcome) is logged in
-    `~/.nirmaan/pr-review/calls.jsonl`, outside the repository. Each run's
+    `~/.nirmaan/pr-review/calls.jsonl`, outside the repository. Validated
+    verdicts are cached per head commit, `main` commit, key, team and lead, so
+    re-running after the founder approves does not call the model again. The
+    pull request title and body are not in that key because the reviewers here
+    never read them (step 7); Nirmaan's reviewers do, so its key also carries
+    a digest of them. Each run's
     worktrees, and the per-run folder that holds them under
     `~/.nirmaan/pr-review/worktrees`, are removed when it ends.
 
 **Posting identity.** The review App posts the check runs with a short-lived
-installation token scoped to this repository, from these environment
-variables: `NIRMAAN_REVIEW_APP_ID`, one of
+installation token scoped to this repository. The token asks for `checks:
+write` (the check runs), `pull_requests: write`, `contents: read` and
+`metadata: read`. `pull_requests: write` is the permission the script uses to
+write the founder-class block into the pull request body (a `PATCH` of
+`/pulls/<n>`, `update_pull_body`); the comments and the `needs-founder` label
+go through the same token. It is made from these environment variables: `NIRMAAN_REVIEW_APP_ID`, one of
 `NIRMAAN_REVIEW_APP_PRIVATE_KEY_FILE` (a PEM outside every repository) or
 `NIRMAAN_REVIEW_APP_KEYCHAIN_SERVICE` (a macOS Keychain item holding the PEM),
 and optionally `NIRMAAN_REVIEW_APP_INSTALLATION_ID`. Until the App exists the
@@ -169,14 +180,16 @@ requests labelled `hold` or `needs-founder` are skipped.
    it waits for the founder's approval of this head and does nothing else;
    once the founder approves, it runs the review again (cached verdicts, no
    model call) so `review/executive` turns green, and the founder merges.
-   Otherwise, when the review App posts the checks, the loop runs `gh pr merge
-   --auto --merge --match-head-commit <head>` with the gh login, so GitHub
-   merges only when every required check passes on that head. It does not
-   read the "Allow auto-merge" setting first (the App's token never sees it).
-   In a dry run, or when GitHub answers that auto-merge is not allowed for the
-   repository, it posts "ready: both keys passed, waiting for the founder's
-   merge settings", and the founder merges. Any other merge error stops the
-   loop with `needs-founder`.
+   Otherwise, when the review App posts the checks, the loop reads the
+   repository's "Allow auto-merge" setting with the gh login (the
+   `allow_auto_merge` field of `gh api repos/<repo>`). When it is on, the loop
+   runs `gh pr merge --auto --merge --match-head-commit <head>`, so GitHub
+   merges only when every required check passes on that head. In a dry run,
+   or when the setting is off, it posts "ready: both keys passed, waiting for
+   the founder's merge settings", and the founder merges. The decision never
+   depends on the wording of a gh error: when the setting cannot be read, or
+   `gh pr merge --auto` fails for any reason, the loop stops with
+   `needs-founder`.
 4. **A key fails.** The loop starts a **fixer**: a separate, fresh `claude -p`
    process, never a reviewer process and never the session that reviewed. It
    runs in a clean worktree of the head with Read, Grep, Glob, Edit and Write
@@ -205,8 +218,13 @@ comments why when: three fix rounds are done and a key still fails; the same
 finding (same key, team, file and wording) fails again after a fix; CI fails
 after a fix; the branch has a merge conflict; a key is deferred (rate limit,
 bad output, missing seat file); the fixer hits a rate limit, gives no valid
-answer, cannot fix every finding or changes nothing; a local check fails; or
-any error. Nothing is pushed in any of these cases. If someone pushes while
+answer, cannot fix every finding or changes nothing; a local check fails; the
+auto-merge setting cannot be read or `gh pr merge --auto` fails; or any error.
+Nothing is pushed in any of these cases. The reason is redacted before it is
+logged or posted: common secret formats (`SECRET_PATTERNS` in
+`scripts/pr_review.py`), credentials in a URL and the value after
+`Authorization:`, `Bearer` or `token` become `[redacted]`, since a gh or git
+error can carry them. If someone pushes while
 the fixer works, the round is dropped without a label and the new head is
 reviewed from scratch. Removing the `needs-founder` label lets the loop resume
 with a fresh round count.
