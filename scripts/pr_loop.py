@@ -11,7 +11,16 @@ agents' account (not a draft, no `hold` or `needs-founder` label), one step
 per call, as a state machine that survives restarts:
 
     skip    already finished on this head (ready, auto-merge, founder wait);
-    wait    the required CI is not finished on the head (no model call);
+    update  GitHub reports the branch behind main (mergeable_state "behind";
+            this repository's ruleset has strict up-to-date branches off, so
+            it is not expected, but if GitHub reports it the loop handles it
+            as Nirmaan's does): merge main into
+            it with the gh login (update-branch, pinned to the head the loop
+            saw) before any review, and again before a founder-class pull
+            request is put to the founder, so the founder approves a head that
+            can merge; a failed update stops, a push in between drops the step;
+    wait    the required CI is not finished on the head (no model call), or
+            GitHub is still making the update's merge commit;
     review  both keys, through scripts/pr_review.py unchanged;
     merge   both keys passed: `gh pr merge --auto --merge` with the gh login
             when the review App posts the checks and the repository's
@@ -51,6 +60,9 @@ import review_map  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 MARK = "nirmaan-pr-loop"
+# After asking GitHub to update a branch, how long the loop waits for the new
+# head before asking again (GitHub makes the merge commit asynchronously).
+UPDATE_WAIT_S = 10 * 60
 
 def run_gh(args: list[str]) -> str:
     """gh with the gh login; its standard output (the merge step reads the
@@ -338,7 +350,7 @@ class Loop:
         for p in pulls:
             r = self.step(p)
             results.append({"pr": p["number"], **r})
-            if r["outcome"] not in ("skip", "wait"):
+            if r["outcome"] not in ("skip", "wait", "updated"):
                 break
         return results
 
@@ -419,6 +431,13 @@ class Loop:
         cfg, o, n, st = self.cfg, self.o, ctx["n"], ctx["st"]
         pull = o["github"].get_pull(n)
         head = ctx["head"] = pull["head_sha"]
+        # Behind main: update first, also for a head that already finished (it
+        # cannot merge while GitHub reports it behind, and a founder-class pull
+        # request must not be approved on a head that needs another push).
+        if pull.get("mergeable_state") == "behind" and (st["done"] or {}).get("outcome") != "refused":
+            u = self._update_behind(ctx)
+            if u:
+                return u
         if st["done"] and st["done"]["head"] == head:
             if st["done"]["outcome"] != "founder-wait" or st["done"].get("founder_rerun"):
                 return {"outcome": "skip", "reason": f"{st['done']['outcome']} on this head"}
@@ -475,13 +494,50 @@ class Loop:
         finally:
             release()
 
+    def _update_behind(self, ctx):
+        """The branch is behind main: ask GitHub to merge main into it (REST
+        update-branch with the gh login, the same merge-commit update as
+        `gh pr update-branch`, but pinned with expected_head_sha so a push in
+        between is never merged over). Returns the step's result, or None to go
+        on (--no-post never updates)."""
+        cfg, o, n, st, head = self.cfg, self.o, ctx["n"], ctx["st"], ctx["head"]
+        sha7 = head[:7]
+        if o["post"] == "none":
+            self.out(f"pr-loop: #{n} is behind main; not updated (--no-post)")
+            return None
+        upd = st.get("updated") or {}
+        if upd.get("from") == head and time.time() - upd.get("at_s", 0) < UPDATE_WAIT_S:
+            self.out(f"pr-loop: #{n} waiting for GitHub to update the branch (head {sha7})")
+            return {"outcome": "wait", "reason": "waiting for GitHub to update the branch"}
+        try:
+            o["run_gh"](["api", "-X", "PUT", f"repos/{cfg['repo']}/pulls/{n}/update-branch", "-f", f"expected_head_sha={head}"])
+        except (subprocess.SubprocessError, OSError) as exc:
+            now = o["github"].get_pull(n)["head_sha"]
+            if now != head:
+                self._log(ctx, "head-moved", new_head=now)
+                return {"outcome": "head-moved"}
+            return self._stop(ctx, head, f"could not update the branch with main {_gh_failure(exc)}. A person resolves it "
+                                         "(a merge conflict with main, or GitHub refused the update)")
+        st["updated"] = {"from": head, "at": _now(), "at_s": time.time()}
+        _save_state(self.state_dir, cfg["repo"], st)
+        self._log(ctx, "updated")
+        self._say(n, f"<!-- {MARK} updated from={head} -->\n### Automated loop: branch updated\n\nThe branch was behind `main`, "
+                     "and GitHub reported that as blocking the merge, so the loop asked GitHub to merge `main` into it "
+                     f"(update-branch, a merge commit, only while the head was still `{sha7}`). The new head is reviewed from scratch.")
+        return {"outcome": "updated"}
+
     def _merge_path(self, ctx, r):
         cfg, o, n, st, head = self.cfg, self.o, ctx["n"], ctx["st"], ctx["head"]
         sha7 = head[:7]
         classes = list((r.get("classification") or {}).get("founder") or {})
-        if cfg["hold_label"] in o["github"].get_pull(n)["labels"]:
+        now = o["github"].get_pull(n)
+        if cfg["hold_label"] in now["labels"]:
             self._log(ctx, "held")
             return {"outcome": "skip", "reason": "hold label set during the review"}
+        # main moved during the review: this head cannot merge, so update it
+        # rather than ask the founder (or GitHub) to merge it.
+        if now.get("mergeable_state") == "behind" and o["post"] != "none":
+            return self._update_behind(ctx)
         if classes:
             approved = self._founder_approved(n, head)
             first = not st["done"] or st["done"]["head"] != head
