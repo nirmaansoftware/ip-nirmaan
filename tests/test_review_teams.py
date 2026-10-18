@@ -5,7 +5,8 @@ every tracked file maps to a team; no rule is dead (a glob that matches no
 tracked file, as the draft's `src/nirmaan/design*` and `src/nirmaan/tools*`
 did, or a rule that later rules shadow everywhere); every seat the map names
 has a file in council/; every marker comment a section relies on exists; and
-.github/CODEOWNERS names the founder on exactly the founder class path globs.
+no CODEOWNERS file exists (since the founder's delegation of 2026-10-18,
+founder classes are reviewed by the Founder Proxy agent, not a code owner).
 
 The suite has no YAML dependency, so the map is read by a small loader for the
 plain subset of YAML the file uses (block maps and lists, one-line flow lists,
@@ -24,8 +25,6 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 MAP = ROOT / ".github" / "review-teams.yml"
-CODEOWNERS = ROOT / ".github" / "CODEOWNERS"
-FOUNDER = "@nirmaansoftware"
 
 # The founder approved these Silicon Design seats on 2026-10-17; their files
 # are added by the council/new-seats pull request (T17). Until it is merged a
@@ -307,7 +306,7 @@ def test_content_patterns_do_not_fire_on_ordinary_words(teams_map):
     assert by_id["currency-amount"].search("\u20b9 9999")
 
 
-# --- Founder classes and CODEOWNERS ---------------------------------------------------
+# --- Founder classes, no CODEOWNERS ----------------------------------------------------
 
 
 def test_the_six_founder_classes_are_kept(teams_map):
@@ -330,34 +329,12 @@ def test_gate_files_are_founder_class_and_reviewed_by_verification(teams_map):
             assert "verification" in owning_teams(teams_map, path), path
 
 
-def _codeowners() -> list[tuple[str, list[str]]]:
-    entries = []
-    for line in CODEOWNERS.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if line and not line.startswith("#"):
-            pattern, *owners = line.split()
-            entries.append((pattern, owners))
-    return entries
-
-
-def test_codeowners_names_the_founder_on_exactly_the_founder_class_globs(teams_map):
-    entries = _codeowners()
-    assert entries
-    for pattern, owners in entries:
-        assert owners == [FOUNDER], pattern
-    patterns = [p[1:] if p.startswith("/") else p for p, _ in entries]
-    assert len(patterns) == len(set(patterns))
-    for pattern, _ in entries:
-        # Anchored at the root, except a "**/" glob, which means any directory.
-        assert pattern.startswith("/") or pattern.startswith("**/"), pattern
-    founder_globs = {g for c in teams_map["founder_classes"] for g in c.get("paths", [])}
-    assert set(patterns) == founder_globs
-
-
-def test_every_codeowners_pattern_matches_a_tracked_file(files):
-    for pattern, _ in _codeowners():
-        glob = pattern[1:] if pattern.startswith("/") else pattern
-        assert any(matches(glob, p) for p in files), pattern
+def test_no_codeowners_file_founder_classes_are_reviewed_by_the_founder_proxy(files):
+    """Bringing back a code-owner gate is the founder's decision, made by
+    changing this test (founder class control-plane)."""
+    for path in ("CODEOWNERS", ".github/CODEOWNERS", "docs/CODEOWNERS"):
+        assert path not in files, f"{path} exists: founder classes are reviewed by the Founder Proxy (council/founder-proxy.md)"
+    assert (ROOT / "council" / "founder-proxy.md").exists()
 
 
 # --- The loader and the globs ---------------------------------------------------------

@@ -2,11 +2,54 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
 
 FIXTURES = Path(__file__).parent / "fixtures"
+
+
+# --- CI shards (scripts/shards.py) -----------------------------------------------------
+
+
+def pytest_addoption(parser):
+    group = parser.getgroup("shards", "CI shards (scripts/shards.py)")
+    group.addoption("--shard", metavar="K/N", default=None, help="run only the test files of shard K of N")
+    group.addoption("--shard-profile", default="test", help="which weights in scripts/shard_weights.json balance the shards")
+    group.addoption("--shard-manifest", metavar="PATH", default=None, help="write what was collected and kept, as JSON")
+
+
+def _shards():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("shards", Path(__file__).resolve().parents[1] / "scripts" / "shards.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+@pytest.hookimpl(trylast=True)
+def pytest_collection_modifyitems(config, items):
+    """With --shard K/N, keep only shard K's files (after every other selection, so all shards split one list)."""
+    spec = config.getoption("--shard")
+    if not spec:
+        return
+    shards = _shards()
+    try:
+        k, n = shards.parse(spec)
+    except ValueError as error:
+        raise pytest.UsageError(str(error)) from None
+    record = shards.manifest([item.nodeid for item in items], k, n, config.getoption("--shard-profile"))
+    path = config.getoption("--shard-manifest")
+    if path:
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        Path(path).write_text(json.dumps(record, indent=1) + "\n", encoding="utf-8")
+    keep = set(record["selected"])
+    dropped = [item for item in items if item.nodeid not in keep]
+    if dropped:
+        config.hook.pytest_deselected(items=dropped)
+    items[:] = [item for item in items if item.nodeid in keep]
 
 
 @pytest.fixture(autouse=True, scope="session")

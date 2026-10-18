@@ -8,8 +8,13 @@ pinned, and a newer push to a pull request cancels the older run.
 from __future__ import annotations
 
 import importlib.util
+import json
 import re
+import subprocess
+import sys
 from pathlib import Path
+
+import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOWS = sorted((ROOT / ".github").rglob("*.yml"))
@@ -171,4 +176,103 @@ def test_required_jobs_run_on_every_pull_request_and_cannot_be_skipped():
     jobs = _jobs(text)
     for job in REQUIRED_JOBS:
         assert job in jobs, job
-        assert not re.search(r"^    if:", jobs[job], re.MULTILINE), f"required job {job} has a job-level if"
+        # The one job-level `if:` allowed is `always()`, which never skips (CI shards, below).
+        conditions = re.findall(r"^    if: (.*)$", jobs[job], re.MULTILINE)
+        assert conditions in ([], ["always()"]), f"required job {job} has a job-level if: {conditions}"
+
+
+# --- CI shards (scripts/shards.py, tests/conftest.py) ---------------------------------------
+#
+# `test` and `physical-design` run as shards on separate runners; the job with the required
+# name checks that every shard passed and that the shards ran every collected test once.
+
+
+def _shards():
+    spec = importlib.util.spec_from_file_location("shards", ROOT / "scripts" / "shards.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _suite(files: int = 9, per_file: int = 4) -> list[str]:
+    return [f"tests/test_{f}.py::test_{t}" for f in range(files) for t in range(per_file)]
+
+
+def test_shards_keep_whole_files_and_split_the_suite_exactly_once():
+    shards = _shards()
+    suite = _suite()
+    seconds = {"tests/test_0.py": 50.0, "tests/test_1.py": 40.0, "tests/test_2.py": 1.0}
+    for n in (1, 2, 3, 4):
+        kept = [shards.select(suite, k, n, seconds) for k in range(1, n + 1)]
+        assert sorted(t for part in kept for t in part) == sorted(suite)
+        files = [{shards.file_of(t) for t in part} for part in kept]
+        assert sum(len(f) for f in files) == len({shards.file_of(t) for t in suite}), "a file was split"
+    # Heaviest first onto the least loaded shard: the two heavy files never share one.
+    owner = shards.assign([shards.file_of(t) for t in suite], seconds, 2)
+    assert owner["tests/test_0.py"] != owner["tests/test_1.py"]
+    # The same input gives the same split, whatever order the files arrive in.
+    assert shards.assign(list(reversed(suite)), seconds, 3) == shards.assign(suite, seconds, 3)
+    assert shards.parse("2/3") == (2, 3)
+    for bad in ("0/3", "4/3", "3", "a/b"):
+        with pytest.raises(ValueError):
+            shards.parse(bad)
+
+
+def test_the_shard_check_fails_on_a_missing_repeated_or_disagreeing_shard(tmp_path, capsys):
+    shards = _shards()
+    suite = _suite()
+    good = [shards.manifest(suite, k, 3, "test") for k in (1, 2, 3)]
+    assert shards.problems(good) == []
+    paths = []
+    for m in good:
+        paths.append(tmp_path / f"s{m['shard']}.json")
+        paths[-1].write_text(json.dumps(m), encoding="utf-8")
+    assert shards.main([str(p) for p in paths]) == 0
+    assert "the shards split the collection exactly" in capsys.readouterr().out
+    assert shards.main([str(p) for p in paths[:2]]) == 1
+    assert shards.problems([]) == ["no shard manifests"]
+    assert any("expected shards 1..3" in p for p in shards.problems(good[:2]))
+    assert any("expected shards 1..3" in p for p in shards.problems([good[0], good[0], good[2]]))
+    other = shards.manifest(suite[:-1], 3, 3, "test")
+    assert any("disagree on digest" in p for p in shards.problems([good[0], good[1], other]))
+    twice = dict(good[2], selected=good[2]["selected"] + good[1]["selected"][:1])
+    assert any("is in shard 2 and shard 3" in p for p in shards.problems([good[0], good[1], twice]))
+    short = dict(good[2], selected=good[2]["selected"][1:])
+    assert any("keep 35 tests, but 36 were collected" in p for p in shards.problems([good[0], good[1], short]))
+
+
+def test_pytest_shards_this_file_through_the_conftest_option(tmp_path):
+    shards = _shards()
+    for k in (1, 2):
+        proc = subprocess.run(
+            [sys.executable, "-m", "pytest", "-q", "--collect-only", "-p", "no:cacheprovider",
+             "tests/test_ci.py", "tests/test_status_docs.py", "--shard", f"{k}/2",
+             "--shard-manifest", str(tmp_path / f"s{k}.json")],
+            cwd=ROOT, capture_output=True, text=True, timeout=120)
+        assert proc.returncode == 0, proc.stdout + proc.stderr
+    manifests = [json.loads((tmp_path / f"s{k}.json").read_text(encoding="utf-8")) for k in (1, 2)]
+    assert shards.problems(manifests) == []
+    assert {shards.file_of(t) for m in manifests for t in m["selected"]} == {"tests/test_ci.py",
+                                                                           "tests/test_status_docs.py"}
+    bad = subprocess.run([sys.executable, "-m", "pytest", "-q", "--collect-only", "-p", "no:cacheprovider",
+                          "tests/test_ci.py", "--shard", "3/2"], cwd=ROOT, capture_output=True, text=True, timeout=120)
+    assert bad.returncode == 4 and "K must be between 1 and N" in bad.stderr
+
+
+def test_the_required_test_jobs_gather_their_shards_and_fail_unless_all_passed():
+    text = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    jobs = _jobs(text)
+    weights = json.loads((ROOT / "scripts" / "shard_weights.json").read_text(encoding="utf-8"))
+    for job in ("test", "physical-design"):
+        shard_job, body = jobs[f"{job}-shard"], jobs[job]
+        count = len(re.search(r"shard: \[([\d, ]+)\]", shard_job).group(1).split(","))
+        assert f'--shard "$SHARD/{count}" --shard-profile {job}' in shard_job
+        assert f"name: {job} (shard ${{{{ matrix.shard }}}}/{count})" in shard_job
+        assert job in weights
+        assert f"needs: [{job}-shard]" in body and "\n    if: always()\n" in body
+        assert f"RESULT: ${{{{ needs.{job}-shard.result }}}}" in body
+        assert 'test "$RESULT" = success' in body and "python3 scripts/shards.py shards/*.json" in body
+        assert f"pattern: shards-{job}-*" in body
+        assert f"junit-{job}-${{{{ matrix.shard }}}}" in shard_job
+    assert "needs: [test, no-tools, physical-design]" in jobs["test-union"]
+    assert "pattern: junit-*" in jobs["test-union"]
