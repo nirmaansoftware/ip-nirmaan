@@ -6,7 +6,8 @@ physical-design-engineer, firmware-engineer, eda-tooling, ai-engineer,
 market-research, finance-licensing, legal-compliance, security, qa-evidence,
 brand-content, site-engineer, legal-counsel, tax-accounts, partnerships).
 Code read on ip-nirmaan main at 5e80dd2. The chair rebuilt the organization
-read only (`build_organization()`, repository venv) to check every count below.
+read only (`build_organization()`, repository venv) to check every count below;
+the command and its output are in the appendix, so any reader can reproduce them.
 
 This is a council record, not a decision in the product's sense. A key is an
 agent review, never a person's decision. The founder can overrule any item, and
@@ -24,7 +25,7 @@ not the plan (qa-evidence must-have).
 | Plan says | Code says (FACT) |
 |---|---|
 | "19 seats and a chair" | 18 seats plus the chair (council/README.md) |
-| CEO spans 5 | CEO has 9 direct reports: CTO, COO, CPO, Chief Architect, Chief of Staff, and the placeholder VPs of Sales, Marketing, Customer Success and Partnerships (org_chart.py:333-347) |
+| CEO spans 5 | CEO has 9 direct reports: CTO, COO, CPO, Chief Architect, Chief of Staff, and the placeholder VPs of Sales, Marketing, Customer Success and Partnerships (the nine placeholder business divisions are declared at org_chart.py:333-347; the four sponsored by the CEO at :342-345) |
 | Documentation under the COO | Technical Documentation is a department sponsored by the CPO (org_chart.py:312) |
 | Add CPU, GPU, AI accelerator, memory, perf modelling to Architecture | They exist: architecture.micro.cpu, gpu, npu, dsp, cache, memctrl and architecture.system.memory, performance (org_chart.py:85-104) |
 | Add hardware security to Security | It exists: security.hardware (org_chart.py:263) |
@@ -414,7 +415,7 @@ Rules:
    rung in organization.py:490) is renamed to a seniority band, and the word
    "expert" leaves the code and its output. The record-based scale is the
    **evidence level**: Knowledge, Practised, Proven. Neither appears on a public
-   page without records. "Checker sign-off" is renamed **check record**.
+   page without records. The checker's output is called a **check record**.
 2. **Skill card and knowledge document.** The skill card is the skills.py entry,
    rendered at most 2,000 characters. Long-form knowledge is one document per
    skill at `knowledge/<division>/<skill_id>.md`, at most 12,000 characters,
@@ -619,3 +620,37 @@ The founder can overrule any decision in this record.
 | G17 | First recorded live eval batch committed before any level is computed | ai-engineer |
 | G18 | Examples stay within their CI budget | eda-tooling |
 | G19 | Plan v4 carries the corrections in section 1 and the minimum span of 3 | chair |
+
+## Appendix: how the counts were computed
+
+Run from the repository root on main at 5e80dd2:
+
+```text
+PYTHONPATH=src .venv/bin/python - <<'PY'
+from collections import Counter
+from nirmaan.company import build_organization
+o = build_organization()
+roles = list(o.roles.values()) if isinstance(o.roles, dict) else list(o.roles)
+units = list(o.units.values()) if isinstance(o.units, dict) else list(o.units)
+reports = Counter(r.reports_to for r in roles if r.reports_to)
+print("roles with reports", len(reports), "over 8", sum(v > 8 for v in reports.values()),
+      "max", max(reports.items(), key=lambda kv: kv[1]))
+print("roles reporting to exec.ceo", reports["exec.ceo"])
+children = Counter(u.parent for u in units if u.parent)
+print("units outside 3 to 8", sorted((k, v) for k, v in children.items() if not 3 <= v <= 8))
+PY
+```
+
+Output:
+
+```text
+roles with reports 69 over 8 26 max ('implementation.dft.engineering.manager', 37)
+roles reporting to exec.ceo 9
+units outside 3 to 8 [('architecture.interface', 12), ('design', 2), ('design.integration', 1), ('documentation', 1), ('documentation.writing', 9), ('implementation', 2), ('implementation.dft', 1), ('implementation.dft.engineering', 9), ('implementation.pd', 9), ('nirmaan', 20), ('quality', 1), ('verification', 9)]
+```
+
+The root unit (`nirmaan`, 20 children) is the company itself; its span is
+counted at the CEO (section 3). `ls evals/` at the same commit shows `firmware`,
+`rtl` (apb_regs, axi4_lite_regs, rr_arbiter, sync_fifo) and `spec`, and no
+`results` directory. P1-04 turns the span count into a committed test.
+
