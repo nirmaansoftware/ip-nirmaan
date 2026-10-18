@@ -202,7 +202,11 @@ def test_a_bad_file_is_refused_with_line_reasons_and_nothing_is_recorded(axi):
 
     with pytest.raises(vplan.PlanError) as broken:
         vplan.import_plan(engine, importer(engine, rtl), '{\n  "format": "nirmaan.vplan",\n  "version": 1,\n}\n')
-    assert broken.value.problems[0].startswith("line 4:")
+    # The line is the decoder's: Python 3.13 and later stop at the trailing comma
+    # (line 3, "Illegal trailing comma before end of object"); 3.11 and 3.12 stop
+    # at the closing brace (line 4, "Expecting property name ...").
+    trailing_comma_line = 3 if sys.version_info >= (3, 13) else 4
+    assert broken.value.problems[0].startswith(f"line {trailing_comma_line}:")
     assert engine.state is before
 
 
