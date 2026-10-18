@@ -69,7 +69,7 @@ first run, not re-run since (only the page copy changed):
 | 1 | Privacy policy | PASS: footer links to nirmaan.online/privacy.html, which covers this site. This page loads nothing from third parties |
 | 2 | Terms & conditions | PASS: footer links to nirmaan.online/terms.html; the code is under Apache-2.0 |
 | 3 | Frontend secrets | PASS: none; the page has no keys at all |
-| 4 | HTTPS | PASS: Vercel enforces it; HSTS, frame-deny, and referrer headers served. No Content-Security-Policy yet |
+| 4 | HTTPS | PASS: Vercel enforces it; HSTS, frame-deny, and referrer headers served. Content-Security-Policy served as Report-Only (inline scripts by hash; enforcing it is open, see `docs/ROADMAP.md`) |
 | 5 | Cookie banner | N/A: no cookies. The theme choice is kept in `localStorage` (disclosed in the privacy policy) |
 | 6 | Meta titles / descriptions | PASS: title, description, canonical, `og:url` |
 | 7 | Social preview image | PASS: `og-image.png`, 1200x630, with alt text |
@@ -90,7 +90,9 @@ first run, not re-run since (only the page copy changed):
 ## Deploying
 
 Deploy on Vercel as its own project with **Root Directory** set to `site`
-(`vercel.json` here adds the security headers; there is no build step). Add
+(`vercel.json` here adds the security headers, including a Report-Only
+Content-Security-Policy whose inline-script hashes `tests/test_landing_site.py`
+checks; there is no build step). Add
 `ip.nirmaan.online` as the project's domain, then a CNAME record for `ip` on
 `nirmaan.online` pointing at `cname.vercel-dns.com`. After it is live, re-run
 item 12 and add the URL to `pyproject.toml` and the README (see `docs/ROADMAP.md`).

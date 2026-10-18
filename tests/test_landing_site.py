@@ -9,10 +9,13 @@
 * Motion is opt-in and switched off under prefers-reduced-motion.
 * The launch list (Nirmaan's docs/engineering/list.md) is met: 404 page,
   robots and sitemap, social preview image, icons, and legal links.
+* The Content-Security-Policy in site/vercel.json allows inline scripts by
+  hash only, and has the hash of every inline script on every page.
 """
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
 import re
@@ -198,3 +201,65 @@ def test_partner_offer_stays_early_and_unpriced() -> None:
     for mark in ("\u20b9", "$", "usd", "lakh"):
         assert mark not in section.lower(), mark
     assert "We have no design partners yet." in HTML
+
+
+# Content-Security-Policy (council item I4, the ip copy of Nirmaan's N14). It
+# ships as Report-Only; enforcing it is a later change after a preview check.
+CSP_KEYS = ("content-security-policy", "content-security-policy-report-only")
+RUNNABLE_TYPES = {"", "text/javascript", "application/javascript", "module", "speculationrules"}
+
+
+def _csp() -> dict[str, list[str]]:
+    # The one CSP header on /(.*). Enforcing it renames the Report-Only header;
+    # two at once would let one go unchecked, so that fails here.
+    config = json.loads((SITE / "vercel.json").read_text(encoding="utf-8"))
+    values = [header["value"]
+              for rule in config["headers"] if rule["source"] == "/(.*)"
+              for header in rule["headers"] if header["key"].lower() in CSP_KEYS]
+    assert len(values) == 1, "site/vercel.json needs exactly one CSP header on /(.*)"
+    directives = (d.split() for d in values[0].split(";") if d.strip())
+    return {name: sources for name, *sources in directives}
+
+
+def _inline_script_hashes(page: str) -> set[str]:
+    page = re.sub(r"<!--.*?-->", "", page, flags=re.S)
+    hashes = set()
+    for attrs, body in re.findall(r"<script(\s[^>]*)?>(.*?)</script\s*>", page, re.S | re.I):
+        if re.search(r"\ssrc\s*=", attrs, re.I):
+            continue
+        kind = re.search(r'\stype\s*=\s*"([^"]*)"', attrs, re.I)
+        if (kind.group(1).strip().lower() if kind else "") not in RUNNABLE_TYPES:
+            continue
+        digest = base64.b64encode(hashlib.sha256(body.encode("utf-8")).digest()).decode()
+        hashes.add(f"'sha256-{digest}'")
+    return hashes
+
+
+def test_csp_script_src_has_exactly_the_inline_script_hashes() -> None:
+    # A changed inline script (the theme bootstrap) changes its hash: put the
+    # new one in site/vercel.json and drop the old one.
+    used = set()
+    for path in sorted(SITE.glob("*.html")):
+        used |= _inline_script_hashes(path.read_text(encoding="utf-8"))
+    assert used, "expected the inline theme bootstrap"
+    allowed = {s for s in _csp()["script-src"] if s.startswith("'sha256-")}
+    assert allowed == used
+
+
+def test_csp_hash_catches_a_one_byte_change() -> None:
+    page = "<script>a</script>"
+    assert _inline_script_hashes(page) != _inline_script_hashes(page.replace(">a<", ">b<"))
+    assert _inline_script_hashes('<script src="/x.js"></script><script type="application/ld+json">{}</script>') == set()
+
+
+def test_csp_is_strict_where_this_site_allows() -> None:
+    csp = _csp()
+    assert "'unsafe-inline'" not in csp["script-src"]
+    assert "'unsafe-eval'" not in csp["script-src"]
+    assert csp["default-src"] == ["'self'"]
+    assert csp["frame-ancestors"] == ["'none'"]
+    assert csp["object-src"] == ["'none'"]
+    assert csp["base-uri"] == ["'self'"]
+    # This site posts no form and calls no third party (no Web3Forms).
+    assert csp["connect-src"] == ["'self'"]
+    assert csp["form-action"] == ["'self'"]
