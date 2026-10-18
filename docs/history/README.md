@@ -107,6 +107,7 @@ The original preface of the section:
 - [M55-side-2-council-seats](M55-side-2-council-seats.md): side work - three more council seats: legal counsel, tax and accounts, partnerships
 - [release-v1.25.0](release-v1.25.0.md): v1.25.0 (2026-10-12) - the four audits of v1.24.0, closed
 - [M58-eval-skills-must-fail](M58-eval-skills-must-fail.md): Milestone 58 - Eval cases name skills; must-fail scorer; the evidence loader refuses replays and attestations
+- [M59-release-mirror-check](M59-release-mirror-check.md): Milestone 59 - Release check for the public org mirrors: the org figure and the hero's plan excerpt are checked against the code at each release
 
 ## Before M43
 

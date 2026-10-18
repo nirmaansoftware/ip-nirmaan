@@ -8,7 +8,8 @@ every call to calls.jsonl beside it.
 
 scenario.json: {"reviews": [...], "fixes": [...]}, each list used in order (the
 last entry repeats).
-  review: {"verdict", "findings"?} or {"type": "rate_limit"}
+  review: {"verdict", "findings"?, "extra"?} or {"type": "rate_limit"}
+    ("extra" adds keys, such as the Founder Proxy's founder_reasons)
   fix: {"status"?, "edits"?: {path: text}, "not_addressed"?: [{id, reason}],
         "human_move"?: {"git_dir", "ref", "sha"}, "type"?: "rate_limit" | "garbage"}
 """
@@ -45,7 +46,7 @@ if r.get("type") == "rate_limit":
 elif not is_fixer:
     head = re.search(r"Head SHA: ([0-9a-f]{40})", stdin).group(1)
     ok({"verdict": r.get("verdict", "pass"), "sha": head, "findings": r.get("findings", []),
-        "checks_run": ["read the diff"], "not_run": ["simulation (no command tools)"]})
+        "checks_run": ["read the diff"], "not_run": ["simulation (no command tools)"], **r.get("extra", {})})
 elif r.get("type") == "garbage":
     print(json.dumps({"type": "result", "subtype": "success", "is_error": False, "result": "I fixed it!"}))
 else:

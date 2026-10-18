@@ -4,7 +4,8 @@
 It reads scenario.json next to itself (the reviewer's environment is an
 allowlist, so the scenario cannot come through the environment), answers the
 next response in order, and records each call to calls.jsonl beside it.
-Response types: verdict, result, stdout, sleep, rate_limit, error.
+Response types: verdict, result, stdout, sleep, rate_limit, error. A verdict's
+"extra" adds keys (such as the Founder Proxy's founder_reasons).
 """
 
 import json
@@ -35,7 +36,7 @@ def ok(text):
 kind = r["type"]
 if kind == "verdict":
     ok(json.dumps({"verdict": r["verdict"], "sha": r.get("sha") or head, "findings": r.get("findings", []),
-                   "checks_run": ["read the diff"], "not_run": ["simulation (no command tools)"]}))
+                   "checks_run": ["read the diff"], "not_run": ["simulation (no command tools)"], **r.get("extra", {})}))
 elif kind == "result":
     ok(r["text"])
 elif kind == "stdout":

@@ -63,8 +63,10 @@ meeting). It is separate from the product's own engineering decisions.
 Pull requests are reviewed by teams of council seats (key 1 per owning team,
 then the chair as key 2); see `docs/REVIEW_MECHANISM.md` and the teams in
 `council/README.md`. It is IMPLEMENTED: the ruleset on `main` requires both
-review checks from the review App, and founder-class pull requests also wait
-for the founder's approval.
+review checks from the review App, and founder-class pull requests also get
+the Founder Proxy (agent, `council/founder-proxy.md`) after key 2, under the
+founder's delegation of 2026-10-18; what only the founder decides waits for the
+founder (`needs-founder`).
 An agent review is never a sign-off or an approval by a person. A session never
 reviews or posts a review status for a pull request it wrote.
 

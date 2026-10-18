@@ -479,7 +479,8 @@ def test_the_core_names_no_stage_tool_or_style_of_this_milestone():
 
 def test_ci_runs_the_real_timing_closure_project_in_the_physical_design_job():
     ci = (Path(__file__).parents[1] / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
-    job = ci[ci.index("  physical-design:"):ci.index("  dashes:")]
+    # The PD tests run in the physical-design shards (the `physical-design` job checks them).
+    job = ci[ci.index("  physical-design-shard:"):ci.index("  dashes:")]
     required = next(ln for ln in job.splitlines() if ln.strip().startswith("NIRMAAN_REQUIRE_EDA:"))
     assert {"yosys", "openroad", "sta", *GATE_TOOLS} <= set(required.split(":", 1)[1].split())
     assert "tests/test_nirmaan_sta_antecedents.py" in job
