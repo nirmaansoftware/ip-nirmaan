@@ -27,7 +27,7 @@ so "detailed knowledge" is a machine-checked property, not a claim.
 
 ```mermaid
 flowchart TB
-    subgraph packs [Knowledge Packs - plugins, 13 built in]
+    subgraph packs [Knowledge Packs - plugins, 44 built in]
         AXI["axi - read, write,\nexclusive access"]
         APBAHB["apb, ahb - AMBA\nlow/high-speed bus"]
         CHITL["chi, tilelink -\ncoherent interconnects"]
@@ -36,7 +36,7 @@ flowchart TB
         CLK["reset-clocking, cdc"]
         COHRV["coherency,\nriscv-privilege"]
         COV["coverage"]
-        FUT["future packs:\ncustom NoCs, power mgmt,\nsecurity, formal,\ncompany-internal..."]
+        FUT["31 more built in, e.g.\nnoc, low-power, security,\nformal; future packs:\ncompany-internal..."]
     end
     packs -.register_pack.-> KG[("Verification\nKnowledge Graph\nfrozen, queryable")]
     EG[("Evidence Graph")] --> MATCH["Pattern matcher\ndeterministic clauses:\nrequired / optional / forbidden"]
