@@ -99,8 +99,17 @@ costs or effort estimates.
 ## What stays with the founder
 
 The council decides; the founder can overrule, and the record says so. These
-always wait for the founder: merging anything that publishes, signing a
-contract, spending money (including legal counsel), and changing a public name.
+always wait for the founder: signing a contract, spending money (including
+legal counsel), and changing a public name.
+
+Merging follows the two-key review (Teams, above; `docs/REVIEW_MECHANISM.md`):
+a pull request merges by itself once CI and both keys pass, unless it is in
+one of the six founder classes (control plane, gate semantics, licence and
+third-party, commercial, public names and claims, export-control sensitive
+content; council record 2026-10-17, section 2). Those also wait for the
+founder's own approval on GitHub. Publishing is not a class of
+its own: a change to ip.nirmaan.online waits for the founder when it is in one
+of the six, for example a new public claim or name.
 
 To run a meeting in a Claude Code session, ask for one; the `council-meeting`
 skill (`.claude/skills/council-meeting/`) follows this page.
