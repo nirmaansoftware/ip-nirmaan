@@ -10,31 +10,32 @@ For each open pull request to main from a branch in this repository by the
 agents' account (not a draft, no `hold` or `needs-founder` label), one step
 per call, as a state machine that survives restarts:
 
-    skip    already finished on this head (ready, auto-merge, founder wait);
+    skip    already finished on this head (ready, auto-merge);
     update  GitHub reports the branch behind main (mergeable_state "behind";
             this repository's ruleset has strict up-to-date branches off, so
             it is not expected, but if GitHub reports it the loop handles it
             as Nirmaan's does): merge main into
             it with the gh login (update-branch, pinned to the head the loop
-            saw) before any review, and again before a founder-class pull
-            request is put to the founder, so the founder approves a head that
-            can merge; a failed update stops, a push in between drops the step;
+            saw) before any review, and again after the review when main moved
+            during it; a failed update stops, a push in between drops the step;
     wait    the required CI is not finished on the head (no model call), or
             GitHub is still making the update's merge commit;
-    review  both keys, through scripts/pr_review.py unchanged;
-    merge   both keys passed: `gh pr merge --auto --merge` with the gh login
+    review  both keys, and the Founder Proxy (agent) for a founder-class pull
+            request, through scripts/pr_review.py;
+    merge   both keys (and the proxy) passed: `gh pr merge --auto --merge` with the gh login
             when the review App posts the checks and the repository's
             allow_auto_merge field (read with gh) is true; a "ready" comment in
             a dry run or when it is false; the field unreadable or any merge
-            error stops. A founder-class pull request waits for
-            the founder's GitHub approval and is never merged by the loop;
-    fix     a key failed: a separate fresh `claude -p` fixer in a clean
+            error stops;
+    fix     a key or the proxy failed: a separate fresh `claude -p` fixer in a clean
             worktree of the head, Edit and Write only inside it; the loop (never
             the model) checks what changed, commits, runs the checks and pushes.
             The new head voids both keys, so the next step reviews from scratch;
     stop    three fix rounds, the same finding twice, CI failing after a fix, a
-            merge conflict, a deferred key, a rate limit, a forbidden path, a
-            failed local check or any error: label `needs-founder`, say why.
+            merge conflict, a deferred key or proxy, the proxy's needs-founder
+            (until the founder's own GitHub review approves the head), a rate
+            limit, a forbidden path, a failed local check or any error: label
+            `needs-founder`, say why.
 
 Usage: python scripts/pr_loop.py (--once | --watch) [--pr N] [--interval-minutes 5] [--no-post]
 Exit: 0 done, 2 setup error, 4 refused (this copy differs from main).
@@ -168,16 +169,18 @@ def fingerprint(f: dict) -> str:
 
 
 def findings_to_fix(review: dict) -> list[dict]:
-    """Blocker and critical findings of every failed key (all of a failed key's
-    findings when it failed on lesser ones), numbered F1, F2, ..."""
-    failed = [r for r in [*(review.get("key1") or []), *([review["key2"]] if review.get("key2") else [])]
+    """Blocker and critical findings of every failed key and of a failed
+    Founder Proxy (all of a failed key's findings when it failed on lesser
+    ones), numbered F1, F2, ..."""
+    failed = [r for r in [*(review.get("key1") or []), *([review["key2"]] if review.get("key2") else []),
+                          *([review["proxy"]] if review.get("proxy") else [])]
               if r.get("status") == "fail" and r.get("verdict")]
     out = []
     for r in failed:
         found = r["verdict"]["findings"]
         blocking = [f for f in found if f["severity"] in ("blocker", "critical")]
         for f in blocking or found:
-            out.append({"key": r["key"], "team": r.get("team") or "chair", "role": r.get("role"), "file": f["file"],
+            out.append({"key": r["key"], "team": r.get("team") or ("founder-proxy" if r["key"] == "proxy" else "chair"), "role": r.get("role"), "file": f["file"],
                         "line": f["line"], "severity": f["severity"], "text": f["text"]})
     return [{"id": f"F{i}", **f, "fingerprint": fingerprint(f)} for i, f in enumerate(out, 1)]
 
@@ -322,6 +325,15 @@ def _worktree_changes(path: str) -> list[str]:
     return sorted(set(out))
 
 
+def _passed_what(r: dict, capital: bool = False) -> str:
+    """What passed, for the merge-path comments."""
+    proxy = r.get("proxy")
+    what = ("both keys passed" if not proxy else
+            "both keys passed, and the founder's own GitHub review approves the changes the Founder Proxy (agent) sent to the founder"
+            if proxy["status"] == pr_review.NEEDS_FOUNDER else "both keys and the Founder Proxy (agent) passed")
+    return what[0].upper() + what[1:] if capital else what
+
+
 # --- One step for one pull request --------------------------------------------------
 
 
@@ -422,27 +434,18 @@ class Loop:
             self.out(f"pr-loop: #{n}: could not label or comment: {exc}")
         return {"outcome": "stopped", "reason": reason}
 
-    def _founder_approved(self, n, head) -> bool:
-        mine = [r for r in self.o["github"].list_reviews(n) if r["login"] == self.cfg["founder_login"]
-                and r["state"] in ("APPROVED", "CHANGES_REQUESTED", "DISMISSED")]
-        return bool(mine) and mine[-1]["state"] == "APPROVED" and mine[-1]["commit_id"] == head
-
     def _step(self, ctx, listed):
         cfg, o, n, st = self.cfg, self.o, ctx["n"], ctx["st"]
         pull = o["github"].get_pull(n)
         head = ctx["head"] = pull["head_sha"]
         # Behind main: update first, also for a head that already finished (it
-        # cannot merge while GitHub reports it behind, and a founder-class pull
-        # request must not be approved on a head that needs another push).
+        # cannot merge while GitHub reports it behind).
         if pull.get("mergeable_state") == "behind" and (st["done"] or {}).get("outcome") != "refused":
             u = self._update_behind(ctx)
             if u:
                 return u
         if st["done"] and st["done"]["head"] == head:
-            if st["done"]["outcome"] != "founder-wait" or st["done"].get("founder_rerun"):
-                return {"outcome": "skip", "reason": f"{st['done']['outcome']} on this head"}
-            if not self._founder_approved(n, head):
-                return {"outcome": "skip", "reason": "waiting for the founder's approval on this head"}
+            return {"outcome": "skip", "reason": f"{st['done']['outcome']} on this head"}
         if pull.get("mergeable") is False or pull.get("mergeable_state") == "dirty":
             return self._stop(ctx, head, "the branch has a merge conflict with main; a person resolves it")
         state, text = ci_state(cfg["required_ci"], o["github"].list_check_runs(head))
@@ -480,14 +483,24 @@ class Loop:
                 return {"outcome": "skip", "reason": f"{r['ci_failed']}; the author fixes it"}
             if r.get("deferred"):
                 return self._stop(ctx, head, f"review deferred: {r['deferred']}")
-            keys = [*(r.get("key1") or []), *([r["key2"]] if r.get("key2") else [])]
+            # The Founder Proxy (agent) is a reviewer like the keys: deferred
+            # stops, fail goes to the fixer.
+            keys = [*(r.get("key1") or []), *([r["key2"]] if r.get("key2") else []), *([r["proxy"]] if r.get("proxy") else [])]
             if not r.get("key1"):
                 return self._stop(ctx, head, "review deferred: no owning team")
             deferred = [k for k in keys if k["status"] == "deferred"]
             if deferred:
                 return self._stop(ctx, head, "review deferred (" + "; ".join(f"{k['team_name']}: {k.get('reason')}" for k in deferred) + ")")
             self._log(ctx, "reviewed", key1=",".join(f"{k['team']}:{k['status']}" for k in r["key1"]),
-                      key2=r["key2"]["status"] if r.get("key2") else "not run")
+                      key2=r["key2"]["status"] if r.get("key2") else "not run",
+                      proxy=r["proxy"]["status"] if r.get("proxy") else "not run")
+            # What the founder keeps: the loop stops and the founder decides on
+            # GitHub. Their own review approving this head lets the review pass
+            # review/executive; removing the label lets the loop resume.
+            if r.get("proxy") and r["proxy"]["status"] == pr_review.NEEDS_FOUNDER and not r.get("founder_approved"):
+                why = "; ".join((r["proxy"].get("verdict") or {}).get("founder_reasons") or [])
+                return self._stop(ctx, head, f"the Founder Proxy (agent) returned needs-founder: {why}. The founder decides: "
+                                             f"approve head {head[:7]} on GitHub (or not), then remove the label")
             if not any(k["status"] == "fail" for k in keys):
                 return self._merge_path(ctx, r)
             return self._fix_round(ctx, pull, r)
@@ -529,30 +542,14 @@ class Loop:
     def _merge_path(self, ctx, r):
         cfg, o, n, st, head = self.cfg, self.o, ctx["n"], ctx["st"], ctx["head"]
         sha7 = head[:7]
-        classes = list((r.get("classification") or {}).get("founder") or {})
         now = o["github"].get_pull(n)
         if cfg["hold_label"] in now["labels"]:
             self._log(ctx, "held")
             return {"outcome": "skip", "reason": "hold label set during the review"}
         # main moved during the review: this head cannot merge, so update it
-        # rather than ask the founder (or GitHub) to merge it.
+        # rather than ask GitHub to merge it.
         if now.get("mergeable_state") == "behind" and o["post"] != "none":
             return self._update_behind(ctx)
-        if classes:
-            approved = self._founder_approved(n, head)
-            first = not st["done"] or st["done"]["head"] != head
-            st["done"] = {"head": head, "outcome": "founder-wait", "founder_rerun": approved}
-            _save_state(self.state_dir, cfg["repo"], st)
-            self._log(ctx, "founder-wait", classes=",".join(classes), founder_approved=approved)
-            if first or approved:
-                body = (f"Founder class {', '.join(classes)}: the founder's approval of this head is on GitHub, so "
-                        "`review/executive` was posted again. The loop never merges a founder-class pull request; the founder merges it."
-                        if approved else
-                        f"Founder class {', '.join(classes)}: this pull request waits for the founder's GitHub approval of head "
-                        f"`{sha7}`. The loop never merges a founder-class pull request, and an agent review never stands in for the founder.")
-                self._say(n, f"<!-- {MARK} ready head={head} founder={','.join(classes)} -->\n"
-                             f"### Automated loop: both keys passed on `{sha7}`\n\n{body}\n\n_Agent review only._")
-            return {"outcome": "founder-wait"}
         # The repository's "Allow auto-merge" setting decides between auto-merge
         # and "ready": read with the gh login (`allow_auto_merge`, a field, never
         # the wording of an error). Off: ready. On: `gh pr merge --auto`, and any
@@ -575,13 +572,13 @@ class Loop:
                 return self._stop(ctx, head, f"gh pr merge --auto failed {_gh_failure(exc)}")
         if why is None:
             self._log(ctx, "auto-merge")
-            self._say(n, f"<!-- {MARK} auto-merge head={head} -->\n### Automated loop: both keys passed on `{sha7}`\n\n"
+            self._say(n, f"<!-- {MARK} auto-merge head={head} -->\n### Automated loop: {_passed_what(r)} on `{sha7}`\n\n"
                          "Auto-merge is on for this pull request: GitHub merges it with a merge commit once every required "
                          "check passes on this head.\n\n_Agent review only._")
             st["done"] = {"head": head, "outcome": "auto-merge"}
         else:
             self._log(ctx, "ready", why=why)
-            self._say(n, f"<!-- {MARK} ready head={head} -->\n### Automated loop: ready\n\nBoth keys passed on `{sha7}`, "
+            self._say(n, f"<!-- {MARK} ready head={head} -->\n### Automated loop: ready\n\n{_passed_what(r, True)} on `{sha7}`, "
                          f"waiting for the founder's merge settings: {why}. The founder merges this pull request.\n\n_Agent review only._")
             st["done"] = {"head": head, "outcome": "ready"}
         _save_state(self.state_dir, cfg["repo"], st)

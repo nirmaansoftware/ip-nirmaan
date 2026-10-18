@@ -57,7 +57,7 @@ founder_classes:
     title: Control plane
     paths: [.github/**, CLAUDE.md]
 """
-SEATS = ["chair", "security", "eda-tooling"]
+SEATS = ["chair", "security", "eda-tooling", "founder-proxy"]
 RECORD = "council/records/2026-10-17-teams-and-pr-review.md"
 
 
@@ -182,7 +182,7 @@ class Repo:
         write(w, ".github/review-teams.yml", MAP)
         write(w, "CLAUDE.md", "# CLAUDE.md\nRULES-MARKER-FROM-MAIN\n")
         for seat in SEATS:
-            write(w, f"council/{seat}.md", f"# {seat}\n\n## In a review (key 1)\nREVIEW-MARKER-{seat}\n")
+            write(w, f"council/{seat}.md", f"# {seat}\nSEAT-MARKER-{seat}\n\n## In a review (key 1)\nREVIEW-MARKER-{seat}\n")
         write(w, RECORD, "# Record\n\n### Every key 1 (base)\nBASE-MARKER\n")
         write(w, "src/app.py", "one\ntwo\nthree\n")
         sh(w, "add", "-A")
@@ -209,7 +209,7 @@ class Repo:
 
     def loop(self, **extra):
         kwargs = dict(repo_root=str(self.work), github=self.github, post="app", claude_bin=str(self.bin), state_dir=self.state,
-                      models={"key1": "k1", "key2": "k2"}, timeout_s=30, backoff_s=0, fixer_model="fixer-model",
+                      models={"key1": "k1", "key2": "k2", "proxy": "proxy-model"}, timeout_s=30, backoff_s=0, fixer_model="fixer-model",
                       fixer_timeout_s=30, check_timeout_s=30, sleep=lambda s: None, out=lambda s: None,
                       run_gh=self.github.run_gh, loop=LOOP)
         kwargs.update(extra)
@@ -469,22 +469,82 @@ def test_ci_failing_on_the_author_head_waits_without_a_call(repo):
 # --- Founder, hold and skips -----------------------------------------------------
 
 
-def test_founder_class_waits_and_is_never_merged_by_the_loop_even_after_the_approval(repo):
-    r = repo(change=lambda w: write(w, ".github/workflows/x.yml", "name: x\n"))
-    assert r.tick() == ["founder-wait"]
-    assert r.github.merges == [], "gh pr merge is never called for a founder-class pull request"
-    assert r.github.body == ("<!-- review:founder-class -->Founder class: control-plane (Control plane); waits for the founder's "
-                             "approval.<!-- /review:founder-class -->\n\nChanges line two."), "the driver declared the class in the body"
-    assert "waits for the founder's GitHub approval" in r.comments()[-1]
+def _change_github(w):
+    write(w, ".github/workflows/x.yml", "name: x\n")
+
+
+def _sys(call):
+    return call["argv"][call["argv"].index("--system-prompt") + 1]
+
+
+NEEDS = {"verdict": "needs-founder", "extra": {"founder_reasons": ["adds a paid runner"]}}
+
+
+def test_founder_class_both_keys_and_the_proxy_pass_and_the_loop_takes_the_merge_path(repo):
+    r = repo(change=_change_github)
+    assert r.tick() == ["auto-merge"]
+    assert r.github.merges and r.github.merges[0][-1] == r.first_head
+    assert r.github.body == ("<!-- review:founder-class -->Founder class: control-plane (Control plane); the Founder Proxy (agent) "
+                             "reviews it after key 2.<!-- /review:founder-class -->\n\nChanges line two."), "the driver declared the class in the body"
+    reviews = [c for c in r.calls() if c["kind"] == "reviews"]
+    assert len(reviews) == 3, "key 1, key 2, then the Founder Proxy"
+    assert "SEAT-MARKER-founder-proxy" in _sys(reviews[2])
+    assert reviews[2]["argv"][reviews[2]["argv"].index("--model") + 1] == "proxy-model"
+    assert [p for p in r.github.posts if p["type"] == "check" and p["name"] == "review/executive"][-1]["state"] == "success"
+    assert "both keys and the Founder Proxy (agent) passed" in r.comments()[-1]
+    assert not any("waits for the founder's GitHub approval" in c for c in r.comments())
+    assert next(l for l in r.log() if l.get("event") == "reviewed")["proxy"] == "pass"
     assert r.tick() == ["skip"]
-    r.github.reviews.append({"login": "nirmaansoftware", "state": "APPROVED", "commit_id": r.first_head})
+
+
+def test_a_pull_request_in_no_founder_class_never_calls_the_proxy(repo):
+    r = repo()
+    assert r.tick() == ["auto-merge"]
+    assert len(r.calls()) == 2
+    assert not any("SEAT-MARKER-founder-proxy" in _sys(c) for c in r.calls())
+    assert next(l for l in r.log() if l.get("event") == "reviewed")["proxy"] == "not run"
+
+
+def test_proxy_fail_sends_its_findings_to_the_fixer_and_the_new_head_is_reviewed_again(repo):
+    r = repo(change=_change_github, reviews=[{"verdict": "pass"}, {"verdict": "pass"}, fail("Attribution names a person, not Nirmaan"), {"verdict": "pass"}],
+             fixes=[{"edits": {"src/app.py": "one by Nirmaan\n"}}])
+    assert r.tick() == ["fixed"]
+    fixer = next(c for c in r.calls() if c["kind"] == "fixes")
+    assert '"key": "proxy"' in fixer["stdin"] and '"team": "founder-proxy"' in fixer["stdin"]
+    assert "Attribution names a person" in fixer["stdin"]
+    assert not r.labeled()
+    assert r.tick() == ["auto-merge"]
+    reviews = [c for c in r.calls() if c["kind"] == "reviews"]
+    assert "SEAT-MARKER-founder-proxy" in _sys(reviews[-1]), "the proxy reviews the new head too"
+
+
+def test_proxy_needs_founder_labels_and_stops_then_the_founders_approval_and_label_removal_merge_without_new_calls(repo):
+    r = repo(change=_change_github, reviews=[{"verdict": "pass"}, {"verdict": "pass"}, NEEDS])
+    assert r.tick() == ["stopped"]
+    assert r.labeled() and r.github.merges == []
+    assert not [c for c in r.calls() if c["kind"] == "fixes"], "what the founder keeps never goes to the fixer"
+    assert "the Founder Proxy (agent) returned needs-founder: adds a paid runner" in r.comments()[-1]
+    assert [p for p in r.github.posts if p["type"] == "check" and p["name"] == "review/executive"][-1]["state"] == "pending"
     n = len(r.calls())
-    assert r.tick() == ["founder-wait"]
+    assert r.tick() == ["skip"]
+    r.github.labels = []
+    assert r.tick() == ["stopped"], "label removed without the founder's approval: stops again"
+    r.github.labels = []
+    r.github.reviews.append({"login": "nirmaansoftware", "state": "APPROVED", "commit_id": r.first_head})
+    assert r.tick() == ["auto-merge"]
     assert len(r.calls()) == n, "cached verdicts: no new model call"
     assert [p for p in r.github.posts if p["type"] == "check" and p["name"] == "review/executive"][-1]["state"] == "success"
-    assert "the founder merges it" in r.comments()[-1]
-    assert r.tick() == ["skip"]
-    assert r.github.merges == []
+    assert "the founder's own GitHub review approves the changes the Founder Proxy (agent) sent to the founder" in r.comments()[-1]
+
+
+def test_proxy_deferred_without_its_seat_on_main_stops_and_never_merges(repo):
+    r = repo(change=_change_github)
+    sh(r.work, "rm", "-q", "council/founder-proxy.md")
+    sh(r.work, "commit", "-qm", "drop proxy seat")
+    sh(r.work, "push", "-q", "origin", "main")
+    assert r.tick() == ["stopped"]
+    assert r.labeled() and r.github.merges == []
+    assert "review deferred (Founder Proxy: seat file missing on main" in r.comments()[-1]
 
 
 @pytest.mark.parametrize("gh", [{"labels": ["hold"]}, {"labels": ["needs-founder"]}, {"draft": True}, {"author": "nirmaansoftware"},
@@ -529,9 +589,6 @@ def is_merge_of(r, sha, head):
     return parents == [head, sh(r.origin, "rev-parse", "refs/heads/main")]
 
 
-ASK = "this pull request waits for the founder's GitHub approval"
-
-
 def test_a_branch_behind_main_is_updated_with_a_merge_commit_before_the_review_then_the_new_head_is_reviewed(repo):
     r = repo()
     r.advance_main()
@@ -556,43 +613,34 @@ def test_while_github_makes_the_merge_commit_the_next_pass_waits_and_does_not_as
     assert len(r.github.updates) == 1 and r.calls() == []
 
 
-def test_founder_class_behind_main_is_updated_before_the_founder_is_asked_so_the_founder_approves_once(repo):
-    r = repo(change=lambda w: write(w, ".github/workflows/x.yml", "name: x\n"))
+def test_founder_class_behind_main_is_updated_first_then_both_keys_and_the_proxy_review_the_new_head(repo):
+    r = repo(change=_change_github)
     r.advance_main()
     assert r.tick() == ["updated"]
-    assert not any(ASK in c for c in r.comments())
+    assert r.calls() == [], "no review of the stale head"
     new = r.origin_head()
-    assert r.tick() == ["founder-wait"]
-    asks = [c for c in r.comments() if ASK in c]
-    assert len(asks) == 1 and f"`{new[:7]}`" in asks[0]
+    assert r.tick() == ["auto-merge"]
+    assert r.github.merges[0][-1] == new
+    reviews = [c for c in r.calls() if c["kind"] == "reviews"]
+    assert len(reviews) == 3 and all(f"Head SHA: {new}" in c["stdin"] for c in reviews)
 
 
-def test_founder_class_main_moves_during_the_review_so_the_loop_updates_instead_of_asking(repo):
-    r = repo(change=lambda w: write(w, ".github/workflows/x.yml", "name: x\n"))
+def test_founder_class_main_moves_during_the_review_so_the_loop_updates_instead_of_merging(repo):
+    r = repo(change=_change_github)
     moved = []
 
     def when():
-        if not moved and len(r.calls()) >= 2:
+        if not moved and len(r.calls()) >= 3:
             moved.append(1)
             r.advance_main()
         return False
     r.github.behind_when = when
     assert r.tick() == ["updated"]
-    assert len(r.calls()) == 2, "both keys ran on the old head"
-    assert not any(ASK in c for c in r.comments()), "the founder is not asked about a head that cannot merge"
+    assert len(r.calls()) == 3, "both keys and the proxy ran on the old head"
+    assert r.github.merges == []
     r.github.behind_when = None
-    assert r.tick() == ["founder-wait"]
-    assert len([c for c in r.comments() if ASK in c]) == 1
-
-
-def test_founder_class_waiting_then_main_moves_the_branch_is_updated_and_the_founder_asked_on_the_new_head(repo):
-    r = repo(change=lambda w: write(w, ".github/workflows/x.yml", "name: x\n"))
-    assert r.tick() == ["founder-wait"]
-    assert r.tick() == ["skip"]
-    r.advance_main()
-    assert r.tick() == ["updated"]
-    assert r.tick() == ["founder-wait"]
-    assert f"`{r.origin_head()[:7]}`" in r.comments()[-1]
+    assert r.tick() == ["auto-merge"]
+    assert r.github.merges[0][-1] == r.origin_head()
 
 
 def test_a_failed_update_stops_with_needs_founder(repo):
@@ -661,7 +709,10 @@ def test_fingerprint_findings_output_and_forbidden_paths():
     assert pr_loop.validate_fixer_output({"status": "fixed", "addressed": ["F1", "F2"], "not_addressed": [], "summary": "s"}, fs)[1] is None
     assert "F2 not accounted for" in pr_loop.validate_fixer_output({"status": "fixed", "addressed": ["F1"], "not_addressed": [], "summary": "s"}, fs)[1]
     assert "unknown finding id" in pr_loop.validate_fixer_output({"status": "fixed", "addressed": ["F9"], "not_addressed": [], "summary": "s"}, fs)[1]
-    for path in (".github/workflows/ci.yml", ".github/CODEOWNERS", ".claude/skills/pr-review/SKILL.md", "CLAUDE.md", "council/chair.md",
+    proxy = pr_loop.findings_to_fix({"key1": [], "key2": None, "proxy": {"key": "proxy", "team": None, "role": "founder-proxy", "status": "fail",
+                                     "verdict": {"findings": [{"file": "a", "line": 3, "severity": "blocker", "text": "p"}]}}})
+    assert [(f["id"], f["key"], f["team"]) for f in proxy] == [("F1", "proxy", "founder-proxy")], "a failed proxy's findings go to the fixer"
+    for path in (".github/workflows/ci.yml", ".claude/skills/pr-review/SKILL.md", "CLAUDE.md", "council/chair.md", "council/founder-proxy.md",
                  "council/records/x.md", "scripts/check_dashes.py", "scripts/pr_loop.py", "tests/test_pr_loop.py", "pyproject.toml",
                  "docs/REVIEW_MECHANISM.md", "docs/pr-loop.plist"):
         assert pr_loop.forbidden_changes([path], pr_loop.LOOP["fixer_forbidden"]), path
