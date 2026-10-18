@@ -87,18 +87,17 @@ first run, not re-run since (only the page copy changed):
 | 19 | Analytics | None, per the brief ("no tracking"). Open for the owner to revisit |
 | 20 | Single clear CTA | PASS: "Talk to us" (nirmaan.online contact page). The page links nowhere on GitHub, by the owner's decision |
 
-Shared-layer sync from Nirmaan `bac3965` (Nirmaan #110, 2026-10-18), checked
-locally against `site/` served from this repository, not on the live site:
+Shared-layer sync from Nirmaan `bac3965` (Nirmaan #110, 2026-10-18). What the
+repository itself shows, without any unrecorded tool run:
 
-- **13 Color contrast: PASS.** Light `--ink-3` is now `#62625C` (dark is
-  unchanged at `#8C8C85`). Every HTML text element drawn in `--ink-3` measures
-  5.42:1 on `--paper` and 4.99:1 on `--paper-2` in light, 5.70:1 and 5.29:1 in
-  dark (computed colours in headless Chrome at 390 px, on `/` and `/404.html`).
-  Lighthouse 12.8.2 accessibility, mobile, light: 100 on both pages, with the
-  color-contrast audit passing. Dark mode was not run through Lighthouse. The
-  graph's SVG text (`fill: var(--ink-3)`) was not measured on its own.
-- **14 Mobile responsiveness: PASS.** At 390 px, light and dark, no sideways
-  scroll on `/` or `/404.html` (`scrollWidth` 390).
+- **13 Color contrast.** Light `--ink-3` is now `#62625C` (dark is unchanged at
+  `#8C8C85`). Computed from these token values with the WCAG formula, `--ink-3`
+  is about 5.4:1 on light `--paper` and 5.0:1 on light `--paper-2`, above the
+  4.5:1 AA minimum for normal text. No Lighthouse or browser run is recorded
+  for this sync, so the item is not re-marked PASS here; it keeps its earlier
+  status until a recorded run.
+- **14 Mobile responsiveness: not re-measured.** The sync changes no layout
+  widths; no recorded run at 390 px is committed for it.
 - **12 Page load speed: not measured.** The sync adds about 25 lines of
   JavaScript and no new request.
 - Items 1 to 11 and 15 to 20 are untouched by the sync: no new markup, links,
