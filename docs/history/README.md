@@ -106,6 +106,7 @@ The original preface of the section:
 - [M55-side-1-decision-council](M55-side-1-decision-council.md): side work - the IP Nirmaan council: thirteen seats and the meeting process for business and product decisions
 - [M55-side-2-council-seats](M55-side-2-council-seats.md): side work - three more council seats: legal counsel, tax and accounts, partnerships
 - [release-v1.25.0](release-v1.25.0.md): v1.25.0 (2026-10-12) - the four audits of v1.24.0, closed
+- [M57-hierarchy-fixes](M57-hierarchy-fixes.md): Milestone 57 - Hierarchy fixes: the org matches the capability build-out council record
 
 ## Before M43
 
