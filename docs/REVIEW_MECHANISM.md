@@ -3,8 +3,10 @@
 Status: IMPLEMENTED, live since 2026-10-18. The ruleset "main: two keys" on
 `main` is active. It requires the five CI checks, and `review/team-lead` and
 `review/executive` from the review App only, so a status posted by a write
-collaborator or a workflow token does not count. Code owner review is required
-for the founder-class paths, and a push dismisses an earlier approval.
+collaborator or a workflow token does not count. The ruleset's "Require review
+from Code Owners" is still on, but since `.github/CODEOWNERS` was removed (the
+Founder Proxy, 2026-10-18) it has no effect; the founder can turn it off. A
+push dismisses an earlier approval.
 Branches need not be up to date with `main` (strict is off). Auto-merge is on.
 The first automatic merge was #106 (both keys passed, the loop turned on
 auto-merge, GitHub merged it with no human action); #105 and #107 merged
@@ -35,8 +37,9 @@ comment. A review whose SHA differs from the head is void.
    `.github/review-teams.yml`, plus teams added by content rules
    (a price or partner name adds Business; a gate change adds Verification).
 3. **Key 2: chair.** One agent review of the whole PR, after every key 1.
-4. **Founder classes.** A PR in one of the six classes below also waits for the
-   founder's own code owner review on GitHub. The review script declares the
+4. **Founder Proxy.** A PR in one of the six classes below also gets the
+   Founder Proxy (agent) after key 2 passes; what only the founder decides it
+   sends to the founder (`needs-founder`). The review script declares the
    classes it detects: before the keys run it writes a
    `<!-- review:founder-class -->` block at the top of the PR body, rewrites it
    when the classes change and removes it when none is left. Every other copy
@@ -62,11 +65,40 @@ The full path map is in the council record, section 1.
 
 The founder confirmed all six on 2026-10-17: control plane, gate semantics,
 licence and third-party, commercial, public names and claims, and
-export-control sensitive content. Path classes are enforced by
-`.github/CODEOWNERS` and code owner review. Content classes are detected by the
-review script, which keeps `review/executive` pending until the founder approves
-the head (step 10 below). A `hold` label also keeps it pending; agents can
-remove labels, so the label is a convention.
+export-control sensitive content. The review script detects both path and
+content classes from `main`'s map. A `hold` label also keeps `review/executive`
+pending; agents can remove labels, so the label is a convention.
+
+**The Founder Proxy (founder's decision, 2026-10-18).** Until 2026-10-18 these
+classes needed the founder's own GitHub approval, enforced by `CODEOWNERS` and
+code owner review. On 2026-10-18 the founder, after being shown the risks,
+delegated that third review to an agent:
+[`council/founder-proxy.md`](../council/founder-proxy.md). Every comment it
+posts says "Founder Proxy (agent), acting under the founder's delegation of
+2026-10-18; not the founder". It is never the founder's approval.
+
+- **When it runs.** Only on a founder-class pull request, only after key 1 and
+  key 2 passed on the same head SHA, as a fresh read-only process with its seat
+  file from `main`, on the strongest model, with the same isolation, untrusted
+  data rules, validation, cache and fail-closed rules as the keys.
+- **Its verdict.** `pass`, `fail` (with file and line findings, which go to
+  the loop's fixer like a key's), or `needs-founder` (with reasons).
+  `review/executive` passes only when key 2 and the proxy pass; there is no
+  third check, so the ruleset needs no change.
+- **What it may not decide** returns `needs-founder`: new spending (a paid
+  service, account, API key billing or runner); contracts, licences and legal
+  counsel; public names and renames; prices published to clients; any sending;
+  and anything that weakens the review system's own gates (removing a key,
+  disabling or loosening CI or a gate script, widening a reviewer's tools, or
+  changing the proxy itself). It fails attribution other than the company
+  "Nirmaan".
+- **Needs the founder.** `review/executive` stays pending and the loop labels
+  the pull request `needs-founder`. The founder decides on GitHub: their own
+  review approving the current head lets the script pass `review/executive`
+  (after the label is removed, the loop reruns the review from cache and takes
+  the merge path).
+- **No CODEOWNERS.** `.github/CODEOWNERS` was removed, and
+  `tests/test_review_teams.py` fails if one is added back.
 
 ## Reviewer isolation
 
@@ -113,14 +145,17 @@ the branch checked out. In order:
    team lead: the base checklist, the lead's seat file and the "In a review"
    sections of the team's members. Key 2 runs only when every key 1 passed:
    the chair's seat file plus every owning lead's seat file, given key 1's
-   results, on the strongest model.
+   results, on the strongest model. On a founder-class pull request whose key
+   2 passed, the Founder Proxy runs next: its seat file from `main` and both
+   keys' results, on the strongest model.
 7. **Isolation.** Read, Grep and Glob only, in the head checkout (`main` is
    readable for comparison); no command, write, network or MCP tools; no
    project customizations; no GitHub, App or API tokens in the environment.
    The pull request title, body and commit messages are not given. The diff is
    untrusted data between delimiters with a random marker; an instruction to
    the reviewer inside it is a critical finding.
-8. **Validation.** One JSON object: verdict (`pass` or `fail`), the head SHA,
+8. **Validation.** One JSON object: verdict (`pass` or `fail`; the Founder
+   Proxy may also return `needs-founder`, with at least one reason), the head SHA,
    findings with file, line and severity, checks run and what was not run. The
    script checks the schema, the SHA and that every cited file and line exists
    at the head. A pass with a blocker or critical finding is recorded as fail.
@@ -133,14 +168,16 @@ the branch checked out. In order:
     verdict, findings, checks run, what was not run) and the checks
     `review/team-lead` and `review/executive`. `review/executive` passes only
     with key 2 passing, no `hold` label, and for a founder-class pull request
-    the founder's latest review approving this head SHA. A comment or check
+    the Founder Proxy passing (or returning `needs-founder` with the founder's
+    latest review approving this head SHA). A comment or check
     run is not posted again when the App's latest one for that key, team and
     head already says the same (a rerun that reused its cached verdicts); the
     comment's marker carries a digest of the result for this.
 11. **Records.** Every model call (tokens, duration, outcome) is logged in
     `~/.nirmaan/pr-review/calls.jsonl`, outside the repository. Validated
     verdicts are cached per head commit, `main` commit, key, team and lead, so
-    re-running after the founder approves does not call the model again. The
+    re-running after the founder decides a `needs-founder` pull request does
+    not call the model again. The
     pull request title and body are not in that key because the reviewers here
     never read them (step 7); Nirmaan's reviewers do, so its key also carries
     a digest of them. Each run's
@@ -168,9 +205,8 @@ Running since 2026-10-18 under launchd (`online.nirmaan.ip-pr-loop`).
 "driver", a port of Nirmaan's `.github/scripts/pr-loop/pr-loop.mjs`) runs the
 whole cycle without anyone starting the review by hand: wait for CI, run both
 keys, fix what a key found, review again, and take the merge path when both
-keys pass. It never replaces a key and never goes around the founder:
-founder-class pull requests still need the founder's GitHub approval, and the
-loop never merges them.
+keys pass. It never replaces a key or the Founder Proxy, and never decides
+what the proxy sends to the founder: a `needs-founder` verdict stops it.
 
 **Which pull requests.** Open, targeting `main`, from a branch in this
 repository, authored by the agents' account (`patel-om`). Drafts and pull
@@ -187,9 +223,8 @@ requests labelled `hold` or `needs-founder` are skipped.
    `gh pr update-branch` makes, but GitHub refuses it if the head has moved.
    The loop does this before any review, also for a head that already
    finished (unless the review refused the pull request), and again after
-   both keys pass when `main` moved during the review. So a founder-class
-   pull request is put to the founder only on a head that can merge, and the
-   founder approves once. The new head is reviewed from scratch. While GitHub
+   both keys pass when `main` moved during the review. The new head is
+   reviewed from scratch. While GitHub
    is still making the merge commit (up to 10 minutes), the loop waits
    instead of asking again. If the update fails (a merge conflict with
    `main`, or GitHub refuses it), the loop stops with `needs-founder`. If
@@ -199,12 +234,10 @@ requests labelled `hold` or `needs-founder` are skipped.
    calls no model. CI failing on a head the loop pushed stops the loop; CI
    failing on the author's head only waits.
 3. **Review.** `scripts/pr_review.py` runs unchanged (fresh read-only process
-   per key, seat files from `main`, comments and checks posted).
-4. **Both keys pass.** A founder-class pull request waits: the loop posts that
-   it waits for the founder's approval of this head and does nothing else;
-   once the founder approves, it runs the review again (cached verdicts, no
-   model call) so `review/executive` turns green, and the founder merges.
-   Otherwise, when the review App posts the checks, the loop reads the
+   per key and for the Founder Proxy on a founder-class pull request, seat
+   files from `main`, comments and checks posted). A proxy `needs-founder`
+   stops the loop (below).
+4. **Both keys (and the proxy) pass.** When the review App posts the checks, the loop reads the
    repository's "Allow auto-merge" setting with the gh login (the
    `allow_auto_merge` field of `gh api repos/<repo>`). When it is on, the loop
    runs `gh pr merge --auto --merge --match-head-commit <head>`, so GitHub
@@ -214,12 +247,12 @@ requests labelled `hold` or `needs-founder` are skipped.
    depends on the wording of a gh error: when the setting cannot be read, or
    `gh pr merge --auto` fails for any reason, the loop stops with
    `needs-founder`.
-5. **A key fails.** The loop starts a **fixer**: a separate, fresh `claude -p`
+5. **A key or the Founder Proxy fails.** The loop starts a **fixer**: a separate, fresh `claude -p`
    process, never a reviewer process and never the session that reviewed. It
    runs in a clean worktree of the head with Read, Grep, Glob, Edit and Write
    allowed only inside that worktree; no shell, network, MCP or token. Its task
    is the structured list of blocker and critical findings from the failed
-   keys; each finding's wording is data, not instructions, and the pull
+   keys and proxy; each finding's wording is data, not instructions, and the pull
    request text is not given (as for the reviewers). It gets `CLAUDE.md` from
    `main` and is told to change only what the findings require.
 6. **The loop, not the model, finishes the round.** It throws the fix away and
@@ -240,8 +273,9 @@ requests labelled `hold` or `needs-founder` are skipped.
 **When it stops.** The loop labels the pull request `needs-founder` and
 comments why when: three fix rounds are done and a key still fails; the same
 finding (same key, team, file and wording) fails again after a fix; CI fails
-after a fix; the branch has a merge conflict; a key is deferred (rate limit,
-bad output, missing seat file); the fixer hits a rate limit, gives no valid
+after a fix; the branch has a merge conflict; a key or the Founder Proxy is
+deferred (rate limit, bad output, missing seat file); the Founder Proxy returns
+`needs-founder` (until the founder's own review approves the head); the fixer hits a rate limit, gives no valid
 answer, cannot fix every finding or changes nothing; a local check fails; the
 auto-merge setting cannot be read or `gh pr merge --auto` fails; the branch
 is behind `main` and the update fails; or any error.
@@ -312,7 +346,8 @@ review script, it refuses to post unless it is `main`'s copy.
   session only starts the script; it never reviews or fixes a pull request
   itself.
 
-**Settings** (environment): `NIRMAAN_LOOP_MODEL_FIXER` (default `sonnet`),
+**Settings** (environment): `NIRMAAN_REVIEW_MODEL_PROXY` (the Founder Proxy's
+model, default `opus`), `NIRMAAN_LOOP_MODEL_FIXER` (default `sonnet`),
 `NIRMAAN_LOOP_FIXER_TIMEOUT_SECONDS` (1800),
 `NIRMAAN_LOOP_CHECK_TIMEOUT_SECONDS` (1200), `NIRMAAN_LOOP_GIT_NAME` and
 `NIRMAAN_LOOP_GIT_EMAIL` (otherwise the clone's git config, otherwise the head
@@ -321,8 +356,9 @@ set them in `~/.nirmaan/pr-loop/env`. The forbidden
 paths, local checks, round limit and authors are `LOOP` in
 `scripts/pr_loop.py`.
 
-**What the loop does not do.** It never merges a founder-class pull request,
-never changes the review configuration, the council or workflows, never pushes
+**What the loop does not do.** It never merges a pull request whose Founder
+Proxy verdict is `needs-founder` without the founder's own GitHub review
+approving its head, never changes the review configuration, the council or workflows, never pushes
 over someone else's push, never runs on a fork or another author's pull
 request, never turns auto-merge on for the repository, and never treats a
 deferred review as a pass. A fix the loop pushed is agent work like any other:

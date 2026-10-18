@@ -37,6 +37,7 @@ sense.
 | [legal-counsel](legal-counsel.md) | Drafts agreements for a qualified lawyer to review (legal-compliance flags, counsel drafts) |
 | [tax-accounts](tax-accounts.md) | GST, export of services, TDS and invoices, for a chartered accountant |
 | [partnerships](partnerships.md) | Finding and recruiting design partners and first customers |
+| [founder-proxy](founder-proxy.md) | Agent, not a meeting seat: the third reviewer of founder-class pull requests, under the founder's delegation of 2026-10-18 |
 
 Add a seat by adding a file in the same format and a row here.
 
@@ -60,7 +61,12 @@ under "In a review".
 One key-1 verdict per owning team; members' checklists run inside the lead's
 review and are cited in it. A key is an agent review: never a person's
 decision, a release, or a claim that a design is ready to be made in silicon.
-Six founder classes (council record, section 2) also wait for the founder.
+Six founder classes (council record, section 2) also get the Founder Proxy
+(agent, [founder-proxy.md](founder-proxy.md)) after key 2, under the founder's
+delegation of 2026-10-18. It is not the founder: what only the founder decides
+(spending, contracts and legal counsel, public names, prices published to
+clients, any sending, and the review system's own gates) it sends to the
+founder as `needs-founder`.
 
 ## When to call a meeting
 
