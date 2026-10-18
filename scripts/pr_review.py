@@ -230,6 +230,35 @@ def validate_verdict(v, head_sha: str, line_exists) -> tuple[dict | None, str | 
 # --- Prompts -------------------------------------------------------------------------
 
 
+# The founder-class declaration the script (never a model, never the author)
+# keeps in the pull request body: written before the review when a founder
+# class is detected, rewritten when the classes change, removed when none is.
+# The keys treat it as the pull request flagging its founder classes, because a
+# fixer cannot edit pull request text.
+FOUNDER_BLOCK_OPEN, FOUNDER_BLOCK_CLOSE = "<!-- review:founder-class -->", "<!-- /review:founder-class -->"
+FOUNDER_BLOCK_RE = re.compile(r"<!-- review:founder-class -->.*?<!-- /review:founder-class -->[ \t]*\n?", re.S)
+
+
+def founder_class_block(teams_map: dict, classes: list[str]) -> str:
+    if not classes:
+        return ""
+    titles = {str(c.get("id")): c.get("title") for c in (teams_map or {}).get("founder_classes") or []}
+    what = ", ".join(f"{c} ({titles[c]})" if titles.get(c) else c for c in classes)
+    return f"{FOUNDER_BLOCK_OPEN}Founder class{'es' if len(classes) > 1 else ''}: {what}; waits for the founder's approval.{FOUNDER_BLOCK_CLOSE}"
+
+
+def with_founder_class_block(body: str | None, block: str) -> str:
+    """The body with every existing block removed and `block` (if any) at the top.
+    Unchanged when there is nothing to add or remove; otherwise leading blank lines
+    and trailing whitespace go, so a rerun changes nothing."""
+    text = body or ""
+    rest = FOUNDER_BLOCK_RE.sub("", text)
+    trimmed = re.sub(r"^\s*\n", "", rest).rstrip()
+    if not block:
+        return text if rest == text else trimmed
+    return f"{block}\n\n{trimmed}" if trimmed else block
+
+
 def untrusted(nonce: str, name: str, text: str) -> str:
     return f'<<<UNTRUSTED-DATA-{nonce} name="{name}">>>\n{text}\n<<<END-UNTRUSTED-DATA-{nonce}>>>'
 
@@ -296,6 +325,9 @@ def user_prompt(ctx: dict) -> str:
         "Owning teams and key-1 leads (from main's map): " + (", ".join(f"{k['name']} ({k['lead']})" for k in c["keys"]) or "none"),
         "Founder classes detected: " + (", ".join(c["founder"]) or "none"),
         *[f"  {k}: {'; '.join(v[:8])}" for k, v in c["founder"].items()],
+        *([f"Founder-class declaration (written by the review script, not the author): {ctx['founder_block']}",
+           "  It is at the top of the pull request body and counts as the pull request flagging its founder classes."]
+          if ctx.get("founder_block") else []),
         "Section and content-rule hits: " + ("; ".join(c["hits"][:30]) or "none"),
         "Ledger files (add no owning team): " + (", ".join(c["ledger"]) or "none"),
         "Required CI on the head commit: " + "; ".join(f"{r['name']}={r['conclusion']}" + (f" ({r['url']})" if r.get("url") else "") for r in ctx["ci"]),
@@ -620,6 +652,7 @@ class GitHub:
     @staticmethod
     def _pull(p) -> dict:
         return {"number": p["number"], "state": p["state"], "draft": bool(p.get("draft")), "title": p.get("title") or "",
+                "body": p.get("body") or "",
                 "author": (p.get("user") or {}).get("login"), "labels": [l["name"] for l in p.get("labels", [])],
                 "head_sha": p["head"]["sha"], "head_ref": p["head"]["ref"], "head_repo": (p["head"].get("repo") or {}).get("full_name"),
                 "base_ref": p["base"]["ref"], "base_repo": p["base"]["repo"]["full_name"],
@@ -633,9 +666,9 @@ class GitHub:
         """Open pull requests, oldest first (used by the automated loop, scripts/pr_loop.py)."""
         return [self._pull(p) for p in self._paged("/pulls?state=open&sort=created&direction=asc")]
 
-    def get_repo_settings(self) -> dict:
-        """The repository's "Allow auto-merge" setting."""
-        return {"allow_auto_merge": self._get("").get("allow_auto_merge") is True}
+    def update_pull_body(self, n: int, body: str):
+        """The pull request body, for the founder-class block only (pull_requests: write)."""
+        _request("PATCH", f"{API}/repos/{self.repo}/pulls/{n}", self.token, {"body": body})
 
     def add_labels(self, n: int, labels: list[str]):
         self._post(f"/issues/{n}/labels", {"labels": labels})
@@ -853,6 +886,18 @@ def _review(repo_root, pr, github, post, claude_bin, state_dir, models, timeout_
     ctx["classification"] = classification
     out(f"pr-review: #{pr} head {head[:7]}; key 1: {', '.join(k['name'] + ' (' + k['lead'] + ')' for k in classification['keys'])}; "
         f"founder classes: {', '.join(classification['founder']) or 'none'}")
+
+    # The founder-class declaration in the pull request body, kept by this script
+    # so a pull request flags its classes even when they come from content (a
+    # fixer cannot edit pull request text). Not edited with --no-post; the
+    # reviewers get it as a trusted fact either way.
+    ctx["founder_block"] = founder_class_block(teams_map, list(classification["founder"]))
+    declared = with_founder_class_block(pull.get("body"), ctx["founder_block"])
+    if declared != (pull.get("body") or ""):
+        if post != "none":
+            github.update_pull_body(pr, declared)
+            out(f"pr-review: {'wrote the founder-class block into' if ctx['founder_block'] else 'removed the founder-class block from'} the pull request body.")
+        pull["body"] = declared
 
     ci_now = required_ci(cfg["required_ci"], head_runs())
     if ci_now["state"] == "failed":

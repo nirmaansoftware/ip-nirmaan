@@ -74,7 +74,7 @@ class FakeGitHub:
     def __init__(self, origin: Path, gh: dict):
         self.origin, self.posts, self.merges, self.reviews = origin, [], [], []
         self.labels = list(gh.get("labels", []))
-        self.allow_auto_merge = gh.get("allow_auto_merge", True)
+        self.merge_error, self.body = gh.get("merge_error"), "Changes line two."
         self.ci = gh.get("ci", lambda sha: "success")
         self.draft, self.author, self.mergeable = gh.get("draft", False), gh.get("author", "patel-om"), gh.get("mergeable", True)
 
@@ -84,7 +84,7 @@ class FakeGitHub:
     def get_pull(self, n):
         head = self.head()
         sh(self.origin, "update-ref", "refs/pull/1/head", head)  # GitHub keeps this in step with the branch
-        return {"number": 1, "state": "open", "draft": self.draft, "title": "Change app", "author": self.author,
+        return {"number": 1, "state": "open", "draft": self.draft, "title": "Change app", "body": self.body, "author": self.author,
                 "labels": list(self.labels), "head_sha": head, "head_ref": "feature", "head_repo": CONFIG["repo"],
                 "base_ref": "main", "base_repo": CONFIG["repo"], "mergeable": self.mergeable,
                 "mergeable_state": "dirty" if self.mergeable is False else "clean"}
@@ -92,8 +92,17 @@ class FakeGitHub:
     def list_open_pulls(self):
         return [self.get_pull(1)]
 
-    def get_repo_settings(self):
-        return {"allow_auto_merge": self.allow_auto_merge}
+    def update_pull_body(self, n, body):
+        self.posts.append({"type": "body", "body": body})
+        self.body = body
+
+    def run_gh(self, args):
+        """`gh pr merge` with the gh login: records the call, and fails the way the
+        loop's real runner does (CalledProcessError, message on stderr) when the
+        test sets merge_error."""
+        self.merges.append(args)
+        if self.merge_error:
+            raise subprocess.CalledProcessError(1, ["gh", *args], output="", stderr=self.merge_error)
 
     def add_labels(self, n, labels):
         self.posts.append({"type": "label", "labels": labels})
@@ -162,7 +171,7 @@ class Repo:
         kwargs = dict(repo_root=str(self.work), github=self.github, post="app", claude_bin=str(self.bin), state_dir=self.state,
                       models={"key1": "k1", "key2": "k2"}, timeout_s=30, backoff_s=0, fixer_model="fixer-model",
                       fixer_timeout_s=30, check_timeout_s=30, sleep=lambda s: None, out=lambda s: None,
-                      run_gh=self.github.merges.append, loop=LOOP)
+                      run_gh=self.github.run_gh, loop=LOOP)
         kwargs.update(extra)
         return pr_loop.Loop(**kwargs)
 
@@ -215,13 +224,32 @@ def test_both_keys_pass_auto_merge_with_the_app_and_the_setting_then_nothing_mor
     assert len(r.github.posts) == before and len(r.calls()) == 2
 
 
-@pytest.mark.parametrize("extra,gh,why", [({}, {"allow_auto_merge": False}, "does not allow auto-merge"),
-                                          ({"post": "dry-run"}, {}, "review App is not configured")])
-def test_both_keys_pass_without_the_setting_or_in_a_dry_run_posts_ready_and_never_merges(repo, extra, gh, why):
-    r = repo(gh=gh)
-    assert r.tick(**extra) == ["ready"]
+def test_both_keys_pass_and_github_says_auto_merge_is_not_allowed_posts_ready_without_a_stop(repo):
+    r = repo(gh={"merge_error": "GraphQL: Pull request Auto merge is not allowed for this repository (enablePullRequestAutoMerge)"})
+    assert r.tick() == ["ready"]
+    assert r.github.merges == [["pr", "merge", "1", "--repo", CONFIG["repo"], "--auto", "--merge", "--match-head-commit", r.first_head]], \
+        "the loop tries the merge itself; no settings read"
+    assert "waiting for the founder's merge settings" in r.comments()[-1] and "does not allow auto-merge" in r.comments()[-1]
+    assert not r.labeled()
+    assert r.tick() == ["skip"]
+    assert len(r.github.merges) == 1
+
+
+def test_both_keys_pass_and_any_other_merge_error_stops_with_needs_founder(repo):
+    r = repo(gh={"merge_error": "GraphQL: Head branch was modified. Review and try the merge again. (enablePullRequestAutoMerge)"})
+    assert r.tick() == ["stopped"]
+    assert len(r.github.merges) == 1
+    assert r.labeled()
+    last = r.comments()[-1]
+    assert "Automated loop stopped" in last and "gh pr merge --auto failed" in last and "Head branch was modified" in last
+    assert not any("Auto-merge is on" in c or "### Automated loop: ready" in c for c in r.comments())
+
+
+def test_a_dry_run_posts_ready_and_never_calls_gh(repo):
+    r = repo()
+    assert r.tick(post="dry-run") == ["ready"]
     assert r.github.merges == []
-    assert "waiting for the founder's merge settings" in r.comments()[-1] and why in r.comments()[-1]
+    assert "waiting for the founder's merge settings" in r.comments()[-1] and "review App is not configured" in r.comments()[-1]
 
 
 # --- The fix loop ----------------------------------------------------------------
@@ -352,6 +380,9 @@ def test_ci_failing_on_the_author_head_waits_without_a_call(repo):
 def test_founder_class_waits_and_is_never_merged_by_the_loop_even_after_the_approval(repo):
     r = repo(change=lambda w: write(w, ".github/workflows/x.yml", "name: x\n"))
     assert r.tick() == ["founder-wait"]
+    assert r.github.merges == [], "gh pr merge is never called for a founder-class pull request"
+    assert r.github.body == ("<!-- review:founder-class -->Founder class: control-plane (Control plane); waits for the founder's "
+                             "approval.<!-- /review:founder-class -->\n\nChanges line two."), "the driver declared the class in the body"
     assert "waits for the founder's GitHub approval" in r.comments()[-1]
     assert r.tick() == ["skip"]
     r.github.reviews.append({"login": "nirmaansoftware", "state": "APPROVED", "commit_id": r.first_head})
