@@ -183,10 +183,44 @@ can be required:
   `.github/` uses `pull_request_target` or expands `github.event.*` or
   `github.head_ref` inside `run:`; container images are pinned by digest;
   the five required jobs run on every pull request with no path or branch
-  filter and no job-level `if:`. A synthetic bad workflow proves each check
+  filter and no job-level `if:` other than `always()` (section 8). A synthetic bad workflow proves each check
   fires. Action pinning by SHA was already tested (section 4).
 
 Not done here: moving a plan token secret to an environment only `main` can
 use. The repository has no Actions secret today (`CLAUDE_CODE_OAUTH_TOKEN` is
 not set), so the live evaluation stays off; creating the secret and the
 environment is the owner's account action.
+
+## 8. Shards (2026-10-18)
+
+Wall time was bounded by two single `pytest` runs: the Test step of `test`
+(448 and 728 s of test time in runs 39133510901 and 39132163503) and of
+`physical-design` (465 and 545 s), with whole runs of 8 to 14 minutes. Both
+jobs now run as shards on separate runners, so section 5's deferral of
+splitting the suite across runners is closed (pytest-xdist is still not used,
+so no two tests share a process they did not share before):
+
+- `test-shard` runs as three shards (`test (shard K/3)`) and
+  `physical-design-shard` as two (`physical-design (shard K/2)`), with the
+  same tools, Python, environment and `NIRMAAN_REQUIRE_EDA` as before.
+  `pytest --shard K/N` (`tests/conftest.py`) keeps whole test files, so a
+  module fixture or a file's own order is never split. `scripts/shards.py`
+  places files heaviest first on the least loaded shard, by the seconds per
+  file in `scripts/shard_weights.json` (measured from the two runs above; an
+  unlisted file counts 0.5 s). The weights only balance the shards: every
+  shard collects the same tests and computes the same split, so a stale
+  number never drops or repeats a test.
+- The jobs `test` and `physical-design` keep the required names. Each needs
+  its shards, runs with `if: always()` (a job skipped after a failed
+  dependency reports as passing, so it would not block a merge), and fails
+  unless every shard succeeded and `python3 scripts/shards.py` confirms from
+  the shards' manifests that they came from one collection, named every
+  shard once, and together kept every collected test exactly once.
+- `test-union` is unchanged: it reads every shard's JUnit report
+  (`junit-test-K`, `junit-physical-design-K`) with `no-tools`.
+- **Tests** (`tests/test_ci.py`): the split keeps whole files, covers the suite
+  exactly once for one to four shards and is the same whatever the input
+  order; the check fails on a missing, repeated or disagreeing shard; a real
+  `pytest --collect-only --shard` run splits two files exactly and rejects a
+  bad `--shard`; the workflow's shard counts, profiles, artifact names and
+  aggregate jobs agree.
