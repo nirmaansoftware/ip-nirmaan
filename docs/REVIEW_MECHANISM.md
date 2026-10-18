@@ -300,20 +300,6 @@ by number, so a pull request waiting for CI, or one that just ran a review or a
 fix, never holds up the others; the steps run one after another, so reviews
 still run one at a time.
 
-**Verdicts carried over.** When only `main` moved (the branch was updated with
-`main`, or `main` moved under the same head), each key's last verdict is reused
-instead of a new review when the head is that verdict's head with only
-merges of `main` added (any other new commit, a rebase or a force push is
-reviewed from scratch), the pull request's own diff is byte for byte the same
-(merge-base..head, so a whitespace-only change counts), the title and body digest is the same, no file
-of the diff changed on `main` since that verdict's merge base, and none of the
-review's inputs (`carry_over_void_paths` in `scripts/pr_review.py`: the map,
-`council/`, the review and map scripts, the review skill) changed on `main`
-since. The citations are checked again at the new head, the comment says the
-verdict was carried over and from which head, and key 2 and the Founder Proxy
-are carried only when every key 1 verdict was. Any other change is reviewed
-from scratch.
-
 **Records.** Every review call, fixer call and loop step is a line in
 `~/.nirmaan/pr-review/calls.jsonl`; per pull request loop state is in
 `~/.nirmaan/pr-review/loop/`.

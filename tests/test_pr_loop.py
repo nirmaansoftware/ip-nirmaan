@@ -238,12 +238,12 @@ class Repo:
     def st(self):
         return pr_loop.load_state(self.state, CONFIG["repo"], 1)
 
-    def advance_main(self, rel="src/other.py", text=None):
+    def advance_main(self, rel="src/other.py"):
         """A new commit on main in origin, so the branch is really behind."""
         w = self.work
         sh(w, "checkout", "-q", "main")
         sh(w, "pull", "-q", "origin", "main")
-        write(w, rel, text if text is not None else f"main moved {len(sh(w, 'rev-list', 'HEAD').split())}\n")
+        write(w, rel, f"main moved {len(sh(w, 'rev-list', 'HEAD').split())}\n")
         sh(w, "add", "-A")
         sh(w, "commit", "-qm", "main moves")
         sh(w, "push", "-q", "origin", "main")
@@ -677,130 +677,6 @@ def test_no_post_never_updates_a_branch(repo):
     r.advance_main()
     r.tick(post="none")
     assert r.github.updates == [] and r.origin_head() == r.first_head
-
-
-# --- Verdict carry-over -----------------------------------------------------------
-
-
-def _reviewed_then_updated(r, edit=None):
-    """Main moves during the review (`edit` runs on main), so the loop updates the
-    branch with a merge of main. Returns the new head."""
-    moved = []
-
-    def when():
-        if not moved and len(r.calls()) >= 2:
-            moved.append(1)
-            (edit or r.advance_main)()
-        return False
-    r.github.behind_when = when
-    assert r.tick() == ["updated"]
-    assert len(r.calls()) == 2, "both keys ran on the old head"
-    r.github.behind_when = None
-    return r.origin_head()
-
-
-def test_only_main_moved_so_the_updated_head_carries_both_verdicts_over_with_no_model_call(repo):
-    r = repo()
-    new = _reviewed_then_updated(r)
-    assert new != r.first_head
-    assert r.tick() == ["auto-merge"]
-    assert len(r.calls()) == 2, "no new model call"
-    assert r.github.merges[0][-1] == new
-    assert len([l for l in r.log() if l.get("outcome") == "carried" and l.get("head") == new]) == 2
-    k1 = next(c for c in r.comments() if c.startswith("<!-- nirmaan-pr-review key=1 ") and f"head={new}" in c)
-    assert f"carried over from head {r.first_head[:7]}" in k1 and "only main merged in, the same diff bytes" in k1
-
-
-def test_a_carried_verdict_carries_again_when_main_moves_twice(repo):
-    r = repo()
-    _reviewed_then_updated(r)
-    assert r.tick() == ["auto-merge"]
-    r.advance_main("src/third.py")
-    assert r.tick() == ["updated"]
-    second = r.origin_head()
-    assert r.tick() == ["auto-merge"]
-    assert len(r.calls()) == 2, "still the first review's verdicts"
-    assert r.github.merges[-1][-1] == second
-    k1 = [c for c in r.comments() if c.startswith("<!-- nirmaan-pr-review key=1 ") and f"head={second}" in c]
-    assert k1 and f"carried over from head {r.first_head[:7]}" in k1[-1], "the note names the head a model reviewed"
-
-
-def test_the_same_head_with_main_moved_carries_the_verdicts_over_on_a_rerun(repo):
-    r = repo(gh={"merge_error": "GraphQL: Head branch was modified. (enablePullRequestAutoMerge)"})
-    assert r.tick() == ["stopped"]
-    assert len(r.calls()) == 2
-    r.advance_main()
-    r.github.behind = False  # the ruleset does not require up-to-date branches
-    r.github.merge_error, r.github.labels = None, []
-    assert r.tick() == ["auto-merge"]
-    assert len(r.calls()) == 2, "main moved, so the exact cache missed; the verdicts were carried over"
-
-
-def _person_pushes(r, tmp, edits):
-    """A person pushes commits to the pull request branch (from a clone of origin)."""
-    w = tmp / f"person-{len(edits)}"
-    sh(tmp, "clone", "-q", "-b", "feature", str(r.origin), str(w))
-    sh(w, "config", "user.email", "p@example.com")
-    sh(w, "config", "user.name", "Person")
-    for i, text in enumerate(edits):
-        write(w, "src/app.py", text)
-        sh(w, "commit", "-qam", f"edit {i}")
-    sh(w, "push", "-q", "origin", "feature")
-
-
-def _reviewed_then_stopped(r):
-    r.github.merge_error = "GraphQL: Head branch was modified. (enablePullRequestAutoMerge)"
-    assert r.tick() == ["stopped"]
-    assert len(r.calls()) == 2
-    r.github.merge_error, r.github.labels = None, []
-
-
-def test_a_whitespace_only_commit_is_a_new_diff_and_is_reviewed_again(repo, tmp_path):
-    r = repo()
-    _reviewed_then_stopped(r)
-    _person_pushes(r, tmp_path, ["one\ntwo    changed\nthree\n"])
-    assert r.tick() == ["auto-merge"]
-    assert len(r.calls()) == 4 and not any(l.get("outcome") == "carried" for l in r.log())
-
-
-def test_a_change_and_its_revert_leave_the_diff_alone_but_are_reviewed_again(repo, tmp_path):
-    r = repo()
-    _reviewed_then_stopped(r)
-    _person_pushes(r, tmp_path, ["one\ntwo changed\nthree changed\n", "one\ntwo changed\nthree\n"])
-    assert sh(r.origin, "diff", r.first_head, r.origin_head()) == "", "the same tree as the reviewed head"
-    assert r.tick() == ["auto-merge"]
-    assert len(r.calls()) == 4 and not any(l.get("outcome") == "carried" for l in r.log())
-
-
-def test_a_file_of_the_diff_changed_on_main_is_reviewed_again(repo):
-    r = repo()
-    new = _reviewed_then_updated(r, lambda: r.advance_main("src/app.py", "one\ntwo\nthree\nfour\n"))
-    assert "two changed" in sh(r.origin, "show", f"{new}:src/app.py") and "four" in sh(r.origin, "show", f"{new}:src/app.py")
-    assert r.tick() == ["auto-merge"]
-    assert len(r.calls()) == 4 and not any("carried over" in c for c in r.comments())
-
-
-def test_a_review_rule_changed_on_main_a_seat_file_is_reviewed_again(repo):
-    r = repo()
-    _reviewed_then_updated(r, lambda: r.advance_main("council/eda-tooling.md", "# eda-tooling\nSEAT-MARKER-eda-tooling\n\n## In a review (key 1)\nA new rule.\n"))
-    assert r.tick() == ["auto-merge"]
-    assert len(r.calls()) == 4
-
-
-def test_a_changed_pull_request_text_is_reviewed_again(repo):
-    r = repo()
-    _reviewed_then_updated(r)
-    r.github.body = "Changes line two, and claims more now."
-    assert r.tick() == ["auto-merge"]
-    assert len(r.calls()) == 4
-
-
-def test_a_new_commit_in_the_pull_request_is_never_carried_over(repo):
-    r = repo(reviews=[fail("Line two lost its test"), {"verdict": "pass"}], fixes=[{"edits": {"src/app.py": "one\ntwo fixed\nthree\n"}}])
-    assert r.tick() == ["fixed"]
-    assert r.tick() == ["auto-merge"]
-    assert len([c for c in r.calls() if c["kind"] == "reviews"]) == 3
-    assert not any(l.get("outcome") == "carried" for l in r.log())
 
 
 # --- Every pull request each pass ---------------------------------------------------
