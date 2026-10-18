@@ -90,7 +90,9 @@ first run, not re-run since (only the page copy changed):
 ## Deploying
 
 Deploy on Vercel as its own project with **Root Directory** set to `site`
-(`vercel.json` here adds the security headers; there is no build step). Add
+(`vercel.json` here adds the security headers, including a Report-Only
+Content-Security-Policy whose inline-script hashes `tests/test_landing_site.py`
+checks; there is no build step). Add
 `ip.nirmaan.online` as the project's domain, then a CNAME record for `ip` on
 `nirmaan.online` pointing at `cname.vercel-dns.com`. After it is live, re-run
 item 12 and add the URL to `pyproject.toml` and the README (see `docs/ROADMAP.md`).
