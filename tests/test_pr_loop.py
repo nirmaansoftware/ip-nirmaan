@@ -282,6 +282,18 @@ def test_gh_error_text_is_redacted_before_it_is_posted_or_saved(repo):
     assert token not in json.dumps(r.log())
 
 
+def test_the_real_gh_runner_returns_standard_output_so_the_setting_can_be_read(monkeypatch):
+    seen = {}
+
+    def fake_run(cmd, **kw):
+        seen["cmd"], seen["kw"] = cmd, kw
+        return subprocess.CompletedProcess(cmd, 0, stdout="true\n", stderr="")
+    monkeypatch.setattr(pr_loop.subprocess, "run", fake_run)
+    assert pr_loop.run_gh(["api", "repos/o/r", "--jq", ".allow_auto_merge"]) == "true\n"
+    assert seen["cmd"] == ["gh", "api", "repos/o/r", "--jq", ".allow_auto_merge"]
+    assert seen["kw"]["check"] is True and seen["kw"]["timeout"] == 300
+
+
 def test_a_dry_run_posts_ready_and_never_calls_gh(repo):
     r = repo()
     assert r.tick(post="dry-run") == ["ready"]

@@ -236,7 +236,13 @@ def validate_verdict(v, head_sha: str, line_exists) -> tuple[dict | None, str | 
 # The keys treat it as the pull request flagging its founder classes, because a
 # fixer cannot edit pull request text.
 FOUNDER_BLOCK_OPEN, FOUNDER_BLOCK_CLOSE = "<!-- review:founder-class -->", "<!-- /review:founder-class -->"
-FOUNDER_BLOCK_RE = re.compile(r"<!-- review:founder-class -->.*?<!-- /review:founder-class -->[ \t]*\n?", re.S)
+# A complete block: an open marker, then text with no other open marker, then a
+# close marker, so a lone open marker before a block never swallows the author's
+# text between them.
+FOUNDER_BLOCK_RE = re.compile(r"<!-- review:founder-class -->(?:(?!<!-- review:founder-class -->).)*?<!-- /review:founder-class -->[ \t]*\n?", re.S)
+# What is left of a marker once every complete block is gone: a lone open or
+# close marker, with its line when it stands alone on one.
+LONE_MARKER_RE = re.compile(r"^[ \t]*<!-- /?review:founder-class -->[ \t]*(?:\n|$)|<!-- /?review:founder-class -->", re.M)
 
 
 def founder_class_block(teams_map: dict, classes: list[str]) -> str:
@@ -248,15 +254,48 @@ def founder_class_block(teams_map: dict, classes: list[str]) -> str:
 
 
 def with_founder_class_block(body: str | None, block: str) -> str:
-    """The body with every existing block removed and `block` (if any) at the top.
-    Unchanged when there is nothing to add or remove; otherwise leading blank lines
-    and trailing whitespace go, so a rerun changes nothing."""
+    """The body with every existing block and every lone open or close marker
+    removed, and `block` (if any) at the top, so the only markers left are the
+    script's own. Unchanged when there is nothing to add or remove; otherwise
+    leading blank lines and trailing whitespace go, so a rerun changes nothing."""
     text = body or ""
-    rest = FOUNDER_BLOCK_RE.sub("", text)
+    rest = LONE_MARKER_RE.sub("", FOUNDER_BLOCK_RE.sub("", text))
     trimmed = re.sub(r"^\s*\n", "", rest).rstrip()
     if not block:
         return text if rest == text else trimmed
     return f"{block}\n\n{trimmed}" if trimmed else block
+
+
+# Secret formats redacted from error text before it is posted (the same set as
+# Nirmaan's .github/scripts/secret-scan.mjs).
+SECRET_PATTERNS = [
+    re.compile(r"-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY(?: BLOCK)?-----"),
+    re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b"),
+    re.compile(r"\bgh[pousr]_[A-Za-z0-9]{36,}\b"),
+    re.compile(r"\bgithub_pat_[A-Za-z0-9_]{50,}\b"),
+    re.compile(r"\bsk-ant-[A-Za-z0-9_-]{20,}"),
+    re.compile(r"\bsk-(?:proj-|svcacct-|admin-)?[A-Za-z0-9_-]{32,}"),
+    re.compile(r"\bAIza[0-9A-Za-z_-]{35}\b"),
+    re.compile(r"\bGOCSPX-[A-Za-z0-9_-]{20,}"),
+    re.compile(r"\bxox[abposr]-[A-Za-z0-9-]{10,}"),
+    re.compile(r"hooks\.slack\.com/services/T[A-Za-z0-9]+/B[A-Za-z0-9]+/[A-Za-z0-9]+"),
+    re.compile(r"\b(?:sk|rk)_live_[0-9A-Za-z]{20,}"),
+    re.compile(r"\bFlyV1 fm[12][a-z]?_[A-Za-z0-9+/=_-]{20,}"),
+    re.compile(r"\bnpm_[A-Za-z0-9]{36}\b"),
+]
+
+
+def redact(text) -> str:
+    """Error text from gh or git, made safe to post: every secret format above,
+    credentials in a URL (https://user:token@host) and the value after
+    `Authorization:`, `Bearer` or `token` become [redacted]."""
+    out = str(text or "")
+    for pattern in SECRET_PATTERNS:
+        out = pattern.sub("[redacted]", out)
+    out = re.sub(r"(\b[a-z][a-z0-9+.-]*://)[^\s/@:]+(?::[^\s/@]*)?@", lambda m: f"{m.group(1)}[redacted]@", out, flags=re.I)
+    out = re.sub(r"\b(authorization\s*[:=]\s*)(?:(bearer|token|basic)\s+)?[^\s;,]+",
+                 lambda m: f"{m.group(1)}{m.group(2) + ' ' if m.group(2) else ''}[redacted]", out, flags=re.I)
+    return re.sub(r"\b(bearer|token)(\s+)(?!\[redacted\])[A-Za-z0-9_\-.=]{20,}", lambda m: f"{m.group(1)}{m.group(2)}[redacted]", out, flags=re.I)
 
 
 def untrusted(nonce: str, name: str, text: str) -> str:
