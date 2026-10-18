@@ -1,0 +1,22 @@
+<!-- M59 fixture: the landing page's hero plan excerpt, with one role renamed
+     (Senior AXI Interface Architect is shown as Senior AXI Interface Wrangler).
+     scripts/status.py --release must refuse it. -->
+<pre class="term__body" tabindex="0" aria-label="Output of nirmaan plan for a 4-port AXI-to-NoC bridge, trimmed"><span class="ln cmd"><span class="prompt">$</span> <span data-type>nirmaan plan "Create a 4-port AXI-to-NoC bridge."</span></span>
+<span class="ln"> </span>
+<span class="ln"><b>PROJECT:</b> Create a 4-port AXI-to-NoC bridge</span>
+<span class="ln"><span class="k">Intent:</span> new_ip   <span class="k">Features:</span> axi, cdc, multi_port, noc, registers</span>
+<span class="ln"><span class="k">Assumption:</span> Clocking was not stated, so CDC/RDC work is planned conservatively.</span>
+<span class="ln"> </span>
+<span class="ln"><b>PROGRAM MANAGER</b>  Senior Technical Program Manager</span>
+<span class="ln">├── <b>Architecture</b>  <span class="o">(lead: Chief Architect)</span></span>
+<span class="ln">│   ├── Interface specification: AXI interface   <span class="o">owner: Senior AXI Interface Wrangler</span></span>
+<span class="ln">│   ├── Microarchitecture                        <span class="o">owner: Staff NoC Microarchitect</span></span>
+<span class="ln">│   └── <span class="gate-tag">GATE</span> Architecture approval                <span class="o">owner: Chief Architect</span> <span class="human">(human approval)</span></span>
+<span class="ln">├── <b>RTL</b>  <span class="o">(lead: Director, RTL Engineering)</span></span>
+<span class="ln">│   ├── RTL implementation: AXI slave interface  <span class="o">owner: Senior Interface Design Engineer</span></span>
+<span class="ln">│   └── RTL implementation: Arbitration          <span class="o">owner: Senior Interconnect Design Engineer</span></span>
+<span class="ln">├── <b>Verification</b>  <span class="o">(lead: VP, Verification)</span></span>
+<span class="ln">│   ├── Verification plan                         <span class="o">owner: Senior Verification Planning Engineer</span></span>
+<span class="ln">│   └── Coverage closure                          <span class="o">owner: Senior Functional Coverage Engineer</span></span>
+<span class="ln">└── <b>Signoff</b></span>
+<span class="ln">    └── <span class="gate-tag">GATE</span> Verification signoff                 <span class="o">owner: VP, Verification</span> <span class="human">(human approval)</span></span></pre>

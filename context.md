@@ -218,7 +218,9 @@ deadline that kills the whole process tree.
 **Counts.** `python scripts/status.py` prints the counts; `--check` fails on
 drift; `--write` rewrites the roadmap block after adding a workflow, tool,
 unit, skill, or principle; `--release` refreshes the test count,
-`site/stats.json`, and the site at a version release.
+`site/stats.json`, and the site at a version release, and first stops, writing
+nothing, if the page's org figure or hero plan excerpt disagrees with the code
+(M59; `docs/STATUS_DOCS.md`, section 9).
 
 **Releases.** Bump `pyproject.toml` and the version line above, run
 `scripts/status.py --release`, add `docs/history/release-vX.Y.Z.md` and its

@@ -4,12 +4,16 @@ Structural counts (units, roles, skills, workflows, principles, tools by status,
 knowledge packs) come from the code and are checked on every PR against the
 generated block in docs/ROADMAP.md. The test count is a release snapshot: it is
 collected only by --release and kept, with the version, in site/stats.json,
-which is also where the landing page gets every number. See docs/STATUS_DOCS.md.
+which is also where the landing page gets every number. Before a release writes
+anything, it also checks the page's two hand-written org mirrors (the org figure's
+division names and the role titles in the hero's plan excerpt) against the code;
+a mismatch fails --release only (M59). See docs/STATUS_DOCS.md.
 
     python scripts/status.py            print the counts and any drift
     python scripts/status.py --check    exit 1 if the roadmap or the site disagree
     python scripts/status.py --write    rewrite the roadmap block
-    python scripts/status.py --release  collect tests; write stats.json, the site, the block
+    python scripts/status.py --release  check the org mirrors; collect tests; write
+                                        stats.json, the site, the block
 
 Run with PYTHONPATH=src or an installed package.
 """
@@ -17,6 +21,7 @@ Run with PYTHONPATH=src or an installed package.
 from __future__ import annotations
 
 import argparse
+import html as htmllib
 import json
 import re
 import subprocess
@@ -149,7 +154,99 @@ def write_site(stats: dict) -> None:
     SITE.write_text(html, encoding="utf-8")
 
 
+# --- The page's org mirrors (M59): checked at release, never per PR -----------------------
+
+FIGURE = re.compile(r'<ul class="org__divs"[^>]*>(?P<body>.*?)</ul>', re.S)
+FIGURE_ITEM = re.compile(r"<li\b[^>]*>(?P<name>.*?)</li>", re.S)
+HERO = re.compile(r'<pre class="term__body"[^>]*>(?P<body>.*?)</pre>', re.S)
+HERO_REQUEST = re.compile(r'<span data-type>nirmaan plan "(?P<request>[^"]+)"</span>')
+# A role title in the hero: after the program-manager label, "(lead: " or "owner: ".
+HERO_TITLE = re.compile(r"(?:PROGRAM MANAGER</b>\s+|\(lead: |owner: )(?P<title>[^<()]+?)\s*(?:\)|</span>)")
+# The same three places in `nirmaan plan` output, where each title is followed by its role id.
+PLAN_TITLE = re.compile(r"(?:PROGRAM MANAGER\s+|\(lead: |owner: )(?P<title>[^()]+?) \([\w.]+\)")
+
+
+class MirrorMismatch(Exception):
+    """The page's org figure or plan excerpt disagrees with the code: the release stops."""
+
+    def __init__(self, problems: list[str]) -> None:
+        super().__init__("\n".join(problems))
+        self.problems = problems
+
+
+def _text(fragment: str) -> str:
+    return htmllib.unescape(re.sub(r"<[^>]+>", "", fragment)).strip()
+
+
+def figure_divisions(page: str) -> list[str]:
+    """The division names the page's org figure shows, in page order."""
+    figure = FIGURE.search(page)
+    return [_text(m["name"]) for m in FIGURE_ITEM.finditer(figure["body"])] if figure else []
+
+
+def code_divisions() -> list[str]:
+    """What the figure stands for: the active divisions outside the business function.
+
+    The caption says the executive office and the business divisions are left out.
+    """
+    from nirmaan.company import build_organization
+    from nirmaan.models.org import Function, UnitKind, UnitStatus
+
+    return [u.name for u in build_organization().units.values()
+            if u.kind is UnitKind.DIVISION and u.status is UnitStatus.ACTIVE
+            and u.function is not Function.BUSINESS]
+
+
+def hero_excerpt(page: str) -> tuple[str | None, list[str]]:
+    """The request the hero's excerpt plans, and every role title it shows."""
+    hero = HERO.search(page)
+    if not hero:
+        return None, []
+    request = HERO_REQUEST.search(hero["body"])
+    titles = [htmllib.unescape(m["title"]).strip() for m in HERO_TITLE.finditer(hero["body"])]
+    return (htmllib.unescape(request["request"]) if request else None), titles
+
+
+def plan_titles(request: str) -> set[str]:
+    """Every role title `nirmaan plan REQUEST` prints: the same plan and view the CLI uses."""
+    from nirmaan.company import build_organization
+    from nirmaan.orchestrator import Orchestrator
+    from nirmaan.views import plan_tree
+
+    org = build_organization()
+    lines = plan_tree(org, Orchestrator(org).plan(request).state)
+    return {m["title"] for line in lines for m in PLAN_TITLE.finditer(line)}
+
+
+def check_mirrors(page: str) -> list[str]:
+    """The page's hand-written org mirrors against the code. Run by --release only."""
+    problems = []
+    shown, built = figure_divisions(page), code_divisions()
+    if not shown:
+        problems.append("site/index.html has no org figure (ul.org__divs)")
+    else:
+        for name in shown:
+            if name not in built:
+                problems.append(f"org figure shows division {name!r}, which the organization does not build")
+        for name in built:
+            if name not in shown:
+                problems.append(f"org figure is missing division {name!r}, which the organization builds")
+    request, titles = hero_excerpt(page)
+    if request is None or not titles:
+        problems.append("site/index.html has no hero plan excerpt with a request and role titles")
+    else:
+        real = plan_titles(request)
+        for title in dict.fromkeys(titles):
+            if title not in real:
+                problems.append(f"hero excerpt shows role {title!r}, which `nirmaan plan {request!r}`"
+                                " does not print")
+    return problems
+
+
 def release() -> dict:
+    problems = check_mirrors(SITE.read_text(encoding="utf-8"))
+    if problems:
+        raise MirrorMismatch(problems)
     stats = {"version": version(), **structural_counts(), "tests": collect_test_count()}
     STATS.write_text(json.dumps(stats, indent=2) + "\n", encoding="utf-8")
     write_site(stats)
@@ -166,7 +263,14 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.release:
-        print(json.dumps(release(), indent=2))
+        try:
+            print(json.dumps(release(), indent=2))
+        except MirrorMismatch as exc:
+            for problem in exc.problems:
+                print(problem, file=sys.stderr)
+            print("release stopped, nothing written: update the page copy in site/index.html"
+                  " (see docs/STATUS_DOCS.md, section 9)", file=sys.stderr)
+            return 1
         return 0
     if args.write:
         write_roadmap()

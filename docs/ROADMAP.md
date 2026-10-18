@@ -108,6 +108,10 @@ new number. M1 to M42 are taken; see `docs/history/README.md`.
 | M53 | Gate integrity (audit B: F1 to F22) | done (#80) |
 | M54 | Demo surfaces (audit C: H0, H1, H2, H4, M1, L11, L12) | done (#83) |
 | M55 | VeriTriage audit fixes (audit D: H1, M1, M2, M3, L3, L6, L9, L15) | done (#82) |
+| M56 | Seniority band replaces the level-derived proficiency scale | reserved |
+| M57 | Hierarchy fixes from the capability build-out council record | reserved |
+| M58 | Eval cases name skills; must-fail scorer | reserved |
+| M59 | Release check for the public org mirrors | reserved |
 
 <!-- review:milestone-numbers:end -->
 
