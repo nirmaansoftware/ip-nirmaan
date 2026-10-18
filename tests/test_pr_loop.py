@@ -711,6 +711,20 @@ def test_only_main_moved_so_the_updated_head_carries_both_verdicts_over_with_no_
     assert f"carried over from head {r.first_head[:7]}" in k1 and "same diff (patch-id)" in k1
 
 
+def test_a_carried_verdict_carries_again_when_main_moves_twice(repo):
+    r = repo()
+    _reviewed_then_updated(r)
+    assert r.tick() == ["auto-merge"]
+    r.advance_main("src/third.py")
+    assert r.tick() == ["updated"]
+    second = r.origin_head()
+    assert r.tick() == ["auto-merge"]
+    assert len(r.calls()) == 2, "still the first review's verdicts"
+    assert r.github.merges[-1][-1] == second
+    k1 = [c for c in r.comments() if c.startswith("<!-- nirmaan-pr-review key=1 ") and f"head={second}" in c]
+    assert k1 and f"carried over from head {r.first_head[:7]}" in k1[-1], "the note names the head a model reviewed"
+
+
 def test_the_same_head_with_main_moved_carries_the_verdicts_over_on_a_rerun(repo):
     r = repo(gh={"merge_error": "GraphQL: Head branch was modified. (enablePullRequestAutoMerge)"})
     assert r.tick() == ["stopped"]
