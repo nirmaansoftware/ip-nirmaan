@@ -69,7 +69,7 @@ first run, not re-run since (only the page copy changed):
 | 1 | Privacy policy | PASS: footer links to nirmaan.online/privacy.html, which covers this site. This page loads nothing from third parties |
 | 2 | Terms & conditions | PASS: footer links to nirmaan.online/terms.html; the code is under Apache-2.0 |
 | 3 | Frontend secrets | PASS: none; the page has no keys at all |
-| 4 | HTTPS | PASS: Vercel enforces it; HSTS, frame-deny, and referrer headers served. No Content-Security-Policy yet |
+| 4 | HTTPS | PASS: Vercel enforces it; HSTS, frame-deny, and referrer headers served. Content-Security-Policy served as Report-Only (inline scripts by hash; enforcing it is open, see `docs/ROADMAP.md`) |
 | 5 | Cookie banner | N/A: no cookies. The theme choice is kept in `localStorage` (disclosed in the privacy policy) |
 | 6 | Meta titles / descriptions | PASS: title, description, canonical, `og:url` |
 | 7 | Social preview image | PASS: `og-image.png`, 1200x630, with alt text |

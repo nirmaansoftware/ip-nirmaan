@@ -210,15 +210,15 @@ RUNNABLE_TYPES = {"", "text/javascript", "application/javascript", "module", "sp
 
 
 def _csp() -> dict[str, list[str]]:
+    # The one CSP header on /(.*). Enforcing it renames the Report-Only header;
+    # two at once would let one go unchecked, so that fails here.
     config = json.loads((SITE / "vercel.json").read_text(encoding="utf-8"))
-    for rule in config["headers"]:
-        if rule["source"] != "/(.*)":
-            continue
-        for header in rule["headers"]:
-            if header["key"].lower() in CSP_KEYS:
-                directives = (d.split() for d in header["value"].split(";") if d.strip())
-                return {name: sources for name, *sources in directives}
-    raise AssertionError("site/vercel.json has no CSP header on /(.*)")
+    values = [header["value"]
+              for rule in config["headers"] if rule["source"] == "/(.*)"
+              for header in rule["headers"] if header["key"].lower() in CSP_KEYS]
+    assert len(values) == 1, "site/vercel.json needs exactly one CSP header on /(.*)"
+    directives = (d.split() for d in values[0].split(";") if d.strip())
+    return {name: sources for name, *sources in directives}
 
 
 def _inline_script_hashes(page: str) -> set[str]:

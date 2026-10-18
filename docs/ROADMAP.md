@@ -126,8 +126,10 @@ still open, with no numbers reserved yet:
   are in `docs/TEST_CI_HARDENING.md` section 6.
 - **Enforcing the Content-Security-Policy** for the site. `site/vercel.json`
   sends it as Report-Only (inline scripts by hash, checked in
-  `tests/test_landing_site.py`); after a preview shows no violations, it
-  becomes `Content-Security-Policy`.
+  `tests/test_landing_site.py`; `style-src` keeps `'unsafe-inline'` for the
+  shared components' inline `style` attributes). It has no report endpoint, so
+  the check is a preview with the browser console open; after it shows no
+  violations, the header becomes `Content-Security-Policy`.
 - **The contract-only tools** that keep `new-ip` partly attestation-based:
   coverage, CDC, power, regression, and equivalence (17 tools in all).
 - **The factory line's deferred steps** (M44): laying out the scan-inserted
