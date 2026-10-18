@@ -78,7 +78,7 @@ first run, not re-run since (only the page copy changed):
 | 10 | Image alt text | PASS: no `<img>`; the graph SVG has a title, glyphs are `aria-hidden` |
 | 11 | Image compression | PASS: the largest image is the 77 KB preview; the largest font is 90 KB |
 | 12 | Page load speed | FIXED: the first live run scored 79 (LCP 3.6 s): Google Fonts blocked the first paint and the terminal hid the plan until printed. Fonts are now self-hosted and preloaded, and the plan is painted from the first frame (printing only lights it). Lighthouse mobile: performance 99, LCP 2.3 s, CLS 0.006, TBT 0 ms |
-| 13 | Color contrast | PASS: Lighthouse accessibility 100 |
+| 13 | Color contrast | PASS: Lighthouse accessibility 100. Re-checked 2026-10-18 after the `bac3965` sync (see below) |
 | 14 | Mobile responsiveness | PASS: checked at a true 390 px viewport |
 | 15 | Custom 404 page | PASS: `404.html` (Vercel serves it with status 404) |
 | 16 | Broken links | PASS: every link on the live page returns 200 |
@@ -86,6 +86,23 @@ first run, not re-run since (only the page copy changed):
 | 18 | Spam protection | N/A: no forms |
 | 19 | Analytics | None, per the brief ("no tracking"). Open for the owner to revisit |
 | 20 | Single clear CTA | PASS: "Talk to us" (nirmaan.online contact page). The page links nowhere on GitHub, by the owner's decision |
+
+Shared-layer sync from Nirmaan `bac3965` (Nirmaan #110, 2026-10-18), checked
+locally against `site/` served from this repository, not on the live site:
+
+- **13 Color contrast: PASS.** Light `--ink-3` is now `#62625C` (dark is
+  unchanged at `#8C8C85`). Every HTML text element drawn in `--ink-3` measures
+  5.42:1 on `--paper` and 4.99:1 on `--paper-2` in light, 5.70:1 and 5.29:1 in
+  dark (computed colours in headless Chrome at 390 px, on `/` and `/404.html`).
+  Lighthouse 12.8.2 accessibility, mobile, light: 100 on both pages, with the
+  color-contrast audit passing. Dark mode was not run through Lighthouse. The
+  graph's SVG text (`fill: var(--ink-3)`) was not measured on its own.
+- **14 Mobile responsiveness: PASS.** At 390 px, light and dark, no sideways
+  scroll on `/` or `/404.html` (`scrollWidth` 390).
+- **12 Page load speed: not measured.** The sync adds about 25 lines of
+  JavaScript and no new request.
+- Items 1 to 11 and 15 to 20 are untouched by the sync: no new markup, links,
+  requests, forms or assets.
 
 ## Deploying
 
