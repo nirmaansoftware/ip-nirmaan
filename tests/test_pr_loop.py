@@ -708,7 +708,7 @@ def test_only_main_moved_so_the_updated_head_carries_both_verdicts_over_with_no_
     assert r.github.merges[0][-1] == new
     assert len([l for l in r.log() if l.get("outcome") == "carried" and l.get("head") == new]) == 2
     k1 = next(c for c in r.comments() if c.startswith("<!-- nirmaan-pr-review key=1 ") and f"head={new}" in c)
-    assert f"carried over from head {r.first_head[:7]}" in k1 and "same diff (patch-id)" in k1
+    assert f"carried over from head {r.first_head[:7]}" in k1 and "only main merged in, the same diff bytes" in k1
 
 
 def test_a_carried_verdict_carries_again_when_main_moves_twice(repo):
@@ -734,6 +734,42 @@ def test_the_same_head_with_main_moved_carries_the_verdicts_over_on_a_rerun(repo
     r.github.merge_error, r.github.labels = None, []
     assert r.tick() == ["auto-merge"]
     assert len(r.calls()) == 2, "main moved, so the exact cache missed; the verdicts were carried over"
+
+
+def _person_pushes(r, tmp, edits):
+    """A person pushes commits to the pull request branch (from a clone of origin)."""
+    w = tmp / f"person-{len(edits)}"
+    sh(tmp, "clone", "-q", "-b", "feature", str(r.origin), str(w))
+    sh(w, "config", "user.email", "p@example.com")
+    sh(w, "config", "user.name", "Person")
+    for i, text in enumerate(edits):
+        write(w, "src/app.py", text)
+        sh(w, "commit", "-qam", f"edit {i}")
+    sh(w, "push", "-q", "origin", "feature")
+
+
+def _reviewed_then_stopped(r):
+    r.github.merge_error = "GraphQL: Head branch was modified. (enablePullRequestAutoMerge)"
+    assert r.tick() == ["stopped"]
+    assert len(r.calls()) == 2
+    r.github.merge_error, r.github.labels = None, []
+
+
+def test_a_whitespace_only_commit_is_a_new_diff_and_is_reviewed_again(repo, tmp_path):
+    r = repo()
+    _reviewed_then_stopped(r)
+    _person_pushes(r, tmp_path, ["one\ntwo    changed\nthree\n"])
+    assert r.tick() == ["auto-merge"]
+    assert len(r.calls()) == 4 and not any(l.get("outcome") == "carried" for l in r.log())
+
+
+def test_a_change_and_its_revert_leave_the_diff_alone_but_are_reviewed_again(repo, tmp_path):
+    r = repo()
+    _reviewed_then_stopped(r)
+    _person_pushes(r, tmp_path, ["one\ntwo changed\nthree changed\n", "one\ntwo changed\nthree\n"])
+    assert sh(r.origin, "diff", r.first_head, r.origin_head()) == "", "the same tree as the reviewed head"
+    assert r.tick() == ["auto-merge"]
+    assert len(r.calls()) == 4 and not any(l.get("outcome") == "carried" for l in r.log())
 
 
 def test_a_file_of_the_diff_changed_on_main_is_reviewed_again(repo):

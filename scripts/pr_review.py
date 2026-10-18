@@ -486,8 +486,8 @@ REUSED_NOTE = "Verdict reused from an earlier run on the same head and main comm
 def carried_note(reviewed: dict) -> str:
     """Said in a comment whose verdict was carried over to a new head (or a new
     main) from the head a model last reviewed (run_review, carry-over)."""
-    return (f"Verdict carried over from head {reviewed['head'][:7]} (reviewed with main {reviewed['main'][:7]}): same diff (patch-id), "
-            "same PR text, and no file of the diff and no review rule changed on main since; no new model call.")
+    return (f"Verdict carried over from head {reviewed['head'][:7]} (reviewed with main {reviewed['main'][:7]}): only main merged in, the same diff bytes, "
+            "the same PR text, and no file of the diff and no review rule changed on main since; no new model call.")
 
 
 def pr_text_digest(title, body) -> str:
@@ -1081,18 +1081,39 @@ def _review(repo_root, pr, github, post, claude_bin, state_dir, models, timeout_
 
     # Carry-over: when only main moved (an update merged main into the branch, or
     # main moved under the same head), the last verdict of a key, team and lead is
-    # reused if the pull request's own diff is the same (patch-id of
-    # merge-base..head), the title and body digest is the same, no file of the
-    # diff changed on main since that verdict's merge base, and none of the
-    # review's inputs (carry_over_void_paths: the map, the council, these
-    # scripts, the skill) changed on main since that verdict's main. Its
+    # reused if the head is that verdict's head with only merges of main added,
+    # the pull request's own diff is byte for byte the same (merge-base..head),
+    # the title and body digest is the same, no file of the diff changed on main
+    # since that verdict's merge base, and none of the review's inputs
+    # (carry_over_void_paths: the map, the council, these scripts, the skill)
+    # changed on main since that verdict's main. Its
     # citations are validated again at this head. Key 2 and the proxy are carried
     # only while no key in this run called a model, since they get key 1's results.
-    try:
-        patch = subprocess.run(["git", "patch-id", "--stable"], cwd=repo_root, input=diff, check=True, capture_output=True, text=True).stdout.split()
-        patch_id = patch[0] if patch else None
-    except (subprocess.CalledProcessError, OSError):
-        patch_id = None
+    # A digest of the exact diff bytes, so a whitespace-only change is a new diff
+    # (git patch-id would ignore whitespace).
+    diff_digest = hashlib.sha256(diff.encode()).hexdigest() if diff else None
+
+    def only_main_merged_since(since):
+        """The head is `since` plus merges of main and nothing else: each new
+        commit not in main has two parents, the first on the pull request's line
+        and the second in main (an update-branch merge). Any other new commit, a
+        rebase or a force push means a full review."""
+        if since == head:
+            return True
+        try:
+            _git(repo_root, "merge-base", "--is-ancestor", since, head)
+            added = [l.split() for l in _git(repo_root, "rev-list", "--parents", head, f"^{since}", f"^{main_sha}").splitlines() if l.strip()]
+        except subprocess.CalledProcessError:
+            return False
+        own = {since, *(c[0] for c in added)}
+        for c in added:
+            if len(c) != 3 or c[1] not in own:
+                return False
+            try:
+                _git(repo_root, "merge-base", "--is-ancestor", c[2], main_sha)
+            except subprocess.CalledProcessError:
+                return False
+        return bool(added)
     text_digest = pr_text_digest(pull.get("title"), pull.get("body"))
     pr_paths = sorted({p for f in files for p in ([f["old"], f["path"]] if f["old"] else [f["path"]])})
     model_called: list[bool] = []
@@ -1109,13 +1130,15 @@ def _review(repo_root, pr, github, post, claude_bin, state_dir, models, timeout_
 
     def carried(key, team, lead):
         void = cfg.get("carry_over_void_paths") or []
-        if fresh or model_called or not patch_id or not pr_paths or not void:
+        if fresh or model_called or not diff_digest or not pr_paths or not void:
             return None
         try:
             c = json.loads(carry_file(key, team, lead).read_text())
         except (OSError, ValueError):
             return None
-        if c.get("patch_id") != patch_id or c.get("text_digest") != text_digest or not (c.get("result") or {}).get("verdict"):
+        if c.get("diff_digest") != diff_digest or c.get("text_digest") != text_digest or not (c.get("result") or {}).get("verdict"):
+            return None
+        if not only_main_merged_since(c["head_sha"]):
             return None
         if changed_on_main_since(c["base_sha"], pr_paths) != [] or changed_on_main_since(c["main_sha"], void) != []:
             return None
@@ -1127,7 +1150,7 @@ def _review(repo_root, pr, github, post, claude_bin, state_dir, models, timeout_
     def save_carry(key, team, lead, reviewed, result):
         cache_dir.mkdir(parents=True, exist_ok=True)
         carry_file(key, team, lead).write_text(json.dumps({"reviewed": reviewed, "head_sha": head, "base_sha": base_sha, "main_sha": main_sha,
-                                                           "patch_id": patch_id, "text_digest": text_digest, "result": result}))
+                                                           "diff_digest": diff_digest, "text_digest": text_digest, "result": result}))
 
     def review(key, team, lead, model, system, user):
         # The Founder Proxy is key "proxy" here: same cache, retry, validation and log.
