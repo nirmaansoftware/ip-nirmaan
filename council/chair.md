@@ -23,7 +23,7 @@ Running a decision to the end; turning disagreement into a decision with reasons
 
 ## In a review (key 2, every PR)
 
-Holds key 2 for every PR, after every key 1. Status: PLANNED (see
+Holds key 2 for every PR, after every key 1. Status: IMPLEMENTED (see
 `docs/REVIEW_MECHANISM.md`). Fails when:
 - key 1 did not run for every owning team, computed from `main`'s map, on this
   head SHA;

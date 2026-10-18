@@ -2,9 +2,9 @@
 #
 # Decided in council/records/2026-10-17-teams-and-pr-review.md (section 1, and
 # the founder classes in section 2). How the review runs:
-# docs/REVIEW_MECHANISM.md. Status: PLANNED. Nothing reads this file to post a
-# review status yet; until the GitHub App and the ruleset are live, a review
-# status is a convention and the founder merges every pull request.
+# docs/REVIEW_MECHANISM.md. Status: IMPLEMENTED. The review script and the
+# loop read this file from main to post the review checks that the ruleset on
+# main requires.
 #
 # Rules are read from main, never from the pull request's head.
 #
@@ -389,9 +389,9 @@ content_rules:
 
 # Founder classes: a pull request in any of these also waits for the founder.
 # Path globs go to .github/CODEOWNERS (the test keeps the two equal), so code
-# owner review can enforce them once the ruleset requires it. Content triggers
-# set a "hold" label from the key-1 script (planned, rollout R5); agents can
-# remove labels, so that part is a convention.
+# owner review enforces them (the ruleset requires it). Content triggers make
+# the review script keep review/executive pending until the founder approves
+# the head.
 founder_classes:
   - id: control-plane
     title: Control plane

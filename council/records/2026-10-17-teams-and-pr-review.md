@@ -4,6 +4,11 @@ Status: decided by the chair; the founder answered on 2026-10-17 (see
 "Founder decisions" at the end). The mechanism itself is PLANNED, not live:
 see `docs/REVIEW_MECHANISM.md`.
 
+Superseded 2026-10-18: the mechanism is IMPLEMENTED. The ruleset on `main`
+(R7) is active and requires the review App's checks; #106 merged
+automatically through both keys, and #105 and #107 merged through both keys
+after the founder's approval. The text below is the record as decided.
+
 The founder asked for one PR review mechanism for Nirmaan and IP Nirmaan: a
 review by a higher authority in the PR's team (key 1), then by the top level
 (key 2), then automatic merge. The Nirmaan meeting decides the shared mechanism.
