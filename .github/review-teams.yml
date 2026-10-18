@@ -11,7 +11,7 @@
 # How a file is mapped:
 # - Path rules are globs on the path from the repository root. "*" matches
 #   within one directory, "**" matches any number of directories (also none).
-# - The last rule in "rules" that matches a file wins (as in CODEOWNERS), so
+# - The last rule in "rules" that matches a file wins, so
 #   the list runs from general to specific and "**" (the catch-all) comes
 #   first. The winning rule gives the owning team, which holds key 1, and its
 #   co-owners, which also hold key 1.
@@ -23,8 +23,8 @@
 # tests/test_review_teams.py checks this file against `git ls-files`: every
 # tracked file maps to a team, every glob wins at least one tracked file (no
 # dead rule), every seat named here has a file in council/, every marker
-# below exists in its file, and .github/CODEOWNERS equals the founder class
-# path globs.
+# below exists in its file, and no CODEOWNERS file exists (founder classes are
+# reviewed by the Founder Proxy agent, council/founder-proxy.md).
 
 version: 1
 
@@ -387,11 +387,11 @@ content_rules:
     in: [src/**, evals/**, tests/fixtures/**, .github/**]
     example: 'max_unannotated_nets=0'
 
-# Founder classes: a pull request in any of these also waits for the founder.
-# Path globs go to .github/CODEOWNERS (the test keeps the two equal), so code
-# owner review enforces them (the ruleset requires it). Content triggers make
-# the review script keep review/executive pending until the founder approves
-# the head.
+# Founder classes: a pull request in any of these gets a third reviewer, the
+# Founder Proxy (agent, council/founder-proxy.md), after key 1 and key 2 pass,
+# under the founder's delegation of 2026-10-18; what the founder keeps it sends
+# to the founder as needs-founder. The review script detects path globs and
+# content triggers from main's copy of this file. There is no CODEOWNERS file.
 founder_classes:
   - id: control-plane
     title: Control plane
@@ -406,7 +406,7 @@ founder_classes:
       - scripts/review_map.py
       - scripts/pr_loop.py
       - docs/pr-loop.plist
-    note: .github/** covers .github/review-teams.yml and .github/CODEOWNERS. The pr-review skill (.claude/skills/pr-review/) falls under .claude/**; its posting script (scripts/pr_review.py), the map logic it shares with the coverage test (scripts/review_map.py), the automated loop that drives it (scripts/pr_loop.py) and the launchd job that runs the loop (docs/pr-loop.plist) are listed here.
+    note: .github/** covers .github/review-teams.yml. The pr-review skill (.claude/skills/pr-review/) falls under .claude/**; its posting script (scripts/pr_review.py), the map logic it shares with the coverage test (scripts/review_map.py), the automated loop that drives it (scripts/pr_loop.py) and the launchd job that runs the loop (docs/pr-loop.plist) are listed here.
   - id: gate-semantics
     title: Gate semantics
     paths:

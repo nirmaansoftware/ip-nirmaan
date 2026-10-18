@@ -46,8 +46,10 @@ in parallel); 4 refused (fork, other author, wrong base, own branch); 5 the
 head moved during the review (nothing posted; run again on the new head).
 
 Tell the user the verdict per key, the head SHA and the comment links, in the
-script's words: "agent review", "pass", "fail", "review deferred", "waits for
-founder approval". A key is an agent review: never a person's decision, a
+script's words: "agent review", "pass", "fail", "review deferred", "needs the
+founder". The Founder Proxy is "Founder Proxy (agent), acting under the
+founder's delegation of 2026-10-18; not the founder": never say the founder
+approved anything because the proxy passed. A key is an agent review: never a person's decision, a
 release, or a claim that a design is ready to be made in silicon. A deferred
 review is not a pass. If no review App is configured, say it was a dry run:
 the statuses are named `dry-run/...` and never count.
@@ -56,8 +58,11 @@ the statuses are named `dry-run/...` and never count.
 
 The author fixes and pushes; the new head voids both keys; run the skill again
 from a session that did not write the fix. A founder-class pull request also
-needs the founder's GitHub approval on the current head; the script keeps
-`review/executive` pending until it exists. A `hold` label keeps it pending.
+gets the Founder Proxy (agent) after key 2; `review/executive` passes only when
+key 2 and the proxy pass. A proxy fail goes to the fixer like a key's; a proxy
+"needs-founder" keeps `review/executive` pending until the founder's own
+GitHub review approves the head, and the loop labels the pull request
+`needs-founder`. A `hold` label keeps it pending.
 The automated loop (`scripts/pr_loop.py`, "Automated loop" in
 `docs/REVIEW_MECHANISM.md`) does this on its own: a separate fixer process,
 checks, push, and both keys again, at most three rounds before it labels the
@@ -74,7 +79,7 @@ pull request `needs-founder`.
   section defers its key.
 - Env: `NIRMAAN_CLAUDE_CODE` (claude path), `NIRMAAN_REVIEW_MODEL_KEY1`
   (default `sonnet`), `NIRMAAN_REVIEW_MODEL_KEY2` (default `opus`, the
-  strongest), `NIRMAAN_REVIEW_TIMEOUT_SECONDS` (1200),
+  strongest), `NIRMAAN_REVIEW_MODEL_PROXY` (default `opus`), `NIRMAAN_REVIEW_TIMEOUT_SECONDS` (1200),
   `NIRMAAN_REVIEW_BACKOFF_SECONDS` (90), `NIRMAAN_REVIEW_STATE_DIR`
   (`~/.nirmaan/pr-review`: lock, call log `calls.jsonl`, cached verdicts,
   temporary worktrees). The review App's variables are in

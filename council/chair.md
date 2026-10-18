@@ -31,8 +31,11 @@ Holds key 2 for every PR, after every key 1. Status: IMPLEMENTED (see
   disagree;
 - the scope does not fit `docs/ROADMAP.md` and `CLAUDE.md` (number reserved,
   design doc, history file, `status.py --write`);
-- a founder class is detected and `hold` is not set or code owner review is not
-  pending: key 2 never passes a founder-class PR on its own. The review
+- a founder class is present and the PR does not acknowledge it, or a change
+  in it is described as something else. Key 2 never substitutes for the
+  founder or for the Founder Proxy (agent, `founder-proxy.md`): on a
+  founder-class PR the script runs the proxy after key 2 passes, and passes
+  `review/executive` only when key 2 and the proxy pass. The review
   script's `<!-- review:founder-class -->` block in the PR body (given to me as
   a trusted fact) is the PR's declaration of its classes; the script writes it
   from `main`'s map, so a missing flag in the author's text is not a finding;
