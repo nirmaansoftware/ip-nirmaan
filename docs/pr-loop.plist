@@ -8,6 +8,11 @@
   virtual environment; launchd never starts a second run while one is going,
   and the loop's lock is shared with Nirmaan. It uses the Mac's own `claude`
   login (the plan) and `gh` login. No secret is stored here or in GitHub Actions.
+  Settings (PATH and the review App's variables) are not in this file: the
+  command sources ~/.nirmaan/pr-loop/env first (the file the Nirmaan loop
+  sources too), so copying a new version of this plist keeps them. That file
+  holds paths and IDs only, never a key's contents. Without it the run stops
+  and says so in the log.
 -->
 <plist version="1.0">
 <dict>
@@ -17,7 +22,7 @@
   <array>
     <string>/bin/zsh</string>
     <string>-lc</string>
-    <string>mkdir -p "$HOME/.nirmaan/pr-review" &amp;&amp; cd "$HOME/.nirmaan/pr-loop/ip-nirmaan" &amp;&amp; git fetch --quiet origin main &amp;&amp; git -c core.hooksPath=/dev/null reset --quiet --hard origin/main &amp;&amp; .venv/bin/python scripts/pr_loop.py --once &gt;&gt; "$HOME/.nirmaan/pr-review/ip-loop.log" 2&gt;&amp;1</string>
+    <string>mkdir -p "$HOME/.nirmaan/pr-review" &amp;&amp; { . "$HOME/.nirmaan/pr-loop/env" &amp;&amp; cd "$HOME/.nirmaan/pr-loop/ip-nirmaan" &amp;&amp; git fetch --quiet origin main &amp;&amp; git -c core.hooksPath=/dev/null reset --quiet --hard origin/main &amp;&amp; .venv/bin/python scripts/pr_loop.py --once; } &gt;&gt; "$HOME/.nirmaan/pr-review/ip-loop.log" 2&gt;&amp;1</string>
   </array>
   <key>StartInterval</key>
   <integer>300</integer>

@@ -78,6 +78,13 @@ class FakeGitHub:
         self.merge_error, self.body = gh.get("merge_error"), "Changes line two."
         self.ci = gh.get("ci", lambda sha: "success")
         self.draft, self.author, self.mergeable = gh.get("draft", False), gh.get("author", "patel-om"), gh.get("mergeable", True)
+        # GitHub's mergeable_state "behind" (main has commits the branch lacks
+        # and GitHub reports it as blocking). behind_when() can turn it on
+        # mid-run; update_error makes the update fail the way gh does;
+        # before_update() runs first (a person's push); update_async leaves the
+        # branch as it was (GitHub has not made the merge commit yet).
+        self.behind, self.behind_when, self.update_error, self.before_update, self.update_async = False, None, None, None, False
+        self.updates = []
 
     def head(self):
         return sh(self.origin, "rev-parse", "refs/heads/feature")
@@ -88,7 +95,8 @@ class FakeGitHub:
         return {"number": 1, "state": "open", "draft": self.draft, "title": "Change app", "body": self.body, "author": self.author,
                 "labels": list(self.labels), "head_sha": head, "head_ref": "feature", "head_repo": CONFIG["repo"],
                 "base_ref": "main", "base_repo": CONFIG["repo"], "mergeable": self.mergeable,
-                "mergeable_state": "dirty" if self.mergeable is False else "clean"}
+                "mergeable_state": "dirty" if self.mergeable is False else
+                "behind" if self.behind or (self.behind_when and self.behind_when()) else "clean"}
 
     def list_open_pulls(self):
         return [self.get_pull(1)]
@@ -103,6 +111,8 @@ class FakeGitHub:
         `gh pr merge` records the call, and fails the way the loop's real runner
         does (CalledProcessError, message on stderr) when the test sets
         merge_error."""
+        if args[0] == "api" and "PUT" in args:
+            return self.update_branch(args)
         if args[0] == "api":
             self.api_calls.append(args)
             if self.settings_error:
@@ -111,6 +121,28 @@ class FakeGitHub:
         self.merges.append(args)
         if self.merge_error:
             raise subprocess.CalledProcessError(1, ["gh", *args], output="", stderr=self.merge_error)
+
+    def update_branch(self, args):
+        """What GitHub's update-branch does: merge main into the pull request
+        branch (a merge commit) when the branch head is still the expected one."""
+        self.updates.append(args)
+        if self.before_update:
+            self.before_update()
+        expected = next(a for a in args if a.startswith("expected_head_sha=")).split("=", 1)[1]
+        if self.update_error or self.head() != expected:
+            raise subprocess.CalledProcessError(1, ["gh", *args], output="",
+                                                stderr=self.update_error or "gh: expected head sha did not match current head ref (HTTP 422)")
+        if self.update_async:
+            return '{"message":"Updating pull request branch."}'
+        tmpw = self.origin.parent / f"upd-{len(self.updates)}"
+        sh(self.origin.parent, "clone", "-q", "-b", "feature", str(self.origin), str(tmpw))
+        sh(tmpw, "config", "user.email", "gh@example.com")
+        sh(tmpw, "config", "user.name", "GitHub")
+        sh(tmpw, "merge", "-q", "--no-ff", "--no-edit", "origin/main")
+        sh(tmpw, "push", "-q", "origin", "feature")
+        shutil.rmtree(tmpw)
+        self.behind = False
+        return '{"message":"Updating pull request branch."}'
 
     def add_labels(self, n, labels):
         self.posts.append({"type": "label", "labels": labels})
@@ -205,6 +237,17 @@ class Repo:
 
     def st(self):
         return pr_loop.load_state(self.state, CONFIG["repo"], 1)
+
+    def advance_main(self, rel="src/other.py"):
+        """A new commit on main in origin, so the branch is really behind."""
+        w = self.work
+        sh(w, "checkout", "-q", "main")
+        sh(w, "pull", "-q", "origin", "main")
+        write(w, rel, f"main moved {len(sh(w, 'rev-list', 'HEAD').split())}\n")
+        sh(w, "add", "-A")
+        sh(w, "commit", "-qm", "main moves")
+        sh(w, "push", "-q", "origin", "main")
+        self.github.behind = True
 
 
 @pytest.fixture
@@ -472,6 +515,134 @@ def test_no_post_commits_the_fix_locally_and_never_pushes(repo):
     r = repo(reviews=[fail("bad")])
     assert r.tick(post="none") == ["fixed-not-pushed"]
     assert r.origin_head() == r.first_head and r.github.posts == []
+
+
+# --- Behind main -----------------------------------------------------------------
+
+
+def update_args(head):
+    return ["api", "-X", "PUT", f"repos/{CONFIG['repo']}/pulls/1/update-branch", "-f", f"expected_head_sha={head}"]
+
+
+def is_merge_of(r, sha, head):
+    parents = sh(r.origin, "rev-list", "--parents", "-n", "1", sha).split()[1:]
+    return parents == [head, sh(r.origin, "rev-parse", "refs/heads/main")]
+
+
+ASK = "this pull request waits for the founder's GitHub approval"
+
+
+def test_a_branch_behind_main_is_updated_with_a_merge_commit_before_the_review_then_the_new_head_is_reviewed(repo):
+    r = repo()
+    r.advance_main()
+    assert r.tick() == ["updated"]
+    assert r.github.updates == [update_args(r.first_head)], "update-branch with the gh login, pinned to the head it saw"
+    assert r.calls() == [], "no review of the stale head"
+    new = r.origin_head()
+    assert is_merge_of(r, new, r.first_head), "main merged into the branch"
+    assert "Automated loop: branch updated" in r.comments()[-1] and "behind `main`" in r.comments()[-1]
+    assert not r.labeled()
+    assert r.tick() == ["auto-merge"]
+    assert r.github.merges[0][-1] == new
+    assert [l["event"] for l in r.log() if l.get("kind") == "loop"] == ["updated", "review", "reviewed", "auto-merge"]
+
+
+def test_while_github_makes_the_merge_commit_the_next_pass_waits_and_does_not_ask_again(repo):
+    r = repo()
+    r.advance_main()
+    r.github.update_async = True
+    assert r.tick() == ["updated"]
+    assert r.tick() == ["wait"]
+    assert len(r.github.updates) == 1 and r.calls() == []
+
+
+def test_founder_class_behind_main_is_updated_before_the_founder_is_asked_so_the_founder_approves_once(repo):
+    r = repo(change=lambda w: write(w, ".github/workflows/x.yml", "name: x\n"))
+    r.advance_main()
+    assert r.tick() == ["updated"]
+    assert not any(ASK in c for c in r.comments())
+    new = r.origin_head()
+    assert r.tick() == ["founder-wait"]
+    asks = [c for c in r.comments() if ASK in c]
+    assert len(asks) == 1 and f"`{new[:7]}`" in asks[0]
+
+
+def test_founder_class_main_moves_during_the_review_so_the_loop_updates_instead_of_asking(repo):
+    r = repo(change=lambda w: write(w, ".github/workflows/x.yml", "name: x\n"))
+    moved = []
+
+    def when():
+        if not moved and len(r.calls()) >= 2:
+            moved.append(1)
+            r.advance_main()
+        return False
+    r.github.behind_when = when
+    assert r.tick() == ["updated"]
+    assert len(r.calls()) == 2, "both keys ran on the old head"
+    assert not any(ASK in c for c in r.comments()), "the founder is not asked about a head that cannot merge"
+    r.github.behind_when = None
+    assert r.tick() == ["founder-wait"]
+    assert len([c for c in r.comments() if ASK in c]) == 1
+
+
+def test_founder_class_waiting_then_main_moves_the_branch_is_updated_and_the_founder_asked_on_the_new_head(repo):
+    r = repo(change=lambda w: write(w, ".github/workflows/x.yml", "name: x\n"))
+    assert r.tick() == ["founder-wait"]
+    assert r.tick() == ["skip"]
+    r.advance_main()
+    assert r.tick() == ["updated"]
+    assert r.tick() == ["founder-wait"]
+    assert f"`{r.origin_head()[:7]}`" in r.comments()[-1]
+
+
+def test_a_failed_update_stops_with_needs_founder(repo):
+    r = repo()
+    r.advance_main()
+    r.github.update_error = "gh: merge conflict between base and head (HTTP 422)"
+    assert r.tick() == ["stopped"]
+    assert r.labeled() and "could not update the branch with main" in r.comments()[-1]
+    assert r.origin_head() == r.first_head and r.calls() == []
+
+
+def test_a_push_just_before_the_update_drops_the_step_without_a_label(repo, tmp_path):
+    r = repo()
+    r.advance_main()
+
+    def human():
+        w = tmp_path / "human"
+        sh(tmp_path, "clone", "-q", "-b", "feature", str(r.origin), str(w))
+        sh(w, "config", "user.email", "h@example.com")
+        sh(w, "config", "user.name", "Human")
+        write(w, "src/human.py", "by hand\n")
+        sh(w, "add", "-A")
+        sh(w, "commit", "-qm", "human")
+        sh(w, "push", "-q", "origin", "feature")
+        r.github.before_update = None
+    r.github.before_update = human
+    assert r.tick() == ["head-moved"]
+    assert r.origin_head() != r.first_head
+    assert not r.labeled() and not any("stopped" in c for c in r.comments())
+
+
+def test_no_post_never_updates_a_branch(repo):
+    r = repo()
+    r.advance_main()
+    r.tick(post="none")
+    assert r.github.updates == [] and r.origin_head() == r.first_head
+
+
+# --- The plist -------------------------------------------------------------------
+
+
+def test_the_plist_reads_its_settings_from_the_sourced_env_file_and_holds_none_itself():
+    plist = (ROOT / "docs" / "pr-loop.plist").read_text(encoding="utf-8")
+    assert '. "$HOME/.nirmaan/pr-loop/env"' in plist, "the command sources the env file"
+    assert "<key>EnvironmentVariables</key>" not in plist, "no EnvironmentVariables block to lose or to hold a value"
+    assert "NIRMAAN_REVIEW_APP_ID=" not in plist and "PRIVATE_KEY_FILE=" not in plist
+    import re as _re
+    cmd = _re.search(r"<string>(mkdir[^<]*)</string>", plist).group(1)
+    assert cmd.index("pr-loop/env") < cmd.index("pr_loop.py"), "sourced before the loop starts"
+    assert "ip-loop.log" in cmd
 
 
 # --- Units -----------------------------------------------------------------------
