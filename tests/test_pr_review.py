@@ -515,6 +515,29 @@ def test_founder_class_block_and_with_founder_class_block():
     assert w(f"A\n{BLOCK_COMMERCIAL}\nB\n{BLOCK_COMMERCIAL}", "") == "A\nB", "every copy is removed"
 
 
+def test_lone_founder_class_markers_are_stripped_so_only_the_script_block_has_markers():
+    w, o, c = pr_review.with_founder_class_block, pr_review.FOUNDER_BLOCK_OPEN, pr_review.FOUNDER_BLOCK_CLOSE
+    block = pr_review.founder_class_block(review_map.load_map(MAP), ["control-plane"])
+    assert w(f"Body {o}Founder class: none.", "") == "Body Founder class: none.", "a lone open marker"
+    assert w(f"Founder class: none.{c}\nBody.", "") == "Founder class: none.\nBody.", "a lone close marker"
+    assert w(f"{o}\n\nBody.", block) == f"{block}\n\nBody.", "a lone marker on its own line goes with its line"
+    once = w(f"Text {c} more {o} end", block)
+    assert once == f"{block}\n\nText  more  end"
+    assert w(once, block) == once, "idempotent"
+    assert once.count(o) == 1 and once.count(c) == 1, "only the script block has markers"
+    assert w(f"Keep {o} this {block} end", "") == "Keep  this end", "a lone open marker before a block does not swallow the text between them"
+
+
+def test_a_lone_open_marker_written_by_the_author_is_stripped_from_the_body(repo):
+    o = pr_review.FOUNDER_BLOCK_OPEN
+    block = pr_review.founder_class_block(review_map.load_map(MAP), ["control-plane"])
+    r = repo(change=lambda w: write(w, ".github/workflows/x.yml", "name: x\n"), gh={"body": f"Adds a workflow. {o}Founder class: none."})
+    r.run()
+    assert r.github.body == f"{block}\n\nAdds a workflow. Founder class: none."
+    r.run()
+    assert len([p for p in r.github.posts if p["type"] == "body"]) == 1, "stable on a rerun"
+
+
 def test_a_change_inside_the_partner_section_adds_business_and_public_names(repo):
     r = repo(change=lambda w: write(w, "site/index.html", "<p>top</p>\n<!-- review:partners:begin -->\n<p>New partner</p>\n<!-- review:partners:end -->\n<p>end</p>\n"))
     c = r.run()["classification"]
