@@ -44,9 +44,8 @@ Add a seat by adding a file in the same format and a row here.
 
 The same seats review pull requests in teams. Decided in
 [the 2026-10-17 council record](records/2026-10-17-teams-and-pr-review.md); how
-the review runs is in `docs/REVIEW_MECHANISM.md` (PLANNED: until the GitHub App
-and the ruleset are live, a review status is a convention and the founder
-merges every pull request). Each lead's seat file holds its key-1 checklist
+the review runs is in `docs/REVIEW_MECHANISM.md` (IMPLEMENTED: the ruleset on
+`main` requires both review checks from the review App). Each lead's seat file holds its key-1 checklist
 under "In a review".
 
 | Team | Key 1 (lead) | Members (no key) |

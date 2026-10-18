@@ -2,11 +2,12 @@
 # control plane, gate semantics, licence and third-party. The globs are the
 # "paths" of founder_classes in .github/review-teams.yml, and
 # tests/test_review_teams.py keeps the two equal. Content classes (commercial,
-# public names and claims, export control) cannot be seen by a path; they use
-# a "hold" label instead.
+# public names and claims, export control) cannot be seen by a path; the
+# review script detects them and keeps review/executive pending until the
+# founder approves the head (docs/REVIEW_MECHANISM.md).
 #
-# Status: PLANNED. This file only requests the founder's review until the
-# ruleset on main turns on "require review from code owners" (rollout R7).
+# Status: IMPLEMENTED. The ruleset on main requires review from code owners
+# (rollout R7, 2026-10-18), so these paths wait for the founder's approval.
 
 # 1. Control plane
 /.github/** @nirmaansoftware

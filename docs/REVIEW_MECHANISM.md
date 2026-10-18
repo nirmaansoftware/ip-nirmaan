@@ -1,9 +1,14 @@
 # PR review mechanism
 
-Status: PLANNED. Nothing below is enforced yet. Until the GitHub App and the
-ruleset on `main` are live, a review status on a pull request is a convention:
-any write collaborator, or a workflow token, could post one. The founder merges
-every pull request by hand, as today.
+Status: IMPLEMENTED, live since 2026-10-18. The ruleset "main: two keys" on
+`main` is active. It requires the five CI checks, and `review/team-lead` and
+`review/executive` from the review App only, so a status posted by a write
+collaborator or a workflow token does not count. Code owner review is required
+for the founder-class paths, and a push dismisses an earlier approval.
+Branches need not be up to date with `main` (strict is off). Auto-merge is on.
+The first automatic merge was #106 (both keys passed, the loop turned on
+auto-merge, GitHub merged it with no human action); #105 and #107 merged
+through both keys after the founder's approval on GitHub.
 
 Decided in the council record
 [2026-10-17: teams and the PR review mechanism](../council/records/2026-10-17-teams-and-pr-review.md).
@@ -27,7 +32,7 @@ comment. A review whose SHA differs from the head is void.
    not run on the development machine, so CI is the record.
 2. **Key 1: team lead.** One agent review per owning team. The owning teams are
    every team whose path rule matches a changed file, read from `main`'s
-   `.github/review-teams.yml` (planned), plus teams added by content rules
+   `.github/review-teams.yml`, plus teams added by content rules
    (a price or partner name adds Business; a gate change adds Verification).
 3. **Key 2: chair.** One agent review of the whole PR, after every key 1.
 4. **Founder classes.** A PR in one of the six classes below also waits for the
@@ -38,8 +43,7 @@ comment. A review whose SHA differs from the head is void.
    of the block, and any lone open or close marker without its pair, is
    removed, so the only markers left are the script's own. The keys treat
    that block as the PR's flag.
-5. **Merge.** Automatic once every required check passes (after the ruleset
-   and auto-merge are turned on).
+5. **Merge.** Automatic once every required check passes.
 
 ## Teams
 
@@ -58,9 +62,11 @@ The full path map is in the council record, section 1.
 
 The founder confirmed all six on 2026-10-17: control plane, gate semantics,
 licence and third-party, commercial, public names and claims, and
-export-control sensitive content. Path classes will be enforced by
-`.github/CODEOWNERS` and code owner review; content classes by a `hold` label,
-which is a convention because agents can remove labels.
+export-control sensitive content. Path classes are enforced by
+`.github/CODEOWNERS` and code owner review. Content classes are detected by the
+review script, which keeps `review/executive` pending until the founder approves
+the head (step 10 below). A `hold` label also keeps it pending; agents can
+remove labels, so the label is a convention.
 
 ## Reviewer isolation
 
@@ -73,7 +79,7 @@ unchanged, then posts the status.
 
 ## How reviewers run
 
-Built for rollout R5, not yet used on a real pull request. The
+Built in rollout R5; in use on real pull requests since 2026-10-18. The
 [`pr-review` skill](../.claude/skills/pr-review/SKILL.md) starts
 `scripts/pr_review.py` from a checkout of `main`; a session never runs it for
 a pull request it wrote, and the script refuses when a Claude Code session has
@@ -150,14 +156,15 @@ write the founder-class block into the pull request body (a `PATCH` of
 go through the same token. It is made from these environment variables: `NIRMAAN_REVIEW_APP_ID`, one of
 `NIRMAAN_REVIEW_APP_PRIVATE_KEY_FILE` (a PEM outside every repository) or
 `NIRMAAN_REVIEW_APP_KEYCHAIN_SERVICE` (a macOS Keychain item holding the PEM),
-and optionally `NIRMAAN_REVIEW_APP_INSTALLATION_ID`. Until the App exists the
-script runs as a dry run with the caller's `gh` login: comments plus commit
+and optionally `NIRMAAN_REVIEW_APP_INSTALLATION_ID`. Without the App ID and
+one of the two key variables, the script runs as a dry run with the caller's `gh` login: comments plus commit
 statuses named `dry-run/review/team-lead` and `dry-run/review/executive`,
 which are never green and are not the checks a ruleset requires.
 
 ## Automated loop
 
-Built, not yet run on a real pull request. `scripts/pr_loop.py` (the
+Running since 2026-10-18 under launchd (`online.nirmaan.ip-pr-loop`).
+`scripts/pr_loop.py` (the
 "driver", a port of Nirmaan's `.github/scripts/pr-loop/pr-loop.mjs`) runs the
 whole cycle without anyone starting the review by hand: wait for CI, run both
 keys, fix what a key found, review again, and take the merge path when both
@@ -284,10 +291,10 @@ request, never turns auto-merge on for the repository, and never treats a
 deferred review as a pass. A fix the loop pushed is agent work like any other:
 both keys review it again.
 
-## What is not done yet
+## Rollout
 
-Each item is a separate PR or a founder action, in the order of the council
-record's rollout (R1 to R7): CI hardening, the path map and its coverage test,
-seat files and checklists, the reviewer skill and posting script, a dry run on
-seeded PRs, then the GitHub App, CODEOWNERS and the ruleset. This page changes
-from PLANNED to IMPLEMENTED only when the ruleset is live.
+Done in the order of the council record's rollout (R1 to R7): CI hardening,
+the path map and its coverage test, seat files and checklists, the reviewer
+skill and posting script, a dry run on seeded PRs, then the GitHub App,
+CODEOWNERS and the ruleset (R7, 2026-10-18). This page moved from PLANNED to
+IMPLEMENTED after the first pull requests merged through both keys.

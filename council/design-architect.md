@@ -32,7 +32,7 @@ Before its own list, every key 1 applies the base checklist in the council
 record 2026-10-17 (teams and PR review), section 3. It starts only when all five
 CI checks are green on the head SHA, reads the diff, the code and the CI logs,
 never the PR title, body or commit messages, and cites the CI run and the SHA.
-Status: PLANNED (see `docs/REVIEW_MECHANISM.md`).
+Status: IMPLEMENTED (see `docs/REVIEW_MECHANISM.md`).
 
 Fails when:
 - a pass claim has no tool run or CI log;
