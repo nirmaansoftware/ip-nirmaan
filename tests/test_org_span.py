@@ -11,6 +11,7 @@ judged by that tool. Each negative fixture below breaks one rule and must fail.
 
 from __future__ import annotations
 
+import hashlib
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -96,6 +97,15 @@ def test_every_active_unit_is_in_the_frozen_list_or_backed(nirmaan_org):
 
 def test_the_frozen_list_names_only_units_that_exist(nirmaan_org):
     assert ACTIVE_AT_M60 <= set(nirmaan_org.units)
+
+
+def test_the_frozen_list_is_pinned():
+    # Never extended by hand: a unit made ACTIVE later passes by its eval case, not by joining the list. Any edit
+    # to the fixture fails here, so it has to change this pin in the same pull request, where review sees it.
+    digest = hashlib.sha256("\n".join(sorted(ACTIVE_AT_M60)).encode()).hexdigest()
+    assert (len(ACTIVE_AT_M60), digest) == (
+        205, "dca031f484116a7f0f3e776b3536c69349e111e7bba0309212a202314347bb63"
+    )
 
 
 # --- Negative fixtures: each must fail -----------------------------------------------------
