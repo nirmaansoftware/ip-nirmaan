@@ -39,6 +39,12 @@ sense.
 | [partnerships](partnerships.md) | Finding and recruiting design partners and first customers |
 | [founder-proxy](founder-proxy.md) | Agent, not a meeting seat: the third reviewer of founder-class pull requests, under the founder's delegation of 2026-10-18 |
 
+Eighteen seats plus the chair; the Founder Proxy in the last row is an agent,
+not a meeting seat. How each seat will map to one role in the product's
+organization (a seat map, not yet built) is decided in
+[the 2026-10-18 capability build-out record](records/2026-10-18-capability-buildout.md),
+section 6.
+
 Add a seat by adding a file in the same format and a row here.
 
 ## Teams (pull request review)

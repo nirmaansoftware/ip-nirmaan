@@ -17,10 +17,21 @@ Wording note (legal-counsel, tax-accounts): this record says "organisation" and
 "shared services". It does not call IP Nirmaan a separate company or describe a
 corporate group; no entity fact is recorded (section 7).
 
+**The plan and what this record decides.** The meeting's brief was the
+capability build-out plan (version 3), an internal planning document. It, the
+round-1 positions and the internal minutes are kept outside this public
+repository, as for every council record (council/README.md, "Records"). A plan
+section number below only names where a statement came from: section 1 quotes
+each plan statement it corrects, and every rule this record adopts or replaces
+is written out here in full, so no reader needs the plan. What the council
+decided is in this record's own sections 2 to 14; where the plan and this
+record differ, the record states the decision (the founder can overrule it, as
+any item). Nothing in the repository reads or depends on the plan.
+
 ## 1. Facts corrected before deciding
 
-Plan v3 sections 2.1 and 2.7 do not match the code. The record cites the code,
-not the plan (qa-evidence must-have).
+The plan's statements in the left column do not match the code. The record
+cites the code, not the plan (qa-evidence must-have).
 
 | Plan says | Code says (FACT) |
 |---|---|
@@ -42,9 +53,9 @@ not the plan (qa-evidence must-have).
 ### Item 1. Hierarchy: CHANGE plan 2.7
 
 The product's org (`src/nirmaan/company/org_chart.py`) stays the one hierarchy
-for engineering work. 2.7 is replaced by the tree in section 4, which is the
-built org plus the changes decided here. Every change is listed with the PR
-stage that lands it.
+for engineering work. Plan section 2.7 (the plan's hierarchy) is replaced by
+the tree in section 4, which is the built org plus the changes decided here.
+Every change is listed with the PR stage that lands it.
 
 Decided changes:
 1. **CEO within span.** The four CEO-level placeholder divisions become one
@@ -93,7 +104,7 @@ Decided changes:
    JTAG, compression, fault models). Silicon Lifecycle owns applying patterns to
    silicon: the ATE program, burn-in, scan diagnosis on silicon, yield, failure
    analysis. Lifecycle's "test" is named "Production Test". Hardware security
-   stays in Security (the chart wins over Appendix A).
+   stays in Security (the chart wins over the plan's Appendix A).
 10. **Activation rule.** A unit added after this record enters as PLACEHOLDER.
     It becomes ACTIVE only in a PR that shows one of its skills uses an
     AVAILABLE tool and has an eval case judged by that tool. A unit in the
@@ -173,9 +184,9 @@ Section 13.
    executive it is the units it heads or sponsors plus the executives reporting
    to it. Generated IC ladder roles are not counted: a leaf unit's ladder (at
    most four rungs and a tech lead) is that leaf's staffing.
-2. **Range: 3 to 8.** The minimum is 3 (plan 2.3.5). Section 10's "manager only
-   at 4 or more ICs" is withdrawn for IP Nirmaan because it counts roles, not
-   units.
+2. **Range: 3 to 8.** The minimum is 3 (plan 2.3.5). Plan section 10's
+   "manager only at 4 or more ICs" is withdrawn for IP Nirmaan because it
+   counts roles, not units.
 3. **Placeholders count.** A head is accountable for a placeholder's capability
    map, so excluding them would hide areas a head owns. A placeholder must
    declare a mission and the coverage-map area it holds; an empty box is not a
@@ -494,7 +505,7 @@ Why: it is the only department whose skills already have tool-judged eval cases
 (evals/rtl: sync_fifo, rr_arbiter, apb_regs, axi4_lite_regs), it needs no new
 tool (a new tool is founder class), it serves the first offer, and its sources
 are our own designs. Processor architecture cannot reach Practised by the
-plan's rule: no tool judges architecture, and its supporters' tools
+rule in section 9: no tool judges architecture, and its supporters' tools
 (riscv-arch-test, riscv-formal, cycle counts on a core we change) are not yet
 wrapped or checked.
 
@@ -549,9 +560,10 @@ exists yet and no tool judges those skills.
 1. One legal entity or two (registration facts). Needed before agreements for
    signature, invoices or cross-charges.
 2. A licence for the Nirmaan repository or an intra-group grant: it is public
-   with no LICENSE file, and this repository vendors three of its site files
-   with no NOTICE entry. Needed before shared components or cross-organisation
-   skills grow.
+   with no LICENSE file (no commit of nirmaansoftware/Nirmaan has added one, as
+   read on its main at 645933d), and this repository vendors three of its site
+   files with no NOTICE entry (site/README.md, file table; NOTICE). Needed
+   before shared components or cross-organisation skills grow.
 3. The skills tile label (G8) before any programme skill is counted.
 4. Approval of the founder-class P1 PRs (record, seat map and tests, programme
    review rules and checklists, CI examples).
@@ -619,7 +631,7 @@ The founder can overrule any decision in this record.
 | G16 | DFT and Silicon Lifecycle boundary written into the chart before P2 | dft-engineer |
 | G17 | First recorded live eval batch committed before any level is computed | ai-engineer |
 | G18 | Examples stay within their CI budget | eda-tooling |
-| G19 | Plan v4 carries the corrections in section 1 and the minimum span of 3 | chair |
+| G19 | The plan's next version (v4, internal) carries the corrections in section 1 and the minimum span of 3; until it does, this record is the reference | chair |
 
 ## Appendix: how the counts were computed
 
