@@ -139,6 +139,27 @@
     $$('.section + .section').forEach(function (el) { ruleObserver.observe(el); });
   }
 
+  /* Ambient loops stop or can be paused (WCAG 2.2.2, motion.md section 1).
+     The ticker has a Pause/Play button; the CTA band's falling blocks run
+     for 5 s after the band first comes into view, then stop where they are. */
+  $$('[data-ticker-toggle]').forEach(function (button) {
+    var ticker = button.closest('.ticker');
+    button.addEventListener('click', function () {
+      var paused = ticker.classList.toggle('is-paused');
+      button.textContent = paused ? 'Play' : 'Pause';
+    });
+  });
+  if (root.classList.contains('motion')) {
+    var stillObserver = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (!entry.isIntersecting) return;
+        stillObserver.unobserve(entry.target);
+        setTimeout(function () { entry.target.classList.add('is-still'); }, 5000);
+      });
+    });
+    $$('.cta-band').forEach(function (band) { stillObserver.observe(band); });
+  }
+
   /* Pointer spotlight: a soft light follows the pointer across cards. */
   if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
     var SPOT = '.price-card, .package, .care-card, .care-link, .plan-switch__item, .included__group, .fit__other, .principles li, .svc-card, .includes li, .gets__list li';

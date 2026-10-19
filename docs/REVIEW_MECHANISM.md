@@ -263,8 +263,13 @@ requests labelled `hold` or `needs-founder` are skipped.
    plist, `pyproject.toml`, `.gitignore`. A fixer that says a finding needs
    such a change stops the loop the same way. Otherwise the loop commits with
    the `Co-Authored-By` line, runs the local checks (`check_dashes.py` always;
-   the test suite when `src/`, `tests/`, `evals/`, `scripts/` or `site/`
-   changed) with no token in the environment, checks the head has not moved,
+   when `src/`, `tests/`, `evals/`, `scripts/` or `site/` changed, the tests
+   related to the changed files, from `related_tests` in `scripts/pr_loop.py`:
+   a changed test file itself, the tests that import a changed module or its
+   package, or name a changed script or fixture, plus `tests/test_laws.py` for
+   `src/`; the whole suite when a changed file maps to no test or is
+   `tests/conftest.py`; CI runs the whole suite either way) with no token in
+   the environment, checks the head has not moved,
    pushes to the branch with `--force-with-lease` on the reviewed head, and
    posts "fix round N" listing the findings addressed.
 7. **Again from scratch.** The new head voids both keys, so the next step waits
@@ -288,10 +293,19 @@ the fixer works, the round is dropped without a label and the new head is
 reviewed from scratch. Removing the `needs-founder` label lets the loop resume
 with a fresh round count.
 
-**One pull request at a time.** The loop holds the review lock (shared with
-Nirmaan) for a whole review and fix round; a pull request the loop is fixing
-goes first, and each pass ends after the first pull request that ran a review
-or a fix.
+**One review at a time, every pull request each pass.** The loop holds the
+review lock (shared with Nirmaan) for a whole review and fix round. Each pass
+takes one step on every open pull request, one the loop is fixing first, then
+by number, so a pull request waiting for CI, or one that just ran a review or a
+fix, never holds up the others; the steps run one after another, so reviews
+still run one at a time. The check that the loop is `main`'s copy runs once,
+before each pass, so the pass ends early when `main` may have moved: after the
+pass's own auto-merge (GitHub may merge at once), and when `main`'s sha on
+origin, read before each step, differs from the one the pass started with
+(the founder's merge, the other loop, any merge) or cannot be read. The pull
+requests after that wait for the next pass, which refetches `main` and checks
+the copy again. A merge that lands while a step runs is seen only before the
+next step; the review itself always fetches `main` afresh.
 
 **Records.** Every review call, fixer call and loop step is a line in
 `~/.nirmaan/pr-review/calls.jsonl`; per pull request loop state is in
@@ -336,7 +350,7 @@ review script, it refuses to post unless it is `main`'s copy.
   `PATH` must reach `git`, `gh` and `claude`. Without the file, a run stops
   before the loop starts and the log says so. To re-install after the plist
   changes on `main`: `launchctl bootout gui/$(id -u)/online.nirmaan.ip-pr-loop`,
-  then the `cp` and `launchctl bootstrap` lines above. Every 5 minutes it
+  then the `cp` and `launchctl bootstrap` lines above. Every minute it
   resets the clone to `origin/main` and runs `--once`; output, including the
   `git` steps', goes to `~/.nirmaan/pr-review/ip-loop.log`. To stop it:
   `launchctl bootout gui/$(id -u)/online.nirmaan.ip-pr-loop`.
