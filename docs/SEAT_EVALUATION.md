@@ -75,7 +75,8 @@ passed.
 ## Scorers
 
 `register_scorer(id, requires_tool=False)` is the extension point, with
-`unregister_scorer` and `available_scorers`. One ships: `held-out-run`,
+`unregister_scorer` and `available_scorers`. Two ship (the second, `must-fail`,
+is M58's negative control; see `docs/EVAL_SKILLS_MUST_FAIL.md`). The first is `held-out-run`,
 which runs the check's `tool` with its `params`, filling each parameter from
 the seat's submitted files of the kinds in `seat_files`, then the case's
 `case_files`, comma-joined as every tool parameter is today (typed parameters

@@ -51,6 +51,7 @@ from nirmaan.models.org import (
     Role,
     SeniorityBand,
     Skill,
+    SpanException,
     ToolRisk,
     ToolSpec,
     ToolStatus,

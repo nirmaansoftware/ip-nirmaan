@@ -2,6 +2,7 @@
   "id": "rtl/sync-fifo",
   "request": "Create a parameterizable synchronous FIFO.",
   "seat": "rtl-implementation",
+  "skills": ["rtl_design"],
   "expected_behavior": "RTL for module sync_fifo (DEPTH 8, WIDTH 8 by default; any DEPTH of 2 or more) with ports clk rst_n wr_en wr_data full rd_en rd_data empty count, first-word fall-through, and a self-checking testbench, gated by lint, simulation, and synthesis (and formal, when a .sby is written) before review.",
   "constraints": [
     "Work only from the approved interface specification and microarchitecture.",
