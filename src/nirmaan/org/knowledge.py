@@ -9,7 +9,8 @@ packet's domain scope, so the seat reads it.
 Two budgets, and no silent cut:
 
 * the domain scope's documents together hold at most ``DOMAIN_CAP``
-  characters (council record 2026-10-18, capability build-out, section 9.3);
+  characters (capability build-out council record of 2026-10-18, section 9.3;
+  pull request #118, waiting for the founder);
 * the rendered prompt must fit the seat's model (``context_limit`` in
   :mod:`nirmaan.runtime.model`).
 

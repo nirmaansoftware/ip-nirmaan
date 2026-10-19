@@ -2,7 +2,8 @@
 
 A skill's knowledge sources reached the prompt only as names, so a document
 written for a skill would never be read by the seat holding it (capability
-build-out council record, item P1-06, gate G3). Design:
+build-out council record, item P1-06, gate G3; pull request #118, waiting
+for the founder). Design:
 `docs/KNOWLEDGE_PACKET.md`. Tests: `tests/test_knowledge_packet.py`.
 
 **A new source kind.** `KnowledgeSourceKind.KNOWLEDGE_DOCUMENT`, ref

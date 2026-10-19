@@ -275,6 +275,10 @@ class ModelRuntime:
         return dataclasses.replace(result, model_calls=tuple(self._calls))
 
     def _execute(self, packet: WorkPacket, tools: ToolHandle) -> WorkResult:
+        # M61: a prompt over the model's context even before any tool note declines before any tool runs.
+        too_big = over_context(len(render_work_prompt(packet, "work").render()), context_limit(self.llm))
+        if too_big:
+            return WorkResult(ResultStatus.DECLINED, uncertainty=1.0, notes=too_big)
         inputs = _inputs(packet)
         notes = self._preflight(packet, tools, inputs)
         runs = tuple(n.run for n in notes if n.run)

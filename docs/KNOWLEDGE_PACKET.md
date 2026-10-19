@@ -1,9 +1,12 @@
 # Knowledge documents in the work packet (M61)
 
 Item P1-06 of the 2026-10-18 council record on the capability build-out
-(`council/records/2026-10-18-capability-buildout.md`, section 9.3, gate G3):
-before any knowledge document is written, the path that brings its text to a
-seat exists, with a budget and a test over every workflow seat.
+(section 9.3, gate G3): before any knowledge document is written, the path
+that brings its text to a seat exists, with a budget and a test over every
+workflow seat. The record is proposed in pull request #118, which waits for
+the founder, so it is not yet in `council/records/`; every rule this
+milestone takes from it is stated here in full, and the 40,000 character cap
+is this milestone's own limit.
 
 ## The gap
 
@@ -28,7 +31,8 @@ not this milestone's.
 `assemble` reads every document cited by a skill in the packet's domain scope
 (the task's skills, plus the seat's skills that provide the task's
 capability), once per ref, in skill order. `DomainScope.documents` carries each
-whole: ref, citing skill, `sha256:` digest of the bytes, and the text. The
+whole: ref, citing skill, `sha256:` digest of the bytes read at assembly,
+and the text, so the digest is always that of the text the seat was given. The
 renderer puts each document after its skill's lines in the Domain section:
 
 ```text
@@ -47,7 +51,9 @@ today).
    text in one packet. At the cap the documents are carried whole; one
    character over, none is carried and `DomainScope.declines` says why.
 2. **The seat's model context.** `ModelRuntime` checks the rendered prompt
-   against `context_limit(llm)` before it calls: the LLM's own
+   against `context_limit(llm)` twice: before the pre-flight tool runs (the
+   prompt without tool notes), so a seat that cannot fit runs no tool, and
+   again before it calls, with the tool notes in: the LLM's own
    `context_chars` if it states one, else the profile of its model, else the
    smallest profile of its provider. Over it, the seat declines with the
    reason and no model is called or counted. The `auto` runtime already
@@ -74,5 +80,5 @@ small model's context declining with no call, and bad refs failing validation.
 ## Not in this milestone
 
 The knowledge file schema and its checks (M62), evidence levels (M63), any
-knowledge document, and the pilot's ablation run (council record section 9.3).
+knowledge document, and the pilot's ablation run (record section 9.3).
 `runtime/tools.py` is untouched.

@@ -169,7 +169,7 @@ def test_a_prompt_over_the_seat_models_context_declines_with_no_call(nirmaan_org
     report = run_task(engine, task, ModelRuntime(llm, runtime_id="tiny"))
     assert report.status is ResultStatus.DECLINED
     assert "over the seat's model context of 1000" in report.detail
-    assert llm.calls == 0 and not engine.state.model_calls
+    assert llm.calls == 0 and not engine.state.model_calls and not engine.state.tool_runs
 
 
 def test_the_context_limit_comes_from_the_model_profiles():
