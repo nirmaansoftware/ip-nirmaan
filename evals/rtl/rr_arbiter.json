@@ -2,6 +2,7 @@
   "id": "rtl/rr-arbiter",
   "request": "Create a round-robin arbiter for four requesters.",
   "seat": "rtl-implementation",
+  "skills": ["rtl_design"],
   "expected_behavior": "RTL for module rr_arbiter (N 4 by default) with ports clk rst_n req grant, a combinational same-cycle grant, and a pointer that moves to one past the winner, so no requester waits more than N-1 grants; with a self-checking testbench, gated by lint, simulation, and synthesis (and formal, when a .sby is written) before review.",
   "constraints": [
     "Work only from the approved interface specification and microarchitecture.",

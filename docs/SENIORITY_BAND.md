@@ -41,11 +41,14 @@ printed `failure_triage (expert)`.
 
 Only names changed. The rank order is the same, so `capabilities_of` and
 `tools_of` compare the same ranks: a capability needs the same band it needed,
-and write, execute, and approve tools still need at least `WORKING`. Checked by
-building the organization on main and on this branch and comparing every
-role's capabilities, tools, and skill map (old values mapped to new): all 685
-roles identical. Prompts in `tests/fixtures/prompts/` do not render the band
-and are unchanged.
+and write, execute, and approve tools still need at least `WORKING`. The
+record for this is the test suite, which passed with only the old names
+replaced by the new ones in its assertions (plus the one new test below), and
+the prompts in `tests/fixtures/prompts/`, which do not render the band and
+are unchanged. The author also compared every role's
+capabilities, tools, and skill map before and after the rename; that
+comparison was a one-off check during authoring and is not committed, so it
+is not evidence.
 
 Tests: `tests/test_nirmaan_org.py::test_band_is_derived_from_level` (the
 derivation, renamed) and `test_band_claims_no_expertise` (no band value says

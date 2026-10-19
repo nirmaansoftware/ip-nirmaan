@@ -35,6 +35,7 @@ from nirmaan.models import (
     CaseFile,
     EvalCase,
     EvalResult,
+    EvidenceKind,
     GateRun,
     HeldOutCheck,
     MemoryScope,
@@ -188,6 +189,11 @@ def _judge(engine: TaskEngine, task: Task, check: HeldOutCheck, repo: Path, reac
     if result.status is ScoreStatus.PASSED and not (recorded and all(r and r.succeeded for r in recorded)):
         return score(ScoreStatus.FAILED, f"claimed a pass with no passing run recorded in the sandbox: "
                                          f"{result.summary}")
+    # M58: a run a negative control needed to fail stands only as a failed run recorded in the sandbox.
+    failed = [engine.state.tool_runs.get(r) for r in result.failed_runs]
+    if result.status is ScoreStatus.PASSED and not all(r and not r.succeeded for r in failed):
+        return score(ScoreStatus.FAILED, f"claimed a run failed with no failed run recorded in the sandbox: "
+                                         f"{result.summary}")
     return result
 
 
@@ -239,6 +245,8 @@ def evaluate(org: Organization, case: EvalCase, seat_runtime: AgentRuntime, *, r
                                     if r in engine.state.tool_runs)),
         scores=scores, passed=reached_review and all(s.status is ScoreStatus.PASSED for s in scores),
         detail=detail, audit_ok=not verify_chain(engine.state.audit), sandbox=str(sandbox),
+        attestations=tuple(e.id for e in engine.state.evidence.values()
+                           if e.task == seat.id and e.kind is EvidenceKind.HUMAN_ATTESTATION),
         model_calls=spend.calls, input_tokens=spend.input_tokens, output_tokens=spend.output_tokens,
         cost_usd=None if spend.unknown_cost_calls else spend.cost_usd,
     ), engine
