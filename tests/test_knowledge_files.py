@@ -90,7 +90,7 @@ def test_the_good_fixture_passes(org):
     ("Knowledge only: no tool run backs this.", "Practising: a tool backs this.", "must state the tier"),
     ("Embedded C", "Expert embedded C", "uses 'Expert'"),
     ("Embedded C", "Tapeout ready embedded C", "uses 'Tapeout ready'"),
-    ("Embedded C", "Embedded C — for drivers", "an em or en dash"),
+    ("Embedded C", "Embedded C " + chr(0x2014) + " for drivers", "an em or en dash"),
     ("## Failure modes", "## Failure modes\n\n" + "x" * kf.DOCUMENT_MAX, "over 12000"),
     ("---\nid:", "id:", "no front matter"),
 ])
