@@ -65,6 +65,35 @@ _VERDICTS = {"approve": Verdict.APPROVE, "request_changes": Verdict.REQUEST_CHAN
 NO_CALL = "no model was called: "
 
 
+def context_limit(llm: Any) -> int | None:
+    """The most prompt characters the seat's model accepts, from its model profile (M61); None when unknown.
+
+    An LLM may state its own ``context_chars``; otherwise the profile of its
+    ``model``, else the smallest profile of its provider. The ``auto`` runtime
+    chooses a model per call and checks each profile's limit itself (M31).
+    """
+    from nirmaan.runtime.selection import model_profiles
+
+    own = getattr(llm, "context_chars", None)
+    if isinstance(own, int) and not isinstance(own, bool):
+        return own
+    profiles = model_profiles()
+    model = getattr(llm, "model", None)
+    by_model = [p.context_chars for p in profiles if model and p.model == model]
+    if by_model:
+        return min(by_model)
+    by_provider = [p.context_chars for p in profiles if p.provider == getattr(llm, "name", None)]
+    return min(by_provider) if by_provider else None
+
+
+def over_context(characters: int, limit: int | None) -> str | None:
+    """Why a prompt of ``characters`` cannot go to a model whose limit is ``limit`` (M61), or None."""
+    if limit is None or characters <= limit:
+        return None
+    return (f"the prompt is {characters} characters, over the seat's model context of {limit}; "
+            "the seat declines rather than cut it")
+
+
 def call_record(completion: "Completion", purpose: str, llm_name: str) -> dict[str, Any]:
     """One model call as the runtime saw it, for the engine to record (M31)."""
     return {"purpose": purpose, "provider": completion.provider or llm_name, "model": completion.model,
@@ -483,6 +512,9 @@ class ModelRuntime:
         return ReviewResult(verdict, comments, uncertainty, notes)
 
     def _ask(self, prompt: WorkPrompt) -> tuple[dict[str, Any] | None, _Files, str]:
+        too_big = over_context(len(prompt.render()), context_limit(self.llm))
+        if too_big:  # M61: the seat declines with the reason; no model is called and nothing is cut
+            return None, ({}, []), too_big
         with outside_writer():  # the call touches no project state: other tasks of a batch take turns (M36)
             completion = self.llm.complete(prompt)
         if not (completion.error or "").startswith(NO_CALL):

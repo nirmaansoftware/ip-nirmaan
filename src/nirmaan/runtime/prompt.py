@@ -5,6 +5,9 @@ scopes, as four sections in fixed order: Company, Domain, Project, Task.
 Packet memory is never rendered (it may hold a task's tool inputs, which the
 runtime uses and the model does not need).
 
+The Domain section carries the whole text of every knowledge document a skill
+on the task cites (M61), after that skill's lines.
+
 Every evidence record and tool run the seat may rely on is declared as a
 citation. Nirmaan IDs contain ``:`` and ``#``, which the M17 token grammar does
 not allow, so an evidence token uses the ID with both replaced by ``.``; the
@@ -128,12 +131,19 @@ def _company(packet: WorkPacket) -> tuple[str, ...]:
 
 def _domain(packet: WorkPacket) -> tuple[str, ...]:
     lines: list[str] = []
+    documents = packet.domain.documents
     for s in packet.domain.skills:
         lines.append(f"Skill {s.name} ({s.id})")
         for items, label in ((s.procedures, "procedure"), (s.constraints, "constraint"),
                              (s.common_failure_modes, "failure mode"), (s.validation_criteria, "validation"),
                              (s.knowledge_sources, "knowledge")):
             lines += [f"{s.name} {label}: {item}" for item in items]
+        for doc in documents:  # M61: a cited knowledge document, whole, after the skill that cites it
+            if doc.skill == s.id:
+                text = doc.text if doc.text.endswith("\n") else doc.text + "\n"
+                lines.append(f"Knowledge document {doc.ref} ({doc.digest}):\n{text}=== END KNOWLEDGE ===")
+    if packet.domain.declines:
+        lines.append(f"Knowledge withheld, so the seat declines: {packet.domain.declines}")
     return tuple(lines) or ("No skills are recorded for this task.",)
 
 

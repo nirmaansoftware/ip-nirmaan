@@ -107,6 +107,7 @@ The original preface of the section:
 - [M55-side-2-council-seats](M55-side-2-council-seats.md): side work - three more council seats: legal counsel, tax and accounts, partnerships
 - [release-v1.25.0](release-v1.25.0.md): v1.25.0 (2026-10-12) - the four audits of v1.24.0, closed
 - [M59-release-mirror-check](M59-release-mirror-check.md): Milestone 59 - Release check for the public org mirrors: the org figure and the hero's plan excerpt are checked against the code at each release
+- [M61-knowledge-packet](M61-knowledge-packet.md): Milestone 61 - Knowledge documents in the work packet: a cited document's text reaches the seat, within a budget, or the seat declines
 
 ## Before M43
 
