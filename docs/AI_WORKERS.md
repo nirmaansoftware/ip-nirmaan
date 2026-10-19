@@ -114,6 +114,9 @@ sections in fixed order: **Company**, **Domain**, **Project**, **Task**.
 Nothing else is rendered: packet memory (including the task's inputs) is
 never shown to the model. The role card appears only as the seat line in the
 Task section.
+The Domain section also carries the whole text of every knowledge document a
+skill on the task cites, within a 40,000 character cap; over it, or with a
+cited document missing, the seat declines (M61, `docs/KNOWLEDGE_PACKET.md`).
 
 The packet's task scope gains three things the seats need:
 
