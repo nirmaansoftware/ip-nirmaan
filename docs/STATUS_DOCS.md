@@ -123,7 +123,8 @@ reserved by the owner.
 python scripts/status.py            # print the live counts and what the docs say
 python scripts/status.py --check    # exit 1 if the roadmap or the site disagree
 python scripts/status.py --write    # rewrite the roadmap block (structural counts)
-python scripts/status.py --release  # at a version release: collect tests, write
+python scripts/status.py --release  # at a version release: check the org mirrors
+                                    # (section 9), collect tests, write
                                     # site/stats.json, the site tiles, the block
 ```
 
@@ -135,7 +136,8 @@ test suite runs the same checks, so CI needs no extra step.
 
 1. Bump `pyproject.toml` and the "Current version" line of `context.md`.
 2. `python scripts/status.py --release`, then commit `site/stats.json`,
-   `site/index.html`, and `docs/ROADMAP.md`.
+   `site/index.html`, and `docs/ROADMAP.md`. If it stops on an org mirror
+   (section 9), update the page copy first; it writes nothing until then.
 3. Add `docs/history/release-vX.Y.Z.md` and its line in the index.
 4. Tag the release.
 
@@ -150,3 +152,47 @@ test suite runs the same checks, so CI needs no extra step.
   repointed them to it. The source comment in
   `knowledge/packs/ddr.py` and `docs/architecture/current-state.md` are updated.
 - **Version and tags.** M43 bumps no version.
+
+## 9. The release checks the page's org mirrors (M59)
+
+The tiles are generated, but two parts of `site/index.html` mirror the
+organization by hand, and until M59 nothing checked them (site-engineer
+position, capability build-out council record, item P1-12):
+
+- **The org figure** (`ul.org__divs`) lists division names. It stands for the
+  divisions the code builds that are active and outside the business function;
+  its caption says the executive office and the business divisions are left
+  out.
+- **The hero excerpt** ("Real output of `nirmaan plan`, trimmed") shows the
+  plan for `nirmaan plan "Create a 4-port AXI-to-NoC bridge."` with the role
+  titles of its leads and owners. A renamed role would silently make "real
+  output" false.
+
+`scripts/status.py --release` now reads both from the page before it writes
+anything. Each figure name must be the name of such a division, and each such
+division must be on the figure. The hero's request is read from its own
+`nirmaan plan "..."` line and planned with the same `Orchestrator` and
+`plan_tree` view the CLI prints; every role title the excerpt shows (after
+`PROGRAM MANAGER`, `lead:` and `owner:`) must be one the plan prints. On any
+mismatch the release prints each problem, writes nothing, and exits 1.
+
+**Release only, like the tiles.** `--check` and the test suite never run the
+comparison, so a PR that renames a role or a division breaks no PR check; the
+page catches up at the next release, and the release cannot ship a page that
+contradicts the code. The comparison takes whatever the code builds at that
+moment, so no test pins today's names. `tests/test_release_mirrors.py` uses a
+fixture hero (`tests/fixtures/site/hero-renamed-role.html`) with one role
+renamed and shows that `--release` fails on it and writes nothing, while
+`--check` passes.
+
+**"Snapshot" means read at the release.** The names are read from the page and
+from the code when `--release` runs; they are not stored in `site/stats.json`,
+because nothing would read them there.
+
+**State on main at M59.** The hero passes: every title it shows is printed by
+today's plan. The figure does not: it shows "Product", "Infrastructure",
+"Documentation" and "Quality", where the code builds "Product and Programs",
+"Engineering Infrastructure" and "Quality and Process", and Technical
+Documentation is a department, not a division. So `--release` on main stops
+until the figure's copy is updated. That is a change to the public page's copy,
+outside this milestone, and goes to the founder; M59 does not edit `site/**`.

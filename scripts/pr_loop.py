@@ -10,31 +10,35 @@ For each open pull request to main from a branch in this repository by the
 agents' account (not a draft, no `hold` or `needs-founder` label), one step
 per call, as a state machine that survives restarts:
 
-    skip    already finished on this head (ready, auto-merge, founder wait);
+    skip    already finished on this head (ready, auto-merge);
     update  GitHub reports the branch behind main (mergeable_state "behind";
             this repository's ruleset has strict up-to-date branches off, so
             it is not expected, but if GitHub reports it the loop handles it
             as Nirmaan's does): merge main into
             it with the gh login (update-branch, pinned to the head the loop
-            saw) before any review, and again before a founder-class pull
-            request is put to the founder, so the founder approves a head that
-            can merge; a failed update stops, a push in between drops the step;
+            saw) before any review, and again after the review when main moved
+            during it; a failed update stops, a push in between drops the step;
     wait    the required CI is not finished on the head (no model call), or
             GitHub is still making the update's merge commit;
-    review  both keys, through scripts/pr_review.py unchanged;
-    merge   both keys passed: `gh pr merge --auto --merge` with the gh login
+    review  both keys, and the Founder Proxy (agent) for a founder-class pull
+            request, through scripts/pr_review.py;
+    merge   both keys (and the proxy) passed: `gh pr merge --auto --merge` with the gh login
             when the review App posts the checks and the repository's
             allow_auto_merge field (read with gh) is true; a "ready" comment in
             a dry run or when it is false; the field unreadable or any merge
-            error stops. A founder-class pull request waits for
-            the founder's GitHub approval and is never merged by the loop;
-    fix     a key failed: a separate fresh `claude -p` fixer in a clean
+            error stops; an auto-merge ends the pass, and so does main's sha
+            on origin (read before each step) differing from the one the pass
+            started with, so the rest wait for the next pass, which refetches
+            main and checks this copy again;
+    fix     a key or the proxy failed: a separate fresh `claude -p` fixer in a clean
             worktree of the head, Edit and Write only inside it; the loop (never
             the model) checks what changed, commits, runs the checks and pushes.
             The new head voids both keys, so the next step reviews from scratch;
     stop    three fix rounds, the same finding twice, CI failing after a fix, a
-            merge conflict, a deferred key, a rate limit, a forbidden path, a
-            failed local check or any error: label `needs-founder`, say why.
+            merge conflict, a deferred key or proxy, the proxy's needs-founder
+            (until the founder's own GitHub review approves the head), a rate
+            limit, a forbidden path, a failed local check or any error: label
+            `needs-founder`, say why.
 
 Usage: python scripts/pr_loop.py (--once | --watch) [--pr N] [--interval-minutes 5] [--no-post]
 Exit: 0 done, 2 setup error, 4 refused (this copy differs from main).
@@ -103,10 +107,13 @@ LOOP = {
     ],
     # Checks the loop runs on the fix commit, in the worktree, with the
     # token-free environment plus `env`. {python} is this interpreter.
+    # "select": "related_tests" appends the test files related to the changed
+    # paths (related_tests) to the last command, or nothing (the whole suite)
+    # when they cannot be told; CI runs the whole suite either way.
     "checks": [
         {"name": "dashes", "when": ["**"], "run": [["{python}", "scripts/check_dashes.py"]]},
         {"name": "test", "when": ["src/**", "tests/**", "evals/**", "scripts/**", "site/**"], "env": {"PYTHONPATH": "src"},
-         "run": [["{python}", "-m", "pytest", "-q", "-x", "-p", "no:cacheprovider"]]},
+         "select": "related_tests", "run": [["{python}", "-m", "pytest", "-q", "-x", "-p", "no:cacheprovider"]]},
     ],
 }
 
@@ -168,16 +175,18 @@ def fingerprint(f: dict) -> str:
 
 
 def findings_to_fix(review: dict) -> list[dict]:
-    """Blocker and critical findings of every failed key (all of a failed key's
-    findings when it failed on lesser ones), numbered F1, F2, ..."""
-    failed = [r for r in [*(review.get("key1") or []), *([review["key2"]] if review.get("key2") else [])]
+    """Blocker and critical findings of every failed key and of a failed
+    Founder Proxy (all of a failed key's findings when it failed on lesser
+    ones), numbered F1, F2, ..."""
+    failed = [r for r in [*(review.get("key1") or []), *([review["key2"]] if review.get("key2") else []),
+                          *([review["proxy"]] if review.get("proxy") else [])]
               if r.get("status") == "fail" and r.get("verdict")]
     out = []
     for r in failed:
         found = r["verdict"]["findings"]
         blocking = [f for f in found if f["severity"] in ("blocker", "critical")]
         for f in blocking or found:
-            out.append({"key": r["key"], "team": r.get("team") or "chair", "role": r.get("role"), "file": f["file"],
+            out.append({"key": r["key"], "team": r.get("team") or ("founder-proxy" if r["key"] == "proxy" else "chair"), "role": r.get("role"), "file": f["file"],
                         "line": f["line"], "severity": f["severity"], "text": f["text"]})
     return [{"id": f"F{i}", **f, "fingerprint": fingerprint(f)} for i, f in enumerate(out, 1)]
 
@@ -310,6 +319,70 @@ def _applies(entry: dict, changed: list[str]) -> bool:
     return any(review_map.matches(g, p) for p in changed for g in entry["when"])
 
 
+# The import-law tests run for every change under src/ (tests/test_laws.py).
+LAW_TESTS = ["tests/test_laws.py"]
+
+
+def _imports_leaf(text: str, package: str, leaf: str) -> bool:
+    """`from <package> import ... <leaf> ...`, on one line or in parentheses."""
+    for m in re.finditer(rf"^\s*from\s+{re.escape(package)}\s+import\s+(\([^)]*\)|[^\n]*)", text, re.MULTILINE):
+        if re.search(rf"\b{re.escape(leaf)}\b", m.group(1)):
+            return True
+    return False
+
+
+def related_tests(root, changed: list[str]) -> list[str] | None:
+    """The test files a fix round's local check runs, from the changed paths (the
+    full suite stays with CI). None means the whole suite: a changed file no test
+    is known to use, a change every test sees (tests/conftest.py), or nothing left
+    to run.
+
+    - tests/test_*.py: that file (a deleted one is skipped).
+    - src/...: tests that import the module (`import a.b.c`, `a.b.c` in the text,
+      or `from a.b import c`), or whose name ends in `_<module>`; failing that,
+      tests that import its package (below the top level); plus the import-law
+      tests.
+    - tests/<helper>.py and scripts/<name>.py: tests that import it or name its file.
+    - anything else (fixtures, evals/, site/): tests that name its file.
+    """
+    root = Path(root)
+    tests = sorted(p.relative_to(root).as_posix() for p in (root / "tests").glob("test_*.py"))
+    texts = {t: (root / t).read_text(encoding="utf-8", errors="replace") for t in tests}
+    chosen: set[str] = set()
+    for path in changed:
+        rel = Path(path)
+        if path == "tests/conftest.py":
+            return None
+        if rel.parent.as_posix() == "tests" and rel.name.startswith("test_") and rel.suffix == ".py":
+            if path in texts:
+                chosen.add(path)
+            continue
+        if rel.parts[0] == "src" and rel.suffix == ".py" and len(rel.parts) >= 2:
+            parts = list(rel.with_suffix("").parts[1:])
+            if parts[-1] == "__init__":
+                parts.pop()
+            module, leaf, package = ".".join(parts), parts[-1], ".".join(parts[:-1])
+            hits = {t for t, text in texts.items()
+                    if re.search(rf"\b{re.escape(module)}\b", text) or (package and _imports_leaf(text, package, leaf))
+                    or Path(t).stem == f"test_{leaf}" or Path(t).stem.endswith(f"_{leaf}")}
+            if not hits and package.count(".") >= 1:
+                # A module its package re-exports: the tests that import the package
+                # (never just the top-level one, which is every test).
+                hits = {t for t, text in texts.items() if re.search(rf"\b{re.escape(package)}\b", text)}
+            if hits:
+                hits.update(t for t in LAW_TESTS if t in texts)
+        elif rel.suffix == ".py" and rel.parent.as_posix() in ("tests", "scripts"):
+            stem = rel.stem
+            hits = {t for t, text in texts.items()
+                    if f"{stem}.py" in text or re.search(rf"^\s*(import\s+{re.escape(stem)}\b|from\s+{re.escape(stem)}\s+import\b)", text, re.MULTILINE)}
+        else:
+            hits = {t for t, text in texts.items() if path in text or rel.name in text}
+        if not hits:
+            return None
+        chosen |= hits
+    return sorted(chosen) or None
+
+
 def _worktree_changes(path: str) -> list[str]:
     parts = [p for p in _git(path, "status", "--porcelain=v1", "-z", "--untracked-files=all").split("\0") if p]
     out, i = [], 0
@@ -320,6 +393,15 @@ def _worktree_changes(path: str) -> list[str]:
             out.append(parts[i])
         i += 1
     return sorted(set(out))
+
+
+def _passed_what(r: dict, capital: bool = False) -> str:
+    """What passed, for the merge-path comments."""
+    proxy = r.get("proxy")
+    what = ("both keys passed" if not proxy else
+            "both keys passed, and the founder's own GitHub review approves the changes the Founder Proxy (agent) sent to the founder"
+            if proxy["status"] == pr_review.NEEDS_FOUNDER else "both keys and the Founder Proxy (agent) passed")
+    return what[0].upper() + what[1:] if capital else what
 
 
 # --- One step for one pull request --------------------------------------------------
@@ -337,9 +419,20 @@ class Loop:
         self.out = o.get("out") or print
         self.state_dir = Path(o["state_dir"])
 
-    # The whole pass: a pull request the loop is fixing first; the pass ends
-    # after the first one that ran a review or a fix (one at a time).
-    def tick(self, only_pr: int | None = None) -> list[dict]:
+    # The whole pass: one step for every pull request, so one waiting for CI, or
+    # one that just ran a review or a fix, never holds up the others. A pull
+    # request the loop is fixing goes first, then by number. The steps run one
+    # after another and each review or fix round holds the shared lock, so
+    # reviews still run one at a time (a lock held elsewhere makes that pull
+    # request "busy" and the pass goes on). The check that this copy is main's
+    # runs once, before the pass, so the pass ends when main may have moved:
+    # after this pass's own auto-merge (GitHub may merge at once), and when
+    # main's sha on origin, read before each step, is no longer the one the
+    # pass started with (any other merge) or cannot be read. The next pass
+    # refetches main and checks this copy again first. A merge landing during
+    # a step is seen only before the next one.
+    def tick(self, only_pr: int | None = None, main_at_start: str | None = None) -> list[dict]:
+        start = main_at_start or self._main_on_origin()
         pulls = [p for p in self.o["github"].list_open_pulls() if not only_pr or p["number"] == only_pr]
 
         def in_flight(p):
@@ -348,11 +441,23 @@ class Loop:
         pulls.sort(key=lambda p: (in_flight(p), p["number"]))
         results = []
         for p in pulls:
-            r = self.step(p)
-            results.append({"pr": p["number"], **r})
-            if r["outcome"] not in ("skip", "wait", "updated"):
+            now = self._main_on_origin()
+            if now is None or now != start:
+                self.out(f"pr-loop: main moved during the pass ({(start or '?')[:7]} -> {(now or 'unreadable')[:11]}); "
+                         "the rest wait for the next pass")
+                break
+            results.append({"pr": p["number"], **self.step(p)})
+            if results[-1]["outcome"] == "auto-merge":
                 break
         return results
+
+    def _main_on_origin(self) -> str | None:
+        """main's sha on origin (one ls-remote, no fetch); None when unreadable."""
+        try:
+            out = _git(self.o["repo_root"], "ls-remote", "origin", f"refs/heads/{self.cfg['base_branch']}")
+        except (subprocess.SubprocessError, OSError):
+            return None
+        return out.split()[0] if out.strip() else None
 
     def step(self, listed: dict) -> dict:
         cfg, lc, o = self.cfg, self.lc, self.o
@@ -422,27 +527,18 @@ class Loop:
             self.out(f"pr-loop: #{n}: could not label or comment: {exc}")
         return {"outcome": "stopped", "reason": reason}
 
-    def _founder_approved(self, n, head) -> bool:
-        mine = [r for r in self.o["github"].list_reviews(n) if r["login"] == self.cfg["founder_login"]
-                and r["state"] in ("APPROVED", "CHANGES_REQUESTED", "DISMISSED")]
-        return bool(mine) and mine[-1]["state"] == "APPROVED" and mine[-1]["commit_id"] == head
-
     def _step(self, ctx, listed):
         cfg, o, n, st = self.cfg, self.o, ctx["n"], ctx["st"]
         pull = o["github"].get_pull(n)
         head = ctx["head"] = pull["head_sha"]
         # Behind main: update first, also for a head that already finished (it
-        # cannot merge while GitHub reports it behind, and a founder-class pull
-        # request must not be approved on a head that needs another push).
+        # cannot merge while GitHub reports it behind).
         if pull.get("mergeable_state") == "behind" and (st["done"] or {}).get("outcome") != "refused":
             u = self._update_behind(ctx)
             if u:
                 return u
         if st["done"] and st["done"]["head"] == head:
-            if st["done"]["outcome"] != "founder-wait" or st["done"].get("founder_rerun"):
-                return {"outcome": "skip", "reason": f"{st['done']['outcome']} on this head"}
-            if not self._founder_approved(n, head):
-                return {"outcome": "skip", "reason": "waiting for the founder's approval on this head"}
+            return {"outcome": "skip", "reason": f"{st['done']['outcome']} on this head"}
         if pull.get("mergeable") is False or pull.get("mergeable_state") == "dirty":
             return self._stop(ctx, head, "the branch has a merge conflict with main; a person resolves it")
         state, text = ci_state(cfg["required_ci"], o["github"].list_check_runs(head))
@@ -480,14 +576,24 @@ class Loop:
                 return {"outcome": "skip", "reason": f"{r['ci_failed']}; the author fixes it"}
             if r.get("deferred"):
                 return self._stop(ctx, head, f"review deferred: {r['deferred']}")
-            keys = [*(r.get("key1") or []), *([r["key2"]] if r.get("key2") else [])]
+            # The Founder Proxy (agent) is a reviewer like the keys: deferred
+            # stops, fail goes to the fixer.
+            keys = [*(r.get("key1") or []), *([r["key2"]] if r.get("key2") else []), *([r["proxy"]] if r.get("proxy") else [])]
             if not r.get("key1"):
                 return self._stop(ctx, head, "review deferred: no owning team")
             deferred = [k for k in keys if k["status"] == "deferred"]
             if deferred:
                 return self._stop(ctx, head, "review deferred (" + "; ".join(f"{k['team_name']}: {k.get('reason')}" for k in deferred) + ")")
             self._log(ctx, "reviewed", key1=",".join(f"{k['team']}:{k['status']}" for k in r["key1"]),
-                      key2=r["key2"]["status"] if r.get("key2") else "not run")
+                      key2=r["key2"]["status"] if r.get("key2") else "not run",
+                      proxy=r["proxy"]["status"] if r.get("proxy") else "not run")
+            # What the founder keeps: the loop stops and the founder decides on
+            # GitHub. Their own review approving this head lets the review pass
+            # review/executive; removing the label lets the loop resume.
+            if r.get("proxy") and r["proxy"]["status"] == pr_review.NEEDS_FOUNDER and not r.get("founder_approved"):
+                why = "; ".join((r["proxy"].get("verdict") or {}).get("founder_reasons") or [])
+                return self._stop(ctx, head, f"the Founder Proxy (agent) returned needs-founder: {why}. The founder decides: "
+                                             f"approve head {head[:7]} on GitHub (or not), then remove the label")
             if not any(k["status"] == "fail" for k in keys):
                 return self._merge_path(ctx, r)
             return self._fix_round(ctx, pull, r)
@@ -529,30 +635,14 @@ class Loop:
     def _merge_path(self, ctx, r):
         cfg, o, n, st, head = self.cfg, self.o, ctx["n"], ctx["st"], ctx["head"]
         sha7 = head[:7]
-        classes = list((r.get("classification") or {}).get("founder") or {})
         now = o["github"].get_pull(n)
         if cfg["hold_label"] in now["labels"]:
             self._log(ctx, "held")
             return {"outcome": "skip", "reason": "hold label set during the review"}
         # main moved during the review: this head cannot merge, so update it
-        # rather than ask the founder (or GitHub) to merge it.
+        # rather than ask GitHub to merge it.
         if now.get("mergeable_state") == "behind" and o["post"] != "none":
             return self._update_behind(ctx)
-        if classes:
-            approved = self._founder_approved(n, head)
-            first = not st["done"] or st["done"]["head"] != head
-            st["done"] = {"head": head, "outcome": "founder-wait", "founder_rerun": approved}
-            _save_state(self.state_dir, cfg["repo"], st)
-            self._log(ctx, "founder-wait", classes=",".join(classes), founder_approved=approved)
-            if first or approved:
-                body = (f"Founder class {', '.join(classes)}: the founder's approval of this head is on GitHub, so "
-                        "`review/executive` was posted again. The loop never merges a founder-class pull request; the founder merges it."
-                        if approved else
-                        f"Founder class {', '.join(classes)}: this pull request waits for the founder's GitHub approval of head "
-                        f"`{sha7}`. The loop never merges a founder-class pull request, and an agent review never stands in for the founder.")
-                self._say(n, f"<!-- {MARK} ready head={head} founder={','.join(classes)} -->\n"
-                             f"### Automated loop: both keys passed on `{sha7}`\n\n{body}\n\n_Agent review only._")
-            return {"outcome": "founder-wait"}
         # The repository's "Allow auto-merge" setting decides between auto-merge
         # and "ready": read with the gh login (`allow_auto_merge`, a field, never
         # the wording of an error). Off: ready. On: `gh pr merge --auto`, and any
@@ -575,13 +665,13 @@ class Loop:
                 return self._stop(ctx, head, f"gh pr merge --auto failed {_gh_failure(exc)}")
         if why is None:
             self._log(ctx, "auto-merge")
-            self._say(n, f"<!-- {MARK} auto-merge head={head} -->\n### Automated loop: both keys passed on `{sha7}`\n\n"
+            self._say(n, f"<!-- {MARK} auto-merge head={head} -->\n### Automated loop: {_passed_what(r)} on `{sha7}`\n\n"
                          "Auto-merge is on for this pull request: GitHub merges it with a merge commit once every required "
                          "check passes on this head.\n\n_Agent review only._")
             st["done"] = {"head": head, "outcome": "auto-merge"}
         else:
             self._log(ctx, "ready", why=why)
-            self._say(n, f"<!-- {MARK} ready head={head} -->\n### Automated loop: ready\n\nBoth keys passed on `{sha7}`, "
+            self._say(n, f"<!-- {MARK} ready head={head} -->\n### Automated loop: ready\n\n{_passed_what(r, True)} on `{sha7}`, "
                          f"waiting for the founder's merge settings: {why}. The founder merges this pull request.\n\n_Agent review only._")
             st["done"] = {"head": head, "outcome": "ready"}
         _save_state(self.state_dir, cfg["repo"], st)
@@ -687,10 +777,19 @@ class Loop:
         for c in lc["checks"]:
             if not _applies(c, commit_changed):
                 continue
-            ok, detail = _run_commands(c["run"], wt, c.get("env"), {"python": sys.executable, "main": main_sha, "head": new}, o["check_timeout_s"])
+            run, name = c["run"], c["name"]
+            if c.get("select") == "related_tests":
+                # Only the tests related to the changed files; CI runs the whole suite.
+                selected = related_tests(wt, commit_changed)
+                if selected is not None:
+                    run = [*run[:-1], [*run[-1], *selected]]
+                    name = f"{name} ({len(selected)} related file{'' if len(selected) == 1 else 's'})"
+                else:
+                    name = f"{name} (whole suite)"
+            ok, detail = _run_commands(run, wt, c.get("env"), {"python": sys.executable, "main": main_sha, "head": new}, o["check_timeout_s"])
             if not ok:
-                return self._stop(ctx, head, f"fix round {rnd}: the local check {c['name']} failed on the fix ({detail}); nothing was pushed")
-            ran.append(c["name"])
+                return self._stop(ctx, head, f"fix round {rnd}: the local check {name} failed on the fix ({detail}); nothing was pushed")
+            ran.append(name)
 
         now = o["github"].get_pull(n)["head_sha"]
         if now != head:
@@ -797,7 +896,7 @@ def main(argv: list[str]) -> int:
                     in_claude_session=bool(os.environ.get("CLAUDECODE")),
                     run_gh=run_gh,
                     **loop_defaults())
-        results = loop.tick(only_pr)
+        results = loop.tick(only_pr, main_at_start=_git(repo_root, "rev-parse", "refs/pr-review/main").strip())
         print(f"pr-loop: {_now()} {post}: " + (", ".join(f"#{r['pr']} {r['outcome']}" for r in results) or "no open pull requests"))
         if once:
             return 0

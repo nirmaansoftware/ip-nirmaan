@@ -46,5 +46,8 @@ Apply the decisions, then have the owning seat verify before anything ships.
 - Copy the minutes and every position to `~/Nirmaan-internal/<date>-ip-<topic>/`.
 
 ## 6. Reserved for the founder
-Merging anything that publishes, contracts, spending money, legal counsel and
-public names. Report and ask; if the founder overrules, record it.
+Contracts, spending money, legal counsel and public names. Report and ask; if
+the founder overrules, record it. Merging follows the two-key review: a pull
+request in one of the six founder classes (`council/README.md`, "What stays
+with the founder") also waits for the founder's approval; any other merges
+once CI and both keys pass.

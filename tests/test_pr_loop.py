@@ -57,7 +57,7 @@ founder_classes:
     title: Control plane
     paths: [.github/**, CLAUDE.md]
 """
-SEATS = ["chair", "security", "eda-tooling"]
+SEATS = ["chair", "security", "eda-tooling", "founder-proxy"]
 RECORD = "council/records/2026-10-17-teams-and-pr-review.md"
 
 
@@ -182,7 +182,7 @@ class Repo:
         write(w, ".github/review-teams.yml", MAP)
         write(w, "CLAUDE.md", "# CLAUDE.md\nRULES-MARKER-FROM-MAIN\n")
         for seat in SEATS:
-            write(w, f"council/{seat}.md", f"# {seat}\n\n## In a review (key 1)\nREVIEW-MARKER-{seat}\n")
+            write(w, f"council/{seat}.md", f"# {seat}\nSEAT-MARKER-{seat}\n\n## In a review (key 1)\nREVIEW-MARKER-{seat}\n")
         write(w, RECORD, "# Record\n\n### Every key 1 (base)\nBASE-MARKER\n")
         write(w, "src/app.py", "one\ntwo\nthree\n")
         sh(w, "add", "-A")
@@ -209,7 +209,7 @@ class Repo:
 
     def loop(self, **extra):
         kwargs = dict(repo_root=str(self.work), github=self.github, post="app", claude_bin=str(self.bin), state_dir=self.state,
-                      models={"key1": "k1", "key2": "k2"}, timeout_s=30, backoff_s=0, fixer_model="fixer-model",
+                      models={"key1": "k1", "key2": "k2", "proxy": "proxy-model"}, timeout_s=30, backoff_s=0, fixer_model="fixer-model",
                       fixer_timeout_s=30, check_timeout_s=30, sleep=lambda s: None, out=lambda s: None,
                       run_gh=self.github.run_gh, loop=LOOP)
         kwargs.update(extra)
@@ -469,22 +469,82 @@ def test_ci_failing_on_the_author_head_waits_without_a_call(repo):
 # --- Founder, hold and skips -----------------------------------------------------
 
 
-def test_founder_class_waits_and_is_never_merged_by_the_loop_even_after_the_approval(repo):
-    r = repo(change=lambda w: write(w, ".github/workflows/x.yml", "name: x\n"))
-    assert r.tick() == ["founder-wait"]
-    assert r.github.merges == [], "gh pr merge is never called for a founder-class pull request"
-    assert r.github.body == ("<!-- review:founder-class -->Founder class: control-plane (Control plane); waits for the founder's "
-                             "approval.<!-- /review:founder-class -->\n\nChanges line two."), "the driver declared the class in the body"
-    assert "waits for the founder's GitHub approval" in r.comments()[-1]
+def _change_github(w):
+    write(w, ".github/workflows/x.yml", "name: x\n")
+
+
+def _sys(call):
+    return call["argv"][call["argv"].index("--system-prompt") + 1]
+
+
+NEEDS = {"verdict": "needs-founder", "extra": {"founder_reasons": ["adds a paid runner"]}}
+
+
+def test_founder_class_both_keys_and_the_proxy_pass_and_the_loop_takes_the_merge_path(repo):
+    r = repo(change=_change_github)
+    assert r.tick() == ["auto-merge"]
+    assert r.github.merges and r.github.merges[0][-1] == r.first_head
+    assert r.github.body == ("<!-- review:founder-class -->Founder class: control-plane (Control plane); the Founder Proxy (agent) "
+                             "reviews it after key 2.<!-- /review:founder-class -->\n\nChanges line two."), "the driver declared the class in the body"
+    reviews = [c for c in r.calls() if c["kind"] == "reviews"]
+    assert len(reviews) == 3, "key 1, key 2, then the Founder Proxy"
+    assert "SEAT-MARKER-founder-proxy" in _sys(reviews[2])
+    assert reviews[2]["argv"][reviews[2]["argv"].index("--model") + 1] == "proxy-model"
+    assert [p for p in r.github.posts if p["type"] == "check" and p["name"] == "review/executive"][-1]["state"] == "success"
+    assert "both keys and the Founder Proxy (agent) passed" in r.comments()[-1]
+    assert not any("waits for the founder's GitHub approval" in c for c in r.comments())
+    assert next(l for l in r.log() if l.get("event") == "reviewed")["proxy"] == "pass"
     assert r.tick() == ["skip"]
-    r.github.reviews.append({"login": "nirmaansoftware", "state": "APPROVED", "commit_id": r.first_head})
+
+
+def test_a_pull_request_in_no_founder_class_never_calls_the_proxy(repo):
+    r = repo()
+    assert r.tick() == ["auto-merge"]
+    assert len(r.calls()) == 2
+    assert not any("SEAT-MARKER-founder-proxy" in _sys(c) for c in r.calls())
+    assert next(l for l in r.log() if l.get("event") == "reviewed")["proxy"] == "not run"
+
+
+def test_proxy_fail_sends_its_findings_to_the_fixer_and_the_new_head_is_reviewed_again(repo):
+    r = repo(change=_change_github, reviews=[{"verdict": "pass"}, {"verdict": "pass"}, fail("Attribution names a person, not Nirmaan"), {"verdict": "pass"}],
+             fixes=[{"edits": {"src/app.py": "one by Nirmaan\n"}}])
+    assert r.tick() == ["fixed"]
+    fixer = next(c for c in r.calls() if c["kind"] == "fixes")
+    assert '"key": "proxy"' in fixer["stdin"] and '"team": "founder-proxy"' in fixer["stdin"]
+    assert "Attribution names a person" in fixer["stdin"]
+    assert not r.labeled()
+    assert r.tick() == ["auto-merge"]
+    reviews = [c for c in r.calls() if c["kind"] == "reviews"]
+    assert "SEAT-MARKER-founder-proxy" in _sys(reviews[-1]), "the proxy reviews the new head too"
+
+
+def test_proxy_needs_founder_labels_and_stops_then_the_founders_approval_and_label_removal_merge_without_new_calls(repo):
+    r = repo(change=_change_github, reviews=[{"verdict": "pass"}, {"verdict": "pass"}, NEEDS])
+    assert r.tick() == ["stopped"]
+    assert r.labeled() and r.github.merges == []
+    assert not [c for c in r.calls() if c["kind"] == "fixes"], "what the founder keeps never goes to the fixer"
+    assert "the Founder Proxy (agent) returned needs-founder: adds a paid runner" in r.comments()[-1]
+    assert [p for p in r.github.posts if p["type"] == "check" and p["name"] == "review/executive"][-1]["state"] == "pending"
     n = len(r.calls())
-    assert r.tick() == ["founder-wait"]
+    assert r.tick() == ["skip"]
+    r.github.labels = []
+    assert r.tick() == ["stopped"], "label removed without the founder's approval: stops again"
+    r.github.labels = []
+    r.github.reviews.append({"login": "nirmaansoftware", "state": "APPROVED", "commit_id": r.first_head})
+    assert r.tick() == ["auto-merge"]
     assert len(r.calls()) == n, "cached verdicts: no new model call"
     assert [p for p in r.github.posts if p["type"] == "check" and p["name"] == "review/executive"][-1]["state"] == "success"
-    assert "the founder merges it" in r.comments()[-1]
-    assert r.tick() == ["skip"]
-    assert r.github.merges == []
+    assert "the founder's own GitHub review approves the changes the Founder Proxy (agent) sent to the founder" in r.comments()[-1]
+
+
+def test_proxy_deferred_without_its_seat_on_main_stops_and_never_merges(repo):
+    r = repo(change=_change_github)
+    sh(r.work, "rm", "-q", "council/founder-proxy.md")
+    sh(r.work, "commit", "-qm", "drop proxy seat")
+    sh(r.work, "push", "-q", "origin", "main")
+    assert r.tick() == ["stopped"]
+    assert r.labeled() and r.github.merges == []
+    assert "review deferred (Founder Proxy: seat file missing on main" in r.comments()[-1]
 
 
 @pytest.mark.parametrize("gh", [{"labels": ["hold"]}, {"labels": ["needs-founder"]}, {"draft": True}, {"author": "nirmaansoftware"},
@@ -529,9 +589,6 @@ def is_merge_of(r, sha, head):
     return parents == [head, sh(r.origin, "rev-parse", "refs/heads/main")]
 
 
-ASK = "this pull request waits for the founder's GitHub approval"
-
-
 def test_a_branch_behind_main_is_updated_with_a_merge_commit_before_the_review_then_the_new_head_is_reviewed(repo):
     r = repo()
     r.advance_main()
@@ -556,43 +613,34 @@ def test_while_github_makes_the_merge_commit_the_next_pass_waits_and_does_not_as
     assert len(r.github.updates) == 1 and r.calls() == []
 
 
-def test_founder_class_behind_main_is_updated_before_the_founder_is_asked_so_the_founder_approves_once(repo):
-    r = repo(change=lambda w: write(w, ".github/workflows/x.yml", "name: x\n"))
+def test_founder_class_behind_main_is_updated_first_then_both_keys_and_the_proxy_review_the_new_head(repo):
+    r = repo(change=_change_github)
     r.advance_main()
     assert r.tick() == ["updated"]
-    assert not any(ASK in c for c in r.comments())
+    assert r.calls() == [], "no review of the stale head"
     new = r.origin_head()
-    assert r.tick() == ["founder-wait"]
-    asks = [c for c in r.comments() if ASK in c]
-    assert len(asks) == 1 and f"`{new[:7]}`" in asks[0]
+    assert r.tick() == ["auto-merge"]
+    assert r.github.merges[0][-1] == new
+    reviews = [c for c in r.calls() if c["kind"] == "reviews"]
+    assert len(reviews) == 3 and all(f"Head SHA: {new}" in c["stdin"] for c in reviews)
 
 
-def test_founder_class_main_moves_during_the_review_so_the_loop_updates_instead_of_asking(repo):
-    r = repo(change=lambda w: write(w, ".github/workflows/x.yml", "name: x\n"))
+def test_founder_class_main_moves_during_the_review_so_the_loop_updates_instead_of_merging(repo):
+    r = repo(change=_change_github)
     moved = []
 
     def when():
-        if not moved and len(r.calls()) >= 2:
+        if not moved and len(r.calls()) >= 3:
             moved.append(1)
             r.advance_main()
         return False
     r.github.behind_when = when
     assert r.tick() == ["updated"]
-    assert len(r.calls()) == 2, "both keys ran on the old head"
-    assert not any(ASK in c for c in r.comments()), "the founder is not asked about a head that cannot merge"
+    assert len(r.calls()) == 3, "both keys and the proxy ran on the old head"
+    assert r.github.merges == []
     r.github.behind_when = None
-    assert r.tick() == ["founder-wait"]
-    assert len([c for c in r.comments() if ASK in c]) == 1
-
-
-def test_founder_class_waiting_then_main_moves_the_branch_is_updated_and_the_founder_asked_on_the_new_head(repo):
-    r = repo(change=lambda w: write(w, ".github/workflows/x.yml", "name: x\n"))
-    assert r.tick() == ["founder-wait"]
-    assert r.tick() == ["skip"]
-    r.advance_main()
-    assert r.tick() == ["updated"]
-    assert r.tick() == ["founder-wait"]
-    assert f"`{r.origin_head()[:7]}`" in r.comments()[-1]
+    assert r.tick() == ["auto-merge"]
+    assert r.github.merges[0][-1] == r.origin_head()
 
 
 def test_a_failed_update_stops_with_needs_founder(repo):
@@ -631,6 +679,139 @@ def test_no_post_never_updates_a_branch(repo):
     assert r.github.updates == [] and r.origin_head() == r.first_head
 
 
+# --- Every pull request each pass ---------------------------------------------------
+
+
+def test_one_pass_steps_every_pull_request_and_a_review_fix_wait_or_busy_lock_never_ends_it(repo):
+    r = repo()
+    loop = r.loop()
+    pulls = [{"number": n} for n in (6, 5, 4, 3, 2, 1)]
+    loop.o["github"] = type("G", (), {"list_open_pulls": lambda self: pulls})()
+    # Pull request 3 is in a fix round, so it goes first; the rest by number.
+    pr_loop._save_state(r.state, CONFIG["repo"], {"pr": 3, "rounds": 1, "seen": {}, "last_fix_head": "abc", "done": None, "stopped": None})
+    outcome = {1: "ready", 2: "wait", 3: "fixed", 4: "busy", 5: "updated", 6: "stopped"}
+    seen = []
+
+    def step(p):
+        seen.append(p["number"])
+        return {"outcome": outcome[p["number"]]}
+    loop.step = step
+    results = loop.tick()
+    assert seen == [3, 1, 2, 4, 5, 6]
+    assert [f"{x['pr']}:{x['outcome']}" for x in results] == ["3:fixed", "1:ready", "2:wait", "4:busy", "5:updated", "6:stopped"]
+
+
+def test_an_auto_merge_ends_the_pass_so_the_rest_are_stepped_against_the_new_main_next_pass(repo):
+    # Auto-merge can merge main while the pass goes on; the pull requests after
+    # it wait for the next pass, which refetches main and checks this copy again.
+    r = repo()
+    loop = r.loop()
+    pulls = [{"number": n} for n in (1, 2, 3)]
+    loop.o["github"] = type("G", (), {"list_open_pulls": lambda self: pulls})()
+    outcome = {1: "skip", 2: "auto-merge", 3: "wait"}
+    seen = []
+
+    def step(p):
+        seen.append(p["number"])
+        return {"outcome": outcome[p["number"]]}
+    loop.step = step
+    assert [f"{x['pr']}:{x['outcome']}" for x in loop.tick()] == ["1:skip", "2:auto-merge"]
+    assert seen == [1, 2], "pull request 3 is not stepped against the main the pass started with"
+    outcome[2] = "skip"
+    assert [f"{x['pr']}:{x['outcome']}" for x in loop.tick()] == ["1:skip", "2:skip", "3:wait"]
+
+
+def test_a_merge_from_outside_the_loop_mid_pass_ends_the_pass_before_the_next_step(repo):
+    # Someone else merges into main while pull request 1 is stepped (not an
+    # auto-merge of this pass): pull request 2 waits for the next pass.
+    r = repo()
+    loop = r.loop()
+    pulls = [{"number": n} for n in (1, 2)]
+    loop.o["github"] = type("G", (), {"list_open_pulls": lambda self: pulls})()
+    seen = []
+
+    def step(p):
+        seen.append(p["number"])
+        if p["number"] == 1 and len(seen) == 1:
+            r.advance_main()
+        return {"outcome": "wait"}
+    loop.step = step
+    assert [f"{x['pr']}:{x['outcome']}" for x in loop.tick()] == ["1:wait"]
+    assert seen == [1], "pull request 2 is not stepped once main moved"
+    assert [f"{x['pr']}:{x['outcome']}" for x in loop.tick()] == ["1:wait", "2:wait"], "the next pass starts from the new main"
+
+
+def test_a_pass_whose_start_main_is_already_stale_steps_nothing(repo):
+    # main moved between the fetch the copy was checked against and the pass.
+    r = repo()
+    loop = r.loop()
+    loop.o["github"] = type("G", (), {"list_open_pulls": lambda self: [{"number": 1}]})()
+    loop.step = lambda p: {"outcome": "wait"}
+    stale = sh(r.work, "rev-parse", "main")
+    r.advance_main()
+    assert loop.tick(main_at_start=stale) == []
+
+
+# --- Related tests for the fixer's local check --------------------------------------
+
+
+def _tree(root: Path, files: dict[str, str]):
+    for rel, text in files.items():
+        write(root, rel, text)
+
+
+def test_related_tests_map_changed_files_to_the_tests_that_use_them(tmp_path):
+    _tree(tmp_path, {
+        "src/nirmaan/alpha.py": "x = 1\n",
+        "src/nirmaan/beta/core.py": "y = 2\n",
+        "src/nirmaan/beta/__init__.py": "",
+        "src/nirmaan/lonely.py": "z = 3\n",
+        "src/nirmaan/gamma/inner.py": "w = 4\n",
+        "tests/test_gamma_pkg.py": "from nirmaan.gamma import W\n",
+        "scripts/check_union.py": "",
+        "tests/conftest.py": "",
+        "tests/laws.py": "",
+        "tests/test_laws.py": "import laws\n",
+        "tests/test_alpha_use.py": "from nirmaan.alpha import x\n",
+        "tests/test_multi.py": "from nirmaan import (\n    other,\n    alpha,\n)\n",
+        "tests/test_beta.py": "import nirmaan.beta.core\n",
+        "tests/test_nirmaan_core.py": "pass\n",
+        "tests/test_union.py": 'SCRIPT = ROOT / "scripts" / "check_union.py"\n',
+        "tests/test_fixture_user.py": 'fixture_log("sample.log")\n',
+        "tests/fixtures/eda/sample.log": "log\n",
+        "tests/test_other.py": "pass\n",
+    })
+    rel = pr_loop.related_tests
+    assert rel(tmp_path, ["src/nirmaan/alpha.py"]) == ["tests/test_alpha_use.py", "tests/test_laws.py", "tests/test_multi.py"]
+    assert rel(tmp_path, ["src/nirmaan/beta/core.py"]) == ["tests/test_beta.py", "tests/test_laws.py", "tests/test_nirmaan_core.py"]
+    assert rel(tmp_path, ["src/nirmaan/gamma/inner.py"]) == ["tests/test_gamma_pkg.py", "tests/test_laws.py"], "re-exported by its package"
+    assert rel(tmp_path, ["tests/test_other.py"]) == ["tests/test_other.py"]
+    assert rel(tmp_path, ["scripts/check_union.py"]) == ["tests/test_union.py"]
+    assert rel(tmp_path, ["tests/fixtures/eda/sample.log"]) == ["tests/test_fixture_user.py"]
+    assert rel(tmp_path, ["tests/laws.py"]) == ["tests/test_laws.py"]
+    assert rel(tmp_path, ["tests/test_other.py", "tests/test_gone.py"]) == ["tests/test_other.py"], "a deleted test file is not run"
+    # No test is known to cover it, or it reaches every test: the whole suite.
+    assert rel(tmp_path, ["tests/conftest.py"]) is None
+    assert rel(tmp_path, ["src/nirmaan/lonely.py"]) is None
+    assert rel(tmp_path, ["tests/test_other.py", "src/nirmaan/lonely.py"]) is None
+    assert rel(tmp_path, ["tests/test_gone.py"]) is None
+
+
+def test_the_fixers_test_check_runs_only_the_related_tests(repo, tmp_path):
+    record = tmp_path / "pytest-args.json"
+    loop = {**LOOP, "checks": [{"name": "test", "when": ["src/**", "tests/**"], "select": "related_tests", "env": {"RECORD": str(record)},
+                                "run": [["{python}", "-c", "import json, os, sys; json.dump(sys.argv[1:], open(os.environ['RECORD'], 'w'))"]]}]}
+
+    def change(w):
+        write(w, "src/app.py", "one\ntwo changed\nthree\n")
+        write(w, "tests/test_app.py", "from app import one\n")
+        write(w, "tests/test_unrelated.py", "pass\n")
+    r = repo(reviews=[fail("Line two lost its test"), {"verdict": "pass"}], fixes=[{"edits": {"src/app.py": "one\ntwo fixed\nthree\n"}}], change=change)
+    assert r.tick(loop=loop) == ["fixed"]
+    assert json.loads(record.read_text()) == ["tests/test_app.py"]
+    assert "test (1 related file): pass" in r.comments()[-1]
+
+
 # --- The plist -------------------------------------------------------------------
 
 
@@ -643,6 +824,7 @@ def test_the_plist_reads_its_settings_from_the_sourced_env_file_and_holds_none_i
     cmd = _re.search(r"<string>(mkdir[^<]*)</string>", plist).group(1)
     assert cmd.index("pr-loop/env") < cmd.index("pr_loop.py"), "sourced before the loop starts"
     assert "ip-loop.log" in cmd
+    assert _re.search(r"<key>StartInterval</key>\s*<integer>60</integer>", plist), "a pass every minute"
 
 
 # --- Units -----------------------------------------------------------------------
@@ -661,7 +843,10 @@ def test_fingerprint_findings_output_and_forbidden_paths():
     assert pr_loop.validate_fixer_output({"status": "fixed", "addressed": ["F1", "F2"], "not_addressed": [], "summary": "s"}, fs)[1] is None
     assert "F2 not accounted for" in pr_loop.validate_fixer_output({"status": "fixed", "addressed": ["F1"], "not_addressed": [], "summary": "s"}, fs)[1]
     assert "unknown finding id" in pr_loop.validate_fixer_output({"status": "fixed", "addressed": ["F9"], "not_addressed": [], "summary": "s"}, fs)[1]
-    for path in (".github/workflows/ci.yml", ".github/CODEOWNERS", ".claude/skills/pr-review/SKILL.md", "CLAUDE.md", "council/chair.md",
+    proxy = pr_loop.findings_to_fix({"key1": [], "key2": None, "proxy": {"key": "proxy", "team": None, "role": "founder-proxy", "status": "fail",
+                                     "verdict": {"findings": [{"file": "a", "line": 3, "severity": "blocker", "text": "p"}]}}})
+    assert [(f["id"], f["key"], f["team"]) for f in proxy] == [("F1", "proxy", "founder-proxy")], "a failed proxy's findings go to the fixer"
+    for path in (".github/workflows/ci.yml", ".claude/skills/pr-review/SKILL.md", "CLAUDE.md", "council/chair.md", "council/founder-proxy.md",
                  "council/records/x.md", "scripts/check_dashes.py", "scripts/pr_loop.py", "tests/test_pr_loop.py", "pyproject.toml",
                  "docs/REVIEW_MECHANISM.md", "docs/pr-loop.plist"):
         assert pr_loop.forbidden_changes([path], pr_loop.LOOP["fixer_forbidden"]), path
