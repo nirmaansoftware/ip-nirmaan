@@ -133,7 +133,10 @@ Legal, HR, Procurement, and Operations (under the COO), Commercial (under the
 CPO: Sales and Partnerships, Marketing, Customer Success, Applications
 Engineering), and FPGA Design, Foundation IP, IP Qualification, and
 Deliverable Kits. Every unit with child units has 3 to 8 of them, and the CEO
-spans 5 (M57, `docs/HIERARCHY_FIXES.md`).
+spans 5 (M57, `docs/HIERARCHY_FIXES.md`). `shape_issues` checks that rule,
+depth, span exceptions and placeholder missions, and a test holds the chart to
+it with zero exceptions; an ACTIVE unit added later must be backed by a
+tool-judged eval case (M60, `docs/ORG_SPAN_RULE.md`).
 
 **Validation runs on every build.** Every reference must resolve, every chain
 must terminate and rise strictly in seniority, the authority matrix must be

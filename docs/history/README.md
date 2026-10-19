@@ -108,6 +108,7 @@ The original preface of the section:
 - [release-v1.25.0](release-v1.25.0.md): v1.25.0 (2026-10-12) - the four audits of v1.24.0, closed
 - [M57-hierarchy-fixes](M57-hierarchy-fixes.md): Milestone 57 - Hierarchy fixes: the org matches the capability build-out council record
 - [M59-release-mirror-check](M59-release-mirror-check.md): Milestone 59 - Release check for the public org mirrors: the org figure and the hero's plan excerpt are checked against the code at each release
+- [M60-span-validator](M60-span-validator.md): Milestone 60 - Span, depth and activation rules become a check
 
 ## Before M43
 

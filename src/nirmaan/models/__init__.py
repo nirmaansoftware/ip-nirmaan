@@ -51,6 +51,7 @@ from nirmaan.models.org import (
     Proficiency,
     Role,
     Skill,
+    SpanException,
     ToolRisk,
     ToolSpec,
     ToolStatus,
