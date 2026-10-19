@@ -571,6 +571,56 @@ def test_one_pull_request_at_a_time_under_the_shared_lock(repo):
     assert r.tick() == ["auto-merge"]
 
 
+def test_the_shared_lock_is_held_for_each_review_call_and_free_during_the_fixer_and_local_checks(repo, monkeypatch):
+    r = repo(reviews=[fail("bad"), {"verdict": "pass"}], fixes=[{"edits": {"src/app.py": "fixed\n"}}])
+    lock = r.state / "review.lock"
+    seen, original = [], pr_review.run_once
+
+    def watched(binary, args, stdin, cwd, timeout_s):
+        seen.append(("fixer" if "Edit(./**)" in " ".join(args) else "review", lock.exists()))
+        return original(binary, args, stdin, cwd, timeout_s)
+    monkeypatch.setattr(pr_review, "run_once", watched)
+    check = {"name": "lock", "when": ["**"], "run": [["{python}", "-c", f"import os, sys; sys.exit(1 if os.path.exists({str(lock)!r}) else 0)"]]}
+    assert r.tick(loop={**LOOP, "checks": [check]}) == ["fixed"], "the local check ran with the lock free"
+    assert r.tick() == ["auto-merge"]
+    assert seen == [("review", True), ("fixer", False), ("review", True), ("review", True)]
+    assert not lock.exists()
+
+
+def test_a_lock_held_elsewhere_between_key1_and_key2_ends_the_step_and_the_next_pass_reuses_key1(repo, monkeypatch):
+    r = repo()
+    original, other = pr_review.run_once, {}
+
+    def then_taken(binary, args, stdin, cwd, timeout_s):
+        out = original(binary, args, stdin, cwd, timeout_s)
+        if not other:
+            other["release"] = None  # taken once the call has released it
+        return out
+    monkeypatch.setattr(pr_review, "run_once", then_taken)
+    real_acquire = pr_review.acquire_lock
+
+    def acquire(state_dir, owner, *a, **kw):
+        if other.get("release") is None and "release" in other and kw.get("name", "review.lock") == "review.lock":
+            other["release"], _ = real_acquire(state_dir, {"repo": "nirmaansoftware/Nirmaan", "pr": 9})
+        return real_acquire(state_dir, owner, *a, **kw)
+    monkeypatch.setattr(pr_review, "acquire_lock", acquire)
+    assert r.tick() == ["busy"] and len(r.calls()) == 1, "key 1 ran; key 2 met the lock held elsewhere"
+    other["release"]()
+    monkeypatch.setattr(pr_review, "acquire_lock", real_acquire)
+    assert r.tick() == ["auto-merge"]
+    assert len(r.calls()) == 2, "key 1 reused from the cache, key 2 called once"
+    assert any(l.get("key") == 1 and l["outcome"] == "reused" for l in r.log())
+
+
+def test_one_pass_at_a_time_per_repository(repo):
+    r = repo()
+    release, _ = pr_review.acquire_lock(r.state, {"repo": CONFIG["repo"], "by": "another pass"},
+                                        name=f"loop-{CONFIG['repo'].replace('/', '_')}.lock")
+    assert r.tick() == [] and r.calls() == []
+    release()
+    assert r.tick() == ["auto-merge"]
+
+
 def test_no_post_commits_the_fix_locally_and_never_pushes(repo):
     r = repo(reviews=[fail("bad")])
     assert r.tick(post="none") == ["fixed-not-pushed"]

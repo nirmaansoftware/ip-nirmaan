@@ -422,9 +422,9 @@ class Loop:
     # The whole pass: one step for every pull request, so one waiting for CI, or
     # one that just ran a review or a fix, never holds up the others. A pull
     # request the loop is fixing goes first, then by number. The steps run one
-    # after another and each review or fix round holds the shared lock, so
-    # reviews still run one at a time (a lock held elsewhere makes that pull
-    # request "busy" and the pass goes on). The check that this copy is main's
+    # after another; the shared lock is held only around each reviewer call,
+    # so model calls still run one at a time (a lock held elsewhere at a call
+    # makes that pull request "busy" and the pass goes on). The check that this copy is main's
     # runs once, before the pass, so the pass ends when main may have moved:
     # after this pass's own auto-merge (GitHub may merge at once), and when
     # main's sha on origin, read before each step, is no longer the one the
@@ -432,6 +432,20 @@ class Loop:
     # refetches main and checks this copy again first. A merge landing during
     # a step is seen only before the next one.
     def tick(self, only_pr: int | None = None, main_at_start: str | None = None) -> list[dict]:
+        # One pass at a time for this repository (its own lock, not the shared
+        # review lock): fix rounds run without the shared lock, so two loop
+        # processes must never step the same pull requests at once.
+        release, holder = pr_review.acquire_lock(self.state_dir, {"repo": self.cfg["repo"], "by": "pr-loop pass"},
+                                                 name=f"loop-{self.cfg['repo'].replace('/', '_')}.lock")
+        if release is None:
+            self.out(f"pr-loop: another pass for {self.cfg['repo']} is running (pid {(holder or {}).get('pid')}); this one ends")
+            return []
+        try:
+            return self._tick(only_pr, main_at_start)
+        finally:
+            release()
+
+    def _tick(self, only_pr: int | None, main_at_start: str | None) -> list[dict]:
         start = main_at_start or self._main_on_origin()
         pulls = [p for p in self.o["github"].list_open_pulls() if not only_pr or p["number"] == only_pr]
 
@@ -550,55 +564,53 @@ class Loop:
                 return self._stop(ctx, head, f"CI failed after fix round {st['rounds']} ({text})")
             return {"outcome": "skip", "reason": f"CI failed on {head[:7]} ({text}); the author fixes it"}
 
-        release, holder = pr_review.acquire_lock(self.state_dir, {"repo": cfg["repo"], "pr": n, "by": "pr-loop"})
-        if release is None:
-            return {"outcome": "busy", "reason": f"lock held by {holder.get('repo')} #{holder.get('pr')}" if holder else "lock held"}
-        try:
-            self._log(ctx, "review", ci=text)
-            r = pr_review.run_review(o["repo_root"], n, o["github"], o["post"], o["claude_bin"], self.state_dir, o["models"],
-                                     o["timeout_s"], o["backoff_s"], config=cfg, caller_branch=o.get("caller_branch"),
-                                     in_claude_session=o.get("in_claude_session", False), sleep=o.get("sleep", time.sleep),
-                                     out=self.out, held_lock=True)
-            if r["exit"] == pr_review.EXIT_HEAD_MOVED:
-                self._log(ctx, "head-moved")
-                return {"outcome": "head-moved"}
-            if r["exit"] == pr_review.EXIT_REFUSED:
-                st["done"] = {"head": head, "outcome": "refused"}
-                _save_state(self.state_dir, cfg["repo"], st)
-                return {"outcome": "skip", "reason": r.get("reason")}
-            if r["exit"] != pr_review.EXIT_OK:
-                return self._stop(ctx, head, f"the review exited {r['exit']}")
-            if r.get("waiting"):
-                return {"outcome": "wait", "reason": r["waiting"]}
-            if r.get("ci_failed"):
-                if st["last_fix_head"] == head:
-                    return self._stop(ctx, head, f"CI failed after fix round {st['rounds']} ({r['ci_failed']})")
-                return {"outcome": "skip", "reason": f"{r['ci_failed']}; the author fixes it"}
-            if r.get("deferred"):
-                return self._stop(ctx, head, f"review deferred: {r['deferred']}")
-            # The Founder Proxy (agent) is a reviewer like the keys: deferred
-            # stops, fail goes to the fixer.
-            keys = [*(r.get("key1") or []), *([r["key2"]] if r.get("key2") else []), *([r["proxy"]] if r.get("proxy") else [])]
-            if not r.get("key1"):
-                return self._stop(ctx, head, "review deferred: no owning team")
-            deferred = [k for k in keys if k["status"] == "deferred"]
-            if deferred:
-                return self._stop(ctx, head, "review deferred (" + "; ".join(f"{k['team_name']}: {k.get('reason')}" for k in deferred) + ")")
-            self._log(ctx, "reviewed", key1=",".join(f"{k['team']}:{k['status']}" for k in r["key1"]),
-                      key2=r["key2"]["status"] if r.get("key2") else "not run",
-                      proxy=r["proxy"]["status"] if r.get("proxy") else "not run")
-            # What the founder keeps: the loop stops and the founder decides on
-            # GitHub. Their own review approving this head lets the review pass
-            # review/executive; removing the label lets the loop resume.
-            if r.get("proxy") and r["proxy"]["status"] == pr_review.NEEDS_FOUNDER and not r.get("founder_approved"):
-                why = "; ".join((r["proxy"].get("verdict") or {}).get("founder_reasons") or [])
-                return self._stop(ctx, head, f"the Founder Proxy (agent) returned needs-founder: {why}. The founder decides: "
-                                             f"approve head {head[:7]} on GitHub (or not), then remove the label")
-            if not any(k["status"] == "fail" for k in keys):
-                return self._merge_path(ctx, r)
-            return self._fix_round(ctx, pull, r)
-        finally:
-            release()
+        self._log(ctx, "review", ci=text)
+        r = pr_review.run_review(o["repo_root"], n, o["github"], o["post"], o["claude_bin"], self.state_dir, o["models"],
+                                 o["timeout_s"], o["backoff_s"], config=cfg, caller_branch=o.get("caller_branch"),
+                                 in_claude_session=o.get("in_claude_session", False), sleep=o.get("sleep", time.sleep),
+                                 out=self.out)
+        if r["exit"] == pr_review.EXIT_HEAD_MOVED:
+            self._log(ctx, "head-moved")
+            return {"outcome": "head-moved"}
+        if r["exit"] == pr_review.EXIT_BUSY:
+            # The shared lock was held elsewhere at a model call; the cached
+            # verdicts carry over to the next pass.
+            return {"outcome": "busy", "reason": "another review holds the lock"}
+        if r["exit"] == pr_review.EXIT_REFUSED:
+            st["done"] = {"head": head, "outcome": "refused"}
+            _save_state(self.state_dir, cfg["repo"], st)
+            return {"outcome": "skip", "reason": r.get("reason")}
+        if r["exit"] != pr_review.EXIT_OK:
+            return self._stop(ctx, head, f"the review exited {r['exit']}")
+        if r.get("waiting"):
+            return {"outcome": "wait", "reason": r["waiting"]}
+        if r.get("ci_failed"):
+            if st["last_fix_head"] == head:
+                return self._stop(ctx, head, f"CI failed after fix round {st['rounds']} ({r['ci_failed']})")
+            return {"outcome": "skip", "reason": f"{r['ci_failed']}; the author fixes it"}
+        if r.get("deferred"):
+            return self._stop(ctx, head, f"review deferred: {r['deferred']}")
+        # The Founder Proxy (agent) is a reviewer like the keys: deferred
+        # stops, fail goes to the fixer.
+        keys = [*(r.get("key1") or []), *([r["key2"]] if r.get("key2") else []), *([r["proxy"]] if r.get("proxy") else [])]
+        if not r.get("key1"):
+            return self._stop(ctx, head, "review deferred: no owning team")
+        deferred = [k for k in keys if k["status"] == "deferred"]
+        if deferred:
+            return self._stop(ctx, head, "review deferred (" + "; ".join(f"{k['team_name']}: {k.get('reason')}" for k in deferred) + ")")
+        self._log(ctx, "reviewed", key1=",".join(f"{k['team']}:{k['status']}" for k in r["key1"]),
+                  key2=r["key2"]["status"] if r.get("key2") else "not run",
+                  proxy=r["proxy"]["status"] if r.get("proxy") else "not run")
+        # What the founder keeps: the loop stops and the founder decides on
+        # GitHub. Their own review approving this head lets the review pass
+        # review/executive; removing the label lets the loop resume.
+        if r.get("proxy") and r["proxy"]["status"] == pr_review.NEEDS_FOUNDER and not r.get("founder_approved"):
+            why = "; ".join((r["proxy"].get("verdict") or {}).get("founder_reasons") or [])
+            return self._stop(ctx, head, f"the Founder Proxy (agent) returned needs-founder: {why}. The founder decides: "
+                                         f"approve head {head[:7]} on GitHub (or not), then remove the label")
+        if not any(k["status"] == "fail" for k in keys):
+            return self._merge_path(ctx, r)
+        return self._fix_round(ctx, pull, r)
 
     def _update_behind(self, ctx):
         """The branch is behind main: ask GitHub to merge main into it (REST

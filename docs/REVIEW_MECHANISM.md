@@ -117,11 +117,16 @@ Built in rollout R5; in use on real pull requests since 2026-10-18. The
 a pull request it wrote, and the script refuses when a Claude Code session has
 the branch checked out. In order:
 
-1. **One review at a time** across Nirmaan and IP Nirmaan: a lock in
-   `~/.nirmaan/pr-review/`, shared with Nirmaan's script. The lock is a folder
-   (`review.lock`) with an owner file written whole (a temporary file renamed
-   inside it). A lock whose process is gone is cleared, and so is one with no
-   readable owner file that is older than 30 minutes.
+1. **One model call at a time** across Nirmaan and IP Nirmaan: a lock in
+   `~/.nirmaan/pr-review/`, shared with Nirmaan's script, held here only
+   around each reviewer call (council record
+   [2026-10-18: two reviews per pull request head](../council/records/2026-10-18-review-loop.md),
+   decision 5), never while checking out, reading CI, posting, fixing or
+   running local checks. When it is held elsewhere at a call, the run ends
+   ("busy", exit 3) and the next run reuses the verdicts already cached. The
+   lock is a folder (`review.lock`) with an owner file written whole (a
+   temporary file renamed inside it). A lock whose process is gone is cleared,
+   and so is one with no readable owner file that is older than 30 minutes.
 2. **Eligibility.** Open, targets `main`, a branch in this repository (never a
    fork), authored by `patel-om` or `nirmaansoftware`; otherwise it refuses and
    posts nothing.
@@ -293,8 +298,12 @@ the fixer works, the round is dropped without a label and the new head is
 reviewed from scratch. Removing the `needs-founder` label lets the loop resume
 with a fresh round count.
 
-**One review at a time, every pull request each pass.** The loop holds the
-review lock (shared with Nirmaan) for a whole review and fix round. Each pass
+**One model call at a time, every pull request each pass.** The shared lock
+is held only around each reviewer call (step 1 of "How reviewers run"); the
+fixer and the local checks run without it, so the other repository's reviews
+go on meanwhile. One pass at a time runs for this repository: the pass holds
+its own lock (`loop-nirmaansoftware_ip-nirmaan.lock` in the same folder), and
+a second pass that finds it held ends at once. Each pass
 takes one step on every open pull request, one the loop is fixing first, then
 by number, so a pull request waiting for CI, or one that just ran a review or a
 fix, never holds up the others; the steps run one after another, so reviews
