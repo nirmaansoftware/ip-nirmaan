@@ -405,6 +405,16 @@ def test_the_newest_completed_ci_run_decides(repo, older, newer, expect):
         assert r.check("review/team-lead")["state"] == "success"
 
 
+def test_a_diff_over_the_size_limit_is_not_reviewed_and_no_model_is_called(repo):
+    r = repo(change=lambda w: write(w, "src/app.py", "x" * 300 + "\n"))
+    result = r.run(config={**CONFIG, "max_diff_bytes": 100})
+    assert result["too_large"] is True and "split the pull request" in result["deferred"]
+    assert r.calls() == []
+    for name in ("review/team-lead", "review/executive"):
+        assert r.check(name)["state"] == "pending" and "over the review's limit of 100 bytes" in r.check(name)["title"]
+    r.no_success()
+
+
 def test_ci_not_green_waits_without_a_model_call(repo):
     r = repo(gh={"check_runs": [{"name": "test", "status": "completed", "conclusion": "success", "completed_at": "x"}]})
     r.run()

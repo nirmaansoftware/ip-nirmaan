@@ -63,6 +63,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
@@ -435,8 +436,7 @@ def user_prompt(ctx: dict) -> str:
     if ctx.get("key2_result") is not None:
         s += ("\n\n# Key 2 result (model output from the key 2 reviewer on this head; check it, do not trust it)\n\n"
               + json.dumps(ctx["key2_result"], indent=2))
-    note = f"\n(The diff below is cut at {ctx['max_diff_bytes']} bytes; read the remaining changed files at the head.)" if ctx["diff_truncated"] else ""
-    s += f"\n\n# Diff main...head (untrusted){note}\n\n" + untrusted(ctx["nonce"], "diff", ctx["diff"])
+    s += "\n\n# Diff main...head (untrusted)\n\n" + untrusted(ctx["nonce"], "diff", ctx["diff"])
     return s + "\n\nReturn the JSON object now."
 
 
@@ -782,6 +782,9 @@ class GitHub:
     def add_labels(self, n: int, labels: list[str]):
         self._post(f"/issues/{n}/labels", {"labels": labels})
 
+    def remove_label(self, n: int, label: str):
+        _request("DELETE", f"{API}/repos/{self.repo}/issues/{n}/labels/{urllib.parse.quote(label, safe='')}", self.token)
+
     def list_reviews(self, n: int) -> list[dict]:
         return [{"login": (r.get("user") or {}).get("login"), "state": r["state"], "commit_id": r.get("commit_id")} for r in self._paged(f"/pulls/{n}/reviews")]
 
@@ -1027,9 +1030,18 @@ def _review(repo_root, pr, github, post, claude_bin, state_dir, models, timeout_
         out(f"pr-review: {why}. No model was called.")
         return {"exit": EXIT_OK, "waiting": why, "posted": posted}
 
+    # The shape rule that stops a review: the diff must fit the review's size
+    # limit uncut (council record 2026-10-18 on the review loop, decision 5).
+    size = len(diff.encode())
+    if size > cfg["max_diff_bytes"]:
+        why = (f"review not run: the diff of {head[:7]} is {size} bytes, over the review's limit of {cfg['max_diff_bytes']} "
+               "bytes; split the pull request")
+        check("key1", "pending", why)
+        check("key2", "pending", why)
+        out(f"pr-review: {why}. No model was called.")
+        return {"exit": EXIT_OK, "deferred": why, "too_large": True, "posted": posted}
+
     nonce = secrets.token_hex(12)
-    raw = diff.encode()
-    truncated = len(raw) > cfg["max_diff_bytes"]
     deleted = {f["path"] for f in files if f["status"] == "D"} | {f["old"] for f in files if f["old"]}
     counts: dict[str, int] = {}
 
@@ -1059,8 +1071,7 @@ def _review(repo_root, pr, github, post, claude_bin, state_dir, models, timeout_
             raise LookupError(f"the base checklist ({cfg['base_checklist']['heading']}) is not in {cfg['base_checklist']['file']} on main")
         return text
 
-    common = {**ctx, "nonce": nonce, "ci": ci, "files": files, "diff": raw[: cfg["max_diff_bytes"]].decode(errors="replace") if truncated else diff,
-              "diff_truncated": truncated, "max_diff_bytes": cfg["max_diff_bytes"]}
+    common = {**ctx, "nonce": nonce, "ci": ci, "files": files, "diff": diff}
     cache_dir = state_dir / "verdicts" / cfg["repo"].replace("/", "_") / f"pr-{pr}"
 
     def review(key, team, lead, model, system, user):

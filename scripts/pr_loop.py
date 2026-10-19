@@ -21,7 +21,8 @@ per call, as a state machine that survives restarts:
     wait    the required CI is not finished on the head (no model call), or
             GitHub is still making the update's merge commit;
     review  both keys, and the Founder Proxy (agent) for a founder-class pull
-            request, through scripts/pr_review.py;
+            request, through scripts/pr_review.py; then one comment naming the
+            soft shape rules it breaks (never a stop);
     merge   both keys (and the proxy) passed: `gh pr merge --auto --merge` with the gh login
             when the review App posts the checks and the repository's
             allow_auto_merge field (read with gh) is true; a "ready" comment in
@@ -30,6 +31,8 @@ per call, as a state machine that survives restarts:
             on origin (read before each step) differing from the one the pass
             started with, so the rest wait for the next pass, which refetches
             main and checks this copy again;
+    author-fix  a finding to fix is on a path the fixer may not change: no
+            fixer; the `author-fix` label until the author's next head;
     fix     a key or the proxy failed: a separate fresh `claude -p` fixer in a clean
             worktree of the head, Edit and Write only inside it; the loop (never
             the model) checks what changed, commits, runs the checks and pushes.
@@ -93,6 +96,15 @@ LOOP = {
     "authors": ["patel-om"],
     "max_fix_rounds": 3,
     "needs_founder_label": "needs-founder",
+    # A finding on a path the fixer may not change: the fixer does not run, the
+    # pull request gets this label, and the author's next head clears it.
+    "author_fix_label": "author-fix",
+    # Shape rules (council record 2026-10-18 on the review loop, decision 5):
+    # soft ones only comment; the hard one (the diff fits the review's size
+    # limit uncut) is the review script's. Changed lines outside these globs
+    # count toward the soft cap.
+    "shape_soft_cap_lines": 400,
+    "shape_uncounted": ["tests/fixtures/**"],
     "co_author": "Claude Opus 5.5 <noreply@anthropic.com>",
     "rules_files": ["CLAUDE.md"],
     # The fixer may never change these: the review mechanism and its map,
@@ -224,6 +236,38 @@ def forbidden_changes(changed: list[str], forbidden: list[str]) -> list[tuple[st
                 out.append((p, f"matches {g}"))
                 break
     return out
+
+
+def shape_notes(classification: dict, name_status: list[dict], numstat: str, lc: dict) -> list[str]:
+    """The soft shape rules a pull request breaks, each named; never a stop.
+    `name_status` is review_map.parse_name_status of `git diff -M100%`,
+    `numstat` the `git diff --numstat` text."""
+    notes = []
+    teams = classification.get("keys") or []
+    names = sorted({k["name"] for k in teams})
+    if len(names) > 1:
+        notes.append(f"One owning team per pull request where possible: this one has {len(names)} ({', '.join(names)}).")
+    founder_paths = {why[len("path "):] for whys in (classification.get("founder") or {}).values() for why in whys if why.startswith("path ")}
+    changed = [f["path"] for f in name_status]
+    ordinary = [p for p in changed if p not in founder_paths]
+    if founder_paths and ordinary:
+        notes.append("Founder-class paths in their own pull request: founder-class "
+                     f"{', '.join(sorted(founder_paths)[:5])} are mixed with {', '.join(ordinary[:5])}"
+                     + (" and more" if len(ordinary) > 5 or len(founder_paths) > 5 else "") + ".")
+    renames = [f for f in name_status if f["status"] == "R"]
+    if renames and len(renames) < len(name_status):
+        notes.append("Mechanical renames in their own pull request: "
+                     + ", ".join(f"{f['old']} -> {f['path']}" for f in renames[:5]) + " are mixed with other changes.")
+    lines = 0
+    for row in numstat.splitlines():
+        parts = row.split("\t")
+        if len(parts) < 3 or any(review_map.matches(g, parts[-1]) for g in lc["shape_uncounted"]):
+            continue
+        lines += sum(int(x) for x in parts[:2] if x.isdigit())
+    if lines > lc["shape_soft_cap_lines"]:
+        notes.append(f"Soft cap on size: {lines} changed lines outside {', '.join(lc['shape_uncounted'])}, "
+                     f"over {lc['shape_soft_cap_lines']}.")
+    return notes
 
 
 def fixer_system_prompt(ctx: dict) -> str:
@@ -486,6 +530,18 @@ class Loop:
             self._log(ctx, "resumed")
         if st["stopped"] and st["stopped"]["head"] == listed["head_sha"]:
             return skip(f"stopped on this head: {st['stopped']['reason']}")
+        if st.get("author_fix"):
+            if st["author_fix"]["head"] == listed["head_sha"]:
+                return skip(f"\"{lc['author_fix_label']}\": waiting for the author's new head")
+            # A new head clears it; it is reviewed from scratch.
+            st["author_fix"] = None
+            _save_state(self.state_dir, cfg["repo"], st)
+            self._log(ctx, "author-fix-cleared")
+            if lc["author_fix_label"] in listed["labels"] and o["post"] != "none":
+                try:
+                    o["github"].remove_label(n, lc["author_fix_label"])
+                except Exception as exc:  # noqa: BLE001 - a label left behind does not block the review
+                    self.out(f"pr-loop: #{n}: could not remove the {lc['author_fix_label']} label: {exc}")
         st["stopped"] = None
         try:
             return self._step(ctx, listed)
@@ -576,6 +632,7 @@ class Loop:
                 return {"outcome": "skip", "reason": f"{r['ci_failed']}; the author fixes it"}
             if r.get("deferred"):
                 return self._stop(ctx, head, f"review deferred: {r['deferred']}")
+            self._shape(ctx, r)
             # The Founder Proxy (agent) is a reviewer like the keys: deferred
             # stops, fail goes to the fixer.
             keys = [*(r.get("key1") or []), *([r["key2"]] if r.get("key2") else []), *([r["proxy"]] if r.get("proxy") else [])]
@@ -677,11 +734,55 @@ class Loop:
         _save_state(self.state_dir, cfg["repo"], st)
         return {"outcome": st["done"]["outcome"]}
 
+    def _shape(self, ctx, r):
+        """The soft shape rules, as one comment that names each rule broken;
+        posted again only when the notes change. Never stops the loop."""
+        cfg, lc, o, n, st, head = self.cfg, self.lc, self.o, ctx["n"], ctx["st"], ctx["head"]
+        try:
+            root = o["repo_root"]
+            base = _git(root, "merge-base", "refs/pr-review/main", head).strip()
+            files = review_map.parse_name_status(_git(root, "diff", "--no-ext-diff", "--name-status", "-z", "-M100%", base, head))
+            numstat = _git(root, "diff", "--no-ext-diff", "--numstat", "-M", base, head)
+        except (subprocess.SubprocessError, OSError) as exc:
+            self.out(f"pr-loop: #{n}: shape rules not checked: {exc}")
+            return
+        notes = shape_notes(r.get("classification") or {}, files, numstat, lc)
+        digest = hashlib.sha256(json.dumps(notes).encode()).hexdigest()[:16]
+        if not notes or st.get("shape_digest") == digest:
+            return
+        st["shape_digest"] = digest
+        _save_state(self.state_dir, cfg["repo"], st)
+        self._log(ctx, "shape", notes=len(notes))
+        self._say(n, "\n".join([f"<!-- {MARK} shape head={head} -->", f"### Automated loop: pull request shape (head `{head[:7]}`)", "",
+                                "Soft shape rules (council record 2026-10-18 on the review loop, decision 5). They do not stop the "
+                                "review; only a diff over the review's size limit does.", "",
+                                *[f"- {_cell(x, 500)}" for x in notes]]))
+
+    def _author_fix(self, ctx, findings, blocked):
+        """Findings on paths the fixer may not change: no fixer; the author fixes them."""
+        lc, o, n, st, head = self.lc, self.o, ctx["n"], ctx["st"], ctx["head"]
+        st["author_fix"] = {"head": head, "at": _now()}
+        _save_state(self.state_dir, self.cfg["repo"], st)
+        self._log(ctx, "author-fix", files=",".join(sorted({f["file"] for f in blocked})))
+        if o["post"] != "none":
+            o["github"].add_labels(n, [lc["author_fix_label"]])
+        rows = [f"| {f['id']} | {f['severity']} | `{_cell(f['file'], 200)}:{f['line']}` | {_cell(f['text'])} |" for f in findings]
+        self._say(n, "\n".join([
+            f"<!-- {MARK} author-fix head={head} -->", "### Automated loop: the author fixes this head", "",
+            f"Head `{head}`: {len(blocked)} finding{'' if len(blocked) == 1 else 's'} {'is' if len(blocked) == 1 else 'are'} on paths "
+            "the loop's fixer may not change, so the fixer did not run. The author pushes a fix; the new head clears the "
+            f"`{lc['author_fix_label']}` label and is reviewed from scratch.", "",
+            "| ID | Severity | Where | Finding |", "|---|---|---|---|", *rows]))
+        return {"outcome": "author-fix"}
+
     def _fix_round(self, ctx, pull, r):
         cfg, lc, o, n, st, head = self.cfg, self.lc, self.o, ctx["n"], ctx["st"], ctx["head"]
         findings = findings_to_fix(r)
         if not findings:
             return self._stop(ctx, head, "a key failed without findings to fix")
+        blocked = [f for f in findings if forbidden_changes([f["file"]], lc["fixer_forbidden"])]
+        if blocked:
+            return self._author_fix(ctx, findings, blocked)
         repeated = [f for f in findings if st["seen"].get(f["fingerprint"])]
         if repeated:
             return self._stop(ctx, head, "the same finding failed again after a fix: " + "; ".join(f"{f['file']}:{f['line']} {f['text']}" for f in repeated))
