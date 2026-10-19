@@ -77,7 +77,10 @@ The units that were ACTIVE when the rule took effect are frozen in
 two active teams M57 added under record item 6). The test fails on any ACTIVE
 unit outside that list that is not backed this way. The list is never
 extended by hand: a unit made ACTIVE later passes by its eval case, not by
-being added.
+being added. The test pins the list's count (205) and a sha256 of its sorted
+ids, so any edit to the file fails until the pin changes in the same pull
+request, where review sees it. Removing a unit from the chart is the only
+reason to edit it.
 
 The rule lives in the test, not in `org/`, because it reads the eval cases in
 `evals/`, and the organization layer does not depend on the evals package.
@@ -85,8 +88,8 @@ The rule lives in the test, not in `org/`, because it reads the eval cases in
 ## 5. Tests
 
 `tests/test_org_span.py`: the chart passes with zero exceptions; executive
-spans; depth exactly 6; every ACTIVE unit is frozen or backed. Negative
-fixtures, each failing with its own message: a unit with 9 child units, a unit
+spans; depth exactly 6; every ACTIVE unit is frozen or backed; the frozen
+list is pinned. Negative fixtures, each failing with its own message: a unit with 9 child units, a unit
 with 2, a role 7 layers below the Board, an executive at 9, an exception that
 is not needed, an exception past its review date (and the same exception with
 a future date passing), an exception with no reason, a placeholder with no

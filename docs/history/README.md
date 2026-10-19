@@ -111,6 +111,7 @@ The original preface of the section:
 - [M58-eval-skills-must-fail](M58-eval-skills-must-fail.md): Milestone 58 - Eval cases name skills; must-fail scorer; the evidence loader refuses replays and attestations
 - [M59-release-mirror-check](M59-release-mirror-check.md): Milestone 59 - Release check for the public org mirrors: the org figure and the hero's plan excerpt are checked against the code at each release
 - [M60-span-validator](M60-span-validator.md): Milestone 60 - Span, depth and activation rules become a check
+- [M62-knowledge-file-checks](M62-knowledge-file-checks.md): Milestone 62 - Knowledge file schema and checks: every knowledge document and skill card is checked before the first is written
 - [M63-evidence-levels](M63-evidence-levels.md): Milestone 63 - Evidence levels: Knowledge, Practised and Proven only from committed records, zero of each on main
 
 ## Before M43
