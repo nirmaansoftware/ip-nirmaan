@@ -65,9 +65,12 @@ The scorer passes only when, in order:
 
 A check with no mutants is `not_run`. A tool the broker refuses is `not_run`.
 
-**Staging.** Every run reads a staged copy of its inputs in a fresh temporary
-directory, each file under its own name, with the mutant written under the name
-of the file it replaces. A simulator takes paths and does not care; a proof's
+**Staging.** Every run reads a staged copy of its inputs in its own folder
+inside the evaluation's sandbox (`judge/check-<n>/must-fail/<run>`), each file
+under its own name, with the mutant written under the name of the file it
+replaces. The staged copies stay with the sandbox's record, so every run's
+parameters name files that still exist. A caller that gives the scorer no
+sandbox folder gets a temporary one, removed when the check ends. A simulator takes paths and does not care; a proof's
 job file names its files relative to itself, so staging is what lets the same
 `.sby` read the mutant. Two inputs with one file name are `not_run`.
 
@@ -125,7 +128,10 @@ pull request that adds the first skill's cases (P1-14 in the build-out plan).
 
 ## 5. The six shipped cases
 
-In a separate commit (no graded code changes in this pull request):
+In a separate commit of the same pull request. That commit adds only the
+`skills` field to each case and the test that checks them; the harness code
+that reads the field is in the first commit, and nothing the cases grade (their RTL, testbenches, proofs and
+reference documents) changed:
 
 | Case | `skills` |
 |---|---|

@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import subprocess
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from typer.testing import CliRunner
@@ -37,9 +38,11 @@ from nirmaan.evals import (
     validate_case,
 )
 from nirmaan.evals.cases import case_digest
+from nirmaan.evals import runner
 from nirmaan.evals.records import record_trial
 from nirmaan.evals.runner import replay_llm
-from nirmaan.models import Score, ScoreStatus
+from nirmaan.evals.scorers import ScoreContext, scorer_spec
+from nirmaan.models import Actor, ActorKind, EvidenceKind, HeldOutCheck, Score, ScoreStatus
 from nirmaan.runtime import ModelRuntime
 
 REPO = Path(__file__).resolve().parents[1]
@@ -179,6 +182,11 @@ def test_the_reference_testbench_and_proofs_catch_the_mutants(nirmaan_org, fixed
         assert runs[run].tool == "simulator.run" and not runs[run].succeeded
         assert "simulation failed" in runs[run].summary and "checks failed" in runs[run].summary, runs[run].summary
     assert runs[testbench.runs[0]].succeeded and runs[testbench.runs[0]].params["top"] == "sync_fifo_tb"
+    # Every run's inputs are staged inside the sandbox and stay there with its record.
+    stage = tmp_path / "sandbox" / "judge" / "check-1" / "must-fail"
+    for run in (*testbench.runs, *testbench.failed_runs):
+        for source in runs[run].params["sources"]:
+            assert Path(source).is_relative_to(stage) and Path(source).is_file(), source
     assert [runs[r].tool for r in depth5.runs] == ["formal.run", "formal.cover"]
     assert all(runs[r].succeeded for r in depth5.runs)
     assert all(not runs[r].succeeded and "formal fail" in runs[r].summary and "[ASSERT]" in runs[r].summary
@@ -210,6 +218,31 @@ def test_clean_inputs_that_fail_are_a_failed_control(nirmaan_org, fixed_clock, t
     assert score.status is ScoreStatus.FAILED
     assert score.summary.startswith("the clean inputs do not pass: simulator.run")
     assert len(score.runs) == 1 and score.failed_runs == ()
+
+
+class _FakeTools:
+    """A tool handle whose simulator fails on a mutant: it records what each run was given, and checks it exists."""
+
+    def __init__(self):
+        self.calls: list[dict] = []
+
+    def invoke(self, tool, **params):
+        sources = [Path(p) for p in params["sources"]]
+        assert all(p.is_file() for p in sources)
+        self.calls.append(params)
+        mutant = "mutant" in sources[0].parent.name
+        outcome = SimpleNamespace(succeeded=not mutant, references=("log",), summary="ran")
+        return f"run-{len(self.calls):04d}", outcome
+
+
+def test_with_no_sandbox_folder_the_staged_inputs_are_removed():
+    check = HeldOutCheck(name="mutants fail", scorer="must-fail", tool="simulator.run",
+                         case_files={"sources": (CLEAN,)}, mutants={CLEAN: (OVERFLOW, POW2)})
+    tools = _FakeTools()
+    score = scorer_spec("must-fail").fn(ScoreContext(None, None, check, REPO, tools))
+    assert score.status is ScoreStatus.PASSED and score.summary.endswith("2 of 2 mutants failed it")
+    staged = [Path(p) for call in tools.calls for p in call["sources"]]
+    assert len(staged) == 3 and not any(p.exists() or p.parent.exists() for p in staged)
 
 
 def test_a_must_fail_check_with_no_mutant_is_not_run(nirmaan_org, fixed_clock, tmp_path):
@@ -294,6 +327,22 @@ def test_the_evidence_loader_refuses_an_attestation(nirmaan_org, fixed_clock, tm
     trial_file.write_text(json.dumps(data))
     with pytest.raises(EvalError, match=r"carries a human attestation \(ev-0007\)"):
         load_evidence(path)
+
+
+def test_the_runner_records_a_human_attestation_on_the_seat(nirmaan_org, fixed_clock, tmp_path, monkeypatch):
+    """The producer side: an attestation recorded on the seat's task is listed on the result."""
+    real = runner.run_task
+    recorded = []
+
+    def attest_then_run(engine, task_id, runtime, **kw):
+        ev = engine.record_evidence(task_id, Actor(role=str(engine.task(task_id).owner), kind=ActorKind.HUMAN,
+                                                   name="test"), EvidenceKind.HUMAN_ATTESTATION, "ran it elsewhere")
+        recorded.append(ev.id)
+        return real(engine, task_id, runtime, **kw)
+
+    monkeypatch.setattr(runner, "run_task", attest_then_run)
+    result = run_case(nirmaan_org, _spec_with_skills(), repo=REPO, sandbox=tmp_path / "s", clock=fixed_clock)
+    assert len(recorded) == 1 and result.attestations == tuple(recorded)
 
 
 # --- The six shipped cases name their skills -----------------------------------------------
