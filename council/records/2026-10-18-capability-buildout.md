@@ -311,7 +311,10 @@ must update the hero or keep the title.
    only.
 3. **The tests are founder class.** `tests/test_review_teams.py` and the new
    seat-map test join the control-plane class (CODEOWNERS and
-   `founder_classes`).
+   `founder_classes`). (Note, 2026-10-19: the same day, the Founder Proxy
+   change removed `.github/CODEOWNERS`, and `tests/test_review_teams.py` now
+   fails if one is added back, so the class is `founder_classes` in
+   `.github/review-teams.yml` alone.)
 4. **Derivation.** Key 2 for a PR is the nearest role above the lowest common
    unit of all owning teams that is held by a seat with a key-2 checklist and a
    passing seeded-defect review set, and that is not a key-1 holder on that PR.
@@ -548,7 +551,8 @@ exists yet and no tool judges those skills.
   roadmap count block changes once per department); knowledge document PRs of 3
   to 8 skills; examples.
 - Founder-class changes for a wave (seat files, review-teams.yml rules,
-  CODEOWNERS, CI) are batched into one hiring PR per wave.
+  CODEOWNERS, CI) are batched into one hiring PR per wave. (Note, 2026-10-19:
+  CODEOWNERS no longer exists; see section 5, rule 3.)
 - Knowledge PRs auto-merge only when no founder class is detected, including
   licence and export-control content.
 - Live eval runs are paced and logged privately; the founder sets each
