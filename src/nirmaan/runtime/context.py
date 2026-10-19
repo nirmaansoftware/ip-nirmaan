@@ -1,8 +1,9 @@
 """The work packet: everything an agent may know about one task, by scope.
 
 Knowledge is assembled per task from four separate scopes, never mixed into
-one prompt: company (constitution and standards), domain (the role's skills
-and the VeriTriage Knowledge Packs they cite), project (requirement, analysis,
+one prompt: company (constitution and standards), domain (the role's skills,
+the VeriTriage Knowledge Packs they cite, and the text of the knowledge
+documents they cite, M61), project (requirement, analysis,
 decisions, and approved upstream artifacts), and task (inputs, evidence
 requirements, permitted tools). Each item says where it came from.
 
@@ -23,6 +24,7 @@ from nirmaan.models import (
     MemoryScope,
     TaskStatus,
 )
+from nirmaan.org.knowledge import cited, over_domain_cap, read_document
 from nirmaan.runtime.files import excerpt, read_verified
 from nirmaan.work.engine import TaskEngine
 from nirmaan.work.policy import upstream_artifacts
@@ -86,8 +88,21 @@ class SkillView(_View):
     knowledge_sources: tuple[str, ...]
 
 
+class KnowledgeDocumentView(_View):
+    """A knowledge document a skill on the task cites (M61): its whole text and digest."""
+
+    ref: str
+    skill: str
+    digest: str
+    text: str
+
+
 class DomainScope(_View):
     skills: tuple[SkillView, ...]
+    #: The cited knowledge documents, whole, in skill order (M61).
+    documents: tuple[KnowledgeDocumentView, ...] = ()
+    #: Why the seat must decline this task (M61): a cited document missing, or over the domain cap.
+    declines: str | None = None
 
 
 class ProjectScope(_View):
@@ -210,6 +225,25 @@ def _failed_run(state, run_id: str, evidence: tuple[str, ...]) -> FailedRun:
                      excerpt=tuple(lines), excerpt_note=note)
 
 
+def _documents(skills) -> tuple[tuple[KnowledgeDocumentView, ...], str | None]:
+    """The knowledge documents the task's skills cite (M61), or none and why the seat declines.
+
+    A document is carried whole or not at all: a missing one, or a total over
+    the domain cap, empties the list and states the reason, never a cut.
+    """
+    found: dict[str, KnowledgeDocumentView] = {}
+    for skill in skills:
+        for ref in cited(skill):
+            if ref in found:
+                continue
+            text, digest, problem = read_document(ref)
+            if problem is not None:
+                return (), f"{skill.id}: {problem}"
+            found[ref] = KnowledgeDocumentView(ref=ref, skill=skill.id, digest=digest, text=text)
+    over = over_domain_cap(sum(len(d.text) for d in found.values()))
+    return ((), over) if over else (tuple(found.values()), None)
+
+
 def assemble(engine: TaskEngine, task_id: str, role: str | None = None) -> WorkPacket:
     """The packet for ``role``'s seat on a task: the owner by default, or e.g. its reviewer."""
     org, state = engine.org, engine.state
@@ -223,12 +257,13 @@ def assemble(engine: TaskEngine, task_id: str, role: str | None = None) -> WorkP
     skills = [org.skills[s] for s in task.skills if s in org.skills]
     if task.capability:
         skills += [s for s in org.providers_of(task.capability) if s.id in card.skills and s not in skills]
+    documents, declines = _documents(skills)
     domain = DomainScope(skills=tuple(
         SkillView(id=s.id, name=s.name, procedures=s.procedures, constraints=s.constraints,
                   common_failure_modes=s.common_failure_modes, validation_criteria=s.validation_criteria,
                   knowledge_sources=tuple(f"{k.kind.value}:{k.ref}" for k in s.knowledge_sources))
         for s in skills
-    ))
+    ), documents=documents, declines=declines)
 
     upstream = []
     built_on = upstream_artifacts(state, task)  # M27: seen through gates

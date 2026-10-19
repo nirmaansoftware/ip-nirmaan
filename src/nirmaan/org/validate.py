@@ -20,6 +20,7 @@ from nirmaan.models import (
     UnitKind,
     UnitStatus,
 )
+from nirmaan.org.knowledge import cited, valid_ref
 
 if TYPE_CHECKING:
     from nirmaan.org.organization import Organization
@@ -122,6 +123,9 @@ def _skills(org: "Organization") -> list[str]:
                 issues.append(f"skill {skill.id}: unknown tool {tool}")
         if not skill.validation_criteria:
             issues.append(f"skill {skill.id}: no validation criteria")
+        for ref in cited(skill):  # M61: one document per skill, at knowledge/<division>/<skill_id>.md
+            if not valid_ref(ref) or ref.rsplit("/", 1)[-1] != skill.id:
+                issues.append(f"skill {skill.id}: knowledge document ref {ref!r} is not <division>/{skill.id}")
         # Composition must terminate.
         frontier, seen = list(skill.includes), set()
         while frontier:
