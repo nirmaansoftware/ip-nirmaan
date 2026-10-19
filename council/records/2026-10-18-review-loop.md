@@ -153,7 +153,8 @@ qa-evidence).
   checklist record, `.claude/skills/pr-review/**` and the review tests
   (`tests/test_review_teams.py`, `tests/test_pr_review.py`,
   `tests/test_pr_loop.py`, `tests/conftest.py`), which also become founder
-  class. The same floor covers `LICENSE`, `NOTICE`, vendored licence files and
+  class. The floor itself is settled; this path list is the proposal, and its
+  scope is the founder's ("For the founder", item 2). The same floor covers `LICENSE`, `NOTICE`, vendored licence files and
   an `export_control: yes` flag (legal-compliance, legal-counsel). Reason:
   CODEOWNERS is gone, so a control-plane change now merges on one model's
   reading of "weakening"; the founder's record already reserves weakening the
@@ -294,9 +295,9 @@ eda-tooling and #117's own key 1 found the same.
 reproduced whitespace case decides it.
 
 **Note, 2026-10-19: #117 merged without a carry-over.** Before it merged, the
-verdict carry-over was removed from #117 altogether (commit ddeed45: the CTO's
-decision of 2026-10-18, kept the same as Nirmaan's decision M4 that a new push
-voids both keys), so every new head is reviewed from scratch and items 1 to 3
+verdict carry-over was removed from #117 altogether (commit ddeed45, which
+keeps this loop the same as Nirmaan's decision M4 that a new push voids both
+keys), so every new head is reviewed from scratch and items 1 to 3
 above apply to no code on `main`. #117 merged (f650396) with the rest of its
 scope: one step for every open pull request each pass, only the tests related
 to the changed files in a fix round's local check (CI still runs the whole
