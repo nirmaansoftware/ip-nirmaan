@@ -3,8 +3,9 @@
 
   The Nirmaan pixel-N assembles from falling blocks, bottom row first (the
   way a structure goes up), on the same grid the page is drawn on. After it
-  settles, cells under the pointer light up in blueprint blue and the odd
-  block of the N blinks, as if the building were still being worked on.
+  settles, cells under the pointer light up in blueprint blue and, for the
+  first 5 seconds, the odd block of the N blinks, as if the building were
+  still being worked on. Then it stays still (WCAG 2.2.2).
 
   Layout is owned by CSS: the N is drawn inside [data-hero-slot], snapped to
   the grid whose cell size is the hero's --cell custom property. This script
@@ -36,6 +37,7 @@
   var ROW_STAGGER_MS = 85;
   var TRAIL_MS = 650;
   var BLINK_MS = 1100;
+  var BLINK_FOR_MS = 5000;  // blinking stops this long after the N settles
 
   var W = 0, H = 0, dpr = 1, cell = 24;
   var blocks = [];          // sub-blocks that make up the N
@@ -47,6 +49,7 @@
   var onScreen = true;
   var rafId = 0;
   var blinkTimer = 0;
+  var blinkUntil = 0;
   var pointer = null;
 
   function readColors() {
@@ -163,7 +166,7 @@
       ctx.fillRect(b.x, y, cell, cell);
     }
     if (!allDown) busy = true;
-    else if (!settled) { settled = true; scheduleBlink(); }
+    else if (!settled) { settled = true; blinkUntil = now + BLINK_FOR_MS; scheduleBlink(); }
 
     // One block of the N blinks blue now and then
     if (blink) {
@@ -190,8 +193,9 @@
 
   function scheduleBlink() {
     clearTimeout(blinkTimer);
-    if (reduceMotion.matches) return;
+    if (reduceMotion.matches || performance.now() >= blinkUntil) return;
     blinkTimer = setTimeout(function () {
+      if (performance.now() + BLINK_MS > blinkUntil) return; // would end after 5 s
       if (onScreen && !document.hidden && blocks.length) {
         blink = { block: blocks[(Math.random() * blocks.length) | 0], t: performance.now() };
         wake();

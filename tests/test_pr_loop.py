@@ -679,6 +679,139 @@ def test_no_post_never_updates_a_branch(repo):
     assert r.github.updates == [] and r.origin_head() == r.first_head
 
 
+# --- Every pull request each pass ---------------------------------------------------
+
+
+def test_one_pass_steps_every_pull_request_and_a_review_fix_wait_or_busy_lock_never_ends_it(repo):
+    r = repo()
+    loop = r.loop()
+    pulls = [{"number": n} for n in (6, 5, 4, 3, 2, 1)]
+    loop.o["github"] = type("G", (), {"list_open_pulls": lambda self: pulls})()
+    # Pull request 3 is in a fix round, so it goes first; the rest by number.
+    pr_loop._save_state(r.state, CONFIG["repo"], {"pr": 3, "rounds": 1, "seen": {}, "last_fix_head": "abc", "done": None, "stopped": None})
+    outcome = {1: "ready", 2: "wait", 3: "fixed", 4: "busy", 5: "updated", 6: "stopped"}
+    seen = []
+
+    def step(p):
+        seen.append(p["number"])
+        return {"outcome": outcome[p["number"]]}
+    loop.step = step
+    results = loop.tick()
+    assert seen == [3, 1, 2, 4, 5, 6]
+    assert [f"{x['pr']}:{x['outcome']}" for x in results] == ["3:fixed", "1:ready", "2:wait", "4:busy", "5:updated", "6:stopped"]
+
+
+def test_an_auto_merge_ends_the_pass_so_the_rest_are_stepped_against_the_new_main_next_pass(repo):
+    # Auto-merge can merge main while the pass goes on; the pull requests after
+    # it wait for the next pass, which refetches main and checks this copy again.
+    r = repo()
+    loop = r.loop()
+    pulls = [{"number": n} for n in (1, 2, 3)]
+    loop.o["github"] = type("G", (), {"list_open_pulls": lambda self: pulls})()
+    outcome = {1: "skip", 2: "auto-merge", 3: "wait"}
+    seen = []
+
+    def step(p):
+        seen.append(p["number"])
+        return {"outcome": outcome[p["number"]]}
+    loop.step = step
+    assert [f"{x['pr']}:{x['outcome']}" for x in loop.tick()] == ["1:skip", "2:auto-merge"]
+    assert seen == [1, 2], "pull request 3 is not stepped against the main the pass started with"
+    outcome[2] = "skip"
+    assert [f"{x['pr']}:{x['outcome']}" for x in loop.tick()] == ["1:skip", "2:skip", "3:wait"]
+
+
+def test_a_merge_from_outside_the_loop_mid_pass_ends_the_pass_before_the_next_step(repo):
+    # Someone else merges into main while pull request 1 is stepped (not an
+    # auto-merge of this pass): pull request 2 waits for the next pass.
+    r = repo()
+    loop = r.loop()
+    pulls = [{"number": n} for n in (1, 2)]
+    loop.o["github"] = type("G", (), {"list_open_pulls": lambda self: pulls})()
+    seen = []
+
+    def step(p):
+        seen.append(p["number"])
+        if p["number"] == 1 and len(seen) == 1:
+            r.advance_main()
+        return {"outcome": "wait"}
+    loop.step = step
+    assert [f"{x['pr']}:{x['outcome']}" for x in loop.tick()] == ["1:wait"]
+    assert seen == [1], "pull request 2 is not stepped once main moved"
+    assert [f"{x['pr']}:{x['outcome']}" for x in loop.tick()] == ["1:wait", "2:wait"], "the next pass starts from the new main"
+
+
+def test_a_pass_whose_start_main_is_already_stale_steps_nothing(repo):
+    # main moved between the fetch the copy was checked against and the pass.
+    r = repo()
+    loop = r.loop()
+    loop.o["github"] = type("G", (), {"list_open_pulls": lambda self: [{"number": 1}]})()
+    loop.step = lambda p: {"outcome": "wait"}
+    stale = sh(r.work, "rev-parse", "main")
+    r.advance_main()
+    assert loop.tick(main_at_start=stale) == []
+
+
+# --- Related tests for the fixer's local check --------------------------------------
+
+
+def _tree(root: Path, files: dict[str, str]):
+    for rel, text in files.items():
+        write(root, rel, text)
+
+
+def test_related_tests_map_changed_files_to_the_tests_that_use_them(tmp_path):
+    _tree(tmp_path, {
+        "src/nirmaan/alpha.py": "x = 1\n",
+        "src/nirmaan/beta/core.py": "y = 2\n",
+        "src/nirmaan/beta/__init__.py": "",
+        "src/nirmaan/lonely.py": "z = 3\n",
+        "src/nirmaan/gamma/inner.py": "w = 4\n",
+        "tests/test_gamma_pkg.py": "from nirmaan.gamma import W\n",
+        "scripts/check_union.py": "",
+        "tests/conftest.py": "",
+        "tests/laws.py": "",
+        "tests/test_laws.py": "import laws\n",
+        "tests/test_alpha_use.py": "from nirmaan.alpha import x\n",
+        "tests/test_multi.py": "from nirmaan import (\n    other,\n    alpha,\n)\n",
+        "tests/test_beta.py": "import nirmaan.beta.core\n",
+        "tests/test_nirmaan_core.py": "pass\n",
+        "tests/test_union.py": 'SCRIPT = ROOT / "scripts" / "check_union.py"\n',
+        "tests/test_fixture_user.py": 'fixture_log("sample.log")\n',
+        "tests/fixtures/eda/sample.log": "log\n",
+        "tests/test_other.py": "pass\n",
+    })
+    rel = pr_loop.related_tests
+    assert rel(tmp_path, ["src/nirmaan/alpha.py"]) == ["tests/test_alpha_use.py", "tests/test_laws.py", "tests/test_multi.py"]
+    assert rel(tmp_path, ["src/nirmaan/beta/core.py"]) == ["tests/test_beta.py", "tests/test_laws.py", "tests/test_nirmaan_core.py"]
+    assert rel(tmp_path, ["src/nirmaan/gamma/inner.py"]) == ["tests/test_gamma_pkg.py", "tests/test_laws.py"], "re-exported by its package"
+    assert rel(tmp_path, ["tests/test_other.py"]) == ["tests/test_other.py"]
+    assert rel(tmp_path, ["scripts/check_union.py"]) == ["tests/test_union.py"]
+    assert rel(tmp_path, ["tests/fixtures/eda/sample.log"]) == ["tests/test_fixture_user.py"]
+    assert rel(tmp_path, ["tests/laws.py"]) == ["tests/test_laws.py"]
+    assert rel(tmp_path, ["tests/test_other.py", "tests/test_gone.py"]) == ["tests/test_other.py"], "a deleted test file is not run"
+    # No test is known to cover it, or it reaches every test: the whole suite.
+    assert rel(tmp_path, ["tests/conftest.py"]) is None
+    assert rel(tmp_path, ["src/nirmaan/lonely.py"]) is None
+    assert rel(tmp_path, ["tests/test_other.py", "src/nirmaan/lonely.py"]) is None
+    assert rel(tmp_path, ["tests/test_gone.py"]) is None
+
+
+def test_the_fixers_test_check_runs_only_the_related_tests(repo, tmp_path):
+    record = tmp_path / "pytest-args.json"
+    loop = {**LOOP, "checks": [{"name": "test", "when": ["src/**", "tests/**"], "select": "related_tests", "env": {"RECORD": str(record)},
+                                "run": [["{python}", "-c", "import json, os, sys; json.dump(sys.argv[1:], open(os.environ['RECORD'], 'w'))"]]}]}
+
+    def change(w):
+        write(w, "src/app.py", "one\ntwo changed\nthree\n")
+        write(w, "tests/test_app.py", "from app import one\n")
+        write(w, "tests/test_unrelated.py", "pass\n")
+    r = repo(reviews=[fail("Line two lost its test"), {"verdict": "pass"}], fixes=[{"edits": {"src/app.py": "one\ntwo fixed\nthree\n"}}], change=change)
+    assert r.tick(loop=loop) == ["fixed"]
+    assert json.loads(record.read_text()) == ["tests/test_app.py"]
+    assert "test (1 related file): pass" in r.comments()[-1]
+
+
 # --- The plist -------------------------------------------------------------------
 
 
@@ -691,6 +824,7 @@ def test_the_plist_reads_its_settings_from_the_sourced_env_file_and_holds_none_i
     cmd = _re.search(r"<string>(mkdir[^<]*)</string>", plist).group(1)
     assert cmd.index("pr-loop/env") < cmd.index("pr_loop.py"), "sourced before the loop starts"
     assert "ip-loop.log" in cmd
+    assert _re.search(r"<key>StartInterval</key>\s*<integer>60</integer>", plist), "a pass every minute"
 
 
 # --- Units -----------------------------------------------------------------------
