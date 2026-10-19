@@ -62,8 +62,9 @@ today).
 A cited document that is missing, unreadable or not UTF-8 also sets
 `declines`. `run_task` and `review_task` check `declines` before asking the
 runtime anything, so the task is not started and the decline names the seat,
-the task and the reason. The automated loop records that reason in the audit
-trail with the step (`loop.step`, M29). Nothing is truncated anywhere: a seat
+the task and the reason. The automated loop keeps that reason on its
+in-memory step; the `loop.step` audit record (M29) holds only the step status,
+not the reason. Nothing is truncated anywhere: a seat
 reads a document whole or declines.
 
 ## The test over every workflow seat
