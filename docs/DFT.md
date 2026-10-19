@@ -158,7 +158,7 @@ All data; the runtime does not name DFT.
 | Tools (`company/tools.py`) | `dft.scan_insert`, `dft.check`, `dft.scan_sim`, all `AVAILABLE` (real backends). `dft.run` (ATPG, MBIST) stays `CONTRACT_ONLY`. |
 | Capability | `dft.insert` (existing), producing `dft_netlist` |
 | Skills | `scan_design` (provides `dft.insert`) gains the three tools; `dft_verification` gains `dft.check` and `dft.scan_sim` |
-| Unit | the existing DFT Engineering team (`implementation.dft.engineering`), whose Scan practice holds `scan_design` and whose team skill `dft_architecture` provides `dft.review` |
+| Unit | the existing DFT Engineering team (`implementation.dft.engineering`; since M57 the Scan and ATPG team, `implementation.dft.scan_atpg`), whose Scan practice holds `scan_design` and whose team skill `dft_architecture` provides `dft.review` |
 | Workflow | `block-design` gains a `dft` stage, "Scan insertion", after `rtl-implementation`, planned only when the request asks for test (the existing `dft` feature: "DFT", "scan chain", "ATPG", "MBIST") |
 
 The stage's evidence follows the M23 pattern:

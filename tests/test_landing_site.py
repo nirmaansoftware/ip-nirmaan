@@ -5,7 +5,8 @@
   workflow or a skill breaks no test here; the page catches up at release.
 * The constitution cards are the constitution: same IDs, same order.
 * The copy follows the brief's rules: no dashes, no hype words, no claims the
-  project cannot substantiate.
+  project cannot substantiate. The repository README is held to the same
+  dash and hype checks.
 * Motion is opt-in and switched off under prefers-reduced-motion.
 * The launch list (Nirmaan's docs/engineering/list.md) is met: 404 page,
   robots and sitemap, social preview image, icons, and legal links.
@@ -27,6 +28,9 @@ from nirmaan.company import CONSTITUTION
 
 SITE = Path(__file__).resolve().parent.parent / "site"
 HTML = (SITE / "index.html").read_text(encoding="utf-8")
+# The repository's README is public copy too (the GitHub page), so it follows
+# the same copy rules as the page.
+README = (SITE.parent / "README.md").read_text(encoding="utf-8")
 
 
 def test_stat_tiles_match_stats_json() -> None:
@@ -70,6 +74,11 @@ def test_no_dashes(path: str) -> None:
 )
 def test_copy_avoids_hype_and_unbacked_claims(phrase: str) -> None:
     assert phrase.lower() not in HTML.lower()
+    assert phrase.lower() not in README.lower()
+
+
+def test_readme_has_no_dashes() -> None:
+    assert "\u2014" not in README and "\u2013" not in README
 
 
 def test_motion_is_opt_in_and_respects_reduced_motion() -> None:
