@@ -56,16 +56,18 @@ today).
    again before it calls, with the tool notes in: the LLM's own
    `context_chars` if it states one, else the profile of its model, else the
    smallest profile of its provider. Over it, the seat declines with the
-   reason and no model is called or counted. The `auto` runtime already
+   reason and no model is called, so no model call is recorded (the
+   automated loop's call budget still charges a review step as at most one
+   call whether or not the runtime answered, as it always has). The `auto`
+   runtime already
    refuses a prompt no profile holds (M31), so it has no limit of its own here.
 
 A cited document that is missing, unreadable or not UTF-8 also sets
 `declines`. `run_task` and `review_task` check `declines` before asking the
 runtime anything, so the task is not started and the decline names the seat,
-the task and the reason. The automated loop keeps that reason on its
-in-memory step; the `loop.step` audit record (M29) holds only the step status,
-not the reason. Nothing is truncated anywhere: a seat
-reads a document whole or declines.
+the task and the reason. The automated loop records the reason of every
+declined step in the `loop.step` audit record (M29), under `reason`. Nothing
+is truncated anywhere: a seat reads a document whole or declines.
 
 ## The test over every workflow seat
 

@@ -20,7 +20,8 @@ from nirmaan.models import KnowledgeSource, KnowledgeSourceKind
 from nirmaan.org import OrganizationError
 from nirmaan.org import knowledge
 from nirmaan.orchestrator import Orchestrator
-from nirmaan.runtime import Completion, ModelRuntime, RegistryLLM, ResultStatus, assemble, render_work_prompt, run_task
+from nirmaan.runtime import (Completion, ModelRuntime, RegistryLLM, ResultStatus, assemble, loop, render_work_prompt,
+                             review_task, run_task)
 from nirmaan.runtime.model import context_limit
 from nirmaan.runtime.selection import SelectingLLM, model_profiles
 
@@ -185,3 +186,28 @@ def test_a_document_ref_must_be_division_slash_the_citing_skill(ref):
     with pytest.raises(OrganizationError, match="knowledge document ref"):
         _org_citing(ref=ref)
 
+
+
+def test_a_reviewer_over_its_models_context_declines_with_no_call(nirmaan_org, fixed_clock):
+    from nirmaan_helpers import agent, attach_evidence
+
+    engine = Orchestrator(nirmaan_org, clock=fixed_clock).plan(REQUEST)
+    task = _task(engine, "requirements")
+    owner = agent(engine.task(task).owner)
+    engine.start(task, owner)
+    engine.submit(task, owner, [{"kind": k, "title": k} for k in engine.task(task).expected_outputs])
+    attach_evidence(engine, task)
+    assert engine.task(task).status.value == "in_review"
+    llm = TinyLLM()
+    report = review_task(engine, task, ModelRuntime(llm, runtime_id="tiny"))
+    assert report.status is ResultStatus.DECLINED and "over the seat's model context of 1000" in report.detail
+    assert llm.calls == 0 and not engine.state.model_calls
+
+
+def test_the_loop_records_why_a_seat_declined(root, fixed_clock):
+    engine = Orchestrator(_org_citing(), clock=fixed_clock).plan(REQUEST)
+    task = _task(engine, "requirements")
+    report = loop(engine, Spy(), task_id=task, max_calls=2)
+    assert report.steps[-1].status == "declined"
+    step = [e for e in engine.state.audit if e.action == "loop.step"][-1]
+    assert "cited but missing" in step.details["reason"]
