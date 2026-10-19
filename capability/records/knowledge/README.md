@@ -9,7 +9,7 @@ what raises a skill to the Knowledge level (`scripts/capability_levels.py`,
 {
   "format": "nirmaan.knowledge-check",
   "skill": "c_programming",
-  "document": "knowledge/software/c_programming.md",
+  "knowledge_document": "knowledge/software/c_programming.md",
   "document_sha256": "sha256:<the document's bytes>",
   "writer": "the session or seat that wrote the document",
   "checker": "a different session or seat",

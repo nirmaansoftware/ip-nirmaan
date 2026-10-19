@@ -209,7 +209,7 @@ def _document(repo: Path) -> Path:
 
 def _check(repo: Path, doc: Path, **override) -> None:
     data = {"format": KNOWLEDGE_CHECK_FORMAT, "skill": "c_programming",
-            "document": "knowledge/software/c_programming.md",
+            "knowledge_document": "knowledge/software/c_programming.md",
             "document_sha256": "sha256:" + hashlib.sha256(doc.read_bytes()).hexdigest(),
             "writer": "session a", "checker": "session b", "sources_read": ["SEI CERT C"], **override}
     path = repo / "capability" / "records" / "knowledge" / "c_programming.json"

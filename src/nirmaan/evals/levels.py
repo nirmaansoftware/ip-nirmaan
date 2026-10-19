@@ -32,6 +32,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
+from nirmaan.company.evidence import MUST_FAIL_DOMAINS
 from nirmaan.evals.cases import EvalError, load_cases, skill_digest
 from nirmaan.evals.records import MANIFEST, load_evidence, wilson
 from nirmaan.evals.scorers import scorer_spec
@@ -47,8 +48,6 @@ REJUDGE = "rejudge.json"
 REJUDGE_FORMAT = "nirmaan.eval-rejudge"
 MIN_TRIALS = 5
 MIN_LOWER = 0.5
-#: Skill domains whose Practised level needs a must-fail control in every case (record section 9.7).
-MUST_FAIL_DOMAINS = ("design", "verification")
 
 
 class Level(str, Enum):
@@ -75,7 +74,7 @@ def knowledge(skill_id: str, repo: Path) -> dict[str, Any] | None:
     if not docs and not check.is_file():
         return None
     problems: list[str] = []
-    entry: dict[str, Any] = {"document": _rel(docs[0], repo) if docs else None,
+    entry: dict[str, Any] = {"knowledge_document": _rel(docs[0], repo) if docs else None,
                              "check_record": _rel(check, repo) if check.is_file() else None}
     if len(docs) != 1:
         problems.append(f"{len(docs)} documents for {skill_id}; there must be one")
@@ -91,8 +90,9 @@ def knowledge(skill_id: str, repo: Path) -> dict[str, Any] | None:
             problems.append(f"the check record's format is not {KNOWLEDGE_CHECK_FORMAT}")
         if data.get("skill") != skill_id:
             problems.append(f"the check record is for {data.get('skill')!r}")
-        if docs and data.get("document") != entry["document"]:
-            problems.append(f"the check record names {data.get('document')!r}, not {entry['document']}")
+        if docs and data.get("knowledge_document") != entry["knowledge_document"]:
+            named, path = data.get("knowledge_document"), entry["knowledge_document"]
+            problems.append(f"the check record names {named!r}, not {path}")
         writer, checker = data.get("writer"), data.get("checker")
         if not writer or not checker or writer == checker:
             problems.append("a check record needs a writer and a different checker")
