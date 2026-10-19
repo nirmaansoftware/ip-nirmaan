@@ -151,9 +151,17 @@ the branch checked out. In order:
 7. **Isolation.** Read, Grep and Glob only, in the head checkout (`main` is
    readable for comparison); no command, write, network or MCP tools; no
    project customizations; no GitHub, App or API tokens in the environment.
-   The pull request title, body and commit messages are not given. The diff is
-   untrusted data between delimiters with a random marker; an instruction to
-   the reviewer inside it is a critical finding.
+   The pull request title, body and commit messages are not given. The diff,
+   the changed file names (the pull request chooses them) and, for key 2 and
+   the Founder Proxy, the earlier keys' results are untrusted data between
+   delimiters with a random marker, a fresh one for every reviewer call, so
+   no reviewer's output can close another's fence; an instruction to the
+   reviewer inside them is a critical finding. A changed path holding a
+   control or format character (a newline, an escape, a bidirectional or
+   zero-width mark) is refused before any reviewer sees it: both checks stay
+   pending, no model is called, and the loop stops (council record
+   [2026-10-18: two reviews per pull request head](../council/records/2026-10-18-review-loop.md),
+   decision 4).
 8. **Validation.** One JSON object: verdict (`pass` or `fail`; the Founder
    Proxy may also return `needs-founder`, with at least one reason), the head SHA,
    findings with file, line and severity, checks run and what was not run. The
