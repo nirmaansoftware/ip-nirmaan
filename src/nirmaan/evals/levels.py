@@ -1,7 +1,7 @@
 """Evidence levels (M63): Knowledge, Practised and Proven, only from committed records.
 
-The capability build-out council record of 2026-10-18 (section 9) sets the
-scale. A level is never typed: ``scripts/capability_levels.py`` computes it
+The capability build-out council record of 2026-10-18 (section 9; pull request
+#118, waiting for the founder, not yet on main) sets the scale. A level is never typed: ``scripts/capability_levels.py`` computes it
 from files in the repository and writes ``capability/levels.json``, and a test
 fails when the committed file differs from what the records give.
 

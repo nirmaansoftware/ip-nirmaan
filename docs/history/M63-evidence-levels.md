@@ -1,7 +1,8 @@
 # Milestone 63 - Evidence levels: Knowledge, Practised and Proven only from committed records, zero of each on main
 
 A skill's evidence level must come from records, never from a typed claim
-(capability build-out council record, section 9; item P1-09). Design:
+(capability build-out council record, section 9, item P1-09; pull request
+#118, waiting for the founder). Design:
 `docs/CAPABILITY_LEVELS.md`. Tests: `tests/test_capability_levels.py`.
 
 **The generator.** `scripts/capability_levels.py` (`--write`, `--check`)
