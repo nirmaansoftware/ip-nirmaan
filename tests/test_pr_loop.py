@@ -689,7 +689,7 @@ def test_one_pass_steps_every_pull_request_and_a_review_fix_wait_or_busy_lock_ne
     loop.o["github"] = type("G", (), {"list_open_pulls": lambda self: pulls})()
     # Pull request 3 is in a fix round, so it goes first; the rest by number.
     pr_loop._save_state(r.state, CONFIG["repo"], {"pr": 3, "rounds": 1, "seen": {}, "last_fix_head": "abc", "done": None, "stopped": None})
-    outcome = {1: "auto-merge", 2: "wait", 3: "fixed", 4: "busy", 5: "updated", 6: "stopped"}
+    outcome = {1: "ready", 2: "wait", 3: "fixed", 4: "busy", 5: "updated", 6: "stopped"}
     seen = []
 
     def step(p):
@@ -698,7 +698,27 @@ def test_one_pass_steps_every_pull_request_and_a_review_fix_wait_or_busy_lock_ne
     loop.step = step
     results = loop.tick()
     assert seen == [3, 1, 2, 4, 5, 6]
-    assert [f"{x['pr']}:{x['outcome']}" for x in results] == ["3:fixed", "1:auto-merge", "2:wait", "4:busy", "5:updated", "6:stopped"]
+    assert [f"{x['pr']}:{x['outcome']}" for x in results] == ["3:fixed", "1:ready", "2:wait", "4:busy", "5:updated", "6:stopped"]
+
+
+def test_an_auto_merge_ends_the_pass_so_the_rest_are_stepped_against_the_new_main_next_pass(repo):
+    # Auto-merge can merge main while the pass goes on; the pull requests after
+    # it wait for the next pass, which refetches main and checks this copy again.
+    r = repo()
+    loop = r.loop()
+    pulls = [{"number": n} for n in (1, 2, 3)]
+    loop.o["github"] = type("G", (), {"list_open_pulls": lambda self: pulls})()
+    outcome = {1: "skip", 2: "auto-merge", 3: "wait"}
+    seen = []
+
+    def step(p):
+        seen.append(p["number"])
+        return {"outcome": outcome[p["number"]]}
+    loop.step = step
+    assert [f"{x['pr']}:{x['outcome']}" for x in loop.tick()] == ["1:skip", "2:auto-merge"]
+    assert seen == [1, 2], "pull request 3 is not stepped against the main the pass started with"
+    outcome[2] = "skip"
+    assert [f"{x['pr']}:{x['outcome']}" for x in loop.tick()] == ["1:skip", "2:skip", "3:wait"]
 
 
 # --- Related tests for the fixer's local check --------------------------------------

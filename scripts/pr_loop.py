@@ -26,7 +26,8 @@ per call, as a state machine that survives restarts:
             when the review App posts the checks and the repository's
             allow_auto_merge field (read with gh) is true; a "ready" comment in
             a dry run or when it is false; the field unreadable or any merge
-            error stops;
+            error stops; an auto-merge ends the pass (main may move), so the
+            rest wait for the next pass, which refetches main;
     fix     a key or the proxy failed: a separate fresh `claude -p` fixer in a clean
             worktree of the head, Edit and Write only inside it; the loop (never
             the model) checks what changed, commits, runs the checks and pushes.
@@ -421,7 +422,10 @@ class Loop:
     # request the loop is fixing goes first, then by number. The steps run one
     # after another and each review or fix round holds the shared lock, so
     # reviews still run one at a time (a lock held elsewhere makes that pull
-    # request "busy" and the pass goes on).
+    # request "busy" and the pass goes on). An auto-merge ends the pass: it is
+    # the one step that can change main (GitHub may merge at once), and the
+    # pass's view of main (this copy checked against it) dates from its start.
+    # The next pass refetches main and checks this copy again first.
     def tick(self, only_pr: int | None = None) -> list[dict]:
         pulls = [p for p in self.o["github"].list_open_pulls() if not only_pr or p["number"] == only_pr]
 
@@ -429,7 +433,12 @@ class Loop:
             s = load_state(self.state_dir, self.cfg["repo"], p["number"])
             return 0 if s["last_fix_head"] and not s["done"] and not s["stopped"] else 1
         pulls.sort(key=lambda p: (in_flight(p), p["number"]))
-        return [{"pr": p["number"], **self.step(p)} for p in pulls]
+        results = []
+        for p in pulls:
+            results.append({"pr": p["number"], **self.step(p)})
+            if results[-1]["outcome"] == "auto-merge":
+                break
+        return results
 
     def step(self, listed: dict) -> dict:
         cfg, lc, o = self.cfg, self.lc, self.o
