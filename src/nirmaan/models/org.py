@@ -126,17 +126,21 @@ _DISPLAY = {
 }
 
 
-class Proficiency(str, Enum):
-    """How deeply a role holds a skill. Derived from level, never hand-set."""
+class SeniorityBand(str, Enum):
+    """The seniority band a role holds a skill at. Derived from level, never hand-set.
 
-    AWARENESS = "awareness"
+    It says how senior the seat is, not how well the skill is done: no record
+    backs a band (M56).
+    """
+
+    FOUNDATION = "foundation"
     WORKING = "working"
-    PROFICIENT = "proficient"
-    EXPERT = "expert"
+    ADVANCED = "advanced"
+    LEAD = "lead"
 
     @property
     def rank(self) -> int:
-        return list(Proficiency).index(self)
+        return list(SeniorityBand).index(self)
 
 
 class CapabilityKind(str, Enum):
@@ -174,9 +178,9 @@ class Capability(BaseModel):
     name: str
     kind: CapabilityKind
     description: str
-    min_proficiency: Proficiency = Field(
-        default=Proficiency.PROFICIENT,
-        description="The proficiency a role needs in a providing skill to hold it.",
+    min_band: SeniorityBand = Field(
+        default=SeniorityBand.ADVANCED,
+        description="The seniority band a role needs in a providing skill to hold it.",
     )
     produces: tuple[str, ...] = Field(default=(), description="Artifact kinds it yields.")
     min_level: "Level | None" = Field(
@@ -481,7 +485,7 @@ class LevelProfile(BaseModel):
         default=(), description="'{unit}' is replaced with the unit name."
     )
     skills: tuple[str, ...] = Field(
-        default=(), description="Skills held at EXPERT proficiency: the level's core competence."
+        default=(), description="Skills held at the LEAD band: the level's core competence."
     )
     tools: tuple[str, ...] = ()
     capabilities: tuple[str, ...] = ()
