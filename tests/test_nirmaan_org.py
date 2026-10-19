@@ -56,20 +56,19 @@ def test_the_executive_layer_exists(nirmaan_org, role):
     [
         "product.management.requirements", "product.programs.tpm", "product.projects.status",
         "architecture.system.interconnect", "architecture.micro.noc", "architecture.interface.axi",
-        "architecture.interface.cxl", "design.rtl.design.fsm", "design.rtl.cdc", "design.rtl.quality.lint",
+        "architecture.io.cxl", "design.rtl.design.fsm", "design.rtl.cdc", "design.rtl.quality.lint",
         "verification.simulation.uvm", "verification.formal.equivalence", "verification.coverage.functional",
         "verification.debug.triage", "verification.signoff", "implementation.pd.sta.mcmm",
-        "implementation.pd.power.ir", "implementation.pd.signoff.lvs", "implementation.dft.engineering.atpg",
+        "implementation.pd.power.ir", "implementation.pd.signoff.lvs", "implementation.dft.scan_atpg.atpg",
         "software.firmware.boot", "software.tools.compiler", "security.secure_boot",
-        "infrastructure.build.ci", "documentation.writing.registers", "quality.engineering.traceability",
+        "infrastructure.build.ci", "documentation.specifications.registers", "quality.reviews.traceability",
     ],
 )
 def test_every_specified_domain_is_a_unit(nirmaan_org, unit):
     assert unit in nirmaan_org.units
 
 
-@pytest.mark.parametrize("unit", ["finance", "legal", "hr", "procurement", "sales", "marketing",
-                                  "customer_success", "partnerships", "operations"])
+@pytest.mark.parametrize("unit", ["finance", "legal", "hr", "procurement", "operations"])
 def test_business_functions_are_structural_placeholders(nirmaan_org, unit):
     u = nirmaan_org.units[unit]
     assert u.function is Function.BUSINESS and u.status is UnitStatus.PLACEHOLDER

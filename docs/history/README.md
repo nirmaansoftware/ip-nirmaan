@@ -107,6 +107,7 @@ The original preface of the section:
 - [M55-side-2-council-seats](M55-side-2-council-seats.md): side work - three more council seats: legal counsel, tax and accounts, partnerships
 - [release-v1.25.0](release-v1.25.0.md): v1.25.0 (2026-10-12) - the four audits of v1.24.0, closed
 - [M56-seniority-band](M56-seniority-band.md): Milestone 56 - Seniority band: the level-derived scale is renamed, and no band says "expert"
+- [M57-hierarchy-fixes](M57-hierarchy-fixes.md): Milestone 57 - Hierarchy fixes: the org matches the capability build-out council record
 - [M59-release-mirror-check](M59-release-mirror-check.md): Milestone 59 - Release check for the public org mirrors: the org figure and the hero's plan excerpt are checked against the code at each release
 - [M61-knowledge-packet](M61-knowledge-packet.md): Milestone 61 - Knowledge documents in the work packet: a cited document's text reaches the seat, within a budget, or the seat declines
 
