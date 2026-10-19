@@ -20,7 +20,7 @@ from nirmaan.models import (
     Function,
     Level,
     OrgUnit,
-    Proficiency,
+    SeniorityBand,
     Skill,
     Track,
     UnitKind,
@@ -153,16 +153,23 @@ def test_skills_compose_through_includes(nirmaan_org):
         assert composed in skills
 
 
-def test_proficiency_is_derived_from_level(nirmaan_org):
-    p = nirmaan_org.proficiency
-    assert p("verification.debug.triage.intern", "failure_triage") is Proficiency.AWARENESS
-    assert p("verification.debug.triage.junior", "failure_triage") is Proficiency.WORKING
-    assert p("verification.debug.triage.engineer", "failure_triage") is Proficiency.PROFICIENT
-    assert p("verification.debug.triage.senior", "failure_triage") is Proficiency.EXPERT
-    # A manager holds inherited domain skills, but not at expert depth.
-    assert p("verification.debug.manager", "debugging") is Proficiency.PROFICIENT
+def test_band_is_derived_from_level(nirmaan_org):
+    b = nirmaan_org.band
+    assert b("verification.debug.triage.intern", "failure_triage") is SeniorityBand.FOUNDATION
+    assert b("verification.debug.triage.junior", "failure_triage") is SeniorityBand.WORKING
+    assert b("verification.debug.triage.engineer", "failure_triage") is SeniorityBand.ADVANCED
+    assert b("verification.debug.triage.senior", "failure_triage") is SeniorityBand.LEAD
+    # A manager holds inherited domain skills, but not at the lead band.
+    assert b("verification.debug.manager", "debugging") is SeniorityBand.ADVANCED
     # Level-granted skills are the level's core competence.
-    assert p("verification.debug.manager", "engineering_management") is Proficiency.EXPERT
+    assert b("verification.debug.manager", "engineering_management") is SeniorityBand.LEAD
+
+
+def test_band_claims_no_expertise(nirmaan_org):
+    # M56: a band is derived from level with no record behind it, so no band value says "expert".
+    assert [b.value for b in SeniorityBand] == ["foundation", "working", "advanced", "lead"]
+    card = nirmaan_org.agent_card("verification.debug.triage.senior")
+    assert card["skills"]["failure_triage"] == "lead"
 
 
 def test_review_capabilities_need_expertise(nirmaan_org):
