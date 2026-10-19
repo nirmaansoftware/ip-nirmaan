@@ -6,7 +6,7 @@ from files in the repository and writes ``capability/levels.json``, and a test
 fails when the committed file differs from what the records give.
 
 * **Knowledge**: the skill's document ``knowledge/<division>/<skill_id>.md``
-  exists, and a check record ``capability/records/knowledge/<skill_id>.json``
+  exists and passes the M62 checks, and a check record ``capability/records/knowledge/<skill_id>.json``
   names it by its current sha256, with a checker who is not the writer and the
   sources the checker read. A document changed since its check is stale.
 * **Practised**: committed, tool-judged eval result records under
@@ -38,6 +38,7 @@ from nirmaan.evals.records import MANIFEST, load_evidence, wilson
 from nirmaan.evals.scorers import scorer_spec
 from nirmaan.models import EvalCase
 from nirmaan.org import Organization
+from nirmaan.org.knowledge_files import check_document
 
 FORMAT = "nirmaan.capability-levels"
 KNOWLEDGE_CHECK_FORMAT = "nirmaan.knowledge-check"
@@ -67,7 +68,7 @@ def _rel(path: Path, repo: Path) -> str:
 # --- Knowledge -------------------------------------------------------------------------------
 
 
-def knowledge(skill_id: str, repo: Path) -> dict[str, Any] | None:
+def knowledge(org: Organization, skill_id: str, repo: Path) -> dict[str, Any] | None:
     """The skill's knowledge evidence, or None when it has neither a document nor a check record."""
     docs = sorted((repo / "knowledge").glob(f"*/{skill_id}.md"))
     check = repo / CHECKS / f"{skill_id}.json"
@@ -78,6 +79,8 @@ def knowledge(skill_id: str, repo: Path) -> dict[str, Any] | None:
                              "check_record": _rel(check, repo) if check.is_file() else None}
     if len(docs) != 1:
         problems.append(f"{len(docs)} documents for {skill_id}; there must be one")
+    for doc in docs:  # M62: a document that fails its own checks raises no level
+        problems += [f"{_rel(doc, repo)}: {p}" for p in check_document(doc, org.skills, org.tools)[0]]
     if not check.is_file():
         problems.append("no check record")
     else:
@@ -199,7 +202,7 @@ def compute(org: Organization, repo: Path) -> dict[str, Any]:
     groups, refused, not_tool_judged = practised(org, repo, cases)
     skills: dict[str, Any] = {}
     for skill_id in sorted(set(org.skills) | set(groups)):
-        know = knowledge(skill_id, repo)
+        know = knowledge(org, skill_id, repo)
         practice = groups.get(skill_id, [])
         if know is None and not practice:
             continue

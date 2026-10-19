@@ -203,7 +203,9 @@ def test_nothing_is_ever_proven(org, tmp_path):
 def _document(repo: Path) -> Path:
     doc = repo / "knowledge" / "software" / "c_programming.md"
     doc.parent.mkdir(parents=True, exist_ok=True)
-    doc.write_text("Knowledge only: no tool run backs this.\n", encoding="utf-8")
+    # The M62 good fixture: a document that passes every file check.
+    doc.write_text((ROOT / "tests" / "fixtures" / "knowledge" / "software" / "c_programming.md").read_text(
+        encoding="utf-8"), encoding="utf-8")
     return doc
 
 
@@ -255,3 +257,11 @@ def test_rejudge_write_records_each_trial_and_feeds_the_level(org, tmp_path):
     path = write_rejudge(record, "run1", outcomes)
     assert json.loads(path.read_text())["format"] == REJUDGE_FORMAT
     assert _level(org, tmp_path)["level"] == "practised"
+
+
+def test_a_document_that_fails_its_file_checks_is_no_level(org, tmp_path):
+    doc = _document(tmp_path)
+    doc.write_text(doc.read_text(encoding="utf-8").replace("checker: fixture checker\n", ""), encoding="utf-8")
+    _check(tmp_path, doc)
+    entry = _level(org, tmp_path, "c_programming")
+    assert entry["level"] is None and any("missing front matter field 'checker'" in p for p in entry["knowledge"]["problems"])

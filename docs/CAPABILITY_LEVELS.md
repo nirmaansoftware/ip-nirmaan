@@ -11,7 +11,7 @@ stated here in full, and the thresholds are this milestone's own.
 
 | Level | Only from |
 |---|---|
-| Knowledge | the document `knowledge/<division>/<skill_id>.md` and a check record `capability/records/knowledge/<skill_id>.json` by a different session, naming the document's current sha256 and the sources read |
+| Knowledge | the document `knowledge/<division>/<skill_id>.md`, passing the M62 checks (`docs/KNOWLEDGE_FILES.md`), and a check record `capability/records/knowledge/<skill_id>.json` by a different session, naming the document's current sha256 and the sources read |
 | Practised | committed, tool-judged eval result records under `evals/results/` (M45, M58) |
 | Proven | the product's own seat run records on delivered work that passed review; no such record kind exists yet, so no skill is Proven |
 
