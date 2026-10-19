@@ -112,6 +112,7 @@ new number. M1 to M42 are taken; see `docs/history/README.md`.
 | M57 | Hierarchy fixes from the capability build-out council record | reserved |
 | M58 | Eval cases name skills; must-fail scorer | reserved |
 | M59 | Release check for the public org mirrors | reserved |
+| M60 | Span, depth and activation rules as a check | reserved |
 | M61 | Knowledge documents in the work packet, with a budget | reserved |
 
 <!-- review:milestone-numbers:end -->

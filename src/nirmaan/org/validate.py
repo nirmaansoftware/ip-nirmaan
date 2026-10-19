@@ -8,6 +8,7 @@ not a surprise at planning time.
 
 from __future__ import annotations
 
+from datetime import date
 from typing import TYPE_CHECKING
 
 from nirmaan.models import (
@@ -283,3 +284,62 @@ def _condition_issues(where: str, cond, features, plan_only: bool) -> list[str]:
     if cond.on != "features":
         return []
     return [f"{where}: unknown feature {f}" for f in (*cond.all_of, *cond.any_of, *cond.none_of) if f not in features]
+
+
+# --- Shape: span, depth, placeholders (M60) ---------------------------------------------
+
+#: The span range of record section 3 (capability build-out council record, 2026-10-18).
+SPAN_MIN, SPAN_MAX = 3, 8
+#: Layers below the Board (the founder): CEO, C-level, VP, director, manager, ICs.
+MAX_DEPTH = 6
+
+
+def executive_span(org: "Organization", role_id: str) -> list[str]:
+    """What an executive manages directly: the units it sponsors, the child units of the units it heads (not the
+    company or the executive office), and the explicit roles reporting to it. Generated ladder roles never count."""
+    span: list[str] = []
+    for unit in org.units.values():
+        if unit.sponsor_role == role_id:
+            span.append(unit.id)
+        elif unit.head_role == role_id and unit.kind not in (UnitKind.COMPANY, UnitKind.OFFICE):
+            span += [c.id for c in org.children(unit.id)]
+    explicit = {r.id for r in org.definition.roles}
+    span += sorted(r for r in explicit if org.roles[r].reports_to == role_id)
+    return span
+
+
+def shape_issues(org: "Organization", today: date | None = None) -> list[str]:
+    """The span, depth and placeholder rules of record section 3, on a built organization.
+
+    Not part of every build: an overlay or extension may grow a unit between reorganizations, so the rule binds the
+    shipped chart through its test. ``today`` also fails exceptions whose review date has passed.
+    """
+    issues: list[str] = []
+    for unit in org.units.values():
+        if unit.kind is UnitKind.COMPANY:
+            continue  # its children report to the executives, counted below
+        n = len(org.children(unit.id))
+        within = n == 0 or SPAN_MIN <= n <= SPAN_MAX  # a leaf is exempt
+        exc = unit.span_exception
+        if exc is None:
+            if not within:
+                issues.append(f"unit {unit.id}: {n} child units, outside {SPAN_MIN} to {SPAN_MAX}")
+        elif within:
+            issues.append(f"unit {unit.id}: span exception not needed ({n} child units)")
+        elif today is not None and exc.review_by < today:
+            issues.append(f"unit {unit.id}: span exception review date {exc.review_by.isoformat()} has passed")
+        if unit.status is UnitStatus.PLACEHOLDER and not unit.mission.strip():
+            issues.append(f"unit {unit.id}: a placeholder declares no mission")
+    for role in org.definition.roles:
+        if role.level is Level.BOARD:
+            continue
+        if not any(u.head_role == role.id or u.sponsor_role == role.id for u in org.units.values()):
+            continue  # a staff role: heads or sponsors no unit (today the Chief of Staff)
+        span = executive_span(org, role.id)
+        if not SPAN_MIN <= len(span) <= SPAN_MAX:
+            issues.append(f"role {role.id}: span {len(span)}, outside {SPAN_MIN} to {SPAN_MAX}")
+    for role_id in org.roles:
+        depth = len(org.line_chain(role_id))
+        if depth > MAX_DEPTH:
+            issues.append(f"role {role_id}: {depth} layers below the Board, more than {MAX_DEPTH}")
+    return issues
