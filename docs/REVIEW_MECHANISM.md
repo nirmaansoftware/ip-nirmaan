@@ -157,12 +157,23 @@ the branch checked out. In order:
 8. **Validation.** One JSON object: verdict (`pass` or `fail`; the Founder
    Proxy may also return `needs-founder`, with at least one reason), the head SHA,
    findings with file, line and severity, checks run and what was not run. The
-   script checks the schema, the SHA and that every cited file and line exists
-   at the head. A pass with a blocker or critical finding is recorded as fail.
+   script checks the schema, the SHA and every citation (council record
+   [2026-10-18: two reviews per pull request head](../council/records/2026-10-18-review-loop.md),
+   decision 5). A cited line must exist at the head, at the base for a file
+   the pull request deletes, or on `main` (written `main:<path>`, or a path
+   that is not at the head but is on `main`); a reviewer's checkout prefix is
+   taken off a cited path first. A minor or info finding with a bad citation
+   is dropped with a note in the comment, and the verdict stands. A bad
+   citation on a major, critical or blocker finding gets one repair: the same
+   reviewer is asked once, with the error, for the same verdict with corrected
+   citations. A repair that fails, cites badly again or changes the verdict
+   defers the key, so a bad citation never leads to a pass. A pass with a
+   blocker or critical finding is recorded as fail. A repair is not a review;
+   the call log marks it `"attempt": "repair"`.
 9. **Fail closed.** A failed call, a timeout or a rate limit gets one retry
-   after a backoff; after that, and on any invalid output or missing
-   citation, the key is "review deferred" and stays pending. It never passes
-   by default.
+   after a backoff; after that, and on any invalid output or a citation that
+   step 8 neither drops nor repairs, the key is "review deferred" and stays
+   pending. It never passes by default.
 10. **Posting.** The head is checked before every post; if it moved, nothing
     more is posted. One comment per key (seat, key, head and base SHA,
     verdict, findings, checks run, what was not run) and the checks
