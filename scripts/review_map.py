@@ -7,8 +7,9 @@ the file uses (block maps and lists, one-line flow lists, quoted and plain
 scalars, comments). The loader refuses anything else rather than guess.
 
 `classify` computes what a pull request needs from the map on main: the owning
-teams and which lead of each holds key 1, the founder classes, and the content
-rule and section hits, from the changed files and the diff.
+teams and which lead of each holds key 1, the founder classes, the founder
+floor's hits (`founder_floor`), and the content rule and section hits, from the
+changed files and the diff.
 """
 
 from __future__ import annotations
@@ -261,7 +262,8 @@ def _applies(rule: dict, path: str) -> bool:
 
 
 def classify(teams_map: dict, files: list[dict], diff: str, read_head, read_base) -> dict:
-    """Owning teams (with the lead or leads that hold key 1), founder classes and hits.
+    """Owning teams (with the lead or leads that hold key 1), founder classes,
+    the founder floor's hits and the section and content hits.
 
     `read_head(path)` and `read_base(path)` return a file's text or None; they
     are used to place changed lines inside marker sections.
@@ -342,6 +344,17 @@ def classify(teams_map: dict, files: list[dict], diff: str, read_head, read_base
                 if section["id"] == section_id and section["file"] in paths and section_lines(section["file"], section):
                     flag(cls["id"], f"section {section_id}")
 
+    # The founder floor: paths and founder classes that wait for the founder's
+    # own approval, decided here from the map with no model.
+    floor_map = teams_map.get("founder_floor") or {}
+    floor: list[str] = []
+    for path in paths:
+        if any(matches(glob, path) for glob in floor_map.get("paths", [])) and f"path {path}" not in floor:
+            floor.append(f"path {path}")
+    for cls in floor_map.get("classes", []):
+        if cls in founder:
+            floor.append(f"founder class {cls}")
+
     keys = []
     for team_id in teams:
         if team_id not in owners:
@@ -354,6 +367,7 @@ def classify(teams_map: dict, files: list[dict], diff: str, read_head, read_base
         "teams": [t for t in teams if t in owners],
         "keys": keys,
         "founder": founder,
+        "floor": floor,
         "hits": sorted(set(hits)),
         "ledger": sorted(ledger_files),
     }

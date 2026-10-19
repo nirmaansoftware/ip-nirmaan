@@ -559,6 +559,139 @@ def test_validate_verdict_for_the_proxy():
     assert v["verdict"] == "needs-founder"
 
 
+# --- The founder floor (council record 2026-10-18 on the review loop, decision 3) ---
+
+# The test map plus a licence class, an export-control class with a detector,
+# and a floor: the review script, licence files and the export-control class.
+# .github/** stays off this floor, so the proxy tests above still reach the proxy.
+FLOOR_MAP = MAP.replace("founder_classes:\n", """founder_classes:
+  - id: licence-and-third-party
+    title: Licence and third-party
+    paths: [LICENSE, NOTICE, '**/LICENSE*']
+  - id: export-control
+    title: Export control
+    content:
+      - pattern: 'EXPORT-SENSITIVE'
+        example: 'EXPORT-SENSITIVE'
+""") + """founder_floor:
+  paths: [scripts/pr_review.py, LICENSE, NOTICE, '**/LICENSE*']
+  classes: [export-control]
+"""
+FLOOR_PENDING = "key 2 pass; founder floor (review script, no model): needs the founder"
+
+
+def floor_repo(repo, change, **kw):
+    return repo(change=change, main_extra=lambda w: write(w, ".github/review-teams.yml", FLOOR_MAP), **kw)
+
+
+@pytest.mark.parametrize("path, reason", [
+    ("scripts/pr_review.py", "path scripts/pr_review.py"),
+    ("LICENSE", "path LICENSE"),
+    ("NOTICE", "path NOTICE"),
+    ("vendor/core/LICENSE.txt", "path vendor/core/LICENSE.txt"),
+])
+def test_a_floor_path_gets_needs_founder_from_the_script_after_key2_and_the_proxy_is_never_called(repo, path, reason):
+    r = floor_repo(repo, lambda w: write(w, path, "changed\n"), responses=[PASS, PASS])
+    result = r.run()
+    assert result["key2"]["status"] == "pass"
+    assert result["proxy"] is None and result["floor"]["status"] == "needs-founder"
+    assert reason in result["floor"]["reasons"] and result["founder_approved"] is False
+    calls = r.calls()
+    assert len(calls) == 2, "key 1 and key 2 only: no model decides the floor"
+    assert not any("Founder Proxy (agent), the third reviewer" in system_prompt(c) for c in calls)
+    assert not any(l["key"] == "proxy" for l in r.log())
+    floor_log = [l for l in r.log() if l["key"] == "floor"]
+    assert floor_log and floor_log[-1]["model"] is None and floor_log[-1]["outcome"] == "needs-founder"
+    ex = r.check("review/executive")
+    assert ex["state"] == "pending" and FLOOR_PENDING in ex["title"]
+    assert r.check("review/team-lead")["state"] == "success", "the keys still review for defects"
+    body = r.comments()[-1]["body"]
+    assert "key=floor team=founder-floor" in body and "**NEEDS THE FOUNDER**" in body and reason in body
+    assert "| Session | no model call |" in body and pr_review.PROXY_DELEGATION not in body
+    assert "approved" not in body.lower()
+    assert "on the founder floor" in r.github.body.lower(), "the declaration says the founder decides, not the proxy"
+    assert "the Founder Proxy (agent) reviews it" not in r.github.body
+
+
+def test_an_export_control_flag_is_on_the_floor_whatever_the_paths(repo):
+    r = floor_repo(repo, lambda w: write(w, "src/app.py", "one\nEXPORT-SENSITIVE\n"), responses=[PASS, PASS])
+    result = r.run()
+    assert "export-control" in result["classification"]["founder"]
+    assert result["floor"]["reasons"] == ["founder class export-control"]
+    assert len(r.calls()) == 2 and result["proxy"] is None
+    assert FLOOR_PENDING in r.check("review/executive")["title"]
+
+
+def test_only_the_founders_own_review_of_this_head_passes_the_floor_with_no_new_model_call(repo):
+    gh = {"reviews": []}
+    r = floor_repo(repo, lambda w: write(w, "LICENSE", "changed\n"), gh=gh, responses=[PASS, PASS])
+    r.run()
+    gh["reviews"] += [{"login": "nirmaansoftware", "state": "APPROVED", "commit_id": SHA},
+                      {"login": "patel-om", "state": "APPROVED", "commit_id": "HEAD"}]
+    r.run()
+    assert r.check("review/executive")["state"] == "pending", "an old head, or someone else, is not the founder's decision"
+    gh["reviews"].append({"login": "nirmaansoftware", "state": "APPROVED", "commit_id": "HEAD"})
+    result = r.run()
+    assert result["founder_approved"] is True and result["floor"]["status"] == "needs-founder"
+    assert len(r.calls()) == 2, "cached key verdicts; the floor never calls a model"
+    ex = r.check("review/executive")
+    assert ex["state"] == "success" and "founder floor (review script, no model): the founder's review approves this head" in ex["title"]
+    gh["reviews"].append({"login": "nirmaansoftware", "state": "CHANGES_REQUESTED", "commit_id": "HEAD"})
+    r.run()
+    assert r.check("review/executive")["state"] == "pending", "the founder's latest review decides"
+
+
+def test_the_hold_label_still_holds_a_floor_head_the_founder_approved(repo):
+    gh = {"labels": ["hold"], "reviews": [{"login": "nirmaansoftware", "state": "APPROVED", "commit_id": "HEAD"}]}
+    r = floor_repo(repo, lambda w: write(w, "LICENSE", "changed\n"), gh=gh, responses=[PASS, PASS])
+    r.run()
+    ex = r.check("review/executive")
+    assert ex["state"] == "pending" and "held" in ex["title"]
+
+
+def test_a_floor_head_whose_key_fails_is_handled_as_before(repo):
+    fail = {"type": "verdict", "verdict": "fail", "findings": [{"file": "LICENSE", "line": 1, "severity": "critical", "text": "x"}]}
+    r = floor_repo(repo, lambda w: write(w, "LICENSE", "changed\n"), responses=[fail])
+    result = r.run()
+    assert result["key2"] is None and result.get("floor") is None
+    assert len(r.calls()) == 1
+    assert r.check("review/team-lead")["state"] == "failure"
+    assert r.check("review/executive")["state"] == "pending"
+
+
+def test_a_diff_touching_no_floor_path_behaves_as_before(repo):
+    plain = floor_repo(repo, None)
+    result = plain.run()
+    assert result["floor"] is None and result["proxy"] is None and len(plain.calls()) == 2
+    assert plain.check("review/executive")["state"] == "success"
+
+
+def test_a_founder_class_head_off_the_floor_still_gets_the_proxy(repo):
+    r = floor_repo(repo, GITHUB_CHANGE)
+    result = r.run()
+    assert result["floor"] is None and result["proxy"]["status"] == "pass" and len(r.calls()) == 3
+
+
+def test_the_floor_is_read_from_main_never_from_the_pr(repo):
+    without = MAP  # the PR's own copy drops the floor
+    r = floor_repo(repo, lambda w: (write(w, ".github/review-teams.yml", without), write(w, "LICENSE", "changed\n")),
+                   responses=[PASS, PASS])
+    result = r.run()
+    assert result["floor"] and "path LICENSE" in result["floor"]["reasons"]
+    assert result["proxy"] is None
+
+
+def test_founder_class_block_on_the_floor():
+    teams_map = review_map.load_map(FLOOR_MAP)
+    block = pr_review.founder_class_block(teams_map, ["licence-and-third-party"], floor=True)
+    assert block == ("<!-- review:founder-class -->Founder class: licence-and-third-party (Licence and third-party); on the "
+                     "founder floor: after key 2 it waits for the founder's own GitHub approval of the head, decided by the "
+                     "review script with no model.<!-- /review:founder-class -->")
+    alone = pr_review.founder_class_block(teams_map, [], floor=True)
+    assert alone.startswith(pr_review.FOUNDER_BLOCK_OPEN + "On the founder floor: ")
+    assert pr_review.founder_class_block(teams_map, ["commercial"]) == BLOCK_COMMERCIAL, "unchanged off the floor"
+
+
 def test_content_trigger_adds_business_with_the_named_lead_and_founder_class(repo):
     r = repo(change=lambda w: write(w, "src/app.py", "one\nthe price\n"))
     result = r.run()

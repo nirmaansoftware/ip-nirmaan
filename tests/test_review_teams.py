@@ -91,6 +91,14 @@ def problems(teams_map: dict, files: list[str], seat_files: set[str]) -> list[st
         for glob in founder_class.get("paths", []):
             if not any(matches(glob, path) for path in files):
                 found.append(f"dead founder class glob ({founder_class['id']}): {glob}")
+    floor = teams_map.get("founder_floor") or {}
+    for glob in floor.get("paths", []):
+        if not any(matches(glob, path) for path in files):
+            found.append(f"dead founder floor glob: {glob}")
+    class_ids = {c["id"] for c in teams_map["founder_classes"]}
+    for cls in floor.get("classes", []):
+        if cls not in class_ids:
+            found.append(f"founder floor names {cls!r}, which is not a founder class")
     return found
 
 
@@ -335,6 +343,56 @@ def test_no_codeowners_file_founder_classes_are_reviewed_by_the_founder_proxy(fi
     for path in ("CODEOWNERS", ".github/CODEOWNERS", "docs/CODEOWNERS"):
         assert path not in files, f"{path} exists: founder classes are reviewed by the Founder Proxy (council/founder-proxy.md)"
     assert (ROOT / "council" / "founder-proxy.md").exists()
+
+
+# --- The founder floor (council record 2026-10-18 on the review loop, decision 3) -----
+
+# council/records/2026-10-18-review-loop.md, decision 3: these wait for the
+# founder's own GitHub approval, decided by the review script with no model.
+FLOOR_PATHS = [
+    "scripts/pr_review.py", "scripts/review_map.py", "scripts/pr_loop.py",
+    ".github/review-teams.yml", ".github/workflows/ci.yml", "docs/pr-loop.plist",
+    ".claude/skills/pr-review/SKILL.md", "council/founder-proxy.md", "council/chair.md",
+    "council/records/2026-10-17-teams-and-pr-review.md",
+    "tests/test_review_teams.py", "tests/test_pr_review.py", "tests/test_pr_loop.py", "tests/conftest.py",
+    "LICENSE", "NOTICE", "src/nirmaan/integrations/firmware_soc/serv/LICENSE", "site/assets/fonts/OFL-archivo.txt",
+]
+OFF_THE_FLOOR = ["src/nirmaan/company/org_chart.py", "site/index.html", "council/security.md", "docs/ROADMAP.md",
+                 "tests/test_laws.py", "README.md", "docs/REVIEW_MECHANISM.md"]
+
+
+def _classify(teams_map, path, diff=""):
+    return review_map.classify(teams_map, [{"status": "M", "old": None, "path": path}], diff, lambda p: None, lambda p: None)
+
+
+@pytest.mark.parametrize("path", FLOOR_PATHS)
+def test_every_review_machinery_and_licence_path_is_on_the_founder_floor(teams_map, files, path):
+    assert path in files, f"{path} is not tracked: the floor list in this test is out of date"
+    c = _classify(teams_map, path)
+    assert c["floor"] == [f"path {path}"]
+    assert c["founder"], "every floor path is also founder class, so the pull request declares it"
+
+
+@pytest.mark.parametrize("path", OFF_THE_FLOOR)
+def test_ordinary_paths_are_off_the_floor(teams_map, path):
+    assert _classify(teams_map, path)["floor"] == []
+
+
+def test_the_review_tests_are_founder_class(teams_map):
+    control = next(c for c in teams_map["founder_classes"] if c["id"] == "control-plane")["paths"]
+    for path in ("tests/test_review_teams.py", "tests/test_pr_review.py", "tests/test_pr_loop.py", "tests/conftest.py"):
+        assert path in control
+
+
+def test_an_export_control_flag_puts_any_path_on_the_floor(teams_map):
+    assert teams_map["founder_floor"]["classes"] == ["export-control"]
+    flagged = {**teams_map, "founder_classes": [
+        {**c, "content": [{"pattern": "EXPORT-SENSITIVE"}]} if c["id"] == "export-control" else c
+        for c in teams_map["founder_classes"]]}
+    diff = "diff --git a/docs/x.md b/docs/x.md\n--- a/docs/x.md\n+++ b/docs/x.md\n@@ -1 +1 @@\n-a\n+EXPORT-SENSITIVE\n"
+    c = _classify(flagged, "docs/x.md", diff)
+    assert "export-control" in c["founder"] and c["floor"] == ["founder class export-control"]
+    assert _classify(teams_map, "docs/x.md", diff)["floor"] == [], "no detector on main today: nothing flags it"
 
 
 # --- The loader and the globs ---------------------------------------------------------

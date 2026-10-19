@@ -35,8 +35,9 @@ per call, as a state machine that survives restarts:
             the model) checks what changed, commits, runs the checks and pushes.
             The new head voids both keys, so the next step reviews from scratch;
     stop    three fix rounds, the same finding twice, CI failing after a fix, a
-            merge conflict, a deferred key or proxy, the proxy's needs-founder
-            (until the founder's own GitHub review approves the head), a rate
+            merge conflict, a deferred key or proxy, the proxy's or the founder
+            floor's needs-founder (until the founder's own GitHub review
+            approves the head), a rate
             limit, a forbidden path, a failed local check or any error: label
             `needs-founder`, say why.
 
@@ -398,6 +399,9 @@ def _worktree_changes(path: str) -> list[str]:
 def _passed_what(r: dict, capital: bool = False) -> str:
     """What passed, for the merge-path comments."""
     proxy = r.get("proxy")
+    if r.get("floor"):
+        what = "both keys passed, and the founder's own GitHub review approves this head (founder floor)"
+        return what[0].upper() + what[1:] if capital else what
     what = ("both keys passed" if not proxy else
             "both keys passed, and the founder's own GitHub review approves the changes the Founder Proxy (agent) sent to the founder"
             if proxy["status"] == pr_review.NEEDS_FOUNDER else "both keys and the Founder Proxy (agent) passed")
@@ -586,10 +590,16 @@ class Loop:
                 return self._stop(ctx, head, "review deferred (" + "; ".join(f"{k['team_name']}: {k.get('reason')}" for k in deferred) + ")")
             self._log(ctx, "reviewed", key1=",".join(f"{k['team']}:{k['status']}" for k in r["key1"]),
                       key2=r["key2"]["status"] if r.get("key2") else "not run",
-                      proxy=r["proxy"]["status"] if r.get("proxy") else "not run")
+                      proxy=r["proxy"]["status"] if r.get("proxy") else "not run",
+                      floor=r["floor"]["status"] if r.get("floor") else "not run")
             # What the founder keeps: the loop stops and the founder decides on
             # GitHub. Their own review approving this head lets the review pass
             # review/executive; removing the label lets the loop resume.
+            # The founder floor: the review script's own needs-founder, no model.
+            if r.get("floor") and not r.get("founder_approved"):
+                why = "; ".join(r["floor"].get("reasons") or [])
+                return self._stop(ctx, head, f"the founder floor (review script, no model) holds it: {why}. The founder decides: "
+                                             f"approve head {head[:7]} on GitHub (or not), then remove the label")
             if r.get("proxy") and r["proxy"]["status"] == pr_review.NEEDS_FOUNDER and not r.get("founder_approved"):
                 why = "; ".join((r["proxy"].get("verdict") or {}).get("founder_reasons") or [])
                 return self._stop(ctx, head, f"the Founder Proxy (agent) returned needs-founder: {why}. The founder decides: "

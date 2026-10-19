@@ -537,6 +537,27 @@ def test_proxy_needs_founder_labels_and_stops_then_the_founders_approval_and_lab
     assert "the founder's own GitHub review approves the changes the Founder Proxy (agent) sent to the founder" in r.comments()[-1]
 
 
+def test_the_founder_floor_labels_and_stops_with_no_proxy_call_then_the_founders_approval_merges(repo, monkeypatch):
+    monkeypatch.setitem(globals(), "MAP", MAP + "founder_floor:\n  paths: [.github/**]\n  classes: []\n")
+    r = repo(change=_change_github, reviews=[{"verdict": "pass"}, {"verdict": "pass"}])
+    assert r.tick() == ["stopped"]
+    assert r.labeled() and r.github.merges == []
+    reviews = [c for c in r.calls() if c["kind"] == "reviews"]
+    assert len(reviews) == 2 and not any("SEAT-MARKER-founder-proxy" in _sys(c) for c in reviews), "no model decides the floor"
+    assert not [c for c in r.calls() if c["kind"] == "fixes"]
+    assert "the founder floor (review script, no model) holds it: path .github/workflows/x.yml" in r.comments()[-1]
+    logged = next(l for l in r.log() if l.get("event") == "reviewed")
+    assert logged["floor"] == "needs-founder" and logged["proxy"] == "not run"
+    r.github.labels = []
+    assert r.tick() == ["stopped"], "label removed without the founder's approval: stops again"
+    r.github.labels = []
+    r.github.reviews.append({"login": "nirmaansoftware", "state": "APPROVED", "commit_id": r.first_head})
+    n = len(r.calls())
+    assert r.tick() == ["auto-merge"]
+    assert len(r.calls()) == n, "cached key verdicts: no new model call"
+    assert "the founder's own GitHub review approves this head (founder floor)" in r.comments()[-1]
+
+
 def test_proxy_deferred_without_its_seat_on_main_stops_and_never_merges(repo):
     r = repo(change=_change_github)
     sh(r.work, "rm", "-q", "council/founder-proxy.md")

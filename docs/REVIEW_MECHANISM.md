@@ -100,6 +100,31 @@ posts says "Founder Proxy (agent), acting under the founder's delegation of
 - **No CODEOWNERS.** `.github/CODEOWNERS` was removed, and
   `tests/test_review_teams.py` fails if one is added back.
 
+**The founder floor.** Some changes wait for the founder's own GitHub approval
+whatever any agent review says, and the review script, not a model, decides
+that. They are listed as data in `founder_floor` in `.github/review-teams.yml`
+on `main`: the review machinery (`scripts/pr_review.py`,
+`scripts/review_map.py`, `scripts/pr_loop.py`, `.github/**`,
+`docs/pr-loop.plist`, `.claude/skills/pr-review/**`,
+`council/founder-proxy.md`, `council/chair.md`, the base checklist record and
+the review tests `tests/test_review_teams.py`, `tests/test_pr_review.py`,
+`tests/test_pr_loop.py`, `tests/conftest.py`), the licence files (`LICENSE`,
+`NOTICE`, every vendored `LICENSE*` file and the font licences), and any head
+in the export-control class. The council record
+[2026-10-18: two reviews per pull request head](../council/records/2026-10-18-review-loop.md)
+(decision 3) recommended it and the founder chose it; the founder's own
+approval of the pull request that adds it records that choice. The review
+tests are founder class (control plane) too.
+
+Key 1 and key 2 still review such a pull request for defects. Once key 2
+passes, the script posts its own "Founder floor (review script, no model)"
+comment with every floor hit as a reason, keeps `review/executive` pending,
+and does not call the Founder Proxy. Only the founder's latest review approving
+that head SHA passes `review/executive` (after the label is removed, the loop
+reruns the review from cache). Every path on the floor is also in a founder
+class, so the pull request declares it, and changing the floor is itself on
+the floor.
+
 ## Reviewer isolation
 
 The reviewer runs as a fresh read-only process in a clean checkout of the head
@@ -147,7 +172,9 @@ the branch checked out. In order:
    the chair's seat file plus every owning lead's seat file, given key 1's
    results, on the strongest model. On a founder-class pull request whose key
    2 passed, the Founder Proxy runs next: its seat file from `main` and both
-   keys' results, on the strongest model.
+   keys' results, on the strongest model. On a pull request on the founder
+   floor (above), the script returns `needs-founder` with the floor's hits as
+   reasons instead, with no model call.
 7. **Isolation.** Read, Grep and Glob only, in the head checkout (`main` is
    readable for comparison); no command, write, network or MCP tools; no
    project customizations; no GitHub, App or API tokens in the environment.
@@ -169,7 +196,8 @@ the branch checked out. In order:
     `review/team-lead` and `review/executive`. `review/executive` passes only
     with key 2 passing, no `hold` label, and for a founder-class pull request
     the Founder Proxy passing (or returning `needs-founder` with the founder's
-    latest review approving this head SHA). A comment or check
+    latest review approving this head SHA); on the founder floor, only the
+    founder's latest review approving this head SHA. A comment or check
     run is not posted again when the App's latest one for that key, team and
     head already says the same (a rerun that reused its cached verdicts); the
     comment's marker carries a digest of the result for this.
@@ -279,8 +307,9 @@ requests labelled `hold` or `needs-founder` are skipped.
 comments why when: three fix rounds are done and a key still fails; the same
 finding (same key, team, file and wording) fails again after a fix; CI fails
 after a fix; the branch has a merge conflict; a key or the Founder Proxy is
-deferred (rate limit, bad output, missing seat file); the Founder Proxy returns
-`needs-founder` (until the founder's own review approves the head); the fixer hits a rate limit, gives no valid
+deferred (rate limit, bad output, missing seat file); the Founder Proxy or the
+founder floor returns `needs-founder` (until the founder's own review approves
+the head); the fixer hits a rate limit, gives no valid
 answer, cannot fix every finding or changes nothing; a local check fails; the
 auto-merge setting cannot be read or `gh pr merge --auto` fails; the branch
 is behind `main` and the update fails; or any error.

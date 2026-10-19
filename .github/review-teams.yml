@@ -23,8 +23,10 @@
 # tests/test_review_teams.py checks this file against `git ls-files`: every
 # tracked file maps to a team, every glob wins at least one tracked file (no
 # dead rule), every seat named here has a file in council/, every marker
-# below exists in its file, and no CODEOWNERS file exists (founder classes are
-# reviewed by the Founder Proxy agent, council/founder-proxy.md).
+# below exists in its file, every founder floor glob wins a tracked file, and
+# no CODEOWNERS file exists (founder classes are reviewed by the Founder Proxy
+# agent, council/founder-proxy.md, except what the founder floor at the end
+# sends to the founder).
 
 version: 1
 
@@ -406,7 +408,11 @@ founder_classes:
       - scripts/review_map.py
       - scripts/pr_loop.py
       - docs/pr-loop.plist
-    note: .github/** covers .github/review-teams.yml. The pr-review skill (.claude/skills/pr-review/) falls under .claude/**; its posting script (scripts/pr_review.py), the map logic it shares with the coverage test (scripts/review_map.py), the automated loop that drives it (scripts/pr_loop.py) and the launchd job that runs the loop (docs/pr-loop.plist) are listed here.
+      - tests/test_review_teams.py
+      - tests/test_pr_review.py
+      - tests/test_pr_loop.py
+      - tests/conftest.py
+    note: .github/** covers .github/review-teams.yml. The pr-review skill (.claude/skills/pr-review/) falls under .claude/**; its posting script (scripts/pr_review.py), the map logic it shares with the coverage test (scripts/review_map.py), the automated loop that drives it (scripts/pr_loop.py), the launchd job that runs the loop (docs/pr-loop.plist) and the tests that pin their behaviour (the review tests and tests/conftest.py, council/records/2026-10-18-review-loop.md, decision 3) are listed here.
   - id: gate-semantics
     title: Gate semantics
     paths:
@@ -458,3 +464,41 @@ founder_classes:
   - id: export-control
     title: Export-control sensitive content
     note: Flagged by legal-compliance in its review; the scope is to be confirmed by counsel. No path or pattern detects it.
+
+# The founder floor (council/records/2026-10-18-review-loop.md,
+# decision 3, chosen by the founder): a pull request that changes one
+# of these paths, or is in one of these founder classes, waits for the
+# founder's own GitHub review approving its head. The review script decides
+# that from main's copy of this file, with no model call: once key 1 and key 2
+# pass, it returns needs-founder with these hits as the reasons and does not
+# call the Founder Proxy. The keys still review the pull request for defects.
+# Every path here is also in a founder class above. The scope is the
+# founder's: narrowing it is a change to this file, which is itself on the
+# floor.
+founder_floor:
+  paths:
+    # The review machinery: the review, map and loop scripts, the review
+    # rules, workflows and App settings under .github/, the launchd job, the
+    # review skill, the seat files of key 2 and the Founder Proxy, the base
+    # checklist record, and the tests that pin their behaviour.
+    - scripts/pr_review.py
+    - scripts/review_map.py
+    - scripts/pr_loop.py
+    - .github/**
+    - docs/pr-loop.plist
+    - .claude/skills/pr-review/**
+    - council/founder-proxy.md
+    - council/chair.md
+    - council/records/2026-10-17-teams-and-pr-review.md
+    - tests/test_review_teams.py
+    - tests/test_pr_review.py
+    - tests/test_pr_loop.py
+    - tests/conftest.py
+    # Licence files: the repository's own and every vendored one.
+    - LICENSE
+    - NOTICE
+    - '**/LICENSE*'
+    - site/assets/fonts/OFL-*.txt
+  # Export control: a head in this class (an export-control flag) is on the
+  # floor whatever its paths.
+  classes: [export-control]

@@ -29,7 +29,12 @@ In order, and fail closed at every step (pending or failure, never success):
    pull request, once key 2 passed: the Founder Proxy (agent), its seat file
    council/founder-proxy.md from main, given both keys' results, on the
    strongest model, with the same isolation (the founder's delegation of
-   2026-10-18, in place of the founder's GitHub approval).
+   2026-10-18, in place of the founder's GitHub approval). A pull request on
+   the founder floor (`founder_floor` in main's map: the review machinery,
+   licence files, an export-control flag) never reaches the proxy: once key 2
+   passed, the script itself returns needs-founder with the floor's hits as
+   the reasons, and no model decides it (council record
+   council/records/2026-10-18-review-loop.md, decision 3).
 7. Validates each JSON verdict (schema, head SHA, every cited file and line at
    the head; the proxy may also say "needs-founder", with reasons). A failed
    call, a timeout or a rate limit gets one backoff retry, then the key is
@@ -38,7 +43,7 @@ In order, and fail closed at every step (pending or failure, never success):
    key and the checks review/team-lead and review/executive (not again when
    the App's latest one for that key, team and head says the same). review/executive
    passes only with key 2 passing, no `hold` label, and for a founder-class
-   pull request the Founder Proxy's pass on this head SHA. A proxy
+   pull request the Founder Proxy's pass on this head SHA. A proxy or floor
    "needs-founder" keeps it pending until the founder's own GitHub review
    approves this head SHA; the loop labels such a pull request needs-founder.
 
@@ -117,6 +122,8 @@ NEEDS_FOUNDER = "needs-founder"
 PROXY_KEYS = VERDICT_KEYS | {"founder_reasons"}
 # The founder's delegation the proxy acts under, said in every proxy comment.
 PROXY_DELEGATION = "Founder Proxy (agent), acting under the founder's delegation of 2026-10-18; not the founder"
+# The founder floor is the review script's own step, never a model's.
+FLOOR_NAME = "Founder floor (review script, no model)"
 RATE_LIMIT = re.compile(r"rate.?limit|usage limit|too many requests|\b429\b|overloaded|limit reached|try again later", re.I)
 
 VERDICT_SCHEMA = {
@@ -281,12 +288,17 @@ FOUNDER_BLOCK_RE = re.compile(r"<!-- review:founder-class -->(?:(?!<!-- review:f
 LONE_MARKER_RE = re.compile(r"^[ \t]*<!-- /?review:founder-class -->[ \t]*(?:\n|$)|<!-- /?review:founder-class -->", re.M)
 
 
-def founder_class_block(teams_map: dict, classes: list[str]) -> str:
-    if not classes:
+def founder_class_block(teams_map: dict, classes: list[str], floor: bool = False) -> str:
+    """The declaration; `floor` says the pull request is on the founder floor,
+    so the founder, not the proxy, decides it after key 2."""
+    if not classes and not floor:
         return ""
     titles = {str(c.get("id")): c.get("title") for c in (teams_map or {}).get("founder_classes") or []}
     what = ", ".join(f"{c} ({titles[c]})" if titles.get(c) else c for c in classes)
-    return f"{FOUNDER_BLOCK_OPEN}Founder class{'es' if len(classes) > 1 else ''}: {what}; the Founder Proxy (agent) reviews it after key 2.{FOUNDER_BLOCK_CLOSE}"
+    then = ("on the founder floor: after key 2 it waits for the founder's own GitHub approval of the head, "
+            "decided by the review script with no model" if floor else "the Founder Proxy (agent) reviews it after key 2")
+    text = f"Founder class{'es' if len(classes) > 1 else ''}: {what}; {then}." if classes else f"{then[0].upper()}{then[1:]}."
+    return f"{FOUNDER_BLOCK_OPEN}{text}{FOUNDER_BLOCK_CLOSE}"
 
 
 def with_founder_class_block(body: str | None, block: str) -> str:
@@ -488,8 +500,10 @@ def comment_marker(r: dict, ctx: dict) -> str:
     payload = {"main": ctx["main_sha"], "base": ctx["base_sha"], "status": r["status"], "reason": r.get("reason"),
                "model": r.get("model"), "verdict": r.get("verdict"), "notes": notes,
                "founder": list(ctx["classification"]["founder"]), "dry_run": bool(ctx.get("dry_run"))}
+    if r.get("reasons"):
+        payload["reasons"] = r["reasons"]
     digest = hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()[:16]
-    team = r.get("team") or ("founder-proxy" if r["key"] == "proxy" else "council-chair")
+    team = r.get("team") or {"proxy": "founder-proxy", "floor": "founder-floor"}.get(r["key"], "council-chair")
     return f"<!-- {MARK} key={r['key']} team={team} head={ctx['head_sha']} digest={digest} -->"
 
 
@@ -499,7 +513,44 @@ def _cell(s, limit: int = 600) -> str:
     return t if len(t) <= limit else t[:limit] + "..."
 
 
+def render_floor_comment(r: dict, ctx: dict) -> str:
+    """The founder floor's comment: the review script's own result, no model."""
+    founder = ", ".join(ctx["classification"]["founder"]) or "none"
+    lines = [
+        comment_marker(r, ctx),
+        f"### {FLOOR_NAME}: needs the founder",
+        "",
+        "| | |",
+        "|---|---|",
+        "| Seat | none: the review script decides this from `founder_floor` in main's `.github/review-teams.yml` |",
+        f"| Key | part of `{r['check_name']}`, after key 2 passed |",
+        f"| Head SHA | `{ctx['head_sha']}` |",
+        f"| Base SHA | `{ctx['base_sha']}` |",
+        f"| Rules and seat files from | main `{ctx['main_sha']}` |",
+        "| Verdict | **NEEDS THE FOUNDER** |",
+        "| Session | no model call |",
+        f"| Founder classes | {founder} |",
+        "",
+        "#### Needs the founder",
+        "",
+        "This head changes the review machinery or a licence file, or is in the export-control class. Only the "
+        "founder's own GitHub review approving this head SHA passes `review/executive`; no agent review can, and "
+        "the Founder Proxy (agent) is not called.",
+        "",
+    ]
+    lines += [f"- {_cell(x, 500)}" for x in r.get("reasons", [])[:40]]
+    for n in r.get("notes", []):
+        lines += ["", f"Note: {_cell(n, 500)}"]
+    lines += ["", "_The review script's rule, not a person's or a model's decision. "
+                  "A comment whose head SHA is not the pull request's current head is void._"]
+    if ctx.get("dry_run"):
+        lines += ["", "_Dry run: posted without the review App. Nothing here counts as a review check._"]
+    return "\n".join(lines)
+
+
 def render_comment(r: dict, ctx: dict) -> str:
+    if r["key"] == "floor":
+        return render_floor_comment(r, ctx)
     proxy = r["key"] == "proxy"
     word = {"pass": "PASS", "fail": "FAIL", NEEDS_FOUNDER: "NEEDS THE FOUNDER"}.get(r["status"], "PENDING: review deferred")
     founder = ", ".join(ctx["classification"]["founder"]) or "none"
@@ -1002,7 +1053,8 @@ def _review(repo_root, pr, github, post, claude_bin, state_dir, models, timeout_
     # so a pull request flags its classes even when they come from content (a
     # fixer cannot edit pull request text). Not edited with --no-post; the
     # reviewers get it as a trusted fact either way.
-    ctx["founder_block"] = founder_class_block(teams_map, list(classification["founder"]))
+    floor = list(classification.get("floor") or [])
+    ctx["founder_block"] = founder_class_block(teams_map, list(classification["founder"]), floor=bool(floor))
     declared = with_founder_class_block(pull.get("body"), ctx["founder_block"])
     if declared != (pull.get("body") or ""):
         if post != "none":
@@ -1159,7 +1211,11 @@ def _review(repo_root, pr, github, post, claude_bin, state_dir, models, timeout_
     classes = list(classification["founder"])
     held = cfg["hold_label"] in pull["labels"]
     k2["notes"] = list(k2.get("notes", []))
-    if classes:
+    if floor:
+        k2["notes"].append("On the founder floor (" + "; ".join(floor[:8]) + "): review/executive waits for the founder's own "
+                           "GitHub approval of this head, decided by the review script with no model; the Founder Proxy "
+                           "(agent) is not called. Key 2 never substitutes for the founder.")
+    elif classes:
         k2["notes"].append(f"Founder classes {', '.join(classes)}: "
                            + ("the Founder Proxy (agent) reviews this head next" if k2["status"] == "pass" else
                               "the Founder Proxy (agent) runs only after key 2 passes")
@@ -1168,9 +1224,27 @@ def _review(repo_root, pr, github, post, claude_bin, state_dir, models, timeout_
         k2["notes"].append(f'The "{cfg["hold_label"]}" label is set: review/executive is not passed.')
     k2["url"] = comment(render_comment(k2, ctx))
 
+    def founder_approves() -> bool:
+        # Only the founder decides: their own latest GitHub review, approving
+        # this head SHA.
+        mine = [r for r in github.list_reviews(pr) if r["login"] == cfg["founder_login"] and r["state"] in ("APPROVED", "CHANGES_REQUESTED", "DISMISSED")]
+        return bool(mine) and mine[-1]["state"] == "APPROVED" and mine[-1]["commit_id"] == head
+
     proxy = None
+    floor_result = None
     approved = False
-    if classes and k2["status"] == "pass":
+    if floor and k2["status"] == "pass":
+        # The founder floor: the script's rule, before and in place of the
+        # proxy call, so no model decides it.
+        approved = founder_approves()
+        floor_result = {"key": "floor", "team": None, "team_name": FLOOR_NAME, "role": "review script",
+                        "check_name": cfg["check_names"]["key2"], "status": NEEDS_FOUNDER, "model": None, "reasons": floor,
+                        "notes": [f"The founder's own GitHub review approves head {sha7}: that is the founder's decision, not an agent's."
+                                  if approved else f"review/executive stays pending: the founder decides, on GitHub, on head {sha7}."]}
+        log_call(state_dir, {"repo": cfg["repo"], "pr": pr, "head": head, "key": "floor", "team": None, "model": None,
+                             "attempt": 0, "outcome": "founder-approved" if approved else NEEDS_FOUNDER, "reasons": floor[:40]})
+        floor_result["url"] = comment(render_comment(floor_result, ctx))
+    elif classes and k2["status"] == "pass":
         pbase = {"key": "proxy", "team": None, "team_name": cfg["proxy_name"], "role": cfg["proxy_seat"], "check_name": cfg["check_names"]["key2"]}
         try:
             proxy_spec = seat(cfg["proxy_seat"])
@@ -1186,10 +1260,7 @@ def _review(repo_root, pr, github, post, claude_bin, state_dir, models, timeout_
             proxy = {**pbase, "status": "deferred", "reason": f"seat file missing on main: {exc}"}
         proxy["notes"] = list(proxy.get("notes", []))
         if proxy["status"] == NEEDS_FOUNDER:
-            # Only the founder decides these: their own latest GitHub review,
-            # approving this head SHA.
-            mine = [r for r in github.list_reviews(pr) if r["login"] == cfg["founder_login"] and r["state"] in ("APPROVED", "CHANGES_REQUESTED", "DISMISSED")]
-            approved = bool(mine) and mine[-1]["state"] == "APPROVED" and mine[-1]["commit_id"] == head
+            approved = founder_approves()
             proxy["notes"].append(f"The founder's own GitHub review approves head {sha7}: that is the founder's decision on the changes above, not the proxy's."
                                   if approved else f"review/executive stays pending: the founder decides these changes, on GitHub, on head {sha7}.")
         proxy["url"] = comment(render_comment(proxy, ctx))
@@ -1197,6 +1268,7 @@ def _review(repo_root, pr, github, post, claude_bin, state_dir, models, timeout_
     desc = f"agent review ({cfg['key2_seat']}), head {sha7}"
     pdesc = f"{desc}: key 2 pass; Founder Proxy (agent)"
     pstatus = proxy["status"] if proxy else None
+    fdesc = f"{desc}: key 2 pass; founder floor (review script, no model)"
     if k2["status"] == "fail":
         check("key2", "failure", f"{desc}: fail", k2["url"])
     elif k2["status"] == "deferred":
@@ -1205,18 +1277,22 @@ def _review(repo_root, pr, github, post, claude_bin, state_dir, models, timeout_
         check("key2", "failure", f"{pdesc}: fail", proxy["url"])
     elif pstatus == "deferred":
         check("key2", "pending", f"{pdesc}: review deferred", proxy["url"])
+    elif floor_result and not approved:
+        check("key2", "pending", f"{fdesc}: needs the founder", floor_result["url"])
     elif pstatus == NEEDS_FOUNDER and not approved:
         check("key2", "pending", f"{pdesc}: needs the founder ({', '.join(classes)})", proxy["url"])
     elif held:
-        check("key2", "pending", f"{desc}: pass; held by the {cfg['hold_label']} label", (proxy or k2)["url"])
+        check("key2", "pending", f"{desc}: pass; held by the {cfg['hold_label']} label", (floor_result or proxy or k2)["url"])
+    elif floor_result:
+        check("key2", "success", f"{fdesc}: the founder's review approves this head", floor_result["url"])
     elif pstatus == NEEDS_FOUNDER:
         check("key2", "success", f"{pdesc}: needs the founder; the founder's review approves this head", proxy["url"])
     elif proxy:
         check("key2", "success", f"{pdesc}: pass", proxy["url"])
     else:
         check("key2", "success", f"{desc}: pass", k2["url"])
-    return {"exit": EXIT_OK, "key1": key1, "key2": k2, "proxy": proxy, "founder_approved": approved, "posted": posted,
-            "classification": classification}
+    return {"exit": EXIT_OK, "key1": key1, "key2": k2, "proxy": proxy, "floor": floor_result, "founder_approved": approved,
+            "posted": posted, "classification": classification}
 
 
 def differs_from_main(repo_root) -> list[str]:
