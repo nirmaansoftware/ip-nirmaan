@@ -110,6 +110,7 @@ The original preface of the section:
 - [M57-hierarchy-fixes](M57-hierarchy-fixes.md): Milestone 57 - Hierarchy fixes: the org matches the capability build-out council record
 - [M58-eval-skills-must-fail](M58-eval-skills-must-fail.md): Milestone 58 - Eval cases name skills; must-fail scorer; the evidence loader refuses replays and attestations
 - [M59-release-mirror-check](M59-release-mirror-check.md): Milestone 59 - Release check for the public org mirrors: the org figure and the hero's plan excerpt are checked against the code at each release
+- [M63-evidence-levels](M63-evidence-levels.md): Milestone 63 - Evidence levels: Knowledge, Practised and Proven only from committed records, zero of each on main
 
 ## Before M43
 
