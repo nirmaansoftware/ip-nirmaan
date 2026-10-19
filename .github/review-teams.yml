@@ -25,36 +25,58 @@
 # dead rule), every seat named here has a file in council/, every marker
 # below exists in its file, and no CODEOWNERS file exists (founder classes are
 # reviewed by the Founder Proxy agent, council/founder-proxy.md).
+#
+# Each team's `unit:` and `key2:` are derived values, stored here and checked
+# by tests/test_seat_map.py against council/seat-map.yml and the built
+# organization (capability build-out council record 2026-10-18, section 5;
+# review-loop record 2026-10-18, work item R12). `unit:` is the lowest common
+# unit of the team's lead seats' roles and their interim covers, or `shared`
+# when a lead holds a shared-services role. `key2:` is the nearest seat above
+# that unit with a key-2 checklist and a passed seeded-defect set that holds no
+# key 1 on the team, else the chair; one that would be the founder or report
+# to the founder is the chair. Today every `key2` is `chair`. The review
+# script does not read these values: key 2 is its own constant, the chair.
 
 version: 1
 
 teams:
   council:
     name: Council
+    unit: nirmaan
     key2: chair
     leads: [security, qa-evidence]
     members: []
     note: security leads control files; qa-evidence leads records and seat files.
   silicon-design:
     name: Silicon Design
+    unit: nirmaan
+    key2: chair
     leads: [design-architect]
     members: [dft-engineer, physical-design-engineer, firmware-engineer]
   verification:
     name: Verification
+    unit: verification
+    key2: chair
     leads: [verification-lead]
     members: [qa-evidence]
     note: key 1 on any gate change, whichever team opened the pull request.
   eda-platform:
     name: EDA and Platform
+    unit: infrastructure
+    key2: chair
     leads: [eda-tooling]
     members: [security, ai-engineer]
     note: owns every file no other rule matches (the catch-all).
   product-site:
     name: Product and Site
+    unit: nirmaan
+    key2: chair
     leads: [product-lead]
     members: [site-engineer, brand-content, market-research]
   business:
     name: Business
+    unit: shared
+    key2: chair
     leads: [legal-compliance, finance-licensing]
     members: [legal-counsel, tax-accounts, partnerships]
     note: legal-compliance leads licences, notices and third-party code and text; finance-licensing leads prices, commercial terms and spend.
@@ -387,6 +409,24 @@ content_rules:
     in: [src/**, evals/**, tests/fixtures/**, .github/**]
     example: 'max_unannotated_nets=0'
 
+# Key 2 floor: paths on which key 2 stays the chair, on the strongest model,
+# whatever a derived `key2:` says (capability build-out record, section 5,
+# item 5): evals and the eval harness, MCP, the runtime, and the paths that
+# read, store, export or send customer design data. Every founder class is on
+# the floor too. Data only today: every key 2 is the chair.
+key2_floor:
+  - evals/**
+  - src/nirmaan/evals/**
+  - src/nirmaan/mcp/**
+  - src/nirmaan/runtime/**
+  - src/nirmaan/integrations/**
+  - src/nirmaan/work/store.py
+  - src/nirmaan/export.py
+  - src/veritriage/ai/**
+  - src/veritriage/parsers/**
+  - src/veritriage/project/**
+  - src/veritriage/storage/**
+
 # Founder classes: a pull request in any of these gets a third reviewer, the
 # Founder Proxy (agent, council/founder-proxy.md), after key 1 and key 2 pass,
 # under the founder's delegation of 2026-10-18; what the founder keeps it sends
@@ -406,6 +446,7 @@ founder_classes:
       - scripts/review_map.py
       - scripts/pr_loop.py
       - docs/pr-loop.plist
+      - tests/test_seat_map.py
     note: .github/** covers .github/review-teams.yml. The pr-review skill (.claude/skills/pr-review/) falls under .claude/**; its posting script (scripts/pr_review.py), the map logic it shares with the coverage test (scripts/review_map.py), the automated loop that drives it (scripts/pr_loop.py) and the launchd job that runs the loop (docs/pr-loop.plist) are listed here.
   - id: gate-semantics
     title: Gate semantics

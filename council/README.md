@@ -68,6 +68,63 @@ delegation of 2026-10-18. It is not the founder: what only the founder decides
 clients, any sending, and the review system's own gates) it sends to the
 founder as `needs-founder`.
 
+## Seat map
+
+[`seat-map.yml`](seat-map.yml) maps each seat to one role in the product's
+modelled company (`src/nirmaan/company/org_chart.py`) or to a shared role
+(legal, legal counsel, tax and accounts, which serve both organisations and
+report to the founder). Decided in the capability build-out council record of
+2026-10-18 (sections 5 and 6) and corrected by the review-loop record of
+2026-10-18 (work item R12). The chart itself names no seat, deputy or vote.
+
+- One seat, one role; no role holds two seats. `legal-compliance` is the shared
+  legal role, never the Quality "Compliance" practice.
+- A key-1 lead holds a role that heads a unit. `covers` lists units a seat
+  reviews until a seat inside each holds key 1 there.
+- A deputy runs only for key 1, only after an infrastructure failure, and
+  shares a review team with its seat; the chair's deputy is the founder.
+- The Founder Proxy is unplaced: where the chart records it is the founder's
+  decision.
+- Each team in `.github/review-teams.yml` stores `unit:` and `key2:`, derived
+  from this map and the chart and checked by `tests/test_seat_map.py`. A derived
+  key 2 that would be the founder or report to the founder is the chair, and
+  today every `key2` is `chair`. Nothing that picks a reviewer reads this map or
+  the chart: the review script reads only `.github/review-teams.yml` on `main`.
+
+### Practice leads (key 1, no vote)
+
+A practice lead holds key 1 on its unit's paths and is asked for owner facts in
+a meeting; it gives no round-1 position. None is seated yet: practice leads are
+added in the founder-class hiring pull request at the start of their wave.
+
+| Seat | Role | Key-1 paths |
+|---|---|---|
+| (none yet) | | |
+
+A practice lead's seat file has the same shape as the other seat files:
+
+```
+---
+slug: <seat>
+role: <title>
+reviewed_by: chair
+permissions: read only (a seat never changes the repository)
+---
+
+# <Title>
+
+## Mission
+## Expertise
+## Reads first
+## In a review (key 1, <team>, practice lead)
+<its unit's paths; the base checklist first; then "Fails when:" items>
+## Never claims
+## In a meeting
+<owner facts only, when the chair asks; no round-1 position and no vote>
+```
+
+Its row goes in the table above and its entry in `seat-map.yml` (`vote: no`).
+
 ## When to call a meeting
 
 Pricing, launching or naming, anything that goes on ip.nirmaan.online, a legal
