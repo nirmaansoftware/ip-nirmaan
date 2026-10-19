@@ -39,8 +39,8 @@ from nirmaan.models import (
     OrgUnit,
     ParameterRule,
     Principle,
-    Proficiency,
     Role,
+    SeniorityBand,
     Skill,
     ToolRisk,
     ToolSpec,
@@ -54,14 +54,14 @@ from nirmaan.registry import Registry
 #: The individual-contributor ladder every leaf unit carries unless it overrides.
 DEFAULT_LADDER: tuple[Level, ...] = (Level.SENIOR, Level.ENGINEER, Level.JUNIOR, Level.INTERN)
 
-#: Proficiency an individual contributor holds in inherited skills, by level.
-_IC_PROFICIENCY = {
-    Level.INTERN: Proficiency.AWARENESS,
-    Level.JUNIOR: Proficiency.WORKING,
-    Level.ENGINEER: Proficiency.PROFICIENT,
-    Level.SENIOR: Proficiency.EXPERT,
-    Level.TECH_LEAD: Proficiency.EXPERT,
-    Level.STAFF: Proficiency.EXPERT,
+#: The seniority band an individual contributor holds inherited skills at, by level.
+_IC_BAND = {
+    Level.INTERN: SeniorityBand.FOUNDATION,
+    Level.JUNIOR: SeniorityBand.WORKING,
+    Level.ENGINEER: SeniorityBand.ADVANCED,
+    Level.SENIOR: SeniorityBand.LEAD,
+    Level.TECH_LEAD: SeniorityBand.LEAD,
+    Level.STAFF: SeniorityBand.LEAD,
 }
 
 _HEAD_LEVEL = {
@@ -487,16 +487,17 @@ class Organization:
         self._skill_cache[role_id] = found
         return list(found)
 
-    def proficiency(self, role_id: str, skill_id: str) -> Proficiency | None:
+    def band(self, role_id: str, skill_id: str) -> SeniorityBand | None:
+        """The seniority band ``role_id`` holds ``skill_id`` at, derived from its level (M56)."""
         role = self.roles[role_id]
         if skill_id not in self.effective_skills(role_id):
             return None
         profile = self.level_profiles.get(role.level)
         if profile and skill_id in self._closure(profile.skills):
-            return Proficiency.EXPERT
+            return SeniorityBand.LEAD
         if role.level.track is Track.INDIVIDUAL:
-            return _IC_PROFICIENCY[role.level]
-        return Proficiency.PROFICIENT
+            return _IC_BAND[role.level]
+        return SeniorityBand.ADVANCED
 
     def _closure(self, skill_ids: Iterable[str]) -> set[str]:
         found: set[str] = set()
@@ -516,13 +517,13 @@ class Organization:
         role = self.roles[role_id]
         held: dict[str, str] = {}
         for skill_id in self.effective_skills(role_id):
-            prof = self.proficiency(role_id, skill_id)
+            band = self.band(role_id, skill_id)
             for cap_id in self.skills[skill_id].provides:
                 cap = self.capabilities.get(cap_id)
                 if (
                     cap
-                    and prof is not None
-                    and prof.rank >= cap.min_proficiency.rank
+                    and band is not None
+                    and band.rank >= cap.min_band.rank
                     and (cap.min_level is None or role.level.at_least(cap.min_level))
                 ):
                     held.setdefault(cap_id, f"skill:{skill_id}")
@@ -541,18 +542,18 @@ class Organization:
         """Granted tools: the role's own, plus those its skills use (capability-based).
 
         Read tools come with any holding of a skill; write, execute, and approve
-        tools need at least WORKING proficiency, so an intern reads but does not run.
+        tools need at least the WORKING band, so an intern reads but does not run.
         """
         if role_id in self._tool_cache:
             return list(self._tool_cache[role_id])
         granted = list(self.roles[role_id].tools)
         for skill_id in self.effective_skills(role_id):
-            prof = self.proficiency(role_id, skill_id)
+            band = self.band(role_id, skill_id)
             for tool_id in self.skills[skill_id].tools:
                 tool = self.tools.get(tool_id)
                 if tool is None or tool_id in granted:
                     continue
-                if tool.risk is ToolRisk.READ or (prof and prof.rank >= Proficiency.WORKING.rank):
+                if tool.risk is ToolRisk.READ or (band and band.rank >= SeniorityBand.WORKING.rank):
                     granted.append(tool_id)
         self._tool_cache[role_id] = granted
         return list(granted)
@@ -584,7 +585,7 @@ class Organization:
             "department": role.unit,
             "division": self.division_of(role.unit).id,
             "manager": role.reports_to,
-            "skills": {s: self.proficiency(role_id, s).value for s in self.effective_skills(role_id)},
+            "skills": {s: self.band(role_id, s).value for s in self.effective_skills(role_id)},
             "capabilities": caps,
             "responsibilities": list(role.responsibilities),
             "authority": [
