@@ -298,10 +298,14 @@ review lock (shared with Nirmaan) for a whole review and fix round. Each pass
 takes one step on every open pull request, one the loop is fixing first, then
 by number, so a pull request waiting for CI, or one that just ran a review or a
 fix, never holds up the others; the steps run one after another, so reviews
-still run one at a time. An auto-merge ends the pass, since it is the one step
-that can move `main` (GitHub may merge at once): the pull requests after it
-wait for the next pass, which refetches `main` and checks again that the loop
-is `main`'s copy before any step, so none is stepped against a stale `main`.
+still run one at a time. The check that the loop is `main`'s copy runs once,
+before each pass, so the pass ends early when `main` may have moved: after the
+pass's own auto-merge (GitHub may merge at once), and when `main`'s sha on
+origin, read before each step, differs from the one the pass started with
+(the founder's merge, the other loop, any merge) or cannot be read. The pull
+requests after that wait for the next pass, which refetches `main` and checks
+the copy again. A merge that lands while a step runs is seen only before the
+next step; the review itself always fetches `main` afresh.
 
 **Records.** Every review call, fixer call and loop step is a line in
 `~/.nirmaan/pr-review/calls.jsonl`; per pull request loop state is in

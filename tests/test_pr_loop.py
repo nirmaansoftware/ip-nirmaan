@@ -721,6 +721,37 @@ def test_an_auto_merge_ends_the_pass_so_the_rest_are_stepped_against_the_new_mai
     assert [f"{x['pr']}:{x['outcome']}" for x in loop.tick()] == ["1:skip", "2:skip", "3:wait"]
 
 
+def test_a_merge_from_outside_the_loop_mid_pass_ends_the_pass_before_the_next_step(repo):
+    # Someone else merges into main while pull request 1 is stepped (not an
+    # auto-merge of this pass): pull request 2 waits for the next pass.
+    r = repo()
+    loop = r.loop()
+    pulls = [{"number": n} for n in (1, 2)]
+    loop.o["github"] = type("G", (), {"list_open_pulls": lambda self: pulls})()
+    seen = []
+
+    def step(p):
+        seen.append(p["number"])
+        if p["number"] == 1 and len(seen) == 1:
+            r.advance_main()
+        return {"outcome": "wait"}
+    loop.step = step
+    assert [f"{x['pr']}:{x['outcome']}" for x in loop.tick()] == ["1:wait"]
+    assert seen == [1], "pull request 2 is not stepped once main moved"
+    assert [f"{x['pr']}:{x['outcome']}" for x in loop.tick()] == ["1:wait", "2:wait"], "the next pass starts from the new main"
+
+
+def test_a_pass_whose_start_main_is_already_stale_steps_nothing(repo):
+    # main moved between the fetch the copy was checked against and the pass.
+    r = repo()
+    loop = r.loop()
+    loop.o["github"] = type("G", (), {"list_open_pulls": lambda self: [{"number": 1}]})()
+    loop.step = lambda p: {"outcome": "wait"}
+    stale = sh(r.work, "rev-parse", "main")
+    r.advance_main()
+    assert loop.tick(main_at_start=stale) == []
+
+
 # --- Related tests for the fixer's local check --------------------------------------
 
 

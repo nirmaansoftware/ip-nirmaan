@@ -26,8 +26,10 @@ per call, as a state machine that survives restarts:
             when the review App posts the checks and the repository's
             allow_auto_merge field (read with gh) is true; a "ready" comment in
             a dry run or when it is false; the field unreadable or any merge
-            error stops; an auto-merge ends the pass (main may move), so the
-            rest wait for the next pass, which refetches main;
+            error stops; an auto-merge ends the pass, and so does main's sha
+            on origin (read before each step) differing from the one the pass
+            started with, so the rest wait for the next pass, which refetches
+            main and checks this copy again;
     fix     a key or the proxy failed: a separate fresh `claude -p` fixer in a clean
             worktree of the head, Edit and Write only inside it; the loop (never
             the model) checks what changed, commits, runs the checks and pushes.
@@ -422,11 +424,15 @@ class Loop:
     # request the loop is fixing goes first, then by number. The steps run one
     # after another and each review or fix round holds the shared lock, so
     # reviews still run one at a time (a lock held elsewhere makes that pull
-    # request "busy" and the pass goes on). An auto-merge ends the pass: it is
-    # the one step that can change main (GitHub may merge at once), and the
-    # pass's view of main (this copy checked against it) dates from its start.
-    # The next pass refetches main and checks this copy again first.
-    def tick(self, only_pr: int | None = None) -> list[dict]:
+    # request "busy" and the pass goes on). The check that this copy is main's
+    # runs once, before the pass, so the pass ends when main may have moved:
+    # after this pass's own auto-merge (GitHub may merge at once), and when
+    # main's sha on origin, read before each step, is no longer the one the
+    # pass started with (any other merge) or cannot be read. The next pass
+    # refetches main and checks this copy again first. A merge landing during
+    # a step is seen only before the next one.
+    def tick(self, only_pr: int | None = None, main_at_start: str | None = None) -> list[dict]:
+        start = main_at_start or self._main_on_origin()
         pulls = [p for p in self.o["github"].list_open_pulls() if not only_pr or p["number"] == only_pr]
 
         def in_flight(p):
@@ -435,10 +441,23 @@ class Loop:
         pulls.sort(key=lambda p: (in_flight(p), p["number"]))
         results = []
         for p in pulls:
+            now = self._main_on_origin()
+            if now is None or now != start:
+                self.out(f"pr-loop: main moved during the pass ({(start or '?')[:7]} -> {(now or 'unreadable')[:11]}); "
+                         "the rest wait for the next pass")
+                break
             results.append({"pr": p["number"], **self.step(p)})
             if results[-1]["outcome"] == "auto-merge":
                 break
         return results
+
+    def _main_on_origin(self) -> str | None:
+        """main's sha on origin (one ls-remote, no fetch); None when unreadable."""
+        try:
+            out = _git(self.o["repo_root"], "ls-remote", "origin", f"refs/heads/{self.cfg['base_branch']}")
+        except (subprocess.SubprocessError, OSError):
+            return None
+        return out.split()[0] if out.strip() else None
 
     def step(self, listed: dict) -> dict:
         cfg, lc, o = self.cfg, self.lc, self.o
@@ -877,7 +896,7 @@ def main(argv: list[str]) -> int:
                     in_claude_session=bool(os.environ.get("CLAUDECODE")),
                     run_gh=run_gh,
                     **loop_defaults())
-        results = loop.tick(only_pr)
+        results = loop.tick(only_pr, main_at_start=_git(repo_root, "rev-parse", "refs/pr-review/main").strip())
         print(f"pr-loop: {_now()} {post}: " + (", ".join(f"#{r['pr']} {r['outcome']}" for r in results) or "no open pull requests"))
         if once:
             return 0
