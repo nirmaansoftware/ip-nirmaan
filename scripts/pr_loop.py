@@ -293,6 +293,19 @@ def _save_state(state_dir, repo: str, st: dict):
     path.write_text(json.dumps(st, indent=2))
 
 
+def ci_completed_at(required: list[str], runs: list[dict]) -> str | None:
+    """When the required CI finished on a head, from GitHub's check runs: the
+    latest completion time of the run that counts for each job (the newest),
+    or None when one has no completion time."""
+    times = []
+    for name in required:
+        mine = sorted((r for r in runs if r["name"] == name), key=pr_review._newest_first_key, reverse=True)
+        if not mine or not mine[0].get("completed_at"):
+            return None
+        times.append(str(mine[0]["completed_at"]))
+    return max(times) if times else None
+
+
 def ci_state(required: list[str], runs: list[dict]) -> tuple[str, str]:
     """("green" | "pending" | "failed", text), read as the review reads it
     (pr_review.required_ci): the newest run of each job counts, and a run still
@@ -433,7 +446,9 @@ class Loop:
     # a step is seen only before the next one.
     def tick(self, only_pr: int | None = None, main_at_start: str | None = None) -> list[dict]:
         start = main_at_start or self._main_on_origin()
-        pulls = [p for p in self.o["github"].list_open_pulls() if not only_pr or p["number"] == only_pr]
+        open_pulls = self.o["github"].list_open_pulls()
+        self._note_closed({p["number"] for p in open_pulls}, only_pr)
+        pulls = [p for p in open_pulls if not only_pr or p["number"] == only_pr]
 
         def in_flight(p):
             s = load_state(self.state_dir, self.cfg["repo"], p["number"])
@@ -450,6 +465,32 @@ class Loop:
             if results[-1]["outcome"] == "auto-merge":
                 break
         return results
+
+    def _note_closed(self, open_numbers: set, only_pr: int | None = None):
+        """A pull request the loop finished (auto-merge or ready) that is no
+        longer open: read it once from GitHub and log a "merged" event with
+        GitHub's merge time (for the turnaround report), or note it closed."""
+        for path in sorted((self.state_dir / "loop").glob(f"{self.cfg['repo'].replace('/', '_')}-pr-*.json")):
+            try:
+                st = json.loads(path.read_text())
+            except (OSError, ValueError):
+                continue
+            n = st.get("pr")
+            if not isinstance(n, int) or n in open_numbers or (only_pr and n != only_pr):
+                continue
+            if not st.get("done") or st["done"].get("outcome") not in ("auto-merge", "ready") or st.get("closed"):
+                continue
+            try:
+                pull = self.o["github"].get_pull(n)
+            except Exception as exc:  # noqa: BLE001 - a failed read is tried again next pass
+                self.out(f"pr-loop: #{n}: could not read whether it merged: {exc}")
+                continue
+            if pull["state"] == "open":
+                continue
+            st["closed"] = {"merged_at": pull.get("merged_at"), "head": pull["head_sha"], "at": _now()}
+            _save_state(self.state_dir, self.cfg["repo"], st)
+            if pull.get("merged_at"):
+                self._log({"n": n, "st": st, "head": pull["head_sha"]}, "merged", merged_at=pull["merged_at"])
 
     def _main_on_origin(self) -> str | None:
         """main's sha on origin (one ls-remote, no fetch); None when unreadable."""
@@ -541,7 +582,14 @@ class Loop:
             return {"outcome": "skip", "reason": f"{st['done']['outcome']} on this head"}
         if pull.get("mergeable") is False or pull.get("mergeable_state") == "dirty":
             return self._stop(ctx, head, "the branch has a merge conflict with main; a person resolves it")
-        state, text = ci_state(cfg["required_ci"], o["github"].list_check_runs(head))
+        runs = o["github"].list_check_runs(head)
+        state, text = ci_state(cfg["required_ci"], runs)
+        if state == "green" and st.get("ci_green_seen") != head:
+            # Once per head: when the loop first saw its required CI green, and
+            # when GitHub says that CI finished (the start of the turnaround).
+            st["ci_green_seen"] = head
+            _save_state(self.state_dir, cfg["repo"], st)
+            self._log(ctx, "ci-green-seen", ci_completed_at=ci_completed_at(cfg["required_ci"], runs))
         if state == "pending":
             self.out(f"pr-loop: #{n} waiting for CI on {head[:7]}: {text}")
             return {"outcome": "wait", "reason": text}
@@ -576,6 +624,11 @@ class Loop:
                 return {"outcome": "skip", "reason": f"{r['ci_failed']}; the author fixes it"}
             if r.get("deferred"):
                 return self._stop(ctx, head, f"review deferred: {r['deferred']}")
+            # When the verdicts reached GitHub (deferred keys included).
+            self._log(ctx, "verdict-posted", key1=",".join(f"{k['team']}:{k['status']}" for k in r.get("key1") or []),
+                      key2=r["key2"]["status"] if r.get("key2") else "not run",
+                      proxy=r["proxy"]["status"] if r.get("proxy") else "not run",
+                      posted=len([p for p in r.get("posted") or [] if not p.get("reused")]))
             # The Founder Proxy (agent) is a reviewer like the keys: deferred
             # stops, fail goes to the fixer.
             keys = [*(r.get("key1") or []), *([r["key2"]] if r.get("key2") else []), *([r["proxy"]] if r.get("proxy") else [])]
