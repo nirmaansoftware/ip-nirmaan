@@ -10,7 +10,7 @@ Three files, self-hosted fonts and icons; no build step, no dependencies, no tra
 | `stats.json` | The numbers on the stat tiles, generated at release by `scripts/status.py --release`. |
 | `nirmaan.css`, `site.js`, `hero.js` | **nirmaan.online's own files, copied unchanged** (`nirmaansoftware/Nirmaan`: `styles.css`, `site.js`, `hero.js`). They give this site the same tokens, type, nav, phone menu, theme toggle, buttons, section heads, cards, hero and falling-blocks N, scroll scene engine, closing band, footer and phone dock, so the two sites cannot drift. Change them there first, then copy them here. |
 
-**Vendored source commit:** `nirmaansoftware/Nirmaan` `6655f013517b766ecd979f618c75201c0428f93c` (`website/src/static/`). `tests/test_landing_site.py` pins each copy's SHA-256 to that commit, so a change of even one byte fails CI. To sync: change Nirmaan first, copy the three files unchanged from the new commit, then update this line and the pins together.
+**Vendored source commit:** `nirmaansoftware/Nirmaan` `bac3965b2d98388df7cb29a34e95992c86140ec0` (`website/src/static/`). `tests/test_landing_site.py` pins each copy's SHA-256 to that commit, so a change of even one byte fails CI. To sync: change Nirmaan first, copy the three files unchanged from the new commit, then update this line and the pins together.
 | `styles.css` | Only IP Nirmaan's own components: the plan terminal, the assurance ladder, the machine inside the scene, the organization numbers, the constitution articles, the VeriTriage graph and the status columns. It uses nirmaan.css's tokens and type, never its own. |
 | `motion.js` | Plays those components (terminal, ladder, counters, graph). It only animates toward what the HTML already says. |
 | `assets/fonts/`, `assets/motion/` | The self-hosted fonts (with their OFL licenses) and the page-transition masks, at the same paths as on nirmaan.online. |
@@ -78,7 +78,7 @@ first run, not re-run since (only the page copy changed):
 | 10 | Image alt text | PASS: no `<img>`; the graph SVG has a title, glyphs are `aria-hidden` |
 | 11 | Image compression | PASS: the largest image is the 77 KB preview; the largest font is 90 KB |
 | 12 | Page load speed | FIXED: the first live run scored 79 (LCP 3.6 s): Google Fonts blocked the first paint and the terminal hid the plan until printed. Fonts are now self-hosted and preloaded, and the plan is painted from the first frame (printing only lights it). Lighthouse mobile: performance 99, LCP 2.3 s, CLS 0.006, TBT 0 ms |
-| 13 | Color contrast | PASS: Lighthouse accessibility 100 |
+| 13 | Color contrast | PASS: Lighthouse accessibility 100 (before the `bac3965` sync; see the note below for the sync) |
 | 14 | Mobile responsiveness | PASS: checked at a true 390 px viewport |
 | 15 | Custom 404 page | PASS: `404.html` (Vercel serves it with status 404) |
 | 16 | Broken links | PASS: every link on the live page returns 200 |
@@ -86,6 +86,22 @@ first run, not re-run since (only the page copy changed):
 | 18 | Spam protection | N/A: no forms |
 | 19 | Analytics | None, per the brief ("no tracking"). Open for the owner to revisit |
 | 20 | Single clear CTA | PASS: "Talk to us" (nirmaan.online contact page). The page links nowhere on GitHub, by the owner's decision |
+
+Shared-layer sync from Nirmaan `bac3965` (Nirmaan #110, 2026-10-18). What the
+repository itself shows, without any unrecorded tool run:
+
+- **13 Color contrast.** Light `--ink-3` is now `#62625C` (dark is unchanged at
+  `#8C8C85`). Computed from these token values with the WCAG formula, `--ink-3`
+  is about 5.4:1 on light `--paper` and 5.0:1 on light `--paper-2`, above the
+  4.5:1 AA minimum for normal text. No Lighthouse or browser run is recorded
+  for this sync, so the item is not re-marked PASS here; it keeps its earlier
+  status until a recorded run.
+- **14 Mobile responsiveness: not re-measured.** The sync changes no layout
+  widths; no recorded run at 390 px is committed for it.
+- **12 Page load speed: not measured.** The sync adds about 25 lines of
+  JavaScript and no new request.
+- Items 1 to 11 and 15 to 20 are untouched by the sync: no new markup, links,
+  requests, forms or assets.
 
 ## Deploying
 

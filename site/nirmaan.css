@@ -32,14 +32,15 @@
   --paper-2:  #E8E8E2;   /* recessed panel */
   --paper-3:  #DEDED7;   /* pressed / hover panel */
   --ink:      #131313;   /* text, primary fills */
-  --ink-2:    #4F4F4A;   /* secondary text  (8.1:1 on paper) */
-  --ink-3:    #6A6A64;   /* meta, mono labels (5.3:1 on paper) */
+  --ink-2:    #4F4F4A;   /* secondary text  (7.3:1 on paper, 6.7:1 on paper-2) */
+  --ink-3:    #62625C;   /* meta, mono labels (5.4:1 on paper, 5.0:1 on paper-2, 4.5:1 on paper-3) */
   --line:     rgb(19 19 19 / 0.11);
   --line-2:   rgb(19 19 19 / 0.22);
-  --blue:     #2E43F5;   /* blueprint accent (6.3:1 on paper) */
+  --blue:     #2E43F5;   /* blueprint accent (5.7:1 on paper) */
   --blue-ink: #FFFFFF;   /* text on blue */
   --blue-wash: rgb(46 67 245 / 0.09);
-  --blue-on-ink: #8190FF; /* blue used on --ink panels (6.2:1 on ink) */
+  --blue-on-ink: #8190FF; /* blue used on --ink panels (6.5:1 on ink) */
+  --danger:   #C2261B;   /* invalid fields, error notice (5.2:1 on paper, 4.8:1 on paper-2) */
   --grid:     rgb(19 19 19 / 0.055);
   color-scheme: light;
 
@@ -74,6 +75,7 @@
     --ink: #EDEDE7; --ink-2: #B2B2AA; --ink-3: #8C8C85;
     --line: rgb(237 237 231 / 0.10); --line-2: rgb(237 237 231 / 0.2);
     --blue: #8190FF; --blue-ink: #0B0B14; --blue-wash: rgb(129 144 255 / 0.12); --blue-on-ink: #2E43F5;
+    --danger: #EC5F52; /* 5.8:1 on paper, 5.4:1 on paper-2 */
     --grid: rgb(237 237 231 / 0.05);
     color-scheme: dark;
   }
@@ -83,6 +85,7 @@
   --ink: #EDEDE7; --ink-2: #B2B2AA; --ink-3: #8C8C85;
   --line: rgb(237 237 231 / 0.10); --line-2: rgb(237 237 231 / 0.2);
   --blue: #8190FF; --blue-ink: #0B0B14; --blue-wash: rgb(129 144 255 / 0.12); --blue-on-ink: #2E43F5;
+  --danger: #EC5F52;
   --grid: rgb(237 237 231 / 0.05);
   color-scheme: dark;
 }
@@ -580,13 +583,24 @@
 
   /* Capability ticker */
   .ticker {
-    position: relative; overflow: hidden;
+    position: relative; display: flex;
     border-top: 1px solid var(--line);
     background: var(--paper);
+  }
+  .ticker__viewport {
+    flex: 1 1 auto; min-width: 0; overflow: hidden;
     -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
     mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
   }
   .ticker__track { display: flex; width: max-content; }
+  /* Pause/play for the moving list (WCAG 2.2.2). Only shown when it moves. */
+  .ticker__toggle {
+    display: none; flex: none; align-items: center; justify-content: center;
+    min-width: 2.75rem; min-height: 2.75rem; padding: 0 var(--gutter) 0 1.25rem; border-left: 1px solid var(--line);
+    font-family: var(--mono); font-size: 0.6875rem; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--ink-2); transition: color 0.2s;
+  }
+  .ticker__toggle:hover { color: var(--blue); }
   .ticker__list { display: flex; flex: none; }
   .ticker__list li {
     display: flex; align-items: center; gap: 1.25rem; padding: 1.05rem 1.25rem;
@@ -806,7 +820,7 @@
     transition: background-color 0.35s, color 0.35s, border-color 0.35s, transform 0.5s var(--ease-out);
   }
   .is-reached .stamp { background: var(--blue-wash); border-color: var(--blue); color: var(--blue); }
-  .stamp--approve::after { content: "you approve"; margin-left: 0.2rem; padding-left: 0.5rem; border-left: 1px solid currentColor; opacity: 0.75; }
+  .stamp--approve::after { content: "you approve"; margin-left: 0.2rem; padding-left: 0.5rem; border-left: 1px solid currentColor; }
   .journey__to { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: baseline; gap: var(--s2) var(--s4); margin-top: clamp(2.5rem, 1.5rem + 3vw, 4rem); padding-top: var(--s4); border-top: 1px solid var(--line-2); font-size: var(--fs-lede); color: var(--ink-2); }
   .journey__to b { color: var(--ink); font-weight: 600; }
   @media (max-width: 40rem) { .journey__to { grid-template-columns: 1fr; } }
@@ -1097,7 +1111,7 @@
   .input::placeholder { color: var(--ink-3); opacity: 1; }
   .input:hover { border-color: var(--ink-3); }
   .input:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px var(--blue-wash); }
-  .input[aria-invalid="true"] { border-color: #C2261B; }
+  .input[aria-invalid="true"] { border-color: var(--danger); }
   textarea.input { min-height: 8rem; resize: vertical; }
   select.input {
     padding-right: 2.5rem;
@@ -1119,14 +1133,14 @@
   .field__hint { font-size: 0.8125rem; color: var(--ink-3); }
   .intake:not(.is-stepped) [data-next], .intake:not(.is-stepped) [data-back] { display: none; }
   .intake:not(.is-stepped) .intake__step + .intake__step { padding-top: var(--s3); border-top: 1px solid var(--line); }
-  .intake [aria-invalid="true"] { border-color: #C2261B; }
+  .intake [aria-invalid="true"] { border-color: var(--danger); }
 
   .form__submit { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--s2); padding-top: var(--s1); }
   .form__note { font-size: 0.8125rem; color: var(--ink-3); }
   .notice { display: grid; gap: 0.25rem; padding: 1rem 1.1rem; border: 1px solid; font-size: var(--fs-small); }
   .notice b { font-weight: 600; }
   .notice--ok { border-color: var(--blue); background: var(--blue-wash); }
-  .notice--error { border-color: #C2261B; background: rgb(194 38 27 / 0.07); }
+  .notice--error { border-color: var(--danger); background: color-mix(in srgb, var(--danger) 7%, transparent); }
   .hp-field { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
 
   .next-steps { display: grid; gap: 0; counter-reset: next; border-top: 1px solid var(--line-2); }
@@ -1546,11 +1560,16 @@
     @keyframes cell-drop { from { opacity: 0; transform: translateY(-3px); } }
 
 
-    .ticker__track { animation: ticker 48s linear infinite; }
-    .ticker:hover .ticker__track { animation-play-state: paused; }
+    /* The ticker moves until paused (its button, or hover). */
+    .motion .ticker__toggle { display: inline-flex; }
+    .motion .ticker__track { animation: ticker 48s linear infinite; }
+    .motion .ticker:hover .ticker__track, .ticker.is-paused .ticker__track { animation-play-state: paused; }
     @keyframes ticker { to { transform: translateX(-50%); } }
 
-    .cta-band__blocks span { animation-name: block-fall; animation-timing-function: linear; animation-iteration-count: infinite; }
+    /* The CTA blocks fall for 5 s after the band comes into view, then stop
+       where they are (site.js adds .is-still). */
+    .motion .cta-band__blocks span { animation-name: block-fall; animation-timing-function: linear; animation-iteration-count: infinite; }
+    .cta-band.is-still .cta-band__blocks span { animation-play-state: paused; }
     @keyframes block-fall { to { transform: translateY(calc(100vh + 6rem)); } }
     /* A card title that morphs into this page's heading arrives with it, instead of rising. */
     .vt-morph .page-head__title .line > span { animation: none; }
@@ -1603,8 +1622,9 @@
   .motion [data-reveal]:not(.is-in) .paybar__fill { transform: scaleX(0); }
 
   /* Journey stamps press in as the line reaches each step. */
-  /* Scale only: dimming the text would drop it below AA contrast. */
-  .motion .timeline--journey li:not(.is-reached) .stamp { transform: scale(0.92); opacity: 0.55; }
+  /* Scale only: dimming the text would drop it below AA contrast
+     (--ink-3 at 55% opacity is 2.1:1 in light, 2.5:1 in dark). */
+  .motion .timeline--journey li:not(.is-reached) .stamp { transform: scale(0.92); }
 
   /* Problem → system scene, pinned and scrubbed by scroll (site.js sets
      .is-pinned, --t on each [data-at] element, and each order's status). */
