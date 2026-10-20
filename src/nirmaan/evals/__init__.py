@@ -3,11 +3,12 @@
 Run records (M45): trials recorded as evidence, with rates, intervals, and re-judging.
 """
 
-from nirmaan.evals.cases import EvalError, case_digest, load_case, load_cases, validate_case
+from nirmaan.evals.cases import EvalError, case_digest, load_case, load_cases, skill_digest, validate_case
 from nirmaan.evals.records import (
     LIVE_TRIALS,
     EvalRecord,
     Rejudged,
+    load_evidence,
     load_record,
     load_records,
     rate_text,

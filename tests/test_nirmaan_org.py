@@ -20,7 +20,7 @@ from nirmaan.models import (
     Function,
     Level,
     OrgUnit,
-    Proficiency,
+    SeniorityBand,
     Skill,
     Track,
     UnitKind,
@@ -56,20 +56,19 @@ def test_the_executive_layer_exists(nirmaan_org, role):
     [
         "product.management.requirements", "product.programs.tpm", "product.projects.status",
         "architecture.system.interconnect", "architecture.micro.noc", "architecture.interface.axi",
-        "architecture.interface.cxl", "design.rtl.design.fsm", "design.rtl.cdc", "design.rtl.quality.lint",
+        "architecture.io.cxl", "design.rtl.design.fsm", "design.rtl.cdc", "design.rtl.quality.lint",
         "verification.simulation.uvm", "verification.formal.equivalence", "verification.coverage.functional",
         "verification.debug.triage", "verification.signoff", "implementation.pd.sta.mcmm",
-        "implementation.pd.power.ir", "implementation.pd.signoff.lvs", "implementation.dft.engineering.atpg",
+        "implementation.pd.power.ir", "implementation.pd.signoff.lvs", "implementation.dft.scan_atpg.atpg",
         "software.firmware.boot", "software.tools.compiler", "security.secure_boot",
-        "infrastructure.build.ci", "documentation.writing.registers", "quality.engineering.traceability",
+        "infrastructure.build.ci", "documentation.specifications.registers", "quality.reviews.traceability",
     ],
 )
 def test_every_specified_domain_is_a_unit(nirmaan_org, unit):
     assert unit in nirmaan_org.units
 
 
-@pytest.mark.parametrize("unit", ["finance", "legal", "hr", "procurement", "sales", "marketing",
-                                  "customer_success", "partnerships", "operations"])
+@pytest.mark.parametrize("unit", ["finance", "legal", "hr", "procurement", "operations"])
 def test_business_functions_are_structural_placeholders(nirmaan_org, unit):
     u = nirmaan_org.units[unit]
     assert u.function is Function.BUSINESS and u.status is UnitStatus.PLACEHOLDER
@@ -154,16 +153,23 @@ def test_skills_compose_through_includes(nirmaan_org):
         assert composed in skills
 
 
-def test_proficiency_is_derived_from_level(nirmaan_org):
-    p = nirmaan_org.proficiency
-    assert p("verification.debug.triage.intern", "failure_triage") is Proficiency.AWARENESS
-    assert p("verification.debug.triage.junior", "failure_triage") is Proficiency.WORKING
-    assert p("verification.debug.triage.engineer", "failure_triage") is Proficiency.PROFICIENT
-    assert p("verification.debug.triage.senior", "failure_triage") is Proficiency.EXPERT
-    # A manager holds inherited domain skills, but not at expert depth.
-    assert p("verification.debug.manager", "debugging") is Proficiency.PROFICIENT
+def test_band_is_derived_from_level(nirmaan_org):
+    b = nirmaan_org.band
+    assert b("verification.debug.triage.intern", "failure_triage") is SeniorityBand.FOUNDATION
+    assert b("verification.debug.triage.junior", "failure_triage") is SeniorityBand.WORKING
+    assert b("verification.debug.triage.engineer", "failure_triage") is SeniorityBand.ADVANCED
+    assert b("verification.debug.triage.senior", "failure_triage") is SeniorityBand.LEAD
+    # A manager holds inherited domain skills, but not at the lead band.
+    assert b("verification.debug.manager", "debugging") is SeniorityBand.ADVANCED
     # Level-granted skills are the level's core competence.
-    assert p("verification.debug.manager", "engineering_management") is Proficiency.EXPERT
+    assert b("verification.debug.manager", "engineering_management") is SeniorityBand.LEAD
+
+
+def test_band_claims_no_expertise(nirmaan_org):
+    # M56: a band is derived from level with no record behind it, so no band value says "expert".
+    assert [b.value for b in SeniorityBand] == ["foundation", "working", "advanced", "lead"]
+    card = nirmaan_org.agent_card("verification.debug.triage.senior")
+    assert card["skills"]["failure_triage"] == "lead"
 
 
 def test_review_capabilities_need_expertise(nirmaan_org):
