@@ -159,6 +159,9 @@ class KnowledgeSourceKind(str, Enum):
     SPECIFICATION = "specification"
     COMPANY_STANDARD = "company_standard"
     METHODOLOGY = "methodology"
+    #: A long-form knowledge document, ref ``<division>/<skill_id>`` (file ``knowledge/<ref>.md``), whose
+    #: text enters the work packet (M61).
+    KNOWLEDGE_DOCUMENT = "knowledge_document"
 
 
 class KnowledgeSource(BaseModel):

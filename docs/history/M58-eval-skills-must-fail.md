@@ -31,3 +31,9 @@ Key design points worth not re-deriving:
   wrap). The power-of-two mutant passes the DEPTH 8 proof and fails the DEPTH 5
   one: formal at each parameter point.
 - Tests: `tests/test_nirmaan_eval_must_fail.py`.
+
+Follow-up from the review of #122: the must-fail scorer stages its inputs
+inside the evaluation's sandbox (`ScoreContext.work`), so each run's
+parameters name files kept with the record, and a caller with no sandbox
+folder gets a temporary one that is removed; the pass summary counts the
+mutants from the check; the runner's attestation list has a test of its own.
