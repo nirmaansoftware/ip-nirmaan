@@ -67,7 +67,7 @@ ORGANIZATION -> ROLES -> SKILLS -> CAPABILITIES -> WORKFLOWS -> TASKS
 | **Role** | Responsibility plus authority plus expertise at one level in one unit. Mostly **derived**: see section 3. | `models/org.py::Role` |
 | **Skill** | Reusable know-how: procedures, failure modes, validation criteria, knowledge sources, tools. Composable through `includes`. | `company/skills.py` |
 | **Capability** | A unit of work (`rtl.implement`, `dv.plan`, `signoff.verification`). Tasks require capabilities; skills provide them. | `company/capabilities.py` |
-| **Proficiency** | How deeply a role holds a skill, derived from level. Capabilities state the proficiency (and, for signoff, the level) they need. | `org/organization.py` |
+| **Seniority band** | The band a role holds a skill at (foundation, working, advanced, lead), derived from level. It says how senior the seat is, not how well the skill is done: no record backs it (M56, `docs/SENIORITY_BAND.md`). Capabilities state the band (and, for signoff, the level) they need. | `models/org.py::SeniorityBand`, `org/organization.py::band` |
 | **Authority** | A table: (decision, criticality) to a minimum level and a scope. | `company/governance.py::AUTHORITY` |
 | **Escalation route** | Where each kind of problem lands, walked up the role's technical chain. | `company/governance.py::ESCALATION` |
 | **Gate** | A point that work may not pass without an authorized (optionally human) approval. | `company/governance.py::GATES` |
@@ -121,16 +121,22 @@ Intern -> Junior -> Engineer -> Senior -> Tech Lead -> Manager -> Director -> VP
 Skills and tools are inherited from every ancestor's baseline, plus the level
 profile (tech leads review and decompose; managers plan, delegate, and track).
 Tools declared by skills are granted too. Read tools come with any holding of
-the skill. Write, execute, and approve tools need at least WORKING proficiency,
+the skill. Write, execute, and approve tools need at least the WORKING band,
 so an intern can read a repository but not run the simulator.
 
-The IP Nirmaan definition today has 207 units, 685 derived roles, 140 skills,
-97 capabilities, 38 tools, 7 workflows, 6 gates, and 12 principles. It covers
-Product and Programs, Architecture, Design Engineering, Verification, Silicon
-Implementation (physical design and DFT), Software, Security, Engineering
-Infrastructure, Technical Documentation, and Quality and Process. It also
-declares structural placeholders for Finance, Legal, HR, Procurement,
-Operations, Sales, Marketing, Customer Success, and Partnerships.
+The IP Nirmaan definition's counts are generated into the "Counts" block of
+`docs/ROADMAP.md`. It covers Product and Programs, Architecture, Design
+Engineering, Verification, Silicon Implementation (physical design and DFT),
+Software, Security, Engineering Infrastructure, Technical Documentation, and
+Quality and Process. It also declares structural placeholders for Finance,
+Legal, HR, Procurement, and Operations (under the COO), Commercial (under the
+CPO: Sales and Partnerships, Marketing, Customer Success, Applications
+Engineering), and FPGA Design, Foundation IP, IP Qualification, and
+Deliverable Kits. Every unit with child units has 3 to 8 of them, and the CEO
+spans 5 (M57, `docs/HIERARCHY_FIXES.md`). `shape_issues` checks that rule,
+depth, span exceptions and placeholder missions, and a test holds the chart to
+it with zero exceptions; an ACTIVE unit added later must be backed by a
+tool-judged eval case (M60, `docs/ORG_SPAN_RULE.md`).
 
 **Validation runs on every build.** Every reference must resolve, every chain
 must terminate and rise strictly in seniority, the authority matrix must be
@@ -281,7 +287,7 @@ and workflow, and plans real work into it with zero core changes.
 | **A department** | Add an `OrgUnit` (a `dept(...)`/`team(...)`/`prac(...)` entry in `company/org_chart.py`) with its baseline `skills` and `tools`. Its head, tech lead, and ladder are derived. Validation tells you if anything is unreachable. |
 | **A role** | Usually unnecessary: roles are derived. For a one-off seat (an executive), add a `Role` to `EXECUTIVES` with `generated=False`. To change what every role at a level does, edit its `LevelProfile`. |
 | **A skill** | Add a `Skill` (use `sk(...)` in `company/skills.py`) with `provides`, `includes`, procedures, failure modes, validation criteria, and knowledge sources. Cite a VeriTriage pack by ID instead of re-writing protocol knowledge. Attach it to the units that should hold it. |
-| **A capability** | Add a `Capability` with its kind, the proficiency it needs, and (for signoff) the minimum level. Then have a skill provide it. |
+| **A capability** | Add a `Capability` with its kind, the seniority band it needs (`min_band`), and (for signoff) the minimum level. Then have a skill provide it. |
 | **An agent** | Implement `AgentRuntime` and register it with `@register_runtime("my-model")`. Seat it with an `AgentProfile(role=..., runtime="my-model")` in the definition's `agents`. It inherits everything else from the role. |
 | **A workflow** | Add a `WorkflowTemplate`: stages naming capabilities, `depends_on`, `when` conditions, `variants`, `review`, `gate`, `evidence` (with the tools whose runs count), `outcomes` and `branch` for decisions, `owner_from` for continuity. Register an `IntentRule` that selects it. |
 | **A tool** | Add a `ToolSpec`. If it can really run here, set `status=AVAILABLE` and register a binding with `@register_binding("tool.id")`. Grant it through a skill's `tools` or a unit's baseline. |

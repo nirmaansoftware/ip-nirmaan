@@ -50,6 +50,11 @@ def prac(slug, name, noun, *skills, **kw):
     return _u(UnitKind.PRACTICE, slug, name, noun=noun, skills=skills, **kw)
 
 
+def _placeholder(mission: str) -> dict:
+    """A declared, unstaffed unit: it has a head and a mission, but no ladder and no routing."""
+    return {"status": UnitStatus.PLACEHOLDER, "mission": mission}
+
+
 # --- Structure -----------------------------------------------------------------
 
 _PRODUCT = div(
@@ -88,7 +93,6 @@ _ARCHITECTURE = div(
          prac("ip", "IP Architecture", "IP Architect", "ip_architecture"),
          prac("memory", "Memory Architecture", "Memory Architect", "memory_architecture"),
          prac("interconnect", "Interconnect Architecture", "Interconnect Architect", "noc_architecture", "qos_architecture"),
-         prac("security", "Security Architecture", "Security Architect", "security_architecture"),
          prac("power", "Power Architecture", "Power Architect", "power_architecture"),
          prac("performance", "Performance Architecture", "Performance Architect", "performance_modeling"),
          prac("software", "Software Architecture", "Software Architect", "software_architecture"),
@@ -109,13 +113,15 @@ _ARCHITECTURE = div(
          prac("chi", "CHI", "CHI Interface Architect", "chi"),
          prac("apb", "APB", "APB Interface Architect", "apb"),
          prac("ahb", "AHB", "AHB Interface Architect", "ahb"),
+         prac("noc", "NoC Interfaces", "NoC Interface Architect", "noc_protocol"),
+         prac("custom", "Custom Interfaces", "Custom Interface Architect", "custom_interfaces"),
+         skills=("interface_specification",), ladder=ARCH_LADDER),
+    dept("io", "External Interface Architecture",
          prac("pcie", "PCIe", "PCIe Interface Architect", "pcie"),
          prac("cxl", "CXL", "CXL Interface Architect", "cxl"),
          prac("ddr", "DDR", "DDR Interface Architect", "ddr"),
          prac("usb", "USB", "USB Interface Architect", "usb"),
          prac("ethernet", "Ethernet", "Ethernet Interface Architect", "ethernet"),
-         prac("noc", "NoC Interfaces", "NoC Interface Architect", "noc_protocol"),
-         prac("custom", "Custom Interfaces", "Custom Interface Architect", "custom_interfaces"),
          skills=("interface_specification",), ladder=ARCH_LADDER),
     function=Function.ENGINEERING, head_role="exec.chief_architect",
     skills=_ENGINEERING_SKILLS, tools=_ENGINEERING_TOOLS,
@@ -148,7 +154,14 @@ _DESIGN = div(
          team("automation", "Design Automation", noun="Design Automation Engineer", skills=("design_automation",)),
          skills=("rtl_design", "change_integration")),
     dept("integration", "IP Integration and Delivery",
-         team("packaging", "IP Integration", noun="IP Integration Engineer", skills=("ip_integration",))),
+         team("packaging", "IP Integration", noun="IP Integration Engineer", skills=("ip_integration",)),
+         team("qualification", "IP Qualification", **_placeholder(
+             "Qualify each IP release against its checklist before delivery.")),
+         team("kits", "Deliverable Kits", **_placeholder(
+             "Assemble what a customer receives: RTL, constraints, documents, and evidence.")),
+    ),
+    dept("fpga", "FPGA Design", **_placeholder(
+        "Map IP to FPGAs: the open flow, vendor flows, and FPGA prototypes.")),
     function=Function.ENGINEERING, sponsor_role="exec.cto",
     skills=_ENGINEERING_SKILLS, tools=_ENGINEERING_TOOLS,
     mission="Turn microarchitecture into clean, reviewed, synthesizable RTL.",
@@ -184,7 +197,6 @@ _VERIFICATION = div(
          prac("intelligence", "Regression Intelligence", "Regression Intelligence Engineer", "regression_intelligence"),
          skills=("debugging", "root_cause_analysis"), tools=("veritriage.investigate", "veritriage.explain_log")),
     team("cdc", "CDC / RDC Verification", noun="CDC Verification Engineer", skills=("cdc_verification",)),
-    team("security", "Security Verification", noun="Security Verification Engineer", skills=("security_verification",)),
     team("signoff", "Verification Signoff", noun="Verification Signoff Engineer",
          skills=("verification_signoff", "functional_coverage"), ladder=(Level.STAFF, Level.SENIOR)),
     function=Function.ENGINEERING, sponsor_role="exec.cto",
@@ -199,9 +211,11 @@ _IMPLEMENTATION = div(
          team("synthesis", "Synthesis", noun="Synthesis Engineer", skills=("synthesis",)),
          team("floorplan", "Floorplanning", noun="Floorplan Engineer", skills=("floorplanning",)),
          team("power_plan", "Power Planning", noun="Power Planning Engineer", skills=("power_planning",)),
-         team("placement", "Placement", noun="Placement Engineer", skills=("place_and_route",)),
-         team("cts", "Clock Tree Synthesis", noun="CTS Engineer", skills=("place_and_route",)),
-         team("routing", "Routing", noun="Routing Engineer", skills=("place_and_route",)),
+         team("place_and_route", "Place and Route",
+              prac("placement", "Placement", "Placement Engineer", "place_and_route"),
+              prac("cts", "Clock Tree Synthesis", "CTS Engineer", "place_and_route"),
+              prac("routing", "Routing", "Routing Engineer", "place_and_route"),
+              skills=("place_and_route",)),
          team("sta", "Static Timing Analysis",
               prac("setup", "Setup", "Setup Timing Engineer", "sta"),
               prac("hold", "Hold", "Hold Timing Engineer", "sta"),
@@ -221,17 +235,23 @@ _IMPLEMENTATION = div(
               prac("density", "Density", "Density Engineer", "physical_verification"),
               skills=("implementation_signoff",))),
     dept("dft", "Design for Test",
-         team("engineering", "DFT Engineering",
+         team("scan_atpg", "Scan and ATPG",
               prac("scan", "Scan", "Scan Engineer", "scan_design"),
               prac("atpg", "ATPG", "ATPG Engineer", "atpg"),
+              prac("faults", "Fault Modeling", "Fault Modeling Engineer", "fault_modeling"),
+              skills=("dft_architecture",)),
+         team("memory_bist", "Memory Test and BIST",
               prac("mbist", "MBIST", "MBIST Engineer", "mbist"),
+              prac("memory_test", "Memory Test", "Memory Test Engineer", "mbist"),
               prac("lbist", "LBIST", "LBIST Engineer", "lbist"),
+              skills=("dft_architecture",)),
+         team("test_access", "Test Access",
               prac("jtag", "JTAG", "JTAG Engineer", "jtag"),
               prac("compression", "Compression", "Test Compression Engineer", "test_compression"),
-              prac("memory_test", "Memory Test", "Memory Test Engineer", "mbist"),
-              prac("faults", "Fault Modeling", "Fault Modeling Engineer", "fault_modeling"),
               prac("verification", "DFT Verification", "DFT Verification Engineer", "dft_verification"),
               skills=("dft_architecture",))),
+    dept("foundation", "Foundation IP", **_placeholder(
+        "Standard cells, memory compilers and SRAM, and I/O and ESD.")),
     function=Function.ENGINEERING, sponsor_role="exec.cto",
     skills=(*_ENGINEERING_SKILLS, "implementation_signoff"), tools=_ENGINEERING_TOOLS,
     mission="Take RTL to signoff-clean silicon: timing, power, test, and physical.",
@@ -267,6 +287,8 @@ _SECURITY = div(
     team("architecture", "Security Architecture", noun="Security Architect", skills=("security_architecture",), ladder=ARCH_LADDER),
     team("verification", "Security Verification", noun="Security Verification Engineer", skills=("security_verification",)),
     team("vulnerabilities", "Vulnerability Management", noun="Vulnerability Engineer", skills=("vulnerability_management",)),
+    team("platform", "Platform and Product Security", noun="Product Security Engineer",
+         skills=("threat_modeling", "vulnerability_management")),
     function=Function.ENGINEERING, sponsor_role="exec.cto",
     skills=_ENGINEERING_SKILLS, tools=_ENGINEERING_TOOLS,
     mission="Make security a property the company can prove, not assert.",
@@ -291,6 +313,7 @@ _INFRASTRUCTURE = div(
          prac("environment", "EDA Environment", "EDA Environment Engineer", "eda_environment"),
          prac("tooling", "Developer Tooling", "Developer Tooling Engineer", "developer_tools", "design_automation"),
          ladder=KNOWLEDGE_LADDER),
+    team("ai", "AI Platform", noun="AI Platform Engineer", skills=("python", "monitoring"), ladder=KNOWLEDGE_LADDER),
     function=Function.INFRASTRUCTURE, sponsor_role="exec.coo",
     skills=_ENGINEERING_SKILLS, tools=_ENGINEERING_TOOLS,
     mission="Keep engineering fast, reproducible, and observable.",
@@ -298,15 +321,19 @@ _INFRASTRUCTURE = div(
 
 _DOCUMENTATION = dept(
     "documentation", "Technical Documentation",
-    team("writing", "Technical Writing",
+    team("specifications", "Specifications and Registers",
          prac("specifications", "Specifications", "Specification Writer", "specification_writing"),
          prac("architecture", "Architecture Documents", "Architecture Writer", "specification_writing"),
+         prac("registers", "Register Documentation", "Register Documentation Writer", "register_documentation"),
+         ladder=KNOWLEDGE_LADDER),
+    team("engineering", "Engineering Documents",
          prac("design", "Design Documents", "Design Documentation Writer"),
          prac("verification", "Verification Plans", "Verification Documentation Writer"),
          prac("api", "API Documentation", "API Writer"),
-         prac("registers", "Register Documentation", "Register Documentation Writer", "register_documentation"),
-         prac("release_notes", "Release Notes", "Release Notes Writer"),
+         ladder=KNOWLEDGE_LADDER),
+    team("product", "Product Documentation",
          prac("manuals", "User Manuals", "User Manual Writer", "user_documentation"),
+         prac("release_notes", "Release Notes", "Release Notes Writer"),
          prac("knowledge_base", "Knowledge Base", "Knowledge Base Curator"),
          ladder=KNOWLEDGE_LADDER),
     function=Function.PRODUCT, sponsor_role="exec.cpo", skills=("technical_writing",), tools=("doc.publish",),
@@ -315,16 +342,19 @@ _DOCUMENTATION = dept(
 
 _QUALITY = div(
     "quality", "Quality and Process",
-    team("engineering", "Quality Engineering",
+    team("reviews", "Reviews and Release Quality",
          prac("design_reviews", "Design Reviews", "Design Review Facilitator", "design_review_facilitation"),
          prac("verification_signoff", "Verification Signoff Oversight", "Signoff Quality Engineer", "verification_signoff"),
          prac("release", "Release Quality", "Release Quality Engineer", "release_quality"),
-         prac("process", "Process QA", "Process QA Engineer", "engineering_audit"),
-         prac("configuration", "Configuration Management", "Configuration Manager", "configuration_management"),
          prac("traceability", "Traceability", "Traceability Engineer", "traceability"),
+         ladder=KNOWLEDGE_LADDER),
+    team("process", "Process and Compliance",
+         prac("process", "Process QA", "Process QA Engineer", "engineering_audit"),
          prac("compliance", "Compliance", "Compliance Engineer", "compliance"),
          prac("audits", "Engineering Audits", "Engineering Auditor", "engineering_audit"),
          ladder=KNOWLEDGE_LADDER),
+    team("configuration", "Configuration Management", noun="Configuration Manager",
+         skills=("configuration_management",), ladder=KNOWLEDGE_LADDER),
     function=Function.QUALITY, sponsor_role="exec.coo", skills=("release_quality", "traceability"),
     tools=("git.read",),
     mission="Make sure what the company says is done is actually done.",
@@ -339,12 +369,27 @@ _BUSINESS = [
         ("hr", "Human Resources", "exec.coo"),
         ("procurement", "Procurement", "exec.coo"),
         ("operations", "Operations", "exec.coo"),
-        ("sales", "Sales", "exec.ceo"),
-        ("marketing", "Marketing", "exec.ceo"),
-        ("customer_success", "Customer Success", "exec.ceo"),
-        ("partnerships", "Partnerships", "exec.ceo"),
     )
 ]
+
+_COMMERCIAL = div(
+    "commercial", "Commercial",
+    dept("sales", "Sales and Partnerships", **_placeholder(
+        "Find and close customers and partners; one owner per lead.")),
+    dept("marketing", "Marketing",
+         team("brand", "Brand and Content", **_placeholder(
+             "Positioning, copy, and technical marketing that cites evidence.")),
+         team("web", "Web", **_placeholder("The public site and its release checks.")),
+         team("research", "Market Research", **_placeholder(
+             "Size markets and name the IP customers will buy.")),
+         **_placeholder("Tell the market what the company makes, with claims it can back.")),
+    dept("customer_success", "Customer Success", **_placeholder(
+        "Keep delivered IP working for customers after handoff.")),
+    dept("applications", "Applications Engineering", **_placeholder(
+        "Help customers integrate delivered IP into their designs.")),
+    function=Function.BUSINESS, sponsor_role="exec.cpo", skills=("business_operations",),
+    **_placeholder("Sell, market, and support what the company builds; declared, not yet staffed."),
+)
 
 STRUCTURE = [
     _PRODUCT,
@@ -358,6 +403,7 @@ STRUCTURE = [
     _DOCUMENTATION,
     _QUALITY,
     *_BUSINESS,
+    _COMMERCIAL,
 ]
 
 

@@ -106,7 +106,13 @@ The original preface of the section:
 - [M55-side-1-decision-council](M55-side-1-decision-council.md): side work - the IP Nirmaan council: thirteen seats and the meeting process for business and product decisions
 - [M55-side-2-council-seats](M55-side-2-council-seats.md): side work - three more council seats: legal counsel, tax and accounts, partnerships
 - [release-v1.25.0](release-v1.25.0.md): v1.25.0 (2026-10-12) - the four audits of v1.24.0, closed
+- [M56-seniority-band](M56-seniority-band.md): Milestone 56 - Seniority band: the level-derived scale is renamed, and no band says "expert"
+- [M57-hierarchy-fixes](M57-hierarchy-fixes.md): Milestone 57 - Hierarchy fixes: the org matches the capability build-out council record
+- [M58-eval-skills-must-fail](M58-eval-skills-must-fail.md): Milestone 58 - Eval cases name skills; must-fail scorer; the evidence loader refuses replays and attestations
 - [M59-release-mirror-check](M59-release-mirror-check.md): Milestone 59 - Release check for the public org mirrors: the org figure and the hero's plan excerpt are checked against the code at each release
+- [M60-span-validator](M60-span-validator.md): Milestone 60 - Span, depth and activation rules become a check
+- [M61-knowledge-packet](M61-knowledge-packet.md): Milestone 61 - Knowledge documents in the work packet: a cited document's text reaches the seat, within a budget, or the seat declines
+- [M62-knowledge-file-checks](M62-knowledge-file-checks.md): Milestone 62 - Knowledge file schema and checks: every knowledge document and skill card is checked before the first is written
 
 ## Before M43
 

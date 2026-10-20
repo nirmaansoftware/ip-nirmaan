@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping, Sequence
 
 import nirmaan
-from nirmaan.evals.cases import case_digest
+from nirmaan.evals.cases import EvalError, case_digest, skill_digest
 from nirmaan.evals.runner import REPLAY, evaluate, replay_llm
 from nirmaan.models import EvalCase, EvalResult, EvalRunManifest, EvalTrial, JudgeRun, RecordedAnswer
 from nirmaan.org import Organization
@@ -136,10 +136,12 @@ def record_trial(org: Organization, case: EvalCase, seat_runtime: AgentRuntime, 
     judge_runs = tuple(
         JudgeRun(check=score.name, run=run.id, tool=run.tool, succeeded=run.succeeded, summary=run.summary,
                  params=run.model_dump(mode="json")["params"])
-        for score in result.scores for run in (engine.state.tool_runs.get(r) for r in score.runs) if run)
+        for score in result.scores for run in (engine.state.tool_runs.get(r) for r in (*score.runs,
+                                                                                         *score.failed_runs)) if run)
     answers = tuple(recorder.answers) if recorder else ()
     model = next((a.model for a in answers if a.model), None) or model_of(seat_runtime)
-    return EvalTrial(record=record, trial=trial, stage=case.seat, model=model, result=result, answers=answers,
+    return EvalTrial(record=record, trial=trial, stage=case.seat, model=model,
+                     skills={s: skill_digest(org, s, repo) for s in case.skills}, result=result, answers=answers,
                      judge_runs=judge_runs)
 
 
@@ -158,7 +160,7 @@ def _free(out: Path, name: str) -> Path:
 
 
 def record_run(org: Organization, cases: Sequence[EvalCase], runtime: str | None, *, trials: int, repo: Path,
-               out: Path, attempts: int | None = None, command: str = "",
+               out: Path, attempts: int | None = None, command: str = "", head_sha: str | None = None,
                clock: Callable[[], datetime] | None = None,
                on_trial: Callable[[EvalTrial, Path], None] | None = None) -> Path:
     """Run every case ``trials`` times on a registered runtime (``None`` replays) and write a run record.
@@ -179,7 +181,8 @@ def record_run(org: Organization, cases: Sequence[EvalCase], runtime: str | None
         return EvalRunManifest(id=path.name, runtime=runtime_id, model=model, replay=runtime is None,
                                nirmaan_version=nirmaan.__version__, started_at=started, finished_at=finished,
                                trials=trials, cases=tuple(c.id for c in cases),
-                               seats=tuple(dict.fromkeys(c.seat for c in cases)), command=command)
+                               seats=tuple(dict.fromkeys(c.seat for c in cases)), command=command,
+                               head_sha=head_sha)
 
     _write(path / MANIFEST, manifest(started).model_dump(mode="json"))
     done: list[EvalTrial] = []
@@ -217,6 +220,25 @@ def load_record(path: Path | str) -> EvalRecord:
     manifest = EvalRunManifest.model_validate_json((path / MANIFEST).read_text(encoding="utf-8"))
     trials = [EvalTrial.model_validate_json(p.read_text(encoding="utf-8")) for p in sorted(path.rglob("trial-*.json"))]
     return EvalRecord(path, manifest, tuple(sorted(trials, key=lambda t: (t.result.case, t.trial))))
+
+
+def load_evidence(path: Path | str) -> EvalRecord:
+    """A run record that may count as evidence about a model (M58), or :class:`EvalError` saying why not.
+
+    A replay proves a case, never a model; a trial with a human attestation on the seat's task (the kind a
+    verification requirement accepts in place of a tool run) is not tool-judged. Either refuses the record.
+    """
+    record = load_record(path)
+    if record.manifest.replay or record.manifest.runtime == REPLAY:
+        raise EvalError(f"{record.path} is a replay: it proves the cases, not a model")
+    for trial in record.trials:
+        where = f"{record.path}: {trial.result.case} trial {trial.trial}"
+        if trial.result.replay or trial.result.runtime == REPLAY:
+            raise EvalError(f"{where} is a replay: it proves the case, not a model")
+        if trial.result.attestations:
+            raise EvalError(f"{where} carries a human attestation ({', '.join(trial.result.attestations)}): "
+                            "an attestation is never a tool-judged result")
+    return record
 
 
 def load_records(root: Path | str) -> list[EvalRecord]:
