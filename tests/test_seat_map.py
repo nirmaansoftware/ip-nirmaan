@@ -1,8 +1,8 @@
 """The seat map (council/seat-map.yml) and the derived key data in .github/review-teams.yml.
 
 Capability build-out council record of 2026-10-18, sections 5 and 6 (proposed
-in pull request #118), as corrected by the review-loop council record of
-2026-10-18 (proposed in pull request #123): each council
+in pull request #118; the message of the founder's commit 30b5825 hands its
+open items to the Founder Proxy), without CODEOWNERS (removed by #113): each council
 seat maps to one org role or one shared role; each review team stores `unit:`
 (the lowest common unit of its lead seats' roles and covers, or `shared`) and
 `key2:`; this test recomputes both from the seat map and build_organization(),
@@ -50,7 +50,7 @@ def org():
     return build_organization()
 
 
-# --- The derivation (record section 5, items 2 and 4, plus the review-loop fallback) ---
+# --- The derivation (record section 5, items 2 and 4, plus the founder fallback) ---
 
 
 def _shared(seat_map: dict) -> dict[str, dict]:
@@ -129,7 +129,7 @@ def test_a_key1_holder_is_never_key2(org, seat_map):
 
 def test_a_derived_key2_that_reports_to_the_founder_is_the_chair(org, seat_map):
     # A seat on the CEO's role with a key-2 set would be derived for any engineering team; it reports to the
-    # founder, so key 2 is the chair (review-loop record, pull request #123).
+    # founder, so key 2 is the chair: the founder is never an agent key.
     seats = {**seat_map["seats"], "chair": {"role": "exec.cto"}, "stand-in": {"role": "exec.ceo"}}
     fixture = {**seat_map, "seats": seats, "key2_seats": ["stand-in"]}
     assert derive_key2(org, fixture, {"leads": ["design-architect"]}) == "chair"
@@ -183,19 +183,9 @@ def test_covers_name_units(org, seat_map):
             assert unit in org.units, unit
 
 
-def test_every_deputy_shares_a_review_team(seat_map, teams):
-    def teams_of(seat):
-        return {tid for tid, t in teams.items() if seat in t["leads"] or seat in t["members"]}
-
-    for name, seat in seat_map["seats"].items():
-        deputy = seat.get("deputy")
-        if deputy is None:
-            continue
-        if deputy == FOUNDER:
-            assert name == "chair"  # above the chair is the founder
-            continue
-        assert deputy in seat_map["seats"] and deputy != name
-        assert teams_of(name) & teams_of(deputy), (name, deputy)
+def test_no_deputy_is_named_yet(seat_map):
+    # A deputy would hold key 1 after an infrastructure failure; it enters with the script change that uses it.
+    assert not [name for name, seat in seat_map["seats"].items() if "deputy" in seat]
 
 
 def test_votes(seat_map):

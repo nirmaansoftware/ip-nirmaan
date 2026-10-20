@@ -73,23 +73,29 @@ founder as `needs-founder`.
 [`seat-map.yml`](seat-map.yml) maps each seat to one role in the product's
 modelled company (`src/nirmaan/company/org_chart.py`) or to a shared role
 (legal, legal counsel, tax and accounts, which serve both organisations and
-report to the founder). Decided in the capability build-out council record of
-2026-10-18 (sections 5 and 6; proposed in pull request #118) and corrected by
-the review-loop council record of 2026-10-18 (proposed in pull request #123). The chart itself names no seat, deputy or vote.
+report to the founder). Proposed in the capability build-out council record
+of 2026-10-18 (sections 5 and 6; pull request #118, not merged), whose open
+items the message of the founder's commit 30b5825 hands to the Founder Proxy; this map
+leaves out CODEOWNERS (removed by #113) and makes a derived key 2 that would be
+the founder, or would report to the founder, the chair. The chart itself names no seat or vote.
 
 - One seat, one role; no role holds two seats. `legal-compliance` is the shared
   legal role, never the Quality "Compliance" practice.
 - A key-1 lead holds a role that heads a unit. `covers` lists units a seat
   reviews until a seat inside each holds key 1 there.
-- A deputy runs only for key 1, only after an infrastructure failure, and
-  shares a review team with its seat; the chair's deputy is the founder.
+- Deputies are not in the map yet: they would hold key 1 after an
+  infrastructure failure, so they come with the script change that uses them,
+  together with the seat files that then hold that key.
 - The Founder Proxy is unplaced: where the chart records it is the founder's
   decision.
 - Each team in `.github/review-teams.yml` stores `unit:` and `key2:`, derived
   from this map and the chart and checked by `tests/test_seat_map.py`. A derived
   key 2 that would be the founder or report to the founder is the chair, and
   today every `key2` is `chair`. Nothing that picks a reviewer reads this map or
-  the chart: the review script reads only `.github/review-teams.yml` on `main`.
+  the chart: the review script reads only `.github/review-teams.yml` on `main`,
+  and key 2 is its constant, the chair. Moving any `key2` off the chair, or
+  having the script read these values, is a separate founder-class pull
+  request.
 
 ### Practice leads (key 1, no vote)
 

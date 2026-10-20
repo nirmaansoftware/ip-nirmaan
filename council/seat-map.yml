@@ -1,11 +1,13 @@
 # Seat map: each council seat to one role in the modelled company.
 #
-# Decided in the capability build-out council record of 2026-10-18 (item 4 and
-# section 6; proposed in pull request #118, waiting for the founder) and
-# corrected by the review-loop council record of 2026-10-18 (proposed in pull
-# request #123): no CODEOWNERS, and the key-2 fallback to the chair. The map lives here, in council/ (founder class), never in src/nirmaan/:
-# org_chart.py is the product's modelled company shown on the public site, and
-# no seat name, deputy or vote is written into it.
+# Proposed in the capability build-out council record of 2026-10-18 (item 4 and
+# section 6; pull request #118, not merged), whose open items the message
+# of the founder's commit 30b5825 hands to the Founder Proxy. Two changes from that record:
+# no CODEOWNERS entry (removed by #113), and a derived key 2 that would be the
+# founder or report to the founder is the chair. The map lives in council/
+# (founder class), never in src/nirmaan/: org_chart.py is the product's
+# modelled company shown on the public site, and no seat name or vote is
+# written into it.
 #
 # Nothing that picks a reviewer reads this file or org_chart.py. The review
 # script reads only .github/review-teams.yml on main. tests/test_seat_map.py
@@ -17,10 +19,12 @@
 # - role: an org role id from build_organization(), or a shared role below.
 # - covers: interim key-1 scope: units whose paths this seat reviews until a
 #   seat inside each holds key 1 there (record section 6).
-# - deputy: a seat in one of this seat's review teams, used only for key 1
-#   after an infrastructure failure (record section 5, item 8; the script
-#   change waits for gate G14). The chair's deputy is the founder.
 # - vote: yes, or chairs. A practice lead (key 1, no vote) has vote: no.
+#
+# Deputies (record section 5, item 8) are not in this map. A deputy would hold
+# key 1 after an infrastructure failure, and today's seat files give members no
+# key, so deputies enter with the script change that would use them (gate G14),
+# together with the seat files that then hold that key.
 #
 # Loaded by the plain YAML subset reader in scripts/review_map.py.
 
@@ -37,7 +41,7 @@ shared_roles:
     name: Legal counsel (shared)
     reports_to: founder
   - id: shared.tax
-    name: Tax and accounts (shared; IP supplement for licences, royalties and export of services)
+    name: Tax and accounts (shared; IP supplement for licences and export of services)
     reports_to: founder
 
 # Seats with a key-2 checklist and a passed seeded-defect review set. Today only
@@ -48,34 +52,28 @@ key2_seats: [chair]
 seats:
   chair:
     role: exec.ceo
-    deputy: founder
     vote: chairs
   product-lead:
     role: exec.cpo
-    deputy: brand-content
     vote: 'yes'
   design-architect:
     role: design.vp
     covers: [architecture, implementation, software]
-    deputy: physical-design-engineer
     vote: 'yes'
   verification-lead:
     role: verification.vp
-    deputy: qa-evidence
     vote: 'yes'
   dft-engineer:
     role: implementation.dft.director
     vote: 'yes'
   physical-design-engineer:
     role: implementation.vp
-    deputy: dft-engineer
     vote: 'yes'
   firmware-engineer:
     role: software.vp
     vote: 'yes'
   eda-tooling:
     role: infrastructure.vp
-    deputy: ai-engineer
     vote: 'yes'
   ai-engineer:
     role: infrastructure.ai.manager
@@ -100,11 +98,9 @@ seats:
     vote: 'yes'
   finance-licensing:
     role: finance.vp
-    deputy: tax-accounts
     vote: 'yes'
   legal-compliance:
     role: shared.legal
-    deputy: legal-counsel
     vote: 'yes'
   legal-counsel:
     role: shared.legal.counsel
