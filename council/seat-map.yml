@@ -1,8 +1,9 @@
 # Seat map: each council seat to one role in the modelled company.
 #
 # Decided in the capability build-out council record of 2026-10-18 (item 4 and
-# section 6) and corrected by the review-loop record of 2026-10-18 (work item
-# R12). The map lives here, in council/ (founder class), never in src/nirmaan/:
+# section 6; proposed in pull request #118, waiting for the founder) and
+# corrected by the review-loop council record of 2026-10-18 (proposed in pull
+# request #123): no CODEOWNERS, and the key-2 fallback to the chair. The map lives here, in council/ (founder class), never in src/nirmaan/:
 # org_chart.py is the product's modelled company shown on the public site, and
 # no seat name, deputy or vote is written into it.
 #

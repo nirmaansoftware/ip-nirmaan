@@ -74,8 +74,8 @@ founder as `needs-founder`.
 modelled company (`src/nirmaan/company/org_chart.py`) or to a shared role
 (legal, legal counsel, tax and accounts, which serve both organisations and
 report to the founder). Decided in the capability build-out council record of
-2026-10-18 (sections 5 and 6) and corrected by the review-loop record of
-2026-10-18 (work item R12). The chart itself names no seat, deputy or vote.
+2026-10-18 (sections 5 and 6; proposed in pull request #118) and corrected by
+the review-loop council record of 2026-10-18 (proposed in pull request #123). The chart itself names no seat, deputy or vote.
 
 - One seat, one role; no role holds two seats. `legal-compliance` is the shared
   legal role, never the Quality "Compliance" practice.

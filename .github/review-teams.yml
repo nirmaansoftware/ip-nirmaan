@@ -28,8 +28,9 @@
 #
 # Each team's `unit:` and `key2:` are derived values, stored here and checked
 # by tests/test_seat_map.py against council/seat-map.yml and the built
-# organization (capability build-out council record 2026-10-18, section 5;
-# review-loop record 2026-10-18, work item R12). `unit:` is the lowest common
+# organization (capability build-out council record 2026-10-18, section 5,
+# proposed in pull request #118; review-loop council record 2026-10-18,
+# proposed in pull request #123). `unit:` is the lowest common
 # unit of the team's lead seats' roles and their interim covers, or `shared`
 # when a lead holds a shared-services role. `key2:` is the nearest seat above
 # that unit with a key-2 checklist and a passed seeded-defect set that holds no
