@@ -7,6 +7,7 @@ a record of responsibility and authority, not a prompt.
 
 from __future__ import annotations
 
+from datetime import date
 from enum import Enum
 from typing import Any
 
@@ -125,17 +126,21 @@ _DISPLAY = {
 }
 
 
-class Proficiency(str, Enum):
-    """How deeply a role holds a skill. Derived from level, never hand-set."""
+class SeniorityBand(str, Enum):
+    """The seniority band a role holds a skill at. Derived from level, never hand-set.
 
-    AWARENESS = "awareness"
+    It says how senior the seat is, not how well the skill is done: no record
+    backs a band (M56).
+    """
+
+    FOUNDATION = "foundation"
     WORKING = "working"
-    PROFICIENT = "proficient"
-    EXPERT = "expert"
+    ADVANCED = "advanced"
+    LEAD = "lead"
 
     @property
     def rank(self) -> int:
-        return list(Proficiency).index(self)
+        return list(SeniorityBand).index(self)
 
 
 class CapabilityKind(str, Enum):
@@ -154,6 +159,9 @@ class KnowledgeSourceKind(str, Enum):
     SPECIFICATION = "specification"
     COMPANY_STANDARD = "company_standard"
     METHODOLOGY = "methodology"
+    #: A long-form knowledge document, ref ``<division>/<skill_id>`` (file ``knowledge/<ref>.md``), whose
+    #: text enters the work packet (M61).
+    KNOWLEDGE_DOCUMENT = "knowledge_document"
 
 
 class KnowledgeSource(BaseModel):
@@ -173,9 +181,9 @@ class Capability(BaseModel):
     name: str
     kind: CapabilityKind
     description: str
-    min_proficiency: Proficiency = Field(
-        default=Proficiency.PROFICIENT,
-        description="The proficiency a role needs in a providing skill to hold it.",
+    min_band: SeniorityBand = Field(
+        default=SeniorityBand.ADVANCED,
+        description="The seniority band a role needs in a providing skill to hold it.",
     )
     produces: tuple[str, ...] = Field(default=(), description="Artifact kinds it yields.")
     min_level: "Level | None" = Field(
@@ -373,6 +381,19 @@ class ToolSpec(BaseModel):
         return next((p for p in self.params or () if p.covers(name)), None)
 
 
+class SpanException(BaseModel):
+    """Why a unit may sit outside the 3 to 8 span rule, and when that is looked at again (M60).
+
+    Exceptions are data: the span check fails on one the unit no longer needs,
+    and on one whose review date has passed.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    reason: str = Field(min_length=1)
+    review_by: date
+
+
 class OrgUnit(BaseModel):
     """One node of the org chart: company, office, division, ..., practice."""
 
@@ -400,6 +421,9 @@ class OrgUnit(BaseModel):
     )
     sponsor_role: str | None = Field(
         default=None, description="Executive role the unit head reports to (divisions)."
+    )
+    span_exception: SpanException | None = Field(
+        default=None, description="Allows a span outside 3 to 8 child units, with a reason and a review date (M60)."
     )
 
 
@@ -464,7 +488,7 @@ class LevelProfile(BaseModel):
         default=(), description="'{unit}' is replaced with the unit name."
     )
     skills: tuple[str, ...] = Field(
-        default=(), description="Skills held at EXPERT proficiency: the level's core competence."
+        default=(), description="Skills held at the LEAD band: the level's core competence."
     )
     tools: tuple[str, ...] = ()
     capabilities: tuple[str, ...] = ()

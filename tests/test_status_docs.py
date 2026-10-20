@@ -156,6 +156,8 @@ DASHES = {chr(0x2014), chr(0x2013)}  # em dash, en dash
 
 
 def test_no_dashes_in_status_documents() -> None:
+    # M62: knowledge documents and the skill catalog's text too.
     paths = [ROOT / p for p in NEW_FILES] + sorted(HISTORY.glob("*.md"))
+    paths += sorted((ROOT / "knowledge").rglob("*.md")) + [ROOT / "src" / "nirmaan" / "company" / "skills.py"]
     dashed = [str(p.relative_to(ROOT)) for p in paths if DASHES & set(p.read_text(encoding="utf-8"))]
     assert dashed == []

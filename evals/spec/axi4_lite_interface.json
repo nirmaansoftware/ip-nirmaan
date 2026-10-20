@@ -2,6 +2,7 @@
   "id": "spec/axi4-lite-interface",
   "request": "Create an AXI4-Lite register block.",
   "seat": "interface-spec",
+  "skills": ["interface_specification"],
   "expected_behavior": "A Markdown interface specification for axi4_lite_regs that restates every requirement of the approved requirements spec in the section where it belongs, each ending with its [req:ID] tag exactly once, and names the parameters, every s_axil_* port, and the four registers, so the microarchitecture, RTL, and verification plan seats can work from it.",
   "constraints": [
     "Work only from the approved requirements specification.",

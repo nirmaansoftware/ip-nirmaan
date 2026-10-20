@@ -284,6 +284,8 @@ def run_task(engine: TaskEngine, task_id: str, runtime: AgentRuntime,
     budget = limits(engine, task_id, attempts, review_rounds)
     actor = Actor(role=task.owner, kind=kind, name=getattr(runtime, "runtime_id", "runtime"))
     packet = assemble(engine, task_id)
+    if packet.domain.declines:  # M61: knowledge is carried whole or the seat declines, before any work
+        return RunReport(task_id, ResultStatus.DECLINED, f"{task.owner} declines {task_id}: {packet.domain.declines}")
     if not runtime.accepts(packet):
         return RunReport(task_id, ResultStatus.DECLINED, f"runtime {runtime.runtime_id!r} declined {task_id}")
     if task.status in (TaskStatus.READY, TaskStatus.CHANGES_REQUESTED, TaskStatus.IN_PROGRESS):
@@ -407,6 +409,8 @@ def review_task(engine: TaskEngine, task_id: str, runtime: AgentRuntime, role: s
     if task.status is not TaskStatus.IN_REVIEW:
         raise WorkError(f"{task_id} is {task.status.value}, not in review")
     packet = assemble(engine, task_id, role=seat)
+    if packet.domain.declines:  # M61: as for the owner, the reviewer declines rather than read a cut
+        return RunReport(task_id, ResultStatus.DECLINED, f"{seat} declines to review {task_id}: {packet.domain.declines}")
     review = getattr(runtime, "review", None)
     if review is None or not runtime.accepts(packet):
         return RunReport(task_id, ResultStatus.DECLINED, f"runtime {runtime.runtime_id!r} does not review {task_id}")
