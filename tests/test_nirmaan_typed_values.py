@@ -298,7 +298,7 @@ def test_the_packet_is_typed_all_the_way_down(regression, fixture_log, tmp_path)
         elif isinstance(value, (list, tuple)):
             for i, item in enumerate(value):
                 no_untyped(item, f"{where}[{i}]")
-        elif isinstance(value, dict):  # only maps whose keys are data: parameters, proficiencies
+        elif isinstance(value, dict):  # only maps whose keys are data: parameters, seniority bands
             assert where in ("packet.project.parameters", "packet.role.skills", "packet.role.capabilities"), where
             assert all(isinstance(v, (str, int)) for v in value.values()), where
 
