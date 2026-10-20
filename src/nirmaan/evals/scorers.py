@@ -29,6 +29,9 @@ class ScoreContext:
     check: HeldOutCheck
     repo: Path
     tools: ToolHandle
+    #: A folder inside the evaluation's sandbox for this check's own files, kept with the record the runs are
+    #: in. None when the caller gives no sandbox: a scorer then cleans up whatever it stages.
+    work: Path | None = None
 
     def seat_files(self, kinds: tuple[str, ...]) -> list[Artifact]:
         """The seat's submitted files of these kinds, in this order."""
@@ -167,7 +170,16 @@ def must_fail(ctx: ScoreContext) -> Score:
             return score(ScoreStatus.NOT_RUN, f"no run of the seat's own declares {param} for its "
                                               f"{' or '.join(kinds)} file")
         entries[param] = entry
-    stage = Path(tempfile.mkdtemp(prefix="nirmaan-must-fail-"))
+    if ctx.work is not None:
+        return _must_fail_runs(ctx, inputs, entries, ctx.work / "must-fail", score)
+    with tempfile.TemporaryDirectory(prefix="nirmaan-must-fail-") as stage:
+        return _must_fail_runs(ctx, inputs, entries, Path(stage), score)
+
+
+def _must_fail_runs(ctx: ScoreContext, inputs: dict[str, list[Path]], entries: dict[str, str], stage: Path,
+                    score: Callable[..., Score]) -> Score:
+    """The clean run, the cover run and one run per mutant, each on inputs staged under ``stage``."""
+    check = ctx.check
 
     def run(tool: str, label: str, swap: tuple[Path, Path] | None = None):
         params = {**check.params, **entries, **_stage(stage / label, inputs, swap)}
@@ -201,5 +213,6 @@ def must_fail(ctx: ScoreContext) -> Score:
         return score(ScoreStatus.NOT_RUN, f"not run: {exc}")
     return score(ScoreStatus.PASSED, f"{check.tool} {clean_id} passed on the clean inputs"
                                      f"{' with every cover reached' if check.cover_tool else ''}; "
-                                     f"{len(caught)} of {len(caught)} mutants failed it", tuple(passed),
+                                     f"{len(caught)} of {sum(map(len, check.mutants.values()))} mutants "
+                                     f"failed it", tuple(passed),
                  tuple(caught))
