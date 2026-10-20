@@ -35,6 +35,7 @@ from nirmaan.models import (
     CaseFile,
     EvalCase,
     EvalResult,
+    EvidenceKind,
     GateRun,
     HeldOutCheck,
     MemoryScope,
@@ -173,7 +174,8 @@ def _prepare(engine: TaskEngine, case: EvalCase, repo: Path, sandbox: Path) -> T
     return seat
 
 
-def _judge(engine: TaskEngine, task: Task, check: HeldOutCheck, repo: Path, reached_review: bool) -> Score:
+def _judge(engine: TaskEngine, task: Task, check: HeldOutCheck, repo: Path, reached_review: bool,
+           work: Path) -> Score:
     def score(status: ScoreStatus, summary: str) -> Score:
         return Score(scorer=check.scorer, name=check.name, status=status, summary=summary)
 
@@ -183,10 +185,15 @@ def _judge(engine: TaskEngine, task: Task, check: HeldOutCheck, repo: Path, reac
     if spec is None:
         return score(ScoreStatus.NOT_RUN, f"no scorer {check.scorer!r} is registered")
     tools = ToolHandle(ToolBroker(engine), Actor(role=str(task.owner), kind=ActorKind.SYSTEM, name=SCORER), task.id)
-    result = spec.fn(ScoreContext(engine, task, check, repo, tools))
+    result = spec.fn(ScoreContext(engine, task, check, repo, tools, work))
     recorded = [engine.state.tool_runs.get(r) for r in result.runs]
     if result.status is ScoreStatus.PASSED and not (recorded and all(r and r.succeeded for r in recorded)):
         return score(ScoreStatus.FAILED, f"claimed a pass with no passing run recorded in the sandbox: "
+                                         f"{result.summary}")
+    # M58: a run a negative control needed to fail stands only as a failed run recorded in the sandbox.
+    failed = [engine.state.tool_runs.get(r) for r in result.failed_runs]
+    if result.status is ScoreStatus.PASSED and not all(r and not r.succeeded for r in failed):
+        return score(ScoreStatus.FAILED, f"claimed a run failed with no failed run recorded in the sandbox: "
                                          f"{result.summary}")
     return result
 
@@ -228,7 +235,8 @@ def evaluate(org: Organization, case: EvalCase, seat_runtime: AgentRuntime, *, r
     from nirmaan.costs import calls_cost
 
     spend = calls_cost(c for c in engine.state.model_calls.values() if c.task == seat.id)
-    scores = tuple(_judge(engine, task, check, repo, reached_review) for check in case.held_out)
+    scores = tuple(_judge(engine, task, check, repo, reached_review, sandbox / "judge" / f"check-{n}")
+                   for n, check in enumerate(case.held_out, start=1))
     ProjectStore(sandbox / ".nirmaan").save(engine.state)
     return EvalResult(
         case=case.id, case_digest=case_digest(case, repo), runtime=seat_runtime.runtime_id, replay=replay,
@@ -239,6 +247,8 @@ def evaluate(org: Organization, case: EvalCase, seat_runtime: AgentRuntime, *, r
                                     if r in engine.state.tool_runs)),
         scores=scores, passed=reached_review and all(s.status is ScoreStatus.PASSED for s in scores),
         detail=detail, audit_ok=not verify_chain(engine.state.audit), sandbox=str(sandbox),
+        attestations=tuple(e.id for e in engine.state.evidence.values()
+                           if e.task == seat.id and e.kind is EvidenceKind.HUMAN_ATTESTATION),
         model_calls=spend.calls, input_tokens=spend.input_tokens, output_tokens=spend.output_tokens,
         cost_usd=None if spend.unknown_cost_calls else spend.cost_usd,
     ), engine

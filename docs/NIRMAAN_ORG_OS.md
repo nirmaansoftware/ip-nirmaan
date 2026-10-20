@@ -124,13 +124,19 @@ Tools declared by skills are granted too. Read tools come with any holding of
 the skill. Write, execute, and approve tools need at least the WORKING band,
 so an intern can read a repository but not run the simulator.
 
-The IP Nirmaan definition today has 207 units, 685 derived roles, 140 skills,
-97 capabilities, 38 tools, 7 workflows, 6 gates, and 12 principles. It covers
-Product and Programs, Architecture, Design Engineering, Verification, Silicon
-Implementation (physical design and DFT), Software, Security, Engineering
-Infrastructure, Technical Documentation, and Quality and Process. It also
-declares structural placeholders for Finance, Legal, HR, Procurement,
-Operations, Sales, Marketing, Customer Success, and Partnerships.
+The IP Nirmaan definition's counts are generated into the "Counts" block of
+`docs/ROADMAP.md`. It covers Product and Programs, Architecture, Design
+Engineering, Verification, Silicon Implementation (physical design and DFT),
+Software, Security, Engineering Infrastructure, Technical Documentation, and
+Quality and Process. It also declares structural placeholders for Finance,
+Legal, HR, Procurement, and Operations (under the COO), Commercial (under the
+CPO: Sales and Partnerships, Marketing, Customer Success, Applications
+Engineering), and FPGA Design, Foundation IP, IP Qualification, and
+Deliverable Kits. Every unit with child units has 3 to 8 of them, and the CEO
+spans 5 (M57, `docs/HIERARCHY_FIXES.md`). `shape_issues` checks that rule,
+depth, span exceptions and placeholder missions, and a test holds the chart to
+it with zero exceptions; an ACTIVE unit added later must be backed by a
+tool-judged eval case (M60, `docs/ORG_SPAN_RULE.md`).
 
 **Validation runs on every build.** Every reference must resolve, every chain
 must terminate and rise strictly in seniority, the authority matrix must be

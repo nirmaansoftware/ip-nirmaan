@@ -2,6 +2,7 @@
   "id": "rtl/axi4-lite-regs",
   "request": "Create an AXI4-Lite register block.",
   "seat": "rtl-implementation",
+  "skills": ["rtl_design", "axi"],
   "expected_behavior": "RTL for module axi4_lite_regs (ADDR_WIDTH 4, DATA_WIDTH 32, s_axil_* ports) with four 32-bit registers at 0x0 to 0xC, and a self-checking testbench, both following the approved interface specification and microarchitecture. The work reaches review only after lint, simulation, and synthesis (and formal, when a .sby is written) pass on those files.",
   "constraints": [
     "Work only from the approved interface specification and microarchitecture.",

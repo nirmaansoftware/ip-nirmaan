@@ -10,7 +10,7 @@ from nirmaan.org.organization import (
     register_extension,
     unregister_extension,
 )
-from nirmaan.org.validate import validate_organization
+from nirmaan.org.validate import shape_issues, validate_organization
 
 __all__ = [
     "AuthorityService",
@@ -21,6 +21,7 @@ __all__ = [
     "available_extensions",
     "register_extension",
     "route_escalation",
+    "shape_issues",
     "unregister_extension",
     "validate_organization",
 ]
