@@ -157,9 +157,7 @@ the branch checked out. In order:
 8. **Validation.** One JSON object: verdict (`pass` or `fail`; the Founder
    Proxy may also return `needs-founder`, with at least one reason), the head SHA,
    findings with file, line and severity, checks run and what was not run. The
-   script checks the schema, the SHA and every citation (council record
-   [2026-10-18: two reviews per pull request head](../council/records/2026-10-18-review-loop.md),
-   decision 5). A cited line must exist at the head, at the base for a file
+   script checks the schema, the SHA and every citation. A cited line must exist at the head, at the base for a file
    the pull request deletes, or on `main` (written `main:<path>`, or a path
    that is not at the head but is on `main`); a reviewer's checkout prefix is
    taken off a cited path first. A minor or info finding with a bad citation
