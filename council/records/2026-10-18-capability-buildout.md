@@ -11,7 +11,8 @@ the command and its output are in the appendix, so any reader can reproduce them
 
 This is a council record, not a decision in the product's sense. A key is an
 agent review, never a person's decision. The founder can overrule any item, and
-the founder items in section 12 wait for the founder.
+the founder items in section 12 wait for the founder (see the note of
+2026-10-20 in section 12: most are now delegated to the Founder Proxy).
 
 Wording note (legal-counsel, tax-accounts): this record says "organisation" and
 "shared services". It does not call IP Nirmaan a separate company or describe a
@@ -574,6 +575,19 @@ exists yet and no tool judges those skills.
 5. Each organisation's share of plan usage, and the first recorded live eval
    batch.
 6. Later: switching any key 2 off the chair; the author loop.
+
+**Note, 2026-10-20.** The founder's commit 30b5825 changed
+`council/founder-proxy.md`: on founder-class pull requests the Founder Proxy
+(agent) now decides everything except new spending, contracts or legal
+counsel, export control, and turning on sending, and weakening a review gate
+is a failing finding rather than a founder item. The commit message delegates
+the open founder items to the Proxy and names this record's items 1, 2, 3 and
+10. So, read with that commit: the items above, and the founder-class pull
+requests this record plans, go to the Founder Proxy under the founder's
+delegation, except where they add spending, rely on a contract or counsel,
+touch export control or turn on sending, which still wait for the founder.
+The founder delegated these items; the founder did not decide them, and no
+item above is recorded as decided.
 
 The founder can overrule any decision in this record.
 
