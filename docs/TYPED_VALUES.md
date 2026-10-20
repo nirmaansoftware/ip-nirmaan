@@ -82,7 +82,7 @@ scope a typed model:
 
 `prompt.py`, `model.py`, and `selection.py` read attributes. Nothing reads the
 packet as a dict, and the packet carries no dict except the ones whose keys are
-data (a project's parameters, a role's skill proficiencies and capabilities).
+data (a project's parameters, a role's skill seniority bands and capabilities).
 
 **Prompts are unchanged.** `tests/fixtures/prompts/` holds prompts rendered by
 the dict packet before this change: a triage seat's work prompt (with its

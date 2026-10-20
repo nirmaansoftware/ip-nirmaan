@@ -2,6 +2,7 @@
   "id": "firmware/axi4-lite-driver",
   "request": "Create an AXI4-Lite register block and its driver.",
   "seat": "firmware",
+  "skills": ["device_drivers"],
   "expected_behavior": "A C driver for axi4_lite_regs (axi4_lite_regs_map.h, axi4_lite_regs_drv.h, axi4_lite_regs_drv.c) written to the approved programming interface, and a test program that drives it through nirmaan_hal. The work reaches review only after the driver builds under strict C flags and the seat's tests pass against the approved RTL in co-simulation.",
   "constraints": [
     "Work only from the approved interface specification, the driver programming interface, and the approved RTL.",

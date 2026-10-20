@@ -1173,7 +1173,7 @@ def eval_run(
 
     try:
         path = record_run(_org(), chosen, runtime, trials=trials, repo=repo, out=out, attempts=attempts,
-                          command=" ".join(["nirmaan", *sys.argv[1:]]), on_trial=show)
+                          command=" ".join(["nirmaan", *sys.argv[1:]]), head_sha=_head_sha(repo), on_trial=show)
     except EvalError as exc:
         _fail(str(exc))
     if as_json:
@@ -1184,6 +1184,20 @@ def eval_run(
         console.print(escape(f"run record: {path}"), highlight=False, soft_wrap=True)
     if not all(r.passed for r in results):
         raise typer.Exit(1)
+
+
+def _head_sha(repo: Path) -> Optional[str]:
+    """The commit checked out at ``repo`` (M58: a run record names it), or None outside a repository."""
+    import subprocess
+
+    try:
+        done = subprocess.run(["git", "-C", str(repo), "rev-parse", "HEAD"], capture_output=True, text=True,
+                              timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if done.returncode != 0:
+        return None
+    return done.stdout.strip() or None
 
 
 def _print_summary(summary: dict, indent: str = "") -> None:
