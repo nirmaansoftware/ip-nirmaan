@@ -302,6 +302,8 @@ def _record(engine: TaskEngine, report: LoopReport, task_id: str, seat: str, rol
                                "calls": calls, "review": run.review, "escalation": run.escalation,
                                "attempts": [a["attempt"] for a in run.attempts if a["attempt"]],
                                "tool_runs": list(run.tool_runs)}
+    if run.status is ResultStatus.DECLINED and run.detail:
+        details["reason"] = run.detail  # M61: why the seat declined (a knowledge document, its model's context)
     engine.record_step(task_id, Actor(role=role, kind=kind, name=name), f"{seat} step: {step.status}", details)
     report.steps.append(step)
 

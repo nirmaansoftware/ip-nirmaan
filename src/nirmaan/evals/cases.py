@@ -54,6 +54,7 @@ def referenced_files(case: EvalCase) -> list[str]:
     paths = [f.path for files in case.upstream.values() for f in files]
     paths += [f.path for f in case.reference]
     paths += [p for check in case.held_out for files in check.case_files.values() for p in files]
+    paths += [p for check in case.held_out for files in check.mutants.values() for p in files]  # M58
     return sorted(dict.fromkeys(paths))
 
 
@@ -67,13 +68,38 @@ def case_digest(case: EvalCase, repo: Path) -> str:
     return "sha256:" + digest.hexdigest()
 
 
+#: Where a skill's knowledge document lives (M58, from the council record): ``knowledge/<division>/<skill>.md``.
+KNOWLEDGE = "knowledge"
+
+
+def skill_digest(org: Organization, skill_id: str, repo: Path) -> str:
+    """sha256 over a skill's card (its catalog entry) and its knowledge document, when one exists (M58).
+
+    A result is credited to a skill as it was when the result was recorded: a change to either changes this.
+    """
+    card = org.skills[skill_id].model_dump(mode="json")
+    digest = hashlib.sha256(json.dumps(card, sort_keys=True).encode("utf-8"))
+    for document in sorted((Path(repo) / KNOWLEDGE).glob(f"*/{skill_id}.md")):
+        digest.update(document.relative_to(repo).as_posix().encode("utf-8"))
+        digest.update(document.read_bytes())
+    return "sha256:" + digest.hexdigest()
+
+
 def validate_case(org: Organization, case: EvalCase, repo: Path) -> list[str]:
     """Every reason the case cannot run as written. Empty means it can."""
     from nirmaan.evals.scorers import scorer_spec
     from nirmaan.orchestrator import Orchestrator, UnrecognizedRequirement
 
     problems = [f"file not found: {p}" for p in referenced_files(case) if not resolve(repo, p).is_file()]
+    problems += [f"unknown skill {s!r}: not in the skill catalog" for s in case.skills if s not in org.skills]
+    if len(set(case.skills)) != len(case.skills):
+        problems.append("a skill is named twice")
     for check in case.held_out:
+        given = {p for files in check.case_files.values() for p in files}
+        problems += [f"check {check.name!r}: mutants stand in for {p}, which is not one of its case files"
+                     for p in check.mutants if p not in given]
+        if check.cover_tool and check.cover_tool not in org.tools:
+            problems.append(f"check {check.name!r}: unknown cover tool {check.cover_tool!r}")
         spec = scorer_spec(check.scorer)
         if spec is None:
             problems.append(f"check {check.name!r}: no scorer {check.scorer!r} is registered")
