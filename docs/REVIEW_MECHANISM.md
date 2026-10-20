@@ -159,9 +159,7 @@ the branch checked out. In order:
    reviewer inside them is a critical finding. A changed path holding a
    control or format character (a newline, an escape, a bidirectional or
    zero-width mark) is refused before any reviewer sees it: both checks stay
-   pending, no model is called, and the loop stops (council record
-   [2026-10-18: two reviews per pull request head](../council/records/2026-10-18-review-loop.md),
-   decision 4).
+   pending, no model is called, and the loop stops.
 8. **Validation.** One JSON object: verdict (`pass` or `fail`; the Founder
    Proxy may also return `needs-founder`, with at least one reason), the head SHA,
    findings with file, line and severity, checks run and what was not run. The
