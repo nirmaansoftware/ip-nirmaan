@@ -3,9 +3,9 @@
 Item P1-09 of the 2026-10-18 council record on the capability build-out
 (section 9; gates G4, G5 and G17): a skill's evidence level is computed from
 committed records, never typed, and today it is none for every skill.
-The record is proposed in pull request #118, which waits for the founder, so
-it is not yet in `council/records/`; every rule this milestone takes from it is
-stated here in full, and the thresholds are this milestone's own.
+The record is proposed in pull request #118, so it is not yet in
+`council/records/`; every rule this milestone takes from it is stated here in
+full, and the thresholds are this milestone's own.
 
 ## The scale
 
