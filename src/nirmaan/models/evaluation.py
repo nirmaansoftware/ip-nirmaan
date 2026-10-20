@@ -38,6 +38,14 @@ class HeldOutCheck(BaseModel):
         default_factory=dict, description="Tool parameter -> artifact kinds taken from the seat's submitted files.")
     case_files: dict[str, tuple[str, ...]] = Field(
         default_factory=dict, description="Tool parameter -> files the case supplies (held out from the seat).")
+    seat_entries: dict[str, tuple[str, ...]] = Field(
+        default_factory=dict, description="Tool parameter -> artifact kinds whose declared entry fills it (M58), "
+                                          "as the seat's own recorded runs of that file gave it.")
+    mutants: dict[str, tuple[str, ...]] = Field(
+        default_factory=dict, description="Case file -> files that each stand in for it in a run that must "
+                                          "fail (M58, the must-fail scorer).")
+    cover_tool: str | None = Field(
+        default=None, description="A tool that must also pass over the clean inputs (M58): every cover reached.")
 
 
 class EvalCase(BaseModel):
@@ -46,6 +54,8 @@ class EvalCase(BaseModel):
     id: str
     request: str = Field(description="The requirement, as a person would type it.")
     seat: str = Field(description="The workflow stage whose seat is evaluated.")
+    #: M58: the skills this case judges, from the skill catalog. Only these get credit from its results.
+    skills: tuple[str, ...] = ()
     expected_behavior: str = ""
     constraints: tuple[str, ...] = ()
     known_failure_modes: tuple[str, ...] = ()
@@ -71,6 +81,8 @@ class Score(BaseModel):
     status: ScoreStatus
     summary: str = ""
     runs: tuple[str, ...] = Field(default=(), description="Tool runs recorded in the sandbox that back it.")
+    failed_runs: tuple[str, ...] = Field(
+        default=(), description="Runs a negative control required to fail, recorded failed in the sandbox (M58).")
 
 
 class GateRun(BaseModel):
@@ -103,6 +115,8 @@ class EvalResult(BaseModel):
     passed: bool
     detail: str = ""
     audit_ok: bool
+    #: M58: human attestations recorded on the seat's task. A trial carrying any is never evidence.
+    attestations: tuple[str, ...] = ()
     sandbox: str
     #: The seat run's model calls (M31): how many, tokens as reported, and cost (None when any is unknown).
     model_calls: int = 0
@@ -153,6 +167,8 @@ class EvalTrial(BaseModel):
     trial: int = Field(ge=1)
     stage: str = Field(description="The workflow stage whose seat was evaluated.")
     model: str | None = Field(default=None, description="The model the answers report.")
+    #: M58: skill ID -> skill digest (card plus knowledge document) at run time, for the case's skills.
+    skills: dict[str, str] = Field(default_factory=dict)
     result: EvalResult
     answers: tuple[RecordedAnswer, ...] = ()
     judge_runs: tuple[JudgeRun, ...] = ()
@@ -176,6 +192,8 @@ class EvalRunManifest(BaseModel):
     cases: tuple[str, ...]
     seats: tuple[str, ...]
     command: str = ""
+    #: M58: the commit the run was made on, when it was made in a repository.
+    head_sha: str | None = None
 
 
 class EvalProposalThresholds(BaseModel):

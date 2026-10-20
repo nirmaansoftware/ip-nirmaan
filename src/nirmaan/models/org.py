@@ -7,6 +7,7 @@ a record of responsibility and authority, not a prompt.
 
 from __future__ import annotations
 
+from datetime import date
 from enum import Enum
 from typing import Any
 
@@ -158,6 +159,9 @@ class KnowledgeSourceKind(str, Enum):
     SPECIFICATION = "specification"
     COMPANY_STANDARD = "company_standard"
     METHODOLOGY = "methodology"
+    #: A long-form knowledge document, ref ``<division>/<skill_id>`` (file ``knowledge/<ref>.md``), whose
+    #: text enters the work packet (M61).
+    KNOWLEDGE_DOCUMENT = "knowledge_document"
 
 
 class KnowledgeSource(BaseModel):
@@ -377,6 +381,19 @@ class ToolSpec(BaseModel):
         return next((p for p in self.params or () if p.covers(name)), None)
 
 
+class SpanException(BaseModel):
+    """Why a unit may sit outside the 3 to 8 span rule, and when that is looked at again (M60).
+
+    Exceptions are data: the span check fails on one the unit no longer needs,
+    and on one whose review date has passed.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    reason: str = Field(min_length=1)
+    review_by: date
+
+
 class OrgUnit(BaseModel):
     """One node of the org chart: company, office, division, ..., practice."""
 
@@ -404,6 +421,9 @@ class OrgUnit(BaseModel):
     )
     sponsor_role: str | None = Field(
         default=None, description="Executive role the unit head reports to (divisions)."
+    )
+    span_exception: SpanException | None = Field(
+        default=None, description="Allows a span outside 3 to 8 child units, with a reason and a review date (M60)."
     )
 
 
