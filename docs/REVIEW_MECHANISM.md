@@ -119,9 +119,7 @@ the branch checked out. In order:
 
 1. **One model call at a time** across Nirmaan and IP Nirmaan: a lock in
    `~/.nirmaan/pr-review/`, shared with Nirmaan's script, held here only
-   around each reviewer call (council record
-   [2026-10-18: two reviews per pull request head](../council/records/2026-10-18-review-loop.md),
-   decision 5), never while checking out, reading CI, posting, fixing or
+   around each reviewer call, never while checking out, reading CI, posting, fixing or
    running local checks. When it is held elsewhere at a call, the run ends
    ("busy", exit 3) and the next run reuses the verdicts already cached. The
    lock is a folder (`review.lock`) with an owner file written whole (a

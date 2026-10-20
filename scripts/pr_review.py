@@ -849,8 +849,7 @@ def run_review(repo_root, pr: int, github, post: str, claude_bin: str, state_dir
                timeout_s: float, backoff_s: float, config: dict = CONFIG, fresh: bool = False,
                caller_branch: str | None = None, in_claude_session: bool = False, sleep=time.sleep, out=print) -> dict:
     """The whole review. `post` is "app", "dry-run" or "none". The shared lock
-    is held only around each model call (council record 2026-10-18 on the
-    review loop, decision 5): when it is held elsewhere at a call, the run ends
+    is held only around each model call: when it is held elsewhere at a call, the run ends
     with EXIT_BUSY, and the next run reuses the verdicts already cached."""
     cfg = config
     state_dir = Path(state_dir)
