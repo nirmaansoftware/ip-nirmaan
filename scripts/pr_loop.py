@@ -99,7 +99,7 @@ LOOP = {
     # A finding on a path the fixer may not change: the fixer does not run, the
     # pull request gets this label, and the author's next head clears it.
     "author_fix_label": "author-fix",
-    # Shape rules (council record 2026-10-18 on the review loop, decision 5):
+    # Shape rules:
     # soft ones only comment; the hard one (the diff fits the review's size
     # limit uncut) is the review script's. Changed lines outside these globs
     # count toward the soft cap.
@@ -754,7 +754,7 @@ class Loop:
         _save_state(self.state_dir, cfg["repo"], st)
         self._log(ctx, "shape", notes=len(notes))
         self._say(n, "\n".join([f"<!-- {MARK} shape head={head} -->", f"### Automated loop: pull request shape (head `{head[:7]}`)", "",
-                                "Soft shape rules (council record 2026-10-18 on the review loop, decision 5). They do not stop the "
+                                "Soft shape rules. They do not stop the "
                                 "review; only a diff over the review's size limit does.", "",
                                 *[f"- {_cell(x, 500)}" for x in notes]]))
 

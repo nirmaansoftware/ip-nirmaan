@@ -143,9 +143,7 @@ the branch checked out. In order:
    No model is called in either case. A diff of `main...head` over 200,000
    bytes is not reviewed either: both checks stay pending with "review not
    run: ... split the pull request". The reviewers always get the whole diff,
-   never a cut one (council record
-   [2026-10-18: two reviews per pull request head](../council/records/2026-10-18-review-loop.md),
-   decision 5: the one shape rule that stops a review).
+   never a cut one (the one shape rule that stops a review).
 6. **Key 1, then key 2.** Key 1 is one fresh `claude -p` process per owning
    team lead: the base checklist, the lead's seat file and the "In a review"
    sections of the team's members. Key 2 runs only when every key 1 passed:

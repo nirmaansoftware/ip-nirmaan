@@ -1031,7 +1031,7 @@ def _review(repo_root, pr, github, post, claude_bin, state_dir, models, timeout_
         return {"exit": EXIT_OK, "waiting": why, "posted": posted}
 
     # The shape rule that stops a review: the diff must fit the review's size
-    # limit uncut (council record 2026-10-18 on the review loop, decision 5).
+    # limit uncut.
     size = len(diff.encode())
     if size > cfg["max_diff_bytes"]:
         why = (f"review not run: the diff of {head[:7]} is {size} bytes, over the review's limit of {cfg['max_diff_bytes']} "
