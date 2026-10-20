@@ -412,7 +412,7 @@ founder_classes:
       - tests/test_pr_review.py
       - tests/test_pr_loop.py
       - tests/conftest.py
-    note: .github/** covers .github/review-teams.yml. The pr-review skill (.claude/skills/pr-review/) falls under .claude/**; its posting script (scripts/pr_review.py), the map logic it shares with the coverage test (scripts/review_map.py), the automated loop that drives it (scripts/pr_loop.py), the launchd job that runs the loop (docs/pr-loop.plist) and the tests that pin their behaviour (the review tests and tests/conftest.py, council/records/2026-10-18-review-loop.md, decision 3) are listed here.
+    note: .github/** covers .github/review-teams.yml. The pr-review skill (.claude/skills/pr-review/) falls under .claude/**; its posting script (scripts/pr_review.py), the map logic it shares with the coverage test (scripts/review_map.py), the automated loop that drives it (scripts/pr_loop.py), the launchd job that runs the loop (docs/pr-loop.plist) and the tests that pin their behaviour (the review tests and tests/conftest.py) are listed here.
   - id: gate-semantics
     title: Gate semantics
     paths:
@@ -465,8 +465,7 @@ founder_classes:
     title: Export-control sensitive content
     note: Flagged by legal-compliance in its review; the scope is to be confirmed by counsel. No path or pattern detects it.
 
-# The founder floor (council/records/2026-10-18-review-loop.md,
-# decision 3, chosen by the founder): a pull request that changes one
+# The founder floor: a pull request that changes one
 # of these paths, or is in one of these founder classes, waits for the
 # founder's own GitHub review approving its head. The review script decides
 # that from main's copy of this file, with no model call: once key 1 and key 2

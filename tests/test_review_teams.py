@@ -345,10 +345,9 @@ def test_no_codeowners_file_founder_classes_are_reviewed_by_the_founder_proxy(fi
     assert (ROOT / "council" / "founder-proxy.md").exists()
 
 
-# --- The founder floor (council record 2026-10-18 on the review loop, decision 3) -----
+# --- The founder floor ---------------------------------------------------------------
 
-# council/records/2026-10-18-review-loop.md, decision 3: these wait for the
-# founder's own GitHub approval, decided by the review script with no model.
+# These wait for the founder's own GitHub approval, decided by the review script with no model.
 FLOOR_PATHS = [
     "scripts/pr_review.py", "scripts/review_map.py", "scripts/pr_loop.py",
     ".github/review-teams.yml", ".github/workflows/ci.yml", "docs/pr-loop.plist",

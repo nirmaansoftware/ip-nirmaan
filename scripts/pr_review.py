@@ -33,8 +33,7 @@ In order, and fail closed at every step (pending or failure, never success):
    the founder floor (`founder_floor` in main's map: the review machinery,
    licence files, an export-control flag) never reaches the proxy: once key 2
    passed, the script itself returns needs-founder with the floor's hits as
-   the reasons, and no model decides it (council record
-   council/records/2026-10-18-review-loop.md, decision 3).
+   the reasons, and no model decides it.
 7. Validates each JSON verdict (schema, head SHA, every cited file and line at
    the head; the proxy may also say "needs-founder", with reasons). A failed
    call, a timeout or a rate limit gets one backoff retry, then the key is

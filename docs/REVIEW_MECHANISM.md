@@ -110,11 +110,9 @@ on `main`: the review machinery (`scripts/pr_review.py`,
 the review tests `tests/test_review_teams.py`, `tests/test_pr_review.py`,
 `tests/test_pr_loop.py`, `tests/conftest.py`), the licence files (`LICENSE`,
 `NOTICE`, every vendored `LICENSE*` file and the font licences), and any head
-in the export-control class. The council record
-[2026-10-18: two reviews per pull request head](../council/records/2026-10-18-review-loop.md)
-(decision 3) recommended it and the founder chose it; the founder's own
-approval of the pull request that adds it records that choice. The review
-tests are founder class (control plane) too.
+in the export-control class. The pull request that adds the floor changes
+the review machinery, so it merges only with the founder's own approval of
+its head. The review tests are founder class (control plane) too.
 
 Key 1 and key 2 still review such a pull request for defects. Once key 2
 passes, the script posts its own "Founder floor (review script, no model)"

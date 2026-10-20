@@ -559,7 +559,7 @@ def test_validate_verdict_for_the_proxy():
     assert v["verdict"] == "needs-founder"
 
 
-# --- The founder floor (council record 2026-10-18 on the review loop, decision 3) ---
+# --- The founder floor ---------------------------------------------------------------
 
 # The test map plus a licence class, an export-control class with a detector,
 # and a floor: the review script, licence files and the export-control class.
