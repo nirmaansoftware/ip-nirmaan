@@ -12,7 +12,7 @@ this record states every decision in full without them.
 The decisions below are left as the meeting made them; where `main` has since
 moved, a dated note says so. The 2026-10-18 capability build-out record that
 this record cites (its sections 5 and 12) is not on `main` yet: it is pull
-request #118, which waits for the founder.
+request #118, still open on 2026-10-20.
 
 A key is an agent review. Nothing here is a person's approval, a release, or a
 claim that a design is ready to be made in silicon.
