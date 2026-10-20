@@ -30,8 +30,8 @@ about prices, invoices, GST, TDS, export of services or the entity. Fails when:
 - a tax treatment is stated as settled (for example that a service is zero
   rated, exempt or under reverse charge) rather than as a question for a
   chartered accountant;
-- a draft names the contracting party or the entity as a fact before the
-  founder has decided it (it says `[FOR COUNSEL / FOUNDER]` instead).
+- a draft names the contracting party or the entity as a fact before a
+  record decides it (it says `[FOR COUNSEL / FOUNDER]` instead).
 
 ## Never claims
 
