@@ -314,9 +314,7 @@ next step; the review itself always fetches `main` afresh.
 `~/.nirmaan/pr-review/calls.jsonl`; per pull request loop state is in
 `~/.nirmaan/pr-review/loop/`.
 
-**Turnaround (T).** The council record
-[2026-10-18: two reviews per pull request head](../council/records/2026-10-18-review-loop.md)
-(decision 5) defines it: the time from the first head of a pull request whose
+**Turnaround (T).** The time from the first head of a pull request whose
 required CI is all green (GitHub's completion time of the last required job,
 the newest run of each counting) to its merge (GitHub's `merged_at`).
 `scripts/turnaround_report.py` prints T for the pull requests merged since a

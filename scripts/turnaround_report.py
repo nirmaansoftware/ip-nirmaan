@@ -1,7 +1,6 @@
 """Turnaround report: T for each merged pull request, printed to stdout only.
 
-Council record 2026-10-18 on the review loop (decision 5, item 1). T is the
-time from the first head of a pull request whose required CI is all green to
+T is the time from the first head of a pull request whose required CI is all green to
 its merge. Both ends come from GitHub: the completion time of the last required
 CI job on that head (the newest run of each job counts, as in the review) and
 the pull request's `merged_at`. T is split, from the call log and the loop's
