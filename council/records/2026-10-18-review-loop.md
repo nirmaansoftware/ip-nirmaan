@@ -154,9 +154,8 @@ qa-evidence).
   (`tests/test_review_teams.py`, `tests/test_pr_review.py`,
   `tests/test_pr_loop.py`, `tests/conftest.py`), which also become founder
   class. The floor itself is settled; this path list is the proposal, and its
-  scope is the founder's ("For the founder", item 2). (Note, 2026-10-20: the
-  founder's commit 30b5825 withdraws the founder floor; see "The founder's
-  answers" below.) The same floor covers `LICENSE`, `NOTICE`, vendored licence files and
+  scope is the founder's ("For the founder", item 2). (Note, 2026-10-20: no
+  floor is on `main`; the floor pull request, #125, is a draft.) The same floor covers `LICENSE`, `NOTICE`, vendored licence files and
   an `export_control: yes` flag (legal-compliance, legal-counsel). Reason:
   CODEOWNERS is gone, so a control-plane change now merges on one model's
   reading of "weakening"; the founder's record already reserves weakening the
@@ -172,8 +171,8 @@ qa-evidence).
   founder, "For the founder", item 3.)
 - **Classes C (licence and third-party) and F (export control)** end with the
   founder's own GitHub approval of the head; no agent pass closes them.
-  (Note, 2026-10-20: since 30b5825, licence and third-party changes go to the
-  Founder Proxy; export control still waits for the founder.)
+  (Note, 2026-10-20: see "The founder's answers" below for the Founder
+  Proxy's seat file on `main` since 30b5825.)
 - **`council/README.md`** "What stays with the founder" still says founder-class
   pull requests wait for the founder's own approval on GitHub, which no longer
   matches the live proxy (legal-counsel). It is corrected to describe the proxy
@@ -391,13 +390,12 @@ These wait for the founder's own decision; the council does not make them.
 The items under "For the founder" are the founder's to decide and to record.
 This council record does not record the founder's answers.
 
-**Note, 2026-10-20.** The founder's commit 30b5825 changed
-`council/founder-proxy.md`: on founder-class pull requests the Founder Proxy
-(agent) now decides everything except new spending, contracts or legal
-counsel, export control, and turning on sending; weakening a review gate is a
-failing finding rather than a founder item. The commit message also
-withdraws the founder floor (decision 3, work item R2) and delegates the open
-founder items to the Proxy. Read with that commit, the items above go to the
-Founder Proxy under the founder's delegation, except where one adds spending,
-relies on a contract or counsel, touches export control or turns on sending.
-The founder delegated them; this record does not say the founder decided them.
+**Note, 2026-10-20.** The Founder Proxy's seat file on `main`
+(`council/founder-proxy.md`, as changed by the founder's commit 30b5825)
+returns needs-founder only for new spending, contracts or legal counsel,
+export control, and turning on sending, and fails a change that weakens a
+review gate. The founder's record of 2026-10-18
+(`council/records/2026-10-18-founder-proxy.md`) also keeps public names,
+prices, licence terms and gate weakening for the founder. This record does not
+say which of the two governs an item above; it records no answer from the
+founder, and no item above is decided here.
