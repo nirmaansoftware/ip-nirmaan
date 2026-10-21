@@ -106,7 +106,9 @@ costs or effort estimates.
 
 The council decides; the founder can overrule, and the record says so. These
 always wait for the founder: signing a contract, spending money (including
-legal counsel), and changing a public name.
+legal counsel), and turning on any sending
+([the founder's record of 2026-10-20](records/2026-10-20-founder-proxy-widened.md));
+the Founder Proxy's seat file also keeps export control for the founder.
 
 Merging follows the two-key review (Teams, above; `docs/REVIEW_MECHANISM.md`):
 a pull request merges by itself once CI and both keys pass, unless it is in
@@ -114,7 +116,8 @@ one of the six founder classes (control plane, gate semantics, licence and
 third-party, commercial, public names and claims, export-control sensitive
 content; council record 2026-10-17, section 2). Those also get the Founder
 Proxy (agent, [founder-proxy.md](founder-proxy.md)) after key 2, under the
-founder's delegation ([record](records/2026-10-18-founder-proxy.md)). The
+founder's delegation ([record of 2026-10-18](records/2026-10-18-founder-proxy.md),
+widened by the [record of 2026-10-20](records/2026-10-20-founder-proxy-widened.md)). The
 proxy is not the founder and never approves for the founder: what its seat
 file reserves for the founder it returns as `needs-founder`, and that pull
 request waits for the founder's own approval of its head on GitHub. Publishing
