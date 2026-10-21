@@ -391,9 +391,8 @@ Rules:
 
 ## 7. Shared services
 
-- **Shared:** one legal policy (copyright, licences, DPDP, claims) and one master
-  template set with a schedule per organisation; one tax and accounts question
-  list for the chartered accountant with one answer per question; the brand
+- **Shared:** one tax and accounts question list for the chartered accountant
+  with one answer per question; the brand
   and site platform (components, mark, privacy and terms), owned in the
   Nirmaan repository; the review platform design; one private plan-usage
   ledger with one cap.
@@ -406,10 +405,13 @@ Rules:
   repository. Shared services are shared records and rules, not new seats.
 - **Books, invoices and returns follow the legal entity,** whatever the chart
   says.
-- **Open founder question: one legal entity or two.** Nothing here depends on the
-  answer until an agreement is drafted for signature, an invoice is raised, or
-  costs are shared across entities. Until then every draft carries the
-  contracting party as `[FOR COUNSEL / FOUNDER]`.
+- **Proposed to the founder, not decided here (section 12, items 1 and 7):**
+  one legal policy (copyright, licences, DPDP, claims) and one master template
+  set with a schedule per organisation; and, while the entity question is open,
+  that drafts leave the contracting party as `[FOR COUNSEL / FOUNDER]`. These
+  take effect only by the founder's own decision. Nothing else here depends on
+  the entity question until an agreement is drafted for signature, an invoice
+  is raised, or costs are shared across entities.
 - No public page uses "group" in a way that implies a corporate group, and none
   calls IP Nirmaan a separate company until an entity exists.
 
@@ -476,7 +478,9 @@ Rules:
    from the knowledge they grade. Held-out inputs never appear in a knowledge
    document (a test checks). An eval and the content it grades never change in
    one PR.
-10. **Export-control screening.** Every knowledge document carries
+10. **Export-control screening: proposed to the founder, not decided here**
+    (section 12, item 8; it takes effect only by the founder's own decision).
+    The proposal: every knowledge document carries
     `export_screen`. Flagged areas by default: radiation hardening, cryptographic
     and post-quantum hardware, side-channel and fault-injection attack
     techniques, advanced AI accelerators, advanced process and fab, high-speed
@@ -485,8 +489,9 @@ Rules:
     legal-compliance as key 1 and raises the export-control founder class.
     Flagged areas stay knowledge only, from published sources, until counsel
     sets the scope. Classifications are questions for counsel.
-11. **Licence rules for knowledge files** (the repository is Apache-2.0, so
-    anything merged is offered under it): summarise and cite, never reproduce
+11. **Licence rules for knowledge files: proposed to the founder, not decided
+    here** (section 12, item 9; the repository is Apache-2.0, so anything
+    merged is offered under it). The proposal: summarise and cite, never reproduce
     specification text, tables, register maps or figures; member-only
     specifications are never sources; no NDA or vendor EDA documentation; no
     benchmark results from licensed tools or SPEC; examples use permissive
@@ -567,9 +572,15 @@ exists yet and no tool judges those skills.
 
 ## 12. Founder items
 
-1. One legal entity or two (registration facts). Needed before agreements for
-   signature, invoices or cross-charges.
-2. A licence for the Nirmaan repository or an intra-group grant: it is public
+Each item below is the founder's own decision. Where the council made a
+proposal, it takes effect only when the founder decides it.
+
+1. One legal entity or two (registration facts), and whether drafts leave the
+   contracting party as `[FOR COUNSEL / FOUNDER]` until then (proposed,
+   section 7). Needed before agreements for signature, invoices or
+   cross-charges.
+2. A licence for the Nirmaan repository or an intra-group grant, and a NOTICE
+   entry for the vendored site files: the Nirmaan repository is public
    with no LICENSE file (no commit of nirmaansoftware/Nirmaan has added one, as
    read on its main at 645933d), and this repository vendors three of its site
    files with no NOTICE entry (site/README.md, file table; NOTICE). Needed
@@ -580,18 +591,20 @@ exists yet and no tool judges those skills.
 5. Each organisation's share of plan usage, and the first recorded live eval
    batch.
 6. Later: switching any key 2 off the chair; the author loop.
+7. The shared legal policy and the master template set with a schedule per
+   organisation (proposed, section 7).
+8. Export-control screening of knowledge documents: the `export_screen` field,
+   the default flagged areas and the rules that raise the export-control class
+   (proposed, section 9 item 10; scope with counsel).
+9. Licence rules for knowledge files (proposed, section 9 item 11).
 
-**Note, 2026-10-20.** The Founder Proxy's seat file on `main`
-(`council/founder-proxy.md`, as changed by the founder's commit 30b5825)
-returns needs-founder only for new spending, contracts or legal counsel,
-export control, and turning on sending, and fails a change that weakens a
-review gate. The founder's record of 2026-10-18
-(`council/records/2026-10-18-founder-proxy.md`) also keeps public names,
-prices and licence terms for the founder. This record does not say which of
-the two governs an item; each item above still names what it needs, and an
-item that touches contracts, counsel or export control (items 1 and 2, and
-the export screen in section 9 item 10) waits for the founder under both. No
-item above is recorded as decided by the founder.
+**Note, 2026-10-20.** On `main`, the Founder Proxy's seat file
+(`council/founder-proxy.md`) sends new spending, contracts or legal counsel,
+export control and turning on sending to the founder, and the founder's
+record of 2026-10-18 (`council/records/2026-10-18-founder-proxy.md`) also
+keeps public names, prices and licence terms. Items 1, 2, 7, 8 and 9 touch
+those and wait for the founder's own decision. No item above is recorded as
+decided by the founder.
 
 The founder can overrule any decision in this record.
 
@@ -640,11 +653,11 @@ The founder can overrule any decision in this record.
 | G3 | Knowledge loading path and budget test merged before any knowledge document | ai-engineer |
 | G4 | `EvalCase.skills` and must-fail scorers merged before any skill is credited Practised | verification-lead |
 | G5 | Levels generator test: no level without a committed record path | verification-lead |
-| G6 | Export-control path and content rule merged before any knowledge file in a flagged area | legal-compliance |
+| G6 | Export-control path and content rule merged before any knowledge file in a flagged area (once the founder decides item 8) | legal-compliance |
 | G7 | Licence front matter and the Knowledge PR checklist merged before the first knowledge PR | legal-compliance |
 | G8 | Skills tile relabelled by founder decision before any programme skill is counted | brand-content (site-engineer implements) |
 | G9 | Release check of the hero role titles and the org figure's division names | site-engineer |
-| G10 | Contracting party stated before any agreement is drafted for signature | legal-counsel (tax-accounts for books) |
+| G10 | Contracting party stated before any agreement is drafted for signature (the founder's item 1) | legal-counsel (tax-accounts for books) |
 | G11 | Pilot exit criteria in section 10 | design-architect |
 | G12 | Processor wave moves up only when an architecture judge is wrapped (CONTRACT_ONLY first) and runnable at no cost | eda-tooling |
 | G13 | New units enter as placeholders and activate only by the activation rule | product-lead |
