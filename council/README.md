@@ -75,7 +75,9 @@ modelled company (`src/nirmaan/company/org_chart.py`) or to a shared role
 (legal, legal counsel, tax and accounts, which serve both organisations and
 report to the founder). Proposed in the capability build-out council record
 of 2026-10-18 (sections 5 and 6; pull request #118, not merged), whose open
-items the message of the founder's commit 30b5825 hands to the Founder Proxy; this map
+items the founder's record
+[2026-10-20: Founder Proxy widened](records/2026-10-20-founder-proxy-widened.md)
+hands to the Founder Proxy; this map
 leaves out CODEOWNERS (removed by #113) and makes a derived key 2 that would be
 the founder, or would report to the founder, the chair. The chart itself names no seat or vote.
 

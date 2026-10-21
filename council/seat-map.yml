@@ -1,8 +1,9 @@
 # Seat map: each council seat to one role in the modelled company.
 #
 # Proposed in the capability build-out council record of 2026-10-18 (item 4 and
-# section 6; pull request #118, not merged), whose open items the message
-# of the founder's commit 30b5825 hands to the Founder Proxy. Two changes from that record:
+# section 6; pull request #118, not merged), whose open items the
+# founder's record records/2026-10-20-founder-proxy-widened.md hands to the
+# Founder Proxy. Two changes from that record:
 # no CODEOWNERS entry (removed by #113), and a derived key 2 that would be the
 # founder or report to the founder is the chair. The map lives in council/
 # (founder class), never in src/nirmaan/: org_chart.py is the product's
