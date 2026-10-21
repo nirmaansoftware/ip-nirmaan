@@ -12,7 +12,7 @@ the command and its output are in the appendix, so any reader can reproduce them
 This is a council record, not a decision in the product's sense. A key is an
 agent review, never a person's decision. The founder can overrule any item, and
 the founder items in section 12 wait for the founder (see the note of
-2026-10-20 in section 12: most are now delegated to the Founder Proxy).
+2026-10-20 in section 12 for who reviews them now).
 
 Wording note (legal-counsel, tax-accounts): this record says "organisation" and
 "shared services". It does not call IP Nirmaan a separate company or describe a
@@ -33,6 +33,11 @@ any item). Nothing in the repository reads or depends on the plan.
 
 The plan's statements in the left column do not match the code. The record
 cites the code, not the plan (qa-evidence must-have).
+
+Note, 2026-10-20: the right column is the code at 5e80dd2, when the meeting
+read it. Milestones since (M56 seniority band, M57 hierarchy fixes, M60 span
+rule) changed some of it, as this record decided; for example Commercial is
+now one placeholder division.
 
 | Plan says | Code says (FACT) |
 |---|---|
@@ -576,18 +581,17 @@ exists yet and no tool judges those skills.
    batch.
 6. Later: switching any key 2 off the chair; the author loop.
 
-**Note, 2026-10-20.** The founder's commit 30b5825 changed
-`council/founder-proxy.md`: on founder-class pull requests the Founder Proxy
-(agent) now decides everything except new spending, contracts or legal
-counsel, export control, and turning on sending, and weakening a review gate
-is a failing finding rather than a founder item. The commit message delegates
-the open founder items to the Proxy and names this record's items 1, 2, 3 and
-10. So, read with that commit: the items above, and the founder-class pull
-requests this record plans, go to the Founder Proxy under the founder's
-delegation, except where they add spending, rely on a contract or counsel,
-touch export control or turn on sending, which still wait for the founder.
-The founder delegated these items; the founder did not decide them, and no
-item above is recorded as decided.
+**Note, 2026-10-20.** The Founder Proxy's seat file on `main`
+(`council/founder-proxy.md`, as changed by the founder's commit 30b5825)
+returns needs-founder only for new spending, contracts or legal counsel,
+export control, and turning on sending, and fails a change that weakens a
+review gate. The founder's record of 2026-10-18
+(`council/records/2026-10-18-founder-proxy.md`) also keeps public names,
+prices and licence terms for the founder. This record does not say which of
+the two governs an item; each item above still names what it needs, and an
+item that touches contracts, counsel or export control (items 1 and 2, and
+the export screen in section 9 item 10) waits for the founder under both. No
+item above is recorded as decided by the founder.
 
 The founder can overrule any decision in this record.
 
