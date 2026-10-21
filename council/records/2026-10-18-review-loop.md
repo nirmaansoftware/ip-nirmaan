@@ -17,6 +17,10 @@ request #118, still open on 2026-10-20.
 A key is an agent review. Nothing here is a person's approval, a release, or a
 claim that a design is ready to be made in silicon.
 
+This record changes no script, check or gate. Each pull request that
+implements a decision here is reviewed on its own, including by the Founder
+Proxy against its rule on weakening a review gate.
+
 ## The question
 
 The founder asked for every pull request to be reviewed correctly with the
@@ -68,9 +72,11 @@ tax-accounts). No seat opposed.
    duplicated or names a checklist that was not loaded. Any checklist that
    fails fails key 1. A checklist that a trigger selected but that is missing
    on `main` defers the review, as a missing lead section does today.
-5. **Export-control flag.** Every key-1 verdict carries `export_control`
-   (yes or no, with cited lines). A missing flag defers. "Yes" adds founder
-   class F and routes the head to the founder with no further model call.
+5. **Export-control flag: proposed to the founder, not decided here** ("For
+   the founder", item 7; it takes effect only by the founder's own decision).
+   The proposal: every key-1 verdict carries `export_control` (yes or no, with
+   cited lines). A missing flag defers. "Yes" adds founder class F and routes
+   the head to the founder with no further model call.
 6. **Key 2 sees what key 1 loaded.** Key 2 receives the list of loaded
    checklists and key 1's entries, inside the untrusted-data fence, so it checks
    each cited item rather than re-reviewing from scratch.
@@ -362,6 +368,8 @@ These wait for the founder's own decision; the council does not make them.
 6. Every pull request in the work items that touches the review machinery will
    wait for the founder's own approval once the floor is live, and the proxy
    already reserves most of them today.
+7. **The export-control flag** (decision 1, item 5): export control waits for
+   the founder and for counsel's scope.
 
 ## Open questions, sent to owners
 
