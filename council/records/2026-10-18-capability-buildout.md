@@ -35,9 +35,9 @@ The plan's statements in the left column do not match the code. The record
 cites the code, not the plan (qa-evidence must-have).
 
 Note, 2026-10-20: the right column is the code at 5e80dd2, when the meeting
-read it. Milestones since (M56 seniority band, M57 hierarchy fixes, M60 span
-rule) changed some of it, as this record decided; for example Commercial is
-now one placeholder division.
+read it. Milestones since (M56 seniority band, M57 hierarchy fixes) changed
+some of it, as this record decided; for example Commercial is now one
+placeholder division.
 
 | Plan says | Code says (FACT) |
 |---|---|
