@@ -1,0 +1,1 @@
+Founder: the Founder Proxy now decides founder-class PRs except new spending, contracts/counsel and sending. It decides the open founder items (capability record items 1, 2, 3, 10 and the #128 reading). The founder floor is withdrawn. Agents may clear needs-founder labels set before today.
