@@ -348,7 +348,7 @@ remaining code change. The founder floor is next in the series.)
 | Composite switched on only after the A/B on seeds | verification-lead |
 | Fold only after the founder's record and approval, and the shadow match | ai-engineer (security key 1) |
 | Seeded sets per seat, key 2 and proxy alone, weekly audit, rerun rule | qa-evidence |
-| Export-control flag on every key 1; class F detected | legal-compliance |
+| Export-control flag on every key 1; class F detected (once the founder decides item 7) | legal-compliance |
 
 ## For the founder
 
