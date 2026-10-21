@@ -160,8 +160,10 @@ qa-evidence).
   (`tests/test_review_teams.py`, `tests/test_pr_review.py`,
   `tests/test_pr_loop.py`, `tests/conftest.py`), which also become founder
   class. The floor itself is settled; this path list is the proposal, and its
-  scope is the founder's ("For the founder", item 2). (Note, 2026-10-20: no
-  floor is on `main`; the floor pull request, #125, is a draft.) The same floor covers `LICENSE`, `NOTICE`, vendored licence files and
+  scope is the founder's ("For the founder", item 2). (Note, 2026-10-20: the
+  founder's record of that date,
+  `council/records/2026-10-20-founder-proxy-widened.md`, withdraws the
+  founder floor.) The same floor covers `LICENSE`, `NOTICE`, vendored licence files and
   an `export_control: yes` flag (legal-compliance, legal-counsel). Reason:
   CODEOWNERS is gone, so a control-plane change now merges on one model's
   reading of "weakening"; the founder's record already reserves weakening the
@@ -398,12 +400,14 @@ These wait for the founder's own decision; the council does not make them.
 The items under "For the founder" are the founder's to decide and to record.
 This council record does not record the founder's answers.
 
-**Note, 2026-10-20.** The Founder Proxy's seat file on `main`
-(`council/founder-proxy.md`, as changed by the founder's commit 30b5825)
-returns needs-founder only for new spending, contracts or legal counsel,
-export control, and turning on sending, and fails a change that weakens a
-review gate. The founder's record of 2026-10-18
-(`council/records/2026-10-18-founder-proxy.md`) also keeps public names,
-prices, licence terms and gate weakening for the founder. This record does not
-say which of the two governs an item above; it records no answer from the
-founder, and no item above is decided here.
+**Note, 2026-10-20.** The founder's record of that date
+(`council/records/2026-10-20-founder-proxy-widened.md`) widens the delegation
+of 2026-10-18: the Founder Proxy now decides founder-class pull requests except
+new spending, contracts or counsel, and sending; it decides the open founder
+items; and the founder floor is withdrawn. The Proxy's seat file on `main`
+(`council/founder-proxy.md`) also still sends export control to the founder,
+and fails a change that weakens a review gate. Read with that record, the
+items under "For the founder" go to the Founder Proxy under the founder's
+delegation, except item 7 (export control), which waits for the founder. The
+founder delegated them; this record records no answer from the founder and
+does not say the founder decided them.
