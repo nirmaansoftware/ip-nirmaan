@@ -1,0 +1,117 @@
+# Seat map: each council seat to one role in the modelled company.
+#
+# Proposed in the capability build-out council record of 2026-10-18 (item 4 and
+# section 6; pull request #118, not merged), whose open items the
+# founder's record records/2026-10-20-founder-proxy-widened.md hands to the
+# Founder Proxy. Two changes from that record:
+# no CODEOWNERS entry (removed by #113), and a derived key 2 that would be the
+# founder or report to the founder is the chair. The map lives in council/
+# (founder class), never in src/nirmaan/: org_chart.py is the product's
+# modelled company shown on the public site, and no seat name or vote is
+# written into it.
+#
+# Nothing that picks a reviewer reads this file or org_chart.py. The review
+# script reads only .github/review-teams.yml on main. tests/test_seat_map.py
+# recomputes each team's `unit:` and `key2:` in that file from this map and
+# build_organization(), so a chart or seat change that would move a derived
+# value fails CI until review-teams.yml changes too, which is founder class.
+#
+# Fields:
+# - role: an org role id from build_organization(), or a shared role below.
+# - covers: interim key-1 scope: units whose paths this seat reviews until a
+#   seat inside each holds key 1 there (record section 6).
+# - vote: yes, or chairs. A practice lead (key 1, no vote) has vote: no.
+#
+# Deputies (record section 5, item 8) are not in this map. A deputy would hold
+# key 1 after an infrastructure failure, and today's seat files give members no
+# key, so deputies enter with the script change that would use them (gate G14),
+# together with the seat files that then hold that key.
+#
+# Loaded by the plain YAML subset reader in scripts/review_map.py.
+
+version: 1
+
+# Shared-services roles: one legal policy and one tax and accounts question
+# list for both organisations (record section 7). They sit outside the
+# modelled chart and report to the founder.
+shared_roles:
+  - id: shared.legal
+    name: Legal (shared; IP supplement for export control, specification terms and IP licensing)
+    reports_to: founder
+  - id: shared.legal.counsel
+    name: Legal counsel (shared)
+    reports_to: founder
+  - id: shared.tax
+    name: Tax and accounts (shared; IP supplement for licences and export of services)
+    reports_to: founder
+
+# Seats with a key-2 checklist and a passed seeded-defect review set. Today only
+# the chair; the first other seat needs a council decision after the pilot
+# retrospective and a founder-class pull request (record section 5, item 6).
+key2_seats: [chair]
+
+seats:
+  chair:
+    role: exec.ceo
+    vote: chairs
+  product-lead:
+    role: exec.cpo
+    vote: 'yes'
+  design-architect:
+    role: design.vp
+    covers: [architecture, implementation, software]
+    vote: 'yes'
+  verification-lead:
+    role: verification.vp
+    vote: 'yes'
+  dft-engineer:
+    role: implementation.dft.director
+    vote: 'yes'
+  physical-design-engineer:
+    role: implementation.vp
+    vote: 'yes'
+  firmware-engineer:
+    role: software.vp
+    vote: 'yes'
+  eda-tooling:
+    role: infrastructure.vp
+    vote: 'yes'
+  ai-engineer:
+    role: infrastructure.ai.manager
+    vote: 'yes'
+  security:
+    role: security.platform.manager
+    vote: 'yes'
+  qa-evidence:
+    role: quality.vp
+    vote: 'yes'
+  market-research:
+    role: commercial.marketing.research.manager
+    vote: 'yes'
+  brand-content:
+    role: commercial.marketing.brand.manager
+    vote: 'yes'
+  site-engineer:
+    role: commercial.marketing.web.manager
+    vote: 'yes'
+  partnerships:
+    role: commercial.sales.director
+    vote: 'yes'
+  finance-licensing:
+    role: finance.vp
+    vote: 'yes'
+  legal-compliance:
+    role: shared.legal
+    vote: 'yes'
+  legal-counsel:
+    role: shared.legal.counsel
+    vote: 'yes'
+  tax-accounts:
+    role: shared.tax
+    vote: 'yes'
+
+# Seat files that hold no role, with the reason. The Founder Proxy acts under
+# the founder's delegation of 2026-10-18 (council/founder-proxy.md); where the
+# chart records it is the founder's decision, so it stays unplaced until then.
+unplaced:
+  founder-proxy: acts under the founder's delegation; its place in the chart is the founder's decision
