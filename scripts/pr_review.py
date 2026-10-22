@@ -675,6 +675,11 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def severity_counts(findings: list[dict]) -> dict:
+    """Findings by severity, every severity named (for the call log)."""
+    return {s: sum(1 for f in findings if f.get("severity") == s) for s in SEVERITIES}
+
+
 def log_call(state_dir: Path, record: dict):
     state_dir.mkdir(parents=True, exist_ok=True)
     with open(state_dir / "calls.jsonl", "a", encoding="utf-8") as handle:
@@ -816,7 +821,7 @@ class GitHub:
                 "body": p.get("body") or "",
                 "author": (p.get("user") or {}).get("login"), "labels": [l["name"] for l in p.get("labels", [])],
                 "head_sha": p["head"]["sha"], "head_ref": p["head"]["ref"], "head_repo": (p["head"].get("repo") or {}).get("full_name"),
-                "base_ref": p["base"]["ref"], "base_repo": p["base"]["repo"]["full_name"],
+                "base_ref": p["base"]["ref"], "base_repo": p["base"]["repo"]["full_name"], "merged_at": p.get("merged_at"),
                 # Only on a single pull request read; None while GitHub is still computing it.
                 "mergeable": p.get("mergeable"), "mergeable_state": p.get("mergeable_state")}
 
@@ -1139,11 +1144,12 @@ def _review(repo_root, pr, github, post, claude_bin, state_dir, models, timeout_
         cache = cache_dir / f"{head}-{main_sha}-k{key}-{team or 'chair'}-{lead}.json"
         if not fresh and cache.exists():
             cached = json.loads(cache.read_text())
-            log_call(state_dir, {"repo": cfg["repo"], "pr": pr, "head": head, "key": key, "team": team, "model": model, "attempt": 0, "outcome": "reused"})
+            log_call(state_dir, {"repo": cfg["repo"], "pr": pr, "head": head, "key": key, "team": team, "model": model, "attempt": 0, "outcome": "reused",
+                                 "verdict": cached.get("status")})
             cached["notes"] = cached.get("notes", []) + [REUSED_NOTE]
             return cached
         args = claude_args(model, system, [main_dir], schema=PROXY_VERDICT_SCHEMA if proxy else None)
-        result = None
+        result = entry = None
         for attempt in (1, 2):
             if attempt == 2:
                 sleep(backoff_s)
@@ -1155,19 +1161,25 @@ def _review(repo_root, pr, github, post, claude_bin, state_dir, models, timeout_
                 result = run_once(claude_bin, args, user, head_dir, timeout_s)
             finally:
                 release()
-            log_call(state_dir, {"repo": cfg["repo"], "pr": pr, "head": head, "key": key, "team": team, "model": model,
-                                 "reported_model": result.get("reported_model"), "attempt": attempt, "outcome": result["kind"],
-                                 "duration_ms": result.get("duration_ms"), **(result.get("tokens") or {}),
-                                 "prompt_chars": len(system) + len(user)})
+            entry = {"repo": cfg["repo"], "pr": pr, "head": head, "key": key, "team": team, "model": model,
+                     "reported_model": result.get("reported_model"), "attempt": attempt, "outcome": result["kind"],
+                     "duration_ms": result.get("duration_ms"), **(result.get("tokens") or {}),
+                     "prompt_chars": len(system) + len(user)}
             if result["kind"] == "ok":
                 break
+            log_call(state_dir, entry)
         if result["kind"] != "ok":
             return {"status": "deferred", "reason": f"{result['kind']}: {result['error']} (after one backoff retry)", "model": model}
+        # The answered call is logged once its verdict is known: its status,
+        # findings by severity, and the validation error that deferred it.
         try:
             value = result["structured"] if result.get("structured") is not None else parse_verdict_text(result["text"])
         except ValueError as exc:
+            log_call(state_dir, {**entry, "verdict": "deferred", "findings": None, "validation_error": f"not valid JSON ({exc})"})
             return {"status": "deferred", "reason": f"the reviewer's output is not valid JSON ({exc})", "model": model}
         verdict, error, notes = validate_verdict(value, head, line_exists, proxy=proxy, prefixes=prefixes)
+        log_call(state_dir, {**entry, "verdict": verdict["verdict"] if verdict else "deferred",
+                             "findings": severity_counts(verdict["findings"]) if verdict else None, "validation_error": error})
         if isinstance(error, CitationError):
             # One repair of the same verdict, with the error shown; it never
             # passes a verdict that was not a pass, and a second bad citation
@@ -1176,18 +1188,28 @@ def _review(repo_root, pr, github, post, claude_bin, state_dir, models, timeout_
             repair_user = (user + "\n\n# Your answer failed the script's citation check\n\n"
                            f"{error}\n\nReturn the same verdict (\"{asked}\") as ONE JSON object, with every finding citing a "
                            "file and line that exist at the head commit (or \"main:<path>\" for a line on main). Change nothing else.")
-            result = run_once(claude_bin, args, repair_user, head_dir, timeout_s)
-            log_call(state_dir, {"repo": cfg["repo"], "pr": pr, "head": head, "key": key, "team": team, "model": model,
-                                 "reported_model": result.get("reported_model"), "attempt": "repair", "outcome": result["kind"],
-                                 "duration_ms": result.get("duration_ms"), **(result.get("tokens") or {}),
-                                 "prompt_chars": len(system) + len(repair_user), "repairs": str(error)[:300]})
+            release, holder = acquire_lock(state_dir, {"repo": cfg["repo"], "pr": pr, "key": key})
+            if release is None:
+                raise LockBusy(holder)
+            try:
+                result = run_once(claude_bin, args, repair_user, head_dir, timeout_s)
+            finally:
+                release()
+            repair = {"repo": cfg["repo"], "pr": pr, "head": head, "key": key, "team": team, "model": model,
+                      "reported_model": result.get("reported_model"), "attempt": "repair", "outcome": result["kind"],
+                      "duration_ms": result.get("duration_ms"), **(result.get("tokens") or {}),
+                      "prompt_chars": len(system) + len(repair_user), "repairs": str(error)[:300]}
             if result["kind"] != "ok":
+                log_call(state_dir, repair)
                 return {"status": "deferred", "reason": f"the verdict failed validation: {error}; the repair failed ({result['kind']})", "model": model}
             try:
                 value = result["structured"] if result.get("structured") is not None else parse_verdict_text(result["text"])
             except ValueError as exc:
+                log_call(state_dir, {**repair, "verdict": "deferred", "findings": None, "validation_error": f"not valid JSON ({exc})"})
                 return {"status": "deferred", "reason": f"the verdict failed validation: {error}; the repair is not valid JSON ({exc})", "model": model}
             verdict, error2, notes = validate_verdict(value, head, line_exists, proxy=proxy, prefixes=prefixes)
+            log_call(state_dir, {**repair, "verdict": verdict["verdict"] if verdict else "deferred",
+                                 "findings": severity_counts(verdict["findings"]) if verdict else None, "validation_error": error2})
             if error2:
                 return {"status": "deferred", "reason": f"the verdict failed validation after one repair: {error2}", "model": model}
             if value.get("verdict") != asked:

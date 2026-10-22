@@ -365,6 +365,22 @@ def test_a_bad_citation_on_a_severe_finding_gets_one_repair_of_the_same_verdict(
     assert r.check("review/team-lead")["state"] == "failure"
 
 
+def test_the_citation_repair_call_also_holds_the_shared_lock_and_is_logged_with_its_verdict(repo, monkeypatch):
+    r = repo(responses=[bad_cite("critical"), bad_cite("critical", file="src/app.py", line=2, text="REPAIRED")])
+    lock, seen, original = r.state / "review.lock", [], pr_review.run_once
+
+    def watched(binary, args, stdin, cwd, timeout_s):
+        seen.append(lock.exists())
+        return original(binary, args, stdin, cwd, timeout_s)
+    monkeypatch.setattr(pr_review, "run_once", watched)
+    assert r.run()["key1"][0]["status"] == "fail"
+    assert seen == [True, True], "the first call and the repair each run under the lock"
+    assert not lock.exists()
+    first, repair = r.log()
+    assert first["attempt"] == 1 and "does not exist" in first["validation_error"]
+    assert repair["attempt"] == "repair" and repair["verdict"] == "fail" and repair["validation_error"] is None
+
+
 @pytest.mark.parametrize("first, repair", [
     (bad_cite("blocker"), {"type": "verdict", "verdict": "pass"}),  # a fail repaired into a pass
     (bad_cite("major", "pass"), {"type": "verdict", "verdict": "fail"}),  # the verdict changed
@@ -887,6 +903,33 @@ def test_a_rerun_on_the_same_head_reuses_verdicts(repo):
     assert [l["outcome"] for l in r.log()][2:] == ["reused", "reused"]
     r.run(fresh=True)
     assert len(r.calls()) == 4
+
+
+def test_the_call_log_records_each_verdict_its_findings_by_severity_and_the_validation_error(repo):
+    finding = {"file": "src/app.py", "line": 2, "severity": "critical", "text": "x"}
+    r = repo(responses=[{"type": "rate_limit"}, {"type": "verdict", "verdict": "pass", "findings": [finding]}])
+    r.run()
+    first, second = r.log()
+    assert first["outcome"] == "rate_limit" and "verdict" not in first, "a call with no answer has no verdict"
+    assert second["outcome"] == "ok" and second["verdict"] == "fail", "the status the script records (pass with a critical is fail)"
+    assert second["findings"] == {"blocker": 0, "critical": 1, "major": 0, "minor": 0, "info": 0}
+    assert second["validation_error"] is None and second["duration_ms"] is not None
+    r.run()
+    assert r.log()[-1]["outcome"] == "reused" and r.log()[-1]["verdict"] == "fail"
+
+
+@pytest.mark.parametrize("response, error", [
+    ({"type": "result", "text": "Looks fine to me."}, "not valid JSON"),
+    # A badly cited minor finding no longer defers (R4a drops it with a note),
+    # so the deferring case is a verdict outside the schema.
+    ({"type": "verdict", "verdict": "approved", "findings": []}, 'pass" or "fail'),
+])
+def test_a_deferred_verdict_logs_its_validation_error_once(repo, response, error):
+    r = repo(responses=[response])
+    r.run()
+    (line,) = r.log()
+    assert line["outcome"] == "ok" and line["verdict"] == "deferred" and line["findings"] is None
+    assert error in line["validation_error"]
 
 
 # --- Units -----------------------------------------------------------------------------------

@@ -280,6 +280,56 @@ def test_both_keys_pass_auto_merge_with_the_app_and_the_setting_then_nothing_mor
     assert len(r.github.posts) == before and len(r.calls()) == 2
 
 
+def test_turnaround_events_ci_green_once_per_head_verdict_posted_and_merged_once_after_github_merges(repo):
+    r = repo(gh={"ci": lambda sha: "pending"})
+    assert r.tick() == ["wait"]
+    assert not [l for l in r.log() if l.get("event") == "ci-green-seen"], "not green yet"
+    r.github.ci = lambda sha: "success"
+    assert r.tick() == ["auto-merge"]
+    green = [l for l in r.log() if l.get("event") == "ci-green-seen"]
+    assert len(green) == 1 and green[0]["head"] == r.first_head and green[0]["ci_completed_at"] == "x"
+    posted = next(l for l in r.log() if l.get("event") == "verdict-posted")
+    assert posted["key1"] == "eda-platform:pass" and posted["key2"] == "pass" and posted["proxy"] == "not run" and posted["posted"] > 0
+    assert r.tick() == ["skip"]
+    assert len([l for l in r.log() if l.get("event") == "ci-green-seen"]) == 1, "logged once per head"
+    assert not [l for l in r.log() if l.get("event") == "merged"], "still open"
+    open_pull = r.github.get_pull
+    r.github.list_open_pulls = lambda: []
+    r.github.get_pull = lambda n: {**open_pull(n), "state": "closed", "merged_at": "2026-10-19T12:00:00Z"}
+    assert r.tick() == []
+    merged = [l for l in r.log() if l.get("event") == "merged"]
+    assert len(merged) == 1 and merged[0]["merged_at"] == "2026-10-19T12:00:00Z" and merged[0]["head"] == r.first_head
+    r.tick()
+    assert len([l for l in r.log() if l.get("event") == "merged"]) == 1, "logged once"
+    assert r.st()["closed"]["merged_at"] == "2026-10-19T12:00:00Z"
+
+
+def test_a_closed_unmerged_pull_request_logs_no_merge_and_an_unfinished_one_is_not_read(repo):
+    r = repo()
+    open_pull = r.github.get_pull
+    reads = []
+    r.github.list_open_pulls = lambda: []
+    r.github.get_pull = lambda n: (reads.append(n), {**open_pull(n), "state": "closed", "merged_at": None})[1]
+    assert r.tick() == [] and reads == [], "the loop never finished it: no read"
+    r.github.list_open_pulls = lambda: [open_pull(1)]
+    r.github.get_pull = open_pull
+    assert r.tick() == ["auto-merge"]
+    r.github.list_open_pulls = lambda: []
+    r.github.get_pull = lambda n: {**open_pull(n), "state": "closed", "merged_at": None}
+    r.tick()
+    assert not [l for l in r.log() if l.get("event") == "merged"] and r.st()["closed"]["merged_at"] is None
+
+
+def test_ci_completed_at_is_the_last_required_job_by_the_newest_run():
+    req = ["a", "b"]
+    runs = [{"id": 1, "name": "a", "started_at": "2026-10-19T10:00:00Z", "completed_at": "2026-10-19T10:05:00Z"},
+            {"id": 2, "name": "a", "started_at": "2026-10-19T11:00:00Z", "completed_at": "2026-10-19T11:02:00Z"},
+            {"id": 3, "name": "b", "started_at": "2026-10-19T10:00:00Z", "completed_at": "2026-10-19T10:30:00Z"}]
+    assert pr_loop.ci_completed_at(req, runs) == "2026-10-19T11:02:00Z"
+    assert pr_loop.ci_completed_at(req + ["c"], runs) is None
+    assert pr_loop.ci_completed_at(req, [*runs, {"id": 4, "name": "b", "started_at": "2026-10-19T12:00:00Z"}]) is None
+
+
 def test_both_keys_pass_and_the_setting_is_off_posts_ready_without_a_merge_call_or_a_stop(repo):
     r = repo(gh={"auto_merge_allowed": "false"})
     assert r.tick() == ["ready"]
@@ -386,7 +436,9 @@ def test_fail_fix_pass_runs_a_separate_fixer_then_commits_checks_pushes_and_revi
     reviews = [c for c in r.calls() if c["kind"] == "reviews"]
     assert len(reviews) == 3 and all(f"Head SHA: {new}" in c["stdin"] for c in reviews[1:])
     events = [l["event"] for l in r.log() if l.get("kind") == "loop"]
-    assert events == ["review", "reviewed", "fixed", "review", "reviewed", "auto-merge"]
+    assert events == ["ci-green-seen", "review", "verdict-posted", "reviewed", "fixed",
+                      "ci-green-seen", "review", "verdict-posted", "reviewed", "auto-merge"]
+    assert [l["head"] for l in r.log() if l.get("event") == "ci-green-seen"] == [r.first_head, new], "once per head"
     assert any(l.get("key") == "fixer" and l["round"] == 1 and l["outcome"] == "ok" for l in r.log())
     assert len(sh(r.work, "worktree", "list").splitlines()) == 1
     assert not (r.state / "review.lock").exists()
@@ -718,7 +770,8 @@ def test_a_branch_behind_main_is_updated_with_a_merge_commit_before_the_review_t
     assert not r.labeled()
     assert r.tick() == ["auto-merge"]
     assert r.github.merges[0][-1] == new
-    assert [l["event"] for l in r.log() if l.get("kind") == "loop"] == ["updated", "review", "reviewed", "auto-merge"]
+    assert [l["event"] for l in r.log() if l.get("kind") == "loop"] == ["updated", "ci-green-seen", "review", "verdict-posted",
+                                                                         "reviewed", "auto-merge"]
 
 
 def test_while_github_makes_the_merge_commit_the_next_pass_waits_and_does_not_ask_again(repo):
