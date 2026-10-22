@@ -811,17 +811,22 @@ class Loop:
         except (subprocess.SubprocessError, OSError) as exc:
             self.out(f"pr-loop: #{n}: shape rules not checked: {exc}")
             return
-        notes = shape_notes(r.get("classification") or {}, files, numstat, lc)
-        digest = hashlib.sha256(json.dumps(notes).encode()).hexdigest()[:16]
-        if not notes or st.get("shape_digest") == digest:
+        try:
+            notes = shape_notes(r.get("classification") or {}, files, numstat, lc)
+            digest = hashlib.sha256(json.dumps(notes).encode()).hexdigest()[:16]
+            if not notes or st.get("shape_digest") == digest:
+                return
+            self._say(n, "\n".join([f"<!-- {MARK} shape head={head} -->", f"### Automated loop: pull request shape (head `{head[:7]}`)", "",
+                                    "Soft shape rules. They do not stop the "
+                                    "review; only a diff over the review's size limit does.", "",
+                                    *[f"- {_cell(x, 500)}" for x in notes]]))
+        except Exception as exc:  # a soft rule never stops the loop; the next pass tries again
+            self.out(f"pr-loop: #{n}: shape rules not posted: {exc}")
             return
+        # Saved only once the comment is posted, so a failed post is retried.
         st["shape_digest"] = digest
         _save_state(self.state_dir, cfg["repo"], st)
         self._log(ctx, "shape", notes=len(notes))
-        self._say(n, "\n".join([f"<!-- {MARK} shape head={head} -->", f"### Automated loop: pull request shape (head `{head[:7]}`)", "",
-                                "Soft shape rules. They do not stop the "
-                                "review; only a diff over the review's size limit does.", "",
-                                *[f"- {_cell(x, 500)}" for x in notes]]))
 
     def _author_fix(self, ctx, findings, blocked):
         """Findings on paths the fixer may not change: no fixer; the author fixes them."""
@@ -845,7 +850,7 @@ class Loop:
         findings = findings_to_fix(r)
         if not findings:
             return self._stop(ctx, head, "a key failed without findings to fix")
-        blocked = [f for f in findings if forbidden_changes([f["file"]], lc["fixer_forbidden"])]
+        blocked = [f for f in findings if forbidden_changes([f["file"].removeprefix("main:")], lc["fixer_forbidden"])]
         if blocked:
             return self._author_fix(ctx, findings, blocked)
         repeated = [f for f in findings if st["seen"].get(f["fingerprint"])]

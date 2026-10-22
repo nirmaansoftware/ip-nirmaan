@@ -359,7 +359,7 @@ def test_a_bad_citation_on_a_severe_finding_gets_one_repair_of_the_same_verdict(
     assert k1["status"] == "fail" and k1["verdict"]["findings"][0]["text"] == "REPAIRED"
     repair = r.calls()[1]
     assert "failed the script's citation check" in repair["stdin"] and "cited src/nope.py:1 does not exist" in repair["stdin"]
-    assert 'Return the same verdict ("fail")' in repair["stdin"]
+    assert 'Return the verdict "fail"' in repair["stdin"] and "keeping every blocker, critical and major finding" in repair["stdin"]
     assert [l.get("attempt") for l in r.log()] == [1, "repair"]
     assert "One citation repair" in r.comments()[0]["body"]
     assert r.check("review/team-lead")["state"] == "failure"
@@ -398,6 +398,31 @@ def test_a_pass_with_a_badly_cited_major_finding_is_repaired_and_stays_a_pass(re
     result = r.run()
     assert result["key1"][0]["status"] == "pass" and len(r.calls()) == 3
     assert r.check("review/executive")["state"] == "success"
+
+
+@pytest.mark.parametrize("repair", [
+    {"type": "verdict", "verdict": "pass"},  # the critical finding dropped
+    bad_cite("minor", "pass", "src/app.py", 1),  # the critical finding swapped for a minor one
+])
+def test_a_pass_with_a_badly_cited_critical_finding_is_asked_as_a_fail_and_never_passes(repo, repair):
+    r = repo(responses=[bad_cite("critical", "pass"), repair, PASS])
+    result = r.run()
+    assert result["key1"][0]["status"] == "deferred", "main deferred this verdict; the repair must not turn it into a pass"
+    assert 'Return the verdict "fail"' in r.calls()[1]["stdin"]
+    r.no_success()
+
+
+def test_a_pass_with_a_badly_cited_critical_finding_repaired_as_a_fail_is_a_fail(repo):
+    r = repo(responses=[bad_cite("critical", "pass"), bad_cite("critical", "fail", "src/app.py", 1)])
+    assert r.run()["key1"][0]["status"] == "fail"
+    assert r.check("review/team-lead")["state"] == "failure"
+
+
+def test_a_repair_that_drops_a_major_finding_defers(repo):
+    r = repo(responses=[bad_cite("major", "pass"), {"type": "verdict", "verdict": "pass"}, PASS])
+    result = r.run()
+    assert result["key1"][0]["status"] == "deferred" and "dropped a major finding" in result["key1"][0]["reason"]
+    r.no_success()
 
 
 def test_the_founder_proxy_gets_the_same_one_repair(repo):
@@ -920,7 +945,8 @@ def test_the_call_log_records_each_verdict_its_findings_by_severity_and_the_vali
 
 @pytest.mark.parametrize("response, error", [
     ({"type": "result", "text": "Looks fine to me."}, "not valid JSON"),
-    # A badly cited minor finding no longer defers (R4a drops it with a note),
+    # A badly cited minor finding no longer defers (it is dropped with a note,
+    # council/records/2026-10-18-review-loop.md, decision 5 item 3),
     # so the deferring case is a verdict outside the schema.
     ({"type": "verdict", "verdict": "approved", "findings": []}, 'pass" or "fail'),
 ])

@@ -167,13 +167,17 @@ the branch checked out. In order:
    the pull request deletes, or on `main` (written `main:<path>`, or a path
    that is not at the head but is on `main`); a reviewer's checkout prefix is
    taken off a cited path first. A minor or info finding with a bad citation
-   is dropped with a note in the comment, and the verdict stands. A bad
-   citation on a major, critical or blocker finding gets one repair: the same
-   reviewer is asked once, with the error, for the same verdict with corrected
-   citations. A repair that fails, cites badly again or changes the verdict
-   defers the key, so a bad citation never leads to a pass. A pass with a
-   blocker or critical finding is recorded as fail. A repair is not a review;
-   the call log marks it `"attempt": "repair"`.
+   is dropped with a note in the comment, and the verdict stands; this is
+   the one case where a finding with a bad citation does not hold the key
+   pending. A bad citation on a major, critical or blocker finding gets one
+   repair: a fresh call to the same seat, given its own answer's error, asked
+   for corrected citations and the verdict it gave, except that a pass listing
+   a blocker or critical finding is asked for as a fail. A repair that fails,
+   cites badly again, returns a different verdict, or keeps fewer blocker,
+   critical or major findings defers the key. So a bad citation never turns a
+   verdict that was not a pass, or a pass with a blocker or critical finding,
+   into a pass. A pass with a blocker or critical finding is recorded as fail.
+   A repair is not a review; the call log marks it `"attempt": "repair"`.
 9. **Fail closed.** A failed call, a timeout or a rate limit gets one retry
    after a backoff; after that, and on any invalid output or a citation that
    step 8 neither drops nor repairs, the key is "review deferred" and stays

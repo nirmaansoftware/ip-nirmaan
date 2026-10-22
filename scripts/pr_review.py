@@ -419,8 +419,10 @@ def rules_text(ctx: dict, proxy: bool = False) -> str:
    "checks_run": ["what you actually checked"], "not_run": ["what you could not check"],
    "files_read": ["..."], "summary": "one or two sentences"{reasons}}}
 - Every finding cites a file and a line that exist at the head commit; for a file the
-  pull request deletes, cite the line at main. A citation that does not exist voids
-  the whole review.
+  pull request deletes, cite the line at the base; for a line only on main, write
+  "main:<path>". The script checks every citation: a minor or info finding with a bad
+  citation is dropped with a note, and any other bad citation gets one repair request
+  or defers the review. Cite exactly.
 {decide}
 - A bounded check is never a proof. Use agent wording only: this review is never a
   person's decision, a release, or a claim that a design is ready to be made in silicon."""
@@ -1181,13 +1183,21 @@ def _review(repo_root, pr, github, post, claude_bin, state_dir, models, timeout_
         log_call(state_dir, {**entry, "verdict": verdict["verdict"] if verdict else "deferred",
                              "findings": severity_counts(verdict["findings"]) if verdict else None, "validation_error": error})
         if isinstance(error, CitationError):
-            # One repair of the same verdict, with the error shown; it never
-            # passes a verdict that was not a pass, and a second bad citation
-            # defers.
+            # One repair, with the error shown, by a fresh call to the same
+            # seat. A pass that lists a blocker or critical finding is a fail
+            # whatever its citations, so that is the verdict asked for. The
+            # repair must return that verdict and keep at least as many
+            # blocker, critical and major findings; otherwise, or on a second
+            # bad citation, the key defers.
+            first = [f for f in value.get("findings") or [] if isinstance(f, dict)]
             asked = value.get("verdict")
+            if asked == "pass" and any(f.get("severity") in ("blocker", "critical") for f in first):
+                asked = "fail"
+            floor = severity_counts(first)
             repair_user = (user + "\n\n# Your answer failed the script's citation check\n\n"
-                           f"{error}\n\nReturn the same verdict (\"{asked}\") as ONE JSON object, with every finding citing a "
-                           "file and line that exist at the head commit (or \"main:<path>\" for a line on main). Change nothing else.")
+                           f"{error}\n\nReturn the verdict \"{asked}\" as ONE JSON object, keeping every blocker, critical "
+                           "and major finding, with every finding citing a file and line that exist at the head commit (or "
+                           "\"main:<path>\" for a line on main). Change nothing else.")
             release, holder = acquire_lock(state_dir, {"repo": cfg["repo"], "pr": pr, "key": key})
             if release is None:
                 raise LockBusy(holder)
@@ -1212,8 +1222,12 @@ def _review(repo_root, pr, github, post, claude_bin, state_dir, models, timeout_
                                  "findings": severity_counts(verdict["findings"]) if verdict else None, "validation_error": error2})
             if error2:
                 return {"status": "deferred", "reason": f"the verdict failed validation after one repair: {error2}", "model": model}
-            if value.get("verdict") != asked:
-                return {"status": "deferred", "reason": f"the citation repair changed the verdict from \"{asked}\" to \"{value.get('verdict')}\"", "model": model}
+            if verdict["verdict"] != asked:
+                return {"status": "deferred", "reason": f"the citation repair changed the verdict from \"{asked}\" to \"{verdict['verdict']}\"", "model": model}
+            got = severity_counts(verdict["findings"])
+            dropped = [s for s in ("blocker", "critical", "major") if got[s] < floor[s]]
+            if dropped:
+                return {"status": "deferred", "reason": f"the citation repair dropped a {dropped[0]} finding", "model": model}
             notes = [f"One citation repair: {str(error)[:300]}"] + notes
         elif error:
             return {"status": "deferred", "reason": f"the verdict failed validation: {error}", "model": model}

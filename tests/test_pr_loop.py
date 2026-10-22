@@ -503,7 +503,30 @@ def test_a_finding_on_a_path_the_fixer_may_not_change_labels_author_fix_and_a_ne
     assert events.index("author-fix") < events.index("author-fix-cleared") < events.index("auto-merge")
 
 
+def test_a_finding_cited_on_main_on_a_forbidden_path_goes_to_the_author(repo):
+    r = repo(reviews=[fail("the map line is wrong", file="main:.github/review-teams.yml")])
+    assert r.tick() == ["author-fix"]
+    assert not [c for c in r.calls() if c["kind"] == "fixes"], "the main: prefix does not hide a forbidden path from the check"
+
+
 SPLIT_MAP_CHANGE = lambda w: (_change_github(w), write(w, "src/app.py", "one\ntwo changed\nthree\n"))  # noqa: E731
+
+
+def test_a_shape_comment_that_fails_to_post_never_stops_the_loop_and_is_retried(repo, monkeypatch):
+    r = repo(change=SPLIT_MAP_CHANGE, reviews=[fail("x"), {"verdict": "pass"}], fixes=[{"edits": {"src/app.py": "fixed\n"}}])
+    real, failed = pr_loop.Loop._say, []
+
+    def say(self, n, body):
+        if "pull request shape" in body and not failed:
+            failed.append(body)
+            raise OSError("GitHub said no")
+        return real(self, n, body)
+    monkeypatch.setattr(pr_loop.Loop, "_say", say)
+    assert r.tick() == ["fixed"], "the failed shape post did not stop the step"
+    assert failed and not [c for c in r.comments() if "pull request shape" in c]
+    assert r.tick() == ["auto-merge"]
+    assert len([c for c in r.comments() if "pull request shape" in c]) == 1, "posted on the next pass"
+    assert not r.labeled()
 
 
 def test_soft_shape_rules_comment_once_and_never_stop(repo, tmp_path):
