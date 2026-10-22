@@ -187,6 +187,36 @@ the branch checked out. In order:
     worktrees, and the per-run folder that holds them under
     `~/.nirmaan/pr-review/worktrees`, are removed when it ends.
 
+**Composite key 1 (built, off).** Council record 2026-10-18 (review loop),
+decision 1. With `composite_key1` on in the script's `CONFIG`, key 1 is one
+call per head instead of one per owning team. What it loads is data in
+`main`'s `.github/review-teams.yml` (`composite_key1`, read by
+`review_map.key1_plan`): the seat that speaks is the lead of the owning team
+that comes first in `precedence` (Council, Verification, Business, Silicon
+Design, Product and Site, EDA and Platform), with its seat file whole; then the
+"In a review" section of every owning team's lead, of every member whose
+trigger matches (team, path, changed-line content, or a line range such as the
+`physical-design` job in `ci.yml`), and of the `always` seats
+(legal-compliance). A member loads by trigger, not by membership: a
+firmware-only change no longer carries the DFT list, and a DFT bound changed in
+`src/nirmaan/company/workflows.py` now does. A selected checklist missing on
+`main` defers the review. The prompt puts the fixed text first (base
+checklist, seat file, loaded checklists, verdict rules) and the rules with the
+head's facts and fence marker last. The verdict adds one entry per loaded
+checklist (name, team, status `pass`, `fail` or `not_applicable`, findings
+with citations) and `export_control` (`yes` or `no`, with cited lines); a
+missing, duplicated or unknown entry or a missing flag defers, a failed
+checklist fails key 1, and entry findings are validated like any finding. A
+`yes` adds founder class `export-control` and sends the head to the founder
+with no further model call (`review/executive` pending, the loop labels
+`needs-founder`) until the founder's own review approves the head. Key 2 gets
+the list of loaded checklists and key 1's entries. The cache name and the
+fix-round fingerprint use one fixed key-1 identity (`composite`), so a fix that
+adds an owning team cannot make a repeated finding look new. It is switched on
+only by its own pull request, after an A/B run on the seeded calibration sets
+(kept outside both repositories) shows it catches every domain seed at least
+as often as the per-team calls, with no Verification regression.
+
 **Posting identity.** The review App posts the check runs with a short-lived
 installation token scoped to this repository. The token asks for `checks:
 write` (the check runs), `pull_requests: write`, `contents: read` and

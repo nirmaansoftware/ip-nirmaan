@@ -898,3 +898,195 @@ def test_the_map_on_main_today_classifies_a_control_plane_change():
     files = [{"status": "M", "old": None, "path": "scripts/pr_review.py"}]
     c = review_map.classify(teams_map, files, "", lambda p: None, lambda p: None)
     assert "control-plane" in c["founder"]
+
+
+# --- Composite key 1 (council record 2026-10-18, review loop, decision 1; off by default) ---
+
+COMPOSITE = CONFIG | {"composite_key1": True}
+COMPOSITE_DATA = """
+composite_key1:
+  precedence: [council, verification, business, silicon-design, product-site, eda-platform]
+  always: [legal-compliance]
+  content_rules:
+    - id: export-sensitive
+      adds: business
+      lead: legal-compliance
+      pattern: '(?i)\\baes'
+      in: ['**/*.v']
+      example: 'module aes_core'
+  members:
+    - seat: qa-evidence
+      teams: [verification]
+    - seat: security
+      paths: [scripts/**]
+    - seat: dft-engineer
+      content:
+        - pattern: 'at_least\\("test_coverage"'
+          in: [src/**]
+          example: 'at_least("test_coverage", 90)'
+"""
+# Leads first (by precedence), then triggered members, then the always-loaded seats.
+LOADED = ["verification-lead", "eda-tooling", "qa-evidence", "legal-compliance"]
+
+
+def composite_main(w):
+    write(w, ".github/review-teams.yml", MAP + COMPOSITE_DATA)
+    write(w, "council/dft-engineer.md", "# dft-engineer\nSEAT-MARKER-dft-engineer\n\n## In a review\nREVIEW-MARKER-dft-engineer\n")
+
+
+def two_teams(w):
+    write(w, "src/app.py", "x\n")
+    write(w, "evals/a.txt", "e\n")
+
+
+def entries(names=LOADED, status="pass", **over):
+    return [{"name": n, "team": "t", "status": over.get(n, status), "findings": []} for n in names]
+
+
+def composite_verdict(names=LOADED, flag=None, verdict="pass", findings=None, **over):
+    return {"type": "verdict", "verdict": verdict, "findings": findings or [],
+            "extra": {"checklists": entries(names, **over), "export_control": flag or {"flag": "no", "lines": []}}}
+
+
+def test_composite_is_off_by_default_and_off_changes_nothing(repo):
+    assert CONFIG["composite_key1"] is False
+    r = repo(change=two_teams, main_extra=composite_main)
+    r.run()
+    calls = r.calls()
+    assert len(calls) == 3, "one key-1 call per owning team, then key 2, as before"
+    assert not any("Loaded checklists" in system_prompt(c) or "--json-schema" in c["argv"] and "checklists" in c["argv"][c["argv"].index("--json-schema") + 1]
+                   for c in calls)
+    eda = next(system_prompt(c) for c in calls if "SEAT-MARKER-eda-tooling" in system_prompt(c) and "SEAT-MARKER-chair" not in system_prompt(c))
+    assert "REVIEW-MARKER-security" in eda, "per-team calls still load members by membership"
+
+
+def test_composite_runs_one_key1_call_with_owning_leads_triggered_members_and_always_loaded(repo):
+    r = repo(responses=[composite_verdict(), {"type": "verdict", "verdict": "pass"}], change=two_teams, main_extra=composite_main)
+    result = r.run(config=COMPOSITE)
+    calls = r.calls()
+    assert len(calls) == 2, "one composite key 1, then key 2"
+    k1 = system_prompt(calls[0])
+    assert "SEAT-MARKER-verification-lead" in k1 and "NEVER-verification-lead" in k1, "the first owning lead by precedence speaks, its seat file whole"
+    for seat in LOADED:
+        assert f"### Checklist: {seat}" in k1
+    assert "REVIEW-MARKER-eda-tooling" in k1 and "REVIEW-MARKER-qa-evidence" in k1 and "REVIEW-MARKER-legal-compliance" in k1
+    assert "REVIEW-MARKER-security" not in k1, "security's trigger (scripts/**) did not match: membership alone loads nothing"
+    assert "REVIEW-MARKER-dft-engineer" not in k1
+    assert k1.index("Loaded checklists") < k1.index("How this review runs") < len(k1), "fixed text first, the per-head rules last"
+    schema = json.loads(calls[0]["argv"][calls[0]["argv"].index("--json-schema") + 1])
+    assert schema["properties"]["checklists"]["items"]["properties"]["name"]["enum"] == LOADED
+    assert "export_control" in schema["required"]
+    k1r = result["key1"][0]
+    assert (k1r["team"], k1r["role"], k1r["loaded"], k1r["status"]) == ("composite", "verification-lead", LOADED, "pass")
+    assert r.check("review/team-lead")["state"] == "success" and r.check("review/executive")["state"] == "success"
+    k2 = system_prompt(calls[1])
+    assert "Key 1 ran as one composite call and loaded these checklists from main: " + ", ".join(LOADED) in k2
+    assert '"loaded"' in calls[1]["stdin"] and '"checklists"' in calls[1]["stdin"], "key 2 gets key 1's list and entries"
+    assert "#### Checklists" in r.comments()[0]["body"] and "Export control: **no**" in r.comments()[0]["body"]
+
+
+def test_composite_identity_is_fixed_whatever_teams_own_the_head(repo):
+    r = repo(responses=[composite_verdict(), {"type": "verdict", "verdict": "pass"}], change=two_teams, main_extra=composite_main)
+    r.run(config=COMPOSITE)
+    cached = [p.name for p in (r.state / "verdicts").rglob("*.json")]
+    assert any(n.endswith("-k1-composite-key1.json") for n in cached), cached
+    assert [l["team"] for l in r.log() if l["key"] == 1] == ["composite"]
+
+
+@pytest.mark.parametrize("names, reason", [
+    (LOADED[:-1], "no entry for the loaded checklist legal-compliance"),
+    ([*LOADED, "security"], "names a checklist that was not loaded"),
+    ([*LOADED, "qa-evidence"], "checklist qa-evidence has more than one entry"),
+])
+def test_composite_missing_extra_or_duplicate_entry_defers(repo, names, reason):
+    r = repo(responses=[composite_verdict(names)], change=two_teams, main_extra=composite_main)
+    result = r.run(config=COMPOSITE)
+    assert result["key1"][0]["status"] == "deferred" and reason in result["key1"][0]["reason"]
+    assert len(r.calls()) == 1, "a deferred key 1: no key 2"
+    r.no_success()
+
+
+def test_composite_missing_export_flag_defers(repo):
+    response = composite_verdict()
+    del response["extra"]["export_control"]
+    r = repo(responses=[response], change=two_teams, main_extra=composite_main)
+    result = r.run(config=COMPOSITE)
+    assert result["key1"][0]["status"] == "deferred" and "export_control" in result["key1"][0]["reason"]
+    r.no_success()
+
+
+def test_composite_a_failed_checklist_fails_key1(repo):
+    r = repo(responses=[composite_verdict(**{"qa-evidence": "fail"})], change=two_teams, main_extra=composite_main)
+    result = r.run(config=COMPOSITE)
+    assert result["key1"][0]["status"] == "fail"
+    assert "Checklist qa-evidence failed" in " ".join(result["key1"][0]["notes"])
+    assert r.check("review/team-lead")["state"] == "failure" and len(r.calls()) == 1
+
+
+def test_composite_entry_findings_are_cited(repo):
+    bad = composite_verdict()
+    bad["extra"]["checklists"][0]["findings"] = [{"file": "src/app.py", "line": 99, "severity": "critical", "text": "x"}]
+    r = repo(responses=[bad], change=two_teams, main_extra=composite_main)
+    assert "does not exist" in r.run(config=COMPOSITE)["key1"][0]["reason"]
+
+
+def test_composite_entry_findings_are_named_by_checklist(repo):
+    good = composite_verdict()
+    good["extra"]["checklists"][1]["findings"] = [{"file": "src/app.py", "line": 1, "severity": "critical", "text": "gate loosened"}]
+    good["extra"]["checklists"][1]["status"] = "fail"
+    r2 = repo(responses=[good], change=two_teams, main_extra=composite_main)
+    k1 = r2.run(config=COMPOSITE)["key1"][0]
+    assert k1["status"] == "fail" and k1["verdict"]["findings"][0]["text"] == "[eda-tooling] gate loosened"
+
+
+def test_composite_triggers_a_member_by_content_and_adds_a_team_by_a_composite_rule(repo):
+    def change(w):
+        write(w, "src/app.py", 'bounds=(at_least("test_coverage", 85),)\n')
+        write(w, "rtl/aes_core.v", "module aes_core;\nendmodule\n")
+    loaded = ["legal-compliance", "eda-tooling", "dft-engineer"]
+    r = repo(responses=[composite_verdict(loaded)], change=change, main_extra=composite_main)
+    result = r.run(config=COMPOSITE)
+    k1 = system_prompt(r.calls()[0])
+    assert "SEAT-MARKER-legal-compliance" in k1, "Business comes before EDA and Platform: legal-compliance speaks"
+    assert "loaded for: content export-sensitive in rtl/aes_core.v" in k1
+    assert "### Checklist: dft-engineer (member, team none; loaded for: content in src/app.py)" in k1
+    assert result["key1"][0]["loaded"] == loaded
+
+
+def test_composite_triggered_checklist_missing_on_main_defers_without_a_model_call(repo):
+    def main(w):
+        composite_main(w)
+        write(w, "council/dft-engineer.md", "# dft-engineer\nno review section\n")
+    r = repo(change=lambda w: write(w, "src/app.py", 'at_least("test_coverage", 85)\n'), main_extra=main)
+    result = r.run(config=COMPOSITE)
+    assert result["key1"][0]["status"] == "deferred" and "dft-engineer.md on main has no" in result["key1"][0]["reason"]
+    assert r.calls() == []
+    r.no_success()
+
+
+def test_composite_export_flag_yes_goes_to_the_founder_with_no_further_model_call(repo):
+    flag = {"flag": "yes", "lines": ["src/app.py:1"]}
+    r = repo(responses=[composite_verdict(flag=flag), {"type": "verdict", "verdict": "pass"}], change=two_teams, main_extra=composite_main)
+    result = r.run(config=COMPOSITE)
+    assert len(r.calls()) == 1 and result["key2"] is None
+    assert result["needs_founder"].startswith("key 1 flagged export-control content (src/app.py:1)")
+    assert result["classification"]["founder"]["export-control"] == ["key 1 flag: src/app.py:1"]
+    assert r.check("review/executive")["state"] == "pending" and "needs the founder" in r.check("review/executive")["title"]
+    assert "export-control" in r.github.body, "the script's founder-class block names the new class"
+    # The founder's own review approving this head lets key 2 run (cached key 1, no new key-1 call).
+    r.github.gh["reviews"] = [{"login": "nirmaansoftware", "state": "APPROVED", "commit_id": "HEAD"}]
+    again = r.run(config=COMPOSITE)
+    assert again.get("needs_founder") is None and again["key2"]["status"] == "pass"
+    assert len(r.calls()) == 3 and "SEAT-MARKER-founder-proxy" in system_prompt(r.calls()[2]), \
+        "cached key 1, then key 2 and the Founder Proxy: export-control is a founder class on this head"
+
+
+@pytest.mark.parametrize("flag, why", [
+    ({"flag": "yes", "lines": []}, "needs at least one cited line"),
+    ({"flag": "yes", "lines": ["src/app.py:99"]}, "not a file:line at the head"),
+    ({"flag": "maybe", "lines": []}, "export_control must be"),
+])
+def test_validate_composite_flag(flag, why):
+    v = {"verdict": "pass", "sha": SHA, "findings": [], "checks_run": [], "not_run": [], "checklists": entries(["a"]), "export_control": flag}
+    verdict, error, _ = pr_review.validate_composite(v, ["a"], SHA, lambda f, l: f == "src/app.py" and l <= 3)
+    assert verdict is None and why in error

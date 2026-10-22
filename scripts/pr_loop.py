@@ -169,7 +169,9 @@ def fixer_args(model: str, system_prompt: str, forbidden: list[str]) -> list[str
 
 def fingerprint(f: dict) -> str:
     """The same finding: same key, team, file and wording (case and spacing
-    ignored). Lines move when code is fixed, so they are not part of it."""
+    ignored). Lines move when code is fixed, so they are not part of it. A
+    composite key 1's team is always pr_review.COMPOSITE_TEAM, so a fix that
+    adds an owning team cannot make a repeated finding look new."""
     text = re.sub(r"\s+", " ", str(f["text"]).lower()).strip()
     return hashlib.sha256(f"{f['key']}|{f.get('team') or 'chair'}|{f['file']}|{text}".encode()).hexdigest()[:16]
 
@@ -637,6 +639,10 @@ class Loop:
             deferred = [k for k in keys if k["status"] == "deferred"]
             if deferred:
                 return self._stop(ctx, head, "review deferred (" + "; ".join(f"{k['team_name']}: {k.get('reason')}" for k in deferred) + ")")
+            # What the review script itself sends to the founder (a composite
+            # key 1's export-control flag): no key 2 ran, so never the merge path.
+            if r.get("needs_founder"):
+                return self._stop(ctx, head, f"{r['needs_founder']}; approve head {head[:7]} on GitHub (or not), then remove the label")
             self._log(ctx, "reviewed", key1=",".join(f"{k['team']}:{k['status']}" for k in r["key1"]),
                       key2=r["key2"]["status"] if r.get("key2") else "not run",
                       proxy=r["proxy"]["status"] if r.get("proxy") else "not run")

@@ -95,6 +95,13 @@ CONFIG = {
     # The review App's slug: its comments are by "<slug>[bot]" and its check
     # runs carry this app slug. Used to skip reposting an identical result.
     "review_app_slug": "nirmaan-review",
+    # Composite key 1 (council record 2026-10-18, review loop, decision 1): one
+    # key-1 call per head, loading the checklists main's map selects
+    # (`composite_key1` in .github/review-teams.yml). Off: one call per owning
+    # team, as before. Switched on only by its own pull request, after the A/B
+    # run on the seeded sets shows it catches every domain seed at least as
+    # often as the per-team calls.
+    "composite_key1": False,
 }
 
 # Environment variables the review App (tracker T21) provides.
@@ -150,6 +157,28 @@ PROXY_VERDICT_SCHEMA = {
         "founder_reasons": {"type": "array", "items": {"type": "string"}},
     },
 }
+
+
+# The composite key-1 verdict adds one entry per loaded checklist and the
+# export-control flag; COMPOSITE_TEAM is its fixed identity (cache name and
+# fix-round fingerprint), whatever teams own the head.
+COMPOSITE_TEAM = "composite"
+CHECKLIST_STATUSES = ("pass", "fail", "not_applicable")
+EXPORT_CONTROL_CLASS = "export-control"
+
+
+def composite_schema(names: list[str]) -> dict:
+    s = json.loads(json.dumps(VERDICT_SCHEMA))
+    s["required"] = [*s["required"], "checklists", "export_control"]
+    s["properties"]["checklists"] = {"type": "array", "items": {
+        "type": "object", "additionalProperties": False, "required": ["name", "status", "findings"],
+        "properties": {"name": {"type": "string", "enum": list(names)}, "team": {"type": "string"},
+                       "status": {"type": "string", "enum": list(CHECKLIST_STATUSES)},
+                       "findings": VERDICT_SCHEMA["properties"]["findings"]}}}
+    s["properties"]["export_control"] = {
+        "type": "object", "additionalProperties": False, "required": ["flag", "lines"],
+        "properties": {"flag": {"type": "string", "enum": ["yes", "no"]}, "lines": {"type": "array", "items": {"type": "string"}}}}
+    return s
 
 
 class HeadMoved(Exception):
@@ -260,6 +289,66 @@ def validate_verdict(v, head_sha: str, line_exists, proxy: bool = False) -> tupl
     if verdict["verdict"] == "pass" and any(f["severity"] in ("blocker", "critical") for f in v["findings"]):
         verdict["verdict"] = "fail"
         notes.append("The reviewer said pass but listed a blocker or critical finding; the script records fail.")
+    return verdict, None, notes
+
+
+def validate_composite(v, names: list[str], head_sha: str, line_exists, **kw) -> tuple[dict | None, str | None, list[str]]:
+    """The composite key-1 verdict: a verdict as validate_verdict checks it,
+    plus exactly one entry per loaded checklist (`names`) and the export-control
+    flag. A missing, duplicated or unknown entry, or a missing flag, is an error
+    (the review defers). Entry findings are checked like any finding and
+    listed with the verdict's findings, named by checklist. A checklist that
+    fails fails the verdict."""
+    def bad(why):
+        return None, why, []
+    if not isinstance(v, dict):
+        return bad("verdict is not a JSON object")
+    entries, flag = v.get("checklists"), v.get("export_control")
+    if not isinstance(entries, list):
+        return bad("checklists must be a list with one entry per loaded checklist")
+    seen = []
+    for i, e in enumerate(entries, 1):
+        if not isinstance(e, dict) or not isinstance(e.get("name"), str) or not isinstance(e.get("findings", []), list):
+            return bad(f"checklist entry {i} is malformed")
+        if any(k not in ("name", "team", "status", "findings") for k in e):
+            return bad(f"checklist entry {i} has an unexpected key")
+        if e.get("status") not in CHECKLIST_STATUSES:
+            return bad(f"checklist {e['name']}: status must be one of {', '.join(CHECKLIST_STATUSES)}")
+        seen.append(e["name"])
+    for name in seen:
+        if name not in names:
+            return bad(f"checklist entry {name} names a checklist that was not loaded")
+        if seen.count(name) > 1:
+            return bad(f"checklist {name} has more than one entry")
+    missing = [n for n in names if n not in seen]
+    if missing:
+        return bad(f"no entry for the loaded checklist {missing[0]}")
+    if not isinstance(flag, dict) or flag.get("flag") not in ("yes", "no") or not isinstance(flag.get("lines"), list) \
+            or not all(isinstance(x, str) for x in flag["lines"]) or any(k not in ("flag", "lines") for k in flag):
+        return bad('export_control must be {"flag": "yes" or "no", "lines": [...]}')
+    if flag["flag"] == "yes":
+        if not flag["lines"]:
+            return bad('export_control "yes" needs at least one cited line')
+        for cite in flag["lines"]:
+            m = re.fullmatch(r"(.+):(\d+)", cite.strip())
+            if not m or not line_exists(m.group(1), int(m.group(2))):
+                return bad(f"export_control cites {cite[:120]!r}, which is not a file:line at the head")
+    if not isinstance(v.get("findings"), list):
+        return bad("findings must be a list")
+    flat = list(v["findings"])
+    for e in entries:
+        flat += [{**f, "text": f"[{e['name']}] {f.get('text')}"} if isinstance(f, dict) and isinstance(f.get("text"), str) and f["text"].strip() else f
+                 for f in e.get("findings", [])]
+    verdict, error, notes = validate_verdict({**{k: x for k, x in v.items() if k not in ("checklists", "export_control")}, "findings": flat},
+                                             head_sha, line_exists, **kw)
+    if error:
+        return None, error, []
+    verdict = {**verdict, "checklists": [{"name": e["name"], "team": e.get("team", ""), "status": e["status"]} for e in entries],
+               "export_control": {"flag": flag["flag"], "lines": flag["lines"]}}
+    failed = [e["name"] for e in entries if e["status"] == "fail"]
+    if failed and verdict["verdict"] == "pass":
+        verdict["verdict"] = "fail"
+        notes = [*notes, f"Checklist {', '.join(failed)} failed but the reviewer said pass; the script records fail."]
     return verdict, None, notes
 
 
@@ -384,6 +473,33 @@ def key1_system_prompt(ctx: dict) -> str:
     return s
 
 
+def composite_key1_system_prompt(ctx: dict) -> str:
+    """One key-1 call per head. Fixed text comes first (the base checklist, the
+    speaking seat's file, the loaded checklists, the verdict rules), and the
+    rules with this head's facts and fence marker come last, nearest the data
+    they govern."""
+    names = [c["seat"] for c in ctx["checklists"]]
+    s = (f"You are {ctx['company']}'s key-1 reviewer for every owning team of this pull request, in one review. "
+         f"You speak as the council seat {ctx['lead']}, whose seat file is below, and you apply every checklist under "
+         "\"Loaded checklists\", each read from main.")
+    s += f"\n\n## The base checklist for every key 1 (council record, from main)\n\n{ctx['base']}"
+    s += f"\n\n## Your seat file ({ctx['lead']}, from main)\n\n{ctx['lead_spec']}"
+    s += "\n\n## Loaded checklists (from main; one entry each in \"checklists\")"
+    for c, text in zip(ctx["checklists"], ctx["texts"]):
+        s += f"\n\n### Checklist: {c['seat']} ({c['kind']}, team {c['team'] or 'none'}; loaded for: {c['why']})\n\n"
+        s += "Its \"In a review\" section is in your seat file above." if c["seat"] == ctx["lead"] else text
+    s += ("\n\n## The composite verdict\n\n"
+          "- Besides the keys below, answer \"checklists\": exactly one entry per loaded checklist, named exactly "
+          f"{', '.join(names)}, each {{\"name\", \"team\", \"status\": \"pass\" | \"fail\" | \"not_applicable\", \"findings\": [...]}}. "
+          "A missing, duplicated or unknown entry voids the review.\n"
+          "- A finding that matches a \"Fails when\" line of a checklist is \"blocker\" or \"critical\", and that "
+          "checklist's status is \"fail\". Any failed checklist fails the verdict.\n"
+          "- Also answer \"export_control\": {\"flag\": \"yes\" | \"no\", \"lines\": [\"path:line\", ...]}. "
+          "\"yes\" when the diff adds or changes export-control sensitive content (legal-compliance's checklist), "
+          "citing each line; a \"yes\" sends the pull request to the founder.")
+    return s + f"\n\n{rules_text(ctx)}"
+
+
 def key2_system_prompt(ctx: dict) -> str:
     s = (f"You are {ctx['company']}'s council chair, holding key 2 of the two-key pull request review: the level "
          f"that manages every team. You review with the domain knowledge of each owning team, whose lead seat "
@@ -393,6 +509,10 @@ def key2_system_prompt(ctx: dict) -> str:
     s += f"\n\n## The base checklist for every key 1 (council record, from main)\n\n{ctx['base']}"
     for lead, team_name, text in ctx["leads"]:
         s += f"\n\n## Owning team {team_name}: lead {lead} seat file (from main)\n\n{text}"
+    if ctx.get("key1_loaded"):
+        s += ("\n\n## What key 1 loaded (from the review script)\n\nKey 1 ran as one composite call and loaded these "
+              "checklists from main: " + ", ".join(ctx["key1_loaded"]) + ". Its results below hold one entry per checklist: "
+              "check each entry and its citations, and look for what it missed.")
     return s
 
 
@@ -499,6 +619,12 @@ def _cell(s, limit: int = 600) -> str:
     return t if len(t) <= limit else t[:limit] + "..."
 
 
+def key1_view(r: dict) -> dict:
+    """Key 1's result as key 2 and the proxy receive it; a composite call also
+    names the checklists it loaded."""
+    return {"team": r["team"], "lead": r["role"], "verdict": r.get("verdict"), **({"loaded": r["loaded"]} if r.get("loaded") else {})}
+
+
 def render_comment(r: dict, ctx: dict) -> str:
     proxy = r["key"] == "proxy"
     word = {"pass": "PASS", "fail": "FAIL", NEEDS_FOUNDER: "NEEDS THE FOUNDER"}.get(r["status"], "PENDING: review deferred")
@@ -533,6 +659,12 @@ def render_comment(r: dict, ctx: dict) -> str:
         if v.get("founder_reasons"):
             lines += ["", "#### Needs the founder", "", "The proxy may not decide these; the founder does, on GitHub.", ""]
             lines += [f"- {_cell(x, 500)}" for x in v["founder_reasons"][:40]]
+        if v.get("checklists"):
+            why = r.get("loaded_why") or {}
+            lines += ["", "#### Checklists", "", "| Checklist | Team | Status | Loaded for |", "|---|---|---|---|"]
+            lines += [f"| {_cell(c['name'], 80)} | {_cell(c.get('team'), 60)} | {c['status']} | {_cell(why.get(c['name']), 200)} |" for c in v["checklists"][:40]]
+            flag = v.get("export_control") or {}
+            lines += ["", f"Export control: **{flag.get('flag', 'not given')}**" + (f" ({_cell('; '.join(flag.get('lines', [])), 400)})" if flag.get("lines") else "")]
         lines += ["", "#### Findings", ""]
         if not v["findings"]:
             lines.append("None reported.")
@@ -1068,8 +1200,9 @@ def _review(repo_root, pr, github, post, claude_bin, state_dir, models, timeout_
               "diff_truncated": truncated, "max_diff_bytes": cfg["max_diff_bytes"]}
     cache_dir = state_dir / "verdicts" / cfg["repo"].replace("/", "_") / f"pr-{pr}"
 
-    def review(key, team, lead, model, system, user):
+    def review(key, team, lead, model, system, user, composite=None):
         # The Founder Proxy is key "proxy" here: same cache, retry, validation and log.
+        # `composite` names the checklists a composite key-1 call loaded.
         proxy = key == "proxy"
         cache = cache_dir / f"{head}-{main_sha}-k{key}-{team or 'chair'}-{lead}.json"
         if not fresh and cache.exists():
@@ -1078,7 +1211,8 @@ def _review(repo_root, pr, github, post, claude_bin, state_dir, models, timeout_
                                  "verdict": cached.get("status")})
             cached["notes"] = cached.get("notes", []) + [REUSED_NOTE]
             return cached
-        args = claude_args(model, system, [main_dir], schema=PROXY_VERDICT_SCHEMA if proxy else None)
+        args = claude_args(model, system, [main_dir],
+                           schema=composite_schema(composite) if composite else PROXY_VERDICT_SCHEMA if proxy else None)
         result = entry = None
         for attempt in (1, 2):
             if attempt == 2:
@@ -1100,7 +1234,8 @@ def _review(repo_root, pr, github, post, claude_bin, state_dir, models, timeout_
         except ValueError as exc:
             log_call(state_dir, {**entry, "verdict": "deferred", "findings": None, "validation_error": f"not valid JSON ({exc})"})
             return {"status": "deferred", "reason": f"the reviewer's output is not valid JSON ({exc})", "model": model}
-        verdict, error, notes = validate_verdict(value, head, line_exists, proxy=proxy)
+        verdict, error, notes = (validate_composite(value, composite, head, line_exists) if composite
+                                 else validate_verdict(value, head, line_exists, proxy=proxy))
         log_call(state_dir, {**entry, "verdict": verdict["verdict"] if verdict else "deferred",
                              "findings": severity_counts(verdict["findings"]) if verdict else None, "validation_error": error})
         if error:
@@ -1112,7 +1247,33 @@ def _review(repo_root, pr, github, post, claude_bin, state_dir, models, timeout_
 
     teams = teams_map["teams"]
     key1 = []
-    for k in classification["keys"]:
+    plan = None
+    if cfg.get("composite_key1") and classification["keys"]:
+        # One call for every owning team; its identity is fixed (COMPOSITE_TEAM),
+        # so a fix that adds an owning team changes neither cache nor fingerprint.
+        plan = review_map.key1_plan(teams_map, classification, files, diff, lambda p: show(head, p), lambda p: show(base_sha, p))
+        sp = plan["speaker"]
+        names = [c["seat"] for c in plan["checklists"]]
+        base = {"key": 1, "team": COMPOSITE_TEAM, "team_name": f"composite: {', '.join(k['name'] for k in classification['keys'])}",
+                "role": sp["lead"], "check_name": cfg["check_names"]["key1"], "composite": True, "loaded": names,
+                "loaded_why": {c["seat"]: c["why"] for c in plan["checklists"]}}
+        try:
+            lead_spec = seat(sp["lead"])
+            texts = []
+            for c in plan["checklists"]:
+                section = markdown_section(read_main(cfg["seat_spec"].format(seat=c["seat"])), "## " + cfg["review_section"])
+                if not section:
+                    raise LookupError(f"council/{c['seat']}.md on main has no \"{cfg['review_section']}\" section (loaded for: {c['why']})")
+                texts.append(section)
+            system = composite_key1_system_prompt({**common, "lead": sp["lead"], "base": base_checklist(), "lead_spec": lead_spec,
+                                                   "checklists": plan["checklists"], "texts": texts})
+        except LookupError as exc:
+            key1.append({**base, "status": "deferred", "reason": f"seat file or checklist missing on main: {exc}"})
+        else:
+            user = user_prompt({**common, "key": 1, "team": COMPOSITE_TEAM, "lead": sp["lead"]})
+            out(f"pr-review: key 1 (composite, {sp['lead']}; {', '.join(names)})...")
+            key1.append({**base, **review(1, COMPOSITE_TEAM, "key1", models["key1"], system, user, composite=names)})
+    for k in ([] if plan else classification["keys"]):
         base = {"key": 1, "team": k["team"], "team_name": f"{k['name']} ({k['lead']})", "role": k["lead"], "check_name": cfg["check_names"]["key1"]}
         try:
             members = []
@@ -1149,6 +1310,22 @@ def _review(repo_root, pr, github, post, claude_bin, state_dir, models, timeout_
         check("key1", "success", f"agent review ({who}), head {sha7}: pass", link)
 
     k2base = {"key": 2, "team": None, "team_name": cfg["key2_name"], "role": cfg["key2_seat"], "check_name": cfg["check_names"]["key2"]}
+    # A composite key 1 that flags export-control content adds founder class
+    # export-control and sends the head to the founder with no further model
+    # call, until the founder's own GitHub review approves this head.
+    flagged = [r for r in key1 if ((r.get("verdict") or {}).get("export_control") or {}).get("flag") == "yes"]
+    if flagged:
+        lines = (flagged[0]["verdict"]["export_control"]["lines"])[:8]
+        classification["founder"].setdefault(EXPORT_CONTROL_CLASS, []).extend(f"key 1 flag: {x}" for x in lines)
+        mine = [r for r in github.list_reviews(pr) if r["login"] == cfg["founder_login"] and r["state"] in ("APPROVED", "CHANGES_REQUESTED", "DISMISSED")]
+        if not (mine and mine[-1]["state"] == "APPROVED" and mine[-1]["commit_id"] == head):
+            why = f"key 1 flagged export-control content ({'; '.join(lines)}); the founder decides, on GitHub, on head {sha7}"
+            block = founder_class_block(teams_map, list(classification["founder"]))
+            if post != "none" and with_founder_class_block(pull.get("body"), block) != (pull.get("body") or ""):
+                github.update_pull_body(pr, with_founder_class_block(pull.get("body"), block))
+            check("key2", "pending", f"needs the founder: {why}")
+            out(f"pr-review: {why}. No further model call.")
+            return {"exit": EXIT_OK, "key1": key1, "key2": None, "needs_founder": why, "posted": posted, "classification": classification}
     if not key1 or fails or deferred:
         check("key2", "pending", f"not run: key 1 did not pass on {sha7}")
         return {"exit": EXIT_OK, "key1": key1, "key2": None, "posted": posted, "classification": classification}
@@ -1157,8 +1334,9 @@ def _review(repo_root, pr, github, post, claude_bin, state_dir, models, timeout_
         if not markdown_section(chair_spec, "## " + cfg["review_section"]):
             raise LookupError(f"council/{cfg['key2_seat']}.md on main has no \"{cfg['review_section']}\" section")
         leads = [(k["lead"], k["name"], seat(k["lead"])) for k in classification["keys"]]
-        system = key2_system_prompt({**common, "chair_spec": chair_spec, "base": base_checklist(), "leads": leads})
-        user = user_prompt({**common, "key": 2, "key1_results": [{"team": r["team"], "lead": r["role"], "verdict": r.get("verdict")} for r in key1]})
+        system = key2_system_prompt({**common, "chair_spec": chair_spec, "base": base_checklist(), "leads": leads,
+                                     "key1_loaded": key1[0]["loaded"] if plan else None})
+        user = user_prompt({**common, "key": 2, "key1_results": [key1_view(r) for r in key1]})
         out(f"pr-review: key 2 ({cfg['key2_seat']})...")
         k2 = {**k2base, **review(2, None, cfg["key2_seat"], models["key2"], system, user)}
     except LookupError as exc:
@@ -1190,7 +1368,7 @@ def _review(repo_root, pr, github, post, claude_bin, state_dir, models, timeout_
                 raise LookupError(f"council/{cfg['proxy_seat']}.md on main has no \"{cfg['review_section']}\" section")
             system = proxy_system_prompt({**common, "proxy_seat": cfg["proxy_seat"], "proxy_spec": proxy_spec})
             user = user_prompt({**common, "key": "proxy",
-                                "key1_results": [{"team": r["team"], "lead": r["role"], "verdict": r.get("verdict")} for r in key1],
+                                "key1_results": [key1_view(r) for r in key1],
                                 "key2_result": {"seat": cfg["key2_seat"], "verdict": k2.get("verdict")}})
             out(f"pr-review: Founder Proxy ({cfg['proxy_seat']})...")
             proxy = {**pbase, **review("proxy", None, cfg["proxy_seat"], models.get("proxy") or models["key2"], system, user)}
