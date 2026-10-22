@@ -1,0 +1,17 @@
+{
+  "title": "Synchronous FIFO: lint, a passing testbench, a wrong testbench and an overflow mutant caught, a formal proof",
+  "fixture": "tests/fixtures/rtl/sync_fifo",
+  "budget_seconds": 60,
+  "steps": [
+    {"tool": "lint.run", "needs": ["verilator"], "expect": "pass",
+     "params": {"sources": "sync_fifo.v", "top": "sync_fifo"}},
+    {"tool": "simulator.run", "needs": ["iverilog", "vvp"], "expect": "pass",
+     "params": {"sources": "sync_fifo.v,sync_fifo_tb.v", "top": "sync_fifo_tb", "backend": "icarus"}},
+    {"tool": "test.run", "needs": ["iverilog", "vvp"], "expect": "fail",
+     "params": {"sources": "sync_fifo.v,sync_fifo_tb_fail.v", "top": "sync_fifo_tb_fail", "backend": "icarus"}},
+    {"tool": "test.run", "needs": ["iverilog", "vvp"], "expect": "fail",
+     "params": {"sources": "mutants/sync_fifo_overflow.v,sync_fifo_tb.v", "top": "sync_fifo_tb", "backend": "icarus"}},
+    {"tool": "formal.run", "needs": ["sby", "yosys", "yices-smt2"], "expect": "pass",
+     "params": {"sby": "sync_fifo.sby"}}
+  ]
+}

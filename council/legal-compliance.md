@@ -39,6 +39,18 @@ Fails when:
 - a vendored licence file changes;
 - export-control sensitive content appears (scope to be confirmed by counsel).
 
+On a Knowledge PR (`knowledge/**`, or a skill card in
+`src/nirmaan/company/skills.py`; rules in `knowledge/README.md`, "Rules a
+reviewer checks"), it also fails when:
+- a document reproduces specification text, a table, a register map or a figure
+  instead of summarising and citing it;
+- a source has no access type, or is member-only, NDA or vendor EDA
+  documentation;
+- `licence_check` is missing or does not say how the text respects its
+  sources' licences;
+- it quotes benchmark results from a licensed tool, or an example carries code
+  under a licence other than a permissive one with a NOTICE entry.
+
 A Business pass is an agent review, never legal advice or a legal clearance, and
 always leads to the founder (founder classes 3 and 6).
 

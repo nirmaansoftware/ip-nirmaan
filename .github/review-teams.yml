@@ -329,6 +329,23 @@ rules:
     co_owners: [business]
     paths: [site/assets/fonts/*.woff2]
 
+  # Capability programme (M64, docs/WORKED_EXAMPLES.md): the Knowledge PR
+  # lists in the qa-evidence, legal-compliance and verification-lead seat files.
+  # A division rule (knowledge/<division>/**) lands with its first document.
+  - team: verification
+    paths:
+      - capability/**
+  - team: eda-platform
+    co_owners: [verification]
+    paths:
+      - examples/**
+      - tests/test_examples_budget.py
+  - team: business
+    lead: legal-compliance
+    co_owners: [verification]
+    paths:
+      - knowledge/**
+
   # Business (legal-compliance leads these).
   - team: business
     lead: legal-compliance
