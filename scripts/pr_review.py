@@ -8,7 +8,8 @@ review runs at a time across the two repositories.
 
 In order, and fail closed at every step (pending or failure, never success):
 
-1. Takes the shared lock (NIRMAAN_REVIEW_STATE_DIR, default ~/.nirmaan/pr-review).
+1. Holds the shared lock (NIRMAAN_REVIEW_STATE_DIR, default ~/.nirmaan/pr-review)
+   only around each model call; held elsewhere at a call, the run ends busy.
 2. Reads the pull request: open, targets main, a branch in this repository,
    an allowed author. Otherwise it refuses and posts nothing.
 3. Fetches main and the head, checks the fetched head is the pull request's
@@ -155,6 +156,14 @@ PROXY_VERDICT_SCHEMA = {
 
 class HeadMoved(Exception):
     pass
+
+
+class LockBusy(Exception):
+    """The shared lock is held elsewhere when a model call is due."""
+
+    def __init__(self, holder):
+        super().__init__("another review holds the lock")
+        self.holder = holder
 
 
 # --- Spec sections ----------------------------------------------------------------
@@ -610,13 +619,14 @@ def short(text: str) -> str:
 OWNERLESS_LOCK_STALE_S = 30 * 60
 
 
-def acquire_lock(state_dir: Path, owner: dict, stale_s: float = OWNERLESS_LOCK_STALE_S):
-    """An atomic mkdir of <state>/review.lock with owner.json inside, written whole
+def acquire_lock(state_dir: Path, owner: dict, stale_s: float = OWNERLESS_LOCK_STALE_S, name: str = "review.lock"):
+    """An atomic mkdir of <state>/<name> (the shared review.lock by default)
+    with owner.json inside, written whole
     (a temporary file renamed inside the lock folder), so a reader never sees half
     of it. A lock whose pid is gone is stale and removed once; so is one with no
     readable owner file older than stale_s. Returns a release function or the holder."""
     state_dir.mkdir(parents=True, exist_ok=True)
-    lock = state_dir / "review.lock"
+    lock = state_dir / name
     for _ in range(2):
         try:
             lock.mkdir()
@@ -882,21 +892,12 @@ def defaults(env=None) -> dict:
 
 def run_review(repo_root, pr: int, github, post: str, claude_bin: str, state_dir: Path, models: dict,
                timeout_s: float, backoff_s: float, config: dict = CONFIG, fresh: bool = False,
-               caller_branch: str | None = None, in_claude_session: bool = False, sleep=time.sleep, out=print,
-               held_lock: bool = False) -> dict:
-    """The whole review. `post` is "app", "dry-run" or "none". The automated loop
-    (scripts/pr_loop.py) passes held_lock=True: it holds the shared lock for the
-    review and the fix round together."""
+               caller_branch: str | None = None, in_claude_session: bool = False, sleep=time.sleep, out=print) -> dict:
+    """The whole review. `post` is "app", "dry-run" or "none". The shared lock
+    is held only around each model call: when it is held elsewhere at a call, the run ends
+    with EXIT_BUSY, and the next run reuses the verdicts already cached."""
     cfg = config
     state_dir = Path(state_dir)
-    if held_lock:
-        release, holder = (lambda: None), None
-    else:
-        release, holder = acquire_lock(state_dir, {"repo": cfg["repo"], "pr": pr})
-    if release is None:
-        who = f"{holder.get('repo')} #{holder.get('pr')}, pid {holder.get('pid')}" if holder else "unknown holder"
-        out(f"pr-review: another review is running ({who}). Try again when it finishes.")
-        return {"exit": EXIT_BUSY}
     worktrees: list[str] = []
     roots: list[Path] = []
     posted: list[dict] = []
@@ -906,6 +907,11 @@ def run_review(repo_root, pr: int, github, post: str, claude_bin: str, state_dir
     except HeadMoved as exc:
         out(f"pr-review: {exc}. Nothing more was posted; run again on the new head.")
         return {"exit": EXIT_HEAD_MOVED, "posted": posted}
+    except LockBusy as exc:
+        holder = exc.holder
+        who = f"{holder.get('repo')} #{holder.get('pr')}, pid {holder.get('pid')}" if holder else "unknown holder"
+        out(f"pr-review: another review holds the lock ({who}). Try again when it finishes; verdicts so far are cached.")
+        return {"exit": EXIT_BUSY, "posted": posted}
     finally:
         for d in worktrees:
             try:
@@ -919,7 +925,6 @@ def run_review(repo_root, pr: int, github, post: str, claude_bin: str, state_dir
             _git(repo_root, "worktree", "prune")
         except subprocess.CalledProcessError:
             pass
-        release()
 
 
 def _review(repo_root, pr, github, post, claude_bin, state_dir, models, timeout_s, backoff_s, cfg, fresh,
@@ -1142,7 +1147,14 @@ def _review(repo_root, pr, github, post, claude_bin, state_dir, models, timeout_
         for attempt in (1, 2):
             if attempt == 2:
                 sleep(backoff_s)
-            result = run_once(claude_bin, args, user, head_dir, timeout_s)
+            # The shared lock, only around the model call itself.
+            release, holder = acquire_lock(state_dir, {"repo": cfg["repo"], "pr": pr, "key": key})
+            if release is None:
+                raise LockBusy(holder)
+            try:
+                result = run_once(claude_bin, args, user, head_dir, timeout_s)
+            finally:
+                release()
             log_call(state_dir, {"repo": cfg["repo"], "pr": pr, "head": head, "key": key, "team": team, "model": model,
                                  "reported_model": result.get("reported_model"), "attempt": attempt, "outcome": result["kind"],
                                  "duration_ms": result.get("duration_ms"), **(result.get("tokens") or {}),
