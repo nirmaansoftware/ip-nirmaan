@@ -792,6 +792,31 @@ def test_a_rerun_on_the_same_head_reuses_verdicts(repo):
     assert len(r.calls()) == 4
 
 
+def test_the_call_log_records_each_verdict_its_findings_by_severity_and_the_validation_error(repo):
+    finding = {"file": "src/app.py", "line": 2, "severity": "critical", "text": "x"}
+    r = repo(responses=[{"type": "rate_limit"}, {"type": "verdict", "verdict": "pass", "findings": [finding]}])
+    r.run()
+    first, second = r.log()
+    assert first["outcome"] == "rate_limit" and "verdict" not in first, "a call with no answer has no verdict"
+    assert second["outcome"] == "ok" and second["verdict"] == "fail", "the status the script records (pass with a critical is fail)"
+    assert second["findings"] == {"blocker": 0, "critical": 1, "major": 0, "minor": 0, "info": 0}
+    assert second["validation_error"] is None and second["duration_ms"] is not None
+    r.run()
+    assert r.log()[-1]["outcome"] == "reused" and r.log()[-1]["verdict"] == "fail"
+
+
+@pytest.mark.parametrize("response, error", [
+    ({"type": "result", "text": "Looks fine to me."}, "not valid JSON"),
+    ({"type": "verdict", "verdict": "pass", "findings": [{"file": "src/app.py", "line": 99, "severity": "minor", "text": "x"}]}, "src/app.py:99 does not exist"),
+])
+def test_a_deferred_verdict_logs_its_validation_error_once(repo, response, error):
+    r = repo(responses=[response])
+    r.run()
+    (line,) = r.log()
+    assert line["outcome"] == "ok" and line["verdict"] == "deferred" and line["findings"] is None
+    assert error in line["validation_error"]
+
+
 # --- Units -----------------------------------------------------------------------------------
 
 

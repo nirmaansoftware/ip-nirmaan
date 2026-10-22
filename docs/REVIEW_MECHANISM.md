@@ -174,7 +174,10 @@ the branch checked out. In order:
     head already says the same (a rerun that reused its cached verdicts); the
     comment's marker carries a digest of the result for this.
 11. **Records.** Every model call (tokens, duration, outcome) is logged in
-    `~/.nirmaan/pr-review/calls.jsonl`, outside the repository. Validated
+    `~/.nirmaan/pr-review/calls.jsonl`, outside the repository; an answered
+    call's line also carries the verdict status the script recorded, its
+    findings by severity, and the validation error when it was deferred.
+    Validated
     verdicts are cached per head commit, `main` commit, key, team and lead, so
     re-running after the founder decides a `needs-founder` pull request does
     not call the model again. The
@@ -310,6 +313,21 @@ next step; the review itself always fetches `main` afresh.
 **Records.** Every review call, fixer call and loop step is a line in
 `~/.nirmaan/pr-review/calls.jsonl`; per pull request loop state is in
 `~/.nirmaan/pr-review/loop/`.
+
+**Turnaround (T).** The time from the first head of a pull request whose
+required CI is all green (GitHub's completion time of the last required job,
+the newest run of each counting) to its merge (GitHub's `merged_at`).
+`scripts/turnaround_report.py` prints T for the pull requests merged since a
+date (`--since`, default seven days), split into review calls, fix rounds,
+founder or proxy wait (a stop to the next resume), branch updates, and queue
+and CI (the rest), with founder-class pull requests on their own line and a
+median and 90th percentile for each. It reads GitHub with the gh login and the
+call log, prints to the terminal and writes no file; its figures are internal
+and are not committed, and a target is called met only after a measured
+baseline. For it the loop logs `ci-green-seen` (once per head, with GitHub's CI
+completion time), `verdict-posted` (once the review has posted, with each
+key's status) and `merged` (once, with GitHub's merge time, when a pull
+request the loop finished is no longer open).
 
 **Running it.** On the founder's Mac with the Mac's own `claude` login (the
 plan) and `gh` login: no new spend and no secret in GitHub Actions. Like the
