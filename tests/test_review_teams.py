@@ -445,7 +445,7 @@ def test_composite_triggers_are_sound():
             assert re.search(t["pattern"], t["example"]), f"{m['seat']}: example does not match"
         for r in m.get("ranges", []):
             assert review_map.marker_ranges((ROOT / r["file"]).read_text(encoding="utf-8"), r["begin"], r["end"]), r
-    for rule in COMPOSITE["content_rules"]:
+    for rule in COMPOSITE.get("content_rules", []):
         assert rule["adds"] in teams and rule["lead"] in teams[rule["adds"]]["leads"]
         assert re.search(rule["pattern"], rule["example"])
 

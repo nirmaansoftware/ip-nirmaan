@@ -204,12 +204,9 @@ firmware-only change no longer carries the DFT list, and a DFT bound changed in
 checklist, seat file, loaded checklists, verdict rules) and the rules with the
 head's facts and fence marker last. The verdict adds one entry per loaded
 checklist (name, team, status `pass`, `fail` or `not_applicable`, findings
-with citations) and `export_control` (`yes` or `no`, with cited lines); a
-missing, duplicated or unknown entry or a missing flag defers, a failed
-checklist fails key 1, and entry findings are validated like any finding. A
-`yes` adds founder class `export-control` and sends the head to the founder
-with no further model call (`review/executive` pending, the loop labels
-`needs-founder`) until the founder's own review approves the head. Key 2 gets
+with citations); a missing, duplicated or unknown entry defers, a failed
+checklist fails key 1, and entry findings are validated like any finding.
+Key 2 gets
 the list of loaded checklists and key 1's entries. The cache name and the
 fix-round fingerprint use one fixed key-1 identity (`composite`), so a fix that
 adds an owning team cannot make a repeated finding look new. It is switched on

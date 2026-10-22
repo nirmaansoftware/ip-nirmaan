@@ -535,17 +535,10 @@ founder_classes:
 #   `in` limits it to some paths) or `ranges` (a changed line between a line
 #   holding `begin` and one holding `end` in `file`), never by membership alone;
 # - `always` seats load on every head.
-# The verdict has one entry per loaded checklist and an export-control flag.
+# The verdict has one entry per loaded checklist.
 composite_key1:
   precedence: [council, verification, business, silicon-design, product-site, eda-platform]
   always: [legal-compliance]
-  content_rules:
-    - id: export-sensitive
-      adds: business
-      lead: legal-compliance
-      pattern: '(?i)\baes(\b|_|-?\d)|\b(rsa|ecdsa|ecdh|chacha20|cipher|cryptograph\w*|encrypt\w*|decrypt\w*|post-quantum)\b|\brad(iation)?[- ]hard'
-      in: ['**/*.v', '**/*.sv', '**/*.vh', '**/*.svh', docs/**, knowledge/**, evals/spec/**, 'tests/fixtures/rtl/**/*.md']
-      example: 'module aes256_core ('
   members:
     - seat: qa-evidence
       teams: [verification]

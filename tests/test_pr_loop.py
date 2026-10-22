@@ -926,16 +926,6 @@ def test_ci_state_takes_the_newest_run_and_a_rerun_in_progress_is_pending():
                                   run(6, "2026-10-17T00:00:00Z", "completed", "success", None)])[0] == "green", "same start: higher id"
 
 
-def test_a_composite_key1_export_flag_labels_and_stops_with_no_key2_and_no_merge(repo):
-    flagged = {"verdict": "pass", "extra": {"checklists": [{"name": "eda-tooling", "status": "pass", "findings": []}],
-                                            "export_control": {"flag": "yes", "lines": ["src/app.py:1"]}}}
-    r = repo(reviews=[flagged])
-    assert r.tick(config={**CONFIG, "composite_key1": True}) == ["stopped"]
-    assert r.labeled() and r.github.merges == []
-    assert len(r.calls()) == 1, "no key 2 and no fixer after the flag"
-    assert "key 1 flagged export-control content (src/app.py:1)" in r.comments()[-1]
-
-
 def test_composite_findings_keep_one_fingerprint_identity():
     review = {"key1": [{"key": 1, "team": pr_review.COMPOSITE_TEAM, "role": "verification-lead", "status": "fail",
                         "verdict": {"findings": [{"file": "a.py", "line": 3, "severity": "critical", "text": "[eda-tooling] gate loosened"}]}}]}

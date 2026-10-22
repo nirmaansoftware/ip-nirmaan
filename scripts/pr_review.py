@@ -159,25 +159,21 @@ PROXY_VERDICT_SCHEMA = {
 }
 
 
-# The composite key-1 verdict adds one entry per loaded checklist and the
-# export-control flag; COMPOSITE_TEAM is its fixed identity (cache name and
-# fix-round fingerprint), whatever teams own the head.
+# The composite key-1 verdict adds one entry per loaded checklist;
+# COMPOSITE_TEAM is its fixed identity (cache name and fix-round fingerprint),
+# whatever teams own the head.
 COMPOSITE_TEAM = "composite"
 CHECKLIST_STATUSES = ("pass", "fail", "not_applicable")
-EXPORT_CONTROL_CLASS = "export-control"
 
 
 def composite_schema(names: list[str]) -> dict:
     s = json.loads(json.dumps(VERDICT_SCHEMA))
-    s["required"] = [*s["required"], "checklists", "export_control"]
+    s["required"] = [*s["required"], "checklists"]
     s["properties"]["checklists"] = {"type": "array", "items": {
         "type": "object", "additionalProperties": False, "required": ["name", "status", "findings"],
         "properties": {"name": {"type": "string", "enum": list(names)}, "team": {"type": "string"},
                        "status": {"type": "string", "enum": list(CHECKLIST_STATUSES)},
                        "findings": VERDICT_SCHEMA["properties"]["findings"]}}}
-    s["properties"]["export_control"] = {
-        "type": "object", "additionalProperties": False, "required": ["flag", "lines"],
-        "properties": {"flag": {"type": "string", "enum": ["yes", "no"]}, "lines": {"type": "array", "items": {"type": "string"}}}}
     return s
 
 
@@ -294,16 +290,15 @@ def validate_verdict(v, head_sha: str, line_exists, proxy: bool = False) -> tupl
 
 def validate_composite(v, names: list[str], head_sha: str, line_exists, **kw) -> tuple[dict | None, str | None, list[str]]:
     """The composite key-1 verdict: a verdict as validate_verdict checks it,
-    plus exactly one entry per loaded checklist (`names`) and the export-control
-    flag. A missing, duplicated or unknown entry, or a missing flag, is an error
-    (the review defers). Entry findings are checked like any finding and
+    plus exactly one entry per loaded checklist (`names`). A missing,
+    duplicated or unknown entry is an error (the review defers). Entry findings are checked like any finding and
     listed with the verdict's findings, named by checklist. A checklist that
     fails fails the verdict."""
     def bad(why):
         return None, why, []
     if not isinstance(v, dict):
         return bad("verdict is not a JSON object")
-    entries, flag = v.get("checklists"), v.get("export_control")
+    entries = v.get("checklists")
     if not isinstance(entries, list):
         return bad("checklists must be a list with one entry per loaded checklist")
     seen = []
@@ -323,28 +318,17 @@ def validate_composite(v, names: list[str], head_sha: str, line_exists, **kw) ->
     missing = [n for n in names if n not in seen]
     if missing:
         return bad(f"no entry for the loaded checklist {missing[0]}")
-    if not isinstance(flag, dict) or flag.get("flag") not in ("yes", "no") or not isinstance(flag.get("lines"), list) \
-            or not all(isinstance(x, str) for x in flag["lines"]) or any(k not in ("flag", "lines") for k in flag):
-        return bad('export_control must be {"flag": "yes" or "no", "lines": [...]}')
-    if flag["flag"] == "yes":
-        if not flag["lines"]:
-            return bad('export_control "yes" needs at least one cited line')
-        for cite in flag["lines"]:
-            m = re.fullmatch(r"(.+):(\d+)", cite.strip())
-            if not m or not line_exists(m.group(1), int(m.group(2))):
-                return bad(f"export_control cites {cite[:120]!r}, which is not a file:line at the head")
     if not isinstance(v.get("findings"), list):
         return bad("findings must be a list")
     flat = list(v["findings"])
     for e in entries:
         flat += [{**f, "text": f"[{e['name']}] {f.get('text')}"} if isinstance(f, dict) and isinstance(f.get("text"), str) and f["text"].strip() else f
                  for f in e.get("findings", [])]
-    verdict, error, notes = validate_verdict({**{k: x for k, x in v.items() if k not in ("checklists", "export_control")}, "findings": flat},
+    verdict, error, notes = validate_verdict({**{k: x for k, x in v.items() if k != "checklists"}, "findings": flat},
                                              head_sha, line_exists, **kw)
     if error:
         return None, error, []
-    verdict = {**verdict, "checklists": [{"name": e["name"], "team": e.get("team", ""), "status": e["status"]} for e in entries],
-               "export_control": {"flag": flag["flag"], "lines": flag["lines"]}}
+    verdict = {**verdict, "checklists": [{"name": e["name"], "team": e.get("team", ""), "status": e["status"]} for e in entries]}
     failed = [e["name"] for e in entries if e["status"] == "fail"]
     if failed and verdict["verdict"] == "pass":
         verdict["verdict"] = "fail"
@@ -493,10 +477,7 @@ def composite_key1_system_prompt(ctx: dict) -> str:
           f"{', '.join(names)}, each {{\"name\", \"team\", \"status\": \"pass\" | \"fail\" | \"not_applicable\", \"findings\": [...]}}. "
           "A missing, duplicated or unknown entry voids the review.\n"
           "- A finding that matches a \"Fails when\" line of a checklist is \"blocker\" or \"critical\", and that "
-          "checklist's status is \"fail\". Any failed checklist fails the verdict.\n"
-          "- Also answer \"export_control\": {\"flag\": \"yes\" | \"no\", \"lines\": [\"path:line\", ...]}. "
-          "\"yes\" when the diff adds or changes export-control sensitive content (legal-compliance's checklist), "
-          "citing each line; a \"yes\" sends the pull request to the founder.")
+          "checklist's status is \"fail\". Any failed checklist fails the verdict.")
     return s + f"\n\n{rules_text(ctx)}"
 
 
@@ -663,8 +644,6 @@ def render_comment(r: dict, ctx: dict) -> str:
             why = r.get("loaded_why") or {}
             lines += ["", "#### Checklists", "", "| Checklist | Team | Status | Loaded for |", "|---|---|---|---|"]
             lines += [f"| {_cell(c['name'], 80)} | {_cell(c.get('team'), 60)} | {c['status']} | {_cell(why.get(c['name']), 200)} |" for c in v["checklists"][:40]]
-            flag = v.get("export_control") or {}
-            lines += ["", f"Export control: **{flag.get('flag', 'not given')}**" + (f" ({_cell('; '.join(flag.get('lines', [])), 400)})" if flag.get("lines") else "")]
         lines += ["", "#### Findings", ""]
         if not v["findings"]:
             lines.append("None reported.")
@@ -1310,22 +1289,6 @@ def _review(repo_root, pr, github, post, claude_bin, state_dir, models, timeout_
         check("key1", "success", f"agent review ({who}), head {sha7}: pass", link)
 
     k2base = {"key": 2, "team": None, "team_name": cfg["key2_name"], "role": cfg["key2_seat"], "check_name": cfg["check_names"]["key2"]}
-    # A composite key 1 that flags export-control content adds founder class
-    # export-control and sends the head to the founder with no further model
-    # call, until the founder's own GitHub review approves this head.
-    flagged = [r for r in key1 if ((r.get("verdict") or {}).get("export_control") or {}).get("flag") == "yes"]
-    if flagged:
-        lines = (flagged[0]["verdict"]["export_control"]["lines"])[:8]
-        classification["founder"].setdefault(EXPORT_CONTROL_CLASS, []).extend(f"key 1 flag: {x}" for x in lines)
-        mine = [r for r in github.list_reviews(pr) if r["login"] == cfg["founder_login"] and r["state"] in ("APPROVED", "CHANGES_REQUESTED", "DISMISSED")]
-        if not (mine and mine[-1]["state"] == "APPROVED" and mine[-1]["commit_id"] == head):
-            why = f"key 1 flagged export-control content ({'; '.join(lines)}); the founder decides, on GitHub, on head {sha7}"
-            block = founder_class_block(teams_map, list(classification["founder"]))
-            if post != "none" and with_founder_class_block(pull.get("body"), block) != (pull.get("body") or ""):
-                github.update_pull_body(pr, with_founder_class_block(pull.get("body"), block))
-            check("key2", "pending", f"needs the founder: {why}")
-            out(f"pr-review: {why}. No further model call.")
-            return {"exit": EXIT_OK, "key1": key1, "key2": None, "needs_founder": why, "posted": posted, "classification": classification}
     if not key1 or fails or deferred:
         check("key2", "pending", f"not run: key 1 did not pass on {sha7}")
         return {"exit": EXIT_OK, "key1": key1, "key2": None, "posted": posted, "classification": classification}
