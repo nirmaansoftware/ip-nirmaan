@@ -1,0 +1,12 @@
+{
+  "format": "nirmaan.capability-levels",
+  "not_tool_judged": [],
+  "proven": "No skill is Proven: no product seat run record of delivered work exists yet.",
+  "refused_records": [],
+  "skills": {},
+  "totals": {
+    "knowledge": 0,
+    "practised": 0,
+    "proven": 0
+  }
+}
