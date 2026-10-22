@@ -40,8 +40,8 @@ sense.
 | [founder-proxy](founder-proxy.md) | Agent, not a meeting seat: the third reviewer of founder-class pull requests, under the founder's delegation of 2026-10-18 |
 
 Eighteen seats plus the chair; the Founder Proxy in the last row is an agent,
-not a meeting seat. How each seat will map to one role in the product's
-organization (a seat map, not yet built) is decided in
+not a meeting seat. Each seat maps to one role in the product's organization
+in [`seat-map.yml`](seat-map.yml) ("Seat map" below), as proposed in
 [the 2026-10-18 capability build-out record](records/2026-10-18-capability-buildout.md),
 section 6.
 
