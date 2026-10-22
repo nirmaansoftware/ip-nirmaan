@@ -183,7 +183,7 @@ def test_the_reference_testbench_and_proofs_catch_the_mutants(nirmaan_org, fixed
         assert "simulation failed" in runs[run].summary and "checks failed" in runs[run].summary, runs[run].summary
     assert runs[testbench.runs[0]].succeeded and runs[testbench.runs[0]].params["top"] == "sync_fifo_tb"
     # Every run's inputs are staged inside the sandbox and stay there with its record.
-    stage = tmp_path / "sandbox" / "judge" / "check-1" / "must-fail"
+    stage = tmp_path / "sandbox" / "judge" / "check-1"
     for run in (*testbench.runs, *testbench.failed_runs):
         for source in runs[run].params["sources"]:
             assert Path(source).is_relative_to(stage) and Path(source).is_file(), source
@@ -243,6 +243,17 @@ def test_with_no_sandbox_folder_the_staged_inputs_are_removed():
     assert score.status is ScoreStatus.PASSED and score.summary.endswith("2 of 2 mutants failed it")
     staged = [Path(p) for call in tools.calls for p in call["sources"]]
     assert len(staged) == 3 and not any(p.exists() or p.parent.exists() for p in staged)
+
+
+def test_a_second_run_into_the_same_sandbox_folder_stages_afresh(tmp_path):
+    check = HeldOutCheck(name="mutants fail", scorer="must-fail", tool="simulator.run",
+                         case_files={"sources": (CLEAN,)}, mutants={CLEAN: (OVERFLOW,)})
+    tools = _FakeTools()
+    for _ in range(2):
+        score = scorer_spec("must-fail").fn(ScoreContext(None, None, check, REPO, tools, tmp_path / "check-1"))
+        assert score.status is ScoreStatus.PASSED, score.summary
+    stages = {Path(call["sources"][0]).parent.parent for call in tools.calls}
+    assert len(stages) == 2 and all(s.parent == tmp_path / "check-1" and s.is_dir() for s in stages)
 
 
 def test_a_must_fail_check_with_no_mutant_is_not_run(nirmaan_org, fixed_clock, tmp_path):

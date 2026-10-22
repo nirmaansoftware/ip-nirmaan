@@ -171,7 +171,9 @@ def must_fail(ctx: ScoreContext) -> Score:
                                               f"{' or '.join(kinds)} file")
         entries[param] = entry
     if ctx.work is not None:
-        return _must_fail_runs(ctx, inputs, entries, ctx.work / "must-fail", score)
+        # A fresh folder each time, so a second evaluation into the same sandbox never meets the first one's files.
+        ctx.work.mkdir(parents=True, exist_ok=True)
+        return _must_fail_runs(ctx, inputs, entries, Path(tempfile.mkdtemp(prefix="must-fail-", dir=ctx.work)), score)
     with tempfile.TemporaryDirectory(prefix="nirmaan-must-fail-") as stage:
         return _must_fail_runs(ctx, inputs, entries, Path(stage), score)
 
