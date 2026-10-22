@@ -43,6 +43,18 @@ Fails when:
 - a seat file gives a key to a member seat, or calls a review a sign-off or
   an approval by a person.
 
+On a Knowledge PR (`knowledge/**`, `capability/**`, or a skill card in
+`src/nirmaan/company/skills.py`; rules in `knowledge/README.md`), it also fails
+when:
+- a claim in a knowledge document cites no source from its front matter;
+- a document, card, doc or page states a level (Knowledge, Practised, Proven)
+  that `capability/levels.json`, generated from committed records by
+  `scripts/capability_levels.py`, does not give;
+- `as_of` or `review_by` is missing, or the first body line does not state the
+  tier computed from the skill's tools;
+- a document is over 12,000 characters or a card over 2,000 rendered (the test
+  checks; the reviewer cites the CI job).
+
 ## Never claims
 
 That a claim is true because a doc says so; read the code.

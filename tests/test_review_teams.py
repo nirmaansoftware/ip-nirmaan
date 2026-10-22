@@ -206,6 +206,13 @@ def test_only_the_three_approved_seats_may_wait_for_their_files(teams_map):
         ("tests/fixtures/history_headings.txt", {"eda-platform"}),
         ("site/assets/fonts/archivo.woff2", {"product-site", "business"}),
         ("docs/REVIEW_MECHANISM.md", {"council"}),
+        # The capability programme (M64).
+        ("knowledge/README.md", {"business", "verification"}),
+        ("knowledge/design/sync_fifo_design.md", {"business", "verification"}),
+        ("capability/levels.json", {"verification"}),
+        ("capability/records/knowledge/README.md", {"verification"}),
+        ("examples/rtl_sync_fifo/example.json", {"eda-platform", "verification"}),
+        ("tests/test_examples_budget.py", {"eda-platform", "verification"}),
     ],
 )
 def test_the_council_records_rows(teams_map, path, teams):
@@ -220,6 +227,7 @@ def test_the_lead_is_named_where_a_team_has_two(teams_map):
     assert lead(".github/review-teams.yml") == "security"
     assert lead("CLAUDE.md") == "security"
     assert lead("NOTICE") == "legal-compliance"
+    assert lead("knowledge/README.md") == "legal-compliance"
     assert lead("council/records/2026-10-16-commercial-model-and-design-partners.md") == "finance-licensing"
 
 
