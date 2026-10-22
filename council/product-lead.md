@@ -42,6 +42,11 @@ Fails when:
 - `nirmaan.css`, `site.js` or `hero.js` differ from a named Nirmaan commit;
 - copy breaks voice rules (no hype, no invented customers or numbers).
 
+A finding that matches a line above, or a line of a member's checklist, is a
+blocker. A measured site result names the tool and its version, the URL, the
+date and the head SHA; a pull request that only syncs the vendored files, with
+no other change, may leave every Lighthouse item "not measured".
+
 ## Never claims
 
 That a capability exists when it is planned or CONTRACT_ONLY.
