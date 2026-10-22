@@ -12,7 +12,7 @@ the command and its output are in the appendix, so any reader can reproduce them
 This is a council record, not a decision in the product's sense. A key is an
 agent review, never a person's decision. The founder can overrule any item, and
 the founder items in section 12 wait for the founder (see the note of
-2026-10-20 in section 12 for who reviews them now).
+2026-10-20 in section 12).
 
 Wording note (legal-counsel, tax-accounts): this record says "organisation" and
 "shared services". It does not call IP Nirmaan a separate company or describe a
@@ -599,16 +599,13 @@ proposal, it takes effect only when the founder decides it.
 9. Licence rules for knowledge files (proposed, section 9 item 11).
 
 **Note, 2026-10-20.** The founder's record of that date
-(`council/records/2026-10-20-founder-proxy-widened.md`) widens the delegation
-of 2026-10-18: the Founder Proxy now decides founder-class pull requests except
-new spending, contracts or counsel, and sending, and decides the open founder
-items, naming this record's items 1, 2, 3 and 10 (its numbering predates
-items 7 to 9; there is no item 10). The Proxy's seat file on `main`
-(`council/founder-proxy.md`) still sends contracts or legal counsel and export
-control to the founder. So items 1, 2, 7 and 8, which touch contracts,
-counsel or export control, wait for the founder's own decision; the others go
-to the Founder Proxy under the founder's delegation. The founder delegated
-them; no item above is recorded as decided by the founder.
+(`council/records/2026-10-20-founder-proxy-widened.md`) changes who reviews
+founder-class pull requests and names this record's items 1, 2, 3 and 10 (its
+numbering predates items 7 to 9; there is no item 10). This record does not
+decide which item goes to whom: that follows the founder's records and the
+Proxy's seat file on `main` (`council/founder-proxy.md`). Items that touch
+contracts, counsel or export control (1, 2, 7 and 8) wait for the founder in
+either reading. No item above is recorded as decided.
 
 The founder can overrule any decision in this record.
 
