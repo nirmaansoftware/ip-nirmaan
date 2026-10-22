@@ -140,7 +140,10 @@ the branch checked out. In order:
    job finished without success, both checks are posted as `action_required`
    with the title "CI failed on <sha>; review not run" (terminal, and never
    green: a required check is satisfied only by success, neutral or skipped).
-   No model is called in either case.
+   No model is called in either case. A diff of `main...head` over 200,000
+   bytes is not reviewed either: both checks stay pending with "review not
+   run: ... split the pull request". The reviewers always get the whole diff,
+   never a cut one (the one shape rule that stops a review).
 6. **Key 1, then key 2.** Key 1 is one fresh `claude -p` process per owning
    team lead: the base checklist, the lead's seat file and the "In a review"
    sections of the team's members. Key 2 runs only when every key 1 passed:
@@ -256,7 +259,11 @@ requests labelled `hold` or `needs-founder` are skipped.
    depends on the wording of a gh error: when the setting cannot be read, or
    `gh pr merge --auto` fails for any reason, the loop stops with
    `needs-founder`.
-5. **A key or the Founder Proxy fails.** The loop starts a **fixer**: a separate, fresh `claude -p`
+5. **A key or the Founder Proxy fails.** When a finding to fix is on a path
+   the fixer may not change (step 6), the fixer does not run: the loop labels
+   the pull request `author-fix` and lists the findings, and waits for the
+   author's next head, which clears the label and is reviewed from scratch.
+   Otherwise the loop starts a **fixer**: a separate, fresh `claude -p`
    process, never a reviewer process and never the session that reviewed. It
    runs in a clean worktree of the head with Read, Grep, Glob, Edit and Write
    allowed only inside that worktree; no shell, network, MCP or token. Its task
@@ -284,11 +291,23 @@ requests labelled `hold` or `needs-founder` are skipped.
 7. **Again from scratch.** The new head voids both keys, so the next step waits
    for CI on it and runs both reviews again.
 
+**Shape rules.** After a review, the loop comments once on the soft shape
+rules a pull request breaks, each named, and again only when that list
+changes: one owning team per pull request where possible; founder-class paths
+not mixed with ordinary paths; mechanical renames (a rename with no content
+change) not mixed with other changes; and a soft cap of 400 changed lines
+outside `tests/fixtures/**` (`shape_soft_cap_lines` and `shape_uncounted` in
+`LOOP`). They never stop the loop. Generated files are not detected (nothing
+marks them in this repository), and stacked pull requests are never reviewed,
+since the loop takes only pull requests to `main`. The one rule that stops a
+review is the size limit above.
+
 **When it stops.** The loop labels the pull request `needs-founder` and
 comments why when: three fix rounds are done and a key still fails; the same
 finding (same key, team, file and wording) fails again after a fix; CI fails
 after a fix; the branch has a merge conflict; a key or the Founder Proxy is
-deferred (rate limit, bad output, missing seat file); the Founder Proxy returns
+deferred (rate limit, bad output, missing seat file), or the diff is over the
+review's size limit; the Founder Proxy returns
 `needs-founder` (until the founder's own review approves the head); the fixer hits a rate limit, gives no valid
 answer, cannot fix every finding or changes nothing; a local check fails; the
 auto-merge setting cannot be read or `gh pr merge --auto` fails; the branch
