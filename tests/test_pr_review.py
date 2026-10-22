@@ -908,12 +908,12 @@ composite_key1:
   precedence: [council, verification, business, silicon-design, product-site, eda-platform]
   always: [legal-compliance]
   content_rules:
-    - id: rtl-licence-header
+    - id: rtl-uart
       adds: business
       lead: legal-compliance
-      pattern: 'SPDX-License-Identifier'
+      pattern: 'module uart'
       in: ['**/*.v']
-      example: '// SPDX-License-Identifier: MIT'
+      example: 'module uart;'
   members:
     - seat: qa-evidence
       teams: [verification]
@@ -1032,13 +1032,13 @@ def test_composite_entry_findings_are_named_by_checklist(repo):
 def test_composite_triggers_a_member_by_content_and_adds_a_team_by_a_composite_rule(repo):
     def change(w):
         write(w, "src/app.py", 'bounds=(at_least("test_coverage", 85),)\n')
-        write(w, "rtl/uart.v", "// SPDX-License-Identifier: MIT\nmodule uart;\nendmodule\n")
+        write(w, "rtl/uart.v", "module uart;\nendmodule\n")
     loaded = ["legal-compliance", "eda-tooling", "dft-engineer"]
     r = repo(responses=[composite_verdict(loaded)], change=change, main_extra=composite_main)
     result = r.run(config=COMPOSITE)
     k1 = system_prompt(r.calls()[0])
     assert "SEAT-MARKER-legal-compliance" in k1, "Business comes before EDA and Platform: legal-compliance speaks"
-    assert "loaded for: content rtl-licence-header in rtl/uart.v" in k1
+    assert "loaded for: content rtl-uart in rtl/uart.v" in k1
     assert "### Checklist: dft-engineer (member, team none; loaded for: content in src/app.py)" in k1
     assert result["key1"][0]["loaded"] == loaded
 

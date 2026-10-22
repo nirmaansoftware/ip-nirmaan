@@ -461,7 +461,8 @@ def test_firmware_and_physical_design_triggers():
     irq = _plan("src/nirmaan/company/workflows.py", 'params=(("require_irq", "yes"),), when=(when("interrupts"),)),',
                 'params=(("require_irq", "auto"),), when=(when("interrupts"),)),')
     assert "firmware-engineer" in _loaded(irq) and "dft-engineer" not in _loaded(irq)
-    pd = _plan(".github/workflows/ci.yml", "NIRMAAN_REQUIRE_EDA: yosys openroad sta klayout", "NIRMAAN_REQUIRE_EDA: yosys openroad sta")
+    pd = _plan(".github/workflows/ci.yml", "python -m pytest -q -rs tests/test_nirmaan_physical.py tests/test_nirmaan_sta_antecedents.py",
+               "python -m pytest -q -rs tests/test_nirmaan_physical.py")
     assert "physical-design-engineer" in _loaded(pd)
     fw = _plan("tests/fixtures/fw/apb_regs/apb_regs_map.h", "#define APB_REGS_REG3_OFFSET 0xCu", "#define APB_REGS_REG3_OFFSET 0x10u")
     assert "firmware-engineer" in _loaded(fw) and "dft-engineer" not in _loaded(fw) and "physical-design-engineer" not in _loaded(fw), \
