@@ -74,6 +74,71 @@ delegation of 2026-10-18. It is not the founder: what only the founder decides
 clients, any sending, and the review system's own gates) it sends to the
 founder as `needs-founder`.
 
+## Seat map
+
+[`seat-map.yml`](seat-map.yml) maps each seat to one role in the product's
+modelled company (`src/nirmaan/company/org_chart.py`) or to a shared role
+(legal, legal counsel, tax and accounts, which serve both organisations and
+report to the founder). Proposed in the capability build-out council record
+of 2026-10-18 (sections 5 and 6; pull request #118, not merged), whose open
+items the founder's record
+[2026-10-20: Founder Proxy widened](records/2026-10-20-founder-proxy-widened.md)
+hands to the Founder Proxy; this map
+leaves out CODEOWNERS (removed by #113) and makes a derived key 2 that would be
+the founder, or would report to the founder, the chair. The chart itself names no seat or vote.
+
+- One seat, one role; no role holds two seats. `legal-compliance` is the shared
+  legal role, never the Quality "Compliance" practice.
+- A key-1 lead holds a role that heads a unit. `covers` lists units a seat
+  reviews until a seat inside each holds key 1 there.
+- Deputies are not in the map yet: they would hold key 1 after an
+  infrastructure failure, so they come with the script change that uses them,
+  together with the seat files that then hold that key.
+- The Founder Proxy is unplaced: where the chart records it is the founder's
+  decision.
+- Each team in `.github/review-teams.yml` stores `unit:` and `key2:`, derived
+  from this map and the chart and checked by `tests/test_seat_map.py`. A derived
+  key 2 that would be the founder or report to the founder is the chair, and
+  today every `key2` is `chair`. Nothing that picks a reviewer reads this map or
+  the chart: the review script reads only `.github/review-teams.yml` on `main`,
+  and key 2 is its constant, the chair. Moving any `key2` off the chair, or
+  having the script read these values, is a separate founder-class pull
+  request.
+
+### Practice leads (key 1, no vote)
+
+A practice lead holds key 1 on its unit's paths and is asked for owner facts in
+a meeting; it gives no round-1 position. None is seated yet: practice leads are
+added in the founder-class hiring pull request at the start of their wave.
+
+| Seat | Role | Key-1 paths |
+|---|---|---|
+| (none yet) | | |
+
+A practice lead's seat file has the same shape as the other seat files:
+
+```
+---
+slug: <seat>
+role: <title>
+reviewed_by: chair
+permissions: read only (a seat never changes the repository)
+---
+
+# <Title>
+
+## Mission
+## Expertise
+## Reads first
+## In a review (key 1, <team>, practice lead)
+<its unit's paths; the base checklist first; then "Fails when:" items>
+## Never claims
+## In a meeting
+<owner facts only, when the chair asks; no round-1 position and no vote>
+```
+
+Its row goes in the table above and its entry in `seat-map.yml` (`vote: no`).
+
 ## When to call a meeting
 
 Pricing, launching or naming, anything that goes on ip.nirmaan.online, a legal
@@ -112,16 +177,23 @@ costs or effort estimates.
 
 The council decides; the founder can overrule, and the record says so. These
 always wait for the founder: signing a contract, spending money (including
-legal counsel), and changing a public name.
+legal counsel), and turning on any sending
+([the founder's record of 2026-10-20](records/2026-10-20-founder-proxy-widened.md));
+the Founder Proxy's seat file also keeps export control for the founder.
 
 Merging follows the two-key review (Teams, above; `docs/REVIEW_MECHANISM.md`):
 a pull request merges by itself once CI and both keys pass, unless it is in
 one of the six founder classes (control plane, gate semantics, licence and
 third-party, commercial, public names and claims, export-control sensitive
-content; council record 2026-10-17, section 2). Those also wait for the
-founder's own approval on GitHub. Publishing is not a class of
-its own: a change to ip.nirmaan.online waits for the founder when it is in one
-of the six, for example a new public claim or name.
+content; council record 2026-10-17, section 2). Those also get the Founder
+Proxy (agent, [founder-proxy.md](founder-proxy.md)) after key 2, under the
+founder's delegation ([record of 2026-10-18](records/2026-10-18-founder-proxy.md),
+widened by the [record of 2026-10-20](records/2026-10-20-founder-proxy-widened.md)). The
+proxy is not the founder and never approves for the founder: what its seat
+file reserves for the founder it returns as `needs-founder`, and that pull
+request waits for the founder's own approval of its head on GitHub. Publishing
+is not a class of its own: a change to ip.nirmaan.online goes to the proxy
+when it is in one of the six, for example a new public claim or name.
 
 To run a meeting in a Claude Code session, ask for one; the `council-meeting`
 skill (`.claude/skills/council-meeting/`) follows this page.
