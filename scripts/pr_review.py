@@ -197,10 +197,46 @@ def parse_verdict_text(text: str) -> dict:
     return value
 
 
-def validate_verdict(v, head_sha: str, line_exists, proxy: bool = False) -> tuple[dict | None, str | None, list[str]]:
+class CitationError(str):
+    """A validation error that is only a bad citation on a major, critical or
+    blocker finding: the script asks the same reviewer once to repair it."""
+
+
+# Severities whose bad citation is dropped with a note (the verdict stands);
+# a bad citation on any other severity gets one repair, then defers.
+DROPPABLE = ("minor", "info")
+MAIN_PREFIX = "main:"
+
+
+def cited_path(file: str, prefixes: dict | None = None) -> str:
+    """A cited path with a reviewer worktree prefix taken off: the head
+    checkout's prefix gives the repository-relative path, the main checkout's
+    gives "main:<path>"."""
+    for prefix, to in (prefixes or {}).items():
+        if prefix and file.startswith(prefix.rstrip("/") + "/"):
+            return to + file[len(prefix.rstrip("/")) + 1:]
+    return file
+
+
+def citation_error(file: str, line: int, line_exists) -> str | None:
+    """Why a finding's citation is bad, or None. "main:<path>" cites main."""
+    path = file[len(MAIN_PREFIX):] if file.startswith(MAIN_PREFIX) else file
+    if not path or path.startswith("/") or ".." in path.split("/") or "\\" in path:
+        return f"{file} is not a repository-relative path"
+    if not line_exists(file, line):
+        return f"cited {file}:{line} does not exist " + ("on main" if file.startswith(MAIN_PREFIX) else "at the head or on main")
+    return None
+
+
+def validate_verdict(v, head_sha: str, line_exists, proxy: bool = False,
+                     prefixes: dict | None = None) -> tuple[dict | None, str | None, list[str]]:
     """(verdict, None, notes) when valid, else (None, error, []). `proxy`
     validates the Founder Proxy's verdict, which may also be "needs-founder"
-    (with at least one reason)."""
+    (with at least one reason). A worktree prefix on a cited path is taken off
+    (`prefixes`); a minor or info finding with a bad citation is dropped with a
+    note and the verdict stands; a bad citation on a more severe finding is a
+    CitationError (the caller repairs it once). Dropping never changes the
+    verdict: it never turns a fail into a pass."""
     def bad(why):
         return None, why, []
     if not isinstance(v, dict):
@@ -238,6 +274,7 @@ def validate_verdict(v, head_sha: str, line_exists, proxy: bool = False) -> tupl
         if not isinstance(c, dict) or not isinstance(c.get("claim"), str) or not isinstance(c.get("citation"), str) \
                 or c.get("verdict") not in ("supported", "unsupported", "not_checked"):
             return bad(f"claim {i} is malformed")
+    kept, notes, severe = [], [], []
     for i, f in enumerate(v["findings"], 1):
         where = f"finding {i}"
         if not isinstance(f, dict):
@@ -251,13 +288,18 @@ def validate_verdict(v, head_sha: str, line_exists, proxy: bool = False) -> tupl
             return bad(f"{where}: severity must be one of {', '.join(SEVERITIES)}")
         if not isinstance(f.get("text"), str) or not f["text"].strip():
             return bad(f"{where}: text missing")
-        if file.startswith("/") or ".." in file.split("/") or "\\" in file:
-            return bad(f"{where}: file must be a repository-relative path")
-        if not line_exists(file, line):
-            return bad(f"{where}: cited {file}:{line} does not exist at the head")
-    notes = []
-    verdict = dict(v)
-    if verdict["verdict"] == "pass" and any(f["severity"] in ("blocker", "critical") for f in v["findings"]):
+        f = {**f, "file": cited_path(file, prefixes)}
+        why = citation_error(f["file"], line, line_exists)
+        if why is None:
+            kept.append(f)
+        elif f["severity"] in DROPPABLE:
+            notes.append(f"Dropped a {f['severity']} finding whose citation is bad ({why}): {f['text'][:200]}")
+        else:
+            severe.append(f"{where} ({f['severity']}): {why}")
+    if severe:
+        return None, CitationError("; ".join(severe)), []
+    verdict = {**v, "findings": kept}
+    if verdict["verdict"] == "pass" and any(f["severity"] in ("blocker", "critical") for f in verdict["findings"]):
         verdict["verdict"] = "fail"
         notes.append("The reviewer said pass but listed a blocker or critical finding; the script records fail.")
     return verdict, None, notes
@@ -1033,8 +1075,20 @@ def _review(repo_root, pr, github, post, claude_bin, state_dir, models, timeout_
     deleted = {f["path"] for f in files if f["status"] == "D"} | {f["old"] for f in files if f["old"]}
     counts: dict[str, int] = {}
 
+    tracked_main = set(p for p in _git(repo_root, "ls-tree", "-r", "--name-only", "-z", main_sha).split("\0") if p)
+    # A path cited with a reviewer worktree prefix (the head or main checkout).
+    prefixes = {head_dir: "", main_dir: MAIN_PREFIX}
+
     def line_exists(path, line):
-        ref = head if path in tracked_head else base_sha if path in deleted else None
+        """At the head; at the base for a file the pull request deletes; on
+        main for "main:<path>", or for a path not at the head that is on main
+        (reviewers have main for comparison)."""
+        if path.startswith(MAIN_PREFIX):
+            path = path[len(MAIN_PREFIX):]
+            ref = main_sha if path in tracked_main else None
+        else:
+            ref = (head if path in tracked_head else base_sha if path in deleted else
+                   main_sha if path in tracked_main else None)
         if ref is None:
             return False
         key = f"{ref}:{path}"
@@ -1090,8 +1144,33 @@ def _review(repo_root, pr, github, post, claude_bin, state_dir, models, timeout_
             value = result["structured"] if result.get("structured") is not None else parse_verdict_text(result["text"])
         except ValueError as exc:
             return {"status": "deferred", "reason": f"the reviewer's output is not valid JSON ({exc})", "model": model}
-        verdict, error, notes = validate_verdict(value, head, line_exists, proxy=proxy)
-        if error:
+        verdict, error, notes = validate_verdict(value, head, line_exists, proxy=proxy, prefixes=prefixes)
+        if isinstance(error, CitationError):
+            # One repair of the same verdict, with the error shown; it never
+            # passes a verdict that was not a pass, and a second bad citation
+            # defers.
+            asked = value.get("verdict")
+            repair_user = (user + "\n\n# Your answer failed the script's citation check\n\n"
+                           f"{error}\n\nReturn the same verdict (\"{asked}\") as ONE JSON object, with every finding citing a "
+                           "file and line that exist at the head commit (or \"main:<path>\" for a line on main). Change nothing else.")
+            result = run_once(claude_bin, args, repair_user, head_dir, timeout_s)
+            log_call(state_dir, {"repo": cfg["repo"], "pr": pr, "head": head, "key": key, "team": team, "model": model,
+                                 "reported_model": result.get("reported_model"), "attempt": "repair", "outcome": result["kind"],
+                                 "duration_ms": result.get("duration_ms"), **(result.get("tokens") or {}),
+                                 "prompt_chars": len(system) + len(repair_user), "repairs": str(error)[:300]})
+            if result["kind"] != "ok":
+                return {"status": "deferred", "reason": f"the verdict failed validation: {error}; the repair failed ({result['kind']})", "model": model}
+            try:
+                value = result["structured"] if result.get("structured") is not None else parse_verdict_text(result["text"])
+            except ValueError as exc:
+                return {"status": "deferred", "reason": f"the verdict failed validation: {error}; the repair is not valid JSON ({exc})", "model": model}
+            verdict, error2, notes = validate_verdict(value, head, line_exists, proxy=proxy, prefixes=prefixes)
+            if error2:
+                return {"status": "deferred", "reason": f"the verdict failed validation after one repair: {error2}", "model": model}
+            if value.get("verdict") != asked:
+                return {"status": "deferred", "reason": f"the citation repair changed the verdict from \"{asked}\" to \"{value.get('verdict')}\"", "model": model}
+            notes = [f"One citation repair: {str(error)[:300]}"] + notes
+        elif error:
             return {"status": "deferred", "reason": f"the verdict failed validation: {error}", "model": model}
         done = {"status": verdict["verdict"], "verdict": verdict, "notes": notes, "model": result.get("reported_model") or model}
         cache_dir.mkdir(parents=True, exist_ok=True)
