@@ -603,9 +603,9 @@ proposal, it takes effect only when the founder decides it.
 founder-class pull requests and names this record's items 1, 2, 3 and 10 (its
 numbering predates items 7 to 9; there is no item 10). This record does not
 decide which item goes to whom: that follows the founder's records and the
-Proxy's seat file on `main` (`council/founder-proxy.md`). Items that touch
-contracts, counsel or export control (1, 2, 7 and 8) wait for the founder in
-either reading. No item above is recorded as decided.
+Proxy's seat file on `main` (`council/founder-proxy.md`). Every item above
+waits for the founder's own decision unless those files say otherwise. No item
+above is recorded as decided.
 
 The founder can overrule any decision in this record.
 
