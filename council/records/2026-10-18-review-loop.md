@@ -137,7 +137,9 @@ design-architect, qa-evidence, physical-design-engineer, others.
 the strongest model that loads the chair's seat file and
 `council/founder-proxy.md` from `main`, and returns pass, fail or
 needs-founder with one line per reason. Every comment keeps the wording "acting
-under the founder's delegation of 2026-10-18; not the founder".
+under the founder's delegation of 2026-10-18; not the founder". (Note,
+2026-10-20: the Proxy's seat file on `main` now says "acting under the
+founder's delegation of 2026-10-20".)
 
 **This meeting cannot make that change.** legal-counsel: the founder delegated a
 "third-reviewer role"; folding it changes what was delegated, and the proxy's
@@ -184,7 +186,9 @@ qa-evidence).
 - **`council/README.md`** "What stays with the founder" still says founder-class
   pull requests wait for the founder's own approval on GitHub, which no longer
   matches the live proxy (legal-counsel). It is corrected to describe the proxy
-  and the floor.
+  and the floor. (Note, 2026-10-20: `council/README.md` on `main` now
+  describes the Founder Proxy and the founder's widening of that date; the
+  floor is withdrawn.)
 
 **Disagreed.** partnerships wanted the proxy kept as a separate gate; its
 concern (partner claims escaping) is met by the wider item, not by a third call.
@@ -333,14 +337,16 @@ as trigger data. The full list is in the work items.
 
 (Note, 2026-10-19: "#117 amended" is done in the sense of the note under
 decision 7: #117 merged with the carry-over removed, so work item R1 has no
-remaining code change. The founder floor is next in the series.)
+remaining code change. The founder floor is next in the series.) (Note,
+2026-10-20: the founder's record of that date withdraws the founder floor, so
+it is not built.)
 
 ## Gates
 
 | Gate | Owner seat |
 |---|---|
 | #117 carry-over uses exact diff bytes, never on Verification-owned or class A heads, void on licence-file changes (2026-10-19: met by removal; #117 merged with no carry-over) | security (eda-tooling implements) |
-| Floor returns needs-founder on every listed path with no model deciding | security |
+| Floor returns needs-founder on every listed path with no model deciding (2026-10-20: withdrawn by the founder's record of that date) | security |
 | T defined, measured from GitHub and the call log, baseline before any target is called met | product-lead |
 | Lock free during fixer and local tests, in both repositories | eda-tooling |
 | No path from a bad citation to a pass | qa-evidence |
@@ -369,7 +375,8 @@ These wait for the founder's own decision; the council does not make them.
    founder-class P1 PRs"): whether it means the founder or the proxy.
 6. Every pull request in the work items that touches the review machinery will
    wait for the founder's own approval once the floor is live, and the proxy
-   already reserves most of them today.
+   already reserves most of them today. (Note, 2026-10-20: the floor is
+   withdrawn; see "The founder's answers".)
 7. **The export-control flag** (decision 1, item 5): export control waits for
    the founder and for counsel's scope.
 
@@ -401,13 +408,15 @@ The items under "For the founder" are the founder's to decide and to record.
 This council record does not record the founder's answers.
 
 **Note, 2026-10-20.** The founder's record of that date
-(`council/records/2026-10-20-founder-proxy-widened.md`) widens the delegation
-of 2026-10-18: the Founder Proxy now decides founder-class pull requests except
-new spending, contracts or counsel, and sending; it decides the open founder
-items; and the founder floor is withdrawn. The Proxy's seat file on `main`
-(`council/founder-proxy.md`) also still sends export control to the founder,
-and fails a change that weakens a review gate. Read with that record, the
-items under "For the founder" go to the Founder Proxy under the founder's
-delegation, except item 7 (export control), which waits for the founder. The
-founder delegated them; this record records no answer from the founder and
-does not say the founder decided them.
+(`council/records/2026-10-20-founder-proxy-widened.md`) says that the Founder
+Proxy now decides founder-class pull requests except new spending,
+contracts/counsel and sending; that it decides the open founder items
+(capability record items 1, 2, 3, 10 and the #128 reading); and that the
+founder floor is withdrawn. It names none of the items under "For the founder"
+in this record. The Proxy's seat file on `main` (`council/founder-proxy.md`)
+also sends export control to the founder and fails a change that weakens a
+review gate. The council's reading, resting only on the first clause: a
+founder-class pull request that carries one of the items under "For the
+founder" is reviewed by the Founder Proxy, and waits for the founder where it
+adds spending, touches contracts, counsel or export control, or turns on
+sending. This record records no answer from the founder to any item.
