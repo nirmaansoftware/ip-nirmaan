@@ -113,6 +113,7 @@ The original preface of the section:
 - [M60-span-validator](M60-span-validator.md): Milestone 60 - Span, depth and activation rules become a check
 - [M61-knowledge-packet](M61-knowledge-packet.md): Milestone 61 - Knowledge documents in the work packet: a cited document's text reaches the seat, within a budget, or the seat declines
 - [M62-knowledge-file-checks](M62-knowledge-file-checks.md): Milestone 62 - Knowledge file schema and checks: every knowledge document and skill card is checked before the first is written
+- [M63-evidence-levels](M63-evidence-levels.md): Milestone 63 - Evidence levels: Knowledge, Practised and Proven only from committed records, zero of each on main
 
 ## Before M43
 

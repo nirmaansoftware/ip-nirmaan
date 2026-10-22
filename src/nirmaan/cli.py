@@ -1245,6 +1245,7 @@ def eval_rejudge(
     record: Path = typer.Argument(..., help="A run record directory."),
     cases: Path = CASES_OPTION,
     repo: Path = typer.Option(Path("."), "--repo", help="Root that case file paths are relative to."),
+    write: bool = typer.Option(False, "--write", help="Also write rejudge.json into the record (M63)."),
 ) -> None:
     """Replay a record's answers through the real gates and judges; exits 1 when any verdict differs."""
     from nirmaan.evals import EvalError, load_record, rejudge
@@ -1265,6 +1266,10 @@ def eval_rejudge(
             console.print(escape(f"DIFFERS {head}: {'; '.join(o.differences)}"), highlight=False, soft_wrap=True)
     same = sum(o.same for o in outcomes)
     console.print(f"{same} of {len(outcomes)} trials reproduced", highlight=False)
+    if write:  # M63: the re-judge an evidence level needs, committed with the record
+        from nirmaan.evals.levels import write_rejudge
+
+        console.print(f"wrote {write_rejudge(record, loaded.manifest.id, outcomes)}", highlight=False)
     if same != len(outcomes):
         raise typer.Exit(1)
 
