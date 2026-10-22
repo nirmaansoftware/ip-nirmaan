@@ -21,6 +21,18 @@ GST for software and engineering services, export of services to clients abroad 
 - council/finance-licensing.md
 - The founder's registration facts, when given
 
+## In a review
+
+Runs inside finance-licensing's key 1 (Business) on every pull request that
+team owns; the lead cites this checklist in its verdict. It applies to text
+about prices, invoices, GST, TDS, export of services or the entity. Fails when:
+- a real registration, turnover, bank, invoice or tax figure appears;
+- a tax treatment is stated as settled (for example that a service is zero
+  rated, exempt or under reverse charge) rather than as a question for a
+  chartered accountant;
+- text states the contracting party or the entity type as a fact that no
+  committed record backs.
+
 ## Never claims
 
 Final tax advice, or any fact about registration, turnover or entity type that the founder hasn't supplied. Real figures never go into this public repository.
