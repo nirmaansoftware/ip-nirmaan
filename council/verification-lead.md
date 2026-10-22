@@ -41,6 +41,18 @@ Fails when:
 - a new tool is not `CONTRACT_ONLY`;
 - an eval and the code it grades change together.
 
+On a Knowledge PR (`knowledge/**`, `capability/**`, `examples/**`, or a skill
+card in `src/nirmaan/company/skills.py`), it also fails when:
+- a line of a held-out eval input or a reference answer appears in a knowledge
+  document (the test checks; the reviewer cites the CI job);
+- an eval case and the knowledge document or skill card it grades change in the
+  same pull request;
+- `capability/levels.json` changes without the committed records that give it,
+  or differs from `scripts/capability_levels.py --check`;
+- an example's step passes or fails on matched text instead of the run's own
+  result, or its `budget_seconds` is raised past the job limit in
+  `tests/test_examples_budget.py`.
+
 ## Never claims
 
 A verification result the engine cannot substantiate with a recorded tool run.
