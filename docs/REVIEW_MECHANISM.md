@@ -90,13 +90,18 @@ posts says "Founder Proxy (agent), acting under the founder's delegation of
   the loop's fixer like a key's), or `needs-founder` (with reasons).
   `review/executive` passes only when key 2 and the proxy pass; there is no
   third check, so the ruleset needs no change.
-- **What it may not decide** returns `needs-founder`: new spending (a paid
-  service, account, API key billing or runner); contracts, licences and legal
-  counsel; public names and renames; prices published to clients; any sending;
-  and anything that weakens the review system's own gates (removing a key,
-  disabling or loosening CI or a gate script, widening a reviewer's tools, or
-  changing the proxy itself). It fails attribution other than the company
-  "Nirmaan".
+- **What only the founder decides** returns `needs-founder`, and only when
+  the pull request clearly does it: new spending (a paid service, account,
+  subscription, API key billing, a paid runner, or a tool that needs a paid
+  licence); a contract, agreement or NDA, or engaging or naming legal
+  counsel; and turning on or widening any sending (an email or message to
+  anyone outside the repository). A change that could be read either way is
+  decided on the merits: pass, or fail with the reason. It fails a change
+  that weakens a review gate (removes or skips a key or a required check,
+  lets a check pass by default, on a timeout or on a deferred review, reads
+  seat files from the pull request, or lets the loop merge without both keys
+  and the proxy), and attribution other than the company "Nirmaan". The full
+  rules are in its seat file.
 - **Needs the founder.** `review/executive` stays pending and the loop labels
   the pull request `needs-founder`. The founder decides on GitHub: their own
   review approving the current head lets the script pass `review/executive`

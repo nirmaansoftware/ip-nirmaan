@@ -49,5 +49,6 @@ Apply the decisions, then have the owning seat verify before anything ships.
 Contracts, spending money, legal counsel and public names. Report and ask; if
 the founder overrules, record it. Merging follows the two-key review: a pull
 request in one of the six founder classes (`council/README.md`, "What stays
-with the founder") also waits for the founder's approval; any other merges
-once CI and both keys pass.
+with the founder") also waits for the founder's approval only when the Founder
+Proxy (agent) returns `needs-founder`; any other merges once CI and both keys
+(and, for a founder class, the proxy) pass.
