@@ -28,10 +28,8 @@
 #
 # Each team's `unit:` and `key2:` are derived values, stored here and checked
 # by tests/test_seat_map.py against council/seat-map.yml and the built
-# organization (capability build-out council record 2026-10-18, section 5,
-# proposed in pull request #118; the founder's record
-# council/records/2026-10-20-founder-proxy-widened.md hands its open items to
-# the Founder Proxy). `unit:` is the lowest common
+# organization (council/records/2026-10-18-capability-buildout.md, section
+# 5). `unit:` is the lowest common
 # unit of the team's lead seats' roles and their interim covers, or `shared`
 # when a lead holds a shared-services role. `key2:` is the nearest seat above
 # that unit with a key-2 checklist and a passed seeded-defect set that holds no
@@ -429,6 +427,33 @@ content_rules:
     pattern: '\b(max|min)_[a-z0-9_]+\b|\bwhen_produced\b|_fail\.v\b|\bNIRMAAN_REQUIRE_EDA\b'
     in: [src/**, evals/**, tests/fixtures/**, .github/**]
     example: 'max_unannotated_nets=0'
+  # The four below route what the Founder Proxy checks (council/founder-proxy.md)
+  # to the key 1 that holds its checklist: export control, sending outside the
+  # repository, and a person named as author, copyright holder or contact
+  # (legal-compliance: export control, customer data, notices). Each also
+  # raises a founder class, below.
+  - id: export-sensitive
+    adds: business
+    lead: legal-compliance
+    pattern: '\b(AES|DES|3DES|RSA|SM4|ECDSA|ECDH|ML-KEM|ML-DSA)\b|(?i:\b(aes(128|192|256)?_\w+|aes-?(128|192|256)|chacha20|poly1305|camellia|twofish|blowfish|kyber|dilithium|block cipher|stream cipher|encryption (core|engine|block)|key expansion|export[- ]control(s|led)?|dual[- ]use|ECCN|EAR99|ITAR|SCOMET|5[AD]002)\b)'
+    in: [src/**, tests/**, evals/**, examples/**, scripts/**, docs/**, site/**, README.md]
+    example: '// AES-256 encryption core: 14 rounds, full key expansion'
+  - id: outbound-sending
+    adds: business
+    lead: legal-compliance
+    pattern: '(?i)\b(smtplib|smtp(_ssl)?|sendmail|send_message|send_email|send_raw_email|emailmessage|mimetext|mimemultipart|nodemailer|sendgrid|mailgun|postmark|twilio)\b|hooks\.slack\.com|chat\.postMessage|api\.telegram\.org|discord(app)?\.com/api/webhooks|api\.resend\.com'
+    example: '    with smtplib.SMTP_SSL(host) as smtp:'
+  - id: person-attribution
+    adds: business
+    lead: legal-compliance
+    pattern: '\b[Cc]opyright\s+(\([Cc]\)\s*|©\s*)?[A-Z]|©|__author__|@author\b|(?<![\w.+-])(?!nirmaansoftware@)[\w.+-]+@(gmail|googlemail|yahoo|outlook|hotmail|live|proton|protonmail|icloud|rediffmail)\.'
+    example: 'Copyright Example Person'
+  - id: package-author
+    adds: business
+    lead: legal-compliance
+    pattern: '^\s*(authors|maintainers)\s*=|^\s*\{\s*name\s*=|\bemail\s*='
+    in: [pyproject.toml]
+    example: 'authors = [{ name = "Example Person", email = "person@example.com" }]'
 
 # Key 2 floor: paths on which key 2 stays the chair, on the strongest model,
 # whatever a derived `key2:` says (capability build-out record, section 5,
@@ -500,7 +525,12 @@ founder_classes:
         example: 'license = { text = "Apache-2.0" }'
       - pattern: '(?i)SPDX-License-Identifier|\bcopyright\s+(\(c\)\s*)?\d{4}'
         example: '// SPDX-License-Identifier: ISC'
-    note: A pyproject.toml change is founder class only when it touches the licence field, classifiers or dependencies, so pyproject.toml is not a path glob here.
+      - pattern: '^\s*(authors|maintainers)\s*=|^\s*\{\s*name\s*=|\bemail\s*='
+        in: [pyproject.toml]
+        example: 'authors = [{ name = "Example Person", email = "person@example.com" }]'
+      - pattern: '\b[Cc]opyright\s+(\([Cc]\)\s*|©\s*)?[A-Z]|©|__author__|@author\b|(?<![\w.+-])(?!nirmaansoftware@)[\w.+-]+@(gmail|googlemail|yahoo|outlook|hotmail|live|proton|protonmail|icloud|rediffmail)\.'
+        example: 'Copyright Example Person'
+    note: A pyproject.toml change is founder class only when it touches the licence field, classifiers, dependencies, authors or maintainers, so pyproject.toml is not a path glob here. Attribution is in this class too (who is named as author, maintainer, copyright holder or contact, and personal email addresses), so the Founder Proxy sees any name other than "Nirmaan".
   - id: commercial
     title: Commercial
     content:
@@ -508,7 +538,9 @@ founder_classes:
         example: 'a 20 percent discount'
       - pattern: '(?i)(\$|\bUSD\b|\bINR\b|\bRs\.?|\bEUR\b|₹|€)\s?\d'
         example: 'Rs. 50000'
-    note: Also anything that adds spend (a paid tool, runner or service), which a key-1 review flags.
+      - pattern: '(?i)\b(smtplib|smtp(_ssl)?|sendmail|send_message|send_email|send_raw_email|emailmessage|mimetext|mimemultipart|nodemailer|sendgrid|mailgun|postmark|twilio)\b|hooks\.slack\.com|chat\.postMessage|api\.telegram\.org|discord(app)?\.com/api/webhooks|api\.resend\.com'
+        example: 'smtp.send_message(msg)'
+    note: Also anything that adds spend (a paid tool, runner or service), which a key-1 review flags, and any code that sends an email or message to anyone outside the repository (a mail library or service, or a chat webhook), which the Founder Proxy reserves for the founder.
   - id: public-names-and-claims
     title: Public names and claims
     sections: [partners]
@@ -519,4 +551,8 @@ founder_classes:
     note: On site/** or README.md, a new or changed public name, a named client, partner or person, launch status lines, or a new capability, performance or compliance claim in the hero or meta tags. Ordinary copy edits are not in this class.
   - id: export-control
     title: Export-control sensitive content
-    note: Flagged by legal-compliance in its review; the scope is to be confirmed by counsel. No path or pattern detects it.
+    content:
+      - pattern: '\b(AES|DES|3DES|RSA|SM4|ECDSA|ECDH|ML-KEM|ML-DSA)\b|(?i:\b(aes(128|192|256)?_\w+|aes-?(128|192|256)|chacha20|poly1305|camellia|twofish|blowfish|kyber|dilithium|block cipher|stream cipher|encryption (core|engine|block)|key expansion|export[- ]control(s|led)?|dual[- ]use|ECCN|EAR99|ITAR|SCOMET|5[AD]002)\b)'
+        in: [src/**, tests/**, evals/**, examples/**, scripts/**, docs/**, site/**, README.md]
+        example: 'module aes256_core ('
+    note: Flagged by legal-compliance in its review; the scope is to be confirmed by counsel. The pattern detects cryptographic cores and algorithms (encryption, key exchange, signatures) and export-control terms; it only routes a pull request to legal-compliance's key 1 and the Founder Proxy, and does not decide what is controlled. Hash functions (SHA, CRC) and error-correcting codes (ECC) are not in it. Knowledge documents (knowledge/**, capability/**) are left to the export screen of council/records/2026-10-18-capability-buildout.md (section 9 item 10, founder item 8), which this does not decide; legal-compliance already holds key 1 on knowledge/**.
