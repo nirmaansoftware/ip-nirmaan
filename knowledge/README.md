@@ -2,8 +2,7 @@
 
 One document per skill, at `knowledge/<division>/<skill_id>.md`, cited from the
 skill in `src/nirmaan/company/skills.py`. The rules come from the 2026-10-18
-capability build-out council record (section 9; pull request #118, waiting
-for the founder); the checks are
+capability build-out council record (section 9; `council/records/2026-10-18-capability-buildout.md`); the checks are
 `nirmaan.org.knowledge_files`, run over every file here by
 `tests/test_knowledge_files.py`. No document exists yet.
 
