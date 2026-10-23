@@ -357,3 +357,81 @@ def classify(teams_map: dict, files: list[dict], diff: str, read_head, read_base
         "hits": sorted(set(hits)),
         "ledger": sorted(ledger_files),
     }
+
+
+# --- Composite key 1 (council record 2026-10-18, review loop, decision 1) ---------
+
+
+def _member_team(teams: dict, seat: str) -> str | None:
+    return next((t for t, team in teams.items() if seat in team.get("members", [])), None)
+
+
+def _lead_team(teams: dict, seat: str) -> str | None:
+    return next((t for t, team in teams.items() if seat in team.get("leads", [])), None)
+
+
+def key1_plan(teams_map: dict, classification: dict, files: list[dict], diff: str, read_head, read_base) -> dict:
+    """What one composite key-1 call loads, from the `composite_key1` data in
+    main's map: the seat that speaks and every checklist, each with why it loaded.
+
+    The speaker is the lead of the owning team that comes first in
+    `precedence`; its seat file loads whole. Loaded: the "In a review" section
+    of every owning team's lead (the teams `classify` found, plus the teams the
+    composite content rules add), every member checklist whose trigger
+    matches, and the `always` seats. Member checklists load by trigger, never
+    by team membership, unless the trigger names the team. Returns
+    {"speaker": {team, name, lead} or None, "checklists": [{seat, kind, team, why}]}.
+    """
+    data = teams_map.get("composite_key1") or {}
+    teams = teams_map["teams"]
+    lines = changed_lines(diff)
+    paths: list[str] = []
+    for f in files:
+        paths.extend([f["old"], f["path"]] if f["old"] else [f["path"]])
+
+    def content_hit(trigger: dict) -> str | None:
+        pattern = re.compile(trigger["pattern"])
+        for path in paths:
+            if _applies(trigger, path) and any(pattern.search(text) for _, _, text in lines.get(path, [])):
+                return path
+        return None
+
+    keys = list(classification["keys"])
+    owning = list(classification["teams"])
+    for rule in data.get("content_rules", []):
+        path = content_hit(rule)
+        if path is None:
+            continue
+        team = rule["adds"]
+        lead = rule.get("lead") or teams[team].get("leads", [None])[0]
+        if team not in owning:
+            owning.append(team)
+        if not any(k["team"] == team and k["lead"] == lead for k in keys):
+            keys.append({"team": team, "name": teams[team]["name"], "lead": lead, "why": f"content {rule['id']} in {path}"})
+    order = {team: i for i, team in enumerate(data.get("precedence", []))}
+    keys.sort(key=lambda k: order.get(k["team"], len(order)))
+
+    loaded: list[dict] = []
+
+    def add(seat: str, kind: str, team: str | None, why: str):
+        if not any(c["seat"] == seat for c in loaded):
+            loaded.append({"seat": seat, "kind": kind, "team": team, "why": why})
+
+    for k in keys:
+        add(k["lead"], "lead", k["team"], k.get("why") or f"lead of the owning team {k['name']}")
+    for member in data.get("members", []):
+        whys = [f"team {team} owns the pull request" for team in member.get("teams", []) if team in owning]
+        whys += [f"path {p}" for p in paths if any(matches(g, p) for g in member.get("paths", []))][:2]
+        whys += [f"content in {p}" for p in [content_hit(t) for t in member.get("content", [])] if p]
+        for r in member.get("ranges", []):
+            if r["file"] not in lines:
+                continue
+            text_of = {"+": read_head(r["file"]), "-": read_base(r["file"])}
+            spans = {sign: marker_ranges(text or "", r["begin"], r["end"]) for sign, text in text_of.items()}
+            if any(_in_ranges(n, spans[sign]) for sign, n, _ in lines.get(r["file"], [])):
+                whys.append(f"lines in {r['file']} from {r['begin'].strip()!r}")
+        if whys:
+            add(member["seat"], "member", _member_team(teams, member["seat"]), "; ".join(whys))
+    for seat in data.get("always", []):
+        add(seat, "always", _lead_team(teams, seat) or _member_team(teams, seat), "loads on every head")
+    return {"speaker": ({k: keys[0][k] for k in ("team", "name", "lead")} if keys else None), "checklists": loaded}

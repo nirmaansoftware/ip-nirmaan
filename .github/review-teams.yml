@@ -556,3 +556,76 @@ founder_classes:
         in: [src/**, tests/**, evals/**, examples/**, scripts/**, docs/**, site/**, README.md]
         example: 'module aes256_core ('
     note: Flagged by legal-compliance in its review; the scope is to be confirmed by counsel. The pattern detects cryptographic cores and algorithms (encryption, key exchange, signatures) and export-control terms; it only routes a pull request to legal-compliance's key 1 and the Founder Proxy, and does not decide what is controlled. Hash functions (SHA, CRC) and error-correcting codes (ECC) are not in it. Knowledge documents (knowledge/**, capability/**) are left to the export screen of council/records/2026-10-18-capability-buildout.md (section 9 item 10, founder item 8), which this does not decide; legal-compliance already holds key 1 on knowledge/**.
+
+# Composite key 1 (council record 2026-10-18, review loop, decision 1): one
+# key-1 call per head in place of one per owning team. Read only while the
+# review script's switch (`composite_key1` in scripts/pr_review.py CONFIG) is
+# on; it ships off, and is switched on by its own pull request after the A/B
+# run on the seeded sets. How it loads (scripts/review_map.py, key1_plan):
+# - the seat that speaks is the lead of the owning team that comes first in
+#   `precedence`, and its seat file loads whole;
+# - the "In a review" section of every owning team's lead loads;
+# - `content_rules` add an owning team for the composite call only;
+# - a member checklist loads when a trigger matches: `teams` (one of them owns
+#   the pull request), `paths` (a changed path), `content` (a changed line;
+#   `in` limits it to some paths) or `ranges` (a changed line between a line
+#   holding `begin` and one holding `end` in `file`), never by membership alone;
+# - `always` seats load on every head.
+# The verdict has one entry per loaded checklist.
+composite_key1:
+  precedence: [council, verification, business, silicon-design, product-site, eda-platform]
+  always: [legal-compliance]
+  members:
+    - seat: qa-evidence
+      teams: [verification]
+    - seat: security
+      paths: [.github/**, scripts/**, src/nirmaan/mcp/**, src/nirmaan/runtime/**]
+    - seat: dft-engineer
+      paths:
+        - src/nirmaan/integrations/dft*.py
+        - tests/fixtures/rtl/dft/**
+        - tests/fixtures/rtl/mbist/**
+        - tests/test_nirmaan_dft*.py
+        - docs/DFT*.md
+      content:
+        - pattern: 'at_least\("test_coverage"|\bdft\.[a-z_]+|March C-'
+          in: [src/nirmaan/company/workflows.py]
+          example: 'bounds=(at_least("test_coverage", 90),)),'
+    - seat: physical-design-engineer
+      paths:
+        - src/nirmaan/integrations/physical.py
+        - src/nirmaan/integrations/pd_parsers.py
+        - tests/fixtures/pd/**
+        - tests/test_nirmaan_physical.py
+        - tests/test_nirmaan_sta_antecedents.py
+        - docs/PHYSICAL_DESIGN.md
+        - docs/PD_*.md
+        - docs/STA_AND_ANTECEDENTS.md
+      content:
+        - pattern: '\b(unannotated_nets|timing_corners|SIGNOFF_LIMITS)\b|\bsta\.[a-z_]+'
+          in: [src/nirmaan/company/workflows.py]
+          example: 'SIGNOFF_LIMITS = (at_most("unannotated_nets", 0), at_least("timing_corners", 3))'
+      ranges:
+        - file: .github/workflows/ci.yml
+          begin: '  physical-design-shard:'
+          end: '  test-union:'
+    - seat: firmware-engineer
+      paths:
+        - src/nirmaan/integrations/firmware*.py
+        - src/nirmaan/integrations/firmware_soc/**
+        - src/nirmaan/integrations/firmware_harness/**
+        - src/nirmaan/integrations/regmap.py
+        - src/nirmaan/regmap.py
+        - tests/fixtures/fw/**
+        - tests/test_nirmaan_firmware*.py
+        - tests/test_nirmaan_riscv_*.py
+        - docs/*FIRMWARE*.md
+      content:
+        - pattern: '\b(require_irq|require_bus_error_trap|text_bytes)\b|\bfw\.[a-z_]+'
+          example: 'params=(("require_irq", "yes"),)'
+    - seat: site-engineer
+      teams: [product-site]
+    - seat: brand-content
+      teams: [product-site]
+    - seat: tax-accounts
+      teams: [business]

@@ -1064,3 +1064,11 @@ def test_ci_state_takes_the_newest_run_and_a_rerun_in_progress_is_pending():
                                   run(2, "2026-10-17T01:00:00Z", "completed", "success", "2026-10-17T01:05:00Z")])[0] == "green"
     assert pr_loop.ci_state(req, [run(5, "2026-10-17T00:00:00Z", "completed", "failure", None),
                                   run(6, "2026-10-17T00:00:00Z", "completed", "success", None)])[0] == "green", "same start: higher id"
+
+
+def test_composite_findings_keep_one_fingerprint_identity():
+    review = {"key1": [{"key": 1, "team": pr_review.COMPOSITE_TEAM, "role": "verification-lead", "status": "fail",
+                        "verdict": {"findings": [{"file": "a.py", "line": 3, "severity": "critical", "text": "[eda-tooling] gate loosened"}]}}]}
+    again = {"key1": [{**review["key1"][0], "role": "legal-compliance"}]}
+    assert pr_loop.findings_to_fix(review)[0]["fingerprint"] == pr_loop.findings_to_fix(again)[0]["fingerprint"], \
+        "a fix that adds an owning team (a new speaker) cannot make the same finding look new"

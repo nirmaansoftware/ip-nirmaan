@@ -473,3 +473,76 @@ def test_the_loader_refuses_what_it_does_not_read(text):
 ])
 def test_globs(glob, path, expected):
     assert matches(glob, path) is expected
+
+
+# --- Composite key 1 data (council record 2026-10-18, review loop, decision 1) ---------
+
+import difflib  # noqa: E402
+
+COMPOSITE = load_map(MAP.read_text(encoding="utf-8"))["composite_key1"]
+
+
+def _plan(path: str, old: str, new: str) -> dict:
+    """key1_plan on main's map for a one-file change of `old` to `new` in a tracked file."""
+    teams_map = load_map(MAP.read_text(encoding="utf-8"))
+    base = (ROOT / path).read_text(encoding="utf-8")
+    assert base.count(old) == 1, f"{old!r} is not once in {path}"
+    head = base.replace(old, new)
+    diff = "\n".join([f"diff --git a/{path} b/{path}", *difflib.unified_diff(base.splitlines(), head.splitlines(), f"a/{path}", f"b/{path}", lineterm="")])
+    files = [{"status": "M", "old": None, "path": path}]
+    read = {path: head}.get
+    c = review_map.classify(teams_map, files, diff, read, {path: base}.get)
+    return {**review_map.key1_plan(teams_map, c, files, diff, read, {path: base}.get), "per_team": [k["lead"] for k in c["keys"]]}
+
+
+def _loaded(plan: dict) -> list[str]:
+    return [c["seat"] for c in plan["checklists"]]
+
+
+def test_composite_precedence_names_every_team_once():
+    teams = load_map(MAP.read_text(encoding="utf-8"))["teams"]
+    assert sorted(COMPOSITE["precedence"]) == sorted(teams) and len(set(COMPOSITE["precedence"])) == len(teams)
+
+
+def test_composite_triggers_are_sound():
+    files = tracked_files()
+    teams = load_map(MAP.read_text(encoding="utf-8"))["teams"]
+    for seat in [m["seat"] for m in COMPOSITE["members"]] + COMPOSITE["always"]:
+        text = (ROOT / "council" / f"{seat}.md").read_text(encoding="utf-8")
+        assert "\n## In a review" in text, f"{seat} has no In a review section on this tree"
+    for m in COMPOSITE["members"]:
+        assert set(m) <= {"seat", "teams", "paths", "content", "ranges"} and len(m) > 1, m
+        assert set(m.get("teams", [])) <= set(teams), m["seat"]
+        for glob in m.get("paths", []):
+            assert any(matches(glob, f) for f in files), f"{m['seat']}: trigger {glob} matches no tracked file"
+        for t in m.get("content", []):
+            assert re.search(t["pattern"], t["example"]), f"{m['seat']}: example does not match"
+        for r in m.get("ranges", []):
+            assert review_map.marker_ranges((ROOT / r["file"]).read_text(encoding="utf-8"), r["begin"], r["end"]), r
+    for rule in COMPOSITE.get("content_rules", []):
+        assert rule["adds"] in teams and rule["lead"] in teams[rule["adds"]]["leads"]
+        assert re.search(rule["pattern"], rule["example"])
+
+
+def test_a_dft_bound_change_in_workflows_loads_the_dft_checklist():
+    plan = _plan("src/nirmaan/company/workflows.py", 'bounds=(at_least("test_coverage", 90),)),', 'bounds=(at_least("test_coverage", 85),)),')
+    assert "dft-engineer" in _loaded(plan)
+    assert "design-architect" not in plan["per_team"], "per-team calls do not load it today: Silicon Design does not own the file"
+    assert plan["speaker"]["lead"] == "verification-lead"
+
+
+def test_firmware_and_physical_design_triggers():
+    irq = _plan("src/nirmaan/company/workflows.py", 'params=(("require_irq", "yes"),), when=(when("interrupts"),)),',
+                'params=(("require_irq", "auto"),), when=(when("interrupts"),)),')
+    assert "firmware-engineer" in _loaded(irq) and "dft-engineer" not in _loaded(irq)
+    pd = _plan(".github/workflows/ci.yml", "python -m pytest -q -rs tests/test_nirmaan_physical.py tests/test_nirmaan_sta_antecedents.py",
+               "python -m pytest -q -rs tests/test_nirmaan_physical.py")
+    assert "physical-design-engineer" in _loaded(pd)
+    fw = _plan("tests/fixtures/fw/apb_regs/apb_regs_map.h", "#define APB_REGS_REG3_OFFSET 0xCu", "#define APB_REGS_REG3_OFFSET 0x10u")
+    assert "firmware-engineer" in _loaded(fw) and "dft-engineer" not in _loaded(fw) and "physical-design-engineer" not in _loaded(fw), \
+        "a firmware-only change stops carrying the DFT and PD lists"
+
+
+def test_legal_compliance_loads_on_every_head():
+    plan = _plan("README.md", "# IP Nirmaan\n", "# IP Nirmaan\n\n")
+    assert _loaded(plan)[-1] == "legal-compliance" and plan["checklists"][-1]["kind"] in ("always", "lead")
