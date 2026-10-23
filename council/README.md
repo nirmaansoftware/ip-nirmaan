@@ -65,14 +65,20 @@ under "In a review".
 | Business | legal-compliance (licences, notices, third-party code and text); finance-licensing (prices, commercial terms, spend) | legal-counsel, tax-accounts, partnerships |
 
 One key-1 verdict per owning team; members' checklists run inside the lead's
-review and are cited in it. A key is an agent review: never a person's
+review and are cited in it. A composite key 1 is built and off (council record
+2026-10-18, review loop, decision 1): one key-1 call per head, spoken by the
+first owning lead in a fixed precedence, loading every owning lead's section,
+each member checklist whose trigger in `.github/review-teams.yml` matches and
+legal-compliance's on every head, with one verdict entry per checklist. It is
+switched on by its own pull request after an A/B run on the seeded sets
+(`docs/REVIEW_MECHANISM.md`). A key is an agent review: never a person's
 decision, a release, or a claim that a design is ready to be made in silicon.
 Six founder classes (council record, section 2) also get the Founder Proxy
 (agent, [founder-proxy.md](founder-proxy.md)) after key 2, under the founder's
 delegation of 2026-10-18. It is not the founder: what only the founder decides
-(spending, contracts and legal counsel, public names, prices published to
-clients, any sending, and the review system's own gates) it sends to the
-founder as `needs-founder`.
+(clear new spending, contracts and legal counsel, and any sending) it sends to
+the founder as `needs-founder`; a change that could be read either way it
+decides on the merits.
 
 ## Seat map
 
@@ -178,8 +184,8 @@ costs or effort estimates.
 The council decides; the founder can overrule, and the record says so. These
 always wait for the founder: signing a contract, spending money (including
 legal counsel), and turning on any sending
-([the founder's record of 2026-10-20](records/2026-10-20-founder-proxy-widened.md));
-the Founder Proxy's seat file also keeps export control for the founder.
+([the founder's record of 2026-10-20](records/2026-10-20-founder-proxy-widened.md)),
+and the Founder Proxy's seat file sends the founder these three only.
 
 Merging follows the two-key review (Teams, above; `docs/REVIEW_MECHANISM.md`):
 a pull request merges by itself once CI and both keys pass, unless it is in

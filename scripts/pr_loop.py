@@ -190,7 +190,9 @@ def fixer_args(model: str, system_prompt: str, forbidden: list[str]) -> list[str
 
 def fingerprint(f: dict) -> str:
     """The same finding: same key, team, file and wording (case and spacing
-    ignored). Lines move when code is fixed, so they are not part of it."""
+    ignored). Lines move when code is fixed, so they are not part of it. A
+    composite key 1's team is always pr_review.COMPOSITE_TEAM, so a fix that
+    adds an owning team cannot make a repeated finding look new."""
     text = re.sub(r"\s+", " ", str(f["text"]).lower()).strip()
     return hashlib.sha256(f"{f['key']}|{f.get('team') or 'chair'}|{f['file']}|{text}".encode()).hexdigest()[:16]
 
