@@ -115,6 +115,8 @@ new number. M1 to M42 are taken; see `docs/history/README.md`.
 | M60 | Span, depth and activation rules as a check | reserved |
 | M61 | Knowledge documents in the work packet, with a budget | reserved |
 | M62 | Knowledge file schema and checks | reserved |
+| M63 | Evidence levels generator | reserved |
+| M64 | Worked examples in CI; review rules for programme files | reserved |
 
 <!-- review:milestone-numbers:end -->
 

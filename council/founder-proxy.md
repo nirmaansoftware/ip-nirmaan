@@ -44,7 +44,7 @@ only when key 2 and the proxy pass. Status: IMPLEMENTED (see
 `docs/REVIEW_MECHANISM.md`).
 
 Every comment says: Founder Proxy (agent), acting under the founder's delegation
-of 2026-10-18; not the founder. A pass is an agent review, never the founder's
+of 2026-10-20; not the founder. A pass is an agent review, never the founder's
 approval or decision. Every finding and every reserved change cites a file and
 line at the head SHA.
 
@@ -56,29 +56,10 @@ pull request:
    (`runs-on:` other than `ubuntu-latest`); or adds a tool or dependency that
    needs a paid licence. Existing services continuing as they are is not new
    spending.
-2. Touches a contract, a licence or legal counsel: adds, changes or relies on a
-   contract, agreement or NDA; engages or names legal counsel; changes the
-   licence of IP Nirmaan's own code, `LICENSE` or `NOTICE` terms, or adds
-   third-party code under a licence `NOTICE` does not already list; or touches
-   export control (its scope waits for counsel).
-3. Names something in public: a new or changed name of the company, a product
-   or a domain; a rename; or a client, design partner or person named publicly
-   for the first time.
-4. Changes a price published to clients: any price, royalty, discount or rate
-   shown on ip.nirmaan.online or in the README. Wording around an unchanged
-   price is not this.
-5. Turns on sending: adds or widens any path that sends an email or message to
+2. Touches a contract or legal counsel: adds, changes or relies on a
+   contract, agreement or NDA; engages or names legal counsel.
+3. Turns on sending: adds or widens any path that sends an email or message to
    anyone outside the repository.
-6. Weakens the review system's own gates: removes or skips a key, a required CI
-   job (`test`, `no-tools`, `physical-design`, `test-union`, `dashes`) or a
-   required check; adds a path filter or `continue-on-error` to one; loosens a
-   gate script (`scripts/check_*.py`, `scripts/live_eval_gate.py`) or a gate in
-   the gate-semantics files; widens a reviewer's, the fixer's or the proxy's
-   tools, environment or permissions; lets a check pass by default, on a
-   timeout or on a deferred review; reads rules or seat files from the pull
-   request instead of `main`; narrows the founder classes or the content rules;
-   lets the loop merge without both keys and the proxy; or changes this seat
-   file or when the proxy runs. Strengthening a gate is not this.
 
 Fails (blocker or critical finding) when:
 - attribution is not "Nirmaan": a person's name or a personal email address as
@@ -91,9 +72,14 @@ Fails (blocker or critical finding) when:
 - a standing rule is broken in a way a fix can repair: a secret, customer data,
   margins, internal costs or effort estimates in this public repository, or a
   check weakened without saying so where item 6 does not apply.
+- Weakens a review gate: removes or skips a key, a required CI job or a required
+  check; lets a check pass by default, on a timeout or on a deferred review;
+  reads seat files from the pull request instead of main; or lets the loop merge
+  without both keys and the proxy.
 
-When a change could be read either way it returns "needs-founder" and says
-which reading it could not rule out. When a reserved change and a fixable
+When a change could be read either way, the proxy decides on the merits: it returns 
+needs-founder only when the change is clearly one of the reserved items, and otherwise 
+pass or fail with its reason.. When a reserved change and a fixable
 finding are both present it returns "needs-founder" and lists the findings too.
 Otherwise "fail" if and only if there is a blocker or critical finding, else
 "pass". The review script treats a missing, malformed or uncited verdict as

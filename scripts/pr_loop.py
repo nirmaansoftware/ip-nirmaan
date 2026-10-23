@@ -21,7 +21,8 @@ per call, as a state machine that survives restarts:
     wait    the required CI is not finished on the head (no model call), or
             GitHub is still making the update's merge commit;
     review  both keys, and the Founder Proxy (agent) for a founder-class pull
-            request, through scripts/pr_review.py;
+            request, through scripts/pr_review.py; then one comment naming the
+            soft shape rules it breaks (never a stop);
     merge   both keys (and the proxy) passed: `gh pr merge --auto --merge` with the gh login
             when the review App posts the checks and the repository's
             allow_auto_merge field (read with gh) is true; a "ready" comment in
@@ -30,6 +31,8 @@ per call, as a state machine that survives restarts:
             on origin (read before each step) differing from the one the pass
             started with, so the rest wait for the next pass, which refetches
             main and checks this copy again;
+    author-fix  a finding to fix is on a path the fixer may not change: no
+            fixer; the `author-fix` label until the author's next head;
     fix     a key or the proxy failed: a separate fresh `claude -p` fixer in a clean
             worktree of the head, Edit and Write only inside it; the loop (never
             the model) checks what changed, commits, runs the checks and pushes.
@@ -93,6 +96,15 @@ LOOP = {
     "authors": ["patel-om"],
     "max_fix_rounds": 3,
     "needs_founder_label": "needs-founder",
+    # A finding on a path the fixer may not change: the fixer does not run, the
+    # pull request gets this label, and the author's next head clears it.
+    "author_fix_label": "author-fix",
+    # Shape rules:
+    # soft ones only comment; the hard one (the diff fits the review's size
+    # limit uncut) is the review script's. Changed lines outside these globs
+    # count toward the soft cap.
+    "shape_soft_cap_lines": 400,
+    "shape_uncounted": ["tests/fixtures/**"],
     "co_author": "Claude Opus 5.5 <noreply@anthropic.com>",
     "rules_files": ["CLAUDE.md"],
     # The fixer may never change these: the review mechanism and its map,
@@ -226,6 +238,38 @@ def forbidden_changes(changed: list[str], forbidden: list[str]) -> list[tuple[st
     return out
 
 
+def shape_notes(classification: dict, name_status: list[dict], numstat: str, lc: dict) -> list[str]:
+    """The soft shape rules a pull request breaks, each named; never a stop.
+    `name_status` is review_map.parse_name_status of `git diff -M100%`,
+    `numstat` the `git diff --numstat` text."""
+    notes = []
+    teams = classification.get("keys") or []
+    names = sorted({k["name"] for k in teams})
+    if len(names) > 1:
+        notes.append(f"One owning team per pull request where possible: this one has {len(names)} ({', '.join(names)}).")
+    founder_paths = {why[len("path "):] for whys in (classification.get("founder") or {}).values() for why in whys if why.startswith("path ")}
+    changed = [f["path"] for f in name_status]
+    ordinary = [p for p in changed if p not in founder_paths]
+    if founder_paths and ordinary:
+        notes.append("Founder-class paths in their own pull request: founder-class "
+                     f"{', '.join(sorted(founder_paths)[:5])} are mixed with {', '.join(ordinary[:5])}"
+                     + (" and more" if len(ordinary) > 5 or len(founder_paths) > 5 else "") + ".")
+    renames = [f for f in name_status if f["status"] == "R"]
+    if renames and len(renames) < len(name_status):
+        notes.append("Mechanical renames in their own pull request: "
+                     + ", ".join(f"{f['old']} -> {f['path']}" for f in renames[:5]) + " are mixed with other changes.")
+    lines = 0
+    for row in numstat.splitlines():
+        parts = row.split("\t")
+        if len(parts) < 3 or any(review_map.matches(g, parts[-1]) for g in lc["shape_uncounted"]):
+            continue
+        lines += sum(int(x) for x in parts[:2] if x.isdigit())
+    if lines > lc["shape_soft_cap_lines"]:
+        notes.append(f"Soft cap on size: {lines} changed lines outside {', '.join(lc['shape_uncounted'])}, "
+                     f"over {lc['shape_soft_cap_lines']}.")
+    return notes
+
+
 def fixer_system_prompt(ctx: dict) -> str:
     return f"""You are {ctx['company']}'s fixer for pull request #{ctx['pr']} in {ctx['repo']}. You are a fresh process: you did not write this pull request and you did not review it.
 
@@ -291,6 +335,19 @@ def _save_state(state_dir, repo: str, st: dict):
     path = _state_path(state_dir, repo, st["pr"])
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(st, indent=2))
+
+
+def ci_completed_at(required: list[str], runs: list[dict]) -> str | None:
+    """When the required CI finished on a head, from GitHub's check runs: the
+    latest completion time of the run that counts for each job (the newest),
+    or None when one has no completion time."""
+    times = []
+    for name in required:
+        mine = sorted((r for r in runs if r["name"] == name), key=pr_review._newest_first_key, reverse=True)
+        if not mine or not mine[0].get("completed_at"):
+            return None
+        times.append(str(mine[0]["completed_at"]))
+    return max(times) if times else None
 
 
 def ci_state(required: list[str], runs: list[dict]) -> tuple[str, str]:
@@ -422,9 +479,9 @@ class Loop:
     # The whole pass: one step for every pull request, so one waiting for CI, or
     # one that just ran a review or a fix, never holds up the others. A pull
     # request the loop is fixing goes first, then by number. The steps run one
-    # after another and each review or fix round holds the shared lock, so
-    # reviews still run one at a time (a lock held elsewhere makes that pull
-    # request "busy" and the pass goes on). The check that this copy is main's
+    # after another; the shared lock is held only around each reviewer call,
+    # so model calls still run one at a time (a lock held elsewhere at a call
+    # makes that pull request "busy" and the pass goes on). The check that this copy is main's
     # runs once, before the pass, so the pass ends when main may have moved:
     # after this pass's own auto-merge (GitHub may merge at once), and when
     # main's sha on origin, read before each step, is no longer the one the
@@ -432,8 +489,24 @@ class Loop:
     # refetches main and checks this copy again first. A merge landing during
     # a step is seen only before the next one.
     def tick(self, only_pr: int | None = None, main_at_start: str | None = None) -> list[dict]:
+        # One pass at a time for this repository (its own lock, not the shared
+        # review lock): fix rounds run without the shared lock, so two loop
+        # processes must never step the same pull requests at once.
+        release, holder = pr_review.acquire_lock(self.state_dir, {"repo": self.cfg["repo"], "by": "pr-loop pass"},
+                                                 name=f"loop-{self.cfg['repo'].replace('/', '_')}.lock")
+        if release is None:
+            self.out(f"pr-loop: another pass for {self.cfg['repo']} is running (pid {(holder or {}).get('pid')}); this one ends")
+            return []
+        try:
+            return self._tick(only_pr, main_at_start)
+        finally:
+            release()
+
+    def _tick(self, only_pr: int | None, main_at_start: str | None) -> list[dict]:
         start = main_at_start or self._main_on_origin()
-        pulls = [p for p in self.o["github"].list_open_pulls() if not only_pr or p["number"] == only_pr]
+        open_pulls = self.o["github"].list_open_pulls()
+        self._note_closed({p["number"] for p in open_pulls}, only_pr)
+        pulls = [p for p in open_pulls if not only_pr or p["number"] == only_pr]
 
         def in_flight(p):
             s = load_state(self.state_dir, self.cfg["repo"], p["number"])
@@ -450,6 +523,32 @@ class Loop:
             if results[-1]["outcome"] == "auto-merge":
                 break
         return results
+
+    def _note_closed(self, open_numbers: set, only_pr: int | None = None):
+        """A pull request the loop finished (auto-merge or ready) that is no
+        longer open: read it once from GitHub and log a "merged" event with
+        GitHub's merge time (for the turnaround report), or note it closed."""
+        for path in sorted((self.state_dir / "loop").glob(f"{self.cfg['repo'].replace('/', '_')}-pr-*.json")):
+            try:
+                st = json.loads(path.read_text())
+            except (OSError, ValueError):
+                continue
+            n = st.get("pr")
+            if not isinstance(n, int) or n in open_numbers or (only_pr and n != only_pr):
+                continue
+            if not st.get("done") or st["done"].get("outcome") not in ("auto-merge", "ready") or st.get("closed"):
+                continue
+            try:
+                pull = self.o["github"].get_pull(n)
+            except Exception as exc:  # noqa: BLE001 - a failed read is tried again next pass
+                self.out(f"pr-loop: #{n}: could not read whether it merged: {exc}")
+                continue
+            if pull["state"] == "open":
+                continue
+            st["closed"] = {"merged_at": pull.get("merged_at"), "head": pull["head_sha"], "at": _now()}
+            _save_state(self.state_dir, self.cfg["repo"], st)
+            if pull.get("merged_at"):
+                self._log({"n": n, "st": st, "head": pull["head_sha"]}, "merged", merged_at=pull["merged_at"])
 
     def _main_on_origin(self) -> str | None:
         """main's sha on origin (one ls-remote, no fetch); None when unreadable."""
@@ -486,6 +585,18 @@ class Loop:
             self._log(ctx, "resumed")
         if st["stopped"] and st["stopped"]["head"] == listed["head_sha"]:
             return skip(f"stopped on this head: {st['stopped']['reason']}")
+        if st.get("author_fix"):
+            if st["author_fix"]["head"] == listed["head_sha"]:
+                return skip(f"\"{lc['author_fix_label']}\": waiting for the author's new head")
+            # A new head clears it; it is reviewed from scratch.
+            st["author_fix"] = None
+            _save_state(self.state_dir, cfg["repo"], st)
+            self._log(ctx, "author-fix-cleared")
+            if lc["author_fix_label"] in listed["labels"] and o["post"] != "none":
+                try:
+                    o["github"].remove_label(n, lc["author_fix_label"])
+                except Exception as exc:  # noqa: BLE001 - a label left behind does not block the review
+                    self.out(f"pr-loop: #{n}: could not remove the {lc['author_fix_label']} label: {exc}")
         st["stopped"] = None
         try:
             return self._step(ctx, listed)
@@ -541,7 +652,14 @@ class Loop:
             return {"outcome": "skip", "reason": f"{st['done']['outcome']} on this head"}
         if pull.get("mergeable") is False or pull.get("mergeable_state") == "dirty":
             return self._stop(ctx, head, "the branch has a merge conflict with main; a person resolves it")
-        state, text = ci_state(cfg["required_ci"], o["github"].list_check_runs(head))
+        runs = o["github"].list_check_runs(head)
+        state, text = ci_state(cfg["required_ci"], runs)
+        if state == "green" and st.get("ci_green_seen") != head:
+            # Once per head: when the loop first saw its required CI green, and
+            # when GitHub says that CI finished (the start of the turnaround).
+            st["ci_green_seen"] = head
+            _save_state(self.state_dir, cfg["repo"], st)
+            self._log(ctx, "ci-green-seen", ci_completed_at=ci_completed_at(cfg["required_ci"], runs))
         if state == "pending":
             self.out(f"pr-loop: #{n} waiting for CI on {head[:7]}: {text}")
             return {"outcome": "wait", "reason": text}
@@ -550,55 +668,59 @@ class Loop:
                 return self._stop(ctx, head, f"CI failed after fix round {st['rounds']} ({text})")
             return {"outcome": "skip", "reason": f"CI failed on {head[:7]} ({text}); the author fixes it"}
 
-        release, holder = pr_review.acquire_lock(self.state_dir, {"repo": cfg["repo"], "pr": n, "by": "pr-loop"})
-        if release is None:
-            return {"outcome": "busy", "reason": f"lock held by {holder.get('repo')} #{holder.get('pr')}" if holder else "lock held"}
-        try:
-            self._log(ctx, "review", ci=text)
-            r = pr_review.run_review(o["repo_root"], n, o["github"], o["post"], o["claude_bin"], self.state_dir, o["models"],
-                                     o["timeout_s"], o["backoff_s"], config=cfg, caller_branch=o.get("caller_branch"),
-                                     in_claude_session=o.get("in_claude_session", False), sleep=o.get("sleep", time.sleep),
-                                     out=self.out, held_lock=True)
-            if r["exit"] == pr_review.EXIT_HEAD_MOVED:
-                self._log(ctx, "head-moved")
-                return {"outcome": "head-moved"}
-            if r["exit"] == pr_review.EXIT_REFUSED:
-                st["done"] = {"head": head, "outcome": "refused"}
-                _save_state(self.state_dir, cfg["repo"], st)
-                return {"outcome": "skip", "reason": r.get("reason")}
-            if r["exit"] != pr_review.EXIT_OK:
-                return self._stop(ctx, head, f"the review exited {r['exit']}")
-            if r.get("waiting"):
-                return {"outcome": "wait", "reason": r["waiting"]}
-            if r.get("ci_failed"):
-                if st["last_fix_head"] == head:
-                    return self._stop(ctx, head, f"CI failed after fix round {st['rounds']} ({r['ci_failed']})")
-                return {"outcome": "skip", "reason": f"{r['ci_failed']}; the author fixes it"}
-            if r.get("deferred"):
-                return self._stop(ctx, head, f"review deferred: {r['deferred']}")
-            # The Founder Proxy (agent) is a reviewer like the keys: deferred
-            # stops, fail goes to the fixer.
-            keys = [*(r.get("key1") or []), *([r["key2"]] if r.get("key2") else []), *([r["proxy"]] if r.get("proxy") else [])]
-            if not r.get("key1"):
-                return self._stop(ctx, head, "review deferred: no owning team")
-            deferred = [k for k in keys if k["status"] == "deferred"]
-            if deferred:
-                return self._stop(ctx, head, "review deferred (" + "; ".join(f"{k['team_name']}: {k.get('reason')}" for k in deferred) + ")")
-            self._log(ctx, "reviewed", key1=",".join(f"{k['team']}:{k['status']}" for k in r["key1"]),
-                      key2=r["key2"]["status"] if r.get("key2") else "not run",
-                      proxy=r["proxy"]["status"] if r.get("proxy") else "not run")
-            # What the founder keeps: the loop stops and the founder decides on
-            # GitHub. Their own review approving this head lets the review pass
-            # review/executive; removing the label lets the loop resume.
-            if r.get("proxy") and r["proxy"]["status"] == pr_review.NEEDS_FOUNDER and not r.get("founder_approved"):
-                why = "; ".join((r["proxy"].get("verdict") or {}).get("founder_reasons") or [])
-                return self._stop(ctx, head, f"the Founder Proxy (agent) returned needs-founder: {why}. The founder decides: "
-                                             f"approve head {head[:7]} on GitHub (or not), then remove the label")
-            if not any(k["status"] == "fail" for k in keys):
-                return self._merge_path(ctx, r)
-            return self._fix_round(ctx, pull, r)
-        finally:
-            release()
+        self._log(ctx, "review", ci=text)
+        r = pr_review.run_review(o["repo_root"], n, o["github"], o["post"], o["claude_bin"], self.state_dir, o["models"],
+                                 o["timeout_s"], o["backoff_s"], config=cfg, caller_branch=o.get("caller_branch"),
+                                 in_claude_session=o.get("in_claude_session", False), sleep=o.get("sleep", time.sleep),
+                                 out=self.out)
+        if r["exit"] == pr_review.EXIT_HEAD_MOVED:
+            self._log(ctx, "head-moved")
+            return {"outcome": "head-moved"}
+        if r["exit"] == pr_review.EXIT_BUSY:
+            # The shared lock was held elsewhere at a model call; the cached
+            # verdicts carry over to the next pass.
+            return {"outcome": "busy", "reason": "another review holds the lock"}
+        if r["exit"] == pr_review.EXIT_REFUSED:
+            st["done"] = {"head": head, "outcome": "refused"}
+            _save_state(self.state_dir, cfg["repo"], st)
+            return {"outcome": "skip", "reason": r.get("reason")}
+        if r["exit"] != pr_review.EXIT_OK:
+            return self._stop(ctx, head, f"the review exited {r['exit']}")
+        if r.get("waiting"):
+            return {"outcome": "wait", "reason": r["waiting"]}
+        if r.get("ci_failed"):
+            if st["last_fix_head"] == head:
+                return self._stop(ctx, head, f"CI failed after fix round {st['rounds']} ({r['ci_failed']})")
+            return {"outcome": "skip", "reason": f"{r['ci_failed']}; the author fixes it"}
+        if r.get("deferred"):
+            return self._stop(ctx, head, f"review deferred: {r['deferred']}")
+        # When the verdicts reached GitHub (deferred keys included).
+        self._log(ctx, "verdict-posted", key1=",".join(f"{k['team']}:{k['status']}" for k in r.get("key1") or []),
+                  key2=r["key2"]["status"] if r.get("key2") else "not run",
+                  proxy=r["proxy"]["status"] if r.get("proxy") else "not run",
+                  posted=len([p for p in r.get("posted") or [] if not p.get("reused")]))
+        self._shape(ctx, r)
+        # The Founder Proxy (agent) is a reviewer like the keys: deferred
+        # stops, fail goes to the fixer.
+        keys = [*(r.get("key1") or []), *([r["key2"]] if r.get("key2") else []), *([r["proxy"]] if r.get("proxy") else [])]
+        if not r.get("key1"):
+            return self._stop(ctx, head, "review deferred: no owning team")
+        deferred = [k for k in keys if k["status"] == "deferred"]
+        if deferred:
+            return self._stop(ctx, head, "review deferred (" + "; ".join(f"{k['team_name']}: {k.get('reason')}" for k in deferred) + ")")
+        self._log(ctx, "reviewed", key1=",".join(f"{k['team']}:{k['status']}" for k in r["key1"]),
+                  key2=r["key2"]["status"] if r.get("key2") else "not run",
+                  proxy=r["proxy"]["status"] if r.get("proxy") else "not run")
+        # What the founder keeps: the loop stops and the founder decides on
+        # GitHub. Their own review approving this head lets the review pass
+        # review/executive; removing the label lets the loop resume.
+        if r.get("proxy") and r["proxy"]["status"] == pr_review.NEEDS_FOUNDER and not r.get("founder_approved"):
+            why = "; ".join((r["proxy"].get("verdict") or {}).get("founder_reasons") or [])
+            return self._stop(ctx, head, f"the Founder Proxy (agent) returned needs-founder: {why}. The founder decides: "
+                                         f"approve head {head[:7]} on GitHub (or not), then remove the label")
+        if not any(k["status"] == "fail" for k in keys):
+            return self._merge_path(ctx, r)
+        return self._fix_round(ctx, pull, r)
 
     def _update_behind(self, ctx):
         """The branch is behind main: ask GitHub to merge main into it (REST
@@ -677,11 +799,60 @@ class Loop:
         _save_state(self.state_dir, cfg["repo"], st)
         return {"outcome": st["done"]["outcome"]}
 
+    def _shape(self, ctx, r):
+        """The soft shape rules, as one comment that names each rule broken;
+        posted again only when the notes change. Never stops the loop."""
+        cfg, lc, o, n, st, head = self.cfg, self.lc, self.o, ctx["n"], ctx["st"], ctx["head"]
+        try:
+            root = o["repo_root"]
+            base = _git(root, "merge-base", "refs/pr-review/main", head).strip()
+            files = review_map.parse_name_status(_git(root, "diff", "--no-ext-diff", "--name-status", "-z", "-M100%", base, head))
+            numstat = _git(root, "diff", "--no-ext-diff", "--numstat", "-M", base, head)
+        except (subprocess.SubprocessError, OSError) as exc:
+            self.out(f"pr-loop: #{n}: shape rules not checked: {exc}")
+            return
+        try:
+            notes = shape_notes(r.get("classification") or {}, files, numstat, lc)
+            digest = hashlib.sha256(json.dumps(notes).encode()).hexdigest()[:16]
+            if not notes or st.get("shape_digest") == digest:
+                return
+            self._say(n, "\n".join([f"<!-- {MARK} shape head={head} -->", f"### Automated loop: pull request shape (head `{head[:7]}`)", "",
+                                    "Soft shape rules. They do not stop the "
+                                    "review; only a diff over the review's size limit does.", "",
+                                    *[f"- {_cell(x, 500)}" for x in notes]]))
+        except Exception as exc:  # a soft rule never stops the loop; the next pass tries again
+            self.out(f"pr-loop: #{n}: shape rules not posted: {exc}")
+            return
+        # Saved only once the comment is posted, so a failed post is retried.
+        st["shape_digest"] = digest
+        _save_state(self.state_dir, cfg["repo"], st)
+        self._log(ctx, "shape", notes=len(notes))
+
+    def _author_fix(self, ctx, findings, blocked):
+        """Findings on paths the fixer may not change: no fixer; the author fixes them."""
+        lc, o, n, st, head = self.lc, self.o, ctx["n"], ctx["st"], ctx["head"]
+        st["author_fix"] = {"head": head, "at": _now()}
+        _save_state(self.state_dir, self.cfg["repo"], st)
+        self._log(ctx, "author-fix", files=",".join(sorted({f["file"] for f in blocked})))
+        if o["post"] != "none":
+            o["github"].add_labels(n, [lc["author_fix_label"]])
+        rows = [f"| {f['id']} | {f['severity']} | `{_cell(f['file'], 200)}:{f['line']}` | {_cell(f['text'])} |" for f in findings]
+        self._say(n, "\n".join([
+            f"<!-- {MARK} author-fix head={head} -->", "### Automated loop: the author fixes this head", "",
+            f"Head `{head}`: {len(blocked)} finding{'' if len(blocked) == 1 else 's'} {'is' if len(blocked) == 1 else 'are'} on paths "
+            "the loop's fixer may not change, so the fixer did not run. The author pushes a fix; the new head clears the "
+            f"`{lc['author_fix_label']}` label and is reviewed from scratch.", "",
+            "| ID | Severity | Where | Finding |", "|---|---|---|---|", *rows]))
+        return {"outcome": "author-fix"}
+
     def _fix_round(self, ctx, pull, r):
         cfg, lc, o, n, st, head = self.cfg, self.lc, self.o, ctx["n"], ctx["st"], ctx["head"]
         findings = findings_to_fix(r)
         if not findings:
             return self._stop(ctx, head, "a key failed without findings to fix")
+        blocked = [f for f in findings if forbidden_changes([f["file"].removeprefix("main:")], lc["fixer_forbidden"])]
+        if blocked:
+            return self._author_fix(ctx, findings, blocked)
         repeated = [f for f in findings if st["seen"].get(f["fingerprint"])]
         if repeated:
             return self._stop(ctx, head, "the same finding failed again after a fix: " + "; ".join(f"{f['file']}:{f['line']} {f['text']}" for f in repeated))

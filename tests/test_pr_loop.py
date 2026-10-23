@@ -148,6 +148,10 @@ class FakeGitHub:
         self.posts.append({"type": "label", "labels": labels})
         self.labels += labels
 
+    def remove_label(self, n, label):
+        self.posts.append({"type": "unlabel", "label": label})
+        self.labels = [l for l in self.labels if l != label]
+
     def list_reviews(self, n):
         return self.reviews
 
@@ -276,6 +280,56 @@ def test_both_keys_pass_auto_merge_with_the_app_and_the_setting_then_nothing_mor
     assert len(r.github.posts) == before and len(r.calls()) == 2
 
 
+def test_turnaround_events_ci_green_once_per_head_verdict_posted_and_merged_once_after_github_merges(repo):
+    r = repo(gh={"ci": lambda sha: "pending"})
+    assert r.tick() == ["wait"]
+    assert not [l for l in r.log() if l.get("event") == "ci-green-seen"], "not green yet"
+    r.github.ci = lambda sha: "success"
+    assert r.tick() == ["auto-merge"]
+    green = [l for l in r.log() if l.get("event") == "ci-green-seen"]
+    assert len(green) == 1 and green[0]["head"] == r.first_head and green[0]["ci_completed_at"] == "x"
+    posted = next(l for l in r.log() if l.get("event") == "verdict-posted")
+    assert posted["key1"] == "eda-platform:pass" and posted["key2"] == "pass" and posted["proxy"] == "not run" and posted["posted"] > 0
+    assert r.tick() == ["skip"]
+    assert len([l for l in r.log() if l.get("event") == "ci-green-seen"]) == 1, "logged once per head"
+    assert not [l for l in r.log() if l.get("event") == "merged"], "still open"
+    open_pull = r.github.get_pull
+    r.github.list_open_pulls = lambda: []
+    r.github.get_pull = lambda n: {**open_pull(n), "state": "closed", "merged_at": "2026-10-19T12:00:00Z"}
+    assert r.tick() == []
+    merged = [l for l in r.log() if l.get("event") == "merged"]
+    assert len(merged) == 1 and merged[0]["merged_at"] == "2026-10-19T12:00:00Z" and merged[0]["head"] == r.first_head
+    r.tick()
+    assert len([l for l in r.log() if l.get("event") == "merged"]) == 1, "logged once"
+    assert r.st()["closed"]["merged_at"] == "2026-10-19T12:00:00Z"
+
+
+def test_a_closed_unmerged_pull_request_logs_no_merge_and_an_unfinished_one_is_not_read(repo):
+    r = repo()
+    open_pull = r.github.get_pull
+    reads = []
+    r.github.list_open_pulls = lambda: []
+    r.github.get_pull = lambda n: (reads.append(n), {**open_pull(n), "state": "closed", "merged_at": None})[1]
+    assert r.tick() == [] and reads == [], "the loop never finished it: no read"
+    r.github.list_open_pulls = lambda: [open_pull(1)]
+    r.github.get_pull = open_pull
+    assert r.tick() == ["auto-merge"]
+    r.github.list_open_pulls = lambda: []
+    r.github.get_pull = lambda n: {**open_pull(n), "state": "closed", "merged_at": None}
+    r.tick()
+    assert not [l for l in r.log() if l.get("event") == "merged"] and r.st()["closed"]["merged_at"] is None
+
+
+def test_ci_completed_at_is_the_last_required_job_by_the_newest_run():
+    req = ["a", "b"]
+    runs = [{"id": 1, "name": "a", "started_at": "2026-10-19T10:00:00Z", "completed_at": "2026-10-19T10:05:00Z"},
+            {"id": 2, "name": "a", "started_at": "2026-10-19T11:00:00Z", "completed_at": "2026-10-19T11:02:00Z"},
+            {"id": 3, "name": "b", "started_at": "2026-10-19T10:00:00Z", "completed_at": "2026-10-19T10:30:00Z"}]
+    assert pr_loop.ci_completed_at(req, runs) == "2026-10-19T11:02:00Z"
+    assert pr_loop.ci_completed_at(req + ["c"], runs) is None
+    assert pr_loop.ci_completed_at(req, [*runs, {"id": 4, "name": "b", "started_at": "2026-10-19T12:00:00Z"}]) is None
+
+
 def test_both_keys_pass_and_the_setting_is_off_posts_ready_without_a_merge_call_or_a_stop(repo):
     r = repo(gh={"auto_merge_allowed": "false"})
     assert r.tick() == ["ready"]
@@ -382,7 +436,9 @@ def test_fail_fix_pass_runs_a_separate_fixer_then_commits_checks_pushes_and_revi
     reviews = [c for c in r.calls() if c["kind"] == "reviews"]
     assert len(reviews) == 3 and all(f"Head SHA: {new}" in c["stdin"] for c in reviews[1:])
     events = [l["event"] for l in r.log() if l.get("kind") == "loop"]
-    assert events == ["review", "reviewed", "fixed", "review", "reviewed", "auto-merge"]
+    assert events == ["ci-green-seen", "review", "verdict-posted", "reviewed", "fixed",
+                      "ci-green-seen", "review", "verdict-posted", "reviewed", "auto-merge"]
+    assert [l["head"] for l in r.log() if l.get("event") == "ci-green-seen"] == [r.first_head, new], "once per head"
     assert any(l.get("key") == "fixer" and l["round"] == 1 and l["outcome"] == "ok" for l in r.log())
     assert len(sh(r.work, "worktree", "list").splitlines()) == 1
     assert not (r.state / "review.lock").exists()
@@ -416,6 +472,92 @@ def test_a_fixer_touching_a_forbidden_path_is_refused_and_reverted(repo, edits):
     assert "changed paths it may not change" in r.comments()[-1] and "nothing was pushed" in r.comments()[-1]
     assert len(sh(r.work, "worktree", "list").splitlines()) == 1
     assert sh(r.work, "status", "--porcelain") == ""
+
+
+def author_push(r, tmp_path, rel="src/app.py", text="by the author\n"):
+    w = tmp_path / f"author-{len(list(tmp_path.glob('author-*')))}"
+    sh(tmp_path, "clone", "-q", "-b", "feature", str(r.origin), str(w))
+    sh(w, "config", "user.email", "a@example.com")
+    sh(w, "config", "user.name", "Author")
+    write(w, rel, text)
+    sh(w, "add", "-A")
+    sh(w, "commit", "-qm", "author fix")
+    sh(w, "push", "-q", "origin", "feature")
+
+
+def test_a_finding_on_a_path_the_fixer_may_not_change_labels_author_fix_and_a_new_head_clears_it(repo, tmp_path):
+    r = repo(change=lambda w: (_change_github(w), write(w, "src/app.py", "one\ntwo changed\nthree\n")),
+             reviews=[fail("workflow pins a moving tag", file=".github/workflows/x.yml"), {"verdict": "pass"}])
+    assert r.tick() == ["author-fix"]
+    assert not [c for c in r.calls() if c["kind"] == "fixes"], "the fixer does not run"
+    assert any(p["type"] == "label" and p["labels"] == ["author-fix"] for p in r.github.posts)
+    assert not r.labeled(), "not needs-founder: the author fixes it"
+    body = r.comments()[-1]
+    assert "the author fixes this head" in body and "`.github/workflows/x.yml:1`" in body and "workflow pins a moving tag" in body
+    n = len(r.calls())
+    assert r.tick() == ["skip"] and len(r.calls()) == n, "waits for the author's new head"
+    author_push(r, tmp_path)
+    assert r.tick() == ["auto-merge"]
+    assert {"type": "unlabel", "label": "author-fix"} in r.github.posts and "author-fix" not in r.github.labels
+    events = [l["event"] for l in r.log() if l.get("kind") == "loop"]
+    assert events.index("author-fix") < events.index("author-fix-cleared") < events.index("auto-merge")
+
+
+def test_a_finding_cited_on_main_on_a_forbidden_path_goes_to_the_author(repo):
+    r = repo(reviews=[fail("the map line is wrong", file="main:.github/review-teams.yml")])
+    assert r.tick() == ["author-fix"]
+    assert not [c for c in r.calls() if c["kind"] == "fixes"], "the main: prefix does not hide a forbidden path from the check"
+
+
+SPLIT_MAP_CHANGE = lambda w: (_change_github(w), write(w, "src/app.py", "one\ntwo changed\nthree\n"))  # noqa: E731
+
+
+def test_a_shape_comment_that_fails_to_post_never_stops_the_loop_and_is_retried(repo, monkeypatch):
+    r = repo(change=SPLIT_MAP_CHANGE, reviews=[fail("x"), {"verdict": "pass"}], fixes=[{"edits": {"src/app.py": "fixed\n"}}])
+    real, failed = pr_loop.Loop._say, []
+
+    def say(self, n, body):
+        if "pull request shape" in body and not failed:
+            failed.append(body)
+            raise OSError("GitHub said no")
+        return real(self, n, body)
+    monkeypatch.setattr(pr_loop.Loop, "_say", say)
+    assert r.tick() == ["fixed"], "the failed shape post did not stop the step"
+    assert failed and not [c for c in r.comments() if "pull request shape" in c]
+    assert r.tick() == ["auto-merge"]
+    assert len([c for c in r.comments() if "pull request shape" in c]) == 1, "posted on the next pass"
+    assert not r.labeled()
+
+
+def test_soft_shape_rules_comment_once_and_never_stop(repo, tmp_path):
+    r = repo(change=SPLIT_MAP_CHANGE, reviews=[fail("x"), {"verdict": "pass"}], fixes=[{"edits": {"src/app.py": "fixed\n"}}])
+    assert r.tick() == ["fixed"]
+    shape = [c for c in r.comments() if "pull request shape" in c]
+    assert len(shape) == 1
+    assert "One owning team per pull request where possible: this one has 2 (Council, EDA and Platform)" in shape[0]
+    assert "Founder-class paths in their own pull request: founder-class .github/workflows/x.yml are mixed with src/app.py" in shape[0]
+    assert r.tick() == ["auto-merge"]
+    assert len([c for c in r.comments() if "pull request shape" in c]) == 1, "the same notes on the new head: not posted again"
+    assert any(l.get("event") == "shape" for l in r.log())
+
+
+def test_shape_notes_for_renames_and_the_soft_cap():
+    lc = pr_loop.LOOP
+    one = {"keys": [{"team": "eda-platform", "name": "EDA and Platform", "lead": "eda-tooling"}], "founder": {}}
+    files = [{"status": "R", "old": "a.py", "path": "b.py"}, {"status": "M", "old": None, "path": "c.py"}]
+    numstat = "300\t50\tc.py\n900\t0\ttests/fixtures/big.v\n-\t-\tlogo.png\n0\t0\tb.py\n"
+    notes = pr_loop.shape_notes(one, files, numstat, lc)
+    assert notes == ["Mechanical renames in their own pull request: a.py -> b.py are mixed with other changes."]
+    notes = pr_loop.shape_notes(one, files[1:], "401\t0\tc.py\n", lc)
+    assert notes == ["Soft cap on size: 401 changed lines outside tests/fixtures/**, over 400."]
+    assert pr_loop.shape_notes(one, files[:1], "0\t0\tb.py\n", lc) == [], "a rename-only pull request is fine"
+
+
+def test_a_diff_over_the_review_size_limit_stops_with_no_model_call(repo):
+    r = repo(change=lambda w: write(w, "src/app.py", "x" * 300 + "\n"))
+    assert r.tick(config={**CONFIG, "max_diff_bytes": 100}) == ["stopped"]
+    assert r.calls() == []
+    assert r.labeled() and "review not run: the diff of" in r.comments()[-1] and "split the pull request" in r.comments()[-1]
 
 
 @pytest.mark.parametrize("fix,why", [
@@ -571,6 +713,56 @@ def test_one_pull_request_at_a_time_under_the_shared_lock(repo):
     assert r.tick() == ["auto-merge"]
 
 
+def test_the_shared_lock_is_held_for_each_review_call_and_free_during_the_fixer_and_local_checks(repo, monkeypatch):
+    r = repo(reviews=[fail("bad"), {"verdict": "pass"}], fixes=[{"edits": {"src/app.py": "fixed\n"}}])
+    lock = r.state / "review.lock"
+    seen, original = [], pr_review.run_once
+
+    def watched(binary, args, stdin, cwd, timeout_s):
+        seen.append(("fixer" if "Edit(./**)" in " ".join(args) else "review", lock.exists()))
+        return original(binary, args, stdin, cwd, timeout_s)
+    monkeypatch.setattr(pr_review, "run_once", watched)
+    check = {"name": "lock", "when": ["**"], "run": [["{python}", "-c", f"import os, sys; sys.exit(1 if os.path.exists({str(lock)!r}) else 0)"]]}
+    assert r.tick(loop={**LOOP, "checks": [check]}) == ["fixed"], "the local check ran with the lock free"
+    assert r.tick() == ["auto-merge"]
+    assert seen == [("review", True), ("fixer", False), ("review", True), ("review", True)]
+    assert not lock.exists()
+
+
+def test_a_lock_held_elsewhere_between_key1_and_key2_ends_the_step_and_the_next_pass_reuses_key1(repo, monkeypatch):
+    r = repo()
+    original, other = pr_review.run_once, {}
+
+    def then_taken(binary, args, stdin, cwd, timeout_s):
+        out = original(binary, args, stdin, cwd, timeout_s)
+        if not other:
+            other["release"] = None  # taken once the call has released it
+        return out
+    monkeypatch.setattr(pr_review, "run_once", then_taken)
+    real_acquire = pr_review.acquire_lock
+
+    def acquire(state_dir, owner, *a, **kw):
+        if other.get("release") is None and "release" in other and kw.get("name", "review.lock") == "review.lock":
+            other["release"], _ = real_acquire(state_dir, {"repo": "nirmaansoftware/Nirmaan", "pr": 9})
+        return real_acquire(state_dir, owner, *a, **kw)
+    monkeypatch.setattr(pr_review, "acquire_lock", acquire)
+    assert r.tick() == ["busy"] and len(r.calls()) == 1, "key 1 ran; key 2 met the lock held elsewhere"
+    other["release"]()
+    monkeypatch.setattr(pr_review, "acquire_lock", real_acquire)
+    assert r.tick() == ["auto-merge"]
+    assert len(r.calls()) == 2, "key 1 reused from the cache, key 2 called once"
+    assert any(l.get("key") == 1 and l["outcome"] == "reused" for l in r.log())
+
+
+def test_one_pass_at_a_time_per_repository(repo):
+    r = repo()
+    release, _ = pr_review.acquire_lock(r.state, {"repo": CONFIG["repo"], "by": "another pass"},
+                                        name=f"loop-{CONFIG['repo'].replace('/', '_')}.lock")
+    assert r.tick() == [] and r.calls() == []
+    release()
+    assert r.tick() == ["auto-merge"]
+
+
 def test_no_post_commits_the_fix_locally_and_never_pushes(repo):
     r = repo(reviews=[fail("bad")])
     assert r.tick(post="none") == ["fixed-not-pushed"]
@@ -601,7 +793,8 @@ def test_a_branch_behind_main_is_updated_with_a_merge_commit_before_the_review_t
     assert not r.labeled()
     assert r.tick() == ["auto-merge"]
     assert r.github.merges[0][-1] == new
-    assert [l["event"] for l in r.log() if l.get("kind") == "loop"] == ["updated", "review", "reviewed", "auto-merge"]
+    assert [l["event"] for l in r.log() if l.get("kind") == "loop"] == ["updated", "ci-green-seen", "review", "verdict-posted",
+                                                                         "reviewed", "auto-merge"]
 
 
 def test_while_github_makes_the_merge_commit_the_next_pass_waits_and_does_not_ask_again(repo):

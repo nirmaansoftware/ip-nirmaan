@@ -66,6 +66,10 @@ difference.
   every file it names) differs from the recorded one, the trial is reported as
   not comparable and counts as a difference: the judges are no longer the ones
   that ruled.
+- **A committed re-judge (M63).** `--write` also writes `rejudge.json` into
+  the record: each trial, same or with its differences. A skill's Practised
+  level counts only trials that file shows re-judged clean
+  (`docs/CAPABILITY_LEVELS.md`).
 - **No invented answers.** When the replay asks for more answers than were
   recorded, the scripted model answers with an error that is not a model call,
   so the seat declines and the difference shows.
@@ -172,7 +176,8 @@ their seat stage, so this runs all six cases, 30 trials in all. Then:
 
 ```
 nirmaan eval history
-nirmaan eval rejudge evals/results/<the new directory>
+nirmaan eval rejudge evals/results/<the new directory> --write
+python scripts/capability_levels.py --write
 nirmaan learn --evals evals/results
 ```
 
