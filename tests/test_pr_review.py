@@ -290,20 +290,148 @@ def test_key2_reviews_with_every_owning_leads_seat(repo):
 # --- Fail closed ------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("response, reason", [
-    ({"type": "result", "text": "Looks fine to me."}, "not valid JSON"),
-    ({"type": "verdict", "verdict": "pass", "findings": [{"file": "src/app.py", "line": 99, "severity": "minor", "text": "x"}]}, "src/app.py:99 does not exist"),
-    ({"type": "verdict", "verdict": "fail", "findings": [{"file": "src/nope.py", "line": 1, "severity": "critical", "text": "x"}]}, "does not exist"),
-    ({"type": "verdict", "verdict": "pass", "sha": SHA}, "not the head"),
+@pytest.mark.parametrize("response, reason, calls", [
+    ({"type": "result", "text": "Looks fine to me."}, "not valid JSON", 1),
+    ({"type": "verdict", "verdict": "fail", "findings": [{"file": "src/nope.py", "line": 1, "severity": "critical", "text": "x"}]},
+     "after one repair: finding 1 (critical): cited src/nope.py:1 does not exist", 2),
+    ({"type": "verdict", "verdict": "pass", "sha": SHA}, "not the head", 1),
 ])
-def test_bad_verdicts_are_deferred_never_success(repo, response, reason):
+def test_bad_verdicts_are_deferred_never_success(repo, response, reason, calls):
     r = repo(responses=[response])
     r.run()
     assert r.check("review/team-lead")["state"] == "pending"
     assert r.check("review/executive")["state"] == "pending"
     assert reason in r.comments()[0]["body"]
-    assert len(r.calls()) == 1, "key 2 is not called after a deferred key 1"
+    assert len(r.calls()) == calls, "key 2 is not called after a deferred key 1 (a bad severe citation gets one repair)"
     r.no_success()
+
+
+# --- Citations: worktree prefixes, main, minor drops, one repair ---------------------------
+
+def bad_cite(severity, verdict="fail", file="src/nope.py", line=1, text="x"):
+    return {"type": "verdict", "verdict": verdict, "findings": [{"file": file, "line": line, "severity": severity, "text": text}]}
+
+
+def test_a_bad_citation_on_a_minor_finding_is_dropped_with_a_note_and_the_verdict_stands(repo):
+    # The #113 deferral, replayed: a minor finding cited line 99 of a 4-line file.
+    r = repo(responses=[bad_cite("minor", "pass", "src/app.py", 99, "MINOR-TEXT"), PASS])
+    result = r.run()
+    assert result["key1"][0]["status"] == "pass" and result["key1"][0]["verdict"]["findings"] == []
+    assert len(r.calls()) == 2, "no repair for a minor finding"
+    body = r.comments()[0]["body"]
+    assert "Dropped a minor finding whose citation is bad (cited src/app.py:99 does not exist" in body and "MINOR-TEXT" in body
+    assert r.check("review/executive")["state"] == "success"
+
+
+def test_a_line_on_main_is_accepted_explicitly_or_when_the_file_is_not_at_the_head(repo):
+    # The #117 deferral, replayed: the cited file reached main after the head was made.
+    r = repo(responses=[bad_cite("major", "pass", "NEW-ON-MAIN.md", 2), bad_cite("major", "pass", "main:NEW-ON-MAIN.md", 1)])
+    write(r.work, "NEW-ON-MAIN.md", "a\nb\n")
+    sh(r.work, "add", "-A")
+    sh(r.work, "commit", "-qm", "main moves")
+    sh(r.work, "push", "-q", "origin", "main")
+    result = r.run()
+    assert result["key1"][0]["status"] == "pass" and len(r.calls()) == 2, "key 1 and key 2, no repair: both lines exist on main"
+    assert [f["file"] for f in result["key2"]["verdict"]["findings"]] == ["main:NEW-ON-MAIN.md"]
+    assert pr_review.citation_error("main:src/app.py", 1, lambda f, l: False) == "cited main:src/app.py:1 does not exist on main"
+
+
+def test_a_worktree_prefix_is_taken_off_a_cited_path():
+    seen = []
+
+    def exists(f, l):
+        seen.append(f)
+        return True
+    v = {"verdict": "fail", "sha": SHA, "checks_run": [], "not_run": [], "findings": [
+        {"file": "/wt/run/head/src/a.py", "line": 1, "severity": "critical", "text": "x"},
+        {"file": "/wt/run/main/src/b.py", "line": 2, "severity": "minor", "text": "y"}]}
+    verdict, error, _ = pr_review.validate_verdict(v, SHA, exists, prefixes={"/wt/run/head": "", "/wt/run/main": "main:"})
+    assert error is None and [f["file"] for f in verdict["findings"]] == ["src/a.py", "main:src/b.py"] and seen == ["src/a.py", "main:src/b.py"]
+    _, error, _ = pr_review.validate_verdict(v, SHA, exists)
+    assert isinstance(error, pr_review.CitationError) and "not a repository-relative path" in error
+
+
+def test_a_bad_citation_on_a_severe_finding_gets_one_repair_of_the_same_verdict(repo):
+    good = bad_cite("critical", file="src/app.py", line=2, text="REPAIRED")
+    r = repo(responses=[bad_cite("critical"), good])
+    result = r.run()
+    k1 = result["key1"][0]
+    assert k1["status"] == "fail" and k1["verdict"]["findings"][0]["text"] == "REPAIRED"
+    repair = r.calls()[1]
+    assert "failed the script's citation check" in repair["stdin"] and "cited src/nope.py:1 does not exist" in repair["stdin"]
+    assert 'Return the verdict "fail"' in repair["stdin"] and "keeping every blocker, critical and major finding" in repair["stdin"]
+    assert [l.get("attempt") for l in r.log()] == [1, "repair"]
+    assert "One citation repair" in r.comments()[0]["body"]
+    assert r.check("review/team-lead")["state"] == "failure"
+
+
+def test_the_citation_repair_call_also_holds_the_shared_lock_and_is_logged_with_its_verdict(repo, monkeypatch):
+    r = repo(responses=[bad_cite("critical"), bad_cite("critical", file="src/app.py", line=2, text="REPAIRED")])
+    lock, seen, original = r.state / "review.lock", [], pr_review.run_once
+
+    def watched(binary, args, stdin, cwd, timeout_s):
+        seen.append(lock.exists())
+        return original(binary, args, stdin, cwd, timeout_s)
+    monkeypatch.setattr(pr_review, "run_once", watched)
+    assert r.run()["key1"][0]["status"] == "fail"
+    assert seen == [True, True], "the first call and the repair each run under the lock"
+    assert not lock.exists()
+    first, repair = r.log()
+    assert first["attempt"] == 1 and "does not exist" in first["validation_error"]
+    assert repair["attempt"] == "repair" and repair["verdict"] == "fail" and repair["validation_error"] is None
+
+
+@pytest.mark.parametrize("first, repair", [
+    (bad_cite("blocker"), {"type": "verdict", "verdict": "pass"}),  # a fail repaired into a pass
+    (bad_cite("major", "pass"), {"type": "verdict", "verdict": "fail"}),  # the verdict changed
+])
+def test_a_repair_that_changes_the_verdict_defers_and_never_passes(repo, first, repair):
+    r = repo(responses=[first, repair, PASS])
+    result = r.run()
+    assert result["key1"][0]["status"] == "deferred" and "the citation repair changed the verdict" in result["key1"][0]["reason"]
+    assert len(r.calls()) == 2
+    r.no_success()
+
+
+def test_a_pass_with_a_badly_cited_major_finding_is_repaired_and_stays_a_pass(repo):
+    r = repo(responses=[bad_cite("major", "pass"), bad_cite("major", "pass", "src/app.py", 1), PASS])
+    result = r.run()
+    assert result["key1"][0]["status"] == "pass" and len(r.calls()) == 3
+    assert r.check("review/executive")["state"] == "success"
+
+
+@pytest.mark.parametrize("repair", [
+    {"type": "verdict", "verdict": "pass"},  # the critical finding dropped
+    bad_cite("minor", "pass", "src/app.py", 1),  # the critical finding swapped for a minor one
+])
+def test_a_pass_with_a_badly_cited_critical_finding_is_asked_as_a_fail_and_never_passes(repo, repair):
+    r = repo(responses=[bad_cite("critical", "pass"), repair, PASS])
+    result = r.run()
+    assert result["key1"][0]["status"] == "deferred", "main deferred this verdict; the repair must not turn it into a pass"
+    assert 'Return the verdict "fail"' in r.calls()[1]["stdin"]
+    r.no_success()
+
+
+def test_a_pass_with_a_badly_cited_critical_finding_repaired_as_a_fail_is_a_fail(repo):
+    r = repo(responses=[bad_cite("critical", "pass"), bad_cite("critical", "fail", "src/app.py", 1)])
+    assert r.run()["key1"][0]["status"] == "fail"
+    assert r.check("review/team-lead")["state"] == "failure"
+
+
+def test_a_repair_that_drops_a_major_finding_defers(repo):
+    r = repo(responses=[bad_cite("major", "pass"), {"type": "verdict", "verdict": "pass"}, PASS])
+    result = r.run()
+    assert result["key1"][0]["status"] == "deferred" and "dropped a major finding" in result["key1"][0]["reason"]
+    r.no_success()
+
+
+def test_the_founder_proxy_gets_the_same_one_repair(repo):
+    needs = {"type": "verdict", "verdict": "needs-founder", "findings": [{"file": "src/nope.py", "line": 1, "severity": "major", "text": "x"}],
+             "extra": {"founder_reasons": ["a paid runner"]}}
+    fixed = {**needs, "findings": [{"file": ".github/workflows/x.yml", "line": 1, "severity": "major", "text": "x"}]}
+    r = repo(change=GITHUB_CHANGE, responses=[PASS, PASS, needs, fixed])
+    result = r.run()
+    assert result["proxy"]["status"] == "needs-founder" and len(r.calls()) == 4
 
 
 def test_cli_output_that_is_not_json_is_retried_once_then_deferred(repo):
@@ -403,6 +531,16 @@ def test_the_newest_completed_ci_run_decides(repo, older, newer, expect):
         assert result.get("ci_failed") and r.calls() == []
     else:
         assert r.check("review/team-lead")["state"] == "success"
+
+
+def test_a_diff_over_the_size_limit_is_not_reviewed_and_no_model_is_called(repo):
+    r = repo(change=lambda w: write(w, "src/app.py", "x" * 300 + "\n"))
+    result = r.run(config={**CONFIG, "max_diff_bytes": 100})
+    assert result["too_large"] is True and "split the pull request" in result["deferred"]
+    assert r.calls() == []
+    for name in ("review/team-lead", "review/executive"):
+        assert r.check(name)["state"] == "pending" and "over the review's limit of 100 bytes" in r.check(name)["title"]
+    r.no_success()
 
 
 def test_ci_not_green_waits_without_a_model_call(repo):
@@ -807,7 +945,10 @@ def test_the_call_log_records_each_verdict_its_findings_by_severity_and_the_vali
 
 @pytest.mark.parametrize("response, error", [
     ({"type": "result", "text": "Looks fine to me."}, "not valid JSON"),
-    ({"type": "verdict", "verdict": "pass", "findings": [{"file": "src/app.py", "line": 99, "severity": "minor", "text": "x"}]}, "src/app.py:99 does not exist"),
+    # A badly cited minor finding no longer defers (it is dropped with a note,
+    # council/records/2026-10-18-review-loop.md, decision 5 item 3),
+    # so the deferring case is a verdict outside the schema.
+    ({"type": "verdict", "verdict": "approved", "findings": []}, 'pass" or "fail'),
 ])
 def test_a_deferred_verdict_logs_its_validation_error_once(repo, response, error):
     r = repo(responses=[response])
@@ -826,7 +967,7 @@ def test_a_deferred_verdict_logs_its_validation_error_once(repo, response, error
     ({"extra": 1}, "unexpected key"),
     ({"findings": [{"file": "a", "line": 0, "severity": "minor", "text": "x"}]}, "positive integer"),
     ({"findings": [{"file": "a", "line": 1, "severity": "huge", "text": "x"}]}, "severity"),
-    ({"findings": [{"file": "../x", "line": 1, "severity": "minor", "text": "x"}]}, "repository-relative"),
+    ({"findings": [{"file": "../x", "line": 1, "severity": "major", "text": "x"}]}, "repository-relative"),
     ({"not_run": "tests"}, "list"),
 ])
 def test_validate_verdict_schema(bad, why):

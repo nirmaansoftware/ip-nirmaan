@@ -148,6 +148,10 @@ class FakeGitHub:
         self.posts.append({"type": "label", "labels": labels})
         self.labels += labels
 
+    def remove_label(self, n, label):
+        self.posts.append({"type": "unlabel", "label": label})
+        self.labels = [l for l in self.labels if l != label]
+
     def list_reviews(self, n):
         return self.reviews
 
@@ -470,6 +474,92 @@ def test_a_fixer_touching_a_forbidden_path_is_refused_and_reverted(repo, edits):
     assert sh(r.work, "status", "--porcelain") == ""
 
 
+def author_push(r, tmp_path, rel="src/app.py", text="by the author\n"):
+    w = tmp_path / f"author-{len(list(tmp_path.glob('author-*')))}"
+    sh(tmp_path, "clone", "-q", "-b", "feature", str(r.origin), str(w))
+    sh(w, "config", "user.email", "a@example.com")
+    sh(w, "config", "user.name", "Author")
+    write(w, rel, text)
+    sh(w, "add", "-A")
+    sh(w, "commit", "-qm", "author fix")
+    sh(w, "push", "-q", "origin", "feature")
+
+
+def test_a_finding_on_a_path_the_fixer_may_not_change_labels_author_fix_and_a_new_head_clears_it(repo, tmp_path):
+    r = repo(change=lambda w: (_change_github(w), write(w, "src/app.py", "one\ntwo changed\nthree\n")),
+             reviews=[fail("workflow pins a moving tag", file=".github/workflows/x.yml"), {"verdict": "pass"}])
+    assert r.tick() == ["author-fix"]
+    assert not [c for c in r.calls() if c["kind"] == "fixes"], "the fixer does not run"
+    assert any(p["type"] == "label" and p["labels"] == ["author-fix"] for p in r.github.posts)
+    assert not r.labeled(), "not needs-founder: the author fixes it"
+    body = r.comments()[-1]
+    assert "the author fixes this head" in body and "`.github/workflows/x.yml:1`" in body and "workflow pins a moving tag" in body
+    n = len(r.calls())
+    assert r.tick() == ["skip"] and len(r.calls()) == n, "waits for the author's new head"
+    author_push(r, tmp_path)
+    assert r.tick() == ["auto-merge"]
+    assert {"type": "unlabel", "label": "author-fix"} in r.github.posts and "author-fix" not in r.github.labels
+    events = [l["event"] for l in r.log() if l.get("kind") == "loop"]
+    assert events.index("author-fix") < events.index("author-fix-cleared") < events.index("auto-merge")
+
+
+def test_a_finding_cited_on_main_on_a_forbidden_path_goes_to_the_author(repo):
+    r = repo(reviews=[fail("the map line is wrong", file="main:.github/review-teams.yml")])
+    assert r.tick() == ["author-fix"]
+    assert not [c for c in r.calls() if c["kind"] == "fixes"], "the main: prefix does not hide a forbidden path from the check"
+
+
+SPLIT_MAP_CHANGE = lambda w: (_change_github(w), write(w, "src/app.py", "one\ntwo changed\nthree\n"))  # noqa: E731
+
+
+def test_a_shape_comment_that_fails_to_post_never_stops_the_loop_and_is_retried(repo, monkeypatch):
+    r = repo(change=SPLIT_MAP_CHANGE, reviews=[fail("x"), {"verdict": "pass"}], fixes=[{"edits": {"src/app.py": "fixed\n"}}])
+    real, failed = pr_loop.Loop._say, []
+
+    def say(self, n, body):
+        if "pull request shape" in body and not failed:
+            failed.append(body)
+            raise OSError("GitHub said no")
+        return real(self, n, body)
+    monkeypatch.setattr(pr_loop.Loop, "_say", say)
+    assert r.tick() == ["fixed"], "the failed shape post did not stop the step"
+    assert failed and not [c for c in r.comments() if "pull request shape" in c]
+    assert r.tick() == ["auto-merge"]
+    assert len([c for c in r.comments() if "pull request shape" in c]) == 1, "posted on the next pass"
+    assert not r.labeled()
+
+
+def test_soft_shape_rules_comment_once_and_never_stop(repo, tmp_path):
+    r = repo(change=SPLIT_MAP_CHANGE, reviews=[fail("x"), {"verdict": "pass"}], fixes=[{"edits": {"src/app.py": "fixed\n"}}])
+    assert r.tick() == ["fixed"]
+    shape = [c for c in r.comments() if "pull request shape" in c]
+    assert len(shape) == 1
+    assert "One owning team per pull request where possible: this one has 2 (Council, EDA and Platform)" in shape[0]
+    assert "Founder-class paths in their own pull request: founder-class .github/workflows/x.yml are mixed with src/app.py" in shape[0]
+    assert r.tick() == ["auto-merge"]
+    assert len([c for c in r.comments() if "pull request shape" in c]) == 1, "the same notes on the new head: not posted again"
+    assert any(l.get("event") == "shape" for l in r.log())
+
+
+def test_shape_notes_for_renames_and_the_soft_cap():
+    lc = pr_loop.LOOP
+    one = {"keys": [{"team": "eda-platform", "name": "EDA and Platform", "lead": "eda-tooling"}], "founder": {}}
+    files = [{"status": "R", "old": "a.py", "path": "b.py"}, {"status": "M", "old": None, "path": "c.py"}]
+    numstat = "300\t50\tc.py\n900\t0\ttests/fixtures/big.v\n-\t-\tlogo.png\n0\t0\tb.py\n"
+    notes = pr_loop.shape_notes(one, files, numstat, lc)
+    assert notes == ["Mechanical renames in their own pull request: a.py -> b.py are mixed with other changes."]
+    notes = pr_loop.shape_notes(one, files[1:], "401\t0\tc.py\n", lc)
+    assert notes == ["Soft cap on size: 401 changed lines outside tests/fixtures/**, over 400."]
+    assert pr_loop.shape_notes(one, files[:1], "0\t0\tb.py\n", lc) == [], "a rename-only pull request is fine"
+
+
+def test_a_diff_over_the_review_size_limit_stops_with_no_model_call(repo):
+    r = repo(change=lambda w: write(w, "src/app.py", "x" * 300 + "\n"))
+    assert r.tick(config={**CONFIG, "max_diff_bytes": 100}) == ["stopped"]
+    assert r.calls() == []
+    assert r.labeled() and "review not run: the diff of" in r.comments()[-1] and "split the pull request" in r.comments()[-1]
+
+
 @pytest.mark.parametrize("fix,why", [
     ({"status": "needs_founder", "not_addressed": [{"id": "F1", "reason": "needs a CODEOWNERS change"}]}, "needs a change the loop may not make (F1: needs a CODEOWNERS change)"),
     ({"edits": {"src/app.py": "x\n"}, "not_addressed": [{"id": "F1", "reason": "unclear"}]}, "could not fix every finding"),
@@ -619,6 +709,56 @@ def test_one_pull_request_at_a_time_under_the_shared_lock(repo):
     r = repo()
     release, _ = pr_review.acquire_lock(r.state, {"repo": "nirmaansoftware/Nirmaan", "pr": 9})
     assert r.tick() == ["busy"] and r.calls() == []
+    release()
+    assert r.tick() == ["auto-merge"]
+
+
+def test_the_shared_lock_is_held_for_each_review_call_and_free_during_the_fixer_and_local_checks(repo, monkeypatch):
+    r = repo(reviews=[fail("bad"), {"verdict": "pass"}], fixes=[{"edits": {"src/app.py": "fixed\n"}}])
+    lock = r.state / "review.lock"
+    seen, original = [], pr_review.run_once
+
+    def watched(binary, args, stdin, cwd, timeout_s):
+        seen.append(("fixer" if "Edit(./**)" in " ".join(args) else "review", lock.exists()))
+        return original(binary, args, stdin, cwd, timeout_s)
+    monkeypatch.setattr(pr_review, "run_once", watched)
+    check = {"name": "lock", "when": ["**"], "run": [["{python}", "-c", f"import os, sys; sys.exit(1 if os.path.exists({str(lock)!r}) else 0)"]]}
+    assert r.tick(loop={**LOOP, "checks": [check]}) == ["fixed"], "the local check ran with the lock free"
+    assert r.tick() == ["auto-merge"]
+    assert seen == [("review", True), ("fixer", False), ("review", True), ("review", True)]
+    assert not lock.exists()
+
+
+def test_a_lock_held_elsewhere_between_key1_and_key2_ends_the_step_and_the_next_pass_reuses_key1(repo, monkeypatch):
+    r = repo()
+    original, other = pr_review.run_once, {}
+
+    def then_taken(binary, args, stdin, cwd, timeout_s):
+        out = original(binary, args, stdin, cwd, timeout_s)
+        if not other:
+            other["release"] = None  # taken once the call has released it
+        return out
+    monkeypatch.setattr(pr_review, "run_once", then_taken)
+    real_acquire = pr_review.acquire_lock
+
+    def acquire(state_dir, owner, *a, **kw):
+        if other.get("release") is None and "release" in other and kw.get("name", "review.lock") == "review.lock":
+            other["release"], _ = real_acquire(state_dir, {"repo": "nirmaansoftware/Nirmaan", "pr": 9})
+        return real_acquire(state_dir, owner, *a, **kw)
+    monkeypatch.setattr(pr_review, "acquire_lock", acquire)
+    assert r.tick() == ["busy"] and len(r.calls()) == 1, "key 1 ran; key 2 met the lock held elsewhere"
+    other["release"]()
+    monkeypatch.setattr(pr_review, "acquire_lock", real_acquire)
+    assert r.tick() == ["auto-merge"]
+    assert len(r.calls()) == 2, "key 1 reused from the cache, key 2 called once"
+    assert any(l.get("key") == 1 and l["outcome"] == "reused" for l in r.log())
+
+
+def test_one_pass_at_a_time_per_repository(repo):
+    r = repo()
+    release, _ = pr_review.acquire_lock(r.state, {"repo": CONFIG["repo"], "by": "another pass"},
+                                        name=f"loop-{CONFIG['repo'].replace('/', '_')}.lock")
+    assert r.tick() == [] and r.calls() == []
     release()
     assert r.tick() == ["auto-merge"]
 
