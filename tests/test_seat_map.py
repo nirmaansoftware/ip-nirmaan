@@ -1,7 +1,7 @@
 """The seat map (council/seat-map.yml) and the derived key data in .github/review-teams.yml.
 
-Capability build-out council record of 2026-10-18, sections 5 and 6 (proposed
-in pull request #118; council/records/2026-10-20-founder-proxy-widened.md
+Capability build-out council record of 2026-10-18, sections 5 and 6
+(council/records/2026-10-18-capability-buildout.md; council/records/2026-10-20-founder-proxy-widened.md
 hands its open items to the Founder Proxy), without CODEOWNERS (removed by #113): each council
 seat maps to one org role or one shared role; each review team stores `unit:`
 (the lowest common unit of its lead seats' roles and covers, or `shared`) and
