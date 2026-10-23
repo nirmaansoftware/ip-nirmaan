@@ -117,11 +117,14 @@ Built in rollout R5; in use on real pull requests since 2026-10-18. The
 a pull request it wrote, and the script refuses when a Claude Code session has
 the branch checked out. In order:
 
-1. **One review at a time** across Nirmaan and IP Nirmaan: a lock in
-   `~/.nirmaan/pr-review/`, shared with Nirmaan's script. The lock is a folder
-   (`review.lock`) with an owner file written whole (a temporary file renamed
-   inside it). A lock whose process is gone is cleared, and so is one with no
-   readable owner file that is older than 30 minutes.
+1. **One model call at a time** across Nirmaan and IP Nirmaan: a lock in
+   `~/.nirmaan/pr-review/`, shared with Nirmaan's script, held here only
+   around each reviewer call, never while checking out, reading CI, posting, fixing or
+   running local checks. When it is held elsewhere at a call, the run ends
+   ("busy", exit 3) and the next run reuses the verdicts already cached. The
+   lock is a folder (`review.lock`) with an owner file written whole (a
+   temporary file renamed inside it). A lock whose process is gone is cleared,
+   and so is one with no readable owner file that is older than 30 minutes.
 2. **Eligibility.** Open, targets `main`, a branch in this repository (never a
    fork), authored by `patel-om` or `nirmaansoftware`; otherwise it refuses and
    posts nothing.
@@ -140,7 +143,10 @@ the branch checked out. In order:
    job finished without success, both checks are posted as `action_required`
    with the title "CI failed on <sha>; review not run" (terminal, and never
    green: a required check is satisfied only by success, neutral or skipped).
-   No model is called in either case.
+   No model is called in either case. A diff of `main...head` over 200,000
+   bytes is not reviewed either: both checks stay pending with "review not
+   run: ... split the pull request". The reviewers always get the whole diff,
+   never a cut one (the one shape rule that stops a review).
 6. **Key 1, then key 2.** Key 1 is one fresh `claude -p` process per owning
    team lead: the base checklist, the lead's seat file and the "In a review"
    sections of the team's members. Key 2 runs only when every key 1 passed:
@@ -157,12 +163,25 @@ the branch checked out. In order:
 8. **Validation.** One JSON object: verdict (`pass` or `fail`; the Founder
    Proxy may also return `needs-founder`, with at least one reason), the head SHA,
    findings with file, line and severity, checks run and what was not run. The
-   script checks the schema, the SHA and that every cited file and line exists
-   at the head. A pass with a blocker or critical finding is recorded as fail.
+   script checks the schema, the SHA and every citation. A cited line must exist at the head, at the base for a file
+   the pull request deletes, or on `main` (written `main:<path>`, or a path
+   that is not at the head but is on `main`); a reviewer's checkout prefix is
+   taken off a cited path first. A minor or info finding with a bad citation
+   is dropped with a note in the comment, and the verdict stands; this is
+   the one case where a finding with a bad citation does not hold the key
+   pending. A bad citation on a major, critical or blocker finding gets one
+   repair: a fresh call to the same seat, given its own answer's error, asked
+   for corrected citations and the verdict it gave, except that a pass listing
+   a blocker or critical finding is asked for as a fail. A repair that fails,
+   cites badly again, returns a different verdict, or keeps fewer blocker,
+   critical or major findings defers the key. So a bad citation never turns a
+   verdict that was not a pass, or a pass with a blocker or critical finding,
+   into a pass. A pass with a blocker or critical finding is recorded as fail.
+   A repair is not a review; the call log marks it `"attempt": "repair"`.
 9. **Fail closed.** A failed call, a timeout or a rate limit gets one retry
-   after a backoff; after that, and on any invalid output or missing
-   citation, the key is "review deferred" and stays pending. It never passes
-   by default.
+   after a backoff; after that, and on any invalid output or a citation that
+   step 8 neither drops nor repairs, the key is "review deferred" and stays
+   pending. It never passes by default.
 10. **Posting.** The head is checked before every post; if it moved, nothing
     more is posted. One comment per key (seat, key, head and base SHA,
     verdict, findings, checks run, what was not run) and the checks
@@ -277,7 +296,11 @@ requests labelled `hold` or `needs-founder` are skipped.
    depends on the wording of a gh error: when the setting cannot be read, or
    `gh pr merge --auto` fails for any reason, the loop stops with
    `needs-founder`.
-5. **A key or the Founder Proxy fails.** The loop starts a **fixer**: a separate, fresh `claude -p`
+5. **A key or the Founder Proxy fails.** When a finding to fix is on a path
+   the fixer may not change (step 6), the fixer does not run: the loop labels
+   the pull request `author-fix` and lists the findings, and waits for the
+   author's next head, which clears the label and is reviewed from scratch.
+   Otherwise the loop starts a **fixer**: a separate, fresh `claude -p`
    process, never a reviewer process and never the session that reviewed. It
    runs in a clean worktree of the head with Read, Grep, Glob, Edit and Write
    allowed only inside that worktree; no shell, network, MCP or token. Its task
@@ -305,11 +328,23 @@ requests labelled `hold` or `needs-founder` are skipped.
 7. **Again from scratch.** The new head voids both keys, so the next step waits
    for CI on it and runs both reviews again.
 
+**Shape rules.** After a review, the loop comments once on the soft shape
+rules a pull request breaks, each named, and again only when that list
+changes: one owning team per pull request where possible; founder-class paths
+not mixed with ordinary paths; mechanical renames (a rename with no content
+change) not mixed with other changes; and a soft cap of 400 changed lines
+outside `tests/fixtures/**` (`shape_soft_cap_lines` and `shape_uncounted` in
+`LOOP`). They never stop the loop. Generated files are not detected (nothing
+marks them in this repository), and stacked pull requests are never reviewed,
+since the loop takes only pull requests to `main`. The one rule that stops a
+review is the size limit above.
+
 **When it stops.** The loop labels the pull request `needs-founder` and
 comments why when: three fix rounds are done and a key still fails; the same
 finding (same key, team, file and wording) fails again after a fix; CI fails
 after a fix; the branch has a merge conflict; a key or the Founder Proxy is
-deferred (rate limit, bad output, missing seat file); the Founder Proxy returns
+deferred (rate limit, bad output, missing seat file), or the diff is over the
+review's size limit; the Founder Proxy returns
 `needs-founder` (until the founder's own review approves the head); the fixer hits a rate limit, gives no valid
 answer, cannot fix every finding or changes nothing; a local check fails; the
 auto-merge setting cannot be read or `gh pr merge --auto` fails; the branch
@@ -323,8 +358,12 @@ the fixer works, the round is dropped without a label and the new head is
 reviewed from scratch. Removing the `needs-founder` label lets the loop resume
 with a fresh round count.
 
-**One review at a time, every pull request each pass.** The loop holds the
-review lock (shared with Nirmaan) for a whole review and fix round. Each pass
+**One model call at a time, every pull request each pass.** The shared lock
+is held only around each reviewer call (step 1 of "How reviewers run"); the
+fixer and the local checks run without it, so the other repository's reviews
+go on meanwhile. One pass at a time runs for this repository: the pass holds
+its own lock (`loop-nirmaansoftware_ip-nirmaan.lock` in the same folder), and
+a second pass that finds it held ends at once. Each pass
 takes one step on every open pull request, one the loop is fixing first, then
 by number, so a pull request waiting for CI, or one that just ran a review or a
 fix, never holds up the others; the steps run one after another, so reviews

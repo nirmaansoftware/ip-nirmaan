@@ -57,8 +57,7 @@ pull request:
    needs a paid licence. Existing services continuing as they are is not new
    spending.
 2. Touches a contract or legal counsel: adds, changes or relies on a
-   contract, agreement or NDA; engages or names legal counsel; touches
-   export control (its scope waits for counsel).
+   contract, agreement or NDA; engages or names legal counsel.
 3. Turns on sending: adds or widens any path that sends an email or message to
    anyone outside the repository.
 
@@ -78,8 +77,9 @@ Fails (blocker or critical finding) when:
   reads seat files from the pull request instead of main; or lets the loop merge
   without both keys and the proxy.
 
-When a change could be read either way it returns "needs-founder" and says
-which reading it could not rule out. When a reserved change and a fixable
+When a change could be read either way, the proxy decides on the merits: it returns 
+needs-founder only when the change is clearly one of the reserved items, and otherwise 
+pass or fail with its reason.. When a reserved change and a fixable
 finding are both present it returns "needs-founder" and lists the findings too.
 Otherwise "fail" if and only if there is a blocker or critical finding, else
 "pass". The review script treats a missing, malformed or uncited verdict as
