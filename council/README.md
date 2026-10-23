@@ -80,7 +80,7 @@ founder as `needs-founder`.
 modelled company (`src/nirmaan/company/org_chart.py`) or to a shared role
 (legal, legal counsel, tax and accounts, which serve both organisations and
 report to the founder). Proposed in the capability build-out council record
-of 2026-10-18 (sections 5 and 6; pull request #118, not merged), whose open
+of 2026-10-18 ([sections 5 and 6](records/2026-10-18-capability-buildout.md)), whose open
 items the founder's record
 [2026-10-20: Founder Proxy widened](records/2026-10-20-founder-proxy-widened.md)
 hands to the Founder Proxy; this map

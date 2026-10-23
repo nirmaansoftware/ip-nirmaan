@@ -3,9 +3,8 @@
 Item P1-06 of the 2026-10-18 council record on the capability build-out
 (section 9.3, gate G3): before any knowledge document is written, the path
 that brings its text to a seat exists, with a budget and a test over every
-workflow seat. The record is proposed in pull request #118, which waits for
-the founder, so it is not yet in `council/records/`; every rule this
-milestone takes from it is stated here in full, and the 40,000 character cap
+workflow seat. The record is `council/records/2026-10-18-capability-buildout.md`; every
+rule this milestone takes from it is also stated here in full, and the 40,000 character cap
 is this milestone's own limit.
 
 ## The gap
