@@ -37,10 +37,17 @@ per call, as a state machine that survives restarts:
             worktree of the head, Edit and Write only inside it; the loop (never
             the model) checks what changed, commits, runs the checks and pushes.
             The new head voids both keys, so the next step reviews from scratch;
+    pause   a key or the proxy deferred only by a rate limit (the plan's
+            session or usage limit, after its one retry), or the fixer hit one:
+            no label, the key stays pending, and no model call for any pull
+            request until the pause ends (rate_limit_pause_minutes, in a file
+            the Nirmaan loop shares, since both run on one plan); then the same
+            head is reviewed again;
     stop    three fix rounds, the same finding twice, CI failing after a fix, a
-            merge conflict, a deferred key or proxy, the proxy's needs-founder
-            (until the founder's own GitHub review approves the head), a rate
-            limit, a forbidden path, a failed local check or any error: label
+            merge conflict, a key or proxy deferred for any other reason, the
+            proxy's needs-founder (until the founder's own GitHub review
+            approves the head), a forbidden path, a failed local check or any
+            error: label
             `needs-founder`, say why.
 
 Usage: python scripts/pr_loop.py (--once | --watch) [--pr N] [--interval-minutes 5] [--no-post]
@@ -58,7 +65,7 @@ import subprocess
 import sys
 import tempfile
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -95,6 +102,8 @@ def _gh_failure(exc) -> str:
 LOOP = {
     "authors": ["patel-om"],
     "max_fix_rounds": 3,
+    # A rate limit pauses the whole loop this long, then it reviews again.
+    "rate_limit_pause_minutes": 30,
     "needs_founder_label": "needs-founder",
     # A finding on a path the fixer may not change: the fixer does not run, the
     # pull request gets this label, and the author's next head clears it.
@@ -337,6 +346,23 @@ def _save_state(state_dir, repo: str, st: dict):
     path.write_text(json.dumps(st, indent=2))
 
 
+# The loop-wide rate-limit pause. The same file and format as the Nirmaan
+# loop's (.github/scripts/pr-loop/pr-loop.mjs, readPause): both loops share the
+# state directory and the plan, so a limit either hits pauses both.
+def pause_path(state_dir) -> Path:
+    return Path(state_dir) / "loop" / "rate-limit-pause.json"
+
+
+def read_pause(state_dir, now: datetime | None = None) -> dict | None:
+    """The pause in force, or None (no file, unreadable, or ended)."""
+    try:
+        p = json.loads(pause_path(state_dir).read_text())
+        until = datetime.fromisoformat(str(p["until"]).replace("Z", "+00:00"))
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+    return p if until > (now or datetime.now(timezone.utc)) else None
+
+
 def ci_completed_at(required: list[str], runs: list[dict]) -> str | None:
     """When the required CI finished on a head, from GitHub's check runs: the
     latest completion time of the run that counts for each job (the newest),
@@ -507,6 +533,10 @@ class Loop:
         open_pulls = self.o["github"].list_open_pulls()
         self._note_closed({p["number"] for p in open_pulls}, only_pr)
         pulls = [p for p in open_pulls if not only_pr or p["number"] == only_pr]
+        paused = read_pause(self.state_dir)
+        if paused:
+            self.out(f"pr-loop: rate-limit pause until {paused['until']} ({paused.get('repo')} #{paused.get('pr')}); no model call this pass")
+            return [{"pr": p["number"], "outcome": "paused", "reason": f"rate-limit pause until {paused['until']}"} for p in pulls]
 
         def in_flight(p):
             s = load_state(self.state_dir, self.cfg["repo"], p["number"])
@@ -520,7 +550,7 @@ class Loop:
                          "the rest wait for the next pass")
                 break
             results.append({"pr": p["number"], **self.step(p)})
-            if results[-1]["outcome"] == "auto-merge":
+            if results[-1]["outcome"] in ("auto-merge", "paused"):
                 break
         return results
 
@@ -638,6 +668,21 @@ class Loop:
             self.out(f"pr-loop: #{n}: could not label or comment: {exc}")
         return {"outcome": "stopped", "reason": reason}
 
+    def _pause(self, ctx, head, why):
+        """A rate limit is not a stop: no label and no comment, the key stays
+        pending, and no model call for any pull request until the pause ends;
+        then this head is reviewed again."""
+        n = ctx["n"]
+        reason = pr_review.redact(why)
+        until = (datetime.now(timezone.utc) + timedelta(minutes=self.lc.get("rate_limit_pause_minutes", 30))).isoformat()
+        if self.o["post"] != "none":  # a --no-post run leaves the real loop alone
+            path = pause_path(self.state_dir)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps({"until": until, "repo": self.cfg["repo"], "pr": n, "head": head, "reason": reason}))
+        self.out(f"pr-loop: #{n} paused until {until}: {reason}")
+        self._log(ctx, "paused", reason=reason, until=until)
+        return {"outcome": "paused", "reason": reason, "until": until}
+
     def _step(self, ctx, listed):
         cfg, o, n, st = self.cfg, self.o, ctx["n"], ctx["st"]
         pull = o["github"].get_pull(n)
@@ -701,11 +746,13 @@ class Loop:
                   posted=len([p for p in r.get("posted") or [] if not p.get("reused")]))
         self._shape(ctx, r)
         # The Founder Proxy (agent) is a reviewer like the keys: deferred
-        # stops, fail goes to the fixer.
+        # stops (only a rate limit pauses), fail goes to the fixer.
         keys = [*(r.get("key1") or []), *([r["key2"]] if r.get("key2") else []), *([r["proxy"]] if r.get("proxy") else [])]
         if not r.get("key1"):
             return self._stop(ctx, head, "review deferred: no owning team")
         deferred = [k for k in keys if k["status"] == "deferred"]
+        if deferred and all(k.get("call_outcome") == "rate_limit" for k in deferred):
+            return self._pause(ctx, head, "rate limit (" + "; ".join(f"{k['team_name']}: {k.get('reason')}" for k in deferred) + ")")
         if deferred:
             return self._stop(ctx, head, "review deferred (" + "; ".join(f"{k['team_name']}: {k.get('reason')}" for k in deferred) + ")")
         self._log(ctx, "reviewed", key1=",".join(f"{k['team']}:{k['status']}" for k in r["key1"]),
@@ -905,7 +952,14 @@ class Loop:
                                             "reported_model": res.get("reported_model"), "round": rnd, "attempt": 1, "outcome": res["kind"],
                                             "duration_ms": res.get("duration_ms"), **(res.get("tokens") or {}), "prompt_chars": len(system) + len(user)})
         if res["kind"] == "rate_limit":
-            return self._stop(ctx, head, f"fix round {rnd}: the fixer hit a rate limit ({res['error']})")
+            # Not a fix attempt: its findings are not counted as seen, so the
+            # round runs again after the pause.
+            for f in findings:
+                st["seen"][f["fingerprint"]] = st["seen"].get(f["fingerprint"], 1) - 1
+                if st["seen"][f["fingerprint"]] <= 0:
+                    del st["seen"][f["fingerprint"]]
+            _save_state(self.state_dir, cfg["repo"], st)
+            return self._pause(ctx, head, f"fix round {rnd}: the fixer hit a rate limit ({res['error']})")
         if res["kind"] != "ok":
             return self._stop(ctx, head, f"fix round {rnd}: the fixer failed ({res['kind']}: {res['error']})")
 
