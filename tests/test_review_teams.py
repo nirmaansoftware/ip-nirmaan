@@ -345,6 +345,80 @@ def test_no_codeowners_file_founder_classes_are_reviewed_by_the_founder_proxy(fi
     assert (ROOT / "council" / "founder-proxy.md").exists()
 
 
+# --- What the Founder Proxy checks reaches it -----------------------------------------
+#
+# Calibration found three seeded pull requests that the map gave no founder
+# class, so the Founder Proxy never saw them: a cryptographic core (export
+# control), a script that emails partners (sending) and a person named as the
+# package author (attribution). Names, addresses and code here are synthetic.
+
+
+def _added(path: str, *lines: str) -> str:
+    body = "\n".join("+" + line for line in lines)
+    return f"diff --git a/{path} b/{path}\n--- /dev/null\n+++ b/{path}\n@@ -0,0 +1,{len(lines)} @@\n{body}\n"
+
+
+def _classify(teams_map, path: str, diff: str, status: str = "A") -> dict:
+    files = [{"status": status, "old": None, "path": path}]
+    return review_map.classify(teams_map, files, diff, lambda p: None, lambda p: None)
+
+
+REACH_FIXTURES = [
+    ("export-control", "tests/fixtures/rtl/aes/aes256_core.v", _added(
+        "tests/fixtures/rtl/aes/aes256_core.v",
+        "// AES-256 encryption core: 14 rounds, full key expansion, one round per cycle.",
+        "module aes256_core (", "    input  wire [255:0] key,", "endmodule")),
+    ("commercial", "scripts/notify_partners.py", _added(
+        "scripts/notify_partners.py",
+        '"""Emails the release notes to every design partner after a release."""',
+        "import smtplib", "from email.message import EmailMessage",
+        "        with smtplib.SMTP_SSL(host) as smtp:", "            smtp.send_message(msg)")),
+    ("licence-and-third-party", "pyproject.toml",
+        "diff --git a/pyproject.toml b/pyproject.toml\n--- a/pyproject.toml\n+++ b/pyproject.toml\n"
+        "@@ -5,1 +5,1 @@\n"
+        '-authors = [{ name = "Nirmaan", email = "nirmaansoftware@gmail.com" }]\n'
+        '+authors = [{ name = "Example Person", email = "example.person@gmail.com" }]\n'),
+]
+
+
+@pytest.mark.parametrize("founder_class, path, diff", REACH_FIXTURES, ids=["crypto-core", "sending", "package-author"])
+def test_what_the_founder_proxy_checks_gets_a_founder_class_and_legal_key1(teams_map, founder_class, path, diff):
+    c = _classify(teams_map, path, diff, status="M" if path == "pyproject.toml" else "A")
+    assert founder_class in c["founder"], c["founder"]
+    assert {"team": "business", "name": "Business", "lead": "legal-compliance"} in c["keys"], c["keys"]
+
+
+@pytest.mark.parametrize("line", [
+    "Copyright Example Person",
+    "/* Copyright (C) Example Person */",
+    "<span>© Example Person</span>",
+    '__author__ = "Example Person"',
+    " * @author Example Person",
+    "contact: example.person@gmail.com",
+])
+def test_a_person_as_author_copyright_holder_or_contact_is_licence_class(teams_map, line):
+    c = _classify(teams_map, "src/nirmaan/x.py", _added("src/nirmaan/x.py", line))
+    assert "licence-and-third-party" in c["founder"], line
+
+
+@pytest.mark.parametrize("path, line", [
+    ("scripts/pr_review.py", "head SHA and base SHA, sha256 digest"),
+    ("tests/fixtures/rtl/x.v", "// SECDED ECC on the memory, CRC32 on the link"),
+    ("scripts/pr_loop.py", "        name, email = self._identity(head)"),
+    ("scripts/pr_review.py", '"author": (p.get("user") or {}).get("login"),'),
+    ("pyproject.toml", 'name = "ip-nirmaan"'),
+    ("site/index.html", "Write to nirmaansoftware@gmail.com"),
+    ("LICENSE", "the copyright owner or entity authorized by"),
+])
+def test_the_reach_rules_stay_quiet_on_ordinary_lines(teams_map, path, line):
+    c = _classify(teams_map, path, _added(path, line), status="M")
+    new = {"export-control", "commercial", "licence-and-third-party"}
+    hits = {h.split(" in ")[0] for h in c["hits"]}
+    assert not hits & {"export-sensitive", "outbound-sending", "person-attribution", "package-author"}, (line, c["hits"])
+    if path != "LICENSE":
+        assert not new & set(c["founder"]), (line, c["founder"])
+
+
 # --- The loader and the globs ---------------------------------------------------------
 
 
