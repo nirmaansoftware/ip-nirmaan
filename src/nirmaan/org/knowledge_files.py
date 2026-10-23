@@ -1,7 +1,7 @@
 """Knowledge files: the computed tier, the skill card, and the checks every knowledge document passes (M62).
 
-The capability build-out council record of 2026-10-18 (section 9; pull request
-#118, waiting for the founder, not yet on main) sets the rules; ``knowledge/README.md`` states the schema. This module is the one place
+The capability build-out council record of 2026-10-18 (section 9;
+council/records/2026-10-18-capability-buildout.md) sets the rules; ``knowledge/README.md`` states the schema. This module is the one place
 the rules are written as code, so a test can run them over every document in
 ``knowledge/`` and over good and bad fixtures alike.
 

@@ -1,9 +1,9 @@
 # Worked examples and the programme review rules (M64)
 
 Items P1-10 and P1-11 of the 2026-10-18 council record on the capability
-build-out (section 9; gate G7). The record is proposed in pull request #118, so
-it is not yet in `council/records/`; every rule this milestone takes from it is
-stated here in full.
+build-out (section 9; gate G7). The record is
+`council/records/2026-10-18-capability-buildout.md`; every rule this milestone takes from it
+is also stated here in full.
 
 ## Worked examples (P1-11)
 

@@ -3,9 +3,8 @@
 Item P1-07 of the 2026-10-18 council record on the capability build-out
 (sections 9.2, 9.4, 9.11 and 9.12; gate G7): the rules every knowledge
 document and skill card follows exist as checks before the first document is
-written. The record is proposed in pull request #118, which waits for the founder, so
-it is not yet in `council/records/`; every rule this milestone takes from it is
-stated here in full, and the limits are this milestone's own.
+written. The record is `council/records/2026-10-18-capability-buildout.md`; every rule this milestone takes from it
+is also stated here in full, and the limits are this milestone's own.
 
 ## Where the rules live
 

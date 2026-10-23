@@ -1,7 +1,7 @@
 # Milestone 62 - Knowledge file schema and checks: every knowledge document and skill card is checked before the first is written
 
-The capability build-out council record (pull request #118, waiting for the
-founder) sets the rules for knowledge
+The capability build-out council record (`council/records/2026-10-18-capability-buildout.md`)
+sets the rules for knowledge
 documents and skill cards (sections 9.2, 9.4, 9.11, 9.12; item P1-07, gate
 G7). Design: `docs/KNOWLEDGE_FILES.md`. Tests: `tests/test_knowledge_files.py`.
 

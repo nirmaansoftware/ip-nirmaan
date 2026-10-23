@@ -1,7 +1,7 @@
 # Milestone 64 - Worked examples inside the existing CI jobs, and review rules for programme files
 
 Items P1-10 and P1-11 of the capability build-out council record (section 9;
-gate G7; pull request #118, not yet on main). Design:
+gate G7; `council/records/2026-10-18-capability-buildout.md`). Design:
 `docs/WORKED_EXAMPLES.md`. Tests: `tests/test_examples_budget.py`,
 `tests/test_review_teams.py`.
 

@@ -10,7 +10,7 @@ Two budgets, and no silent cut:
 
 * the domain scope's documents together hold at most ``DOMAIN_CAP``
   characters (capability build-out council record of 2026-10-18, section 9.3;
-  pull request #118, waiting for the founder);
+  council/records/2026-10-18-capability-buildout.md);
 * the rendered prompt must fit the seat's model (``context_limit`` in
   :mod:`nirmaan.runtime.model`).
 
