@@ -24,7 +24,8 @@ pr_loop = importlib.util.module_from_spec(_spec)
 sys.modules["pr_loop"] = pr_loop
 _spec.loader.exec_module(pr_loop)
 pr_review = sys.modules["pr_review"]
-CONFIG = pr_review.CONFIG
+# The per-team key 1 (composite switch off), as most tests here describe it.
+CONFIG = pr_review.CONFIG | {"composite_key1": False}
 
 # The real loop settings, with a local check the tests can make fail.
 LOOP = {**pr_loop.LOOP, "checks": [{"name": "dashes", "when": ["**"], "run": [
@@ -215,7 +216,7 @@ class Repo:
         kwargs = dict(repo_root=str(self.work), github=self.github, post="app", claude_bin=str(self.bin), state_dir=self.state,
                       models={"key1": "k1", "key2": "k2", "proxy": "proxy-model"}, timeout_s=30, backoff_s=0, fixer_model="fixer-model",
                       fixer_timeout_s=30, check_timeout_s=30, sleep=lambda s: None, out=lambda s: None,
-                      run_gh=self.github.run_gh, loop=LOOP)
+                      run_gh=self.github.run_gh, loop=LOOP, config=CONFIG)
         kwargs.update(extra)
         return pr_loop.Loop(**kwargs)
 

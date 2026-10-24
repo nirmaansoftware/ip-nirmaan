@@ -65,12 +65,12 @@ under "In a review".
 | Business | legal-compliance (licences, notices, third-party code and text); finance-licensing (prices, commercial terms, spend) | legal-counsel, tax-accounts, partnerships |
 
 One key-1 verdict per owning team; members' checklists run inside the lead's
-review and are cited in it. A composite key 1 is built and off (council record
+review and are cited in it. A composite key 1 runs (council record
 2026-10-18, review loop, decision 1): one key-1 call per head, spoken by the
 first owning lead in a fixed precedence, loading every owning lead's section,
 each member checklist whose trigger in `.github/review-teams.yml` matches and
-legal-compliance's on every head, with one verdict entry per checklist. It is
-switched on by its own pull request after an A/B run on the seeded sets
+legal-compliance's on every head, with one verdict entry per checklist. Its own
+pull request switched it on after an A/B run on the seeded sets
 (`docs/REVIEW_MECHANISM.md`). A key is an agent review: never a person's
 decision, a release, or a claim that a design is ready to be made in silicon.
 Six founder classes (council record, section 2) also get the Founder Proxy

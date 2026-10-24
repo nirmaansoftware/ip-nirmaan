@@ -101,10 +101,11 @@ CONFIG = {
     # Composite key 1 (council record 2026-10-18, review loop, decision 1): one
     # key-1 call per head, loading the checklists main's map selects
     # (`composite_key1` in .github/review-teams.yml). Off: one call per owning
-    # team, as before. Switched on only by its own pull request, after the A/B
-    # run on the seeded sets shows it catches every domain seed at least as
-    # often as the per-team calls.
-    "composite_key1": False,
+    # team, as before. On since its own pull request (R10), after the A/B run
+    # on the seeded sets showed it catches every domain seed at least as often
+    # as the per-team calls; a change back is a calibration rerun first
+    # (decision 6, rerun rule).
+    "composite_key1": True,
 }
 
 # Environment variables the review App (tracker T21) provides.

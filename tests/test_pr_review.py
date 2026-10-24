@@ -26,7 +26,9 @@ sys.modules["pr_review"] = pr_review
 _spec.loader.exec_module(pr_review)
 review_map = sys.modules["review_map"]
 
-CONFIG = pr_review.CONFIG
+# The per-team key 1 (the composite switch off): what most tests here describe.
+# Production runs the composite (CONFIG on in scripts/pr_review.py; COMPOSITE below).
+CONFIG = pr_review.CONFIG | {"composite_key1": False}
 SHA = "a" * 40
 
 MAP = """version: 1
@@ -197,7 +199,7 @@ class Repo:
     def run(self, **extra):
         kwargs = dict(repo_root=str(self.work), pr=1, github=self.github, post="app", claude_bin=str(self.bin),
                       state_dir=self.state, models={"key1": "k1-model", "key2": "k2-model", "proxy": "proxy-model"}, timeout_s=30,
-                      backoff_s=0, sleep=lambda s: None, out=lambda s: None)
+                      backoff_s=0, sleep=lambda s: None, out=lambda s: None, config=CONFIG)
         kwargs.update(extra)
         return pr_review.run_review(**kwargs)
 
@@ -1101,7 +1103,7 @@ def test_the_map_on_main_today_classifies_a_control_plane_change():
     assert "control-plane" in c["founder"]
 
 
-# --- Composite key 1 (council record 2026-10-18, review loop, decision 1; off by default) ---
+# --- Composite key 1 (council record 2026-10-18, review loop, decision 1; on since R10) ---
 
 COMPOSITE = CONFIG | {"composite_key1": True}
 COMPOSITE_DATA = """
@@ -1148,7 +1150,8 @@ def composite_verdict(names=LOADED, verdict="pass", findings=None, **over):
     return {"type": "verdict", "verdict": verdict, "findings": findings or [], "extra": {"checklists": entries(names, **over)}}
 
 
-def test_composite_is_off_by_default_and_off_changes_nothing(repo):
+def test_composite_is_on_in_production_and_off_changes_nothing(repo):
+    assert pr_review.CONFIG["composite_key1"] is True, "switched on after the A/B (R10)"
     assert CONFIG["composite_key1"] is False
     r = repo(change=two_teams, main_extra=composite_main)
     r.run()
