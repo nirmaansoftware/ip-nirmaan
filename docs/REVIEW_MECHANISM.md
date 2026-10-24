@@ -40,7 +40,12 @@ comment. A review whose SHA differs from the head is void.
    or message outside the repository, or a person named as author, copyright
    holder or contact adds Business with legal-compliance as key 1, and raises
    the founder class export-control, commercial or licence-and-third-party,
-   so the Founder Proxy sees it.
+   so the Founder Proxy sees it. Specification text reproduced rather than
+   cited (a rights or permission notice, NDA wording, a standard's document
+   number, a standard's numbered table or figure) adds Business with
+   legal-compliance as key 1. A change inside the site hero's review markers
+   (`site/index.html`) raises public-names-and-claims, as the partners
+   section does.
 3. **Key 2: chair.** One agent review of the whole PR, after every key 1.
 4. **Founder Proxy.** A PR in one of the six classes below also gets the
    Founder Proxy (agent) after key 2 passes; what only the founder decides it

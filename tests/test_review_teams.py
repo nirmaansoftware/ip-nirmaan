@@ -419,6 +419,60 @@ def test_the_reach_rules_stay_quiet_on_ordinary_lines(teams_map, path, line):
         assert not new & set(c["founder"]), (line, c["founder"])
 
 
+# --- Checklist gaps the review-loop record closes before the composite switch -----------
+# (council/records/2026-10-18-review-loop.md, decision 1, "Checklist gaps").
+
+
+def test_the_hero_markers_bound_the_hero_and_a_hero_change_is_public_names(teams_map):
+    path = "site/index.html"
+    text = (ROOT / path).read_text(encoding="utf-8")
+    start, end = text.index("<!-- review:hero:begin"), text.index("<!-- review:hero:end -->")
+    assert '<section class="hero"' in text[start:end] and 'id="hero-title"' in text[start:end]
+    assert 'class="hero"' not in text[:start] + text[end:]
+    n = next(i for i, line in enumerate(text.splitlines(), 1) if 'id="hero-title"' in line)
+    old = text.splitlines()[n - 1]
+    diff = (f"diff --git a/{path} b/{path}\n--- a/{path}\n+++ b/{path}\n@@ -{n},1 +{n},1 @@\n"
+            f"-{old}\n+{old.replace('hero__title', 'hero__title x')}\n")
+    c = review_map.classify(teams_map, [{"status": "M", "old": None, "path": path}], diff, lambda p: text, lambda p: text)
+    assert "public-names-and-claims" in c["founder"] and f"section hero in {path}" in c["hits"], c
+
+
+@pytest.mark.parametrize("line", [
+    "The standards body. All rights reserved.",
+    "Reproduced with permission from the vendor's manual.",
+    "Confidential information: distribute under NDA only.",
+    "Signal timing follows IEEE Std 1800-2017, clause 9.",
+    "The DDR4 limits come from JESD79-4.",
+    "| Table 3-2 | Write channel signals |",
+    "See Figure 4-1 for the handshake.",
+])
+def test_specification_text_routes_to_legal_compliance_key1(teams_map, line):
+    c = _classify(teams_map, "docs/x.md", _added("docs/x.md", line))
+    assert "spec-text in docs/x.md" in c["hits"], (line, c["hits"])
+    assert {"team": "business", "name": "Business", "lead": "legal-compliance"} in c["keys"], c["keys"]
+
+
+@pytest.mark.parametrize("line", [
+    "The AXI4-Lite slave answers every read in one cycle.",
+    "customer design data stays confidential to the customer",
+    "Stage 2-3 of the flow",
+    "IEEE 754 single precision",
+])
+def test_the_spec_text_rule_stays_quiet_on_ordinary_lines(teams_map, line):
+    c = _classify(teams_map, "docs/x.md", _added("docs/x.md", line))
+    assert not any(h.startswith("spec-text") for h in c["hits"]), (line, c["hits"])
+
+
+def test_a_design_knowledge_document_is_owned_by_silicon_design(teams_map, files):
+    # knowledge/design/** routes to Silicon Design. No such document exists yet,
+    # and a rule may not name a path with no tracked file (the dead-glob check),
+    # so the division rule lands with the first document (the map's comment on
+    # knowledge/**): this test makes that document carry it.
+    for path in files:
+        if path.startswith("knowledge/design/"):
+            assert "silicon-design" in owning_teams(teams_map, path), path
+
+
 # --- The loader and the globs ---------------------------------------------------------
 
 
