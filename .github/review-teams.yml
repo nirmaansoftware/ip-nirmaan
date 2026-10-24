@@ -379,6 +379,14 @@ sections:
     team: product-site
     co_owners: [business]
     founder_class: public-names-and-claims
+  # The hero's name and claims (council record 2026-10-18, review loop,
+  # decision 1: review markers around the site hero).
+  - id: hero
+    file: site/index.html
+    begin: '<!-- review:hero:begin'
+    end: '<!-- review:hero:end -->'
+    team: product-site
+    founder_class: public-names-and-claims
   - id: roadmap-scope
     file: docs/ROADMAP.md
     begin: '<!-- review:roadmap-scope:begin'
@@ -454,6 +462,15 @@ content_rules:
     pattern: '^\s*(authors|maintainers)\s*=|^\s*\{\s*name\s*=|\bemail\s*='
     in: [pyproject.toml]
     example: 'authors = [{ name = "Example Person", email = "person@example.com" }]'
+  # Specification or other third-party text reproduced rather than summarised
+  # and cited (legal-compliance's checklist; council record 2026-10-18, review
+  # loop, decision 1): rights and permission notices, NDA wording, a
+  # standard's document number, and a standard's numbered tables and figures.
+  - id: spec-text
+    adds: business
+    lead: legal-compliance
+    pattern: '(?i:\ball rights reserved\b|\b(reproduced|reprinted|excerpted) (from|with permission)\b|\bused with permission\b|\b(confidential|proprietary) (information|document|specification|material)\b|\bunder (an )?NDA\b)|\b(IEEE Std \d{3,4}|JESD\d+[A-Z]?|ARM IHI ?\d{4}|ISO/IEC \d{4,5})\b|\b(Table|Figure) [A-Z]?\d+-\d+\b'
+    example: 'Table 3-2 of the protocol specification lists every signal.'
 
 # Key 2 floor: paths on which key 2 stays the chair, on the strongest model,
 # whatever a derived `key2:` says (capability build-out record, section 5,
@@ -543,7 +560,7 @@ founder_classes:
     note: Also anything that adds spend (a paid tool, runner or service), which a key-1 review flags, and any code that sends an email or message to anyone outside the repository (a mail library or service, or a chat webhook), which the Founder Proxy reserves for the founder.
   - id: public-names-and-claims
     title: Public names and claims
-    sections: [partners]
+    sections: [partners, hero]
     content:
       - pattern: '(?i)<meta\b|<title>'
         in: [site/**]
