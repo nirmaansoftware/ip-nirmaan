@@ -465,8 +465,9 @@ def test_timeout_is_retried_once_then_deferred(repo):
 
 def test_rate_limit_twice_defers(repo):
     r = repo(responses=[{"type": "rate_limit"}])
-    r.run()
+    result = r.run()
     assert [l["outcome"] for l in r.log()] == ["rate_limit", "rate_limit"]
+    assert [(k["status"], k["call_outcome"]) for k in result["key1"]] == [("deferred", "rate_limit")], "the loop pauses on this, never stops"
     r.no_success()
 
 
@@ -1050,6 +1051,11 @@ def test_interpret_classifies_results():
     assert pr_review.interpret(0, json.dumps({"subtype": "success", "result": "{}"}), "")["kind"] == "ok"
     assert pr_review.interpret(1, json.dumps({"subtype": "error_during_execution", "is_error": True, "result": "usage limit reached"}), "")["kind"] == "rate_limit"
     assert pr_review.interpret(1, "", "boom")["kind"] == "error"
+    # The plan's session limit, as claude reported it to the loop on 2026-10-23
+    # (subtype "success" with is_error set): a rate limit, not an error.
+    limit = json.dumps({"subtype": "success", "is_error": True, "result": "You've hit your session limit \u00b7 resets 10pm (Asia/Calcutta)"})
+    assert pr_review.interpret(1, limit, "")["kind"] == "rate_limit"
+    assert pr_review.interpret(1, json.dumps({"subtype": "success", "is_error": True, "result": "You've hit your limit"}), "")["kind"] == "rate_limit"
 
 
 def test_markdown_section_stops_at_the_same_level():

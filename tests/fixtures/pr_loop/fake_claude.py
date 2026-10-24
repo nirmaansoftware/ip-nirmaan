@@ -8,10 +8,12 @@ every call to calls.jsonl beside it.
 
 scenario.json: {"reviews": [...], "fixes": [...]}, each list used in order (the
 last entry repeats).
-  review: {"verdict", "findings"?, "extra"?} or {"type": "rate_limit"}
+  review: {"verdict", "findings"?, "extra"?} or {"type": "rate_limit" | "session_limit" | "error"}
     ("extra" adds keys, such as the Founder Proxy's founder_reasons)
   fix: {"status"?, "edits"?: {path: text}, "not_addressed"?: [{id, reason}],
-        "human_move"?: {"git_dir", "ref", "sha"}, "type"?: "rate_limit" | "garbage"}
+        "human_move"?: {"git_dir", "ref", "sha"}, "type"?: "rate_limit" | "session_limit" | "garbage"}
+  session_limit is the plan's limit as claude reports it (subtype "success",
+  is_error set); error is a failed call that is not a limit.
 """
 
 import json
@@ -43,6 +45,10 @@ def ok(value):
 
 if r.get("type") == "rate_limit":
     print(json.dumps({"type": "result", "subtype": "error_during_execution", "is_error": True, "result": "API Error: 429 rate limit exceeded"}))
+elif r.get("type") == "session_limit":
+    print(json.dumps({"type": "result", "subtype": "success", "is_error": True, "result": "You've hit your session limit \u00b7 resets 10pm (Asia/Calcutta)"}))
+elif r.get("type") == "error":
+    print(json.dumps({"type": "result", "subtype": "error_during_execution", "is_error": True, "result": "the process crashed"}))
 elif not is_fixer:
     head = re.search(r"Head SHA: ([0-9a-f]{40})", stdin).group(1)
     ok({"verdict": r.get("verdict", "pass"), "sha": head, "findings": r.get("findings", []),
