@@ -563,14 +563,92 @@ def test_a_diff_over_the_review_size_limit_stops_with_no_model_call(repo):
 @pytest.mark.parametrize("fix,why", [
     ({"status": "needs_founder", "not_addressed": [{"id": "F1", "reason": "needs a CODEOWNERS change"}]}, "needs a change the loop may not make (F1: needs a CODEOWNERS change)"),
     ({"edits": {"src/app.py": "x\n"}, "not_addressed": [{"id": "F1", "reason": "unclear"}]}, "could not fix every finding"),
-    ({"type": "rate_limit"}, "rate limit"),
     ({"type": "garbage"}, "not JSON"),
     ({}, "changed no file"),
 ])
-def test_fixer_refusals_rate_limits_and_bad_output_stop_without_pushing(repo, fix, why):
+def test_fixer_refusals_and_bad_output_stop_without_pushing(repo, fix, why):
     r = repo(reviews=[fail("bad")], fixes=[fix])
     assert r.tick() == ["stopped"]
     assert why in r.comments()[-1] and r.origin_head() == r.first_head
+
+
+# --- Rate limits pause, they do not stop ----------------------------------------------
+
+
+def pause_file(r):
+    return r.state / "loop" / "rate-limit-pause.json"
+
+
+def end_pause(r):
+    p = json.loads(pause_file(r).read_text())
+    pause_file(r).write_text(json.dumps({**p, "until": "2000-01-01T00:00:00Z"}))
+
+
+@pytest.mark.parametrize("limit", ["session_limit", "rate_limit"])
+def test_a_key_hitting_the_plan_limit_pauses_the_loop_with_no_label_then_the_same_head_is_reviewed_again(repo, limit):
+    r = repo(reviews=[{"type": limit}, {"type": limit}, {"verdict": "pass"}])
+    assert r.tick() == ["paused"]
+    assert not r.labeled() and not any("Automated loop stopped" in c for c in r.comments())
+    assert r.st()["stopped"] is None and r.origin_head() == r.first_head
+    p = json.loads(pause_file(r).read_text())
+    assert p["pr"] == 1 and p["head"] == r.first_head and p["repo"] == CONFIG["repo"] and "rate limit" in p["reason"]
+    assert any(l.get("event") == "paused" for l in r.log())
+    calls = len(r.calls())
+    assert r.tick() == ["paused"] and len(r.calls()) == calls, "no model call while the pause lasts"
+    end_pause(r)
+    assert r.tick() == ["auto-merge"]
+    assert not r.labeled()
+
+
+def test_a_limit_then_a_failed_call_still_stops(repo):
+    r = repo(reviews=[{"type": "session_limit"}, {"type": "error"}])
+    assert r.tick() == ["stopped"]
+    assert r.labeled() and "review deferred" in r.comments()[-1] and not pause_file(r).exists()
+
+
+def test_the_fixer_hitting_the_limit_pauses_without_pushing_and_the_round_runs_again_after(repo):
+    r = repo(reviews=[fail("bad"), fail("bad"), {"verdict": "pass"}], fixes=[{"type": "session_limit"}, {"edits": {"src/app.py": "fixed\n"}}])
+    assert r.tick() == ["paused"]
+    assert not r.labeled() and r.origin_head() == r.first_head
+    st = r.st()
+    assert st["seen"] == {} and st["rounds"] == 0, "a round cut short by the limit is not a fix attempt"
+    end_pause(r)
+    assert r.tick() == ["fixed"], "the same finding is fixed after the pause, not counted as failing twice"
+    assert r.origin_head() != r.first_head and not r.labeled()
+
+
+def test_a_pause_ends_the_pass_so_no_other_pull_request_calls_a_model(repo):
+    r = repo()
+    loop = r.loop()
+    loop.o["github"] = type("G", (), {"list_open_pulls": lambda self: [{"number": 1}, {"number": 2}, {"number": 3}]})()
+    seen = []
+
+    def step(p):
+        seen.append(p["number"])
+        return {"outcome": "paused" if p["number"] == 2 else "wait"}
+    loop.step = step
+    assert [x["outcome"] for x in loop.tick()] == ["wait", "paused"] and seen == [1, 2]
+
+
+def test_the_pause_file_is_shared_with_the_nirmaan_loop_and_read_safely(tmp_path):
+    path = pr_loop.pause_path(tmp_path)
+    assert path == tmp_path / "loop" / "rate-limit-pause.json"
+    assert pr_loop.read_pause(tmp_path) is None
+    path.parent.mkdir(parents=True)
+    # The Nirmaan loop writes toISOString() times ("...Z").
+    path.write_text(json.dumps({"until": "2999-01-01T00:00:00.000Z", "repo": "nirmaansoftware/Nirmaan", "pr": 7}))
+    assert pr_loop.read_pause(tmp_path)["pr"] == 7
+    path.write_text(json.dumps({"until": "2000-01-01T00:00:00+00:00"}))
+    assert pr_loop.read_pause(tmp_path) is None
+    for bad in ("not json", "{}", json.dumps({"until": "soon"})):
+        path.write_text(bad)
+        assert pr_loop.read_pause(tmp_path) is None
+
+
+def test_a_no_post_run_that_hits_the_limit_writes_no_pause(repo):
+    r = repo(reviews=[{"type": "session_limit"}])
+    assert r.tick(post="none") == ["paused"]
+    assert not pause_file(r).exists() and not r.labeled()
 
 
 def test_a_failing_local_check_stops_without_pushing(repo):

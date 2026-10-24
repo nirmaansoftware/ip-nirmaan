@@ -364,10 +364,11 @@ review is the size limit above.
 comments why when: three fix rounds are done and a key still fails; the same
 finding (same key, team, file and wording) fails again after a fix; CI fails
 after a fix; the branch has a merge conflict; a key or the Founder Proxy is
-deferred (rate limit, bad output, missing seat file), or the diff is over the
-review's size limit; the Founder Proxy returns
-`needs-founder` (until the founder's own review approves the head); the fixer hits a rate limit, gives no valid
-answer, cannot fix every finding or changes nothing; a local check fails; the
+deferred for any reason but a rate limit (bad output, a failed call, a
+missing seat file), or the diff is over the review's size limit; the Founder
+Proxy returns `needs-founder` (until the founder's own review approves the
+head); the fixer gives no valid answer, cannot fix every finding or changes
+nothing; a local check fails; the
 auto-merge setting cannot be read or `gh pr merge --auto` fails; the branch
 is behind `main` and the update fails; or any error.
 Nothing is pushed in any of these cases. The reason is redacted before it is
@@ -378,6 +379,20 @@ error can carry them. If someone pushes while
 the fixer works, the round is dropped without a label and the new head is
 reviewed from scratch. Removing the `needs-founder` label lets the loop resume
 with a fresh round count.
+
+**Rate limits pause, they do not stop.** When every deferred key (or the
+Founder Proxy) was deferred only by a rate limit (the plan's session, weekly
+or usage limit, or a 429, after its one retry), or the fixer hits one, the
+loop does not label the pull request and does not stop. The key's check
+stays pending, nothing is pushed, and the pass ends. Then the loop makes no
+model call for any pull request for `rate_limit_pause_minutes` (30, `LOOP`
+in `scripts/pr_loop.py`), and afterwards reviews the same head again. The
+pause is the file `loop/rate-limit-pause.json` in the state directory. It
+has the same name and format as the Nirmaan loop's pause file, since both
+loops run on one plan: a limit either loop hits pauses both. A fix round cut
+short by a limit does not count its findings as seen. A `--no-post` run
+writes no pause. Any other deferral still stops the loop, and so does a limit
+whose retry failed some other way.
 
 **One model call at a time, every pull request each pass.** The shared lock
 is held only around each reviewer call (step 1 of "How reviewers run"); the

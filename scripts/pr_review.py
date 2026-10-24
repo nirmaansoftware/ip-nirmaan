@@ -127,7 +127,9 @@ NEEDS_FOUNDER = "needs-founder"
 PROXY_KEYS = VERDICT_KEYS | {"founder_reasons"}
 # The founder's delegation the proxy acts under, said in every proxy comment.
 PROXY_DELEGATION = "Founder Proxy (agent), acting under the founder's delegation of 2026-10-18; not the founder"
-RATE_LIMIT = re.compile(r"rate.?limit|usage limit|too many requests|\b429\b|overloaded|limit reached|try again later", re.I)
+# A plan's session limit ("You've hit your session limit · resets 10pm") is a
+# rate limit too: claude reports it with subtype "success" and is_error set.
+RATE_LIMIT = re.compile(r"rate.?limit|usage limit|session limit|weekly limit|hit your limit|too many requests|\b429\b|overloaded|limit reached|try again later", re.I)
 
 VERDICT_SCHEMA = {
     "type": "object",
@@ -1303,7 +1305,9 @@ def _review(repo_root, pr, github, post, claude_bin, state_dir, models, timeout_
                 break
             log_call(state_dir, entry)
         if result["kind"] != "ok":
-            return {"status": "deferred", "reason": f"{result['kind']}: {result['error']} (after one backoff retry)", "model": model}
+            # call_outcome tells the loop why: a rate limit pauses it, anything else stops it.
+            return {"status": "deferred", "reason": f"{result['kind']}: {result['error']} (after one backoff retry)", "model": model,
+                    "call_outcome": result["kind"]}
         # The answered call is logged once its verdict is known: its status,
         # findings by severity, and the validation error that deferred it.
         try:
@@ -1349,7 +1353,8 @@ def _review(repo_root, pr, github, post, claude_bin, state_dir, models, timeout_
                       "prompt_chars": len(system) + len(repair_user), "repairs": str(error)[:300]}
             if result["kind"] != "ok":
                 log_call(state_dir, repair)
-                return {"status": "deferred", "reason": f"the verdict failed validation: {error}; the repair failed ({result['kind']})", "model": model}
+                return {"status": "deferred", "reason": f"the verdict failed validation: {error}; the repair failed ({result['kind']})", "model": model,
+                        "call_outcome": result["kind"]}
             try:
                 value = result["structured"] if result.get("structured") is not None else parse_verdict_text(result["text"])
             except ValueError as exc:
