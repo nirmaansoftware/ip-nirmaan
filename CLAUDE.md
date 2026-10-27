@@ -69,6 +69,10 @@ founder's delegation of 2026-10-18; what only the founder decides waits for the
 founder (`needs-founder`).
 An agent review is never a sign-off or an approval by a person. A session never
 reviews or posts a review status for a pull request it wrote.
+Before opening a pull request, or pushing a fix to one, the author session
+runs Claude's code review on its own diff (the `code-review` skill, effort
+`low`) and fixes the findings. That pre-check is the author's own, posts nothing
+and is not a key; its output does not go in the PR text.
 
 ## Running tests
 
