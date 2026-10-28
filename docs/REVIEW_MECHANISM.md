@@ -29,6 +29,11 @@ comment. A review whose SHA differs from the head is void.
 
 ## The flow
 
+Before the flow starts, the author session runs Claude's code review on its
+own diff (the `code-review` skill, effort `low`) and fixes the findings, both
+before opening the pull request and before pushing each fix to it. It posts
+nothing and is not a key; it catches plain bugs before the keys spend calls.
+
 1. **CI first.** The five CI checks (`test`, `no-tools`, `physical-design`,
    `test-union`, `dashes`) are green on the head SHA. Physical design tools do
    not run on the development machine, so CI is the record.
