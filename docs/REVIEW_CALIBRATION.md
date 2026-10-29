@@ -56,7 +56,7 @@ these. Seeds that the per-team calls already miss are not in it.
 ## Checklist gaps closed on `main` before the switch
 
 The record lists gaps to close before the switch. Each is on `main`:
-- brand-content, site-engineer and tax-accounts each have an "In a review"
+- The three seats named in the record's first gap each have an "In a review"
   section in their seat files under `council/`.
 - dft-engineer, firmware-engineer and physical-design-engineer member triggers
   are in `.github/review-teams.yml` (`members`): `at_least("test_coverage"`,
