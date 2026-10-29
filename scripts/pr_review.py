@@ -103,8 +103,8 @@ CONFIG = {
     # (`composite_key1` in .github/review-teams.yml). Off: one call per owning
     # team, as before. On since its own pull request (R10), after the A/B run
     # on the seeded sets showed it catches every domain seed at least as often
-    # as the per-team calls; a change back is a calibration rerun first
-    # (decision 6, rerun rule).
+    # as the per-team calls (docs/REVIEW_CALIBRATION.md); a change back is a
+    # calibration rerun first (decision 6, rerun rule).
     "composite_key1": True,
 }
 

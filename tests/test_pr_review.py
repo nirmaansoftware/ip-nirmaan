@@ -1151,7 +1151,7 @@ def composite_verdict(names=LOADED, verdict="pass", findings=None, **over):
 
 
 def test_composite_is_on_in_production_and_off_changes_nothing(repo):
-    assert pr_review.CONFIG["composite_key1"] is True, "switched on after the A/B (R10)"
+    assert pr_review.CONFIG["composite_key1"] is True, "switched on after the A/B (R10, docs/REVIEW_CALIBRATION.md)"
     assert CONFIG["composite_key1"] is False
     r = repo(change=two_teams, main_extra=composite_main)
     r.run()

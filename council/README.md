@@ -71,7 +71,7 @@ first owning lead in a fixed precedence, loading every owning lead's section,
 each member checklist whose trigger in `.github/review-teams.yml` matches and
 legal-compliance's on every head, with one verdict entry per checklist. Its own
 pull request switched it on after an A/B run on the seeded sets
-(`docs/REVIEW_MECHANISM.md`). A key is an agent review: never a person's
+(`docs/REVIEW_CALIBRATION.md`, `docs/REVIEW_MECHANISM.md`). A key is an agent review: never a person's
 decision, a release, or a claim that a design is ready to be made in silicon.
 Six founder classes (council record, section 2) also get the Founder Proxy
 (agent, [founder-proxy.md](founder-proxy.md)) after key 2, under the founder's
