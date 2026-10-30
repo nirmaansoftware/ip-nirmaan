@@ -1,4 +1,4 @@
-# Review calibration: composite key 1 A/B (R10)
+# Review calibration: composite key 1 A/B (R10, run 2026-10-23 to 2026-10-28)
 
 The record behind the composite key 1 switch (council record
 `council/records/2026-10-18-review-loop.md`, decision 1 item 8 and decision 6).
