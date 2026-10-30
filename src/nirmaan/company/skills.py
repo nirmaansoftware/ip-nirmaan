@@ -33,6 +33,7 @@ def sk(
     fails: tuple[str, ...] = (),
     valid: tuple[str, ...] = (),
     examples: tuple[str, ...] = (),
+    docs: tuple[str, ...] = (),
 ) -> Skill:
     return Skill(
         id=id,
@@ -46,6 +47,7 @@ def sk(
             _src(KnowledgeSourceKind.VERITRIAGE_PACK, packs)
             + _src(KnowledgeSourceKind.SPECIFICATION, specs)
             + _src(KnowledgeSourceKind.COMPANY_STANDARD, standards)
+            + _src(KnowledgeSourceKind.KNOWLEDGE_DOCUMENT, docs)  # M61: knowledge/<ref>.md
         ),
         procedures=procedures,
         tools=tools,
@@ -315,10 +317,11 @@ SKILLS: list[Skill] = [
        includes=("rtl_design", "arbitration", "buffering_flow_control", "noc_protocol"), packs=("noc", "axi"),
        procedures=("Implement routing, arbitration, and flow control.",),
        fails=("Credit leaks.", "Deadlock."), valid=("Flow control is credit-correct.",)),
-    sk("arbitration", "Arbitration", "design", "arbitration", packs=("noc",),
-       procedures=("Choose round-robin, weighted, or priority arbitration with starvation bounds.",),
-       fails=("Starvation.", "Unfair grants under backpressure."),
-       valid=("Fairness and starvation bounds are verified.",)),
+    sk("arbitration", "Arbitration", "design", "arbitration", packs=("noc",), docs=("design/arbitration",),
+       procedures=("Choose round-robin, weighted, or priority arbitration with starvation bounds.",
+                   "Move priority only on a grant the resource takes, to one past the winner, wrapping at N."),
+       fails=("Starvation.", "Unfair grants under backpressure.", "Wrapping at a power of two instead of at N."),
+       valid=("Fairness and starvation bounds are verified.", "Checks run under contention and at more than one N.")),
     sk("buffering_flow_control", "Buffering and flow control", "design", "flow-control", packs=("noc",),
        procedures=("Size FIFOs from latency and throughput.",),
        fails=("Overflow.", "Underflow."), valid=("FIFO sizing is justified.",)),

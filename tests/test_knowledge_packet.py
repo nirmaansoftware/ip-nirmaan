@@ -109,6 +109,29 @@ def test_a_cited_document_is_in_the_prompt_of_the_seats_whose_skill_cites_it(roo
     assert program.domain.documents == () and MARKER not in render_work_prompt(program).render()
 
 
+def test_the_arbitration_document_is_in_the_rtl_seats_prompt_on_the_arbiter_case(nirmaan_org, fixed_clock):
+    # P1-14: rtl/rr-arbiter judges arbitration at the rtl-implementation seat (M65 puts the skill on that task),
+    # and the skill's card cites knowledge/design/arbitration.md, so the seat reads the shipped document whole.
+    from nirmaan.evals import load_cases
+
+    case = next(c for c in load_cases(knowledge.KNOWLEDGE_ROOT.parent / "evals") if c.id == "rtl/rr-arbiter")
+    assert "arbitration" in case.skills
+    ref = "design/arbitration"
+    assert knowledge.cited(nirmaan_org.skills["arbitration"]) == (ref,)
+    text = knowledge.document_path(ref).read_text(encoding="utf-8")
+    engine = Orchestrator(nirmaan_org, clock=fixed_clock).plan(case.request)
+    rtl = next(t for t in engine.state.tasks.values() if t.stage == case.seat)
+    for seat, mode in ((rtl.owner, "work"), (rtl.reviewer, "review")):
+        packet = assemble(engine, rtl.id, role=seat)
+        assert [d.ref for d in packet.domain.documents] == [ref] and packet.domain.declines is None
+        prompt = render_work_prompt(packet, mode).render()
+        assert f"Knowledge document {ref}" in prompt and text in prompt
+    # A block that is not an arbiter never carries it.
+    fifo = Orchestrator(nirmaan_org, clock=fixed_clock).plan(REQUEST)
+    fifo_rtl = next(t for t in fifo.state.tasks.values() if t.stage == "rtl-implementation")
+    assert assemble(fifo, fifo_rtl.id).domain.documents == ()
+
+
 def test_a_document_no_skill_cites_never_reaches_a_prompt(root, nirmaan_org, fixed_clock):
     _write(root, REF, MARKER)
     engine = Orchestrator(nirmaan_org, clock=fixed_clock).plan(REQUEST)

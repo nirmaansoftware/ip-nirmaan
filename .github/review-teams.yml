@@ -343,6 +343,11 @@ rules:
     co_owners: [verification]
     paths:
       - knowledge/**
+  # Division rule (P1-14): design knowledge also goes to Silicon Design.
+  - team: silicon-design
+    co_owners: [business, verification]
+    paths:
+      - knowledge/design/**
 
   # Business (legal-compliance leads these).
   - team: business
