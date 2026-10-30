@@ -67,7 +67,7 @@ Stat tiles, using these exact numbers (from `site/stats.json`, v1.25.0):
 | 44 | verification knowledge packs |
 | 1987 | automated tests |
 
-The skills label is "skills defined" (founder decision, in session, 2026-10-30): the count is the skills the model defines, not a claim that any is practised. There is no level tile; a practised count appears only once committed check records back it.
+The skills label is "skills defined" (founder decision, 2026-10-30, recorded in `council/records/2026-10-18-capability-buildout.md`, "Founder decisions (2026-10-30)"): the count is the skills the model defines, not a claim that any is practised. There is no level tile; a practised count appears only once committed check records back it.
 
 A simplified org chart helps here: Product, Architecture, Design Engineering, Verification, Silicon Implementation, Software, Security, Infrastructure, Documentation, Quality.
 

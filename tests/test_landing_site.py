@@ -43,8 +43,8 @@ def test_stat_tiles_match_stats_json() -> None:
 
 
 def test_skills_tile_says_defined_and_no_level_tile() -> None:
-    # Founder decision, in session, 2026-10-30 (gate G8 of the capability
-    # build-out record): the count is skills defined, never read as
+    # Founder decision, 2026-10-30, gate G8 (recorded in
+    # council/records/2026-10-18-capability-buildout.md): the count is skills defined, never read as
     # capability. A practised count or a level tile appears only from
     # committed check records, so none is on the page today.
     tiles = re.findall(
