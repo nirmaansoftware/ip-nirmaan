@@ -42,6 +42,21 @@ def test_stat_tiles_match_stats_json() -> None:
         assert int(count) == int(shown) == stats[key], key
 
 
+def test_skills_tile_says_defined_and_no_level_tile() -> None:
+    # Founder decision, in session, 2026-10-30 (gate G8 of the capability
+    # build-out record): the count is skills defined, never read as
+    # capability. A practised count or a level tile appears only from
+    # committed check records, so none is on the page today.
+    tiles = re.findall(
+        r'<li class="stat"><span class="stat__num" data-stat="(\w+)"[^>]*>\d+</span>'
+        r'<span class="stat__label">([^<]*)</span></li>', HTML)
+    assert len(tiles) == HTML.count('class="stat"')
+    assert dict(tiles)["skills"] == "skills defined"
+    assert "engineering skills" not in HTML
+    for key, label in tiles:
+        assert not re.search(r"(?i)practi[cs]ed|proven|level|expert", f"{key} {label}"), key
+
+
 def test_stat_tiles_show_their_final_value_without_javascript() -> None:
     for count, shown in re.findall(r'data-count="(\d+)">(\d+)<', HTML):
         assert count == shown
