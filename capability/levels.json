@@ -6,19 +6,17 @@
   "skills": {
     "arbitration": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/arbitration.json",
+        "counts": true,
         "knowledge_document": "knowledge/design/arbitration.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     }
   },
   "totals": {
-    "knowledge": 0,
+    "knowledge": 1,
     "practised": 0,
     "proven": 0
   }

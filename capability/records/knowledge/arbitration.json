@@ -1,0 +1,21 @@
+{
+  "format": "nirmaan.knowledge-check",
+  "skill": "arbitration",
+  "knowledge_document": "knowledge/design/arbitration.md",
+  "document_sha256": "sha256:a16a08a3a221d5f86cd942581f5e70fd8f34be15b5b8f09646634d6e0fc7b44e",
+  "writer": "IP-SKILL-B2 session (P1-14 part b, open-source revision), revising the IP-SKILL-B session's first version",
+  "checker": "IP-SKILL-C2 session (P1-14 part c)",
+  "sources_read": [
+    "[iSLIP] McKeown, The iSLIP Scheduling Algorithm for Input-Queued Switches, IEEE/ACM ToN 1999: the whole paper, author's copy at http://tiny-tera.stanford.edu/~nickm/papers/ToN_April_99.pdf",
+    "[SMR] Shin, Mooney and Riley, Round-robin Arbiter Design and Generation, ISSS 2002: the whole paper, authors' copy at https://users.ece.gatech.edu/mooney/codesign/publications/eung/paper/isss_02.pdf",
+    "[Becker] Becker, Efficient Microarchitecture for Network-on-Chip Routers, Stanford PhD dissertation 2012: chapter 2 (Arbiters, sections 2.1 to 2.9), thesis-augmented.pdf from https://purl.stanford.edu/wr368td5072",
+    "[SBY] YosysHQ SBY documentation: Reference for .sby file format (https://yosyshq.readthedocs.io/projects/sby/en/latest/reference.html) and Formal extensions to Verilog (https://yosyshq.readthedocs.io/projects/sby/en/latest/verilog.html), both pages whole"
+  ],
+  "result": "every claim tagged with a source was found in that source, and every line marked inference is a fair reading of the source it names",
+  "notes": [
+    "The wording that prove mode can end unknown when the induction step fails is stated on the SBY Formal extensions to Verilog page (assert: in mode prove the proof may yield UNKNOWN if an assertion can be made to fail during the induction step); the reference page gives unknown as a result token and the smtbmc k-induction depth for prove mode.",
+    "The N - 1 starvation bound is in SMR section 4.1 (at most M - 1 time slots until a master holds the token) and iSLIP section 3, property 2 (an output serves at most N - 1 other inputs first).",
+    "The SMR token-stepping inference (one requester can win several decisions in a row while the N - 1 bound holds) was worked by hand from SMR's 4-master example."
+  ],
+  "checked_at": "2026-10-30"
+}

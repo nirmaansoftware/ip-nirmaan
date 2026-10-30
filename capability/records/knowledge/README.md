@@ -3,7 +3,7 @@
 One JSON file per skill, `<skill_id>.json`: the record that a session other
 than the writer read the skill's knowledge document and its sources. It is
 what raises a skill to the Knowledge level (`scripts/capability_levels.py`,
-`docs/CAPABILITY_LEVELS.md`). No record exists yet.
+`docs/CAPABILITY_LEVELS.md`). The first is `arbitration.json`.
 
 ```json
 {
