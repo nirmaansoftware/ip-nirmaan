@@ -36,7 +36,7 @@ On the page (2026-09-28) the hero headline reads **"Chip IP, built as software."
 
 ### Hero
 - Tagline, the one-sentence pitch, and two buttons: **Talk to us** (the nirmaan.online contact page) and **See how it works** (scrolls down).
-- The page links to the source once, in the footer ("All rights reserved. Source on GitHub."; wording from the founder decision, in session, 2026-10-30), never from the hero, the navigation or a call to action (founder decision, 2026-10-16, replacing the 2026-09-28 decision not to link it).
+- The page links to the source once, in the footer ("All rights reserved. Source on GitHub."; it follows the founder decision of 2026-10-30, recorded in `council/records/2026-10-18-capability-buildout.md`), never from the hero, the navigation or a call to action (founder decision, 2026-10-16, replacing the 2026-09-28 decision not to link it).
 - One visual: an excerpt of a real plan tree (sample in section 6), styled as a terminal.
 
 ### The idea

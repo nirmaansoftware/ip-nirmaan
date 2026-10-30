@@ -12,7 +12,8 @@ confirm". Internal minutes and the positions are kept outside the repository.
 We sell engineer-led work and its evidence. We do not sell the code, which is
 public under Apache-2.0. We do not sell AI capability.
 
-**Note, 2026-10-30.** Founder decision, in session, 2026-10-30: the
+**Note, 2026-10-30.** Founder decision, 2026-10-30 (recorded in
+`council/records/2026-10-18-capability-buildout.md`): the
 repository is all rights reserved from then on and no longer offered under
 Apache-2.0 (see `LICENSE` and `NOTICE`); versions published before were offered
 under Apache-2.0, and that does not change. This note corrects the licence
