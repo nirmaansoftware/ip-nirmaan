@@ -398,4 +398,7 @@ GitHub Action.
 
 ## License
 
-Apache-2.0
+All rights reserved: publishing this repository grants no licence to it
+(see [LICENSE](LICENSE)). Earlier versions, published while LICENSE held
+the Apache License, Version 2.0, were offered under that licence. Third-party
+files keep their own licences, listed in [NOTICE](NOTICE).
