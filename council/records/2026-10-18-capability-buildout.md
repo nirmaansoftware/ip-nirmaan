@@ -702,3 +702,14 @@ counted at the CEO (section 3). `ls evals/` at the same commit shows `firmware`,
 `rtl` (apb_regs, axi4_lite_regs, rr_arbiter, sync_fifo) and `spec`, and no
 `results` directory. P1-04 turns the span count into a committed test.
 
+## Founder decisions (2026-10-30)
+
+- **Skills tile (founder item 3, gate G8):** the tile label reads "skills
+  defined". No level tile. A practised count appears only once check records
+  back it.
+- **Licence (founder item 2, rule 11):** the repository is all rights reserved
+  from this change on and leaves Apache-2.0. Versions published before it were
+  offered under Apache-2.0, and that stays. Third-party files keep their own
+  licences (NOTICE).
+- **Outside contributions:** not accepted for now.
+- **Legal entity (founder item 1):** still open.
