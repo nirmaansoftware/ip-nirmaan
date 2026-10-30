@@ -21,7 +21,8 @@ import pytest
 
 from nirmaan.company import build_organization
 from nirmaan.evals import skill_digest
-from nirmaan.evals.levels import (KNOWLEDGE_CHECK_FORMAT, LEVELS, REJUDGE, REJUDGE_FORMAT, compute, render)
+from nirmaan.evals.levels import (CHECKS, KNOWLEDGE_CHECK_FORMAT, LEVELS, REJUDGE, REJUDGE_FORMAT, compute,
+                                  render)
 from nirmaan.evals.records import MANIFEST, trial_path
 from nirmaan.models import EvalResult, EvalRunManifest, EvalTrial, JudgeRun, Score, ScoreStatus
 
@@ -91,7 +92,10 @@ def _level(org, repo: Path, skill: str = SKILL):
 
 def test_on_main_nothing_is_practised_or_proven_and_the_file_says_so(org):
     levels = compute(org, ROOT)
-    assert levels["totals"] == {"knowledge": 0, "practised": 0, "proven": 0}
+    assert levels["totals"]["practised"] == 0 and levels["totals"]["proven"] == 0
+    # Knowledge comes only from committed check records, and every committed record counts.
+    at_knowledge = {s for s, v in levels["skills"].items() if v["level"] == "knowledge"}
+    assert at_knowledge == {p.stem for p in (ROOT / CHECKS).glob("*.json")}
     assert (ROOT / LEVELS).read_text(encoding="utf-8") == render(levels)
 
 
