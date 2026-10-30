@@ -208,7 +208,7 @@ def test_only_the_three_approved_seats_may_wait_for_their_files(teams_map):
         ("docs/REVIEW_MECHANISM.md", {"council"}),
         # The capability programme (M64).
         ("knowledge/README.md", {"business", "verification"}),
-        ("knowledge/design/sync_fifo_design.md", {"business", "verification"}),
+        ("knowledge/design/sync_fifo_design.md", {"silicon-design", "business", "verification"}),
         ("capability/levels.json", {"verification"}),
         ("capability/records/knowledge/README.md", {"verification"}),
         ("examples/rtl_sync_fifo/example.json", {"eda-platform", "verification"}),
