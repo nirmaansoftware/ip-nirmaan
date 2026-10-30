@@ -247,6 +247,20 @@ class Variant(BaseModel):
     skills: tuple[str, ...] = Field(default=(), description="Extra skills that refine routing.")
 
 
+class Refinement(BaseModel):
+    """Skills a stage's task takes on when a plan-time condition holds, with no fan-out (M65).
+
+    A variant makes a task of its own per feature; a refinement adds its skills to the stage's one task
+    (an arbiter's single RTL task carries ``arbitration``). Its skills refine routing and enter the
+    task's work packet, like a variant's.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    when: Condition
+    skills: tuple[str, ...]
+
+
 class StageTemplate(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -259,6 +273,8 @@ class StageTemplate(BaseModel):
     depends_on: tuple[str, ...] = ()
     when: Condition = Condition()
     variants: tuple[Variant, ...] = ()
+    #: M65: skills added to the stage's task (each variant's task) when a refinement's condition holds.
+    refinements: tuple[Refinement, ...] = ()
     criticality: Criticality = Criticality.MEDIUM
     review: ReviewRequirement | None = None
     gate: str | None = Field(default=None, description="Gate ID this stage closes.")

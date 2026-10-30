@@ -19,6 +19,7 @@ from nirmaan.models import (
     Level,
     Limits,
     OnFailure,
+    Refinement,
     ReviewRequirement,
     StageTemplate,
     Variant,
@@ -588,6 +589,8 @@ BLOCK_DESIGN = WorkflowTemplate(
         st("rtl-implementation", "RTL implementation and testbench", "RTL", "rtl.implement",
            depends_on=("interface-spec", "register-map", "microarchitecture"), criticality=H,
            review=rv("rtl.review"),
+           # M65: an arbiter is one block, not a fan-out: its one RTL task carries the arbitration skill.
+           refinements=(Refinement(when=when("arbitration"), skills=("arbitration",)),),
            outputs=("rtl_source", "testbench"),
            evidence=(REVIEWED,
                      checked("Lint-clean under the RTL lint rules", "lint.run",

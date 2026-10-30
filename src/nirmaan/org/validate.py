@@ -185,7 +185,7 @@ def _workflows(org: "Organization") -> list[str]:
                 issues.append(f"{where}: owner_from names unknown stage {stage.owner_from}")
             if stage.gate and stage.gate not in org.gates:
                 issues.append(f"{where}: unknown gate {stage.gate}")
-            for skill in (*stage.skills, *(s for v in stage.variants for s in v.skills)):
+            for skill in (*stage.skills, *(s for v in (*stage.variants, *stage.refinements) for s in v.skills)):
                 if skill not in org.skills:
                     issues.append(f"{where}: unknown skill {skill}")
             if stage.branch:
@@ -252,7 +252,7 @@ def _vocabulary(org: "Organization") -> list[str]:
                 issues.append(f"workflow {wf.id}: unknown intent {intent}")
         for stage in wf.stages:
             where = f"workflow {wf.id} stage {stage.id}"
-            for cond in (stage.when, *(v.when for v in stage.variants)):
+            for cond in (stage.when, *(v.when for v in (*stage.variants, *stage.refinements))):
                 issues += _condition_issues(where, cond, features, plan_only=True)
             for req in stage.evidence:
                 for cond in req.when:

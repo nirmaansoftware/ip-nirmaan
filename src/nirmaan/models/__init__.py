@@ -103,6 +103,7 @@ from nirmaan.models.workflow import (
     FileInput,
     IntentRule,
     ParameterRule,
+    Refinement,
     ReviewRequirement,
     StageTemplate,
     Variant,

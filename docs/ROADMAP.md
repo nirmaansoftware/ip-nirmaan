@@ -117,6 +117,7 @@ new number. M1 to M42 are taken; see `docs/history/README.md`.
 | M62 | Knowledge file schema and checks | reserved |
 | M63 | Evidence levels generator | reserved |
 | M64 | Worked examples in CI; review rules for programme files | reserved |
+| M65 | Stage refinements: feature skills on a stage's one task | reserved |
 
 <!-- review:milestone-numbers:end -->
 

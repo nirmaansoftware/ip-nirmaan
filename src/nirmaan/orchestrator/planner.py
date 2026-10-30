@@ -214,7 +214,9 @@ class Orchestrator:
     def _work_task(self, tid, pid, req_id, wf, stage: StageTemplate, variant, observed, assumed,
                    instances, entry) -> Task:
         org = self._org
-        skills = tuple(dict.fromkeys((*stage.skills, *(variant.skills if variant else ()))))
+        features = observed | set(assumed)
+        refined = (s for r in stage.refinements if self._holds((r.when,), features) for s in r.skills)  # M65
+        skills = tuple(dict.fromkeys((*stage.skills, *(variant.skills if variant else ()), *refined)))
         owner = self._router.owner(stage.capability, stage.criticality, skills, self._context)
         inherited = self._owners.get((wf.id, stage.owner_from or ""), [])
         if inherited and org.holds(inherited[0], stage.capability):
@@ -254,7 +256,7 @@ class Orchestrator:
             risk=_risk(stage, variant, lambda c: self._holds((c,), observed), assumed, owner, reviewer),
             inputs=tuple(dict.fromkeys(o for d in stage.depends_on for o in _outputs(wf, d))),
             expected_outputs=stage.outputs,
-            evidence_requirements=tuple(r for r in stage.evidence if self._holds(r.when, observed | set(assumed))),
+            evidence_requirements=tuple(r for r in stage.evidence if self._holds(r.when, features)),
             outcomes=stage.outcomes, branch=branch,
             review_state=ReviewState.PENDING if stage.review else ReviewState.NOT_REQUIRED,
             approval_state=ApprovalState.PENDING if stage.review else ApprovalState.NOT_REQUIRED,
