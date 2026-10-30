@@ -8,13 +8,14 @@ version = "1.25.0"
 description = "IP Nirmaan: an organizational operating system for semiconductor engineering, with VeriTriage verification intelligence."
 readme = "README.md"
 requires-python = ">=3.11"
-license = { text = "Apache-2.0" }
+license = { text = "Proprietary. All rights reserved. See LICENSE." }
+license-files = ["LICENSE", "NOTICE", "third_party/LICENSE-Apache-2.0.txt"]
 authors = [{ name = "Nirmaan", email = "nirmaansoftware@gmail.com" }]
 keywords = ["eda", "semiconductor", "ip", "verification", "rtl", "uvm", "systemverilog", "agents", "workflow", "root-cause"]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Intended Audience :: Developers",
-  "License :: OSI Approved :: Apache Software License",
+  "License :: Other/Proprietary License",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",

@@ -10,8 +10,8 @@ up to the builder.
 |---|---|
 | **URL** | `ip.nirmaan.online`, a subdomain of the owner's existing software-services company site (`nirmaan.online`). |
 | **Brand** | **IP Nirmaan**, always written that way. The command-line tool is `nirmaan`; the verification engine is **VeriTriage**. |
-| **Source** | https://github.com/nirmaansoftware/ip-nirmaan (public, Apache-2.0) |
-| **Stage** | Early and open source: a working foundation, not a commercial product. A small number of design partners may work with it under written terms. The page must read that way. |
+| **Source** | https://github.com/nirmaansoftware/ip-nirmaan (public, all rights reserved; see `LICENSE`) |
+| **Stage** | Early: a working foundation, not a commercial product. A small number of design partners may work with it under written terms. The page must read that way. |
 | **Owner** | Nirmaan, the company (founder decision, 2026-10-16: the company name, not a person). Contact details are for the owner to supply; do not invent an email address or a form endpoint. |
 
 ## 2. Who the page is for
@@ -36,7 +36,7 @@ On the page (2026-09-28) the hero headline reads **"Chip IP, built as software."
 
 ### Hero
 - Tagline, the one-sentence pitch, and two buttons: **Talk to us** (the nirmaan.online contact page) and **See how it works** (scrolls down).
-- The page links to the source once, in the footer ("Open source under Apache-2.0. Source on GitHub."), never from the hero, the navigation or a call to action (founder decision, 2026-10-16, replacing the 2026-09-28 decision not to link it).
+- The page links to the source once, in the footer ("All rights reserved. Source on GitHub."; wording from the founder decision, in session, 2026-10-30), never from the hero, the navigation or a call to action (founder decision, 2026-10-16, replacing the 2026-09-28 decision not to link it).
 - One visual: an excerpt of a real plan tree (sample in section 6), styled as a terminal.
 
 ### The idea

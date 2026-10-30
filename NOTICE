@@ -1,12 +1,21 @@
 IP Nirmaan
 Copyright 2026 Nirmaan
 
-Licensed under the Apache License, Version 2.0. See LICENSE.
+All rights reserved. See LICENSE.
 
 This product includes third-party files under their own licences:
 - SERV, Copyright 2019 Olof Kindgren, ISC licence:
   src/nirmaan/integrations/firmware_soc/serv/ (see LICENSE there).
+  One SERV file, serv_compdec.v, is adapted from lowRISC's Ibex and is under
+  the Apache License, Version 2.0 (notice in the file header); the licence
+  text is in third_party/LICENSE-Apache-2.0.txt.
 - PicoRV32, Copyright (C) 2015 Claire Xenia Wolf, ISC-style licence:
   src/nirmaan/integrations/firmware_soc/picorv32.v (notice in the file header).
 - Fonts under the SIL Open Font License: site/assets/fonts/
   (see the OFL-*.txt files there).
+
+This product also includes files from nirmaan.online, copied unchanged from
+the nirmaansoftware/Nirmaan repository (website/src/static/) and used with the
+owner's permission: site/nirmaan.css (styles.css there), site/site.js,
+site/hero.js, site/favicon.svg, site/apple-touch-icon.png and
+site/assets/motion/build-landscape.svg and build-portrait.svg.

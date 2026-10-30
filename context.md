@@ -12,7 +12,9 @@ changes, and keep it under 400 lines (a test enforces it). Counts (units,
 workflows, tools, tests) are not written here; they are generated into the
 "Counts" block of `docs/ROADMAP.md` by `scripts/status.py`.
 
-Repo: https://github.com/nirmaansoftware/ip-nirmaan (public, Apache-2.0).
+Repo: https://github.com/nirmaansoftware/ip-nirmaan (public, all rights
+reserved since the founder decision, in session, 2026-10-30; earlier versions
+were offered under Apache-2.0).
 Earlier names `veritriage` and `nirmaan-ip`; transferred from `patel-om` to
 `nirmaansoftware` on 2026-09-28. GitHub redirects the old URLs.
 Current version: **1.25.0** (distribution `ip-nirmaan`; packages `nirmaan` and
