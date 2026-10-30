@@ -90,7 +90,7 @@ desynchronises the pointers and is what removes starvation [iSLIP].
    [DT], so indexes and pointers run from 0 to N - 1 and the step after N - 1
    must be written as a return to 0. A counter of ceil(log2 N) bits left to
    overflow wraps at the next power of two instead, which is right only when
-   N is one.
+   N is itself a power of two.
 6. **Hold the grant when transfers span cycles** (a grant-hold or lock input),
    and count a held grant as one grant in the starvation bound [DT].
 
