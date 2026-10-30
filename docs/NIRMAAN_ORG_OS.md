@@ -155,6 +155,7 @@ requirement
   -> analyze          declared intents, features, parameters; silence becomes an explicit assumption
   -> select workflow  by intent, from the registry
   -> instantiate      stages whose conditions hold; one task per applicable variant
+                      (refinements add skills to a task without fanning out, M65)
   -> route            owner, reviewer, approver: a scored join over organizational data
   -> gate             downstream work depends on the gate, not just the task
   -> workstreams      one per phase, led by the head of the narrowest unit containing the work
@@ -289,7 +290,7 @@ and workflow, and plans real work into it with zero core changes.
 | **A skill** | Add a `Skill` (use `sk(...)` in `company/skills.py`) with `provides`, `includes`, procedures, failure modes, validation criteria, and knowledge sources. Cite a VeriTriage pack by ID instead of re-writing protocol knowledge. Attach it to the units that should hold it. |
 | **A capability** | Add a `Capability` with its kind, the seniority band it needs (`min_band`), and (for signoff) the minimum level. Then have a skill provide it. |
 | **An agent** | Implement `AgentRuntime` and register it with `@register_runtime("my-model")`. Seat it with an `AgentProfile(role=..., runtime="my-model")` in the definition's `agents`. It inherits everything else from the role. |
-| **A workflow** | Add a `WorkflowTemplate`: stages naming capabilities, `depends_on`, `when` conditions, `variants`, `review`, `gate`, `evidence` (with the tools whose runs count), `outcomes` and `branch` for decisions, `owner_from` for continuity. Register an `IntentRule` that selects it. |
+| **A workflow** | Add a `WorkflowTemplate`: stages naming capabilities, `depends_on`, `when` conditions, `variants`, `refinements` (skills a feature adds to the stage's one task, M65), `review`, `gate`, `evidence` (with the tools whose runs count), `outcomes` and `branch` for decisions, `owner_from` for continuity. Register an `IntentRule` that selects it. |
 | **A tool** | Add a `ToolSpec`. If it can really run here, set `status=AVAILABLE` and register a binding with `@register_binding("tool.id")`. Grant it through a skill's `tools` or a unit's baseline. |
 | **A policy** | Add a `Principle` naming check IDs, and implement each check with `@register_check("check-id")` in any module. The engine refuses to start if a named check is unregistered. |
 | **An engineering domain** | All of the above, in one extension function. See the crown-jewel test for a complete, runnable example. |
