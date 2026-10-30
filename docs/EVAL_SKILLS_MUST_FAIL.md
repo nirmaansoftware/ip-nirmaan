@@ -108,9 +108,20 @@ is wrong; everything else is identical), in
 | `sync_fifo_overflow.v` | `wr_acc = wr_en`: a write while full is accepted and count passes DEPTH |
 | `sync_fifo_pow2_wrap.v` | `next = ptr + 1`: the pointers wrap only at a power of two |
 
-No shipped case uses `must-fail` yet. A case and the content it grades never
-change in one pull request, so negative controls join the shipped cases in the
-pull request that adds the first skill's cases (P1-14 in the build-out plan).
+A case and the content it grades never change in one pull request, so negative
+controls joined the shipped cases in the pull request that added the first
+skill's cases (P1-14 in the build-out plan): `rtl/rr-arbiter` now also judges
+`arbitration`, with three mutants in `tests/fixtures/rtl/rr_arbiter/mutants/`:
+
+| File | The one change |
+|---|---|
+| `rr_arbiter_winner_keeps_priority.v` | the pointer moves to the winner, not one past it: the winner keeps top priority |
+| `rr_arbiter_no_wrap.v` | the search stops at `N-1`: a request below the pointer is never granted |
+| `rr_arbiter_pow2_wrap.v` | the search index and the pointer wrap only at a power of two |
+
+Its seat-testbench control fails all three. The N 5 proof fails all three; the
+N 4 proof fails the first two and cannot see the third, so the case runs both
+proofs, each with its covers.
 
 ## 4. The evidence loader
 

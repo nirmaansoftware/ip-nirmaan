@@ -220,6 +220,92 @@ def test_clean_inputs_that_fail_are_a_failed_control(nirmaan_org, fixed_clock, t
     assert len(score.runs) == 1 and score.failed_runs == ()
 
 
+# --- The shipped arbiter case: the first skill's negative controls (P1-14) --------------------
+
+
+ARB = "tests/fixtures/rtl/rr_arbiter"
+ARB_CLEAN = f"{ARB}/rr_arbiter.v"
+ARB_POW2 = f"{ARB}/mutants/rr_arbiter_pow2_wrap.v"
+
+#: An arbiter testbench that only ever has requester 0 asking, so the pointer never matters.
+WEAK_ARB_TB = """\
+`timescale 1ns / 1ps
+module weak_arb_tb;
+    reg clk = 1'b0;
+    reg rst_n = 1'b0;
+    reg [3:0] req = 4'd0;
+    wire [3:0] grant;
+    always #5 clk = ~clk;
+    rr_arbiter dut (.clk(clk), .rst_n(rst_n), .req(req), .grant(grant));
+    reg [8*64-1:0] nonce;
+    initial begin
+        #20 rst_n = 1'b1;
+        req = 4'b0001;
+        #10 if (!$value$plusargs("nirmaan_nonce=%s", nonce)) nonce = "none";
+        $display("NIRMAAN-SIM %0s %0d passed, %0d failed", nonce, grant === 4'b0001, grant !== 4'b0001);
+        $finish;
+    end
+endmodule
+"""
+
+
+def _arbiter_case(tmp_path: Path, held_out: list[dict]) -> Path:
+    """The shipped arbiter case with other held-out checks."""
+    data = json.loads((EVALS / "rtl" / "rr_arbiter.json").read_text(encoding="utf-8"))
+    data.update(id="tmp/rr-arbiter-must-fail", held_out=held_out)
+    path = tmp_path / "cases" / "arbiter.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data), encoding="utf-8")
+    return path
+
+
+@needs("verilator", "iverilog", "vvp", "yosys", "sby", "yices-smt2")
+def test_the_arbiter_case_controls_fail_every_mutant_for_a_real_reason(nirmaan_org, fixed_clock, tmp_path):
+    """Each mutant fails a check of the reference testbench or an assertion, never a build error."""
+    case = next(c for c in load_cases(EVALS) if c.id == "rtl/rr-arbiter")
+    assert {"arbitration"} <= set(case.skills)
+    trial = record_trial(nirmaan_org, case, ModelRuntime(replay_llm(case, REPO), runtime_id="replay"), replay=True,
+                         record="tmp", trial=1, repo=REPO, sandbox=tmp_path / "sandbox", clock=fixed_clock)
+    result = trial.result
+    assert result.passed, result.detail
+    _, testbench, n5, n4 = result.scores
+    assert [len(testbench.failed_runs), len(n5.failed_runs), len(n4.failed_runs)] == [3, 3, 2]
+    runs = {j.run: j for j in trial.judge_runs}
+    for run in testbench.failed_runs:
+        assert runs[run].tool == "simulator.run" and "checks failed" in runs[run].summary, runs[run].summary
+    for run in (*n5.failed_runs, *n4.failed_runs):
+        assert runs[run].tool == "formal.run" and "[ASSERT]" in runs[run].summary, runs[run].summary
+
+
+@needs("verilator", "iverilog", "vvp", "yosys", "sby", "yices-smt2")
+def test_the_arbiter_pow2_mutant_needs_the_n5_proof(nirmaan_org, fixed_clock, tmp_path):
+    """Wrapping only at a power of two is right at N 4: the N 4 proof alone cannot see it."""
+    check = {"name": "N 4 proof", "scorer": "must-fail", "tool": "formal.run",
+             "case_files": {"sby": [f"{ARB}/rr_arbiter.sby"], "sources": [ARB_CLEAN]},
+             "mutants": {ARB_CLEAN: [ARB_POW2]}}
+    result = run_case(nirmaan_org, load_case(_arbiter_case(tmp_path, [check])), repo=REPO,
+                      sandbox=tmp_path / "sandbox", clock=fixed_clock)
+    [score] = result.scores
+    assert score.status is ScoreStatus.FAILED and not result.passed
+    assert score.summary.startswith(f"mutant {ARB_POW2} survived: formal.run"), score.summary
+
+
+@needs("verilator", "iverilog", "vvp", "yosys")
+def test_an_arbiter_testbench_that_never_contends_fails_the_control(nirmaan_org, fixed_clock, tmp_path):
+    """A testbench with one requester passes its own gates and the clean RTL, and misses every mutant."""
+    shipped = json.loads((EVALS / "rtl" / "rr_arbiter.json").read_text(encoding="utf-8"))
+    control = next(c for c in shipped["held_out"] if c["scorer"] == "must-fail" and c["tool"] == "simulator.run")
+    case = load_case(_arbiter_case(tmp_path, [control]))
+    llm = ReplayLLM([("rr_arbiter.v", "rtl_source", (REPO / ARB_CLEAN).read_text(encoding="utf-8"), "rr_arbiter"),
+                     ("weak_arb_tb.v", "testbench", WEAK_ARB_TB, "weak_arb_tb")])
+    result = run_case(nirmaan_org, case, ModelRuntime(llm, runtime_id="weak-seat"), repo=REPO,
+                      sandbox=tmp_path / "sandbox", clock=fixed_clock)
+    assert result.submitted, result.detail
+    [score] = result.scores
+    assert score.status is ScoreStatus.FAILED and not result.passed
+    assert " survived: simulator.run run-" in score.summary and score.failed_runs == (), score.summary
+
+
 class _FakeTools:
     """A tool handle whose simulator fails on a mutant: it records what each run was given, and checks it exists."""
 
@@ -365,7 +451,7 @@ def test_the_shipped_cases_name_the_skills_they_judge(nirmaan_org):
         "firmware/axi4-lite-driver": ("device_drivers",),
         "rtl/apb-regs": ("rtl_design", "apb"),
         "rtl/axi4-lite-regs": ("rtl_design", "axi"),
-        "rtl/rr-arbiter": ("rtl_design",),
+        "rtl/rr-arbiter": ("rtl_design", "arbitration"),
         "rtl/sync-fifo": ("rtl_design",),
         "spec/axi4-lite-interface": ("interface_specification",),
     }

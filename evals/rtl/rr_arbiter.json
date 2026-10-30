@@ -2,7 +2,7 @@
   "id": "rtl/rr-arbiter",
   "request": "Create a round-robin arbiter for four requesters.",
   "seat": "rtl-implementation",
-  "skills": ["rtl_design"],
+  "skills": ["rtl_design", "arbitration"],
   "expected_behavior": "RTL for module rr_arbiter (N 4 by default) with ports clk rst_n req grant, a combinational same-cycle grant, and a pointer that moves to one past the winner, so no requester waits more than N-1 grants; with a self-checking testbench, gated by lint, simulation, and synthesis (and formal, when a .sby is written) before review.",
   "constraints": [
     "Work only from the approved interface specification and microarchitecture.",
@@ -14,7 +14,8 @@
     "The winner keeps top priority (fixed priority, not round robin).",
     "The pointer advancing when nothing was granted.",
     "More than one grant, or a grant with no request.",
-    "A self-written testbench that never has everyone requesting; the held-out reference testbench judges instead."
+    "A self-written testbench that never has everyone requesting; the held-out reference testbench judges instead.",
+    "A self-written testbench that cannot tell a starving or non-wrapping arbiter from a fair one; the must-fail control fails it."
   ],
   "upstream": {
     "interface-spec": [{"path": "tests/fixtures/rtl/rr_arbiter/interface_spec.md", "kind": "interface_spec"}],
@@ -33,6 +34,41 @@
       "seat_files": {"sources": ["rtl_source"]},
       "case_files": {"sources": ["tests/fixtures/rtl/rr_arbiter/rr_arbiter_tb.v"]},
       "params": {"top": "rr_arbiter_tb"}
+    },
+    {
+      "name": "The seat's testbench fails each arbitration mutant",
+      "scorer": "must-fail",
+      "tool": "simulator.run",
+      "seat_files": {"sources": ["testbench"]},
+      "seat_entries": {"top": ["testbench"]},
+      "case_files": {"sources": ["tests/fixtures/rtl/rr_arbiter/rr_arbiter.v"]},
+      "mutants": {"tests/fixtures/rtl/rr_arbiter/rr_arbiter.v": [
+        "tests/fixtures/rtl/rr_arbiter/mutants/rr_arbiter_winner_keeps_priority.v",
+        "tests/fixtures/rtl/rr_arbiter/mutants/rr_arbiter_no_wrap.v",
+        "tests/fixtures/rtl/rr_arbiter/mutants/rr_arbiter_pow2_wrap.v"]}
+    },
+    {
+      "name": "The case's N 5 proof reaches every cover and fails each mutant",
+      "scorer": "must-fail",
+      "tool": "formal.run",
+      "cover_tool": "formal.cover",
+      "case_files": {"sby": ["tests/fixtures/rtl/rr_arbiter/rr_arbiter_n5.sby"],
+                     "sources": ["tests/fixtures/rtl/rr_arbiter/rr_arbiter.v"]},
+      "mutants": {"tests/fixtures/rtl/rr_arbiter/rr_arbiter.v": [
+        "tests/fixtures/rtl/rr_arbiter/mutants/rr_arbiter_winner_keeps_priority.v",
+        "tests/fixtures/rtl/rr_arbiter/mutants/rr_arbiter_no_wrap.v",
+        "tests/fixtures/rtl/rr_arbiter/mutants/rr_arbiter_pow2_wrap.v"]}
+    },
+    {
+      "name": "The case's N 4 proof reaches every cover and fails each mutant wrong at N 4",
+      "scorer": "must-fail",
+      "tool": "formal.run",
+      "cover_tool": "formal.cover",
+      "case_files": {"sby": ["tests/fixtures/rtl/rr_arbiter/rr_arbiter.sby"],
+                     "sources": ["tests/fixtures/rtl/rr_arbiter/rr_arbiter.v"]},
+      "mutants": {"tests/fixtures/rtl/rr_arbiter/rr_arbiter.v": [
+        "tests/fixtures/rtl/rr_arbiter/mutants/rr_arbiter_winner_keeps_priority.v",
+        "tests/fixtures/rtl/rr_arbiter/mutants/rr_arbiter_no_wrap.v"]}
     }
   ]
 }
