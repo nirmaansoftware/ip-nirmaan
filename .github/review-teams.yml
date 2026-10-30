@@ -577,8 +577,9 @@ founder_classes:
 # Composite key 1 (council record 2026-10-18, review loop, decision 1): one
 # key-1 call per head in place of one per owning team. Read only while the
 # review script's switch (`composite_key1` in scripts/pr_review.py CONFIG) is
-# on; it ships off, and is switched on by its own pull request after the A/B
-# run on the seeded sets. How it loads (scripts/review_map.py, key1_plan):
+# on, which it is since its own pull request after the A/B run on the seeded
+# sets (R10; aggregates and seed digests in docs/REVIEW_CALIBRATION.md).
+# How it loads (scripts/review_map.py, key1_plan):
 # - the seat that speaks is the lead of the owning team that comes first in
 #   `precedence`, and its seat file loads whole;
 # - the "In a review" section of every owning team's lead loads;

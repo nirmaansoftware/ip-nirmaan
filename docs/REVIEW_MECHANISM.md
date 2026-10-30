@@ -254,10 +254,13 @@ checklist fails key 1, and entry findings are validated like any finding.
 Key 2 gets
 the list of loaded checklists and key 1's entries. The cache name and the
 fix-round fingerprint use one fixed key-1 identity (`composite`), so a fix that
-adds an owning team cannot make a repeated finding look new. It is switched on
-only by its own pull request, after an A/B run on the seeded calibration sets
-(kept outside both repositories) shows it catches every domain seed at least
-as often as the per-team calls, with no Verification regression.
+adds an owning team cannot make a repeated finding look new. It is on: its own
+pull request switched it on after an A/B run on the seeded calibration sets
+(kept outside both repositories) showed it catches every domain seed at least
+as often as the per-team calls, with no Verification regression (aggregates,
+sample sizes and seed digests: `docs/REVIEW_CALIBRATION.md`). The switch
+(`composite_key1` in `scripts/pr_review.py`) turned off gives the per-team
+calls back unchanged.
 
 **Posting identity.** The review App posts the check runs with a short-lived
 installation token scoped to this repository. The token asks for `checks:
