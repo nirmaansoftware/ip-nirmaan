@@ -4,6 +4,18 @@
   "proven": "No skill is Proven: no product seat run record of delivered work exists yet.",
   "refused_records": [],
   "skills": {
+    "apb": {
+      "knowledge": {
+        "check_record": null,
+        "counts": false,
+        "knowledge_document": "knowledge/design/apb.md",
+        "problems": [
+          "no check record"
+        ]
+      },
+      "level": null,
+      "practised": []
+    },
     "arbitration": {
       "knowledge": {
         "check_record": "capability/records/knowledge/arbitration.json",
@@ -12,6 +24,30 @@
         "problems": []
       },
       "level": "knowledge",
+      "practised": []
+    },
+    "axi": {
+      "knowledge": {
+        "check_record": null,
+        "counts": false,
+        "knowledge_document": "knowledge/design/axi.md",
+        "problems": [
+          "no check record"
+        ]
+      },
+      "level": null,
+      "practised": []
+    },
+    "rtl_design": {
+      "knowledge": {
+        "check_record": null,
+        "counts": false,
+        "knowledge_document": "knowledge/design/rtl_design.md",
+        "problems": [
+          "no check record"
+        ]
+      },
+      "level": null,
       "practised": []
     }
   },
