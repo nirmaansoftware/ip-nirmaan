@@ -143,8 +143,12 @@ def test_what_the_gates_miss_the_held_out_testbench_catches(nirmaan_org, fixed_c
     assert result.submitted, result.detail  # its own lint, simulation, and synthesis all passed
     assert {g.tool for g in result.gate_runs if g.succeeded} >= {"lint.run", "simulator.run", "synth.run"}
     # Both held-out judges catch it: the reference testbench, and (M30) the test generated from the map.
-    assert [s.status for s in result.scores] == [ScoreStatus.FAILED, ScoreStatus.FAILED]
-    assert all(s.runs for s in result.scores)
+    judges = [s for s, c in zip(result.scores, case.held_out) if c.scorer == "held-out-run"]
+    assert [s.status for s in judges] == [ScoreStatus.FAILED, ScoreStatus.FAILED]
+    assert all(s.runs for s in judges)
+    # The must-fail controls (P3-E1): the weak testbench lets a mutant survive; the case's own proof passes.
+    controls = {c.tool: s.status for s, c in zip(result.scores, case.held_out) if c.scorer == "must-fail"}
+    assert controls == {"simulator.run": ScoreStatus.FAILED, "formal.run": ScoreStatus.PASSED}
     assert not result.passed
 
 

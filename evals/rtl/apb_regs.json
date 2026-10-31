@@ -13,7 +13,8 @@
     "Unmapped addresses (misaligned, or 0x10 and above) answered without PSLVERR, or a write to them changing a register.",
     "pstrb ignored or applied to the wrong byte lanes.",
     "A write taking effect in the setup phase, invisible at the ports to a weak testbench.",
-    "A self-written testbench too weak to notice the above; the held-out reference testbench judges instead."
+    "A self-written testbench too weak to notice the above; the held-out reference testbench judges instead.",
+    "A self-written testbench that cannot tell ignored strobes, a missing PSLVERR, or an aliased decode from a correct block; the must-fail control fails it."
   ],
   "upstream": {
     "interface-spec": [{"path": "tests/fixtures/rtl/apb_regs/interface_spec.md", "kind": "interface_spec"}],
@@ -32,6 +33,31 @@
       "seat_files": {"sources": ["rtl_source"]},
       "case_files": {"sources": ["tests/fixtures/rtl/apb_regs/apb_regs_tb.v"]},
       "params": {"top": "apb_regs_tb"}
+    },
+    {
+      "name": "The seat's testbench fails each APB mutant visible at the ports",
+      "scorer": "must-fail",
+      "tool": "simulator.run",
+      "seat_files": {"sources": ["testbench"]},
+      "seat_entries": {"top": ["testbench"]},
+      "case_files": {"sources": ["tests/fixtures/rtl/apb_regs/apb_regs.v"]},
+      "mutants": {"tests/fixtures/rtl/apb_regs/apb_regs.v": [
+        "tests/fixtures/rtl/apb_regs/mutants/apb_regs_pstrb_ignored.v",
+        "tests/fixtures/rtl/apb_regs/mutants/apb_regs_no_pslverr.v",
+        "tests/fixtures/rtl/apb_regs/mutants/apb_regs_decode_alias.v"]}
+    },
+    {
+      "name": "The case's proof reaches every cover and fails each APB mutant",
+      "scorer": "must-fail",
+      "tool": "formal.run",
+      "cover_tool": "formal.cover",
+      "case_files": {"sby": ["tests/fixtures/rtl/apb_regs/apb_regs.sby"],
+                     "sources": ["tests/fixtures/rtl/apb_regs/apb_regs.v"]},
+      "mutants": {"tests/fixtures/rtl/apb_regs/apb_regs.v": [
+        "tests/fixtures/rtl/apb_regs/mutants/apb_regs_pstrb_ignored.v",
+        "tests/fixtures/rtl/apb_regs/mutants/apb_regs_setup_write.v",
+        "tests/fixtures/rtl/apb_regs/mutants/apb_regs_no_pslverr.v",
+        "tests/fixtures/rtl/apb_regs/mutants/apb_regs_decode_alias.v"]}
     }
   ]
 }

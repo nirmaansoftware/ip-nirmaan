@@ -306,6 +306,85 @@ def test_an_arbiter_testbench_that_never_contends_fails_the_control(nirmaan_org,
     assert " survived: simulator.run run-" in score.summary and score.failed_runs == (), score.summary
 
 
+# --- The other shipped RTL cases: negative controls for the pilot skills (P3-E1) -------------
+
+
+#: Each shipped RTL case with must-fail controls, and how many mutants each of its controls lists.
+SHIPPED_CONTROLS = {
+    "rtl/sync-fifo": {"simulator.run": [2], "formal.run": [2, 1]},
+    "rtl/apb-regs": {"simulator.run": [3], "formal.run": [4]},
+    "rtl/axi4-lite-regs": {"simulator.run": [3], "formal.run": [2]},
+}
+
+
+@needs("verilator", "iverilog", "vvp", "yosys", "sby", "yices-smt2")
+@pytest.mark.parametrize("case_id", sorted(SHIPPED_CONTROLS))
+def test_a_shipped_case_controls_fail_every_mutant_for_a_real_reason(nirmaan_org, fixed_clock, tmp_path, case_id):
+    """The replayed reference passes every check; each mutant fails a testbench check or an assertion, never a build."""
+    case = next(c for c in load_cases(EVALS) if c.id == case_id)
+    controls = [c for c in case.held_out if c.scorer == "must-fail"]
+    listed = {m for c in controls for ms in c.mutants.values() for m in ms}
+    folder = REPO / next(iter(controls[0].mutants)).rsplit("/", 1)[0] / "mutants"
+    # Every mutant in the case's folder is used by some control.
+    assert listed == {str(f.relative_to(REPO)) for f in folder.glob("*.v")}
+    trial = record_trial(nirmaan_org, case, ModelRuntime(replay_llm(case, REPO), runtime_id="replay"), replay=True,
+                         record="tmp", trial=1, repo=REPO, sandbox=tmp_path / "sandbox", clock=fixed_clock)
+    result = trial.result
+    assert result.passed, result.detail
+    scores = [s for s, c in zip(result.scores, case.held_out) if c.scorer == "must-fail"]
+    by_tool: dict[str, list[int]] = {}
+    for score, control in zip(scores, controls):
+        by_tool.setdefault(control.tool, []).append(len(score.failed_runs))
+    assert by_tool == SHIPPED_CONTROLS[case_id]
+    runs = {j.run: j for j in trial.judge_runs}
+    for score, control in zip(scores, controls):
+        for run in score.failed_runs:
+            if control.tool == "simulator.run":
+                assert runs[run].tool == "simulator.run" and "checks failed" in runs[run].summary, runs[run].summary
+            else:
+                assert runs[run].tool == "formal.run" and "[ASSERT]" in runs[run].summary, runs[run].summary
+
+
+def _shipped_case(tmp_path: Path, case_file: str, held_out: list[dict]) -> Path:
+    """A shipped case with other held-out checks."""
+    data = json.loads((EVALS / "rtl" / case_file).read_text(encoding="utf-8"))
+    data.update(id=f"tmp/{case_file[:-5]}-must-fail", held_out=held_out)
+    path = tmp_path / "cases" / case_file
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data), encoding="utf-8")
+    return path
+
+
+APB = "tests/fixtures/rtl/apb_regs"
+AXIL = "tests/fixtures/rtl/axi4_lite"
+
+
+@needs("verilator", "iverilog", "vvp", "yosys", "sby", "yices-smt2")
+@pytest.mark.parametrize(("case_file", "check"), [
+    # A setup-phase write leaves the same register values when the manager follows APB: no testbench sees it.
+    ("apb_regs.json", {"tool": "simulator.run", "params": {"top": "apb_regs_tb"},
+                       "case_files": {"sources": [f"{APB}/apb_regs.v", f"{APB}/apb_regs_tb.v"]},
+                       "mutants": {f"{APB}/apb_regs.v": [f"{APB}/mutants/apb_regs_setup_write.v"]}}),
+    # The AXI4-Lite proof checks handshakes and response codes, not register data.
+    ("axi4_lite_regs.json", {"tool": "formal.run",
+                             "case_files": {"sby": [f"{AXIL}/axi4_lite_regs.sby"], "sources": [f"{AXIL}/axi4_lite_regs.v"]},
+                             "mutants": {f"{AXIL}/axi4_lite_regs.v": [f"{AXIL}/mutants/axi4_lite_regs_wstrb_ignored.v"]}}),
+], ids=["apb-setup-write-vs-testbench", "axil-wstrb-vs-proof"])
+def test_a_mutant_one_judge_cannot_see_is_left_to_the_other(nirmaan_org, fixed_clock, tmp_path, case_file, check):
+    """Why a control leaves a mutant out: that judge passes it, and the case's other control lists it."""
+    [(clean, [mutant])] = check["mutants"].items()
+    shipped = json.loads((EVALS / "rtl" / case_file).read_text(encoding="utf-8"))
+    controls = {c["tool"]: c["mutants"][clean] for c in shipped["held_out"] if c["scorer"] == "must-fail"}
+    assert mutant not in controls[check["tool"]]
+    assert any(mutant in ms for tool, ms in controls.items() if tool != check["tool"])
+    held_out = [{"name": "one judge alone", "scorer": "must-fail", **check}]
+    result = run_case(nirmaan_org, load_case(_shipped_case(tmp_path, case_file, held_out)), repo=REPO,
+                      sandbox=tmp_path / "sandbox", clock=fixed_clock)
+    [score] = result.scores
+    assert score.status is ScoreStatus.FAILED and not result.passed
+    assert score.summary.startswith(f"mutant {mutant} survived: {check['tool']}"), score.summary
+
+
 class _FakeTools:
     """A tool handle whose simulator fails on a mutant: it records what each run was given, and checks it exists."""
 
@@ -452,7 +531,7 @@ def test_the_shipped_cases_name_the_skills_they_judge(nirmaan_org):
         "rtl/apb-regs": ("rtl_design", "apb"),
         "rtl/axi4-lite-regs": ("rtl_design", "axi"),
         "rtl/rr-arbiter": ("rtl_design", "arbitration"),
-        "rtl/sync-fifo": ("rtl_design",),
+        "rtl/sync-fifo": ("rtl_design", "buffering_flow_control"),
         "spec/axi4-lite-interface": ("interface_specification",),
     }
     for case in load_cases(EVALS):
