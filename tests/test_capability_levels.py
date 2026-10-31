@@ -4,8 +4,9 @@ On main no record exists, so the generator reports zero Knowledge, zero
 Practised and zero Proven, and the committed capability/levels.json says so.
 Fixture repositories show each rule: 5 of 5 tool-judged trials with a clean
 re-judge and a must-fail control make a skill Practised; 4 of 5 do not; a
-changed skill card makes the group stale; replays, attestations and trials not
-judged by a tool never count; only a case's own skills get credit; Knowledge
+changed skill card makes the group stale; replays, attestations, trials not
+judged by a tool and trials run without knowledge documents (M67) never count;
+only a case's own skills get credit; Knowledge
 needs a check record by a different session that names the current document.
 """
 
@@ -53,14 +54,17 @@ def _case(repo: Path, *, must_fail: bool = True, scorer: str = "held-out-run", c
 
 def _record(org, repo: Path, outcomes: list[bool], *, name: str = "run1", case_id: str = "rtl/fixture",
             replay: bool = False, attest: bool = False, rejudge: bool | None = True,
-            digest: str | None = None, judged: bool = True) -> Path:
+            digest: str | None = None, judged: bool = True, knowledge: str = "on",
+            trial_knowledge: str | None = None) -> Path:
     record = repo / "evals" / "results" / name
     record.mkdir(parents=True)
     manifest = EvalRunManifest(id=name, runtime="claude-code", model=MODEL, replay=replay, nirmaan_version="t",
                                started_at=AT, finished_at=AT, trials=len(outcomes), cases=(case_id,),
-                               seats=("rtl-implementation",), head_sha="0" * 40)
+                               seats=("rtl-implementation",), head_sha="0" * 40, knowledge=knowledge)
     (record / MANIFEST).write_text(manifest.model_dump_json(), encoding="utf-8")
-    digest = digest or skill_digest(org, SKILL, repo)
+    trial_knowledge = trial_knowledge or knowledge
+    # As record_run writes it (M67): with knowledge off, the digest of the card alone.
+    digest = digest or skill_digest(org, SKILL, repo, knowledge=trial_knowledge == "on")
     for number, passed in enumerate(outcomes, start=1):
         status = ScoreStatus.PASSED if passed else ScoreStatus.FAILED
         result = EvalResult(case=case_id, case_digest="sha256:x", runtime="claude-code", replay=replay, version="t",
@@ -71,7 +75,7 @@ def _record(org, repo: Path, outcomes: list[bool], *, name: str = "run1", case_i
         runs = (JudgeRun(check="reference testbench", run=f"run-{number}", tool="simulator.run",
                          succeeded=passed),) if judged else ()
         trial = EvalTrial(record=name, trial=number, stage="rtl-implementation", model=MODEL,
-                          skills={SKILL: digest}, result=result, judge_runs=runs)
+                          skills={SKILL: digest}, knowledge=trial_knowledge, result=result, judge_runs=runs)
         path = trial_path(record, case_id, number)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(trial.model_dump_json(), encoding="utf-8")
@@ -187,6 +191,52 @@ def test_a_trial_no_tool_judged_is_listed_apart_and_never_counts(org, tmp_path):
     _record(org, tmp_path, [True] * 5, judged=False)
     levels = compute(org, tmp_path)
     assert SKILL not in levels["skills"] and len(levels["not_tool_judged"]) == 5
+
+
+# --- Without knowledge (M67) -------------------------------------------------------------------
+
+
+def test_trials_without_knowledge_never_count_and_are_listed_with_the_reason(org, tmp_path):
+    _case(tmp_path)
+    _record(org, tmp_path, [True] * 5, name="ablation", knowledge="off")
+    levels = compute(org, tmp_path)
+    assert SKILL not in levels["skills"] and levels["totals"]["practised"] == 0
+    listed = levels["without_knowledge"]
+    assert [(t["record"], t["trial"], t["passed"]) for t in listed] == [("evals/results/ablation", n, True)
+                                                                         for n in range(1, 6)]
+    assert all("knowledge: off in the run manifest and the trial" in t["reason"]
+               and "never counts toward a level" in t["reason"] for t in listed)
+    # Beside a record that counts, the ablation adds nothing and takes nothing away.
+    _record(org, tmp_path, [True] * 5, name="run1")
+    [group] = _level(org, tmp_path)["practised"]
+    assert group["counts"] and group["n"] == 5 and group["records"] == ["evals/results/run1"]
+
+
+@pytest.mark.parametrize("manifest, trial, where", [("on", "off", "the trial"),
+                                                    ("off", "on", "the run manifest")])
+def test_one_label_edited_back_to_on_never_relabels_an_ablation_trial(org, tmp_path, manifest, trial, where):
+    # Either the manifest or the trial saying off is enough: editing a different field changes nothing.
+    _case(tmp_path)
+    _record(org, tmp_path, [True] * 5, name="ablation", knowledge=manifest, trial_knowledge=trial)
+    levels = compute(org, tmp_path)
+    assert SKILL not in levels["skills"] and len(levels["without_knowledge"]) == 5
+    assert all(f"knowledge: off in {where}):" in t["reason"] for t in levels["without_knowledge"])
+
+
+def test_both_labels_edited_still_leave_the_trials_stale_when_the_skill_has_a_document(org, tmp_path):
+    # The trial's digest is the card alone (what the seat was given), so it is never the skill's current digest.
+    _case(tmp_path)
+    doc = tmp_path / "knowledge" / "design" / f"{SKILL}.md"
+    doc.parent.mkdir(parents=True)
+    doc.write_text("Practising: lint and simulation back this.\n", encoding="utf-8")
+    record = _record(org, tmp_path, [True] * 5, name="ablation", knowledge="off")
+    for path in [record / MANIFEST, *record.rglob("trial-*.json")]:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        data["knowledge"] = "on"
+        path.write_text(json.dumps(data), encoding="utf-8")
+    entry = _level(org, tmp_path)
+    assert entry["level"] is None
+    assert any(r.startswith("stale") for r in entry["practised"][0]["reasons"])
 
 
 def test_only_the_cases_own_skills_get_credit(org, tmp_path):

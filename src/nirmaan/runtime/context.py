@@ -244,8 +244,12 @@ def _documents(skills) -> tuple[tuple[KnowledgeDocumentView, ...], str | None]:
     return ((), over) if over else (tuple(found.values()), None)
 
 
-def assemble(engine: TaskEngine, task_id: str, role: str | None = None) -> WorkPacket:
-    """The packet for ``role``'s seat on a task: the owner by default, or e.g. its reviewer."""
+def assemble(engine: TaskEngine, task_id: str, role: str | None = None, *, knowledge: bool = True) -> WorkPacket:
+    """The packet for ``role``'s seat on a task: the owner by default, or e.g. its reviewer.
+
+    ``knowledge=False`` (M67, the ablation) leaves out the knowledge documents only: the skills, their
+    cards and everything else are as with them, and nothing is declined for a document.
+    """
     org, state = engine.org, engine.state
     task = engine.task(task_id)
     if task.owner is None:
@@ -257,7 +261,7 @@ def assemble(engine: TaskEngine, task_id: str, role: str | None = None) -> WorkP
     skills = [org.skills[s] for s in task.skills if s in org.skills]
     if task.capability:
         skills += [s for s in org.providers_of(task.capability) if s.id in card.skills and s not in skills]
-    documents, declines = _documents(skills)
+    documents, declines = _documents(skills) if knowledge else ((), None)
     domain = DomainScope(skills=tuple(
         SkillView(id=s.id, name=s.name, procedures=s.procedures, constraints=s.constraints,
                   common_failure_modes=s.common_failure_modes, validation_criteria=s.validation_criteria,

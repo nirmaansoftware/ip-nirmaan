@@ -59,18 +59,29 @@ def run_id(result: EvalResult, trial: str = "") -> str:
 _TRIAL, _NOT_RESULTS = "nirmaan.eval-trial", ("nirmaan.eval-run", "nirmaan.eval-summary")
 
 
+def _knowledge_off(data: Any, kind: str) -> bool:
+    return isinstance(data, dict) and data.get("format") == kind and data.get("knowledge", "on") != "on"
+
+
 def load_results(root: Path | str) -> list[EvalRun]:
     """Every recorded result under ``root``: one per file, a list per file, or a run record's trials (M45).
 
     The same run read twice is one. Each run is labelled with its source: ``record:<record ID>`` for a
-    trial of a run record, ``file`` for a plain result file (such as the synthetic fixtures).
+    trial of a run record, ``file`` for a plain result file (such as the synthetic fixtures). A trial run
+    without knowledge documents (M67, the ablation) is not read: its failures say what the documents add,
+    not that the seat regressed.
     """
     runs: dict[str, EvalRun] = {}
+    # M67: a trial is an ablation trial when its run manifest or the trial itself says knowledge off.
+    ablation = {path.parent for path in Path(root).rglob("manifest.json")
+                if _knowledge_off(json.loads(path.read_text(encoding="utf-8")), _NOT_RESULTS[0])}
     for path in sorted(Path(root).rglob("*.json")):
         data = json.loads(path.read_text(encoding="utf-8"))
         if isinstance(data, dict) and data.get("format") in _NOT_RESULTS:
             continue
         if isinstance(data, dict) and data.get("format") == _TRIAL:
+            if _knowledge_off(data, _TRIAL) or ablation.intersection(path.parents):
+                continue
             result = EvalResult.model_validate(data["result"])
             rid = run_id(result, f"{data['record']}#{data['trial']}")
             runs.setdefault(rid, EvalRun(rid, str(path), result, f"record:{data['record']}"))

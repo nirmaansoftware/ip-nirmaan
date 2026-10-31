@@ -1125,6 +1125,10 @@ def eval_run(
     seats: Optional[str] = typer.Option(None, "--seats",
                                         help="Comma-separated case groups or seat stages to run, e.g. rtl,spec."),
     attempts: Optional[int] = typer.Option(None, "--attempts", min=1, help="Attempts when a submission is refused."),
+    without_knowledge: bool = typer.Option(
+        False, "--without-knowledge",
+        help="The ablation (M67): seat packets carry no knowledge documents (the skills stay). The record is "
+             "labelled knowledge: off and never counts toward an evidence level."),
     cases: Path = CASES_OPTION,
     repo: Path = typer.Option(Path("."), "--repo", help="Root that case file paths are relative to."),
     out: Optional[Path] = typer.Option(None, "--out", help="Where the run record is written (default: "
@@ -1153,6 +1157,9 @@ def eval_run(
     if runtime and trials < LIVE_TRIALS and not as_json:
         console.print(f"note: fewer than {LIVE_TRIALS} trials per case; the intervals below will be wide, and "
                       f"the convention for a model is --trials {LIVE_TRIALS}", highlight=False, soft_wrap=True)
+    if without_knowledge and not as_json:
+        console.print("note: without knowledge documents (the ablation); this record never counts toward an "
+                      "evidence level", highlight=False, soft_wrap=True)
     out = out or (repo / "evals" / "results" if runtime else Path(".nirmaan") / "evals")
     results = []
 
@@ -1173,7 +1180,8 @@ def eval_run(
 
     try:
         path = record_run(_org(), chosen, runtime, trials=trials, repo=repo, out=out, attempts=attempts,
-                          command=" ".join(["nirmaan", *sys.argv[1:]]), head_sha=_head_sha(repo), on_trial=show)
+                          command=" ".join(["nirmaan", *sys.argv[1:]]), head_sha=_head_sha(repo), on_trial=show,
+                          knowledge=not without_knowledge)
     except EvalError as exc:
         _fail(str(exc))
     if as_json:
@@ -1234,7 +1242,8 @@ def eval_history(
         return
     for r in records:
         m = r.manifest
-        kind = "replay" if m.replay else f"{m.runtime}, model {m.model}"
+        kind = ("replay" if m.replay else f"{m.runtime}, model {m.model}") + (
+            ", without knowledge" if m.knowledge == "off" else "")
         console.print(escape(f"{m.id}  ({kind}, version {m.nirmaan_version}, {m.started_at:%Y-%m-%d %H:%M}, "
                              f"{m.trials} trials per case)"), highlight=False, soft_wrap=True)
         _print_summary(r.summary(), indent="  ")
