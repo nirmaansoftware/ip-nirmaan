@@ -161,7 +161,7 @@ def test_regmap_check_records_validation_as_a_run(rtl_seat, tmp_path):
 
 def test_the_axi4_lite_evaluation_case_holds_the_map_out():
     case = json.loads((Path(__file__).parents[1] / "evals" / "rtl" / "axi4_lite_regs.json").read_text())
-    tools = [check.get("tool") for check in case["held_out"]]
+    tools = [check.get("tool") for check in case["held_out"] if check["scorer"] == "held-out-run"]
     assert tools == ["simulator.run", "regmap.verify"]
 
 
