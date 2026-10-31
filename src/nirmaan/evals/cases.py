@@ -72,14 +72,15 @@ def case_digest(case: EvalCase, repo: Path) -> str:
 KNOWLEDGE = "knowledge"
 
 
-def skill_digest(org: Organization, skill_id: str, repo: Path) -> str:
+def skill_digest(org: Organization, skill_id: str, repo: Path, *, knowledge: bool = True) -> str:
     """sha256 over a skill's card (its catalog entry) and its knowledge document, when one exists (M58).
 
     A result is credited to a skill as it was when the result was recorded: a change to either changes this.
+    ``knowledge=False`` (M67, a run without knowledge documents) digests the card alone, what the seat was given.
     """
     card = org.skills[skill_id].model_dump(mode="json")
     digest = hashlib.sha256(json.dumps(card, sort_keys=True).encode("utf-8"))
-    for document in sorted((Path(repo) / KNOWLEDGE).glob(f"*/{skill_id}.md")):
+    for document in sorted((Path(repo) / KNOWLEDGE).glob(f"*/{skill_id}.md")) if knowledge else ():
         digest.update(document.relative_to(repo).as_posix().encode("utf-8"))
         digest.update(document.read_bytes())
     return "sha256:" + digest.hexdigest()

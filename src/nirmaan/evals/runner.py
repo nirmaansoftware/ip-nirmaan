@@ -210,8 +210,11 @@ def run_case(org: Organization, case: EvalCase, runtime: AgentRuntime | None = N
 
 def evaluate(org: Organization, case: EvalCase, seat_runtime: AgentRuntime, *, replay: bool, repo: Path,
              attempts: int | None = None, sandbox: Path | None = None,
-             clock: Callable[[], datetime] | None = None) -> tuple[EvalResult, TaskEngine]:
-    """``run_case`` with the runtime given and the replay flag stated, returning the sandbox engine too (M45)."""
+             clock: Callable[[], datetime] | None = None, knowledge: bool = True) -> tuple[EvalResult, TaskEngine]:
+    """``run_case`` with the runtime given and the replay flag stated, returning the sandbox engine too (M45).
+
+    ``knowledge=False`` (M67, the ablation) seats the runtime with packets that carry no knowledge documents.
+    """
     problems = validate_case(org, case, repo)
     if problems:
         raise EvalError(f"case {case.id} cannot run: {'; '.join(problems)}")
@@ -225,7 +228,7 @@ def evaluate(org: Organization, case: EvalCase, seat_runtime: AgentRuntime, *, r
                     Actor(role=str(seat.owner), kind=ActorKind.SYSTEM, name=FIXTURE))
     tool_runs: list[str] = []
     try:
-        report = run_task(engine, seat.id, seat_runtime, attempts=attempts or case.attempts)
+        report = run_task(engine, seat.id, seat_runtime, attempts=attempts or case.attempts, knowledge=knowledge)
         detail, used, tool_runs = report.detail, len(report.attempts), list(report.tool_runs)
     except (WorkError, PolicyViolationError, PermissionError) as exc:
         detail, used = f"the engine refused the seat's work: {exc}", 1

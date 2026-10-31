@@ -19,5 +19,6 @@
     "knowledge": 1,
     "practised": 0,
     "proven": 0
-  }
+  },
+  "without_knowledge": []
 }

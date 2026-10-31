@@ -18,7 +18,10 @@ fails when the committed file differs from what the records give.
   verification skill, a must-fail control in every case it rests on. A group
   whose digest is not the skill's current one is stale and never counts.
   Replays and attested trials are refused (``load_evidence``); a trial judged
-  by anything but a tool is listed apart and never counts.
+  by anything but a tool is listed apart and never counts. A trial run without
+  knowledge documents (M67, the ablation: ``knowledge: off`` in its run
+  manifest or in the trial itself) is listed apart with the reason and never
+  counts toward any level.
 * **Proven**: only from the product's own seat run records on delivered work
   that passed review. No such record kind exists yet, so no skill is Proven.
 """
@@ -34,7 +37,7 @@ from typing import Any
 
 from nirmaan.company.evidence import MUST_FAIL_DOMAINS
 from nirmaan.evals.cases import EvalError, load_cases, skill_digest
-from nirmaan.evals.records import MANIFEST, load_evidence, wilson
+from nirmaan.evals.records import MANIFEST, knowledge_off, load_evidence, wilson
 from nirmaan.evals.scorers import scorer_spec
 from nirmaan.models import EvalCase
 from nirmaan.org import Organization
@@ -133,11 +136,14 @@ def _rejudged(record_dir: Path) -> dict[tuple[str, int], bool]:
     return {(t["case"], int(t["trial"])): bool(t.get("same")) for t in data.get("trials", [])}
 
 
-def practised(org: Organization, repo: Path, cases: dict[str, EvalCase]) -> tuple[dict[str, list], list[str], list]:
-    """Per skill, every (model, digest) group of tool-judged trials; the refused records; trials not tool-judged."""
+def practised(org: Organization, repo: Path,
+              cases: dict[str, EvalCase]) -> tuple[dict[str, list], list[str], list, list]:
+    """Per skill, every (model, digest) group of tool-judged trials; the refused records; trials not
+    tool-judged; trials run without knowledge documents (M67), which never count."""
     groups: dict[tuple[str, str | None, str | None], dict[str, Any]] = {}
     refused: list[str] = []
     not_tool_judged: list[dict[str, Any]] = []
+    without_knowledge: list[dict[str, Any]] = []
     for manifest in sorted((repo / RESULTS).rglob(MANIFEST)):
         try:
             record = load_evidence(manifest.parent)
@@ -147,6 +153,13 @@ def practised(org: Organization, repo: Path, cases: dict[str, EvalCase]) -> tupl
         rejudged = _rejudged(manifest.parent)
         where = _rel(manifest.parent, repo)
         for trial in record.trials:
+            off = knowledge_off(record.manifest, trial)
+            if off:  # M67: the ablation measures the documents' effect; it is never evidence of a skill
+                without_knowledge.append({"record": where, "case": trial.result.case, "trial": trial.trial,
+                                          "passed": trial.result.passed,
+                                          "reason": f"run without knowledge documents (knowledge: off in "
+                                                    f"{' and '.join(off)}): never counts toward a level"})
+                continue
             case = cases.get(trial.result.case)
             if case is None:
                 refused.append(f"{where}: case {trial.result.case} is not among the eval cases")
@@ -189,7 +202,7 @@ def practised(org: Organization, repo: Path, cases: dict[str, EvalCase]) -> tupl
         out[skill].append({"model": model, "digest": digest, "n": g["n"], "passed": g["passed"],
                            "lower": round(low, 4), "records": sorted(g["records"]), "cases": sorted(g["cases"]),
                            "counts": not reasons, "reasons": reasons})
-    return dict(out), refused, not_tool_judged
+    return dict(out), refused, not_tool_judged, without_knowledge
 
 
 # --- Levels ----------------------------------------------------------------------------------
@@ -199,7 +212,7 @@ def compute(org: Organization, repo: Path) -> dict[str, Any]:
     """Every skill's evidence level from the repository's committed records, as ``capability/levels.json``."""
     repo = Path(repo)
     cases = {c.id: c for c in load_cases(repo / "evals")} if (repo / "evals").is_dir() else {}
-    groups, refused, not_tool_judged = practised(org, repo, cases)
+    groups, refused, not_tool_judged, without_knowledge = practised(org, repo, cases)
     skills: dict[str, Any] = {}
     for skill_id in sorted(set(org.skills) | set(groups)):
         know = knowledge(org, skill_id, repo)
@@ -211,7 +224,7 @@ def compute(org: Organization, repo: Path) -> dict[str, Any]:
         skills[skill_id] = {"level": level.value if level else None, "knowledge": know, "practised": practice}
     totals = {lvl.value: sum(1 for s in skills.values() if s["level"] == lvl.value) for lvl in Level}
     return {"format": FORMAT, "totals": totals, "skills": skills,
-            "refused_records": refused, "not_tool_judged": not_tool_judged,
+            "refused_records": refused, "not_tool_judged": not_tool_judged, "without_knowledge": without_knowledge,
             "proven": "No skill is Proven: no product seat run record of delivered work exists yet."}
 
 

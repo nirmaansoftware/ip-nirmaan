@@ -26,6 +26,12 @@ listed in `refused_records`. A trial counts only for the skills its case names
 (`EvalCase.skills`), and only when every held-out check of the case uses a
 scorer that requires a tool and the trial has judge runs; any other trial is
 listed in `not_tool_judged` with its outcome and never raises a level.
+A trial run without knowledge documents (M67, `eval run --without-knowledge`,
+the ablation; `docs/EVAL_ABLATION.md`) is labelled `"knowledge": "off"` in its
+run manifest and in the trial. Labelled off in either, it is taken out first,
+listed in `without_knowledge` with its outcome and the reason, and never counts
+toward any level; its skill digests are the cards alone, so with both labels
+edited back a skill with a document is still stale.
 
 Trials are grouped by skill, model and the skill digest recorded with the trial
 (card plus knowledge document, M58). A group counts when all hold:
@@ -60,8 +66,8 @@ Proven: no result record is committed.
 Fixture repositories in `tests/test_capability_levels.py`: 5 of 5 with a clean
 re-judge and a must-fail control is Practised; 4 of 5, fewer than 5 trials, no
 re-judge, a failed re-judge or no must-fail control is not; a changed card or a
-later document makes it stale; replays, attestations and trials not judged by a
-tool never count; a case's other skills get nothing; nothing is Proven;
+later document makes it stale; replays, attestations, trials not judged by a
+tool and trials run without knowledge documents (either label) never count; a case's other skills get nothing; nothing is Proven;
 Knowledge needs a check record by a different session, with sources, naming the
 current document.
 
