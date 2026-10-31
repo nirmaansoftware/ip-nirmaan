@@ -119,6 +119,7 @@ new number. M1 to M42 are taken; see `docs/history/README.md`.
 | M64 | Worked examples in CI; review rules for programme files | reserved |
 | M65 | Stage refinements: feature skills on a stage's one task | reserved |
 | M66 | RTL pilot routing: block features and refinements on the RTL seat | reserved |
+| M67 | Evals without knowledge documents: the ablation switch | reserved |
 
 <!-- review:milestone-numbers:end -->
 

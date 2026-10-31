@@ -268,7 +268,7 @@ def _exhausted(engine: TaskEngine, task_id: str, actor: Actor, budget: Limits) -
 
 def run_task(engine: TaskEngine, task_id: str, runtime: AgentRuntime,
              kind: ActorKind = ActorKind.AI_AGENT, attempts: int | None = None,
-             review_rounds: int | None = None) -> RunReport:
+             review_rounds: int | None = None, *, knowledge: bool = True) -> RunReport:
     """Hand one task to a runtime and apply its result through the engine.
 
     When the engine refuses a submission, the refused attempt is recorded (M52:
@@ -276,14 +276,15 @@ def run_task(engine: TaskEngine, task_id: str, runtime: AgentRuntime,
     allows (M26), the same seat is asked again, with the refused attempts in its
     packet. A task a review sent back is worked again with the review's findings
     (M27) while review rounds remain. The counts live in state, so each limit
-    covers every run; an exhausted one escalates.
+    covers every run; an exhausted one escalates. ``knowledge=False`` (M67, the ablation) assembles every
+    packet without its knowledge documents.
     """
     task = engine.task(task_id)
     if task.owner is None:
         raise WorkError(f"{task_id} has no owner")
     budget = limits(engine, task_id, attempts, review_rounds)
     actor = Actor(role=task.owner, kind=kind, name=getattr(runtime, "runtime_id", "runtime"))
-    packet = assemble(engine, task_id)
+    packet = assemble(engine, task_id, knowledge=knowledge)
     if packet.domain.declines:  # M61: knowledge is carried whole or the seat declines, before any work
         return RunReport(task_id, ResultStatus.DECLINED, f"{task.owner} declines {task_id}: {packet.domain.declines}")
     if not runtime.accepts(packet):
@@ -304,7 +305,7 @@ def run_task(engine: TaskEngine, task_id: str, runtime: AgentRuntime,
     used = len(_spent(engine, task_id)[1])
     for number in range(used + 1, limit + 1):
         if number > used + 1:
-            packet = assemble(engine, task_id)  # now carries the refused attempts
+            packet = assemble(engine, task_id, knowledge=knowledge)  # now carries the refused attempts
         result = runtime.execute(packet, tools)
         step, refusal = _apply(engine, task_id, actor, result, f"attempt {number} of {limit}" if limit > 1 else "")
         entry: dict[str, Any] = {"number": number, "status": step.status.value, "detail": step.detail,

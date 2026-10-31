@@ -168,7 +168,11 @@ class EvalTrial(BaseModel):
     stage: str = Field(description="The workflow stage whose seat was evaluated.")
     model: str | None = Field(default=None, description="The model the answers report.")
     #: M58: skill ID -> skill digest (card plus knowledge document) at run time, for the case's skills.
+    #: M67: with knowledge off, the digest of the card alone, since the seat was given no document.
     skills: dict[str, str] = Field(default_factory=dict)
+    #: M67: "off" when the seat's packets carried no knowledge documents (``eval run --without-knowledge``,
+    #: the ablation). Such a trial never counts toward an evidence level.
+    knowledge: Literal["on", "off"] = "on"
     result: EvalResult
     answers: tuple[RecordedAnswer, ...] = ()
     judge_runs: tuple[JudgeRun, ...] = ()
@@ -194,6 +198,8 @@ class EvalRunManifest(BaseModel):
     command: str = ""
     #: M58: the commit the run was made on, when it was made in a repository.
     head_sha: str | None = None
+    #: M67: "off" for a run without knowledge documents (the ablation); every trial it writes says so too.
+    knowledge: Literal["on", "off"] = "on"
 
 
 class EvalProposalThresholds(BaseModel):
