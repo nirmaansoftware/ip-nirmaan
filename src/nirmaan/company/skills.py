@@ -58,11 +58,13 @@ def sk(
     )
 
 
-def protocol(id: str, name: str, packs: tuple[str, ...], spec: str, fails: tuple[str, ...]) -> Skill:
+def protocol(id: str, name: str, packs: tuple[str, ...], spec: str, fails: tuple[str, ...],
+             docs: tuple[str, ...] = ()) -> Skill:
     """A protocol skill: knowledge that refines routing, backed by a pack."""
     return sk(
         id, name, "protocols", "interface",
         packs=packs,
+        docs=docs,
         specs=(spec,),
         prereq=("digital_design",),
         procedures=(
@@ -260,10 +262,11 @@ SKILLS: list[Skill] = [
        fails=("Interrupt races.",), valid=("Interrupt semantics are specified.",)),
     # --- Protocols (knowledge only; backed by VeriTriage packs) ----------------
     protocol("axi", "AMBA AXI", ("axi",), "ARM IHI 0022 (AMBA AXI)",
-             ("Handshake deadlock (VALID waiting on READY).", "Out-of-order ID misuse.", "Missing write response.")),
+             ("Handshake deadlock (VALID waiting on READY).", "Out-of-order ID misuse.", "Missing write response."),
+             docs=("design/axi",)),
     protocol("ace", "AMBA ACE", ("ace", "coherency"), "ARM IHI 0022 (ACE)", ("Snoop response errors.", "Barrier misordering.")),
     protocol("chi", "AMBA CHI", ("chi",), "ARM IHI 0050 (CHI)", ("Credit starvation.", "Retry protocol misuse.")),
-    protocol("apb", "AMBA APB", ("apb",), "ARM IHI 0024 (APB)", ("PREADY stuck low.",)),
+    protocol("apb", "AMBA APB", ("apb",), "ARM IHI 0024 (APB)", ("PREADY stuck low.",), docs=("design/apb",)),
     protocol("ahb", "AMBA AHB", ("ahb",), "ARM IHI 0033 (AHB)", ("HREADY stalls.", "Burst boundary violations.")),
     protocol("axi_stream", "AMBA AXI-Stream", ("axi-stream",), "ARM IHI 0051 (AXI4-Stream)", ("Missing TLAST.",)),
     protocol("pcie", "PCI Express", ("pcie",), "PCI Express Base Specification", ("LTSSM stuck.", "Completion timeouts.")),
@@ -277,7 +280,7 @@ SKILLS: list[Skill] = [
        procedures=("Define custom protocols with the same rigor as a standard.",),
        fails=("Undocumented handshakes.",), valid=("Custom protocol has a written, reviewed spec.",)),
     # --- RTL design -------------------------------------------------------------
-    sk("rtl_design", "RTL design", "design", "rtl",
+    sk("rtl_design", "RTL design", "design", "rtl", docs=("design/rtl_design",),
        provides=("rtl.implement", "rtl.review", "signoff.rtl"),
        includes=("systemverilog", "digital_design"),
        tools=("git.write", "lint.run", "simulator.run", "synth.run", "formal.run", "formal.cover",
