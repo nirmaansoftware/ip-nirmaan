@@ -116,6 +116,7 @@ The original preface of the section:
 - [M63-evidence-levels](M63-evidence-levels.md): Milestone 63 - Evidence levels: Knowledge, Practised and Proven only from committed records, zero of each on main
 - [M64-worked-examples-review-rules](M64-worked-examples-review-rules.md): Milestone 64 - Worked examples inside the existing CI jobs, and review rules for programme files
 - [M65-stage-refinements](M65-stage-refinements.md): Milestone 65 - Stage refinements: a feature adds skills to a stage's one task, with no fan-out
+- [M66-rtl-pilot-routing](M66-rtl-pilot-routing.md): Milestone 66 - RTL pilot routing: the pilot's block and bus skills reach the block-design RTL seat
 
 ## Before M43
 

@@ -590,7 +590,14 @@ BLOCK_DESIGN = WorkflowTemplate(
            depends_on=("interface-spec", "register-map", "microarchitecture"), criticality=H,
            review=rv("rtl.review"),
            # M65: an arbiter is one block, not a fan-out: its one RTL task carries the arbitration skill.
-           refinements=(Refinement(when=when("arbitration"), skills=("arbitration",)),),
+           # M66: so do the pilot's other blocks and bus interfaces (docs/RTL_PILOT_ROUTING.md).
+           refinements=(Refinement(when=when("arbitration"), skills=("arbitration",)),
+                        Refinement(when=when("apb"), skills=("apb",)),
+                        Refinement(when=when("axi"), skills=("axi",)),
+                        Refinement(when=when("fifo"), skills=("buffering_flow_control",)),
+                        Refinement(when=when("register_slice"), skills=("pipeline_design", "buffering_flow_control")),
+                        Refinement(when=when("timer"), skills=("fsm_design",)),
+                        Refinement(when=when("gpio"), skills=("control_logic_design",))),
            outputs=("rtl_source", "testbench"),
            evidence=(REVIEWED,
                      checked("Lint-clean under the RTL lint rules", "lint.run",

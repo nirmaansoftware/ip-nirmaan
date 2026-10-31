@@ -68,3 +68,6 @@ unknown feature or a run-time condition fails validation.
 
 The `arbitration` skill card and its knowledge document (P1-14 part b, a
 separate pull request), and the check record (part c). No eval case changes.
+
+M66 adds the RTL pilot's refinements (APB, AXI, FIFO, skid buffer, timer,
+GPIO) on the same stage: `docs/RTL_PILOT_ROUTING.md`.
