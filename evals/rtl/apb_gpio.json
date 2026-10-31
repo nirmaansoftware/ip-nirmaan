@@ -1,0 +1,80 @@
+{
+  "id": "rtl/apb-gpio",
+  "request": "Create an APB GPIO peripheral with interrupts.",
+  "seat": "rtl-implementation",
+  "skills": ["rtl_design", "apb", "control_logic_design"],
+  "expected_behavior": "RTL for module apb_gpio (APB4, ADDR_WIDTH 8, 32-bit data, zero wait states, N pins with N 8 by default and 1 to 32 allowed) with DATA_OUT, DIR, a read-only DATA_IN, rising, falling, high and low detection enables, an interrupt enable mask and a write-1-to-clear INTR_STATUS at 0x00 to 0x20, a level irq, and a self-checking testbench, following the approved interface specification and microarchitecture, gated by lint, simulation, and synthesis (and formal, when a .sby is written) before review.",
+  "constraints": [
+    "Work only from the approved interface specification and microarchitecture.",
+    "Correct for every N from 1 to 32: bits N and up read as zero and ignore writes.",
+    "Lint-clean under Verilator -Wall with no waivers.",
+    "Synthesizes with no latches."
+  ],
+  "known_failure_modes": [
+    "A write to INTR_STATUS that clears every bit, or bits written 0, or bits in unstrobed bytes.",
+    "An edge detector that fires on the level, so a clear never sticks while the pin is held.",
+    "A level detector that fires only once, so a clear sticks while the level holds.",
+    "irq that ignores INTR_ENABLE.",
+    "A clear that wipes out a detection landing on the same edge.",
+    "A self-written testbench that never holds a pin past a clear or clears one bit of several; the held-out reference testbench judges instead.",
+    "A self-written testbench that cannot tell a clear-all, an edge on level, a level as edge or an ignored mask from a correct block; the must-fail control fails it."
+  ],
+  "upstream": {
+    "interface-spec": [{"path": "tests/fixtures/rtl/apb_gpio/interface_spec.md", "kind": "interface_spec"}],
+    "microarchitecture": [{"path": "tests/fixtures/rtl/apb_gpio/microarchitecture.md", "kind": "microarchitecture_spec"}]
+  },
+  "reference": [
+    {"path": "tests/fixtures/rtl/apb_gpio/apb_gpio.v", "kind": "rtl_source", "entry": "apb_gpio"},
+    {"path": "tests/fixtures/rtl/apb_gpio/apb_gpio_tb.v", "kind": "testbench", "entry": "apb_gpio_tb"},
+    {"path": "tests/fixtures/rtl/apb_gpio/apb_gpio.sby", "kind": "formal_spec"}
+  ],
+  "held_out": [
+    {
+      "name": "The reference testbench passes on the seat's RTL",
+      "scorer": "held-out-run",
+      "tool": "simulator.run",
+      "seat_files": {"sources": ["rtl_source"]},
+      "case_files": {"sources": ["tests/fixtures/rtl/apb_gpio/apb_gpio_tb.v"]},
+      "params": {"top": "apb_gpio_tb"}
+    },
+    {
+      "name": "The seat's testbench fails each GPIO mutant",
+      "scorer": "must-fail",
+      "tool": "simulator.run",
+      "seat_files": {"sources": ["testbench"]},
+      "seat_entries": {"top": ["testbench"]},
+      "case_files": {"sources": ["tests/fixtures/rtl/apb_gpio/apb_gpio.v"]},
+      "mutants": {"tests/fixtures/rtl/apb_gpio/apb_gpio.v": [
+        "tests/fixtures/rtl/apb_gpio/mutants/apb_gpio_w1c_clears_all.v",
+        "tests/fixtures/rtl/apb_gpio/mutants/apb_gpio_edge_on_level.v",
+        "tests/fixtures/rtl/apb_gpio/mutants/apb_gpio_level_as_edge.v",
+        "tests/fixtures/rtl/apb_gpio/mutants/apb_gpio_mask_ignored.v"]}
+    },
+    {
+      "name": "The case's N 8 proof reaches every cover and fails each mutant",
+      "scorer": "must-fail",
+      "tool": "formal.run",
+      "cover_tool": "formal.cover",
+      "case_files": {"sby": ["tests/fixtures/rtl/apb_gpio/apb_gpio.sby"],
+                     "sources": ["tests/fixtures/rtl/apb_gpio/apb_gpio.v"]},
+      "mutants": {"tests/fixtures/rtl/apb_gpio/apb_gpio.v": [
+        "tests/fixtures/rtl/apb_gpio/mutants/apb_gpio_w1c_clears_all.v",
+        "tests/fixtures/rtl/apb_gpio/mutants/apb_gpio_edge_on_level.v",
+        "tests/fixtures/rtl/apb_gpio/mutants/apb_gpio_level_as_edge.v",
+        "tests/fixtures/rtl/apb_gpio/mutants/apb_gpio_mask_ignored.v"]}
+    },
+    {
+      "name": "The case's N 32 proof reaches every cover and fails each mutant",
+      "scorer": "must-fail",
+      "tool": "formal.run",
+      "cover_tool": "formal.cover",
+      "case_files": {"sby": ["tests/fixtures/rtl/apb_gpio/apb_gpio_n32.sby"],
+                     "sources": ["tests/fixtures/rtl/apb_gpio/apb_gpio.v"]},
+      "mutants": {"tests/fixtures/rtl/apb_gpio/apb_gpio.v": [
+        "tests/fixtures/rtl/apb_gpio/mutants/apb_gpio_w1c_clears_all.v",
+        "tests/fixtures/rtl/apb_gpio/mutants/apb_gpio_edge_on_level.v",
+        "tests/fixtures/rtl/apb_gpio/mutants/apb_gpio_level_as_edge.v",
+        "tests/fixtures/rtl/apb_gpio/mutants/apb_gpio_mask_ignored.v"]}
+    }
+  ]
+}
