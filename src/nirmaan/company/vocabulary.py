@@ -38,7 +38,13 @@ INTENTS: list[IntentRule] = [
                patterns=(r"\b(create|build|design|develop|implement|write)\b.*"
                          r"\b(register (block|file|bank)|fifo|arbiter|counter)\b",
                          r"\b(create|build|design|develop|implement|write)\b.*"
-                         r"\b(apb[34]?|axi4?[- ]?lite) (subordinate|slave|peripheral)\b")),
+                         r"\b(apb[34]?|axi4?[- ]?lite) (subordinate|slave|peripheral)\b",
+                         # M66: a timer, GPIO, skid buffer or register slice is the block only when it is the thing
+                         # built (at most three words before it, none of them "with", "and", "for"...), so a
+                         # controller "with a timer" stays new IP.
+                         r"\b(create|build|design|develop|implement|write)\s+(an?\s+|the\s+)?"
+                         r"((?!(with|and|for|of|to|in|on)\b)[\w/-]+\s+){0,3}"
+                         r"(timers?|gpios?|skid[- ]buffers?|register slices?)\b")),
     IntentRule(intent="new_ip", priority=60, description="Build something new.",
                patterns=(r"\b(create|build|design|develop|implement|architect)\b.*\b(ip|bridge|controller|router|block|"
                          r"interconnect|fabric|core|engine|phy|interface|subsystem|accelerator)\b",)),
@@ -58,6 +64,14 @@ FEATURES: list[FeatureRule] = [
     FeatureRule(feature="noc", skills=("noc_architecture", "noc_protocol", "interconnect_design"), patterns=(r"\bnoc\b", r"\bnetwork[- ]on[- ]chip\b"), description="Network-on-chip"),
     FeatureRule(feature="qos", skills=("qos_architecture", "arbitration"), patterns=(r"\bqos\b", r"\bquality[- ]of[- ]service\b"), implies=("arbitration",)),
     FeatureRule(feature="arbitration", skills=("arbitration",), patterns=(r"\barbitrat\w*", r"\barbiter\b")),
+    # M66: the small blocks the RTL pilot builds. No routing context of their own: block-design's RTL stage
+    # refines its one task with the block's skill (docs/RTL_PILOT_ROUTING.md), and no other stage moves.
+    FeatureRule(feature="fifo", patterns=(r"\bfifos?\b",), description="A FIFO buffer (M66)"),
+    FeatureRule(feature="timer", patterns=(r"\btimers?\b",), description="A timer or counter peripheral (M66)"),
+    FeatureRule(feature="gpio", patterns=(r"\bgpios?\b", r"\bgeneral[- ]purpose i/?o\b"),
+                description="General-purpose I/O (M66)"),
+    FeatureRule(feature="register_slice", patterns=(r"\bskid[- ]buffers?\b", r"\bregister slices?\b"),
+                description="A skid buffer or register slice on a valid/ready path (M66)"),
     FeatureRule(feature="multi_port", skills=("buffering_flow_control", "arbitration"), patterns=(r"\b\d+[- ]port\b", r"\bmulti[- ]?port\b")),
     FeatureRule(feature="configurable", patterns=(r"\bconfigurable\b", r"\bparameteri[sz]\w*")),
     FeatureRule(feature="cdc", skills=("cdc_design", "cdc_verification"), patterns=(r"\bcdc\b", r"\bclock[- ]domains?\b", r"\basync\w*\b",

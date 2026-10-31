@@ -20,6 +20,7 @@ from nirmaan.runtime import assemble
 
 ARBITER = "Create a round-robin arbiter for four requesters."
 FIFO = "Create a parameterizable synchronous FIFO."
+COUNTER = "Create a 4-bit wrapping counter."
 
 
 def _stage_task(engine, stage: str):
@@ -52,7 +53,8 @@ def test_the_arbiter_rtl_task_carries_arbitration_with_no_fan_out(nirmaan_org, f
 
 
 def test_a_block_without_the_feature_plans_as_before(nirmaan_org, fixed_clock):
-    engine = Orchestrator(nirmaan_org, clock=fixed_clock).plan(FIFO)
+    # A counter: no refinement holds (M66 refines the FIFO's RTL task, tests/test_pilot_refinements.py).
+    engine = Orchestrator(nirmaan_org, clock=fixed_clock).plan(COUNTER)
     rtl = _stage_task(engine, "rtl-implementation")
     assert rtl.skills == ()
     assert "arbitration" not in [s.id for s in assemble(engine, rtl.id).domain.skills]

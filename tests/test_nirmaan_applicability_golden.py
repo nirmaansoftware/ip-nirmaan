@@ -37,6 +37,10 @@ REQUESTS = (
     "Create an AXI4-Lite register block.",
     "Create an AXI4-Lite register block with a verification plan.",
     "Create a parameterizable synchronous FIFO.",
+    # M66: the RTL pilot's timer, GPIO and skid buffer.
+    "Create an AXI4-Lite timer peripheral with an interrupt.",
+    "Create an APB GPIO peripheral with interrupts.",
+    "Create a skid buffer with valid/ready handshakes.",
     "Create a 4-bit wrapping counter with scan chains.",
     "Create a register file backed by a synchronous RAM.",
     "Create a register file backed by a synchronous RAM, with scan chains and memory BIST.",
