@@ -191,7 +191,7 @@ Unit: design.fpga (placeholder, a director only). No FPGA skill id exists.
 | FPGA architecture and devices | K | none | design.fpga | |
 | Open FPGA flow | K | none | design.fpga | No FPGA binding in eda.py; Yosys already has the FPGA passes. Free tool: nextpnr (the strongest upgrade candidate) |
 | Vendor flows | K | none | design.fpga | Large proprietary installs whose licence terms the founder must accept |
-| FPGA design methodology and timing closure | K | none | design.fpga | Free tool: nextpnr timing reports |
+| FPGA design methodology and timing signoff | K | none | design.fpga | Free tool: nextpnr timing reports |
 | SoC FPGAs and soft processors | K | none | design.fpga, software.firmware | Free tool: LiteX with Verilator simulation, no board needed |
 | FPGA HLS and accelerator frameworks | K | none | design.fpga | Needs vendor tools and boards |
 | FPGA debug and board bring-up | K | none | design.fpga | Needs physical boards |
@@ -238,7 +238,7 @@ Units: implementation.pd, implementation.dft, implementation.foundation
 | Extraction and signal integrity | P | none | implementation.pd.sta | OpenRCX extraction in CI; crosstalk and noise analysis is K |
 | Power analysis and power integrity | P | power_analysis | implementation.pd.power | Static IR in pnr.run; EM is K. Free tool: OpenSTA power reports (power.run is contract only) |
 | Low-power implementation | K | none | none | No UPF-aware free flow here |
-| Timing closure and ECO | P | change_impact_analysis | implementation.pd.sta | A closure project (violated, then met) runs in CI; metal-only ECO is K |
+| Timing fixes and ECO | P | change_impact_analysis | implementation.pd.sta | No cited test ID or eval record yet for a violated-then-met project; metal-only ECO is K |
 | Physical verification and signoff | P | physical_verification, implementation_signoff | implementation.pd.signoff | KLayout DRC and LVS with the sky130hd decks in CI |
 | Chip-level integration | K | none | none | The flow runs one block today. Free tool: OpenROAD macro support |
 | DFT architecture, scan and ATPG | P | dft_architecture, scan_design, atpg, fault_modeling, test_compression, dft_verification | implementation.dft.scan_atpg, implementation.dft.test_access.compression, implementation.dft.test_access.verification | Scan, stuck-at and transition ATPG with measured coverage; compression and diagnosis are K |
