@@ -123,6 +123,36 @@ Its seat-testbench control fails all three. The N 5 proof fails all three; the
 N 4 proof fails the first two and cannot see the third, so the case runs both
 proofs, each with its covers.
 
+The pilot's first eval pull request (P3-E1) gave the other three shipped RTL
+cases the same controls. `rtl/sync-fifo` now runs the two FIFO mutants above:
+its seat-testbench control and the DEPTH 5 proof fail both, and the DEPTH 8
+proof fails the overflow mutant (the one wrong at DEPTH 8), each proof with its
+covers. It also judges `buffering_flow_control` (full, empty and count at a
+depth that is not a power of two). The register blocks got their own mutants:
+
+| File | The one change |
+|---|---|
+| `apb_regs/mutants/apb_regs_pstrb_ignored.v` | any `pstrb` bit set writes every byte |
+| `apb_regs/mutants/apb_regs_setup_write.v` | a write also takes effect in the setup phase |
+| `apb_regs/mutants/apb_regs_no_pslverr.v` | `pslverr` is never raised |
+| `apb_regs/mutants/apb_regs_decode_alias.v` | the decode ignores the bits above 0xC, so 0x10 and up alias the registers |
+| `axi4_lite/mutants/axi4_lite_regs_wstrb_ignored.v` | any `wstrb` bit set writes every byte |
+| `axi4_lite/mutants/axi4_lite_regs_okay_unmapped.v` | an unmapped write is answered OKAY, not SLVERR |
+| `axi4_lite/mutants/axi4_lite_regs_b_before_w.v` | the write and B happen once AW is accepted, before W |
+
+Paths are under `tests/fixtures/rtl/`. Each case runs a seat-testbench control
+and a proof control, and every mutant fails at least one:
+
+| Case | Seat testbench fails | Proof fails | Why one judge leaves a mutant out |
+|---|---|---|---|
+| `rtl/sync-fifo` | both | DEPTH 5: both; DEPTH 8: overflow | the power-of-two wrap is right at DEPTH 8 |
+| `rtl/apb-regs` | pstrb, no pslverr, alias | all four | a manager that follows APB holds address and data into the access phase, so a setup-phase write leaves the same registers and only the proof's per-cycle register property sees it |
+| `rtl/axi4-lite-regs` | all three | OKAY on unmapped, B before W | the proof checks handshakes and response codes, not register data |
+
+A mutant fails a testbench check or an assertion, never a build error; the
+tests check both, and that the judge a control leaves out really passes the
+mutant it leaves out.
+
 ## 4. The evidence loader
 
 `load_evidence(path)` reads a run record (as `load_record` does) and raises
@@ -147,7 +177,7 @@ cases grade (their RTL, testbenches, proofs and reference documents) changed:
 
 | Case | `skills` |
 |---|---|
-| `rtl/sync-fifo`, `rtl/rr-arbiter` | `rtl_design` |
+| `rtl/sync-fifo`, `rtl/rr-arbiter` | `rtl_design` (later also `buffering_flow_control` and `arbitration`, section 3) |
 | `rtl/axi4-lite-regs` | `rtl_design`, `axi` (the reference testbench drives AXI4-Lite transfers) |
 | `rtl/apb-regs` | `rtl_design`, `apb` (the reference testbench drives APB transfers) |
 | `spec/axi4-lite-interface` | `interface_specification` |

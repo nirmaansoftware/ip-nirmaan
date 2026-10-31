@@ -2,7 +2,7 @@
   "id": "rtl/sync-fifo",
   "request": "Create a parameterizable synchronous FIFO.",
   "seat": "rtl-implementation",
-  "skills": ["rtl_design"],
+  "skills": ["rtl_design", "buffering_flow_control"],
   "expected_behavior": "RTL for module sync_fifo (DEPTH 8, WIDTH 8 by default; any DEPTH of 2 or more) with ports clk rst_n wr_en wr_data full rd_en rd_data empty count, first-word fall-through, and a self-checking testbench, gated by lint, simulation, and synthesis (and formal, when a .sby is written) before review.",
   "constraints": [
     "Work only from the approved interface specification and microarchitecture.",
@@ -15,7 +15,8 @@
     "A write while full or a read while empty not dropped.",
     "Full with a simultaneous write and read accepting the write.",
     "count wrong at the full boundary.",
-    "A self-written testbench that never reaches full or empty; the held-out reference testbench (with coverage counters) judges instead."
+    "A self-written testbench that never reaches full or empty; the held-out reference testbench (with coverage counters) judges instead.",
+    "A self-written testbench that cannot tell an overflowing or power-of-two-only FIFO from a correct one; the must-fail control fails it."
   ],
   "upstream": {
     "interface-spec": [{"path": "tests/fixtures/rtl/sync_fifo/interface_spec.md", "kind": "interface_spec"}],
@@ -34,6 +35,38 @@
       "seat_files": {"sources": ["rtl_source"]},
       "case_files": {"sources": ["tests/fixtures/rtl/sync_fifo/sync_fifo_tb.v"]},
       "params": {"top": "sync_fifo_tb"}
+    },
+    {
+      "name": "The seat's testbench fails each FIFO mutant",
+      "scorer": "must-fail",
+      "tool": "simulator.run",
+      "seat_files": {"sources": ["testbench"]},
+      "seat_entries": {"top": ["testbench"]},
+      "case_files": {"sources": ["tests/fixtures/rtl/sync_fifo/sync_fifo.v"]},
+      "mutants": {"tests/fixtures/rtl/sync_fifo/sync_fifo.v": [
+        "tests/fixtures/rtl/sync_fifo/mutants/sync_fifo_overflow.v",
+        "tests/fixtures/rtl/sync_fifo/mutants/sync_fifo_pow2_wrap.v"]}
+    },
+    {
+      "name": "The case's DEPTH 5 proof reaches every cover and fails each mutant",
+      "scorer": "must-fail",
+      "tool": "formal.run",
+      "cover_tool": "formal.cover",
+      "case_files": {"sby": ["tests/fixtures/rtl/sync_fifo/sync_fifo_depth5.sby"],
+                     "sources": ["tests/fixtures/rtl/sync_fifo/sync_fifo.v"]},
+      "mutants": {"tests/fixtures/rtl/sync_fifo/sync_fifo.v": [
+        "tests/fixtures/rtl/sync_fifo/mutants/sync_fifo_overflow.v",
+        "tests/fixtures/rtl/sync_fifo/mutants/sync_fifo_pow2_wrap.v"]}
+    },
+    {
+      "name": "The case's DEPTH 8 proof reaches every cover and fails each mutant wrong at DEPTH 8",
+      "scorer": "must-fail",
+      "tool": "formal.run",
+      "cover_tool": "formal.cover",
+      "case_files": {"sby": ["tests/fixtures/rtl/sync_fifo/sync_fifo.sby"],
+                     "sources": ["tests/fixtures/rtl/sync_fifo/sync_fifo.v"]},
+      "mutants": {"tests/fixtures/rtl/sync_fifo/sync_fifo.v": [
+        "tests/fixtures/rtl/sync_fifo/mutants/sync_fifo_overflow.v"]}
     }
   ]
 }
