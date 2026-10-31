@@ -27,6 +27,10 @@ hunter added; "widened" marks a row whose scope a gap-hunt round enlarged.
 
 ## Method in brief
 
+Unverified research notes: the research counts, the per-round new-row counts
+and the stop rule below come from private notes. No committed record backs
+them yet, so read them as unverified. Only the row tables are checkable here.
+
 1. **Reference taxonomies.** Four research notes (2026-10-30) built the first
    map from Appendix A of the plan and from open taxonomies: the ISSCC 2026
    topics, the IEEE CAS, MTT-S and EMC Society technical committees, the IEEE
@@ -71,7 +75,7 @@ the research notes, job listings and source wish list stay in private notes.
 | Design | 29 | 14 | 14 | 1 |
 | FPGA | 9 | 0 | 8 | 1 |
 | Verification | 19 | 7 | 11 | 1 |
-| Implementation | 18 | 10 | 8 | 0 |
+| Implementation | 18 | 9 | 9 | 0 |
 | Hardware software | 13 | 5 | 8 | 0 |
 | Silicon lifecycle | 15 | 0 | 15 | 0 |
 | Analog and mixed-signal | 13 | 0 | 12 | 1 |
@@ -80,7 +84,7 @@ the research notes, job listings and source wish list stay in private notes.
 | Packaging and systems | 10 | 0 | 10 | 0 |
 | Emerging compute | 6 | 0 | 6 | 0 |
 | Business | 34 | 4 | 26 | 4 |
-| Total | 214 | 52 | 153 | 9 |
+| Total | 214 | 51 | 154 | 9 |
 
 The level-1 list is Appendix A's. Changes to it (promotions and splits) are
 proposals for the council, listed after the tables.
