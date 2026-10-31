@@ -238,7 +238,7 @@ Units: implementation.pd, implementation.dft, implementation.foundation
 | Extraction and signal integrity | P | none | implementation.pd.sta | OpenRCX extraction in CI; crosstalk and noise analysis is K |
 | Power analysis and power integrity | P | power_analysis | implementation.pd.power | Static IR in pnr.run; EM is K. Free tool: OpenSTA power reports (power.run is contract only) |
 | Low-power implementation | K | none | none | No UPF-aware free flow here |
-| Timing fixes and ECO | P | change_impact_analysis | implementation.pd.sta | No cited test ID or eval record yet for a violated-then-met project; metal-only ECO is K |
+| Timing fixes and ECO | K | change_impact_analysis | implementation.pd.sta | No test ID or eval record exists yet for a violated-then-met project, so this is not claimed as practised; metal-only ECO is also K |
 | Physical verification and signoff | P | physical_verification, implementation_signoff | implementation.pd.signoff | KLayout DRC and LVS with the sky130hd decks in CI |
 | Chip-level integration | K | none | none | The flow runs one block today. Free tool: OpenROAD macro support |
 | DFT architecture, scan and ATPG | P | dft_architecture, scan_design, atpg, fault_modeling, test_compression, dft_verification | implementation.dft.scan_atpg, implementation.dft.test_access.compression, implementation.dft.test_access.verification | Scan, stuck-at and transition ATPG with measured coverage; compression and diagnosis are K |
@@ -476,8 +476,11 @@ offer of an IP software product, name the operating owner.
 
 ## Job market (aggregate)
 
-73 distinct job titles from 24 employers, read on 2026-10-30 from public career
-pages and public aggregators: 4 EDA or IP vendors, 1 foundry, 10 large
+Unverified research notes: no test, CI job or committed eval record backs the
+figures in this section. They come from private notes that are not in the
+repository, so treat every count as a research observation and not as a
+substantiated fact. The notes report 73 distinct job titles from 24 employers,
+read on 2026-10-30 from public career pages and public aggregators: 4 EDA or IP vendors, 1 foundry, 10 large
 semiconductor or systems companies, 6 startups and 3 India design or test
 services firms. 47 of the 73 titles are in India. 11 listings were closed but
 still show demand; 6 carried a title only. Each title was mapped to a role in
