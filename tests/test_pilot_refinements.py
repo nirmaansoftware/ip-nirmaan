@@ -40,9 +40,8 @@ CASES = {
     "rtl/sync-fifo": (("buffering_flow_control",), INTERCONNECT, DESIGN_LEAD),
     "rtl/apb-regs": (("apb",), INTERFACE, INTERFACE_LEAD),
     "rtl/axi4-lite-regs": (("axi",), INTERFACE, INTERFACE_LEAD),
-    # P3-E2: the timer and GPIO cases make two of the BLOCKS requests below.
+    # P3-E2: the timer case makes one of the BLOCKS requests below.
     "rtl/axil-timer": (("axi", "fsm_design"), INTERFACE, INTERFACE_LEAD),
-    "rtl/apb-gpio": (("apb", "control_logic_design"), INTERFACE, INTERFACE_LEAD),
 }
 
 #: Requests the pilot's new cases will make; before M66 the first three matched no intent.
