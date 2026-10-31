@@ -34,12 +34,15 @@ PIPELINE = "design.rtl.design.pipeline.senior"
 DESIGN_LEAD = "design.rtl.design.tech_lead"
 INTERFACE_LEAD = "design.rtl.interface.tech_lead"
 
-#: Each existing RTL eval case's request: its RTL task's skills, owner and reviewer.
+#: Each RTL eval case's request: its RTL task's skills, owner and reviewer.
 CASES = {
     "rtl/rr-arbiter": (("arbitration",), INTERCONNECT, DESIGN_LEAD),
     "rtl/sync-fifo": (("buffering_flow_control",), INTERCONNECT, DESIGN_LEAD),
     "rtl/apb-regs": (("apb",), INTERFACE, INTERFACE_LEAD),
     "rtl/axi4-lite-regs": (("axi",), INTERFACE, INTERFACE_LEAD),
+    # P3-E2: the timer and GPIO cases make two of the BLOCKS requests below.
+    "rtl/axil-timer": (("axi", "fsm_design"), INTERFACE, INTERFACE_LEAD),
+    "rtl/apb-gpio": (("apb", "control_logic_design"), INTERFACE, INTERFACE_LEAD),
 }
 
 #: Requests the pilot's new cases will make; before M66 the first three matched no intent.
