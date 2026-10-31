@@ -95,7 +95,7 @@ The applicability golden file (`tests/fixtures/applicability/plans.txt`)
 gains the timer, GPIO and skid-buffer requests as representative requests,
 and otherwise changes only in its analysis lines: the FIFO request now lists
 `fifo`, and the three requests about "the timer" (a parameter change, a
-sign-off and a timing closure) list `timer`. Their tasks and evidence are
+final-checks request and a slack-fix request) list `timer`. Their tasks and evidence are
 unchanged.
 
 ## Tests
