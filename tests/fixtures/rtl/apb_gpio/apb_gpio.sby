@@ -1,0 +1,13 @@
+[options]
+mode prove
+depth 8
+
+[engines]
+smtbmc
+
+[script]
+read -formal apb_gpio.v
+prep -top apb_gpio
+
+[files]
+apb_gpio.v
