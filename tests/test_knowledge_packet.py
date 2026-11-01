@@ -123,13 +123,46 @@ def test_the_arbitration_document_is_in_the_rtl_seats_prompt_on_the_arbiter_case
     rtl = next(t for t in engine.state.tasks.values() if t.stage == case.seat)
     for seat, mode in ((rtl.owner, "work"), (rtl.reviewer, "review")):
         packet = assemble(engine, rtl.id, role=seat)
-        assert [d.ref for d in packet.domain.documents] == [ref] and packet.domain.declines is None
+        assert ref in [d.ref for d in packet.domain.documents] and packet.domain.declines is None
         prompt = render_work_prompt(packet, mode).render()
         assert f"Knowledge document {ref}" in prompt and text in prompt
     # A block that is not an arbiter never carries it.
     fifo = Orchestrator(nirmaan_org, clock=fixed_clock).plan(REQUEST)
     fifo_rtl = next(t for t in fifo.state.tasks.values() if t.stage == "rtl-implementation")
-    assert assemble(fifo, fifo_rtl.id).domain.documents == ()
+    assert ref not in [d.ref for d in assemble(fifo, fifo_rtl.id).domain.documents]
+
+
+#: P3-K1: the feature documents each RTL pilot case's seat reads besides design/rtl_design.
+FEATURE_DOCUMENTS = {"rtl/apb-regs": {"design/apb"}, "rtl/axi4-lite-regs": {"design/axi"},
+                     "rtl/rr-arbiter": {"design/arbitration"}, "rtl/sync-fifo": set()}
+
+
+def test_the_rtl_design_document_reaches_every_rtl_case_and_each_protocol_document_its_own(nirmaan_org,
+                                                                                         fixed_clock):
+    # rtl_design provides rtl.implement, so every RTL seat reads its document; M66 puts apb and axi on their
+    # cases' RTL tasks, and their cards cite design/apb and design/axi. Risk 4 of the pilot plan: the
+    # rtl_design document reaches every RTL seat, so it stays at or under 8,000 characters.
+    from nirmaan.evals import load_cases
+
+    for skill in ("rtl_design", "apb", "axi"):
+        assert knowledge.cited(nirmaan_org.skills[skill]) == (f"design/{skill}",)
+    texts = {ref: knowledge.document_path(ref).read_text(encoding="utf-8")
+             for ref in {"design/rtl_design"}.union(*FEATURE_DOCUMENTS.values())}
+    assert len(texts["design/rtl_design"]) <= 8_000
+    cases = [c for c in load_cases(knowledge.KNOWLEDGE_ROOT.parent / "evals") if c.seat == "rtl-implementation"]
+    assert set(FEATURE_DOCUMENTS) <= {c.id for c in cases}
+    for case in cases:
+        assert "rtl_design" in case.skills, case.id
+        engine = Orchestrator(nirmaan_org, clock=fixed_clock).plan(case.request)
+        rtl = next(t for t in engine.state.tasks.values() if t.stage == case.seat)
+        for seat, mode in ((rtl.owner, "work"), (rtl.reviewer, "review")):
+            packet = assemble(engine, rtl.id, role=seat)
+            refs = {d.ref for d in packet.domain.documents}
+            assert packet.domain.declines is None and "design/rtl_design" in refs, (case.id, seat)
+            if case.id in FEATURE_DOCUMENTS:
+                assert refs == {"design/rtl_design"} | FEATURE_DOCUMENTS[case.id], (case.id, seat)
+                prompt = render_work_prompt(packet, mode).render()
+                assert all(f"Knowledge document {ref}" in prompt and texts[ref] in prompt for ref in refs)
 
 
 def test_a_document_no_skill_cites_never_reaches_a_prompt(root, nirmaan_org, fixed_clock):
