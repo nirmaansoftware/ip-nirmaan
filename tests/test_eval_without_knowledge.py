@@ -59,7 +59,7 @@ def test_without_knowledge_the_packet_drops_the_documents_and_nothing_else(nirma
     for seat in (rtl.owner, rtl.reviewer):
         with_docs = assemble(engine, rtl.id, role=seat)
         without = assemble(engine, rtl.id, role=seat, knowledge=False)
-        assert [d.ref for d in with_docs.domain.documents] == ["design/arbitration"]
+        assert sorted(d.ref for d in with_docs.domain.documents) == ["design/arbitration", "design/rtl_design"]
         assert without.domain.documents == () and without.domain.declines is None
         # The skills and their cards stay, including the card's pointer to its document.
         assert "arbitration" in [s.id for s in without.domain.skills]
