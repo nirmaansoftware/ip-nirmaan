@@ -317,6 +317,8 @@ SHIPPED_CONTROLS = {
     # P3-E2: two new cases, each with proofs at two parameter points.
     "rtl/axil-timer": {"simulator.run": [4], "formal.run": [4, 3]},
     "rtl/apb-gpio": {"simulator.run": [4], "formal.run": [4, 4]},
+    # P3-E3: the skid buffer, with proofs at WIDTH 8 and 1.
+    "rtl/skid-buffer": {"simulator.run": [4], "formal.run": [4, 4]},
 }
 
 
@@ -547,7 +549,7 @@ def test_the_runner_records_a_human_attestation_on_the_seat(nirmaan_org, fixed_c
     assert len(recorded) == 1 and result.attestations == tuple(recorded)
 
 
-# --- The eight shipped cases name their skills ---------------------------------------------
+# --- The nine shipped cases name their skills ---------------------------------------------
 
 
 def test_the_shipped_cases_name_the_skills_they_judge(nirmaan_org):
@@ -559,6 +561,7 @@ def test_the_shipped_cases_name_the_skills_they_judge(nirmaan_org):
         "rtl/axi4-lite-regs": ("rtl_design", "axi"),
         "rtl/axil-timer": ("rtl_design", "axi", "fsm_design"),
         "rtl/rr-arbiter": ("rtl_design", "arbitration"),
+        "rtl/skid-buffer": ("rtl_design", "pipeline_design", "buffering_flow_control"),
         "rtl/sync-fifo": ("rtl_design", "buffering_flow_control"),
         "spec/axi4-lite-interface": ("interface_specification",),
     }

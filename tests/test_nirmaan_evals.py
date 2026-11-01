@@ -41,8 +41,9 @@ from nirmaan.runtime import MockLLM, ModelRuntime
 REPO = Path(__file__).parents[1]
 EVALS = REPO / "evals"
 AXI = REPO / "tests" / "fixtures" / "rtl" / "axi4_lite"
-#: P3-E2 added rtl/apb-gpio and rtl/axil-timer to the four RTL cases of M27.
-RTL_CASES = ["rtl/apb-gpio", "rtl/apb-regs", "rtl/axi4-lite-regs", "rtl/axil-timer", "rtl/rr-arbiter", "rtl/sync-fifo"]
+#: P3-E2 added rtl/apb-gpio and rtl/axil-timer to the four RTL cases of M27, and P3-E3 rtl/skid-buffer.
+RTL_CASES = ["rtl/apb-gpio", "rtl/apb-regs", "rtl/axi4-lite-regs", "rtl/axil-timer", "rtl/rr-arbiter",
+             "rtl/skid-buffer", "rtl/sync-fifo"]
 #: M45: a spec seat case and a firmware seat case join the RTL cases.
 SHIPPED = ["firmware/axi4-lite-driver", *RTL_CASES, "spec/axi4-lite-interface"]
 

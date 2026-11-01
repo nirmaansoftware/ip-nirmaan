@@ -1,0 +1,81 @@
+{
+  "id": "rtl/skid-buffer",
+  "request": "Create a skid buffer with valid/ready handshakes.",
+  "seat": "rtl-implementation",
+  "skills": ["rtl_design", "pipeline_design", "buffering_flow_control"],
+  "expected_behavior": "RTL for module skid_buffer (a register slice on a valid/ready stream, WIDTH-bit beats with WIDTH 8 by default and any WIDTH from 1 allowed) with s_valid, s_ready and s_data upstream, m_valid, m_ready and m_data downstream, every output driven from a flop, full throughput with one beat in and one out per cycle, room for one more beat while the output stalls, and a self-checking testbench, following the approved interface specification and microarchitecture, gated by lint, simulation, and synthesis (and formal, when a .sby is written) before review.",
+  "constraints": [
+    "Work only from the approved interface specification and microarchitecture.",
+    "Correct for every WIDTH from 1 up: the control does not depend on the data width.",
+    "s_ready, m_valid and m_data come from flops: no combinational path from m_ready or s_valid to an output.",
+    "Lint-clean under Verilator -Wall with no waivers.",
+    "Synthesizes with no latches."
+  ],
+  "known_failure_modes": [
+    "A beat accepted in the cycle the output stalls that is overwritten or dropped.",
+    "s_ready computed from m_ready, which lengthens the timing path the slice exists to cut.",
+    "A beat sent twice when ready rises after a stall, or the skid beat sent after a newer one.",
+    "m_data that changes while m_valid is high and m_ready low.",
+    "A slice that takes a beat only every other cycle, losing full throughput.",
+    "A self-written testbench that never stalls the output with a beat already held; the held-out reference testbench judges instead.",
+    "A self-written testbench that cannot tell a dropped skid beat, a combinational ready, a duplicated beat or unstable output data from a correct slice; the must-fail control fails it."
+  ],
+  "upstream": {
+    "interface-spec": [{"path": "tests/fixtures/rtl/skid_buffer/interface_spec.md", "kind": "interface_spec"}],
+    "microarchitecture": [{"path": "tests/fixtures/rtl/skid_buffer/microarchitecture.md", "kind": "microarchitecture_spec"}]
+  },
+  "reference": [
+    {"path": "tests/fixtures/rtl/skid_buffer/skid_buffer.v", "kind": "rtl_source", "entry": "skid_buffer"},
+    {"path": "tests/fixtures/rtl/skid_buffer/skid_buffer_tb.v", "kind": "testbench", "entry": "skid_buffer_tb"},
+    {"path": "tests/fixtures/rtl/skid_buffer/skid_buffer.sby", "kind": "formal_spec"}
+  ],
+  "held_out": [
+    {
+      "name": "The reference testbench passes on the seat's RTL",
+      "scorer": "held-out-run",
+      "tool": "simulator.run",
+      "seat_files": {"sources": ["rtl_source"]},
+      "case_files": {"sources": ["tests/fixtures/rtl/skid_buffer/skid_buffer_tb.v"]},
+      "params": {"top": "skid_buffer_tb"}
+    },
+    {
+      "name": "The seat's testbench fails each skid buffer mutant",
+      "scorer": "must-fail",
+      "tool": "simulator.run",
+      "seat_files": {"sources": ["testbench"]},
+      "seat_entries": {"top": ["testbench"]},
+      "case_files": {"sources": ["tests/fixtures/rtl/skid_buffer/skid_buffer.v"]},
+      "mutants": {"tests/fixtures/rtl/skid_buffer/skid_buffer.v": [
+        "tests/fixtures/rtl/skid_buffer/mutants/skid_buffer_stall_drops_beat.v",
+        "tests/fixtures/rtl/skid_buffer/mutants/skid_buffer_ready_from_downstream.v",
+        "tests/fixtures/rtl/skid_buffer/mutants/skid_buffer_skid_not_emptied.v",
+        "tests/fixtures/rtl/skid_buffer/mutants/skid_buffer_data_not_held.v"]}
+    },
+    {
+      "name": "The case's WIDTH 8 proof reaches every cover and fails each mutant",
+      "scorer": "must-fail",
+      "tool": "formal.run",
+      "cover_tool": "formal.cover",
+      "case_files": {"sby": ["tests/fixtures/rtl/skid_buffer/skid_buffer.sby"],
+                     "sources": ["tests/fixtures/rtl/skid_buffer/skid_buffer.v"]},
+      "mutants": {"tests/fixtures/rtl/skid_buffer/skid_buffer.v": [
+        "tests/fixtures/rtl/skid_buffer/mutants/skid_buffer_stall_drops_beat.v",
+        "tests/fixtures/rtl/skid_buffer/mutants/skid_buffer_ready_from_downstream.v",
+        "tests/fixtures/rtl/skid_buffer/mutants/skid_buffer_skid_not_emptied.v",
+        "tests/fixtures/rtl/skid_buffer/mutants/skid_buffer_data_not_held.v"]}
+    },
+    {
+      "name": "The case's WIDTH 1 proof reaches every cover and fails each mutant",
+      "scorer": "must-fail",
+      "tool": "formal.run",
+      "cover_tool": "formal.cover",
+      "case_files": {"sby": ["tests/fixtures/rtl/skid_buffer/skid_buffer_w1.sby"],
+                     "sources": ["tests/fixtures/rtl/skid_buffer/skid_buffer.v"]},
+      "mutants": {"tests/fixtures/rtl/skid_buffer/skid_buffer.v": [
+        "tests/fixtures/rtl/skid_buffer/mutants/skid_buffer_stall_drops_beat.v",
+        "tests/fixtures/rtl/skid_buffer/mutants/skid_buffer_ready_from_downstream.v",
+        "tests/fixtures/rtl/skid_buffer/mutants/skid_buffer_skid_not_emptied.v",
+        "tests/fixtures/rtl/skid_buffer/mutants/skid_buffer_data_not_held.v"]}
+    }
+  ]
+}
