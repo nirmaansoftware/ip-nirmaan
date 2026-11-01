@@ -11,6 +11,7 @@
 
 #define AXIL_TIMER_CTRL_EN 0x1u /* writing 1 loads COUNT from LOAD and starts */
 #define AXIL_TIMER_CTRL_IE 0x2u /* interrupt enable */
+#define AXIL_TIMER_CTRL_MODE 0x4u /* 0 one-shot, 1 periodic; the driver keeps it 0 */
 #define AXIL_TIMER_STATUS_EXPIRED 0x1u /* write 1 to clear */
 
 #endif /* AXIL_TIMER_MAP_H */

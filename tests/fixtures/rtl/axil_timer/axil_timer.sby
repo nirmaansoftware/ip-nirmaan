@@ -1,0 +1,13 @@
+[options]
+mode prove
+depth 10
+
+[engines]
+smtbmc
+
+[script]
+read -formal axil_timer.v
+prep -top axil_timer
+
+[files]
+axil_timer.v

@@ -68,7 +68,9 @@ of `axi4_lite_regs.v` and four registers:
 | `0xC` | `STATUS` | W1C | bit 0 `EXPIRED`: set when `COUNT` reaches zero; writing 1 clears it |
 
 `irq = EXPIRED && IE`. Unaligned or unmapped offsets are SLVERR, as on the
-register block. Its driver (`tests/fixtures/fw/axil_timer/`) has an interrupt
+register block. P3-E2 later added `CTRL` bit 2 `MODE` (periodic counts) for the
+eval case `rtl/axil-timer` (`docs/EVAL_SKILLS_MUST_FAIL.md`); the driver
+writes it as 0, so these tests run the one-shot mode as before. Its driver (`tests/fixtures/fw/axil_timer/`) has an interrupt
 API: `axil_timer_start(dev, cycles, irq_enable)`, `axil_timer_irq_enable`,
 `axil_timer_expired`, and `axil_timer_ack` (the W1C write).
 

@@ -153,6 +153,34 @@ A mutant fails a testbench check or an assertion, never a build error; the
 tests check both, and that the judge a control leaves out really passes the
 mutant it leaves out.
 
+The pilot's second eval pull request (P3-E2) added `rtl/axil-timer`, with a
+seat-testbench control and proofs at two parameter points. It judges
+`rtl_design`, `axi` and `fsm_design`. Its reference RTL is the M29 firmware
+timer (`axil_timer/axil_timer.v`), extended with a periodic mode, a `CTRL`
+write that needs `wstrb[0]`, and an expiry that wins over a clear on the same
+edge; the firmware's driver writes `MODE` 0, so its tests are unchanged. The
+reference testbench runs lanes at `ADDR_WIDTH` 4 and 8 and times every count
+to the edge.
+
+| File | The one change |
+|---|---|
+| `axil_timer/mutants/axil_timer_oneshot_runs_on.v` | `MODE` is ignored when a count ends: a one-shot count reloads and runs on |
+| `axil_timer/mutants/axil_timer_reload_off_by_one.v` | a periodic count reloads `LOAD + 1`: every period after the first is one cycle long |
+| `axil_timer/mutants/axil_timer_stop_ignored.v` | a `CTRL` write of `EN` 0 does not stop a running count |
+| `axil_timer/mutants/axil_timer_decode_alias.v` | the decode ignores the bits above 0xC, so at `ADDR_WIDTH` 8 offsets 0x10 and up alias the registers |
+
+| Case | Seat testbench fails | Proof fails | Why one judge leaves a mutant out |
+|---|---|---|---|
+| `rtl/axil-timer` | all four | `ADDR_WIDTH` 8: all four; `ADDR_WIDTH` 4: the first three | the aliasing decode is right at `ADDR_WIDTH` 4 |
+
+The proofs model the specification register by register (decode, byte merge
+and count written independently of the design's) and assert that the design
+matches it after every edge, so each mutant fails an assertion. The seat's
+testbench must catch every mutant: each is visible at the ports, the aliasing
+decode at `ADDR_WIDTH` 8, which the case's constraints and its specification
+require. The reference testbench also checks a race no mutant covers: a clear
+on the very edge a new expiry lands must leave `EXPIRED` set.
+
 ## 4. The evidence loader
 
 `load_evidence(path)` reads a run record (as `load_record` does) and raises
@@ -171,7 +199,9 @@ mutant it leaves out.
 
 ## 5. The six shipped cases
 
-Named in #122, in a separate commit from the harness. That commit added only
+Six cases shipped when this milestone landed; P3-E2 added `rtl/axil-timer`
+with its skills (section 3). The six were named in #122,
+in a separate commit from the harness. That commit added only
 the `skills` field to each case and the test that checks them; nothing the
 cases grade (their RTL, testbenches, proofs and reference documents) changed:
 

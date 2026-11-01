@@ -306,7 +306,7 @@ def test_an_arbiter_testbench_that_never_contends_fails_the_control(nirmaan_org,
     assert " survived: simulator.run run-" in score.summary and score.failed_runs == (), score.summary
 
 
-# --- The other shipped RTL cases: negative controls for the pilot skills (P3-E1) -------------
+# --- The other shipped RTL cases: negative controls for the pilot skills (P3-E1, P3-E2) ------
 
 
 #: Each shipped RTL case with must-fail controls, and how many mutants each of its controls lists.
@@ -314,6 +314,8 @@ SHIPPED_CONTROLS = {
     "rtl/sync-fifo": {"simulator.run": [2], "formal.run": [2, 1]},
     "rtl/apb-regs": {"simulator.run": [3], "formal.run": [4]},
     "rtl/axi4-lite-regs": {"simulator.run": [3], "formal.run": [2]},
+    # P3-E2: a new case, with proofs at two parameter points.
+    "rtl/axil-timer": {"simulator.run": [4], "formal.run": [4, 3]},
 }
 
 
@@ -383,6 +385,29 @@ def test_a_mutant_one_judge_cannot_see_is_left_to_the_other(nirmaan_org, fixed_c
     [score] = result.scores
     assert score.status is ScoreStatus.FAILED and not result.passed
     assert score.summary.startswith(f"mutant {mutant} survived: {check['tool']}"), score.summary
+
+
+TIMER = "tests/fixtures/rtl/axil_timer"
+TIMER_CLEAN = f"{TIMER}/axil_timer.v"
+TIMER_ALIAS = f"{TIMER}/mutants/axil_timer_decode_alias.v"
+
+
+@needs("verilator", "iverilog", "vvp", "yosys", "sby", "yices-smt2")
+def test_the_timer_alias_mutant_needs_the_wide_address_proof(nirmaan_org, fixed_clock, tmp_path):
+    """A decode that ignores the bits above 0xC is right at ADDR_WIDTH 4: that proof alone cannot see it."""
+    shipped = json.loads((EVALS / "rtl" / "axil_timer.json").read_text(encoding="utf-8"))
+    proofs = {c["case_files"]["sby"][0]: c["mutants"][TIMER_CLEAN] for c in shipped["held_out"]
+              if c["scorer"] == "must-fail" and c["tool"] == "formal.run"}
+    assert TIMER_ALIAS in proofs[f"{TIMER}/axil_timer_aw8.sby"]
+    assert TIMER_ALIAS not in proofs[f"{TIMER}/axil_timer.sby"]
+    check = {"name": "ADDR_WIDTH 4 proof", "scorer": "must-fail", "tool": "formal.run",
+             "case_files": {"sby": [f"{TIMER}/axil_timer.sby"], "sources": [TIMER_CLEAN]},
+             "mutants": {TIMER_CLEAN: [TIMER_ALIAS]}}
+    result = run_case(nirmaan_org, load_case(_shipped_case(tmp_path, "axil_timer.json", [check])), repo=REPO,
+                      sandbox=tmp_path / "sandbox", clock=fixed_clock)
+    [score] = result.scores
+    assert score.status is ScoreStatus.FAILED and not result.passed
+    assert score.summary.startswith(f"mutant {TIMER_ALIAS} survived: formal.run"), score.summary
 
 
 class _FakeTools:
@@ -521,7 +546,7 @@ def test_the_runner_records_a_human_attestation_on_the_seat(nirmaan_org, fixed_c
     assert len(recorded) == 1 and result.attestations == tuple(recorded)
 
 
-# --- The six shipped cases name their skills -----------------------------------------------
+# --- The seven shipped cases name their skills ---------------------------------------------
 
 
 def test_the_shipped_cases_name_the_skills_they_judge(nirmaan_org):
@@ -530,6 +555,7 @@ def test_the_shipped_cases_name_the_skills_they_judge(nirmaan_org):
         "firmware/axi4-lite-driver": ("device_drivers",),
         "rtl/apb-regs": ("rtl_design", "apb"),
         "rtl/axi4-lite-regs": ("rtl_design", "axi"),
+        "rtl/axil-timer": ("rtl_design", "axi", "fsm_design"),
         "rtl/rr-arbiter": ("rtl_design", "arbitration"),
         "rtl/sync-fifo": ("rtl_design", "buffering_flow_control"),
         "spec/axi4-lite-interface": ("interface_specification",),

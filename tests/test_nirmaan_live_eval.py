@@ -483,5 +483,5 @@ def test_records_and_spec_check_keep_the_laws(nirmaan_org):
 def test_the_case_loader_skips_data_files():
     """Checks files and run records under evals/ carry a format and are never read as cases."""
     ids = [c.id for c in load_cases(EVALS)]
-    assert SPEC_CASE in ids and FW_CASE in ids and len(ids) == 6
+    assert SPEC_CASE in ids and FW_CASE in ids and len(ids) == 7
     assert load_case(EVALS / "spec" / "axi4_lite_interface.json").seat == "interface-spec"

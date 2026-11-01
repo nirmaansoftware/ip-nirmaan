@@ -1,0 +1,79 @@
+{
+  "id": "rtl/axil-timer",
+  "request": "Create an AXI4-Lite timer peripheral with an interrupt.",
+  "seat": "rtl-implementation",
+  "skills": ["rtl_design", "axi", "fsm_design"],
+  "expected_behavior": "RTL for module axil_timer (AXI4-Lite subordinate, ADDR_WIDTH 4 by default and 4 to 8 allowed, 32-bit data) with CTRL (EN, IE, MODE), LOAD, a read-only COUNT and a write-1-to-clear STATUS at 0x0 to 0xC, one-shot and periodic counts of exactly LOAD cycles, a level irq, and a self-checking testbench, following the approved interface specification and microarchitecture, gated by lint, simulation, and synthesis (and formal, when a .sby is written) before review.",
+  "constraints": [
+    "Work only from the approved interface specification and microarchitecture.",
+    "Correct for every ADDR_WIDTH from 4 to 8: offsets 0x10 and up are unmapped.",
+    "Lint-clean under Verilator -Wall with no waivers.",
+    "Synthesizes with no latches."
+  ],
+  "known_failure_modes": [
+    "A one-shot count that reloads and runs on, or whose EN never clears itself.",
+    "A periodic period one cycle long or short, or a first period that differs from the rest.",
+    "A write of EN 0 that does not stop a running count.",
+    "An acknowledgement that wipes out an expiry landing on the same edge.",
+    "Offsets 0x10 and above aliasing the registers when ADDR_WIDTH is above 4.",
+    "A self-written testbench that never times a count to the cycle; the held-out reference testbench judges instead.",
+    "A self-written testbench that cannot tell a one-shot that runs on, an off-by-one reload, an ignored stop or an aliased decode from a correct timer; the must-fail control fails it."
+  ],
+  "upstream": {
+    "interface-spec": [{"path": "tests/fixtures/rtl/axil_timer/interface_spec.md", "kind": "interface_spec"}],
+    "microarchitecture": [{"path": "tests/fixtures/rtl/axil_timer/microarchitecture.md", "kind": "microarchitecture_spec"}]
+  },
+  "reference": [
+    {"path": "tests/fixtures/rtl/axil_timer/axil_timer.v", "kind": "rtl_source", "entry": "axil_timer"},
+    {"path": "tests/fixtures/rtl/axil_timer/axil_timer_tb.v", "kind": "testbench", "entry": "axil_timer_tb"},
+    {"path": "tests/fixtures/rtl/axil_timer/axil_timer.sby", "kind": "formal_spec"}
+  ],
+  "held_out": [
+    {
+      "name": "The reference testbench passes on the seat's RTL",
+      "scorer": "held-out-run",
+      "tool": "simulator.run",
+      "seat_files": {"sources": ["rtl_source"]},
+      "case_files": {"sources": ["tests/fixtures/rtl/axil_timer/axil_timer_tb.v"]},
+      "params": {"top": "axil_timer_tb"}
+    },
+    {
+      "name": "The seat's testbench fails each timer mutant",
+      "scorer": "must-fail",
+      "tool": "simulator.run",
+      "seat_files": {"sources": ["testbench"]},
+      "seat_entries": {"top": ["testbench"]},
+      "case_files": {"sources": ["tests/fixtures/rtl/axil_timer/axil_timer.v"]},
+      "mutants": {"tests/fixtures/rtl/axil_timer/axil_timer.v": [
+        "tests/fixtures/rtl/axil_timer/mutants/axil_timer_oneshot_runs_on.v",
+        "tests/fixtures/rtl/axil_timer/mutants/axil_timer_reload_off_by_one.v",
+        "tests/fixtures/rtl/axil_timer/mutants/axil_timer_stop_ignored.v",
+        "tests/fixtures/rtl/axil_timer/mutants/axil_timer_decode_alias.v"]}
+    },
+    {
+      "name": "The case's ADDR_WIDTH 8 proof reaches every cover and fails each mutant",
+      "scorer": "must-fail",
+      "tool": "formal.run",
+      "cover_tool": "formal.cover",
+      "case_files": {"sby": ["tests/fixtures/rtl/axil_timer/axil_timer_aw8.sby"],
+                     "sources": ["tests/fixtures/rtl/axil_timer/axil_timer.v"]},
+      "mutants": {"tests/fixtures/rtl/axil_timer/axil_timer.v": [
+        "tests/fixtures/rtl/axil_timer/mutants/axil_timer_oneshot_runs_on.v",
+        "tests/fixtures/rtl/axil_timer/mutants/axil_timer_reload_off_by_one.v",
+        "tests/fixtures/rtl/axil_timer/mutants/axil_timer_stop_ignored.v",
+        "tests/fixtures/rtl/axil_timer/mutants/axil_timer_decode_alias.v"]}
+    },
+    {
+      "name": "The case's ADDR_WIDTH 4 proof reaches every cover and fails each mutant wrong at ADDR_WIDTH 4",
+      "scorer": "must-fail",
+      "tool": "formal.run",
+      "cover_tool": "formal.cover",
+      "case_files": {"sby": ["tests/fixtures/rtl/axil_timer/axil_timer.sby"],
+                     "sources": ["tests/fixtures/rtl/axil_timer/axil_timer.v"]},
+      "mutants": {"tests/fixtures/rtl/axil_timer/axil_timer.v": [
+        "tests/fixtures/rtl/axil_timer/mutants/axil_timer_oneshot_runs_on.v",
+        "tests/fixtures/rtl/axil_timer/mutants/axil_timer_reload_off_by_one.v",
+        "tests/fixtures/rtl/axil_timer/mutants/axil_timer_stop_ignored.v"]}
+    }
+  ]
+}
