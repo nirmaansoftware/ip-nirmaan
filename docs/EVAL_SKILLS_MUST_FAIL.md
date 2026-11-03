@@ -192,6 +192,33 @@ constraints and its specification require. Each reference testbench also
 checks a race no mutant here covers: a clear on the very edge a new expiry or
 detection lands must leave the status set.
 
+The pilot's third eval pull request (P3-E3) added `rtl/skid-buffer`, which
+judges `rtl_design`, `pipeline_design` and `buffering_flow_control`: a new
+register slice (`skid_buffer/skid_buffer.v`) on a valid/ready stream, with
+every output from a flop, full throughput, and a skid register that takes the
+one beat accepted while the output stalls. Its request plans through M66's
+`register_slice` feature. The reference testbench runs lanes at `WIDTH` 8 and
+1 against its own queue model, and the proofs run at the same two widths.
+
+| File | The one change |
+|---|---|
+| `skid_buffer/mutants/skid_buffer_stall_drops_beat.v` | a beat accepted while the output stalls is not kept in the skid register, so it is lost and `s_ready` stays high |
+| `skid_buffer/mutants/skid_buffer_ready_from_downstream.v` | `s_ready` is computed from `m_ready`: no beat is lost, but ready is not registered and drops while one beat is held |
+| `skid_buffer/mutants/skid_buffer_skid_not_emptied.v` | the skid register is not emptied when ready rises and its beat moves out, so that beat is sent again |
+| `skid_buffer/mutants/skid_buffer_data_not_held.v` | a beat accepted while the output stalls also loads the output register, so `m_data` changes under a stall |
+
+| Case | Seat testbench fails | Proof fails | Why one judge leaves a mutant out |
+|---|---|---|---|
+| `rtl/skid-buffer` | all four | `WIDTH` 8 and `WIDTH` 1: all four | none |
+
+The proofs keep their own queue of up to two beats, moved only by the
+handshakes at the ports, and assert that `m_valid`, `s_ready` and `m_data`
+match it after every edge, so each mutant fails an assertion. The
+combinational ready loses no beat, so a testbench that only compares the
+stream in and out misses it; the reference testbench checks `s_ready` against
+its model every cycle and flips `m_ready` and `s_valid` inside a cycle to
+check that `s_ready` does not move.
+
 ## 4. The evidence loader
 
 `load_evidence(path)` reads a run record (as `load_record` does) and raises
@@ -211,7 +238,7 @@ detection lands must leave the status set.
 ## 5. The six shipped cases
 
 Six cases shipped when this milestone landed; P3-E2 added `rtl/axil-timer`
-and `rtl/apb-gpio` with their skills (section 3). The six were named in #122,
+and `rtl/apb-gpio`, and P3-E3 `rtl/skid-buffer`, with their skills (section 3). The six were named in #122,
 in a separate commit from the harness. That commit added only
 the `skills` field to each case and the test that checks them; nothing the
 cases grade (their RTL, testbenches, proofs and reference documents) changed:

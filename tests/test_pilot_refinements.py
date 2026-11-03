@@ -43,6 +43,8 @@ CASES = {
     # P3-E2: the timer and GPIO cases make two of the BLOCKS requests below.
     "rtl/axil-timer": (("axi", "fsm_design"), INTERFACE, INTERFACE_LEAD),
     "rtl/apb-gpio": (("apb", "control_logic_design"), INTERFACE, INTERFACE_LEAD),
+    # P3-E3: the skid buffer case makes the first skid-buffer BLOCKS request below.
+    "rtl/skid-buffer": (("pipeline_design", "buffering_flow_control"), PIPELINE, DESIGN_LEAD),
 }
 
 #: Requests the pilot's new cases will make; before M66 the first three matched no intent.
@@ -125,6 +127,19 @@ def test_timer_gpio_and_skid_buffer_requests_plan_block_design(request_text, nir
     engine = Orchestrator(nirmaan_org, clock=fixed_clock).plan(request_text)
     assert engine.state.project.analysis.intent == "block_design"
     _check(engine, *BLOCKS[request_text])
+
+
+def test_the_skid_buffer_case_routes_through_register_slice_and_carries_its_three_skills(nirmaan_org, fixed_clock):
+    """P3-E3: the case's request is a register_slice block, and both seats' packets carry every judged skill."""
+    case = next(c for c in load_cases(knowledge.KNOWLEDGE_ROOT.parent / "evals") if c.id == "rtl/skid-buffer")
+    assert case.skills == ("rtl_design", "pipeline_design", "buffering_flow_control")
+    engine = Orchestrator(nirmaan_org, clock=fixed_clock).plan(case.request)
+    analysis = engine.state.project.analysis
+    assert analysis.intent == "block_design" and "register_slice" in analysis.features
+    rtl = _check(engine, ("pipeline_design", "buffering_flow_control"), PIPELINE, DESIGN_LEAD)
+    for seat in (None, rtl.owner, rtl.reviewer):
+        packet = assemble(engine, rtl.id) if seat is None else assemble(engine, rtl.id, role=seat)
+        assert set(case.skills) <= {s.id for s in packet.domain.skills}, seat
 
 
 def test_a_block_with_several_features_carries_every_skill_within_the_domain_cap(nirmaan_org, fixed_clock):

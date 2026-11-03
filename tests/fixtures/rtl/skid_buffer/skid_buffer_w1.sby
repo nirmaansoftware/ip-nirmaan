@@ -1,0 +1,14 @@
+[options]
+mode prove
+depth 8
+
+[engines]
+smtbmc
+
+[script]
+read -formal skid_buffer.v
+chparam -set WIDTH 1 skid_buffer
+prep -top skid_buffer
+
+[files]
+skid_buffer.v
