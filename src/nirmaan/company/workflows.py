@@ -831,7 +831,7 @@ BLOCK_VERIFICATION = WorkflowTemplate(
            depends_on=("interface-spec", "design-under-test"),
            skills=("formal_verification", "sva", "assertion_coverage"), criticality=H, review=rv("formal.review"),
            refinements=(Refinement(when=when("unbounded_proof"), skills=("model_checking",)),),
-           outputs=("assertions", "formal_spec"),
+           outputs=("assertions",),  # with the .sby (formal_spec) the gates read, as block-design's RTL seat writes one
            evidence=(REVIEWED,
                      checked("The seat's properties are proven on the approved RTL", "formal.run", *PROOF_SETUP,
                              bounds=(at_least("proven", 1),)),
