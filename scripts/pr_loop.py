@@ -38,17 +38,29 @@ per call, as a state machine that survives restarts:
             the model) checks what changed, commits, runs the checks and pushes.
             The new head voids both keys, so the next step reviews from scratch;
     pause   a key or the proxy deferred only by a rate limit (the plan's
-            session or usage limit, after its one retry), or the fixer hit one:
-            no label, the key stays pending, and no model call for any pull
-            request until the pause ends (rate_limit_pause_minutes, in a file
-            the Nirmaan loop shares, since both run on one plan); then the same
-            head is reviewed again;
+            session, 5-hour, weekly or usage limit, by its call outcome or its
+            text, after its one retry), or the fixer hit one: no label, the key
+            stays pending, and no model call for any pull request until the
+            pause ends (rate_limit_pause_minutes, in a file the Nirmaan loop
+            shares, since both run on one plan); then the same head is reviewed
+            again;
+    retry   a passing fault (transient_error: a network error, a timeout, a
+            GitHub 401, 429 or 5xx, a model call that failed that way): no
+            label; the same head is tried again on a later pass after a
+            doubling backoff (transient_backoff_minutes), and after
+            transient_retries retries in a row it stops with the
+            `loop-stalled` label and a comment;
     stop    three fix rounds, the same finding twice, CI failing after a fix, a
             merge conflict, a key or proxy deferred for any other reason, the
             proxy's needs-founder (until the founder's own GitHub review
             approves the head), a forbidden path, a failed local check or any
-            error: label
-            `needs-founder`, say why.
+            other error: label
+            `needs-founder`, say why. A stop whose label or comment could not
+            be posted (GitHub unreachable) is logged and posted on a later pass.
+
+Up to `parallel_reviews` (2) pull requests are stepped at once in a pass, each
+by one worker; every model call holds one of the model slots shared with the
+Nirmaan loop (pr_review CONFIG model_cap).
 
 Usage: python scripts/pr_loop.py (--once | --watch) [--pr N] [--interval-minutes 5] [--no-post]
 Exit: 0 done, 2 setup error, 4 refused (this copy differs from main).
@@ -64,7 +76,10 @@ import secrets
 import subprocess
 import sys
 import tempfile
+import threading
 import time
+import urllib.error
+from http.client import HTTPException
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -99,11 +114,56 @@ def _gh_failure(exc) -> str:
     return f"({kind}): {detail[:500]}"
 
 
+# Text of a passing fault: a dropped or refused connection, a timeout, a name
+# that did not resolve, a GitHub 401 (an expired token) or 5xx, from gh, git,
+# urllib or a model call.
+TRANSIENT_TEXT = re.compile(
+    r"remote end closed connection|connection (?:reset|refused|aborted|closed|error|timed out)|econnreset|econnrefused|"
+    r"etimedout|timed out|time-?out|name resolution|could not resolve host|nodename nor servname|name or service not known|"
+    r"network is unreachable|broken pipe|the remote end hung up|early eof|unexpected disconnect|error connecting to|"
+    r"http error (?:401|429|5\d\d)|\bhttp (?:401|429|5\d\d)\b|api error:? 5\d\d|bad credentials|"
+    r"\b5\d\d (?:internal server error|bad gateway|service unavailable)", re.I)
+
+
+def transient_error(exc) -> bool:
+    """A passing fault worth trying again on a later pass, not a stop: a
+    network error or timeout, a GitHub 401 (the installation token expired),
+    429 or 5xx, or a gh or git failure whose text says so."""
+    if isinstance(exc, urllib.error.HTTPError):
+        return exc.code in (401, 429) or exc.code >= 500
+    if isinstance(exc, (urllib.error.URLError, HTTPException, ConnectionError, TimeoutError, subprocess.TimeoutExpired)):
+        return True
+    if isinstance(exc, (subprocess.CalledProcessError, OSError)):
+        return bool(TRANSIENT_TEXT.search(f"{exc} {getattr(exc, 'stderr', None) or ''} {getattr(exc, 'output', None) or ''}"))
+    return False
+
+
+def _rate_limited(k: dict) -> bool:
+    """A key deferred by the plan's limit: by its call outcome, or by the text
+    of its failed call (wordings the classifier missed)."""
+    return k.get("call_outcome") == "rate_limit" or bool(k.get("call_outcome") and pr_review.RATE_LIMIT.search(k.get("reason") or ""))
+
+
+def _transient_call(kind: str, text: str) -> bool:
+    """A failed model call that is a passing fault: a timeout, or an error
+    whose text shows a network or server fault."""
+    return kind == "timeout" or (kind == "error" and bool(TRANSIENT_TEXT.search(text or "")))
+
+
 LOOP = {
     "authors": ["patel-om"],
     "max_fix_rounds": 3,
     # A rate limit pauses the whole loop this long, then it reviews again.
     "rate_limit_pause_minutes": 30,
+    # A passing fault (transient_error) is tried again on later passes, the
+    # first after this many minutes, each wait twice the last (2, 4, 8, 16);
+    # after transient_retries retries in a row the next failure stops with
+    # stalled_label (not needs-founder: nothing in it is the founder's).
+    "transient_retries": 4,
+    "transient_backoff_minutes": 2,
+    "stalled_label": "loop-stalled",
+    # Pull requests stepped at once in one pass (each by one worker).
+    "parallel_reviews": 2,
     "needs_founder_label": "needs-founder",
     # A finding on a path the fixer may not change: the fixer does not run, the
     # pull request gets this label, and the author's next head clears it.
@@ -506,20 +566,22 @@ class Loop:
 
     # The whole pass: one step for every pull request, so one waiting for CI, or
     # one that just ran a review or a fix, never holds up the others. A pull
-    # request the loop is fixing goes first, then by number. The steps run one
-    # after another; the shared lock is held only around each reviewer call,
-    # so model calls still run one at a time (a lock held elsewhere at a call
-    # makes that pull request "busy" and the pass goes on). The check that this copy is main's
-    # runs once, before the pass, so the pass ends when main may have moved:
-    # after this pass's own auto-merge (GitHub may merge at once), and when
-    # main's sha on origin, read before each step, is no longer the one the
-    # pass started with (any other merge) or cannot be read. The next pass
-    # refetches main and checks this copy again first. A merge landing during
-    # a step is seen only before the next one.
+    # request the loop is fixing goes first, then by number. Up to
+    # parallel_reviews steps run at once, each pull request taken by one worker
+    # only; every model call holds one of the model slots shared with the
+    # Nirmaan loop (none free at a call makes that pull request "busy" and the
+    # pass goes on). The check that this copy is main's runs once, before the
+    # pass, so no new step starts once main may have moved: after this pass's
+    # own auto-merge (GitHub may merge at once), after a rate-limit pause, and
+    # when main's sha on origin, read before each step, is no longer the one
+    # the pass started with (any other merge) or cannot be read. A step already
+    # running finishes (as a merge landing during a step always could); the
+    # next pass refetches main and checks this copy again first.
     def tick(self, only_pr: int | None = None, main_at_start: str | None = None) -> list[dict]:
-        # One pass at a time for this repository (its own lock, not the shared
-        # review lock): fix rounds run without the shared lock, so two loop
-        # processes must never step the same pull requests at once.
+        # One pass at a time for this repository (its own lock, not a model
+        # slot): the slots are held only around model calls, so two loop
+        # processes must never step the same pull requests at once. Inside the
+        # pass each pull request is taken by one worker only.
         release, holder = pr_review.acquire_lock(self.state_dir, {"repo": self.cfg["repo"], "by": "pr-loop pass"},
                                                  name=f"loop-{self.cfg['repo'].replace('/', '_')}.lock")
         if release is None:
@@ -544,17 +606,35 @@ class Loop:
             s = load_state(self.state_dir, self.cfg["repo"], p["number"])
             return 0 if s["last_fix_head"] and not s["done"] and not s["stopped"] else 1
         pulls.sort(key=lambda p: (in_flight(p), p["number"]))
-        results = []
-        for p in pulls:
-            now = self._main_on_origin()
-            if now is None or now != start:
-                self.out(f"pr-loop: main moved during the pass ({(start or '?')[:7]} -> {(now or 'unreadable')[:11]}); "
-                         "the rest wait for the next pass")
-                break
-            results.append({"pr": p["number"], **self.step(p)})
-            if results[-1]["outcome"] in ("auto-merge", "paused"):
-                break
-        return results
+        queue, results, guard, halt = list(enumerate(pulls)), [], threading.Lock(), threading.Event()
+
+        def worker():
+            while True:
+                with guard:
+                    if halt.is_set() or not queue:
+                        return
+                    i, p = queue.pop(0)
+                    now = self._main_on_origin()
+                    if now is None or now != start:
+                        self.out(f"pr-loop: main moved during the pass ({(start or '?')[:7]} -> {(now or 'unreadable')[:11]}); "
+                                 "the rest wait for the next pass")
+                        halt.set()
+                        return
+                try:
+                    res = {"pr": p["number"], **self.step(p)}
+                except Exception as exc:  # noqa: BLE001 - step() stops on its own errors; this is a last guard
+                    res = {"pr": p["number"], "outcome": "error", "reason": str(exc)}
+                with guard:
+                    results.append((i, res))
+                    if res["outcome"] in ("auto-merge", "paused"):
+                        halt.set()
+
+        workers = [threading.Thread(target=worker, name=f"pr-loop-{k}") for k in range(max(1, int(self.lc.get("parallel_reviews", 1))))]
+        for t in workers:
+            t.start()
+        for t in workers:
+            t.join()
+        return [res for _, res in sorted(results, key=lambda x: x[0])]
 
     def _note_closed(self, open_numbers: set, only_pr: int | None = None):
         """A pull request the loop finished (auto-merge or ready) that is no
@@ -606,17 +686,47 @@ class Loop:
             return skip("not a same-repository pull request to main")
         if listed["author"] not in lc["authors"]:
             return skip(f"author {listed['author']} is not the agents' account")
+        stopped = st["stopped"]
+        if stopped and stopped.get("visible") is False and stopped["head"] == listed["head_sha"] and o["post"] != "none":
+            # A stop GitHub did not take (unreachable, or the token expired):
+            # its label and comment are posted now.
+            self._post_stop(ctx, stopped)
+            return skip(f"stopped on this head: {stopped['reason']}")
         if cfg["hold_label"] in listed["labels"]:
             return skip(f'"{cfg["hold_label"]}" label')
         if lc["needs_founder_label"] in listed["labels"]:
             return skip(f'"{lc["needs_founder_label"]}" label')
-        if st["stopped"] and st["stopped"].get("labeled"):
-            self.out(f"pr-loop: #{n} resumes: the \"{lc['needs_founder_label']}\" label was removed")
-            st.update(rounds=0, seen={}, last_fix_head=None, done=None, stopped=None)
+        stalled = lc.get("stalled_label")
+        if stalled and stalled in listed["labels"]:
+            if not (stopped and stopped.get("label") == stalled and stopped["head"] != listed["head_sha"]):
+                # The loop's stall on this head, or a label someone set by hand
+                # (no stall recorded): held until the label is removed.
+                return skip(f'"{stalled}" label')
+            # The author's new head clears the loop's stall: it is tried from scratch.
+            st.update(stopped=None, transient=None)
+            _save_state(self.state_dir, cfg["repo"], st)
+            self._log(ctx, "stall-cleared")
+            if o["post"] != "none":
+                try:
+                    o["github"].remove_label(n, stalled)
+                except Exception as exc:  # noqa: BLE001 - a label left behind is retried on the next pass
+                    self.out(f"pr-loop: #{n}: could not remove the {stalled} label: {exc}")
+                    return {"outcome": "retry", "reason": f"could not remove the {stalled} label"}
+        elif st["stopped"] and st["stopped"].get("labeled"):
+            label = st["stopped"].get("label") or lc["needs_founder_label"]
+            self.out(f"pr-loop: #{n} resumes: the \"{label}\" label was removed")
+            if label == stalled:
+                # A stall says nothing about the change: the fix-round count stays.
+                st.update(stopped=None, transient=None)
+            else:
+                st.update(rounds=0, seen={}, last_fix_head=None, done=None, stopped=None)
             _save_state(self.state_dir, cfg["repo"], st)
             self._log(ctx, "resumed")
         if st["stopped"] and st["stopped"]["head"] == listed["head_sha"]:
             return skip(f"stopped on this head: {st['stopped']['reason']}")
+        tr = st.get("transient")
+        if tr and tr.get("head") == listed["head_sha"] and tr.get("next_at") and _now() < tr["next_at"]:
+            return {"outcome": "backoff", "reason": f"retry {tr['count']} of {lc['transient_retries']} after {tr['next_at']}"}
         if st.get("author_fix"):
             if st["author_fix"]["head"] == listed["head_sha"]:
                 return skip(f"\"{lc['author_fix_label']}\": waiting for the author's new head")
@@ -631,9 +741,17 @@ class Loop:
                     self.out(f"pr-loop: #{n}: could not remove the {lc['author_fix_label']} label: {exc}")
         st["stopped"] = None
         try:
-            return self._step(ctx, listed)
-        except Exception as exc:  # any error stops the loop on this pull request
-            return self._stop(ctx, listed["head_sha"], f"error: {exc}")
+            result = self._step(ctx, listed)
+        except Exception as exc:  # a passing fault retries; any other error stops the loop on this pull request
+            if transient_error(exc):
+                return self._retry(ctx, ctx["head"], f"error: {exc}")
+            return self._stop(ctx, ctx["head"], f"error: {exc}")
+        if st.get("transient") and result.get("outcome") not in ("retry", "stopped", "busy", "paused"):
+            # The fault passed (a step that stopped short for a slot or a
+            # pause proves nothing): the next one starts a new count.
+            st["transient"] = None
+            _save_state(self.state_dir, cfg["repo"], st)
+        return result
 
     def _log(self, ctx, event, **extra):
         pr_review.log_call(self.state_dir, {"kind": "loop", "repo": self.cfg["repo"], "pr": ctx["n"], "head": ctx["head"],
@@ -645,30 +763,85 @@ class Loop:
             return None
         return self.o["github"].create_comment(n, body)
 
-    def _stop(self, ctx, head, why):
+    def _stop(self, ctx, head, why, label=None):
         n, st, lc = ctx["n"], ctx["st"], self.lc
         # Reasons can carry gh or git error text: redacted before it is logged,
         # saved or posted.
         reason = pr_review.redact(why)
+        label = label or lc["needs_founder_label"]
         self.out(f"pr-loop: #{n} stopped: {reason}")
-        st["stopped"] = {"head": head, "reason": reason, "at": _now(), "labeled": False}
+        st["stopped"] = {"head": head, "reason": reason, "at": _now(), "label": label, "labeled": False, "commented": False,
+                         "rounds": st["rounds"]}
         _save_state(self.state_dir, self.cfg["repo"], st)
-        self._log(ctx, "stopped", reason=reason)
-        try:
-            if self.o["post"] != "none":
-                self.o["github"].add_labels(n, [lc["needs_founder_label"]])
-                st["stopped"]["labeled"] = True
-                _save_state(self.state_dir, self.cfg["repo"], st)
-            rounds = st["rounds"]
-            self._say(n, "\n".join([
-                f"<!-- {MARK} stop head={head} -->", "### Automated loop stopped", "",
-                f"Head `{head}`, after {rounds} fix round{'' if rounds == 1 else 's'}: {_cell(reason, 1500)}", "",
-                f"The loop does nothing more on this pull request while the `{lc['needs_founder_label']}` label is set. "
-                "Remove the label to let it resume (the fix-round count starts again).",
-            ]))
-        except Exception as exc:  # noqa: BLE001 - a failed label or comment must not hide the stop
-            self.out(f"pr-loop: #{n}: could not label or comment: {exc}")
+        self._log(ctx, "stopped", reason=reason, label=label)
+        self._post_stop(ctx, st["stopped"])
         return {"outcome": "stopped", "reason": reason}
+
+    def _post_stop(self, ctx, stopped):
+        """The stop's label and comment, whichever is not posted yet. When
+        GitHub does not take them (unreachable, an expired token), the stop
+        is marked not visible and the next pass posts them; it is never left
+        silent."""
+        n, st, lc = ctx["n"], ctx["st"], self.lc
+        label, head, reason = stopped.get("label") or lc["needs_founder_label"], stopped["head"], stopped["reason"]
+        if self.o["post"] == "none":
+            self._say(n, self._stop_text(stopped))
+            return
+        try:
+            if not stopped.get("labeled"):
+                self.o["github"].add_labels(n, [label])
+                stopped["labeled"] = True
+                _save_state(self.state_dir, self.cfg["repo"], st)
+            if not stopped.get("commented"):
+                self._say(n, self._stop_text(stopped))
+                stopped["commented"] = True
+            stopped["visible"] = True
+        except Exception as exc:  # noqa: BLE001 - a failed label or comment must not hide the stop
+            stopped["visible"] = False
+            self.out(f"pr-loop: #{n}: STOP NOT YET VISIBLE on GitHub (could not label or comment: {pr_review.redact(str(exc))}); "
+                     f"the next pass posts it. Stopped on {head[:7]}: {reason}")
+            self._log(ctx, "stop-not-visible", error=pr_review.redact(str(exc))[:300])
+        _save_state(self.state_dir, self.cfg["repo"], st)
+
+    def _stop_text(self, stopped):
+        lc = self.lc
+        label, head, rounds = stopped.get("label") or lc["needs_founder_label"], stopped["head"], stopped.get("rounds", 0)
+        if label == lc.get("stalled_label"):
+            after = ("A passing fault (network, timeout or GitHub) kept failing on later passes, so the loop stopped "
+                     "rather than retry for ever. Nothing in it is the founder's: the author (or anyone) removes the "
+                     f"`{label}` label to let it try again (the fix-round count stays), and a new head clears it.")
+        else:
+            after = (f"The loop does nothing more on this pull request while the `{label}` label is set. "
+                     "Remove the label to let it resume (the fix-round count starts again).")
+        return "\n".join([f"<!-- {MARK} stop head={head} -->", "### Automated loop stopped", "",
+                          f"Head `{head}`, after {rounds} fix round{'' if rounds == 1 else 's'}: {_cell(stopped['reason'], 1500)}", "",
+                          after])
+
+    def _retry(self, ctx, head, why):
+        """A passing fault is not a stop: no label, the same head is tried
+        again on a later pass after a doubling backoff; after transient_retries
+        retries in a row the next failure stops with the stalled label."""
+        n, st, lc = ctx["n"], ctx["st"], self.lc
+        reason = pr_review.redact(why)
+        tr = st.get("transient") if (st.get("transient") or {}).get("head") == head else {"head": head, "count": 0}
+        if tr["count"] >= lc.get("transient_retries", 0):
+            st["transient"] = None
+            return self._stop(ctx, head, f"{reason} (still failing after {tr['count']} retries on later passes)",
+                              label=lc.get("stalled_label"))
+        tr["count"] += 1
+        wait = lc.get("transient_backoff_minutes", 2) * 2 ** (tr["count"] - 1)
+        tr["next_at"] = (datetime.now(timezone.utc) + timedelta(minutes=wait)).isoformat()
+        st["transient"] = tr
+        _save_state(self.state_dir, self.cfg["repo"], st)
+        self.out(f"pr-loop: #{n} retries after {tr['next_at']} ({tr['count']} of {lc.get('transient_retries')}): {reason}")
+        self._log(ctx, "retry", reason=reason, attempt=tr["count"], next_at=tr["next_at"])
+        return {"outcome": "retry", "reason": reason, "next_at": tr["next_at"]}
+
+    def _paused_now(self) -> str | None:
+        """The gate asked before each model call: the rate-limit pause in force
+        (written by the other worker, or by the Nirmaan loop), or None."""
+        p = read_pause(self.state_dir)
+        return f"rate-limit pause until {p['until']}" if p else None
 
     def _pause(self, ctx, head, why):
         """A rate limit is not a stop: no label and no comment, the key stays
@@ -719,13 +892,15 @@ class Loop:
         r = pr_review.run_review(o["repo_root"], n, o["github"], o["post"], o["claude_bin"], self.state_dir, o["models"],
                                  o["timeout_s"], o["backoff_s"], config=cfg, caller_branch=o.get("caller_branch"),
                                  in_claude_session=o.get("in_claude_session", False), sleep=o.get("sleep", time.sleep),
-                                 out=self.out)
+                                 out=self.out, gate=self._paused_now)
         if r["exit"] == pr_review.EXIT_HEAD_MOVED:
             self._log(ctx, "head-moved")
             return {"outcome": "head-moved"}
         if r["exit"] == pr_review.EXIT_BUSY:
-            # The shared lock was held elsewhere at a model call; the cached
-            # verdicts carry over to the next pass.
+            # Every model slot was held elsewhere at a model call, or the other
+            # worker's rate-limit pause began; the cached verdicts carry over.
+            if r.get("paused"):
+                return {"outcome": "paused", "reason": r["paused"]}
             return {"outcome": "busy", "reason": "another review holds the lock"}
         if r["exit"] == pr_review.EXIT_REFUSED:
             st["done"] = {"head": head, "outcome": "refused"}
@@ -753,8 +928,14 @@ class Loop:
         if not r.get("key1"):
             return self._stop(ctx, head, "review deferred: no owning team")
         deferred = [k for k in keys if k["status"] == "deferred"]
-        if deferred and all(k.get("call_outcome") == "rate_limit" for k in deferred):
-            return self._pause(ctx, head, "rate limit (" + "; ".join(f"{k['team_name']}: {k.get('reason')}" for k in deferred) + ")")
+        what = "; ".join(f"{k['team_name']}: {k.get('reason')}" for k in deferred)
+        if deferred and all(_rate_limited(k) for k in deferred):
+            return self._pause(ctx, head, f"rate limit ({what})")
+        passing = [k for k in deferred if _rate_limited(k) or _transient_call(k.get("call_outcome"), k.get("reason"))]
+        if deferred and len(passing) == len(deferred):
+            if any(_rate_limited(k) for k in deferred):
+                return self._pause(ctx, head, f"rate limit ({what})")
+            return self._retry(ctx, head, f"review deferred by a passing fault ({what})")
         if deferred:
             return self._stop(ctx, head, "review deferred (" + "; ".join(f"{k['team_name']}: {k.get('reason')}" for k in deferred) + ")")
         self._log(ctx, "reviewed", key1=",".join(f"{k['team']}:{k['status']}" for k in r["key1"]),
@@ -793,6 +974,8 @@ class Loop:
             if now != head:
                 self._log(ctx, "head-moved", new_head=now)
                 return {"outcome": "head-moved"}
+            if transient_error(exc):
+                return self._retry(ctx, head, f"could not update the branch with main {_gh_failure(exc)}")
             return self._stop(ctx, head, f"could not update the branch with main {_gh_failure(exc)}. A person resolves it "
                                          "(a merge conflict with main, or GitHub refused the update)")
         st["updated"] = {"from": head, "at": _now(), "at_s": time.time()}
@@ -824,6 +1007,8 @@ class Loop:
             try:
                 allowed = str(o["run_gh"](["api", f"repos/{cfg['repo']}", "--jq", ".allow_auto_merge"]) or "").strip()
             except (subprocess.SubprocessError, OSError) as exc:
+                if transient_error(exc):
+                    return self._retry(ctx, head, f"could not read the repository's auto-merge setting {_gh_failure(exc)}")
                 return self._stop(ctx, head, f"could not read the repository's auto-merge setting {_gh_failure(exc)}")
             if allowed == "false":
                 why = "the repository does not allow auto-merge"
@@ -833,6 +1018,8 @@ class Loop:
             try:
                 o["run_gh"](["pr", "merge", str(n), "--repo", cfg["repo"], "--auto", "--merge", "--match-head-commit", head])
             except (subprocess.SubprocessError, OSError) as exc:
+                if transient_error(exc):
+                    return self._retry(ctx, head, f"gh pr merge --auto failed {_gh_failure(exc)}")
                 return self._stop(ctx, head, f"gh pr merge --auto failed {_gh_failure(exc)}")
         if why is None:
             self._log(ctx, "auto-merge")
@@ -905,11 +1092,46 @@ class Loop:
         repeated = [f for f in findings if st["seen"].get(f["fingerprint"])]
         if repeated:
             return self._stop(ctx, head, "the same finding failed again after a fix: " + "; ".join(f"{f['file']}:{f['line']} {f['text']}" for f in repeated))
+        if st["rounds"] < lc["max_fix_rounds"]:
+            # The fixer's call holds a model slot, like every review call; the
+            # local checks after it hold none.
+            why = self._paused_now()
+            if why:
+                return {"outcome": "paused", "reason": why}
+            release, holder = pr_review.acquire_slot(self.state_dir, {"repo": cfg["repo"], "pr": n, "key": "fixer"}, cfg.get("model_cap", 1))
+            if release is None:
+                return {"outcome": "busy", "reason": f"no model slot free for the fixer ({(holder or {}).get('repo')} #{(holder or {}).get('pr')})"}
+        else:
+            release = None
+        slot = {"release": release}
+        try:
+            for f in findings:
+                st["seen"][f["fingerprint"]] = st["seen"].get(f["fingerprint"], 0) + 1
+            _save_state(self.state_dir, cfg["repo"], st)
+            if st["rounds"] >= lc["max_fix_rounds"]:
+                return self._stop(ctx, head, f"{lc['max_fix_rounds']} fix rounds done and a key still fails")
+            try:
+                return self._fix_round_in(ctx, pull, findings, slot)
+            except Exception as exc:
+                if transient_error(exc):
+                    # Not a fix attempt: tried again from the same findings.
+                    self._unsee(st, findings)
+                raise
+        finally:
+            if slot["release"]:
+                slot["release"]()
+
+    def _unsee(self, st, findings):
+        """A round cut short (a limit or a passing fault) was not a fix
+        attempt: its findings are not counted as seen."""
         for f in findings:
-            st["seen"][f["fingerprint"]] = st["seen"].get(f["fingerprint"], 0) + 1
-        _save_state(self.state_dir, cfg["repo"], st)
-        if st["rounds"] >= lc["max_fix_rounds"]:
-            return self._stop(ctx, head, f"{lc['max_fix_rounds']} fix rounds done and a key still fails")
+            st["seen"][f["fingerprint"]] = st["seen"].get(f["fingerprint"], 1) - 1
+            if st["seen"][f["fingerprint"]] <= 0:
+                del st["seen"][f["fingerprint"]]
+        _save_state(self.state_dir, self.cfg["repo"], st)
+
+    def _fix_round_in(self, ctx, pull, findings, slot):
+        cfg, lc, o, n, st, head = self.cfg, self.lc, self.o, ctx["n"], ctx["st"], ctx["head"]
         rnd = st["rounds"] + 1
         root = o["repo_root"]
         _git(root, "fetch", "--no-tags", "--quiet", "origin", f"+refs/heads/{cfg['base_branch']}:refs/pr-review/main",
@@ -923,7 +1145,7 @@ class Loop:
         wt = str(wt_root / "head")
         _git(root, "worktree", "add", "--quiet", "--detach", wt, head)
         try:
-            return self._fix_in(ctx, pull, findings, rnd, wt, main_sha)
+            return self._fix_in(ctx, pull, findings, rnd, wt, main_sha, slot)
         finally:
             try:
                 _git(root, "worktree", "remove", "--force", wt)
@@ -935,7 +1157,7 @@ class Loop:
             except subprocess.CalledProcessError:
                 pass
 
-    def _fix_in(self, ctx, pull, findings, rnd, wt, main_sha):
+    def _fix_in(self, ctx, pull, findings, rnd, wt, main_sha, slot):
         cfg, lc, o, n, st, head = self.cfg, self.lc, self.o, ctx["n"], ctx["st"], ctx["head"]
         root = o["repo_root"]
 
@@ -949,19 +1171,24 @@ class Loop:
                 "rules": rules, "findings": findings, "round": rnd, "max_rounds": lc["max_fix_rounds"], "nonce": secrets.token_hex(12)}
         system, user = fixer_system_prompt(pctx), fixer_user_prompt(pctx)
         self.out(f"pr-loop: #{n} fix round {rnd}: {len(findings)} finding(s), fixer model {o['fixer_model']}...")
-        res = pr_review.run_once(o["claude_bin"], fixer_args(o["fixer_model"], system, lc["fixer_forbidden"]), user, wt, o["fixer_timeout_s"])
+        try:
+            res = pr_review.run_once(o["claude_bin"], fixer_args(o["fixer_model"], system, lc["fixer_forbidden"]), user, wt, o["fixer_timeout_s"])
+        finally:
+            # The slot was for the model call only.
+            if slot["release"]:
+                slot["release"]()
+                slot["release"] = None
         pr_review.log_call(self.state_dir, {"repo": cfg["repo"], "pr": n, "head": head, "key": "fixer", "team": None, "model": o["fixer_model"],
                                             "reported_model": res.get("reported_model"), "round": rnd, "attempt": 1, "outcome": res["kind"],
                                             "duration_ms": res.get("duration_ms"), **(res.get("tokens") or {}), "prompt_chars": len(system) + len(user)})
         if res["kind"] == "rate_limit":
             # Not a fix attempt: its findings are not counted as seen, so the
             # round runs again after the pause.
-            for f in findings:
-                st["seen"][f["fingerprint"]] = st["seen"].get(f["fingerprint"], 1) - 1
-                if st["seen"][f["fingerprint"]] <= 0:
-                    del st["seen"][f["fingerprint"]]
-            _save_state(self.state_dir, cfg["repo"], st)
+            self._unsee(st, findings)
             return self._pause(ctx, head, f"fix round {rnd}: the fixer hit a rate limit ({res['error']})")
+        if _transient_call(res["kind"], res.get("error")):
+            self._unsee(st, findings)
+            return self._retry(ctx, head, f"fix round {rnd}: the fixer's call failed ({res['kind']}: {res['error']})")
         if res["kind"] != "ok":
             return self._stop(ctx, head, f"fix round {rnd}: the fixer failed ({res['kind']}: {res['error']})")
 
@@ -1035,6 +1262,9 @@ class Loop:
             if o["github"].get_pull(n)["head_sha"] != head:
                 self._log(ctx, "head-moved", round=rnd)
                 return {"outcome": "head-moved"}
+            if transient_error(exc):
+                self._unsee(st, findings)
+                return self._retry(ctx, head, f"fix round {rnd}: the push failed ({(exc.stderr or str(exc)).strip()[:300]})")
             return self._stop(ctx, head, f"fix round {rnd}: the push failed ({(exc.stderr or str(exc)).strip()[:300]})")
         st["rounds"], st["last_fix_head"] = rnd, new
         _save_state(self.state_dir, cfg["repo"], st)
@@ -1123,8 +1353,18 @@ def main(argv: list[str]) -> int:
                     in_claude_session=bool(os.environ.get("CLAUDECODE")),
                     run_gh=run_gh,
                     **loop_defaults())
-        results = loop.tick(only_pr, main_at_start=_git(repo_root, "rev-parse", "refs/pr-review/main").strip())
-        print(f"pr-loop: {_now()} {post}: " + (", ".join(f"#{r['pr']} {r['outcome']}" for r in results) or "no open pull requests"))
+        try:
+            results = loop.tick(only_pr, main_at_start=_git(repo_root, "rev-parse", "refs/pr-review/main").strip())
+        except Exception as exc:  # noqa: BLE001 - only a passing fault is caught; anything else is raised
+            if not transient_error(exc):
+                raise
+            # GitHub or the network down before any step (listing the pull
+            # requests): nothing is stopped; the next pass tries again.
+            print(f"pr-loop: {_now()} {post}: GitHub or the network is unreachable "
+                  f"({pr_review.redact(str(exc))[:300]}); nothing stopped, the next pass tries again", file=sys.stderr)
+            results = None
+        if results is not None:
+            print(f"pr-loop: {_now()} {post}: " + (", ".join(f"#{r['pr']} {r['outcome']}" for r in results) or "no open pull requests"))
         if once:
             return 0
         time.sleep(interval)

@@ -912,10 +912,12 @@ def test_dry_run_posts_never_green_dry_run_statuses(repo):
 
 def test_lock_is_shared_and_a_dead_holder_is_cleared(repo):
     r = repo()
-    release, _ = pr_review.acquire_lock(r.state, {"repo": "nirmaansoftware/Nirmaan", "pr": 9})
-    assert r.run()["exit"] == pr_review.EXIT_BUSY
+    held = [pr_review.acquire_lock(r.state, {"repo": "nirmaansoftware/Nirmaan", "pr": 9}, name=name)[0]
+            for name in ("review.lock", "model-slot-1.lock")]
+    assert r.run()["exit"] == pr_review.EXIT_BUSY, "every model slot (cap 2) held elsewhere"
     assert r.calls() == []
-    release()
+    for release in held:
+        release()
     (r.state / "review.lock").mkdir()
     (r.state / "review.lock" / "owner.json").write_text(json.dumps({"repo": "x", "pr": 1, "pid": 999999}))
     assert r.run()["exit"] == pr_review.EXIT_OK
@@ -1058,6 +1060,47 @@ def test_interpret_classifies_results():
     limit = json.dumps({"subtype": "success", "is_error": True, "result": "You've hit your session limit \u00b7 resets 10pm (Asia/Calcutta)"})
     assert pr_review.interpret(1, limit, "")["kind"] == "rate_limit"
     assert pr_review.interpret(1, json.dumps({"subtype": "success", "is_error": True, "result": "You've hit your limit"}), "")["kind"] == "rate_limit"
+
+
+@pytest.mark.parametrize("text", [
+    "You've hit your 5-hour limit \u00b7 resets 2:40pm (Asia/Calcutta)",  # ip#165, 2026-11-03
+    "You've hit your session limit \u00b7 resets 10pm (Asia/Calcutta)",
+    "You've hit your weekly limit \u00b7 resets Mon 9am",
+    "You've hit your Opus weekly limit",
+    "You've hit your limit",
+    "Claude usage limit reached. Your limit will reset at 5pm",
+])
+def test_every_wording_of_the_plan_limit_is_a_rate_limit(text):
+    out = json.dumps({"subtype": "success", "is_error": True, "result": text})
+    assert pr_review.interpret(0, out, "")["kind"] == "rate_limit"
+
+
+def test_text_that_is_not_a_limit_stays_an_error():
+    for text in ("the process crashed", "You've hit a snag", "limits of the design are not tested"):
+        assert pr_review.interpret(1, json.dumps({"subtype": "error_during_execution", "is_error": True, "result": text}), "")["kind"] == "error"
+
+
+def test_model_slots_cap_the_calls_across_both_repositories(tmp_path):
+    a, _ = pr_review.acquire_slot(tmp_path, {"repo": "x", "pr": 1}, 2)
+    assert (tmp_path / "review.lock").exists(), "the shared review.lock is tried first"
+    b, _ = pr_review.acquire_slot(tmp_path, {"repo": "x", "pr": 2}, 2)
+    assert (tmp_path / "model-slot-1.lock").exists()
+    c, holder = pr_review.acquire_slot(tmp_path, {"repo": "x", "pr": 3}, 2)
+    assert c is None and holder["pr"] == 2, "never a third"
+    assert pr_review.acquire_slot(tmp_path, {"repo": "x", "pr": 3}, 1)[0] is None, "cap 1 is the shared lock alone"
+    a()
+    c, _ = pr_review.acquire_slot(tmp_path, {"repo": "x", "pr": 3}, 2)
+    assert c is not None
+    b()
+    c()
+
+
+def test_the_gate_stops_the_review_before_a_model_call_and_keeps_what_is_cached(repo):
+    r = repo()
+    out = r.run(gate=lambda: "rate-limit pause until later")
+    assert out["exit"] == pr_review.EXIT_BUSY and out["paused"] == "rate-limit pause until later"
+    assert r.calls() == [], "no model call while the gate says no"
+    assert r.run()["exit"] == pr_review.EXIT_OK
 
 
 def test_markdown_section_stops_at_the_same_level():
