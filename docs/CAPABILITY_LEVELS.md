@@ -33,8 +33,9 @@ listed in `without_knowledge` with its outcome and the reason, and never counts
 toward any level; its skill digests are the cards alone, so with both labels
 edited back a skill with a document is still stale.
 
-Trials are grouped by skill, model and the skill digest recorded with the trial
-(card plus knowledge document, M58). A group counts when all hold:
+Trials are grouped by skill, model, the skill digest recorded with the trial
+(card plus knowledge document, M58) and the harness recorded with it (M73,
+`docs/HARNESS.md`). A group counts when all hold:
 
 - at least 5 trials;
 - a 95 percent Wilson lower bound of at least 0.5 (5 of 5 gives 0.566; 4 of 5
@@ -45,7 +46,11 @@ Trials are grouped by skill, model and the skill digest recorded with the trial
   `src/nirmaan/company/evidence.py`), every case it rests on has
   a must-fail control (a held-out check with `mutants`, M58);
 - the group's digest is the skill's current digest. A changed card or
-  document, including a knowledge document added later, makes the group stale.
+  document, including a knowledge document added later, makes the group stale;
+- the group's harness is the current default harness (`harness_sha256()`). A
+  changed harness setting or harness code file makes the group stale, and a
+  trial that records no harness ("harness not recorded", a record written
+  before M73) never counts.
 
 Each group in `capability/levels.json` lists its records, cases, counts and
 every reason it does not count.
@@ -69,7 +74,7 @@ Fixture repositories in `tests/test_capability_levels.py`: 5 of 5 with a clean
 re-judge and a must-fail control is Practised; 4 of 5, fewer than 5 trials, no
 re-judge, a failed re-judge or no must-fail control is not; a changed card or a
 later document makes it stale; replays, attestations, trials not judged by a
-tool and trials run without knowledge documents (either label) never count; a case's other skills get nothing; nothing is Proven;
+tool and trials run without knowledge documents (either label) never count; a changed harness makes the group stale and a trial with no harness recorded never counts (M73); a case's other skills get nothing; nothing is Proven;
 Knowledge needs a check record by a different session, with sources, naming the
 current document.
 

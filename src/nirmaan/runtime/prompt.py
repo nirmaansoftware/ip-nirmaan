@@ -16,6 +16,9 @@ citable too (M23), and a recorded file's content is rendered only while its
 digest still matches; a task that works only from approved inputs never sees
 an unapproved one. Rendering goes through the bridge, so the text shown by
 ``nirmaan run --dry-run`` is exactly the text a provider receives.
+
+The system prompts, the section order and the repair text are harness
+settings (M73, :mod:`nirmaan.runtime.harness`).
 """
 
 from __future__ import annotations
@@ -24,56 +27,8 @@ import re
 from dataclasses import dataclass
 
 from nirmaan.applicability import describe
+from nirmaan.runtime import harness
 from nirmaan.runtime.context import ArtifactView, AttemptView, ReviewView, WorkPacket
-
-SCOPES = ("Company", "Domain", "Project", "Task")
-
-_OUTPUT_WORK = (
-    '{"uncertainty": number, "outcome": string or null, '
-    '"artifacts": [{"kind": string, "title": string, "summary": string}], '
-    '"files": [{"path": string, "kind": string, "title": string, "summary": string, "entry": string or null}], '
-    '"tool_runs": [string], "claims": [string], '
-    '"escalation": null or {"reason": string, "question": string, "options": [string]}, "notes": string}'
-)
-_FILE_FORMAT = """\
-When an output is a file (a specification, RTL, a testbench), describe it in "files" and put its
-exact content after the JSON object, once per file:
-=== FILE: <path> ===
-<content>
-=== END FILE ===
-Paths are relative (letters, digits, '_', '.', '-', '/'). A file's summary must cite like an
-artifact's. "entry" names what a tool starts from, such as the top module. The platform writes
-the files and runs the checks your task's evidence requirements name over them; you cannot run
-or report those checks yourself."""
-_OUTPUT_REVIEW = '{"verdict": "approve" or "request_changes", "comments": string, "uncertainty": number}'
-
-WORK_SYSTEM = f"""\
-You fill one seat in an engineering organization whose work is checked, not trusted.
-Rules:
-- Use only the four sections you are given. Do not assume facts they do not contain.
-- Every artifact summary must cite at least one token from the citation list, written exactly.
-  An artifact that cites nothing is discarded, and a token that is not on the list is removed.
-- List in "tool_runs" only run IDs from the citation list. Naming a run that never happened
-  rejects your whole result.
-- Never claim that a tool ran, or that anything was verified or approved. Put statements you
-  cannot cite in "claims"; they are recorded and prove nothing.
-- Declare your uncertainty, from 0 (certain) to 1. If the evidence does not support a
-  conclusion, escalate instead of guessing.
-Answer with one JSON object and nothing else, except the file blocks described below:
-{_OUTPUT_WORK}
-{_FILE_FORMAT}"""
-
-REVIEW_SYSTEM = f"""\
-You are an independent reviewer in an engineering organization whose work is checked, not trusted.
-You did not produce the work under review. Judge it only against the evidence you are given.
-Rules:
-- Your comments must cite at least one token from the citation list, written exactly.
-  A review that cites nothing is not recorded, and a token that is not on the list is removed.
-- Approve only if the conclusion follows from substantiated evidence. Otherwise request
-  changes and say what is missing.
-- Declare your uncertainty, from 0 (certain) to 1.
-Answer with one JSON object and nothing else:
-{_OUTPUT_REVIEW}"""
 
 _UNSAFE = re.compile(r"[^A-Za-z0-9._\-]")
 
@@ -276,9 +231,7 @@ def _repair(attempts: tuple[AttemptView, ...], reviews: tuple[ReviewView, ...], 
     lines: list[str] = []
     sent = [a for a in attempts if a.reviews]
     if sent:
-        lines.append(f"Repair after review: submission {sent[-1].number} was sent back by an independent "
-                     "review and nothing from it counts. Address every finding and answer again in full; your "
-                     "new files go through every check and to review again.")
+        lines.append(harness.REPAIR_AFTER_REVIEW.format(number=sent[-1].number))
         lines += _sent_back(tuple(sent), reviews, token)
         for art in sent[-1].artifacts:
             lines += _content(art, f"sent-back file {art.title}")
@@ -286,8 +239,7 @@ def _repair(attempts: tuple[AttemptView, ...], reviews: tuple[ReviewView, ...], 
     if not refused:
         return lines
     latest = refused[-1]
-    lines.append(f"Repair: your previous attempt {latest.number} was refused and nothing from it counts. "
-                 "Fix what failed and answer again in full; files from a refused attempt are never reviewed.")
+    lines.append(harness.REPAIR_AFTER_REFUSAL.format(number=latest.number))
     lines += [f"Attempt {a.number} was refused: {a.refusal}" for a in refused]
     for failed in latest.failed_runs:
         run = token.get(failed.run, failed.run)
@@ -310,12 +262,12 @@ def render_work_prompt(packet: WorkPacket, mode: str = "work", tools: tuple[Tool
     t = packet.task
     cites = _citations(packet, tools)
     if mode == "review":
-        system, ask = REVIEW_SYSTEM, f"Review the submitted work of task {t.id} independently."
+        system, ask = harness.REVIEW_SYSTEM, f"Review the submitted work of task {t.id} independently."
     else:
-        system = WORK_SYSTEM
+        system = harness.WORK_SYSTEM
         ask = f"Produce {', '.join(t.expected_outputs) or 'the task output'} for task {t.id}"
         ask += f" and conclude exactly one outcome: {', '.join(t.outcomes)}." if t.outcomes else "."
-    sections = tuple(zip(SCOPES, (_company(packet), _domain(packet), _project(packet),
+    sections = tuple(zip(harness.SCOPES, (_company(packet), _domain(packet), _project(packet),
                                   _task(packet, mode, cites, tools))))
     from nirmaan.runtime.selection import seat_needs
 

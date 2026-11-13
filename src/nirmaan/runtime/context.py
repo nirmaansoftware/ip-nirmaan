@@ -25,12 +25,10 @@ from nirmaan.models import (
     TaskStatus,
 )
 from nirmaan.org.knowledge import cited, over_domain_cap, read_document
+from nirmaan.runtime import harness
 from nirmaan.runtime.files import excerpt, read_verified
 from nirmaan.work.engine import TaskEngine
 from nirmaan.work.policy import upstream_artifacts
-
-#: The most of one file's content a packet carries.
-MAX_CONTENT = 60_000
 
 
 class _View(BaseModel):
@@ -208,7 +206,7 @@ def _artifact(art, trusted: bool | None = None, content: bool = False) -> Artifa
     if content and art.digest:
         # A recorded file is read only if its bytes still match what was recorded.
         text, problem = read_verified(art.location, art.digest)
-        if text is not None and len(text) > MAX_CONTENT:
+        if text is not None and len(text) > harness.MAX_CONTENT:
             text, problem = None, f"too large to include ({len(text)} characters)"
         entry = {"content": text, "content_problem": problem}
     return ArtifactView(id=art.id, kind=art.kind, title=art.title, assurance=art.assurance.value,

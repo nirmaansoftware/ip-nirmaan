@@ -293,13 +293,16 @@ def test_a_bound_passed_as_a_parameter_is_refused(nirmaan_org, fixed_clock):
 
 def test_one_resolver_takes_each_limit_from_the_first_layer_that_sets_it():
     from nirmaan.models import resolve_limits
+    from nirmaan.runtime.harness import DEFAULT_LIMITS  # M73: the default is a harness setting, the last layer
 
-    assert resolve_limits() == Limits(attempts=1, review_rounds=1, retries=1,
-                                      on_failure=OnFailure.RETRY_THEN_ESCALATE)
+    assert resolve_limits(DEFAULT_LIMITS) == Limits(attempts=1, review_rounds=1, retries=1,
+                                                    on_failure=OnFailure.RETRY_THEN_ESCALATE)
     cli, stage, cap = Limits(attempts=4), Limits(attempts=2, retries=3), Limits(review_rounds=5, retries=9,
                                                                                 on_failure=OnFailure.FAIL)
-    assert resolve_limits(cli, stage, cap) == Limits(attempts=4, review_rounds=5, retries=3,
-                                                     on_failure=OnFailure.FAIL)
+    assert resolve_limits(cli, stage, cap, DEFAULT_LIMITS) == Limits(attempts=4, review_rounds=5, retries=3,
+                                                                     on_failure=OnFailure.FAIL)
+    with pytest.raises(ValueError, match="pass the default limits as the last layer"):
+        resolve_limits(cli, stage)
 
 
 def test_the_engine_and_the_runner_resolve_limits_alike(nirmaan_org, fixed_clock):

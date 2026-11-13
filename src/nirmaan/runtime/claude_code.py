@@ -21,7 +21,8 @@ How the call is kept honest and clean:
 
 The executable is ``NIRMAAN_CLAUDE_CODE`` or ``claude`` on PATH; the model is
 ``NIRMAAN_CLAUDE_CODE_MODEL`` or the model profiles' ``DEFAULT_MODEL`` (Claude Opus 5.5). With no executable, the seat
-declines and nothing is called or counted.
+declines and nothing is called or counted. The flags, the cleared variables and
+the timeout are harness settings (M73, :mod:`nirmaan.runtime.harness`).
 """
 
 from __future__ import annotations
@@ -33,13 +34,12 @@ import subprocess
 import tempfile
 
 from nirmaan.company.model_profiles import DEFAULT_MODEL
+from nirmaan.runtime import harness
 from nirmaan.runtime.base import register_runtime
 from nirmaan.runtime.model import NO_CALL, Completion, ModelRuntime
 from nirmaan.runtime.prompt import WorkPrompt
 
-DEFAULT_TIMEOUT = 1800
 PROVIDER = "claude-code"
-_CREDENTIAL_VARS = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN")
 
 
 def find_claude() -> str | None:
@@ -56,10 +56,10 @@ class ClaudeCodeLLM:
 
     name = PROVIDER
 
-    def __init__(self, executable: str | None = None, model: str | None = None, timeout: int = DEFAULT_TIMEOUT):
+    def __init__(self, executable: str | None = None, model: str | None = None, timeout: int | None = None):
         self._executable = executable
         self.model = model or os.environ.get("NIRMAAN_CLAUDE_CODE_MODEL") or DEFAULT_MODEL
-        self.timeout = timeout
+        self.timeout = harness.CLAUDE_CODE_TIMEOUT if timeout is None else timeout
 
     def complete(self, prompt: WorkPrompt) -> Completion:
         from nirmaan.integrations.veritriage import render_parts
@@ -69,9 +69,8 @@ class ClaudeCodeLLM:
             return Completion("", error=NO_CALL + "no Claude Code executable (set NIRMAAN_CLAUDE_CODE or put "
                                                   "claude on PATH)")
         system, user = render_parts(prompt)
-        argv = [executable, "-p", "--output-format", "json", "--model", self.model, "--system-prompt", system,
-                "--tools", "", "--no-session-persistence", "--strict-mcp-config"]
-        env = {k: v for k, v in os.environ.items() if k not in _CREDENTIAL_VARS}
+        argv = [executable, "-p", *harness.CLAUDE_CODE_FLAGS, "--model", self.model, "--system-prompt", system]
+        env = {k: v for k, v in os.environ.items() if k not in harness.CLAUDE_CODE_CLEARED_ENV}
         with tempfile.TemporaryDirectory(prefix="nirmaan-claude-code-") as cwd:
             try:
                 proc = subprocess.run(argv, input=user, capture_output=True, text=True, cwd=cwd, env=env,
