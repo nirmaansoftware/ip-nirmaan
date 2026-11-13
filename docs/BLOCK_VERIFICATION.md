@@ -37,7 +37,11 @@ to judge, and gives "bring your RTL, we verify it" a workflow.
 
 The RTL is never written here: `design-under-test` records the existing RTL
 and its review approves it, and every DV gate reads that approved file, never
-a file of the seat's own. No gate task precedes a seat, so an eval case fixes
+a file of the seat's own. It is the one stage with `rtl_source` among its outputs
+that does not carry the RTL gates (lint, the RTL's own testbench, synthesis): it
+writes no RTL and has no testbench, and handed-over RTL that fails Verilator's
+lint is still verified. `test_every_stage_that_produces_rtl_is_gated` names it
+as that one exception. No gate task precedes a seat, so an eval case fixes
 `interface-spec` and `design-under-test` from its own files and judges any DV
 seat. The plan, the testbench and the proof run side by side, as block-design's
 plan does: nothing waits on the plan.
@@ -118,7 +122,8 @@ in the golden suite, plus five that say "verify" mid-sentence or name a new
 feature in another workflow. The golden file
 (`tests/fixtures/applicability/plans.txt`) only gains the two
 block-verification requests; the `[beside]` marker appears on those alone. No
-existing stage, gate, evidence requirement or role changes.
+existing stage, gate, evidence requirement or role changes; the RTL-gate law
+test gains the one exception above, by name.
 
 ## Tests
 
