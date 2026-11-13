@@ -1,0 +1,36 @@
+{
+  "id": "dv/plan-irq-ctrl",
+  "request": "Verify the existing interrupt controller RTL.",
+  "seat": "dv-plan",
+  "skills": ["verification_planning"],
+  "expected_behavior": "A verification plan in the nirmaan.vplan format for the approved irq_ctrl interface specification: every requirement the specification tags, quoted exactly with its source and section, and items that say how each will be proven, checked by vplan.check against the approved specification before review.",
+  "constraints": [
+    "Work only from the approved interface specification.",
+    "Cover every tagged requirement exactly once, quoting its text, and invent none.",
+    "Plan items for the testbench and the proof that name plain file names."
+  ],
+  "known_failure_modes": [
+    "A requirement left out of the plan, such as the acknowledge, the same-edge race or the parameter range.",
+    "A requirement paraphrased instead of quoted, or its ID or source changed, so it no longer traces to the specification.",
+    "A requirement the specification does not tag, added from general knowledge of interrupt controllers.",
+    "A plan whose requirements would also match a specification with one requirement more or one requirement changed; the must-fail control fails it."
+  ],
+  "upstream": {
+    "interface-spec": [{"path": "tests/fixtures/dv/irq_ctrl/interface_spec.md", "kind": "interface_spec"}]
+  },
+  "reference": [
+    {"path": "tests/fixtures/dv/irq_ctrl/irq_ctrl_vplan.json", "kind": "verification_plan"}
+  ],
+  "held_out": [
+    {
+      "name": "The seat's plan covers the approved specification exactly and fails each specification mutant",
+      "scorer": "must-fail",
+      "tool": "vplan.check",
+      "seat_files": {"plan": ["verification_plan"]},
+      "case_files": {"spec": ["tests/fixtures/dv/irq_ctrl/interface_spec.md"]},
+      "mutants": {"tests/fixtures/dv/irq_ctrl/interface_spec.md": [
+        "tests/fixtures/dv/irq_ctrl/mutants/interface_spec_added_req.md",
+        "tests/fixtures/dv/irq_ctrl/mutants/interface_spec_priority_changed.md"]}
+    }
+  ]
+}

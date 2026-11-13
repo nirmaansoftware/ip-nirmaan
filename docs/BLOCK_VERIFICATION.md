@@ -144,7 +144,9 @@ a proof seat that ships its own `counter.v` and is refused.
   AVAILABLE tools, each its own milestone.
 - Repro testbenches on regression-investigation's root-cause and triage
   stages, and a scorer over several seat testbenches.
-- The verification eval cases themselves, and the department cut. The role ids
+- The verification eval cases themselves (W2-E1 added the first two,
+  `dv/directed-irq-ctrl` and `dv/plan-irq-ctrl`: `docs/EVAL_SKILLS_MUST_FAIL.md`),
+  and the department cut. The role ids
   in the tests are today's; a cut that renames them moves the tests with it.
 
 No count other than workflows changes (`scripts/status.py --write`): no new

@@ -549,12 +549,14 @@ def test_the_runner_records_a_human_attestation_on_the_seat(nirmaan_org, fixed_c
     assert len(recorded) == 1 and result.attestations == tuple(recorded)
 
 
-# --- The nine shipped cases name their skills ---------------------------------------------
+# --- The shipped cases name their skills ---------------------------------------------
 
 
 def test_the_shipped_cases_name_the_skills_they_judge(nirmaan_org):
     named = {c.id: c.skills for c in load_cases(EVALS)}
     assert named == {
+        "dv/directed-irq-ctrl": ("directed_testing", "systemverilog"),
+        "dv/plan-irq-ctrl": ("verification_planning",),
         "firmware/axi4-lite-driver": ("device_drivers",),
         "rtl/apb-gpio": ("rtl_design", "apb", "control_logic_design"),
         "rtl/apb-regs": ("rtl_design", "apb"),

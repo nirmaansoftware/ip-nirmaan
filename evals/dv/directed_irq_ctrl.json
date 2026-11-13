@@ -1,0 +1,43 @@
+{
+  "id": "dv/directed-irq-ctrl",
+  "request": "Verify the existing interrupt controller RTL with a SystemVerilog testbench.",
+  "seat": "testbench",
+  "skills": ["directed_testing", "systemverilog"],
+  "expected_behavior": "A directed, self-checking SystemVerilog testbench for the approved irq_ctrl RTL (N sources, N 8 by default and 2 to 32 allowed; ENABLE, MODE, write-1-to-clear PENDING and CLAIM with acknowledge; fixed priority, lowest number first), written from the approved interface specification, that passes on the approved RTL under the testbench gate before review and fails on RTL that breaks any requirement of that specification.",
+  "constraints": [
+    "Work only from the approved interface specification and the approved RTL; never change the RTL.",
+    "Write the testbench in SystemVerilog, self-checking, ending with the verdict line the simulation gate reads.",
+    "Check every requirement the specification tags, at more than one value of N."
+  ],
+  "known_failure_modes": [
+    "A testbench that reads irq_id with only one source pending, so an inverted priority passes.",
+    "A testbench that never acknowledges through CLAIM, or never checks PENDING after an acknowledge.",
+    "A testbench that checks the ENABLE mask on rising-edge sources only, so a mask that ignores high-level sources passes.",
+    "A testbench that never lands a detection on the very edge of its clear, so a clear that wins over the detection passes.",
+    "A testbench that clears one bit while only that bit is pending, so a write that clears every bit passes.",
+    "A testbench that cannot tell an inverted priority, an ignored acknowledge, a level mask ignored, a clear that beats a detection or a clear of every bit from the approved RTL; the must-fail control fails it."
+  ],
+  "upstream": {
+    "interface-spec": [{"path": "tests/fixtures/dv/irq_ctrl/interface_spec.md", "kind": "interface_spec"}],
+    "design-under-test": [{"path": "tests/fixtures/dv/irq_ctrl/irq_ctrl.v", "kind": "rtl_source", "entry": "irq_ctrl"}]
+  },
+  "reference": [
+    {"path": "tests/fixtures/dv/irq_ctrl/irq_ctrl_tb.sv", "kind": "testbench", "entry": "irq_ctrl_tb"}
+  ],
+  "held_out": [
+    {
+      "name": "The seat's testbench passes the approved RTL and fails each interrupt controller mutant",
+      "scorer": "must-fail",
+      "tool": "simulator.run",
+      "seat_files": {"sources": ["testbench"]},
+      "seat_entries": {"top": ["testbench"]},
+      "case_files": {"sources": ["tests/fixtures/dv/irq_ctrl/irq_ctrl.v"]},
+      "mutants": {"tests/fixtures/dv/irq_ctrl/irq_ctrl.v": [
+        "tests/fixtures/dv/irq_ctrl/mutants/irq_ctrl_priority_inverted.v",
+        "tests/fixtures/dv/irq_ctrl/mutants/irq_ctrl_ack_ignored.v",
+        "tests/fixtures/dv/irq_ctrl/mutants/irq_ctrl_level_mask_ignored.v",
+        "tests/fixtures/dv/irq_ctrl/mutants/irq_ctrl_clear_beats_set.v",
+        "tests/fixtures/dv/irq_ctrl/mutants/irq_ctrl_w1c_clears_all.v"]}
+    }
+  ]
+}
