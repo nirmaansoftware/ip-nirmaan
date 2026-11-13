@@ -234,7 +234,8 @@ def _item_status(state: ProjectState, item: VerificationItem, kinds: dict[str, I
     if item.name not in data.decode("utf-8", errors="replace"):
         return status("unverifiable", f"{item.name!r} does not occur in {art.location}")
     note = _unaccepted(state, art.task)
-    runs = [r for r in state.tool_runs.values() if r.tool in kind.tools and _names(r, art.location)]
+    runs = [r for r in state.tool_runs.values()  # M71: a reproduction is not a passing check of the item
+            if r.tool in kind.tools and _names(r, art.location) and r.answers(())]
     if not runs:
         return status("not_run", f"no recorded run of {' or '.join(kind.tools)} names {art.location}{note}")
     latest = runs[-1]

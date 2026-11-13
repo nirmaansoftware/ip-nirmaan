@@ -51,6 +51,10 @@ TOP = _p("top", TEXT, "The top module.")
 TOP_REQUIRED = _p("top", TEXT, "The top module.", required=True)
 #: M41: the approved register map; the firmware tools generate <block>_map.h from it and check the driver's.
 FW_MAP = _p("map", PATH, "A register map (JSON): its header is generated, and the driver's must agree with it.")
+#: M71: what a simulation's pass means (docs/REPRO_GATES.md). A run made with ``fail`` is read only by a
+#: requirement that fixes it (``ToolRun.answers``), so a reproduction is never read as a passing simulation.
+EXPECT = _p("expect", TEXT, "pass (the default) or fail: with fail, the run passes only when the testbench's own "
+                            "verdict reports a failed check, so the failure reproduced.")
 #: What the EDA runner itself reads, for every tool it runs (integrations/eda.py).
 RUNNER = (
     _p("backend", TEXT, "Which backend to use, when the tool has several."),
@@ -116,14 +120,8 @@ TOOLS: list[ToolSpec] = [
     _tool("lint.run", "Lint", "eda", EXE, AV, "RTL lint against coding standards.",
           (SOURCES, TOP, *RUNNER)),
     _tool("simulator.run", "Simulator", "eda", EXE, AV, "Compile and simulate RTL and testbenches.",
-          (SOURCES, TOP_REQUIRED, *RUNNER)),
+          (SOURCES, TOP_REQUIRED, EXPECT, *RUNNER)),
     _tool("test.run", "Run tests", "eda", EXE, AV, "Run individual tests.",
-          (SOURCES, TOP_REQUIRED, *RUNNER)),
-    # M71: the same simulators, asked the opposite question (docs/REPRO_GATES.md). A run passes only when the
-    # testbench ran to its end and its own verdict reports a failed check: the failure reproduced. A tool of its
-    # own, so a reproduction is never read as a passing simulation.
-    _tool("simulator.reproduce", "Reproduce a failure", "eda", EXE, AV,
-          "Simulate RTL with a repro testbench that must fail one of its own checks: the failure reproduces.",
           (SOURCES, TOP_REQUIRED, *RUNNER)),
     _tool("regression.run", "Run regressions", "eda", EXE, CO, "Launch and monitor regressions."),
     _tool("waveform.inspect", "Waveform viewer", "eda", RD, CO, "Inspect waveforms."),

@@ -65,7 +65,7 @@ CITE ONLY THESE ARTIFACTS, using the token exactly as written:
 - Expected outputs: root_cause_analysis
 - Outcomes (conclude exactly one): rtl_bug, testbench_bug, infrastructure, spec_ambiguity
 - Evidence requirement: Independent review recorded (accepts: review_record)
-- Permitted tools: project.read, status.read, artifact.read, trace.read, escalation.raise, spec.read, knowledge.search, git.read, code.search, veritriage.investigate, veritriage.explain_log, review.create, git.write, simulator.reproduce, simulator.run
+- Permitted tools: project.read, status.read, artifact.read, trace.read, escalation.raise, spec.read, knowledge.search, git.read, code.search, veritriage.investigate, veritriage.explain_log, review.create, git.write, simulator.run
 - Upstream artifact Triage report (mock) (triage_report, verified): Deterministic triage report grounded in [run:run-0001].
 - Upstream artifact [artifact:prj-<id>.change-correlation.a1] Correlate with recent RTL commits (impact_analysis) (impact_analysis, approved)
 - Evidence [evidence:prj-<id>.triage.e1] on prj-<id>:triage: veritriage_session, substantiated, tool run [run:run-0001]: VeriTriage classified axi_timeout.log as timeout (85% confidence, 5 evidence nodes); top hypothesis: Likely RTL bug

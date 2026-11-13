@@ -9,23 +9,24 @@ investigation had no RTL artifact to run a repro on, the debug seats held no
 simulator, and the eval harness could not seat a decision or give a stage its
 failing logs.
 
-**Tool.** `simulator.reproduce`: the `simulator.run` backends, judged the other
-way. A run passes only when the testbench ran to `$finish` and its one
-nonce-carrying verdict reports a failed check. A tool of its own, so no
-requirement naming `simulator.run` is ever met by a reproduction.
+**Reproduction.** `simulator.run` gains `expect` (`pass` or `fail`). With
+`fail` a run passes only when the testbench ran to `$finish` and its one
+nonce-carrying verdict reports a failed check. `expect` is a verdict parameter
+(`ToolRun.answers`): such a run counts only where a requirement fixes it, so a
+reproduction never meets a requirement for a passing simulation, and the
+verification-plan status never reads one. No tool is added.
 
 **Workflow.** The `reproduction` feature plans `design-under-investigation`
 (the RTL handed over and reviewed) and refines `triage` (adds
 `failure_triage`) and `root-cause`: both build on the handed-over RTL, also
-write repro testbenches, and must pass `simulator.reproduce` on each one, one
+write repro testbenches, and must pass `simulator.run` with `expect=fail` on each one, one
 run per testbench, before the work goes on.
 
 **Model.** `Refinement.outputs` and `Refinement.depends_on` (earlier stages
 only); `FileInput.each` (one run per task file; the policy counts a file
 covered only by a run that had no other such file of the task's).
 
-**Grant.** `failure_triage` and `root_cause_analysis` gain
-`simulator.reproduce` and `simulator.run`.
+**Grant.** `failure_triage` and `root_cause_analysis` gain `simulator.run`.
 
 **Harness.** A decision seat with the case's `outcome`; `EvalCase.inputs`
 (task inputs as case files, such as the failing logs triage investigates);
@@ -36,4 +37,4 @@ Every request that does not ask an investigation for a reproduction plans
 exactly as before, which a test proves against the organization without M71's
 planning data.
 
-**Counts.** Tools `AVAILABLE` 36 to 37 (`scripts/status.py --write`).
+**Counts.** None change (`scripts/status.py --write`).

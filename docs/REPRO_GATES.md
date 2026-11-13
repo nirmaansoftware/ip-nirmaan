@@ -20,12 +20,13 @@ the RTL under investigation, and, in an evaluation, passes on the held-out fix.
   decision), could not give a stage the failing logs it investigates, and the
   must-fail scorer judged a seat's files together, one top module for all.
 
-## Reproduction as a tool of its own
+## Reproduction: `simulator.run` with `expect=fail`
 
-`simulator.reproduce` runs the same simulators as `simulator.run` (the `icarus`
-and `verilator-sim` steps, the same check that only the testbench may end the
-run or read its arguments, the same per-run nonce) and asks the opposite
-question. A run passes only when the failure reproduced:
+`simulator.run` gains one parameter, `expect` (`pass`, the default, or
+`fail`). With `fail` the same steps run (the `icarus` and `verilator-sim`
+backends, the same check that only the testbench may end the run or read its
+arguments, the same per-run nonce) and the run answers the opposite question.
+It passes only when the failure reproduced:
 
 - the design and the testbench built;
 - the simulation ran to `$finish`;
@@ -38,13 +39,23 @@ or forged, and a testbench whose checks all pass fail the run, so only the
 testbench's own failed check stands for the failure
 (`integrations/eda_parsers.py`, `parse_reproduction`).
 
-Why a tool and not a parameter of `simulator.run`: a passing `simulator.run`
-means the tests pass, and every reader relies on that (the RTL gates, the
-verification-plan status in `engineering.py`, VeriTriage's simulation runs, the
-eval records). A reproduction is a passing run of a different tool, so no
-requirement that names `simulator.run` can ever be met by one, and no policy
-rule had to change. It is not a new external tool: the executables are the
-ones `simulator.run` already uses.
+Any other value of `expect` is refused before anything runs. The steps record
+the value in the run's folder (`expect.txt`), where the parser reads it, as a
+formal run records its mode and depth.
+
+**A reproduction is never read as a passing simulation.** A passing
+`simulator.run` means the tests pass, and readers rely on that. `expect` is a
+verdict parameter (`VERDICT_PARAMS` in `models/work.py`): `ToolRun.answers`
+says a run made with one counts only where a requirement fixes it to the same
+value, and a requirement that fixes one is met only by a run made with it.
+The policy's `satisfies` asks it of every tool-backed evidence (so even a
+requirement that names no tool is never met by a reproduction), and the
+verification-plan status (`engineering.py`) reads only runs with no verdict
+parameter. Tested both ways in `test_a_reproduction_is_read_only_where_a_requirement_fixes_it`.
+
+No tool is added (a new tool starts as `CONTRACT_ONLY`, and a contract could
+not run this gate): the executables, backends and contract are
+`simulator.run`'s.
 
 ## The workflow
 
@@ -55,7 +66,7 @@ asks for it:
 | Stage | Change | Checked before review |
 |---|---|---|
 | `design-under-investigation` (new, planned only with `reproduction`) | the RTL under investigation, handed over and reviewed (`rtl.implement`, as block verification's `design-under-test`) | none (reviewed) |
-| `triage` | builds on that stage; also writes `testbench` files, one repro per failure bucket; adds the skill `failure_triage` | `simulator.reproduce` over the approved RTL and each repro testbench, one run per testbench, top from that testbench |
+| `triage` | builds on that stage; also writes `testbench` files, one repro per failure bucket; adds the skill `failure_triage` | `simulator.run` with `expect=fail` over the approved RTL and each repro testbench, one run per testbench, top from that testbench |
 | `root-cause` | builds on that stage; also writes `testbench` (the repro for its root cause) | the same gate |
 
 The gate's files: `sources` takes the approved upstream `rtl_source` plus one
@@ -76,7 +87,8 @@ decision.
 
 ## Three model additions
 
-All are data; nothing names a stage, a tool or a kind in the engine.
+All are data; nothing names a stage, a tool or a kind in the engine (the one
+verdict parameter's name is in `VERDICT_PARAMS`, next to `ToolRun`).
 
 1. **`Refinement.outputs` and `Refinement.depends_on`.** A refinement (M65)
    adds skills to a stage's one task when a plan-time condition holds; it may
@@ -92,9 +104,9 @@ All are data; nothing names a stage, a tool or a kind in the engine.
    no other file of those kinds from the task, so one run over two
    testbenches, which executes only one top, covers neither.
 3. **The grant.** The `failure_triage` and `root_cause_analysis` cards gain
-   `simulator.reproduce` and `simulator.run` (tools are granted through
-   skills, at the working band and above). The gate needs the first; the
-   must-fail judges of an evaluation run the second as the seat.
+   `simulator.run` (tools are granted through skills, at the working band
+   and above, so an intern still may not simulate). The gate runs it as the
+   seat, and so do the must-fail judges of an evaluation.
 
 ## Who gets each task
 
@@ -105,8 +117,7 @@ All are data; nothing names a stage, a tool or a kind in the engine.
 | same | root-cause | root_cause_analysis | debug root-cause senior (unchanged) | debug tech lead (unchanged) |
 
 Role changes: every role holding `failure_triage` or `root_cause_analysis` at
-the working band or above is now granted `simulator.reproduce` and
-`simulator.run`. No owner changes outside a reproduction request.
+the working band or above is now granted `simulator.run`. No owner changes outside a reproduction request.
 
 ## The eval harness
 
@@ -140,14 +151,15 @@ block-design request that says "reproduces". On a reproduction request, only
 the new stage and its workstream are added, triage and root cause change, and
 the later tasks' priorities and the debug workstream's status follow the
 longer path. No existing gate, evidence requirement or review changes. The regression seats' golden prompts
-(`tests/fixtures/prompts/`) change in one line each: their permitted tools now list `simulator.reproduce`
-and `simulator.run`.
+(`tests/fixtures/prompts/`) change in one line each: their permitted tools now list `simulator.run`.
 
 ## Tests
 
 `tests/test_repro_gates.py`: planning and the gate's files; each seat's
 skill, owner, grant and packet; `FileInput.each` and refinement validation;
-the reproduction verdict on captured logs; the before-and-after comparison;
+the reproduction verdict on captured logs; a reproduction read only where a
+requirement fixes it, and an `expect` that is neither value refused; the
+before-and-after comparison;
 and, with real simulators through `run_case`, a root-cause seat whose repro
 reproduces on the RTL under investigation and passes the must-fail check
 against the fix, one whose repro passes on that RTL and never reaches review,
@@ -166,5 +178,5 @@ does not reproduce beside one that does, stopped.
 `runtime/model.py` and `evals/runner.py` are harness code (M73, `docs/HARNESS.md`), so the harness
 fingerprint changes; no trial is recorded, so no level goes stale.
 
-Counts: tools `AVAILABLE` 36 to 37 (`scripts/status.py --write`); no new
-skill, workflow, unit or principle.
+No count changes (`scripts/status.py --write`): no new tool, skill, workflow,
+unit or principle.

@@ -2,9 +2,10 @@
 
 A regression investigation asked to reproduce its failure hands over the RTL under
 investigation, and triage and root cause each write repro testbenches that
-``simulator.reproduce`` runs on that approved RTL, one file at a time, before the
-work goes on: a run passes only when the testbench's own verdict reports a failed
-check. Through the eval harness, the must-fail scorer then judges a root-cause
+``simulator.run`` runs with ``expect=fail`` on that approved RTL, one file at a
+time, before the work goes on: such a run passes only when the testbench's own
+verdict reports a failed check, and only a requirement that fixes ``expect=fail``
+reads it. Through the eval harness, the must-fail scorer then judges a root-cause
 seat's repro against the fixed RTL, and ``must-fail-each`` a triage seat's repros,
 one per seeded bug. Every request that does not ask for a reproduction plans
 exactly as before. Real-tool tests skip when an executable is absent (or fail
@@ -69,7 +70,7 @@ def test_a_reproduction_hands_over_the_rtl_and_gates_triage_and_root_cause(reque
         task = _task(engine, stage)
         assert handed.id in task.depends_on and "testbench" in task.expected_outputs
         [gate] = _gates(task)
-        assert gate.tools == ("simulator.reproduce",)
+        assert gate.tools == ("simulator.run",) and gate.params == (("expect", "fail"),)
         assert gate.files == (FileInput(param="sources", kinds=("rtl_source",), upstream=True),
                               FileInput(param="sources", kinds=("testbench",), each=True),
                               FileInput(param="top", kinds=("testbench",), entry=True))
@@ -84,7 +85,7 @@ def test_each_debug_seat_carries_its_skill_and_may_run_the_reproduction(request_
                                 ("root-cause", "root_cause_analysis", "verification.debug.root_cause.senior")):
         task = _task(engine, stage)
         assert task.owner == owner
-        assert "simulator.reproduce" in nirmaan_org.tools_of(owner)
+        assert "simulator.run" in nirmaan_org.tools_of(owner)
         for seat in (None, task.owner, task.reviewer):
             if seat is None and task.reviewer is None:
                 continue
@@ -141,6 +142,43 @@ def test_only_the_testbenchs_own_failed_check_is_a_reproduction(log, codes, repr
     result = parse_reproduction(log, codes, NONCE)
     assert result.passed is reproduced and result.metrics["reproduced"] is reproduced
     assert said in result.summary, result.summary
+
+
+def test_a_reproduction_is_read_only_where_a_requirement_fixes_it():
+    """A passing ``expect=fail`` run never meets a requirement for a passing simulation, and vice versa."""
+    from types import SimpleNamespace
+
+    from nirmaan.company.workflows import REPRODUCES, RTL_GATES
+    from nirmaan.models import EvidenceKind, ToolRun
+    from nirmaan.work.policy import satisfies
+
+    def met(run: ToolRun, req) -> bool:
+        state = SimpleNamespace(tool_runs={run.id: run})
+        return satisfies(state, SimpleNamespace(substantiated=True, kind=EvidenceKind.TOOL_RUN, tool_run=run.id), req)
+
+    passing = next(r for r in RTL_GATES if r.tools == ("simulator.run",))
+    repro = ToolRun(id="run-0001", tool="simulator.run", actor="a", task="t", succeeded=True, summary="reproduced",
+                    params={"sources": ("counter.v", "tb.v"), "top": "tb", "expect": "fail"})
+    plain = repro.model_copy(update={"params": {"sources": ("counter.v", "tb.v"), "top": "tb"}})
+    assert met(repro, REPRODUCES) and not met(repro, passing)
+    assert met(plain, passing) and not met(plain, REPRODUCES)
+    assert not repro.answers(()) and plain.answers(())
+    explicit = plain.model_copy(update={"params": {**plain.params, "expect": "pass"}})
+    assert met(explicit, passing) and explicit.answers(())  # pass, said or not, is a plain pass
+
+
+@needs(*SIM_TOOLS)
+def test_an_expect_other_than_pass_or_fail_is_refused(nirmaan_org, tmp_path):
+    from nirmaan.runtime import ToolBroker
+    from nirmaan.models import Actor, ActorKind
+
+    engine = Orchestrator(nirmaan_org).plan(ROOT_CAUSE)
+    tb = _write(tmp_path, "wrap_repro.v", _tb("wrap_repro", WRAP))
+    owner = _task(engine, "root-cause").owner
+    _, outcome = ToolBroker(engine).invoke(Actor(role=owner, kind=ActorKind.AI_AGENT, name="t"), "simulator.run",
+                                           {"sources": [str(REPO / COUNTER), tb], "top": "wrap_repro",
+                                            "expect": "maybe", "workdir": str(tmp_path / "run")})
+    assert not outcome.succeeded and "expect must be pass or fail" in outcome.summary
 
 
 # --- Nothing else moves ----------------------------------------------------------------------------------
@@ -326,7 +364,7 @@ def test_a_root_cause_seat_reproduces_the_failure_and_its_repro_is_judged_agains
     assert validate_case(nirmaan_org, case, REPO) == []
     result = run_case(nirmaan_org, case, repo=REPO, sandbox=tmp_path / "sandbox", clock=fixed_clock)
     assert result.submitted, result
-    assert [g.tool for g in result.gate_runs] == ["simulator.reproduce"] and result.gate_runs[0].succeeded
+    assert [g.tool for g in result.gate_runs] == ["simulator.run"] and result.gate_runs[0].succeeded
     assert "failure reproduced" in result.gate_runs[0].summary
     assert [s.status for s in result.scores] == [ScoreStatus.PASSED], result.scores
 
@@ -370,7 +408,7 @@ def test_a_triage_seat_reproduces_each_bucket_on_its_own_and_each_bug_fails_a_re
     assert validate_case(nirmaan_org, case, REPO) == []
     result = run_case(nirmaan_org, case, repo=REPO, sandbox=tmp_path / "sandbox", clock=fixed_clock)
     assert result.submitted, result
-    repro = [g for g in result.gate_runs if g.tool == "simulator.reproduce"]
+    repro = [g for g in result.gate_runs if "failure reproduced" in g.summary]
     assert len(repro) == 2 and all(g.succeeded for g in repro), repro  # one run per repro, each on its own
     assert [s.status for s in result.scores] == [ScoreStatus.PASSED], result.scores
     assert "each of 2 mutants fails a file of its own" in result.scores[0].summary

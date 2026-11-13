@@ -448,10 +448,10 @@ RTL_CHANGE = WorkflowTemplate(
 #: before the work goes on: a claimed root cause comes with a failure the gate ran (docs/REPRO_GATES.md).
 REPRODUCTION = when("reproduction")
 REPRODUCES = checked("Each repro testbench fails on the approved RTL under investigation: the failure reproduces",
-                     "simulator.reproduce", approved("sources", "rtl_source"),
+                     "simulator.run", approved("sources", "rtl_source"),
                      FileInput(param="sources", kinds=("testbench",), each=True),
                      FileInput(param="top", kinds=("testbench",), entry=True),
-                     when=(REPRODUCTION,))
+                     params=(("expect", "fail"),), when=(REPRODUCTION,))
 
 
 def reproducing(*skills: str) -> Refinement:

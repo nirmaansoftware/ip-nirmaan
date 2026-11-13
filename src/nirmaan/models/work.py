@@ -246,6 +246,11 @@ class Attempt(BaseModel):
     reviews: tuple[str, ...] = Field(default=(), description="The reviews that sent this submission back (M27).")
 
 
+#: M71: run parameters that change what a passing run means, with the value that means a plain pass
+#: (``simulator.run``'s ``expect``, docs/REPRO_GATES.md). Left out, a parameter has that value.
+VERDICT_PARAMS = {"expect": "pass"}
+
+
 class ToolRun(BaseModel):
     """A brokered tool invocation. The only thing a TOOL_RUN evidence may cite."""
 
@@ -278,6 +283,17 @@ class ToolRun(BaseModel):
         if isinstance(data, dict) and data.get("bounds", ()) is None:
             data.pop("bounds", None)
         return data
+
+    def answers(self, fixed) -> bool:
+        """Whether this run answers the question a requirement with these fixed parameters asks (M71).
+
+        A parameter in :data:`VERDICT_PARAMS` changes what a passing run means (``expect=fail``: the failure
+        reproduced), so a run made with one counts only where the requirement fixes it to the same value, and a
+        requirement that fixes one is met only by a run made with it.
+        """
+        wanted = dict(fixed)
+        return all((text_value(self.params.get(k)).strip() or plain) == (str(wanted.get(k, "")).strip() or plain)
+                   for k, plain in VERDICT_PARAMS.items())
 
     def checked_against(self, bound: Bound) -> bool:
         """Whether the run was checked against this bound: recorded since M48, a parameter before (section 3 of
