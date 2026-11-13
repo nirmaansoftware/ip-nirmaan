@@ -1,0 +1,24 @@
+{
+  "format": "nirmaan.knowledge-check",
+  "skill": "apb",
+  "knowledge_document": "knowledge/design/apb.md",
+  "document_sha256": "sha256:b321b2e59acd40291b23cd4c2efa8b7958cac21195bdc7c6bc36c7b135580d00",
+  "writer": "IP-P3-K1 session (P3 pilot, item K1, 2026-10-31)",
+  "checker": "IP-P3-C1 session (P3 pilot, item C1)",
+  "sources_read": [
+    "[UMich] Ghena, EECS 373 Lecture 5: Memory and Peripheral Buses, University of Michigan, 2015: the text of all 54 slides, https://web.eecs.umich.edu/~prabal/teaching/eecs373-w15/slides/lec5.pdf",
+    "[MSOE] Johnson, ELE 4142 Parallel Communications: APB, Milwaukee School of Engineering, 2024: the text of all 19 slides, https://faculty-web.msoe.edu/johnsontimoj/ELE4142/files4142/parallel_communications_apb.pdf",
+    "[AVL] AVL-APB documentation, Protocol Support: the whole page, https://avl-apb.readthedocs.io/en/latest/protocol/protocol.html",
+    "[FAPB] Gisselquist, bench/formal/fapb_slave.v, WB2AXIP (Apache 2.0): the whole file, master branch of https://github.com/ZipCPU/wb2axip",
+    "[APBS] Gisselquist, rtl/apbslave.v, WB2AXIP (Apache 2.0): the whole file with its formal section, master branch of https://github.com/ZipCPU/wb2axip",
+    "[A2APB] Gisselquist, rtl/axil2apb.v, WB2AXIP (Apache 2.0): the whole file with its formal section, master branch of https://github.com/ZipCPU/wb2axip"
+  ],
+  "result": "every claim tagged with a source was found in that source, and every line marked inference is a fair reading of the source it names or the document's own reasoning",
+  "notes": [
+    "The completion rule (PSEL, PENABLE and PREADY high together) is the stall condition in fapb_slave.v and the response condition in axil2apb.v; the bridge's at-most-half rate is the 50 percent throughput in the axil2apb.v header.",
+    "PREADY low during reset: fapb_slave.v asserts PREADY low on the cycle after one with PRESETn low; apbslave.v resets PREADY low and raises it only after a setup cycle.",
+    "The bounded wait is the F_OPT_MAXSTALL stall counter in fapb_slave.v; the UMich lecture (its Things left out slide) says it cannot find a limit on how long a device may stall.",
+    "The demonstration completer writes memory and loads PRDATA on PSEL with PENABLE low, the setup edge, as the document says."
+  ],
+  "checked_at": "2026-11-13"
+}
