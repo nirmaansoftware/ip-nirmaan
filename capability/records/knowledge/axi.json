@@ -1,0 +1,24 @@
+{
+  "format": "nirmaan.knowledge-check",
+  "skill": "axi",
+  "knowledge_document": "knowledge/design/axi.md",
+  "document_sha256": "sha256:c44702e6895eea31565f712aedd6424d4f7d51acab3cba9a646a37e0fd2f1162",
+  "writer": "IP-P3-K1F session (P3 pilot, fix to the Channels line found by P3-C1, 2026-11-13), revising the IP-P3-K1 session's first version",
+  "checker": "IP-P3-C2 session (P3 pilot, item C2)",
+  "sources_read": [
+    "[Rules] Gisselquist, AXI Handshaking Rules, ZipCPU blog, 2021: the whole article, https://zipcpu.com/blog/2021/08/28/axi-rules.html",
+    "[Easy] Gisselquist, Building an AXI-Lite slave the easy way, ZipCPU blog, 2020: the whole article with its formal section, https://zipcpu.com/blog/2020/03/08/easyaxil.html",
+    "[Props] Gisselquist, Using a formal property file to verify an AXI-lite peripheral, ZipCPU blog, 2018: the whole article with the property set it walks through, https://zipcpu.com/formal/2018/12/28/axilite.html",
+    "[A2APB] Gisselquist, rtl/axil2apb.v, WB2AXIP (Apache 2.0): the whole file with its formal section, master branch of https://github.com/ZipCPU/wb2axip"
+  ],
+  "result": "every claim tagged with a source was found in that source, and every line marked inference is a fair reading of the source it names or the document's own reasoning",
+  "notes": [
+    "The Channels line fixed in #173 now matches [Props]: AXI-lite has no requirement to implement a cache protocol; some implementations add cache flags to the address request (F_OPT_HAS_CACHE); the property set has i_axi_awcache and i_axi_arcache inputs next to i_axi_awprot and i_axi_arprot.",
+    "That the subordinate asserts the handshake rules of B and R and assumes them of AW, W and AR is [Props]' rule of assuming inputs and asserting outputs, applied channel by channel in its stability section.",
+    "The bounds on how far AW and W arrive apart are the two Xilinx constraints in [Props], which its author found in a Xilinx guide and not in the specification.",
+    "The combinational grant that gives one side priority is the axil_write_ready and axil_read_ready pair in [Rules]; the alternating grant is write_grant in [A2APB], which also forwards AWPROT and ARPROT to PPROT and answers PSLVERR with 2'b10.",
+    "A manager treats bit 1 of a response as an error: the r_err example in [Easy] sets its error on M_AXI_BRESP[1].",
+    "The induction rule (a bounded check passes with the property set alone; an unbounded proof ties the outstanding counts to BVALID and RVALID) is in both [Easy] and [Props]."
+  ],
+  "checked_at": "2026-11-13"
+}

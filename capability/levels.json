@@ -28,14 +28,12 @@
     },
     "axi": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/axi.json",
+        "counts": true,
         "knowledge_document": "knowledge/design/axi.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     },
     "buffering_flow_control": {
@@ -92,7 +90,7 @@
     }
   },
   "totals": {
-    "knowledge": 5,
+    "knowledge": 6,
     "practised": 0,
     "proven": 0
   },
