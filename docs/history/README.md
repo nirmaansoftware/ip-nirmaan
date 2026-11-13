@@ -118,6 +118,8 @@ The original preface of the section:
 - [M65-stage-refinements](M65-stage-refinements.md): Milestone 65 - Stage refinements: a feature adds skills to a stage's one task, with no fan-out
 - [M66-rtl-pilot-routing](M66-rtl-pilot-routing.md): Milestone 66 - RTL pilot routing: the pilot's block and bus skills reach the block-design RTL seat
 - [M67-eval-ablation-switch](M67-eval-ablation-switch.md): Milestone 67 - Evals without knowledge documents: the ablation switch, whose trials never count toward a level
+- [M68-block-verification](M68-block-verification.md): Milestone 68 - Block verification: verify an existing block's RTL, with the testbench and the proof gated over the approved RTL
+- [M73-harness-fingerprint](M73-harness-fingerprint.md): Milestone 73 - The harness in one place, and its fingerprint on every trial; a changed harness makes a level's trials stale
 
 ## Before M43
 

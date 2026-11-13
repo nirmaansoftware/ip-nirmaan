@@ -787,6 +787,67 @@ PHYSICAL_IMPLEMENTATION = WorkflowTemplate(
     ),
 )
 
+# --- 10. Verification of an existing block (M68) ---------------------------------------------
+
+#: M68: the block under verification, handed over: its approved specification and RTL are what every DV seat
+#: works from and is judged over. The proof's setup names the RTL by its file name, so the approved RTL is
+#: placed beside the seat's files (docs/BLOCK_VERIFICATION.md).
+DUT_RTL = FileInput(param="sources", kinds=("rtl_source",), upstream=True)
+DUT_RTL_BESIDE = FileInput(param="sources", kinds=("rtl_source",), upstream=True, beside=True)
+PROOF_SETUP = (FileInput(param="sby", kinds=("formal_spec",)), DUT_RTL_BESIDE,
+               FileInput(param="sources", kinds=("assertions",)))
+
+BLOCK_VERIFICATION = WorkflowTemplate(
+    id="block-verification",
+    name="Block verification",
+    description="Verify an existing block's RTL against its specification: a checked verification plan, a "
+                "self-checking testbench that passes on the approved RTL, and a formal proof over it that is "
+                "proven and not vacuous, each before review. The RTL is handed over, never written here.",
+    intents=("block_verification",),
+    stages=(
+        st("interface-spec", "Specification of the block under verification", "Architecture", "arch.interface",
+           criticality=M, review=rv("arch.review"), outputs=("interface_spec",), evidence=(REVIEWED,)),
+        st("design-under-test", "RTL under verification, as handed over", "RTL", "rtl.implement",
+           depends_on=("interface-spec",), criticality=M, review=rv("rtl.review"), outputs=("rtl_source",),
+           evidence=(REVIEWED,)),
+        st("dv-plan", "Verification plan", "Verification", "dv.plan", depends_on=("interface-spec",),
+           skills=("verification_planning",), criticality=M, review=rv("dv.review"),
+           outputs=("verification_plan",),
+           evidence=(REVIEWED,
+                     checked("The plan covers every requirement of the approved interface spec", "vplan.check",
+                             FileInput(param="plan", kinds=("verification_plan",)),
+                             FileInput(param="spec", kinds=("interface_spec",), upstream=True)))),
+        st("testbench", "Self-checking testbench", "Verification", "dv.directed_tests",
+           depends_on=("interface-spec", "design-under-test"), skills=("directed_testing",), criticality=H,
+           review=rv("dv.review"),
+           refinements=(Refinement(when=when("systemverilog"), skills=("systemverilog",)),
+                        Refinement(when=when("random_stimulus"), skills=("constrained_random",))),
+           outputs=("testbench",),
+           evidence=(REVIEWED,
+                     checked("The seat's testbench passes on the approved RTL", "simulator.run", DUT_RTL,
+                             FileInput(param="sources", kinds=("testbench",)),
+                             FileInput(param="top", kinds=("testbench",), entry=True)))),
+        st("assertions-formal", "Assertions and formal proof", "Formal", "formal.prove",
+           depends_on=("interface-spec", "design-under-test"),
+           skills=("formal_verification", "sva", "assertion_coverage"), criticality=H, review=rv("formal.review"),
+           refinements=(Refinement(when=when("unbounded_proof"), skills=("model_checking",)),),
+           outputs=("assertions",),  # with the .sby (formal_spec) the gates read, as block-design's RTL seat writes one
+           evidence=(REVIEWED,
+                     checked("The seat's properties are proven on the approved RTL", "formal.run", *PROOF_SETUP,
+                             bounds=(at_least("proven", 1),)),
+                     checked("The proof is not vacuous: every cover is reached", "formal.cover", *PROOF_SETUP))),
+        # Asked for by name; their tools are contracts today, so their evidence is recorded, not run, before
+        # review (docs/BLOCK_VERIFICATION.md, "Not in this milestone").
+        st("coverage", "Coverage", "Verification", "dv.coverage", depends_on=("testbench",), when=when("coverage"),
+           skills=("code_coverage",), criticality=M, review=rv("dv.review"), outputs=("coverage_report",),
+           evidence=(REVIEWED, dv_ran("Coverage of the testbench on the approved RTL", "coverage.read"))),
+        st("equivalence", "Equivalence check", "Formal", "formal.equivalence", depends_on=("design-under-test",),
+           when=when("equivalence"), skills=("equivalence_checking",), criticality=M, review=rv("formal.review"),
+           outputs=("equivalence_report",),
+           evidence=(REVIEWED, ran("Equivalence result with the compared versions named", "equivalence.run"))),
+    ),
+)
+
 WORKFLOWS: list[WorkflowTemplate] = [
     NEW_IP,
     FEATURE_ADDITION,
@@ -797,4 +858,5 @@ WORKFLOWS: list[WorkflowTemplate] = [
     TIMING_CLOSURE,
     BLOCK_DESIGN,
     PHYSICAL_IMPLEMENTATION,
+    BLOCK_VERIFICATION,
 ]

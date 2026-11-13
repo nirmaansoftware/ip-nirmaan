@@ -239,7 +239,8 @@ def test_seats_select_by_group_or_stage():
     assert [c.id for c in select_cases(cases, ["firmware"])] == [FW_CASE]  # its group and its stage
     assert {c.seat for c in select_cases(cases, ["rtl"])} == {"rtl-implementation"}
     assert [c.id for c in select_cases(cases, ["interface-spec"])] == [SPEC_CASE]
-    assert len(select_cases(cases, ["rtl", "spec", "firmware"])) == len(cases)
+    assert [c.id for c in select_cases(cases, ["dv"])] == ["dv/directed-irq-ctrl", "dv/plan-irq-ctrl"]  # W2-E1
+    assert len(select_cases(cases, ["rtl", "spec", "firmware", "dv"])) == len(cases)
     assert select_cases(cases, []) == cases
 
 
@@ -483,5 +484,5 @@ def test_records_and_spec_check_keep_the_laws(nirmaan_org):
 def test_the_case_loader_skips_data_files():
     """Checks files and run records under evals/ carry a format and are never read as cases."""
     ids = [c.id for c in load_cases(EVALS)]
-    assert SPEC_CASE in ids and FW_CASE in ids and len(ids) == 9
+    assert SPEC_CASE in ids and FW_CASE in ids and len(ids) == 11
     assert load_case(EVALS / "spec" / "axi4_lite_interface.json").seat == "interface-spec"

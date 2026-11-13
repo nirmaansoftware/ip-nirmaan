@@ -1,0 +1,23 @@
+{
+  "format": "nirmaan.knowledge-check",
+  "skill": "rtl_design",
+  "knowledge_document": "knowledge/design/rtl_design.md",
+  "document_sha256": "sha256:d5904d22db5ddb4bb00b1b6a5413d81c7cf4317daea42dbc9ee423bed2530eab",
+  "writer": "IP-P3-K1 session (P3 pilot, item K1, 2026-10-31)",
+  "checker": "IP-P3-C1 session (P3 pilot, item C1)",
+  "sources_read": [
+    "[lowRISC] lowRISC, Verilog Coding Style Guide (CC BY 4.0): the whole guide, VerilogCodingStyle.md on the master branch of https://github.com/lowRISC/style-guides",
+    "[Yosys] YosysHQ, Yosys command reference, Converting process blocks (proc and every proc_* pass): the whole page, https://yosyshq.readthedocs.io/projects/yosys/en/latest/cmd/index_passes_proc.html",
+    "[Verilator] Verilator manual, Input Languages: the whole page, https://verilator.org/guide/latest/languages.html",
+    "[SBY] YosysHQ SBY documentation: Reference for .sby file format (https://yosyshq.readthedocs.io/projects/sby/en/latest/reference.html) and Formal extensions to Verilog (https://yosyshq.readthedocs.io/projects/sby/en/latest/verilog.html), both pages whole",
+    "[ZipCPU] Gisselquist, AXI Handshaking Rules, ZipCPU blog, 2021: the whole post, https://zipcpu.com/blog/2021/08/28/axi-rules.html"
+  ],
+  "result": "every claim tagged with a source was found in that source, and every line marked inference is a fair reading of the source it names or the document's own reasoning",
+  "notes": [
+    "Reset every flop: lowRISC says sequential statements for state assignments should contain only reset values and the next-state assignment, and its resets are active-low and asynchronous by default; the document's rule that every flop holding state gets a reset value is read from that line.",
+    "No latches: lowRISC requires a default case item to avoid accidental latch inference and, without defaults before the case, every variable assigned in one item assigned in all items including the default; the document's first sentence on how a latch is inferred summarises those rules.",
+    "Proof setup: SBY gives depth a default of 20 for bmc and cover, and in prove mode it is the k-induction depth of the smtbmc engine (other engines ignore it), the engine the document uses.",
+    "The f_past_valid guard and the assumption of reset on the first cycle are in the section of the ZipCPU post on capturing the rules in formal properties."
+  ],
+  "checked_at": "2026-11-13"
+}

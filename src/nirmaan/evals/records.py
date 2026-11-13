@@ -28,6 +28,7 @@ from nirmaan.evals.runner import REPLAY, evaluate, replay_llm
 from nirmaan.models import EvalCase, EvalResult, EvalRunManifest, EvalTrial, JudgeRun, RecordedAnswer
 from nirmaan.org import Organization
 from nirmaan.runtime import AgentRuntime, Completion, ModelRuntime, WorkPrompt, get_runtime
+from nirmaan.runtime.harness import harness_sha256
 from nirmaan.runtime.model import NO_CALL
 
 MANIFEST = "manifest.json"
@@ -70,9 +71,10 @@ def packet_sha256(prompt: WorkPrompt) -> str:
 class RecordingLLM:
     """Wraps a runtime's model for one trial and keeps every answer it gives, as given."""
 
-    def __init__(self, inner: Any) -> None:
+    def __init__(self, inner: Any, harness: str | None = None) -> None:
         self.inner = inner
         self.name = getattr(inner, "name", "llm")
+        self.harness = harness
         self.answers: list[RecordedAnswer] = []
 
     def __getattr__(self, item: str) -> Any:
@@ -84,7 +86,7 @@ class RecordingLLM:
             mode=prompt.mode, provider=c.provider or self.name, model=c.model, prompt_sha256=prompt_sha256(prompt),
             packet_sha256=packet_sha256(prompt), text=c.text, error=c.error, input_tokens=c.input_tokens,
             output_tokens=c.output_tokens, cache_read_tokens=c.cache_read_tokens,
-            cache_write_tokens=c.cache_write_tokens))
+            cache_write_tokens=c.cache_write_tokens, harness=self.harness))
         return c
 
 
@@ -127,9 +129,10 @@ def record_trial(org: Organization, case: EvalCase, seat_runtime: AgentRuntime, 
     """Run one case once with every model answer captured, and keep the tool runs behind each verdict.
 
     ``knowledge=False`` (M67) runs the seat without knowledge documents and labels the trial ``knowledge: off``.
+    Every answer, and the result, records the harness (M73).
     """
     llm = getattr(seat_runtime, "llm", None)
-    recorder = RecordingLLM(llm) if llm is not None else None
+    recorder = RecordingLLM(llm, harness_sha256(attempts=attempts, knowledge=knowledge)) if llm is not None else None
     if recorder is not None:
         seat_runtime.llm = recorder  # type: ignore[attr-defined]
     try:

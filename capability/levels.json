@@ -6,14 +6,12 @@
   "skills": {
     "apb": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/apb.json",
+        "counts": true,
         "knowledge_document": "knowledge/design/apb.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     },
     "arbitration": {
@@ -28,79 +26,67 @@
     },
     "axi": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/axi.json",
+        "counts": true,
         "knowledge_document": "knowledge/design/axi.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     },
     "buffering_flow_control": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/buffering_flow_control.json",
+        "counts": true,
         "knowledge_document": "knowledge/design/buffering_flow_control.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     },
     "control_logic_design": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/control_logic_design.json",
+        "counts": true,
         "knowledge_document": "knowledge/design/control_logic_design.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     },
     "fsm_design": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/fsm_design.json",
+        "counts": true,
         "knowledge_document": "knowledge/design/fsm_design.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     },
     "pipeline_design": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/pipeline_design.json",
+        "counts": true,
         "knowledge_document": "knowledge/design/pipeline_design.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     },
     "rtl_design": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/rtl_design.json",
+        "counts": true,
         "knowledge_document": "knowledge/design/rtl_design.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     }
   },
   "totals": {
-    "knowledge": 1,
+    "knowledge": 8,
     "practised": 0,
     "proven": 0
   },

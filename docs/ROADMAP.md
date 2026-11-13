@@ -56,7 +56,7 @@ snapshot, refreshed by `python scripts/status.py --release`.
 | Organizational units | 222 | `units`, every PR |
 | Derived roles | 704 | `roles`, every PR |
 | Skills | 140 | `skills`, every PR |
-| Workflows | 9 | `workflows`, every PR |
+| Workflows | 10 | `workflows`, every PR |
 | Constitution principles | 12 | `principles`, every PR |
 | Tools `AVAILABLE` | 36 | `tools_available`, every PR |
 | Tools `CONTRACT_ONLY` | 17 | `tools_contract_only`, every PR |
@@ -120,6 +120,8 @@ new number. M1 to M42 are taken; see `docs/history/README.md`.
 | M65 | Stage refinements: feature skills on a stage's one task | reserved |
 | M66 | RTL pilot routing: block features and refinements on the RTL seat | reserved |
 | M67 | Evals without knowledge documents: the ablation switch | reserved |
+| M68 | Block verification: a workflow with DV gates over an existing block's RTL | reserved |
+| M73 | The harness in one place, and its fingerprint on every trial | reserved |
 
 <!-- review:milestone-numbers:end -->
 
