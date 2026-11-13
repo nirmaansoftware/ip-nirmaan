@@ -240,6 +240,28 @@ def _grounded(art: dict[str, Any], prompt: WorkPrompt, stripped: list[str]) -> d
             **({"derived_from": derived} if derived else {})}
 
 
+def _fill(files: dict[str, str | list[str]], param: str, paths: list[str]) -> None:
+    """One tool parameter's files; two bindings of one parameter (M68: approved RTL and the seat's testbench) add up."""
+    earlier = files.get(param)
+    files[param] = [*earlier, *paths] if isinstance(earlier, list) else paths
+
+
+def _place_beside(paths: list[str], req: EvidenceRequirement, produced: list[dict[str, Any]]) -> None:
+    """Link each approved upstream file beside the task's own files of this requirement, under its own name (M68).
+
+    A setup that names its files relative to itself (a .sby's [files]) then reads the approved file itself. A file
+    of the task's own with that name is never replaced: the tool then reads the seat's file, and a check that the
+    run read the approved one (the formal backend's) refuses it.
+    """
+    kinds = {k for b in req.files if not b.upstream for k in b.kinds}
+    folders = {Path(f["location"]).parent for f in produced if f["kind"] in kinds and f.get("location")}
+    for folder in folders:
+        for path in paths:
+            link = folder / Path(path).name
+            if not link.exists() and not link.is_symlink():
+                link.symlink_to(Path(path).resolve())
+
+
 def _attempt_dir(task_id: str, workspace: str | None) -> Path:
     """A fresh directory per attempt, so no later attempt overwrites files an earlier run checked."""
     base = Path(workspace) if workspace else Path(tempfile.mkdtemp(prefix="nirmaan-work-"))
@@ -428,7 +450,9 @@ class ModelRuntime:
                     if not binding_wanted(binding, Facts(ConditionPhase.RUN, inputs={kind for kind, _ in found})):
                         continue  # M41: an optional input with nothing approved upstream is left out
                     missing = missing or (None if paths else f"no approved upstream {kinds} file")
-                    files[binding.param] = paths
+                    _fill(files, binding.param, paths)
+                    if binding.beside:
+                        _place_beside(paths, req, produced)
                     continue
                 matched = [f for kind in binding.kinds for f in produced if f["kind"] == kind]
                 if binding.entry:
@@ -440,7 +464,7 @@ class ModelRuntime:
                 else:
                     paths = [f["location"] for f in matched]
                     missing = missing or (None if paths else f"the answer carried no {kinds} file")
-                    files[binding.param] = paths
+                    _fill(files, binding.param, paths)
             refusals = []
             for tool in req.tools:
                 if missing:

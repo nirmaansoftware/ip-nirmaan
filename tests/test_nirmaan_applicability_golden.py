@@ -59,6 +59,10 @@ REQUESTS = (
     "Prepare the bridge for sign-off.",
     "Prepare the single-clock timer for sign-off.",
     "Close timing on the timer: negative slack on the count path.",
+    # M68: verification of an existing block, plain and with every feature its stages read.
+    "Verify the existing interrupt controller RTL.",
+    "Formally verify the existing CRC block RTL with an unbounded proof, a constrained-random SystemVerilog "
+    "testbench, coverage and an equivalence check.",
 )
 
 
@@ -121,7 +125,7 @@ def _when(req, universe: set[str]) -> str:
 def _files(req) -> str:
     return " ".join(f"{b.param}<-{'|'.join(b.kinds)}"
                     f"{'[entry]' if b.entry else ''}{'[upstream]' if b.upstream else ''}"
-                    f"{'[optional]' if b.optional else ''}" for b in req.files)
+                    f"{'[optional]' if b.optional else ''}{'[beside]' if b.beside else ''}" for b in req.files)
 
 
 def snapshot(org, clock) -> str:
