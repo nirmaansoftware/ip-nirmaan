@@ -71,3 +71,5 @@ separate pull request), and the check record (part c). No eval case changes.
 
 M66 adds the RTL pilot's refinements (APB, AXI, FIFO, skid buffer, timer,
 GPIO) on the same stage: `docs/RTL_PILOT_ROUTING.md`.
+M68 uses refinements on `block-verification`'s testbench and proof stages:
+`docs/BLOCK_VERIFICATION.md`.
