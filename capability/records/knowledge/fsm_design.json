@@ -1,0 +1,24 @@
+{
+  "format": "nirmaan.knowledge-check",
+  "skill": "fsm_design",
+  "knowledge_document": "knowledge/design/fsm_design.md",
+  "document_sha256": "sha256:9482e11d822b4e34ae6fed2cdc601bc1ac9ab03c1895da73ed4c13ff49d400c7",
+  "writer": "IP-P3-K2 session (P3 pilot, item K2, 2026-11-03)",
+  "checker": "IP-P3-C2 session (P3 pilot, item C2)",
+  "sources_read": [
+    "[Tmr] Gisselquist, ZipTimer: A simple countdown timer, ZipCPU blog, 2018: the whole article with its formal properties, https://zipcpu.com/zipcpu/2018/04/17/ziptimer.html",
+    "[FSM] Gisselquist, Lesson 3: Finite State Machines, ZipCPU tutorial: the text of all 51 slides, https://zipcpu.com/tutorial/lsn-03-fsm.pdf",
+    "[Yosys] YosysHQ, Yosys command reference, FSM handling (fsm and the eight fsm_* passes): the whole page, https://yosyshq.readthedocs.io/projects/yosys/en/latest/cmd/index_passes_fsm.html",
+    "[RVT] lowRISC, OpenTitan rv_timer Theory of Operation (Apache 2.0): the whole page, https://opentitan.org/book/hw/ip/rv_timer/doc/theory_of_operation.html",
+    "[CIP] lowRISC, OpenTitan Comportability Specification (Apache 2.0): the whole page, read closely in its Interrupt Handling section, https://opentitan.org/book/doc/contributing/hw/comportability/index.html"
+  ],
+  "result": "every claim tagged with a source was found in that source, and every line marked inference is a fair reading of the source it names or the document's own reasoning",
+  "notes": [
+    "The running flag, the non-zero interval rule for periodic mode, the registered zero flag and the expiry interrupt gated by a tick and cleared on reset or a write are in the ZipTimer code and formal section of [Tmr].",
+    "The count-is-one bug when a restart lands on the same cycle is the reader's note in [Tmr]: the interrupt fires while the count is not zero, and the restarted count fires again later, so expiry is doubled or on the wrong cycle; a write on the expiry cycle clears the interrupt in the ZipTimer, so it can also be missing.",
+    "The N+1 inference holds for [Tmr]'s periodic mode: the count steps N down to 0 and reloads on the next tick at 0, N+1 ticks per period.",
+    "Moore and Mealy and the one or two process forms are slides 21 to 26 of [FSM]; the in-range assertion is slide 37.",
+    "A state that cannot be reached or cannot be left is attributed to the card: the fsm_design card's failure mode is unreachable or trap states."
+  ],
+  "checked_at": "2026-11-13"
+}
