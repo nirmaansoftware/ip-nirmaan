@@ -1,0 +1,24 @@
+{
+  "format": "nirmaan.knowledge-check",
+  "skill": "buffering_flow_control",
+  "knowledge_document": "knowledge/design/buffering_flow_control.md",
+  "document_sha256": "sha256:c0061ab7f54a665b44c76ecfa735975cf664199fa909083e3e9a985fa509f046",
+  "writer": "IP-P3-K2 session (P3 pilot, item K2, 2026-11-03)",
+  "checker": "IP-P3-C2 session (P3 pilot, item C2)",
+  "sources_read": [
+    "[Tut] Gisselquist, Lesson 10: Adding a FIFO, ZipCPU tutorial: the text of all 61 slides, https://zipcpu.com/tutorial/lsn-10-fifo.pdf",
+    "[Blog] Gisselquist, Getting the basic FIFO right, ZipCPU blog, 2017: the whole article, https://zipcpu.com/blog/2017/07/29/fifo.html",
+    "[OT] lowRISC, OpenTitan hw/ip/prim/rtl/prim_fifo_sync.sv and prim_fifo_sync_cnt.sv (Apache 2.0): both whole files, master branch of https://github.com/lowRISC/opentitan",
+    "[LaF] LaForest, Pipeline FIFO Buffer, FPGA Design Elements (MIT): the whole page, https://fpgacpu.ca/fpga/Pipeline_FIFO_Buffer.html",
+    "[Rules] Gisselquist, AXI Handshaking Rules, ZipCPU blog, 2021: the whole article, https://zipcpu.com/blog/2021/08/28/axi-rules.html"
+  ],
+  "result": "every claim tagged with a source was found in that source, and every line marked inference is a fair reading of the source it names or the document's own reasoning",
+  "notes": [
+    "Write ready held low for the cycle after reset: prim_fifo_sync.sv sets under_rst during reset and clears it on the first clock after, and wready_o is not full and not under_rst.",
+    "The any-depth count, the wrap-bit full and empty tests and the count width of one more than the pointer are in prim_fifo_sync_cnt.sv (depth_o and its three cases); LaF keeps the same wrap-around bits and accepts any depth.",
+    "The older design that accepts a push when full together with a pop is the Next Verilog Cut in [Blog] (the write pointer moves when not full or when a read happens on the same clock); [OT] and [Tut] refuse it (ready, or w_wr, is not full).",
+    "A count off by one, or a cycle late: [Blog] says a registered pointer difference is always one clock out of date, and builds its registered count from accepted pushes and pops only, paying attention to full and empty when each request is made; a count that moves on a refused request is off by one.",
+    "The producer that needs room for data already on its way is the [Tut] closing question (stopping an upstream transmitter on a nearly full FIFO, since these things do not stop on a dime)."
+  ],
+  "checked_at": "2026-11-13"
+}
