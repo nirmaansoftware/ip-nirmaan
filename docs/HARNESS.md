@@ -82,8 +82,10 @@ one; otherwise it has none. Each group in `capability/levels.json` shows its
 
 - a group whose harness is not the current default is stale ("stale: the
   harness changed after these trials") and never counts, as a group whose skill
-  digest changed is stale. A run with `--attempts` or without knowledge is a
-  different harness, so it never pools with the default;
+  digest changed is stale. A run with `--attempts` (any value, even 1: the
+  override is recorded as given, since what it changes depends on the stage)
+  or without knowledge is a different harness, so it never pools with the
+  default;
 - a group with no harness ("harness not recorded") never counts. No live
   record exists yet (only replays, which never count), so nothing is lost.
 
