@@ -498,7 +498,11 @@ Rules:
     licences with a NOTICE entry, no GPL code and no CC-BY-SA text. Front
     matter: `sources` with an access type (open, purchasable; member-only
     fails), `licence_check`, `export_screen`, `as_of`, `review_by`, writer and
-    checker.
+    checker. (Note, 2026-11-13: by the founder's decision of 2026-10-30, in
+    "Founder decisions (2026-10-30)" below, the repository is all rights
+    reserved from that change on and no longer offered under Apache-2.0, so
+    what is merged since is not offered under it; versions published before
+    were. This note corrects that fact only; the proposed rules stand.)
 12. **Writing checks** extend to skill cards and knowledge documents: no em or en
     dashes; no level words ("expert", "industry level", "robust"); no readiness
     claims ("signoff clean", "timing closed", "tapeout ready", "foundry ready");
