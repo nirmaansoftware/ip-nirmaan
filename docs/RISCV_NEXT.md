@@ -186,7 +186,11 @@ uses, byte for byte, plus its `LICENSE`. A test pins every file's SHA-256 and
 license header. One of them, `serv_compdec.v` (the compressed decoder, unused
 here since `COMPRESSED=0` but instantiated in a generate branch Verilator
 still resolves), is adapted from lowRISC's Ibex and keeps Ibex's Apache-2.0
-header, the license of this repository.
+header; the license text is in `third_party/LICENSE-Apache-2.0.txt` and NOTICE
+lists the file. That is not the license of this repository, which is all
+rights reserved since the founder decision of 2026-10-30
+(`council/records/2026-10-18-capability-buildout.md`, "Founder decisions
+(2026-10-30)"; see `LICENSE`).
 
 **Why SERV, and not VexRiscv.** Both licenses are fine (ISC, MIT). SERV is
 Verilog source: what is vendored is what its author wrote and releases, about
