@@ -420,6 +420,9 @@ def test_ci_pipes_fail_and_live_eval_is_pinned_and_keeps_the_token_away():
     for block in ci.split("- name:")[1:]:
         if "| tail" in block:
             assert "set -o pipefail" in block, block.splitlines()[0]
+        if "set -o pipefail" in block:
+            # the container job's default sh is dash, which has no pipefail
+            assert "shell: bash" in block, block.splitlines()[0]
     live = (root / ".github" / "workflows" / "live-eval.yml").read_text()
     assert "uses: ./.github/actions/oss-cad-suite" in live and "oss-cad-suite-build/releases" not in live
     assert "npm install -g @anthropic-ai/claude-code@" in live
