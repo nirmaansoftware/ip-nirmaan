@@ -851,15 +851,24 @@ def test_a_pause_in_one_worker_starts_no_new_step(repo):
     r = repo()
     loop = r.loop()
     loop.o["github"] = type("G", (), {"list_open_pulls": lambda self: [{"number": n} for n in (1, 2, 3)]})()
-    first_done, seen = threading.Event(), []
+    # Pull request 2 is taken while 1 is still in its step (which worker takes
+    # which is the scheduler's choice), and 2's step ends only after the worker
+    # that paused has ended, so the halt is in force when 2's worker looks for
+    # more. Without this ordering the paused worker can halt the pass before
+    # the other worker takes 2, which the loop rightly allows.
+    first_started, second_started, seen, threads = threading.Event(), threading.Event(), [], {}
 
     def step(p):
         seen.append(p["number"])
+        threads[p["number"]] = threading.current_thread()
         if p["number"] == 1:
-            first_done.set()
+            first_started.set()
+            assert second_started.wait(10), "pull request 2 was taken while 1 was in its step"
             return {"outcome": "paused"}
-        first_done.wait(10)
-        time.sleep(0.2)  # the pause is in force before this worker looks for more
+        second_started.set()
+        assert first_started.wait(10)
+        threads[1].join(10)
+        assert not threads[1].is_alive(), "the worker that paused has ended"
         return {"outcome": "wait"}
     loop.step = step
     assert [x["outcome"] for x in loop.tick()] == ["paused", "wait"]
