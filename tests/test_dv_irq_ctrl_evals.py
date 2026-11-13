@@ -11,8 +11,8 @@ approved block, the interrupt controller in ``tests/fixtures/dv/irq_ctrl/``:
   fail against two specification mutants (a requirement added, one changed).
 
 Each request plans block-verification and its seat's packet, for the owner and
-the reviewer, carries every skill the case judges. Real-tool tests skip when an
-executable is absent (or fail when CI names it in NIRMAAN_REQUIRE_EDA).
+the reviewer, carries every skill the case judges. Real-tool tests need the
+simulators (``laws.needs``).
 """
 
 from __future__ import annotations
