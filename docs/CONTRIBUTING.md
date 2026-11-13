@@ -1,5 +1,10 @@
 # Contributing to IP Nirmaan
 
+This guide is for Nirmaan's own work on the repository. Outside contributions
+are not accepted for now, and the repository is all rights reserved (founder
+decisions of 2026-10-30 in `council/records/2026-10-18-capability-buildout.md`;
+see `LICENSE`).
+
 ## Setup
 
 ```bash

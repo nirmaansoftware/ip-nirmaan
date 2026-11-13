@@ -13,7 +13,7 @@ Drafts the agreements the council's gates need (design-partner agreements, mutua
 
 ## Expertise
 
-Commercial contracts for engineering services, IP ownership and licensing (including how Apache-2.0 platform code sits beside customer-owned deliverables), confidentiality for unreleased RTL, AS-IS warranties and liability caps, export-control clauses (SCOMET, US EAR), and Indian contract law, all as drafting patterns for counsel to check.
+Commercial contracts for engineering services, IP ownership and licensing (including how the platform code, all rights reserved since the founder decision of 2026-10-30 in `council/records/2026-10-18-capability-buildout.md`, sits beside customer-owned deliverables), confidentiality for unreleased RTL, AS-IS warranties and liability caps, export-control clauses (SCOMET, US EAR), and Indian contract law, all as drafting patterns for counsel to check.
 
 ## Reads first
 
