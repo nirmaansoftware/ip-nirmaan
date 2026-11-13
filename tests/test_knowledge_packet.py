@@ -22,6 +22,7 @@ from nirmaan.org import knowledge
 from nirmaan.orchestrator import Orchestrator
 from nirmaan.runtime import (Completion, ModelRuntime, RegistryLLM, ResultStatus, assemble, loop, render_work_prompt,
                              review_task, run_task)
+from nirmaan.runtime import harness
 from nirmaan.runtime.model import context_limit
 from nirmaan.runtime.selection import SelectingLLM, model_profiles
 
@@ -89,7 +90,7 @@ def test_every_workflow_seat_holds_a_full_domain_scope_within_its_model_context(
                 assert packet.domain.declines is None, (task.id, seat)
                 rendered = len(render_work_prompt(packet, mode).render())
                 # With the domain scope at its cap, the prompt still fits the default seat model.
-                assert rendered + knowledge.DOMAIN_CAP <= limit, (task.id, seat, rendered)
+                assert rendered + harness.DOMAIN_CAP <= limit, (task.id, seat, rendered)
                 seats += 1
     assert seats > 100
 
@@ -168,7 +169,7 @@ def test_the_rtl_design_document_reaches_every_rtl_case_and_each_feature_documen
             assert packet.domain.declines is None and "design/rtl_design" in refs, (case.id, seat)
             if case.id in FEATURE_DOCUMENTS:
                 assert refs == {"design/rtl_design"} | FEATURE_DOCUMENTS[case.id], (case.id, seat)
-                assert sum(len(texts[ref]) for ref in refs) <= knowledge.DOMAIN_CAP, case.id
+                assert sum(len(texts[ref]) for ref in refs) <= harness.DOMAIN_CAP, case.id
                 prompt = render_work_prompt(packet, mode).render()
                 assert all(f"Knowledge document {ref}" in prompt and texts[ref] in prompt for ref in refs)
 
@@ -184,7 +185,7 @@ def test_the_widest_pilot_block_carries_six_rtl_documents_within_the_domain_cap(
         packet = assemble(engine, rtl.id, role=seat)
         assert packet.domain.declines is None, seat
         assert {d.ref for d in packet.domain.documents} == expected, seat
-        assert sum(len(d.text) for d in packet.domain.documents) <= knowledge.DOMAIN_CAP
+        assert sum(len(d.text) for d in packet.domain.documents) <= harness.DOMAIN_CAP
 
 
 def test_a_document_no_skill_cites_never_reaches_a_prompt(root, nirmaan_org, fixed_clock):
@@ -196,7 +197,7 @@ def test_a_document_no_skill_cites_never_reaches_a_prompt(root, nirmaan_org, fix
 
 
 def test_over_the_domain_cap_the_seat_declines_and_nothing_is_cut(root, fixed_clock):
-    _write(root, REF, MARKER + "x" * knowledge.DOMAIN_CAP)
+    _write(root, REF, MARKER + "x" * harness.DOMAIN_CAP)
     engine = Orchestrator(_org_citing(), clock=fixed_clock).plan(REQUEST)
     task = _task(engine, "requirements")
     packet = assemble(engine, task)
@@ -211,7 +212,7 @@ def test_over_the_domain_cap_the_seat_declines_and_nothing_is_cut(root, fixed_cl
 
 
 def test_at_the_domain_cap_the_document_is_carried_whole(root, fixed_clock):
-    text = MARKER + "y" * (knowledge.DOMAIN_CAP - len(MARKER))
+    text = MARKER + "y" * (harness.DOMAIN_CAP - len(MARKER))
     _write(root, REF, text)
     engine = Orchestrator(_org_citing(), clock=fixed_clock).plan(REQUEST)
     packet = assemble(engine, _task(engine, "requirements"))

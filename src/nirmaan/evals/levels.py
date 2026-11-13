@@ -10,13 +10,15 @@ fails when the committed file differs from what the records give.
   names it by its current sha256, with a checker who is not the writer and the
   sources the checker read. A document changed since its check is stale.
 * **Practised**: committed, tool-judged eval result records under
-  ``evals/results/`` (M45, M58), counted per model and per skill digest (card
-  plus document). Only a case's own ``skills`` get credit. A group counts when
+  ``evals/results/`` (M45, M58), counted per model, per skill digest (card
+  plus document) and per harness (M73, ``docs/HARNESS.md``). Only a case's own ``skills`` get credit. A group counts when
   it has at least ``MIN_TRIALS`` trials, a 95 percent Wilson lower bound of at
   least ``MIN_LOWER``, a clean re-judge of every trial (``rejudge.json`` in the
   record, written by ``nirmaan eval rejudge --write``), and, for a design or
   verification skill, a must-fail control in every case it rests on. A group
-  whose digest is not the skill's current one is stale and never counts.
+  whose digest is not the skill's current one is stale and never counts, and
+  so is a group whose harness is not the current one; a trial that records no
+  harness (a record written before M73) never counts.
   Replays and attested trials are refused (``load_evidence``); a trial judged
   by anything but a tool is listed apart and never counts. A trial run without
   knowledge documents (M67, the ablation: ``knowledge: off`` in its run
@@ -42,6 +44,7 @@ from nirmaan.evals.scorers import scorer_spec
 from nirmaan.models import EvalCase
 from nirmaan.org import Organization
 from nirmaan.org.knowledge_files import check_document
+from nirmaan.runtime.harness import harness_sha256
 
 FORMAT = "nirmaan.capability-levels"
 KNOWLEDGE_CHECK_FORMAT = "nirmaan.knowledge-check"
@@ -123,6 +126,12 @@ def _must_fail(case: EvalCase) -> bool:
     return any(check.mutants for check in case.held_out)
 
 
+def _harness(trial) -> str | None:
+    """The harness a trial records (M73): on its result and on every answer alike, else None."""
+    recorded = trial.result.harness
+    return recorded if all(a.harness == recorded for a in trial.answers) else None
+
+
 def _rejudged(record_dir: Path) -> dict[tuple[str, int], bool]:
     path = record_dir / REJUDGE
     if not path.is_file():
@@ -138,9 +147,9 @@ def _rejudged(record_dir: Path) -> dict[tuple[str, int], bool]:
 
 def practised(org: Organization, repo: Path,
               cases: dict[str, EvalCase]) -> tuple[dict[str, list], list[str], list, list]:
-    """Per skill, every (model, digest) group of tool-judged trials; the refused records; trials not
+    """Per skill, every (model, digest, harness) group of tool-judged trials; the refused records; trials not
     tool-judged; trials run without knowledge documents (M67), which never count."""
-    groups: dict[tuple[str, str | None, str | None], dict[str, Any]] = {}
+    groups: dict[tuple[str, str | None, str | None, str | None], dict[str, Any]] = {}
     refused: list[str] = []
     not_tool_judged: list[dict[str, Any]] = []
     without_knowledge: list[dict[str, Any]] = []
@@ -169,7 +178,7 @@ def practised(org: Organization, repo: Path,
                                         "passed": trial.result.passed})
                 continue
             for skill in case.skills:  # only the skills the case names get credit
-                key = (skill, trial.model, trial.skills.get(skill))
+                key = (skill, trial.model, trial.skills.get(skill), _harness(trial))
                 g = groups.setdefault(key, {"n": 0, "passed": 0, "records": set(), "cases": set(),
                                             "unrejudged": 0, "no_must_fail": set()})
                 g["n"] += 1
@@ -181,7 +190,8 @@ def practised(org: Organization, repo: Path,
                 if not _must_fail(case):
                     g["no_must_fail"].add(case.id)
     out: dict[str, list] = defaultdict(list)
-    for (skill, model, digest), g in sorted(groups.items(), key=lambda kv: tuple(str(x) for x in kv[0])):
+    current_harness = harness_sha256()  # M73: the current harness, with no run options
+    for (skill, model, digest, recorded), g in sorted(groups.items(), key=lambda kv: tuple(str(x) for x in kv[0])):
         low = (wilson(g["passed"], g["n"]) or (0.0, 0.0))[0]
         current = skill_digest(org, skill, repo) if skill in org.skills else None
         reasons = []
@@ -189,6 +199,10 @@ def practised(org: Organization, repo: Path,
             reasons.append("the skill is not in the catalog")
         if digest != current:
             reasons.append("stale: the skill card or document changed after these trials")
+        if recorded is None:
+            reasons.append("harness not recorded: the trials carry no harness, or their answers disagree")
+        elif recorded != current_harness:
+            reasons.append("stale: the harness changed after these trials (docs/HARNESS.md)")
         if model is None:
             reasons.append("no model is recorded")
         if g["n"] < MIN_TRIALS:
@@ -199,7 +213,7 @@ def practised(org: Organization, repo: Path,
             reasons.append(f"{g['unrejudged']} trials without a clean re-judge")
         if skill in org.skills and org.skills[skill].domain in MUST_FAIL_DOMAINS and g["no_must_fail"]:
             reasons.append(f"no must-fail control in {', '.join(sorted(g['no_must_fail']))}")
-        out[skill].append({"model": model, "digest": digest, "n": g["n"], "passed": g["passed"],
+        out[skill].append({"model": model, "digest": digest, "harness": recorded, "n": g["n"], "passed": g["passed"],
                            "lower": round(low, 4), "records": sorted(g["records"]), "cases": sorted(g["cases"]),
                            "counts": not reasons, "reasons": reasons})
     return dict(out), refused, not_tool_judged, without_knowledge
