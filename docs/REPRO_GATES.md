@@ -161,5 +161,8 @@ does not reproduce beside one that does, stopped.
 - `log_analysis` on the triage seat: it is credited only with a repro
   must-fail (wave 2 plan), which W2-E4's cases give.
 
+`runtime/model.py` and `evals/runner.py` are harness code (M73, `docs/HARNESS.md`), so the harness
+fingerprint changes; no trial is recorded, so no level goes stale.
+
 Counts: tools `AVAILABLE` 36 to 37 (`scripts/status.py --write`); no new
 skill, workflow, unit or principle.

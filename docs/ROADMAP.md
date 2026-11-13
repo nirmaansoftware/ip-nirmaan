@@ -122,6 +122,7 @@ new number. M1 to M42 are taken; see `docs/history/README.md`.
 | M67 | Evals without knowledge documents: the ablation switch | reserved |
 | M68 | Block verification: a workflow with DV gates over an existing block's RTL | reserved |
 | M71 | Repro gates: triage and root cause reproduce the failure on the handed-over RTL | reserved |
+| M73 | The harness in one place, and its fingerprint on every trial | reserved |
 
 <!-- review:milestone-numbers:end -->
 

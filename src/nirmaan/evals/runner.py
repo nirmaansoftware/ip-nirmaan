@@ -50,6 +50,7 @@ from nirmaan.orchestrator import Orchestrator
 from nirmaan.org import Organization
 from nirmaan.runtime import AgentRuntime, Completion, ModelRuntime, ToolBroker, ToolHandle, WorkPrompt, run_task
 from nirmaan.runtime.files import write_file
+from nirmaan.runtime.harness import harness_sha256
 from nirmaan.work import PolicyViolationError, ProjectStore, TaskEngine, WorkError, verify_chain
 from nirmaan.work.policy import unsatisfied_requirements
 
@@ -224,6 +225,7 @@ def evaluate(org: Organization, case: EvalCase, seat_runtime: AgentRuntime, *, r
     """``run_case`` with the runtime given and the replay flag stated, returning the sandbox engine too (M45).
 
     ``knowledge=False`` (M67, the ablation) seats the runtime with packets that carry no knowledge documents.
+    The result records the harness it ran in (M73): ``harness_sha256`` with this ``attempts`` and ``knowledge``.
     """
     problems = validate_case(org, case, repo)
     if problems:
@@ -265,6 +267,7 @@ def evaluate(org: Organization, case: EvalCase, seat_runtime: AgentRuntime, *, r
                            if e.task == seat.id and e.kind is EvidenceKind.HUMAN_ATTESTATION),
         model_calls=spend.calls, input_tokens=spend.input_tokens, output_tokens=spend.output_tokens,
         cost_usd=None if spend.unknown_cost_calls else spend.cost_usd,
+        harness=harness_sha256(attempts=attempts, knowledge=knowledge),
     ), engine
 
 
