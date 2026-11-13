@@ -57,8 +57,9 @@ every reason it does not count.
 differs from what the records give. `tests/test_capability_levels.py` runs the
 check, so a record committed without regenerating the file fails CI.
 
-On main the file reports three Knowledge (`apb`, `arbitration` and
-`rtl_design`, each from its check record under
+On main the file reports eight Knowledge (`apb`, `arbitration`, `axi`,
+`buffering_flow_control`, `control_logic_design`, `fsm_design`,
+`pipeline_design` and `rtl_design`, each from its check record under
 `capability/records/knowledge/`), zero Practised and zero Proven: no result
 record is committed.
 

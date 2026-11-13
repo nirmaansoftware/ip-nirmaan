@@ -10,7 +10,7 @@ sources:
   - open | Gisselquist, axil2apb.v, an AXI-Lite to APB bridge with its proof, WB2AXIP (Apache 2.0) [A2APB] | https://github.com/ZipCPU/wb2axip/blob/master/rtl/axil2apb.v
 licence_check: original writing that summarises and cites; no text, table, figure or code copied from any source; the Arm AXI specification is not a source here (it comes under a licence accepted by use)
 export_screen: clear
-writer: IP-P3-K1 session (P3 pilot, item K1, 2026-10-31)
+writer: IP-P3-K1F session (P3 pilot, fix to the Channels line found by P3-C1, 2026-11-13), revising the IP-P3-K1 session's first version
 checker: pending, a different session reads the sources in P3-C1 and writes the check record
 ---
 Knowledge only: no tool run backs this.
@@ -30,9 +30,13 @@ it is more precise than this page.
 AXI has five channels: write address (AW), write data (W), write response
 (B), read address (AR) and read data (R) [Props]. Each has a VALID from the
 side that sends and a READY from the side that receives [Easy] [Props].
-AXI-Lite carries one data item per request and has no bursts, IDs, locking,
-quality of service or cache signals [Props]; it also has no size signal, so
-`WSTRB` is the only way to write part of a word [Easy].
+AXI-Lite carries one data item per request and has no bursts, IDs, locking
+or quality of service guarantees [Props]; it also has no size signal, so
+`WSTRB` is the only way to write part of a word [Easy]. Nothing obliges an
+AXI-Lite design to implement a cache protocol, but cache signals can still be
+present: some implementations put cache flags on the address request, and the
+property set takes `awcache` and `arcache` inputs next to `awprot` and
+`arprot` [Props].
 
 ## Handshake rules
 

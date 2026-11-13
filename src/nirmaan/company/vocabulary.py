@@ -31,6 +31,12 @@ INTENTS: list[IntentRule] = [
     IntentRule(intent="rtl_change", priority=45, description="Change RTL.",
                patterns=(r"\b(rtl|design) (change|fix|update|modification)\b", r"\bmodify\b.*\brtl\b",
                          r"\bfix\b.*\b(bug|rtl)\b")),
+    # M68: verify a block that already exists (its RTL handed over): only when the request starts with the
+    # verification verb, so a request that builds or changes something and also verifies it keeps its intent.
+    IntentRule(intent="block_verification", priority=47, description="Verify an existing block's RTL.",
+               patterns=(r"^\W*(please\s+)?(formally\s+)?verify\b",
+                         r"^\W*(please\s+)?write\s+(an?\s+|the\s+)?(self-checking\s+)?"
+                         r"(testbench|tests|assertions|properties|formal (proof|properties))\s+for\b")),
     IntentRule(intent="physical_implementation", priority=50, description="Take a netlist to layout.",
                patterns=(r"\bplace[- ]and[- ]route\b", r"\bp&r\b", r"\bpnr\b",
                          r"\bphysical (design|implementation)\b")),
@@ -72,6 +78,18 @@ FEATURES: list[FeatureRule] = [
                 description="General-purpose I/O (M66)"),
     FeatureRule(feature="register_slice", patterns=(r"\bskid[- ]buffers?\b", r"\bregister slices?\b"),
                 description="A skid buffer or register slice on a valid/ready path (M66)"),
+    # M68: what a block-verification request asks of its DV seats. No routing context of their own: they
+    # refine block-verification's testbench and proof tasks, or plan its coverage and equivalence stages
+    # (docs/BLOCK_VERIFICATION.md), and no other workflow reads them.
+    FeatureRule(feature="systemverilog", patterns=(r"\bsystem[- ]?verilog\b",),
+                description="A testbench in SystemVerilog, not plain Verilog (M68)"),
+    FeatureRule(feature="random_stimulus", patterns=(r"\b(constrained[- ])?random(i[sz]ed)?\b",),
+                description="Seeded random stimulus in the testbench (M68)"),
+    FeatureRule(feature="unbounded_proof", patterns=(r"\bunbounded\b", r"\b(k-?)?induction\b"),
+                description="A proof for all depths, not a bounded check (M68)"),
+    FeatureRule(feature="coverage", patterns=(r"\bcoverage\b",), description="Measured coverage (M68)"),
+    FeatureRule(feature="equivalence", patterns=(r"\bequivalen(ce|t)\b",),
+                description="An equivalence check between two versions of the RTL (M68)"),
     FeatureRule(feature="multi_port", skills=("buffering_flow_control", "arbitration"), patterns=(r"\b\d+[- ]port\b", r"\bmulti[- ]?port\b")),
     FeatureRule(feature="configurable", patterns=(r"\bconfigurable\b", r"\bparameteri[sz]\w*")),
     FeatureRule(feature="cdc", skills=("cdc_design", "cdc_verification"), patterns=(r"\bcdc\b", r"\bclock[- ]domains?\b", r"\basync\w*\b",

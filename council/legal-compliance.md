@@ -13,7 +13,7 @@ Flags legal risk for qualified counsel to review: licences, specifications, expo
 
 ## Expertise
 
-Open-source licensing (the code is Apache-2.0), protocol specification terms, export control, customer design confidentiality and NDAs, India's DPDP Act, claims on public pages.
+Licensing: the repository is all rights reserved (founder decision 2026-10-30, `council/records/2026-10-18-capability-buildout.md`, "Founder decisions (2026-10-30)"; earlier versions were offered under Apache-2.0), and the open-source licences of the third-party code it vendors (NOTICE); protocol specification terms, export control, customer design confidentiality and NDAs, India's DPDP Act, claims on public pages.
 
 ## Reads first
 
