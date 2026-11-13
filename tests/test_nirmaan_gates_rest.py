@@ -100,7 +100,11 @@ def test_every_stage_that_produces_rtl_is_gated():
 
     ungated = [(wf.id, st.id) for wf in WORKFLOWS for st in wf.stages
                if "rtl_source" in st.outputs and st.evidence[1:1 + len(RTL_GATES)] != RTL_GATES]  # M41: extras after
-    assert ungated == []
+    # M68: block-verification's design-under-test writes no RTL: it records the existing RTL as handed over, with
+    # no testbench of its own, and every check of that workflow then runs over it (tests/test_block_verification.py).
+    assert ungated == [("block-verification", "design-under-test")]
+    handed_over = next(wf for wf in WORKFLOWS if wf.id == "block-verification").stage("design-under-test")
+    assert handed_over.outputs == ("rtl_source",) and handed_over.review is not None
 
 
 def test_the_cdc_seat_builds_on_approved_inputs_and_may_run_the_checks(nirmaan_org):

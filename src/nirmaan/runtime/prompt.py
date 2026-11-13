@@ -219,6 +219,10 @@ def _task(packet: WorkPacket, mode: str, cites: list[Citable], tools: tuple[Tool
         if upstream:
             tools_named += (f", with the approved {', '.join(upstream)}" if kinds
                             else f"; run by the platform over the approved {', '.join(upstream)}")
+        beside = dict.fromkeys(k for b in req.files if b.beside for k in b.kinds)
+        if beside:  # M68: name them as files in your own folder
+            tools_named += (f"; the approved {', '.join(beside)} files are placed beside your files under their "
+                            "own names: refer to them by name and do not write files with those names")
         if req.before_review:
             tools_named += "; must be met before review"
         for said in describe(req.when):  # M48: each clause in its kind's words

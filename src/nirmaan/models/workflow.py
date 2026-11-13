@@ -56,6 +56,17 @@ class FileInput(BaseModel):
                     "When one exists, a passing run must still have used it. Per parameter, not a condition on "
                     "the requirement; decided by the one evaluator over the available inputs (M48).",
     )
+    beside: bool = Field(
+        default=False,
+        description="An upstream input also linked beside the task's own files under its own name (M68), so a "
+                    "setup that names it relative to itself (a .sby's [files]) reads the approved file itself.",
+    )
+
+    @model_validator(mode="after")
+    def _beside_is_upstream(self) -> "FileInput":
+        if self.beside and not self.upstream:
+            raise ValueError(f"{self.param}: only an upstream input can be placed beside the task's own files")
+        return self
 
 
 class ConditionPhase(str, Enum):

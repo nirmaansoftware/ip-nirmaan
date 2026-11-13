@@ -1443,3 +1443,53 @@ intent=timing_closure features=timer workflows=timing-closure
     * Timing report with failing paths | accepts=tool_run,human_attestation | tools=sta.run | applies always
 - ws.fix [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
 - ws.implementation [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+
+## Verify the existing interrupt controller RTL.
+intent=block_verification features=existing_design,interrupts workflows=block-verification
+- assertions-formal [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * The seat's properties are proven on the approved RTL | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source[upstream][beside] sources<-assertions | fixed=proven>=1 | applies always
+    * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source[upstream][beside] sources<-assertions | applies always
+- design-under-test [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- dv-plan [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * The plan covers every requirement of the approved interface spec | accepts=tool_run | tools=vplan.check | before-review | files=plan<-verification_plan spec<-interface_spec[upstream] | applies always
+- interface-spec [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- program [program] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- testbench [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * The seat's testbench passes on the approved RTL | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source[upstream] sources<-testbench top<-testbench[entry] | applies always
+- ws.architecture [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.formal [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.rtl [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.verification [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+
+## Formally verify the existing CRC block RTL with an unbounded proof, a constrained-random SystemVerilog testbench, coverage and an equivalence check.
+intent=block_verification features=coverage,equivalence,existing_design,random_stimulus,systemverilog,unbounded_proof workflows=block-verification
+- assertions-formal [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * The seat's properties are proven on the approved RTL | accepts=tool_run | tools=formal.run | before-review | files=sby<-formal_spec sources<-rtl_source[upstream][beside] sources<-assertions | fixed=proven>=1 | applies always
+    * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source[upstream][beside] sources<-assertions | applies always
+- coverage [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Coverage of the testbench on the approved RTL | accepts=tool_run,veritriage_session,human_attestation | tools=coverage.read,veritriage.investigate | applies always
+- design-under-test [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- dv-plan [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * The plan covers every requirement of the approved interface spec | accepts=tool_run | tools=vplan.check | before-review | files=plan<-verification_plan spec<-interface_spec[upstream] | applies always
+- equivalence [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * Equivalence result with the compared versions named | accepts=tool_run,human_attestation | tools=equivalence.run | applies always
+- interface-spec [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+- program [program] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- testbench [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+    * Independent review recorded | accepts=review_record | tools=- | applies always
+    * The seat's testbench passes on the approved RTL | accepts=tool_run | tools=simulator.run | before-review | files=sources<-rtl_source[upstream] sources<-testbench top<-testbench[entry] | applies always
+- ws.architecture [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.formal [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.rtl [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
+- ws.verification [workstream] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
