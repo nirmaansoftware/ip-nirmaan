@@ -556,7 +556,9 @@ def test_the_shipped_cases_name_the_skills_they_judge(nirmaan_org):
     named = {c.id: c.skills for c in load_cases(EVALS)}
     assert named == {
         "dv/directed-irq-ctrl": ("directed_testing", "systemverilog"),
+        "dv/formal-credit-counter": ("formal_verification", "sva", "assertion_coverage"),
         "dv/plan-irq-ctrl": ("verification_planning",),
+        "dv/prove-deep-counter": ("model_checking",),
         "firmware/axi4-lite-driver": ("device_drivers",),
         "rtl/apb-gpio": ("rtl_design", "apb", "control_logic_design"),
         "rtl/apb-regs": ("rtl_design", "apb"),

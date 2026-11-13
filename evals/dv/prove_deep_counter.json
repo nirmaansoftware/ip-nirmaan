@@ -1,0 +1,42 @@
+{
+  "id": "dv/prove-deep-counter",
+  "request": "Formally verify the existing deep counter RTL with an unbounded proof.",
+  "seat": "assertions-formal",
+  "skills": ["model_checking"],
+  "expected_behavior": "A property file and a single-task SymbiYosys setup for the approved deep_counter RTL (count 0 to LIMIT, default 99, with enable, synchronous clear and a carry out on the wrapping cycle), written from the approved interface specification, whose properties are inductive, so a prove-mode run (k-induction) proves them for every cycle with a short unrolling and reaches every cover, and that fails on RTL that goes wrong only 64 or more cycles after reset.",
+  "constraints": [
+    "Work only from the approved interface specification and the approved RTL; never change the RTL or ship a file of the same name.",
+    "Prove in prove mode at the default LIMIT; a bounded model check is not a proof, and its gate refuses it.",
+    "Use the SVA subset open Yosys reads: immediate assertions, assumptions and covers in always blocks, with $past; no implication or sequence operators."
+  ],
+  "known_failure_modes": [
+    "A bounded check (mode bmc) a few dozen cycles deep: it never sees a wrap or the top bit, so every mutant here passes it; the proof gate refuses it because nothing is proven.",
+    "Properties that are true but not inductive, so induction fails on the approved RTL and the proof never reaches review.",
+    "Properties that only bound the count (never above LIMIT), so a count that loses its carry into the top bit, and stays in range, passes.",
+    "A proof whose unrolling is deep enough to reach a wrap but whose covers or assumptions stop the counter from counting.",
+    "A proof that cannot tell a lost carry, a compare that ignores bit 0, a wrap to 1 or a count that stops at LIMIT from the approved RTL; the must-fail control fails it."
+  ],
+  "upstream": {
+    "interface-spec": [{"path": "tests/fixtures/dv/deep_counter/interface_spec.md", "kind": "interface_spec"}],
+    "design-under-test": [{"path": "tests/fixtures/dv/deep_counter/deep_counter.v", "kind": "rtl_source", "entry": "deep_counter"}]
+  },
+  "reference": [
+    {"path": "tests/fixtures/dv/deep_counter/deep_counter_check.sv", "kind": "assertions"},
+    {"path": "tests/fixtures/dv/deep_counter/deep_counter_check.sby", "kind": "formal_spec"}
+  ],
+  "held_out": [
+    {
+      "name": "The seat's proof passes the approved RTL with every cover reached and fails each deep counter mutant",
+      "scorer": "must-fail",
+      "tool": "formal.run",
+      "cover_tool": "formal.cover",
+      "seat_files": {"sby": ["formal_spec"], "sources": ["assertions"]},
+      "case_files": {"sources": ["tests/fixtures/dv/deep_counter/deep_counter.v"]},
+      "mutants": {"tests/fixtures/dv/deep_counter/deep_counter.v": [
+        "tests/fixtures/dv/deep_counter/mutants/deep_counter_carry_lost.v",
+        "tests/fixtures/dv/deep_counter/mutants/deep_counter_last_low_bits.v",
+        "tests/fixtures/dv/deep_counter/mutants/deep_counter_wrap_to_one.v",
+        "tests/fixtures/dv/deep_counter/mutants/deep_counter_saturates.v"]}
+    }
+  ]
+}
