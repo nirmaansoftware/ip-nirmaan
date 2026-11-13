@@ -3,13 +3,15 @@
 Council record 2026-10-17 (teams and the PR review mechanism), rollout R5. How
 it runs: docs/REVIEW_MECHANISM.md. The skill that calls it:
 .claude/skills/pr-review/SKILL.md. The same mechanism runs in Nirmaan
-(.github/scripts/pr-review/review.mjs); both share one lock, so only one
-review runs at a time across the two repositories.
+(.github/scripts/pr-review/review.mjs); both share the model slots
+(CONFIG model_cap, 2), so at most that many model calls run at once across the
+two repositories.
 
 In order, and fail closed at every step (pending or failure, never success):
 
-1. Holds the shared lock (NIRMAAN_REVIEW_STATE_DIR, default ~/.nirmaan/pr-review)
-   only around each model call; held elsewhere at a call, the run ends busy.
+1. Holds one of the shared model slots (NIRMAAN_REVIEW_STATE_DIR, default
+   ~/.nirmaan/pr-review) only around each model call; none free at a call, the
+   run ends busy.
 2. Reads the pull request: open, targets main, a branch in this repository,
    an allowed author. Otherwise it refuses and posts nothing.
 3. Fetches main and the head, checks the fetched head is the pull request's
@@ -48,8 +50,9 @@ token (APP_ENV below). Without it, the caller's gh login posts comments and
 commit statuses named dry-run/<check>, which are never green.
 
 Usage: python scripts/pr_review.py <pr-number> [--no-post] [--fresh]
-Exit: 0 reviewed and posted (any verdict), 2 setup error, 3 another review
-holds the lock, 4 refused, 5 the head moved (nothing posted).
+Exit: 0 reviewed and posted (any verdict), 2 setup error, 3 every model slot
+is held elsewhere (or the loop's rate-limit pause began), 4 refused, 5 the head
+moved (nothing posted).
 """
 
 from __future__ import annotations
@@ -63,6 +66,7 @@ import secrets
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import unicodedata
 import urllib.parse
@@ -106,6 +110,10 @@ CONFIG = {
     # as the per-team calls (docs/REVIEW_CALIBRATION.md); a change back is a
     # calibration rerun first (decision 6, rerun rule).
     "composite_key1": True,
+    # Model slots shared with the Nirmaan loop (its model_cap): at most this
+    # many model calls run at once across both repositories. Slot 0 is the
+    # shared review.lock, slot 1 model-slot-1.lock.
+    "model_cap": 2,
 }
 
 # Environment variables the review App (tracker T21) provides.
@@ -130,7 +138,9 @@ PROXY_KEYS = VERDICT_KEYS | {"founder_reasons"}
 PROXY_DELEGATION = "Founder Proxy (agent), acting under the founder's delegation of 2026-10-18; not the founder"
 # A plan's session limit ("You've hit your session limit · resets 10pm") is a
 # rate limit too: claude reports it with subtype "success" and is_error set.
-RATE_LIMIT = re.compile(r"rate.?limit|usage limit|session limit|weekly limit|hit your limit|too many requests|\b429\b|overloaded|limit reached|try again later", re.I)
+# The plan's limits come in several wordings ("You've hit your 5-hour limit",
+# "hit your weekly limit", "hit your limit"), all a rate limit.
+RATE_LIMIT = re.compile(r"rate.?limit|usage limit|session limit|weekly limit|hit your (?:[\w-]+ ){0,3}limit|too many requests|\b429\b|overloaded|limit reached|try again later", re.I)
 
 VERDICT_SCHEMA = {
     "type": "object",
@@ -188,11 +198,15 @@ class HeadMoved(Exception):
 
 
 class LockBusy(Exception):
-    """The shared lock is held elsewhere when a model call is due."""
+    """Every model slot is held elsewhere when a model call is due."""
 
     def __init__(self, holder):
         super().__init__("another review holds the lock")
         self.holder = holder
+
+
+class Paused(Exception):
+    """The caller's gate (the loop's rate-limit pause) says no model call now."""
 
 
 # --- Spec sections ----------------------------------------------------------------
@@ -783,6 +797,20 @@ def acquire_lock(state_dir: Path, owner: dict, stale_s: float = OWNERLESS_LOCK_S
     return None, None
 
 
+def acquire_slot(state_dir: Path, owner: dict, cap: int = 1):
+    """One of `cap` model slots shared by both repositories' loops (the same
+    folders as Nirmaan's acquireSlot): slot 0 is the shared review.lock, slot
+    n is model-slot-<n>.lock. This script tries review.lock first and the
+    Nirmaan loop tries its other slots first, so the two rarely meet. Every
+    acquire is a try, never a wait. Returns a release function or the holder."""
+    held = None
+    for i in range(max(1, int(cap))):
+        release, held = acquire_lock(state_dir, owner, name="review.lock" if i == 0 else f"model-slot-{i}.lock")
+        if release is not None:
+            return release, None
+    return None, held
+
+
 def _pid_alive(pid: int) -> bool:
     try:
         os.kill(pid, 0)
@@ -807,10 +835,14 @@ def severity_counts(findings: list[dict]) -> dict:
     return {s: sum(1 for f in findings if f.get("severity") == s) for s in SEVERITIES}
 
 
+_LOG_LOCK = threading.Lock()
+
+
 def log_call(state_dir: Path, record: dict):
     state_dir.mkdir(parents=True, exist_ok=True)
-    with open(state_dir / "calls.jsonl", "a", encoding="utf-8") as handle:
-        handle.write(json.dumps({"time": _now(), **record}) + "\n")
+    line = json.dumps({"time": _now(), **record}) + "\n"
+    with _LOG_LOCK, open(state_dir / "calls.jsonl", "a", encoding="utf-8") as handle:
+        handle.write(line)
 
 
 # --- The reviewer process --------------------------------------------------------------
@@ -1004,9 +1036,19 @@ class GitHub:
 # --- The review ----------------------------------------------------------------------
 
 
+# The loop steps two pull requests at once in one process: the git commands
+# that write shared refs or worktree records in the one clone run one at a time.
+_GIT_SERIAL = threading.Lock()
+
+
 def _git(repo_root, *args) -> str:
-    return subprocess.run(["git", "-c", "core.hooksPath=/dev/null", *args], cwd=repo_root, check=True,
-                          capture_output=True, text=True).stdout
+    def run():
+        return subprocess.run(["git", "-c", "core.hooksPath=/dev/null", *args], cwd=repo_root, check=True,
+                              capture_output=True, text=True).stdout
+    if args and args[0] in ("fetch", "worktree"):
+        with _GIT_SERIAL:
+            return run()
+    return run()
 
 
 def defaults(env=None) -> dict:
@@ -1024,10 +1066,13 @@ def defaults(env=None) -> dict:
 
 def run_review(repo_root, pr: int, github, post: str, claude_bin: str, state_dir: Path, models: dict,
                timeout_s: float, backoff_s: float, config: dict = CONFIG, fresh: bool = False,
-               caller_branch: str | None = None, in_claude_session: bool = False, sleep=time.sleep, out=print) -> dict:
-    """The whole review. `post` is "app", "dry-run" or "none". The shared lock
-    is held only around each model call: when it is held elsewhere at a call, the run ends
-    with EXIT_BUSY, and the next run reuses the verdicts already cached."""
+               caller_branch: str | None = None, in_claude_session: bool = False, sleep=time.sleep, out=print,
+               gate=None) -> dict:
+    """The whole review. `post` is "app", "dry-run" or "none". A model slot
+    is held only around each model call: when none is free at a call, the run ends
+    with EXIT_BUSY, and the next run reuses the verdicts already cached.
+    `gate()` (the loop's rate-limit pause) is asked before each model call; a
+    reason back ends the run the same way, with "paused" set to it."""
     cfg = config
     state_dir = Path(state_dir)
     worktrees: list[str] = []
@@ -1035,7 +1080,7 @@ def run_review(repo_root, pr: int, github, post: str, claude_bin: str, state_dir
     posted: list[dict] = []
     try:
         return _review(repo_root, pr, github, post, claude_bin, state_dir, models, timeout_s, backoff_s, cfg, fresh,
-                       caller_branch, in_claude_session, sleep, out, worktrees, posted, roots)
+                       caller_branch, in_claude_session, sleep, out, worktrees, posted, roots, gate)
     except HeadMoved as exc:
         out(f"pr-review: {exc}. Nothing more was posted; run again on the new head.")
         return {"exit": EXIT_HEAD_MOVED, "posted": posted}
@@ -1044,6 +1089,9 @@ def run_review(repo_root, pr: int, github, post: str, claude_bin: str, state_dir
         who = f"{holder.get('repo')} #{holder.get('pr')}, pid {holder.get('pid')}" if holder else "unknown holder"
         out(f"pr-review: another review holds the lock ({who}). Try again when it finishes; verdicts so far are cached.")
         return {"exit": EXIT_BUSY, "posted": posted}
+    except Paused as exc:
+        out(f"pr-review: no model call: {exc}. Verdicts so far are cached.")
+        return {"exit": EXIT_BUSY, "paused": str(exc), "posted": posted}
     finally:
         for d in worktrees:
             try:
@@ -1060,7 +1108,7 @@ def run_review(repo_root, pr: int, github, post: str, claude_bin: str, state_dir
 
 
 def _review(repo_root, pr, github, post, claude_bin, state_dir, models, timeout_s, backoff_s, cfg, fresh,
-            caller_branch, in_claude_session, sleep, out, worktrees, posted, roots):
+            caller_branch, in_claude_session, sleep, out, worktrees, posted, roots, gate=None):
     pull = github.get_pull(pr)
 
     def refuse(why):
@@ -1273,6 +1321,12 @@ def _review(repo_root, pr, github, post, claude_bin, state_dir, models, timeout_
     common = {**ctx, "ci": ci, "files": files, "diff": diff}
     cache_dir = state_dir / "verdicts" / cfg["repo"].replace("/", "_") / f"pr-{pr}"
 
+    def take_slot(key):
+        why = gate() if gate else None
+        if why:
+            raise Paused(why)
+        return acquire_slot(state_dir, {"repo": cfg["repo"], "pr": pr, "key": key}, cfg.get("model_cap", 1))
+
     def review(key, team, lead, model, system, user, composite=None):
         # The Founder Proxy is key "proxy" here: same cache, retry, validation and log.
         # `composite` names the checklists a composite key-1 call loaded.
@@ -1290,8 +1344,8 @@ def _review(repo_root, pr, github, post, claude_bin, state_dir, models, timeout_
         for attempt in (1, 2):
             if attempt == 2:
                 sleep(backoff_s)
-            # The shared lock, only around the model call itself.
-            release, holder = acquire_lock(state_dir, {"repo": cfg["repo"], "pr": pr, "key": key})
+            # A model slot, only around the model call itself.
+            release, holder = take_slot(key)
             if release is None:
                 raise LockBusy(holder)
             try:
@@ -1341,7 +1395,7 @@ def _review(repo_root, pr, github, post, claude_bin, state_dir, models, timeout_
                            f"{error}\n\nReturn the verdict \"{asked}\" as ONE JSON object, keeping every blocker, critical "
                            "and major finding, with every finding citing a file and line that exist at the head commit (or "
                            "\"main:<path>\" for a line on main). Change nothing else.")
-            release, holder = acquire_lock(state_dir, {"repo": cfg["repo"], "pr": pr, "key": key})
+            release, holder = take_slot(key)
             if release is None:
                 raise LockBusy(holder)
             try:

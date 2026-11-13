@@ -13,6 +13,10 @@ import shutil
 import stat
 import subprocess
 import sys
+import threading
+import time
+import urllib.error
+from http.client import RemoteDisconnected
 from pathlib import Path
 
 import pytest
@@ -30,6 +34,8 @@ CONFIG = pr_review.CONFIG | {"composite_key1": False}
 # The real loop settings, with a local check the tests can make fail.
 LOOP = {**pr_loop.LOOP, "checks": [{"name": "dashes", "when": ["**"], "run": [
     ["{python}", "-c", "import os, sys; sys.exit(1 if os.path.exists('FAIL_CHECK') else 0)"]]}]}
+# One step at a time, for the tests of the order steps run in.
+SERIAL = {**LOOP, "parallel_reviews": 1}
 
 MAP = """version: 1
 teams:
@@ -620,7 +626,7 @@ def test_the_fixer_hitting_the_limit_pauses_without_pushing_and_the_round_runs_a
 
 def test_a_pause_ends_the_pass_so_no_other_pull_request_calls_a_model(repo):
     r = repo()
-    loop = r.loop()
+    loop = r.loop(loop=SERIAL)
     loop.o["github"] = type("G", (), {"list_open_pulls": lambda self: [{"number": 1}, {"number": 2}, {"number": 3}]})()
     seen = []
 
@@ -650,6 +656,233 @@ def test_a_no_post_run_that_hits_the_limit_writes_no_pause(repo):
     r = repo(reviews=[{"type": "session_limit"}])
     assert r.tick(post="none") == ["paused"]
     assert not pause_file(r).exists() and not r.labeled()
+
+
+def test_the_5_hour_limit_wording_pauses_and_never_stops(repo):
+    # ip#165 (2026-11-03): "You've hit your 5-hour limit" stopped the pull
+    # request with needs-founder for ten days; it is the plan's limit.
+    r = repo(reviews=[{"type": "five_hour_limit"}, {"type": "five_hour_limit"}, {"verdict": "pass"}])
+    assert r.tick() == ["paused"]
+    assert not r.labeled() and r.st()["stopped"] is None and pause_file(r).exists()
+    assert "5-hour limit" in json.loads(pause_file(r).read_text())["reason"]
+    end_pause(r)
+    assert r.tick() == ["auto-merge"] and not r.labeled()
+
+
+def test_a_deferral_whose_failed_call_text_shows_the_limit_is_a_rate_limit():
+    limit = "error: claude reported success: You've hit your 5-hour limit \u00b7 resets 2:40pm (after one backoff retry)"
+    assert pr_loop._rate_limited({"call_outcome": "error", "reason": limit})
+    assert pr_loop._rate_limited({"call_outcome": "rate_limit", "reason": "x"})
+    # Text from a verdict (no failed call) never pauses: only a call's failure can.
+    assert not pr_loop._rate_limited({"reason": "the verdict failed validation: rate limit in a finding"})
+    assert not pr_loop._rate_limited({"call_outcome": "error", "reason": "error: the process crashed"})
+
+
+# --- Passing faults retry, then stop where it shows --------------------------------
+
+
+def expire_backoff(r):
+    st = r.st()
+    st["transient"]["next_at"] = "2000-01-01T00:00:00+00:00"
+    pr_loop._save_state(r.state, CONFIG["repo"], st)
+
+
+def stalled(r):
+    return any(p["type"] == "label" and "loop-stalled" in p["labels"] for p in r.github.posts)
+
+
+@pytest.mark.parametrize("exc", [
+    urllib.error.HTTPError("https://api.github.com", 401, "Unauthorized", {}, None),  # ip#164: the token expired
+    urllib.error.HTTPError("https://api.github.com", 502, "Bad Gateway", {}, None),
+    RemoteDisconnected("Remote end closed connection without response"),  # ip#162
+    urllib.error.URLError(OSError(8, "nodename nor servname provided, or not known")),
+    TimeoutError("The read operation timed out"),
+    ConnectionResetError(54, "Connection reset by peer"),
+], ids=["401", "502", "remote-closed", "dns", "timeout", "reset"])
+def test_a_github_or_network_fault_retries_with_backoff_then_stops_with_a_visible_label_and_comment(repo, exc):
+    r = repo()
+    real = r.github.list_check_runs
+
+    def down(sha):
+        raise exc
+    r.github.list_check_runs = down
+    assert r.tick() == ["retry"]
+    assert r.github.posts == [] and r.st()["stopped"] is None, "no label, no comment, not stopped"
+    first = r.st()["transient"]
+    assert first["count"] == 1 and first["head"] == r.first_head
+    assert r.tick() == ["backoff"], "the next pass waits out the backoff"
+    for n in range(2, LOOP["transient_retries"] + 1):
+        expire_backoff(r)
+        assert r.tick() == ["retry"] and r.st()["transient"]["count"] == n
+    waits = [l["next_at"] for l in r.log() if l.get("event") == "retry"]
+    assert len(waits) == LOOP["transient_retries"]
+    expire_backoff(r)
+    assert r.tick() == ["stopped"]
+    assert stalled(r) and not r.labeled(), "a stall is labelled loop-stalled, never needs-founder"
+    assert "Automated loop stopped" in r.comments()[-1] and f"still failing after {LOOP['transient_retries']} retries" in r.comments()[-1]
+    assert r.st()["stopped"]["visible"] is True
+    r.github.list_check_runs = real
+    assert r.tick() == ["skip"], "the label holds it"
+    r.github.labels = []
+    assert r.tick() == ["auto-merge"], "removing loop-stalled resumes"
+
+
+def test_a_fault_that_passes_clears_the_count(repo):
+    r = repo()
+    real, fails = r.github.list_check_runs, [RemoteDisconnected("Remote end closed connection without response")]
+
+    def flaky(sha):
+        if fails:
+            raise fails.pop()
+        return real(sha)
+    r.github.list_check_runs = flaky
+    assert r.tick() == ["retry"]
+    expire_backoff(r)
+    assert r.tick() == ["auto-merge"]
+    assert r.st()["transient"] is None and r.github.posts and not r.labeled() and not stalled(r)
+
+
+def test_any_other_error_still_stops_with_needs_founder(repo):
+    r = repo()
+
+    def broken(sha):
+        raise ValueError("an answer the loop cannot read")
+    r.github.list_check_runs = broken
+    assert r.tick() == ["stopped"]
+    assert r.labeled() and "an answer the loop cannot read" in r.comments()[-1]
+
+
+def test_a_stop_github_does_not_take_is_logged_and_posted_on_a_later_pass(repo):
+    r = repo(gh={"mergeable": False})
+    real_label, real_comment = r.github.add_labels, r.github.create_comment
+
+    def unreachable(*a):
+        raise urllib.error.URLError(OSError(8, "nodename nor servname provided, or not known"))
+    r.github.add_labels = r.github.create_comment = unreachable
+    lines = []
+    assert r.loop(out=lines.append).tick() == [{"pr": 1, "outcome": "stopped", "reason": "the branch has a merge conflict with main; a person resolves it"}]
+    assert r.github.posts == [] and r.st()["stopped"]["visible"] is False
+    assert any("STOP NOT YET VISIBLE" in l and "next pass posts it" in l for l in lines)
+    assert any(l.get("event") == "stop-not-visible" for l in r.log())
+    r.github.add_labels, r.github.create_comment = real_label, real_comment
+    assert r.tick() == ["skip"]
+    assert r.labeled() and "merge conflict" in r.comments()[-1] and r.st()["stopped"]["visible"] is True
+    assert r.tick() == ["skip"] and len(r.comments()) == 1, "posted once"
+
+
+def test_a_new_head_clears_a_stall(repo, tmp_path):
+    r = repo()
+    st = r.st()
+    st["stopped"] = {"head": r.first_head, "reason": "error: x", "at": "t", "label": "loop-stalled", "labeled": True,
+                     "commented": True, "visible": True, "rounds": 0}
+    pr_loop._save_state(r.state, CONFIG["repo"], st)
+    r.github.labels = ["loop-stalled"]
+    assert r.tick() == ["skip"]
+    author_push(r, tmp_path)
+    assert r.tick() == ["auto-merge"]
+    assert {"type": "unlabel", "label": "loop-stalled"} in r.github.posts
+
+
+def test_a_key_deferred_by_a_network_fault_retries_instead_of_stopping(repo):
+    r = repo(reviews=[{"type": "network_error"}, {"type": "network_error"}, {"verdict": "pass"}])
+    assert r.tick() == ["retry"]
+    assert not r.labeled() and not stalled(r) and not pause_file(r).exists()
+    calls = len(r.calls())
+    assert r.tick() == ["backoff"] and len(r.calls()) == calls, "no model call during the backoff"
+    expire_backoff(r)
+    assert r.tick() == ["auto-merge"]
+
+
+def test_the_fixer_cut_by_a_network_fault_retries_and_its_findings_are_not_counted(repo):
+    r = repo(reviews=[fail("bad"), {"verdict": "pass"}], fixes=[{"type": "network_error"}, {"edits": {"src/app.py": "fixed\n"}}])
+    assert r.tick() == ["retry"]
+    st = r.st()
+    assert st["seen"] == {} and st["rounds"] == 0 and r.origin_head() == r.first_head
+    expire_backoff(r)
+    assert r.tick() == ["fixed"], "not stopped as the same finding failing twice"
+
+
+def test_transient_error_classification():
+    t = pr_loop.transient_error
+    assert t(urllib.error.HTTPError("u", 401, "Unauthorized", {}, None)) and t(urllib.error.HTTPError("u", 503, "x", {}, None))
+    assert not t(urllib.error.HTTPError("u", 404, "Not Found", {}, None)) and not t(urllib.error.HTTPError("u", 422, "x", {}, None))
+    assert t(RemoteDisconnected("Remote end closed connection without response")) and t(TimeoutError()) and t(subprocess.TimeoutExpired("gh", 300))
+    assert t(subprocess.CalledProcessError(128, ["git", "fetch"], stderr="fatal: unable to access 'https://github.com/': Could not resolve host: github.com"))
+    assert t(subprocess.CalledProcessError(1, ["gh"], stderr="error connecting to api.github.com"))
+    assert not t(subprocess.CalledProcessError(1, ["gh"], stderr="GraphQL: Pull request is not mergeable"))
+    assert not t(ValueError("x")) and not t(FileNotFoundError("gh"))
+    assert pr_loop._transient_call("timeout", "claude did not answer within 1200s")
+    assert pr_loop._transient_call("error", "API Error: 503 Service Unavailable")
+    assert not pr_loop._transient_call("error", "claude reported error_during_execution: the process crashed")
+
+
+# --- Two pull requests at once ---------------------------------------------------------
+
+
+def test_two_pull_requests_are_stepped_at_once_never_more_and_each_by_one_worker(repo):
+    r = repo()
+    loop = r.loop()
+    assert LOOP["parallel_reviews"] == 2
+    pulls = [{"number": n} for n in (1, 2, 3, 4, 5)]
+    loop.o["github"] = type("G", (), {"list_open_pulls": lambda self: pulls})()
+    guard, active, peak, seen = threading.Lock(), set(), [0], []
+    both = threading.Barrier(2, timeout=10)
+
+    def step(p):
+        with guard:
+            assert p["number"] not in active, "one pull request is never stepped by two workers"
+            active.add(p["number"])
+            seen.append(p["number"])
+            peak[0] = max(peak[0], len(active))
+        if p["number"] in (1, 2):
+            both.wait()  # 1 and 2 are in their steps together
+        time.sleep(0.02)
+        with guard:
+            active.discard(p["number"])
+        return {"outcome": "wait"}
+    loop.step = step
+    results = loop.tick()
+    assert peak[0] == 2, "two at once, never more"
+    assert sorted(seen) == [1, 2, 3, 4, 5], "every pull request stepped once"
+    assert [x["pr"] for x in results] == [1, 2, 3, 4, 5], "results in the pass's order"
+
+
+def test_a_pause_in_one_worker_starts_no_new_step(repo):
+    r = repo()
+    loop = r.loop()
+    loop.o["github"] = type("G", (), {"list_open_pulls": lambda self: [{"number": n} for n in (1, 2, 3)]})()
+    first_done, seen = threading.Event(), []
+
+    def step(p):
+        seen.append(p["number"])
+        if p["number"] == 1:
+            first_done.set()
+            return {"outcome": "paused"}
+        first_done.wait(10)
+        time.sleep(0.2)  # the pause is in force before this worker looks for more
+        return {"outcome": "wait"}
+    loop.step = step
+    assert [x["outcome"] for x in loop.tick()] == ["paused", "wait"]
+    assert sorted(seen) == [1, 2], "pull request 3 is not stepped"
+
+
+def test_a_pause_written_mid_review_stops_the_next_model_call(repo, monkeypatch):
+    # The other worker (or the Nirmaan loop) hits the limit while this review
+    # runs: key 2 is not called, nothing is labelled, and key 1 is reused after.
+    r = repo()
+    original = pr_review.run_once
+
+    def then_paused(binary, args, stdin, cwd, timeout_s):
+        out = original(binary, args, stdin, cwd, timeout_s)
+        if not pause_file(r).exists():
+            pause_file(r).parent.mkdir(parents=True, exist_ok=True)
+            pause_file(r).write_text(json.dumps({"until": "2999-01-01T00:00:00+00:00", "repo": "nirmaansoftware/Nirmaan", "pr": 9}))
+        return out
+    monkeypatch.setattr(pr_review, "run_once", then_paused)
+    assert r.tick() == ["paused"] and len(r.calls()) == 1
+    assert not r.labeled() and json.loads(pause_file(r).read_text())["pr"] == 9, "the other loop's pause is kept"
+    end_pause(r)
+    assert r.tick() == ["auto-merge"] and len(r.calls()) == 2, "key 1 reused, key 2 called once"
 
 
 def test_a_failing_local_check_stops_without_pushing(repo):
@@ -784,28 +1017,32 @@ def test_a_merge_conflict_stops_and_removing_the_label_resumes(repo):
     assert r.tick() == ["auto-merge"]
 
 
-def test_one_pull_request_at_a_time_under_the_shared_lock(repo):
+def test_every_model_slot_held_elsewhere_makes_the_step_busy_and_one_free_slot_is_enough(repo):
     r = repo()
-    release, _ = pr_review.acquire_lock(r.state, {"repo": "nirmaansoftware/Nirmaan", "pr": 9})
-    assert r.tick() == ["busy"] and r.calls() == []
-    release()
-    assert r.tick() == ["auto-merge"]
+    held = [pr_review.acquire_lock(r.state, {"repo": "nirmaansoftware/Nirmaan", "pr": 9}, name=name)[0]
+            for name in ("review.lock", "model-slot-1.lock")]
+    assert r.tick() == ["busy"] and r.calls() == [], "both slots of the cap (2) taken: no model call"
+    held[1]()
+    assert r.tick() == ["auto-merge"], "the shared review.lock held (the Nirmaan loop reviewing): this loop takes slot 1"
+    held[0]()
+    assert not any((r.state / n).exists() for n in ("review.lock", "model-slot-1.lock"))
 
 
-def test_the_shared_lock_is_held_for_each_review_call_and_free_during_the_fixer_and_local_checks(repo, monkeypatch):
+def test_a_model_slot_is_held_for_each_review_call_and_the_fixer_call_and_free_during_the_local_checks(repo, monkeypatch):
     r = repo(reviews=[fail("bad"), {"verdict": "pass"}], fixes=[{"edits": {"src/app.py": "fixed\n"}}])
-    lock = r.state / "review.lock"
+    slots = [r.state / "review.lock", r.state / "model-slot-1.lock"]
     seen, original = [], pr_review.run_once
 
     def watched(binary, args, stdin, cwd, timeout_s):
-        seen.append(("fixer" if "Edit(./**)" in " ".join(args) else "review", lock.exists()))
+        seen.append(("fixer" if "Edit(./**)" in " ".join(args) else "review", sum(p.exists() for p in slots)))
         return original(binary, args, stdin, cwd, timeout_s)
     monkeypatch.setattr(pr_review, "run_once", watched)
-    check = {"name": "lock", "when": ["**"], "run": [["{python}", "-c", f"import os, sys; sys.exit(1 if os.path.exists({str(lock)!r}) else 0)"]]}
-    assert r.tick(loop={**LOOP, "checks": [check]}) == ["fixed"], "the local check ran with the lock free"
+    check = {"name": "lock", "when": ["**"], "run": [["{python}", "-c",
+             f"import os, sys; sys.exit(1 if any(os.path.exists(p) for p in {[str(p) for p in slots]!r}) else 0)"]]}
+    assert r.tick(loop={**LOOP, "checks": [check]}) == ["fixed"], "the local check ran with every slot free"
     assert r.tick() == ["auto-merge"]
-    assert seen == [("review", True), ("fixer", False), ("review", True), ("review", True)]
-    assert not lock.exists()
+    assert seen == [("review", 1), ("fixer", 1), ("review", 1), ("review", 1)], "one slot per model call, the fixer's too"
+    assert not any(p.exists() for p in slots)
 
 
 def test_a_lock_held_elsewhere_between_key1_and_key2_ends_the_step_and_the_next_pass_reuses_key1(repo, monkeypatch):
@@ -822,7 +1059,10 @@ def test_a_lock_held_elsewhere_between_key1_and_key2_ends_the_step_and_the_next_
 
     def acquire(state_dir, owner, *a, **kw):
         if other.get("release") is None and "release" in other and kw.get("name", "review.lock") == "review.lock":
-            other["release"], _ = real_acquire(state_dir, {"repo": "nirmaansoftware/Nirmaan", "pr": 9})
+            # Both model slots taken elsewhere (the Nirmaan loop and a hand run).
+            held = [real_acquire(state_dir, {"repo": "nirmaansoftware/Nirmaan", "pr": 9}, name=name)[0]
+                    for name in ("review.lock", "model-slot-1.lock")]
+            other["release"] = lambda: [h() for h in held]
         return real_acquire(state_dir, owner, *a, **kw)
     monkeypatch.setattr(pr_review, "acquire_lock", acquire)
     assert r.tick() == ["busy"] and len(r.calls()) == 1, "key 1 ran; key 2 met the lock held elsewhere"
@@ -956,7 +1196,7 @@ def test_no_post_never_updates_a_branch(repo):
 
 def test_one_pass_steps_every_pull_request_and_a_review_fix_wait_or_busy_lock_never_ends_it(repo):
     r = repo()
-    loop = r.loop()
+    loop = r.loop(loop=SERIAL)
     pulls = [{"number": n} for n in (6, 5, 4, 3, 2, 1)]
     loop.o["github"] = type("G", (), {"list_open_pulls": lambda self: pulls})()
     # Pull request 3 is in a fix round, so it goes first; the rest by number.
@@ -977,7 +1217,7 @@ def test_an_auto_merge_ends_the_pass_so_the_rest_are_stepped_against_the_new_mai
     # Auto-merge can merge main while the pass goes on; the pull requests after
     # it wait for the next pass, which refetches main and checks this copy again.
     r = repo()
-    loop = r.loop()
+    loop = r.loop(loop=SERIAL)
     pulls = [{"number": n} for n in (1, 2, 3)]
     loop.o["github"] = type("G", (), {"list_open_pulls": lambda self: pulls})()
     outcome = {1: "skip", 2: "auto-merge", 3: "wait"}
@@ -997,7 +1237,7 @@ def test_a_merge_from_outside_the_loop_mid_pass_ends_the_pass_before_the_next_st
     # Someone else merges into main while pull request 1 is stepped (not an
     # auto-merge of this pass): pull request 2 waits for the next pass.
     r = repo()
-    loop = r.loop()
+    loop = r.loop(loop=SERIAL)
     pulls = [{"number": n} for n in (1, 2)]
     loop.o["github"] = type("G", (), {"list_open_pulls": lambda self: pulls})()
     seen = []
