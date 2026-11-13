@@ -9,7 +9,7 @@ packet's domain scope, so the seat reads it.
 Two budgets, and no silent cut:
 
 * the domain scope's documents together hold at most ``DOMAIN_CAP``
-  characters (capability build-out council record of 2026-10-18, section 9.3;
+  characters (a harness setting, M73: ``nirmaan.runtime.harness``) (capability build-out council record of 2026-10-18, section 9.3;
   council/records/2026-10-18-capability-buildout.md);
 * the rendered prompt must fit the seat's model (``context_limit`` in
   :mod:`nirmaan.runtime.model`).
@@ -28,9 +28,6 @@ from nirmaan.models import KnowledgeSourceKind, Skill
 
 #: Where knowledge documents live: ``knowledge/`` at the repository root.
 KNOWLEDGE_ROOT = Path(__file__).resolve().parents[3] / "knowledge"
-#: The most characters of knowledge documents one packet's domain scope carries.
-DOMAIN_CAP = 40_000
-
 _REF = re.compile(r"[a-z0-9_]+/[a-z0-9_]+")
 
 
@@ -67,7 +64,9 @@ def read_document(ref: str, root: Path | None = None) -> tuple[str | None, str |
 
 
 def over_domain_cap(characters: int) -> str | None:
-    if characters <= DOMAIN_CAP:
+    from nirmaan.runtime import harness  # M73: read when called; importing the runtime here would be a cycle
+
+    if characters <= harness.DOMAIN_CAP:
         return None
     return (f"the cited knowledge documents total {characters} characters, over the domain cap of "
-            f"{DOMAIN_CAP}; the seat declines rather than cut them")
+            f"{harness.DOMAIN_CAP}; the seat declines rather than cut them")

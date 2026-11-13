@@ -33,7 +33,7 @@ from nirmaan.models.governance import (
     GateSpec,
     Principle,
 )
-from nirmaan.models.limits import DEFAULT_LIMITS, Limits, OnFailure, resolve_limits
+from nirmaan.models.limits import Limits, OnFailure, resolve_limits
 from nirmaan.models.org import (
     ActorKind,
     AgentProfile,

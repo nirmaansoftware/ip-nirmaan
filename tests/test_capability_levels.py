@@ -6,7 +6,8 @@ Fixture repositories show each rule: 5 of 5 tool-judged trials with a clean
 re-judge and a must-fail control make a skill Practised; 4 of 5 do not; a
 changed skill card makes the group stale; replays, attestations, trials not
 judged by a tool and trials run without knowledge documents (M67) never count;
-only a case's own skills get credit; Knowledge
+a changed harness makes the group stale and a trial with no harness recorded
+never counts (M73); only a case's own skills get credit; Knowledge
 needs a check record by a different session that names the current document.
 """
 
@@ -25,13 +26,17 @@ from nirmaan.evals import skill_digest
 from nirmaan.evals.levels import (CHECKS, KNOWLEDGE_CHECK_FORMAT, LEVELS, REJUDGE, REJUDGE_FORMAT, compute,
                                   render)
 from nirmaan.evals.records import MANIFEST, trial_path
-from nirmaan.models import EvalResult, EvalRunManifest, EvalTrial, JudgeRun, Score, ScoreStatus
+from nirmaan.models import EvalResult, EvalRunManifest, EvalTrial, JudgeRun, RecordedAnswer, Score, ScoreStatus
+from nirmaan.runtime import harness
+from nirmaan.runtime.harness import harness_sha256
 
 ROOT = Path(__file__).resolve().parent.parent
 SKILL = "rtl_design"
 OTHER = "systemverilog"
 MODEL = "claude-opus-5-5"
 AT = datetime(2026, 10, 19, 12, 0, tzinfo=timezone.utc)
+#: ``_record``'s default harness: the one ``record_run`` would record now.
+CURRENT = object()
 
 
 @pytest.fixture(scope="module")
@@ -55,7 +60,8 @@ def _case(repo: Path, *, must_fail: bool = True, scorer: str = "held-out-run", c
 def _record(org, repo: Path, outcomes: list[bool], *, name: str = "run1", case_id: str = "rtl/fixture",
             replay: bool = False, attest: bool = False, rejudge: bool | None = True,
             digest: str | None = None, judged: bool = True, knowledge: str = "on",
-            trial_knowledge: str | None = None) -> Path:
+            trial_knowledge: str | None = None, harness_digest=CURRENT,
+            answer_harness=CURRENT) -> Path:
     record = repo / "evals" / "results" / name
     record.mkdir(parents=True)
     manifest = EvalRunManifest(id=name, runtime="claude-code", model=MODEL, replay=replay, nirmaan_version="t",
@@ -65,17 +71,25 @@ def _record(org, repo: Path, outcomes: list[bool], *, name: str = "run1", case_i
     trial_knowledge = trial_knowledge or knowledge
     # As record_run writes it (M67): with knowledge off, the digest of the card alone.
     digest = digest or skill_digest(org, SKILL, repo, knowledge=trial_knowledge == "on")
+    # M73: as record_run writes it, on the result and on every answer.
+    if harness_digest is CURRENT:
+        harness_digest = harness_sha256(knowledge=trial_knowledge == "on")
+    if answer_harness is CURRENT:
+        answer_harness = harness_digest
     for number, passed in enumerate(outcomes, start=1):
         status = ScoreStatus.PASSED if passed else ScoreStatus.FAILED
         result = EvalResult(case=case_id, case_digest="sha256:x", runtime="claude-code", replay=replay, version="t",
                             started_at=AT, duration_s=1.0, seat="rtl-implementation", seat_status="done",
                             submitted=True, attempts=1, passed=passed, audit_ok=True, sandbox="s",
                             attestations=("dv_ran",) if attest else (),
-                            scores=(Score(scorer="held-out-run", name="reference testbench", status=status),))
+                            scores=(Score(scorer="held-out-run", name="reference testbench", status=status),),
+                            harness=harness_digest)
         runs = (JudgeRun(check="reference testbench", run=f"run-{number}", tool="simulator.run",
                          succeeded=passed),) if judged else ()
         trial = EvalTrial(record=name, trial=number, stage="rtl-implementation", model=MODEL,
-                          skills={SKILL: digest}, knowledge=trial_knowledge, result=result, judge_runs=runs)
+                          skills={SKILL: digest}, knowledge=trial_knowledge, result=result, judge_runs=runs,
+                          answers=(RecordedAnswer(mode="work", model=MODEL, prompt_sha256="p", packet_sha256="k",
+                                                  harness=answer_harness),))
         path = trial_path(record, case_id, number)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(trial.model_dump_json(), encoding="utf-8")
@@ -237,6 +251,51 @@ def test_both_labels_edited_still_leave_the_trials_stale_when_the_skill_has_a_do
     entry = _level(org, tmp_path)
     assert entry["level"] is None
     assert any(r.startswith("stale") for r in entry["practised"][0]["reasons"])
+
+
+# --- The harness (M73) -------------------------------------------------------------------------
+
+
+def test_a_changed_harness_setting_makes_the_level_stale(org, tmp_path, monkeypatch):
+    _case(tmp_path)
+    _record(org, tmp_path, [True] * 5)
+    assert _level(org, tmp_path)["level"] == "practised"
+    monkeypatch.setattr(harness, "DOMAIN_CAP", harness.DOMAIN_CAP // 2)
+    entry = _level(org, tmp_path)
+    [group] = entry["practised"]
+    assert entry["level"] is None and not group["counts"]
+    assert group["reasons"] == ["stale: the harness changed after these trials (docs/HARNESS.md)"]
+
+
+def test_trials_from_two_harnesses_are_two_groups_and_only_the_current_one_counts(org, tmp_path):
+    _case(tmp_path)
+    _record(org, tmp_path, [True] * 5, name="before", harness_digest="sha256:" + "1" * 64)
+    _record(org, tmp_path, [True] * 3, name="now")
+    groups = {g["harness"]: g for g in _level(org, tmp_path)["practised"]}
+    assert set(groups) == {"sha256:" + "1" * 64, harness_sha256()}
+    # Five old trials and three current ones are never pooled into eight.
+    assert groups[harness_sha256()]["n"] == 3 and not groups[harness_sha256()]["counts"]
+    assert groups["sha256:" + "1" * 64]["reasons"][0].startswith("stale: the harness changed")
+
+
+def test_a_run_option_other_than_the_default_harness_is_stale(org, tmp_path):
+    _case(tmp_path)
+    _record(org, tmp_path, [True] * 5, harness_digest=harness_sha256(attempts=3))
+    assert _level(org, tmp_path)["level"] is None
+
+
+@pytest.mark.parametrize("result, answer", [(None, None), (None, CURRENT), (CURRENT, None),
+                                            (CURRENT, "sha256:" + "2" * 64)])
+def test_a_trial_with_no_harness_recorded_never_counts(org, tmp_path, result, answer):
+    # A record written before M73 has none; a result and an answer that disagree are no record either.
+    _case(tmp_path)
+    current = harness_sha256()
+    _record(org, tmp_path, [True] * 5, harness_digest=current if result is CURRENT else result,
+            answer_harness=current if answer is CURRENT else answer)
+    entry = _level(org, tmp_path)
+    [group] = entry["practised"]
+    assert entry["level"] is None and group["harness"] is None
+    assert group["reasons"] == ["harness not recorded: the trials carry no harness, or their answers disagree"]
 
 
 def test_only_the_cases_own_skills_get_credit(org, tmp_path):
