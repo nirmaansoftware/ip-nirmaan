@@ -77,10 +77,13 @@ The units that were ACTIVE when the rule took effect are frozen in
 two active teams M57 added under record item 6). The test fails on any ACTIVE
 unit outside that list that is not backed this way. The list is never
 extended by hand: a unit made ACTIVE later passes by its eval case, not by
-being added. The test pins the list's count (205) and a sha256 of its sorted
-ids, so any edit to the file fails until the pin changes in the same pull
-request, where review sees it. Removing a unit from the chart is the only
-reason to edit it.
+being added. The test pins the list's count and a sha256 of its sorted ids,
+so any edit to the file fails until the pin changes in the same pull request,
+where review sees it. Removing a unit from the chart, or moving one, is the
+only reason to edit it. The wave 2 cut of Verification into five departments
+moved its 26 active units to new IDs and added the four active departments
+that group them (209 units); `tests/test_verification_departments.py` checks
+that the list changed by exactly that move.
 
 The rule lives in the test, not in `org/`, because it reads the eval cases in
 `evals/`, and the organization layer does not depend on the evals package.
