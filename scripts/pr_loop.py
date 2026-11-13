@@ -699,8 +699,10 @@ class Loop:
         stalled = lc.get("stalled_label")
         if stalled and stalled in listed["labels"]:
             if not (stopped and stopped.get("label") == stalled and stopped["head"] != listed["head_sha"]):
+                # The loop's stall on this head, or a label someone set by hand
+                # (no stall recorded): held until the label is removed.
                 return skip(f'"{stalled}" label')
-            # The author's new head clears a stall: it is tried from scratch.
+            # The author's new head clears the loop's stall: it is tried from scratch.
             st.update(stopped=None, transient=None)
             _save_state(self.state_dir, cfg["repo"], st)
             self._log(ctx, "stall-cleared")
@@ -744,8 +746,9 @@ class Loop:
             if transient_error(exc):
                 return self._retry(ctx, ctx["head"], f"error: {exc}")
             return self._stop(ctx, ctx["head"], f"error: {exc}")
-        if st.get("transient") and result.get("outcome") not in ("retry", "stopped"):
-            # The fault passed: the next one starts a new count.
+        if st.get("transient") and result.get("outcome") not in ("retry", "stopped", "busy", "paused"):
+            # The fault passed (a step that stopped short for a slot or a
+            # pause proves nothing): the next one starts a new count.
             st["transient"] = None
             _save_state(self.state_dir, cfg["repo"], st)
         return result
