@@ -219,6 +219,49 @@ stream in and out misses it; the reference testbench checks `s_ready` against
 its model every cycle and flips `m_ready` and `s_valid` inside a cycle to
 check that `s_ready` does not move.
 
+### Verification seats (wave 2)
+
+Wave 2's first eval pull request (W2-E1) judges verification seats of M68's
+`block-verification` workflow (`docs/BLOCK_VERIFICATION.md`), where the RTL is
+fixed and the seat writes the testbench or the plan. Both cases verify one
+approved block, an interrupt controller (`tests/fixtures/dv/irq_ctrl/`): `N`
+sources (2 to 32) with an enable mask, a high-level or rising-edge mode per
+source, a write-1-to-clear pending register, and a claim register that names
+the lowest-numbered pending, enabled source and acknowledges one source on a
+write. The case fixes `interface-spec` (`interface_spec.md`, 14 tagged
+requirements) and `design-under-test` (`irq_ctrl.v`) from its own files;
+`microarchitecture.md` documents the RTL and is given to no seat.
+
+- `dv/directed-irq-ctrl` judges the testbench seat on `directed_testing` and
+  `systemverilog` (its request asks for a SystemVerilog testbench, which
+  plans the `systemverilog` refinement). Its one control is the seat's own
+  testbench with `simulator.run`: it must pass on the approved RTL and fail
+  each RTL mutant below. The reference testbench (`irq_ctrl_tb.sv`) runs
+  lanes at `N` 8 and 5 and fails every mutant on a check, not a build.
+- `dv/plan-irq-ctrl` judges the dv-plan seat on `verification_planning`. Its
+  one control runs `vplan.check` over the seat's plan: it must pass against
+  the approved specification and fail against each specification mutant
+  below. A plan that leaves out a requirement already fails the seat's own
+  gate and never reaches review (tested). This control is weaker than a
+  testbench's: it proves the plan is tied to the approved requirement set
+  and wording, not that its items would catch a bug.
+
+| File | The one change | Judge that fails it |
+|---|---|---|
+| `mutants/irq_ctrl_priority_inverted.v` | `irq_id` names the highest-numbered active source | seat testbench (`simulator.run`) |
+| `mutants/irq_ctrl_ack_ignored.v` | a `CLAIM` write never clears a pending bit | seat testbench |
+| `mutants/irq_ctrl_level_mask_ignored.v` | `ENABLE` masks rising-edge sources only, so a disabled high-level source raises `irq` | seat testbench |
+| `mutants/irq_ctrl_clear_beats_set.v` | a clear wins over a detection at the same edge | seat testbench |
+| `mutants/irq_ctrl_w1c_clears_all.v` | a `PENDING` write clears every bit | seat testbench |
+| `mutants/interface_spec_added_req.md` | one requirement added (`IRQ-RECLAIM`) | seat plan (`vplan.check`: not in the plan) |
+| `mutants/interface_spec_priority_changed.md` | `IRQ-PRIORITY` changed to highest number first | seat plan (`vplan.check`: does not quote it) |
+
+Paths are under `tests/fixtures/dv/irq_ctrl/`. Every mutant is visible at
+`N` 8, the default, through the ports and registers the specification names.
+A testbench that never raises a source passes its own gate and the approved
+RTL, and the first mutant survives it (tested in
+`tests/test_dv_irq_ctrl_evals.py`).
+
 ## 4. The evidence loader
 
 `load_evidence(path)` reads a run record (as `load_record` does) and raises

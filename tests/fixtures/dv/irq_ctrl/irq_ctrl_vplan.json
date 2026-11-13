@@ -1,0 +1,207 @@
+{
+  "format": "nirmaan.vplan",
+  "version": 1,
+  "requirements": [
+    {
+      "id": "IRQ-PARAM",
+      "text": "The block works for every `N` from 2 to 32, and bits `N` and up of the `ENABLE`, `MODE` and `PENDING` registers read as zero and ignore writes.",
+      "source": "interface_spec.md",
+      "section": "1"
+    },
+    {
+      "id": "IRQ-RESET",
+      "text": "While `rst_n` is low at a rising edge of `clk`, `ENABLE`, `MODE` and `PENDING` clear to zero and the remembered level of every source clears to zero.",
+      "source": "interface_spec.md",
+      "section": "4.1"
+    },
+    {
+      "id": "IRQ-REG-RW",
+      "text": "A write to `ENABLE` or `MODE` stores `wdata` bits `N-1` to 0 in that register.",
+      "source": "interface_spec.md",
+      "section": "4.1"
+    },
+    {
+      "id": "IRQ-READ",
+      "text": "A read never changes any register; `rdata` follows `addr` with no clock edge.",
+      "source": "interface_spec.md",
+      "section": "4.1"
+    },
+    {
+      "id": "IRQ-LEVEL",
+      "text": "A high-level source sets its `PENDING` bit at every rising edge where its input is high.",
+      "source": "interface_spec.md",
+      "section": "4.2"
+    },
+    {
+      "id": "IRQ-EDGE",
+      "text": "A rising-edge source sets its `PENDING` bit at a rising edge where its input is high and was low at the previous rising edge, so an input held high sets it once.",
+      "source": "interface_spec.md",
+      "section": "4.2"
+    },
+    {
+      "id": "IRQ-DETECT-DISABLED",
+      "text": "Detection does not depend on `ENABLE`: a disabled source still sets its `PENDING` bit.",
+      "source": "interface_spec.md",
+      "section": "4.2"
+    },
+    {
+      "id": "IRQ-W1C",
+      "text": "A write to `PENDING` clears each bit written 1 and leaves each bit written 0 unchanged; it never sets a bit.",
+      "source": "interface_spec.md",
+      "section": "4.3"
+    },
+    {
+      "id": "IRQ-ACK",
+      "text": "A write to `CLAIM` acknowledges the source whose number is in `wdata` bits 4 to 0: that source's `PENDING` bit clears and no other bit changes; a number of `N` or more changes nothing.",
+      "source": "interface_spec.md",
+      "section": "4.3"
+    },
+    {
+      "id": "IRQ-SET-WINS",
+      "text": "A source detected at the same rising edge as a write that clears its bit keeps its `PENDING` bit set, so a high-level source acknowledged while its input is still high stays pending.",
+      "source": "interface_spec.md",
+      "section": "4.3"
+    },
+    {
+      "id": "IRQ-MASK",
+      "text": "`irq` is high exactly when some source has both its `PENDING` and its `ENABLE` bit set, for high-level and rising-edge sources alike.",
+      "source": "interface_spec.md",
+      "section": "4.4"
+    },
+    {
+      "id": "IRQ-PRIORITY",
+      "text": "`irq_id` is the lowest-numbered source whose `PENDING` and `ENABLE` bits are both set, so source 0 has the highest priority, and it is 0 while `irq` is low.",
+      "source": "interface_spec.md",
+      "section": "4.4"
+    },
+    {
+      "id": "IRQ-CLAIM",
+      "text": "A read of `CLAIM` returns `irq` in bit 31 and `irq_id` in bits 4 to 0, with every other bit zero.",
+      "source": "interface_spec.md",
+      "section": "4.4"
+    },
+    {
+      "id": "IRQ-LATENCY",
+      "text": "`irq` and `irq_id` follow the registers with no clock edge, so a source detected at one rising edge drives `irq` until the next.",
+      "source": "interface_spec.md",
+      "section": "4.4"
+    }
+  ],
+  "items": [
+    {
+      "id": "tb-reset",
+      "kind": "test",
+      "file": "irq_ctrl_tb.sv",
+      "name": "Reset values and reset from a busy state",
+      "proves": [
+        "IRQ-RESET"
+      ],
+      "rationale": "Both lanes read every register and the claim after the first reset and again after a reset with every source pending."
+    },
+    {
+      "id": "tb-registers",
+      "kind": "test",
+      "file": "irq_ctrl_tb.sv",
+      "name": "ENABLE and MODE write and read back",
+      "proves": [
+        "IRQ-REG-RW",
+        "IRQ-PARAM"
+      ],
+      "rationale": "Patterns and all ones are written and read back at N 8 and N 5; bits N and up must read zero."
+    },
+    {
+      "id": "tb-reads",
+      "kind": "test",
+      "file": "irq_ctrl_tb.sv",
+      "name": "Reads change nothing",
+      "proves": [
+        "IRQ-READ"
+      ],
+      "rationale": "CLAIM and PENDING are read repeatedly between edges and must not move; every read is sampled with no clock edge."
+    },
+    {
+      "id": "tb-level",
+      "kind": "test",
+      "file": "irq_ctrl_tb.sv",
+      "name": "High-level detection",
+      "proves": [
+        "IRQ-LEVEL",
+        "IRQ-SET-WINS"
+      ],
+      "rationale": "A held level must stay pending through a PENDING clear and an acknowledge, and clear only once low."
+    },
+    {
+      "id": "tb-edge",
+      "kind": "test",
+      "file": "irq_ctrl_tb.sv",
+      "name": "Rising-edge detection",
+      "proves": [
+        "IRQ-EDGE"
+      ],
+      "rationale": "An input held high fires once; a falling edge fires nothing; a second rising edge fires again."
+    },
+    {
+      "id": "tb-disabled",
+      "kind": "test",
+      "file": "irq_ctrl_tb.sv",
+      "name": "Detection and masking while disabled",
+      "proves": [
+        "IRQ-DETECT-DISABLED",
+        "IRQ-MASK"
+      ],
+      "rationale": "A disabled source of each mode must set PENDING while irq, irq_id and CLAIM stay quiet; enabling it raises irq."
+    },
+    {
+      "id": "tb-w1c",
+      "kind": "test",
+      "file": "irq_ctrl_tb.sv",
+      "name": "Write-1-to-clear",
+      "proves": [
+        "IRQ-W1C"
+      ],
+      "rationale": "With every source pending, one bit written 1 clears that bit alone; a write of zero clears nothing; a write of ones to an empty PENDING sets nothing."
+    },
+    {
+      "id": "tb-ack",
+      "kind": "test",
+      "file": "irq_ctrl_tb.sv",
+      "name": "Acknowledge",
+      "proves": [
+        "IRQ-ACK"
+      ],
+      "rationale": "Each in-range number clears only its bit; every number from N to 31 is written and must change nothing; bits above 4 are ignored."
+    },
+    {
+      "id": "tb-race",
+      "kind": "test",
+      "file": "irq_ctrl_tb.sv",
+      "name": "Detection at the edge of its clear",
+      "proves": [
+        "IRQ-SET-WINS"
+      ],
+      "rationale": "A rising edge lands at the very edge of a PENDING clear and of an acknowledge; the bit must stay set."
+    },
+    {
+      "id": "tb-priority",
+      "kind": "test",
+      "file": "irq_ctrl_tb.sv",
+      "name": "Fixed priority and the claim",
+      "proves": [
+        "IRQ-PRIORITY",
+        "IRQ-CLAIM",
+        "IRQ-MASK"
+      ],
+      "rationale": "With several sources pending, irq_id and the CLAIM read must name the lowest enabled one, skip disabled ones, and walk up in order as each is acknowledged."
+    },
+    {
+      "id": "tb-latency",
+      "kind": "test",
+      "file": "irq_ctrl_tb.sv",
+      "name": "Outputs with no added cycle",
+      "proves": [
+        "IRQ-LATENCY"
+      ],
+      "rationale": "irq and irq_id are checked 1 ns after the edge that detects or clears, with no extra edge."
+    }
+  ]
+}

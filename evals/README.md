@@ -19,8 +19,8 @@ a live run under `evals/results/<date>-<runtime>-<model>/`, which is
 committed, and a replay under `.nirmaan/evals/`, which is not (`--out` to
 change). The command exits 1 when any trial fails.
 
-Cases live in groups (`rtl/`, `spec/`, `firmware/`); `--seats` selects by group
-or by seat stage. A JSON file with a `format` field (a run record, a checks
+Cases live in groups (`rtl/`, `spec/`, `firmware/`, and `dv/` for verification
+seats); `--seats` selects by group or by seat stage. A JSON file with a `format` field (a run record, a checks
 file such as `spec/axi4_lite/interface_checks.json`) is data, never a case.
 
 ## Fields
