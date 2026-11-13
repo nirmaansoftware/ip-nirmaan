@@ -62,6 +62,12 @@ class EvalCase(BaseModel):
     upstream: dict[str, tuple[CaseFile, ...]] = Field(
         default_factory=dict, description="Stage -> reference documents that fix its approved output.")
     reference: tuple[CaseFile, ...] = Field(default=(), description="The reference answer, for replay.")
+    #: M71: a decision seat's reference answer also records an outcome (root cause: ``rtl_bug``, say).
+    outcome: str | None = Field(default=None, description="The reference answer's outcome, for a decision seat.")
+    #: M71: task inputs the seat or an upstream stage is given, as files the case supplies (the failing logs a
+    #: triage investigates). A file here is part of the case digest.
+    inputs: dict[str, dict[str, tuple[str, ...]]] = Field(
+        default_factory=dict, description="Stage -> task input -> files the case supplies, comma-joined.")
     held_out: tuple[HeldOutCheck, ...] = ()
     attempts: int = Field(default=1, ge=1)
 

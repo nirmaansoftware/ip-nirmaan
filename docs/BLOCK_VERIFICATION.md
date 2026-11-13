@@ -143,7 +143,8 @@ a proof seat that ships its own `counter.v` and is refused.
   (verilator_coverage) and `equivalence.run` (eqy) to be wrapped as
   AVAILABLE tools, each its own milestone.
 - Repro testbenches on regression-investigation's root-cause and triage
-  stages, and a scorer over several seat testbenches.
+  stages, and a scorer over several seat testbenches: M71,
+  `docs/REPRO_GATES.md`.
 - The verification eval cases themselves (W2-E1 added the first two,
   `dv/directed-irq-ctrl` and `dv/plan-irq-ctrl`: `docs/EVAL_SKILLS_MUST_FAIL.md`),
   and the department cut. The role ids

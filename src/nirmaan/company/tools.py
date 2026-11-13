@@ -119,6 +119,12 @@ TOOLS: list[ToolSpec] = [
           (SOURCES, TOP_REQUIRED, *RUNNER)),
     _tool("test.run", "Run tests", "eda", EXE, AV, "Run individual tests.",
           (SOURCES, TOP_REQUIRED, *RUNNER)),
+    # M71: the same simulators, asked the opposite question (docs/REPRO_GATES.md). A run passes only when the
+    # testbench ran to its end and its own verdict reports a failed check: the failure reproduced. A tool of its
+    # own, so a reproduction is never read as a passing simulation.
+    _tool("simulator.reproduce", "Reproduce a failure", "eda", EXE, AV,
+          "Simulate RTL with a repro testbench that must fail one of its own checks: the failure reproduces.",
+          (SOURCES, TOP_REQUIRED, *RUNNER)),
     _tool("regression.run", "Run regressions", "eda", EXE, CO, "Launch and monitor regressions."),
     _tool("waveform.inspect", "Waveform viewer", "eda", RD, CO, "Inspect waveforms."),
     _tool("coverage.read", "Coverage database", "eda", RD, CO, "Read and merge coverage."),

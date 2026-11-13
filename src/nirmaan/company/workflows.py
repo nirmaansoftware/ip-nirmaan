@@ -443,24 +443,46 @@ RTL_CHANGE = WorkflowTemplate(
 
 # --- 5. Regression investigation ----------------------------------------------------
 
+#: M71: an investigation asked to reproduce its failure hands over the RTL under investigation, and triage and
+#: root cause each write repro testbenches that must fail on that approved RTL, every one in a run of its own,
+#: before the work goes on: a claimed root cause comes with a failure the gate ran (docs/REPRO_GATES.md).
+REPRODUCTION = when("reproduction")
+REPRODUCES = checked("Each repro testbench fails on the approved RTL under investigation: the failure reproduces",
+                     "simulator.reproduce", approved("sources", "rtl_source"),
+                     FileInput(param="sources", kinds=("testbench",), each=True),
+                     FileInput(param="top", kinds=("testbench",), entry=True),
+                     when=(REPRODUCTION,))
+
+
+def reproducing(*skills: str) -> Refinement:
+    """M71: asked for a reproduction, the stage also writes repro testbenches over the handed-over RTL."""
+    return Refinement(when=REPRODUCTION, skills=skills, outputs=("testbench",),
+                      depends_on=("design-under-investigation",))
+
+
 REGRESSION_INVESTIGATION = WorkflowTemplate(
     id="regression-investigation",
     name="Regression investigation",
     description="Triage with VeriTriage, establish a root cause, branch to the right fix, prove it.",
     intents=("regression_investigation",),
     stages=(
+        st("design-under-investigation", "RTL under investigation, as handed over", "RTL", "rtl.implement",
+           when=REPRODUCTION, criticality=M, review=rv("rtl.review"), outputs=("rtl_source",),
+           evidence=(REVIEWED,)),
         st("triage", "Failure triage (VeriTriage)", "Debug", "debug.triage", criticality=M,
-           outputs=("triage_report",),
+           refinements=(reproducing("failure_triage"),), outputs=("triage_report",),
            evidence=(EvidenceRequirement(description="VeriTriage investigation of the failing artifacts",
-                                         accepts=(K.VERITRIAGE_SESSION,), tools=("veritriage.investigate",)),)),
+                                         accepts=(K.VERITRIAGE_SESSION,), tools=("veritriage.investigate",)),
+                     REPRODUCES)),
         st("change-correlation", "Correlate with recent RTL commits", "Debug", "rtl.impact",
            depends_on=("triage",), when=when("recent_change"), criticality=M, review=rv("rtl.review"),  # M50
            outputs=("impact_analysis",),
            evidence=(documented("Commit range and touched modules"),)),
         st("root-cause", "Root-cause analysis", "Debug", "debug.root_cause",
            depends_on=("triage", "change-correlation"), skills=("root_cause_analysis",), criticality=H, review=rv("debug.review"),
+           refinements=(reproducing(),),
            outcomes=("rtl_bug", "testbench_bug", "infrastructure", "spec_ambiguity"),
-           outputs=("root_cause_analysis",), evidence=(REVIEWED,)),
+           outputs=("root_cause_analysis",), evidence=(REVIEWED, REPRODUCES)),
         st("rtl-fix", "RTL fix", "Fix", "rtl.implement", depends_on=("root-cause",),
            branch=("root-cause", "rtl_bug"), criticality=H, review=rv("rtl.review"),
            outputs=("rtl_source", "testbench"), evidence=(REVIEWED, *RTL_GATES)),  # M29

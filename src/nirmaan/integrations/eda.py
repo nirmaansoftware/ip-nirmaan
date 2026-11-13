@@ -44,6 +44,7 @@ from nirmaan.integrations.eda_antecedents import DERIVED, Definitions, definitio
 from nirmaan.integrations.eda_parsers import (
     Diagnostic,
     EdaResult,
+    parse_reproduction,
     parse_sby,
     parse_sby_cover,
     parse_simulation,
@@ -126,6 +127,8 @@ _BOUND: MutableMapping[str, bool] = Registry("eda.bound")
 
 #: Tools whose runs produce a simulation log VeriTriage can investigate.
 SIMULATION_TOOLS = ("simulator.run", "test.run")
+#: M71: the simulators asked whether a repro testbench fails on the RTL (docs/REPRO_GATES.md).
+REPRODUCE_TOOL = "simulator.reproduce"
 
 
 def register_backend(backend: Backend) -> Backend:
@@ -639,6 +642,10 @@ def _sim_parse(run: RunRecord) -> EdaResult:
     return parse_simulation(run.log, run.returncodes, nonce=run_nonce(run.log) or "")
 
 
+def _repro_parse(run: RunRecord) -> EdaResult:
+    return parse_reproduction(run.log, run.returncodes, nonce=run_nonce(run.log) or "")
+
+
 def _sby_parse(run: RunRecord) -> EdaResult:
     options = run.workdir / FORMAL_OPTIONS
     ran = json.loads(options.read_text(encoding="utf-8")) if options.is_file() else {}
@@ -657,6 +664,11 @@ for _tool in SIMULATION_TOOLS:
                              check=testbench_only_problem))
     register_backend(Backend("verilator-sim", _tool, ("verilator",), _verilator_sim, _sim_parse, ("sources", "top"),
                              check=testbench_only_problem))
+# M71: the same steps and the same testbench-only check, judged as a reproduction (docs/REPRO_GATES.md).
+register_backend(Backend("icarus", REPRODUCE_TOOL, ("iverilog", "vvp"), _icarus, _repro_parse, ("sources", "top"),
+                         check=testbench_only_problem))
+register_backend(Backend("verilator-sim", REPRODUCE_TOOL, ("verilator",), _verilator_sim, _repro_parse,
+                         ("sources", "top"), check=testbench_only_problem))
 register_backend(Backend("yosys", "synth.run", ("yosys",), _yosys, _yosys_parse, ("sources", "top")))
 register_backend(Backend("symbiyosys", "formal.run", ("sby", "yosys"), _sby, _sby_parse, ("sby",), _sby_dir,
                          check=_sby_check))

@@ -14,6 +14,7 @@ This milestone binds five tools to open-source backends:
 | `lint.run` | `verilator-lint` | `verilator` |
 | `simulator.run` | `icarus`, `verilator-sim` | `iverilog` and `vvp`; or `verilator` |
 | `test.run` | `icarus`, `verilator-sim` | as above |
+| `simulator.reproduce` (M71) | `icarus`, `verilator-sim` | as above; passes only when the testbench's own verdict reports a failed check (`docs/REPRO_GATES.md`) |
 | `synth.run` | `yosys` | `yosys` |
 | `formal.run` | `symbiyosys` | `sby` (plus `yosys` and a solver, which `sby` finds itself) |
 

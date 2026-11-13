@@ -181,6 +181,9 @@ def _workflows(org: "Organization") -> list[str]:
             for dep in stage.depends_on:
                 if dep not in ids:
                     issues.append(f"{where}: unknown dependency {dep}")
+            for dep in (d for r in stage.refinements for d in r.depends_on):  # M71: planned before this stage
+                if dep not in ids[:ids.index(stage.id)]:
+                    issues.append(f"{where}: a refinement depends on {dep}, which is not an earlier stage")
             if stage.owner_from and stage.owner_from not in ids:
                 issues.append(f"{where}: owner_from names unknown stage {stage.owner_from}")
             if stage.gate and stage.gate not in org.gates:

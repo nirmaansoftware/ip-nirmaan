@@ -90,6 +90,11 @@ FEATURES: list[FeatureRule] = [
     FeatureRule(feature="coverage", patterns=(r"\bcoverage\b",), description="Measured coverage (M68)"),
     FeatureRule(feature="equivalence", patterns=(r"\bequivalen(ce|t)\b",),
                 description="An equivalence check between two versions of the RTL (M68)"),
+    # M71: a regression investigation asked to reproduce its failure. No routing context of its own: it hands
+    # over the RTL under investigation and gates triage and root cause on repro testbenches that fail on it
+    # (docs/REPRO_GATES.md), and no other workflow reads it.
+    FeatureRule(feature="reproduction", patterns=(r"\brepro(duc\w*|s)?\b",),
+                description="The failure reproduced by a testbench the gate runs on the RTL (M71)"),
     FeatureRule(feature="multi_port", skills=("buffering_flow_control", "arbitration"), patterns=(r"\b\d+[- ]port\b", r"\bmulti[- ]?port\b")),
     FeatureRule(feature="configurable", patterns=(r"\bconfigurable\b", r"\bparameteri[sz]\w*")),
     FeatureRule(feature="cdc", skills=("cdc_design", "cdc_verification"), patterns=(r"\bcdc\b", r"\bclock[- ]domains?\b", r"\basync\w*\b",
