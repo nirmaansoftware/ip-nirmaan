@@ -57,8 +57,8 @@ def test_the_executive_layer_exists(nirmaan_org, role):
         "product.management.requirements", "product.programs.tpm", "product.projects.status",
         "architecture.system.interconnect", "architecture.micro.noc", "architecture.interface.axi",
         "architecture.io.cxl", "design.rtl.design.fsm", "design.rtl.cdc", "design.rtl.quality.lint",
-        "verification.simulation.uvm", "verification.formal.equivalence", "verification.coverage.functional",
-        "verification.debug.triage", "verification.signoff", "implementation.pd.sta.mcmm",
+        "verification.dynamic.testbench.uvm", "verification.formal.equivalence", "verification.dynamic.coverage.functional",
+        "verification.debug.triage", "verification.methodology.signoff", "implementation.pd.sta.mcmm",
         "implementation.pd.power.ir", "implementation.pd.signoff.lvs", "implementation.dft.scan_atpg.atpg",
         "software.firmware.boot", "software.tools.compiler", "security.secure_boot",
         "infrastructure.build.ci", "documentation.specifications.registers", "quality.reviews.traceability",
@@ -91,9 +91,10 @@ def test_staffing_is_derived_from_unit_kind(nirmaan_org):
     org = nirmaan_org
     assert org.head_of("verification").level is Level.VP
     assert org.head_of("design.rtl").level is Level.DIRECTOR
-    assert org.head_of("verification.debug").level is Level.MANAGER
-    assert org.lead_of("verification.debug").level is Level.TECH_LEAD
-    ladder = sorted((r.level for r in org.roles_in("verification.debug.triage", recursive=False)),
+    assert org.head_of("verification.debug").level is Level.DIRECTOR
+    assert org.head_of("verification.debug.analysis").level is Level.MANAGER
+    assert org.lead_of("verification.debug.analysis").level is Level.TECH_LEAD
+    ladder = sorted((r.level for r in org.roles_in("verification.debug.analysis.logs", recursive=False)),
                     key=lambda level: level.rank)
     assert ladder == [Level.INTERN, Level.JUNIOR, Level.ENGINEER, Level.SENIOR]
 
@@ -126,13 +127,13 @@ def test_every_chain_rises_strictly_and_terminates_at_the_board(nirmaan_org):
 
 
 def test_staff_never_escalates_down_to_a_tech_lead(nirmaan_org):
-    staff = nirmaan_org.roles["verification.architecture.staff"]
+    staff = nirmaan_org.roles["verification.methodology.architecture.staff"]
     assert nirmaan_org.roles[staff.escalates_to].level.rank > staff.level.rank
 
 
 def test_managers_are_on_the_management_track(nirmaan_org):
-    assert nirmaan_org.roles["verification.debug.manager"].track is Track.MANAGEMENT
-    assert nirmaan_org.roles["verification.debug.tech_lead"].track is Track.INDIVIDUAL
+    assert nirmaan_org.roles["verification.debug.analysis.manager"].track is Track.MANAGEMENT
+    assert nirmaan_org.roles["verification.debug.analysis.tech_lead"].track is Track.INDIVIDUAL
 
 
 # --- Skills and capabilities --------------------------------------------------------------
@@ -160,9 +161,9 @@ def test_band_is_derived_from_level(nirmaan_org):
     assert b("verification.debug.triage.engineer", "failure_triage") is SeniorityBand.ADVANCED
     assert b("verification.debug.triage.senior", "failure_triage") is SeniorityBand.LEAD
     # A manager holds inherited domain skills, but not at the lead band.
-    assert b("verification.debug.manager", "debugging") is SeniorityBand.ADVANCED
+    assert b("verification.debug.analysis.manager", "debugging") is SeniorityBand.ADVANCED
     # Level-granted skills are the level's core competence.
-    assert b("verification.debug.manager", "engineering_management") is SeniorityBand.LEAD
+    assert b("verification.debug.analysis.manager", "engineering_management") is SeniorityBand.LEAD
 
 
 def test_band_claims_no_expertise(nirmaan_org):
@@ -181,8 +182,8 @@ def test_review_capabilities_need_expertise(nirmaan_org):
 
 def test_signoff_needs_seniority_not_just_skill(nirmaan_org):
     # Everyone in Verification holds the signoff skill; only directors and up sign off.
-    assert "verification_signoff" in nirmaan_org.effective_skills("verification.simulation.uvm.senior")
-    assert not nirmaan_org.holds("verification.simulation.uvm.senior", "signoff.verification")
+    assert "verification_signoff" in nirmaan_org.effective_skills("verification.dynamic.testbench.uvm.senior")
+    assert not nirmaan_org.holds("verification.dynamic.testbench.uvm.senior", "signoff.verification")
     assert nirmaan_org.holds("verification.vp", "signoff.verification")
 
 
@@ -228,9 +229,9 @@ def test_tools_are_granted_by_capability_not_to_everyone(nirmaan_org):
     assert "simulator.run" in tools("design.rtl.design.fsm.engineer")
     assert "simulator.run" not in tools("design.rtl.design.fsm.intern")
     assert "git.read" in tools("design.rtl.design.fsm.intern")
-    assert "task.assign" in tools("verification.debug.manager")
+    assert "task.assign" in tools("verification.debug.analysis.manager")
     assert "task.assign" not in tools("verification.debug.triage.engineer")
-    assert "approval.grant" in tools("verification.debug.tech_lead")
+    assert "approval.grant" in tools("verification.debug.analysis.tech_lead")
 
 
 # --- Export and determinism --------------------------------------------------------------

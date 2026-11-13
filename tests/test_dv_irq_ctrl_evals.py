@@ -41,9 +41,10 @@ SPEC = f"{IRQ}/interface_spec.md"
 #: Each case: its seat, the seat task's skills, owner and reviewer (docs/BLOCK_VERIFICATION.md).
 CASES = {
     "dv/directed-irq-ctrl": ("testbench", ("directed_testing", "systemverilog"),
-                             "verification.simulation.systemverilog.senior", "verification.simulation.tech_lead"),
+                             "verification.dynamic.testbench.systemverilog.senior",
+                             "verification.dynamic.testbench.tech_lead"),
     "dv/plan-irq-ctrl": ("dv-plan", ("verification_planning",),
-                         "verification.planning.engineer", "verification.planning.senior"),
+                         "verification.methodology.planning.engineer", "verification.methodology.planning.senior"),
 }
 
 #: The RTL mutants the directed case's control lists, each with a check of the reference testbench it fails.

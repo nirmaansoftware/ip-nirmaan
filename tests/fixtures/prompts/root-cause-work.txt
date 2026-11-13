@@ -61,7 +61,7 @@ CITE ONLY THESE ARTIFACTS, using the token exactly as written:
 
 ## Task
 - Task prj-<id>:root-cause: Root-cause analysis (decision, ready)
-- Your seat: Senior Root Cause Engineer (verification.debug.root_cause.senior)
+- Your seat: Senior Root Cause Engineer (verification.debug.analysis.root_cause.senior)
 - Expected outputs: root_cause_analysis
 - Outcomes (conclude exactly one): rtl_bug, testbench_bug, infrastructure, spec_ambiguity
 - Evidence requirement: Independent review recorded (accepts: review_record)
@@ -70,4 +70,4 @@ CITE ONLY THESE ARTIFACTS, using the token exactly as written:
 - Upstream artifact [artifact:prj-<id>.change-correlation.a1] Correlate with recent RTL commits (impact_analysis) (impact_analysis, approved)
 - Evidence [evidence:prj-<id>.triage.e1] on prj-<id>:triage: veritriage_session, substantiated, tool run [run:run-0001]: VeriTriage classified axi_timeout.log as timeout (85% confidence, 5 evidence nodes); top hypothesis: Likely RTL bug
 - Evidence [evidence:prj-<id>.change-correlation.e1] on prj-<id>:change-correlation: review_record, substantiated: Independent review by design.rtl.architecture.senior: looks right
-- Escalation path: verification.debug.tech_lead -> verification.debug.manager -> verification.vp -> exec.cto -> exec.ceo -> exec.board
+- Escalation path: verification.debug.analysis.tech_lead -> verification.debug.analysis.manager -> verification.debug.director -> verification.vp -> exec.cto -> exec.ceo -> exec.board
