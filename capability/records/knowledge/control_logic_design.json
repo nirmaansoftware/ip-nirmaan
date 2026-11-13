@@ -1,0 +1,23 @@
+{
+  "format": "nirmaan.knowledge-check",
+  "skill": "control_logic_design",
+  "knowledge_document": "knowledge/design/control_logic_design.md",
+  "document_sha256": "sha256:27714b3524b715f5906a32817d74bfa4a5ec798490ecb47d27aa1206387ffc6e",
+  "writer": "IP-P3-K2 session (P3 pilot, item K2, 2026-11-03)",
+  "checker": "IP-P3-C2 session (P3 pilot, item C2)",
+  "sources_read": [
+    "[GPIO] lowRISC, OpenTitan GPIO Theory of Operation (Apache 2.0): the whole page, https://opentitan.org/book/hw/ip/gpio/doc/theory_of_operation.html",
+    "[CIP] lowRISC, OpenTitan Comportability Specification (Apache 2.0): the whole page, read closely in its Interrupt Handling section, https://opentitan.org/book/doc/contributing/hw/comportability/index.html",
+    "[PIC] Gisselquist, The ZipCPU's Interrupt Controller, ZipCPU blog, 2019: the whole article with its formal rules and covers, https://zipcpu.com/zipcpu/2019/04/02/icontrol.html",
+    "[CDC] Gisselquist, Some Simple Clock-Domain Crossing Solutions, ZipCPU blog, 2017: the whole article, https://zipcpu.com/blog/2017/10/20/cdc.html"
+  ],
+  "result": "every claim tagged with a source was found in that source, and every line marked inference is a fair reading of the source it names or the document's own reasoning",
+  "notes": [
+    "The input filter is the [GPIO] optional 16-cycle noise filter per input, applied to both DATA_IN and interrupt detection; the page names it a noise filter and the delay it imposes, and the document's waits for a stable value is read as what such a filter does.",
+    "Status raw and unmasked, the output as status AND enable, W1C clearing, a clear while the event is active leaving the bit set, hardware never clearing it, the test register and the status-type interrupt cleared only by removing the cause or masking are all in the [CIP] Interrupt Handling section.",
+    "New events win over a clear because [PIC] writes the state as the incoming interrupts OR (old state AND NOT the written bits); its single output is the OR of state AND enable, gated by the master enable, and registered.",
+    "The properties are [PIC] rules 1 to 8 with its reset assertions; the covers are an outgoing interrupt and w_any falling on a write with the enables stable.",
+    "The rise detect (last copy low, new value high) is the event crossing in [CDC]; the two or three flip-flop synchroniser and the rule never to use the first flip-flop's output are its first method."
+  ],
+  "checked_at": "2026-11-13"
+}

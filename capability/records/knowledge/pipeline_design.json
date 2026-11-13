@@ -1,0 +1,23 @@
+{
+  "format": "nirmaan.knowledge-check",
+  "skill": "pipeline_design",
+  "knowledge_document": "knowledge/design/pipeline_design.md",
+  "document_sha256": "sha256:2c56048ff7329e5016b5e6b79fe5333d4d1b807fdfad3eea3cce1448fe323f47",
+  "writer": "IP-P3-K2 session (P3 pilot, item K2, 2026-11-03)",
+  "checker": "IP-P3-C2 session (P3 pilot, item C2)",
+  "sources_read": [
+    "[Skid] Gisselquist, Building a Skid Buffer for AXI processing, ZipCPU blog, 2019: the whole article with its properties and SymbiYosys script, https://zipcpu.com/blog/2019/05/22/skidbuffer.html",
+    "[Pipe] Gisselquist, Strategies for pipelining logic, ZipCPU blog, 2017: the whole article, https://zipcpu.com/blog/2017/08/14/strategies-for-pipelining.html",
+    "[LaF] LaForest, Pipeline Skid Buffer, FPGA Design Elements (MIT): the whole page, https://fpgacpu.ca/fpga/Pipeline_Skid_Buffer.html",
+    "[Rules] Gisselquist, AXI Handshaking Rules, ZipCPU blog, 2021: the whole article, https://zipcpu.com/blog/2021/08/28/axi-rules.html"
+  ],
+  "result": "every claim tagged with a source was found in that source, and every line marked inference is a fair reading of the source it names or the document's own reasoning",
+  "notes": [
+    "The handshake rules (valid raised without waiting for ready to avoid deadlock, ready idling not busy, payload held until the clock after the transfer, data a don't care while valid is low, valid reset to 0) are rules 3 to 7 of the simple handshake in [Pipe]; [Rules] gives valid cleared after reset and the stalled-beat hold.",
+    "Neither clock-enable style can stall: [Pipe] says the traveling CE cannot handle stalls and offers no stall for the global CE, which runs at a fixed rate.",
+    "Upstream ready as the inverse of the buffer valid bit is the o_ready = !r_valid equivalence in [Skid]; the five moves and the two registered outputs from the next state are in [LaF].",
+    "The buffered pipeline (a stall moves back one stage per clock, data bunching like an accordion, at least double the logic) is the buffered handshake section of [Pipe].",
+    "The four properties are [Skid] rules 1 to 4 with its reset assumption and assertion; each parameter combination is its own SymbiYosys task, proved at depth 3, with a cover that drops ready twice, counts data and ends idle."
+  ],
+  "checked_at": "2026-11-13"
+}
