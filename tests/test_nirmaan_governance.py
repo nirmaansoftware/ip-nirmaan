@@ -79,7 +79,8 @@ def test_escalation_never_lands_below_the_raiser(nirmaan_org):
 def test_tools_are_refused_honestly(authority):
     ok, _ = authority.may_use_tool("verification.debug.triage.engineer", "veritriage.investigate")
     assert ok
-    ok, why = authority.may_use_tool("verification.debug.triage.engineer", "simulator.run")
+    # M71: triage may simulate (to reproduce a failure), but not synthesize.
+    ok, why = authority.may_use_tool("verification.debug.triage.engineer", "synth.run")
     assert not ok and "not granted" in why
     ok, why = authority.may_use_tool("design.rtl.design.fsm.engineer", "git.write")
     assert not ok and "contract-only" in why

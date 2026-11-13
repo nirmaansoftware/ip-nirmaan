@@ -139,7 +139,9 @@ request in the golden suite, plus investigations without a reproduction and a
 block-design request that says "reproduces". On a reproduction request, only
 the new stage and its workstream are added, triage and root cause change, and
 the later tasks' priorities and the debug workstream's status follow the
-longer path. No existing gate, evidence requirement or review changes.
+longer path. No existing gate, evidence requirement or review changes. The regression seats' golden prompts
+(`tests/fixtures/prompts/`) change in one line each: their permitted tools now list `simulator.reproduce`
+and `simulator.run`.
 
 ## Tests
 
