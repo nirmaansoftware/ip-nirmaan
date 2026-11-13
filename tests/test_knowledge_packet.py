@@ -132,19 +132,26 @@ def test_the_arbitration_document_is_in_the_rtl_seats_prompt_on_the_arbiter_case
     assert ref not in [d.ref for d in assemble(fifo, fifo_rtl.id).domain.documents]
 
 
-#: P3-K1: the feature documents each RTL pilot case's seat reads besides design/rtl_design.
+#: P3-K1 and P3-K2: the feature documents each RTL pilot case's seat reads besides design/rtl_design.
 FEATURE_DOCUMENTS = {"rtl/apb-regs": {"design/apb"}, "rtl/axi4-lite-regs": {"design/axi"},
-                     "rtl/rr-arbiter": {"design/arbitration"}, "rtl/sync-fifo": set()}
+                     "rtl/rr-arbiter": {"design/arbitration"}, "rtl/sync-fifo": {"design/buffering_flow_control"},
+                     "rtl/skid-buffer": {"design/pipeline_design", "design/buffering_flow_control"},
+                     "rtl/axil-timer": {"design/axi", "design/fsm_design"},
+                     "rtl/apb-gpio": {"design/apb", "design/control_logic_design"}}
+#: The skills whose cards cite design/<skill>, and whose documents reach the RTL pilot cases.
+RTL_PILOT_DOCUMENTED = ("rtl_design", "apb", "axi", "buffering_flow_control", "pipeline_design", "fsm_design",
+                        "control_logic_design")
 
 
-def test_the_rtl_design_document_reaches_every_rtl_case_and_each_protocol_document_its_own(nirmaan_org,
-                                                                                         fixed_clock):
-    # rtl_design provides rtl.implement, so every RTL seat reads its document; M66 puts apb and axi on their
-    # cases' RTL tasks, and their cards cite design/apb and design/axi. Risk 4 of the pilot plan: the
-    # rtl_design document reaches every RTL seat, so it stays at or under 8,000 characters.
+def test_the_rtl_design_document_reaches_every_rtl_case_and_each_feature_document_its_own(nirmaan_org,
+                                                                                        fixed_clock):
+    # rtl_design provides rtl.implement, so every RTL seat reads its document; M66 puts the feature skills
+    # (apb, axi, buffering_flow_control, pipeline_design, fsm_design, control_logic_design) on their cases'
+    # RTL tasks, and each card cites design/<skill>. Risk 4 of the pilot plan: the rtl_design document reaches
+    # every RTL seat, so it stays at or under 8,000 characters, and each case's documents fit the domain cap.
     from nirmaan.evals import load_cases
 
-    for skill in ("rtl_design", "apb", "axi"):
+    for skill in RTL_PILOT_DOCUMENTED:
         assert knowledge.cited(nirmaan_org.skills[skill]) == (f"design/{skill}",)
     texts = {ref: knowledge.document_path(ref).read_text(encoding="utf-8")
              for ref in {"design/rtl_design"}.union(*FEATURE_DOCUMENTS.values())}
@@ -161,8 +168,23 @@ def test_the_rtl_design_document_reaches_every_rtl_case_and_each_protocol_docume
             assert packet.domain.declines is None and "design/rtl_design" in refs, (case.id, seat)
             if case.id in FEATURE_DOCUMENTS:
                 assert refs == {"design/rtl_design"} | FEATURE_DOCUMENTS[case.id], (case.id, seat)
+                assert sum(len(texts[ref]) for ref in refs) <= knowledge.DOMAIN_CAP, case.id
                 prompt = render_work_prompt(packet, mode).render()
                 assert all(f"Knowledge document {ref}" in prompt and texts[ref] in prompt for ref in refs)
+
+
+def test_the_widest_pilot_block_carries_six_rtl_documents_within_the_domain_cap(nirmaan_org, fixed_clock):
+    # Pilot risk 4: a block with every M66 feature but the register slice puts six documents on one RTL seat.
+    # They must fit the 40,000 character domain cap together, or the seat declines.
+    engine = Orchestrator(nirmaan_org, clock=fixed_clock).plan(
+        "Create an AXI4-Lite timer peripheral with a FIFO and an APB GPIO.")
+    rtl = next(t for t in engine.state.tasks.values() if t.stage == "rtl-implementation")
+    expected = {f"design/{s}" for s in RTL_PILOT_DOCUMENTED if s != "pipeline_design"}
+    for seat in (rtl.owner, rtl.reviewer):
+        packet = assemble(engine, rtl.id, role=seat)
+        assert packet.domain.declines is None, seat
+        assert {d.ref for d in packet.domain.documents} == expected, seat
+        assert sum(len(d.text) for d in packet.domain.documents) <= knowledge.DOMAIN_CAP
 
 
 def test_a_document_no_skill_cites_never_reaches_a_prompt(root, nirmaan_org, fixed_clock):
