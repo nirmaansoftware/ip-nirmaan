@@ -19,7 +19,7 @@ each and a test fails if another module defines one.
 |---|---|---|---|
 | `DOMAIN_CAP` | 40,000 characters | knowledge documents in one packet; over it the seat declines (M61) | `org/knowledge.py` |
 | `MAX_CONTENT` | 60,000 characters | one recorded file's content in a packet; larger is withheld | `runtime/context.py` |
-| `DEFAULT_LIMITS` | attempts 1, review rounds 1, retries 1, retry then escalate | the limits when no override, stage or capability sets one (M48) | `models/limits.py` |
+| `DEFAULT_LIMITS` | attempts 1, review rounds 1, retries 1, retry then escalate | the limits when no override, stage or capability sets one (M48) | `work/limits.py` |
 | `SCOPES` | Company, Domain, Project, Task | the prompt's sections, in this order (M20) | `runtime/prompt.py` |
 | `WORK_SYSTEM`, `REVIEW_SYSTEM` | the system prompts, with the answer formats | every work and review prompt | `runtime/prompt.py` |
 | `REPAIR_AFTER_REVIEW` | "Repair after review: submission N was sent back ..." | the work prompt after a review sent it back (M27) | `runtime/prompt.py` |

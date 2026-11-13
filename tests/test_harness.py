@@ -12,16 +12,18 @@ from __future__ import annotations
 import ast
 import shutil
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 from nirmaan.evals import load_cases, load_record, record_run
-from nirmaan.models import Limits, OnFailure, resolve_limits
+from nirmaan.models import Limits, OnFailure
 from nirmaan.org.knowledge import over_domain_cap
 from nirmaan.runtime import harness
 from nirmaan.runtime.claude_code import ClaudeCodeLLM
 from nirmaan.runtime.files import excerpt
 from nirmaan.runtime.harness import CODE, SETTINGS, fingerprint, harness_sha256
+from nirmaan.work.limits import limits_for
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
@@ -100,8 +102,10 @@ def test_the_code_reads_each_setting_from_the_harness(monkeypatch):
     assert "over the domain cap of 10" in over_domain_cap(11) and over_domain_cap(10) is None
     monkeypatch.setattr(harness, "DEFAULT_LIMITS", Limits(attempts=4, review_rounds=2, retries=0,
                                                           on_failure=OnFailure.FAIL))
-    assert resolve_limits(None, Limits(retries=3)) == Limits(attempts=4, review_rounds=2, retries=3,
-                                                              on_failure=OnFailure.FAIL)
+    org = SimpleNamespace(workflows={}, capabilities={})
+    task = SimpleNamespace(workflow=None, stage=None, capability=None)
+    assert limits_for(org, task, Limits(retries=3)) == Limits(attempts=4, review_rounds=2, retries=3,
+                                                               on_failure=OnFailure.FAIL)
     monkeypatch.setattr(harness, "CLAUDE_CODE_TIMEOUT", 7)
     assert ClaudeCodeLLM().timeout == 7 and ClaudeCodeLLM(timeout=9).timeout == 9
 

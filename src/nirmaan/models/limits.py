@@ -10,8 +10,10 @@ Three limits count three different events, so they stay three numbers
 
 A stage and a capability each declare a ``Limits``, any field left None. One
 resolver takes each field from the first layer that sets it: the override
-(the CLI), then the stage, then the capability, then ``DEFAULT_LIMITS``, a
-harness setting (M73, ``nirmaan.runtime.harness``).
+(the CLI), then the stage, then the capability, then the default, which sets
+every field. The default is a harness setting (M73: ``DEFAULT_LIMITS`` in
+``nirmaan.runtime.harness``), passed as the last layer by
+``nirmaan.work.limits.limits_for``, so this module stays plain data.
 """
 
 from __future__ import annotations
@@ -44,13 +46,14 @@ LEGACY_LIMIT_FIELDS = {"max_attempts": "attempts", "max_review_rounds": "review_
 
 
 def resolve_limits(*layers: Limits | None) -> Limits:
-    """Each field from the first layer that sets it, else the harness default: every field set."""
-    from nirmaan.runtime import harness  # M73: read when called; the harness imports this module
-
+    """Each field from the first layer that sets it. The last layer is the default, which sets every field."""
     chosen = {}
     for name in Limits.model_fields:
         values = [getattr(layer, name) for layer in layers if layer is not None]
-        chosen[name] = next((v for v in values if v is not None), getattr(harness.DEFAULT_LIMITS, name))
+        chosen[name] = next((v for v in values if v is not None), None)
+    missing = [name for name, value in chosen.items() if value is None]
+    if missing:
+        raise ValueError(f"no layer sets {', '.join(missing)}: pass the default limits as the last layer")
     return Limits(**chosen)
 
 
