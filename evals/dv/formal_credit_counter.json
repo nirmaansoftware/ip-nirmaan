@@ -1,0 +1,42 @@
+{
+  "id": "dv/formal-credit-counter",
+  "request": "Formally verify the existing credit counter RTL.",
+  "seat": "assertions-formal",
+  "skills": ["formal_verification", "sva", "assertion_coverage"],
+  "expected_behavior": "A property file and a single-task SymbiYosys setup for the approved credit_counter RTL (MAX credits at reset, 1 to 255; take, give, both at once, refused take at zero and give at MAX, sticky err, avail and full), written from the approved interface specification, that proves every property in prove mode and reaches every cover under the proof gates before review, at MAX 4 and at MAX 5, and fails on RTL that breaks any requirement of that specification.",
+  "constraints": [
+    "Work only from the approved interface specification and the approved RTL; never change the RTL or ship a file of the same name.",
+    "Use the SVA subset open Yosys reads: immediate assertions, assumptions and covers in always blocks, with $past; no implication or sequence operators.",
+    "Prove at MAX 4 and at MAX 5 in one single-task setup, and cover the refusals and a take with a give at zero and at MAX."
+  ],
+  "known_failure_modes": [
+    "A proof that checks only that credits stay in range, so a take and a give together that spend a credit pass.",
+    "A proof that checks err only on the cycle after a refusal, so an err that clears again passes.",
+    "A proof at MAX 4 only, a power of two, so a full test that checks the bits of MAX passes.",
+    "Covers that never reach zero credits or MAX with both inputs high, so a proof whose assumptions block them looks complete.",
+    "A proof that cannot tell a give lost to a same-edge take, a take at zero that wraps, an err that is not sticky or a full that tests the bits of MAX from the approved RTL; the must-fail control fails it."
+  ],
+  "upstream": {
+    "interface-spec": [{"path": "tests/fixtures/dv/credit_counter/interface_spec.md", "kind": "interface_spec"}],
+    "design-under-test": [{"path": "tests/fixtures/dv/credit_counter/credit_counter.v", "kind": "rtl_source", "entry": "credit_counter"}]
+  },
+  "reference": [
+    {"path": "tests/fixtures/dv/credit_counter/credit_counter_check.sv", "kind": "assertions"},
+    {"path": "tests/fixtures/dv/credit_counter/credit_counter_check.sby", "kind": "formal_spec"}
+  ],
+  "held_out": [
+    {
+      "name": "The seat's proof passes the approved RTL with every cover reached and fails each credit counter mutant",
+      "scorer": "must-fail",
+      "tool": "formal.run",
+      "cover_tool": "formal.cover",
+      "seat_files": {"sby": ["formal_spec"], "sources": ["assertions"]},
+      "case_files": {"sources": ["tests/fixtures/dv/credit_counter/credit_counter.v"]},
+      "mutants": {"tests/fixtures/dv/credit_counter/credit_counter.v": [
+        "tests/fixtures/dv/credit_counter/mutants/credit_counter_both_takes.v",
+        "tests/fixtures/dv/credit_counter/mutants/credit_counter_underflow_wraps.v",
+        "tests/fixtures/dv/credit_counter/mutants/credit_counter_err_not_sticky.v",
+        "tests/fixtures/dv/credit_counter/mutants/credit_counter_full_bit_test.v"]}
+    }
+  ]
+}

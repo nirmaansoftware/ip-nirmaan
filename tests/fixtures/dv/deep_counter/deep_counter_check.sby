@@ -1,0 +1,14 @@
+[options]
+mode prove
+depth 20
+
+[engines]
+smtbmc
+
+[script]
+read -formal deep_counter.v deep_counter_check.sv
+prep -top deep_counter_check
+
+[files]
+deep_counter.v
+deep_counter_check.sv

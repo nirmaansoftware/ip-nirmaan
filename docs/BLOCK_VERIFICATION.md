@@ -146,7 +146,9 @@ a proof seat that ships its own `counter.v` and is refused.
   stages, and a scorer over several seat testbenches: M71,
   `docs/REPRO_GATES.md`.
 - The verification eval cases themselves (W2-E1 added the first two,
-  `dv/directed-irq-ctrl` and `dv/plan-irq-ctrl`: `docs/EVAL_SKILLS_MUST_FAIL.md`),
+  `dv/directed-irq-ctrl` and `dv/plan-irq-ctrl`, and W2-E2 the proof seat's
+  `dv/formal-credit-counter` and `dv/prove-deep-counter`:
+  `docs/EVAL_SKILLS_MUST_FAIL.md`),
   and the department cut. The role ids
   in the tests are today's; a cut that renames them moves the tests with it.
 
