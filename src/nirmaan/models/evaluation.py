@@ -123,6 +123,9 @@ class EvalResult(BaseModel):
     input_tokens: int = 0
     output_tokens: int = 0
     cost_usd: float | None = None
+    #: M73: the harness the seat ran in (``nirmaan.runtime.harness.harness_sha256``). None in a record written
+    #: before M73: such a trial never counts toward an evidence level.
+    harness: str | None = None
 
 
 class RecordedAnswer(BaseModel):
@@ -141,6 +144,8 @@ class RecordedAnswer(BaseModel):
     output_tokens: int | None = None
     cache_read_tokens: int | None = None
     cache_write_tokens: int | None = None
+    #: M73: the harness the answer was given in, as on the trial's result.
+    harness: str | None = None
 
 
 class JudgeRun(BaseModel):

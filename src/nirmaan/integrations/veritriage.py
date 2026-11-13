@@ -29,6 +29,7 @@ from veritriage.models import GenerationRequest, GenerationResponse, ProviderCap
 from nirmaan.company.model_profiles import DEFAULT_MODEL
 from nirmaan.events import TOPICS, OrgEvent
 from nirmaan.models import list_values
+from nirmaan.runtime import harness
 from nirmaan.runtime.tools import Params, ToolOutcome, register_binding
 from nirmaan.work.engine import TaskEngine
 
@@ -271,10 +272,14 @@ def render_parts(prompt) -> tuple[str, str]:
     return rendered.system, rendered.model_copy(update={"system": ""}).render()
 
 
-def generate(provider: str, prompt, max_output_chars: int = 64_000) -> Generation:
-    """Ask a registered M17 provider. Never raises: a failure is returned."""
+def generate(provider: str, prompt, max_output_chars: int | None = None) -> Generation:
+    """Ask a registered M17 provider. Never raises: a failure is returned. The answer's length is bounded
+    by ``max_output_chars``, by default the harness setting (M73)."""
     from veritriage.ai import get_llm_provider
     from veritriage.models import GenerationRequest
+
+    if max_output_chars is None:
+        max_output_chars = harness.MAX_OUTPUT_CHARS
 
     try:
         llm = get_llm_provider(provider)
@@ -320,11 +325,11 @@ class AnthropicProvider(BaseProvider):
         prompt = request.prompt
         response = anthropic.Anthropic().beta.messages.create(
             model=self.model,
-            max_tokens=16_000,
+            max_tokens=harness.ANTHROPIC_MAX_TOKENS,
             system=prompt.system,
             messages=[{"role": "user", "content": prompt.model_copy(update={"system": ""}).render()}],
-            thinking={"type": "adaptive"},
-            output_config={"effort": "high"},
+            thinking={"type": harness.ANTHROPIC_THINKING},
+            output_config={"effort": harness.ANTHROPIC_EFFORT},
             betas=["server-side-fallback-2026-07-01"],
             fallbacks="default",
         )

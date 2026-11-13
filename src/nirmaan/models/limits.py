@@ -10,7 +10,8 @@ Three limits count three different events, so they stay three numbers
 
 A stage and a capability each declare a ``Limits``, any field left None. One
 resolver takes each field from the first layer that sets it: the override
-(the CLI), then the stage, then the capability, then ``DEFAULT_LIMITS``.
+(the CLI), then the stage, then the capability, then ``DEFAULT_LIMITS``, a
+harness setting (M73, ``nirmaan.runtime.harness``).
 """
 
 from __future__ import annotations
@@ -37,19 +38,19 @@ class Limits(BaseModel):
     on_failure: OnFailure | None = Field(default=None, description="After the last retry: escalate, or just fail.")
 
 
-DEFAULT_LIMITS = Limits(attempts=1, review_rounds=1, retries=1, on_failure=OnFailure.RETRY_THEN_ESCALATE)
-
 #: The old field names, as data written before M48 used them, and the ``Limits`` field each became.
 LEGACY_LIMIT_FIELDS = {"max_attempts": "attempts", "max_review_rounds": "review_rounds",
                        "max_retries": "retries", "on_failure": "on_failure"}
 
 
 def resolve_limits(*layers: Limits | None) -> Limits:
-    """Each field from the first layer that sets it, else the default: every field set."""
+    """Each field from the first layer that sets it, else the harness default: every field set."""
+    from nirmaan.runtime import harness  # M73: read when called; the harness imports this module
+
     chosen = {}
     for name in Limits.model_fields:
         values = [getattr(layer, name) for layer in layers if layer is not None]
-        chosen[name] = next((v for v in values if v is not None), getattr(DEFAULT_LIMITS, name))
+        chosen[name] = next((v for v in values if v is not None), getattr(harness.DEFAULT_LIMITS, name))
     return Limits(**chosen)
 
 
