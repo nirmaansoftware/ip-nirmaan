@@ -59,7 +59,7 @@ CITE ONLY THESE ARTIFACTS, using the token exactly as written:
 - RTL design validation: RTL is lint-clean, reviewed, and traceable to the microarchitecture.
 - RTL design knowledge: company_standard:NIP-STD-020 RTL Coding Standard
 - RTL design knowledge: knowledge_document:design/rtl_design
-- Knowledge document design/rtl_design (sha256:d5904d22db5ddb4bb00b1b6a5413d81c7cf4317daea42dbc9ee423bed2530eab):
+- Knowledge document design/rtl_design (sha256:db1d48c29fdb222e4d01322dc8abfbc3fd68f06b03e73eb1b21370aca15eda8d):
 ---
 id: design/rtl_design
 skill: rtl_design
@@ -71,12 +71,13 @@ sources:
   - open | Verilator manual: Input Languages [Verilator] | https://verilator.org/guide/latest/languages.html
   - open | YosysHQ, SBY documentation: Reference for .sby file format, and Formal extensions to Verilog [SBY] | https://yosyshq.readthedocs.io/projects/sby/en/latest/reference.html and https://yosyshq.readthedocs.io/projects/sby/en/latest/verilog.html
   - open | Gisselquist, AXI Handshaking Rules, ZipCPU blog, 2021 [ZipCPU] | https://zipcpu.com/blog/2021/08/28/axi-rules.html
+  - open | IP Nirmaan, formal gate: docs/FORMAL_GATE.md section 3 and src/nirmaan/integrations/eda.py L644-L760 [Gate] | this repository
 licence_check: original writing that summarises and cites; no text, table, figure or code copied from any source
 export_screen: clear
 writer: IP-P3-K1 session (P3 pilot, item K1, 2026-10-31)
 checker: pending, a different session reads the sources in P3-C1 and writes the check record
 ---
-Practising: the lint, simulation, synthesis and formal tools this skill holds are available; this document is knowledge, not evidence.
+Practising: the lint, simulation, synthesis and formal tools this skill names are run by the platform; the seat has none [Gate]; this document is knowledge, not evidence.
 
 # RTL design
 
@@ -116,16 +117,13 @@ and its proof setup. Tags in brackets name the sources above. A line marked
   simulation an `X` selector matches no item and holds its old value like a
   latch, so simulation and synthesis differ [lowRISC].
 - Never use the `full_case` or `parallel_case` pragmas [lowRISC]. Verilator
-  proves such a directive, or a `unique` or `priority` case, or inserts a check
-  that reports a failing case at run time [Verilator].
+  proves such a directive, or a `unique` or `priority` case, or checks it at
+  run time [Verilator].
 - A function must not infer a latch; assign every local on every path
   [lowRISC].
-- Checking: Yosys's `proc` replaces processes with multiplexers, flip-flops
-  and latches; `proc_dlatch` is the step that finds latches, and its
-  `-latches` option reports each one as info, warn (the default) or error,
-  except those written as `always_latch` [Yosys]. So read the synthesis log
-  for latch reports; a block that must have none can be run with `error`
-  (inference from [Yosys]).
+- Checking: Yosys's `proc_dlatch` finds latches, and its `-latches` option
+  reports each as info, warn (the default) or error [Yosys]. The platform's synthesis script is fixed, so you
+  cannot pass `error`; any latch fails the gate [Gate].
 
 ## Reset every flop
 
@@ -151,22 +149,29 @@ and its proof setup. Tags in brackets name the sources above. A line marked
   `--main` [Verilator].
 - Compute each expected value in the testbench from the stimulus, and check
   every output the spec defines, not only the data path (inference).
+- Every coverage goal the testbench asserts needs stimulus that drives it (an
+  arbiter: a no-request cycle); check each goal against the directed
+  sequence (inference).
+- Write the expected-value model step for step with the RTL, and run your own
+  testbench and reconcile every mismatch first (inference).
 - Drive the cases a quiet test never reaches: wait states, back-pressure,
   back-to-back transfers, illegal inputs and reset during traffic
   (inference).
-- Keep `$display` out of combinational blocks; it may print several times
-  [Verilator].
 - A test is worth what it catches: break the design on purpose (invert a
   condition, drop an assignment) and confirm the test fails before relying on
   it (inference).
 
 ## Proof setup
 
-- A `.sby` file has `[options]` (`mode` is required: `bmc`, `prove`, `live`,
-  `cover` or `prep`), `[engines]` (for example `smtbmc`), `[script]` (read the
-  sources, then `prep -top`) and `[files]`; an optional `[tasks]` section runs,
-  say, a proof and a cover from one file. `depth` defaults to 20 and is the
-  induction depth in `prove` mode [SBY].
+- Submit one `.sby` with no `[tasks]`: a setup with `[tasks]` is refused and
+  nothing runs [Gate]. `[options]` needs `mode prove`; `bmc` is a bounded
+  check and fails [Gate]. Add `[engines]`, `[script]`
+  (read the sources, then `prep -top`) and `[files]` listing every RTL file
+  you submit, by path from the `.sby`'s directory [Gate]. `depth` defaults to
+  20 and is the induction depth in `prove` mode [SBY]. The platform runs the
+  cover separately in cover mode: write at least
+  one `cover`, and every cover and every assertion's antecedent must be
+  reachable [Gate].
 - `read -formal` defines `FORMAL`, so properties sit inside `` `ifdef FORMAL ``
   next to the logic [SBY].
 - `assume` narrows what the solver examines, `assert` is what it tries to
@@ -190,8 +195,7 @@ and its proof setup. Tags in brackets name the sources above. A line marked
 ## Common failure modes
 
 - A latch from a missing default or an unassigned branch [lowRISC].
-- A flop with no reset value that passes only in a two-state run
-  (inference from [Verilator]).
+- A flop with no reset value (inference from [Verilator]).
 - Blocking assignments in a clocked block [lowRISC].
 - A proof that passes only up to its depth, reported as if unbounded [SBY].
 === END KNOWLEDGE ===
