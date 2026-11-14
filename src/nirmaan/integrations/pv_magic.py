@@ -28,7 +28,7 @@ from pathlib import Path
 from nirmaan.integrations.eda import Backend, EdaResult, Job, RunRecord, register_backend
 from nirmaan.integrations.eda_parsers import Diagnostic, _first, _plural
 from nirmaan.integrations.pd_parsers import parse_klayout
-from nirmaan.integrations.physical import STREAM_SCRIPT, _klayout_tech, _tcl, _token, needs_pdk, pdk_paths
+from nirmaan.integrations.physical import STREAM_SCRIPT, _tcl, _token, needs_pdk, pdk_paths, stream_step
 from nirmaan.models import text_value
 from nirmaan.runtime.tools import Params
 
@@ -142,10 +142,7 @@ def _steps(job: Job) -> list[list[str]]:
     }
     for name, text in scripts.items():
         (work / name).write_text(text, encoding="utf-8")
-    return [["klayout", "-zz", "-rd", f"tech_file={_klayout_tech(job)}",
-             "-rd", f"in_def={Path(p['def']).resolve()}",
-             "-rd", f"in_gds={' '.join(str(f) for f in pdk_paths(p, 'gds'))}",
-             "-rd", f"design_name={top}", "-rd", f"out_file={work / 'layout.gds'}", "-r", "stream.py"],
+    return [stream_step(job),
             ["magic", "-dnull", "-noconsole", "magic_drc.tcl"],
             ["magic", "-dnull", "-noconsole", "magic_extract.tcl"],
             ["netgen", "-batch", "source", "netgen_lvs.tcl"],

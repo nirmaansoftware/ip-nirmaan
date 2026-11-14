@@ -38,7 +38,7 @@ from laws import needs
 
 from nirmaan.integrations.eda import Backend, EdaResult, register_backend, unregister_backend
 from nirmaan.integrations.pd_parsers import VIOLATOR_REPORT_LIMIT, parse_klayout, parse_openroad, parse_opensta
-from nirmaan.integrations.physical import PDK_ROOT_ENV, needs_pdk
+from nirmaan.integrations.physical import PDK_ROOT_ENV, fill_layer_map, needs_pdk
 from nirmaan.models import Bound, EvidenceKind, TaskKind, ToolStatus
 from nirmaan.orchestrator import Orchestrator
 from nirmaan.runtime import ToolAccessDenied, ToolBroker, available_bindings, unavailable_reason
@@ -302,6 +302,40 @@ def test_klayout_broken_layout_and_netlist_fail():
     assert "1 layout cell with no GDS (X)" in parse_klayout(empty, 0).summary
     crashed = parse_klayout(clean + "\nERROR: drc.lydrc:12: undefined method\n", 1)
     assert not crashed.passed and crashed.errors[-1].message == "drc.lydrc:12: undefined method"
+
+
+def test_fill_on_layers_the_technology_does_not_map_fails():
+    """M80: fill the stream put on layers of KLayout's own numbering is read by no deck, so the run fails."""
+    clean = _text("klayout_pv.log")
+    lines = "\nnirmaan-gds-fill-layer: 7/28 3000\nnirmaan-gds-fill-layer: 9/28 9947\n"
+    bad = parse_klayout(clean + lines + "nirmaan-gds-fill-unmapped: 12947 7/28,9/28\n", 0)
+    assert not bad.passed and bad.metrics["fill_layers"] == {"7/28": 3000, "9/28": 9947}
+    assert bad.metrics["fill_unmapped"] == 12947
+    assert bad.summary == ("physical verification failed: 12947 fill shapes on GDS layers the technology does not "
+                           "map (7/28, 9/28), which no check reads")
+    good = parse_klayout(clean + lines.replace("7/28", "68/28") + "nirmaan-gds-fill-unmapped: 0 -\n", 0)
+    assert good.passed and good.metrics["fill_unmapped"] == 0, good.summary
+
+
+#: A LEF/DEF reader section as sky130hd.lyt has it: drawing entries, a fill suffix and datatype, no fill entry.
+LYT = ("<technology><lefdef><layer-map>layer_map('li1.drawing : 67/20';'met1.drawing : 68/20';"
+       "'met2.drawing : 69/20';'met2.FILL : 41/28';'via.drawing : 68/44')</layer-map>"
+       "<special-fills-suffix-string>.FILL</special-fills-suffix-string>"
+       "<special-fills-datatype-string>28</special-fills-datatype-string>"
+       "<routing-suffix-string>.drawing</routing-suffix-string></lefdef>"
+       "<mag><layer-map>layer_map()</layer-map></mag></technology>")
+
+
+def test_fill_layer_map_maps_each_routing_layer_to_its_drawing_number_and_the_fill_datatype():
+    tech, targets = fill_layer_map(LYT, ["li1", "met1", "met2", "met3"])
+    assert "'met2.drawing : 69/20';'met2.FILL : 41/28';'via.drawing : 68/44';'li1.FILL : 67/28';" \
+           "'met1.FILL : 68/28')</layer-map>" in tech  # an entry the map has is kept; met3 has no drawing entry
+    assert targets == ["41/28", "67/28", "68/28"] and tech.endswith("<mag><layer-map>layer_map()</layer-map></mag>"
+                                                                     "</technology>")  # other sections untouched
+    assert fill_layer_map(LYT, []) == (LYT, ["41/28"])  # nothing to add
+    no_suffix = LYT.replace("<special-fills-suffix-string>.FILL</special-fills-suffix-string>", "")
+    assert fill_layer_map(no_suffix, ["met1"]) == (no_suffix, [])
+    assert fill_layer_map("<technology/>", ["met1"]) == ("<technology/>", [])
 
 
 def test_openroad_failure_names_the_stage():
@@ -609,6 +643,7 @@ def test_pv_runs_stream_drc_and_lvs_and_counts_them_itself(project, tmp_path, mo
     steps = outcome.data["commands"]
     assert [s[0] for s in steps] == ["openroad", "klayout", "klayout", "klayout", "klayout", "klayout"]
     assert steps[1][-1] == "stream.py" and steps[2][-1] == pdk["drc_deck"] and steps[3][-1] == "drc_count.py"
+    assert "fill_targets=" in steps[1]  # M80: the stand-in technology maps no fill layer
     assert steps[4][-1] == pdk["lvs_deck"] and steps[5][-1] == "lvs_count.py"
     work = tmp_path / "w"
     tech = (work / "klayout.lyt").read_text()
