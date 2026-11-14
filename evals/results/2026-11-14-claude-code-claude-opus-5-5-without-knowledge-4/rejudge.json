@@ -1,0 +1,19 @@
+{
+  "format": "nirmaan.eval-rejudge",
+  "record": "2026-11-14-claude-code-claude-opus-5-5-without-knowledge-4",
+  "nirmaan_version": "1.25.0",
+  "trials": [
+    {
+      "case": "rtl/sync-fifo",
+      "trial": 1,
+      "same": true,
+      "differences": []
+    },
+    {
+      "case": "rtl/sync-fifo",
+      "trial": 2,
+      "same": true,
+      "differences": []
+    }
+  ]
+}
