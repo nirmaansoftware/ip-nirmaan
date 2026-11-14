@@ -55,7 +55,7 @@ snapshot, refreshed by `python scripts/status.py --release`.
 |---|---|---|
 | Organizational units | 232 | `units`, every PR |
 | Derived roles | 720 | `roles`, every PR |
-| Skills | 142 | `skills`, every PR |
+| Skills | 151 | `skills`, every PR |
 | Workflows | 10 | `workflows`, every PR |
 | Constitution principles | 12 | `principles`, every PR |
 | Tools `AVAILABLE` | 38 | `tools_available`, every PR |
@@ -131,6 +131,7 @@ new number. M1 to M42 are taken; see `docs/history/README.md`.
 | M78 | Signoff gates independent of the producing department (G13 record, decision 2c) | reserved |
 | M79 | SKY130 physical design pilot in CI: Magic DRC and Netgen LVS (`pv.run` backend `magic-netgen`), resources item R3 | reserved |
 | M80 | Metal fill streamed to the layers the DRC deck reads, with a must-fail fill control | reserved |
+| M81 | GF180MCU physical design pilot in CI: the M79 pilot on the ORFS gf180 platform, Magic DRC and Netgen LVS over open_pdks gf180mcuC | reserved |
 
 <!-- review:milestone-numbers:end -->
 
