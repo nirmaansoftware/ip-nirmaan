@@ -402,7 +402,9 @@ def _check(repo: Path, doc: Path, **override) -> None:
     data = {"format": KNOWLEDGE_CHECK_FORMAT, "skill": "c_programming",
             "knowledge_document": "knowledge/software/c_programming.md",
             "document_sha256": "sha256:" + hashlib.sha256(doc.read_bytes()).hexdigest(),
-            "writer": "session a", "checker": "session b", "sources_read": ["SEI CERT C"], **override}
+            "writer": "session a", "checker": "session b", "sources_read": ["SEI CERT C"],
+            "checked_at": "2026-11-15", "gate_claims": [{"claim": "no tool named", "evidence": "unverified"}],
+            **override}
     path = repo / "capability" / "records" / "knowledge" / "c_programming.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data), encoding="utf-8")
@@ -413,6 +415,54 @@ def test_a_checked_document_is_knowledge(org, tmp_path):
     _check(tmp_path, doc)
     entry = _level(org, tmp_path, "c_programming")
     assert entry["level"] == "knowledge" and entry["knowledge"]["check_record"].endswith("c_programming.json")
+
+
+def _without(repo: Path, doc: Path, key: str, **override) -> None:
+    _check(repo, doc, **override)
+    path = repo / "capability" / "records" / "knowledge" / "c_programming.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    del data[key]
+    path.write_text(json.dumps(data), encoding="utf-8")
+
+
+def test_a_new_check_record_needs_gate_claims(org, tmp_path):
+    doc = _document(tmp_path)
+    _without(tmp_path, doc, "gate_claims")
+    entry = _level(org, tmp_path, "c_programming")
+    assert entry["level"] is None and any("no gate_claims" in p for p in entry["knowledge"]["problems"])
+
+
+def test_a_record_with_no_date_needs_gate_claims(org, tmp_path):
+    doc = _document(tmp_path)
+    _without(tmp_path, doc, "gate_claims")
+    path = tmp_path / "capability" / "records" / "knowledge" / "c_programming.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    del data["checked_at"]
+    path.write_text(json.dumps(data), encoding="utf-8")
+    assert _level(org, tmp_path, "c_programming")["level"] is None
+
+
+def test_an_older_check_record_stays_valid_without_gate_claims(org, tmp_path):
+    doc = _document(tmp_path)
+    _without(tmp_path, doc, "gate_claims", checked_at="2026-11-13")
+    assert _level(org, tmp_path, "c_programming")["level"] == "knowledge"
+
+
+@pytest.mark.parametrize("claims", [
+    [], "none", [{"claim": "x"}], [{"evidence": "unverified"}], [{"claim": "x", "evidence": "see the gate"}],
+    [{"claim": "x", "evidence": "src/a.py"}],
+])
+def test_bad_gate_claims_are_no_level(org, tmp_path, claims):
+    doc = _document(tmp_path)
+    _check(tmp_path, doc, gate_claims=claims)
+    assert _level(org, tmp_path, "c_programming")["level"] is None
+
+
+@pytest.mark.parametrize("evidence", ["src/nirmaan/runtime/model.py:120", "tests/test_x.py::test_y", "unverified"])
+def test_gate_claims_accept_a_line_a_test_id_or_unverified(org, tmp_path, evidence):
+    doc = _document(tmp_path)
+    _check(tmp_path, doc, gate_claims=[{"claim": "mode prove only", "evidence": evidence}])
+    assert _level(org, tmp_path, "c_programming")["level"] == "knowledge"
 
 
 def test_a_document_without_a_check_record_is_no_level(org, tmp_path):
