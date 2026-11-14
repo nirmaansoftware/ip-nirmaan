@@ -34,10 +34,14 @@ added.
 
 One run, four steps, in the run's own directory (M53):
 
-1. `verilator --binary --coverage-line --coverage-toggle` over the sources,
-   top module `top`.
-2. The model, with the run's nonce (`+nirmaan_nonce=`) and
-   `+verilator+coverage+file+` naming where it writes its data.
+1. `verilator --cc --exe --build --timing --coverage-line --coverage-toggle`
+   over the sources, top module `top`, with the backend's own C++ main
+   (`COVERAGE_MAIN`, written into the run's directory): Verilator's main
+   loop, then the coverage data written to a path the backend names.
+   Verilator 5.020, which CI installs from Ubuntu 24.04, has a `--binary`
+   main that writes no coverage and no `+verilator+coverage+file+` argument,
+   so the backend does not rely on either.
+2. The model, with the run's nonce (`+nirmaan_nonce=`).
 3. `verilator_coverage --write coverage.dat` reads that data and writes it back.
 4. `verilator_coverage --write-info coverage.info` writes the lcov report.
 

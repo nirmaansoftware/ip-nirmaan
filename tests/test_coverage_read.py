@@ -43,7 +43,7 @@ COVERAGE_TOOLS = ("verilator", "verilator_coverage")
 
 def _log(passed: int = 4, failed: int = 0) -> str:
     """A run's log as the backend writes it: its own echo of the step with the nonce, then the simulation."""
-    return (f"$ obj/Vcounter_idle_tb +nirmaan_nonce={NONCE} +verilator+coverage+file+coverage_sim.dat\n"
+    return (f"$ obj/Vcounter_idle_tb +nirmaan_nonce={NONCE}\n"
             f"NIRMAAN-SIM {NONCE} {passed} passed, {failed} failed\n"
             "- counter_idle_tb.v:33: Verilog $finish\n"
             "- Verilator: $finish at 40ns; walltime 0.001 s; speed 54.348 us/s\n")

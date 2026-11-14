@@ -559,14 +559,42 @@ def coverage_problem(job: Job) -> str | None:
     return None
 
 
+#: The coverage run's own C++ main (M70). Verilator 5.020 (Ubuntu 24.04's, in CI) has a ``--binary`` main that
+#: writes no coverage, and no ``+verilator+coverage+file+`` argument, so this one, the same loop as Verilator's,
+#: writes the data itself, to the path the backend names. The backend writes it; no seat does.
+COVERAGE_MAIN = """\
+// Written by the coverage.read backend (M70): Verilator's own main loop, then the coverage data.
+#include "verilated.h"
+#include "verilated_cov.h"
+#include "V{top}.h"
+#include <memory>
+
+int main(int argc, char** argv) {{
+    const std::unique_ptr<VerilatedContext> contextp{{new VerilatedContext}};
+    contextp->commandArgs(argc, argv);
+    const std::unique_ptr<V{top}> topp{{new V{top}{{contextp.get()}}}};
+    while (!contextp->gotFinish()) {{
+        topp->eval();
+        if (!topp->eventsPending()) break;
+        contextp->time(topp->nextTimeSlot());
+    }}
+    topp->final();
+    contextp->coveragep()->write({data});
+    return 0;
+}}
+"""
+
+
 def _verilator_coverage(job: Job) -> list[list[str]]:
-    """Build the simulation with line and toggle coverage, run it, then have ``verilator_coverage`` read the data
-    the run wrote and write it back, as data and as an lcov report (M70)."""
+    """Build the simulation with line and toggle coverage and the run's own main, run it, then have
+    ``verilator_coverage`` read the data the run wrote and write it back, as data and as an lcov report (M70)."""
     (job.workdir / COVERAGE_DESIGN).write_text(json.dumps({"design": coverage_design(job)}) + "\n", encoding="utf-8")
     raw, data = job.workdir / COVERAGE_RAW, job.workdir / COVERAGE_DATA
-    return [["verilator", "--binary", "--coverage-line", "--coverage-toggle", "-Wno-fatal", "-j", "0",
-             "--top-module", str(job.top), "-Mdir", "obj", *job.sources],
-            [str(job.workdir / "obj" / f"V{job.top}"), NONCE_ARG + new_nonce(), f"+verilator+coverage+file+{raw}"],
+    main = job.workdir / "coverage_main.cpp"
+    main.write_text(COVERAGE_MAIN.format(top=job.top, data=json.dumps(str(raw))), encoding="utf-8")
+    return [["verilator", "--cc", "--exe", "--build", "--timing", "--coverage-line", "--coverage-toggle",
+             "-Wno-fatal", "-j", "0", "--top-module", str(job.top), "-Mdir", "obj", str(main), *job.sources],
+            [str(job.workdir / "obj" / f"V{job.top}"), NONCE_ARG + new_nonce()],
             ["verilator_coverage", "--write", str(data), str(raw)],
             ["verilator_coverage", "--write-info", str(job.workdir / COVERAGE_INFO), str(data)]]
 
