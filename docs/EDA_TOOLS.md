@@ -16,6 +16,7 @@ This milestone binds five tools to open-source backends:
 | `test.run` | `icarus`, `verilator-sim` | as above |
 | `synth.run` | `yosys` | `yosys` |
 | `formal.run` | `symbiyosys` | `sby` (plus `yosys` and a solver, which `sby` finds itself) |
+| `equivalence.run` (M69) | `eqy` | `eqy`, `yosys` and `make`; see `docs/EQUIVALENCE.md` |
 
 `sta.run` (OpenSTA) is not bound. It needs a liberty file and constraints that
 the fixture flow does not have yet, so it stays `CONTRACT_ONLY` for Stage 6.
@@ -213,7 +214,8 @@ Suite.
 ## 9. Not in this milestone
 
 * `sta.run` (OpenSTA), `equivalence.run`, `cdc.run`, and the physical design
-  tools remain `CONTRACT_ONLY`.
+  tools remain `CONTRACT_ONLY`. (M69 bound `equivalence.run` through eqy:
+  `docs/EQUIVALENCE.md`.)
 * Coverage collection from simulation (`coverage.read`).
 * Waveform capture into the VeriTriage waveform engine.
 * Version pinning of the backends: a run records which executable ran (its

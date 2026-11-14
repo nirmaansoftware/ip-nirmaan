@@ -182,7 +182,9 @@ python3.11 -m venv .venv && .venv/bin/pip install -e ".[ai,dev]"
 ```
 EDA tools on macOS come from Homebrew (`verilator`, `icarus-verilog`, `yosys`,
 `sby`, `yices2`, `riscv64-elf-gcc`). OpenROAD, OpenSTA, and KLayout are not
-supported on macOS arm64 (M34): their tests run only in CI.
+supported on macOS arm64 (M34): their tests run only in CI. eqy (M69) has no
+Homebrew formula: build it from source at the tag matching Yosys
+(`docs/EQUIVALENCE.md`, "Install"); without it the five eqy tests skip.
 
 **Running tests.**
 ```
