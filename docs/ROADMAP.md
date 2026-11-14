@@ -55,7 +55,7 @@ snapshot, refreshed by `python scripts/status.py --release`.
 |---|---|---|
 | Organizational units | 232 | `units`, every PR |
 | Derived roles | 720 | `roles`, every PR |
-| Skills | 147 | `skills`, every PR |
+| Skills | 151 | `skills`, every PR |
 | Workflows | 10 | `workflows`, every PR |
 | Constitution principles | 12 | `principles`, every PR |
 | Tools `AVAILABLE` | 38 | `tools_available`, every PR |
