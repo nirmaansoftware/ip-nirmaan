@@ -122,6 +122,22 @@ def test_sync_fifo_from_rtl_to_drc_and_lvs_on_gf180mcu(project, tmp_path, monkey
     clean, c_outcome = invoke(project, "pv.run", magic_pv, tmp_path / "pv_magic", bounds=SIGNOFF)
     cm = c_outcome.data["result"]["metrics"]
     print(f"pilot magic-netgen: {clean.summary}")
+    if cm["drc_violations"]:  # TEMPORARY diagnostic, removed before review
+        import subprocess
+        work = tmp_path / "pv_magic"
+        (work / "diag.tcl").write_text(
+            f'tech load {root / GF180MCUC_MAGIC["magic_tech"]}\ngds flatglob VIA_*\ngds read {work / "layout.gds"}\n'
+            f'load {TOP}\nselect top cell\nexpand\ndrc euclidean on\ndrc style drc(full)\ndrc check\ndrc catchup\n'
+            'puts "diag-scale: [cif scale out]"\n'
+            'foreach {why boxes} [drc listall why] { puts "diag-rule: $why"; foreach b [lrange $boxes 0 7] { puts "diag-box: $b" } }\n'
+            'quit -noprompt\n')
+        print(subprocess.run(["magic", "-dnull", "-noconsole", str(work / "diag.tcl")], cwd=work, capture_output=True,
+                             text=True).stdout[-4000:])
+        d = Path(out["def"]).read_text()
+        nets = d[d.index("\nNETS "):]
+        print("diag-def-rect-count:", nets.count("RECT"), "units:", re.search(r"UNITS DISTANCE MICRONS (\d+)", d)[1])
+        print("\n".join([ln for ln in nets.splitlines() if "RECT" in ln][:10]))
+        print("\n".join(d.splitlines()[:12]))
     assert cm["drc_violations"] == 0 and cm["lvs_mismatches"] == 0 and cm["gds_empty_cells"] == 0, clean.summary
     assert cm["magic_drc_style"] == "drc(full)" and cm["gds_shapes_skipped"] == 0, clean.summary
     assert cm["netgen_final"] == "Final result: Circuits match uniquely.", clean.summary
