@@ -19,7 +19,7 @@ from test_nirmaan_physical import AXI, TOP, fake_pv_pdk, fake_tool, invoke, only
 
 from nirmaan.integrations import pv_magic
 from nirmaan.integrations.eda import RunRecord, backends_for
-from nirmaan.integrations.pd_parsers import parse_klayout
+from nirmaan.integrations.pd_parsers import parse_klayout, parse_openroad
 from nirmaan.integrations.pv_magic import BACKEND
 from nirmaan.orchestrator import Orchestrator
 from nirmaan.runtime import ToolAccessDenied
@@ -149,6 +149,50 @@ def test_shapes_magic_cannot_read_fail_the_run_even_when_the_counts_are_clean():
     assert m["drc_violations"] == 0 and m["lvs_mismatches"] == 0  # the counts alone would pass it
     assert not result.passed and m["gds_shapes_skipped"] == 4, result.summary
     assert "4 GDS records Magic could not read" in result.summary and "layer=7 type=28" in result.summary
+
+
+
+# --- Captured runs (CI, the pd-gf180 workflow, M81) -------------------------------------------
+
+
+def test_gf180_the_pilot_routes_and_signs_off_clean():
+    """The pilot on the ORFS gf180 platform with the open_pdks cell views (docs/PD_GF180_PILOT.md)."""
+    pnr = parse_openroad(captured("gf180/openroad_gf180.log"), 0, "extract",
+                         ["floorplan", "place", "cts", "route", "extract"])
+    assert pnr.passed and pnr.metrics["drc_violations"] == 0, pnr.summary
+    assert "worst setup slack 4.059" in pnr.summary and "TNS 0.000 on extracted parasitics" in pnr.summary
+    clean = parse("gf180/magic_netgen_pv.log")
+    m = clean.metrics
+    assert clean.passed and m["drc_violations"] == 0 and m["lvs_mismatches"] == 0, clean.summary
+    assert m["magic_drc_style"] == "drc(full)" and m["gds_shapes_skipped"] == 0
+    assert m["netgen_final"] == "Final result: Circuits match uniquely."
+
+
+def test_gf180_both_must_fail_runs_fail():
+    overlap = parse("gf180/magic_netgen_pv_drc.log")
+    assert not overlap.passed and overlap.metrics["drc_violations"] == 423, overlap.summary
+    assert overlap.metrics["drc_by_rule"]["Metal1_spacing_<_0.23um_(M1.2a)"] == 116
+    rewired = parse("gf180/magic_netgen_pv_lvs.log")
+    assert not rewired.passed and rewired.metrics["drc_violations"] == 0, rewired.summary
+    assert rewired.metrics["lvs_mismatched"]["nets"] == 1 and rewired.metrics["lvs_unmatched_circuits"] == ["sync_fifo"]
+
+
+def test_gf180_what_the_earlier_runs_found():
+    """The three findings the fixes answer, each a recorded failed run (docs/PD_GF180_PILOT.md, section 5)."""
+    no_map = parse("gf180/magic_netgen_pv_no_layer_map.log")  # no layer_map, vendor cell views
+    assert not no_map.passed and no_map.metrics["gds_shapes_skipped"] == 24, no_map.summary
+    assert "VIA_" in no_map.summary and no_map.metrics["lvs_mismatched"]["pins"] == 80
+    subcells = parse("gf180/magic_netgen_pv_via_subcells.log")  # via cells as subcells, DEF after extraction
+    rules = subcells.metrics["drc_by_rule"]
+    assert not subcells.passed and rules["This_layer_can't_abut_or_partially_overlap_between_subcells"] == 134240
+    assert rules["Metal2_minimum_area_<_0.1444um^2_(M2.3)"] == 405 and subcells.metrics["lvs_mismatches"] == 0
+    ir = parse_openroad(captured("gf180/openroad_gf180_ir_drop.log"), 1, "extract",
+                        ["floorplan", "place", "cts", "route", "extract"])
+    assert not ir.passed and "PSM-0021" in ir.summary, ir.summary  # why the pilot runs without IR drop
+    patches = dict(line.removeprefix("diag ").split(" RECT in NETS: ")
+                   for line in captured("gf180/patches_diagnostic.log").splitlines() if "RECT in NETS" in line)
+    assert patches == {"d1.def": "252", "d2.def": "252", "d3.def": "252", "d4.def": "252", "d5.def": "0",
+                       "route.def": "0"}  # the router's patches, until extract_parasitics
 
 
 TOP_FIFO = "sync_fifo"

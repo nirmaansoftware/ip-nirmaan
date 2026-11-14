@@ -3,9 +3,8 @@
 The M79 pilot (`docs/PD_SKY130_PILOT.md`) on a second open PDK: the same
 block from RTL to DRC and LVS, on GitHub-hosted runners only, on the
 OpenROAD-flow-scripts `gf180` platform with Magic and Netgen over the open_pdks
-GF180MCU files. Use of GF180MCU in CI is pending the founder's
-decision; no committed record of that decision exists yet. CI runners only,
-never a development machine. IHP SG13G2 is a
+GF180MCU files. The founder approved GF180MCU for CI use (founder, in session,
+2026-11-14); CI runners only, never a development machine. IHP SG13G2 is a
 separate follow-up.
 
 ## 1. Decisions
@@ -91,36 +90,46 @@ is committed, so NOTICE does not change.
 
 ## 5. Results, and what the runs found
 
-**Evidence status.** No result of the pilot is recorded in this repository: no
-slack, DRC, LVS or timing figure is stated here, because no committed log,
-artifact or eval record of a `pd-gf180` run on the head being merged exists,
-and the required `physical-design` job does not run the GF180 pilot. The
-pilot's pass criteria are the ones in section 3. Its results are recorded only
-when `pd-gf180` is run on the head being merged and its log is kept.
+From the pull request's own runs of `pd-gf180` (run 43616066140, head 65d619d). The record is committed:
+the tool logs, or excerpts of them, in `tests/fixtures/pd/gf180/` (each file's first line names its run,
+head and what the excerpt keeps), and `tests/test_pv_magic.py` reads every figure below back through
+Nirmaan's own parsers (`test_gf180_*`). `pd-gf180` runs again on every head that changes the flow, the
+pilot or these records.
 
-What earlier runs of this pull request are said to have found, in order,
-without figures (unrecorded in the repository):
+| Run | Result |
+|---|---|
+| `pnr.run`, sync_fifo, gf180, 100 MHz (`openroad_gf180.log`) | routed and extracted: 0 router DRC violations, wirelength 15268 um, utilization 34%, power grid connected, clock skew 0.010 ns, worst setup slack 4.059 ns, hold 1.000 ns, TNS 0 on extracted parasitics |
+| `pv.run`, Magic and Netgen (`magic_netgen_pv.log`) | Magic `drc(full)`: 0 violations, every GDS record read; Netgen: "Circuits match uniquely", 0 mismatches |
+| a flip-flop half a site over another (`magic_netgen_pv_drc.log`) | failed: 423 Magic DRC violations (`M1.2a` 116, `CO.2a` 88, `CO.7` 58, ...) and an LVS mismatch |
+| a D input rewired (`magic_netgen_pv_lvs.log`) | failed: LVS, 1 mismatched net in `sync_fifo`; DRC 0 |
 
-1. **IR drop.** PDNSim refused the grid (`PSM-0021`,
+**CI time:** 2 min 19 s for the job (run 43616066140); pulling the image
+takes about a minute, the open_pdks fetch 7 s, the pilot test 51 s. The owners
+can decide from this whether it becomes required.
+
+What the earlier runs of this pull request found, in order:
+
+1. **IR drop** (run 43612057949, `openroad_gf180_ir_drop.log`). PDNSim refused the grid (`PSM-0021`,
    invalid resistance map): the technology LEF gives the via cut layers no
    resistance, and `setRC.tcl` sets one only at the BC and WC corners. The
    pilot runs at TC without `supply_voltage`, so without IR-drop analysis; the
    grid's connectivity is still checked (`check_power_grid`).
-2. **Layer map.** With the platform's KLayout technology
+2. **Layer map** (run 43612313722, `magic_netgen_pv_no_layer_map.log`). With the platform's KLayout technology
    alone, the stream left the via cells' geometry on layers of KLayout's own
    numbering (24 GDS records Magic could not read, which the M79 rule fails)
    and the pin labels too (Magic ignores labels on unknown layers, so the top
    cell's ports had no names). ORFS itself streams through the layer map file
    (`GDS_LAYER_MAP`), which `pv.run` now takes as `layer_map`. The same run
    found the well pins (section 2).
-3. **Via cells in Magic.** With the vias read, Magic reported many "This layer
-   can't abut or partially overlap between subcells" errors: each via cell is a subcell, and stacked vias in separate subcells
+3. **Via cells in Magic** (run 43613127358, `magic_netgen_pv_via_subcells.log`). With the vias read, Magic counted
+   134240 "This layer can't abut or partially overlap between subcells"
+   errors: each via cell is a subcell, and stacked vias in separate subcells
    break its exact-overlap rules for contacts. Flattening the via cells as
    Magic reads them removed all of them; the geometry is the same.
-4. **Minimum-area patches.** Magic then found
+4. **Minimum-area patches** (runs 43613127358 to 43615692267; `patches_diagnostic.log`). Magic then found
    Metal2 and Metal3 islands under the minimum area (`M2.3`, `M3.3`,
    0.1444 um2), for example a 0.28 by 0.38 um Metal2 pad between a via1 and a
-   via2 stacked on a cell pin. The router had patched them (patch
+   via2 stacked on a cell pin. The router had patched them (252 patch
    rectangles in a DEF written right after `detailed_route`), but
    `extract_parasitics` reorders the wires and drops the patches, and
    `pnr.run` wrote its DEF after extraction. It now writes the layout before
@@ -137,11 +146,12 @@ without figures (unrecorded in the repository):
   are the file's `FILL` lines (datatype 4, the PDK's dummy metal), and the
   platform's KLayout map, used without the file, sends fill to the drawing
   datatype 0, also a mapped target. No fill was checked by either deck here.
-* **Earlier pilots.** M29 and M34 wrote their DEF after extraction too, so
-  their layouts lacked any minimum-area patches. M34's note that the KLayout
-  deck found met3 islands under the minimum area where via2 and via3 stack
-  (why sky130hd signals stop at met3) is most likely this cause. Not re-tested
-  here: `pd-sky130` and `physical-design` stay green with the fix.
+* **Earlier pilots, an open question.** M29 and M34 wrote their DEF after
+  extraction too, so any minimum-area patch the router made there was dropped
+  in the same way. Whether that explains M34's met3 islands at stacked via2
+  and via3 (why sky130hd signals stop at met3) is not tested here; it is a
+  question for the physical design owners. `pd-sky130` and `physical-design`
+  are green with the fix.
 
 ## 6. Not in this milestone
 

@@ -15,6 +15,7 @@ on:
       - src/nirmaan/integrations/pv_magic.py
       - src/nirmaan/integrations/pd_parsers.py
       - tests/test_pd_gf180_pilot.py
+      - tests/fixtures/pd/gf180/**
       - tests/fixtures/pd/sync_fifo.sdc
       - tests/fixtures/rtl/sync_fifo/sync_fifo.v
   push:
@@ -25,6 +26,7 @@ on:
       - src/nirmaan/integrations/pv_magic.py
       - src/nirmaan/integrations/pd_parsers.py
       - tests/test_pd_gf180_pilot.py
+      - tests/fixtures/pd/gf180/**
       - tests/fixtures/pd/sync_fifo.sdc
       - tests/fixtures/rtl/sync_fifo/sync_fifo.v
 
