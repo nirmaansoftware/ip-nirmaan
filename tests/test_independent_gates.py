@@ -5,7 +5,7 @@ Council record ``council/records/2026-11-14-g13-grouping-units.md``, decision 2c
 (``INDEPENDENT_GATES`` in ``src/nirmaan/company/governance.py``) read by the router. The approver is the first
 holder of the gate's capability further up the producer's chain: the division's VP. The gate specs do not change.
 
-The plan-equivalence proof plans every representative request with the rule and without it and allows only the
+The plan-equivalence test plans every representative request with the rule and without it and allows only the
 changes in ``INTENDED``.
 """
 
