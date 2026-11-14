@@ -30,7 +30,7 @@ module uart_tx_regress_tb;
         frames = frames + 1;
         $display("INFO: frame %0d received 0x%02h", frames, rx_byte);
         if (rx_byte !== 8'h3C)
-            $display("ERROR: uart_tx_regress_tb.v:34: frame %0d: received 0x%02h, expected 0x3c", frames, rx_byte);
+            $display("ERROR: uart_tx_regress_tb.v:33: frame %0d: received 0x%02h, expected 0x3c", frames, rx_byte);
     end
 
     initial begin

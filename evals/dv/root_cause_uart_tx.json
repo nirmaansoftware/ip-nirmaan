@@ -8,7 +8,7 @@
   "expected_behavior": "A root-cause analysis that names the defect in the uart_tx RTL under investigation and its outcome class, and a reproducing testbench that fails on that RTL under simulator.run with expect=fail and passes on the fixed RTL. The defect: the transmitter copies data into its hold register on every start pulse, including while a frame is in flight, although a start pulse while busy must be ignored; a second start with a different byte therefore replaces every bit of the frame in flight that has not gone out yet, and the first frame carries the second byte. The outcome is an RTL bug. The repro sends one byte, pulses start with a different byte during a later bit, reads the frame back at the middle of every bit, and fails on a wrong data bit, not on a build error or a missing verdict.",
   "constraints": [
     "Work from the RTL under investigation, the failing log and the triage report; name the root cause in the RTL, not only the symptom in the log.",
-    "Write the repro as a self-checking testbench that ends with the verdict line the simulation gate reads, and that checks the behaviour the specification states (a start pulse while busy is ignored), not the buggy RTL's output.",
+    "Write the repro as a self-checking testbench that ends with the verdict line the simulation gate reads, and that checks the behaviour the RTL's header states (a start pulse while busy is ignored), not the buggy RTL's output, and that does not depend on the names inside one implementation.",
     "Choose the outcome class from rtl_bug, testbench_bug, infrastructure and spec_ambiguity, and say why the other three do not fit."
   ],
   "known_failure_modes": [

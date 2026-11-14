@@ -375,7 +375,11 @@ seat today, so these cases do not name it (a later skills batch adds it).
   even while a frame is in flight, though a start while `busy` must be
   ignored; a second start with another byte replaces the bits not yet sent.
   The case gives the failing regression log (`logs/regression_fail.log`, the
-  output of a real run) and a triage report to the triage stage. The reference
+  recorded output of the regression test on that RTL, which a test reruns) and
+  the triage stage's report and quick repro (`uart_tx_triage_repro.v`, which
+  probes the hold register by name: it reproduces on the RTL under
+  investigation but cannot build on another implementation, so copying it
+  passes neither control). The reference
   answer is a root-cause note and a repro (`uart_tx_repro.v`: send `0x3C`,
   pulse start with `0xB2` during bit 1, read the frame back at each bit's
   middle). Two `must-fail` controls judge the seat's repro: on the first
@@ -389,7 +393,7 @@ seat today, so these cases do not name it (a later skills batch adds it).
 - `debug/triage-three-bugs` judges the triage seat on `failure_triage`. Its
   block (`tests/fixtures/dv/uart_frame_tx/`) is a UART transmitter with even
   parity (eleven bit periods per frame) and three independent defects, shown
-  by three failing logs, one per regression test. The one control is
+  by three failing logs, one per regression test (recorded runs, rerun by a test). The one control is
   `must-fail-each` over the seat's repro testbenches: each must pass the clean
   RTL, and each of the three single-defect mutants must fail a repro of its
   own (a matching, so one repro that fails all three defects cannot stand for

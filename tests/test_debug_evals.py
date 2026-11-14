@@ -123,13 +123,46 @@ def test_the_root_cause_case_has_two_controls_on_two_implementations():
     assert _case("debug/triage-three-bugs").held_out[0].scorer == "must-fail-each"
 
 
-def test_the_failing_logs_are_what_the_buggy_rtl_printed():
-    """Each log is a real run: one ERROR line naming the failure, and the finish."""
+def test_the_failing_logs_name_one_failure_each():
     assert "received 0xb2, expected 0x3c" in _text(f"{UART}/logs/regression_fail.log")
     for name, text in (("data_byte", "received 0xd2, expected 0x4b"), ("parity_bit", "parity bit are odd"),
                        ("frame_period", "busy for 42 clocks, expected 44")):
         log = _text(f"{FRAME}/logs/{name}_fail.log")
         assert text in log and log.count("ERROR:") == 1, name
+
+
+def _simulate(tmp_path, sources, *args):
+    """Run the sources (paths from the repository root) from their folder, so a log names a file by its bare name."""
+    import subprocess
+    folder = (REPO / sources[-1]).parent
+    out = tmp_path / "sim.vvp"
+    names = [str((REPO / s).relative_to(folder)) for s in sources]
+    subprocess.run(["iverilog", "-g2012", "-o", str(out), *names], check=True, capture_output=True, cwd=folder)
+    return subprocess.run(["vvp", str(out), *args], check=True, capture_output=True, text=True, cwd=folder).stdout
+
+
+@needs(*GATE_TOOLS)
+def test_each_failing_log_is_what_the_regression_test_prints_on_the_buggy_rtl(tmp_path):
+    """The committed logs are recorded runs: rerunning each regression test on the RTL under investigation matches."""
+    assert _simulate(tmp_path, [f"{UART}/mutants/uart_tx_reload_while_busy.v", f"{UART}/uart_tx_regress_tb.v"]) \
+        == _text(f"{UART}/logs/regression_fail.log")
+    for name in ("data_byte", "parity_bit", "frame_period"):
+        out = _simulate(tmp_path, [f"{FRAME}/uart_frame_tx_buggy.v", f"{FRAME}/uart_frame_tx_regress_tb.v"],
+                        f"+test={name}")
+        assert out == _text(f"{FRAME}/logs/{name}_fail.log"), name
+
+
+@needs(*GATE_TOOLS)
+def test_the_triage_repro_given_to_the_root_cause_seat_is_tied_to_one_implementation(tmp_path):
+    """It probes the hold register: it reproduces on the RTL under investigation, and no copy of it builds on the
+    second implementation, so handing it to the root-cause seat does not hand over the held-out answer."""
+    repro = f"{UART}/uart_tx_triage_repro.v"
+    buggy = _simulate(tmp_path, [f"{UART}/mutants/uart_tx_reload_while_busy.v", repro])
+    assert "1 failed" in buggy and "hold is 0xb2" in buggy
+    assert "0 failed" in _simulate(tmp_path, [f"{UART}/uart_tx.v", repro])
+    import subprocess
+    with pytest.raises(subprocess.CalledProcessError):
+        _simulate(tmp_path, [f"{UART}/alt/uart_tx.v", repro])
 
 
 # --- The reference answers, run for real ------------------------------------------------------------
