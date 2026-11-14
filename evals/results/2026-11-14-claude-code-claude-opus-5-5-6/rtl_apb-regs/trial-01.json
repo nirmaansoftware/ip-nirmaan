@@ -1,0 +1,265 @@
+{
+  "answers": [
+    {
+      "cache_read_tokens": 13384,
+      "cache_write_tokens": 707,
+      "error": null,
+      "harness": "sha256:35643990d58bf28264abe98752bd6c2750a391483ac43176b4748a38fbc32711",
+      "input_tokens": 2,
+      "mode": "work",
+      "model": "claude-opus-5-5",
+      "output_tokens": 29534,
+      "packet_sha256": "a54b10575124590f7432b77223d5c4fdee9868f6463e70d75152dcf73c9aa3da",
+      "prompt_sha256": "aa13bbd46181630bc6e8ffbdf03e8c8480ad47c6b99dd558d594d59572ae8a84",
+      "provider": "claude-code",
+      "text": "```json\n{\"uncertainty\": 0.2, \"outcome\": \"Submitted the rtl_source (apb_regs.v, top apb_regs) and the self-checking testbench (apb_regs_tb.v, top apb_regs_tb) for prj-5c0d85843a:rtl-implementation. Lint, simulation and synthesis are still to be run by the platform. Independent review is still to be recorded.\", \"artifacts\": [{\"kind\": \"design_note\", \"title\": \"Implementation decisions for apb_regs\", \"summary\": \"This follows [artifact:prj-5c0d85843a.microarchitecture.a1]. pready is tied high. access = psel && penable. pslverr = access && !mapped, where mapped means paddr[1:0]==0 and paddr[ADDR_WIDTH-1:4]==0. Writes go through a byte mask built from pstrb and commit on the rising edge that ends a mapped write access. prdata is a combinational 4:1 mux, forced to zero unless the cycle is a mapped read access. Reset is synchronous and active low and clears all four registers. Port list, register map and PSLVERR policy come from [artifact:prj-5c0d85843a.interface-spec.a1], which meets [requirement:req-294155bac1] (four 32-bit registers). Both upstream specs carry independent review records: [evidence:prj-5c0d85843a.interface-spec.e1] and [evidence:prj-5c0d85843a.microarchitecture.e1].\"}], \"files\": [{\"path\": \"apb_regs.v\", \"kind\": \"rtl_source\", \"title\": \"apb_regs: four 32-bit APB4 registers\", \"summary\": \"Synthesizable Verilog-2001 for the APB4 completer in [artifact:prj-5c0d85843a.interface-spec.a1], built to [artifact:prj-5c0d85843a.microarchitecture.a1]. Zero wait states, no state machine, and four separately named flops with synchronous active-low reset. Byte-strobed writes happen only in a mapped write access. Unmapped transfers (misaligned, or 0x10 and above) get pslverr in the access phase. prdata and pslverr are zero outside the access phase. An `ifdef FORMAL` block holds manager assumptions and design-intent assertions, using a decode and byte model written separately from the design. It serves [requirement:req-294155bac1].\", \"entry\": \"apb_regs\"}, {\"path\": \"apb_regs_tb.v\", \"kind\": \"testbench\", \"title\": \"apb_regs_tb: directed self-checking testbench\", \"summary\": \"Directed testbench covering the verification list in section 7 of [artifact:prj-5c0d85843a.interface-spec.a1], using the drive-after-falling-edge, sample-before-rising-edge scheme in [artifact:prj-5c0d85843a.microarchitecture.a1]. It covers: reset values; write and read of every register; all 16 pstrb patterns, including none; single-byte writes; back-to-back mixed-direction transfers and idle gaps; zero wait states; quiet prdata and pslverr in setup, idle and reset cycles; misaligned and out-of-range writes and reads, checking pslverr, a zero prdata and no aliasing; and a second reset. The testbench keeps its own reference model. Every failed check calls $error. It prints the NIRMAAN-SIM verdict once before $finish.\", \"entry\": \"apb_regs_tb\"}], \"tool_runs\": [], \"claims\": [\"The RTL is written to be Verilator -Wall lint clean with no waivers. That is a design intent, not a result; no lint has run.\", \"The always @* read mux assigns rd_mux on every path, including a default, so no latch should be inferred. Synthesis has not run.\", \"The testbench should pass against this RTL under Icarus Verilog and under Verilator with --timing. No simulation has run.\", \"The `ifdef FORMAL` properties have not been proven or covered. No formal_spec (.sby) file is submitted with this task.\"], \"escalation\": null, \"notes\": \"Items from the verification plan in [artifact:prj-5c0d85843a.microarchitecture.a1] that are not in this submission: (1) apb_regs.sby is not here, because this task's expected outputs are rtl_source and testbench, and formal.run and formal.cover apply only when a formal_spec file is submitted. The properties are inside apb_regs.v under `ifdef FORMAL`, ready for a later formal task. (2) apb_regs_tb_fail.v, the failure-path testbench, is not here either. The platform takes the simulation top from the first testbench file, so a second testbench would add nothing to this task's evidence. Neither item changes the design, but each needs a recorded decision or a follow-up task. One open spec question: [artifact:prj-5c0d85843a.interface-spec.a1] says a write with pstrb all zero completes without error, and separately that unmapped transfers raise pslverr. The microarchitecture sets pslverr = access && !mapped, so an unmapped write with zero strobes errors. The testbench deliberately does not test that corner, so the evidence does not lock in either reading. The spec owner should confirm. Under Verilator, $error may end the run at the first failure (the default error limit), so a failing run may end without its verdict line. That still counts as a failed run.\"}\n```\n=== FILE: apb_regs.v ===\n`timescale 1ns/1ps\n`default_nettype none\n\n// apb_regs: four 32-bit read/write registers behind an APB4 completer port.\n// Implements interface_spec.md and microarchitecture.md (block apb_regs).\n//  - Zero wait states: pready is tied high.\n//  - access = psel && penable is the one cycle in which writes commit and\n//    the response is sampled.\n//  - Mapped addresses: word aligned and in 0x0..0xC. Everything else in the\n//    slot is unmapped and answers pslverr in the access phase.\n//  - prdata and pslverr are zero outside the access phase.\nmodule apb_regs #(\n    parameter ADDR_WIDTH = 8,\n    parameter DATA_WIDTH = 32\n) (\n    input  wire                    pclk,\n    input  wire                    presetn,\n    input  wire [ADDR_WIDTH-1:0]   paddr,\n    input  wire                    psel,\n    input  wire                    penable,\n    input  wire                    pwrite,\n    input  wire [DATA_WIDTH-1:0]   pwdata,\n    input  wire [DATA_WIDTH/8-1:0] pstrb,\n    output wire [DATA_WIDTH-1:0]   prdata,\n    output wire                    pready,\n    output wire                    pslverr\n);\n\n    localparam STRB_WIDTH = DATA_WIDTH / 8;\n\n    // ------------------------------------------------------------------\n    // Decode\n    // ------------------------------------------------------------------\n    wire                  access;\n    wire                  mapped;\n    wire [1:0]            idx;\n    wire                  wr_en;\n    wire                  rd_en;\n    wire [DATA_WIDTH-1:0] wmask;\n\n    assign access = psel & penable;\n    assign mapped = (paddr[1:0] == 2'b00) &&\n                    (paddr[ADDR_WIDTH-1:4] == {(ADDR_WIDTH-4){1'b0}});\n    assign idx    = paddr[3:2];\n    assign wr_en  = access & pwrite & mapped;\n    assign rd_en  = access & ~pwrite & mapped;\n\n    // Byte-lane write mask from pstrb: lane n is bits 8n+7:8n.\n    genvar g;\n    generate\n        for (g = 0; g < STRB_WIDTH; g = g + 1) begin : g_mask\n            assign wmask[8*g +: 8] = {8{pstrb[g]}};\n        end\n    endgenerate\n\n    // ------------------------------------------------------------------\n    // Register file: four separate flops\n    // ------------------------------------------------------------------\n    reg  [DATA_WIDTH-1:0] reg0;\n    reg  [DATA_WIDTH-1:0] reg1;\n    reg  [DATA_WIDTH-1:0] reg2;\n    reg  [DATA_WIDTH-1:0] reg3;\n\n    wire [DATA_WIDTH-1:0] reg0_nxt;\n    wire [DATA_WIDTH-1:0] reg1_nxt;\n    wire [DATA_WIDTH-1:0] reg2_nxt;\n    wire [DATA_WIDTH-1:0] reg3_nxt;\n\n    wire                  wr0;\n    wire                  wr1;\n    wire                  wr2;\n    wire                  wr3;\n\n    // merge(old, data, strb): strobed bytes from pwdata, others kept.\n    assign reg0_nxt = (reg0 & ~wmask) | (pwdata & wmask);\n    assign reg1_nxt = (reg1 & ~wmask) | (pwdata & wmask);\n    assign reg2_nxt = (reg2 & ~wmask) | (pwdata & wmask);\n    assign reg3_nxt = (reg3 & ~wmask) | (pwdata & wmask);\n\n    assign wr0 = wr_en & (idx == 2'd0);\n    assign wr1 = wr_en & (idx == 2'd1);\n    assign wr2 = wr_en & (idx == 2'd2);\n    assign wr3 = wr_en & (idx == 2'd3);\n\n    // Synchronous, active-low reset; load enable per register.\n    always @(posedge pclk) begin\n        if (!presetn) begin\n            reg0 <= {DATA_WIDTH{1'b0}};\n            reg1 <= {DATA_WIDTH{1'b0}};\n            reg2 <= {DATA_WIDTH{1'b0}};\n            reg3 <= {DATA_WIDTH{1'b0}};\n        end else begin\n            if (wr0) reg0 <= reg0_nxt;\n            if (wr1) reg1 <= reg1_nxt;\n            if (wr2) reg2 <= reg2_nxt;\n            if (wr3) reg3 <= reg3_nxt;\n        end\n    end\n\n    // ------------------------------------------------------------------\n    // Read data: combinational 4:1 mux, zero unless a mapped read access\n    // ------------------------------------------------------------------\n    reg [DATA_WIDTH-1:0] rd_mux;\n\n    always @* begin\n        case (idx)\n            2'd0:    rd_mux = reg0;\n            2'd1:    rd_mux = reg1;\n            2'd2:    rd_mux = reg2;\n            2'd3:    rd_mux = reg3;\n            default: rd_mux = {DATA_WIDTH{1'b0}};\n        endcase\n    end\n\n    assign prdata  = rd_en ? rd_mux : {DATA_WIDTH{1'b0}};\n    assign pready  = 1'b1;\n    assign pslverr = access & ~mapped;\n\n`ifdef FORMAL\n    // ------------------------------------------------------------------\n    // Design-intent properties. The decode and byte model below are written\n    // independently of the design's decode and merge.\n    // ------------------------------------------------------------------\n    reg f_past_valid;\n    initial f_past_valid = 1'b0;\n    always @(posedge pclk) f_past_valid <= 1'b1;\n\n    wire                    f_access = psel && penable;\n    wire                    f_mapped = (paddr < 16) && (paddr[1:0] == 2'b00);\n    wire [4*DATA_WIDTH-1:0] f_regs   = {reg3, reg2, reg1, reg0};\n\n    // Manager assumptions (interface_spec sections 4 and 6).\n    always @(*) begin\n        if (!f_past_valid) assume(!presetn);\n        if (!presetn)      assume(!psel);\n        if (penable)       assume(psel);\n    end\n\n    always @(posedge pclk) begin\n        if (f_past_valid) begin\n            // Setup is followed by access with a stable request.\n            if ($past(presetn) && $past(psel) && !$past(penable)) begin\n                assume(psel && penable);\n                assume(paddr  == $past(paddr));\n                assume(pwrite == $past(pwrite));\n                assume(pwdata == $past(pwdata));\n                assume(pstrb  == $past(pstrb));\n            end\n            // penable only in the cycle after a setup phase.\n            if (penable) assume($past(psel) && !$past(penable));\n        end\n    end\n\n    // Response rules.\n    always @(*) begin\n        assert(pready);\n        if (!f_access) begin\n            assert(prdata == {DATA_WIDTH{1'b0}});\n            assert(!pslverr);\n        end else begin\n            assert(pslverr == !f_mapped);\n            if (f_mapped && !pwrite)\n                assert(prdata == f_regs[paddr[3:2]*DATA_WIDTH +: DATA_WIDTH]);\n            else\n                assert(prdata == {DATA_WIDTH{1'b0}});\n        end\n    end\n\n    // Register rules: zero after reset; each byte changes only in a mapped\n    // write access to its register with its strobe set, to the written byte.\n    genvar f_b;\n    generate\n        for (f_b = 0; f_b < 4*STRB_WIDTH; f_b = f_b + 1) begin : g_f_byte\n            always @(posedge pclk) begin\n                if (f_past_valid) begin\n                    if (!$past(presetn))\n                        assert(f_regs[8*f_b +: 8] == 8'h00);\n                    else if ($past(f_access && pwrite && f_mapped) &&\n                             ($past(paddr[3:2]) == (f_b / STRB_WIDTH)) &&\n                             $past(pstrb[f_b % STRB_WIDTH]))\n                        assert(f_regs[8*f_b +: 8] ==\n                               $past(pwdata[8*(f_b % STRB_WIDTH) +: 8]));\n                    else\n                        assert(f_regs[8*f_b +: 8] == $past(f_regs[8*f_b +: 8]));\n                end\n            end\n        end\n    endgenerate\n\n    // Non-vacuity covers.\n    always @(*) begin\n        cover(f_access && pwrite && f_mapped && (pstrb != 0));\n        cover(f_access && !pwrite && f_mapped && (prdata != 0));\n        cover(f_access && !f_mapped && pslverr);\n    end\n`endif\n\nendmodule\n\n`default_nettype wire\n=== END FILE ===\n=== FILE: apb_regs_tb.v ===\n`timescale 1ns/1ps\n`default_nettype none\n\n`define CHECK(cond, msg) \\\n    begin \\\n        if (cond) begin \\\n            passed = passed + 1; \\\n        end else begin \\\n            failed = failed + 1; \\\n            $error msg; \\\n        end \\\n    end\n\n// apb_regs_tb: directed, self-checking testbench for apb_regs.\n// Inputs are driven after the falling edge and outputs are sampled 1 ns\n// later, well before the next rising edge.\nmodule apb_regs_tb;\n\n    reg         pclk;\n    reg         presetn;\n    reg  [7:0]  paddr;\n    reg         psel;\n    reg         penable;\n    reg         pwrite;\n    reg  [31:0] pwdata;\n    reg  [3:0]  pstrb;\n    wire [31:0] prdata;\n    wire        pready;\n    wire        pslverr;\n\n    integer        passed;\n    integer        failed;\n    integer        got_nonce;\n    reg [8*64-1:0] nonce;\n\n    // Reference model of the four registers.\n    reg [31:0] model [0:3];\n\n    reg [2:0] r;\n    reg [4:0] s;\n    reg [4:0] u;\n\n    apb_regs #(\n        .ADDR_WIDTH(8),\n        .DATA_WIDTH(32)\n    ) dut (\n        .pclk    (pclk),\n        .presetn (presetn),\n        .paddr   (paddr),\n        .psel    (psel),\n        .penable (penable),\n        .pwrite  (pwrite),\n        .pwdata  (pwdata),\n        .pstrb   (pstrb),\n        .prdata  (prdata),\n        .pready  (pready),\n        .pslverr (pslverr)\n    );\n\n    initial pclk = 1'b0;\n    always #5 pclk = ~pclk;\n\n    // ------------------------------------------------------------------\n    // Reference functions (independent of the RTL)\n    // ------------------------------------------------------------------\n    function tb_mapped;\n        input [7:0] a;\n        begin\n            tb_mapped = (a[1:0] == 2'b00) && (a < 8'h10);\n        end\n    endfunction\n\n    function [31:0] tb_merge;\n        input [31:0] old_v;\n        input [31:0] new_v;\n        input [3:0]  strb;\n        begin\n            tb_merge = old_v;\n            if (strb[0]) tb_merge[7:0]   = new_v[7:0];\n            if (strb[1]) tb_merge[15:8]  = new_v[15:8];\n            if (strb[2]) tb_merge[23:16] = new_v[23:16];\n            if (strb[3]) tb_merge[31:24] = new_v[31:24];\n        end\n    endfunction\n\n    function [31:0] tb_pattern;\n        input [1:0] ri;\n        begin\n            case (ri)\n                2'd0:    tb_pattern = 32'h1234_5678;\n                2'd1:    tb_pattern = 32'h9ABC_DEF0;\n                2'd2:    tb_pattern = 32'hCAFE_F00D;\n                2'd3:    tb_pattern = 32'h0BAD_C0DE;\n                default: tb_pattern = 32'h0000_0000;\n            endcase\n        end\n    endfunction\n\n    // Unmapped addresses: misaligned and out of range.\n    function [7:0] tb_unmapped;\n        input [4:0] ui;\n        begin\n            case (ui)\n                5'd0:    tb_unmapped = 8'h01;\n                5'd1:    tb_unmapped = 8'h02;\n                5'd2:    tb_unmapped = 8'h03;\n                5'd3:    tb_unmapped = 8'h05;\n                5'd4:    tb_unmapped = 8'h06;\n                5'd5:    tb_unmapped = 8'h07;\n                5'd6:    tb_unmapped = 8'h09;\n                5'd7:    tb_unmapped = 8'h0D;\n                5'd8:    tb_unmapped = 8'h0F;\n                5'd9:    tb_unmapped = 8'h10;\n                5'd10:   tb_unmapped = 8'h14;\n                5'd11:   tb_unmapped = 8'h18;\n                5'd12:   tb_unmapped = 8'h1C;\n                5'd13:   tb_unmapped = 8'h20;\n                5'd14:   tb_unmapped = 8'h80;\n                5'd15:   tb_unmapped = 8'hFC;\n                default: tb_unmapped = 8'hFF;\n            endcase\n        end\n    endfunction\n\n    // ------------------------------------------------------------------\n    // Bus tasks\n    // ------------------------------------------------------------------\n\n    // One APB transfer: setup cycle, then one access cycle. Returns just\n    // after the rising edge that ends the access phase, so a following\n    // call starts a back-to-back setup phase.\n    task apb_xfer;\n        input        wr;\n        input [7:0]  addr;\n        input [31:0] wdata;\n        input [3:0]  strb;\n        input [31:0] exp_rdata;\n        input        exp_err;\n        begin\n            @(negedge pclk);\n            psel    = 1'b1;\n            penable = 1'b0;\n            pwrite  = wr;\n            paddr   = addr;\n            pwdata  = wdata;\n            pstrb   = strb;\n            #1;\n            `CHECK(prdata === 32'h0000_0000, (\"setup @%h: prdata %h, expected zero\", addr, prdata))\n            `CHECK(pslverr === 1'b0, (\"setup @%h: pslverr high outside access phase\", addr))\n            @(negedge pclk);\n            penable = 1'b1;\n            #1;\n            `CHECK(pready === 1'b1, (\"access @%h: pready low, expected zero wait states\", addr))\n            `CHECK(pslverr === exp_err, (\"access @%h: pslverr %b, expected %b\", addr, pslverr, exp_err))\n            `CHECK(prdata === exp_rdata, (\"access @%h: prdata %h, expected %h\", addr, prdata, exp_rdata))\n            @(posedge pclk);\n        end\n    endtask\n\n    task apb_write;\n        input [7:0]  addr;\n        input [31:0] wdata;\n        input [3:0]  strb;\n        begin\n            if (tb_mapped(addr)) begin\n                apb_xfer(1'b1, addr, wdata, strb, 32'h0000_0000, 1'b0);\n                model[addr[3:2]] = tb_merge(model[addr[3:2]], wdata, strb);\n            end else begin\n                apb_xfer(1'b1, addr, wdata, strb, 32'h0000_0000, 1'b1);\n            end\n        end\n    endtask\n\n    // Reads drive non-zero pwdata to show a read never writes.\n    task apb_read;\n        input [7:0] addr;\n        begin\n            if (tb_mapped(addr))\n                apb_xfer(1'b0, addr, 32'hDEAD_BEEF, 4'h0, model[addr[3:2]], 1'b0);\n            else\n                apb_xfer(1'b0, addr, 32'hDEAD_BEEF, 4'h0, 32'h0000_0000, 1'b1);\n        end\n    endtask\n\n    task read_all;\n        reg [2:0] rr;\n        begin\n            for (rr = 3'd0; rr < 3'd4; rr = rr + 3'd1)\n                apb_read({3'b000, rr, 2'b00});\n        end\n    endtask\n\n    task idle;\n        input integer n;\n        integer k;\n        begin\n            for (k = 0; k < n; k = k + 1) begin\n                @(negedge pclk);\n                psel    = 1'b0;\n                penable = 1'b0;\n                pwrite  = 1'b0;\n                paddr   = 8'h00;\n                pwdata  = 32'h0000_0000;\n                pstrb   = 4'h0;\n                #1;\n                `CHECK(prdata === 32'h0000_0000, (\"idle: prdata %h, expected zero\", prdata))\n                `CHECK(pslverr === 1'b0, (\"idle: pslverr high outside access phase\"))\n            end\n        end\n    endtask\n\n    task do_reset;\n        integer k;\n        begin\n            @(negedge pclk);\n            presetn = 1'b0;\n            psel    = 1'b0;\n            penable = 1'b0;\n            pwrite  = 1'b0;\n            paddr   = 8'h00;\n            pwdata  = 32'h0000_0000;\n            pstrb   = 4'h0;\n            for (k = 0; k < 3; k = k + 1) begin\n                #1;\n                `CHECK(pready === 1'b1, (\"reset: pready low\"))\n                `CHECK(prdata === 32'h0000_0000, (\"reset: prdata %h, expected zero\", prdata))\n                `CHECK(pslverr === 1'b0, (\"reset: pslverr high\"))\n                @(negedge pclk);\n            end\n            presetn  = 1'b1;\n            model[0] = 32'h0000_0000;\n            model[1] = 32'h0000_0000;\n            model[2] = 32'h0000_0000;\n            model[3] = 32'h0000_0000;\n        end\n    endtask\n\n    // ------------------------------------------------------------------\n    // Test sequence\n    // ------------------------------------------------------------------\n    initial begin\n        passed   = 0;\n        failed   = 0;\n        presetn  = 1'b0;\n        psel     = 1'b0;\n        penable  = 1'b0;\n        pwrite   = 1'b0;\n        paddr    = 8'h00;\n        pwdata   = 32'h0000_0000;\n        pstrb    = 4'h0;\n        model[0] = 32'h0000_0000;\n        model[1] = 32'h0000_0000;\n        model[2] = 32'h0000_0000;\n        model[3] = 32'h0000_0000;\n        got_nonce = $value$plusargs(\"nirmaan_nonce=%s\", nonce);\n        if (got_nonce == 0) nonce = {(8*64){1'b0}};\n\n        // 1. Reset values.\n        do_reset;\n        read_all;\n\n        // 2. Full-word write of every register (back to back), idle gap,\n        //    then read back (back to back).\n        for (r = 3'd0; r < 3'd4; r = r + 3'd1)\n            apb_write({3'b000, r, 2'b00}, tb_pattern(r[1:0]), 4'hF);\n        idle(2);\n        read_all;\n\n        // 3. Back-to-back transfers with mixed directions, including a read\n        //    straight after a write to the same register.\n        apb_write(8'h04, 32'h0F1E_2D3C, 4'hF);\n        apb_read(8'h04);\n        apb_write(8'h0C, 32'h8796_A5B4, 4'hF);\n        apb_read(8'h00);\n        apb_read(8'h0C);\n        idle(1);\n\n        // 4. Every pstrb pattern on REG2, including none.\n        apb_write(8'h08, 32'h0000_0000, 4'hF);\n        for (s = 5'd0; s < 5'd16; s = s + 5'd1) begin\n            apb_write(8'h08, {8{s[3:0]}} ^ 32'h5AC3_96E1, s[3:0]);\n            apb_read(8'h08);\n            if (s[1:0] == 2'b11) idle(1);\n        end\n\n        // Single-byte and mixed partial writes on REG0 and REG3.\n        apb_write(8'h00, 32'h1111_1111, 4'h1);\n        apb_write(8'h00, 32'h2222_2222, 4'h2);\n        apb_write(8'h00, 32'h3333_3333, 4'h4);\n        apb_write(8'h00, 32'h4444_4444, 4'h8);\n        apb_read(8'h00);\n        apb_write(8'h0C, 32'hA5A5_A5A5, 4'h6);\n        apb_write(8'h0C, 32'h5A5A_5A5A, 4'h9);\n        idle(3);\n        read_all;\n\n        // 5. Zero-strobe writes to every register change nothing.\n        for (r = 3'd0; r < 3'd4; r = r + 3'd1)\n            apb_write({3'b000, r, 2'b00}, 32'hFFFF_FFFF, 4'h0);\n        read_all;\n\n        // 6. Unmapped addresses: writes error and change nothing (no\n        //    aliasing onto a register), reads error and return zero.\n        for (u = 5'd0; u < 5'd17; u = u + 5'd1)\n            apb_write(tb_unmapped(u), 32'hFFFF_FFFF, 4'hF);\n        idle(3);\n        read_all;\n        for (u = 5'd0; u < 5'd17; u = u + 5'd1)\n            apb_read(tb_unmapped(u));\n        idle(1);\n        read_all;\n\n        // 7. Reset again: every register returns to zero.\n        do_reset;\n        read_all;\n\n        // 8. The block works after the second reset.\n        apb_write(8'h0C, 32'hC0FF_EE00, 4'hF);\n        apb_read(8'h0C);\n        apb_read(8'h08);\n        idle(1);\n\n        $display(\"NIRMAAN-SIM %0s %0d passed, %0d failed\", nonce, passed, failed);\n        $finish;\n    end\n\nendmodule\n\n`undef CHECK\n`default_nettype wire\n=== END FILE ==="
+    }
+  ],
+  "format": "nirmaan.eval-trial",
+  "judge_runs": [
+    {
+      "check": "The reference testbench passes on the seat's RTL",
+      "params": {
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-wolnn80d/seat/prj-5c0d85843a_rtl-implementation/1/apb_regs.v",
+          "tests/fixtures/rtl/apb_regs/apb_regs_tb.v"
+        ],
+        "top": "apb_regs_tb"
+      },
+      "run": "run-0004",
+      "succeeded": true,
+      "summary": "icarus: simulation passed: 310 checks passed, $finish reached at time 1460000, 0 errors",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The seat's testbench fails each APB mutant visible at the ports",
+      "params": {
+        "sources": [
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-wolnn80d/judge/check-2/must-fail-a8uyb8qb/clean/apb_regs_tb.v",
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-wolnn80d/judge/check-2/must-fail-a8uyb8qb/clean/apb_regs.v"
+        ],
+        "top": "apb_regs_tb"
+      },
+      "run": "run-0005",
+      "succeeded": true,
+      "summary": "icarus: simulation passed: 638 checks passed, $finish reached at time 2591000, 0 errors",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The seat's testbench fails each APB mutant visible at the ports",
+      "params": {
+        "sources": [
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-wolnn80d/judge/check-2/must-fail-a8uyb8qb/mutant-1-1/apb_regs_tb.v",
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-wolnn80d/judge/check-2/must-fail-a8uyb8qb/mutant-1-1/apb_regs.v"
+        ],
+        "top": "apb_regs_tb"
+      },
+      "run": "run-0006",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: 23 errors, the testbench reports 23 of 638 checks failed; first: /private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-wolnn80d/judge/check-2/must-fail-a8uyb8qb/mutant-1-1/apb_regs_tb.v:161: access @08: prdata 4bd287f0, expected 000000f0",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The seat's testbench fails each APB mutant visible at the ports",
+      "params": {
+        "sources": [
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-wolnn80d/judge/check-2/must-fail-a8uyb8qb/mutant-1-2/apb_regs_tb.v",
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-wolnn80d/judge/check-2/must-fail-a8uyb8qb/mutant-1-2/apb_regs.v"
+        ],
+        "top": "apb_regs_tb"
+      },
+      "run": "run-0007",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: 34 errors, the testbench reports 34 of 638 checks failed; first: /private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-wolnn80d/judge/check-2/must-fail-a8uyb8qb/mutant-1-2/apb_regs_tb.v:160: access @01: pslverr 0, expected 1",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The seat's testbench fails each APB mutant visible at the ports",
+      "params": {
+        "sources": [
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-wolnn80d/judge/check-2/must-fail-a8uyb8qb/mutant-1-3/apb_regs_tb.v",
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-wolnn80d/judge/check-2/must-fail-a8uyb8qb/mutant-1-3/apb_regs.v"
+        ],
+        "top": "apb_regs_tb"
+      },
+      "run": "run-0008",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: 29 errors, the testbench reports 29 of 638 checks failed; first: /private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-wolnn80d/judge/check-2/must-fail-a8uyb8qb/mutant-1-3/apb_regs_tb.v:160: access @10: pslverr 0, expected 1",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The case's proof reaches every cover and fails each APB mutant",
+      "params": {
+        "sby": "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-wolnn80d/judge/check-3/must-fail-a7efvw48/clean/apb_regs.sby",
+        "sources": [
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-wolnn80d/judge/check-3/must-fail-a7efvw48/clean/apb_regs.v"
+        ]
+      },
+      "run": "run-0009",
+      "succeeded": true,
+      "summary": "symbiyosys: formal passed: every property proven",
+      "tool": "formal.run"
+    },
+    {
+      "check": "The case's proof reaches every cover and fails each APB mutant",
+      "params": {
+        "sby": "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-wolnn80d/judge/check-3/must-fail-a7efvw48/cover/apb_regs.sby",
+        "sources": [
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-wolnn80d/judge/check-3/must-fail-a7efvw48/cover/apb_regs.v"
+        ]
+      },
+      "run": "run-0010",
+      "succeeded": true,
+      "summary": "symbiyosys-cover: not vacuous: every cover reached (4 of 4); every assertion antecedent reached (38 of 38)",
+      "tool": "formal.cover"
+    },
+    {
+      "check": "The case's proof reaches every cover and fails each APB mutant",
+      "params": {
+        "sby": "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-wolnn80d/judge/check-3/must-fail-a7efvw48/mutant-1-1/apb_regs.sby",
+        "sources": [
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-wolnn80d/judge/check-3/must-fail-a7efvw48/mutant-1-1/apb_regs.v"
+        ]
+      },
+      "run": "run-0011",
+      "succeeded": false,
+      "summary": "symbiyosys: formal fail: 1 error; first: apb_regs.v:150: [ASSERT] assertion apb_regs._witness_.check_assert_apb_regs_v_150_498 failed at step 4",
+      "tool": "formal.run"
+    },
+    {
+      "check": "The case's proof reaches every cover and fails each APB mutant",
+      "params": {
+        "sby": "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-wolnn80d/judge/check-3/must-fail-a7efvw48/mutant-1-2/apb_regs.sby",
+        "sources": [
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-wolnn80d/judge/check-3/must-fail-a7efvw48/mutant-1-2/apb_regs.v"
+        ]
+      },
+      "run": "run-0012",
+      "succeeded": false,
+      "summary": "symbiyosys: formal fail: 1 error; first: apb_regs.v:151: [ASSERT] assertion apb_regs._witness_.check_assert_apb_regs_v_151_482 failed at step 3",
+      "tool": "formal.run"
+    },
+    {
+      "check": "The case's proof reaches every cover and fails each APB mutant",
+      "params": {
+        "sby": "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-wolnn80d/judge/check-3/must-fail-a7efvw48/mutant-1-3/apb_regs.sby",
+        "sources": [
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-wolnn80d/judge/check-3/must-fail-a7efvw48/mutant-1-3/apb_regs.v"
+        ]
+      },
+      "run": "run-0013",
+      "succeeded": false,
+      "summary": "symbiyosys: formal fail: 1 error; first: apb_regs.v:164: [ASSERT] assertion apb_regs._witness_.check_assert_apb_regs_v_164_342 failed at step 3",
+      "tool": "formal.run"
+    },
+    {
+      "check": "The case's proof reaches every cover and fails each APB mutant",
+      "params": {
+        "sby": "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-wolnn80d/judge/check-3/must-fail-a7efvw48/mutant-1-4/apb_regs.sby",
+        "sources": [
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-wolnn80d/judge/check-3/must-fail-a7efvw48/mutant-1-4/apb_regs.v"
+        ]
+      },
+      "run": "run-0014",
+      "succeeded": false,
+      "summary": "symbiyosys: formal fail: 1 error; first: apb_regs.v:164: [ASSERT] assertion apb_regs._witness_.check_assert_apb_regs_v_164_344 failed at step 3",
+      "tool": "formal.run"
+    }
+  ],
+  "knowledge": "on",
+  "model": "claude-opus-5-5",
+  "record": "2026-11-14-claude-code-claude-opus-5-5-6",
+  "result": {
+    "attempts": 1,
+    "attestations": [],
+    "audit_ok": true,
+    "case": "rtl/apb-regs",
+    "case_digest": "sha256:a8f885ccc40ff1e8c1f4c0b896131e968d83328f5e6ca72f478e0d9b6a955a38",
+    "cli": "2.1.325",
+    "cost_usd": null,
+    "detail": "Items from the verification plan in [artifact:prj-5c0d85843a.microarchitecture.a1] that are not in this submission: (1) apb_regs.sby is not here, because this task's expected outputs are rtl_source and testbench, and formal.run and formal.cover apply only when a formal_spec file is submitted. The properties are inside apb_regs.v under `ifdef FORMAL`, ready for a later formal task. (2) apb_regs_tb_fail.v, the failure-path testbench, is not here either. The platform takes the simulation top from the first testbench file, so a second testbench would add nothing to this task's evidence. Neither item changes the design, but each needs a recorded decision or a follow-up task. One open spec question: [artifact:prj-5c0d85843a.interface-spec.a1] says a write with pstrb all zero completes without error, and separately that unmapped transfers raise pslverr. The microarchitecture sets pslverr = access && !mapped, so an unmapped write with zero strobes errors. The testbench deliberately does not test that corner, so the evidence does not lock in either reading. The spec owner should confirm. Under Verilator, $error may end the run at the first failure (the default error limit), so a failing run may end without its verdict line. That still counts as a failed run.",
+    "duration_s": 252.951,
+    "gate_runs": [
+      {
+        "run": "run-0001",
+        "succeeded": true,
+        "summary": "verilator-lint: lint clean: 0 errors, 0 warnings",
+        "tool": "lint.run"
+      },
+      {
+        "run": "run-0002",
+        "succeeded": true,
+        "summary": "icarus: simulation passed: 638 checks passed, $finish reached at time 2591000, 0 errors",
+        "tool": "simulator.run"
+      },
+      {
+        "run": "run-0003",
+        "succeeded": true,
+        "summary": "yosys: synthesis passed: 530 cells, 128 flip-flops, 0 latches, 0 warnings",
+        "tool": "synth.run"
+      }
+    ],
+    "harness": "sha256:35643990d58bf28264abe98752bd6c2750a391483ac43176b4748a38fbc32711",
+    "input_tokens": 2,
+    "model_calls": 1,
+    "output_tokens": 29534,
+    "passed": true,
+    "replay": false,
+    "runtime": "claude-code",
+    "sandbox": "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-wolnn80d",
+    "scores": [
+      {
+        "failed_runs": [],
+        "name": "The reference testbench passes on the seat's RTL",
+        "runs": [
+          "run-0004"
+        ],
+        "scorer": "held-out-run",
+        "status": "passed",
+        "summary": "simulator.run run-0004: icarus: simulation passed: 310 checks passed, $finish reached at time 1460000, 0 errors"
+      },
+      {
+        "failed_runs": [
+          "run-0006",
+          "run-0007",
+          "run-0008"
+        ],
+        "name": "The seat's testbench fails each APB mutant visible at the ports",
+        "runs": [
+          "run-0005"
+        ],
+        "scorer": "must-fail",
+        "status": "passed",
+        "summary": "simulator.run run-0005 passed on the clean inputs; 3 of 3 mutants failed it"
+      },
+      {
+        "failed_runs": [
+          "run-0011",
+          "run-0012",
+          "run-0013",
+          "run-0014"
+        ],
+        "name": "The case's proof reaches every cover and fails each APB mutant",
+        "runs": [
+          "run-0009",
+          "run-0010"
+        ],
+        "scorer": "must-fail",
+        "status": "passed",
+        "summary": "formal.run run-0009 passed on the clean inputs with every cover reached; 4 of 4 mutants failed it"
+      }
+    ],
+    "seat": "prj-5c0d85843a:rtl-implementation",
+    "seat_status": "in_review",
+    "started_at": "2026-11-14T09:58:52.690470Z",
+    "submitted": true,
+    "version": "1.25.0"
+  },
+  "skills": {
+    "apb": "sha256:5eb05f03c1201b9bd2acd8e66fea165abd5ba773977cacaf015ddc071119c38e",
+    "rtl_design": "sha256:81102d62aff3859dcecb679bc3bbbd342b815b374739d5fa70b97567a8b3b5f0"
+  },
+  "stage": "rtl-implementation",
+  "trial": 1,
+  "version": 1
+}
