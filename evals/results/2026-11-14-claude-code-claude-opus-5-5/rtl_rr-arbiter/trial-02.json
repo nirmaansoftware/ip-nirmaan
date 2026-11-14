@@ -1,0 +1,317 @@
+{
+  "answers": [
+    {
+      "cache_read_tokens": 13638,
+      "cache_write_tokens": 709,
+      "error": null,
+      "harness": "sha256:35643990d58bf28264abe98752bd6c2750a391483ac43176b4748a38fbc32711",
+      "input_tokens": 2,
+      "mode": "work",
+      "model": "claude-opus-5-5",
+      "output_tokens": 38824,
+      "packet_sha256": "9d9c897ad987699c77785ee119ebfdcbbc56bfc5387f512c1313ad62580e9542",
+      "prompt_sha256": "77c5b7bf0f96891406396d7202a470e70a44d01031807924bd04a32542ffc3f2",
+      "provider": "claude-code",
+      "text": "```json\n{\"uncertainty\": 0.3, \"outcome\": \"rtl_source rr_arbiter.v and self-checking testbench rr_arbiter_tb.v written from the approved microarchitecture and interface specs. No tool has run on them. Lint, simulation and synthesis are left to the platform.\", \"artifacts\": [{\"kind\": \"rtl_source\", \"title\": \"rr_arbiter.v: N-requester round-robin arbiter\", \"summary\": \"Implements [artifact:prj-1b70baad63.microarchitecture.a1] sections 1-4 for the interface in [artifact:prj-1b70baad63.interface-spec.a1], serving [requirement:req-142be1ce31]. The only state is a $clog2(N)-bit pointer. It resets to 0 on a synchronous, active-low reset. A combinational loop searches from the pointer and wraps by comparing against LAST (N-1), not at a power of two. On a rising edge with a grant, the pointer moves to one past the winner; with no request it holds. grant is combinational and not gated by reset. Every combinational output gets a default first, so no latch is intended. Design-intent assertions and covers sit under `ifdef FORMAL`: pointer range, one-hot or zero grant, grant only to a requester, work conserving, no requester between the pointer and the winner, the pointer update rule, and a per-requester wait bound of N-1 with the induction invariant wait + distance <= N-1.\"}, {\"kind\": \"testbench\", \"title\": \"rr_arbiter_tb.v: self-checking testbench at N=4 and N=5\", \"summary\": \"Follows the verification plan in [artifact:prj-1b70baad63.microarchitecture.a1] and section 6 of [artifact:prj-1b70baad63.interface-spec.a1]. It runs an N=4 and an N=5 arbiter side by side. Every cycle it checks grant against an independent reference pointer model and checks the model-free properties: grant only to a requester, one-hot or zero, and work conserving. With every requester asking after reset, it checks strict rotation 0..N-1. Per-requester wait counters taken from the DUT's grant fail the run at N cycles of waiting. Coverage counters fail the run unless each of these is reached: no requests, each requester alone, everyone requesting, the N-1 longest wait, a held request among changing others, and reset during traffic. Every failure is reported with $error and every pass is counted. The run ends with the NIRMAAN-SIM verdict line, using the nonce read from $value$plusargs, then $finish.\"}], \"files\": [{\"path\": \"rr_arbiter.v\", \"kind\": \"rtl_source\", \"title\": \"Round-robin arbiter RTL\", \"summary\": \"RTL for rr_arbiter, parameter N (default 4, any N >= 2). It follows [artifact:prj-1b70baad63.microarchitecture.a1] and implements the ports and behavior of [artifact:prj-1b70baad63.interface-spec.a1] for [requirement:req-142be1ce31]. Formal properties are under `ifdef FORMAL`.\", \"entry\": \"rr_arbiter\"}, {\"path\": \"rr_arbiter_tb.v\", \"kind\": \"testbench\", \"title\": \"Self-checking testbench for rr_arbiter\", \"summary\": \"Testbench rr_arbiter_tb instantiates rr_arbiter at N=4 and at N=5 (not a power of two). It runs reference-model checks, fairness counters and coverage counters as required by [artifact:prj-1b70baad63.interface-spec.a1] section 6 and [artifact:prj-1b70baad63.microarchitecture.a1] section 5, and prints the NIRMAAN-SIM verdict.\", \"entry\": \"rr_arbiter_tb\"}], \"tool_runs\": [], \"claims\": [\"The RTL is intended to be clean under Verilator --lint-only -Wall at the default N. Constants LAST and ONE are built bit by bit so that no literal or parameter width mismatches. This has not been checked by any tool.\", \"The combinational search block assigns defaults to grant, winner, any_grant and idx before its loop, which should infer no latch in Yosys. This is unverified.\", \"The testbench is written to avoid width mismatches, so Verilator's default fatal warnings should not stop the build. It uses # delays, so it needs Verilator --timing (or --binary with timing) and an Icarus mode that supports $error. This is unverified.\", \"By hand reasoning, the induction invariant f_wait + f_dist <= N-1 is preserved: an unserved requester's distance to the pointer drops by at least one each cycle it waits. It has not been proven by any tool.\"], \"escalation\": null, \"notes\": \"Decisions recorded as deviations from the verification plan in microarchitecture.md section 5. (1) No formal_spec file is submitted in this task, because the expected outputs are rtl_source and testbench only. The planned rr_arbiter.sby and rr_arbiter_n5.sby are therefore not delivered. The formal properties and covers are written under `ifdef FORMAL` in rr_arbiter.v, ready for a follow-up formal task, but nothing about them is proven. (2) The planned failure-path testbench rr_arbiter_tb_fail.v is not delivered. Each check in rr_arbiter_tb.v reports with $error, and a failed check makes the verdict count it. (3) Fairness is measured from the DUT's own grant, not the model's, so the N-1 bound is checked independently of the reference model. The waits are reset on reset cycles because the spec gives no fairness promise across reset. (4) grant is checked only after the first reset edge; before that the pointer is uninitialised. Independent review is still required ([evidence:prj-1b70baad63.microarchitecture.e1] covers only the upstream spec).\"}\n```\n=== FILE: rr_arbiter.v ===\n// rr_arbiter.v\n// Round-robin arbiter for N requesters (interface_spec.md, microarchitecture.md).\n// State: one priority pointer `ptr`, $clog2(N) bits, reset to 0.\n// Grant: combinational wrapping priority search from `ptr`, wrap at N-1.\n// Update: on a rising edge with a grant, ptr <= winner + 1 (wrapping at N-1);\n//         with no request ptr holds. Reset is synchronous, active low.\nmodule rr_arbiter #(\n    parameter integer N = 4\n) (\n    input  wire         clk,\n    input  wire         rst_n,\n    input  wire [N-1:0] req,\n    output reg  [N-1:0] grant\n);\n\n    localparam integer PW     = (N > 1) ? $clog2(N) : 1;\n    localparam integer LAST_I = N - 1;\n\n    // Pointer-width constants, built bit by bit so every width matches.\n    wire [PW-1:0] LAST;   // N-1\n    wire [PW-1:0] ONE;    // 1\n\n    genvar g;\n    generate\n        for (g = 0; g < PW; g = g + 1) begin : g_const\n            assign LAST[g] = (((LAST_I >> g) & 1) != 0);\n            assign ONE[g]  = (g == 0);\n        end\n    endgenerate\n\n    reg  [PW-1:0] ptr;\n    reg  [PW-1:0] ptr_nxt;\n    reg  [PW-1:0] winner;\n    reg  [PW-1:0] idx;\n    reg           any_grant;\n    integer       k;\n\n    // Wrapping priority search: first requester at or after ptr wins.\n    always @* begin\n        grant     = {N{1'b0}};\n        winner    = ptr;\n        any_grant = 1'b0;\n        idx       = ptr;\n        for (k = 0; k < N; k = k + 1) begin\n            if (!any_grant && req[idx]) begin\n                any_grant  = 1'b1;\n                grant[idx] = 1'b1;\n                winner     = idx;\n            end\n            if (idx == LAST) idx = {PW{1'b0}};\n            else             idx = idx + ONE;\n        end\n    end\n\n    // One past the winner, wrapping explicitly at N-1.\n    always @* begin\n        if (winner == LAST) ptr_nxt = {PW{1'b0}};\n        else                ptr_nxt = winner + ONE;\n    end\n\n    // Pointer register: reset to 0, move only on a grant.\n    always @(posedge clk) begin\n        if (!rst_n)         ptr <= {PW{1'b0}};\n        else if (any_grant) ptr <= ptr_nxt;\n    end\n\n`ifdef FORMAL\n    reg f_past_valid;\n    initial f_past_valid = 1'b0;\n    always @(posedge clk) f_past_valid <= 1'b1;\n\n    always @(*) begin\n        if (!f_past_valid) assume (!rst_n);\n    end\n\n    // Upward, wrapping distance from ptr to the winner.\n    wire [31:0] f_wdist = (winner >= ptr) ? (winner - ptr) : (winner + N - ptr);\n\n    always @(*) begin\n        if (f_past_valid) begin\n            assert (ptr <= LAST);\n            assert ((grant & (grant - 1'b1)) == {N{1'b0}});\n            assert ((grant & ~req) == {N{1'b0}});\n            assert ((req == {N{1'b0}}) || (grant != {N{1'b0}}));\n            assert (any_grant == (grant != {N{1'b0}}));\n            if (any_grant) assert (grant[winner]);\n            cover (req == {N{1'b1}});\n        end\n    end\n\n    always @(posedge clk) begin\n        if (f_past_valid) begin\n            if (!$past(rst_n))\n                assert (ptr == {PW{1'b0}});\n            else if ($past(any_grant))\n                assert (ptr == (($past(winner) == LAST) ? {PW{1'b0}} : ($past(winner) + ONE)));\n            else\n                assert (ptr == $past(ptr));\n            if ($past(rst_n) && $past(any_grant) && ($past(winner) == LAST))\n                cover (ptr == {PW{1'b0}});\n        end\n    end\n\n    genvar fi;\n    generate\n        for (fi = 0; fi < N; fi = fi + 1) begin : g_fair\n            reg  [7:0]  f_wait;\n            wire [31:0] f_dist = (fi >= ptr) ? (fi - ptr) : (fi + N - ptr);\n\n            always @(posedge clk) begin\n                if (!rst_n || !req[fi] || grant[fi]) f_wait <= 8'd0;\n                else                                  f_wait <= f_wait + 8'd1;\n            end\n\n            always @(*) begin\n                if (f_past_valid) begin\n                    assert (f_wait <= LAST_I);\n                    assert (f_wait + f_dist <= LAST_I);\n                    if (any_grant && req[fi]) assert (f_wdist <= f_dist);\n                    cover (grant[fi]);\n                end\n            end\n        end\n    endgenerate\n`endif\n\nendmodule\n=== END FILE ===\n=== FILE: rr_arbiter_tb.v ===\n// rr_arbiter_tb.v\n// Self-checking testbench for rr_arbiter at N=4 and N=5, side by side.\n// Each cycle: grant vs an independent reference pointer model, model-free\n// grant properties, per-requester wait bound (fail at N cycles), and\n// coverage counters that fail the run if a required case is not reached.\nmodule rr_arbiter_tb;\n\n    reg        clk;\n    reg        rst_n;\n    reg  [3:0] req4;\n    reg  [4:0] req5;\n    wire [3:0] grant4;\n    wire [4:0] grant5;\n\n    rr_arbiter #(.N(4)) u_arb4 (.clk(clk), .rst_n(rst_n), .req(req4), .grant(grant4));\n    rr_arbiter #(.N(5)) u_arb5 (.clk(clk), .rst_n(rst_n), .req(req5), .grant(grant5));\n\n    initial clk = 1'b0;\n    always #5 clk = ~clk;\n\n    integer   passed;\n    integer   failed;\n    integer   cyc;\n    integer   nn           [0:1];\n    integer   mptr         [0:1];\n    integer   wt           [0:15];\n    reg       chg          [0:15];\n    reg [7:0] prev_r       [0:1];\n    integer   cov_none     [0:1];\n    integer   cov_all      [0:1];\n    integer   cov_fullwait [0:1];\n    integer   cov_held     [0:1];\n    integer   cov_rst      [0:1];\n    integer   cov_alone    [0:15];\n    reg       mvalid;\n    reg       rot_mode;\n    integer   rot_cnt;\n    integer   seed;\n    integer   ti;\n    integer   th;\n    integer   ta;\n    integer   tk;\n    reg [31:0] rnd;\n    reg        rv;\n    reg [8*64-1:0] nonce;\n\n    // Check one arbiter (index a) for the current cycle, then advance its model.\n    task check_arb;\n        input integer a;\n        input [7:0]   r;\n        input [7:0]   g;\n        input         rst_v;\n        integer   n;\n        integer   p;\n        integer   pick;\n        integer   k;\n        integer   j;\n        integer   w;\n        reg [7:0] expg;\n        reg [7:0] allm;\n        reg [7:0] bit_k;\n        reg       rb;\n        reg       gb;\n        begin\n            n    = nn[a];\n            allm = (8'd1 << n) - 8'd1;\n            pick = -1;\n            p    = 0;\n            if (mvalid) begin\n                p = mptr[a];\n                for (k = n - 1; k >= 0; k = k - 1) begin\n                    j = (p + k) % n;\n                    if (((r >> j) & 8'd1) != 8'd0) pick = j;\n                end\n                expg = (pick >= 0) ? (8'd1 << pick) : 8'd0;\n\n                if (g === expg) passed = passed + 1;\n                else begin\n                    failed = failed + 1;\n                    $error(\"N=%0d cycle %0d: grant %b, reference model expects %b (ptr %0d, req %b)\",\n                           n, cyc, g, expg, p, r);\n                end\n\n                if ((g & ~r) == 8'd0) passed = passed + 1;\n                else begin\n                    failed = failed + 1;\n                    $error(\"N=%0d cycle %0d: grant %b to a requester that is not asking (req %b)\",\n                           n, cyc, g, r);\n                end\n\n                if ((g & (g - 8'd1)) == 8'd0) passed = passed + 1;\n                else begin\n                    failed = failed + 1;\n                    $error(\"N=%0d cycle %0d: grant %b is not one-hot or zero\", n, cyc, g);\n                end\n\n                if ((r == 8'd0) || (g != 8'd0)) passed = passed + 1;\n                else begin\n                    failed = failed + 1;\n                    $error(\"N=%0d cycle %0d: req %b but no grant (not work conserving)\", n, cyc, r);\n                end\n\n                if (rot_mode) begin\n                    if (g === (8'd1 << (rot_cnt % n))) passed = passed + 1;\n                    else begin\n                        failed = failed + 1;\n                        $error(\"N=%0d cycle %0d: rotation step %0d granted %b, expected requester %0d\",\n                               n, cyc, rot_cnt, g, rot_cnt % n);\n                    end\n                end\n            end\n\n            if (!rst_v) begin\n                mptr[a] = 0;\n                for (k = 0; k < 8; k = k + 1) begin\n                    wt[a*8+k]  = 0;\n                    chg[a*8+k] = 1'b0;\n                end\n                if (mvalid && (r != 8'd0)) cov_rst[a] = cov_rst[a] + 1;\n            end else if (mvalid) begin\n                if (r == 8'd0) cov_none[a] = cov_none[a] + 1;\n                if (r == allm) cov_all[a]  = cov_all[a] + 1;\n                for (k = 0; k < n; k = k + 1) begin\n                    bit_k = 8'd1 << k;\n                    rb    = ((r & bit_k) != 8'd0);\n                    gb    = ((g & bit_k) != 8'd0);\n                    if (r == bit_k) cov_alone[a*8+k] = cov_alone[a*8+k] + 1;\n                    if (rb && gb) begin\n                        w = wt[a*8+k];\n                        if (w <= n - 1) passed = passed + 1;\n                        else begin\n                            failed = failed + 1;\n                            $error(\"N=%0d cycle %0d: requester %0d granted after waiting %0d cycles\",\n                                   n, cyc, k, w);\n                        end\n                        if (w == n - 1) cov_fullwait[a] = cov_fullwait[a] + 1;\n                        if ((w > 0) && chg[a*8+k]) cov_held[a] = cov_held[a] + 1;\n                        wt[a*8+k]  = 0;\n                        chg[a*8+k] = 1'b0;\n                    end else if (rb) begin\n                        wt[a*8+k] = wt[a*8+k] + 1;\n                        if (((r ^ prev_r[a]) & ~bit_k) != 8'd0) chg[a*8+k] = 1'b1;\n                        if (wt[a*8+k] == n) begin\n                            failed = failed + 1;\n                            $error(\"N=%0d cycle %0d: requester %0d has waited %0d cycles (bound %0d)\",\n                                   n, cyc, k, n, n - 1);\n                        end\n                    end else begin\n                        wt[a*8+k]  = 0;\n                        chg[a*8+k] = 1'b0;\n                    end\n                end\n                if (pick >= 0) mptr[a] = (pick + 1) % n;\n            end\n            prev_r[a] = r;\n        end\n    endtask\n\n    // Drive one cycle: inputs change at the falling edge, checks before the rising edge.\n    task do_cycle;\n        input [7:0] r;\n        input       rst_v;\n        begin\n            @(negedge clk);\n            req4  = r[3:0];\n            req5  = r[4:0];\n            rst_n = rst_v;\n            #1;\n            check_arb(0, {4'd0, r[3:0]}, {4'd0, grant4}, rst_v);\n            check_arb(1, {3'd0, r[4:0]}, {3'd0, grant5}, rst_v);\n            if (!rst_v) mvalid = 1'b1;\n            cyc = cyc + 1;\n        end\n    endtask\n\n    // Coverage item: 1 none, 3 all, 4 longest wait, 5 held among changing, 6 reset in traffic, 20+k alone.\n    task cov_check;\n        input         ok;\n        input integer a;\n        input integer item;\n        begin\n            if (ok) passed = passed + 1;\n            else begin\n                failed = failed + 1;\n                $error(\"coverage: N=%0d item %0d was not reached\", nn[a], item);\n            end\n        end\n    endtask\n\n    initial begin\n        passed   = 0;\n        failed   = 0;\n        cyc      = 0;\n        mvalid   = 1'b0;\n        rot_mode = 1'b0;\n        rot_cnt  = 0;\n        seed     = 32'h1b70baad;\n        rnd      = 32'd0;\n        rv       = 1'b1;\n        nn[0]    = 4;\n        nn[1]    = 5;\n        for (ta = 0; ta < 2; ta = ta + 1) begin\n            mptr[ta]         = 0;\n            prev_r[ta]       = 8'd0;\n            cov_none[ta]     = 0;\n            cov_all[ta]      = 0;\n            cov_fullwait[ta] = 0;\n            cov_held[ta]     = 0;\n            cov_rst[ta]      = 0;\n        end\n        for (tk = 0; tk < 16; tk = tk + 1) begin\n            wt[tk]        = 0;\n            chg[tk]       = 1'b0;\n            cov_alone[tk] = 0;\n        end\n        nonce = {64{8'h00}};\n        if ($value$plusargs(\"nirmaan_nonce=%s\", nonce) == 0) nonce = {64{8'h00}};\n\n        req4  = 4'd0;\n        req5  = 5'd0;\n        rst_n = 1'b0;\n\n        // Reset.\n        repeat (3) do_cycle(8'h00, 1'b0);\n\n        // No requests: no grant, pointer holds.\n        repeat (4) do_cycle(8'h00, 1'b1);\n\n        // Each requester alone.\n        for (ti = 0; ti < 5; ti = ti + 1) begin\n            do_cycle(8'd1 << ti, 1'b1);\n            do_cycle(8'd1 << ti, 1'b1);\n        end\n\n        // Everyone requesting after reset: strict rotation 0..N-1, longest wait N-1.\n        do_cycle(8'h00, 1'b0);\n        rot_mode = 1'b1;\n        rot_cnt  = 0;\n        for (ti = 0; ti < 20; ti = ti + 1) begin\n            do_cycle(8'h1f, 1'b1);\n            rot_cnt = rot_cnt + 1;\n        end\n        rot_mode = 1'b0;\n\n        // A held request among changing others.\n        for (th = 0; th < 5; th = th + 1) begin\n            for (ti = 0; ti < 12; ti = ti + 1) begin\n                rnd = $random(seed);\n                do_cycle(rnd[7:0] | (8'd1 << th), 1'b1);\n            end\n        end\n\n        // Random traffic, drops and re-raises, with reset during traffic.\n        for (ti = 0; ti < 400; ti = ti + 1) begin\n            rnd = $random(seed);\n            if (((ti % 97) == 50) || ((ti % 97) == 51)) rv = 1'b0;\n            else                                        rv = 1'b1;\n            case (rnd[18:16])\n                3'd0:    do_cycle(8'h00, rv);\n                3'd1:    do_cycle(8'hff, rv);\n                default: do_cycle(rnd[7:0] | rnd[15:8], rv);\n            endcase\n        end\n\n        // Coverage: every case the interface spec names must have been reached.\n        for (ta = 0; ta < 2; ta = ta + 1) begin\n            cov_check(cov_none[ta] > 0,     ta, 1);\n            cov_check(cov_all[ta] > 0,      ta, 3);\n            cov_check(cov_fullwait[ta] > 0, ta, 4);\n            cov_check(cov_held[ta] > 0,     ta, 5);\n            cov_check(cov_rst[ta] > 0,      ta, 6);\n            for (tk = 0; tk < nn[ta]; tk = tk + 1)\n                cov_check(cov_alone[ta*8+tk] > 0, ta, 20 + tk);\n        end\n\n        $display(\"NIRMAAN-SIM %0s %0d passed, %0d failed\", nonce, passed, failed);\n        $finish;\n    end\n\nendmodule\n=== END FILE ==="
+    }
+  ],
+  "format": "nirmaan.eval-trial",
+  "judge_runs": [
+    {
+      "check": "The reference testbench passes on the seat's RTL",
+      "params": {
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-mcvovj0w/seat/prj-1b70baad63_rtl-implementation/1/rr_arbiter.v",
+          "tests/fixtures/rtl/rr_arbiter/rr_arbiter_tb.v"
+        ],
+        "top": "rr_arbiter_tb"
+      },
+      "run": "run-0004",
+      "succeeded": true,
+      "summary": "icarus: simulation passed: 6151 checks passed, $finish reached at time 30730000, 0 errors",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The seat's testbench fails each arbitration mutant",
+      "params": {
+        "sources": [
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-mcvovj0w/judge/check-2/must-fail-fw_s5nnt/clean/rr_arbiter_tb.v",
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-mcvovj0w/judge/check-2/must-fail-fw_s5nnt/clean/rr_arbiter.v"
+        ],
+        "top": "rr_arbiter_tb"
+      },
+      "run": "run-0005",
+      "succeeded": true,
+      "summary": "icarus: simulation passed: 4890 checks passed, $finish reached at time 4981000000000000, 0 errors",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The seat's testbench fails each arbitration mutant",
+      "params": {
+        "sources": [
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-mcvovj0w/judge/check-2/must-fail-fw_s5nnt/mutant-1-1/rr_arbiter_tb.v",
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-mcvovj0w/judge/check-2/must-fail-fw_s5nnt/mutant-1-1/rr_arbiter.v"
+        ],
+        "top": "rr_arbiter_tb"
+      },
+      "run": "run-0006",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: 761 errors, the testbench reports 761 of 5033 checks failed; first: /private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-mcvovj0w/judge/check-2/must-fail-fw_s5nnt/mutant-1-1/rr_arbiter_tb.v:80: N=4 cycle 19: grant 00000001, reference model expects 00000010 (ptr 1, req 00001111)",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The seat's testbench fails each arbitration mutant",
+      "params": {
+        "sources": [
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-mcvovj0w/judge/check-2/must-fail-fw_s5nnt/mutant-1-2/rr_arbiter_tb.v",
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-mcvovj0w/judge/check-2/must-fail-fw_s5nnt/mutant-1-2/rr_arbiter.v"
+        ],
+        "top": "rr_arbiter_tb"
+      },
+      "run": "run-0007",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: 364 errors, the testbench reports 364 of 4845 checks failed; first: /private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-mcvovj0w/judge/check-2/must-fail-fw_s5nnt/mutant-1-2/rr_arbiter_tb.v:80: N=4 cycle 8: grant 00000000, reference model expects 00000001 (ptr 1, req 00000001)",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The seat's testbench fails each arbitration mutant",
+      "params": {
+        "sources": [
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-mcvovj0w/judge/check-2/must-fail-fw_s5nnt/mutant-1-3/rr_arbiter_tb.v",
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-mcvovj0w/judge/check-2/must-fail-fw_s5nnt/mutant-1-3/rr_arbiter.v"
+        ],
+        "top": "rr_arbiter_tb"
+      },
+      "run": "run-0008",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: 146 errors, the testbench reports 146 of 4864 checks failed; first: /private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-mcvovj0w/judge/check-2/must-fail-fw_s5nnt/mutant-1-3/rr_arbiter_tb.v:80: N=5 cycle 8: grant 00000000, reference model expects 00000001 (ptr 1, req 00000001)",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The case's N 5 proof reaches every cover and fails each mutant",
+      "params": {
+        "sby": "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-mcvovj0w/judge/check-3/must-fail-7ijtvtgh/clean/rr_arbiter_n5.sby",
+        "sources": [
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-mcvovj0w/judge/check-3/must-fail-7ijtvtgh/clean/rr_arbiter.v"
+        ]
+      },
+      "run": "run-0009",
+      "succeeded": true,
+      "summary": "symbiyosys: formal passed: every property proven",
+      "tool": "formal.run"
+    },
+    {
+      "check": "The case's N 5 proof reaches every cover and fails each mutant",
+      "params": {
+        "sby": "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-mcvovj0w/judge/check-3/must-fail-7ijtvtgh/cover/rr_arbiter_n5.sby",
+        "sources": [
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-mcvovj0w/judge/check-3/must-fail-7ijtvtgh/cover/rr_arbiter.v"
+        ]
+      },
+      "run": "run-0010",
+      "succeeded": true,
+      "summary": "symbiyosys-cover: not vacuous: every cover reached (10 of 10); every assertion antecedent reached (45 of 45)",
+      "tool": "formal.cover"
+    },
+    {
+      "check": "The case's N 5 proof reaches every cover and fails each mutant",
+      "params": {
+        "sby": "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-mcvovj0w/judge/check-3/must-fail-7ijtvtgh/mutant-1-1/rr_arbiter_n5.sby",
+        "sources": [
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-mcvovj0w/judge/check-3/must-fail-7ijtvtgh/mutant-1-1/rr_arbiter.v"
+        ]
+      },
+      "run": "run-0011",
+      "succeeded": false,
+      "summary": "symbiyosys: formal fail: 1 error; first: rr_arbiter.v:115: [ASSERT] assertion rr_arbiter._witness_.check_assert_rr_arbiter_v_115_1460 failed at step 2",
+      "tool": "formal.run"
+    },
+    {
+      "check": "The case's N 5 proof reaches every cover and fails each mutant",
+      "params": {
+        "sby": "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-mcvovj0w/judge/check-3/must-fail-7ijtvtgh/mutant-1-2/rr_arbiter_n5.sby",
+        "sources": [
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-mcvovj0w/judge/check-3/must-fail-7ijtvtgh/mutant-1-2/rr_arbiter.v"
+        ]
+      },
+      "run": "run-0012",
+      "succeeded": false,
+      "summary": "symbiyosys: formal fail: 1 error; first: rr_arbiter.v:102: [ASSERT] assertion rr_arbiter._witness_.check_assert_rr_arbiter_v_102_1085 failed at step 2",
+      "tool": "formal.run"
+    },
+    {
+      "check": "The case's N 5 proof reaches every cover and fails each mutant",
+      "params": {
+        "sby": "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-mcvovj0w/judge/check-3/must-fail-7ijtvtgh/mutant-1-3/rr_arbiter_n5.sby",
+        "sources": [
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-mcvovj0w/judge/check-3/must-fail-7ijtvtgh/mutant-1-3/rr_arbiter.v"
+        ]
+      },
+      "run": "run-0013",
+      "succeeded": false,
+      "summary": "symbiyosys: formal fail: 1 error; first: rr_arbiter.v:96: [ASSERT] assertion rr_arbiter._witness_.check_assert_rr_arbiter_v_96_1051 failed at step 2",
+      "tool": "formal.run"
+    },
+    {
+      "check": "The case's N 4 proof reaches every cover and fails each mutant wrong at N 4",
+      "params": {
+        "sby": "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-mcvovj0w/judge/check-4/must-fail-hp6_z9b3/clean/rr_arbiter.sby",
+        "sources": [
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-mcvovj0w/judge/check-4/must-fail-hp6_z9b3/clean/rr_arbiter.v"
+        ]
+      },
+      "run": "run-0014",
+      "succeeded": true,
+      "summary": "symbiyosys: formal passed: every property proven",
+      "tool": "formal.run"
+    },
+    {
+      "check": "The case's N 4 proof reaches every cover and fails each mutant wrong at N 4",
+      "params": {
+        "sby": "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-mcvovj0w/judge/check-4/must-fail-hp6_z9b3/cover/rr_arbiter.sby",
+        "sources": [
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-mcvovj0w/judge/check-4/must-fail-hp6_z9b3/cover/rr_arbiter.v"
+        ]
+      },
+      "run": "run-0015",
+      "succeeded": true,
+      "summary": "symbiyosys-cover: not vacuous: every cover reached (8 of 8); every assertion antecedent reached (33 of 33)",
+      "tool": "formal.cover"
+    },
+    {
+      "check": "The case's N 4 proof reaches every cover and fails each mutant wrong at N 4",
+      "params": {
+        "sby": "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-mcvovj0w/judge/check-4/must-fail-hp6_z9b3/mutant-1-1/rr_arbiter.sby",
+        "sources": [
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-mcvovj0w/judge/check-4/must-fail-hp6_z9b3/mutant-1-1/rr_arbiter.v"
+        ]
+      },
+      "run": "run-0016",
+      "succeeded": false,
+      "summary": "symbiyosys: formal fail: 1 error; first: rr_arbiter.v:115: [ASSERT] assertion rr_arbiter._witness_.check_assert_rr_arbiter_v_115_481 failed at step 2",
+      "tool": "formal.run"
+    },
+    {
+      "check": "The case's N 4 proof reaches every cover and fails each mutant wrong at N 4",
+      "params": {
+        "sby": "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-mcvovj0w/judge/check-4/must-fail-hp6_z9b3/mutant-1-2/rr_arbiter.sby",
+        "sources": [
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-mcvovj0w/judge/check-4/must-fail-hp6_z9b3/mutant-1-2/rr_arbiter.v"
+        ]
+      },
+      "run": "run-0017",
+      "succeeded": false,
+      "summary": "symbiyosys: formal fail: 1 error; first: rr_arbiter.v:102: [ASSERT] assertion rr_arbiter._witness_.check_assert_rr_arbiter_v_102_231 failed at step 2",
+      "tool": "formal.run"
+    }
+  ],
+  "knowledge": "on",
+  "model": "claude-opus-5-5",
+  "record": "2026-11-14-claude-code-claude-opus-5-5",
+  "result": {
+    "attempts": 1,
+    "attestations": [],
+    "audit_ok": true,
+    "case": "rtl/rr-arbiter",
+    "case_digest": "sha256:13cb8f4535f0b2f6eaee7b4e780bfb35f7869149472630fcb60e6113d3d7a740",
+    "cli": "2.1.325",
+    "cost_usd": null,
+    "detail": "Decisions recorded as deviations from the verification plan in microarchitecture.md section 5. (1) No formal_spec file is submitted in this task, because the expected outputs are rtl_source and testbench only. The planned rr_arbiter.sby and rr_arbiter_n5.sby are therefore not delivered. The formal properties and covers are written under `ifdef FORMAL` in rr_arbiter.v, ready for a follow-up formal task, but nothing about them is proven. (2) The planned failure-path testbench rr_arbiter_tb_fail.v is not delivered. Each check in rr_arbiter_tb.v reports with $error, and a failed check makes the verdict count it. (3) Fairness is measured from the DUT's own grant, not the model's, so the N-1 bound is checked independently of the reference model. The waits are reset on reset cycles because the spec gives no fairness promise across reset. (4) grant is checked only after the first reset edge; before that the pointer is uninitialised. Independent review is still required ([evidence:prj-1b70baad63.microarchitecture.e1] covers only the upstream spec).",
+    "duration_s": 351.712,
+    "gate_runs": [
+      {
+        "run": "run-0001",
+        "succeeded": true,
+        "summary": "verilator-lint: lint clean: 0 errors, 0 warnings",
+        "tool": "lint.run"
+      },
+      {
+        "run": "run-0002",
+        "succeeded": true,
+        "summary": "icarus: simulation passed: 4890 checks passed, $finish reached at time 4981, 0 errors",
+        "tool": "simulator.run"
+      },
+      {
+        "run": "run-0003",
+        "succeeded": true,
+        "summary": "yosys: synthesis passed: 57 cells, 2 flip-flops, 0 latches, 0 warnings",
+        "tool": "synth.run"
+      }
+    ],
+    "harness": "sha256:35643990d58bf28264abe98752bd6c2750a391483ac43176b4748a38fbc32711",
+    "input_tokens": 2,
+    "model_calls": 1,
+    "output_tokens": 38824,
+    "passed": true,
+    "replay": false,
+    "runtime": "claude-code",
+    "sandbox": "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-mcvovj0w",
+    "scores": [
+      {
+        "failed_runs": [],
+        "name": "The reference testbench passes on the seat's RTL",
+        "runs": [
+          "run-0004"
+        ],
+        "scorer": "held-out-run",
+        "status": "passed",
+        "summary": "simulator.run run-0004: icarus: simulation passed: 6151 checks passed, $finish reached at time 30730000, 0 errors"
+      },
+      {
+        "failed_runs": [
+          "run-0006",
+          "run-0007",
+          "run-0008"
+        ],
+        "name": "The seat's testbench fails each arbitration mutant",
+        "runs": [
+          "run-0005"
+        ],
+        "scorer": "must-fail",
+        "status": "passed",
+        "summary": "simulator.run run-0005 passed on the clean inputs; 3 of 3 mutants failed it"
+      },
+      {
+        "failed_runs": [
+          "run-0011",
+          "run-0012",
+          "run-0013"
+        ],
+        "name": "The case's N 5 proof reaches every cover and fails each mutant",
+        "runs": [
+          "run-0009",
+          "run-0010"
+        ],
+        "scorer": "must-fail",
+        "status": "passed",
+        "summary": "formal.run run-0009 passed on the clean inputs with every cover reached; 3 of 3 mutants failed it"
+      },
+      {
+        "failed_runs": [
+          "run-0016",
+          "run-0017"
+        ],
+        "name": "The case's N 4 proof reaches every cover and fails each mutant wrong at N 4",
+        "runs": [
+          "run-0014",
+          "run-0015"
+        ],
+        "scorer": "must-fail",
+        "status": "passed",
+        "summary": "formal.run run-0014 passed on the clean inputs with every cover reached; 2 of 2 mutants failed it"
+      }
+    ],
+    "seat": "prj-1b70baad63:rtl-implementation",
+    "seat_status": "in_review",
+    "started_at": "2026-11-14T05:16:09.422391Z",
+    "submitted": true,
+    "version": "1.25.0"
+  },
+  "skills": {
+    "arbitration": "sha256:53dff4b10deec145e18247fd490870321613e50b35a8da2f0e0a044b95b58e31",
+    "rtl_design": "sha256:81102d62aff3859dcecb679bc3bbbd342b815b374739d5fa70b97567a8b3b5f0"
+  },
+  "stage": "rtl-implementation",
+  "trial": 2,
+  "version": 1
+}
