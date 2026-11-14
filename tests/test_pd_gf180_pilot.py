@@ -125,27 +125,25 @@ def test_sync_fifo_from_rtl_to_drc_and_lvs_on_gf180mcu(project, tmp_path, monkey
     if cm["drc_violations"]:  # TEMPORARY diagnostic, removed before review
         import subprocess
         work = tmp_path / "pv_magic"
-        (work / "diag.tcl").write_text(
-            f'tech load {root / GF180MCUC_MAGIC["magic_tech"]}\ngds flatglob VIA_*\ngds read {work / "layout.gds"}\n'
-            f'load {TOP}\nselect top cell\nexpand\ndrc euclidean on\ndrc style drc(full)\ndrc check\ndrc catchup\n'
-            'puts "diag-scale: [cif scale out]"\n'
-            'foreach {why boxes} [drc listall why] { puts "diag-rule: $why"; foreach b [lrange $boxes 0 7] { puts "diag-box: $b" } }\n'
-            'quit -noprompt\n')
-        print(subprocess.run(["magic", "-dnull", "-noconsole", str(work / "diag.tcl")], cwd=work, capture_output=True,
-                             text=True).stdout[-4000:])
-        d = Path(out["def"]).read_text()
-        nets = d[d.index("\nNETS "):]
-        print("diag-def-rect-count:", nets.count("RECT"), "units:", re.search(r"UNITS DISTANCE MICRONS (\d+)", d)[1])
-        vias = d[d.index("\nVIAS "):d.index("END VIAS")]
-        print("diag-vias:\n" + vias[:3000])
+        head = (f'tech load {root / GF180MCUC_MAGIC["magic_tech"]}\ngds flatglob VIA_*\ngds read {work / "layout.gds"}\n'
+                f'load {TOP}\nselect top cell\nexpand\ndrc euclidean on\ndrc style drc(full)\ndrc check\ndrc catchup\n')
+        (work / "diag.tcl").write_text(head + 'foreach {why boxes} [drc listall why] { foreach b [lrange $boxes 0 30] '
+                                       '{ puts "diag-box: $b" } }\nquit -noprompt\n')
         boxes = [tuple(map(int, ln.split()[1:])) for ln in subprocess.run(
             ["magic", "-dnull", "-noconsole", str(work / "diag.tcl")], cwd=work, capture_output=True, text=True
         ).stdout.splitlines() if ln.startswith("diag-box:")]
-        for b in boxes[:16:5]:
+        picks = [boxes[0], boxes[1], boxes[-1], boxes[-6], boxes[-11]]
+        probe = "".join(f'puts "diag-probe {b}"\nbox values {b[0]} {b[1]} {b[2]} {b[3]}\nputs "diag-what [what -list]"\n'
+                        f'box grow c 40\nputs "diag-what-grown [what -list]"\n' for b in picks)
+        (work / "probe.tcl").write_text(head + probe + "quit -noprompt\n")
+        print("\n".join(ln for ln in subprocess.run(["magic", "-dnull", "-noconsole", str(work / "probe.tcl")], cwd=work,
+                                                    capture_output=True, text=True).stdout.splitlines() if "diag" in ln)[:6000])
+        d = Path(out["def"]).read_text()
+        for b in picks:
             cx, cy = (b[0] + b[2]) * 5, (b[1] + b[3]) * 5  # Magic units of 0.005 um to DEF units of 0.0005 um
-            near = [ln.strip() for ln in d.splitlines() if any(
-                abs(int(x) - cx) < 600 and abs(int(y) - cy) < 600 for x, y in re.findall(r"\( (\d+) (\d+)", ln))]
-            print(f"diag-near {b} ({cx}, {cy}):\n" + "\n".join(near[:12]))
+            near = [ln.strip() for ln in d.splitlines() if any(abs(int(n) - cx) < 1200 for n in re.findall(r"\b\d{4,7}\b", ln))
+                    and any(abs(int(n) - cy) < 1200 for n in re.findall(r"\b\d{4,7}\b", ln)) and ("NEW" in ln or "+ ROUTED" in ln or "+ FIXED" in ln or "PLACED" in ln)]
+            print(f"diag-near {b} ({cx}, {cy}):\n" + "\n".join(near[:14]))
     assert cm["drc_violations"] == 0 and cm["lvs_mismatches"] == 0 and cm["gds_empty_cells"] == 0, clean.summary
     assert cm["magic_drc_style"] == "drc(full)" and cm["gds_shapes_skipped"] == 0, clean.summary
     assert cm["netgen_final"] == "Final result: Circuits match uniquely.", clean.summary
