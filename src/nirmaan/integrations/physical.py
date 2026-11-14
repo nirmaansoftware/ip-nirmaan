@@ -586,6 +586,15 @@ for name in empty[:20]:
 with open(in_def) as f:
     fills = re.search(r"^FILLS .*?^END FILLS", f.read(), re.S | re.M)
 print("nirmaan-gds-fill-shapes: %d" % (len(re.findall(r"RECT", fills.group(0))) if fills else 0))
+fill_layers = {}  # M80: the GDS layer each fill shape landed on, which decides whether a deck reads it
+for cell in out.each_cell():
+    if cell.name.endswith("_DEF_FILL"):
+        for li in out.layer_indexes():
+            info = out.get_info(li)
+            key = "%d/%d" % (info.layer, info.datatype)
+            fill_layers[key] = fill_layers.get(key, 0) + cell.shapes(li).size()
+for key in sorted(k for k, n in fill_layers.items() if n):
+    print("nirmaan-gds-fill-layer: %s %d" % (key, fill_layers[key]))
 out.write(out_file)
 '''
 

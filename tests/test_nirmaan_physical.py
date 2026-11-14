@@ -996,6 +996,25 @@ def test_real_signoff_flow_on_sky130hd(project, tmp_path):
     assert bm["drc_violations"] > 0 and any("OFFGRID" in r for r in bm["drc_by_rule"]), bad_drc.summary
     assert "DRC violation" in bad_drc.summary
 
+    # M80: one met1 fill rectangle shrunk to 0.1 um square, under met1's minimum width (m1.1, 0.14 um) and
+    # area (m1.6, 0.083 um2). Only a deck that reads the fill layers can see it, so it must fail DRC.
+    fills = re.search(r"^FILLS .*?^END FILLS", layout, re.S | re.M)
+    rect = re.compile(r"- LAYER met1 (?:\+ MASK \d+ )?RECT \( (-?\d+) (-?\d+) \) \( -?\d+ -?\d+ \)").search(
+        layout, fills.start(), fills.end())
+    side = int(re.search(r"^UNITS DISTANCE MICRONS (\d+) ;", layout, re.M)[1]) // 10
+    tiny = rect[0][:rect[0].rindex("(")] + f"( {int(rect[1]) + side} {int(rect[2]) + side} )"
+    bad_fill_def = tmp_path / "bad_fill.def"
+    bad_fill_def.write_text(layout[:rect.start()] + tiny + layout[rect.end():], encoding="utf-8")
+    bad_fill, fill_outcome = invoke(project, "pv.run", {**pv, "def": str(bad_fill_def)}, tmp_path / "pv_fill",
+                                    bounds=signoff)
+    fm = fill_outcome.data["result"]["metrics"]
+    seen = (bad_fill.summary, fm["drc_by_rule"], cm["fill_layers"])
+    assert not bad_fill.succeeded and fm["drc_violations"] > 0 and {"m1.1", "m1.6"} & set(fm["drc_by_rule"]), seen
+    assert fm["lvs_mismatches"] == 0, seen  # the LVS deck reads met1 drawing only: the fill is no net
+    # Every fill shape is on a layer the deck reads as metal: li1 or met1 to met5 (67 to 72), fill datatype 28.
+    assert cm["fill_layers"] and set(cm["fill_layers"]) <= {f"{n}/28" for n in range(67, 73)}, seen
+    assert sum(cm["fill_layers"].values()) == cm["fill_shapes"], seen
+
     # A flip-flop's D input rewired to another net in the netlist: the layout no longer matches it.
     pg = Path(out["pg_netlist"]).read_text(encoding="utf-8")
     d_pins = list(re.finditer(r"\.D\((\w+)\)", pg))
