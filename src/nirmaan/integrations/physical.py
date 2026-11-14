@@ -47,7 +47,8 @@ from nirmaan.runtime.tools import Params
 PDK_ROOT_ENV = "NIRMAAN_PDK_ROOT"
 #: PDK parameters that name files; every other PDK parameter is a setting (a site, layers).
 PDK_FILES = ("liberty", "tech_lef", "lef", "pdn_tcl", "rc_tcl", "rcx_rules",
-             "fill_rules", "gds", "klayout_tech", "drc_deck", "lvs_deck", "cdl")  # M34: fill and KLayout
+             "fill_rules", "gds", "klayout_tech", "drc_deck", "lvs_deck", "cdl",  # M34: fill and KLayout
+             "magic_tech", "netgen_setup", "spice")  # M79: Magic and Netgen (integrations/pv_magic.py)
 #: M34: ``liberty_<corner>`` names one timing corner's Liberty files.
 CORNER_LIBERTY = "liberty_"
 

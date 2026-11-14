@@ -10,7 +10,8 @@ no agent can ever claim a CDC run happened.
 Lint, simulation, tests, synthesis, and formal are AVAILABLE through
 open-source EDA (``nirmaan/integrations/eda.py``, M21); static timing and
 place and route through OpenSTA and OpenROAD (``integrations/physical.py``,
-M25), and physical verification through KLayout (M34). Their bindings still refuse, with a reason, on a machine whose PATH
+M25), and physical verification through KLayout (M34) or Magic and Netgen
+(M79). Their bindings still refuse, with a reason, on a machine whose PATH
 lacks the executable or that has no PDK input for the run. Firmware build and
 co-simulation are AVAILABLE the same way (``nirmaan/integrations/firmware.py``,
 M25), and so are the RV32I cross build and the run on a RISC-V core
@@ -223,7 +224,8 @@ TOOLS: list[ToolSpec] = [
            *RUNNER)),
     _tool("power.run", "Power analysis", "eda", EXE, CO, "Power, IR-drop, and EM."),
     _tool("pv.run", "Physical verification", "eda", EXE, AV,
-          "The routed layout streamed to GDS, then DRC and LVS with the PDK's KLayout decks (M34).",
+          "The routed layout streamed to GDS, then DRC and LVS with the PDK's KLayout decks (M34), or, named "
+          "(backend magic-netgen), DRC in Magic and LVS in Netgen (M79).",
           (_p("def", PATH, "The routed (and filled) DEF, as pnr.run writes it.", required=True),
            _p("netlist", PATH, "The routed netlist with supply pins (pnr.run's pg_netlist), LVS's reference.",
               required=True),
@@ -235,6 +237,9 @@ TOOLS: list[ToolSpec] = [
            _p("drc_deck", PATH, "The PDK's KLayout DRC deck; enables DRC."),
            _p("lvs_deck", PATH, "The PDK's KLayout LVS deck; enables LVS with cdl."),
            _p("cdl", PATHS, "The cells' CDL netlists, for LVS."),
+           _p("magic_tech", PATH, "The PDK's Magic technology file (backend magic-netgen, M79)."),
+           _p("netgen_setup", PATH, "The PDK's Netgen setup script (backend magic-netgen, M79)."),
+           _p("spice", PATHS, "The cells' SPICE netlists, for Netgen (backend magic-netgen, M79)."),
            _p("pdk_root", PATH, "Where relative PDK paths resolve."), *RUNNER)),
     _tool("dft.run", "DFT tools", "eda", EXE, CO, "ATPG, MBIST, and commercial scan flows."),
     _tool("dft.scan_insert", "Scan insertion", "eda", EXE, AV, "Mux-D scan flops stitched into one chain.",
