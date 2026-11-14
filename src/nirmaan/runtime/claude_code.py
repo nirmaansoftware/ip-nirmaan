@@ -15,6 +15,9 @@ How the call is kept honest and clean:
   memory reaches the prompt, with ``--no-session-persistence``;
 * ``ANTHROPIC_API_KEY`` and ``ANTHROPIC_AUTH_TOKEN`` are removed from its
   environment, so Claude Code uses the plan login rather than billing a key;
+* the model recorded is the one asked for when Claude Code reports it (it
+  also makes a small side call on another model, which ``modelUsage`` may
+  list first), else the one that wrote the most output (``answered_by``);
 * tokens are recorded as Claude Code reports them, and the cost as unknown:
   a subscription has no per-call price, and its ``total_cost_usd`` is an
   API-equivalent estimate, not a charge.
@@ -49,6 +52,24 @@ def find_claude() -> str | None:
 
 def _int(value) -> int | None:
     return value if isinstance(value, int) and not isinstance(value, bool) else None
+
+
+def answered_by(requested: str, model_usage) -> str:
+    """The model to record for a call: ``requested`` when Claude Code reports it, else the one that wrote most.
+
+    Claude Code also makes a small side call on another model on every ``-p`` run, and ``modelUsage`` may list
+    that one first, so its first key is never taken on its own. When the requested model is absent, the key
+    with the most output tokens is recorded; a tie for most is recorded as every tied key, sorted and joined
+    with ``+``, never one of them picked. With no ``modelUsage`` the requested model is recorded.
+    """
+    if not isinstance(model_usage, dict) or not model_usage:
+        return requested
+    if requested in model_usage:
+        return requested
+    written = {key: (_int(value.get("outputTokens")) or 0) if isinstance(value, dict) else 0
+               for key, value in model_usage.items()}
+    most = max(written.values())
+    return "+".join(sorted(str(key) for key, n in written.items() if n == most))
 
 
 class ClaudeCodeLLM:
@@ -87,12 +108,11 @@ class ClaudeCodeLLM:
             return Completion("", self.model, error=f"Claude Code exited {proc.returncode} without a JSON result: "
                               f"{detail[-1] if detail else 'no output'}", provider=PROVIDER, priced=False)
         usage = data.get("usage") or {}
-        reported = list((data.get("modelUsage") or {}).keys())
         common = dict(provider=PROVIDER, priced=False, input_tokens=_int(usage.get("input_tokens")),
                       output_tokens=_int(usage.get("output_tokens")),
                       cache_read_tokens=_int(usage.get("cache_read_input_tokens")),
                       cache_write_tokens=_int(usage.get("cache_creation_input_tokens")))
-        model = reported[0] if reported else self.model
+        model = answered_by(self.model, data.get("modelUsage"))
         if data.get("is_error") or data.get("subtype") != "success":
             return Completion("", model, error=f"Claude Code reported {data.get('subtype') or 'an error'}: "
                               f"{str(data.get('result') or '')[:300]}", **common)

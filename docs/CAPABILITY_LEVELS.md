@@ -24,8 +24,15 @@ its check record counts, else none. The levels are not the seniority band
 a trial with a human attestation refuses the whole record; refused records are
 listed in `refused_records`. A trial counts only for the skills its case names
 (`EvalCase.skills`), and only when every held-out check of the case uses a
-scorer that requires a tool and the trial has judge runs; any other trial is
-listed in `not_tool_judged` with its outcome and never raises a level.
+scorer that requires a tool; a trial of any other case is listed in
+`not_tool_judged` with its outcome and never raises a level. On a tool-judged
+case, a trial with no judge run (the work was blocked, declined or refused
+before it reached review) is a failed trial of its group, whatever its result
+says, and the group's `unjudged` counts it. It is never left out: leaving it
+out once read a 4 of 5 case as 4 of 4. This only makes a group harder to count
+(section 9, item 6: Practised only from tool-judged trials, at least 5 of
+them, with a Wilson lower bound of at least 0.5; a blocked trial is one of
+those trials and it failed).
 A trial run without knowledge documents (M67, `eval run --without-knowledge`,
 the ablation; `docs/EVAL_ABLATION.md`) is labelled `"knowledge": "off"` in its
 run manifest and in the trial. Labelled off in either, it is taken out first,
@@ -52,8 +59,8 @@ Trials are grouped by skill, model, the skill digest recorded with the trial
   trial that records no harness ("harness not recorded", a record written
   before M73) never counts.
 
-Each group in `capability/levels.json` lists its records, cases, counts and
-every reason it does not count.
+Each group in `capability/levels.json` lists its records, cases, counts
+(`n`, `passed`, `unjudged`) and every reason it does not count.
 
 ## The generator
 
@@ -72,9 +79,13 @@ record is committed.
 
 Fixture repositories in `tests/test_capability_levels.py`: 5 of 5 with a clean
 re-judge and a must-fail control is Practised; 4 of 5, fewer than 5 trials, no
-re-judge, a failed re-judge or no must-fail control is not; a changed card or a
-later document makes it stale; replays, attestations, trials not judged by a
-tool and trials run without knowledge documents (either label) never count; a changed harness makes the group stale and a trial with no harness recorded never counts (M73); a case's other skills get nothing; nothing is Proven;
+re-judge, a failed re-judge or no must-fail control is not; 4 passes and 1
+blocked trial are 5 trials with 4 passed, not Practised, and a trial with no
+judge run on a tool-judged case is a failure even when its result says passed;
+a changed card or a
+later document makes it stale; replays, attestations, trials of a case not
+judged by a tool and trials run without knowledge documents (either label)
+never count; a changed harness makes the group stale and a trial with no harness recorded never counts (M73); a case's other skills get nothing; nothing is Proven;
 Knowledge needs a check record by a different session, with sources, naming the
 current document.
 

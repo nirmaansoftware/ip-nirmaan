@@ -19,8 +19,11 @@ fails when the committed file differs from what the records give.
   whose digest is not the skill's current one is stale and never counts, and
   so is a group whose harness is not the current one; a trial that records no
   harness (a record written before M73) never counts.
-  Replays and attested trials are refused (``load_evidence``); a trial judged
-  by anything but a tool is listed apart and never counts. A trial run without
+  Replays and attested trials are refused (``load_evidence``); a trial of a
+  case not judged by a tool is listed apart and never counts. On a tool-judged
+  case, a trial that no judge ran on (the work was blocked, declined or refused
+  before review) is a failed trial of its group, never left out: leaving it out
+  would turn 4 of 5 into 4 of 4. A trial run without
   knowledge documents (M67, the ablation: ``knowledge: off`` in its run
   manifest or in the trial itself) is listed apart with the reason and never
   counts toward any level.
@@ -147,8 +150,9 @@ def _rejudged(record_dir: Path) -> dict[tuple[str, int], bool]:
 
 def practised(org: Organization, repo: Path,
               cases: dict[str, EvalCase]) -> tuple[dict[str, list], list[str], list, list]:
-    """Per skill, every (model, digest, harness) group of tool-judged trials; the refused records; trials not
-    tool-judged; trials run without knowledge documents (M67), which never count."""
+    """Per skill, every (model, digest, harness) group of tool-judged cases' trials, a trial no judge ran on
+    counted as failed; the refused records; trials of cases not tool-judged; trials run without knowledge
+    documents (M67), which never count."""
     groups: dict[tuple[str, str | None, str | None, str | None], dict[str, Any]] = {}
     refused: list[str] = []
     not_tool_judged: list[dict[str, Any]] = []
@@ -173,16 +177,20 @@ def practised(org: Organization, repo: Path,
             if case is None:
                 refused.append(f"{where}: case {trial.result.case} is not among the eval cases")
                 continue
-            if not _tool_judged(case) or not trial.judge_runs:
+            if not _tool_judged(case):
                 not_tool_judged.append({"record": where, "case": case.id, "trial": trial.trial,
                                         "passed": trial.result.passed})
                 continue
+            # Record section 9, item 6: a tool-judged case's trial that never reached a judge stays in its group
+            # as a failure, whatever it claims, so a blocked trial cannot drop out of the count.
+            judged = bool(trial.judge_runs)
             for skill in case.skills:  # only the skills the case names get credit
                 key = (skill, trial.model, trial.skills.get(skill), _harness(trial))
-                g = groups.setdefault(key, {"n": 0, "passed": 0, "records": set(), "cases": set(),
+                g = groups.setdefault(key, {"n": 0, "passed": 0, "unjudged": 0, "records": set(), "cases": set(),
                                             "unrejudged": 0, "no_must_fail": set()})
                 g["n"] += 1
-                g["passed"] += int(trial.result.passed)
+                g["passed"] += int(judged and trial.result.passed)
+                g["unjudged"] += int(not judged)
                 g["records"].add(where)
                 g["cases"].add(case.id)
                 if not rejudged.get((case.id, trial.trial), False):
@@ -214,8 +222,8 @@ def practised(org: Organization, repo: Path,
         if skill in org.skills and org.skills[skill].domain in MUST_FAIL_DOMAINS and g["no_must_fail"]:
             reasons.append(f"no must-fail control in {', '.join(sorted(g['no_must_fail']))}")
         out[skill].append({"model": model, "digest": digest, "harness": recorded, "n": g["n"], "passed": g["passed"],
-                           "lower": round(low, 4), "records": sorted(g["records"]), "cases": sorted(g["cases"]),
-                           "counts": not reasons, "reasons": reasons})
+                           "unjudged": g["unjudged"], "lower": round(low, 4), "records": sorted(g["records"]),
+                           "cases": sorted(g["cases"]), "counts": not reasons, "reasons": reasons})
     return dict(out), refused, not_tool_judged, without_knowledge
 
 
