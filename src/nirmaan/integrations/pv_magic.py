@@ -160,8 +160,8 @@ def _parse(run: RunRecord) -> EdaResult:
     result = parse_klayout(run.log, run.returncode, ["drc", "lvs"])
     lines = [line.strip() for line in run.log.splitlines()]
     # Both Magic sessions read the same GDS, so each record is counted once.
-    skipped = [Diagnostic("error", f"Magic skipped GDS shapes in {text}") for text in dict.fromkeys(
-        f"{m['cell']}: {m['msg']}" for line in lines if (m := _GDS_SKIP_RE.match(line)))]
+    records = [f"{m['cell']}: {m['msg']}" for line in lines if (m := _GDS_SKIP_RE.match(line))]
+    skipped = [Diagnostic("error", f"Magic skipped GDS shapes in {text}") for text in dict.fromkeys(records)]
     style = next((m["style"] for line in lines if (m := _STYLE_RE.match(line))), None)
     final = next((m["final"] for line in lines if (m := _FINAL_RE.match(line))), None)
     outputs = {kind: str(run.workdir / name) for kind, name in
