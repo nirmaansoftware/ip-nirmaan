@@ -10,6 +10,7 @@ and fails, so a missing tool in CI is red, never a silent skip.
 from __future__ import annotations
 
 import ast
+import importlib.util
 import os
 import shutil
 from pathlib import Path
@@ -33,14 +34,16 @@ def imports(path: Path) -> set[str]:
     return found
 
 
-def needs(*executables: str, any_of: tuple[str, ...] = ()):
+def needs(*executables: str, any_of: tuple[str, ...] = (), modules: tuple[str, ...] = ()):
     """Skip without the executables (and, with ``any_of``, without any one of those), unless CI requires them.
 
     A missing ``any_of`` group is reported, and matched against
-    ``NIRMAAN_REQUIRE_EDA``, by its first name.
+    ``NIRMAAN_REQUIRE_EDA``, by its first name. ``modules`` are Python packages
+    a tool runs from (M72: cocotb), matched by their own names.
     """
     required = set(os.environ.get("NIRMAAN_REQUIRE_EDA", "").replace(",", " ").split())
     missing = [e for e in executables if shutil.which(e) is None]
+    missing += [m for m in modules if importlib.util.find_spec(m) is None]
     if any_of and not any(shutil.which(e) for e in any_of):
         missing.append(any_of[0])
     skip = bool(missing) and not required.intersection(missing)

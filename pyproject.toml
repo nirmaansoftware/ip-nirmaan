@@ -30,6 +30,9 @@ dependencies = [
 
 [project.optional-dependencies]
 ai = ["anthropic>=0.40"]
+# M72: Python testbenches (simulator.run backend cocotb, docs/COCOTB.md). Pinned to one release, since its
+# runner and results file are what a run is judged by. BSD-3-Clause; installed from PyPI, never vendored.
+cocotb = ["cocotb==2.1.0"]
 dev = ["pytest>=8.0"]
 
 [project.urls]

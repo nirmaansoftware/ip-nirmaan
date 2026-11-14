@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import re
+import xml.etree.ElementTree as ET
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -511,3 +512,94 @@ def parse_eqy(log: str, returncode: int, gold: Sequence[str] = (), gate: Sequenc
                                "partitions_proved": len(proved), "partitions_failed": len(failed),
                                "equivalent": int(passed), "gold": list(gold), "gate": list(gate)}
     return EdaResult(passed, summary, tuple(diags), metrics)
+
+
+# --- cocotb (M72) ----------------------------------------------------------------------
+
+# cocotb's regression manager ends a run with its own table, whose totals line is
+# "** TESTS=2 PASS=1 FAIL=1 SKIP=0   160.00   0.00   82513.74  **" (a continuation line of its log record).
+# The verdict of each test comes from the JUnit file cocotb itself writes (COCOTB_RESULTS_FILE, in the run's
+# own directory); the totals line only has to agree with it, so a line a test or the design prints can make a
+# run fail, never pass.
+_COCOTB_TOTALS_RE = re.compile(
+    r"\*\* TESTS=(?P<tests>\d+) PASS=(?P<passed>\d+) FAIL=(?P<failed>\d+) SKIP=(?P<skipped>\d+)\s")
+_COCOTB_VERSION_RE = re.compile(r"\bcocotb\.initialize\s+Initialized cocotb v(?P<version>\S+) from ")
+_COCOTB_SIMULATOR_RE = re.compile(r"\bcocotb\.initialize\s+Running on (?P<simulator>.+?)\s*$")
+
+
+def _cocotb_cases(results: str) -> tuple[list[dict[str, str]], str | None]:
+    """Each test in cocotb's JUnit results, with its status (pass, fail, skip), or why the file cannot be read."""
+    if "<!DOCTYPE" in results or "<!ENTITY" in results:  # cocotb writes neither; an entity could blow it up
+        return [], "the results file declares a DOCTYPE or an entity, which cocotb never writes"
+    try:
+        root = ET.fromstring(results)
+    except ET.ParseError as exc:
+        return [], f"the results file is not valid XML ({exc})"
+    cases = []
+    for case in root.iter("testcase"):
+        bad = next((case.find(tag) for tag in ("failure", "error") if case.find(tag) is not None), None)
+        status = "skip" if case.find("skipped") is not None else "fail" if bad is not None else "pass"
+        message = "" if bad is None else (bad.get("message") or bad.text or "").strip()
+        seed = next((p.get("value", "") for p in case.iter("property") if p.get("name") == "random_seed"), "")
+        cases.append({"name": ".".join(n for n in (case.get("classname", ""), case.get("name", "")) if n),
+                      "status": status, "type": "" if bad is None else bad.get("type", ""),
+                      "message": message.splitlines()[0] if message else "", "seed": seed})
+    return cases, None
+
+
+def parse_cocotb(log: str, returncodes: tuple[int, ...], results: str | None) -> EdaResult:
+    """Pass means cocotb ran its tests and reported every one passed, at least one, and none failed (M72).
+
+    ``results`` is the JUnit file cocotb wrote, or None when it wrote none (a compile error, a test module
+    that would not load, a simulator that never started cocotb). Its totals line in the log must be printed
+    exactly once and agree with the file. cocotb counts tests, not checks: a test that checks nothing
+    passes, so what shows a cocotb testbench checks something is that it fails on broken RTL.
+    """
+    plain = _ANSI_RE.sub("", log)
+    version = next((m["version"] for ln in plain.splitlines() if (m := _COCOTB_VERSION_RE.search(ln))), None)
+    simulator = next((m["simulator"] for ln in plain.splitlines() if (m := _COCOTB_SIMULATOR_RE.search(ln))), None)
+    totals = [tuple(int(m[k]) for k in ("tests", "passed", "failed", "skipped"))
+              for m in _COCOTB_TOTALS_RE.finditer(plain)]
+    cases, unreadable = _cocotb_cases(results) if results is not None else ([], None)
+    count = {s: sum(1 for c in cases if c["status"] == s) for s in ("pass", "fail", "skip")}
+    failing = [c for c in cases if c["status"] == "fail"]
+    diags = [Diagnostic("error", f"{c['name']}: {c['type'] or 'failed'}: {c['message']}".rstrip(": "),
+                        "TEST_FAILED") for c in failing]
+    exit_ok = bool(returncodes) and all(rc == 0 for rc in returncodes)
+    problem = None
+    if results is None:
+        compile_errors = [Diagnostic("error", m["msg"].strip(), "", m["file"], _int(m["line"]))
+                          for ln in plain.splitlines()
+                          if (m := _ICARUS_COMPILE_RE.match(ln.strip())) and (m["sev"] == "error" or
+                                                                             "error" in m["msg"].lower())]
+        diags += compile_errors
+        last = next((ln.strip() for ln in reversed(plain.splitlines()) if ln.strip()), "no output")
+        problem = (f"cocotb wrote no results (exit status {returncodes[-1] if returncodes else 'none'})"
+                   f"{_first(compile_errors) if compile_errors else f'; last: {last}'}")
+    elif unreadable:
+        problem = f"cocotb's results cannot be read: {unreadable}"
+    elif failing:
+        first = failing[0]
+        problem = (f"{len(failing)} of {_plural(len(cases), 'test')} failed; first: {first['name']} "
+                   f"({first['type'] or 'failed'}: {first['message']})")
+    elif not count["pass"]:
+        problem = "no test passed: a run with no passing test proves nothing"
+    elif len(totals) != 1:
+        problem = f"cocotb's totals line was printed {len(totals)} times, not once"
+    elif totals[0] != (len(cases), count["pass"], count["fail"], count["skip"]):
+        problem = "cocotb's totals line does not agree with its results file"
+    elif not exit_ok:
+        problem = f"exit status {returncodes[-1] if returncodes else 'none'}"
+    passed = problem is None
+    on = f"; cocotb {version}" + (f" on {simulator}" if simulator else "") if version else ""
+    if passed:
+        skipped = f", {count['skip']} skipped" if count["skip"] else ""
+        summary = f"{count['pass']} of {_plural(len(cases), 'test')} passed{skipped}{on}"
+    else:
+        summary = f"{problem}{on}"
+    seeds = sorted({c["seed"] for c in cases if c["seed"]})
+    return EdaResult(passed, summary, tuple(diags), {
+        "tests": len(cases), "tests_passed": count["pass"], "tests_failed": count["fail"],
+        "tests_skipped": count["skip"], "failing": [c["name"] for c in failing], "cocotb": version,
+        "simulator": simulator, "seed": seeds[0] if len(seeds) == 1 else None, "exit_statuses": list(returncodes),
+    })
