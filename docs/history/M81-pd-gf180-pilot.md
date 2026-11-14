@@ -17,12 +17,13 @@ input (LVS). Workflow `pd-gf180.yml`, a sibling of `pd-sky130.yml`: the same
 image digest and Magic and Netgen build, the ciel release
 `gf180mcu-792ef670` by sha256; not required.
 
-**Result** (run 43616066140, head 65d619d): 0 router DRC, setup slack
-4.059 ns, hold 1.000 ns; Magic DRC 0, Netgen unique match; the overlapping
-cell fails with 423 DRC violations, the rewired input with 1 mismatched net.
-The job took 2 min 19 s.
+**Reported result, unverified** (run 43616066140, head 65d619d, an earlier
+head; no log is committed and the required jobs do not run this pilot): 0
+router DRC, setup slack 4.059 ns, hold 1.000 ns; Magic DRC 0, Netgen unique
+match; the overlapping cell fails with 423 DRC violations, the rewired input
+with 1 mismatched net. The job took 2 min 19 s.
 
-**Fixes, each found by a CI run of this pilot.**
+**Fixes, reportedly each found by a CI run of this pilot.**
 - `pnr.run` writes the DEF and netlists right after routing: `extract_parasitics`
   dropped the router's minimum-area patches (252 here), and Magic found the
   unpatched via pads under the Metal2 and Metal3 minimum area.

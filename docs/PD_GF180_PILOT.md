@@ -91,7 +91,15 @@ is committed, so NOTICE does not change.
 
 ## 5. Results, and what the runs found
 
-From the pull request's own runs of `pd-gf180` (run 43616066140, head 65d619d):
+**Evidence status.** The figures below were reported from a CI run of the
+non-required `pd-gf180` job on an earlier head of this pull request (run
+43616066140, head 65d619d). No log or artifact of that run is committed, and
+the required `physical-design` job does not run the GF180 pilot, so nothing in
+this repository substantiates them for the current head. Treat them as an
+unverified report until `pd-gf180` is run on the head being merged and its
+log is kept.
+
+Reported figures (run 43616066140, head 65d619d):
 
 | Run | Result |
 |---|---|
@@ -104,7 +112,8 @@ From the pull request's own runs of `pd-gf180` (run 43616066140, head 65d619d):
 takes about a minute, the open_pdks fetch 7 s, the pilot test 51 s. The owners
 can decide from this whether it becomes required.
 
-What the earlier runs of this pull request found, in order:
+What the earlier runs of this pull request reportedly found, in order (also
+unrecorded in the repository):
 
 1. **IR drop** (run 43612057949). PDNSim refused the grid (`PSM-0021`,
    invalid resistance map): the technology LEF gives the via cut layers no
