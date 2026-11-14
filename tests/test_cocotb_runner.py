@@ -165,7 +165,9 @@ def test_tests_it_cannot_judge_are_refused(tmp_path, tests, params, why):
 
 
 @pytest.mark.parametrize("line", ["initial $finish;", "integer f = $fopen(\"results.xml\");",
-                                  "initial $system(\"true\");", "`define P(a) a``b"])
+                                  "initial $system(\"true\");", "`define P(a) a``b",
+                                  "initial begin $display(\"//\"); $finish; end",
+                                  "initial begin $display(\"/*\"); $finish; $display(\"*/\"); end"])
 def test_hdl_that_could_stand_in_for_the_verdict_is_refused(tmp_path, line):
     design = tmp_path / "counter.v"
     design.write_text(COUNTER.read_text(encoding="utf-8").replace("endmodule", f"{line}\nendmodule"),

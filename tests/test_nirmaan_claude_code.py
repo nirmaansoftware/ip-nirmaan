@@ -79,6 +79,47 @@ def test_a_reply_is_a_recorded_call_with_tokens_and_no_invented_cost(triage, tmp
     assert call.cost_usd is None  # a subscription has no per-call price; total_cost_usd is an estimate
 
 
+#: Claude Code's side call on a small model, listed first in ``modelUsage`` on a real ``-p`` run.
+SIDE_CALL = {"claude-haiku-5-5": {"inputTokens": 300, "outputTokens": 20}}
+
+
+def test_the_model_asked_for_is_recorded_when_a_side_call_is_listed_first(triage, tmp_path):
+    engine, task = triage
+    usage = {**SIDE_CALL, "claude-opus-5-5": {"inputTokens": 12, "outputTokens": 345}}
+    assert next(iter(usage)) == "claude-haiku-5-5"
+    script, _ = _fake_claude(tmp_path, _result("reply", modelUsage=usage))
+    run_task(engine, task, ModelRuntime(ClaudeCodeLLM(executable=str(script)), runtime_id="claude-code"))
+    [call] = engine.state.model_calls.values()
+    assert call.model == "claude-opus-5-5" and call.output_tokens == 345
+
+
+def test_a_failed_call_records_the_model_asked_for_too(triage, tmp_path):
+    engine, task = triage
+    usage = {**SIDE_CALL, "claude-opus-5-5": {"outputTokens": 1}}
+    script, _ = _fake_claude(tmp_path, {"type": "result", "subtype": "error_max_turns", "is_error": True,
+                                        "result": "stopped", "modelUsage": usage}, exit_code=1)
+    run_task(engine, task, ModelRuntime(ClaudeCodeLLM(executable=str(script)), runtime_id="claude-code"))
+    [call] = engine.state.model_calls.values()
+    assert not call.succeeded and call.model == "claude-opus-5-5"
+
+
+@pytest.mark.parametrize("usage, recorded", [
+    # The model asked for is absent: the one that wrote most, never the first key.
+    ({**SIDE_CALL, "claude-sonnet-5-5": {"outputTokens": 900}}, "claude-sonnet-5-5"),
+    # A tie for most is every tied model, never one picked.
+    ({"claude-b": {"outputTokens": 7}, "claude-a": {"outputTokens": 7}, "claude-c": {"outputTokens": 1}},
+     "claude-a+claude-b"),
+    ({"claude-a": {}, "claude-b": "not a mapping"}, "claude-a+claude-b"),
+    # Nothing reported: the model asked for.
+    ({}, "claude-opus-5-5"),
+    (None, "claude-opus-5-5"),
+])
+def test_without_the_model_asked_for_the_one_that_wrote_most_is_recorded(usage, recorded):
+    from nirmaan.runtime.claude_code import answered_by
+
+    assert answered_by("claude-opus-5-5", usage) == recorded
+
+
 @pytest.mark.parametrize("answer,code,why", [
     ({"type": "result", "subtype": "error_max_turns", "is_error": True, "result": "stopped"}, 1, "error_max_turns"),
     ("Invalid API key or not logged in", 1, "without a JSON result"),

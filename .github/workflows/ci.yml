@@ -60,7 +60,7 @@ jobs:
           tools: sby yices-smt2 eqy
       - name: Tool versions
         run: |
-          which verilator iverilog yosys sby yices-smt2 eqy
+          which verilator verilator_coverage iverilog yosys sby yices-smt2 eqy
           yosys -V && verilator --version && sby --version && yices-smt2 --version | head -1 && eqy --version
       # M72: cocotb, pinned in its own extra, runs Python testbenches on apt's Icarus (docs/COCOTB.md).
       - name: Install
@@ -72,9 +72,10 @@ jobs:
         # skipping. `cc` and `make` build the firmware and its co-simulation
         # (M25); `sby` and `yices-smt2` run formal (M26); the RISC-V GCC builds
         # the image PicoRV32 runs against the RTL (M27); `eqy` runs equivalence (M69);
+        # `verilator_coverage`, which apt's verilator package ships, reads code coverage (M70);
         # `cocotb` (a Python package, not an executable) runs Python testbenches (M72).
         env:
-          NIRMAAN_REQUIRE_EDA: verilator iverilog vvp yosys cc make sby yices-smt2 eqy riscv64-unknown-elf-gcc cocotb
+          NIRMAAN_REQUIRE_EDA: verilator verilator_coverage iverilog vvp yosys cc make sby yices-smt2 eqy riscv64-unknown-elf-gcc cocotb
           SHARD: ${{ matrix.shard }}
         run: >-
           python -m pytest -q -rs --shard "$SHARD/3" --shard-profile test
@@ -132,7 +133,7 @@ jobs:
         run: pip install -e ".[dev]"
       - name: No EDA tool and no SDK
         run: |
-          for tool in verilator iverilog vvp yosys sby yices-smt2 eqy riscv64-unknown-elf-gcc riscv64-elf-gcc openroad sta klayout; do
+          for tool in verilator verilator_coverage iverilog vvp yosys sby yices-smt2 eqy riscv64-unknown-elf-gcc riscv64-elf-gcc openroad sta klayout; do
             if command -v "$tool"; then echo "unexpected on PATH: $tool"; exit 1; fi
           done
           if python -c "import anthropic" 2>/dev/null; then echo "anthropic is installed"; exit 1; fi

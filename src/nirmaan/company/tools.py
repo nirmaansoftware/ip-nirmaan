@@ -24,6 +24,8 @@ ATPG (M29). Logic equivalence is AVAILABLE through eqy
 testbenches through cocotb on Icarus (backend ``cocotb``,
 ``nirmaan/integrations/cocotb_runner.py``, M72).
 
+Code coverage is AVAILABLE through Verilator and verilator_coverage (``coverage.read``, M70).
+
 Every tool with a binding declares its parameters (M28): the broker refuses an
 undeclared or ill-typed one before anything runs. The lists below are what the
 bindings and backends actually read.
@@ -131,7 +133,13 @@ TOOLS: list[ToolSpec] = [
           (SOURCES, TOP_REQUIRED, *RUNNER)),
     _tool("regression.run", "Run regressions", "eda", EXE, CO, "Launch and monitor regressions."),
     _tool("waveform.inspect", "Waveform viewer", "eda", RD, CO, "Inspect waveforms."),
-    _tool("coverage.read", "Coverage database", "eda", RD, CO, "Read and merge coverage."),
+    _tool("coverage.read", "Coverage database", "eda", EXE, AV,
+          "Code coverage of a self-checking simulation (M70): built with Verilator's line and toggle coverage, "
+          "the testbench run as simulator.run runs it, and the data read by verilator_coverage into line, toggle "
+          "and branch percentages over the design files, which a requirement's bounds then check.",
+          (SOURCES, TOP_REQUIRED,
+           _p("design", PATHS, "The files whose coverage is measured, each among the sources; by default every "
+                               "source but the testbench (the file that declares the top module)."), *RUNNER)),
     _tool("formal.run", "Formal engine", "eda", EXE, AV, "Model checking and property proofs.",
           (_p("sby", PATH, "The SymbiYosys job file.", required=True),
            _p("sources", PATHS, "RTL the proof must read; the job file must list each one."), *RUNNER)),

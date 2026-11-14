@@ -37,7 +37,8 @@ RESULTS = "results.xml"
 TIMESCALE = "+timescale+1ns/1ps"
 _MODULE_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 _USES_RE = re.compile(r"(?<![\w$])(?:" + "|".join(re.escape(t) for t in TESTBENCH_ONLY) + r")(?![\w$])")
-_COMMENT_RE = re.compile(r"//[^\n]*|/\*.*?\*/", re.DOTALL)
+#: Strings and comments, removed together before the scan, so a "//" inside a string cannot hide what follows it.
+_TEXT_RE = re.compile(r'"(?:\\.|[^"\\\n])*"|//[^\n]*|/\*.*?\*/', re.DOTALL)
 
 
 def _environment(params: object) -> str | None:
@@ -69,7 +70,7 @@ def _check(job: Job) -> str | None:
         return "two cocotb test modules have the same name (refused, nothing ran)"
     found = []
     for source in job.sources:
-        text = _COMMENT_RE.sub("", Path(source).read_text(encoding="utf-8", errors="replace"))
+        text = _TEXT_RE.sub(" ", Path(source).read_text(encoding="utf-8", errors="replace"))
         used = sorted(set(_USES_RE.findall(text)))
         if used:
             found.append(f"{Path(source).name} uses {', '.join(used)}")

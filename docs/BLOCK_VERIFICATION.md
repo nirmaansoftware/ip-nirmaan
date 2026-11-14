@@ -32,7 +32,7 @@ to judge, and gives "bring your RTL, we verify it" a workflow.
 | `dv-plan`: verification plan | `dv.plan` | interface-spec | `vplan.check`: the plan covers every requirement of the approved spec |
 | `testbench`: self-checking testbench | `dv.directed_tests` | interface-spec, design-under-test | `simulator.run` over the approved RTL and the seat's testbench, top from the testbench |
 | `assertions-formal`: properties and proof | `formal.prove` | interface-spec, design-under-test | `formal.run` over the seat's .sby, the approved RTL and the seat's property files, at least one property proven; `formal.cover` over the same: every cover reached |
-| `coverage` (when asked) | `dv.coverage` | testbench | none yet: `coverage.read` is a contract (recorded evidence) |
+| `coverage` (when asked) | `dv.coverage` | testbench (M70: and design-under-test) | M70: `coverage.read` over the approved RTL and the seat's testbench, line at least 90 and toggle at least 75 percent (`docs/COVERAGE_READ.md`) |
 | `equivalence` (when asked) | `formal.equivalence` | design-under-test | M69: `equivalence.run` over the seat's .eqy and the approved RTL versions, placed beside it (`docs/EQUIVALENCE.md`) |
 
 The RTL is never written here: `design-under-test` records the existing RTL
@@ -139,9 +139,9 @@ a proof seat that ships its own `counter.v` and is refused.
 - Refinements that need new skill ids: scoreboard or reference model
   (`reference_modelling`) and cocotb (`python_verification`). Each is one
   feature and one `Refinement` when its skill lands.
-- The coverage gate: it waits for `coverage.read` (verilator_coverage) to be
-  wrapped as an AVAILABLE tool, its own milestone. (The equivalence gate came
-  with `equivalence.run` through eqy, M69: `docs/EQUIVALENCE.md`.)
+- The coverage and equivalence gates came with their tools: `coverage.read`
+  through verilator_coverage (M70, `docs/COVERAGE_READ.md`) and
+  `equivalence.run` through eqy (M69, `docs/EQUIVALENCE.md`).
 - Repro testbenches on regression-investigation's root-cause and triage
   stages, and a scorer over several seat testbenches: M71,
   `docs/REPRO_GATES.md`.
