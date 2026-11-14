@@ -125,6 +125,7 @@ The original preface of the section:
 - [M72-cocotb](M72-cocotb.md): Milestone 72 - Python testbenches through cocotb: simulator.run's cocotb backend, judged by cocotb's own results
 - [M73-harness-fingerprint](M73-harness-fingerprint.md): Milestone 73 - The harness in one place, and its fingerprint on every trial; a changed harness makes a level's trials stale
 - [M77-verification-departments](M77-verification-departments.md): Milestone 77 - Verification in five departments; four of them ACTIVE as grouping units, the frozen list changed by renames only
+- [M78-independent-signoff-gates](M78-independent-signoff-gates.md): Milestone 78 - Signoff gates independent of the producing department
 
 ## Before M43
 

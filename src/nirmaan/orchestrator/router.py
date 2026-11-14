@@ -189,11 +189,21 @@ class Router:
                 return role.id
         return None
 
-    def gate_approver(self, gate: GateSpec, criticality: Criticality, stage_owner: str | None) -> RoutingDecision:
+    def gate_approver(
+        self, gate: GateSpec, criticality: Criticality, stage_owner: str | None, producers: tuple[str, ...] = ()
+    ) -> RoutingDecision:
+        """``producers`` own the gated work. On an independent gate none of them, nor the head of a unit below the
+        division that holds one, may approve it (``Organization.own_heads``)."""
         org = self._org
         chain = [r.id for r in org.escalation_chain(stage_owner)] if stage_owner else []
+        excluded = (
+            {h for p in {*producers, *([stage_owner] if stage_owner else [])} for h in org.own_heads(p)}
+            if gate.id in org.independent_gates else set()
+        )
         scored: list[RoutingCandidate] = []
         for role in org.roles_with(gate.approver_capability):
+            if role.id in excluded:
+                continue
             if not org.is_active(role.id) or not role.level.at_least(gate.min_level):
                 continue
             if not self._authority.check(role.id, DecisionKind.APPROVE_GATE, criticality).allowed:
