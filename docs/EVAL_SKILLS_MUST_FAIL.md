@@ -450,6 +450,42 @@ as the broker checks a requirement's bounds. Nothing else changes:
 - `tests/test_eval_cover_bounds.py` tests all of this with synthetic tool
   results: no case, no real tool and no measured figure.
 
+### A coverage case (W2-E5)
+
+`dv/coverage-irq-ctrl` judges the coverage seat (`code_coverage`) on the
+interrupt controller of the directed case, using `cover_bounds` (above). The
+seat is handed an approved testbench that only resets the block and reads
+registers (`coverage/irq_ctrl_idle_tb.sv`: it never raises a source) and must
+write one whose line and toggle coverage of the approved RTL, read by
+`coverage.read`, meets the bounds, which equal the coverage gate's
+`COVERAGE_TARGETS` (a test pins that). Its control runs `coverage.read` as
+`tool` (the coverage seat holds `coverage.read` and not `simulator.run`) and as
+`cover_tool` with the bounds: the testbench passes on the approved RTL, meets
+the bounds, and fails each of three RTL mutants (priority inverted,
+acknowledge ignored, level mask ignored) on a check, so coverage is not bought
+with stimulus that checks nothing. The reference answer is the directed case's
+testbench with a coverage report.
+
+No coverage percentage is stated in this repository for the case. The tests
+run the real coverage tool (they need Verilator, and skip where it is absent)
+and assert that the reference testbench meets the bounds and that each weak
+testbench misses them, so each CI run is the record.
+
+Three weak testbenches in `tests/fixtures/dv/irq_ctrl/coverage/` each pass
+their own checks on the approved RTL and miss the bounds:
+
+| File | What it never does |
+|---|---|
+| `irq_ctrl_idle_tb.sv` | raise a source (the approved testbench the seat is handed) |
+| `irq_ctrl_no_ack_tb.sv` | acknowledge through `CLAIM` or write `PENDING` |
+| `irq_ctrl_no_mask_tb.sv` | mask a source or write `MODE` |
+
+The coverage seat's own gate refuses the idle testbench before review (tested
+at the gate). The other two reach only the scorer in the tests, never the
+gate. The scorer's bounds are the second look: they let a coverage case be
+judged the same way when the testbench reaches it by another route, and the
+tests run the scorer directly on each (`tests/test_dv_coverage_irq_ctrl.py`).
+
 ## 5. The six shipped cases
 
 Six cases shipped when this milestone landed; P3-E2 added `rtl/axil-timer`

@@ -75,7 +75,8 @@ assertion) executed and wrote its log, so it counts as a mutant caught
 (`dv/prove-deep-counter`). An equivalence seat's control runs
 `equivalence.run` over the seat's eqy setup with a non-equivalent refactor in
 place of the approved one (`dv/equiv-gray`); a random-stimulus testbench's
-control is the ordinary `simulator.run` one (`dv/random-crc`), and a run that
+control is the ordinary `simulator.run` one (`dv/random-crc`), a coverage seat's runs
+`coverage.read` with `cover_bounds` (`dv/coverage-irq-ctrl`), and a run that
 is too short or whose constraints never reach a corner lets a mutant survive.
 
 A debug seat's control judges its repro testbenches. A root-cause repro has

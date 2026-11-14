@@ -320,7 +320,7 @@ def test_n6_a_grouping_unit_with_no_children_fails():
 def test_n7_a_grouping_unit_over_an_unbacked_new_unit_fails():
     def mutate(d):
         _add(d, "verification.fixture", UnitKind.DEPARTMENT, "verification")
-        _add(d, "verification.fixture.team", UnitKind.TEAM, "verification.fixture", skills=("code_coverage",))
+        _add(d, "verification.fixture.team", UnitKind.TEAM, "verification.fixture", skills=("functional_coverage",))
 
     assert _unbacked(mutate) == [
         "verification.fixture: ACTIVE child verification.fixture.team neither frozen nor backed",
