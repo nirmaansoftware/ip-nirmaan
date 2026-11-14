@@ -136,8 +136,16 @@ def test_sync_fifo_from_rtl_to_drc_and_lvs_on_gf180mcu(project, tmp_path, monkey
         d = Path(out["def"]).read_text()
         nets = d[d.index("\nNETS "):]
         print("diag-def-rect-count:", nets.count("RECT"), "units:", re.search(r"UNITS DISTANCE MICRONS (\d+)", d)[1])
-        print("\n".join([ln for ln in nets.splitlines() if "RECT" in ln][:10]))
-        print("\n".join(d.splitlines()[:12]))
+        vias = d[d.index("\nVIAS "):d.index("END VIAS")]
+        print("diag-vias:\n" + vias[:3000])
+        boxes = [tuple(map(int, ln.split()[1:])) for ln in subprocess.run(
+            ["magic", "-dnull", "-noconsole", str(work / "diag.tcl")], cwd=work, capture_output=True, text=True
+        ).stdout.splitlines() if ln.startswith("diag-box:")]
+        for b in boxes[:16:5]:
+            cx, cy = (b[0] + b[2]) * 5, (b[1] + b[3]) * 5  # Magic units of 0.005 um to DEF units of 0.0005 um
+            near = [ln.strip() for ln in d.splitlines() if any(
+                abs(int(x) - cx) < 600 and abs(int(y) - cy) < 600 for x, y in re.findall(r"\( (\d+) (\d+)", ln))]
+            print(f"diag-near {b} ({cx}, {cy}):\n" + "\n".join(near[:12]))
     assert cm["drc_violations"] == 0 and cm["lvs_mismatches"] == 0 and cm["gds_empty_cells"] == 0, clean.summary
     assert cm["magic_drc_style"] == "drc(full)" and cm["gds_shapes_skipped"] == 0, clean.summary
     assert cm["netgen_final"] == "Final result: Circuits match uniquely.", clean.summary
