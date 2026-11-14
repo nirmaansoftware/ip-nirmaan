@@ -186,8 +186,9 @@ LOOP = {
         "scripts/loop_cloud.py", "tests/test_pr_review.py", "tests/test_pr_loop.py", "tests/test_review_teams.py", "tests/test_loop_cloud.py", "tests/fixtures/pr_review/**", "tests/fixtures/pr_loop/**",
         "docs/REVIEW_MECHANISM.md", "docs/pr-loop.plist", "pyproject.toml", ".gitignore", ".gitattributes",
     ],
-    # Checks the loop runs on the fix commit, in the worktree, with the
-    # token-free environment plus `env`. {python} is this interpreter.
+    # Checks the loop runs on the fix commit, in the worktree (in GitHub Actions
+    # as the check account, in check_clone), with the token-free environment
+    # plus `env`. {python} is this interpreter.
     # "select": "related_tests" appends the test files related to the changed
     # paths (related_tests) to the last command, or nothing (the whole suite)
     # when they cannot be told; CI runs the whole suite either way.

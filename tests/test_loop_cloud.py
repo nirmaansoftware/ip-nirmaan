@@ -319,6 +319,8 @@ def test_the_workflow_lands_off_runs_from_main_only_and_keeps_secrets_in_the_env
     assert "persist-credentials: false" in WORKFLOW
     for tool in ("verilator iverilog yosys gcc-riscv64-unknown-elf", "tools: sby yices-smt2 eqy"):
         assert tool in WORKFLOW
+    assert 'sudo mv "$RUNNER_TEMP/oss-cad-suite" /opt/oss-cad-suite' in WORKFLOW and "echo /opt/cad-bin >> \"$GITHUB_PATH\"" in WORKFLOW, \
+        "the check account cannot enter $RUNNER_TEMP, so the formal tools move where it can run them"
     steps = WORKFLOW.split("\n      - ")[1:]
     holders = {s: sorted(set(re.findall(r"secrets\.(\w+)", s))) for s in steps if "secrets." in s}
     by_name = {re.search(r"name: (.+)", s).group(1).strip(): v for s, v in holders.items()}

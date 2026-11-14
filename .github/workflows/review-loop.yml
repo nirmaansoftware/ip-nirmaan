@@ -95,6 +95,20 @@ jobs:
         uses: ./.github/actions/oss-cad-suite
         with:
           tools: sby yices-smt2 eqy
+      # The action unpacks under $RUNNER_TEMP, inside the runner's home folder (mode 750), which the
+      # check account cannot enter; the formal tests would then skip. The suite moves to /opt with new
+      # wrappers, first on PATH.
+      - name: CAD tools the check account can run
+        if: steps.work.outputs.work == 'true' && env.MODE != 'check'
+        run: |
+          sudo mv "$RUNNER_TEMP/oss-cad-suite" /opt/oss-cad-suite
+          sudo mkdir -p /opt/cad-bin
+          for tool in sby yices-smt2 eqy; do
+            printf '#!/bin/sh\nexec /opt/oss-cad-suite/bin/%s "$@"\n' "$tool" | sudo tee "/opt/cad-bin/$tool" > /dev/null
+            sudo chmod 755 "/opt/cad-bin/$tool"
+          done
+          echo /opt/cad-bin >> "$GITHUB_PATH"
+          /opt/cad-bin/sby --version && /opt/cad-bin/eqy --version && /opt/cad-bin/yices-smt2 --version | head -1
       - name: Install
         if: steps.work.outputs.work == 'true' && env.MODE != 'check'
         run: pip install -e ".[ai,dev,cocotb]"
@@ -111,8 +125,9 @@ jobs:
         if: steps.work.outputs.work == 'true'
         run: sudo useradd --system --no-create-home --shell /usr/sbin/nologin loopcheck
       # Both steps `exec` the script, which moves the secrets out of its environment before any
-      # claude process starts. `claude auth status` makes no model call; `check` also proves the
-      # /proc deny rule with one small call and the isolation (loop_cloud.py isolation_check).
+      # claude process starts. The login check is `claude auth status` (no model call) and one tiny
+      # call on the plan; `check` also proves the /proc deny rule with one small call and the
+      # isolation (loop_cloud.py isolation_check).
       - name: Check the Claude login
         if: steps.work.outputs.work == 'true'
         env:
