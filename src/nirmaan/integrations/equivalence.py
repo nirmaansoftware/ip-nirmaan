@@ -111,6 +111,7 @@ def _check(job: Job) -> str | None:
     sides, problem = setup_files(eqy)
     if problem:
         return problem
+    # By resolved path on both sides (``execute`` resolves ``sources``), so a linked approved file matches itself.
     read = {str((eqy.parent / f).resolve()) for files in sides.values() for f in files}
     unread = [Path(src).name for src in job.sources if src not in read]
     return f"{eqy.name} does not read {', '.join(unread)}" if unread else None

@@ -470,10 +470,11 @@ def parse_eqy(log: str, returncode: int, gold: Sequence[str] = (), gate: Sequenc
     why: dict[str, str] = {}
     errors: list[Diagnostic] = []
     for raw in log.splitlines():
-        line = _EQY_LINE_RE.match(_ANSI_RE.sub("", raw))
+        plain = _ANSI_RE.sub("", raw)
+        line = _EQY_LINE_RE.match(plain)
         if not line:  # eqy's own fatal errors are printed bare
-            if raw.startswith("ERROR:"):
-                errors.append(Diagnostic("error", raw[len("ERROR:"):].strip()))
+            if plain.startswith("ERROR:"):
+                errors.append(Diagnostic("error", plain[len("ERROR:"):].strip()))
             continue
         msg = line["msg"]
         if m := _EQY_DONE_RE.match(msg):
