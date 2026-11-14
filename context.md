@@ -183,7 +183,7 @@ python3.11 -m venv .venv && .venv/bin/pip install -e ".[ai,dev]"
 EDA tools on macOS come from Homebrew (`verilator`, `icarus-verilog`, `yosys`,
 `sby`, `yices2`, `riscv64-elf-gcc`). OpenROAD, OpenSTA, and KLayout are not
 supported on macOS arm64 (M34): their tests run only in CI. Magic and Netgen
-(M79) run only in the `pd-sky130` workflow, never on the development machine.
+(M79) run only in the `pd-sky130` and `pd-gf180` workflows, never on the development machine.
 eqy (M69) has no
 Homebrew formula: build it from source at the tag matching Yosys
 (`docs/EQUIVALENCE.md`, "Install"); without it the five eqy tests skip.
@@ -214,6 +214,9 @@ pinned by SHA, runners `ubuntu-24.04`, older PR runs cancelled (M46,
   synchronous FIFO through synthesis, place and route, and DRC and LVS with
   KLayout and with Magic and Netgen, on demand and when the flow or the block
   changes (`docs/PD_SKY130_PILOT.md`).
+- `pd-gf180` (its own workflow, not required; M81): the same pilot on the
+  ORFS gf180 platform, with Magic and Netgen over open_pdks gf180mcuC
+  (`docs/PD_GF180_PILOT.md`).
 - `test-union`: fails if a test was skipped in every job.
 - `dashes`: `scripts/check_dashes.py`.
 

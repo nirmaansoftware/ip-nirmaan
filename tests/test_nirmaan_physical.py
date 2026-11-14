@@ -39,7 +39,7 @@ from laws import needs
 
 from nirmaan.integrations.eda import Backend, EdaResult, register_backend, unregister_backend
 from nirmaan.integrations.pd_parsers import VIOLATOR_REPORT_LIMIT, parse_klayout, parse_openroad, parse_opensta
-from nirmaan.integrations.physical import PDK_ROOT_ENV, fill_layer_map, needs_pdk
+from nirmaan.integrations.physical import PDK_ROOT_ENV, fill_layer_map, map_file_fill_targets, needs_pdk
 from nirmaan.models import Bound, EvidenceKind, TaskKind, ToolStatus
 from nirmaan.orchestrator import Orchestrator
 from nirmaan.runtime import ToolAccessDenied, ToolBroker, available_bindings, unavailable_reason
@@ -339,6 +339,46 @@ def test_fill_layer_map_maps_each_routing_layer_to_its_drawing_number_and_the_fi
     assert fill_layer_map("<technology/>", ["met1"]) == ("<technology/>", [])
 
 
+#: M81: lines of a LEF/DEF layer map file as the ORFS gf180 platform ships it (edi2gds.layermap).
+MAP_FILE = """#EDI Layer Name   EDI Layer Type   GDS Layer Number   GDS Layer Type
+Metal1\t\tNET\t\t34\t\t0
+Metal1\t\tFILL\t\t34\t\t4
+Metal1\t\tFILLOPC\t\t34\t\t4
+NAME\t\tMetal1/PIN\t34\t\t10
+Via1\t\tFILL\t\t35\t\t0
+Via1\t\tVIA:SIZE:0.260x0.260\t35\t0
+Metal2\t\tFILL\t\t36\t\t4
+PR_bndry        ALL              0               0
+"""
+
+
+def test_map_file_fill_targets_are_its_fill_lines():
+    assert map_file_fill_targets(MAP_FILE) == ["34/4", "35/0", "36/4"]
+    assert map_file_fill_targets("# FILL 1 2\nMetal1 NET 34 0\n") == []
+
+
+def test_pv_streams_through_the_layer_map_file_when_given(project, tmp_path, monkeypatch):
+    """M81: the stream reads the DEF through the PDK's map file, and the fill guard checks the file's fill layers."""
+    bin_dir = tmp_path / "bin"
+    fake_tool(bin_dir, "openroad", 'echo "argv: $*"')
+    fake_tool(bin_dir, "klayout", 'echo "argv: $*"')
+    only_on_path(monkeypatch, bin_dir)
+    layout = tmp_path / "route.def"
+    layout.write_text("stand-in\n", encoding="utf-8")
+    pdk = fake_pv_pdk(tmp_path / "pdk", lvs=False)
+    (tmp_path / "pdk" / "edi2gds.layermap").write_text(MAP_FILE, encoding="utf-8")
+    params = {"def": str(layout), "netlist": str(AXI), "top": TOP, **pdk,
+              "layer_map": str(tmp_path / "pdk" / "edi2gds.layermap")}
+    _, outcome = invoke(project, "pv.run", params, tmp_path / "w")
+    stream = outcome.data["commands"][0]
+    assert f"layer_map={tmp_path / 'pdk' / 'edi2gds.layermap'}" in stream and "fill_targets=34/4,35/0,36/4" in stream
+    assert "options.lefdef_config.map_file = layer_map" in (tmp_path / "w" / "stream.py").read_text()
+    _, outcome = invoke(project, "pv.run", {**params, "layer_map": ""}, tmp_path / "v")
+    assert "layer_map=" in outcome.data["commands"][0]  # none given: the technology's own map, as before
+    with pytest.raises(ToolAccessDenied, match="layer_map not found"):
+        invoke(project, "pv.run", {**params, "layer_map": str(tmp_path / "none.map")}, tmp_path / "x")
+
+
 def test_openroad_failure_names_the_stage():
     result = parse_openroad(_text("openroad_error.log"), 1, "route")
     assert not result.passed
@@ -465,6 +505,22 @@ def test_pnr_stages_follow_stop_after(project, tmp_path, monkeypatch):
 
     bad, _ = invoke(project, "pnr.run", {**params, "stop_after": "signoff"}, tmp_path / "bad")
     assert not bad.succeeded and "stop_after" in bad.summary
+
+
+def test_pnr_writes_the_layout_before_extraction(project, tmp_path, monkeypatch):
+    """M81: OpenRCX drops the router's minimum-area patches, so the DEF and netlists are written before it."""
+    bin_dir = tmp_path / "bin"
+    fake_tool(bin_dir, "openroad", f"cat '{PD / 'openroad_route.log'}'")
+    only_on_path(monkeypatch, bin_dir)
+    pdk = fake_pdk(tmp_path / "pdk", rc=True)
+    (tmp_path / "pdk" / "rcx.rules").write_text("stand-in\n", encoding="utf-8")
+    params = {"netlist": str(AXI), "sdc": str(SDC), "top": TOP, **pdk, **PNR_PDK,
+              "rcx_rules": str(tmp_path / "pdk" / "rcx.rules")}
+    invoke(project, "pnr.run", params, tmp_path / "x")
+    script = (tmp_path / "x" / "pnr.tcl").read_text()
+    route_done, extract = script.index("nirmaan-stage-done: route"), script.index("nirmaan-stage: extract")
+    for line in ("write_def route.def", "write_verilog final.v", "write_verilog -include_pwr_gnd final_pg.v"):
+        assert route_done < script.index(line) < extract and script.count(line) == 1, line
 
 
 def test_sta_falls_back_to_openroads_embedded_opensta(project, tmp_path, monkeypatch):

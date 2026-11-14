@@ -87,6 +87,8 @@ def test_it_streams_then_checks_in_magic_and_compares_in_netgen(project, tmp_pat
     work = tmp_path / "w"
     drc = (work / "magic_drc.tcl").read_text()
     assert drc.startswith(f'tech load "{pdk["magic_tech"]}"') and f"load {TOP}" in drc and "drc listall why" in drc
+    for script in (drc, (work / "magic_extract.tcl").read_text()):  # M81: via cells flattened as Magic reads them
+        assert script.index("gds flatglob VIA_*") < script.index("gds read")
     lvs = (work / "netgen_lvs.tcl").read_text()
     assert f'readnet spice "{pdk["spice"]}"' in lvs and f'readnet verilog "{AXI}" $source' in lvs
     assert f'"{pdk["netgen_setup"]}"' in lvs and "-json" in lvs

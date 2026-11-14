@@ -213,7 +213,7 @@ got:
 | `place` | `global_placement`, `detailed_placement`, `check_placement`, `report_design_area` |
 | `route` | `global_route`, `detailed_route -output_drc route_drc.rpt` |
 | `timing` | `estimate_parasitics` (`-placement` after place, `-global_routing` after route; none after floorplan), then the four timing reports of 4.2 |
-| (outputs) | `write_def <last stage>.def`, and after routing `write_verilog final.v` |
+| (outputs) | `write_def <last stage>.def`, and after routing `write_verilog final.v`; a routed layout is written right after the route stage, before extraction, which drops the router's minimum-area patches (M81, `docs/PD_GF180_PILOT.md`) |
 
 Parsed (`parse_openroad`):
 

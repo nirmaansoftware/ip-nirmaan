@@ -162,7 +162,7 @@ KLayout's own numbers, so the pilot still runs without fill.
 
 ## 7. Not in this milestone
 
-* GF180MCU and IHP SG13G2 (pending the founder's decision; follow-ups, one PDK per pull request).
+* GF180MCU and IHP SG13G2 (pending the founder's decision; follow-ups, one PDK per pull request). GF180MCU: M81, `docs/PD_GF180_PILOT.md`.
 * The OpenROAD-flow-scripts `make` flow itself: `pnr.run` keeps its own
   script, and the image supplies the tools and the platform.
 * Making `pd-sky130` a required check, or adding the backend to a workflow's
