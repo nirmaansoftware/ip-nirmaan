@@ -60,9 +60,9 @@ group counts when all hold:
   gives 0.376);
 - every trial re-judged clean: `rejudge.json` in the record, written by
   `nirmaan eval rejudge <record> --write`, says `same` for it;
-- for a skill of the design or verification domain (`MUST_FAIL_DOMAINS`, data in
-  `src/nirmaan/company/evidence.py`), every case it rests on has
-  a must-fail control (a held-out check with `mutants`, M58);
+- for a skill of the design, verification or protocols domain
+  (`MUST_FAIL_DOMAINS`, data in `src/nirmaan/company/evidence.py`), every case
+  it rests on has a must-fail control (a held-out check with `mutants`, M58);
 - the group's digest is the skill's current digest. A changed card or
   document, including a knowledge document added later, makes the group stale;
 - the group's harness is the current default harness at the group's CLI
