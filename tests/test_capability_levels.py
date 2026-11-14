@@ -1,7 +1,8 @@
 """Evidence levels come only from committed records (M63).
 
-On main no record exists, so the generator reports zero Knowledge, zero
-Practised and zero Proven, and the committed capability/levels.json says so.
+With no result record committed the generator reports zero Practised and zero
+Proven; each committed record can only raise a level through the rules below,
+and the committed capability/levels.json is the generator's output over them.
 Fixture repositories show each rule: 5 of 5 tool-judged trials with a clean
 re-judge and a must-fail control make a skill Practised; 4 of 5 do not; a
 changed skill card makes the group stale; replays, attestations, trials of a
@@ -118,12 +119,24 @@ def _level(org, repo: Path, skill: str = SKILL):
 # --- Main -------------------------------------------------------------------------------------
 
 
-def test_on_main_nothing_is_practised_or_proven_and_the_file_says_so(org):
+def test_on_main_every_practised_or_proven_level_has_committed_records_and_the_file_says_so(org):
     levels = compute(org, ROOT)
-    assert levels["totals"]["practised"] == 0 and levels["totals"]["proven"] == 0
+    results = ROOT / "evals" / "results"
+    committed = {p.parent.name for p in results.glob("*/manifest.json")} if results.is_dir() else set()
+    for name in ("practised", "proven"):
+        at_level = {s for s, v in levels["skills"].items() if v["level"] == name}
+        assert levels["totals"][name] == len(at_level)
+    if not committed:  # no result record: nothing can be Practised or Proven
+        assert levels["totals"]["practised"] == 0 and levels["totals"]["proven"] == 0
+    for skill, v in levels["skills"].items():
+        if v["level"] in ("practised", "proven"):
+            counting = [g for g in v["practised"] if g["counts"]]
+            assert counting, skill
+            # Every record behind a counted group is a committed record of this repository.
+            assert all(Path(r).name in committed for g in counting for r in g["records"]), skill
     # Knowledge comes only from committed check records, and every committed record counts, except a
     # record whose document was corrected after its check: that one is stale until it is re-checked.
-    at_knowledge = {s for s, v in levels["skills"].items() if v["level"] == "knowledge"}
+    at_knowledge = {s for s, v in levels["skills"].items() if v["level"] in ("knowledge", "practised", "proven")}
     stale = {s for s, v in levels["skills"].items()
              if "stale: the document changed after its check" in v.get("knowledge", {}).get("problems", [])}
     assert at_knowledge == {p.stem for p in (ROOT / CHECKS).glob("*.json")} - stale
