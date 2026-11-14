@@ -717,3 +717,10 @@ counted at the CEO (section 3). `ls evals/` at the same commit shows `firmware`,
   licences (NOTICE).
 - **Outside contributions:** not accepted for now.
 - **Legal entity (founder item 1):** still open.
+- **Live eval batches (founder item 5, gate G17):** approved on the founder's
+  plan through the local CLI, run only while both review loops are idle: the
+  RTL pilot's first recorded batch including the ablation run (2026-10-31), and
+  wave 2 Verification's batch (2026-11-13).
+- **New tools for wave 2 (2026-11-13):** eqy, verilator_coverage and cocotb may
+  be wired into the tool broker, each in its own milestone PR. No spending.
+
