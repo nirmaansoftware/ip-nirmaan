@@ -127,8 +127,8 @@ backed on its own: that takes a passing run, below.
 | `assertion` | `formal.run`, `simulator.run` |
 | `coverage_point` | `coverage.read` |
 
-`coverage.read` is `CONTRACT_ONLY`, so a coverage point is always a gap today,
-and the gap says so. `register_item_kind` adds or replaces one.
+A coverage point is a gap until a passing `coverage.read` run backs it, and the
+gap says so (`coverage.read` was `CONTRACT_ONLY` until M70, `docs/COVERAGE_READ.md`). `register_item_kind` adds or replaces one.
 
 ## Decision 3: the gap query
 

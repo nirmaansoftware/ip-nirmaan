@@ -214,7 +214,7 @@ Units: verification. Seat: verification-lead.
 | Python-based verification | K | none | none | Free tool: cocotb on Icarus or Verilator |
 | Assertions and formal property checking | P | sva, formal_verification, model_checking, formal_coverage, assertion_coverage | verification.formal, verification.coverage.assertion | SBY proofs and covers run; open Yosys reads only a subset of SVA |
 | Equivalence checking | K | equivalence_checking | verification.formal.equivalence | equivalence.run is contract only. Free tool: Yosys eqy |
-| Coverage and closure | K | code_coverage, functional_coverage, assertion_coverage | verification.coverage | coverage.read is contract only; covergroups are unreliable in open simulators. Free tool: verilator_coverage. Includes UCIS |
+| Coverage and closure | K | code_coverage, functional_coverage, assertion_coverage | verification.coverage | coverage.read runs line, toggle and branch coverage through verilator_coverage (M70); covergroups are unreliable in open simulators. Includes UCIS |
 | Debug, triage and regression | P | failure_triage, log_analysis, waveform_debug, root_cause_analysis, regression_intelligence, regression_management | verification.debug, verification.simulation.regression, infrastructure.eda.regression | veritriage.investigate runs on real simulation logs; replayed-failure evals are writable |
 | CDC and RDC verification | K | cdc_verification | verification.cdc | cdc.run is contract only; no mature free structural CDC tool |
 | Processor and ISA verification | K | none | none | The cores already run. Free tool: riscv-arch-test, riscv-dv, riscv-formal |

@@ -815,6 +815,9 @@ PHYSICAL_IMPLEMENTATION = WorkflowTemplate(
 #: works from and is judged over. The proof's setup names the RTL by its file name, so the approved RTL is
 #: placed beside the seat's files (docs/BLOCK_VERIFICATION.md).
 DUT_RTL = FileInput(param="sources", kinds=("rtl_source",), upstream=True)
+#: M70: the code coverage block verification's coverage seat must reach on the approved RTL, in percent of the
+#: design files' points (docs/COVERAGE_READ.md, section 4). Branch coverage is read but not bounded.
+COVERAGE_TARGETS = (at_least("line", 90), at_least("toggle", 75))
 DUT_RTL_BESIDE = FileInput(param="sources", kinds=("rtl_source",), upstream=True, beside=True)
 PROOF_SETUP = (FileInput(param="sby", kinds=("formal_spec",)), DUT_RTL_BESIDE,
                FileInput(param="sources", kinds=("assertions",)))
@@ -860,11 +863,17 @@ BLOCK_VERIFICATION = WorkflowTemplate(
                      checked("The seat's properties are proven on the approved RTL", "formal.run", *PROOF_SETUP,
                              bounds=(at_least("proven", 1),)),
                      checked("The proof is not vacuous: every cover is reached", "formal.cover", *PROOF_SETUP))),
-        # Asked for by name. coverage.read is a contract today, so its evidence is recorded, not run, before
-        # review (docs/BLOCK_VERIFICATION.md, "Not in this milestone").
-        st("coverage", "Coverage", "Verification", "dv.coverage", depends_on=("testbench",), when=when("coverage"),
-           skills=("code_coverage",), criticality=M, review=rv("dv.review"), outputs=("coverage_report",),
-           evidence=(REVIEWED, dv_ran("Coverage of the testbench on the approved RTL", "coverage.read"))),
+        # Asked for by name. M70: the coverage seat's testbench must reach COVERAGE_TARGETS on the approved RTL
+        # before review (docs/COVERAGE_READ.md).
+        st("coverage", "Coverage", "Verification", "dv.coverage", depends_on=("design-under-test", "testbench"),
+           when=when("coverage"), skills=("code_coverage",), criticality=M, review=rv("dv.review"),
+           outputs=("testbench", "coverage_report"),
+           evidence=(REVIEWED,
+                     checked("The seat's testbench passes on the approved RTL and reaches the coverage targets on "
+                             "it", "coverage.read", DUT_RTL, FileInput(param="design", kinds=("rtl_source",),
+                                                                       upstream=True),
+                             FileInput(param="sources", kinds=("testbench",)),
+                             FileInput(param="top", kinds=("testbench",), entry=True), bounds=COVERAGE_TARGETS))),
         # M69: equivalence.run runs (eqy), so the seat's setup must prove the approved versions equivalent before
         # review; the run's result names the files each side read (docs/EQUIVALENCE.md).
         st("equivalence", "Equivalence check", "Formal", "formal.equivalence", depends_on=("design-under-test",),

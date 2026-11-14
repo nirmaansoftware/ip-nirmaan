@@ -210,8 +210,8 @@ tools:
    simulation, and synthesis before review.
 4. `nirmaan gaps` reports what the M24 demo did: AXIL-RESET, AXIL-WSTRB,
    AXIL-ORDER, AXIL-SLVERR, and AXIL-LATENCY backed by the real simulation;
-   AXIL-B2B a gap (its cover point needs `coverage.read`, which is
-   `CONTRACT_ONLY`); AXIL-SYNTH and AXIL-FORMAL gaps with no item.
+   AXIL-B2B a gap (its cover point needs a `coverage.read` run, which the
+   demo does not make; the tool was `CONTRACT_ONLY` until M70); AXIL-SYNTH and AXIL-FORMAL gaps with no item.
 
 The difference is where the plan came from: M24's demo test recorded it by
 hand, after the RTL existed. Here a seat wrote it from the approved spec
