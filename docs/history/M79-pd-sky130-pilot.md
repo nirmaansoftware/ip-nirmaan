@@ -1,8 +1,8 @@
 # Milestone 79 - The SKY130 physical design pilot in CI: Magic DRC and Netgen LVS
 
-Resources item R3 of the capability build-out, under the founder's approval
-in session, 2026-11-14, of OpenROAD-flow-scripts, KLayout, Magic, Netgen and
-the open PDKs SKY130, GF180MCU and IHP SG13G2, on CI runners only. Design:
+A physical design pilot in CI, with OpenROAD-flow-scripts, KLayout, Magic,
+Netgen and the open PDKs SKY130, GF180MCU and IHP SG13G2 pending the
+founder's decision (no committed record yet), on CI runners only. Design:
 `docs/PD_SKY130_PILOT.md`. Tests: `tests/test_pv_magic.py`,
 `tests/test_pd_sky130_pilot.py`.
 

@@ -1,10 +1,10 @@
 # The SKY130 physical design pilot (Milestone 79)
 
-Resources item R3 of the capability build-out: physical design in CI, one
-pilot block from RTL to DRC and LVS on an open PDK, on GitHub-hosted runners
-only. Tools approved by the founder, in session, 2026-11-14 (OpenROAD-flow-scripts,
-KLayout, Magic, Netgen; the open PDKs SKY130, GF180MCU and IHP SG13G2; CI
-runners only, never a development machine). This milestone covers SKY130;
+A physical design pilot in CI: one pilot block from RTL to DRC and LVS on an
+open PDK, on GitHub-hosted runners only. The tools (OpenROAD-flow-scripts,
+KLayout, Magic, Netgen) and the open PDKs (SKY130, GF180MCU, IHP SG13G2) are
+pending the founder's decision; no committed record of that decision exists
+yet. CI runners only, never a development machine. This milestone covers SKY130;
 GF180MCU and IHP SG13G2 are follow-ups.
 
 ## 1. What already existed, and the gap
@@ -156,7 +156,7 @@ datatypes in the stream is a follow-up for the physical design owners.
 
 ## 7. Not in this milestone
 
-* GF180MCU and IHP SG13G2 (approved; follow-ups, one PDK per pull request).
+* GF180MCU and IHP SG13G2 (pending the founder's decision; follow-ups, one PDK per pull request).
 * The OpenROAD-flow-scripts `make` flow itself: `pnr.run` keeps its own
   script, and the image supplies the tools and the platform.
 * Making `pd-sky130` a required check, or adding the backend to a workflow's
