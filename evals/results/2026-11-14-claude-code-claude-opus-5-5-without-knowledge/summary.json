@@ -1,0 +1,29 @@
+{
+  "cases": {
+    "rtl/rr-arbiter": {
+      "high": 1.0,
+      "low": 0.4385029682449546,
+      "n": 3,
+      "passed": 3,
+      "rate": 1.0
+    }
+  },
+  "format": "nirmaan.eval-summary",
+  "seats": {
+    "rtl-implementation": {
+      "high": 1.0,
+      "low": 0.4385029682449546,
+      "n": 3,
+      "passed": 3,
+      "rate": 1.0
+    }
+  },
+  "totals": {
+    "cost_usd": null,
+    "duration_s": 1121.85,
+    "input_tokens": 6,
+    "model_calls": 3,
+    "output_tokens": 121963,
+    "trials": 3
+  }
+}
