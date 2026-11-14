@@ -515,7 +515,21 @@ founder_classes:
       - scripts/pr_loop.py
       - docs/pr-loop.plist
       - tests/test_seat_map.py
-    note: .github/** covers .github/review-teams.yml. The pr-review skill (.claude/skills/pr-review/) falls under .claude/**; its posting script (scripts/pr_review.py), the map logic it shares with the coverage test (scripts/review_map.py), the automated loop that drives it (scripts/pr_loop.py) and the launchd job that runs the loop (docs/pr-loop.plist) are listed here.
+      - src/nirmaan/runtime/harness.py
+      - src/nirmaan/evals/levels.py
+      - src/nirmaan/runtime/base.py
+      - src/nirmaan/runtime/context.py
+      - src/nirmaan/runtime/prompt.py
+      - src/nirmaan/runtime/model.py
+      - src/nirmaan/runtime/files.py
+      - src/nirmaan/runtime/selection.py
+      - src/nirmaan/runtime/claude_code.py
+      - src/nirmaan/org/knowledge.py
+      - src/nirmaan/integrations/veritriage.py
+      - src/nirmaan/evals/runner.py
+      - src/veritriage/models/ai.py
+      - src/veritriage/ai/grounding.py
+    note: .github/** covers .github/review-teams.yml. The pr-review skill (.claude/skills/pr-review/) falls under .claude/**; its posting script (scripts/pr_review.py), the map logic it shares with the coverage test (scripts/review_map.py), the automated loop that drives it (scripts/pr_loop.py) and the launchd job that runs the loop (docs/pr-loop.plist) are listed here. A harness change is control plane (docs/HARNESS.md), so the harness settings (src/nirmaan/runtime/harness.py), the level computation (src/nirmaan/evals/levels.py) and every file in harness.CODE are listed here by name, not by a glob; tests/test_review_teams.py fails if a CODE file is missing from this list.
   - id: gate-semantics
     title: Gate semantics
     paths:
