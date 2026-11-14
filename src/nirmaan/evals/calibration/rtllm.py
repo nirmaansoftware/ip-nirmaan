@@ -30,14 +30,15 @@ from typing import Sequence
 
 from nirmaan.evals.cases import EvalError
 from nirmaan.evals.records import record_run
+from nirmaan.org.knowledge import KNOWLEDGE_ROOT
 from nirmaan.models import CaseFile, EvalCase, HeldOutCheck
 from nirmaan.org import Organization
 
 #: The environment variable the CLI reads the benchmark's path from when ``--benchmark`` is not given.
 BENCHMARK_ENV = "NIRMAAN_RTLLM_DIR"
-SOURCE = "RTLLM (hkust-zhiyao/RTLLM, MIT)"
+SOURCE = "RTLLM (hkust-zhiyao/RTLLM, licence MIT per its upstream LICENSE file)"
 UPSTREAM_FILE = "UPSTREAM_COMMIT"
-#: The seat stage and skill the calibration cases evaluate; the skill is the RTL pilot's, so the digest is real.
+#: The seat stage and skill the calibration cases evaluate; the skill is the RTL pilot's; its digest is taken from the real repository (card and knowledge document).
 SEAT = "rtl-implementation"
 SKILLS = ("rtl_design",)
 #: The one request shape the planner turns into the block-design workflow for any design name (a small block).
@@ -120,7 +121,7 @@ def upstream_commit(root: Path | str) -> str:
 
 def _licence(root: Path) -> None:
     if not (root / "LICENSE").is_file():
-        raise OutsideError(f"{root} has no LICENSE file: the MIT notice must stay with the benchmark copy")
+        raise OutsideError(f"{root} has no LICENSE file: the upstream licence notice must stay with the benchmark copy")
 
 
 def with_verdict(text: str, finish: bool = False) -> str:
@@ -266,4 +267,5 @@ def calibrate(org: Organization, root: Path | str, *, runtime: str | None, trial
         note = f"; {len(mapped)} of {len(cases)} designs mapped" + (f", not mapped: {', '.join(left)}" if left else "")
         return record_run(org, mapped, runtime, trials=trials, repo=Path(stage), out=out, command=command,
                           head_sha=None, on_trial=on_trial, purpose="calibration",
+                          digest_repo=KNOWLEDGE_ROOT.parent,
                           source=f"{SOURCE} at {commit}{note}")

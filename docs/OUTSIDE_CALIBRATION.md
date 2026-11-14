@@ -20,9 +20,13 @@ RTLLM (https://github.com/hkust-zhiyao/RTLLM, "RTLLM: An Open-Source Benchmark
 for Design RTL Generation with Large Language Model") is 50 small designs:
 arithmetic, counters and state machines, memories, signal generators and a few
 processor parts. Each has a natural-language description, a testbench and a
-reference RTL. Its licence terms are not recorded in this repository: the
-adapter requires the upstream `LICENSE` file to sit with the private copy, and
-that file is the only source for the terms. VerilogEval has no confirmed
+reference RTL. Licence record: the upstream repository is
+hkust-zhiyao/RTLLM, read at commit 51ed553d0ffd32797a1a0a13e051656bf302c81f;
+its `LICENSE` file, at the root of that repository, is the MIT licence
+(copyright 2024, Nora Lu). The terms are that file's; this repository
+commits no text of the benchmark, so it carries no NOTICE entry, and the
+adapter requires the upstream `LICENSE` file to stay with the private copy.
+This is a reading of the file, not legal advice. VerilogEval has no confirmed
 licence for its problem text and CVDP needs a separate decision, so neither is
 used here.
 
@@ -131,7 +135,7 @@ on main and no trial recorded under it goes stale.
 
 ## Next
 
-The live calibration (about 46 designs, one or a few trials each) and the
+The live calibration (the designs that map, one or a few trials each) and the
 bare-model comparison on the same designs, after the owner's usage go-ahead.
 Tests: `tests/test_outside_calibration.py`, on tiny synthetic designs written
 for the tests in the benchmark's layout.

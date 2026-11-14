@@ -126,11 +126,13 @@ def select_cases(cases: Sequence[EvalCase], seats: Sequence[str]) -> list[EvalCa
 def record_trial(org: Organization, case: EvalCase, seat_runtime: AgentRuntime, *, replay: bool, record: str,
                  trial: int, repo: Path, attempts: int | None = None, sandbox: Path | None = None,
                  clock: Callable[[], datetime] | None = None, knowledge: bool = True,
-                 purpose: str = "evidence") -> EvalTrial:
+                 purpose: str = "evidence", digest_repo: Path | None = None) -> EvalTrial:
     """Run one case once with every model answer captured, and keep the tool runs behind each verdict.
 
     ``knowledge=False`` (M67) runs the seat without knowledge documents and labels the trial ``knowledge: off``.
     Every answer, and the result, records the harness (M73), with the runtime's CLI version in it.
+    ``digest_repo`` is where the skills' knowledge documents are digested from (default ``repo``): a run that stages
+    its cases elsewhere (M76) still digests the documents the seat was really given.
     """
     llm = getattr(seat_runtime, "llm", None)
     harness = harness_sha256(attempts=attempts, knowledge=knowledge, cli=runtime_cli(seat_runtime))
@@ -151,7 +153,7 @@ def record_trial(org: Organization, case: EvalCase, seat_runtime: AgentRuntime, 
     answers = tuple(recorder.answers) if recorder else ()
     model = next((a.model for a in answers if a.model), None) or model_of(seat_runtime)
     return EvalTrial(record=record, trial=trial, stage=case.seat, model=model,
-                     skills={s: skill_digest(org, s, repo, knowledge=knowledge) for s in case.skills},
+                     skills={s: skill_digest(org, s, digest_repo or repo, knowledge=knowledge) for s in case.skills},
                      knowledge="on" if knowledge else "off", purpose=purpose, result=result,
                      answers=answers, judge_runs=judge_runs)
 
@@ -174,7 +176,7 @@ def record_run(org: Organization, cases: Sequence[EvalCase], runtime: str | None
                out: Path, attempts: int | None = None, command: str = "", head_sha: str | None = None,
                clock: Callable[[], datetime] | None = None,
                on_trial: Callable[[EvalTrial, Path], None] | None = None, knowledge: bool = True,
-               purpose: str = "evidence", source: str = "") -> Path:
+               purpose: str = "evidence", source: str = "", digest_repo: Path | None = None) -> Path:
     """Run every case ``trials`` times on a registered runtime (``None`` replays) and write a run record.
 
     Each trial gets a fresh runtime and its own sandbox. The manifest is written first and rewritten at the
@@ -208,7 +210,8 @@ def record_run(org: Organization, cases: Sequence[EvalCase], runtime: str | None
         for number in range(1, trials + 1):
             seat = get_runtime(runtime) if runtime else ModelRuntime(replay_llm(case, repo), runtime_id=REPLAY)
             trial = record_trial(org, case, seat, replay=runtime is None, record=path.name, trial=number, repo=repo,
-                                 attempts=attempts, clock=clock, knowledge=knowledge, purpose=purpose)
+                                 attempts=attempts, clock=clock, knowledge=knowledge, purpose=purpose,
+                                 digest_repo=digest_repo)
             target = trial_path(path, case.id, number)
             _write(target, trial.model_dump(mode="json"))
             done.append(trial)

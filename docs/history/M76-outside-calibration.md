@@ -6,9 +6,10 @@ Tests: `tests/test_outside_calibration.py`, `tests/test_capability_levels.py`.
 **The gap.** Every case we run was written by us. There was no outside
 yardstick for the RTL seat in our harness.
 
-**The adapter.** `nirmaan.evals.calibration` reads a private copy of RTLLM (MIT,
-fetched outside both repositories; no problem text, testbench or reference is
-committed) and maps each design to a case for the `rtl-implementation` seat:
+**The adapter.** `nirmaan.evals.calibration` reads a private copy of RTLLM (licence MIT per its
+upstream LICENSE file, recorded in `docs/OUTSIDE_CALIBRATION.md` with the
+upstream commit; fetched outside both repositories; no problem text, testbench
+or reference is committed) and maps each design to a case for the `rtl-implementation` seat:
 the description is the approved interface specification, the benchmark's own
 testbench is the judge, run over the seat's RTL through `simulator.run` and the
 `held-out-run` scorer. A staged copy of the testbench also prints the verdict

@@ -43,7 +43,11 @@ A calibration trial (M76, `nirmaan eval outside`, an outside benchmark;
 `docs/OUTSIDE_CALIBRATION.md`) is labelled `"purpose": "calibration"` in its run
 manifest and in the trial. Labelled so in either, it is listed in `calibration`
 with the reason "outside calibration" and never counts toward any level; the
-record is not judged as evidence at all, so a replay of one is no refusal.
+record is not judged as evidence at all, so a replay of one is no refusal. A
+record that mixes calibration trials with evidence trials is refused, so one
+stray label never takes the other trials out of the levels. A calibration
+trial's skill digest covers the card and the knowledge document the seat was
+given, as for any trial.
 
 Trials are grouped by skill, model, the skill digest recorded with the trial
 (card plus knowledge document, M58), the harness recorded with it (M73,

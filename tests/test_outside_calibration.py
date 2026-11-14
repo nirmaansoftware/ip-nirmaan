@@ -22,6 +22,8 @@ from nirmaan.eval_proposals import load_results
 from nirmaan.evals import EvalError, load_record
 from nirmaan.evals.levels import compute
 from nirmaan.evals.calibration import OutsideError, calibrate, check_reference, locate, stage_cases, with_verdict
+from nirmaan.evals.cases import skill_digest
+from nirmaan.org.knowledge import KNOWLEDGE_ROOT
 from nirmaan.runtime.harness import harness_sha256
 
 SIM = needs("iverilog", "vvp")
@@ -105,7 +107,7 @@ def test_the_cli_needs_the_path_and_one_mode(tmp_path):
 
 def test_the_licence_and_the_commit_must_travel_with_the_copy(bench, org):
     (bench / "LICENSE").unlink()
-    with pytest.raises(OutsideError, match="MIT notice"):
+    with pytest.raises(OutsideError, match="licence notice"):
         stage_cases(bench, bench.parent / "stage")
     (bench / "LICENSE").write_text("MIT License\n", encoding="utf-8")
     (bench / "UPSTREAM_COMMIT").unlink()
@@ -204,6 +206,33 @@ def test_either_label_alone_keeps_the_trial_out_of_the_levels(record, org, tmp_p
     assert levels["skills"] == {} and len(levels["calibration"]) == 2
     assert all(f"labelled in the {'trial' if where == 'manifest' else 'run manifest'})" in c["reason"]
                for c in levels["calibration"])
+
+
+@FLOW
+def test_a_record_that_mixes_calibration_and_evidence_trials_is_refused(record, org, tmp_path):
+    repo = tmp_path / "repo"
+    copy = repo / "evals" / "results" / record.name
+    shutil.copytree(record, copy)
+    for path in copy.rglob("*.json"):
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if data["format"] == "nirmaan.eval-run" or (
+                data["format"] == "nirmaan.eval-trial" and data["result"]["case"] == "rtllm/inv"):
+            data["purpose"] = "evidence"  # one trial and the manifest say evidence; the other trial still says calibration
+            path.write_text(json.dumps(data), encoding="utf-8")
+    levels = compute(org, repo)
+    assert levels["skills"] == {} and levels["calibration"] == []
+    assert len(levels["refused_records"]) == 1 and "mixes outside calibration" in levels["refused_records"][0]
+
+
+@FLOW
+def test_calibration_trials_digest_the_knowledge_document_the_seat_was_given(record, org):
+    run = load_record(record)
+    for trial in run.trials:
+        assert trial.skills
+        for skill, digest in trial.skills.items():
+            assert digest == skill_digest(org, skill, KNOWLEDGE_ROOT.parent)
+            if list((KNOWLEDGE_ROOT).glob(f"*/{skill}.md")):
+                assert digest != skill_digest(org, skill, KNOWLEDGE_ROOT.parent, knowledge=False)
 
 
 @FLOW

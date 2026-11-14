@@ -167,11 +167,16 @@ def practised(org: Organization, repo: Path,
     for manifest in sorted((repo / RESULTS).rglob(MANIFEST)):
         try:
             record = load_record(manifest.parent)
-            if record.manifest.purpose != "evidence" or any(t.purpose != "evidence" for t in record.trials):
+            labelled = [bool(calibration_labels(record.manifest, t)) for t in record.trials]
+            if any(labelled) and not all(labelled):
+                # M76: one record never mixes the two; a stray label cannot take the other trials out of the levels
+                raise EvalError("the record mixes outside calibration trials with evidence trials: "
+                                "each trial is one or the other, so the record is refused")
+            if any(labelled) or (not record.trials and record.manifest.purpose != "evidence"):
                 # M76: a calibration record is listed, never judged as evidence (a replay of it is no refusal)
                 where = _rel(manifest.parent, repo)
                 for trial in record.trials:
-                    named = " and ".join(calibration_labels(record.manifest, trial)) or "the record"
+                    named = " and ".join(calibration_labels(record.manifest, trial))
                     calibration.append({"record": where, "case": trial.result.case, "trial": trial.trial,
                                         "passed": trial.result.passed,
                                         "reason": f"outside calibration (labelled in {named}): "
