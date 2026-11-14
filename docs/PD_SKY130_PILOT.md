@@ -154,6 +154,12 @@ therefore most likely did not check the fill shapes. The pilot runs without
 fill, so every shape it signs off is read; mapping fill to SKY130's fill
 datatypes in the stream is a follow-up for the physical design owners.
 
+**Fixed in M80 (2026-11-14)** for the KLayout deck: confirmed in CI (a shrunk
+fill rectangle passed DRC), the stream now maps fill to `68/28` to `72/28`,
+which the deck reads, and fails any fill shape on a layer the technology does
+not map (`docs/PD_FILL_LAYERS.md`). Magic reads neither those layers nor
+KLayout's own numbers, so the pilot still runs without fill.
+
 ## 7. Not in this milestone
 
 * GF180MCU and IHP SG13G2 (pending the founder's decision; follow-ups, one PDK per pull request).

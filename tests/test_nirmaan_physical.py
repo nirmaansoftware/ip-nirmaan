@@ -24,6 +24,7 @@
 from __future__ import annotations
 
 import ast
+import json
 import os
 import re
 import shutil
@@ -38,7 +39,7 @@ from laws import needs
 
 from nirmaan.integrations.eda import Backend, EdaResult, register_backend, unregister_backend
 from nirmaan.integrations.pd_parsers import VIOLATOR_REPORT_LIMIT, parse_klayout, parse_openroad, parse_opensta
-from nirmaan.integrations.physical import PDK_ROOT_ENV, needs_pdk
+from nirmaan.integrations.physical import PDK_ROOT_ENV, fill_layer_map, needs_pdk
 from nirmaan.models import Bound, EvidenceKind, TaskKind, ToolStatus
 from nirmaan.orchestrator import Orchestrator
 from nirmaan.runtime import ToolAccessDenied, ToolBroker, available_bindings, unavailable_reason
@@ -302,6 +303,40 @@ def test_klayout_broken_layout_and_netlist_fail():
     assert "1 layout cell with no GDS (X)" in parse_klayout(empty, 0).summary
     crashed = parse_klayout(clean + "\nERROR: drc.lydrc:12: undefined method\n", 1)
     assert not crashed.passed and crashed.errors[-1].message == "drc.lydrc:12: undefined method"
+
+
+def test_fill_on_layers_the_technology_does_not_map_fails():
+    """M80: fill the stream put on layers of KLayout's own numbering is read by no deck, so the run fails."""
+    clean = _text("klayout_pv.log")
+    lines = "\nnirmaan-gds-fill-layer: 7/28 3000\nnirmaan-gds-fill-layer: 9/28 9947\n"
+    bad = parse_klayout(clean + lines + "nirmaan-gds-fill-unmapped: 12947 7/28,9/28\n", 0)
+    assert not bad.passed and bad.metrics["fill_layers"] == {"7/28": 3000, "9/28": 9947}
+    assert bad.metrics["fill_unmapped"] == 12947
+    assert bad.summary == ("physical verification failed: 12947 fill shapes on GDS layers the technology does not "
+                           "map (7/28, 9/28), which no check reads")
+    good = parse_klayout(clean + lines.replace("7/28", "68/28") + "nirmaan-gds-fill-unmapped: 0 -\n", 0)
+    assert good.passed and good.metrics["fill_unmapped"] == 0, good.summary
+
+
+#: A LEF/DEF reader section as sky130hd.lyt has it: drawing entries, a fill suffix and datatype, no fill entry.
+LYT = ("<technology><lefdef><layer-map>layer_map('li1.drawing : 67/20';'met1.drawing : 68/20';"
+       "'met2.drawing : 69/20';'met2.FILL : 41/28';'via.drawing : 68/44')</layer-map>"
+       "<special-fills-suffix-string>.FILL</special-fills-suffix-string>"
+       "<special-fills-datatype-string>28</special-fills-datatype-string>"
+       "<routing-suffix-string>.drawing</routing-suffix-string></lefdef>"
+       "<mag><layer-map>layer_map()</layer-map></mag></technology>")
+
+
+def test_fill_layer_map_maps_each_routing_layer_to_its_drawing_number_and_the_fill_datatype():
+    tech, targets = fill_layer_map(LYT, ["li1", "met1", "met2", "met3"])
+    assert "'met2.drawing : 69/20';'met2.FILL : 41/28';'via.drawing : 68/44';'li1.FILL : 67/28';" \
+           "'met1.FILL : 68/28')</layer-map>" in tech  # an entry the map has is kept; met3 has no drawing entry
+    assert targets == ["41/28", "67/28", "68/28"] and tech.endswith("<mag><layer-map>layer_map()</layer-map></mag>"
+                                                                     "</technology>")  # other sections untouched
+    assert fill_layer_map(LYT, []) == (LYT, ["41/28"])  # nothing to add
+    no_suffix = LYT.replace("<special-fills-suffix-string>.FILL</special-fills-suffix-string>", "")
+    assert fill_layer_map(no_suffix, ["met1"]) == (no_suffix, [])
+    assert fill_layer_map("<technology/>", ["met1"]) == ("<technology/>", [])
 
 
 def test_openroad_failure_names_the_stage():
@@ -609,6 +644,7 @@ def test_pv_runs_stream_drc_and_lvs_and_counts_them_itself(project, tmp_path, mo
     steps = outcome.data["commands"]
     assert [s[0] for s in steps] == ["openroad", "klayout", "klayout", "klayout", "klayout", "klayout"]
     assert steps[1][-1] == "stream.py" and steps[2][-1] == pdk["drc_deck"] and steps[3][-1] == "drc_count.py"
+    assert "fill_targets=" in steps[1]  # M80: the stand-in technology maps no fill layer
     assert steps[4][-1] == pdk["lvs_deck"] and steps[5][-1] == "lvs_count.py"
     work = tmp_path / "w"
     tech = (work / "klayout.lyt").read_text()
@@ -940,6 +976,23 @@ def sky130hd(*extra: dict[str, str]) -> None:
         pytest.skip(reason)
 
 
+def sky130hd_fill_rules(tmp_path: Path) -> str:
+    """M80: the platform's ``fill.json`` without fill sides under the minimum metal area's square root.
+
+    Its 0.4 um sides on met3 and met4 give fill of 0.16 or 0.232 um2, under the deck's minimum met3 and
+    met4 area (m3.6, m4.4: 0.24 um2). Once the deck read the fill, it found 543 of them (CI run
+    43608045086: m4.4 294, m3.6 249). The platform's file is read, never copied into the repository.
+    """
+    rules = json.loads((Path(os.environ[PDK_ROOT_ENV]) / SKY130HD_PNR["fill_rules"]).read_text(encoding="utf-8"))
+    for layer in ("met3", "met4"):
+        sizes = rules["layers"][layer]["non-opc"]
+        for side in ("width", "height"):
+            sizes[side] = [s for s in sizes[side] if s * s >= 0.24]
+    path = tmp_path / "sky130hd_fill.json"
+    path.write_text(json.dumps(rules, indent=1), encoding="utf-8")
+    return str(path)
+
+
 @needs("openroad", "yosys", "klayout")
 def test_real_signoff_flow_on_sky130hd(project, tmp_path):
     """M29 signoff flow, and M34: metal fill, three timing corners, and KLayout DRC and LVS, clean and broken."""
@@ -951,7 +1004,8 @@ def test_real_signoff_flow_on_sky130hd(project, tmp_path):
     assert synth.succeeded, synth.summary
     netlist = outcome.data["result"]["metrics"]["netlist"]
     run, outcome = invoke(project, "pnr.run", {"netlist": netlist, "sdc": str(SDC), "top": TOP, **SKY130HD,
-                                               **SKY130HD_PNR, "utilization": "30", "timeout": "900"},
+                                               **SKY130HD_PNR, "fill_rules": sky130hd_fill_rules(tmp_path),
+                                               "utilization": "30", "timeout": "900"},
                           tmp_path / "pnr")
     m = outcome.data["result"]["metrics"]
     assert m["stages_completed"] == ["floorplan", "place", "cts", "route", "extract", "timing"], run.summary
@@ -995,6 +1049,26 @@ def test_real_signoff_flow_on_sky130hd(project, tmp_path):
     bm = bad_outcome.data["result"]["metrics"]
     assert bm["drc_violations"] > 0 and any("OFFGRID" in r for r in bm["drc_by_rule"]), bad_drc.summary
     assert "DRC violation" in bad_drc.summary
+
+    # M80: the first fill rectangle (on metN) shrunk to 0.1 um square, under the layer's minimum width (mN.1,
+    # 0.14 um) and area (mN.6). Only a deck that reads the fill layers can see it, so it must fail DRC.
+    fills = re.search(r"^FILLS .*?^END FILLS", layout, re.S | re.M)
+    rect = re.compile(r"- LAYER met(\d)[^;]*?RECT \( (-?\d+) (-?\d+) \) \( -?\d+ -?\d+ \)").search(
+        layout, fills.start(), fills.end())
+    side = int(re.search(r"^UNITS DISTANCE MICRONS (\d+) ;", layout, re.M)[1]) // 10
+    tiny = rect[0][:rect[0].rindex("(")] + f"( {int(rect[2]) + side} {int(rect[3]) + side} )"
+    bad_fill_def = tmp_path / "bad_fill.def"
+    bad_fill_def.write_text(layout[:rect.start()] + tiny + layout[rect.end():], encoding="utf-8")
+    bad_fill, fill_outcome = invoke(project, "pv.run", {**pv, "def": str(bad_fill_def)}, tmp_path / "pv_fill",
+                                    bounds=signoff)
+    fm = fill_outcome.data["result"]["metrics"]
+    seen = (rect[0], bad_fill.summary, fm["drc_by_rule"], cm["fill_layers"])
+    assert not bad_fill.succeeded and fm["drc_violations"] > 0, seen
+    assert {f"m{rect[1]}.1", f"m{rect[1]}.6"} & set(fm["drc_by_rule"]), seen
+    assert fm["lvs_mismatches"] == 0, seen  # the LVS deck reads metal drawing (datatype 20) only: fill is no net
+    # Every fill shape is on a layer the deck reads as metal: li1 or met1 to met5 (67 to 72), fill datatype 28.
+    assert cm["fill_layers"] and set(cm["fill_layers"]) <= {f"{n}/28" for n in range(67, 73)}, seen
+    assert sum(cm["fill_layers"].values()) == cm["fill_shapes"], seen
 
     # A flip-flop's D input rewired to another net in the netlist: the layout no longer matches it.
     pg = Path(out["pg_netlist"]).read_text(encoding="utf-8")

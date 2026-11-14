@@ -54,3 +54,14 @@ from 3.6 to 6.4 minutes, still inside the main jobs' time.
 `tests/test_nirmaan_physical.py`; crown jewel
 `test_physical_verification_needs_no_core_changes`; the M29 crown jewel's timer
 now reports `timing_corners`.
+
+**Correction (M80, 2026-11-14).** "DRC 0 ... on the filled layout (12947 fill
+shapes)" above did not check the fill. The stream wrote the fill to GDS layers
+KLayout numbered itself (7/28 to 13/28), which the sky130hd deck does not read:
+in CI run 43607383342 a fill rectangle shrunk under the minimum width still
+passed DRC. The DRC 0 held for the routing and the cells only: once the deck
+read the fill, the block filled with the platform's `fill.json` had 543
+violations (met3 and met4 minimum area, from its 0.4 um fill sides; CI run
+43608045086). M80 streams the fill to the layers the deck reads, adds that
+control, and fills the CI tests without the 0.4 um sides; see
+`docs/history/M80-pd-fill-layers.md`. The text above is kept as it was written.

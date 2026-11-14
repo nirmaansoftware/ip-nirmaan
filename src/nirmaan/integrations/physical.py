@@ -586,6 +586,17 @@ for name in empty[:20]:
 with open(in_def) as f:
     fills = re.search(r"^FILLS .*?^END FILLS", f.read(), re.S | re.M)
 print("nirmaan-gds-fill-shapes: %d" % (len(re.findall(r"RECT", fills.group(0))) if fills else 0))
+fill_layers = {}  # M80: the GDS layer each fill shape landed on, which decides whether a deck reads it
+for cell in out.each_cell():
+    if cell.name.endswith("_DEF_FILL"):
+        for li in out.layer_indexes():
+            info = out.get_info(li)
+            key = "%d/%d" % (info.layer, info.datatype)
+            fill_layers[key] = fill_layers.get(key, 0) + cell.shapes(li).size()
+for key in sorted(k for k, n in fill_layers.items() if n):
+    print("nirmaan-gds-fill-layer: %s %d" % (key, fill_layers[key]))
+unmapped = sorted(k for k, n in fill_layers.items() if n and k not in fill_targets.split(","))
+print("nirmaan-gds-fill-unmapped: %d %s" % (sum(fill_layers[k] for k in unmapped), ",".join(unmapped) or "-"))
 out.write(out_file)
 '''
 
@@ -628,15 +639,64 @@ def pv_checks(params: Params) -> list[str]:
     return [c for c, needs in (("drc", {"drc_deck"}), ("lvs", {"lvs_deck", "cdl"})) if needs <= given]
 
 
-def _klayout_tech(job: Job) -> Path:
-    """The PDK's KLayout technology with this run's LEF files, as ORFS fills in its template."""
+def _tag(section: str, *names: str) -> str | None:
+    """The text of the first of these XML elements in a technology section."""
+    return next((m[1].strip() for n in names if (m := re.search(fr"<{n}>([^<]*)</{n}>", section))), None)
+
+
+def fill_layer_map(tech: str, routing_layers: list[str]) -> tuple[str, list[str]]:
+    """M80: the technology with a LEF/DEF fill entry for every routing layer its layer map leaves out.
+
+    KLayout's DEF reader names a fill shape's layer ``<layer><fill suffix>`` and looks the name up in
+    the layer map. A name the map lacks gets a layer number of KLayout's own (on sky130hd, 7/28 for
+    met2), which no PDK deck reads. Each missing entry takes the layer's own drawing number (its
+    routing-suffix entry) with the technology's own fill datatype. Also returns every fill target the
+    map now has, as ``layer/datatype``.
+    """
+    section = re.search(r"<lefdef>.*?</lefdef>", tech, re.S)
+    layer_map = section and re.search(r"<layer-map>layer_map\((.*?)\)</layer-map>", section[0], re.S)
+    if not layer_map:
+        return tech, []
+    fill = _tag(section[0], "special-fills-suffix-string", "fills-suffix-string", "fills-suffix")
+    datatype = _tag(section[0], "special-fills-datatype-string", "fills-datatype-string", "fills-datatype")
+    routing = _tag(section[0], "routing-suffix-string", "routing-suffix")
+    entries = {name.strip(): f"{layer}/{dt}" for name, layer, dt in
+               re.findall(r"'([^':]+?)\s*:\s*(\d+)/(\d+)'", layer_map[1])}
+    added = {} if not (fill and routing and datatype and datatype.isdigit()) else {
+        f"{name}{fill}": f"{entries[name + routing].split('/')[0]}/{datatype}" for name in routing_layers
+        if name + routing in entries and f"{name}{fill}" not in entries}
+    targets = sorted({t for n, t in {**entries, **added}.items() if fill and n.endswith(fill)})
+    if not added:
+        return tech, targets
+    body = ";".join(filter(None, [layer_map[1].strip(), *(f"'{n} : {t}'" for n, t in added.items())]))
+    start = section.start() + layer_map.start(1)
+    return tech[:start] + body + tech[section.start() + layer_map.end(1):], targets
+
+
+def _klayout_tech(job: Job) -> tuple[Path, list[str]]:
+    """The PDK's KLayout technology with this run's LEF files, as ORFS fills in its template, and its
+    LEF/DEF layer map completed for metal fill (M80); also the fill layers it maps to."""
     template = pdk_paths(job.params, "klayout_tech")[0].read_text(encoding="utf-8")
-    lefs = "".join(f"<lef-files>{f}</lef-files>"
-                   for f in pdk_paths(job.params, "tech_lef") + pdk_paths(job.params, "lef"))
+    lef_paths = pdk_paths(job.params, "tech_lef") + pdk_paths(job.params, "lef")
+    lefs = "".join(f"<lef-files>{f}</lef-files>" for f in lef_paths)
+    routing = [m for f in lef_paths for m in re.findall(r"^\s*LAYER\s+(\S+)\s*\n\s*TYPE\s+ROUTING\b",
+                                                        f.read_text(encoding="utf-8", errors="replace"), re.M)]
+    text, targets = fill_layer_map(re.sub(r"<lef-files>.*?</lef-files>", lambda _: lefs, template, count=1,
+                                          flags=re.S) if "<lef-files>" in template else template, routing)
     tech = job.workdir / "klayout.lyt"
-    tech.write_text(re.sub(r"<lef-files>.*?</lef-files>", lambda _: lefs, template, count=1, flags=re.S)
-                    if "<lef-files>" in template else template, encoding="utf-8")
-    return tech
+    tech.write_text(text, encoding="utf-8")
+    return tech, targets
+
+
+def stream_step(job: Job) -> list[str]:
+    """The KLayout step that streams the routed DEF to ``layout.gds`` (M34), shared by both pv.run backends;
+    the run's directory must hold ``stream.py`` (``STREAM_SCRIPT``)."""
+    p = job.params
+    tech, fill_targets = _klayout_tech(job)
+    return ["klayout", "-zz", "-rd", f"tech_file={tech}", "-rd", f"in_def={Path(p['def']).resolve()}",
+            "-rd", f"in_gds={' '.join(str(f) for f in pdk_paths(p, 'gds'))}",
+            "-rd", f"design_name={_token(p, 'top')}", "-rd", f"fill_targets={','.join(fill_targets)}",
+            "-rd", f"out_file={job.workdir / 'layout.gds'}", "-r", "stream.py"]
 
 
 def _pv_steps(job: Job) -> list[list[str]]:
@@ -655,10 +715,7 @@ def _pv_steps(job: Job) -> list[list[str]]:
         (work / "reference.cdl").write_text("".join(f'.INCLUDE "{f}"\n' for f in pdk_paths(p, "cdl"))
                                             + f'.INCLUDE "{work / "netlist.cdl"}"\n', encoding="utf-8")
         steps.append(["openroad", "-no_init", "-no_splash", "-exit", "cdl.tcl"])
-    steps.append(["klayout", "-zz", "-rd", f"tech_file={_klayout_tech(job)}",
-                  "-rd", f"in_def={Path(job.params['def']).resolve()}",
-                  "-rd", f"in_gds={' '.join(str(f) for f in pdk_paths(p, 'gds'))}",
-                  "-rd", f"design_name={top}", "-rd", f"out_file={work / 'layout.gds'}", "-r", "stream.py"])
+    steps.append(stream_step(job))
     if "drc" in checks:
         (work / "drc_count.py").write_text(DRC_COUNT_SCRIPT, encoding="utf-8")
         steps += [["klayout", "-zz", "-rd", f"in_gds={work / 'layout.gds'}", "-rd", f"report_file={work / 'drc.lyrdb'}",

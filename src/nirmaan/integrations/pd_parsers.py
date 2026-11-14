@@ -401,6 +401,8 @@ def parse_openroad(log: str, returncode: int, stop_after: str = "route",
 _GDS_EMPTY_RE = re.compile(r"^nirmaan-gds-empty-cells: (?P<n>\d+)")
 _GDS_EMPTY_CELL_RE = re.compile(r"^nirmaan-gds-empty-cell: (?P<cell>\S+)")
 _GDS_FILL_RE = re.compile(r"^nirmaan-gds-fill-shapes: (?P<n>\d+)")
+_GDS_FILL_LAYER_RE = re.compile(r"^nirmaan-gds-fill-layer: (?P<layer>-?\d+/-?\d+) (?P<n>\d+)")  # M80
+_GDS_FILL_UNMAPPED_RE = re.compile(r"^nirmaan-gds-fill-unmapped: (?P<n>\d+) (?P<layers>\S+)")
 _DRC_TOTAL_RE = re.compile(r"^nirmaan-drc-violations: (?P<n>\d+)")
 _DRC_RULE_RE = re.compile(r"^nirmaan-drc-rule: (?P<rule>\S+) (?P<n>\d+)")
 _LVS_KIND_RE = re.compile(r"^nirmaan-lvs-mismatched-(?P<kind>\w+): (?P<n>\d+)")
@@ -424,7 +426,9 @@ def parse_klayout(log: str, returncode: int, checks: list[str] | tuple[str, ...]
                                    if (m := _KLAYOUT_ERROR_RE.match(line))]
     errors = [d for d in diags if d.severity == "error"]
     empty = fill = drc = None
+    unmapped: tuple[int, str] | None = None
     empty_cells: list[str] = []
+    fill_layers: dict[str, int] = {}
     rules: dict[str, int] = {}
     lvs: dict[str, int] = {}
     unmatched: list[str] = []
@@ -435,6 +439,10 @@ def parse_klayout(log: str, returncode: int, checks: list[str] | tuple[str, ...]
             empty_cells.append(m["cell"])
         elif m := _GDS_FILL_RE.match(line):
             fill = int(m["n"])
+        elif m := _GDS_FILL_LAYER_RE.match(line):
+            fill_layers[m["layer"]] = int(m["n"])
+        elif m := _GDS_FILL_UNMAPPED_RE.match(line):
+            unmapped = (int(m["n"]), m["layers"])
         elif m := _DRC_TOTAL_RE.match(line):
             drc = int(m["n"])
         elif m := _DRC_RULE_RE.match(line):
@@ -446,6 +454,7 @@ def parse_klayout(log: str, returncode: int, checks: list[str] | tuple[str, ...]
     mismatches = sum(lvs.values()) if lvs else None
     metrics: dict[str, Any] = {
         "checks": list(checks), "gds_empty_cells": empty, "empty_cells": empty_cells, "fill_shapes": fill,
+        "fill_layers": fill_layers, "fill_unmapped": unmapped[0] if unmapped else None,  # M80
         "drc_violations": drc, "drc_by_rule": dict(sorted(rules.items(), key=lambda r: (-r[1], r[0]))),
         "lvs_mismatches": mismatches, "lvs_mismatched": lvs, "lvs_unmatched_circuits": unmatched,
         "exit_status": returncode,
@@ -459,6 +468,9 @@ def parse_klayout(log: str, returncode: int, checks: list[str] | tuple[str, ...]
         reasons.append("no GDS written")
     elif empty:
         reasons.append(f"{_plural(empty, 'layout cell')} with no GDS ({', '.join(empty_cells[:3])})")
+    if unmapped and unmapped[0]:  # M80: no deck reads a layer the technology does not map
+        reasons.append(f"{_plural(unmapped[0], 'fill shape')} on GDS layers the technology does not map "
+                       f"({unmapped[1].replace(',', ', ')}), which no check reads")
     if "drc" in checks:
         if drc is None:
             reasons.append("no DRC count reported")

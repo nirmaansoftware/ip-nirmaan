@@ -130,6 +130,7 @@ new number. M1 to M42 are taken; see `docs/history/README.md`.
 | M77 | Verification in five departments (wave 2, W2-O1); number reserved after the branch was cut | reserved |
 | M78 | Signoff gates independent of the producing department (G13 record, decision 2c) | reserved |
 | M79 | SKY130 physical design pilot in CI: Magic DRC and Netgen LVS (`pv.run` backend `magic-netgen`), resources item R3 | reserved |
+| M80 | Metal fill streamed to the layers the DRC deck reads, with a must-fail fill control | reserved |
 
 <!-- review:milestone-numbers:end -->
 
