@@ -128,6 +128,30 @@
           "unjudged": 1
         }
       ]
+    },
+    "rtl_lint": {
+      "knowledge": {
+        "check_record": null,
+        "counts": false,
+        "knowledge_document": "knowledge/design/rtl_lint.md",
+        "problems": [
+          "no check record"
+        ]
+      },
+      "level": null,
+      "practised": []
+    },
+    "synthesis_awareness": {
+      "knowledge": {
+        "check_record": null,
+        "counts": false,
+        "knowledge_document": "knowledge/design/synthesis_awareness.md",
+        "problems": [
+          "no check record"
+        ]
+      },
+      "level": null,
+      "practised": []
     }
   },
   "totals": {
