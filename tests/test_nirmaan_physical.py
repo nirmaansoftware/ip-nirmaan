@@ -122,12 +122,17 @@ def test_the_catalog_says_why_a_tool_cannot_run_here(monkeypatch, tmp_path):
 def test_the_logs_say_where_they_were_captured():
     logs = sorted(PD.glob("*.log"))
     assert [p.name for p in logs] == ["klayout_pv.log", "klayout_pv_drc.log", "klayout_pv_lvs.log",  # M34
+                                      "magic_netgen_pv.log", "magic_netgen_pv_drc.log",  # M79
+                                      "magic_netgen_pv_fill.log", "magic_netgen_pv_lvs.log",
                                       "openroad_error.log", "openroad_route.log", "openroad_signoff.log",
                                       "openroad_sky130_fill.log", "opensta_corners.log", "opensta_met.log",
                                       "opensta_spef.log", "opensta_violated.log"]
     for log in logs:
         first, second = log.read_text(encoding="utf-8").splitlines()[:2]
         assert first.startswith("# CAPTURED:") and "CI run" in first, log
+        if log.name.startswith("magic_netgen"):  # M79: the magic-netgen backend streams in KLayout first
+            assert second.startswith("$ klayout -zz -rd tech_file="), log
+            continue
         # M29: standalone OpenSTA, built in CI. M34: pv.run's first step writes the CDL in OpenROAD.
         exe = "sta" if log.name in ("opensta_spef.log", "opensta_corners.log") else "openroad"
         assert second.startswith(f"$ {exe} -no_init -no_splash -exit "), log  # as eda.execute logs a step

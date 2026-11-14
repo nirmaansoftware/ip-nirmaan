@@ -38,14 +38,29 @@ and every run records which tools judged it.
 | Step | Executable | What |
 |---|---|---|
 | stream | `klayout` | The routed DEF to GDS with the cells' GDS merged in: the M34 stream script, unchanged |
-| DRC | `magic` | The PDK's Magic technology file; `gds read`, `drc check`, then Nirmaan's Tcl counts each rule `drc listall why` reports |
+| DRC | `magic` | The PDK's Magic technology file; `gds read`, `drc check` in the full rule set (`drc(full)`, the open_pdks name; the style that ran is recorded as `magic_drc_style`), then Nirmaan's Tcl counts each rule `drc listall why` reports |
 | extract | `magic` | The same GDS extracted to SPICE (`extract all`, `ext2spice lvs`) |
 | LVS | `netgen` | The extracted layout against the routed netlist with supply pins (`pnr.run`'s `pg_netlist`), read over the cells' SPICE, under the PDK's Netgen setup, written as JSON |
 | count | this Python | Nirmaan's own script reads Netgen's JSON and prints mismatched circuits, nets, devices and pins |
 
-Pass means every step exited 0, the GDS has no empty cell, DRC counted 0, and
-the LVS count found no mismatch and Netgen's final result is a unique match.
-A run that cannot show a count is a recorded failed run.
+Pass means every step exited 0, the GDS has no empty cell, Magic read every
+GDS record, DRC counted 0, and the LVS count found no mismatch and Netgen's
+final result is a unique match (`netgen_final`). A run that cannot show a
+count is a recorded failed run.
+
+Two rules came from the first real runs:
+
+* **Magic skips a shape it cannot read and goes on.** `Error while reading
+  cell ...: Unknown layer/datatype` is not fatal to Magic, so its checks would
+  judge a layout with shapes missing. Each such record fails the run
+  (`gds_shapes_skipped`; captured: `magic_netgen_pv_fill.log`).
+* **The count reads Netgen's JSON, not its prose.** Per circuit pair: nets that
+  differ in number or that Netgen could not match (`badnets`), devices that
+  differ in number per class or that it could not match (`badelements`), and
+  pins that did not pair. A clean count without Netgen's unique match still
+  fails, and Netgen's prose cannot pass a mismatched count (tested on the
+  captured JSON). Netgen treats a cell instance as a device, so a wrong
+  instance is counted under devices and `subcircuits` is always 0 here.
 
 ### Parameters (declared on `pv.run`)
 
@@ -60,11 +75,13 @@ The block is the M26 synchronous FIFO (`tests/fixtures/rtl/sync_fifo`), the
 smaller of the two the plan named (sync_fifo or timer), at 100 MHz
 (`tests/fixtures/pd/sync_fifo.sdc`). `tests/test_pd_sky130_pilot.py` runs
 it through the broker: `synth.run` (`yosys-liberty`), `pnr.run` on sky130hd
-(power grid, CTS, fill, extraction, timing), then `pv.run` with KLayout and
-with Magic and Netgen, both clean. Two must-fail runs keep the clean result
-from being vacuous: a flip-flop moved 1 nm off the 5 nm grid must fail Magic
-DRC, and a flip-flop input rewired in the reference netlist must fail Netgen
-LVS.
+(power grid, CTS, extraction, timing; no metal fill, see section 6), then
+`pv.run` with KLayout and with Magic and Netgen, both clean. Two must-fail
+runs keep the clean result from being vacuous: a flip-flop moved 0.23 um
+(half a site) into its neighbour must fail Magic DRC, and a flip-flop input
+rewired in the reference netlist must fail Netgen LVS. (M34's 1 nm off-grid
+move fails KLayout's off-grid rule; Magic snaps the GDS to its own grid and
+found nothing, so the pilot moves the cell far enough to collide.)
 
 `.github/workflows/pd-sky130.yml`, on `ubuntu-24.04`:
 
@@ -107,9 +124,33 @@ redistributed. That sentence is flagged for the owners in the pull request.
 
 ## 5. Results
 
-To be filled from the pull request's own CI runs.
+From the pull request's own runs of `pd-sky130` (run 43602071471, head
+294435a, captured in `tests/fixtures/pd/magic_netgen_pv*.log` and
+`tests/fixtures/pd/netgen/`):
 
-## 6. Not in this milestone
+| Run | Result |
+|---|---|
+| `pnr.run`, sync_fifo, sky130hd, 100 MHz | routed and extracted: 0 router DRC violations, wirelength 6111 um, utilization 34%, power grid connected, clock skew 0.002 ns, worst setup slack 6.006 ns, hold 0.628 ns, TNS 0 on extracted parasitics |
+| `pv.run`, KLayout decks | DRC clean, LVS clean |
+| `pv.run`, Magic and Netgen | Magic `drc(full)`: 0 violations; Netgen: "Circuits match uniquely" (the top and its 32 cell types, 0 mismatches) |
+| a flip-flop moved 0.23 um | failed: 173 Magic DRC violations (`mcon.2` 135, `li.c2` 18, `li.3` 18), and an LVS mismatch |
+| a D input rewired | failed: LVS, 1 mismatched net in `sync_fifo`; DRC 0 |
+
+CI time: RUNTIME_LINE
+
+## 6. Found, not fixed here: the sky130hd stream drops fill to unread layers
+
+The platform's KLayout technology (`sky130hd.lyt` in the image) maps every
+drawing, pin and label purpose to its SKY130 GDS layer, but has no entry for
+the fill purpose (`.FILL`, datatype 28). So the M34 stream writes metal fill
+on layers KLayout numbers itself (7/28, 9/28, 11/28, 13/28 in the first run),
+which Magic reports as unknown and which, as far as this pilot can tell, the
+KLayout DRC deck does not read either. M34's "DRC clean on the filled layout"
+therefore most likely did not check the fill shapes. The pilot runs without
+fill, so every shape it signs off is read; mapping fill to SKY130's fill
+datatypes in the stream is a follow-up for the physical design owners.
+
+## 7. Not in this milestone
 
 * GF180MCU and IHP SG13G2 (approved; follow-ups, one PDK per pull request).
 * The OpenROAD-flow-scripts `make` flow itself: `pnr.run` keeps its own

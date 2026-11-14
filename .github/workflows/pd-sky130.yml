@@ -142,22 +142,19 @@ jobs:
         run: >-
           python -m pytest -q -rs -s tests/test_pd_sky130_pilot.py
           --basetemp="$RUNNER_TEMP/pd" --junitxml="$RUNNER_TEMP/junit/pd-sky130.xml"
-      # Text only (logs, scripts, reports, the comparison JSON): no layout or PDK data.
+      # Text only (logs, scripts, reports, Netgen's comparison JSON, run records): no layout, netlist
+      # or PDK data.
+      - name: Collect the tool logs
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/pd-logs"
+          cd "$RUNNER_TEMP/pd" 2>/dev/null && find . -type f \( -name '*.log' -o -name '*.tcl' -o -name '*.report' \
+            -o -name '*.json' -o -name '*.rpt' \) -exec cp --parents {} "$RUNNER_TEMP/pd-logs" \; || true
+          cp -r "$RUNNER_TEMP/junit" "$RUNNER_TEMP/pd-logs/" 2>/dev/null || true
       - name: Keep the tool logs
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: pd-sky130-logs
-          path: |
-            ${{ runner.temp }}/pd
-            ${{ runner.temp }}/junit
-            !${{ runner.temp }}/pd/**/*.gds
-            !${{ runner.temp }}/pd/**/*.def
-            !${{ runner.temp }}/pd/**/*.odb
-            !${{ runner.temp }}/pd/**/*.spice
-            !${{ runner.temp }}/pd/**/*.spef
-            !${{ runner.temp }}/pd/**/*.ext
-            !${{ runner.temp }}/pd/**/*.v
-            !${{ runner.temp }}/pd/**/*.cdl
-            !${{ runner.temp }}/pd/**/*.lyt
+          path: ${{ runner.temp }}/pd-logs
           if-no-files-found: warn
