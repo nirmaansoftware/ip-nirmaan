@@ -126,6 +126,7 @@ The original preface of the section:
 - [M73-harness-fingerprint](M73-harness-fingerprint.md): Milestone 73 - The harness in one place, and its fingerprint on every trial; a changed harness makes a level's trials stale
 - [M76-outside-calibration](M76-outside-calibration.md): Milestone 76 - Outside calibration: the RTLLM adapter, and calibration records that never count toward a level
 - [M77-verification-departments](M77-verification-departments.md): Milestone 77 - Verification in five departments; four of them ACTIVE as grouping units, the frozen list changed by renames only
+- [M78-independent-signoff-gates](M78-independent-signoff-gates.md): Milestone 78 - Signoff gates independent of the producing department
 
 ## Before M43
 

@@ -169,11 +169,12 @@ does not reproduce beside one that does, stopped.
 
 ## Not in this milestone
 
-- The debug eval cases (W2-E4: `debug/root-cause-uart-tx`,
-  `debug/triage-three-bugs`) and their fixtures.
+- The debug eval cases and their fixtures: added by W2-E4 (`debug/root-cause-uart-tx`,
+  `debug/triage-three-bugs`, `docs/EVAL_SKILLS_MUST_FAIL.md`).
 - Repro gates on an investigation that does not ask for one.
 - `log_analysis` on the triage seat: it is credited only with a repro
-  must-fail (wave 2 plan), which W2-E4's cases give.
+  must-fail (wave 2 plan). W2-E4's cases do not name it: neither debug seat holds
+  it yet.
 
 `runtime/model.py` and `evals/runner.py` are harness code (M73, `docs/HARNESS.md`), so the harness
 fingerprint changes; no trial is recorded, so no level goes stale.

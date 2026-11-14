@@ -1,0 +1,13 @@
+{
+  "title": "Formal proofs: the credit counter proved with every cover reached, and the deep counter proved unbounded",
+  "fixture": "tests/fixtures/dv",
+  "budget_seconds": 30,
+  "steps": [
+    {"tool": "formal.run", "needs": ["sby", "yosys", "yices-smt2"], "expect": "pass",
+     "params": {"sby": "credit_counter/credit_counter_check.sby"}},
+    {"tool": "formal.cover", "needs": ["sby", "yosys", "yices-smt2"], "expect": "pass",
+     "params": {"sby": "credit_counter/credit_counter_check.sby"}},
+    {"tool": "formal.run", "needs": ["sby", "yosys", "yices-smt2"], "expect": "pass",
+     "params": {"sby": "deep_counter/deep_counter_check.sby"}}
+  ]
+}

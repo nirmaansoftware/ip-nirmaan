@@ -30,13 +30,17 @@ Subcommands (each exits non-zero with a reason on failure):
     pull        clone the state repository and lay the state out as the loop expects
     has-work    `work=true|false`: an open pull request the loop would step, or a
                 finished one not yet noted closed
-    auth-check  the claude CLI, with exactly the environment the loop gives it, is
-                logged in with the plan's OAuth token; --deny-probe also asks a model
-                to read /proc/self/status and passes only if the read is denied
+    auth-check  the claude CLI, started as every review call is, is logged in with the
+                plan's OAuth token and one tiny call answers; --deny-probe also asks a model to read
+                /proc/self/status and passes only if the read is denied, then checks that no
+                readable process environment holds a secret and the check account cannot
+                read the loop's
+    run         the loop once (pr_loop.py --once; --shadow N: --no-post on pull request N),
+                with the step's secrets moved out of the environment first
     push        write this loop's state back, commit, push, rebase and retry
     seed        once, before the switch: the Mac's state for this repository into a clone
 
-Usage: python scripts/loop_cloud.py <subcommand> [--clone DIR] [--state-dir DIR] [--from DIR] [--deny-probe]
+Usage: python scripts/loop_cloud.py <subcommand> [--clone DIR] [--state-dir DIR] [--from DIR] [--deny-probe] [--shadow N]
 """
 
 from __future__ import annotations
@@ -63,7 +67,7 @@ STATE_REMOTE = os.environ.get("NIRMAAN_LOOP_STATE_REMOTE") or "git@github.com:ni
 GITHUB_HOST_KEY = "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl"
 COMMITTER = ("-c", "user.name=Nirmaan review loop", "-c", "user.email=41898282+github-actions[bot]@users.noreply.github.com")
 PUSH_TRIES = 5
-USAGE = "python scripts/loop_cloud.py (app-token | pull | has-work | auth-check | push | seed) [--clone DIR] [--state-dir DIR] [--from DIR] [--deny-probe]"
+USAGE = "python scripts/loop_cloud.py (app-token | pull | has-work | auth-check | run | push | seed) [--clone DIR] [--state-dir DIR] [--from DIR] [--deny-probe] [--shadow N]"
 
 
 class SyncError(RuntimeError):
@@ -236,12 +240,12 @@ def has_work(pulls: list[dict], state_dir: Path, cfg: dict = pr_review.CONFIG, l
 # --- The job's own checks -------------------------------------------------------------
 
 
-def auth_status(binary: str, env: dict) -> tuple[bool, str]:
-    """`claude auth status --json` (no model call) with the loop's environment:
-    logged in, by the OAuth token, and no API key in reach."""
-    if any(k in env for k in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN")):
-        return False, "an API key is in the claude environment"
-    proc = subprocess.run([binary, "auth", "status", "--json"], capture_output=True, text=True, env=env, timeout=120)
+def auth_status(binary: str) -> tuple[bool, str]:
+    """`claude auth status --json` (no model call), started as every review call
+    is (pr_review.run_claude): logged in by the OAuth token from the pipe."""
+    if not pr_review._PLAN_TOKEN:
+        return False, "no plan token was handed over"
+    proc = pr_review.run_claude(binary, ["auth", "status", "--json"], "", os.getcwd(), 120)
     try:
         status = json.loads(proc.stdout)
     except ValueError:
@@ -249,6 +253,20 @@ def auth_status(binary: str, env: dict) -> tuple[bool, str]:
     if status.get("loggedIn") is True and status.get("authMethod") == "oauth_token":
         return True, "logged in with the OAuth token"
     return False, f"not logged in with the OAuth token (loggedIn={status.get('loggedIn')}, authMethod={status.get('authMethod')})"
+
+
+OK_SCHEMA = {"type": "object", "additionalProperties": False, "required": ["ok"], "properties": {"ok": {"type": "boolean"}}}
+
+
+def login_call(binary: str, cwd: str) -> tuple[bool, str]:
+    """One tiny model call (`auth status` does not ask the server, so a revoked
+    token would otherwise reach a review and stop a pull request)."""
+    args = pr_review.claude_args("haiku", "Answer with ok set to true.", [], OK_SCHEMA)
+    proc = pr_review.run_claude(binary, args, "Answer.", cwd, 300)
+    result = pr_review.interpret(proc.returncode, proc.stdout, proc.stderr)
+    if result["kind"] == "ok":
+        return True, "logged in with the OAuth token; the plan answered"
+    return False, f"the plan did not answer ({result['kind']}: {pr_review.redact(result.get('error'))[:200]})"
 
 
 DENY_PROMPT = ("Use the Read tool on /proc/self/status. Then answer: read is true only if the tool returned the "
@@ -260,8 +278,7 @@ DENY_SCHEMA = {"type": "object", "additionalProperties": False, "required": ["re
 def deny_probe(binary: str, cwd: str) -> tuple[bool, str]:
     """One small model call with the reviewers' exact tool rules: /proc must be denied."""
     args = pr_review.claude_args("haiku", "You test a tool permission. Do only what the user asks.", [], DENY_SCHEMA)
-    proc = subprocess.run([binary, *args], input=DENY_PROMPT, capture_output=True, text=True, cwd=cwd,
-                          env=pr_review.model_env(), timeout=300)
+    proc = pr_review.run_claude(binary, args, DENY_PROMPT, cwd, 300)
     try:
         data = json.loads(proc.stdout)
     except ValueError:
@@ -271,6 +288,74 @@ def deny_probe(binary: str, cwd: str) -> tuple[bool, str]:
     if denied and not answer.get("read") and "Name:" not in str(answer.get("first_line")):
         return True, "the read of /proc was denied"
     return False, f"the read of /proc was not denied (denials={len(denied)}, answer={str(answer)[:120]})"
+
+
+# --- Secrets out of the environment ---------------------------------------------------
+
+# What GitHub gives a step only as environment variables. `run` and `auth-check`
+# start again without them (handoff), so the loop's /proc/<pid>/environ, all a
+# process of the same account could read, holds none; the loop keeps them in
+# memory and hands the plan token to each claude process through a pipe.
+SECRET_NAMES = ("CLAUDE_CODE_OAUTH_TOKEN", "GH_TOKEN", pr_review.APP_TOKEN_ENV)
+SECRETS_FD_ENV = "NIRMAAN_LOOP_SECRETS_FD"
+
+
+def handoff(argv: list[str], env=None, execve=os.execve):
+    env = dict(os.environ if env is None else env)
+    secrets = {k: env.pop(k) for k in SECRET_NAMES if k in env}
+    r, w = os.pipe()
+    os.write(w, json.dumps(secrets).encode())
+    os.close(w)
+    os.set_inheritable(r, True)
+    env[SECRETS_FD_ENV] = str(r)
+    execve(sys.executable, [sys.executable, str(Path(__file__).resolve()), *argv], env)
+
+
+_HELD: list[str] = []
+
+
+def take_secrets():
+    """Stage two: read the pipe once. The plan token stays in memory; the GitHub
+    tokens go into this process's environment for the gh and git it starts. Every
+    claude process and every check gets an explicit allowlisted environment, so
+    neither receives them."""
+    with os.fdopen(int(os.environ.pop(SECRETS_FD_ENV)), encoding="utf-8") as handle:
+        secrets = json.load(handle)
+    _HELD[:] = [v for v in secrets.values() if v]
+    pr_review.set_plan_token(secrets.get("CLAUDE_CODE_OAUTH_TOKEN"))
+    for name in ("GH_TOKEN", pr_review.APP_TOKEN_ENV):
+        if secrets.get(name):
+            os.environ[name] = secrets[name]
+
+
+def environ_holders(values: list[str]) -> list[str]:
+    """Every /proc/<pid>/environ this account can read that holds one of `values`."""
+    hits = []
+    for path in sorted(Path("/proc").glob("[0-9]*/environ")):
+        try:
+            data = path.read_bytes()
+        except OSError:
+            continue
+        hits += [str(path) for v in values if v and v.encode() in data]
+    return hits
+
+
+def isolation_check(user: str | None) -> tuple[bool, str]:
+    """On the runner (`check` mode): after the handoff no readable process
+    environment holds a secret, and the check account cannot read this one's."""
+    if not Path("/proc/self/environ").exists():
+        return False, "no /proc here (the isolation check is for the Linux runner)"
+    hits = environ_holders(_HELD)
+    if hits:
+        return False, f"a secret is in a readable process environment ({', '.join(hits[:5])})"
+    if not user:
+        return False, "NIRMAAN_LOOP_CHECK_USER is not set"
+    with tempfile.TemporaryDirectory() as tmp:
+        os.chmod(tmp, 0o755)
+        readable, detail = pr_loop._run_commands([["cat", f"/proc/{os.getpid()}/environ"]], tmp, {}, {}, 60, user)
+    if readable or "Permission denied" not in detail:
+        return False, f"the check account could read the loop's environment ({detail[:120] or 'it read it'})"
+    return True, "no readable process environment holds a secret; the check account cannot read the loop's"
 
 
 # --- Commands -------------------------------------------------------------------------
@@ -294,6 +379,10 @@ def main(argv: list[str]) -> int:
     def arg(name):
         return Path(argv[argv.index(name) + 1]).expanduser() if name in argv and argv.index(name) + 1 < len(argv) else None
     cmd = argv[0] if argv else ""
+    if cmd in ("run", "auth-check"):
+        if SECRETS_FD_ENV not in os.environ:
+            handoff(argv)
+        take_secrets()
     clone, state_dir, source = arg("--clone"), arg("--state-dir"), arg("--from")
     try:
         if cmd == "app-token":
@@ -307,11 +396,20 @@ def main(argv: list[str]) -> int:
             work = has_work(pr_review.GitHub(REPO, token).list_open_pulls(), state_dir)
             print(f"loop-cloud: {'work to do' if work else 'nothing to step'}")
             output("work", "true" if work else "false")
+        elif cmd == "run":
+            shadow = argv[argv.index("--shadow") + 1] if "--shadow" in argv and argv.index("--shadow") + 1 < len(argv) else None
+            if shadow is not None and not shadow.isdigit():
+                raise SyncError("--shadow takes one pull request number")
+            return pr_loop.main(["--once", *(["--no-post", "--pr", shadow] if shadow else [])])
         elif cmd == "auth-check":
             binary = pr_review.defaults()["claude_bin"]
-            ok, why = auth_status(binary, pr_review.model_env())
+            ok, why = auth_status(binary)
+            if ok:
+                ok, why = login_call(binary, os.getcwd())
             if ok and "--deny-probe" in argv:
                 ok, why = deny_probe(binary, os.getcwd())
+            if ok and "--deny-probe" in argv:
+                ok, why = isolation_check(os.environ.get("NIRMAAN_LOOP_CHECK_USER"))
             print(f"loop-cloud: auth-check: {why}")
             return 0 if ok else 1
         elif cmd == "push" and clone and state_dir:
@@ -326,7 +424,7 @@ def main(argv: list[str]) -> int:
         else:
             print(f"usage: {USAGE}", file=sys.stderr)
             return 2
-    except (SyncError, OSError, subprocess.CalledProcessError, ValueError) as exc:
+    except (SyncError, OSError, subprocess.SubprocessError, ValueError) as exc:
         print(f"loop-cloud: {cmd}: {pr_review.redact(str(exc))[:500]}", file=sys.stderr)
         return 1
     return 0

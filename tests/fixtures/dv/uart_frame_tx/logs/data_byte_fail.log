@@ -1,0 +1,2 @@
+ERROR: uart_frame_tx_regress_tb.v:54: data_byte: received 0xd2, expected 0x4b
+uart_frame_tx_regress_tb.v:62: $finish called at 585000 (1ps)

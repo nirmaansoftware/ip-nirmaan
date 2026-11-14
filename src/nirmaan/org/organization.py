@@ -93,6 +93,10 @@ class CompanyDefinition(BaseModel):
     tools: list[ToolSpec] = Field(default_factory=list)
     workflows: list[WorkflowTemplate] = Field(default_factory=list)
     gates: list[GateSpec] = Field(default_factory=list)
+    independent_gates: list[str] = Field(
+        default_factory=list,
+        description="Gates nobody may approve whose own team or department produced the gated work.",
+    )
     principles: list[Principle] = Field(default_factory=list)
     authority: list[AuthorityRule] = Field(default_factory=list)
     escalation: list[EscalationRoute] = Field(default_factory=list)
@@ -345,6 +349,7 @@ class Organization:
         self.tools: dict[str, ToolSpec] = {t.id: t for t in definition.tools}
         self.workflows: dict[str, WorkflowTemplate] = {w.id: w for w in definition.workflows}
         self.gates: dict[str, GateSpec] = {g.id: g for g in definition.gates}
+        self.independent_gates: frozenset[str] = frozenset(definition.independent_gates)
         self.principles: dict[str, Principle] = {p.id: p for p in definition.principles}
         self.level_profiles: dict[Level, LevelProfile] = {p.level: p for p in definition.level_profiles}
         self.authority: dict[tuple[str, str], AuthorityRule] = {
@@ -441,6 +446,17 @@ class Organization:
             return self.roles.get(unit.head_role)
         level = _HEAD_LEVEL.get(unit.kind)
         return self.roles.get(f"{unit_id}.{level.value}") if level else None
+
+    def own_heads(self, role_id: str) -> set[str]:
+        """The role and the heads of the units below its division that hold it (its team, its department).
+
+        Evidence a role produces is its unit's work, so none of these may approve it at a gate (council record
+        2026-11-14-g13, decision 2c). The division's head is not among them.
+        """
+        role = self.roles[role_id]
+        below = self.ancestors(role.unit, include_self=True)[:-2]  # drop the division and the company
+        heads = {self.head_of(u.id) for u in below}
+        return {role_id} | {h.id for h in heads if h is not None}
 
     def lead_of(self, unit_id: str) -> Role | None:
         return self.roles.get(f"{unit_id}.{Level.TECH_LEAD.value}")

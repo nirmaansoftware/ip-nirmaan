@@ -65,6 +65,30 @@ it derives the needs, selects, and delegates to the chosen profile's provider,
 and the call record names the model chosen. `--runtime anthropic` and
 `--runtime mock-llm` are unchanged.
 
+## Role-to-model defaults (R8)
+
+The default model for each kind of agent work. The repo has no per-role model
+field in the organization chart and no `.claude/agents` files, so this table is
+the one place the defaults are written down, and
+`tests/test_nirmaan_model_routing.py` pins it. It is a default for whoever
+starts an agent (a lane brief, the review loop), not a runtime switch.
+
+| Work | Alias | Model id |
+|---|---|---|
+| Planning: wave plans, retrospective prep, council chairs, hardest debugging | `fable` | `claude-fable-5-2` |
+| RTL, runtime and harness code, review key 2, the Founder Proxy | `opus` | `claude-opus-5-5` |
+| Knowledge documents, eval cases, check records, fixes, review key 1 | `sonnet` | `claude-sonnet-5-5` |
+| Search and explore helpers, summaries, label and log checks | `haiku` | `claude-haiku-5-5` |
+
+The review loop already follows the table: key 1 and the fixer default to
+`sonnet`, key 2 and the Founder Proxy to `opus` (`scripts/pr_review.py`
+`defaults`, `scripts/pr_loop.py` `loop_defaults`). The test fails if either
+drifts from the table.
+
+Not changed by this table: the model a live evaluation seats. It stays pinned in
+the harness, because a different model makes every level group stale; it changes
+only by a recorded decision.
+
 ## Tests (`tests/test_nirmaan_model_selection.py`)
 
 - Selection: a need no profile offers is refused with every reason; a prompt
