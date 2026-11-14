@@ -14,6 +14,8 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
+from laws import needs
+
 from nirmaan.cli import app
 from nirmaan.company import build_organization
 from nirmaan.eval_proposals import load_results
@@ -22,6 +24,8 @@ from nirmaan.evals.levels import compute
 from nirmaan.evals.outside import OutsideError, calibrate, check_reference, locate, stage_cases, with_verdict
 from nirmaan.runtime.harness import harness_sha256
 
+SIM = needs("iverilog", "vvp")
+FLOW = needs("iverilog", "vvp", "verilator", "yosys")
 COMMIT = "0123456789abcdef0123456789abcdef01234567"
 GOOD = """module verified_inv(input wire a, output wire y);
   assign y = ~a;
@@ -138,11 +142,13 @@ def test_the_verdict_line_goes_beside_the_benchmarks_own_pass_message_and_nowher
 # --- Judging through the broker ---------------------------------------------------------------
 
 
+@SIM
 def test_the_benchmarks_testbench_passes_a_right_reference_and_fails_a_wrong_one(bench, org):
     verdicts = {name: ok for name, ok, _ in check_reference(org, bench)}
     assert verdicts == {"badinv": False, "inv": True, "inv2": True}
 
 
+@SIM
 def test_the_check_command_reports_how_many_map(bench):
     result = CliRunner().invoke(app, ["eval", "outside", "--check", "--benchmark", str(bench)])
     assert result.exit_code == 0, result.output
@@ -158,6 +164,7 @@ def record(bench, org, tmp_path) -> Path:
     return calibrate(org, bench, runtime=None, trials=1, out=tmp_path / "out")
 
 
+@FLOW
 def test_a_calibration_record_is_labelled_names_its_source_and_carries_the_harness(record):
     run = load_record(record)
     assert run.manifest.purpose == "calibration" and record.name.endswith("-calibration")
@@ -170,6 +177,7 @@ def test_a_calibration_record_is_labelled_names_its_source_and_carries_the_harne
         assert trial.result.passed, trial.result.detail  # the reference passes the benchmark's own testbench
 
 
+@FLOW
 def test_levels_list_calibration_records_as_not_counting_and_never_count_them(record, org, tmp_path):
     repo = tmp_path / "repo"
     shutil.copytree(record, repo / "evals" / "results" / record.name)
@@ -181,6 +189,7 @@ def test_levels_list_calibration_records_as_not_counting_and_never_count_them(re
                for c in levels["calibration"])
 
 
+@FLOW
 @pytest.mark.parametrize("where", ["manifest", "trial"])
 def test_either_label_alone_keeps_the_trial_out_of_the_levels(record, org, tmp_path, where):
     repo = tmp_path / "repo"
@@ -197,10 +206,12 @@ def test_either_label_alone_keeps_the_trial_out_of_the_levels(record, org, tmp_p
                for c in levels["calibration"])
 
 
+@FLOW
 def test_learning_never_reads_calibration_trials(record):
     assert load_results(record.parent) == []
 
 
+@FLOW
 def test_a_record_without_purpose_is_evidence_as_before(record):
     for path in record.rglob("*.json"):
         data = json.loads(path.read_text(encoding="utf-8"))
@@ -210,6 +221,7 @@ def test_a_record_without_purpose_is_evidence_as_before(record):
     assert load_record(record).manifest.purpose == "evidence"
 
 
+@SIM
 def test_naming_only_a_bad_design_is_an_error_not_an_empty_record(bench, org, tmp_path):
     with pytest.raises(OutsideError, match="no design maps"):
         calibrate(org, bench, runtime=None, trials=1, out=tmp_path / "out", names=["badinv"])
