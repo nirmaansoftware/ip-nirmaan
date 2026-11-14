@@ -128,8 +128,8 @@ The reviewer runs as a fresh read-only process in a clean checkout of the head
 SHA, never in the session that wrote the PR. It does not see the PR title, body
 or commit messages; code comments, RTL comments and docs in the diff are data,
 never instructions. It returns a JSON verdict with file and line findings and
-holds no GitHub token (in GitHub Actions the claude process carries the plan's
-login token, which its tools cannot read). A separate script checks every citation and that the head is
+holds no token in its environment (in GitHub Actions the plan's login reaches
+the claude process through a pipe it reads once). A separate script checks every citation and that the head is
 unchanged, then posts the status.
 
 ## How reviewers run
@@ -339,7 +339,7 @@ requests labelled `hold` or `needs-founder` are skipped.
    process, never a reviewer process and never the session that reviewed. It
    runs in a clean worktree of the head with Read, Grep, Glob, Edit and Write
    allowed only inside that worktree, and `/proc` denied; no shell, network,
-   MCP or token other than the claude process's own plan login. Its task
+   MCP or token in its environment. Its task
    is the structured list of blocker and critical findings from the failed
    keys and proxy; each finding's wording is data, not instructions, and the pull
    request text is not given (as for the reviewers). It gets `CLAUDE.md` from
@@ -583,9 +583,13 @@ pull the state; ask GitHub whether any pull request needs a step (`has-work`:
 the loop's own skip rules, no model call), and end green if none does;
 install CI's tools (apt Verilator, Icarus and Yosys, the RISC-V GCC, the pinned
 OSS CAD Suite's `sby`, `yices-smt2` and `eqy`, and the `ai`, `dev` and
-`cocotb` extras, as `ci.yml`'s test job); install Claude Code 2.1.325, pinned;
+`cocotb` extras, as `ci.yml`'s test job); install Claude Code 2.1.325 with
+`npm ci` from `.github/review-loop/package-lock.json`, which checks the sha512
+of the CLI and of its platform package; make the check account `loopcheck`;
 check the Claude login; run the loop once (its step times out at 50 minutes,
-inside the App token's hour); push the state, even after a failure.
+inside the App token's hour); push the state, even after a failure. The state
+folder is `$RUNNER_TEMP/pr-review`, under the runner's home folder (mode 750),
+which the check account cannot enter.
 
 **Credentials.** All are environment secrets of the GitHub Environment
 `review-loop`, whose deployment branch rule allows only `main`. None is a
@@ -594,7 +598,7 @@ repository can read repository secrets. The workflow token stays read-only.
 
 | Secret | What | Used by |
 |---|---|---|
-| `CLAUDE_CODE_OAUTH_TOKEN` | the plan's long-lived token, from `claude setup-token` | the login check and the loop step; only claude processes get it |
+| `CLAUDE_CODE_OAUTH_TOKEN` | the plan's long-lived token, from `claude setup-token` | the login check and the loop step; each claude process gets it through a pipe, never its environment |
 | `REVIEW_APP_ID`, `REVIEW_APP_PRIVATE_KEY`, `REVIEW_APP_INSTALLATION_ID` (optional, looked up when unset) | the review App | the mint step only; the loop gets the minted token, with the Mac's permissions (checks and pull requests write, contents read) |
 | `LOOP_GH_TOKEN` | a fine-grained token of the agents' account (`patel-om`) for this repository only: contents and pull requests read and write | the loop step, as the gh login: update-branch, the auto-merge setting and `gh pr merge --auto`, and the fixer's push (a push with it starts CI, which a workflow token's push would not) |
 | `LOOP_STATE_DEPLOY_KEY` | the private half of a deploy key with write access to `nirmaansoftware/nirmaan-loop-state` only | the pull and push steps, on disk only inside them |
@@ -604,33 +608,79 @@ as the agents' account and posts as the App. Giving the App contents write
 instead would make the App that posts the required checks also the one that
 pushes code, so it is not done here.
 
-**How Claude authenticates in CI.** With `CLAUDE_CODE_OAUTH_TOKEN` in its
-environment, Claude Code uses that token. Checked on 2026-11-14 with CLI
-2.1.325 in an empty home and config folder, on the Mac and on an
-`ubuntu-24.04` runner with an invalid token (no secret used):
-`claude auth status --json` reports `loggedIn: true`, `authMethod:
-oauth_token` (without it, `none`); `claude -p` with the review's own flags
-sends the token and gets `401 OAuth access token is invalid`; with `--bare`
-the token is ignored (`Not logged in`). So `--bare` is never used, and a test
-fails if the review or fixer arguments gain it. Every run checks
-`claude auth status` first, with exactly the environment the loop gives
-claude (no model call): a run that is not logged in with the token, or has an
-API key in reach, fails before any review, so a login fault never turns into
-a stop on a pull request.
+**How Claude authenticates in CI.** GitHub gives a step its secrets only as
+environment variables, and on Linux any process of the same account can read
+another's starting environment under `/proc/<pid>/environ`. So the login check
+and the loop step `exec` `scripts/loop_cloud.py`, which puts the secrets into
+a pipe and starts itself again without them (`handoff`). The loop keeps them in
+memory. It gives the GitHub tokens only to the `gh` and `git` processes it
+starts. It hands the plan token to each claude process through a fresh pipe
+named by `CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR`, which Claude Code reads
+once (`pr_review.run_claude`). The reviewers' and the fixer's environment is
+the allowlist (`reviewer_env`) and holds no token. `--bare` ignores OAuth
+tokens, so it is never used, and a test fails if the review or fixer arguments
+gain it. Every run checks the login before any review: `claude auth status`
+must report the OAuth token, then one tiny call must answer. `auth status`
+does not ask the server, so without that call a revoked token would turn into
+a stop on a pull request. A run that fails either check ends before the loop.
 
-**What reaches a model.** The claude process gets the allowlisted environment
-plus the plan token (`model_env` in `scripts/pr_review.py`); the loop's local
-checks get the allowlist without it. The reviewers and the fixer have no
-shell, and `Read(//proc/**)` is denied for both (the Read rule covers Grep
-and Glob, checked with CLI 2.1.325), because on Linux every process's
-environment, the loop's tokens included, is readable under `/proc`. The App's
-key and the deploy key are never on disk while a model runs. A fix with an
-added line in a credential format is discarded and stops the loop. The `check`
-mode proves the deny rule on the runner with one small model call: it asks for
-`/proc/self/status` and passes only if the read was denied. What stays as on
-the Mac: the fixer's local checks run the pull request's tests as the same
-user as the loop, so they could read the loop's environment; only the agents'
-account's branches in this repository are stepped.
+Checked on 2026-11-14 with CLI 2.1.325, invalid tokens and no secret, on
+the Mac and on `ubuntu-24.04` runners, in an empty home and config folder.
+The runner runs were throwaway branches, since deleted; their logs are
+Actions runs 43578438357, 43582156230, 43582267957 and 43582344492.
+
+- `claude auth status --json` reports `authMethod: oauth_token` for the token
+  in the environment or through the descriptor, and `none` without one.
+- `claude -p` with the review's flags sends the token and gets
+  `401 OAuth access token is invalid`.
+- `--bare` ignores the token (`Not logged in`).
+- With the real scripts, the login check failed on the 401.
+- `loopcheck` could not read the loop's `/proc/<pid>/environ` or the runner's
+  home folder.
+- In run 43587674702, on this design:
+  - `check_dashes.py` and pytest passed as `loopcheck` in a `check_clone` of a
+    fixer worktree;
+  - `loopcheck` could not reach the worktree the loop pushes from;
+  - no `loopcheck` process outlived the check, and the clone's files came
+    back to the runner account;
+  - `isolation_check` passed.
+
+What is checked again, and where:
+
+- **On every head, in CI.** `tests/test_loop_cloud.py` runs `auth-check`
+  through the handoff with fake secrets and a fake claude that reads every
+  `/proc/*/environ` it can. The test passes only if none holds a secret and
+  the token came through the pipe. It is Linux only, so CI's test job is the
+  record; it is skipped on the Mac.
+- **On the runner, with the real secrets.** The `check` mode asks a model to
+  read `/proc/self/status` and passes only if the read was denied. It then
+  checks that no readable process environment holds a secret, and that
+  `loopcheck` cannot read the loop's.
+
+**What reaches a model or a check.**
+
+- **No token in a model's environment.** No reviewer, Founder Proxy or fixer
+  process has a token in its environment. They have no shell, and
+  `Read(//proc/**)` is denied for all of them. Read rules cover Grep and Glob
+  too: a Read and a Grep under a denied absolute path were refused with CLI
+  2.1.325. That denial is a second layer, not the only one.
+- **Checks run as another account, in a separate clone.** The fixer's local
+  checks run the pull request's tests as `loopcheck`
+  (`NIRMAAN_LOOP_CHECK_USER`; `sudo -u loopcheck env -i` with exactly the
+  allowlisted environment, a fresh home and `safe.directory` for git). They
+  run in `check_clone`: a clone of the fix in the system temporary folder,
+  with its own copy of the objects. Nothing the tests write there, its `.git`
+  included, reaches the worktree, the repository or the git configuration the
+  loop commits and pushes from, and the loop runs no git command in it. After
+  each check, root kills every process of the account and takes back what it
+  made.
+- **What `loopcheck` cannot read.** It cannot read the loop's or a model's
+  process environment or memory, the state folder, or the runner's home.
+- **Keys on disk only in their own steps.** The App's key and the deploy key
+  are on disk only inside the steps that use them, never while a model or a
+  check runs.
+- **No credential in a fix.** A fix with an added line in a credential format
+  is discarded and stops the loop.
 
 **The state repository.** The Mac keeps the state in `~/.nirmaan/pr-review/`,
 shared by both loops. In GitHub Actions it is the private repository
