@@ -42,7 +42,7 @@ def test_denied_outside_authority_domain(authority):
 
 def test_review_crosses_teams_within_a_division(authority):
     assert authority.check("design.rtl.cdc.senior", D.REVIEW_ARTIFACT, C.HIGH, "design.rtl.design.fsm").allowed
-    assert not authority.check("design.rtl.cdc.senior", D.REVIEW_ARTIFACT, C.HIGH, "verification.cdc").allowed
+    assert not authority.check("design.rtl.cdc.senior", D.REVIEW_ARTIFACT, C.HIGH, "verification.formal.cdc").allowed
 
 
 def test_criticality_raises_the_bar(authority):
@@ -59,7 +59,7 @@ def test_major_decisions_need_executives(authority):
 
 @pytest.mark.parametrize("kind, raiser, expected", [
     (EscalationKind.UNCERTAINTY, "verification.debug.triage.intern", "verification.debug.triage.junior"),
-    (EscalationKind.TECHNICAL, "verification.debug.triage.engineer", "verification.debug.tech_lead"),
+    (EscalationKind.TECHNICAL, "verification.debug.triage.engineer", "verification.debug.triage.tech_lead"),
     (EscalationKind.ARCHITECTURAL, "design.rtl.design.fsm.senior", "design.rtl.design.tech_lead"),
     (EscalationKind.CROSS_TEAM, "design.rtl.design.fsm.senior", "design.rtl.design.manager"),
     (EscalationKind.STRATEGIC, "design.rtl.design.fsm.senior", "design.rtl.director"),
@@ -71,7 +71,7 @@ def test_escalation_routes_by_kind(nirmaan_org, kind, raiser, expected):
 
 def test_escalation_never_lands_below_the_raiser(nirmaan_org):
     for kind in EscalationKind:
-        for raiser in ("verification.debug.tech_lead", "design.rtl.director", "verification.vp"):
+        for raiser in ("verification.debug.analysis.tech_lead", "design.rtl.director", "verification.vp"):
             target = route_escalation(nirmaan_org, raiser, kind)
             assert nirmaan_org.roles[target].level.rank > nirmaan_org.roles[raiser].level.rank, (kind, raiser)
 

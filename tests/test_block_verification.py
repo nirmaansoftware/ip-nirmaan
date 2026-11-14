@@ -45,24 +45,24 @@ UNBOUNDED = "Formally verify the existing deep counter RTL with an unbounded pro
 EVERYTHING = ("Formally verify the existing CRC block RTL with an unbounded proof, a constrained-random "
               "SystemVerilog testbench, coverage and an equivalence check.")
 
-SV_SENIOR = "verification.simulation.systemverilog.senior"
-TB_SENIOR = "verification.simulation.testbench.senior"
-SIM_LEAD = "verification.simulation.tech_lead"
-PROPERTY = "verification.formal.property.senior"
-MODEL_CHECKING = "verification.formal.model_checking.senior"
+SV_SENIOR = "verification.dynamic.testbench.systemverilog.senior"
+TB_SENIOR = "verification.dynamic.testbench.testing.senior"
+SIM_LEAD = "verification.dynamic.testbench.tech_lead"
+PROPERTY = "verification.formal.proof.property.senior"
+MODEL_CHECKING = "verification.formal.proof.model_checking.senior"
 FORMAL_SKILLS = ("formal_verification", "sva", "assertion_coverage")
 
 #: Each request's DV seats: the task's skills, its owner and its reviewer.
 SEATS = {
-    (PLAIN, "dv-plan"): (("verification_planning",), "verification.planning.engineer",
-                         "verification.planning.senior"),
+    (PLAIN, "dv-plan"): (("verification_planning",), "verification.methodology.planning.engineer",
+                         "verification.methodology.planning.senior"),
     (PLAIN, "testbench"): (("directed_testing",), SV_SENIOR, SIM_LEAD),
     (SV, "testbench"): (("directed_testing", "systemverilog"), SV_SENIOR, SIM_LEAD),
     (RANDOM, "testbench"): (("directed_testing", "constrained_random"), TB_SENIOR, SIM_LEAD),
     (PLAIN, "assertions-formal"): (FORMAL_SKILLS, PROPERTY, MODEL_CHECKING),
     (UNBOUNDED, "assertions-formal"): ((*FORMAL_SKILLS, "model_checking"), MODEL_CHECKING, PROPERTY),
-    (EVERYTHING, "coverage"): (("code_coverage",), "verification.coverage.code.engineer",
-                               "verification.coverage.code.senior"),
+    (EVERYTHING, "coverage"): (("code_coverage",), "verification.dynamic.coverage.code.engineer",
+                               "verification.dynamic.coverage.code.senior"),
     (EVERYTHING, "equivalence"): (("equivalence_checking",), "verification.formal.equivalence.engineer",
                                   MODEL_CHECKING),
 }

@@ -123,6 +123,7 @@ The original preface of the section:
 - [M70-coverage-read](M70-coverage-read.md): Milestone 70 - Code coverage: `coverage.read` runs through Verilator and verilator_coverage, and block verification's coverage stage gates on it
 - [M71-repro-gates](M71-repro-gates.md): Milestone 71 - Repro gates: a regression investigation asked to reproduce its failure gates triage and root cause on repro testbenches that fail on the handed-over RTL
 - [M73-harness-fingerprint](M73-harness-fingerprint.md): Milestone 73 - The harness in one place, and its fingerprint on every trial; a changed harness makes a level's trials stale
+- [M77-verification-departments](M77-verification-departments.md): Milestone 77 - Verification in five departments; four of them ACTIVE as grouping units, the frozen list changed by renames only
 
 ## Before M43
 

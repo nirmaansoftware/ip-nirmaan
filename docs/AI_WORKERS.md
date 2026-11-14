@@ -14,7 +14,7 @@ evidence there, so an agent's report can be held to it.
 nirmaan run <project> triage --runtime mock-llm --input paths=failing.log
 nirmaan run <project> root-cause --runtime anthropic --dry-run
 nirmaan run <project> root-cause --runtime anthropic --review
-nirmaan task approve <project> root-cause --as verification.debug.tech_lead
+nirmaan task approve <project> root-cause --as verification.debug.analysis.tech_lead
 ```
 
 ---
