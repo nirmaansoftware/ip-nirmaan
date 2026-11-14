@@ -1,0 +1,8 @@
+EQY  7:32:56 [/tmp/nirmaan-eqy/eqy] read_gold: starting process "yosys -ql /tmp/nirmaan-eqy/eqy/gold.log /tmp/nirmaan-eqy/eqy/gold.ys"
+EQY  7:32:56 [/tmp/nirmaan-eqy/eqy] read_gold: finished (returncode=0)
+EQY  7:32:56 [/tmp/nirmaan-eqy/eqy] read_gate: starting process "yosys -ql /tmp/nirmaan-eqy/eqy/gate.log /tmp/nirmaan-eqy/eqy/gate.ys"
+EQY  7:32:56 [/tmp/nirmaan-eqy/eqy] read_gate: finished (returncode=0)
+EQY  7:32:56 [/tmp/nirmaan-eqy/eqy] combine: starting process "yosys -ql /tmp/nirmaan-eqy/eqy/combine.log /tmp/nirmaan-eqy/eqy/combine.ys"
+EQY  7:32:56 [/tmp/nirmaan-eqy/eqy] combine: ERROR: No matching port in gate module was found for \wrap!
+EQY  7:32:56 [/tmp/nirmaan-eqy/eqy] combine: finished (returncode=1)
+ERROR: Failed to combine designs. For details see '/tmp/nirmaan-eqy/eqy/combine.log'.

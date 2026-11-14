@@ -818,6 +818,8 @@ DUT_RTL = FileInput(param="sources", kinds=("rtl_source",), upstream=True)
 DUT_RTL_BESIDE = FileInput(param="sources", kinds=("rtl_source",), upstream=True, beside=True)
 PROOF_SETUP = (FileInput(param="sby", kinds=("formal_spec",)), DUT_RTL_BESIDE,
                FileInput(param="sources", kinds=("assertions",)))
+#: M69: the seat's eqy setup compares the approved RTL versions, which it names by file name (docs/EQUIVALENCE.md).
+EQUIVALENCE_SETUP = (FileInput(param="eqy", kinds=("equivalence_setup",)), DUT_RTL_BESIDE)
 
 BLOCK_VERIFICATION = WorkflowTemplate(
     id="block-verification",
@@ -858,15 +860,18 @@ BLOCK_VERIFICATION = WorkflowTemplate(
                      checked("The seat's properties are proven on the approved RTL", "formal.run", *PROOF_SETUP,
                              bounds=(at_least("proven", 1),)),
                      checked("The proof is not vacuous: every cover is reached", "formal.cover", *PROOF_SETUP))),
-        # Asked for by name; their tools are contracts today, so their evidence is recorded, not run, before
+        # Asked for by name. coverage.read is a contract today, so its evidence is recorded, not run, before
         # review (docs/BLOCK_VERIFICATION.md, "Not in this milestone").
         st("coverage", "Coverage", "Verification", "dv.coverage", depends_on=("testbench",), when=when("coverage"),
            skills=("code_coverage",), criticality=M, review=rv("dv.review"), outputs=("coverage_report",),
            evidence=(REVIEWED, dv_ran("Coverage of the testbench on the approved RTL", "coverage.read"))),
+        # M69: equivalence.run runs (eqy), so the seat's setup must prove the approved versions equivalent before
+        # review; the run's result names the files each side read (docs/EQUIVALENCE.md).
         st("equivalence", "Equivalence check", "Formal", "formal.equivalence", depends_on=("design-under-test",),
            when=when("equivalence"), skills=("equivalence_checking",), criticality=M, review=rv("formal.review"),
-           outputs=("equivalence_report",),
-           evidence=(REVIEWED, ran("Equivalence result with the compared versions named", "equivalence.run"))),
+           outputs=("equivalence_report",),  # with the .eqy (equivalence_setup) the gate reads
+           evidence=(REVIEWED, checked("The seat's setup proves the approved RTL versions equivalent, with the "
+                                       "compared versions named", "equivalence.run", *EQUIVALENCE_SETUP))),
     ),
 )
 

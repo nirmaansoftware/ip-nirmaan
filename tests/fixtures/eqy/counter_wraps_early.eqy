@@ -1,0 +1,13 @@
+# M69: the M21 counter (gold) against counter_wraps_early.v (gate).
+[gold]
+read_verilog -sv counter.v
+prep -top counter
+
+[gate]
+read_verilog -sv counter_wraps_early.v
+prep -top counter
+
+[strategy sby]
+use sby
+engine smtbmc
+depth 10

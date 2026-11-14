@@ -1,0 +1,22 @@
+$ eqy -f -d /tmp/nirmaan-eqy/eqy /tmp/nirmaan-eqy/setup/counter_refactor.eqy
+EQY  7:32:47 [/tmp/nirmaan-eqy/eqy] read_gold: starting process "yosys -ql /tmp/nirmaan-eqy/eqy/gold.log /tmp/nirmaan-eqy/eqy/gold.ys"
+EQY  7:32:47 [/tmp/nirmaan-eqy/eqy] read_gold: finished (returncode=0)
+EQY  7:32:47 [/tmp/nirmaan-eqy/eqy] read_gate: starting process "yosys -ql /tmp/nirmaan-eqy/eqy/gate.log /tmp/nirmaan-eqy/eqy/gate.ys"
+EQY  7:32:47 [/tmp/nirmaan-eqy/eqy] read_gate: finished (returncode=0)
+EQY  7:32:47 [/tmp/nirmaan-eqy/eqy] combine: starting process "yosys -ql /tmp/nirmaan-eqy/eqy/combine.log /tmp/nirmaan-eqy/eqy/combine.ys"
+EQY  7:32:47 [/tmp/nirmaan-eqy/eqy] combine: finished (returncode=0)
+EQY  7:32:47 [/tmp/nirmaan-eqy/eqy] partition: starting process "cd /tmp/nirmaan-eqy/eqy; yosys -ql partition.log partition.ys"
+EQY  7:32:47 [/tmp/nirmaan-eqy/eqy] partition: finished (returncode=0)
+EQY  7:32:47 [/tmp/nirmaan-eqy/eqy] run: starting process "make -C /tmp/nirmaan-eqy/eqy -f strategies.mk"
+EQY  7:32:47 [/tmp/nirmaan-eqy/eqy] run: Running strategy 'sby' on 'counter.count'..
+EQY  7:32:48 [/tmp/nirmaan-eqy/eqy] run: Proved equivalence of partition 'counter.count' using strategy 'sby'
+EQY  7:32:48 [/tmp/nirmaan-eqy/eqy] run: Running strategy 'sby' on 'counter.wrap'..
+EQY  7:32:48 [/tmp/nirmaan-eqy/eqy] run: Proved equivalence of partition 'counter.wrap' using strategy 'sby'
+EQY  7:32:48 [/tmp/nirmaan-eqy/eqy] run: /Library/Developer/CommandLineTools/usr/bin/make -f strategies.mk summary
+EQY  7:32:48 [/tmp/nirmaan-eqy/eqy] run: finished (returncode=0)
+EQY  7:32:48 [/tmp/nirmaan-eqy/eqy] Successfully proved equivalence of partition counter.wrap
+EQY  7:32:48 [/tmp/nirmaan-eqy/eqy] Successfully proved equivalence of partition counter.count
+EQY  7:32:48 [/tmp/nirmaan-eqy/eqy] Successfully proved designs equivalent
+EQY  7:32:48 [/tmp/nirmaan-eqy/eqy] summary: Elapsed clock time [H:MM:SS (secs)]: 0:00:00 (0)
+EQY  7:32:48 [/tmp/nirmaan-eqy/eqy] summary: Elapsed process time [H:MM:SS (secs)]: 0:00:00 (0)
+EQY  7:32:48 [/tmp/nirmaan-eqy/eqy] DONE (PASS, rc=0)
