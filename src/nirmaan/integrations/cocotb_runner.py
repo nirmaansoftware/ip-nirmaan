@@ -13,8 +13,11 @@ Python), so none may end the simulation, read its arguments, open a file or reac
 language (M53's testbench-only constructs), and the run is refused before anything runs if one
 does.
 
-It is chosen by name (``backend: cocotb``): the other ``simulator.run`` backends run HDL
-testbenches. This module adds a backend and nothing else (docs/COCOTB.md): no core change.
+It runs only when named (``backend: cocotb``), so every run records it: the other
+``simulator.run`` backends run HDL testbenches, and ``ToolRun.answers`` (``VERDICT_BACKENDS``)
+lets a cocotb run meet only a requirement that fixes this backend, never a gate that reads an
+HDL testbench's verdict. This module adds a backend and nothing else (docs/COCOTB.md): no EDA
+core change.
 """
 
 from __future__ import annotations
@@ -58,6 +61,8 @@ def _tests(job: Job) -> list[Path]:
 
 def _check(job: Job) -> str | None:
     """Refuse, before anything runs, what this backend cannot judge by cocotb's verdict."""
+    if text_value(job.params.get("backend")).strip() != "cocotb":  # so the run records it (ToolRun.answers, M72)
+        return "the cocotb backend runs only when named (backend: cocotb) (refused, nothing ran)"
     expect = text_value(job.params.get("expect")).strip()
     if expect not in ("", "pass"):
         return f"expect {expect!r}: the cocotb backend judges passing runs only (refused, nothing ran)"

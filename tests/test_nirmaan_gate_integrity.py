@@ -169,9 +169,11 @@ def test_a_timeout_stops_every_process_the_step_started(tmp_path):
 
 
 def test_the_timeout_covers_the_whole_run(tmp_path):
-    backend = _shell("steps", "sleep 0.8", "sleep 0.8", "sleep 0.8")
-    outcome = execute(backend, {"sources": str(RTL / "counter.v"), "timeout": "2", "workdir": str(tmp_path)})
-    assert not outcome.succeeded and "timed out after 2s" in outcome.summary, outcome.summary
+    # Each step is well inside the timeout and all three are past it. Two steps leave 1.2 s for starting their
+    # processes, so a loaded machine still finishes them in time (0.4 s did not, on a shared machine under load).
+    backend = _shell("steps", "sleep 1.4", "sleep 1.4", "sleep 1.4")
+    outcome = execute(backend, {"sources": str(RTL / "counter.v"), "timeout": "4", "workdir": str(tmp_path)})
+    assert not outcome.succeeded and "timed out after 4s" in outcome.summary, outcome.summary
     assert outcome.data["exit_statuses"] == [0, 0]  # the third step ran out of the run's time
 
 

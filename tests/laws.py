@@ -43,8 +43,10 @@ def needs(*executables: str, any_of: tuple[str, ...] = (), modules: tuple[str, .
     """
     required = set(os.environ.get("NIRMAAN_REQUIRE_EDA", "").replace(",", " ").split())
     missing = [e for e in executables if shutil.which(e) is None]
-    missing += [m for m in modules if importlib.util.find_spec(m) is None]
     if any_of and not any(shutil.which(e) for e in any_of):
         missing.append(any_of[0])
-    skip = bool(missing) and not required.intersection(missing)
-    return pytest.mark.skipif(skip, reason=f"not on PATH: {', '.join(missing)}")
+    absent = [m for m in modules if importlib.util.find_spec(m) is None]
+    skip = bool(missing or absent) and not required.intersection(missing + absent)
+    reason = "; ".join([*([f"not on PATH: {', '.join(missing)}"] if missing else []),
+                        *([f"not installed: {', '.join(absent)}"] if absent else [])])
+    return pytest.mark.skipif(skip, reason=reason)

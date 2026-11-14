@@ -16,6 +16,7 @@ from __future__ import annotations
 import importlib.util
 import re
 import shutil
+import time
 import tomllib
 from pathlib import Path
 
@@ -58,7 +59,7 @@ def _invoke(engine, sources: list[Path], workdir: Path, tests: Path = TESTBENCH,
 
 
 def _job(tmp_path: Path, sources: list[Path], tests: list[Path], **params: str) -> Job:
-    given = {"cocotb": ",".join(str(t) for t in tests), **params}
+    given = {"cocotb": ",".join(str(t) for t in tests), "backend": "cocotb", **params}
     return Job("simulator.run", given, tmp_path, tuple(str(s) for s in sources), "counter")
 
 
@@ -210,6 +211,19 @@ def test_a_design_that_prints_cocotbs_totals_fails_the_run(bridge, tmp_path):
     assert not run.succeeded and "printed 2 times" in run.summary
 
 
+@COCOTB_RUN
+def test_the_timeout_stops_a_python_test_that_never_returns(bridge, tmp_path):
+    """The Python runs inside the run's ``vvp`` step, so the broker's one deadline for the run (M53) stops it."""
+    hangs = tmp_path / "tb" / "hangs.py"
+    hangs.parent.mkdir()
+    hangs.write_text("import cocotb\n\n\n@cocotb.test()\nasync def never_returns(dut):\n    while True:\n"
+                     "        pass\n", encoding="utf-8")
+    started = time.monotonic()
+    run, outcome = _invoke(bridge, [COUNTER], tmp_path / "run", hangs, timeout="3")
+    assert not run.succeeded and "timed out after 3s in env" in run.summary, run.summary
+    assert time.monotonic() - started < 20 and outcome.metrics["exit_statuses"] == [0]  # compiled, then stopped
+
+
 @needs("iverilog", "vvp")
 def test_without_the_cocotb_backend_the_tests_are_not_run_and_nothing_passes(bridge, tmp_path):
     """The HDL testbench backends ignore ``cocotb``; the design alone gives no verdict, so the run fails."""
@@ -233,3 +247,43 @@ def test_ci_requires_cocotb_so_the_real_runs_never_skip_there():
     assert {"iverilog", "vvp", "cocotb"} <= set(required.split(":", 1)[1].split())
     assert 'pip install -e ".[ai,dev,cocotb]"' in ci
     assert 'python -c "import cocotb"' in ci  # the no-tools job checks it is absent there
+
+
+# --- Gates: a cocotb pass counts only where a requirement asks for it ----------------------------------
+
+
+def test_a_cocotb_pass_never_meets_a_gate_for_an_hdl_testbenchs_verdict():
+    """M72: every simulation gate today reads an HDL testbench's nonce verdict (M53); a cocotb run is judged
+    another way, so it counts only where a requirement fixes ``backend: cocotb``."""
+    from types import SimpleNamespace
+
+    from nirmaan.company.workflows import WORKFLOWS
+    from nirmaan.models import EvidenceKind, EvidenceRequirement, ToolRun
+    from nirmaan.work.policy import satisfies
+
+    def met(run: ToolRun, req) -> bool:
+        state = SimpleNamespace(tool_runs={run.id: run})
+        return satisfies(state, SimpleNamespace(substantiated=True, kind=EvidenceKind.TOOL_RUN, tool_run=run.id), req)
+
+    cocotb = ToolRun(id="run-0001", tool="simulator.run", actor="a", task="t", succeeded=True,
+                     summary="cocotb: 2 of 2 tests passed", params={"sources": ("counter.v",), "top": "counter",
+                                                                    "cocotb": ("t.py",), "backend": "cocotb"})
+    hdl = cocotb.model_copy(update={"params": {"sources": ("counter.v", "tb.v"), "top": "tb", "backend": "icarus"}})
+    gates = [req for wf in WORKFLOWS for stage in wf.stages for req in stage.evidence
+             if "simulator.run" in req.tools and dict(req.params).get("backend") != "cocotb"]
+    assert gates  # the simulation gates the workflows have today
+    for req in gates:
+        assert not met(cocotb, req), req.description
+    plain = next(req for req in gates if not req.params and not req.bounds)
+    assert met(hdl, plain)
+    asks = EvidenceRequirement(description="cocotb tests pass", accepts=(EvidenceKind.TOOL_RUN,),
+                               tools=("simulator.run",), params=(("backend", "cocotb"),))
+    assert met(cocotb, asks) and not met(hdl, asks)
+    assert not cocotb.answers(()) and cocotb.answers((("backend", "cocotb"),)) and hdl.answers(())
+    assert not hdl.answers((("backend", "cocotb"),))  # both ways, as for expect
+
+
+def test_the_backend_runs_only_when_named_so_the_run_records_it(tmp_path):
+    job = _job(tmp_path, [COUNTER], [TESTBENCH])
+    job = Job(job.tool, {k: v for k, v in job.params.items() if k != "backend"}, job.workdir, job.sources, job.top)
+    assert "runs only when named" in cocotb_runner._check(job)

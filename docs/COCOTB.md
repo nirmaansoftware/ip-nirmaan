@@ -26,11 +26,26 @@ registered only because it really runs and is tested here, in CI too.
 | `simulator.run` | `cocotb` (`nirmaan/integrations/cocotb_runner.py`), chosen by name | `iverilog`, `vvp`, and cocotb importable in this Python | `sources` (the design), `top` (its top module), `cocotb` (the Python test modules), all required; `workdir`, `timeout`, `backend` |
 
 The backend is one `register_backend` call in its own module; the EDA core,
-the broker, the engine and the policy do not change (a test checks the core
-never names cocotb). It comes after `icarus` and `verilator-sim`, so a
-`simulator.run` without `backend` still runs an HDL testbench. Those backends
+the broker and the engine do not change (a test checks the EDA core never
+names cocotb). It comes after `icarus` and `verilator-sim`, so a
+`simulator.run` without `backend` still runs an HDL testbench, and it refuses
+to run unless named, so every cocotb run records `backend: cocotb`. Those backends
 ignore `cocotb`; given only a design, they find no testbench verdict and the
 run fails, never passes.
+
+## Gates (gate semantics)
+
+Every simulation gate in the workflows today reads an HDL testbench's verdict:
+the testbench prints `NIRMAAN-SIM <nonce> <n> passed, <m> failed`, counted
+checks with the run's nonce (M53, `docs/GATE_INTEGRITY.md` section 1). A cocotb
+pass is judged another way (cocotb's count of passing Python tests), so it
+must not meet those gates. The policy changes in one place for this:
+`ToolRun.answers` (M71) reads `VERDICT_BACKENDS` (`models/work.py`, today
+`cocotb`), and a run made with such a backend answers a requirement only when
+the requirement fixes that very backend (`params: (("backend", "cocotb"),)`).
+So no existing gate is met by a cocotb run (a test walks every `simulator.run`
+requirement in every workflow), and a gate that wants cocotb says so. No
+existing gate changes; none names cocotb yet.
 
 ## What a run does
 
@@ -62,8 +77,8 @@ run fails, never passes.
    totals line (`** TESTS=n PASS=p FAIL=f SKIP=s`) was printed exactly once
    and agrees with the file, and both steps exited 0. The exit status alone
    says nothing: `vvp` exits 0 when tests fail, and when cocotb never
-   started. The HDL design cannot write the file (it may not open one), and a
-   totals line it prints makes two, which fails the run: a forged line from
+   started. The HDL design cannot write the file (it may not open a file), and
+   a totals line it prints makes two, which fails the run: a forged line from
    the design can only fail a run. The Python testbench is not so bound (see
    "Trust model" below). A results file with a DOCTYPE or an entity is refused
    unread.
@@ -92,14 +107,19 @@ What is true instead:
   is as trusted as a `pytest` file a seat runs in the same checkout. The
   controls are the ones around the tool, not inside the run: only roles that
   may simulate can call `simulator.run`, the broker records every call, and the
-  run has a `timeout` and its own working directory. Running cocotb on text
+  run has a `timeout` and its own working directory. The Python runs inside
+  the run's `vvp` step, so the run's one deadline (M53) stops it too: a test
+  gives it a Python test that never returns. Running cocotb on text
   from an untrusted source is outside this milestone and must not be done
   without a container or VM boundary, which this repository does not provide.
 - **The Python can forge the verdict.** It could write `results.xml` or print a
-  totals line itself. "The design cannot write the file" in step 4 holds for
-  the HDL only, since the HDL check forbids file access and printing a verdict.
-  A passing cocotb run therefore proves "the testbench author's Python reported
-  success", never "an independent check passed".
+  totals line itself, as an HDL testbench can print a passing verdict line.
+  "The design cannot write the file" in step 4 holds for the HDL only, since
+  the HDL check forbids opening a file. A passing cocotb run therefore proves
+  "the testbench author's Python reported success", never "an independent
+  check passed".
+- **No credential reaches it.** The run's environment has every credential
+  removed (M53, `run_environment`), as for every EDA run.
 - **What backs the verdict is not the run but the scorer.** The must-fail
   scorer (M58) runs the same testbench on broken RTL and requires it to fail;
   a testbench that always reports success is caught there, not by this parser.
@@ -113,7 +133,7 @@ something is the must-fail scorer (M58): it must fail on broken RTL.
 ## The pinned dependency, and NOTICE
 
 cocotb is the `cocotb` extra in `pyproject.toml`, pinned to one release,
-`cocotb==2.1.0` (2026-08-30), since its runner, its start-up and totals lines
+`cocotb==2.1.0`, since its runner, its start-up and totals lines
 and its results file are what a run is judged by. It is not a base
 dependency: installing IP Nirmaan never needs it, and the backend refuses
 honestly ("cocotb is not installed in this Python") without it. Its one
@@ -155,8 +175,9 @@ into the venv (or `pip install -e '.[cocotb]'`), with Icarus on PATH.
 
 ## Not in this milestone
 
-- cocotb on Verilator: cocotb 2.1 needs Verilator 5.036 or later (its Verilator
-  makefile says so), and CI's apt Verilator is 5.020.
+- cocotb on Verilator: cocotb 2.1 needs Verilator 5.036 or later
+  (`VLT_MIN := 5.036` in its `cocotb_tools/makefiles/simulators/Makefile.verilator`),
+  and CI's apt Verilator on Ubuntu 24.04 is 5.020 (`docs/COVERAGE_READ.md`).
 - VHDL, mixed-language designs, and simulator parameters as inputs.
 - `expect: fail` for cocotb reproductions (M71).
 - A gate that names the backend, and the `dv/cocotb-crc` eval case (W2-E6),

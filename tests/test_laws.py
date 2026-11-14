@@ -60,7 +60,7 @@ def test_needs_modules_skips_a_missing_python_package_unless_ci_requires_it(monk
     monkeypatch.delenv("NIRMAAN_REQUIRE_EDA", raising=False)
     missing = "nirmaan_no_such_package"
     mark = needs(modules=(missing,))
-    assert mark.args == (True,) and mark.kwargs["reason"] == f"not on PATH: {missing}"
+    assert mark.args == (True,) and mark.kwargs["reason"] == f"not installed: {missing}"
     assert needs(modules=("json",)).args == (False,)
     monkeypatch.setenv("NIRMAAN_REQUIRE_EDA", missing)
     assert needs(modules=(missing,)).args == (False,)
