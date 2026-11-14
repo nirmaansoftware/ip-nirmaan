@@ -17,6 +17,7 @@ from typing import Callable
 
 from nirmaan.evals.cases import resolve
 from nirmaan.models import Artifact, HeldOutCheck, Score, ScoreStatus, Task
+from nirmaan.models.workflow import Bound
 from nirmaan.registry import Registry
 from nirmaan.runtime import ToolAccessDenied, ToolHandle
 from nirmaan.work import TaskEngine
@@ -137,9 +138,10 @@ def must_fail(ctx: ScoreContext) -> Score:
 
     The clean run (the seat's files of the kinds in ``seat_files`` with the case's files) must pass; the
     check's ``cover_tool``, when it names one, must pass over the same clean inputs, so every cover is
-    reached and the pass is not vacuous; and each mutant must make the tool fail on a run that executed
-    and wrote its log. A refusal, which ran nothing, never counts as a mutant caught. Every run reads a
-    staged copy of its inputs, each under its own file name, so a mutant takes the name of the file it
+    reached and the pass is not vacuous (with ``cover_bounds`` the cover run is checked against them as a
+    requirement's bounds are, M48: a coverage run must meet them); and each mutant must make the tool fail
+    on a run that executed and wrote its log. A refusal, which ran nothing, never counts as a mutant caught.
+    Every run reads a staged copy of its inputs, each under its own file name, so a mutant takes the name of the file it
     stands in for. The scorer is judging the seat's testbench or assertions, not the seat's RTL: a
     testbench that cannot tell a mutant from the clean design proves nothing about either.
     """
@@ -183,9 +185,11 @@ def _must_fail_runs(ctx: ScoreContext, inputs: dict[str, list[Path]], entries: d
     """The clean run, the cover run and one run per mutant, each on inputs staged under ``stage``."""
     check = ctx.check
 
-    def run(tool: str, label: str, swap: tuple[Path, Path] | None = None):
+    bounds = tuple(Bound.parse(text) for text in check.cover_bounds)
+
+    def run(tool: str, label: str, swap: tuple[Path, Path] | None = None, bounds: tuple[Bound, ...] = ()):
         params = {**check.params, **entries, **_stage(stage / label, inputs, swap)}
-        return ctx.tools.invoke(tool, **params)
+        return ctx.tools.invoke(tool, bounds=bounds, **params)
 
     try:
         clean_id, clean = run(str(check.tool), "clean")
@@ -194,7 +198,7 @@ def _must_fail_runs(ctx: ScoreContext, inputs: dict[str, list[Path]], entries: d
             return score(ScoreStatus.FAILED, f"the clean inputs do not pass: {check.tool} {clean_id}: "
                                              f"{clean.summary}", tuple(passed))
         if check.cover_tool:
-            cover_id, cover = run(check.cover_tool, "cover")
+            cover_id, cover = run(check.cover_tool, "cover", bounds=bounds)
             passed.append(cover_id)
             if not cover.succeeded:
                 return score(ScoreStatus.FAILED, f"covers not reached on the clean inputs: {check.cover_tool} "
