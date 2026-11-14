@@ -93,7 +93,9 @@ def test_a_cover_bound_must_read_as_a_bound():
         HeldOutCheck(name="n", cover_bounds=("line",))
 
 
-def test_no_shipped_case_dump_carries_cover_bounds():
+def test_only_the_coverage_case_dumps_cover_bounds():
+    """Every other shipped case dumps as it did before the field existed, so its digest is unchanged."""
     for case in load_cases(REPO / "evals"):
-        assert all("cover_bounds" not in h.model_dump(mode="json") for h in case.held_out), case.id
+        has = any("cover_bounds" in h.model_dump(mode="json") for h in case.held_out)
+        assert has == (case.id == "dv/coverage-irq-ctrl"), case.id
         assert case_digest(case, REPO)
