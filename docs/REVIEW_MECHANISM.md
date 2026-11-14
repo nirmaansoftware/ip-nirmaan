@@ -637,6 +637,13 @@ Actions runs 43578438357, 43582156230, 43582267957 and 43582344492.
 - With the real scripts, the login check failed on the 401.
 - `loopcheck` could not read the loop's `/proc/<pid>/environ` or the runner's
   home folder.
+- In run 43587674702, on this design:
+  - `check_dashes.py` and pytest passed as `loopcheck` in a `check_clone` of a
+    fixer worktree;
+  - `loopcheck` could not reach the worktree the loop pushes from;
+  - no `loopcheck` process outlived the check, and the clone's files came
+    back to the runner account;
+  - `isolation_check` passed.
 
 What is checked again, and where:
 
