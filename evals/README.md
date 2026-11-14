@@ -71,7 +71,11 @@ a mutant that is wrong only for a DEPTH that is not a power of two passes a
 DEPTH 8 proof and fails a DEPTH 5 one. A prove-mode mutant run that passes
 its basecase and fails its induction step (sby reports UNKNOWN with the failed
 assertion) executed and wrote its log, so it counts as a mutant caught
-(`dv/prove-deep-counter`).
+(`dv/prove-deep-counter`). An equivalence seat's control runs
+`equivalence.run` over the seat's eqy setup with a non-equivalent refactor in
+place of the approved one (`dv/equiv-gray`); a random-stimulus testbench's
+control is the ordinary `simulator.run` one (`dv/random-crc`), and a run that
+is too short or whose constraints never reach a corner lets a mutant survive.
 
 ```json
 {

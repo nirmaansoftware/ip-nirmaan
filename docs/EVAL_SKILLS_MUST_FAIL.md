@@ -311,6 +311,53 @@ set: a proof at `MAX` 4 alone passes its gates and the approved RTL, and the
 bit-test mutant survives it; a prove-mode proof that only bounds the count
 and defines the carry, true and inductive, lets the lost carry survive.
 
+Wave 2's third eval pull request (W2-E3) adds a random-stimulus testbench case
+and an equivalence case, each on an approved block of its own:
+
+- `dv/random-crc` judges the testbench seat on `directed_testing` and
+  `constrained_random`. Its request asks for constrained-random stimulus, which
+  plans the `random_stimulus` refinement, and so a different owner (the
+  testbench testing senior) from the directed case. Its block
+  (`tests/fixtures/dv/crc8/`) is a byte-at-a-time CRC-8 engine: polynomial
+  0x07, start value 0xFF, bytes taken bit 7 first with no reflection, check
+  value inverted, `init` reloads and wins over a byte, `valid` low holds (8
+  tagged requirements). Its one control is the seat's testbench with
+  `simulator.run`. The reference testbench (`crc8_block_tb.sv`) drives random
+  bytes, `init` and `valid` under stated constraints from a fixed-seed
+  generator, compares `crc` with a model of the specification after every
+  edge, and fails itself when the run is too short or never reaches `init`
+  with `valid`, idle cycles or a mid-frame reset. Each of the five mutants
+  fails a check, never a build.
+- `dv/equiv-gray` judges the `equivalence` seat (M69) on
+  `equivalence_checking`. Its block (`tests/fixtures/dv/gray_counter/`) is a
+  4-bit Gray-code counter with enable, synchronous reset and a `wrap` flag at
+  the last code (4 tagged requirements): the gold version decodes to binary,
+  adds one and encodes again; the approved refactor steps the code by the
+  parity rule, under the same state register. The seat writes the `.eqy`
+  setup (`equivalence_setup`). The control runs `equivalence.run` over it with
+  each mutant below in place of the refactor: it must prove the approved pair
+  equivalent (the equivalence gate before review) and fail each mutant on an
+  unproved partition.
+
+| File | The one change | Judge that fails it |
+|---|---|---|
+| `crc8/mutants/crc8_block_poly_tap.v` | the polynomial is 0x03, without its x^2 tap | seat testbench (`simulator.run`) |
+| `crc8/mutants/crc8_block_reflected_input.v` | each byte is taken bit 0 first | seat testbench |
+| `crc8/mutants/crc8_block_no_final_xor.v` | `crc` is the running value, not inverted | seat testbench |
+| `crc8/mutants/crc8_block_init_loses.v` | a byte offered with `init` wins over the reload | seat testbench, only if `init` meets `valid` |
+| `crc8/mutants/crc8_block_hold_ignored.v` | `valid` is ignored: a byte is taken at every edge | seat testbench, only if `valid` goes low |
+| `gray_counter/mutants/gray_counter_refactor_flip_wrong_bit.v` | after an odd code ending in 1 the wrong bit flips | seat setup (`equivalence.run`) |
+| `gray_counter/mutants/gray_counter_refactor_wrap_off_by_one.v` | `wrap` is high at count 14, not 15 | seat setup |
+| `gray_counter/mutants/gray_counter_refactor_reset_to_one.v` | reset loads 0001, not 0000 | seat setup |
+
+Paths are under `tests/fixtures/dv/`. The tests in
+`tests/test_dv_crc_gray_evals.py` show the control catches a weak testbench: a
+testbench that sends one fixed message with `valid` held high passes its own
+gate and the approved RTL and lets `init_loses` survive; a random testbench
+whose constraint keeps `init` away from `valid` lets the same mutant survive;
+and the reference over only 12 random cycles, with its own thinness check
+removed, lets a mutant survive. The scorer stops at the first survivor.
+
 ## 4. The evidence loader
 
 `load_evidence(path)` reads a run record (as `load_record` does) and raises
