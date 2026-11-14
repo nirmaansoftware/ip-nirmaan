@@ -1,0 +1,29 @@
+{
+  "cases": {
+    "rtl/skid-buffer": {
+      "high": 1.0,
+      "low": 0.4385029682449546,
+      "n": 3,
+      "passed": 3,
+      "rate": 1.0
+    }
+  },
+  "format": "nirmaan.eval-summary",
+  "seats": {
+    "rtl-implementation": {
+      "high": 1.0,
+      "low": 0.4385029682449546,
+      "n": 3,
+      "passed": 3,
+      "rate": 1.0
+    }
+  },
+  "totals": {
+    "cost_usd": null,
+    "duration_s": 602.214,
+    "input_tokens": 6,
+    "model_calls": 3,
+    "output_tokens": 68177,
+    "trials": 3
+  }
+}
