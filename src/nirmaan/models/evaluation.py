@@ -208,6 +208,8 @@ class EvalTrial(BaseModel):
     #: M67: "off" when the seat's packets carried no knowledge documents (``eval run --without-knowledge``,
     #: the ablation). Such a trial never counts toward an evidence level.
     knowledge: Literal["on", "off"] = "on"
+    #: M76: "calibration" for a trial run on an outside benchmark (``eval outside``); it never counts toward a level.
+    purpose: Literal["evidence", "calibration"] = "evidence"
     result: EvalResult
     answers: tuple[RecordedAnswer, ...] = ()
     judge_runs: tuple[JudgeRun, ...] = ()
@@ -235,6 +237,10 @@ class EvalRunManifest(BaseModel):
     head_sha: str | None = None
     #: M67: "off" for a run without knowledge documents (the ablation); every trial it writes says so too.
     knowledge: Literal["on", "off"] = "on"
+    #: M76: "calibration" for a run on an outside benchmark; every trial it writes says so too.
+    purpose: Literal["evidence", "calibration"] = "evidence"
+    #: M76: where a calibration run's problems came from (name, upstream commit, licence), else empty.
+    source: str = ""
 
 
 class EvalProposalThresholds(BaseModel):

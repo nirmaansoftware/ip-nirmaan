@@ -126,6 +126,7 @@ new number. M1 to M42 are taken; see `docs/history/README.md`.
 | M71 | Repro gates: triage and root cause reproduce the failure on the handed-over RTL | reserved |
 | M72 | Python testbenches through cocotb: simulator.run's cocotb backend | reserved |
 | M73 | The harness in one place, and its fingerprint on every trial | reserved |
+| M76 | Outside calibration: the RTLLM adapter, and calibration records that never count toward a level | reserved |
 | M77 | Verification in five departments (wave 2, W2-O1); number reserved after the branch was cut | reserved |
 | M78 | Signoff gates independent of the producing department (G13 record, decision 2c) | reserved |
 
