@@ -62,10 +62,20 @@ class FileInput(BaseModel):
                     "setup that names it relative to itself (a .sby's [files]) reads the approved file itself.",
     )
 
+    each: bool = Field(
+        default=False,
+        description="One run per task file of these kinds, each run with that file alone in this parameter (M71), "
+                    "so every file is judged on its own: a seat's several repro testbenches each reproduce. An "
+                    "entry binding of the same kinds takes that file's own entry.",
+    )
+
     @model_validator(mode="after")
     def _beside_is_upstream(self) -> "FileInput":
         if self.beside and not self.upstream:
             raise ValueError(f"{self.param}: only an upstream input can be placed beside the task's own files")
+        if self.each and (self.upstream or self.entry):
+            raise ValueError(f"{self.param}: only the task's own files, not an upstream input or an entry, run "
+                             "one at a time")
         return self
 
 
@@ -269,7 +279,11 @@ class Refinement(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     when: Condition
-    skills: tuple[str, ...]
+    skills: tuple[str, ...] = ()
+    #: M71: outputs the task also produces, and earlier stages it also builds on, when the condition holds (a
+    #: regression investigation asked for a reproduction writes repro testbenches over the handed-over RTL).
+    outputs: tuple[str, ...] = ()
+    depends_on: tuple[str, ...] = ()
 
 
 class StageTemplate(BaseModel):

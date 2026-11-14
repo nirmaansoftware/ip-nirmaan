@@ -218,3 +218,124 @@ def _must_fail_runs(ctx: ScoreContext, inputs: dict[str, list[Path]], entries: d
                                      f"{len(caught)} of {sum(map(len, check.mutants.values()))} mutants "
                                      f"failed it", tuple(passed),
                  tuple(caught))
+
+
+# --- One file at a time (M71) -----------------------------------------------------------------
+
+
+def _own_entry(ctx: ScoreContext, param: str, location: str, others: set[str]) -> str | None:
+    """The value the seat's own latest passing run over this one file, and none of its others, gave ``param``."""
+    for run in reversed(list(ctx.engine.state.tool_runs.values())):
+        used = {v for value in run.params.values() for v in _values(value)}
+        if run.task == ctx.task.id and run.succeeded and param in run.params and location in used \
+                and others.isdisjoint(used):
+            return str(run.params[param])
+    return None
+
+
+def _matched(caught: dict[str, set[str]], files: list[str]) -> dict[str, str]:
+    """A different file for every mutant, each one that fails it (a bipartite matching, by augmenting paths)."""
+    owner: dict[str, str] = {}
+
+    def assign(mutant: str, seen: set[str]) -> bool:
+        for f in files:
+            if f in caught[mutant] and f not in seen:
+                seen.add(f)
+                if f not in owner or assign(owner[f], seen):
+                    owner[f] = mutant
+                    return True
+        return False
+
+    for mutant in caught:
+        assign(mutant, set())
+    return {mutant: f for f, mutant in owner.items()}
+
+
+@register_scorer("must-fail-each", requires_tool=True)
+def must_fail_each(ctx: ScoreContext) -> Score:
+    """A negative control over several seat files, each judged on its own (M71): one repro per failure bucket.
+
+    The check's ``seat_files`` name one parameter and the kinds of the files judged one at a time (a triage
+    seat's repro testbenches); each runs alone with the case's files, its entry from the seat's own passing run
+    over that file alone. Every file must pass on the clean inputs, and every mutant (one seeded bug per
+    bucket) must fail a different file: one repro that fails every bug, or two buckets the seat merged, leaves a
+    mutant with no file of its own. A refusal never counts as a mutant caught.
+    """
+    check = ctx.check
+
+    def score(status: ScoreStatus, summary: str, runs: tuple[str, ...] = (), failed: tuple[str, ...] = ()) -> Score:
+        return Score(scorer=check.scorer, name=check.name, status=status, summary=summary, runs=runs,
+                     failed_runs=failed)
+
+    if not check.mutants:
+        return score(ScoreStatus.NOT_RUN, "the check names no mutant, so nothing has to fail")
+    if len(check.seat_files) != 1:
+        return score(ScoreStatus.NOT_RUN, "a check judged one file at a time names exactly one seat parameter")
+    [(param, kinds)] = check.seat_files.items()
+    files = [str(a.location) for a in ctx.seat_files(kinds)]
+    if not files:
+        return score(ScoreStatus.NOT_RUN, f"the seat submitted no {' or '.join(kinds)} file")
+    case_inputs = {p: [resolve(ctx.repo, f) for f in paths] for p, paths in check.case_files.items()}
+    entries: dict[str, dict[str, str]] = {}
+    for location in files:
+        entries[location] = {}
+        for entry_param, entry_kinds in check.seat_entries.items():
+            if set(entry_kinds) != set(kinds):
+                return score(ScoreStatus.NOT_RUN, f"{entry_param} must come from the files judged one at a time")
+            entry = _own_entry(ctx, entry_param, location, set(files) - {location})
+            if entry is None:
+                return score(ScoreStatus.NOT_RUN, f"no run of the seat's own over {Path(location).name} alone "
+                                                  f"declares {entry_param}")
+            entries[location][entry_param] = entry
+    if ctx.work is not None:
+        ctx.work.mkdir(parents=True, exist_ok=True)
+        return _each_runs(ctx, param, files, case_inputs, entries,
+                          Path(tempfile.mkdtemp(prefix="must-fail-each-", dir=ctx.work)), score)
+    with tempfile.TemporaryDirectory(prefix="nirmaan-must-fail-each-") as stage:
+        return _each_runs(ctx, param, files, case_inputs, entries, Path(stage), score)
+
+
+def _each_runs(ctx: ScoreContext, param: str, files: list[str], case_inputs: dict[str, list[Path]],
+               entries: dict[str, dict[str, str]], stage: Path, score: Callable[..., Score]) -> Score:
+    """Per seat file: the clean run, then one run per mutant; then the matching of mutants to files."""
+    check = ctx.check
+    mutants = [(resolve(ctx.repo, original), resolve(ctx.repo, m))
+               for original, ms in sorted(check.mutants.items()) for m in ms]
+    passed: list[str] = []
+    failed_by: dict[str, dict[str, str]] = {str(m): {} for _, m in mutants}  # mutant -> file -> failed run
+    try:
+        for n, location in enumerate(files, start=1):
+            inputs = {**case_inputs}
+            inputs[param] = [*inputs.get(param, []), Path(location)]
+            names = [p.name for paths in inputs.values() for p in paths]
+            if len(set(names)) != len(names):
+                return score(ScoreStatus.NOT_RUN, f"two inputs share a file name ({', '.join(sorted(names))}); "
+                                                  "a staged run could not tell them apart")
+
+            def run(label: str, swap: tuple[Path, Path] | None = None):
+                return ctx.tools.invoke(str(check.tool), **{**check.params, **entries[location],
+                                                            **_stage(stage / f"file-{n}" / label, inputs, swap)})
+
+            clean_id, clean = run("clean")
+            passed.append(clean_id)
+            if not clean.succeeded:
+                return score(ScoreStatus.FAILED, f"{Path(location).name} does not pass on the clean inputs: "
+                                                 f"{check.tool} {clean_id}: {clean.summary}", tuple(passed))
+            for m, (original, mutant) in enumerate(mutants, start=1):
+                run_id, outcome = run(f"mutant-{m}", (original, mutant))
+                if not outcome.succeeded and not outcome.references:
+                    return score(ScoreStatus.NOT_RUN, f"mutant {mutant} was refused, not run: {outcome.summary}",
+                                 tuple(passed))
+                if not outcome.succeeded:
+                    failed_by[str(mutant)][location] = run_id
+    except ToolAccessDenied as exc:
+        return score(ScoreStatus.NOT_RUN, f"not run: {exc}")
+    matching = _matched({m: set(by) for m, by in failed_by.items()}, files)
+    alone = [m for m in failed_by if m not in matching]
+    caught = tuple(failed_by[m][f] for m, f in sorted(matching.items()))
+    if alone:
+        return score(ScoreStatus.FAILED, f"no repro of its own fails {', '.join(Path(m).name for m in alone)}: "
+                                         f"only {len(matching)} of {len(failed_by)} mutants have a file of their "
+                                         "own that fails them", tuple(passed), caught)
+    return score(ScoreStatus.PASSED, f"each of {len(files)} files passed {check.tool} on the clean inputs; each of "
+                                     f"{len(failed_by)} mutants fails a file of its own", tuple(passed), caught)

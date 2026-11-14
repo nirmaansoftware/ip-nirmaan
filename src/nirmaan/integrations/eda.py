@@ -44,6 +44,7 @@ from nirmaan.integrations.eda_antecedents import DERIVED, Definitions, definitio
 from nirmaan.integrations.eda_parsers import (
     Diagnostic,
     EdaResult,
+    parse_reproduction,
     parse_sby,
     parse_sby_cover,
     parse_simulation,
@@ -126,6 +127,8 @@ _BOUND: MutableMapping[str, bool] = Registry("eda.bound")
 
 #: Tools whose runs produce a simulation log VeriTriage can investigate.
 SIMULATION_TOOLS = ("simulator.run", "test.run")
+#: M71: where a simulation records the ``expect`` it ran with, for the parser (docs/REPRO_GATES.md).
+SIM_EXPECT = "expect.txt"
 
 
 def register_backend(backend: Backend) -> Backend:
@@ -424,12 +427,19 @@ def _verilator_lint(job: Job) -> list[list[str]]:
     return [["verilator", "--lint-only", "-Wall", *job.top_args("--top-module"), *job.sources]]
 
 
+def _expect(job: Job) -> None:
+    """Record what this simulation's pass means (M71), for the parser; only ``fail`` changes it."""
+    (job.workdir / SIM_EXPECT).write_text(text_value(job.params.get("expect")).strip() or "pass", encoding="utf-8")
+
+
 def _icarus(job: Job) -> list[list[str]]:
+    _expect(job)
     return [["iverilog", "-g2012", "-o", "sim.vvp", "-s", str(job.top), *job.sources],
             ["vvp", "-n", "sim.vvp", NONCE_ARG + new_nonce()]]
 
 
 def _verilator_sim(job: Job) -> list[list[str]]:
+    _expect(job)
     return [["verilator", "--binary", "-Wno-fatal", "-j", "0", "--top-module", str(job.top),
              "-Mdir", "obj", *job.sources],
             [str(job.workdir / "obj" / f"V{job.top}"), NONCE_ARG + new_nonce()]]
@@ -441,6 +451,15 @@ TESTBENCH_ONLY = ("$finish", "$stop", "$exit", "$value$plusargs", "$test$plusarg
                   "DPI")
 _TESTBENCH_ONLY_RE = re.compile(r"(?<![\w$])(?:" + "|".join(re.escape(t) for t in TESTBENCH_ONLY) + r")(?![\w$])")
 _COMMENT_RE = re.compile(r"//[^\n]*|/\*.*?\*/", re.DOTALL)
+
+
+def simulation_problem(job: Job) -> str | None:
+    """Why a simulation cannot run as given: an ``expect`` other than pass or fail (M71), or a design that could
+    stand in for its testbench's verdict (M53)."""
+    expect = text_value(job.params.get("expect")).strip()
+    if expect not in ("", "pass", "fail"):
+        return f"expect must be pass or fail, not {expect!r}; nothing was simulated"
+    return testbench_only_problem(job)
 
 
 def testbench_only_problem(job: Job) -> str | None:
@@ -636,6 +655,9 @@ def _lint_parse(run: RunRecord) -> EdaResult:
 
 
 def _sim_parse(run: RunRecord) -> EdaResult:
+    expect = run.workdir / SIM_EXPECT
+    if expect.is_file() and expect.read_text(encoding="utf-8").strip() == "fail":  # M71: a reproduction
+        return parse_reproduction(run.log, run.returncodes, nonce=run_nonce(run.log) or "")
     return parse_simulation(run.log, run.returncodes, nonce=run_nonce(run.log) or "")
 
 
@@ -654,9 +676,9 @@ def _sby_cover_parse(run: RunRecord) -> EdaResult:
 register_backend(Backend("verilator-lint", "lint.run", ("verilator",), _verilator_lint, _lint_parse))
 for _tool in SIMULATION_TOOLS:
     register_backend(Backend("icarus", _tool, ("iverilog", "vvp"), _icarus, _sim_parse, ("sources", "top"),
-                             check=testbench_only_problem))
+                             check=simulation_problem))
     register_backend(Backend("verilator-sim", _tool, ("verilator",), _verilator_sim, _sim_parse, ("sources", "top"),
-                             check=testbench_only_problem))
+                             check=simulation_problem))
 register_backend(Backend("yosys", "synth.run", ("yosys",), _yosys, _yosys_parse, ("sources", "top")))
 register_backend(Backend("symbiyosys", "formal.run", ("sby", "yosys"), _sby, _sby_parse, ("sby",), _sby_dir,
                          check=_sby_check))
