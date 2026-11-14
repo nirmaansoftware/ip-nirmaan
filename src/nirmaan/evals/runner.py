@@ -219,13 +219,24 @@ def run_case(org: Organization, case: EvalCase, runtime: AgentRuntime | None = N
                     clock=clock)[0]
 
 
+def runtime_cli(runtime: AgentRuntime) -> str | None:
+    """The version of the command-line program a runtime calls its model through, or None when it calls none.
+
+    A runtime's model that has one says so with ``cli_version()`` (the claude-code runtime: ``claude --version``,
+    asked once per seat runtime). It enters the trial's harness fingerprint (``docs/HARNESS.md``).
+    """
+    ask = getattr(getattr(runtime, "llm", None), "cli_version", None)
+    return ask() if callable(ask) else None
+
+
 def evaluate(org: Organization, case: EvalCase, seat_runtime: AgentRuntime, *, replay: bool, repo: Path,
              attempts: int | None = None, sandbox: Path | None = None,
              clock: Callable[[], datetime] | None = None, knowledge: bool = True) -> tuple[EvalResult, TaskEngine]:
     """``run_case`` with the runtime given and the replay flag stated, returning the sandbox engine too (M45).
 
     ``knowledge=False`` (M67, the ablation) seats the runtime with packets that carry no knowledge documents.
-    The result records the harness it ran in (M73): ``harness_sha256`` with this ``attempts`` and ``knowledge``.
+    The result records the harness it ran in (M73): ``harness_sha256`` with this ``attempts`` and ``knowledge``,
+    and the runtime's CLI version (``runtime_cli``), recorded beside it as ``cli``.
     """
     problems = validate_case(org, case, repo)
     if problems:
@@ -240,6 +251,7 @@ def evaluate(org: Organization, case: EvalCase, seat_runtime: AgentRuntime, *, r
                     Actor(role=str(seat.owner), kind=ActorKind.SYSTEM, name=FIXTURE))
     _give_inputs(engine, case, seat, repo, Actor(role=str(seat.owner), kind=ActorKind.SYSTEM, name=FIXTURE))
     tool_runs: list[str] = []
+    cli = runtime_cli(seat_runtime)  # before the seat runs, as the answers' harness is
     try:
         report = run_task(engine, seat.id, seat_runtime, attempts=attempts or case.attempts, knowledge=knowledge)
         detail, used, tool_runs = report.detail, len(report.attempts), list(report.tool_runs)
@@ -267,7 +279,7 @@ def evaluate(org: Organization, case: EvalCase, seat_runtime: AgentRuntime, *, r
                            if e.task == seat.id and e.kind is EvidenceKind.HUMAN_ATTESTATION),
         model_calls=spend.calls, input_tokens=spend.input_tokens, output_tokens=spend.output_tokens,
         cost_usd=None if spend.unknown_cost_calls else spend.cost_usd,
-        harness=harness_sha256(attempts=attempts, knowledge=knowledge),
+        harness=harness_sha256(attempts=attempts, knowledge=knowledge, cli=cli), cli=cli,
     ), engine
 
 

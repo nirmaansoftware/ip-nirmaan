@@ -14,8 +14,10 @@ and grounded, how the eval runner fixes the upstream stages. ``CODE`` names
 those files, and the fingerprint carries the sha256 of each file's bytes.
 
 ``harness_sha256`` is the sha256 of ``fingerprint()``: these settings, the
-code digests and the run's own options (an ``--attempts`` override, and
-whether knowledge documents were given, M67). Every eval trial records it
+code digests and the run's own options (an ``--attempts`` override, whether
+knowledge documents were given, M67, and the version of the command-line
+program the runtime calls the model through: Claude Code's ``claude
+--version`` on the claude-code runtime, None on any other). Every eval trial records it
 (``EvalResult.harness`` and each ``RecordedAnswer.harness``), and the levels
 generator groups trials by skill, model, skill digest and harness: a group
 whose harness is not the current one is stale, and a trial with no harness
@@ -182,16 +184,21 @@ def code_digests() -> dict[str, str]:
     return out
 
 
-def fingerprint(*, attempts: int | None = None, knowledge: bool = True) -> dict[str, Any]:
-    """The harness a trial runs in: every setting, the code digests, and the run's own options."""
+def fingerprint(*, attempts: int | None = None, knowledge: bool = True, cli: str | None = None) -> dict[str, Any]:
+    """The harness a trial runs in: every setting, the code digests, and the run's own options.
+
+    ``cli`` is the version of the command-line program the runtime calls the model through (the claude-code
+    runtime's ``claude --version``), None for a runtime that calls none: a changed CLI is a changed harness.
+    """
     module = globals()
     return {"format": FORMAT, "version": VERSION,
             "settings": {name: _value(module[name]) for name in SETTINGS},
             "code": code_digests(),
-            "run": {"attempts": attempts, "knowledge": knowledge}}
+            "run": {"attempts": attempts, "knowledge": knowledge, "cli": cli}}
 
 
-def harness_sha256(*, attempts: int | None = None, knowledge: bool = True) -> str:
+def harness_sha256(*, attempts: int | None = None, knowledge: bool = True, cli: str | None = None) -> str:
     """sha256 over ``fingerprint()``, as ``sha256:<hex>``. With no options: the current default harness."""
-    text = json.dumps(fingerprint(attempts=attempts, knowledge=knowledge), sort_keys=True, ensure_ascii=True)
+    text = json.dumps(fingerprint(attempts=attempts, knowledge=knowledge, cli=cli), sort_keys=True,
+                      ensure_ascii=True)
     return "sha256:" + hashlib.sha256(text.encode("utf-8")).hexdigest()

@@ -5,7 +5,8 @@ one prompt: company (constitution and standards), domain (the role's skills,
 the VeriTriage Knowledge Packs they cite, and the text of the knowledge
 documents they cite, M61), project (requirement, analysis,
 decisions, and approved upstream artifacts), and task (inputs, evidence
-requirements, permitted tools). Each item says where it came from.
+requirements, permitted tools, and the definitions of the tools the platform
+runs over the task's files). Each item says where it came from.
 
 The packet is typed (M39): frozen models all the way down, so a renderer reads
 attributes the type checker knows, never keys of an untyped dict.
@@ -23,6 +24,7 @@ from nirmaan.models import (
     MemoryEntry,
     MemoryScope,
     TaskStatus,
+    ToolSpec,
 )
 from nirmaan.org.knowledge import cited, over_domain_cap, read_document
 from nirmaan.runtime import harness
@@ -188,6 +190,9 @@ class TaskScope(_View):
     attempts: tuple[AttemptView, ...]
     reviews: tuple[ReviewView, ...]
     ready: bool
+    #: The definitions of the tools the platform runs over files for this task's evidence requirements, so the
+    #: prompt states each one's input contract from the tool's own parameters.
+    gates: tuple[ToolSpec, ...] = ()
 
 
 class WorkPacket(_View):
@@ -296,6 +301,7 @@ def assemble(engine: TaskEngine, task_id: str, role: str | None = None, *, knowl
         or (m.scope is MemoryScope.TEAM and task.unit and org.is_within(task.unit, m.owner))
     )
     analysis = state.project.analysis
+    gated = dict.fromkeys(tool for req in task.evidence_requirements if req.files for tool in req.tools)
     return WorkPacket(
         task_id=task_id,
         role=card,
@@ -336,6 +342,7 @@ def assemble(engine: TaskEngine, task_id: str, role: str | None = None, *, knowl
             reviews=tuple(ReviewView(id=r.id, reviewer=r.reviewer, verdict=r.verdict.value, comments=r.comments)
                           for r in state.reviews.values() if r.task == task_id),
             ready=task.status in (TaskStatus.READY, TaskStatus.IN_PROGRESS, TaskStatus.CHANGES_REQUESTED),
+            gates=tuple(org.tools[tool] for tool in gated if tool in org.tools),
         ),
         tools=card.tools,
         memory=memory,

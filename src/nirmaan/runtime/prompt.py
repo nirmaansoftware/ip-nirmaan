@@ -17,6 +17,11 @@ digest still matches; a task that works only from approved inputs never sees
 an unapproved one. Rendering goes through the bridge, so the text shown by
 ``nirmaan run --dry-run`` is exactly the text a provider receives.
 
+A work prompt states the input contract of every tool the platform runs over
+the seat's files: each parameter a requirement fills, whether it takes one
+path or a list, and which file kinds fill it, generated from the tool's own
+definition and the requirement's file bindings, never written per case.
+
 The system prompts, the section order and the repair text are harness
 settings (M73, :mod:`nirmaan.runtime.harness`).
 """
@@ -27,6 +32,7 @@ import re
 from dataclasses import dataclass
 
 from nirmaan.applicability import describe
+from nirmaan.models import EvidenceRequirement, FileInput, ParamKind, ToolSpec
 from nirmaan.runtime import harness
 from nirmaan.runtime.context import ArtifactView, AttemptView, ReviewView, WorkPacket
 
@@ -154,8 +160,57 @@ def _content(art: ArtifactView, label: str) -> list[str]:
     return []
 
 
+#: How a parameter of each kind takes its value, in the words of the input contract.
+_TAKES = {ParamKind.PATH: "one path", ParamKind.PATHS: "a list of paths", ParamKind.TEXT: "one value",
+          ParamKind.INTEGER: "one whole number", ParamKind.NUMBER: "one number"}
+
+
+def _source(binding: FileInput) -> str:
+    kinds = ", ".join(binding.kinds)
+    if binding.entry:
+        return f'the "entry" your first {kinds} file declares'
+    if binding.upstream:
+        return f"the approved upstream {kinds} files" + (", when one exists" if binding.optional else "")
+    if binding.each:
+        return f"each of your {kinds} files on its own, one run per file"
+    return f"your {kinds} files"
+
+
+def _contract(tool: str, spec: ToolSpec | None, req: EvidenceRequirement) -> str:
+    """The input contract of a tool the platform runs over files: from its definition and the requirement's bindings."""
+    if spec is None or spec.params is None:
+        return f"Input contract of {tool}: it declares no parameters, so the platform passes the files as given"
+    bindings: dict[str, list[FileInput]] = {}
+    for binding in req.files:
+        bindings.setdefault(binding.param, []).append(binding)
+    parts = []
+    for param, filled in bindings.items():
+        declared = spec.param(param)
+        if declared is None:
+            parts.append(f"Parameter {param} is not one {tool} declares; the platform fills it from "
+                         f"{' and '.join(_source(b) for b in filled)}.")
+            continue
+        text = f"Parameter {param} takes {_TAKES[declared.kind]}{', required' if declared.required else ''}"
+        if declared.description:
+            text += f": {declared.description.rstrip('.')}"
+        text += f". The platform fills it from {' and '.join(_source(b) for b in filled)}"
+        counted = [b for b in filled if not (b.entry or b.each)]
+        if declared.kind is not ParamKind.PATHS and counted:
+            kinds = " or ".join(dict.fromkeys(k for b in counted for k in b.kinds))
+            one = (f"submit exactly one {kinds} file" if not any(b.upstream for b in counted)
+                   else f"exactly one {kinds} file in all")
+            text += (f", so {one}: two or more make a list, and {tool} refuses the run "
+                     f"({param} takes one {'path' if declared.kind is ParamKind.PATH else 'value'}, not a list)")
+        parts.append(text + ".")
+    if req.params:
+        parts.append(f"Set by the platform: {', '.join(f'{k}={v}' for k, v in req.params)}.")
+    return f"Input contract of {tool}, from its definition: {' '.join(parts)}"
+
+
 def _task(packet: WorkPacket, mode: str, cites: list[Citable], tools: tuple[ToolNote, ...]) -> tuple[str, ...]:
     t = packet.task
+    gates = {spec.id: spec for spec in t.gates}
+    contracts: set[str] = set()
     token = {c.target: c.token for c in cites}
     lines = [f"Task {t.id}: {t.title} ({t.kind}, {t.status})",
              f"Your seat: {packet.role.name} ({packet.role.role})"]
@@ -184,6 +239,12 @@ def _task(packet: WorkPacket, mode: str, cites: list[Citable], tools: tuple[Tool
             tools_named += f"; {said}"
         accepts = ", ".join(k.value for k in req.accepts)
         lines.append(f"Evidence requirement: {req.description} (accepts: {accepts}{tools_named})")
+        if mode == "work" and req.files:  # what the seat submits must fit each gate tool's inputs
+            for tool in req.tools:
+                contract = _contract(tool, gates.get(tool), req)
+                if contract not in contracts:
+                    contracts.add(contract)
+                    lines.append(contract)
     lines.append(f"Permitted tools: {', '.join(packet.tools) or 'none'}")
     for art in t.upstream_artifacts:
         if t.approved_inputs and not art.trusted:
