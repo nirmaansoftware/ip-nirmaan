@@ -127,6 +127,7 @@ new number. M1 to M42 are taken; see `docs/history/README.md`.
 | M72 | Python testbenches through cocotb: simulator.run's cocotb backend | reserved |
 | M73 | The harness in one place, and its fingerprint on every trial | reserved |
 | M77 | Verification in five departments (wave 2, W2-O1); number reserved after the branch was cut | reserved |
+| M78 | Signoff gates independent of the producing department (G13 record, decision 2c) | reserved |
 
 <!-- review:milestone-numbers:end -->
 

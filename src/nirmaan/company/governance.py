@@ -101,6 +101,13 @@ GATES: list[GateSpec] = [
              approver_capability="signoff.release", min_level=Level.VP, human_required=True),
 ]
 
+#: Signoff gates whose approver may not be a producer of the gated work, nor the head of a team or department
+#: below the division that holds a producer (M78; council record 2026-11-14-g13, decision 2c). The approver is
+#: then the first holder further up the producer's chain: the division's VP. ``gate.rtl`` is not listed: only
+#: the RTL department's own director holds ``signoff.rtl`` at the authority its high-criticality gates need,
+#: so it would have no approver (docs/HIERARCHY_FIXES.md section 6).
+INDEPENDENT_GATES: tuple[str, ...] = ("gate.verification", "gate.implementation")
+
 B, W = Enforcement.BLOCK, Enforcement.WARN
 CONSTITUTION: list[Principle] = [
     Principle(id="P1", title="Traceability", enforcement=B, checks=("traceable-to-requirement",),

@@ -151,9 +151,8 @@ INTENDED = {
     # stream spans two Debug and Regression teams and their director leads it.
     ("ws.debug", "owner", "verification.debug.analysis.manager", "verification.debug.director"),
     ("ws.debug", "unit", "verification.debug.analysis", "verification.debug"),
-    # The coverage gate goes to the first approver in the coverage owner's chain: now the Simulation director.
-    *{("coverage.gate", field, "verification.vp", "verification.dynamic.director") for field in ("owner", "approver")},
-    ("coverage.gate", "unit", "verification", "verification.dynamic"),
+    # The coverage gate stays with the VP: the Simulation director heads the department that produced the coverage,
+    # so may not approve it (M78, tests/test_independent_gates.py).
 }
 
 BLOCK_VERIFICATION = (PLAIN, SV, RANDOM, UNBOUNDED, EVERYTHING)

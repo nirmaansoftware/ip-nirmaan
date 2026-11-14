@@ -126,8 +126,7 @@ other verification teams); proof plus equivalence work is led by the Formal
 and Static director, and equivalence work is approved by its own tech lead;
 on a regression investigation asked for a reproduction (M71), the debug work
 stream spans the Debug Analysis and Triage teams, so the Debug and Regression
-director leads it; the coverage gate is approved by the Simulation director;
-and a department director joins each verification escalation path below the
+director leads it; and a department director joins each verification escalation path below the
 VP. The site hero's role titles do not change.
 
 Activation (M77). Four of the departments (Methodology and Signoff,
@@ -141,7 +140,72 @@ frozen list changes by renames only (205 ids, through `MOVES`): the
 departments are not added, and `verification.formal` and `verification.debug`,
 reused for departments, left it, their M60 units now listed as
 `verification.formal.proof` and `verification.debug.analysis`
-(`docs/ORG_SPAN_RULE.md` section 4). The coverage gate's move from the VP to
-the Simulation director stays, pinned in `INTENDED`; routing verification
-signoff so its approver is never the head of the department that produced the
-evidence is a separate wave 2 pull request (record decision 2c).
+(`docs/ORG_SPAN_RULE.md` section 4). The cut first moved the coverage gate
+from the VP to the Simulation director, pinned in `INTENDED`; M78 (section 6)
+routes it back to the VP, so that move is no longer in `INTENDED`.
+
+## 6. Signoff gates independent of the producing department (M78)
+
+Council record `council/records/2026-11-14-g13-grouping-units.md`, decision
+2c, gate owner verification-lead: the approver of a `gate.verification` task
+is never the head of the department whose unit produced the evidence. After
+the cut, five of the twelve `gate.verification` tasks in the representative
+requests (the coverage gates of `parameter-change` and `feature-addition`)
+went to the Simulation director, whose department's coverage team produced
+the coverage.
+
+**The approver: the VP, not Methodology and Signoff.** Verification-lead's
+choice, which the record leaves to this pull request. The reasons, from the
+plans of every representative request:
+
+1. On the other seven `gate.verification` tasks (the `verification-signoff`
+   gate of `new-ip` and the `closure-report` gate of `signoff-preparation`)
+   the evidence is produced by
+   Methodology and Signoff itself: the stage owner is
+   `verification.methodology.signoff.staff`. Routing the gate to the
+   Methodology and Signoff director would break the record's constraint on
+   those seven to fix it on the other five.
+2. Those seven are critical, and approving a critical gate needs VP level in
+   the authority matrix (`APPROVE_GATE`, `src/nirmaan/company/governance.py`).
+   The Methodology and Signoff director, a director, could not approve them
+   anyway.
+3. The VP heads the division, not a department, and was the approver of all
+   twelve before the cut, so the coverage gate returns to the routing the plan
+   had. The rule names no unit: the router excludes the producing roles and
+   their heads and takes the next holder up the producer's chain, which is the
+   VP for every Verification department.
+
+**The rule, as data.** `INDEPENDENT_GATES` in
+`src/nirmaan/company/governance.py` lists the gates it covers, carried by the
+company definition (`CompanyDefinition.independent_gates`; validation reports
+an unknown gate id). On those gates `Router.gate_approver` drops every
+candidate in `Organization.own_heads` of a producer: the producer itself and
+the head of each unit below the division that holds it (its team's manager
+and its department's director; the division's VP is not one). Teams are
+included because a team manager approving their own team's evidence is the
+same conflict one level lower; no plan routes a gate to a team manager today,
+so including them moves nothing. When only dependent holders remain, the gate
+is planned blocked with the staffing reason, never routed back to them. The
+`GateSpec` of every gate is unchanged: `gate.verification` still needs a
+DIRECTOR or above holding `signoff.verification`, with `human_required`.
+
+**Which gates.** `gate.verification`, and `gate.implementation`, the other
+signoff gate whose evidence a department produces: its timing signoff tasks
+went to the Physical Design director, head of the department that produced
+the timing evidence, and now go to the Implementation VP. `gate.rtl` is not
+listed: only the RTL department's own director holds `signoff.rtl` at the
+authority its high-criticality gates need, so under the rule every RTL gate
+would be planned blocked (a test pins that). Giving it an independent approver
+is a change to the Design organization, left to a later pull request. The
+architecture, requirements and release gates are approved by executives
+outside the producing departments already.
+
+**What moves.** `tests/test_independent_gates.py` plans every representative
+request with the rule and without it and allows only these changes, each of
+the gate task's owner, approver and unit: the coverage gate (5 tasks) from
+the Simulation director to the Verification VP, and the `sta`, `sta-signoff`
+and `reanalysis` gates (8 tasks) from the Physical Design director to the
+Implementation VP. Every other task plans as before. The must-fail tests:
+planned without the rule, the check finds the Simulation director approving
+coverage evidence and the Physical Design director approving timing evidence;
+and with `gate.rtl` added, the RTL gate is blocked, not self-approved.
