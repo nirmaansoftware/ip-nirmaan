@@ -8,7 +8,8 @@ fails when the committed file differs from what the records give.
 * **Knowledge**: the skill's document ``knowledge/<division>/<skill_id>.md``
   exists and passes the M62 checks, and a check record ``capability/records/knowledge/<skill_id>.json``
   names it by its current sha256, with a checker who is not the writer and the
-  sources the checker read. A document changed since its check is stale.
+  sources the checker read, and in a record checked from 2026-11-15 its ``gate_claims``.
+  A document changed since its check is stale.
 * **Practised**: committed, tool-judged eval result records under
   ``evals/results/`` (M45, M58), counted per model, per skill digest (card
   plus document) and per harness (M73, ``docs/HARNESS.md``). Only a case's own ``skills`` get credit. A group counts when
@@ -40,6 +41,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from collections import defaultdict
 from enum import Enum
 from pathlib import Path
@@ -62,6 +64,8 @@ CHECKS = Path("capability") / "records" / "knowledge"
 RESULTS = Path("evals") / "results"
 REJUDGE = "rejudge.json"
 REJUDGE_FORMAT = "nirmaan.eval-rejudge"
+GATE_CLAIMS_FROM = "2026-11-15"  # a check record dated on or after this day carries ``gate_claims``
+_GATE_EVIDENCE = re.compile(r"^(\S+:\d+|\S+::\S+|unverified)$")  # path:line, a test id, or "unverified"
 MIN_TRIALS = 5
 MIN_LOWER = 0.5
 
@@ -81,6 +85,32 @@ def _rel(path: Path, repo: Path) -> str:
 
 
 # --- Knowledge -------------------------------------------------------------------------------
+
+
+def _gate_claim_problems(data: dict[str, Any]) -> list[str]:
+    """Problems with a check record's ``gate_claims`` (council 2026-11-14, decision 3).
+
+    Required when ``checked_at`` is on or after ``GATE_CLAIMS_FROM``; a record before that day
+    may omit it (it counts as not checked for gate claims) and, when it carries one, is held
+    to the same shape.
+    """
+    claims = data.get("gate_claims")
+    if claims is None:
+        checked = data.get("checked_at")
+        if isinstance(checked, str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", checked) and checked < GATE_CLAIMS_FROM:
+            return []
+        return [f"the check record has no gate_claims (required for a record checked on or after {GATE_CLAIMS_FROM})"]
+    if not isinstance(claims, list) or not claims:
+        return ["gate_claims must be a non-empty list"]
+    problems: list[str] = []
+    for i, item in enumerate(claims, 1):
+        claim = item.get("claim") if isinstance(item, dict) else None
+        evidence = item.get("evidence") if isinstance(item, dict) else None
+        if not isinstance(claim, str) or not claim.strip():
+            problems.append(f"gate_claims[{i}] has no claim")
+        if not isinstance(evidence, str) or not _GATE_EVIDENCE.match(evidence):
+            problems.append(f"gate_claims[{i}] evidence must be path:line, a test id (path::name) or unverified")
+    return problems
 
 
 def knowledge(org: Organization, skill_id: str, repo: Path) -> dict[str, Any] | None:
@@ -118,6 +148,7 @@ def knowledge(org: Organization, skill_id: str, repo: Path) -> dict[str, Any] | 
             problems.append("the check record lists no source the checker read")
         if docs and data.get("document_sha256") != _sha256(docs[0]):
             problems.append("stale: the document changed after its check")
+        problems += _gate_claim_problems(data)
     entry["counts"] = not problems
     entry["problems"] = problems
     return entry
