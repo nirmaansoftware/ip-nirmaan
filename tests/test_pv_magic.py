@@ -153,7 +153,10 @@ TOP_FIFO = "sync_fifo"
 
 
 def run_count(tmp_path: Path, comparison: str, final: str) -> str:
-    """Nirmaan's count script over a captured Netgen JSON, beside a report holding Netgen's final line."""
+    """Nirmaan's count script over a captured Netgen JSON, beside a report holding Netgen's final line.
+
+    The JSON files are Netgen's, from CI run 43602071471 (clean and rewired), reserialised without whitespace.
+    """
     (tmp_path / "lvs.json").write_text((PD / "netgen" / comparison).read_text(encoding="utf-8"), encoding="utf-8")
     (tmp_path / "lvs.report").write_text(f"{final}\n", encoding="utf-8")
     (tmp_path / "lvs_count.py").write_text(pv_magic.LVS_COUNT_SCRIPT, encoding="utf-8")

@@ -125,7 +125,7 @@ redistributed. That sentence is flagged for the owners in the pull request.
 ## 5. Results
 
 From the pull request's own runs of `pd-sky130` (run 43602071471, head
-294435a, captured in `tests/fixtures/pd/magic_netgen_pv*.log` and
+294435a; excerpts of the logs in `tests/fixtures/pd/magic_netgen_pv*.log` and Netgen's JSON in
 `tests/fixtures/pd/netgen/`):
 
 | Run | Result |
