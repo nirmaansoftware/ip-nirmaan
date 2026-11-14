@@ -183,7 +183,7 @@ LOOP = {
     "fixer_forbidden": [
         ".github/**", ".claude/**", "CLAUDE.md", "council/**",
         "scripts/check_*.py", "scripts/live_eval_gate.py", "scripts/pr_review.py", "scripts/review_map.py", "scripts/pr_loop.py",
-        "tests/test_pr_review.py", "tests/test_pr_loop.py", "tests/test_review_teams.py", "tests/fixtures/pr_review/**", "tests/fixtures/pr_loop/**",
+        "scripts/loop_cloud.py", "tests/test_pr_review.py", "tests/test_pr_loop.py", "tests/test_review_teams.py", "tests/test_loop_cloud.py", "tests/fixtures/pr_review/**", "tests/fixtures/pr_loop/**",
         "docs/REVIEW_MECHANISM.md", "docs/pr-loop.plist", "pyproject.toml", ".gitignore", ".gitattributes",
     ],
     # Checks the loop runs on the fix commit, in the worktree, with the
@@ -199,7 +199,7 @@ LOOP = {
 }
 
 FIXER_TOOLS = "Read,Grep,Glob,Edit,Write"
-FIXER_DENIED = "Bash,NotebookEdit,WebFetch,WebSearch,Task,Agent"
+FIXER_DENIED = f"Bash,NotebookEdit,WebFetch,WebSearch,Task,Agent,{pr_review.PROC_DENIED}"
 FIXER_SCHEMA = {
     "type": "object",
     "additionalProperties": False,
@@ -1215,6 +1215,12 @@ class Loop:
 
         name, email = self._identity(head)
         _git(wt, "add", "-A")
+        # Nothing in a credential format leaves in a fix (the repository is public).
+        added = "\n".join(line[1:] for line in _git(wt, "diff", "--cached", "--no-color", "--no-ext-diff", "--no-textconv", "--unified=0").splitlines()
+                          if line.startswith("+") and not line.startswith("+++"))
+        if any(p.search(added) for p in pr_review.SECRET_PATTERNS):
+            return self._stop(ctx, head, f"fix round {rnd}: the fixer's change holds text in a credential format. "
+                              "Its changes were discarded and nothing was pushed")
         addressed = [f for f in findings if f["id"] in fo["addressed"]]
         message = "\n".join([
             f"Fix round {rnd}: address review findings on {head[:7]}", "",
@@ -1313,6 +1319,21 @@ def differs_from_main(repo_root) -> list[str]:
     return differ
 
 
+def github_client(repo: str, no_post: bool, env=None):
+    """(GitHub, post mode): --no-post reads with the gh login; an installation
+    token already minted (pr_review.APP_TOKEN_ENV, GitHub Actions) or the App's
+    key posts as the App; neither is a dry run with the gh login."""
+    env = os.environ if env is None else env
+    if no_post:
+        return pr_review.GitHub(repo, pr_review._gh_token()), "none"
+    if env.get(pr_review.APP_TOKEN_ENV):
+        return pr_review.GitHub(repo, env[pr_review.APP_TOKEN_ENV]), "app"
+    app = pr_review.app_config(env)
+    if app:
+        return pr_review.GitHub(repo, pr_review.installation_token(app, repo)), "app"
+    return pr_review.GitHub(repo, pr_review._gh_token()), "dry-run"
+
+
 def main(argv: list[str]) -> int:
     watch, once = "--watch" in argv, "--once" in argv
     if watch == once:
@@ -1332,13 +1353,7 @@ def main(argv: list[str]) -> int:
         caller_branch = None
     while True:
         try:
-            app = pr_review.app_config()
-            if no_post:
-                github, post = pr_review.GitHub(cfg["repo"], pr_review._gh_token()), "none"
-            elif app:
-                github, post = pr_review.GitHub(cfg["repo"], pr_review.installation_token(app, cfg["repo"])), "app"
-            else:
-                github, post = pr_review.GitHub(cfg["repo"], pr_review._gh_token()), "dry-run"
+            github, post = github_client(cfg["repo"], no_post)
         except (OSError, subprocess.CalledProcessError, ValueError) as exc:
             print(f"pr-loop: could not get a GitHub token: {exc}", file=sys.stderr)
             return 2
