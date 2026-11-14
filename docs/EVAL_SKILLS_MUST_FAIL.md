@@ -480,10 +480,11 @@ their own checks on the approved RTL and miss the bounds:
 | `irq_ctrl_no_ack_tb.sv` | acknowledge through `CLAIM` or write `PENDING` |
 | `irq_ctrl_no_mask_tb.sv` | mask a source or write `MODE` |
 
-The coverage seat's own gate refuses all three before review (tested), so the
-scorer's bounds are the second look: they let a coverage case be judged the
-same way when the testbench reaches it by another route, and the tests run the
-scorer directly on each (`tests/test_dv_coverage_irq_ctrl.py`).
+The coverage seat's own gate refuses the idle testbench before review (tested
+at the gate). The other two reach only the scorer in the tests, never the
+gate. The scorer's bounds are the second look: they let a coverage case be
+judged the same way when the testbench reaches it by another route, and the
+tests run the scorer directly on each (`tests/test_dv_coverage_irq_ctrl.py`).
 
 ## 5. The six shipped cases
 
