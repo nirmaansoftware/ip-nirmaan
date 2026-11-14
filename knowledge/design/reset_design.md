@@ -104,8 +104,7 @@ The sources disagree, so the document records both and the reason each gives.
   src/nirmaan/integrations/eda.py:427-428; src/nirmaan/integrations/eda_parsers.py:92-103).
   SYNCASYNCNET, the mixed-reset warning, belongs to the style group that
   `-Wall` enables [VLW], so a block that uses one net both ways fails
-  `lint.run` (inference from the gate lines and [VLW]; not confirmed by a
-  recorded tool run). That the lint gate
+  `lint.run` (inference from the gate lines and [VLW]). That the lint gate
   accepts a style is not a statement that the style is right.
 - No gate in the repository checks reset sequencing or release timing; the
   card's "documented and checked" is a review matter (inference; no reset
