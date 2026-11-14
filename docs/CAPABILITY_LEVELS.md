@@ -10,7 +10,7 @@ is also stated here in full, and the thresholds are this milestone's own.
 
 | Level | Only from |
 |---|---|
-| Knowledge | the document `knowledge/<division>/<skill_id>.md`, passing the M62 checks (`docs/KNOWLEDGE_FILES.md`), and a check record `capability/records/knowledge/<skill_id>.json` by a different session, naming the document's current sha256 and the sources read |
+| Knowledge | the document `knowledge/<division>/<skill_id>.md`, passing the M62 checks (`docs/KNOWLEDGE_FILES.md`), and a check record `capability/records/knowledge/<skill_id>.json` by a different session, naming the document's current sha256 and the sources read, and, in a record checked from 2026-11-15, its `gate_claims` (`capability/records/knowledge/README.md`) |
 | Practised | committed, tool-judged eval result records under `evals/results/` (M45, M58) |
 | Proven | the product's own seat run records on delivered work that passed review; no such record kind exists yet, so no skill is Proven |
 
@@ -60,9 +60,9 @@ group counts when all hold:
   gives 0.376);
 - every trial re-judged clean: `rejudge.json` in the record, written by
   `nirmaan eval rejudge <record> --write`, says `same` for it;
-- for a skill of the design or verification domain (`MUST_FAIL_DOMAINS`, data in
-  `src/nirmaan/company/evidence.py`), every case it rests on has
-  a must-fail control (a held-out check with `mutants`, M58);
+- for a skill of the design, verification or protocols domain
+  (`MUST_FAIL_DOMAINS`, data in `src/nirmaan/company/evidence.py`), every case
+  it rests on has a must-fail control (a held-out check with `mutants`, M58);
 - the group's digest is the skill's current digest. A changed card or
   document, including a knowledge document added later, makes the group stale;
 - the group's harness is the current default harness at the group's CLI
@@ -82,10 +82,10 @@ Each group in `capability/levels.json` lists its records, cases, counts
 differs from what the records give. `tests/test_capability_levels.py` runs the
 check, so a record committed without regenerating the file fails CI.
 
-On main the file reports eight Knowledge (`apb`, `arbitration`, `axi`,
-`buffering_flow_control`, `control_logic_design`, `fsm_design`,
-`pipeline_design` and `rtl_design`, each from its check record under
-`capability/records/knowledge/`), zero Practised and zero Proven: no result
+A record whose document changed after its check is stale and counts for
+nothing until the document is checked again. On main the file reports as
+Knowledge each skill with a current check record under
+`capability/records/knowledge/`, zero Practised and zero Proven: no result
 record is committed.
 
 ## Tests

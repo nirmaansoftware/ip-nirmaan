@@ -23,6 +23,7 @@ from pathlib import Path
 import pytest
 
 from nirmaan.company import build_organization
+from nirmaan.company.evidence import MUST_FAIL_DOMAINS
 from nirmaan.evals import skill_digest
 from nirmaan.evals.levels import (CHECKS, KNOWLEDGE_CHECK_FORMAT, LEVELS, REJUDGE, REJUDGE_FORMAT, compute,
                                   render)
@@ -34,6 +35,8 @@ from nirmaan.runtime.harness import harness_sha256
 
 ROOT = Path(__file__).resolve().parent.parent
 SKILL = "rtl_design"
+#: A skill of the protocols domain (the pilot's apb cases).
+PROTOCOL = "apb"
 OTHER = "systemverilog"
 MODEL = "claude-opus-5-5"
 AT = datetime(2026, 10, 19, 12, 0, tzinfo=timezone.utc)
@@ -46,13 +49,14 @@ def org():
     return build_organization()
 
 
-def _case(repo: Path, *, must_fail: bool = True, scorer: str = "held-out-run", case_id: str = "rtl/fixture") -> str:
+def _case(repo: Path, *, must_fail: bool = True, scorer: str = "held-out-run", case_id: str = "rtl/fixture",
+          skill: str = SKILL) -> str:
     check = {"name": "reference testbench", "scorer": scorer, "tool": "simulator.run",
              "seat_files": {"sources": ["rtl_source"]}, "case_files": {"sources": ["tb.v"]}}
     if must_fail:
         check["mutants"] = {"tb.v": ["tb_mutant.v"]}
     case = {"id": case_id, "request": "Create a parameterizable synchronous FIFO.", "seat": "rtl-implementation",
-            "skills": [SKILL], "held_out": [check]}
+            "skills": [skill], "held_out": [check]}
     path = repo / "evals" / f"{case_id.replace('/', '_')}.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(case), encoding="utf-8")
@@ -63,7 +67,8 @@ def _record(org, repo: Path, outcomes: list[bool], *, name: str = "run1", case_i
             replay: bool = False, attest: bool = False, rejudge: bool | None = True,
             digest: str | None = None, judged: bool = True, knowledge: str = "on",
             trial_knowledge: str | None = None, harness_digest=CURRENT,
-            answer_harness=CURRENT, blocked: frozenset[int] = frozenset(), cli: str | None = None) -> Path:
+            answer_harness=CURRENT, blocked: frozenset[int] = frozenset(), cli: str | None = None,
+            skill: str = SKILL) -> Path:
     record = repo / "evals" / "results" / name
     record.mkdir(parents=True)
     manifest = EvalRunManifest(id=name, runtime="claude-code", model=MODEL, replay=replay, nirmaan_version="t",
@@ -72,7 +77,7 @@ def _record(org, repo: Path, outcomes: list[bool], *, name: str = "run1", case_i
     (record / MANIFEST).write_text(manifest.model_dump_json(), encoding="utf-8")
     trial_knowledge = trial_knowledge or knowledge
     # As record_run writes it (M67): with knowledge off, the digest of the card alone.
-    digest = digest or skill_digest(org, SKILL, repo, knowledge=trial_knowledge == "on")
+    digest = digest or skill_digest(org, skill, repo, knowledge=trial_knowledge == "on")
     # M73: as record_run writes it, on the result and on every answer.
     if harness_digest is CURRENT:
         harness_digest = harness_sha256(knowledge=trial_knowledge == "on", cli=cli)
@@ -92,7 +97,7 @@ def _record(org, repo: Path, outcomes: list[bool], *, name: str = "run1", case_i
         runs = (JudgeRun(check="reference testbench", run=f"run-{number}", tool="simulator.run",
                          succeeded=passed),) if judged and not stopped else ()
         trial = EvalTrial(record=name, trial=number, stage="rtl-implementation", model=MODEL,
-                          skills={SKILL: digest}, knowledge=trial_knowledge, result=result, judge_runs=runs,
+                          skills={skill: digest}, knowledge=trial_knowledge, result=result, judge_runs=runs,
                           answers=(RecordedAnswer(mode="work", model=MODEL, prompt_sha256="p", packet_sha256="k",
                                                   harness=answer_harness),))
         path = trial_path(record, case_id, number)
@@ -116,9 +121,12 @@ def _level(org, repo: Path, skill: str = SKILL):
 def test_on_main_nothing_is_practised_or_proven_and_the_file_says_so(org):
     levels = compute(org, ROOT)
     assert levels["totals"]["practised"] == 0 and levels["totals"]["proven"] == 0
-    # Knowledge comes only from committed check records, and every committed record counts.
+    # Knowledge comes only from committed check records, and every committed record counts, except a
+    # record whose document was corrected after its check: that one is stale until it is re-checked.
     at_knowledge = {s for s, v in levels["skills"].items() if v["level"] == "knowledge"}
-    assert at_knowledge == {p.stem for p in (ROOT / CHECKS).glob("*.json")}
+    stale = {s for s, v in levels["skills"].items()
+             if "stale: the document changed after its check" in v.get("knowledge", {}).get("problems", [])}
+    assert at_knowledge == {p.stem for p in (ROOT / CHECKS).glob("*.json")} - stale
     assert (ROOT / LEVELS).read_text(encoding="utf-8") == render(levels)
 
 
@@ -175,6 +183,20 @@ def test_a_design_skill_without_a_must_fail_control_is_not_practised(org, tmp_pa
     _record(org, tmp_path, [True] * 5)
     entry = _level(org, tmp_path)
     assert entry["level"] is None and any("no must-fail control" in r for r in entry["practised"][0]["reasons"])
+
+
+@pytest.mark.parametrize("must_fail", [True, False])
+def test_a_protocols_skill_needs_a_must_fail_control_to_be_practised(org, tmp_path, must_fail):
+    # Pilot retrospective, decision 11: protocols joins the design and verification domains.
+    assert "protocols" in MUST_FAIL_DOMAINS and org.skills[PROTOCOL].domain == "protocols"
+    _case(tmp_path, must_fail=must_fail, skill=PROTOCOL)
+    _record(org, tmp_path, [True] * 5, skill=PROTOCOL)
+    entry = _level(org, tmp_path, PROTOCOL)
+    if must_fail:
+        assert entry["level"] == "practised", entry
+    else:
+        assert entry["level"] is None and any("no must-fail control" in r
+                                              for r in entry["practised"][0]["reasons"])
 
 
 def test_a_changed_skill_card_makes_the_level_stale(org, tmp_path):
@@ -402,7 +424,9 @@ def _check(repo: Path, doc: Path, **override) -> None:
     data = {"format": KNOWLEDGE_CHECK_FORMAT, "skill": "c_programming",
             "knowledge_document": "knowledge/software/c_programming.md",
             "document_sha256": "sha256:" + hashlib.sha256(doc.read_bytes()).hexdigest(),
-            "writer": "session a", "checker": "session b", "sources_read": ["SEI CERT C"], **override}
+            "writer": "session a", "checker": "session b", "sources_read": ["SEI CERT C"],
+            "checked_at": "2026-11-15", "gate_claims": [{"claim": "no tool named", "evidence": "unverified"}],
+            **override}
     path = repo / "capability" / "records" / "knowledge" / "c_programming.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data), encoding="utf-8")
@@ -413,6 +437,54 @@ def test_a_checked_document_is_knowledge(org, tmp_path):
     _check(tmp_path, doc)
     entry = _level(org, tmp_path, "c_programming")
     assert entry["level"] == "knowledge" and entry["knowledge"]["check_record"].endswith("c_programming.json")
+
+
+def _without(repo: Path, doc: Path, key: str, **override) -> None:
+    _check(repo, doc, **override)
+    path = repo / "capability" / "records" / "knowledge" / "c_programming.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    del data[key]
+    path.write_text(json.dumps(data), encoding="utf-8")
+
+
+def test_a_new_check_record_needs_gate_claims(org, tmp_path):
+    doc = _document(tmp_path)
+    _without(tmp_path, doc, "gate_claims")
+    entry = _level(org, tmp_path, "c_programming")
+    assert entry["level"] is None and any("no gate_claims" in p for p in entry["knowledge"]["problems"])
+
+
+def test_a_record_with_no_date_needs_gate_claims(org, tmp_path):
+    doc = _document(tmp_path)
+    _without(tmp_path, doc, "gate_claims")
+    path = tmp_path / "capability" / "records" / "knowledge" / "c_programming.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    del data["checked_at"]
+    path.write_text(json.dumps(data), encoding="utf-8")
+    assert _level(org, tmp_path, "c_programming")["level"] is None
+
+
+def test_an_older_check_record_stays_valid_without_gate_claims(org, tmp_path):
+    doc = _document(tmp_path)
+    _without(tmp_path, doc, "gate_claims", checked_at="2026-11-13")
+    assert _level(org, tmp_path, "c_programming")["level"] == "knowledge"
+
+
+@pytest.mark.parametrize("claims", [
+    [], "none", [{"claim": "x"}], [{"evidence": "unverified"}], [{"claim": "x", "evidence": "see the gate"}],
+    [{"claim": "x", "evidence": "src/a.py"}],
+])
+def test_bad_gate_claims_are_no_level(org, tmp_path, claims):
+    doc = _document(tmp_path)
+    _check(tmp_path, doc, gate_claims=claims)
+    assert _level(org, tmp_path, "c_programming")["level"] is None
+
+
+@pytest.mark.parametrize("evidence", ["src/nirmaan/runtime/model.py:120", "tests/test_x.py::test_y", "unverified"])
+def test_gate_claims_accept_a_line_a_test_id_or_unverified(org, tmp_path, evidence):
+    doc = _document(tmp_path)
+    _check(tmp_path, doc, gate_claims=[{"claim": "mode prove only", "evidence": evidence}])
+    assert _level(org, tmp_path, "c_programming")["level"] == "knowledge"
 
 
 def test_a_document_without_a_check_record_is_no_level(org, tmp_path):
