@@ -213,7 +213,7 @@ verification.processor (placeholder, no skill). Seat: verification-lead.
 | Planning, methodology and signoff | P | verification_planning, verification_architecture, verification_signoff, traceability | verification.methodology.planning, verification.methodology.architecture, verification.methodology.signoff, quality.reviews.verification_signoff | vplan.check runs against specification tags |
 | Directed and self-checking testbenches | P | directed_testing, systemverilog | verification.dynamic.testbench.systemverilog, verification.dynamic.testbench.testing | Icarus and Verilator run; the RTL evals hold must-fail testbench checks but credit rtl_design |
 | UVM and constrained random | K | uvm, constrained_random, vip_integration | verification.dynamic.testbench.uvm, verification.dynamic.testbench.vip | No simulator here runs UVM. Free tool: a Verilator release with upstream UVM support |
-| Python-based verification | K | none | none | cocotb testbenches run on Icarus as simulator.run's cocotb backend (M72); cocotb on Verilator needs 5.036 or later |
+| Python-based verification | K | python_verification | verification.dynamic.testbench.testing | No eval case yet. cocotb testbenches run on Icarus as simulator.run's cocotb backend (M72); cocotb on Verilator needs 5.036 or later |
 | Assertions and formal property checking | P | sva, formal_verification, model_checking, formal_coverage, assertion_coverage | verification.formal.proof, verification.dynamic.coverage.assertion | SBY proofs and covers run; open Yosys reads only a subset of SVA |
 | Equivalence checking | K | equivalence_checking | verification.formal.equivalence | equivalence.run is contract only. Free tool: Yosys eqy |
 | Coverage and closure | K | code_coverage, functional_coverage, assertion_coverage | verification.dynamic.coverage | coverage.read runs line, toggle and branch coverage through verilator_coverage (M70); no committed evals/results record yet, so the status stays K; covergroups are unreliable in open simulators. Includes UCIS |
@@ -222,10 +222,11 @@ verification.processor (placeholder, no skill). Seat: verification-lead.
 | Processor and ISA verification | K | none | verification.processor.isa | The cores already run. Free tool: riscv-arch-test, riscv-dv, riscv-formal |
 | Datapath and accelerator verification | K | none | verification.processor.models, verification.processor.accelerator | Free tool: cocotb with Python golden models; Berkeley TestFloat |
 | Hardware/software co-verification | P | embedded_firmware, device_drivers, register_programming | software.validation, software.registers | fw.test and fw.soc_test; the firmware/axi4_lite_driver eval |
-| Gate-level simulation | P | none | verification.dynamic.gate_level_power | Icarus simulates Yosys netlists in the DFT flow; SDF-annotated runs not yet |
-| Power-aware verification | K | none | verification.dynamic.gate_level_power | No free UPF-aware simulator |
-| FPGA prototyping | K | none | design.fpga, verification.dynamic.emulation | Needs a board |
-| Hardware emulation | O | none | verification.dynamic.emulation | Emulators are paid hardware |
+| Gate-level simulation | K | gate_level_simulation | verification.dynamic.testbench.testing | Icarus simulates Yosys netlists in the DFT flow; SDF-annotated runs not yet; the skill has no tool of its own yet, and the placeholder gate_level_power team holds no skill |
+| Power-aware verification | K | power_aware_verification | verification.dynamic.testbench.testing | No free UPF-aware simulator |
+| FPGA prototyping | K | emulation_prototyping | design.fpga, verification.dynamic.testbench.testing | Needs a board |
+| Hardware emulation | O | emulation_prototyping | verification.dynamic.testbench.testing | Emulators are paid hardware |
+| Hardware fuzzing | K | hardware_fuzzing | verification.dynamic.testbench.testing | Verilator-based fuzzing is possible later; cross-links Security |
 | Security verification | K | security_verification | security.verification | Free tool: access-control properties in SBY and fuzzing on Verilator |
 | System-level and portable stimulus | K | portable_stimulus | verification.methodology.architecture | No free PSS tool here |
 | Testbench qualification (mutation) | K | testbench_qualification | verification.methodology.architecture | The eval scorer plants mutants itself; a seat-written mutant set needs a scorer change or YosysHQ MCY, not wrapped here |

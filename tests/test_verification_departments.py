@@ -122,6 +122,9 @@ LEFT_SIMULATION = {"verification.debug.regression": {"uvm", "sva"}}
 #: Skills the wave 2 batches (W2-S1 to S5) gave a moved unit after the cut.
 GAINED = {
     "verification.methodology.architecture": {"testbench_qualification", "portable_stimulus"},
+    "verification.dynamic.testbench.testing": {"python_verification", "gate_level_simulation",
+                                               "power_aware_verification", "emulation_prototyping",
+                                               "hardware_fuzzing"},
 }
 
 DEPARTMENTS = {

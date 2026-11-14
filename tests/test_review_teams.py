@@ -32,6 +32,15 @@ MAP = ROOT / ".github" / "review-teams.yml"
 # they are checked like every other seat.
 PENDING_SEATS = {"dft-engineer", "physical-design-engineer", "firmware-engineer"}
 
+# Decision 12 of council/records/2026-11-14-pilot-retrospective.md lands the
+# knowledge/verification/** rule by itself, before the division's first
+# document, so documents are not held up. While no tracked file matches it,
+# its dead-glob and dead-rule findings are tolerated for this glob only; the
+# first document makes it a checked rule, and that pull request removes the
+# glob from this set (test_a_pending_glob_matches_no_tracked_file fails until
+# it does).
+PENDING_GLOBS = {"knowledge/verification/**"}
+
 
 # --- The loader and ownership rules, shared with scripts/pr_review.py -------------
 
@@ -69,11 +78,12 @@ def problems(teams_map: dict, files: list[str], seat_files: set[str]) -> list[st
         if index is None:
             found.append(f"unmapped file: {path}")
     won = set(winners.values())
+    waiting = {glob for glob in PENDING_GLOBS if not any(matches(glob, path) for path in files)}
     for index, rule in enumerate(teams_map["rules"]):
         for glob in rule["paths"]:
-            if not any(matches(glob, path) for path in files):
+            if not any(matches(glob, path) for path in files) and glob not in waiting:
                 found.append(f"dead glob (matches no tracked file): {glob}")
-        if index not in won:
+        if index not in won and not set(rule["paths"]) <= waiting:
             found.append(f"dead rule {index} {rule['paths']}: later rules win every file it matches")
     for team_id, team in teams.items():
         named = list(team.get("leads", [])) + list(team.get("members", []))
@@ -152,6 +162,26 @@ def test_the_check_catches_a_seat_with_no_file(teams_map, files):
     assert "team 'business' names 'cto', which has no council/cto.md" in problems(broken, files, _seat_files())
 
 
+def test_a_pending_glob_matches_no_tracked_file(teams_map, files):
+    # The tolerance ends with the first document: the pull request that adds
+    # one removes its glob from PENDING_GLOBS, and the glob is checked like
+    # every other one from then on.
+    globs = {glob for rule in teams_map["rules"] for glob in rule["paths"]}
+    assert PENDING_GLOBS <= globs
+    for glob in PENDING_GLOBS:
+        assert not any(matches(glob, path) for path in files), glob
+
+
+def test_the_check_still_catches_a_dead_glob_that_is_not_pending(teams_map, files):
+    import copy
+
+    broken = copy.deepcopy(teams_map)
+    broken["rules"].append({"team": "verification", "paths": ["knowledge/verificaton/**"]})
+    found = problems(broken, files, _seat_files())
+    assert "dead glob (matches no tracked file): knowledge/verificaton/**" in found
+    assert any(p.startswith(f"dead rule {len(broken['rules']) - 1} ") for p in found)
+
+
 def test_only_the_three_approved_seats_may_wait_for_their_files(teams_map):
     assert PENDING_SEATS == set(teams_map["teams"]["silicon-design"]["members"])
     named = {s for t in teams_map["teams"].values() for s in [*t["leads"], *t["members"]]}
@@ -209,6 +239,7 @@ def test_only_the_three_approved_seats_may_wait_for_their_files(teams_map):
         # The capability programme (M64).
         ("knowledge/README.md", {"business", "verification"}),
         ("knowledge/design/sync_fifo_design.md", {"silicon-design", "business", "verification"}),
+        ("knowledge/verification/sva_basics.md", {"verification", "business"}),
         ("capability/levels.json", {"verification"}),
         ("capability/records/knowledge/README.md", {"verification"}),
         ("examples/rtl_sync_fifo/example.json", {"eda-platform", "verification"}),
