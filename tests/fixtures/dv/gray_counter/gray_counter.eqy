@@ -1,0 +1,13 @@
+# W2-E3: the Gray-code counter (gold) against its refactor (gate).
+[gold]
+read_verilog -sv gray_counter.v
+prep -top gray_counter
+
+[gate]
+read_verilog -sv gray_counter_refactor.v
+prep -top gray_counter
+
+[strategy sby]
+use sby
+engine smtbmc
+depth 10

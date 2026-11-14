@@ -1,0 +1,75 @@
+{
+  "id": "dv/random-crc",
+  "request": "Verify the existing CRC block RTL with constrained-random stimulus.",
+  "seat": "testbench",
+  "skills": [
+    "directed_testing",
+    "constrained_random"
+  ],
+  "expected_behavior": "A constrained-random, self-checking SystemVerilog testbench for the approved crc8_block RTL (CRC-8, polynomial 0x07, start value 0xFF, bytes taken bit 7 first with no reflection, check value inverted; init reloads and wins over a byte, valid low holds), written from the approved interface specification, that passes on the approved RTL under the testbench gate before review and fails on RTL that breaks any requirement of that specification. It drives random bytes, init and valid under stated constraints from a repeatable generator, compares the crc with its own reference model of the specification after every edge, and fails itself when the random run is too short or never reaches the corner cases.",
+  "constraints": [
+    "Work only from the approved interface specification and the approved RTL; never change the RTL.",
+    "Write the testbench in SystemVerilog, self-checking, ending with the verdict line the simulation gate reads.",
+    "Randomise under stated constraints with a fixed seed so a run repeats, run long enough to reach init together with valid, idle cycles and a reset mid-frame, and check against a model written from the specification, not from the RTL."
+  ],
+  "known_failure_modes": [
+    "A testbench that sends one fixed message and checks one check value, so a valid that is ignored or a reload that loses to a byte passes.",
+    "A testbench whose random run is so short, or whose constraints are so tight, that init never coincides with valid.",
+    "A reference model copied from the RTL, so a wrong polynomial tap passes.",
+    "A testbench that checks the crc only after the last byte of a frame, so a mistake that a later byte hides passes.",
+    "A testbench that cannot tell a wrong polynomial tap, a reflected byte, a missing final inversion, a reload that loses to a byte or a valid that is ignored from the approved RTL; the must-fail control fails it."
+  ],
+  "upstream": {
+    "interface-spec": [
+      {
+        "path": "tests/fixtures/dv/crc8/interface_spec.md",
+        "kind": "interface_spec"
+      }
+    ],
+    "design-under-test": [
+      {
+        "path": "tests/fixtures/dv/crc8/crc8_block.v",
+        "kind": "rtl_source",
+        "entry": "crc8_block"
+      }
+    ]
+  },
+  "reference": [
+    {
+      "path": "tests/fixtures/dv/crc8/crc8_block_tb.sv",
+      "kind": "testbench",
+      "entry": "crc8_block_tb"
+    }
+  ],
+  "held_out": [
+    {
+      "name": "The seat's testbench passes the approved RTL and fails each CRC block mutant",
+      "scorer": "must-fail",
+      "tool": "simulator.run",
+      "seat_files": {
+        "sources": [
+          "testbench"
+        ]
+      },
+      "seat_entries": {
+        "top": [
+          "testbench"
+        ]
+      },
+      "case_files": {
+        "sources": [
+          "tests/fixtures/dv/crc8/crc8_block.v"
+        ]
+      },
+      "mutants": {
+        "tests/fixtures/dv/crc8/crc8_block.v": [
+          "tests/fixtures/dv/crc8/mutants/crc8_block_poly_tap.v",
+          "tests/fixtures/dv/crc8/mutants/crc8_block_reflected_input.v",
+          "tests/fixtures/dv/crc8/mutants/crc8_block_no_final_xor.v",
+          "tests/fixtures/dv/crc8/mutants/crc8_block_init_loses.v",
+          "tests/fixtures/dv/crc8/mutants/crc8_block_hold_ignored.v"
+        ]
+      }
+    }
+  ]
+}

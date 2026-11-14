@@ -1,0 +1,71 @@
+{
+  "id": "dv/equiv-gray",
+  "request": "Verify the existing Gray-code counter RTL with an equivalence check of its refactor.",
+  "seat": "equivalence",
+  "skills": [
+    "equivalence_checking"
+  ],
+  "expected_behavior": "An eqy setup (.eqy) for the approved gray_counter RTL and its approved refactor, written from the approved interface specification: the gold script reads the original, the gate script reads the refactor, both prepared at the same top, and a strategy that proves every partition. It passes under the equivalence gate before review (the two approved versions are equivalent, with both versions named) and fails when the refactor is replaced by RTL that is not equivalent to the original.",
+  "constraints": [
+    "Work only from the approved interface specification and the two approved RTL versions, which sit beside the setup under their own names; never change or ship a file of the same name.",
+    "Give the gold and the gate side their own scripts, one reading each version, with the same top; use only Yosys commands that read and prepare a design.",
+    "Choose a strategy that proves partitions rather than only searching to a depth, and keep the depth above the design's sequence length of 16 codes unless the proof is unbounded."
+  ],
+  "known_failure_modes": [
+    "A setup whose gold and gate scripts read the same file, which compares a design with itself; the equivalence runner refuses it.",
+    "A setup that reads only the original on both sides, or leaves the refactor out.",
+    "A setup that matches no signal, so nothing is proved.",
+    "A setup that cannot tell a refactor with a wrong flip, a wrap flag one count early or a wrong reset code from the approved refactor; the must-fail control fails it."
+  ],
+  "upstream": {
+    "interface-spec": [
+      {
+        "path": "tests/fixtures/dv/gray_counter/interface_spec.md",
+        "kind": "interface_spec"
+      }
+    ],
+    "design-under-test": [
+      {
+        "path": "tests/fixtures/dv/gray_counter/gray_counter.v",
+        "kind": "rtl_source",
+        "entry": "gray_counter"
+      },
+      {
+        "path": "tests/fixtures/dv/gray_counter/gray_counter_refactor.v",
+        "kind": "rtl_source",
+        "entry": "gray_counter"
+      }
+    ]
+  },
+  "reference": [
+    {
+      "path": "tests/fixtures/dv/gray_counter/gray_counter.eqy",
+      "kind": "equivalence_setup"
+    }
+  ],
+  "held_out": [
+    {
+      "name": "The seat's setup proves the approved refactor equivalent and fails each non-equivalent refactor",
+      "scorer": "must-fail",
+      "tool": "equivalence.run",
+      "seat_files": {
+        "eqy": [
+          "equivalence_setup"
+        ]
+      },
+      "case_files": {
+        "sources": [
+          "tests/fixtures/dv/gray_counter/gray_counter.v",
+          "tests/fixtures/dv/gray_counter/gray_counter_refactor.v"
+        ]
+      },
+      "mutants": {
+        "tests/fixtures/dv/gray_counter/gray_counter_refactor.v": [
+          "tests/fixtures/dv/gray_counter/mutants/gray_counter_refactor_flip_wrong_bit.v",
+          "tests/fixtures/dv/gray_counter/mutants/gray_counter_refactor_wrap_off_by_one.v",
+          "tests/fixtures/dv/gray_counter/mutants/gray_counter_refactor_reset_to_one.v"
+        ]
+      }
+    }
+  ]
+}

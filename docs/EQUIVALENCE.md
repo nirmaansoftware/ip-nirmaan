@@ -114,7 +114,7 @@ Homebrew's Yosys.
 
 - Partition-level options as gate inputs (a stated `depth` or strategy): the
   seat's setup chooses them, and the must-fail check judges the choice.
-- Equivalence in any workflow other than block verification, and the
-  `dv/equiv-gray` eval case (W2-E3).
+- Equivalence in any workflow other than block verification. The
+  `dv/equiv-gray` eval case (W2-E3) came after: `docs/EVAL_SKILLS_MUST_FAIL.md`.
 - The same copy-before-run protection for `formal.run`: SymbiYosys already
   copies its `[files]` into its own work directory.
