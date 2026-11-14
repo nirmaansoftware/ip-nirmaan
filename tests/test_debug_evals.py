@@ -238,7 +238,7 @@ def test_one_repro_that_checks_the_whole_frame_cannot_stand_for_three_buckets(ni
                       "    always @(posedge clk) if (busy) total <= total + 1;\n")
              .replace("        repeat (6 * CLKS) @(posedge clk);",
                       "        repeat (CLKS) @(posedge clk);\n"
-                      "        verdict_check(tx === 1'b1, \"parity bit of 0x4B is not 1\");\n"
+                      "        verdict_check(tx === 1'b0, \"parity bit of 0x4B is not 0\");\n"
                       "        repeat (6 * CLKS) @(posedge clk);\n"
                       "        verdict_check(total === 11 * CLKS, \"frame period is not 11 bit periods\");"))
     assert whole != data_order
@@ -247,3 +247,4 @@ def test_one_repro_that_checks_the_whole_frame_cannot_stand_for_three_buckets(ni
     assert result.submitted, result.detail
     [score] = result.scores
     assert score.status is ScoreStatus.FAILED, score
+    assert "only 1 of 3 mutants have a file of their own" in score.summary, score.summary
