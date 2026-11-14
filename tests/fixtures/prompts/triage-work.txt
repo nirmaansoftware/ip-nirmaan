@@ -58,6 +58,6 @@ CITE ONLY THESE ARTIFACTS, using the token exactly as written:
 - Your seat: Regression Intelligence Engineer (verification.debug.analysis.intelligence.engineer)
 - Expected outputs: triage_report
 - Evidence requirement: VeriTriage investigation of the failing artifacts (accepts: veritriage_session; tools: veritriage.investigate)
-- Permitted tools: project.read, status.read, artifact.read, trace.read, escalation.raise, spec.read, knowledge.search, git.read, code.search, veritriage.investigate, veritriage.explain_log, git.write
+- Permitted tools: project.read, status.read, artifact.read, trace.read, escalation.raise, spec.read, knowledge.search, git.read, code.search, veritriage.investigate, veritriage.explain_log, git.write, simulator.run
 - Tool run [run:run-0001] veritriage.investigate succeeded for this task: VeriTriage classified axi_timeout.log as timeout (85% confidence, 5 evidence nodes); top hypothesis: Likely RTL bug
 - Escalation path: verification.debug.analysis.intelligence.senior -> verification.debug.analysis.tech_lead -> verification.debug.analysis.manager -> verification.debug.director -> verification.vp -> exec.cto -> exec.ceo -> exec.board

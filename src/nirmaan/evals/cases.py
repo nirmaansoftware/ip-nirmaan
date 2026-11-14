@@ -55,6 +55,7 @@ def referenced_files(case: EvalCase) -> list[str]:
     paths += [f.path for f in case.reference]
     paths += [p for check in case.held_out for files in check.case_files.values() for p in files]
     paths += [p for check in case.held_out for files in check.mutants.values() for p in files]  # M58
+    paths += [p for stage in case.inputs.values() for files in stage.values() for p in files]  # M71
     return sorted(dict.fromkeys(paths))
 
 
@@ -113,9 +114,19 @@ def validate_case(org: Organization, case: EvalCase, repo: Path) -> list[str]:
     except UnrecognizedRequirement as exc:
         return [*problems, f"the request is not recognized: {exc}"]
     work = [t for t in engine.state.tasks.values() if t.kind is TaskKind.WORK and t.stage]
-    seats = [t for t in work if t.stage == case.seat]
+    # M71: the seat may be a decision (root cause), whose reference answer then names its outcome.
+    seats = [t for t in engine.state.tasks.values()
+             if t.kind in (TaskKind.WORK, TaskKind.DECISION) and t.stage and t.stage == case.seat]
     if len(seats) != 1:
         problems.append(f"seat {case.seat!r} is {len(seats)} tasks in the planned workflow; it must be one")
+    elif seats[0].outcomes and case.outcome not in seats[0].outcomes:
+        problems.append(f"seat {case.seat!r} is a decision: the case's outcome must be one of "
+                        f"{list(seats[0].outcomes)}, not {case.outcome!r}")
+    elif not seats[0].outcomes and case.outcome is not None:
+        problems.append(f"seat {case.seat!r} is not a decision, so the case names no outcome")
+    planned = {t.stage for t in work} | {case.seat}
+    problems += [f"inputs for stage {stage!r}, which is not in the planned workflow"
+                 for stage in case.inputs if stage not in planned]
     for stage, files in case.upstream.items():
         tasks = [t for t in work if t.stage == stage]
         if not tasks:

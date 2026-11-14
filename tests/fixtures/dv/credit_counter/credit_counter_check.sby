@@ -1,0 +1,14 @@
+[options]
+mode prove
+depth 12
+
+[engines]
+smtbmc
+
+[script]
+read -formal credit_counter.v credit_counter_check.sv
+prep -top credit_counter_check
+
+[files]
+credit_counter.v
+credit_counter_check.sv

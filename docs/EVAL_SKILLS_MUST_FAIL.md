@@ -262,6 +262,55 @@ A testbench that never raises a source passes its own gate and the approved
 RTL, and the first mutant survives it (tested in
 `tests/test_dv_irq_ctrl_evals.py`).
 
+Wave 2's second eval pull request (W2-E2) judges the proof seat,
+`assertions-formal`, on two more approved blocks. The seat writes a property
+file (`assertions`) and a single-task `.sby` (`formal_spec`) that names the
+approved RTL by its file name (`FileInput.beside`); its gates ask for at
+least one property proven and every cover reached. Each case's one control
+runs `formal.run` over the seat's setup, with `formal.cover` as its
+`cover_tool`: the proof must pass the approved RTL with every cover reached
+and fail each RTL mutant below on a failed assertion.
+
+- `dv/formal-credit-counter` judges `formal_verification`, `sva` and
+  `assertion_coverage`. Its block (`tests/fixtures/dv/credit_counter/`) is a
+  credit counter for credit-based flow control: `MAX` credits (1 to 255) at
+  reset, a take spends one, a give returns one, both at once change nothing,
+  a take at zero or a give at `MAX` is refused and sets a sticky `err`, with
+  `avail` and `full` outputs (11 tagged requirements). The reference proof
+  (`credit_counter_check.sv`, `credit_counter_check.sby`) checks the RTL
+  against a model of the specification at `MAX` 4 and 5 in one setup, with
+  immediate assertions and `$past` (the SVA subset open Yosys reads), and
+  covers both refusals and a take with a give at zero and at `MAX`.
+- `dv/prove-deep-counter` judges `model_checking`. Its request asks for an
+  unbounded proof, which plans the `unbounded_proof` refinement. Its block
+  (`tests/fixtures/dv/deep_counter/`) is a modulo counter, 0 to `LIMIT`
+  (default 99), with enable, synchronous clear and a carry out on the
+  wrapping cycle (7 tagged requirements). Every mutant goes wrong 64 or more
+  cycles after reset. The reference proof ties `count` to a model, which is
+  inductive, and runs in prove mode with a 20-cycle unrolling: the basecase
+  passes on each mutant and the induction step fails on an assertion (sby
+  reports UNKNOWN with the failed assertion, which the control counts as a
+  mutant caught, since the run executed and wrote its log). The same
+  properties checked in `bmc` mode at that depth pass every mutant, and the
+  proof gate refuses that setup before review (no property proven).
+
+| File | The one change | Judge that fails it |
+|---|---|---|
+| `credit_counter/mutants/credit_counter_both_takes.v` | a take and a give at the same edge spend a credit | seat proof (`formal.run`), `MAX` 4 and 5 |
+| `credit_counter/mutants/credit_counter_underflow_wraps.v` | a take at zero is not refused: credits wrap to 255 | seat proof, `MAX` 4 and 5 |
+| `credit_counter/mutants/credit_counter_err_not_sticky.v` | `err` clears at the edge after a refusal | seat proof, `MAX` 4 and 5 |
+| `credit_counter/mutants/credit_counter_full_bit_test.v` | the `MAX` compare tests the bits of `MAX`: right only for a power of two | seat proof at `MAX` 5 only |
+| `deep_counter/mutants/deep_counter_carry_lost.v` | no carry into the top bit: 63 goes to 0 (cycle 64) | seat proof, induction step |
+| `deep_counter/mutants/deep_counter_last_low_bits.v` | the compare with `LIMIT` ignores bit 0: wraps at 98 (cycle 99) | seat proof, induction step |
+| `deep_counter/mutants/deep_counter_wrap_to_one.v` | after `LIMIT` the count restarts at 1 (cycle 100) | seat proof, induction step |
+| `deep_counter/mutants/deep_counter_saturates.v` | the count stops at `LIMIT` (cycle 100) | seat proof, induction step |
+
+Paths are under `tests/fixtures/dv/`. The tests in
+`tests/test_dv_formal_evals.py` show each control catches a weak property
+set: a proof at `MAX` 4 alone passes its gates and the approved RTL, and the
+bit-test mutant survives it; a prove-mode proof that only bounds the count
+and defines the carry, true and inductive, lets the lost carry survive.
+
 ## 4. The evidence loader
 
 `load_evidence(path)` reads a run record (as `load_record` does) and raises

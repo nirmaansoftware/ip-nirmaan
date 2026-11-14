@@ -28,12 +28,14 @@ file such as `spec/axi4_lite/interface_checks.json`) is data, never a case.
 | Field | Meaning |
 |---|---|
 | `id` | Unique case ID, e.g. `rtl/axi4-lite-regs`. |
-| `request` | The requirement as a person would type it. It must plan a workflow with `seat` as one work task. |
+| `request` | The requirement as a person would type it. It must plan a workflow with `seat` as one work or decision task. |
 | `seat` | The stage whose seat is evaluated. |
 | `skills` | The skill IDs the case judges (M58), each in the skill catalog (`nirmaan org skills`). Only these skills get credit from its results; a stage pass never credits every skill of the stage. |
 | `expected_behavior`, `constraints`, `known_failure_modes` | What good work looks like and how it tends to go wrong. For people; not scored. |
 | `upstream` | Stage ID to reference documents (`path`, `kind`). They stand in for that stage's approved output. Upstream stages not listed get the request text. |
 | `reference` | The reference answer's files (`path`, `kind`, optional `entry`), used by `--replay`. |
+| `outcome` | A decision seat's reference outcome (M71: root cause, e.g. `rtl_bug`), required for a decision seat and refused for any other. |
+| `inputs` | Stage ID to task input to case files (M71), given to that stage, seat or upstream, as a comma-joined list: the failing logs a triage investigates (`{"triage": {"paths": [...]}}`). The files are part of the case digest. |
 | `held_out` | Checks the seat never sees. The built-in scorer `held-out-run` runs `tool` with `params`, filling each parameter from the seat's submitted files of the kinds in `seat_files`, then the files in `case_files`. The scorer `must-fail` is a negative control (below). |
 | `attempts` | Attempts per run when the engine refuses a submission (default 1). |
 
@@ -66,7 +68,10 @@ mutant caught. Each run reads a staged copy of its inputs under their own file
 names, so a mutant takes the name of the file it replaces and a proof setup
 that names its files reads it in place. Run each proof at each parameter point:
 a mutant that is wrong only for a DEPTH that is not a power of two passes a
-DEPTH 8 proof and fails a DEPTH 5 one.
+DEPTH 8 proof and fails a DEPTH 5 one. A prove-mode mutant run that passes
+its basecase and fails its induction step (sby reports UNKNOWN with the failed
+assertion) executed and wrote its log, so it counts as a mutant caught
+(`dv/prove-deep-counter`).
 
 ```json
 {
@@ -81,6 +86,16 @@ DEPTH 8 proof and fails a DEPTH 5 one.
     "tests/fixtures/rtl/sync_fifo/mutants/sync_fifo_pow2_wrap.v"]}
 }
 ```
+
+## One repro per bucket: the `must-fail-each` scorer (M71)
+
+For a seat that writes several files of one kind (a triage seat's repro
+testbenches, one per failure bucket), `must-fail-each` judges each file on its
+own: `seat_files` names one parameter, each seat file of those kinds runs alone
+with the `case_files` (its `seat_entries` from the seat's own passing run over
+that file alone), each must pass on the clean inputs, and every mutant (one
+seeded bug per bucket) must fail a different file. One repro that fails every
+bug cannot stand for two buckets. Design: `docs/REPRO_GATES.md`.
 
 ## Result records (M58)
 

@@ -144,10 +144,12 @@ def satisfies(state: ProjectState, ev, req) -> bool:
     checked against every bound (M48)."""
     if not ev.substantiated or ev.kind not in req.accepts:
         return False
-    if (req.tools or req.params or req.bounds) and ev.kind in (EvidenceKind.TOOL_RUN, EvidenceKind.VERITRIAGE_SESSION):
+    # M71: every tool-backed kind is checked, so a reproduction never meets even a requirement that names no tool.
+    if ev.kind in (EvidenceKind.TOOL_RUN, EvidenceKind.VERITRIAGE_SESSION):
         run = state.tool_runs.get(ev.tool_run or "")
         return (run is not None and (not req.tools or run.tool in req.tools)
                 and all(param_matches(run.params.get(k), v) for k, v in req.params)
+                and run.answers(req.params)  # M71: a reproduction never meets a requirement for a passing run
                 and all(run.checked_against(b) for b in req.bounds))
     return True
 
@@ -373,15 +375,19 @@ def _before_review(ctx: PolicyContext) -> list[str]:
                 problems.append(f"{task.id} cannot go to review: no passing run for {req.description!r} over the "
                                 f"approved inputs wrote {location or 'the ' + str(draft.get('kind'))}")
         for binding in (b for b in req.files if not b.entry and not b.upstream):
+            mine = {d.get("location") for d in ctx.payload.get("artifacts", ()) if d.get("kind") in binding.kinds}
             for draft in ctx.payload.get("artifacts", ()):
                 location = draft.get("location")
                 if draft.get("kind") not in binding.kinds or not location:
                     continue
+                # M71: a file run one at a time is covered only by a run that had no other such file of the task's.
+                others = mine - {location} if binding.each else set()
                 if not any(ev.kind is not EvidenceKind.TOOL_RUN
-                           or location in ctx.state.tool_runs[ev.tool_run].values(binding.param)
+                           or (location in (used := set(ctx.state.tool_runs[ev.tool_run].values(binding.param)))
+                               and others.isdisjoint(used))
                            for ev in met):
                     problems.append(f"{task.id} cannot go to review: no passing run for {req.description!r} "
-                                    f"covers {location}")
+                                    f"covers {location}{' on its own' if binding.each else ''}")
     return problems
 
 

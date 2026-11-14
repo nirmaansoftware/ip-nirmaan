@@ -246,6 +246,16 @@ def _fill(files: dict[str, str | list[str]], param: str, paths: list[str]) -> No
     files[param] = [*earlier, *paths] if isinstance(earlier, list) else paths
 
 
+def _one_at_a_time(req: EvidenceRequirement, produced: list[dict[str, Any]]) -> list[dict[str, Any] | None]:
+    """The task's files a requirement runs one at a time (M71, ``FileInput.each``), or ``[None]``: one run over all.
+
+    With no such file produced, one run is still made, so the missing file is reported as for any binding.
+    """
+    each = [k for b in req.files if b.each for k in b.kinds]
+    singles = [f for kind in dict.fromkeys(each) for f in produced if f["kind"] == kind]
+    return singles or [None]
+
+
 def _place_beside(paths: list[str], req: EvidenceRequirement, produced: list[dict[str, Any]]) -> None:
     """Link each approved upstream file beside the task's own files of this requirement, under its own name (M68).
 
@@ -432,7 +442,9 @@ class ModelRuntime:
         seen: dict[tuple, ToolNote] = {}  # by tool, parameters, and bounds
         wrote: dict[tuple, dict[str, str]] = {}  # what each passing run wrote
         made_with: dict[str, dict] = {}  # M44: a yielded file's location -> the parameters of the run that wrote it
-        for req in packet.task.evidence_requirements:
+        # M71: a requirement over files run one at a time (``FileInput.each``) is run once per such file.
+        for req, single in ((r, one) for r in packet.task.evidence_requirements
+                            for one in _one_at_a_time(r, produced)):
             if not req.files or not _TOOL_BACKED & set(req.accepts):
                 continue
             if not applies(req.when, _facts(packet, produced)):
@@ -455,6 +467,8 @@ class ModelRuntime:
                         _place_beside(paths, req, produced)
                     continue
                 matched = [f for kind in binding.kinds for f in produced if f["kind"] == kind]
+                if single is not None and single["kind"] in binding.kinds:
+                    matched = [single]  # M71: this run's one file, and its own entry
                 if binding.entry:
                     # M44: a file a run wrote has the entry that run was given.
                     entry = (matched[0]["entry"] or made_with.get(matched[0]["location"], {}).get(binding.param)

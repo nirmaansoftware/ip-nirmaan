@@ -81,7 +81,9 @@ The full path map is in the council record, section 1.
 The founder confirmed all six on 2026-10-17: control plane, gate semantics,
 licence and third-party, commercial, public names and claims, and
 export-control sensitive content. The review script detects both path and
-content classes from `main`'s map. A `hold` label also keeps `review/executive`
+content classes from `main`'s map. Control plane includes the eval harness:
+its settings, the level computation and every file whose bytes are in the
+harness fingerprint, each listed by name (`docs/HARNESS.md`). A `hold` label also keeps `review/executive`
 pending; agents can remove labels, so the label is a convention.
 
 **The Founder Proxy (founder's decision, 2026-10-18).** Until 2026-10-18 these
@@ -137,13 +139,16 @@ Built in rollout R5; in use on real pull requests since 2026-10-18. The
 a pull request it wrote, and the script refuses when a Claude Code session has
 the branch checked out. In order:
 
-1. **One model call at a time** across Nirmaan and IP Nirmaan: a lock in
-   `~/.nirmaan/pr-review/`, shared with Nirmaan's script, held here only
-   around each reviewer call, never while checking out, reading CI, posting, fixing or
-   running local checks. When it is held elsewhere at a call, the run ends
-   ("busy", exit 3) and the next run reuses the verdicts already cached. The
-   lock is a folder (`review.lock`) with an owner file written whole (a
-   temporary file renamed inside it). A lock whose process is gone is cleared,
+1. **At most two model calls at once** across Nirmaan and IP Nirmaan: two
+   model slots in `~/.nirmaan/pr-review/`, shared with Nirmaan's loop
+   (`model_cap` 2 in both), held here only around each model call (a
+   reviewer's, or the loop's fixer's), never while checking out, reading CI,
+   posting or running local checks. Slot 0 is `review.lock`, slot 1
+   `model-slot-1.lock`; this script tries `review.lock` first and Nirmaan's
+   loop its other slot first. When every slot is held elsewhere at a call, the
+   run ends ("busy", exit 3) and the next run reuses the verdicts already
+   cached. Each slot is a folder with an owner file written whole (a
+   temporary file renamed inside it). A slot whose process is gone is cleared,
    and so is one with no readable owner file that is older than 30 minutes.
 2. **Eligibility.** Open, targets `main`, a branch in this repository (never a
    fork), authored by `patel-om` or `nirmaansoftware`; otherwise it refuses and
@@ -372,13 +377,13 @@ review is the size limit above.
 comments why when: three fix rounds are done and a key still fails; the same
 finding (same key, team, file and wording) fails again after a fix; CI fails
 after a fix; the branch has a merge conflict; a key or the Founder Proxy is
-deferred for any reason but a rate limit (bad output, a failed call, a
-missing seat file), or the diff is over the review's size limit; the Founder
+deferred for any reason but a rate limit or a passing fault (bad output, a
+crashed call, a missing seat file), or the diff is over the review's size limit; the Founder
 Proxy returns `needs-founder` (until the founder's own review approves the
 head); the fixer gives no valid answer, cannot fix every finding or changes
 nothing; a local check fails; the
 auto-merge setting cannot be read or `gh pr merge --auto` fails; the branch
-is behind `main` and the update fails; or any error.
+is behind `main` and the update fails; or any other error.
 Nothing is pushed in any of these cases. The reason is redacted before it is
 logged or posted: common secret formats (`SECRET_PATTERNS` in
 `scripts/pr_review.py`), credentials in a URL and the value after
@@ -386,11 +391,34 @@ logged or posted: common secret formats (`SECRET_PATTERNS` in
 error can carry them. If someone pushes while
 the fixer works, the round is dropped without a label and the new head is
 reviewed from scratch. Removing the `needs-founder` label lets the loop resume
-with a fresh round count.
+with a fresh round count. A stop is never silent: when GitHub does not take
+its label or comment (unreachable, or the App's token expired), the loop logs
+`STOP NOT YET VISIBLE` with the reason in `ip-loop.log` and a
+`stop-not-visible` line in the call log, and posts the label and comment on
+the next pass that reaches GitHub.
+
+**Passing faults retry, then stop where it shows.** A network error (a
+connection reset or closed, a timeout, a name that does not resolve), a
+GitHub 401 (an expired installation token), 429 or 5xx, a gh or git failure
+whose text says so, and a model call that timed out or failed that way
+(`transient_error` and `TRANSIENT_TEXT` in `scripts/pr_loop.py`) do not stop
+the pull request. The loop adds no label, keeps the head, and tries again on a
+later pass after a backoff that doubles from `transient_backoff_minutes` (2,
+4, 8, 16 minutes; the passes between say `backoff` and call nothing). A fix
+round cut short this way does not count its findings as seen. After
+`transient_retries` (4) retries in a row on one head, the next failure stops
+with the `loop-stalled` label and a comment, not `needs-founder`: nothing in it
+is the founder's. Removing `loop-stalled` lets the loop try again (the
+fix-round count stays), and a new head clears it. Any step that gets past
+the fault ends the count. When GitHub cannot even list the pull requests,
+the pass logs that GitHub or the network is unreachable and stops nothing.
 
 **Rate limits pause, they do not stop.** When every deferred key (or the
-Founder Proxy) was deferred only by a rate limit (the plan's session, weekly
-or usage limit, or a 429, after its one retry), or the fixer hits one, the
+Founder Proxy) was deferred only by a rate limit (the plan's session,
+5-hour, weekly or usage limit in any of its wordings, such as "You've hit
+your 5-hour limit", told by the call's outcome or by the text of the failed
+call, or a 429, after its one retry), or by a limit and passing faults
+together, or the fixer hits one, the
 loop does not label the pull request and does not stop. The key's check
 stays pending, nothing is pushed, and the pass ends. Then the loop makes no
 model call for any pull request for `rate_limit_pause_minutes` (30, `LOOP`
@@ -399,26 +427,35 @@ pause is the file `loop/rate-limit-pause.json` in the state directory. It
 has the same name and format as the Nirmaan loop's pause file, since both
 loops run on one plan: a limit either loop hits pauses both. A fix round cut
 short by a limit does not count its findings as seen. A `--no-post` run
-writes no pause. Any other deferral still stops the loop, and so does a limit
-whose retry failed some other way.
+writes no pause. The pause is read again before every model call, so a
+review or fix round already running when the other worker (or the Nirmaan
+loop) starts a pause makes no further call: its step ends `paused` and its
+cached verdicts carry over. Any other deferral still stops the loop, and so
+does a limit whose retry failed some other way.
 
-**One model call at a time, every pull request each pass.** The shared lock
-is held only around each reviewer call (step 1 of "How reviewers run"); the
-fixer and the local checks run without it, so the other repository's reviews
-go on meanwhile. One pass at a time runs for this repository: the pass holds
-its own lock (`loop-nirmaansoftware_ip-nirmaan.lock` in the same folder), and
-a second pass that finds it held ends at once. Each pass
-takes one step on every open pull request, one the loop is fixing first, then
-by number, so a pull request waiting for CI, or one that just ran a review or a
-fix, never holds up the others; the steps run one after another, so reviews
-still run one at a time. The check that the loop is `main`'s copy runs once,
-before each pass, so the pass ends early when `main` may have moved: after the
-pass's own auto-merge (GitHub may merge at once), and when `main`'s sha on
-origin, read before each step, differs from the one the pass started with
-(the founder's merge, the other loop, any merge) or cannot be read. The pull
-requests after that wait for the next pass, which refetches `main` and checks
-the copy again. A merge that lands while a step runs is seen only before the
-next step; the review itself always fetches `main` afresh.
+**Two pull requests at once, every pull request each pass.** A model slot is
+held only around each model call (step 1 of "How reviewers run"); the local
+checks run without one, so other reviews go on meanwhile. One pass at a time
+runs for this repository: the pass holds its own lock
+(`loop-nirmaansoftware_ip-nirmaan.lock` in the same folder), and a second pass
+that finds it held ends at once. Each pass takes one step on every open pull
+request, one the loop is fixing first, then by number, so a pull request
+waiting for CI, or one that just ran a review or a fix, never holds up the
+others. Up to `parallel_reviews` (2) steps run at once, in two workers of the
+one pass; each pull request is taken by one worker only, so no pull request is
+ever reviewed or fixed by two at once. The keys, the Founder Proxy and the
+fixer are the same in each. Every model call of either worker holds one of the
+two model slots shared with the Nirmaan loop, so at most two model calls run
+at once across both repositories; a worker that finds both held ends its step
+`busy` and its cached verdicts carry over. The check that the loop is `main`'s
+copy runs once, before each pass, so no new step starts once `main` may have
+moved: after the pass's own auto-merge (GitHub may merge at once), after a
+rate-limit pause, and when `main`'s sha on origin, read before each step,
+differs from the one the pass started with (the founder's merge, the other
+loop, any merge) or cannot be read. A step already running finishes, as a
+merge landing during a step always could; the pull requests after that wait
+for the next pass, which refetches `main` and checks the copy again. The
+review itself always fetches `main` afresh.
 
 **Records.** Every review call, fixer call and loop step is a line in
 `~/.nirmaan/pr-review/calls.jsonl`; per pull request loop state is in
