@@ -109,7 +109,7 @@ The wave 2 plan (routing item R1) gives block verification's coverage stage
 |---|---|---|
 | `line` | at least 90 | a directed testbench that exercises a block reaches nearly every line (the W2-E1 `irq_ctrl` testbench reaches 100); the margin is for a line no stimulus can reach |
 | `toggle` | at least 75 | wide buses and constant inputs leave toggles a good directed test never reaches (the W2-E1 `irq_ctrl` testbench reaches 79.7 with Verilator 5.052) |
-| `branch` | not bounded | read and recorded; Verilator versions count branch points differently |
+| `branch` | not bounded | read and recorded; Verilator versions count points differently, and branch the most |
 
 These replace the stage's recorded-evidence requirement (a coverage run, a
 VeriTriage session or a human attestation). This is a gate-semantics change
@@ -136,7 +136,8 @@ code, only roles at the working band or above that hold a skill naming it
   (counts through a wrap, holds, resets mid-count) reaches 100 percent line,
   toggle and branch and meets `COVERAGE_TARGETS`; `counter_idle_tb.v` holds the
   counter in reset, passes its own four checks, and reads 66.66 percent line
-  and 18.75 percent toggle, so the same bounds fail it. Without bounds it
+  and 18.75 percent toggle (25 with Verilator 5.020, which counts one toggle
+  point per bit, not per direction), so the same bounds fail it. Without bounds it
   passes: only the threshold fails it. A testbench whose own check fails reads
   no coverage;
 - the coverage stage's gate, and, through the eval harness (`run_case`), a

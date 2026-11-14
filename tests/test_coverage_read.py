@@ -167,7 +167,10 @@ def test_a_testbench_that_exercises_the_design_meets_the_bounds_and_an_idle_one_
     assert Path(full.outputs["info"]).read_text(encoding="utf-8").startswith("TN:")  # the lcov report
     idle, outcome = _run(engine, IDLE_TB, tmp_path)
     assert not idle.succeeded and "limit not met" in idle.summary, idle.summary
-    assert "line 66.66 is below min_line 90" in idle.summary and "toggle 18.75 is below min_toggle 75" in idle.summary
+    # Verilator 5.052 counts a toggle point per bit and direction (18.75, 3 of 16), 5.020 one per bit (25.0, 2 of
+    # 8); either way the idle testbench is far below the bound.
+    assert "line 66.66 is below min_line 90" in idle.summary and outcome.metrics["toggle"] < 30, idle.summary
+    assert f"toggle {outcome.metrics['toggle']} is below min_toggle 75" in idle.summary
     # Its own checks passed and the coverage was read: only the bounds failed it.
     assert outcome.metrics["checks"] == 4 and outcome.metrics["coverage"]["line"]["points"] == 3
     unbounded, _ = _run(engine, IDLE_TB, tmp_path / "unbounded", bounds=())
