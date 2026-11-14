@@ -359,6 +359,63 @@ whose constraint keeps `init` away from `valid` lets the same mutant survive;
 and the reference over only 12 random cycles, with its own thinness check
 removed, lets a mutant survive. The scorer stops at the first survivor.
 
+Wave 2's fourth eval pull request (W2-E4) adds the two debug cases, which judge
+the seats of a regression investigation that asks for a reproduction (M71,
+`docs/REPRO_GATES.md`). The request plans `regression-investigation` with the
+`reproduction` feature, so the RTL under investigation is a planned stage the
+case fixes from its own file (`design-under-investigation`), and the seat's
+repro testbenches pass the gate `simulator.run` with `expect=fail` before
+review. The packets carry only the skill the stage plans for the seat
+(`root_cause_analysis`, `failure_triage`): `log_analysis` is held by neither
+seat today, so these cases do not name it (a later skills batch adds it).
+
+- `debug/root-cause-uart-tx` judges the root-cause seat (a decision, outcome
+  `rtl_bug`) on `root_cause_analysis`. Its block
+  (`tests/fixtures/dv/uart_tx/`) is an 8N1 UART transmitter whose RTL under
+  investigation copies `data` into its hold register on every `start` pulse,
+  even while a frame is in flight, though a start while `busy` must be
+  ignored; a second start with another byte replaces the bits not yet sent.
+  The case gives the failing regression log (`logs/regression_fail.log`, the
+  recorded output of the regression test on that RTL, which a test reruns) and
+  the triage stage's report and quick repro (`uart_tx_triage_repro.v`, which
+  probes the hold register by name: it reproduces on the RTL under
+  investigation but cannot build on another implementation, so copying it
+  passes neither control). The reference
+  answer is a root-cause note and a repro (`uart_tx_repro.v`: send `0x3C`,
+  pulse start with `0xB2` during bit 1, read the frame back at each bit's
+  middle). Two `must-fail` controls judge the seat's repro: on the first
+  implementation it must pass the fixed RTL and fail the RTL under
+  investigation and a shift-register variant with the same defect; on the
+  second, independent fixed implementation (`alt/uart_tx.v`) it must pass and
+  fail the same two. A repro whose start while busy carries the same byte passes the
+  RTL under investigation and is refused at the gate, before review; a repro
+  that fails the RTL under investigation but expects the wrong byte on every
+  RTL fails the clean run of the control (tested).
+- `debug/triage-three-bugs` judges the triage seat on `failure_triage`. Its
+  block (`tests/fixtures/dv/uart_frame_tx/`) is a UART transmitter with even
+  parity (eleven bit periods per frame) and three independent defects, shown
+  by three failing logs, one per regression test (recorded runs, rerun by a test). The one control is
+  `must-fail-each` over the seat's repro testbenches: each must pass the clean
+  RTL, and each of the three single-defect mutants must fail a repro of its
+  own (a matching, so one repro that fails all three defects cannot stand for
+  three buckets). The reference has three repros, each narrow to one defect.
+
+| File | The one change | Judge that fails it |
+|---|---|---|
+| `uart_tx/mutants/uart_tx_reload_while_busy.v` (also the RTL under investigation) | `data` is latched on a start pulse while busy | seat repro (`simulator.run`), on a failed data check |
+| `uart_tx/mutants/uart_tx_alt_reload.v` | the same defect in the shift-register implementation | seat repro |
+| `uart_frame_tx/mutants/uart_frame_tx_msb_first.v` | data bits go out most significant bit first | the seat's data-order repro |
+| `uart_frame_tx/mutants/uart_frame_tx_odd_parity.v` | the parity bit has odd polarity | the seat's parity repro |
+| `uart_frame_tx/mutants/uart_frame_tx_short_stop.v` | the stop bit lasts half a bit period, so `busy` falls two clocks early | the seat's frame-period repro |
+
+Paths are under `tests/fixtures/dv/`. `uart_frame_tx/uart_frame_tx_buggy.v` has
+all three defects and is the RTL under investigation. The tests in
+`tests/test_debug_evals.py` run both reference answers with the real
+simulators and show the controls catch weak answers: a root-cause repro whose
+second start carries the same byte, a repro that expects the
+wrong byte, a triage with repros for two of the three bugs, and one repro that
+checks the whole frame.
+
 ## 4. The evidence loader
 
 `load_evidence(path)` reads a run record (as `load_record` does) and raises

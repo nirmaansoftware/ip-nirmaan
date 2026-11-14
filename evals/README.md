@@ -79,6 +79,14 @@ control is the ordinary `simulator.run` one (`dv/random-crc`), a coverage seat's
 `coverage.read` with `cover_bounds` (`dv/coverage-irq-ctrl`), and a run that
 is too short or whose constraints never reach a corner lets a mutant survive.
 
+A debug seat's control judges its repro testbenches. A root-cause repro has
+`must-fail` checks like a testbench (`debug/root-cause-uart-tx`: it passes the
+fixed RTL and fails the RTL under investigation and a variant, on two
+independent implementations); a triage seat's repros are judged by
+`must-fail-each`, one repro per seeded bug (`debug/triage-three-bugs`). Both
+cases give the failing logs through `inputs` and run against RTL the case
+hands over as `design-under-investigation`.
+
 ```json
 {
   "name": "The seat's testbench fails each mutant",

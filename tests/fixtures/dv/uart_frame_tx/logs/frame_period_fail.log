@@ -1,0 +1,2 @@
+ERROR: uart_frame_tx_regress_tb.v:60: frame_period: busy for 42 clocks, expected 44
+uart_frame_tx_regress_tb.v:62: $finish called at 585000 (1ps)

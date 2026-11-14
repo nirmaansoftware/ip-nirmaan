@@ -44,10 +44,12 @@ AXI = REPO / "tests" / "fixtures" / "rtl" / "axi4_lite"
 #: P3-E2 added rtl/apb-gpio and rtl/axil-timer to the four RTL cases of M27, and P3-E3 rtl/skid-buffer.
 RTL_CASES = ["rtl/apb-gpio", "rtl/apb-regs", "rtl/axi4-lite-regs", "rtl/axil-timer", "rtl/rr-arbiter",
              "rtl/skid-buffer", "rtl/sync-fifo"]
-#: M45: a spec seat case and a firmware seat case join the RTL cases; W2-E1, W2-E2 and W2-E3 add verification seat cases.
+#: M45: a spec seat case and a firmware seat case join the RTL cases; W2-E1, W2-E2 and W2-E3 add verification seat
+#: cases, W2-E4 two debug seat cases, W2-E5 a coverage seat case.
+DEBUG_CASES = ["debug/root-cause-uart-tx", "debug/triage-three-bugs"]
 DV_CASES = ["dv/coverage-irq-ctrl", "dv/directed-irq-ctrl", "dv/equiv-gray", "dv/formal-credit-counter", "dv/plan-irq-ctrl",
             "dv/prove-deep-counter", "dv/random-crc"]
-SHIPPED = [*DV_CASES, "firmware/axi4-lite-driver", *RTL_CASES, "spec/axi4-lite-interface"]
+SHIPPED = [*DEBUG_CASES, *DV_CASES, "firmware/axi4-lite-driver", *RTL_CASES, "spec/axi4-lite-interface"]
 
 #: A testbench that exercises nothing: it resets the block, prints PASS, and stops.
 WEAK_TB = """\
