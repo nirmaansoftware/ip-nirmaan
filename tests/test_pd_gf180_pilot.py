@@ -4,6 +4,7 @@ The M26 synchronous FIFO goes through the tool broker on the OpenROAD-flow-scrip
 platform (5 metals with a 0.9 um top metal, the 9-track 5 V library): Liberty-mapped synthesis
 (``synth.run``), place and route with the power grid, clock tree, and timing (``pnr.run``), then
 Magic DRC and Netgen LVS over the open_pdks gf180mcuC files (``pv.run`` backend ``magic-netgen``).
+The cells' LEF, GDS and SPICE are open_pdks' build of the same library, which adds the well pins.
 Both must be clean. A flip-flop placed half a site over another and a netlist with a flip-flop
 input rewired must each fail as recorded runs, so a clean result is not vacuous. The platform ships
 no KLayout DRC or LVS deck, so the M34 KLayout backend has nothing to run here.
@@ -26,7 +27,7 @@ import pytest
 from laws import needs
 from test_nirmaan_physical import invoke
 
-from nirmaan.integrations.physical import PDK_ROOT_ENV
+from nirmaan.integrations.physical import PDK_FILES, PDK_ROOT_ENV
 from nirmaan.orchestrator import Orchestrator
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -36,10 +37,13 @@ SDC = FIXTURES / "pd" / "sync_fifo.sdc"
 CELL = "gf180mcu_fd_sc_mcu9t5v0__"
 #: The platform as its config.mk selects it by default (METAL_OPTION 5LM_1TM, KVALUE 9, TRACK_OPTION
 #: 9t, POWER_OPTION 5v0), at the typical corner (CORNER TC: the tt 25 C 5.0 V Liberty, the typical RCX).
-GF180 = {
-    "tech_lef": "gf180/lef/gf180mcu_5LM_1TM_9K_9t_tech.lef",
-    "lef": "gf180/lef/gf180mcu_5LM_1TM_9K_9t_sc.lef",
-}
+#: The cells' views come from open_pdks' build of the same library (gf180mcuC, fetched by the workflow,
+#: pinned by sha256): its LEF and GDS add the well and substrate pins VNW and VPW that the vendor files in
+#: the platform lack (open_pdks fix_digital_lef.py and fix_stdcell_gds.py). With the platform's LEF and GDS
+#: the routed netlist left VNW and VPW unconnected and Magic named the wells itself, so every cell's two well
+#: pins went unpaired in LVS (CI run 43612313722).
+LIB = "gf180mcuC/libs.ref/gf180mcu_fd_sc_mcu9t5v0"
+GF180 = {"tech_lef": f"{LIB}/techlef/{CELL}nom.tlef", "lef": f"{LIB}/lef/gf180mcu_fd_sc_mcu9t5v0.lef"}
 LIBERTY_GZ = f"gf180/lib/{CELL}tt_025C_5v00.lib.gz"
 GF180_PNR = {
     "site": "GF018hv5v_green_sc9", "hor_layers": "Metal3", "ver_layers": "Metal4",
@@ -52,8 +56,11 @@ GF180_PNR = {
     # and setRC.tcl sets one only at the BC and WC corners, so at TC PDNSim refuses the grid (PSM-0021,
     # CI run 43612057949). The grid's connectivity is still checked (check_power_grid).
 }
-KLAYOUT_TECH = "gf180/KLayout/gf180mcu_5LM_1TM_9K_9t.lyt"
-GDS_DIR = "gf180/gds/9t"
+#: The stream reads the DEF through the platform's LEF/DEF layer map file, as ORFS's def2stream does
+#: (GDS_LAYER_MAP): the KLayout technology's own map leaves via geometry and pin labels on layers of
+#: KLayout's numbering, which Magic skipped (CI run 43612313722).
+GF180_PV = {"gds": f"{LIB}/gds/gf180mcu_fd_sc_mcu9t5v0.gds", "klayout_tech": "gf180/KLayout/gf180mcu_5LM_1TM_9K_9t.lyt",
+            "layer_map": "gf180/gds/9t/gf180mcu_5LM_1TM_9K_9t_edi2gds.layermap"}
 #: The open_pdks gf180mcuC files Magic and Netgen read, which the workflow fetches (pinned by sha256)
 #: into the PDK root with their ciel paths.
 GF180MCUC_MAGIC = {
@@ -72,9 +79,8 @@ def project(nirmaan_org, fixed_clock):
 def gf180(*extra: dict[str, str]) -> Path:
     """The PDK root; skip without the gf180 platform and the inputs named, or fail when CI requires OpenROAD."""
     root = Path(os.environ.get(PDK_ROOT_ENV, "") or "/nonexistent")
-    paths = [LIBERTY_GZ, KLAYOUT_TECH, *(v for d in (GF180, *extra) for k, v in d.items() if k.endswith(
-        ("lef", "tcl", "rules", "tech", "setup", "spice")))]
-    missing = [p for p in paths if not (root / p).is_file()] + ([] if (root / GDS_DIR).is_dir() else [GDS_DIR])
+    paths = [LIBERTY_GZ, *(v for d in (GF180, *extra) for k, v in d.items() if k in PDK_FILES)]
+    missing = [p for p in paths if not (root / p).is_file()]
     if missing:
         reason = f"{PDK_ROOT_ENV} has no gf180 platform with {', '.join(missing)}"
         if "openroad" in os.environ.get("NIRMAAN_REQUIRE_EDA", "").split():
@@ -85,7 +91,7 @@ def gf180(*extra: dict[str, str]) -> Path:
 
 @needs("openroad", "yosys", "klayout", "magic", "netgen")
 def test_sync_fifo_from_rtl_to_drc_and_lvs_on_gf180mcu(project, tmp_path, monkeypatch):
-    root = gf180(GF180_PNR, GF180MCUC_MAGIC)
+    root = gf180(GF180_PNR, GF180_PV, GF180MCUC_MAGIC)
     # The platform's setRC.tcl reads the metal stack and the corner from the environment, as ORFS sets them.
     monkeypatch.setenv("METAL_OPTION", "5LM_1TM")
     monkeypatch.setenv("CORNER", "TC")
@@ -111,9 +117,8 @@ def test_sync_fifo_from_rtl_to_drc_and_lvs_on_gf180mcu(project, tmp_path, monkey
     assert m["drc_violations"] == 0 and m["unconnected_supply_pins"] == 0 and pnr.succeeded, pnr.summary
     out = m["outputs"]
 
-    gds = ",".join(str(p) for p in sorted((root / GDS_DIR).glob(f"{CELL}*.gds")))
-    magic_pv = {"def": out["def"], "netlist": out["pg_netlist"], "top": TOP, **GF180, "gds": gds,
-                "klayout_tech": KLAYOUT_TECH, "backend": "magic-netgen", **GF180MCUC_MAGIC, "timeout": "900"}
+    magic_pv = {"def": out["def"], "netlist": out["pg_netlist"], "top": TOP, **GF180, **GF180_PV,
+                "backend": "magic-netgen", **GF180MCUC_MAGIC, "timeout": "900"}
     clean, c_outcome = invoke(project, "pv.run", magic_pv, tmp_path / "pv_magic", bounds=SIGNOFF)
     cm = c_outcome.data["result"]["metrics"]
     print(f"pilot magic-netgen: {clean.summary}")

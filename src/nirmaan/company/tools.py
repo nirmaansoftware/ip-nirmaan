@@ -234,6 +234,8 @@ TOOLS: list[ToolSpec] = [
            _p("lef", PATHS, "Cell LEF files.", required=True),
            _p("gds", PATHS, "The cells' GDS, merged into the layout.", required=True),
            _p("klayout_tech", PATH, "The PDK's KLayout technology (.lyt).", required=True),
+           _p("layer_map", PATH, "The PDK's LEF/DEF layer map file; the stream reads the DEF through it, as ORFS's "
+              "GDS_LAYER_MAP (M81)."),
            _p("drc_deck", PATH, "The PDK's KLayout DRC deck; enables DRC."),
            _p("lvs_deck", PATH, "The PDK's KLayout LVS deck; enables LVS with cdl."),
            _p("cdl", PATHS, "The cells' CDL netlists, for LVS."),

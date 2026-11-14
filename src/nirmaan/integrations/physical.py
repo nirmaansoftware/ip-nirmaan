@@ -48,7 +48,8 @@ PDK_ROOT_ENV = "NIRMAAN_PDK_ROOT"
 #: PDK parameters that name files; every other PDK parameter is a setting (a site, layers).
 PDK_FILES = ("liberty", "tech_lef", "lef", "pdn_tcl", "rc_tcl", "rcx_rules",
              "fill_rules", "gds", "klayout_tech", "drc_deck", "lvs_deck", "cdl",  # M34: fill and KLayout
-             "magic_tech", "netgen_setup", "spice")  # M79: Magic and Netgen (integrations/pv_magic.py)
+             "magic_tech", "netgen_setup", "spice",  # M79: Magic and Netgen (integrations/pv_magic.py)
+             "layer_map")  # M81: the PDK's LEF/DEF layer map file for the stream to GDS
 #: M34: ``liberty_<corner>`` names one timing corner's Liberty files.
 CORNER_LIBERTY = "liberty_"
 
@@ -562,13 +563,18 @@ register_backend(Backend("openroad", "pnr.run", ("openroad",), _pnr_steps, _pnr_
 #: Streams a routed DEF to GDS with the cells' GDS merged in, as ORFS's def2stream does: read the DEF with
 #: the technology's LEF/DEF options, empty every cell but the top (keeping DEF vias and fill), read the cell
 #: GDS over them, and copy the top cell's tree into a new layout. A cell with no GDS stays empty and is counted.
+#: M81: with the PDK's LEF/DEF layer map file (``layer_map``), the DEF is read through it, as def2stream does
+#: with ORFS's ``GDS_LAYER_MAP``.
 STREAM_SCRIPT = '''import re
 import pya
 
 tech = pya.Technology()
 tech.load(tech_file)
+options = tech.load_layout_options
+if layer_map:
+    options.lefdef_config.map_file = layer_map
 layout = pya.Layout()
-layout.read(in_def, tech.load_layout_options)
+layout.read(in_def, options)
 top = layout.cell(design_name)
 for cell in layout.each_cell():
     if cell.cell_index() != top.cell_index() and not cell.name.startswith("VIA_") \\
@@ -688,12 +694,29 @@ def _klayout_tech(job: Job) -> tuple[Path, list[str]]:
     return tech, targets
 
 
+def map_file_fill_targets(text: str) -> list[str]:
+    """M81: the GDS layers a LEF/DEF layer map file sends fill to (its ``FILL`` and ``FILLOPC`` lines), as
+    ``layer/datatype``. With a map file the stream ignores the technology's layer map, so these are the
+    fill targets the M80 guard checks against."""
+    targets = set()
+    for line in text.splitlines():
+        fields = line.split("#", 1)[0].split()
+        if len(fields) == 4 and fields[1].split(":")[0] in ("FILL", "FILLOPC") and fields[2].isdigit() \
+                and fields[3].isdigit():
+            targets.add(f"{fields[2]}/{fields[3]}")
+    return sorted(targets)
+
+
 def stream_step(job: Job) -> list[str]:
     """The KLayout step that streams the routed DEF to ``layout.gds`` (M34), shared by both pv.run backends;
     the run's directory must hold ``stream.py`` (``STREAM_SCRIPT``)."""
     p = job.params
     tech, fill_targets = _klayout_tech(job)
-    return ["klayout", "-zz", "-rd", f"tech_file={tech}", "-rd", f"in_def={Path(p['def']).resolve()}",
+    layer_map = pdk_paths(p, "layer_map")[:1]
+    if layer_map:
+        fill_targets = map_file_fill_targets(layer_map[0].read_text(encoding="utf-8", errors="replace"))
+    return ["klayout", "-zz", "-rd", f"tech_file={tech}", "-rd", f"layer_map={''.join(map(str, layer_map))}",
+            "-rd", f"in_def={Path(p['def']).resolve()}",
             "-rd", f"in_gds={' '.join(str(f) for f in pdk_paths(p, 'gds'))}",
             "-rd", f"design_name={_token(p, 'top')}", "-rd", f"fill_targets={','.join(fill_targets)}",
             "-rd", f"out_file={job.workdir / 'layout.gds'}", "-r", "stream.py"]
