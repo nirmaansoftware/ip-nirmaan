@@ -136,7 +136,11 @@ From the pull request's own runs of `pd-sky130` (run 43602071471, head
 | a flip-flop moved 0.23 um | failed: 173 Magic DRC violations (`mcon.2` 135, `li.c2` 18, `li.3` 18), and an LVS mismatch |
 | a D input rewired | failed: LVS, 1 mismatched net in `sync_fifo`; DRC 0 |
 
-CI time: RUNTIME_LINE
+CI time, measured on the pull request's runs: about 2.3 minutes a run. Run
+43602071471 (Magic and Netgen built, PDK files fetched) took 2 min 12 s; run
+43602677980 (both restored from the cache) 2 min 19 s. Of that, pulling the
+image takes about a minute and the pilot test 41 to 53 s, well inside the
+45 minute limit and a GitHub-hosted runner's memory and disk.
 
 ## 6. Found, not fixed here: the sky130hd stream drops fill to unread layers
 
