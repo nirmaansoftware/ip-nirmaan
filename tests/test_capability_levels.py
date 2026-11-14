@@ -117,8 +117,7 @@ def test_on_main_nothing_is_practised_or_proven_and_the_file_says_so(org):
     levels = compute(org, ROOT)
     assert levels["totals"]["practised"] == 0 and levels["totals"]["proven"] == 0
     # Knowledge comes only from committed check records, and every committed record counts, except a
-    # record whose document was corrected after its check: that one is stale until it is re-checked
-    # (retrospective D1c: rtl_design and pipeline_design await new check records).
+    # record whose document was corrected after its check: that one is stale until it is re-checked.
     at_knowledge = {s for s, v in levels["skills"].items() if v["level"] == "knowledge"}
     stale = {s for s, v in levels["skills"].items()
              if "stale: the document changed after its check" in v.get("knowledge", {}).get("problems", [])}
