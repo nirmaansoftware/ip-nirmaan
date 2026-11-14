@@ -20,10 +20,11 @@ RTLLM (https://github.com/hkust-zhiyao/RTLLM, "RTLLM: An Open-Source Benchmark
 for Design RTL Generation with Large Language Model") is 50 small designs:
 arithmetic, counters and state machines, memories, signal generators and a few
 processor parts. Each has a natural-language description, a testbench and a
-reference RTL. It is MIT-licensed, code and data, copyright 2024 Nora Lu. Its
-licence was read for the build-out (the G4 licence note); VerilogEval has no
-confirmed licence for its problem text and CVDP needs a separate decision, so
-neither is used here.
+reference RTL. Its licence terms are not recorded in this repository: the
+adapter requires the upstream `LICENSE` file to sit with the private copy, and
+that file is the only source for the terms. VerilogEval has no confirmed
+licence for its problem text and CVDP needs a separate decision, so neither is
+used here.
 
 Credit: the problems, testbenches and the idea of judging generated RTL by a
 testbench are RTLLM's authors'. This repository carries none of their text.

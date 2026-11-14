@@ -1,6 +1,6 @@
 """The RTLLM adapter (M76): the benchmark's design problems as calibration runs of the RTL seat.
 
-RTLLM (https://github.com/hkust-zhiyao/RTLLM, MIT, copyright 2024 Nora Lu) is 50 small designs, each a
+RTLLM (https://github.com/hkust-zhiyao/RTLLM) is 50 small designs, each a
 natural-language description, a testbench and a reference RTL. The benchmark lives outside both repositories, in a
 private folder named by path (``docs/OUTSIDE_CALIBRATION.md``); nothing of it is committed here, and this module
 carries no benchmark text. For each design it:
@@ -52,7 +52,7 @@ _PASS = re.compile(r'\$display\s*\(\s*"[^"\n]*Your Design Passed[^"\n]*"\s*\)\s*
 _MODULE = re.compile(r"^\s*module\s+(\w+)", re.MULTILINE)
 _NAMED = re.compile(r"Module name\s*:\s*(\w+)", re.IGNORECASE)
 DATA_SUFFIXES = (".dat", ".txt", ".hex", ".mem")
-_SKIPPED = ("_chatgpt",)  # model-generated answers, not problems; never read (licence note, G4)
+_SKIPPED = ("_chatgpt",)  # model-generated answers, not problems; never read
 
 
 class OutsideError(EvalError):
