@@ -337,6 +337,28 @@ def test_gate_files_are_founder_class_and_reviewed_by_verification(teams_map):
             assert "verification" in owning_teams(teams_map, path), path
 
 
+def _harness_files() -> list[str]:
+    """The harness settings, the level computation and every harness.CODE file,
+    from the repository root. Read from harness.CODE, so a file added there is
+    checked here without editing this test."""
+    from nirmaan.runtime import harness
+
+    code = [(harness.SOURCE_ROOT / name).relative_to(ROOT).as_posix() for name in harness.CODE]
+    return ["src/nirmaan/runtime/harness.py", "src/nirmaan/evals/levels.py", *code]
+
+
+@pytest.mark.parametrize("path", _harness_files())
+def test_a_harness_change_is_control_plane(teams_map, files, path):
+    """docs/HARNESS.md: a harness change is control plane. Each file is listed
+    in the class by name (not swept in by a glob) and a change to it is
+    classified control-plane, so the Founder Proxy reviews it."""
+    assert path in files, f"{path} is not tracked"
+    control_plane = next(c for c in teams_map["founder_classes"] if c["id"] == "control-plane")
+    assert path in control_plane["paths"], f"{path} is missing from the control-plane class"
+    diff = f"diff --git a/{path} b/{path}\n--- a/{path}\n+++ b/{path}\n@@ -1,1 +1,1 @@\n-# old\n+# new\n"
+    assert "control-plane" in _classify(teams_map, path, diff, status="M")["founder"], path
+
+
 def test_no_codeowners_file_founder_classes_are_reviewed_by_the_founder_proxy(files):
     """Bringing back a code-owner gate is the founder's decision, made by
     changing this test (founder class control-plane)."""

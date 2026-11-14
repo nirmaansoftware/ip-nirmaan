@@ -111,10 +111,23 @@ Decided changes:
    silicon: the ATE program, burn-in, scan diagnosis on silicon, yield, failure
    analysis. Lifecycle's "test" is named "Production Test". Hardware security
    stays in Security (the chart wins over the plan's Appendix A).
-10. **Activation rule.** A unit added after this record enters as PLACEHOLDER.
+10. **Activation rule.** A unit added after this record enters as
+    PLACEHOLDER. It becomes ACTIVE only in a PR that shows either (a) one of
+    its skills uses an AVAILABLE tool and has an eval case judged by that
+    tool, or (b) it is a grouping unit: it has no skills, tools, ladder or
+    explicit roles of its own; at least one of its children is ACTIVE, and
+    every ACTIVE child is in the frozen list or meets (a); and its head holds
+    no capability or tool that the head of its parent unit does not hold. A
+    new grouping unit never counts as the ACTIVE child of another new
+    grouping unit. A grouping unit that gains a skill, tool, ladder or
+    explicit role must then meet (a). The frozen list never gains a unit: it
+    changes only when a unit in it is removed or moved, and an id reused for
+    a different unit leaves it. A unit in the chart is never an offer.
+    (Amended 2026-11-14 by council record 2026-11-14-g13-grouping-units.
+    Earlier wording: "A unit added after this record enters as PLACEHOLDER.
     It becomes ACTIVE only in a PR that shows one of its skills uses an
     AVAILABLE tool and has an eval case judged by that tool. A unit in the
-    chart is never an offer.
+    chart is never an offer.")
 11. **Sibling practices with identical skill sets** (for example the STA,
     signoff, power and project-management practices) get distinct skills or
     merge during their department's wave. This is a wave exit criterion, not a

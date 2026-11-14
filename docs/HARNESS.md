@@ -99,7 +99,11 @@ Change the setting in `harness.py` (or the code in a `CODE` file), say so in
 the pull request, and regenerate `capability/levels.json`
 (`scripts/capability_levels.py --write`): every Practised group from before
 becomes stale, and its skills need a new batch under the new harness. This is
-control plane: level computation decides what counts as evidence.
+control plane: level computation decides what counts as evidence. The
+control-plane founder class in `.github/review-teams.yml` lists `harness.py`,
+`evals/levels.py` and every `CODE` file by name, so a change to any of them
+gets the Founder Proxy's review. A file added to `CODE` is added to that class
+in the same pull request.
 
 ## What is not the harness
 
@@ -123,7 +127,10 @@ result and every answer. `tests/test_capability_levels.py`: a group that
 counts goes stale when one setting changes (the must-fail); two harnesses
 make two groups and only the current one counts; a run option other than the
 default is stale; no harness recorded, or a result and an answer that
-disagree, never counts.
+disagree, never counts. `tests/test_review_teams.py`: `harness.py`,
+`evals/levels.py` and each file in `CODE` (read from `CODE`, so a new entry
+is checked too) is listed in the control-plane class, and a change to it is
+classified control-plane.
 
 ## Not in this milestone
 
