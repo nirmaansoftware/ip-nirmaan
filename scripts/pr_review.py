@@ -136,10 +136,16 @@ READ_ONLY_TOOLS = "Read,Grep,Glob"
 PROC_DENIED = "Read(//proc/**)"
 DENIED_TOOLS = f"Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch,Task,Agent,{PROC_DENIED}"
 ENV_ALLOWLIST = ("HOME", "PATH", "USER", "LOGNAME", "LANG", "LC_ALL", "LC_CTYPE", "TMPDIR", "TERM", "SHELL", "CLAUDE_CONFIG_DIR")
-# The plan's long-lived token (`claude setup-token`) where the loop runs in
-# GitHub Actions; on the Mac the login is the Keychain's and it is unset. Only
-# the claude process gets it (model_env), never a check the loop runs.
-MODEL_ENV_EXTRA = ("CLAUDE_CODE_OAUTH_TOKEN",)
+# GitHub Actions: the plan's long-lived token (`claude setup-token`) is held in
+# this process's memory (set_plan_token) and handed to each claude process
+# through a pipe it reads once (Claude Code's CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR),
+# so no process environment holds it. On the Mac it is unset: the Keychain login.
+TOKEN_FD_ENV = "CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR"
+_PLAN_TOKEN: list[str] = []
+
+
+def set_plan_token(token: str | None):
+    _PLAN_TOKEN[:] = [token] if token else []
 SEVERITIES = ("blocker", "critical", "major", "minor", "info")
 VERDICT_KEYS = {"verdict", "sha", "findings", "checks_run", "not_run", "claims", "files_read", "summary"}
 # The Founder Proxy (agent) answers with one more verdict, and its reasons.
@@ -869,10 +875,23 @@ def reviewer_env(env=None) -> dict:
     return {k: env[k] for k in ENV_ALLOWLIST if k in env}
 
 
-def model_env(env=None) -> dict:
-    """reviewer_env plus the plan's token when one is set: for a claude process only."""
-    env = os.environ if env is None else env
-    return {**reviewer_env(env), **{k: env[k] for k in MODEL_ENV_EXTRA if env.get(k)}}
+def run_claude(binary: str, args: list[str], stdin: str, cwd: str, timeout_s: float) -> subprocess.CompletedProcess:
+    """A claude process with reviewer_env; the plan's token, when one is held,
+    only through a pipe (TOKEN_FD_ENV names its descriptor), never the environment."""
+    env = reviewer_env()
+    if not _PLAN_TOKEN:
+        return subprocess.run([binary, *args], input=stdin, capture_output=True, text=True, cwd=cwd, env=env, timeout=timeout_s)
+    r, w = os.pipe()
+    try:
+        os.write(w, _PLAN_TOKEN[0].encode())
+        os.close(w)
+        w = None
+        return subprocess.run([binary, *args], input=stdin, capture_output=True, text=True, cwd=cwd,
+                              env={**env, TOKEN_FD_ENV: str(r)}, pass_fds=(r,), timeout=timeout_s)
+    finally:
+        os.close(r)
+        if w is not None:
+            os.close(w)
 
 
 def claude_args(model: str, system_prompt: str, add_dirs: list[str], schema: dict | None = None) -> list[str]:
@@ -908,8 +927,7 @@ def interpret(code: int, stdout: str, stderr: str) -> dict:
 def run_once(binary: str, args: list[str], stdin: str, cwd: str, timeout_s: float) -> dict:
     started = time.monotonic()
     try:
-        proc = subprocess.run([binary, *args], input=stdin, capture_output=True, text=True, cwd=cwd,
-                              env=model_env(), timeout=timeout_s)
+        proc = run_claude(binary, args, stdin, cwd, timeout_s)
     except subprocess.TimeoutExpired:
         return {"kind": "timeout", "error": f"claude did not answer within {round(timeout_s)}s", "duration_ms": int((time.monotonic() - started) * 1000)}
     except OSError as exc:

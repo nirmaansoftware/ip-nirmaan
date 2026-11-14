@@ -15,6 +15,14 @@ reuses the M26 FIFO fixtures: lint, the self-checking testbench, a wrong
 testbench that must fail, the overflow mutant (M58) that the testbench must
 catch, and the DEPTH 8 proof.
 
+The wave 2 example (W2-X1, gate G18 of the record) has two folders on the
+verification eval fixtures. `examples/dv_irq_ctrl/` reuses W2-E1's interrupt
+controller: lint, the directed SystemVerilog testbench passing, and the same
+testbench failing each of the five RTL mutants its case lists.
+`examples/dv_formal/` reuses W2-E2's blocks: the credit counter proof and its
+cover run (every cover reached), and the deep counter's prove-mode proof. Each
+declares 30 seconds, so the three examples together declare 120 of the 300.
+
 Rules, checked by `tests/test_examples_budget.py`:
 
 1. **Inside the existing jobs.** The examples are a test file, so they run in

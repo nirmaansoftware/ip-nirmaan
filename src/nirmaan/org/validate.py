@@ -218,6 +218,7 @@ def _workflows(org: "Organization") -> list[str]:
             issues.append(f"gate {gate.id}: unknown capability {gate.approver_capability}")
         elif not _held_by_active(org, gate.approver_capability, gate.min_level):
             issues.append(f"gate {gate.id}: nobody at {gate.min_level.value}+ can approve it")
+    issues += [f"independent gate {g}: unknown gate" for g in sorted(org.independent_gates - set(org.gates))]
     return issues
 
 

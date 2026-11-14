@@ -8,7 +8,7 @@ extensions, validates, and freezes it.
 from __future__ import annotations
 
 from nirmaan.company.capabilities import CAPABILITIES
-from nirmaan.company.governance import AUTHORITY, CONSTITUTION, ESCALATION, GATES
+from nirmaan.company.governance import AUTHORITY, CONSTITUTION, ESCALATION, GATES, INDEPENDENT_GATES
 from nirmaan.company.org_chart import COMPANY_NAME, EXECUTIVES, LEVEL_PROFILES, units
 from nirmaan.company.skills import SKILLS
 from nirmaan.company.tools import TOOLS
@@ -28,6 +28,7 @@ def nirmaan_definition() -> CompanyDefinition:
         tools=list(TOOLS),
         workflows=list(WORKFLOWS),
         gates=list(GATES),
+        independent_gates=list(INDEPENDENT_GATES),
         principles=list(CONSTITUTION),
         authority=list(AUTHORITY),
         escalation=list(ESCALATION),

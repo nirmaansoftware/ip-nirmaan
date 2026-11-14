@@ -276,7 +276,7 @@ class Orchestrator:
         org = self._org
         gate = org.gates[stage.gate]
         owners = [tasks[t].owner for t in ids if tasks[t].owner]
-        decision = self._router.gate_approver(gate, stage.criticality, owners[0] if owners else None)
+        decision = self._router.gate_approver(gate, stage.criticality, owners[0] if owners else None, tuple(owners))
         return Task(
             id=f"{pid}:{prefix}{stage.id}.gate", title=f"Gate: {gate.name}", kind=TaskKind.GATE, project=pid,
             description=gate.description, phase=stage.phase, workflow=wf.id, stage=stage.id,
