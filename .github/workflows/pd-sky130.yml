@@ -149,9 +149,15 @@ jobs:
         with:
           name: pd-sky130-logs
           path: |
-            ${{ runner.temp }}/pd/**/*.log
-            ${{ runner.temp }}/pd/**/*.tcl
-            ${{ runner.temp }}/pd/**/*.report
-            ${{ runner.temp }}/pd/**/*.json
+            ${{ runner.temp }}/pd
             ${{ runner.temp }}/junit
+            !${{ runner.temp }}/pd/**/*.gds
+            !${{ runner.temp }}/pd/**/*.def
+            !${{ runner.temp }}/pd/**/*.odb
+            !${{ runner.temp }}/pd/**/*.spice
+            !${{ runner.temp }}/pd/**/*.spef
+            !${{ runner.temp }}/pd/**/*.ext
+            !${{ runner.temp }}/pd/**/*.v
+            !${{ runner.temp }}/pd/**/*.cdl
+            !${{ runner.temp }}/pd/**/*.lyt
           if-no-files-found: warn

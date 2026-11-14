@@ -1,0 +1,118 @@
+# The SKY130 physical design pilot (Milestone 79)
+
+Resources item R3 of the capability build-out: physical design in CI, one
+pilot block from RTL to DRC and LVS on an open PDK, on GitHub-hosted runners
+only. Tools approved by the founder, in session, 2026-11-14 (OpenROAD-flow-scripts,
+KLayout, Magic, Netgen; the open PDKs SKY130, GF180MCU and IHP SG13G2; CI
+runners only, never a development machine). This milestone covers SKY130;
+GF180MCU and IHP SG13G2 are follow-ups.
+
+## 1. What already existed, and the gap
+
+M27, M29 and M34 already run synthesis, place and route, signoff timing, and
+KLayout DRC and LVS on the sky130hd platform in the required `physical-design`
+job, over the AXI4-Lite register block (`docs/PHYSICAL_DESIGN.md`,
+`docs/PD_SIGNOFF.md`, `docs/PD_FINAL.md`). Two things were missing:
+
+* **Magic and Netgen**, the DRC and LVS tools the SKY130 open-source signoff
+  flows use with the open_pdks rule files. M34 found neither in the image, so
+  `pv.run` could judge a layout only with the platform's KLayout decks.
+* **A pilot block of the product's own**, run end to end as its own job, so
+  the flow can change without touching the required checks.
+
+## 2. Decision: a second `pv.run` backend, not a new tool
+
+Magic DRC and Netgen LVS answer the same question as the KLayout backend, so
+they are a backend of `pv.run` (`magic-netgen`, `integrations/pv_magic.py`),
+one `register_backend` call with no EDA core change. Its counts are printed
+as the same `nirmaan-*` lines the KLayout scripts print, so `parse_klayout`
+judges both and the physical-verification gate's bounds
+(`drc_violations<=0`, `lvs_mismatches<=0`) read either. The tool stays
+`AVAILABLE` (it was since M34), so no count changes.
+
+It runs only when named (`backend: magic-netgen`): KLayout stays the default,
+and every run records which tools judged it.
+
+### Steps
+
+| Step | Executable | What |
+|---|---|---|
+| stream | `klayout` | The routed DEF to GDS with the cells' GDS merged in: the M34 stream script, unchanged |
+| DRC | `magic` | The PDK's Magic technology file; `gds read`, `drc check`, then Nirmaan's Tcl counts each rule `drc listall why` reports |
+| extract | `magic` | The same GDS extracted to SPICE (`extract all`, `ext2spice lvs`) |
+| LVS | `netgen` | The extracted layout against the routed netlist with supply pins (`pnr.run`'s `pg_netlist`), read over the cells' SPICE, under the PDK's Netgen setup, written as JSON |
+| count | this Python | Nirmaan's own script reads Netgen's JSON and prints mismatched circuits, nets, devices and pins |
+
+Pass means every step exited 0, the GDS has no empty cell, DRC counted 0, and
+the LVS count found no mismatch and Netgen's final result is a unique match.
+A run that cannot show a count is a recorded failed run.
+
+### Parameters (declared on `pv.run`)
+
+`magic_tech` (the PDK's `.tech`), `netgen_setup` (the PDK's setup `.tcl`),
+`spice` (the cells' SPICE), plus the stream's `tech_lef`, `lef`, `gds` and
+`klayout_tech`. All are PDK files: relative paths resolve under
+`NIRMAAN_PDK_ROOT`, a missing one is a refusal, and no PDK is bundled.
+
+## 3. The pilot and its workflow
+
+The block is the M26 synchronous FIFO (`tests/fixtures/rtl/sync_fifo`), the
+smaller of the two the plan named (sync_fifo or timer), at 100 MHz
+(`tests/fixtures/pd/sync_fifo.sdc`). `tests/test_pd_sky130_pilot.py` runs
+it through the broker: `synth.run` (`yosys-liberty`), `pnr.run` on sky130hd
+(power grid, CTS, fill, extraction, timing), then `pv.run` with KLayout and
+with Magic and Netgen, both clean. Two must-fail runs keep the clean result
+from being vacuous: a flip-flop moved 1 nm off the 5 nm grid must fail Magic
+DRC, and a flip-flop input rewired in the reference netlist must fail Netgen
+LVS.
+
+`.github/workflows/pd-sky130.yml`, on `ubuntu-24.04`:
+
+* in the same OpenROAD-flow-scripts image as `ci.yml`, pinned by digest
+  (OpenROAD, Yosys, KLayout, the sky130hd platform);
+* Magic and Netgen built from release tags, each checked against its commit,
+  and cached by commit;
+* the three open_pdks SKY130A files Magic and Netgen read
+  (`sky130A.tech`, `sky130A_setup.tcl`, `sky130_fd_sc_hd.spice`), from the
+  same ciel release `ci.yml` already pins, each archive checked by sha256;
+* triggers: `workflow_dispatch`, and pull requests and pushes to `main` that
+  touch the flow (`physical.py`, `pv_magic.py`, `pd_parsers.py`), the pilot
+  test, its SDC, or the block's RTL;
+* not a required check. The owners decide whether it becomes one from its
+  measured time (section 5).
+
+The pilot test is collected only where `NIRMAAN_PD_PILOT` is set
+(`tests/conftest.py`), so the required jobs neither run nor skip it and
+`test-union` is unchanged. The backend's own tests, with stand-in executables,
+run everywhere (`tests/test_pv_magic.py`).
+
+## 4. Tools, PDK and licences
+
+Each licence is read from the project's own licence file upstream. Nothing of
+any of them is committed here: the tools are built or pulled in CI, the PDK
+files are fetched in CI, so NOTICE does not change.
+
+| What | Version | Licence (upstream file) |
+|---|---|---|
+| OpenROAD-flow-scripts image | `26Q3-687-gc63a606f9`, by digest (as `ci.yml`) | BSD 3-Clause for the build and run scripts (`LICENSE_BUILD_RUN_SCRIPTS`) |
+| OpenROAD (in the image) | submodule `c487fc70` | BSD 3-Clause (`LICENSE`) |
+| KLayout (in the image) | 0.30.12 | GNU GPL version 3 (`LICENSE`) |
+| Magic | 8.3.686 (`56319630`) | University of California permission notice (`LICENSE`) |
+| Netgen | 1.5.325 (`85bddb8f`) | GNU GPL version 1 (`Copying`) |
+| SKY130 PDK, open_pdks build | ciel release `sky130-ff08c23d` (`common`, `sky130_fd_sc_hd`) | Apache 2.0 (`google/skywater-pdk` and `skywater-pdk-libs-sky130_fd_sc_hd` `LICENSE`; `open_pdks` `LICENSE`) |
+
+Magic's notice ends: "Export of this software outside of the United States of
+America may require an export license." The runners only run it; nothing is
+redistributed. That sentence is flagged for the owners in the pull request.
+
+## 5. Results
+
+To be filled from the pull request's own CI runs.
+
+## 6. Not in this milestone
+
+* GF180MCU and IHP SG13G2 (approved; follow-ups, one PDK per pull request).
+* The OpenROAD-flow-scripts `make` flow itself: `pnr.run` keeps its own
+  script, and the image supplies the tools and the platform.
+* Making `pd-sky130` a required check, or adding the backend to a workflow's
+  gate (the physical-verification stage still names no backend).

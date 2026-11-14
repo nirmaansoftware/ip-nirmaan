@@ -54,8 +54,11 @@ def test_sync_fifo_from_rtl_to_drc_and_lvs_on_sky130(project, tmp_path):
     assert synth.succeeded, synth.summary
     netlist = outcome.data["result"]["metrics"]["netlist"]
 
+    # No metal fill: the platform's KLayout layer map has no fill layers, so the stream writes fill on
+    # layers neither deck reads (Magic says so and fails the run); see docs/PD_SKY130_PILOT.md.
+    pnr_pdk = {k: v for k, v in SKY130HD_PNR.items() if k != "fill_rules"}
     pnr, outcome = invoke(project, "pnr.run", {"netlist": netlist, "sdc": str(SDC), "top": TOP, **SKY130HD,
-                                               **SKY130HD_PNR, "utilization": "30", "timeout": "900"},
+                                               **pnr_pdk, "utilization": "30", "timeout": "900"},
                           tmp_path / "pnr")
     m = outcome.data["result"]["metrics"]
     print(f"pilot pnr: {pnr.summary}")
@@ -75,13 +78,15 @@ def test_sync_fifo_from_rtl_to_drc_and_lvs_on_sky130(project, tmp_path):
     cm = c_outcome.data["result"]["metrics"]
     print(f"pilot magic-netgen: {clean.summary}")
     assert cm["drc_violations"] == 0 and cm["lvs_mismatches"] == 0 and cm["gds_empty_cells"] == 0, clean.summary
+    assert cm["magic_drc_style"] == "drc(full)" and cm["gds_shapes_skipped"] == 0, clean.summary
+    assert cm["netgen_final"] == "Final result: Circuits match uniquely.", clean.summary
     assert clean.succeeded and clean.id in project.state.tool_runs, clean.summary
 
-    # Must fail: a flip-flop moved 1 nm off the 5 nm grid, so its shapes are off grid and overlap.
+    # Must fail: a flip-flop moved 0.23 um (half a site) into its neighbour, so their shapes collide.
     layout = Path(out["def"]).read_text(encoding="utf-8")
     place = re.search(r"(- \S+ sky130_fd_sc_hd__dfxtp_\d \+ PLACED \( )(\d+) ", layout)
     broken_def = tmp_path / "broken.def"
-    broken_def.write_text(layout[:place.start()] + place[1] + f"{int(place[2]) + 1} " + layout[place.end():],
+    broken_def.write_text(layout[:place.start()] + place[1] + f"{int(place[2]) + 230} " + layout[place.end():],
                           encoding="utf-8")
     bad_drc, outcome = invoke(project, "pv.run", {**magic_pv, "def": str(broken_def)}, tmp_path / "pv_magic_drc",
                               bounds=SIGNOFF)

@@ -21,10 +21,12 @@ backend and nothing else: no EDA core change. See ``docs/PD_SKY130_PILOT.md``.
 
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 
 from nirmaan.integrations.eda import Backend, EdaResult, Job, RunRecord, register_backend
+from nirmaan.integrations.eda_parsers import Diagnostic, _first, _plural
 from nirmaan.integrations.pd_parsers import parse_klayout
 from nirmaan.integrations.physical import STREAM_SCRIPT, _klayout_tech, _tcl, _token, needs_pdk, pdk_paths
 from nirmaan.models import text_value
@@ -32,13 +34,15 @@ from nirmaan.runtime.tools import Params
 
 BACKEND = "magic-netgen"
 
-#: Magic DRC over the streamed GDS: every error Magic finds in the hierarchy, counted per rule.
+#: Magic DRC over the streamed GDS: every error Magic finds in the hierarchy, counted per rule, in the
+#: full rule set (``drc(full)``, the open_pdks name; the style that ran is printed and recorded, M79).
 DRC_SCRIPT = '''tech load {tech}
 gds read {gds}
 load {top}
 select top cell
 expand
 drc euclidean on
+drc style drc(full)
 puts "nirmaan-magic-drc-style: [drc list style]"
 drc check
 drc catchup
@@ -145,14 +149,33 @@ def _steps(job: Job) -> list[list[str]]:
             [sys.executable, "-I", "lvs_count.py", str(work / "lvs.report"), top]]
 
 
+#: Magic skips a GDS shape on a layer its technology does not read and goes on: the checks would then
+#: judge a layout with shapes missing, so each such line fails the run.
+_GDS_SKIP_RE = re.compile(r'^Error while reading cell "(?P<cell>[^"]+)".*?: (?P<msg>.*)$')
+_STYLE_RE = re.compile(r"^nirmaan-magic-drc-style: (?P<style>\S+)")
+_FINAL_RE = re.compile(r"^nirmaan-netgen-final: (?P<final>.*)$")
+
+
 def _parse(run: RunRecord) -> EdaResult:
     result = parse_klayout(run.log, run.returncode, ["drc", "lvs"])
+    lines = [line.strip() for line in run.log.splitlines()]
+    # Both Magic sessions read the same GDS, so each record is counted once.
+    skipped = [Diagnostic("error", f"Magic skipped GDS shapes in {text}") for text in dict.fromkeys(
+        f"{m['cell']}: {m['msg']}" for line in lines if (m := _GDS_SKIP_RE.match(line)))]
+    style = next((m["style"] for line in lines if (m := _STYLE_RE.match(line))), None)
+    final = next((m["final"] for line in lines if (m := _FINAL_RE.match(line))), None)
     outputs = {kind: str(run.workdir / name) for kind, name in
                (("gds", "layout.gds"), ("layout_spice", "layout.spice"), ("lvs_report", "lvs.report"))
                if (run.workdir / name).is_file()}
-    return EdaResult(result.passed, result.summary.replace("physical verification", "physical verification "
-                                                           "(Magic and Netgen)", 1),
-                     result.diagnostics, {**result.metrics, "outputs": outputs})
+    metrics = {**result.metrics, "magic_drc_style": style, "netgen_final": final,
+               "gds_shapes_skipped": len(skipped), "outputs": outputs}
+    summary = result.summary.replace("physical verification", "physical verification (Magic and Netgen)", 1)
+    if skipped:
+        why = f"{_plural(len(skipped), 'GDS record')} Magic could not read{_first(skipped)}"
+        rest = summary.split(": ", 1)[1] if not result.passed else ""
+        summary = f"physical verification (Magic and Netgen) failed: {why}" + (f"; {rest}" if rest else "")
+        return EdaResult(False, summary, (*result.diagnostics, *skipped), metrics)
+    return EdaResult(result.passed, summary, result.diagnostics, metrics)
 
 
 _PDK = needs_pdk(tech_lef="a technology LEF", lef="a cell LEF", gds="the cells' GDS",
