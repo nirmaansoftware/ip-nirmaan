@@ -3,8 +3,9 @@
 The M79 pilot (`docs/PD_SKY130_PILOT.md`) on a second open PDK: the same
 block from RTL to DRC and LVS, on GitHub-hosted runners only, on the
 OpenROAD-flow-scripts `gf180` platform with Magic and Netgen over the open_pdks
-GF180MCU files. The founder approved GF180MCU for CI use (founder, in session,
-2026-11-14); CI runners only, never a development machine. IHP SG13G2 is a
+GF180MCU files. Use of GF180MCU in CI is pending the founder's
+decision; no committed record of that decision exists yet. CI runners only,
+never a development machine. IHP SG13G2 is a
 separate follow-up.
 
 ## 1. Decisions
