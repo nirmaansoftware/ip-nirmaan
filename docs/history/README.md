@@ -121,6 +121,7 @@ The original preface of the section:
 - [M68-block-verification](M68-block-verification.md): Milestone 68 - Block verification: verify an existing block's RTL, with the testbench and the proof gated over the approved RTL
 - [M69-eqy-equivalence](M69-eqy-equivalence.md): Milestone 69 - Logic equivalence through eqy: equivalence.run runs, and gates block verification's equivalence stage
 - [M71-repro-gates](M71-repro-gates.md): Milestone 71 - Repro gates: a regression investigation asked to reproduce its failure gates triage and root cause on repro testbenches that fail on the handed-over RTL
+- [M72-cocotb](M72-cocotb.md): Milestone 72 - Python testbenches through cocotb: simulator.run's cocotb backend, judged by cocotb's own results
 - [M73-harness-fingerprint](M73-harness-fingerprint.md): Milestone 73 - The harness in one place, and its fingerprint on every trial; a changed harness makes a level's trials stale
 
 ## Before M43
