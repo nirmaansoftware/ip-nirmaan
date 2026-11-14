@@ -80,8 +80,8 @@ that backs it. This card holds no tool; the tool it points to is `synth.run`.
   adds up from stage to stage and can set the clock period; registering it
   breaks the chain at the cost of a buffer or a lost cycle [Pipe].
 - Wide arithmetic is area. A multiplier costs far more cells than an adder of
-  the same width. On 2026-11-15 the gate's synthesis of a 32 by 32 bit multiply
-  into a 64-bit register gave 6,280 cells and 64 flip-flops (gate lines above).
+  the same width, and its cell count grows roughly with the product of the
+  operand widths (inference, no run record is committed for a measured figure).
   Share one unit across cycles where the throughput allows (inference).
 - Yosys has passes that restructure cascades of adders and multipliers into
   trees to improve timing [Opt]; do not write an arithmetic chain assuming
