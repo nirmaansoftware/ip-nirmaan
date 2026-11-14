@@ -1,0 +1,21 @@
+{
+  "title": "Interrupt controller: lint, the directed SystemVerilog testbench passing, and each of five RTL mutants caught",
+  "fixture": "tests/fixtures/dv/irq_ctrl",
+  "budget_seconds": 30,
+  "steps": [
+    {"tool": "lint.run", "needs": ["verilator"], "expect": "pass",
+     "params": {"sources": "irq_ctrl.v", "top": "irq_ctrl"}},
+    {"tool": "simulator.run", "needs": ["iverilog", "vvp"], "expect": "pass",
+     "params": {"sources": "irq_ctrl.v,irq_ctrl_tb.sv", "top": "irq_ctrl_tb", "backend": "icarus"}},
+    {"tool": "test.run", "needs": ["iverilog", "vvp"], "expect": "fail",
+     "params": {"sources": "mutants/irq_ctrl_priority_inverted.v,irq_ctrl_tb.sv", "top": "irq_ctrl_tb", "backend": "icarus"}},
+    {"tool": "test.run", "needs": ["iverilog", "vvp"], "expect": "fail",
+     "params": {"sources": "mutants/irq_ctrl_ack_ignored.v,irq_ctrl_tb.sv", "top": "irq_ctrl_tb", "backend": "icarus"}},
+    {"tool": "test.run", "needs": ["iverilog", "vvp"], "expect": "fail",
+     "params": {"sources": "mutants/irq_ctrl_level_mask_ignored.v,irq_ctrl_tb.sv", "top": "irq_ctrl_tb", "backend": "icarus"}},
+    {"tool": "test.run", "needs": ["iverilog", "vvp"], "expect": "fail",
+     "params": {"sources": "mutants/irq_ctrl_clear_beats_set.v,irq_ctrl_tb.sv", "top": "irq_ctrl_tb", "backend": "icarus"}},
+    {"tool": "test.run", "needs": ["iverilog", "vvp"], "expect": "fail",
+     "params": {"sources": "mutants/irq_ctrl_w1c_clears_all.v,irq_ctrl_tb.sv", "top": "irq_ctrl_tb", "backend": "icarus"}}
+  ]
+}
