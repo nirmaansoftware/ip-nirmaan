@@ -1,7 +1,7 @@
 # Milestone 81 - The GF180MCU physical design pilot in CI, and three signoff fixes it found
 
-The M79 pilot on a second open PDK, approved for CI use by the founder
-(founder, in session, 2026-11-14). Design: `docs/PD_GF180_PILOT.md`. Tests:
+The M79 pilot on a second open PDK, whose CI use is pending the founder's
+decision (no committed record of that decision exists yet). Design: `docs/PD_GF180_PILOT.md`. Tests:
 `tests/test_pd_gf180_pilot.py` (in `pd-gf180` only), and in
 `tests/test_nirmaan_physical.py` and `tests/test_pv_magic.py` for the fixes.
 No version bump, no count changes (`pv.run` and `pnr.run` were already
