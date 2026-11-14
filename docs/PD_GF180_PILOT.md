@@ -146,12 +146,10 @@ What the earlier runs of this pull request found, in order:
   are the file's `FILL` lines (datatype 4, the PDK's dummy metal), and the
   platform's KLayout map, used without the file, sends fill to the drawing
   datatype 0, also a mapped target. No fill was checked by either deck here.
-* **Earlier pilots, an open question.** M29 and M34 wrote their DEF after
-  extraction too, so any minimum-area patch the router made there was dropped
-  in the same way. Whether that explains M34's met3 islands at stacked via2
-  and via3 (why sky130hd signals stop at met3) is not tested here; it is a
-  question for the physical design owners. `pd-sky130` and `physical-design`
-  are green with the fix.
+* **Earlier pilots, not re-tested.** M29 and M34 also wrote their DEF after extraction, so by the same
+  mechanism any minimum-area patch the router made there would have been dropped. This pull request did not
+  re-run those pilots without the fix, so it makes no claim about them, including about M34's met3 islands.
+  An open item for the physical design owners. `pd-sky130` and `physical-design` run with the fix.
 
 ## 6. Not in this milestone
 

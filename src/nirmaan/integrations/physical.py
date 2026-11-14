@@ -488,9 +488,8 @@ def _pnr_steps(job: Job) -> list[list[str]]:
             *(["foreach net $nirmaan_supplies { check_power_grid -net $net }"] if grid else []),
             *ir])
         # M81: the layout is written here, before extraction: OpenRCX reorders the routed wires and drops the
-        # router's minimum-area patches, so a DEF written after it lost every patch (252 on the GF180MCU
-        # pilot, which Magic then found as Metal2 and Metal3 islands under the minimum area; captured in
-        # tests/fixtures/pd/gf180/patches_diagnostic.log and magic_netgen_pv_via_subcells.log).
+        # router's minimum-area patches, so a DEF written after it lacked them, and Magic then found the unpatched
+        # via pads as islands under the minimum area (record: tests/fixtures/pd/gf180/patches_diagnostic.log).
         script += _layout_outputs("route")
     if "extract" in plan:
         rules = pdk_paths(p, "rcx_rules")[0]

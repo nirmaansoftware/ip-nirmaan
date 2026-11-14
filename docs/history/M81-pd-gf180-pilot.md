@@ -35,6 +35,6 @@ The job took 2 min 19 s.
 
 **Gaps, stated.** No KLayout deck in the platform (DRC and LVS are Magic's and
 Netgen's only); no IR drop (via cut layers have no resistance at TC); no fill
-(ORFS fills only chips). Open question for the owners: M29 and M34 DEFs were
-written after extraction too; whether that explains M34's met3 islands at
-stacked vias is not tested here.
+(ORFS fills only chips). Not re-tested, an open item for the owners: M29 and M34 also wrote their DEF after
+extraction, so by the same mechanism they would have lost patches; this milestone did not re-run them and
+claims nothing about them (including M34's met3 islands).
