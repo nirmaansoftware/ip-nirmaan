@@ -192,6 +192,14 @@ the filled one, so `pv.run` checks the layout with its fill, and extraction
 runs after fill, as in ORFS. On the AXI4-Lite block: 12947 fill shapes on met2
 to met5 (met1 has no room), and DRC is clean with and without them.
 
+**Correction (M80, 2026-11-14).** "DRC is clean with them" did not hold as a
+check of the fill: the stream put the fill on GDS layers no deck reads (7/28 to
+13/28), so DRC saw the routing and the cells only. Read, the fill from
+`fill.json` as shipped has 543 violations of the met3 and met4 minimum area
+(`m3.6`, `m4.4`), from its 0.4 um sides. M80 streams the fill to the layers the
+deck reads, adds a broken-fill control, and fills the CI tests without the 0.4
+um sides (`docs/PD_FILL_LAYERS.md`).
+
 ---
 
 ## 7. The workflow, and `min_` limits
@@ -239,6 +247,10 @@ Physical verification on the filled layout:
 | Clean | DRC 0 (BEOL and grid rules), LVS match (0 mismatched circuits, nets, devices, pins, subcircuits), 0 cells without GDS, 12947 fill shapes |
 | One `dfxtp` moved 1 nm (off the 5 nm grid) | 782 DRC violations: `licon_OFFGRID` 200, `li_OFFGRID` 172, `poly_OFFGRID` 138, `ct_OFFGRID` 88, `ct.1` 64, and more; a recorded failed run |
 | One flip-flop's `D` rewired in the netlist | LVS: the top circuit unmatched, 2 nets and 1 subcircuit mismatched; DRC still 0; a recorded failed run |
+
+Correction (M80): the clean run's DRC 0 did not cover the 12947 fill shapes,
+which were on layers the deck does not read; see section 6 and
+`docs/PD_FILL_LAYERS.md`.
 
 **Routing on met1 to met3.** With signals allowed up to met4 (M29's
 setting), the KLayout deck found 3 `m3.6` violations (met3 area under

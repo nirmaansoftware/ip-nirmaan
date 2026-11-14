@@ -63,7 +63,26 @@ numbers. The fill therefore goes where the deck that judges it reads it. The
 `magic-netgen` backend still cannot read a filled sky130hd layout (each skipped
 shape fails its run, M79), so the M79 pilot keeps running without fill.
 
-## 3. The must-fail control
+## 3. What the deck found in the fill
+
+Once it read the fill (CI run 43608045086, head a0685e6), the deck found 543
+violations on the AXI4-Lite block filled with the platform's `fill.json` as it
+ships: `m4.4` 294 and `m3.6` 249, the minimum met4 and met3 area (0.24 um2).
+That file allows 0.4 um fill sides on met3 and met4, and a 0.4 by 0.4 um (0.16
+um2) or 0.4 by 0.58 um (0.232 um2) rectangle is under that area. The same run
+refused the M44 factory line's physical-verification stage for the same
+reason, so its "signed-off layout" had the same gap. `pv.run` failing that
+layout is the correct result now that the fill is checked.
+
+The PDK's file is not edited and not copied into the repository. The two tests
+that fill a real sky130hd layout (`test_real_signoff_flow_on_sky130hd` and the
+factory line's `test_one_request_runs_from_requirements_to_a_signed_off_layout`)
+read it at run time and drop every fill side whose square is under 0.24 um2 on
+met3 and met4 (`sky130hd_fill_rules` in `tests/test_nirmaan_physical.py`),
+which leaves 0.58, 1 and 2 um. Anyone filling with the platform's file as it
+ships gets these violations from `pv.run`, as they should.
+
+## 4. The must-fail control
 
 In `test_real_signoff_flow_on_sky130hd` (the `physical-design` CI job), after the
 clean run: the first fill rectangle in the routed DEF's `FILLS` section is
@@ -74,8 +93,9 @@ area rule, with LVS still clean. The clean run must have every fill shape on
 
 CI_RESULT_PLACEHOLDER
 
-## 4. Not in this milestone
+## 5. Not in this milestone
 
 * Streaming SKY130 fill to its mask-numbered layers for a tapeout GDS, with a
   deck that reads them. The ORFS deck is the PDK's file and is not edited here.
 * Fill in the M79 pilot (Magic reads no fill layer the KLayout deck reads).
+* Reporting the 0.4 um met3 and met4 fill sizes upstream to ORFS.

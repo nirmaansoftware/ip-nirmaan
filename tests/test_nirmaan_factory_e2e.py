@@ -37,6 +37,7 @@ from test_nirmaan_physical import (
     SKY130HD_PV,
     only_on_path,
     sky130hd,
+    sky130hd_fill_rules,
 )
 
 from nirmaan.models import (
@@ -343,9 +344,10 @@ def _front_end(engine, tmp_path: Path, rtl: Path, until: str | None = None, scan
 
 
 def _layout(engine, tmp_path: Path) -> None:
+    fill = {"fill_rules": sky130hd_fill_rules(tmp_path)}  # M80: fill the deck finds legal once it reads the fill
     for stage in LAYOUT_STAGES:
         files = [("axi4_lite_regs.sdc", "constraints", SDC, None)] if stage == "timing-constraints" else []
-        _seat(engine, stage, files, tmp_path, **LAYOUT_INPUTS)
+        _seat(engine, stage, files, tmp_path, **{**LAYOUT_INPUTS, **fill})
     (gate,) = [t for t in engine.state.tasks.values() if t.kind is TaskKind.GATE]
     assert gate.status is TaskStatus.READY
     engine.approve_gate(gate.id, human(gate.owner), "signed off: timing, DRC, and LVS clean")

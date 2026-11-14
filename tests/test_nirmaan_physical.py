@@ -24,6 +24,7 @@
 from __future__ import annotations
 
 import ast
+import json
 import os
 import re
 import shutil
@@ -975,6 +976,23 @@ def sky130hd(*extra: dict[str, str]) -> None:
         pytest.skip(reason)
 
 
+def sky130hd_fill_rules(tmp_path: Path) -> str:
+    """M80: the platform's ``fill.json`` without fill sides under the minimum metal area's square root.
+
+    Its 0.4 um sides on met3 and met4 give fill of 0.16 or 0.232 um2, under the deck's minimum met3 and
+    met4 area (m3.6, m4.4: 0.24 um2). Once the deck read the fill, it found 543 of them (CI run
+    43608045086: m4.4 294, m3.6 249). The platform's file is read, never copied into the repository.
+    """
+    rules = json.loads((Path(os.environ[PDK_ROOT_ENV]) / SKY130HD_PNR["fill_rules"]).read_text(encoding="utf-8"))
+    for layer in ("met3", "met4"):
+        sizes = rules["layers"][layer]["non-opc"]
+        for side in ("width", "height"):
+            sizes[side] = [s for s in sizes[side] if s * s >= 0.24]
+    path = tmp_path / "sky130hd_fill.json"
+    path.write_text(json.dumps(rules, indent=1), encoding="utf-8")
+    return str(path)
+
+
 @needs("openroad", "yosys", "klayout")
 def test_real_signoff_flow_on_sky130hd(project, tmp_path):
     """M29 signoff flow, and M34: metal fill, three timing corners, and KLayout DRC and LVS, clean and broken."""
@@ -986,7 +1004,8 @@ def test_real_signoff_flow_on_sky130hd(project, tmp_path):
     assert synth.succeeded, synth.summary
     netlist = outcome.data["result"]["metrics"]["netlist"]
     run, outcome = invoke(project, "pnr.run", {"netlist": netlist, "sdc": str(SDC), "top": TOP, **SKY130HD,
-                                               **SKY130HD_PNR, "utilization": "30", "timeout": "900"},
+                                               **SKY130HD_PNR, "fill_rules": sky130hd_fill_rules(tmp_path),
+                                               "utilization": "30", "timeout": "900"},
                           tmp_path / "pnr")
     m = outcome.data["result"]["metrics"]
     assert m["stages_completed"] == ["floorplan", "place", "cts", "route", "extract", "timing"], run.summary
