@@ -1,0 +1,19 @@
+{
+  "format": "nirmaan.eval-rejudge",
+  "record": "2026-11-14-claude-code-claude-opus-5-5-12",
+  "nirmaan_version": "1.25.0",
+  "trials": [
+    {
+      "case": "rtl/axil-timer",
+      "trial": 1,
+      "same": true,
+      "differences": []
+    },
+    {
+      "case": "rtl/axil-timer",
+      "trial": 2,
+      "same": true,
+      "differences": []
+    }
+  ]
+}
