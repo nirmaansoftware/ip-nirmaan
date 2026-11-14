@@ -432,42 +432,47 @@ checks the whole frame.
 `load_record` and `load_records` are unchanged: `nirmaan eval history` and
 `nirmaan eval rejudge` still read replays, which is how cases are proven.
 
-### Cover bounds: a coverage case (W2-E5)
+### Cover bounds (W2-E5)
 
-`coverage.read` (M70) reports line, toggle and branch percentages, and a
-requirement's own `bounds` (M48) are the threshold: the coverage seat's gate
-checks `COVERAGE_TARGETS`, line at least 90 and toggle at least 75. The scorer
-ran its `cover_tool` without bounds, so a run that read coverage of 7 percent
-passed the cover. A check may now carry `cover_bounds`, a list of the same M48
-text form as the CLI's `--bound` (`line>=90`); each is parsed when the case
-loads, and the `cover_tool` run is checked against them exactly as the broker
-checks a requirement's bounds (a metric that breaks one, or was never
-reported, fails the run). Nothing else changes:
+A requirement's own `bounds` (M48) are a threshold on the metrics a tool
+reports, and the broker fails a run that breaks one or never reports it. The
+scorer used to run its `cover_tool` without bounds, so a run that read a low
+coverage still passed the cover. A check may now carry `cover_bounds`, a list
+of the same M48 text form as the CLI's `--bound` (`line>=90`); each is parsed
+when the case loads, and the `cover_tool` run is checked against them exactly
+as the broker checks a requirement's bounds. Nothing else changes:
 
 - the bounds apply to the `cover_tool` run only, never to the clean run or to
   a mutant run (a mutant must fail on its own checks, not on a coverage
   shortfall);
 - a check with no `cover_bounds` runs as before, and its dump leaves the field
   out, so no case digest changes;
-- a test pins the case's bounds to `COVERAGE_TARGETS`, so the case and the
-  seat's gate cannot drift apart.
+- `tests/test_eval_cover_bounds.py` tests all of this with synthetic tool
+  results: no case, no real tool and no measured figure.
+
+### A coverage case (W2-E5)
 
 `dv/coverage-irq-ctrl` judges the coverage seat (`code_coverage`) on the
-interrupt controller of the directed case. The seat is handed an approved
-testbench that only resets the block and reads registers
-(`coverage/irq_ctrl_idle_tb.sv`: it never raises a source) and must write one
-whose line and toggle coverage of the approved RTL, read by `coverage.read`,
-meets the bounds. Its control runs `coverage.read` as `tool` (the coverage
-seat holds `coverage.read` and not `simulator.run`) and as `cover_tool` with
-the bounds: the testbench passes on the approved RTL, meets the bounds, and
-fails each of three RTL mutants (priority inverted, acknowledge ignored, level
-mask ignored) on a check, so coverage is not bought with stimulus that checks
-nothing. The reference answer is the directed case's testbench with a coverage report.
-No coverage percentages are recorded here: none has a committed
-`evals/results/<run>/` record, and the tests assert pass or fail only.
+interrupt controller of the directed case, using `cover_bounds` (above). The
+seat is handed an approved testbench that only resets the block and reads
+registers (`coverage/irq_ctrl_idle_tb.sv`: it never raises a source) and must
+write one whose line and toggle coverage of the approved RTL, read by
+`coverage.read`, meets the bounds, which equal the coverage gate's
+`COVERAGE_TARGETS` (a test pins that). Its control runs `coverage.read` as
+`tool` (the coverage seat holds `coverage.read` and not `simulator.run`) and as
+`cover_tool` with the bounds: the testbench passes on the approved RTL, meets
+the bounds, and fails each of three RTL mutants (priority inverted,
+acknowledge ignored, level mask ignored) on a check, so coverage is not bought
+with stimulus that checks nothing. The reference answer is the directed case's
+testbench with a coverage report.
+
+No coverage percentage is stated in this repository for the case. The tests
+run the real coverage tool (they need Verilator, and skip where it is absent)
+and assert that the reference testbench meets the bounds and that each weak
+testbench misses them, so each CI run is the record.
 
 Three weak testbenches in `tests/fixtures/dv/irq_ctrl/coverage/` each pass
-their own checks on the approved RTL and fail the bounds:
+their own checks on the approved RTL and miss the bounds:
 
 | File | What it never does |
 |---|---|

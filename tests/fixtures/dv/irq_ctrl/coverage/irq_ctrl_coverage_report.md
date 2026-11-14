@@ -6,16 +6,11 @@ directed testbench of `dv/directed-irq-ctrl`: two lanes, `N` 8 and `N` 5, that
 raise level and rising-edge sources, mask and unmask them, clear by write and
 by acknowledge, and claim by priority.
 
-Measured by `coverage.read` over the approved `irq_ctrl.v` (the testbench's own
-points never count):
-
-| Metric | Result | Bound |
-|---|---|---|
-| line | 100 percent | at least 90 |
-| toggle | 79.7 percent | at least 75 |
-| branch | 100 percent | not bounded |
+Coverage is read by `coverage.read` over the approved `irq_ctrl.v` (the
+testbench's own points never count). The bounds are line at least 90 percent
+and toggle at least 75 percent; branch is not bounded. No measured figure is
+stated here: the eval's tests run the tool and assert the bounds are met, so
+the record is the test run.
 
 Toggle is the tighter bound: the wide `wdata` and `rdata` buses and the
-high bits of the `N` 5 lane's registers never move in a directed test. The
-figures are Verilator 5.052's; a Verilator that counts toggle points
-differently reads a different percentage.
+high bits of the `N` 5 lane's registers never move in a directed test.

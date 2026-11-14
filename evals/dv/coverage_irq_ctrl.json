@@ -5,7 +5,7 @@
   "skills": [
     "code_coverage"
   ],
-  "expected_behavior": "A self-checking SystemVerilog testbench for the approved irq_ctrl RTL, extending the approved testbench the seat is handed, whose line and toggle coverage of the approved RTL, read by coverage.read, meets the bounds (line at least 90 percent, toggle at least 75 percent), and a coverage report that states the measured figures. The testbench passes on the approved RTL under the coverage gate before review, and its checks are real: it fails on RTL that breaks the specification, so coverage is not bought with stimulus that checks nothing.",
+  "expected_behavior": "A self-checking SystemVerilog testbench for the approved irq_ctrl RTL, extending the approved testbench the seat is handed, whose line and toggle coverage of the approved RTL, read by coverage.read, meets the bounds (line at least 90 percent, toggle at least 75 percent), and a coverage report that states the figures the seat measured. The testbench passes on the approved RTL under the coverage gate before review, and its checks are real: it fails on RTL that breaks the specification, so coverage is not bought with stimulus that checks nothing.",
   "constraints": [
     "Work only from the approved interface specification, the approved RTL and the approved testbench; never change the RTL.",
     "Write the testbench in SystemVerilog, self-checking, ending with the verdict line the simulation gate reads.",
@@ -13,7 +13,7 @@
     "Check what the stimulus produces; the held-out controls also run the testbench against mutant RTL."
   ],
   "known_failure_modes": [
-    "A testbench that only resets the block and reads registers, as the approved one does: its checks pass and its toggle coverage is a few percent.",
+    "A testbench that only resets the block and reads registers, as the approved one does: its checks pass and its toggle coverage is far below the bound.",
     "A testbench that never acknowledges through CLAIM or never writes PENDING, so the clear logic is never run and line coverage stays under the bound.",
     "A testbench that never masks a source or never writes MODE, so the rising-edge and mask paths are never run.",
     "A testbench that drives every input but checks few outputs, so coverage is met and a mutant passes.",

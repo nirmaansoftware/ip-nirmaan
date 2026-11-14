@@ -119,7 +119,7 @@ def test_the_reference_meets_the_bounds_passes_the_rtl_and_fails_every_mutant(ni
     runs = {j.run: j for j in trial.judge_runs}
     clean, cover = score.runs
     assert runs[clean].tool == runs[cover].tool == "coverage.read"
-    assert runs[cover].succeeded and "line 100.00%" in runs[cover].summary, runs[cover].summary
+    assert runs[cover].succeeded and "limit not met" not in runs[cover].summary, runs[cover].summary  # meets the bounds
     assert len(score.failed_runs) == len(MUTANTS)
     for run in score.failed_runs:  # a mutant fails a check of the testbench, so its coverage is never read
         assert "coverage not read: simulation failed" in runs[run].summary, runs[run].summary
