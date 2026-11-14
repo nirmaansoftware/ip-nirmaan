@@ -36,7 +36,11 @@ BACKEND = "magic-netgen"
 
 #: Magic DRC over the streamed GDS: every error Magic finds in the hierarchy, counted per rule, in the
 #: full rule set (``drc(full)``, the open_pdks name; the style that ran is printed and recorded, M79).
+#: M81: the stream's via cells (``VIA_*``) are flattened into the cell that places them as Magic reads the
+#: GDS, in DRC and in extraction: Magic checks each subcell on its own and contacts across subcells, so a
+#: via cell judged alone gave hierarchy-only errors (GF180MCU, CI run 43613127358).
 DRC_SCRIPT = '''tech load {tech}
+gds flatglob VIA_*
 gds read {gds}
 load {top}
 select top cell
@@ -58,6 +62,7 @@ quit -noprompt
 
 #: Magic extraction of the same GDS to a SPICE netlist for LVS (devices and connectivity, no parasitics).
 EXTRACT_SCRIPT = '''tech load {tech}
+gds flatglob VIA_*
 gds read {gds}
 load {top}
 select top cell

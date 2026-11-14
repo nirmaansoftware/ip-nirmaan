@@ -1,0 +1,64 @@
+# CAPTURED: pv.run backend magic-netgen, a flip-flop D input rewired in the reference netlist; CI run 43616066140 (head 65d619d), job gf180-pilot, test_sync_fifo_from_rtl_to_drc_and_lvs_on_gf180mcu; excerpt: in order, every step line, the tools' banners, errors and warnings, Magic's DRC and GDS lines, Netgen's final result and every nirmaan- line; nothing else is edited.
+$ klayout -zz -rd tech_file=/__w/_temp/pd/test_sync_fifo_from_rtl_to_drc0/pv_magic_lvs/klayout.lyt -rd layer_map=/OpenROAD-flow-scripts/flow/platforms/gf180/gds/9t/gf180mcu_5LM_1TM_9K_9t_edi2gds.layermap -rd in_def=/__w/_temp/pd/test_sync_fifo_from_rtl_to_drc0/pnr/route.def -rd in_gds=/OpenROAD-flow-scripts/flow/platforms/gf180mcuC/libs.ref/gf180mcu_fd_sc_mcu9t5v0/gds/gf180mcu_fd_sc_mcu9t5v0.gds -rd design_name=sync_fifo -rd fill_targets=34/4,35/0,36/4,38/0,40/0,41/0,42/4,46/4,81/4 -rd out_file=/__w/_temp/pd/test_sync_fifo_from_rtl_to_drc0/pv_magic_lvs/layout.gds -r stream.py
+Warning: DEF UNITS does not match reader DBU (DEF UNITS is 2000 and corresponds to a DBU of 0.0005, but reader DBU is set to 0.001) (line=5, cell=, file=route.def)
+Warning: No mapping for purpose 'OUTLINE' - layer is ignored (line=6, cell=, file=route.def)
+nirmaan-gds-empty-cells: 0
+nirmaan-gds-fill-shapes: 0
+nirmaan-gds-fill-unmapped: 0 -
+$ magic -dnull -noconsole magic_drc.tcl
+Magic 8.3 revision 686 - Compiled on Sat Nov 14 14:47:48 UTC 2026.
+WARNING: RLIMIT_NOFILE is above 1024 and Tcl_Version<9 this may cause runtime issues [rlim_cur=65536]
+Input style import: scaleFactor=10, multiplier=2
+Warning: Calma reading is not undoable!  I hope that's OK.
+DRC style is now "drc(full)"
+nirmaan-magic-drc-style: drc(full)
+Loading DRC CIF style.
+nirmaan-drc-violations: 0
+$ magic -dnull -noconsole magic_extract.tcl
+Magic 8.3 revision 686 - Compiled on Sat Nov 14 14:47:48 UTC 2026.
+WARNING: RLIMIT_NOFILE is above 1024 and Tcl_Version<9 this may cause runtime issues [rlim_cur=65536]
+Input style import: scaleFactor=10, multiplier=2
+Warning: Calma reading is not undoable!  I hope that's OK.
+$ netgen -batch source netgen_lvs.tcl
+Netgen 1.5.325 compiled on Sat Nov 14 14:48:03 UTC 2026
+Warning: netgen command 'format' use fully-qualified name '::netgen::format'
+Warning: netgen command 'global' use fully-qualified name '::netgen::global'
+Warning:  A case-insensitive file has been read and so the	verilog file must be treated case-insensitive to match.
+Final result: 
+Netlists do not match.
+$ /__w/ip-nirmaan/ip-nirmaan/.venv/bin/python -I lvs_count.py /__w/_temp/pd/test_sync_fifo_from_rtl_to_drc0/pv_magic_lvs/lvs.report sync_fifo
+nirmaan-lvs-circuit: - - Match
+nirmaan-lvs-circuit: - - Match
+nirmaan-lvs-circuit: gf180mcu_fd_sc_mcu9t5v0__buf_4 gf180mcu_fd_sc_mcu9t5v0__buf_4 Match
+nirmaan-lvs-circuit: gf180mcu_fd_sc_mcu9t5v0__aoi21_1 gf180mcu_fd_sc_mcu9t5v0__aoi21_1 Match
+nirmaan-lvs-circuit: gf180mcu_fd_sc_mcu9t5v0__mux2_1 gf180mcu_fd_sc_mcu9t5v0__mux2_1 Match
+nirmaan-lvs-circuit: gf180mcu_fd_sc_mcu9t5v0__dffq_1 gf180mcu_fd_sc_mcu9t5v0__dffq_1 Match
+nirmaan-lvs-circuit: gf180mcu_fd_sc_mcu9t5v0__nor2_1 gf180mcu_fd_sc_mcu9t5v0__nor2_1 Match
+nirmaan-lvs-circuit: gf180mcu_fd_sc_mcu9t5v0__clkinv_1 gf180mcu_fd_sc_mcu9t5v0__clkinv_1 Match
+nirmaan-lvs-circuit: gf180mcu_fd_sc_mcu9t5v0__mux4_1 gf180mcu_fd_sc_mcu9t5v0__mux4_1 Match
+nirmaan-lvs-circuit: gf180mcu_fd_sc_mcu9t5v0__nand2_1 gf180mcu_fd_sc_mcu9t5v0__nand2_1 Match
+nirmaan-lvs-circuit: gf180mcu_fd_sc_mcu9t5v0__clkbuf_8 gf180mcu_fd_sc_mcu9t5v0__clkbuf_8 Match
+nirmaan-lvs-circuit: gf180mcu_fd_sc_mcu9t5v0__or4_1 gf180mcu_fd_sc_mcu9t5v0__or4_1 Match
+nirmaan-lvs-circuit: gf180mcu_fd_sc_mcu9t5v0__clkbuf_4 gf180mcu_fd_sc_mcu9t5v0__clkbuf_4 Match
+nirmaan-lvs-circuit: gf180mcu_fd_sc_mcu9t5v0__inv_3 gf180mcu_fd_sc_mcu9t5v0__inv_3 Match
+nirmaan-lvs-circuit: gf180mcu_fd_sc_mcu9t5v0__xor3_1 gf180mcu_fd_sc_mcu9t5v0__xor3_1 Match
+nirmaan-lvs-circuit: gf180mcu_fd_sc_mcu9t5v0__aoi211_1 gf180mcu_fd_sc_mcu9t5v0__aoi211_1 Match
+nirmaan-lvs-circuit: gf180mcu_fd_sc_mcu9t5v0__nand4_1 gf180mcu_fd_sc_mcu9t5v0__nand4_1 Match
+nirmaan-lvs-circuit: gf180mcu_fd_sc_mcu9t5v0__xnor2_1 gf180mcu_fd_sc_mcu9t5v0__xnor2_1 Match
+nirmaan-lvs-circuit: gf180mcu_fd_sc_mcu9t5v0__nor3_1 gf180mcu_fd_sc_mcu9t5v0__nor3_1 Match
+nirmaan-lvs-circuit: gf180mcu_fd_sc_mcu9t5v0__and3_1 gf180mcu_fd_sc_mcu9t5v0__and3_1 Match
+nirmaan-lvs-circuit: gf180mcu_fd_sc_mcu9t5v0__xor2_1 gf180mcu_fd_sc_mcu9t5v0__xor2_1 Match
+nirmaan-lvs-circuit: gf180mcu_fd_sc_mcu9t5v0__nor4_2 gf180mcu_fd_sc_mcu9t5v0__nor4_2 Match
+nirmaan-lvs-circuit: gf180mcu_fd_sc_mcu9t5v0__inv_4 gf180mcu_fd_sc_mcu9t5v0__inv_4 Match
+nirmaan-lvs-circuit: gf180mcu_fd_sc_mcu9t5v0__oai21_1 gf180mcu_fd_sc_mcu9t5v0__oai21_1 Match
+nirmaan-lvs-circuit: gf180mcu_fd_sc_mcu9t5v0__nand3_1 gf180mcu_fd_sc_mcu9t5v0__nand3_1 Match
+nirmaan-lvs-circuit: gf180mcu_fd_sc_mcu9t5v0__or2_1 gf180mcu_fd_sc_mcu9t5v0__or2_1 Match
+nirmaan-lvs-circuit: gf180mcu_fd_sc_mcu9t5v0__inv_2 gf180mcu_fd_sc_mcu9t5v0__inv_2 Match
+nirmaan-lvs-circuit: gf180mcu_fd_sc_mcu9t5v0__and2_1 gf180mcu_fd_sc_mcu9t5v0__and2_1 Match
+nirmaan-lvs-circuit: sync_fifo sync_fifo Mismatch
+nirmaan-netgen-final: Final result: Netlists do not match.
+nirmaan-lvs-mismatched-circuits: 1
+nirmaan-lvs-mismatched-nets: 1
+nirmaan-lvs-mismatched-devices: 0
+nirmaan-lvs-mismatched-pins: 0
+nirmaan-lvs-mismatched-subcircuits: 0

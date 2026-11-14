@@ -1,0 +1,38 @@
+# CAPTURED: pnr.run on the ORFS gf180 platform with supply_voltage 5.0 (IR-drop analysis) at the TC corner; CI run 43612057949 (head ef23a6d), job gf180-pilot, test_sync_fifo_from_rtl_to_drc_and_lvs_on_gf180mcu. excerpt: in order, the step line, every nirmaan- line, every ERROR and WARNING line, every PSM line and the Tcl trace after the error; nothing else is edited.
+$ openroad -no_init -no_splash -exit pnr.tcl
+nirmaan-stage: floorplan
+[WARNING IFP-0028] Core area lower left (2.000, 2.000) snapped to (2.240, 5.040).
+nirmaan-stage-done: floorplan
+nirmaan-stage: place
+nirmaan-stage-done: place
+nirmaan-stage: cts
+nirmaan-stage-done: cts
+nirmaan-stage: route
+[WARNING DRT-0349] LEF58_ENCLOSURE with no CUTCLASS is not supported. Skipping for layer Via1
+[WARNING DRT-0349] LEF58_ENCLOSURE with no CUTCLASS is not supported. Skipping for layer Via1
+[WARNING DRT-0349] LEF58_ENCLOSURE with no CUTCLASS is not supported. Skipping for layer Via2
+[WARNING DRT-0349] LEF58_ENCLOSURE with no CUTCLASS is not supported. Skipping for layer Via2
+[WARNING DRT-0349] LEF58_ENCLOSURE with no CUTCLASS is not supported. Skipping for layer Via3
+[WARNING DRT-0349] LEF58_ENCLOSURE with no CUTCLASS is not supported. Skipping for layer Via3
+[WARNING DRT-0349] LEF58_ENCLOSURE with no CUTCLASS is not supported. Skipping for layer Via4
+[WARNING DRT-0349] LEF58_ENCLOSURE with no CUTCLASS is not supported. Skipping for layer Via4
+nirmaan-unconnected-supply-pins: 0
+nirmaan-supply-nets: VDD VSS
+[INFO PSM-0040] All shapes on net VDD are connected.
+[INFO PSM-0040] All shapes on net VSS are connected.
+[INFO PSM-0040] All shapes on net VDD are connected.
+[WARNING PSM-0020] Via1 has zero resistance.
+[WARNING PSM-0020] Via2 has zero resistance.
+[WARNING PSM-0020] Via3 has zero resistance.
+[WARNING PSM-0020] Via4 has zero resistance.
+[ERROR PSM-0021] Resistance map constains invalid values.
+PSM-0021
+    while executing
+"psm::analyze_power_grid_cmd  [psm::find_net $keys(-net)]  [sta::parse_scene_or_default keys]  $source_type  $error_file  [info exists flags(-allow_reu..."
+    (procedure "analyze_power_grid" line 36)
+    invoked from within
+"analyze_power_grid -net $net "
+    ("foreach" body line 1)
+    invoked from within
+"foreach net $nirmaan_supplies { analyze_power_grid -net $net }"
+    (file "pnr.tcl" line 76)
