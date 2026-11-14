@@ -1,0 +1,21 @@
+{
+  "cases": [
+    "rtl/skid-buffer"
+  ],
+  "command": "nirmaan eval run --runtime claude-code --trials 2 --seats rtl rtl/skid-buffer",
+  "finished_at": "2026-11-14T11:38:24.309259Z",
+  "format": "nirmaan.eval-run",
+  "head_sha": "a65ca3ee273661345ff4894a16156ff005b0697d",
+  "id": "2026-11-14-claude-code-claude-opus-5-5-10",
+  "knowledge": "on",
+  "model": "claude-opus-5-5",
+  "nirmaan_version": "1.25.0",
+  "replay": false,
+  "runtime": "claude-code",
+  "seats": [
+    "rtl-implementation"
+  ],
+  "started_at": "2026-11-14T11:32:34.620989Z",
+  "trials": 2,
+  "version": 1
+}
