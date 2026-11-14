@@ -455,24 +455,25 @@ reported, fails the run). Nothing else changes:
 `dv/coverage-irq-ctrl` judges the coverage seat (`code_coverage`) on the
 interrupt controller of the directed case. The seat is handed an approved
 testbench that only resets the block and reads registers
-(`coverage/irq_ctrl_idle_tb.sv`: line 100, toggle 7 percent) and must write one
+(`coverage/irq_ctrl_idle_tb.sv`: it never raises a source) and must write one
 whose line and toggle coverage of the approved RTL, read by `coverage.read`,
 meets the bounds. Its control runs `coverage.read` as `tool` (the coverage
 seat holds `coverage.read` and not `simulator.run`) and as `cover_tool` with
 the bounds: the testbench passes on the approved RTL, meets the bounds, and
 fails each of three RTL mutants (priority inverted, acknowledge ignored, level
 mask ignored) on a check, so coverage is not bought with stimulus that checks
-nothing. The reference answer is the directed case's testbench (line 100,
-toggle 79.7, Verilator 5.052) with a coverage report.
+nothing. The reference answer is the directed case's testbench with a coverage report.
+No coverage percentages are recorded here: none has a committed
+`evals/results/<run>/` record, and the tests assert pass or fail only.
 
 Three weak testbenches in `tests/fixtures/dv/irq_ctrl/coverage/` each pass
-their own checks on the approved RTL and fail the bounds (Verilator 5.052):
+their own checks on the approved RTL and fail the bounds:
 
-| File | What it never does | Line | Toggle |
-|---|---|---|---|
-| `irq_ctrl_idle_tb.sv` | raise a source (the approved testbench the seat is handed) | 100 | 7.04 |
-| `irq_ctrl_no_ack_tb.sv` | acknowledge through `CLAIM` or write `PENDING` | 75 | 21.47 |
-| `irq_ctrl_no_mask_tb.sv` | mask a source or write `MODE` | 87.5 | 27.51 |
+| File | What it never does |
+|---|---|
+| `irq_ctrl_idle_tb.sv` | raise a source (the approved testbench the seat is handed) |
+| `irq_ctrl_no_ack_tb.sv` | acknowledge through `CLAIM` or write `PENDING` |
+| `irq_ctrl_no_mask_tb.sv` | mask a source or write `MODE` |
 
 The coverage seat's own gate refuses all three before review (tested), so the
 scorer's bounds are the second look: they let a coverage case be judged the
