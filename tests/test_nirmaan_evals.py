@@ -45,7 +45,7 @@ AXI = REPO / "tests" / "fixtures" / "rtl" / "axi4_lite"
 RTL_CASES = ["rtl/apb-gpio", "rtl/apb-regs", "rtl/axi4-lite-regs", "rtl/axil-timer", "rtl/rr-arbiter",
              "rtl/skid-buffer", "rtl/sync-fifo"]
 #: M45: a spec seat case and a firmware seat case join the RTL cases; W2-E1, W2-E2 and W2-E3 add verification seat cases.
-DV_CASES = ["dv/directed-irq-ctrl", "dv/equiv-gray", "dv/formal-credit-counter", "dv/plan-irq-ctrl",
+DV_CASES = ["dv/coverage-irq-ctrl", "dv/directed-irq-ctrl", "dv/equiv-gray", "dv/formal-credit-counter", "dv/plan-irq-ctrl",
             "dv/prove-deep-counter", "dv/random-crc"]
 SHIPPED = [*DV_CASES, "firmware/axi4-lite-driver", *RTL_CASES, "spec/axi4-lite-interface"]
 

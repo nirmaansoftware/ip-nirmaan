@@ -149,7 +149,7 @@ a proof seat that ships its own `counter.v` and is refused.
   `dv/directed-irq-ctrl` and `dv/plan-irq-ctrl`, and W2-E2 the proof seat's
   `dv/formal-credit-counter` and `dv/prove-deep-counter`, and W2-E3 the
   random-stimulus testbench `dv/random-crc` and the equivalence seat's
-  `dv/equiv-gray`:
+  `dv/equiv-gray`, and W2-E5 the coverage seat's `dv/coverage-irq-ctrl`:
   `docs/EVAL_SKILLS_MUST_FAIL.md`),
   and the department cut. The role ids
   in the tests are today's; a cut that renames them moves the tests with it.

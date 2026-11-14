@@ -57,8 +57,9 @@ check gives:
 The scorer passes only when, in order:
 
 1. the clean run passes (otherwise `failed`: "the clean inputs do not pass");
-2. the `cover_tool` run passes over the same clean inputs (otherwise `failed`:
-   "covers not reached");
+2. the `cover_tool` run passes over the same clean inputs, checked against the
+   check's `cover_bounds` when it has any (otherwise `failed`: "covers not
+   reached"; "Cover bounds" below);
 3. every mutant run fails, on a run that executed and wrote its log. A mutant
    that passes is reported by name as surviving. A refusal (a tool outcome with
    no log: a check problem, a missing file) is `not_run`, never a mutant caught.
@@ -373,6 +374,53 @@ removed, lets a mutant survive. The scorer stops at the first survivor.
 
 `load_record` and `load_records` are unchanged: `nirmaan eval history` and
 `nirmaan eval rejudge` still read replays, which is how cases are proven.
+
+### Cover bounds: a coverage case (W2-E5)
+
+`coverage.read` (M70) reports line, toggle and branch percentages, and a
+requirement's own `bounds` (M48) are the threshold: the coverage seat's gate
+checks `COVERAGE_TARGETS`, line at least 90 and toggle at least 75. The scorer
+ran its `cover_tool` without bounds, so a run that read coverage of 7 percent
+passed the cover. A check may now carry `cover_bounds`, a list of the same M48
+text form as the CLI's `--bound` (`line>=90`); each is parsed when the case
+loads, and the `cover_tool` run is checked against them exactly as the broker
+checks a requirement's bounds (a metric that breaks one, or was never
+reported, fails the run). Nothing else changes:
+
+- the bounds apply to the `cover_tool` run only, never to the clean run or to
+  a mutant run (a mutant must fail on its own checks, not on a coverage
+  shortfall);
+- a check with no `cover_bounds` runs as before, and its dump leaves the field
+  out, so no case digest changes;
+- a test pins the case's bounds to `COVERAGE_TARGETS`, so the case and the
+  seat's gate cannot drift apart.
+
+`dv/coverage-irq-ctrl` judges the coverage seat (`code_coverage`) on the
+interrupt controller of the directed case. The seat is handed an approved
+testbench that only resets the block and reads registers
+(`coverage/irq_ctrl_idle_tb.sv`: line 100, toggle 7 percent) and must write one
+whose line and toggle coverage of the approved RTL, read by `coverage.read`,
+meets the bounds. Its control runs `coverage.read` as `tool` (the coverage
+seat holds `coverage.read` and not `simulator.run`) and as `cover_tool` with
+the bounds: the testbench passes on the approved RTL, meets the bounds, and
+fails each of three RTL mutants (priority inverted, acknowledge ignored, level
+mask ignored) on a check, so coverage is not bought with stimulus that checks
+nothing. The reference answer is the directed case's testbench (line 100,
+toggle 79.7, Verilator 5.052) with a coverage report.
+
+Three weak testbenches in `tests/fixtures/dv/irq_ctrl/coverage/` each pass
+their own checks on the approved RTL and fail the bounds (Verilator 5.052):
+
+| File | What it never does | Line | Toggle |
+|---|---|---|---|
+| `irq_ctrl_idle_tb.sv` | raise a source (the approved testbench the seat is handed) | 100 | 7.04 |
+| `irq_ctrl_no_ack_tb.sv` | acknowledge through `CLAIM` or write `PENDING` | 75 | 21.47 |
+| `irq_ctrl_no_mask_tb.sv` | mask a source or write `MODE` | 87.5 | 27.51 |
+
+The coverage seat's own gate refuses all three before review (tested), so the
+scorer's bounds are the second look: they let a coverage case be judged the
+same way when the testbench reaches it by another route, and the tests run the
+scorer directly on each (`tests/test_dv_coverage_irq_ctrl.py`).
 
 ## 5. The six shipped cases
 

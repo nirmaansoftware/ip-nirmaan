@@ -60,6 +60,7 @@ assertions can tell wrong RTL from right. Its fields beyond `held-out-run`'s:
 | `mutants` | Case file -> files that each stand in for it. Each mutant is one run of `tool` that must fail. A mutant must replace one of the check's `case_files`. |
 | `seat_entries` | Tool parameter -> artifact kinds whose declared entry fills it, as the seat's own passing runs of that file gave it (the seat's testbench top, for example). |
 | `cover_tool` | Optional. A tool that must also pass over the clean inputs, so the clean pass is not vacuous (`formal.cover`: every cover reached). |
+| `cover_bounds` | Optional. Metric bounds in the M48 text form (`line>=90`) the `cover_tool` run is checked against, as a requirement's bounds are: `coverage.read` must meet them (`dv/coverage-irq-ctrl`, line 90 and toggle 75, the coverage gate's `COVERAGE_TARGETS`). Never applied to the clean run or a mutant run. |
 
 The check passes only when the clean run (the seat's files with the case
 files) passes, the `cover_tool` passes, and every mutant makes `tool` fail on a
@@ -74,7 +75,8 @@ assertion) executed and wrote its log, so it counts as a mutant caught
 (`dv/prove-deep-counter`). An equivalence seat's control runs
 `equivalence.run` over the seat's eqy setup with a non-equivalent refactor in
 place of the approved one (`dv/equiv-gray`); a random-stimulus testbench's
-control is the ordinary `simulator.run` one (`dv/random-crc`), and a run that
+control is the ordinary `simulator.run` one (`dv/random-crc`), a coverage seat's runs
+`coverage.read` with `cover_bounds` (`dv/coverage-irq-ctrl`), and a run that
 is too short or whose constraints never reach a corner lets a mutant survive.
 
 ```json
