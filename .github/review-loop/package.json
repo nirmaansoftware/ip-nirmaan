@@ -1,0 +1,8 @@
+{
+  "name": "review-loop-tools",
+  "private": true,
+  "description": "The Claude Code CLI the review loop runs in GitHub Actions, pinned with its integrity hashes in package-lock.json (npm ci checks them).",
+  "dependencies": {
+    "@anthropic-ai/claude-code": "2.1.325"
+  }
+}

@@ -224,6 +224,7 @@ def loop_defaults(env=None) -> dict:
         "check_timeout_s": float(env.get("NIRMAAN_LOOP_CHECK_TIMEOUT_SECONDS") or 1200),
         "git_name": env.get("NIRMAAN_LOOP_GIT_NAME"),
         "git_email": env.get("NIRMAAN_LOOP_GIT_EMAIL"),
+        "check_user": env.get("NIRMAAN_LOOP_CHECK_USER") or None,
     }
 
 
@@ -446,18 +447,41 @@ def ci_state(required: list[str], runs: list[dict]) -> tuple[str, str]:
     return ci["state"], ci["text"]
 
 
-def _run_commands(commands, cwd, extra_env, variables, timeout_s) -> tuple[bool, str]:
+def check_argv(args: list[str], env: dict, user: str | None) -> list[str]:
+    """A check command; with `user` (NIRMAAN_LOOP_CHECK_USER, GitHub Actions)
+    run as that account, which cannot read the loop's or a model's process
+    environment or memory, with exactly `env`."""
+    if not user:
+        return args
+    return ["sudo", "-n", "-u", user, "--", "env", "-i", *[f"{k}={v}" for k, v in env.items()], *args]
+
+
+def _run_commands(commands, cwd, extra_env, variables, timeout_s, user=None) -> tuple[bool, str]:
     env = {**pr_review.reviewer_env(), **(extra_env or {})}
-    for argv in commands:
-        args = [re.sub(r"\{(\w+)\}", lambda m: variables.get(m.group(1), m.group(0)), a) for a in argv]
-        try:
-            proc = subprocess.run(args, cwd=cwd, env=env, capture_output=True, text=True, timeout=timeout_s)
-        except (OSError, subprocess.TimeoutExpired) as exc:
-            return False, f"{' '.join(args)}: {exc}"
-        if proc.returncode != 0:
-            tail = " / ".join(((proc.stderr or "") + "\n" + (proc.stdout or "")).strip().splitlines()[-5:])
-            return False, f"{' '.join(args)}: exit {proc.returncode}: {tail[:400]}"
-    return True, ""
+    home = None
+    if user:
+        # The check account writes in the worktree and its own home; git trusts the loop's checkout.
+        home = tempfile.mkdtemp(prefix="loop-check-home-")
+        os.chmod(home, 0o777)
+        subprocess.run(["chmod", "-R", "a+rwX", cwd], capture_output=True)
+        env = {**env, "HOME": home, "GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": "safe.directory", "GIT_CONFIG_VALUE_0": "*"}
+    try:
+        for argv in commands:
+            args = [re.sub(r"\{(\w+)\}", lambda m: variables.get(m.group(1), m.group(0)), a) for a in argv]
+            try:
+                proc = subprocess.run(check_argv(args, env, user), cwd=cwd, env=pr_review.reviewer_env() if user else env,
+                                      capture_output=True, text=True, timeout=timeout_s)
+            except (OSError, subprocess.TimeoutExpired) as exc:
+                return False, f"{' '.join(args)}: {exc}"
+            if proc.returncode != 0:
+                tail = " / ".join(((proc.stderr or "") + "\n" + (proc.stdout or "")).strip().splitlines()[-5:])
+                return False, f"{' '.join(args)}: exit {proc.returncode}: {tail[:400]}"
+        return True, ""
+    finally:
+        if user and home:
+            # What the check account made, the loop can remove with the worktree.
+            subprocess.run(check_argv(["chmod", "-R", "a+rwX", cwd, home], env, user), env=pr_review.reviewer_env(), capture_output=True)
+            pr_review._rmtree(Path(home))
 
 
 def _applies(entry: dict, changed: list[str]) -> bool:
@@ -1142,6 +1166,8 @@ class Loop:
         main_sha = _git(root, "rev-parse", "refs/pr-review/main").strip()
         (self.state_dir / "worktrees").mkdir(parents=True, exist_ok=True)
         wt_root = Path(tempfile.mkdtemp(prefix=f"{cfg['repo'].replace('/', '_')}-{n}-fix-", dir=self.state_dir / "worktrees"))
+        if o.get("check_user"):
+            os.chmod(wt_root, 0o755)  # the check account reaches the worktree
         wt = str(wt_root / "head")
         _git(root, "worktree", "add", "--quiet", "--detach", wt, head)
         try:
@@ -1246,7 +1272,8 @@ class Loop:
                     name = f"{name} ({len(selected)} related file{'' if len(selected) == 1 else 's'})"
                 else:
                     name = f"{name} (whole suite)"
-            ok, detail = _run_commands(run, wt, c.get("env"), {"python": sys.executable, "main": main_sha, "head": new}, o["check_timeout_s"])
+            ok, detail = _run_commands(run, wt, c.get("env"), {"python": sys.executable, "main": main_sha, "head": new}, o["check_timeout_s"],
+                                        o.get("check_user"))
             if not ok:
                 return self._stop(ctx, head, f"fix round {rnd}: the local check {name} failed on the fix ({detail}); nothing was pushed")
             ran.append(name)

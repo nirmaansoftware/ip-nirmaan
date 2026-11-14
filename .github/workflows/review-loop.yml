@@ -7,7 +7,8 @@ name: Review loop
 # and never write state. It never runs on a pull request or a push. Its secrets are
 # environment secrets of `review-loop`, an environment only `main` may deploy to, so no
 # pull request workflow can read them. The workflow token reads only; the loop posts with the
-# review App's token and pushes and merges with LOOP_GH_TOKEN, as the Mac's gh login does.
+# review App's token and pushes and merges with LOOP_GH_TOKEN, as the Mac's gh login does. No
+# claude process and no check gets a token in its environment (docs/REVIEW_MECHANISM.md).
 # Setup and switch-on: docs/REVIEW_MECHANISM.md ("Running the loop in GitHub Actions").
 on:
   schedule:
@@ -43,9 +44,11 @@ jobs:
     env:
       MODE: ${{ inputs.mode || 'loop' }}
     steps:
+      # /srv/loop, not the home folder (mode 750), so the check account can reach the fixer's worktree.
       - name: State paths
         run: |
-          echo "NIRMAAN_REVIEW_STATE_DIR=$RUNNER_TEMP/pr-review" >> "$GITHUB_ENV"
+          sudo install -d -o "$(id -u)" -g "$(id -g)" -m 755 /srv/loop
+          echo "NIRMAAN_REVIEW_STATE_DIR=/srv/loop/pr-review" >> "$GITHUB_ENV"
           echo "STATE_CLONE=$RUNNER_TEMP/loop-state" >> "$GITHUB_ENV"
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -93,20 +96,36 @@ jobs:
         uses: ./.github/actions/oss-cad-suite
         with:
           tools: sby yices-smt2 eqy
-      - name: Install
+      # The loop runs from its own clone of this commit, as the Mac's job does, where the check account can read it.
+      - name: Loop clone and install
         if: steps.work.outputs.work == 'true' && env.MODE != 'check'
-        run: pip install -e ".[ai,dev,cocotb]"
+        run: |
+          git clone --quiet --no-hardlinks "$GITHUB_WORKSPACE" /srv/loop/ip-nirmaan
+          git -C /srv/loop/ip-nirmaan checkout --quiet --detach "$GITHUB_SHA"
+          git -C /srv/loop/ip-nirmaan remote set-url origin "https://github.com/$GITHUB_REPOSITORY.git"
+          pip install -e "/srv/loop/ip-nirmaan[ai,dev,cocotb]"
+      # Claude Code 2.1.325 and its platform package, each checked against the sha512 in the lockfile.
       - name: Install Claude Code
         if: steps.work.outputs.work == 'true'
-        run: npm install -g @anthropic-ai/claude-code@2.1.325 && claude --version
-      # `claude auth status` makes no model call; `check` also proves the /proc deny rule with one small call.
+        run: |
+          npm ci --prefix .github/review-loop --no-audit --no-fund
+          echo "NIRMAAN_CLAUDE_CODE=$PWD/.github/review-loop/node_modules/.bin/claude" >> "$GITHUB_ENV"
+          .github/review-loop/node_modules/.bin/claude --version
+      # The loop's local checks run the pull request's tests as this account, which cannot read the
+      # loop's or a model's process environment or memory.
+      - name: Make the check account
+        if: steps.work.outputs.work == 'true' && env.MODE != 'check'
+        run: sudo useradd --system --no-create-home --shell /usr/sbin/nologin loopcheck
+      # Both steps `exec` the script, which moves the secrets out of its environment before any
+      # claude process starts. `claude auth status` makes no model call; `check` also proves the
+      # /proc deny rule with one small call.
       - name: Check the Claude login
         if: steps.work.outputs.work == 'true'
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
         run: |
-          if [ "$MODE" = check ]; then python scripts/loop_cloud.py auth-check --deny-probe
-          else python scripts/loop_cloud.py auth-check; fi
+          if [ "$MODE" = check ]; then exec python scripts/loop_cloud.py auth-check --deny-probe; fi
+          exec python scripts/loop_cloud.py auth-check
       - name: Run the loop once
         if: steps.work.outputs.work == 'true' && env.MODE != 'check'
         timeout-minutes: 50
@@ -114,16 +133,14 @@ jobs:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           GH_TOKEN: ${{ secrets.LOOP_GH_TOKEN }}
           NIRMAAN_REVIEW_APP_TOKEN: ${{ steps.app.outputs.token }}
+          NIRMAAN_LOOP_CHECK_USER: loopcheck
           SHADOW_PR: ${{ inputs.pr }}
         run: |
           git config --global credential.https://github.com.helper ''
           git config --global --add credential.https://github.com.helper '!gh auth git-credential'
-          if [ "$MODE" = shadow ]; then
-            case "$SHADOW_PR" in ''|*[!0-9]*) echo "shadow needs a pull request number"; exit 2;; esac
-            python scripts/pr_loop.py --once --no-post --pr "$SHADOW_PR"
-          else
-            python scripts/pr_loop.py --once
-          fi
+          cd /srv/loop/ip-nirmaan
+          if [ "$MODE" = shadow ]; then exec python scripts/loop_cloud.py run --shadow "$SHADOW_PR"; fi
+          exec python scripts/loop_cloud.py run
       - name: Push the loop state
         if: always() && steps.pull.outcome == 'success'
         env:
