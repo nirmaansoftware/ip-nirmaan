@@ -90,7 +90,7 @@ is committed, so NOTICE does not change.
 
 ## 5. Results, and what the runs found
 
-From the pull request's own runs of `pd-gf180` (run 43616066140, head 65d619d). The record is committed:
+From the pull request's own runs of `pd-gf180`; the run on the head that added the records is 43630635463 (head abb7c46, success, the pilot test passed with both must-fail controls: `pilot_run_records.log`, read back by `test_gf180_the_pilot_ran_in_ci_with_its_must_fail_controls`). The figures below are from run 43616066140 (head 65d619d, same flow code) and its excerpts; the later run's records give the same result figures. The record is committed:
 the tool logs, or excerpts of them, in `tests/fixtures/pd/gf180/` (each file's first line names its run,
 head and what the excerpt keeps), and `tests/test_pv_magic.py` reads every figure below back through
 Nirmaan's own parsers (`test_gf180_*`). `pd-gf180` runs again on every head that changes the flow, the

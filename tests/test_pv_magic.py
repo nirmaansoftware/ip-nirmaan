@@ -195,6 +195,24 @@ def test_gf180_what_the_earlier_runs_found():
                        "route.def": "0"}  # the router's patches, until extract_parasitics
 
 
+def test_gf180_the_pilot_ran_in_ci_with_its_must_fail_controls():
+    """The pd-gf180 job's own records from the run on the head that added them (docs/PD_GF180_PILOT.md)."""
+    import json
+
+    text = captured("gf180/pilot_run_records.log")
+    junit, *records = text.split("\n== ")
+    assert 'tests="1"' in junit and 'failures="0"' in junit and 'errors="0"' in junit and 'skipped="0"' in junit
+    assert "test_sync_fifo_from_rtl_to_drc_and_lvs_on_gf180mcu" in junit
+    by_name = {r.split("\n", 1)[0]: json.loads(r.split("\n", 1)[1]) for r in records}
+    pnr, clean, drc, lvs = (by_name[f"{n}.result.json"] for n in
+                            ("pnr/openroad", "pv_magic/magic-netgen", "pv_magic_drc/magic-netgen",
+                             "pv_magic_lvs/magic-netgen"))
+    assert pnr["passed"] and "worst setup slack 4.059" in pnr["summary"]
+    assert clean["passed"] and clean["metrics"]["drc_violations"] == 0 and clean["metrics"]["lvs_mismatches"] == 0
+    assert not drc["passed"] and drc["metrics"]["drc_violations"] == 423
+    assert not lvs["passed"] and lvs["metrics"]["drc_violations"] == 0 and lvs["metrics"]["lvs_mismatched"]["nets"] == 1
+
+
 TOP_FIFO = "sync_fifo"
 
 
