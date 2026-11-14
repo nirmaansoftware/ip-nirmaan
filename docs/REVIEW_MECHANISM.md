@@ -679,7 +679,9 @@ What is checked again, and where:
   included, reaches the worktree, the repository or the git configuration the
   loop commits and pushes from, and the loop runs no git command in it. After
   each check, root kills every process of the account and takes back what it
-  made.
+  made, so check-account runs take one lock and never overlap: a parallel
+  worker's cleanup would otherwise kill another's running suite (run
+  43629454383).
 - **What `loopcheck` cannot read.** It cannot read the loop's or a model's
   process environment or memory, the state folder, or the runner's home.
 - **Keys on disk only in their own steps.** The App's key and the deploy key

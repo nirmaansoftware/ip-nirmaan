@@ -1,0 +1,405 @@
+# Council record: RTL pilot retrospective (P3-R, 2026-11-14)
+
+The capability build-out record
+(`council/records/2026-10-18-capability-buildout.md`, section 10, gate G11,
+owner design-architect) ends the RTL pilot with "a retrospective that decides
+format and process changes". This is that retrospective. It also decides the
+items that later work put on its agenda: the causes of the failed live trials
+and the harness variants to compare, frontier cases, whole-flow cases, outside
+calibration, where held-out files live, and which wave 2 (Verification) work
+that waited for it may start.
+
+Eighteen seats gave round 1 positions independently; the chair decided. Read
+against ip-nirmaan `main` at fbbf479. Nothing in the repository was changed by
+the meeting: this record changes no code, document, check or gate. Each pull
+request that implements a decision is reviewed on its own.
+
+A key is an agent review. Nothing here is a person's approval, a release, or a
+claim that a design is ready to be made in silicon.
+
+## Who decided what
+
+- The council decided every item below except the two marked otherwise.
+- The founder was away. Two founder items were answered by the orchestrator
+  session, on the founder's in-session instruction of 2026-11-14 to keep work
+  moving and answer open questions with its own recommendation. They are cited
+  below as "orchestrator, on the founder's in-session instruction of
+  2026-11-14". They are not founder decisions, and the founder can overrule
+  either:
+  - usage for four follow-on runs (the harness variants, the frontier trials,
+    the outside calibration calls, the whole-flow trials) is approved, one
+    batch at a time, each stopping on any plan-limit message;
+  - the visibility of held-out files is not changed. The council recommends an
+    option (decision 9) and the founder decides.
+- The top-up batch of decision 1 is not one of those four runs. It starts only
+  on the orchestrator's answer under the same instruction, or the founder's.
+
+## Facts checked
+
+On `main` at fbbf479, checked by the chair or by the seat named:
+
+1. Eight skills have a knowledge document and a check record
+   (`knowledge/design/`, `capability/records/knowledge/`), and
+   `capability/levels.json` totals read knowledge 8, practised 0, proven 0.
+   The four pilot skills on the Knowledge track (rtl_microarchitecture,
+   rtl_lint, synthesis_awareness, reset_design) have no document and no check
+   record (qa-evidence; the chair confirmed). The brief said all twelve were at
+   Knowledge; that was wrong.
+2. `evals/results/` holds two records, both of case rtl/rr-arbiter:
+   `evals/results/2026-11-14-claude-code-claude-opus-5-5` (3 trials) and
+   `evals/results/2026-11-14-claude-code-claude-opus-5-5-2` (2 trials), merged
+   in #203. `capability/levels.json` shows the arbitration group at 4 of 5,
+   lower bound 0.376, not counted.
+3. `knowledge/design/rtl_design.md` lines 105 to 106 say an optional
+   `[tasks]` section "runs, say, a proof and a cover from one file". The gates
+   refuse exactly that: `src/nirmaan/integrations/eda.py:648` (formal.run) and
+   `:751` (the cover check). The tool descriptions a seat is shown
+   (`src/nirmaan/company/tools.py:144-150`) say nothing about single-task
+   setups.
+4. `knowledge/design/pipeline_design.md:98` says "Prove every parameter
+   combination as its own task", which reads as the same refused construct
+   (design-architect).
+5. `src/nirmaan/company/tools.py` is not among the fingerprinted files
+   (`CODE`, `src/nirmaan/runtime/harness.py:152-165`), yet its parameter
+   descriptions reach the prompt (`docs/HARNESS.md`, "Changes to the harness
+   since M73"). An edit there changes what every seat reads and makes no group
+   stale (qa-evidence and ai-engineer, independently; the chair confirmed).
+6. A skill digest covers that skill's own card and document only
+   (`src/nirmaan/evals/cases.py:76-87`). Correcting rtl_design.md makes the
+   rtl_design group stale and no other.
+7. A changed harness code file makes every group stale. A new Claude Code
+   version starts a separate group that never pools with the old one
+   (`docs/CAPABILITY_LEVELS.md` lines 52 to 73). Must-fail controls are
+   required for skills of the design and verification domains
+   (`src/nirmaan/company/evidence.py:13`); apb and axi are domain protocols.
+8. The seat runs with no tools (`docs/HARNESS.md` line 30): it answers in text
+   and sees no gate message before its attempt is spent.
+9. The review stops a diff over 200,000 bytes (`docs/REVIEW_MECHANISM.md`
+   line 172).
+
+Not on `main` yet. The batch's other records are in pull requests #204 to #206
+and a queue behind them, and become checkable as each merges. From those
+records, as the batch reported them: 31 trials with knowledge documents and 31
+without, every trial re-judged the same; with documents 22 passed, without 27.
+Of the 9 failed trials with documents, 6 followed the `[tasks]` sentence and
+were refused before review, 2 were the seat's own faults caught by its own
+simulation gate, and 1 never reached the model (a plan limit). No case defect
+was found. Every trial used one attempt. This record names no level from those
+records: a level is what `capability/levels.json` shows after a merge.
+
+## Decisions
+
+Each decision names its owner seat and its first pull request.
+
+### 1. Pilot exit (G11): not met; correct the documents, one fixed top-up, one read
+
+The exit is not met on `main`'s own facts: 8 of 12 skills at Knowledge, none
+Practised.
+
+a. **Knowledge track.** The four missing documents and their check records are
+   written now, under decision 3. Owner design-architect. First pull request:
+   the four documents (one batch); the check records follow in their own.
+
+b. **Corrections.** rtl_design.md "Proof setup" is corrected to what the gates
+   accept: exactly one `.sby`, no `[tasks]` section, `mode prove`, `[files]`
+   listing every submitted RTL file, and the platform's own cover rerun.
+   pipeline_design.md:98 is corrected likewise. The two notes owed under
+   decision 7 for the seat's own faults go into rtl_design.md in the same
+   change, so the document changes once. The gates do not loosen to match a
+   document (eda-tooling: the cover check rewrites only an unprefixed `mode`
+   line, so a task setup would not map to one verdict). Owner
+   design-architect. First pull request: the correction to both documents; new
+   check records with the gate-claims field (decision 3) follow in their own,
+   from a different session.
+
+c. **All eight documents are checked for gate claims before the top-up.** A
+   correction is only a sentence that a gate contradicts, cited by path and
+   line in the check record. This matters because a correction makes that
+   skill's group stale: it must never be a way to shed failed trials.
+   qa-evidence holds key 1 on those records.
+
+d. **The top-up, fixed here before any trial runs.** 5 trials on each of the 7
+   pilot cases, 35 in all, with knowledge documents, on the same model, the
+   same harness fingerprint and the same Claude Code version as the batch. No
+   harness code file, and no file in decision 4's bundle, changes on `main`
+   before the read. The runner confirms the user-level instruction file that
+   reaches seat calls is byte-identical to the batch's. Records are split as
+   in decision 10. A plan-limit stop resumes until all 35 are done.
+
+e. **One read.** Levels are read once from `capability/levels.json`, after
+   every evidence record of the batch and the top-up is merged. A group that
+   counts earlier, mid-queue, decides nothing. Every trial stays counted,
+   including the six refused `[tasks]` trials in the apb, axi and
+   buffering_flow_control groups, whose digests did not change. There is no
+   second round and no extension.
+
+f. **Outcome.** Six or more Practised with all twelve at Knowledge: the exit is
+   met. Fewer: the pilot closes with the shortfall recorded here by an
+   addendum, and those skills are measured again in the first evidence batch
+   on the harness chosen under decision 4.
+
+Owner of the top-up and the read: verification-lead; of G11: design-architect.
+First pull request: the first top-up record, after (b) and (c) are merged.
+
+Why this and not the others. Exiting now would close the pilot on a known
+document defect. Fixing the harness first would make every group stale before
+any could count. Seats differed on the top-up's shape: product-lead wanted only
+the short and borderline skills topped up, ai-engineer a total of 10 per skill,
+verification-lead and design-architect 5 on every case. The chair chose 5 on
+every case because it is uniform, cannot be read as chosen after seeing which
+cases failed, and gives the restarted groups a full count.
+
+### 2. The ablation: met as a run, with no measured benefit
+
+The exit item "the ablation run" is met when the records without documents are
+on `main`, where the levels generator lists them apart. They never count toward
+a level, so they queue behind the evidence records and may merge after decision
+4's bundle. What it showed: on these cases the documents gave no measured
+benefit, the intervals overlap, and one document sentence cost six trials. The
+cases are near the model's ceiling, so the run could not have shown a benefit.
+The Knowledge level means a document was checked against its sources, not that
+it helps. Every later live batch carries an arm without documents on the same
+cases, its size fixed in the batch plan. Owner verification-lead. First pull
+request: the first record without documents.
+
+### 3. Format and process: kept, plus a gate-claims check
+
+- Kept: the card (at most 2,000 characters), the document (at most 12,000;
+  8,000 for a document that reaches many seats), three sessions per skill,
+  evals first in their own pull request, 3 or 4 documents per pull request.
+- **Gate claims, in the check record.** The check record gains a field: every
+  sentence that names a tool, gate, mode, option, section or file rule is
+  listed with the gate code that confirms it (path and line) or a test id. A
+  sentence about an option the gate restricts says that it is restricted. A
+  sentence about a tool with no gate behind it is marked unverified. Owner
+  qa-evidence, with verification-lead for the levels generator. First pull
+  request: the field in `capability/records/knowledge/README.md`, the schema
+  check and the reviewer checklist line.
+- **Gate claims, mechanical.** Each pre-run refusal is declared as data on its
+  tool, and a test fails when a knowledge sentence names a refused construct
+  without saying so; a second test runs every `.sby` example under
+  `knowledge/` through the gate's own checks. Owner eda-tooling. First pull
+  request: the test over `knowledge/` (no prompt change). Rendering the
+  refusals into the seat's contract waits for decision 4's bundle.
+- The Sources rule is restated in every wave 2 writing brief: sources an agent
+  can read in full; summarise and cite; no tables, register maps or figures;
+  no member-only or vendor EDA text. Owner legal-compliance.
+
+Disagreement: eda-tooling wanted the mechanical test instead of a field; four
+seats wanted the field. Both are adopted: the field covers sentences no parser
+can read, the test cannot be forgotten.
+
+### 4. Causes accepted; two harness variants; one bundle, then a quiet window
+
+The cause tally stands: of the failures, most were gate refusals whose message
+named the fault and which the seat never saw.
+
+- **Variants.** (1) Tools in the loop: the seat calls brokered lint,
+  simulation and formal during its attempt. (2) Three attempts with repair
+  text against one. The knowledge cap variant is dropped: no trial was declined
+  or cut.
+- **Baseline.** The default harness, run again in the same batch on the same
+  commit with arms interleaved, never the pilot's records. Counts are fixed in
+  the batch plan before the first trial. Frontier cases (decision 5) carry the
+  pass-rate comparison; pilot cases carry the secondary measures (refusals,
+  proofs submitted, attempts used) and a no-regression check. A variant trial
+  carries its variant label, is listed apart and never counts toward a level.
+- **Tools in the loop is its own milestone**, with these conditions (security,
+  eda-tooling): brokered tools only, through the tool broker under the seat's
+  role, no shell, file or network tool; no credential in a tool run's
+  environment; paths limited to the seat's workspace, so held-out files are
+  unreachable; a cap on calls and time per attempt, a timeout being a failed
+  attempt; every call recorded; in-loop runs advisory, the platform's gate
+  runs alone judging; the server code and tool pins in the fingerprint.
+- **The bundle** (the named-variants milestone) is one fingerprint change: the
+  single-task rule in the formal tools' contract; the tool definitions brought
+  into the fingerprint (fact 5); seat calls that load no user-level
+  instruction file, shown by a canary test; and the `--harness <name>` switch
+  with the attempts variant.
+- **Order.** The bundle merges only after decision 1's read. From that merge
+  until the pull request that names the default harness, a quiet window: any
+  harness change may merge (tools in the loop, the whole-flow runner option),
+  and no evidence trial runs. Wave 2's live batch and the re-measured pilot
+  skills run after the default is named.
+
+Owners: ai-engineer (variants, the default), eda-tooling (bundle, broker),
+security (conditions). First pull request: the bundle, opened as a draft now
+and made ready after the read; it is control plane, so the Founder Proxy
+reviews it. Tools in the loop reserves its own milestone number when it starts.
+
+### 5. Frontier cases: run now, privately, as calibration
+
+The three frontier cases run now from the local copy, after a recorded case
+validation (the reference passes, every mutant fails). Counts with and without
+documents are fixed in a private plan before the first trial. The records stay
+private, are labelled calibration for good, and are never relabelled or pooled.
+The cases are not pushed. Their purpose is headroom and case sanity; the
+variant comparison of decision 4 uses its own baseline arm. Usage: orchestrator,
+on the founder's in-session instruction of 2026-11-14. Owner verification-lead.
+No pull request until decision 9 is settled by the founder.
+
+security preferred waiting for decision 9 as the safer course. The chair chose
+to run because nothing is pushed and no held-out file enters a prompt.
+
+### 6. Whole-flow trials credit no skill
+
+A whole-flow trial (no upstream stage fixed, only the final block judged) gives
+one verdict that cannot say which skill earned it. It credits no skill level.
+Its records form their own labelled group, keyed by every digest in the flow,
+listed apart and never pooled with fixed-upstream trials. A record lists the
+stages and the skills exercised and keeps stage boundaries visible. Where a
+flow ends in firmware, the driver's register map comes from the RTL stage's
+output, not the specification. The runner option lands inside decision 4's
+quiet window. Owners: verification-lead (rule), eda-tooling (runner). First
+pull request: the runner option with the labelled group, control plane.
+
+market-research, partnerships and product-lead see the whole-flow pass rate as
+the number a buyer reads first. The chair agrees it is its own measure, and
+none of it reaches a public page until a committed record backs it.
+
+### 7. Two standing rules
+
+- **Failure to curriculum.** Every failed live trial labelled "model" yields a
+  knowledge note or a must-fail case, or a written reason why not, listed in
+  the batch's pull request and naming the failing run.
+- **Gate claims.** Decision 3's check applies to every knowledge document in
+  every wave. A sentence about a tool that the gate refuses is a defect,
+  however the source reads.
+
+Owner verification-lead for the first, qa-evidence for the second. First pull
+request: both rules in `knowledge/README.md` with decision 3's field.
+
+### 8. Outside calibration: RTLLM only, after the default harness is named
+
+One baseline before wave 2's live batch: the RTLLM set through the merged
+adapter, with and without documents, compared only with our own bare-model
+run. Conditions (legal-compliance): the copy stays private with its upstream
+licence and commit pin; no problem text, testbench or reference in any
+committed file, record or transcript; records carry ids, digests, counts,
+source and a credit line, as `docs/OUTSIDE_CALIBRATION.md` sets out. CVDP is
+not run until a qualified lawyer has read its tool-label terms, which is the
+founder's to arrange. VerilogEval is not used. No calibration figure goes on a
+public page. Usage: orchestrator, on the founder's in-session instruction of
+2026-11-14. Owner ai-engineer. First pull request: the RTLLM calibration
+record.
+
+### 9. Held-out files: the council's recommendation to the founder
+
+Not decided here. Nothing changes until the founder decides (orchestrator, on
+the founder's in-session instruction of 2026-11-14).
+
+Recommended: a private store for the held-out bytes of new and frontier cases,
+with a public manifest of digests, so a public record names exactly which
+held-out bytes judged it. Each digest covers the whole file with a private
+salt per case, and files are listed by opaque id. Existing cases stay public
+and are marked as exposed. Held-out bytes are pulled only by the live runner
+and by trusted jobs (never a job that runs pull request content), and never
+appear in a log or an uploaded artifact. No paid plan is assumed; any spending
+is the founder's. A pushed branch is no protection. Whether reference RTL meant
+for sale stays public is a separate question for the founder, and a later
+removal does not recall earlier copies. A private store also changes what a
+future evaluation agreement must say about confidentiality (legal-counsel).
+
+Seven seats gave a view (security, eda-tooling, legal-compliance,
+finance-licensing, market-research, legal-counsel, tax-accounts); none
+preferred staying public. Owner of the follow-up, once decided: eda-tooling,
+with security.
+
+### 10. Record splits and trial time
+
+- A record's trial count is fixed in the batch plan before the run, never by
+  outcome. Each part holds whole trials, is a complete record with its own
+  rejudge, and is sized from measured bytes to stay well under the review's
+  limit. Groups pool across records, so splitting changes no level.
+- Evidence records queue ahead of records that never count.
+- The runner stops after any record that shows a plan-limit message and
+  resumes until the planned count is done.
+- The planning estimate in `docs/LIVE_EVAL_EVIDENCE.md` is replaced by one
+  computed from the committed records, and a batch is planned on the largest
+  case's measured mean with a margin. A wave whose trials include long tool
+  runs measures one real run first and keeps large artifacts out of the diff
+  by digest (physical-design-engineer, dft-engineer).
+
+Owner verification-lead; ai-engineer for the estimate. First pull request: the
+estimate, once the pilot's records are merged.
+
+### 11. Trial counts, interrupted trials, protocols
+
+- More than 5 trials is allowed. The count is uniform across the batch, fixed
+  in a committed plan before the first trial, and read once.
+- An interrupted trial stays a failed trial. ai-engineer proposed that a trial
+  whose model call never started be replaced, for later records only. The
+  chair did not adopt it: it would make a level easier to reach, and the
+  runner's stop rule already limits the loss to one trial.
+- `protocols` joins `MUST_FAIL_DOMAINS`. Every apb and axi case already
+  carries a must-fail control, so no level moves. Owner verification-lead.
+  First pull request: that one-line gate change with its test, gate semantics,
+  so the Founder Proxy reviews it.
+
+### 12. Practice leads
+
+No RTL practice lead was needed, and one would not have caught the `[tasks]`
+sentence: the checklist was missing, not the reviewer. For wave 2 no practice
+lead is seated at the start. The path rule for `knowledge/verification/**`
+(team Verification, key 1 verification-lead, with Business as for other
+knowledge paths) lands by itself in a founder-class pull request, so documents
+are not held up. A department's lead is seated later, in the hiring pull
+request, only when the review loop's records show that department's pull
+requests waiting on key 1. Names stay with the founder. Owner
+verification-lead. First pull request: the path rule.
+
+This departs from the wave 2 plan's five leads at the start. security wanted
+none or one; design-architect wanted leads only as each department's work
+arrives.
+
+### 13. Wave 2 items that waited for this meeting
+
+| Item | Ruling | Must follow |
+|---|---|---|
+| Skills batches, one per department | start now | card format unchanged; at each release, regenerate the site's counts and run the release checks of gates G8 and G9 (site-engineer) |
+| Knowledge documents | start per department once its skills batch, the path rule of decision 12 and the field of decision 3 are merged | decisions 3 and 7; the Sources rule in the brief; 3 or 4 per pull request; 8,000 characters for broad documents |
+| Check records | with each document batch | the gate-claims field; a different session |
+| The two eval cases that need the skills batches | start after those batches | ordinary cases stay public until decision 9 is settled |
+| Hiring pull request | waits | decision 12 |
+| Live batch | waits for the default harness of decision 4 | a committed plan with counts, an arm without documents, cause labels, decision 10 |
+
+Owner verification-lead (wave owner). First pull request: the first
+department's skills batch.
+
+## Dissent and positions not adopted
+
+- ai-engineer: replace a trial whose model call never started (decision 11).
+- ai-engineer: the group digest should cover every document the packet
+  carried, not only the skill's own. Not adopted now: it is a level-rule
+  change that would restart every group, and belongs to a later meeting with
+  the re-measured pilot's records in hand.
+- security: wait for decision 9 before any frontier trial (decision 5).
+- eda-tooling: a mechanical test instead of a check-record field (decision 3).
+- product-lead: top up only the short and borderline skills (decision 1).
+- verification-lead: the top-up's usage is the founder's to grant. Kept as a
+  gate below.
+- legal-counsel: counsel should review before any calibration result is
+  published. Kept: no calibration figure goes on a public page (decision 8).
+
+## Gates
+
+| Gate | Condition | Owner seat |
+|---|---|---|
+| RT1 | The corrected documents and their new check records, with gate claims, are merged before the first top-up trial | design-architect |
+| RT2 | The top-up starts only on the orchestrator's answer under the founder's instruction, or the founder's; 35 trials, fixed here | verification-lead |
+| RT3 | No harness code file and no part of the bundle merges before the one read of decision 1 | ai-engineer |
+| RT4 | No evidence trial between the bundle's merge and the pull request that names the default harness | ai-engineer |
+| RT5 | Tools in the loop merges only with every condition of decision 4 shown by a test | security |
+| RT6 | Variant, whole-flow, frontier and calibration trials carry labels and never count toward a level | verification-lead |
+| RT7 | No knowledge pull request passes key 1 with a gate sentence that cites no gate | qa-evidence |
+| RT8 | No held-out byte of a frontier case is pushed, logged or uploaded before the founder settles decision 9 | security |
+| RT9 | No level, projection or calibration figure on a public page beyond what `capability/levels.json` shows | brand-content |
+
+## Open, for the founder
+
+1. Decision 9: where held-out files live, and whether reference RTL meant for
+   sale stays public.
+2. The two orchestrator answers above, to confirm or overrule, and the top-up's
+   usage (gate RT2).
+3. A lawyer's reading of the CVDP terms, if that set is wanted (decision 8).
+4. Names, if a practice lead is seated later (decision 12).
