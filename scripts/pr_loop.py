@@ -469,7 +469,19 @@ def check_clone(wt: str, sha: str) -> Path:
     return root
 
 
+# One check-account run at a time: its cleanup kills every process of the account,
+# which would kill another worker's check (parallel_reviews) mid-run.
+_CHECK_USER_LOCK = threading.Lock()
+
+
 def _run_commands(commands, cwd, extra_env, variables, timeout_s, user=None) -> tuple[bool, str]:
+    if not user:
+        return _run_commands_once(commands, cwd, extra_env, variables, timeout_s)
+    with _CHECK_USER_LOCK:
+        return _run_commands_once(commands, cwd, extra_env, variables, timeout_s, user)
+
+
+def _run_commands_once(commands, cwd, extra_env, variables, timeout_s, user=None) -> tuple[bool, str]:
     env = {**pr_review.reviewer_env(), **(extra_env or {})}
     home = None
     if user:

@@ -12,6 +12,8 @@ import re
 import subprocess
 import sys
 import tempfile
+import threading
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -287,6 +289,49 @@ def test_checks_run_as_the_check_account_with_exactly_their_environment():
     assert pr_loop.check_argv(["python"], env, "loopcheck") == ["sudo", "-n", "-u", "loopcheck", "--", "env", "-i", "PATH=/p", "HOME=/h2", "python"]
     assert pr_loop.loop_defaults({"NIRMAAN_LOOP_CHECK_USER": "loopcheck"})["check_user"] == "loopcheck"
     assert pr_loop.loop_defaults({})["check_user"] is None
+
+
+def _concurrent_checks(monkeypatch, tmp_path, user):
+    """Two workers' checks at once (parallel_reviews 2); subprocess and sudo are faked.
+    Returns the events and the most check commands seen running at once."""
+    state = {"running": 0, "most": 0, "events": []}
+    guard = threading.Lock()
+
+    def fake_run(argv, **kw):
+        if "pkill" in argv or "chown" in argv:
+            with guard:
+                state["events"].append(("cleanup", state["running"]))
+        elif argv[-1] == "suite":
+            with guard:
+                state["running"] += 1
+                state["most"] = max(state["most"], state["running"])
+            time.sleep(0.2)
+            with guard:
+                state["running"] -= 1
+        return subprocess.CompletedProcess(argv, 0, "", "")
+
+    monkeypatch.setattr(pr_loop.subprocess, "run", fake_run)
+    results = []
+    threads = [threading.Thread(target=lambda d=d: results.append(pr_loop._run_commands(
+        [["suite"]], str(d), None, {}, 5, user))) for d in (tmp_path / "a", tmp_path / "b")]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(10)
+    assert results == [(True, ""), (True, "")]
+    return state["events"], state["most"]
+
+
+def test_check_account_runs_never_overlap_so_cleanup_cannot_kill_another_check(monkeypatch, tmp_path):
+    # Actions run 43629454383: ip#205 and ip#204 died at exit -9 when the other worker's pkill ran.
+    events, most = _concurrent_checks(monkeypatch, tmp_path, "loopcheck")
+    assert most == 1
+    assert len(events) == 4 and all(running == 0 for _, running in events)
+
+
+def test_checks_without_the_check_account_still_run_in_parallel(monkeypatch, tmp_path):
+    events, most = _concurrent_checks(monkeypatch, tmp_path, None)
+    assert most == 2 and events == []
 
 
 def test_the_cli_is_pinned_with_its_integrity_hashes():
