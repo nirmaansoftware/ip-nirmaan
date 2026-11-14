@@ -200,11 +200,11 @@ def test_gf180_the_pilot_ran_in_ci_with_its_must_fail_controls():
     import json
 
     text = captured("gf180/pilot_run_records.log")
-    junit, *records = text.split("\n== ")
+    junit, *records = text.removeprefix("== ").split("\n== ")
     assert 'tests="1"' in junit and 'failures="0"' in junit and 'errors="0"' in junit and 'skipped="0"' in junit
     assert "test_sync_fifo_from_rtl_to_drc_and_lvs_on_gf180mcu" in junit
     by_name = {r.split("\n", 1)[0]: json.loads(r.split("\n", 1)[1]) for r in records}
-    pnr, clean, drc, lvs = (by_name[f"{n}.result.json"] for n in
+    pnr, clean, drc, lvs = (by_name[f"{n}.result.json"]["result"] for n in
                             ("pnr/openroad", "pv_magic/magic-netgen", "pv_magic_drc/magic-netgen",
                              "pv_magic_lvs/magic-netgen"))
     assert pnr["passed"] and "worst setup slack 4.059" in pnr["summary"]
