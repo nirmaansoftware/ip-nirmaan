@@ -43,7 +43,29 @@
         "problems": []
       },
       "level": "knowledge",
-      "practised": []
+      "practised": [
+        {
+          "cases": [
+            "rtl/sync-fifo"
+          ],
+          "cli": "2.1.325",
+          "counts": false,
+          "digest": "sha256:9ce453d40894146149cbc0b239b46c96be234eb3e1d8657fede9b2e728bfb5e2",
+          "harness": "sha256:35643990d58bf28264abe98752bd6c2750a391483ac43176b4748a38fbc32711",
+          "lower": 0.2307,
+          "model": "claude-opus-5-5",
+          "n": 5,
+          "passed": 3,
+          "reasons": [
+            "Wilson lower bound 0.231, under 0.5"
+          ],
+          "records": [
+            "evals/results/2026-11-14-claude-code-claude-opus-5-5-3",
+            "evals/results/2026-11-14-claude-code-claude-opus-5-5-4"
+          ],
+          "unjudged": 2
+        }
+      ]
     },
     "control_logic_design": {
       "knowledge": {
@@ -83,7 +105,29 @@
         "problems": []
       },
       "level": "knowledge",
-      "practised": []
+      "practised": [
+        {
+          "cases": [
+            "rtl/sync-fifo"
+          ],
+          "cli": "2.1.325",
+          "counts": false,
+          "digest": "sha256:81102d62aff3859dcecb679bc3bbbd342b815b374739d5fa70b97567a8b3b5f0",
+          "harness": "sha256:35643990d58bf28264abe98752bd6c2750a391483ac43176b4748a38fbc32711",
+          "lower": 0.2307,
+          "model": "claude-opus-5-5",
+          "n": 5,
+          "passed": 3,
+          "reasons": [
+            "Wilson lower bound 0.231, under 0.5"
+          ],
+          "records": [
+            "evals/results/2026-11-14-claude-code-claude-opus-5-5-3",
+            "evals/results/2026-11-14-claude-code-claude-opus-5-5-4"
+          ],
+          "unjudged": 2
+        }
+      ]
     }
   },
   "totals": {
