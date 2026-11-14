@@ -1,0 +1,89 @@
+{
+  "id": "debug/triage-three-bugs",
+  "request": "Triage the three failing uart_frame_tx tests in the nightly regression and write a repro for each failure.",
+  "seat": "triage",
+  "skills": [
+    "failure_triage"
+  ],
+  "expected_behavior": "A triage report that sorts the three failing logs into three buckets, and one reproducing testbench per bucket, each failing on the RTL under investigation under simulator.run with expect=fail. The block, uart_frame_tx (a UART transmitter with even parity, eleven bit periods per frame), carries three independent defects: the data bits go out most significant bit first, the parity bit has odd polarity, and the stop bit lasts half a bit period so busy falls early. Each repro fails on its own defect and on nothing else, passes on the fixed RTL, and is judged on its own: one repro that fails all three defects cannot stand for three buckets.",
+  "constraints": [
+    "Work from the RTL under investigation and the failing logs; one bucket per distinct defect, not per log line.",
+    "Write one self-checking testbench per bucket, each ending with the verdict line the simulation gate reads and each reproducing on its own against the RTL under investigation.",
+    "Check the behaviour the specification states (data bit order, parity polarity, frame length), not the buggy RTL's output, and keep each repro narrow so it does not also fail on another bucket's defect."
+  ],
+  "known_failure_modes": [
+    "Merging the three failures into one bucket, or splitting one by log line, so the number of repros does not match the number of defects.",
+    "A single repro that checks the whole frame and so fails on all three defects; the must-fail-each check cannot match it to three seeded bugs and fails it.",
+    "A repro that passes on the RTL under investigation (for example a byte whose reversal is itself, such as 0x81, or a parity check that reads only 0x00); the repro gate refuses it before review.",
+    "A repro that fails the fixed RTL, because it expects odd parity or a ten-bit frame; the clean run of the control fails it.",
+    "A repro that fails on a build error or never finishes, which the gate does not count as a reproduction."
+  ],
+  "upstream": {
+    "design-under-investigation": [
+      {
+        "path": "tests/fixtures/dv/uart_frame_tx/uart_frame_tx_buggy.v",
+        "kind": "rtl_source",
+        "entry": "uart_frame_tx"
+      }
+    ]
+  },
+  "reference": [
+    {
+      "path": "tests/fixtures/dv/uart_frame_tx/triage_report.md",
+      "kind": "triage_report"
+    },
+    {
+      "path": "tests/fixtures/dv/uart_frame_tx/uart_frame_tx_repro_data_order.v",
+      "kind": "testbench",
+      "entry": "uart_frame_tx_repro_data_order"
+    },
+    {
+      "path": "tests/fixtures/dv/uart_frame_tx/uart_frame_tx_repro_parity.v",
+      "kind": "testbench",
+      "entry": "uart_frame_tx_repro_parity"
+    },
+    {
+      "path": "tests/fixtures/dv/uart_frame_tx/uart_frame_tx_repro_frame_period.v",
+      "kind": "testbench",
+      "entry": "uart_frame_tx_repro_frame_period"
+    }
+  ],
+  "inputs": {
+    "triage": {
+      "paths": [
+        "tests/fixtures/dv/uart_frame_tx/logs/data_byte_fail.log",
+        "tests/fixtures/dv/uart_frame_tx/logs/parity_bit_fail.log",
+        "tests/fixtures/dv/uart_frame_tx/logs/frame_period_fail.log"
+      ]
+    }
+  },
+  "held_out": [
+    {
+      "name": "Each repro passes the fixed uart_frame_tx, and each seeded defect fails a repro of its own",
+      "scorer": "must-fail-each",
+      "tool": "simulator.run",
+      "seat_files": {
+        "sources": [
+          "testbench"
+        ]
+      },
+      "seat_entries": {
+        "top": [
+          "testbench"
+        ]
+      },
+      "case_files": {
+        "sources": [
+          "tests/fixtures/dv/uart_frame_tx/uart_frame_tx.v"
+        ]
+      },
+      "mutants": {
+        "tests/fixtures/dv/uart_frame_tx/uart_frame_tx.v": [
+          "tests/fixtures/dv/uart_frame_tx/mutants/uart_frame_tx_msb_first.v",
+          "tests/fixtures/dv/uart_frame_tx/mutants/uart_frame_tx_odd_parity.v",
+          "tests/fixtures/dv/uart_frame_tx/mutants/uart_frame_tx_short_stop.v"
+        ]
+      }
+    }
+  ]
+}
