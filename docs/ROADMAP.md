@@ -58,8 +58,8 @@ snapshot, refreshed by `python scripts/status.py --release`.
 | Skills | 140 | `skills`, every PR |
 | Workflows | 10 | `workflows`, every PR |
 | Constitution principles | 12 | `principles`, every PR |
-| Tools `AVAILABLE` | 37 | `tools_available`, every PR |
-| Tools `CONTRACT_ONLY` | 16 | `tools_contract_only`, every PR |
+| Tools `AVAILABLE` | 38 | `tools_available`, every PR |
+| Tools `CONTRACT_ONLY` | 15 | `tools_contract_only`, every PR |
 | Verification knowledge packs | 44 | `knowledge_packs`, every PR |
 | Tests collected | 1987 | `tests`, at release (v1.25.0) |
 <!-- status:end -->
@@ -121,6 +121,7 @@ new number. M1 to M42 are taken; see `docs/history/README.md`.
 | M66 | RTL pilot routing: block features and refinements on the RTL seat | reserved |
 | M67 | Evals without knowledge documents: the ablation switch | reserved |
 | M68 | Block verification: a workflow with DV gates over an existing block's RTL | reserved |
+| M69 | Logic equivalence through eqy: equivalence.run, and the block-verification equivalence gate | reserved |
 | M70 | Code coverage: `coverage.read` through Verilator and verilator_coverage, and block verification's coverage gate | reserved |
 | M71 | Repro gates: triage and root cause reproduce the failure on the handed-over RTL | reserved |
 | M73 | The harness in one place, and its fingerprint on every trial | reserved |

@@ -5,7 +5,7 @@ broker binding that executes, or (for :data:`ENGINE_OPERATIONS`) an operation
 of the task engine itself, which the authority service permits by this
 capability and the broker never runs (M53). ``CONTRACT_ONLY`` means the organization plans around the
 tool but nothing here can run it, and the broker refuses rather than pretends:
-no agent can ever claim a CDC or equivalence run happened.
+no agent can ever claim a CDC run happened.
 
 Lint, simulation, tests, synthesis, and formal are AVAILABLE through
 open-source EDA (``nirmaan/integrations/eda.py``, M21); static timing and
@@ -19,7 +19,8 @@ M25), and so are the RV32I cross build and the run on a RISC-V core
 Scan insertion, DFT rule checks, and scan chain simulation are AVAILABLE through
 Yosys and Icarus (``nirmaan/integrations/dft.py``, M25); so are stuck-at ATPG,
 graded by fault simulation, and March C- memory BIST (M27), and transition
-ATPG (M29).
+ATPG (M29). Logic equivalence is AVAILABLE through eqy
+(``nirmaan/integrations/equivalence.py``, M69).
 
 Code coverage is AVAILABLE through Verilator and verilator_coverage (``coverage.read``, M70).
 
@@ -160,7 +161,11 @@ TOOLS: list[ToolSpec] = [
           (_p("spec", PATHS, "The specification file or files to check.", required=True),
            _p("checks", PATH, "The checks file (nirmaan.spec-checks): requirement IDs with terms, and names.",
               required=True))),
-    _tool("equivalence.run", "Equivalence checker", "eda", EXE, CO, "Logic equivalence checking."),
+    _tool("equivalence.run", "Equivalence checker", "eda", EXE, AV,
+          "Logic equivalence of a gold and a gate design through eqy (M69): every partition proved.",
+          (_p("eqy", PATH, "The eqy setup (.eqy): its [gold] and [gate] scripts name files relative to it.",
+              required=True),
+           _p("sources", PATHS, "RTL the check must read; the setup's scripts must read each one."), *RUNNER)),
     _tool("cdc.run", "CDC/RDC analyzer", "eda", EXE, CO, "Structural and functional crossing analysis."),
     # Implementation EDA.
     _tool("synth.run", "Synthesis", "eda", EXE, AV, "Logic synthesis.",

@@ -437,6 +437,82 @@ def parse_sby_cover(log: str, returncode: int, antecedents: Sequence[Mapping[str
                      tuple(diags), metrics)
 
 
+# --- eqy (M69) -------------------------------------------------------------------------
+
+# eqy prefixes every line it prints with its own tag, time and work directory:
+# EQY  7:26:45 [/tmp/run/eqy] Successfully proved equivalence of partition counter.count
+# EQY  7:26:45 [/tmp/run/eqy] Failed to prove equivalence of partition counter.wrap
+# EQY  7:26:45 [/tmp/run/eqy] run: Could not prove equivalence of partition 'counter.wrap' using strategy 'sat': ...
+# EQY  7:26:45 [/tmp/run/eqy] Successfully proved designs equivalent
+# EQY  7:26:45 [/tmp/run/eqy] DONE (PASS, rc=0)
+# What a step eqy started prints comes after that step's name ("read_gold: ", "run: "), so a design or a
+# script cannot print a line these patterns read as eqy's own.
+_EQY_LINE_RE = re.compile(r"^EQY\s+\S+\s+\[[^\]]*\]\s+(?P<msg>.*?)\s*$")
+_EQY_DONE_RE = re.compile(r"^DONE \((?P<status>[A-Z]+), rc=(?P<rc>\d+)\)$")
+_EQY_PROVED_RE = re.compile(r"^Successfully proved equivalence of partition (?P<name>\S+)$")
+_EQY_FAILED_RE = re.compile(r"^Failed to prove equivalence of partition (?P<name>\S+)$")
+_EQY_WHY_RE = re.compile(r"^run: Could not prove equivalence of partition '(?P<name>[^']+)' using strategy "
+                         r"'(?P<strategy>[^']+)': (?P<why>.+)$")
+_EQY_ERROR_RE = re.compile(r"\bERROR:\s*(?P<msg>.*)$")
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def parse_eqy(log: str, returncode: int, gold: Sequence[str] = (), gate: Sequence[str] = ()) -> EdaResult:
+    """Pass means eqy proved the gold and gate designs equivalent: every partition proved, at least one (M69).
+
+    ``gold`` and ``gate`` name the files each side read, so the result says which versions it compared.
+    A partition eqy could not prove (not equivalent, unknown, or out of time) fails the run, with the
+    reason its last strategy gave.
+    """
+    status, everything = "UNKNOWN", False
+    proved: list[str] = []
+    failed: list[str] = []
+    why: dict[str, str] = {}
+    errors: list[Diagnostic] = []
+    for raw in log.splitlines():
+        plain = _ANSI_RE.sub("", raw)
+        line = _EQY_LINE_RE.match(plain)
+        if not line:  # eqy's own fatal errors are printed bare
+            if plain.startswith("ERROR:"):
+                errors.append(Diagnostic("error", plain[len("ERROR:"):].strip()))
+            continue
+        msg = line["msg"]
+        if m := _EQY_DONE_RE.match(msg):
+            status = m["status"]
+        elif m := _EQY_PROVED_RE.match(msg):
+            proved.append(m["name"])
+        elif m := _EQY_FAILED_RE.match(msg):
+            failed.append(m["name"])
+        elif m := _EQY_WHY_RE.match(msg):
+            why[m["name"]] = f"{m['why']} (strategy {m['strategy']})"
+        elif msg == "Successfully proved designs equivalent":
+            everything = True
+        elif m := _EQY_ERROR_RE.search(msg):
+            errors.append(Diagnostic("error", m["msg"].strip()))
+    diags = [*errors, *(Diagnostic("error", f"partition {p} not proved equivalent: {why.get(p, 'no reason given')}",
+                                   "NOT_EQUIVALENT") for p in failed)]
+    total = len(proved) + len(failed)
+    passed = returncode == 0 and status == "PASS" and everything and bool(proved) and not failed
+    compared = f"gate {', '.join(gate)} against gold {', '.join(gold)}: " if gold and gate else ""
+    if passed:
+        summary = f"equivalent: {compared}every partition proved ({len(proved)} of {total})"
+    elif failed:
+        first = failed[0]
+        summary = (f"not equivalent: {compared}{len(failed)} of {_plural(total, 'partition')} not proved; "
+                   f"first: {first} ({why.get(first, 'no reason given')})")
+    elif status == "PASS" and not proved:
+        summary = "no partition was proved: a setup that compares nothing says nothing about equivalence"
+    elif errors:
+        summary = f"equivalence check {status.lower()}: {_plural(len(errors), 'error')}{_first(errors)}"
+    else:
+        last = next((ln.strip() for ln in reversed(log.splitlines()) if ln.strip()), "no output")
+        summary = f"equivalence check did not finish (exit status {returncode}): {last}"
+    metrics: dict[str, Any] = {"status": status, "exit_status": returncode, "partitions": total,
+                               "partitions_proved": len(proved), "partitions_failed": len(failed),
+                               "equivalent": int(passed), "gold": list(gold), "gate": list(gate)}
+    return EdaResult(passed, summary, tuple(diags), metrics)
+
+
 # --- Coverage (M70) --------------------------------------------------------------------
 
 #: One coverage point in a Verilator coverage data file (``SystemC::Coverage-3``): ``C '<keys>' <count>``,
