@@ -48,7 +48,9 @@ GF180_PNR = {
     "pdn_tcl": "gf180/openROAD/pdn/pdn_grid_strategy_9t_6M.cfg", "rc_tcl": "gf180/setRC.tcl",
     "rcx_rules": "gf180/openROAD/rcx/gf180mcu_1p5m_1tm_9k_sp_smim_OPTB_typ.rules",
     "filler_cells": ",".join(f"{CELL}fill_{n}" for n in (64, 32, 16, 8, 4, 2, 1)),
-    "supply_voltage": "5.0",
+    # No supply_voltage, so no IR-drop analysis: the technology LEF gives the via cut layers no resistance
+    # and setRC.tcl sets one only at the BC and WC corners, so at TC PDNSim refuses the grid (PSM-0021,
+    # CI run 43612057949). The grid's connectivity is still checked (check_power_grid).
 }
 KLAYOUT_TECH = "gf180/KLayout/gf180mcu_5LM_1TM_9K_9t.lyt"
 GDS_DIR = "gf180/gds/9t"
