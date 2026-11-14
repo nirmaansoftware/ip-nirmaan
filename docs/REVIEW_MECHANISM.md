@@ -592,7 +592,9 @@ folder is `$RUNNER_TEMP/pr-review`, under the runner's home folder (mode 750),
 which the check account cannot enter.
 The OSS CAD Suite moves from `$RUNNER_TEMP` to `/opt/oss-cad-suite`, with its
 wrappers in `/opt/cad-bin` first on `PATH`, so the formal tests the checks
-select run as the check account instead of skipping.
+select run as the check account instead of skipping. In run 43589272285, the
+formal gate and equivalence tests passed as `loopcheck` in a `check_clone`,
+with `sby`, `yices-smt2` and `eqy` required.
 
 **Credentials.** All are environment secrets of the GitHub Environment
 `review-loop`, whose deployment branch rule allows only `main`. None is a
