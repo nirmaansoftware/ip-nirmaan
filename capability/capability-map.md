@@ -227,7 +227,8 @@ verification.processor (placeholder, no skill). Seat: verification-lead.
 | FPGA prototyping | K | none | design.fpga, verification.dynamic.emulation | Needs a board |
 | Hardware emulation | O | none | verification.dynamic.emulation | Emulators are paid hardware |
 | Security verification | K | security_verification | security.verification | Free tool: access-control properties in SBY and fuzzing on Verilator |
-| System-level and portable stimulus | K | none | none | No free PSS tool here |
+| System-level and portable stimulus | K | portable_stimulus | verification.methodology.architecture | No free PSS tool here |
+| Testbench qualification (mutation) | K | testbench_qualification | verification.methodology.architecture | The eval scorer plants mutants itself; a seat-written mutant set needs a scorer change or YosysHQ MCY, not wrapped here |
 | AI-assisted verification | P | regression_intelligence | verification.debug.analysis.intelligence, infrastructure.ai | The eval harness and VeriTriage judge model output with real tool runs |
 
 ## Implementation
