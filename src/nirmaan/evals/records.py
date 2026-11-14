@@ -125,11 +125,14 @@ def select_cases(cases: Sequence[EvalCase], seats: Sequence[str]) -> list[EvalCa
 
 def record_trial(org: Organization, case: EvalCase, seat_runtime: AgentRuntime, *, replay: bool, record: str,
                  trial: int, repo: Path, attempts: int | None = None, sandbox: Path | None = None,
-                 clock: Callable[[], datetime] | None = None, knowledge: bool = True) -> EvalTrial:
+                 clock: Callable[[], datetime] | None = None, knowledge: bool = True,
+                 purpose: str = "evidence", digest_repo: Path | None = None) -> EvalTrial:
     """Run one case once with every model answer captured, and keep the tool runs behind each verdict.
 
     ``knowledge=False`` (M67) runs the seat without knowledge documents and labels the trial ``knowledge: off``.
     Every answer, and the result, records the harness (M73), with the runtime's CLI version in it.
+    ``digest_repo`` is where the skills' knowledge documents are digested from (default ``repo``): a run that stages
+    its cases elsewhere (M76) still digests the documents the seat was really given.
     """
     llm = getattr(seat_runtime, "llm", None)
     harness = harness_sha256(attempts=attempts, knowledge=knowledge, cli=runtime_cli(seat_runtime))
@@ -150,8 +153,9 @@ def record_trial(org: Organization, case: EvalCase, seat_runtime: AgentRuntime, 
     answers = tuple(recorder.answers) if recorder else ()
     model = next((a.model for a in answers if a.model), None) or model_of(seat_runtime)
     return EvalTrial(record=record, trial=trial, stage=case.seat, model=model,
-                     skills={s: skill_digest(org, s, repo, knowledge=knowledge) for s in case.skills},
-                     knowledge="on" if knowledge else "off", result=result, answers=answers, judge_runs=judge_runs)
+                     skills={s: skill_digest(org, s, digest_repo or repo, knowledge=knowledge) for s in case.skills},
+                     knowledge="on" if knowledge else "off", purpose=purpose, result=result,
+                     answers=answers, judge_runs=judge_runs)
 
 
 def _write(path: Path, data: dict[str, Any]) -> None:
@@ -171,13 +175,16 @@ def _free(out: Path, name: str) -> Path:
 def record_run(org: Organization, cases: Sequence[EvalCase], runtime: str | None, *, trials: int, repo: Path,
                out: Path, attempts: int | None = None, command: str = "", head_sha: str | None = None,
                clock: Callable[[], datetime] | None = None,
-               on_trial: Callable[[EvalTrial, Path], None] | None = None, knowledge: bool = True) -> Path:
+               on_trial: Callable[[EvalTrial, Path], None] | None = None, knowledge: bool = True,
+               purpose: str = "evidence", source: str = "", digest_repo: Path | None = None) -> Path:
     """Run every case ``trials`` times on a registered runtime (``None`` replays) and write a run record.
 
     Each trial gets a fresh runtime and its own sandbox. The manifest is written first and rewritten at the
     end, so a run cut short still leaves a readable record of the trials it finished. ``knowledge=False``
     (M67, the ablation) runs every seat without knowledge documents: the record's name ends in
-    ``-without-knowledge`` and its manifest and every trial say ``knowledge: off``.
+    ``-without-knowledge`` and its manifest and every trial say ``knowledge: off``. ``purpose="calibration"``
+    (M76, ``eval outside``) labels the record, its manifest and every trial the same way, and ``source`` says where
+    the problems came from.
     """
     if trials < 1:
         raise ValueError("trials must be at least 1")
@@ -185,7 +192,7 @@ def record_run(org: Organization, cases: Sequence[EvalCase], runtime: str | None
     started = now()
     probe = get_runtime(runtime) if runtime else None
     runtime_id, model = (probe.runtime_id, model_of(probe)) if probe else (REPLAY, REPLAY)
-    label = "" if knowledge else f"-{WITHOUT_KNOWLEDGE}"
+    label = ("" if knowledge else f"-{WITHOUT_KNOWLEDGE}") + ("-calibration" if purpose == "calibration" else "")
     path = _free(out, f"{started:%Y-%m-%d}-{_safe(runtime_id)}-{_safe(model)}{label}")
     path.mkdir(parents=True)
 
@@ -194,7 +201,8 @@ def record_run(org: Organization, cases: Sequence[EvalCase], runtime: str | None
                                nirmaan_version=nirmaan.__version__, started_at=started, finished_at=finished,
                                trials=trials, cases=tuple(c.id for c in cases),
                                seats=tuple(dict.fromkeys(c.seat for c in cases)), command=command,
-                               head_sha=head_sha, knowledge="on" if knowledge else "off")
+                               head_sha=head_sha, knowledge="on" if knowledge else "off",
+                               purpose=purpose, source=source)
 
     _write(path / MANIFEST, manifest(started).model_dump(mode="json"))
     done: list[EvalTrial] = []
@@ -202,7 +210,8 @@ def record_run(org: Organization, cases: Sequence[EvalCase], runtime: str | None
         for number in range(1, trials + 1):
             seat = get_runtime(runtime) if runtime else ModelRuntime(replay_llm(case, repo), runtime_id=REPLAY)
             trial = record_trial(org, case, seat, replay=runtime is None, record=path.name, trial=number, repo=repo,
-                                 attempts=attempts, clock=clock, knowledge=knowledge)
+                                 attempts=attempts, clock=clock, knowledge=knowledge, purpose=purpose,
+                                 digest_repo=digest_repo)
             target = trial_path(path, case.id, number)
             _write(target, trial.model_dump(mode="json"))
             done.append(trial)
@@ -260,6 +269,15 @@ def knowledge_off(manifest: EvalRunManifest, trial: EvalTrial) -> tuple[str, ...
     """
     return tuple(where for where, value in (("the run manifest", manifest.knowledge), ("the trial", trial.knowledge))
                  if value != "on")
+
+
+def calibration_labels(manifest: EvalRunManifest, trial: EvalTrial) -> tuple[str, ...]:
+    """Where a trial is labelled as an outside calibration (M76): the manifest, the trial, or both.
+
+    Either label is enough, so editing one of them never turns a calibration trial into evidence.
+    """
+    return tuple(where for where, value in (("the run manifest", manifest.purpose), ("the trial", trial.purpose))
+                 if value != "evidence")
 
 
 def load_records(root: Path | str) -> list[EvalRecord]:

@@ -57,8 +57,9 @@ check gives:
 The scorer passes only when, in order:
 
 1. the clean run passes (otherwise `failed`: "the clean inputs do not pass");
-2. the `cover_tool` run passes over the same clean inputs (otherwise `failed`:
-   "covers not reached");
+2. the `cover_tool` run passes over the same clean inputs, checked against the
+   check's `cover_bounds` when it has any (otherwise `failed`: "covers not
+   reached"; "Cover bounds" below);
 3. every mutant run fails, on a run that executed and wrote its log. A mutant
    that passes is reported by name as surviving. A refusal (a tool outcome with
    no log: a check problem, a missing file) is `not_run`, never a mutant caught.
@@ -430,6 +431,24 @@ checks the whole frame.
 
 `load_record` and `load_records` are unchanged: `nirmaan eval history` and
 `nirmaan eval rejudge` still read replays, which is how cases are proven.
+
+### Cover bounds (W2-E5)
+
+A requirement's own `bounds` (M48) are a threshold on the metrics a tool
+reports, and the broker fails a run that breaks one or never reports it. The
+scorer used to run its `cover_tool` without bounds, so a run that read a low
+coverage still passed the cover. A check may now carry `cover_bounds`, a list
+of the same M48 text form as the CLI's `--bound` (`line>=90`); each is parsed
+when the case loads, and the `cover_tool` run is checked against them exactly
+as the broker checks a requirement's bounds. Nothing else changes:
+
+- the bounds apply to the `cover_tool` run only, never to the clean run or to
+  a mutant run (a mutant must fail on its own checks, not on a coverage
+  shortfall);
+- a check with no `cover_bounds` runs as before, and its dump leaves the field
+  out, so no case digest changes;
+- `tests/test_eval_cover_bounds.py` tests all of this with synthetic tool
+  results: no case, no real tool and no measured figure.
 
 ## 5. The six shipped cases
 

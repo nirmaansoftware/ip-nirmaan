@@ -1194,6 +1194,65 @@ def eval_run(
         raise typer.Exit(1)
 
 
+@eval_app.command("outside")
+def eval_outside(
+    benchmark: Optional[Path] = typer.Option(None, "--benchmark", envvar="NIRMAAN_RTLLM_DIR",
+                                             help="The private RTLLM copy (docs/OUTSIDE_CALIBRATION.md)."),
+    runtime: Optional[str] = typer.Option(None, "--runtime", help="Registered runtime ID to put in the seat."),
+    check: bool = typer.Option(False, "--check", help="Only judge each design's reference RTL with the benchmark's "
+                                                       "testbench (proves the mapping, calls no model)."),
+    trials: int = typer.Option(1, "--trials", min=1, help="Trials per design."),
+    only: Optional[str] = typer.Option(None, "--only", help="Comma-separated design names (default: every design)."),
+    out: Path = typer.Option(Path(".nirmaan") / "outside", "--out",
+                             help="Where the calibration record is written: keep it outside the repositories."),
+) -> None:
+    """Outside calibration (M76): RTLLM designs through the RTL seat, judged by the benchmark's testbench.
+
+    The record is labelled calibration and never counts toward a skill level. Exits 1 when any trial fails.
+    """
+    from nirmaan.evals import EvalError
+    from nirmaan.evals.calibration import calibrate, check_reference
+
+    if check == (runtime is not None):
+        _fail("choose one: --runtime ID (a model in the seat) or --check (the reference RTL, no model)")
+    if benchmark is None:
+        _fail("name the benchmark copy with --benchmark PATH or the NIRMAAN_RTLLM_DIR variable "
+              "(docs/OUTSIDE_CALIBRATION.md says how to fetch it)")
+    names = [x.strip() for x in (only or "").split(",") if x.strip()]
+    if check:
+        try:
+            verdicts = check_reference(_org(), benchmark, names)
+        except EvalError as exc:
+            _fail(str(exc))
+        for name, ok, summary in verdicts:
+            console.print(escape(f"{'MAPPED' if ok else 'NOT MAPPED'} {name}: {summary}"), highlight=False,
+                          soft_wrap=True)
+        console.print(f"{sum(ok for _, ok, _ in verdicts)} of {len(verdicts)} designs map", highlight=False)
+        return
+    if runtime is not None:
+        from nirmaan.runtime import available_runtimes
+
+        if runtime not in available_runtimes():
+            _fail(f"Unknown runtime {runtime!r}. Registered: {', '.join(available_runtimes())}")
+    results = []
+
+    def show(trial, path: Path) -> None:
+        results.append(trial.result)
+        console.print(escape(f"{'PASS' if trial.result.passed else 'FAIL'} {trial.result.case} [{trial.result.runtime}] "
+                             f"trial {trial.trial}/{trials}: {trial.result.seat_status} ({trial.result.duration_s}s)"),
+                      highlight=False, soft_wrap=True)
+
+    try:
+        path = calibrate(_org(), benchmark, runtime=runtime, trials=trials, out=out, names=names,
+                         command=" ".join(["nirmaan", *sys.argv[1:]]), on_trial=show)
+    except EvalError as exc:
+        _fail(str(exc))
+    _print_summary(json.loads((path / "summary.json").read_text(encoding="utf-8")))
+    console.print(escape(f"calibration record (never counts toward a level): {path}"), highlight=False, soft_wrap=True)
+    if not all(r.passed for r in results):
+        raise typer.Exit(1)
+
+
 def _head_sha(repo: Path) -> Optional[str]:
     """The commit checked out at ``repo`` (M58: a run record names it), or None outside a repository."""
     import subprocess
