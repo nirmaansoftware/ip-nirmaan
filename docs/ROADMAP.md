@@ -132,6 +132,7 @@ new number. M1 to M42 are taken; see `docs/history/README.md`.
 | M79 | SKY130 physical design pilot in CI: Magic DRC and Netgen LVS (`pv.run` backend `magic-netgen`), resources item R3 | reserved |
 | M80 | Metal fill streamed to the layers the DRC deck reads, with a must-fail fill control | reserved |
 | M81 | GF180MCU physical design pilot in CI: the M79 pilot on the ORFS gf180 platform, Magic DRC and Netgen LVS over open_pdks gf180mcuC | reserved |
+| M82 | IHP SG13G2 physical design pilot in CI: the M79 pilot on the ORFS ihp-sg13g2 platform, Magic DRC and Netgen LVS over the IHP Open PDK's own Magic and Netgen files | reserved |
 
 <!-- review:milestone-numbers:end -->
 
