@@ -81,7 +81,9 @@ The full path map is in the council record, section 1.
 The founder confirmed all six on 2026-10-17: control plane, gate semantics,
 licence and third-party, commercial, public names and claims, and
 export-control sensitive content. The review script detects both path and
-content classes from `main`'s map. A `hold` label also keeps `review/executive`
+content classes from `main`'s map. Control plane includes the eval harness:
+its settings, the level computation and every file whose bytes are in the
+harness fingerprint, each listed by name (`docs/HARNESS.md`). A `hold` label also keeps `review/executive`
 pending; agents can remove labels, so the label is a convention.
 
 **The Founder Proxy (founder's decision, 2026-10-18).** Until 2026-10-18 these
