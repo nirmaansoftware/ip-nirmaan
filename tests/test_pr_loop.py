@@ -481,6 +481,15 @@ def test_a_fixer_touching_a_forbidden_path_is_refused_and_reverted(repo, edits):
     assert sh(r.work, "status", "--porcelain") == ""
 
 
+def test_a_fix_holding_text_in_a_credential_format_is_never_pushed(repo):
+    token = "gh" + "s_" + "A1b2" * 9  # built here so this file holds no credential-shaped literal
+    r = repo(reviews=[fail("bad")], fixes=[{"edits": {"src/app.py": f"one\ntwo = '{token}'\nthree\n"}}])
+    assert r.tick() == ["stopped"]
+    assert r.origin_head() == r.first_head and r.labeled()
+    assert "credential format" in r.comments()[-1] and "nothing was pushed" in r.comments()[-1]
+    assert token not in r.comments()[-1]
+
+
 def author_push(r, tmp_path, rel="src/app.py", text="by the author\n"):
     w = tmp_path / f"author-{len(list(tmp_path.glob('author-*')))}"
     sh(tmp_path, "clone", "-q", "-b", "feature", str(r.origin), str(w))

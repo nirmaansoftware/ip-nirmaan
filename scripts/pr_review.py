@@ -123,12 +123,23 @@ APP_ENV = {
     "key_file": "NIRMAAN_REVIEW_APP_PRIVATE_KEY_FILE",  # a PEM outside every repository
     "keychain_service": "NIRMAAN_REVIEW_APP_KEYCHAIN_SERVICE",  # or a macOS Keychain item holding the PEM
 }
+# An installation token already minted (GitHub Actions: scripts/loop_cloud.py app-token), so the
+# private key never sits on disk while a model runs. The loop uses it in place of minting one.
+APP_TOKEN_ENV = "NIRMAAN_REVIEW_APP_TOKEN"
 
 READ_ONLY_TOOLS = "Read,Grep,Glob"
 # Bash stays off: `git diff --output=<file>` writes files and diff drivers can
-# run programs, so the script computes the diff itself.
-DENIED_TOOLS = "Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch,Task,Agent"
+# run programs, so the script computes the diff itself. /proc is denied (Read
+# rules cover Grep and Glob too): on a Linux runner every process's environment
+# is readable there, the loop's tokens included (docs/REVIEW_MECHANISM.md,
+# "Running the loop in GitHub Actions").
+PROC_DENIED = "Read(//proc/**)"
+DENIED_TOOLS = f"Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch,Task,Agent,{PROC_DENIED}"
 ENV_ALLOWLIST = ("HOME", "PATH", "USER", "LOGNAME", "LANG", "LC_ALL", "LC_CTYPE", "TMPDIR", "TERM", "SHELL", "CLAUDE_CONFIG_DIR")
+# The plan's long-lived token (`claude setup-token`) where the loop runs in
+# GitHub Actions; on the Mac the login is the Keychain's and it is unset. Only
+# the claude process gets it (model_env), never a check the loop runs.
+MODEL_ENV_EXTRA = ("CLAUDE_CODE_OAUTH_TOKEN",)
 SEVERITIES = ("blocker", "critical", "major", "minor", "info")
 VERDICT_KEYS = {"verdict", "sha", "findings", "checks_run", "not_run", "claims", "files_read", "summary"}
 # The Founder Proxy (agent) answers with one more verdict, and its reasons.
@@ -858,6 +869,12 @@ def reviewer_env(env=None) -> dict:
     return {k: env[k] for k in ENV_ALLOWLIST if k in env}
 
 
+def model_env(env=None) -> dict:
+    """reviewer_env plus the plan's token when one is set: for a claude process only."""
+    env = os.environ if env is None else env
+    return {**reviewer_env(env), **{k: env[k] for k in MODEL_ENV_EXTRA if env.get(k)}}
+
+
 def claude_args(model: str, system_prompt: str, add_dirs: list[str], schema: dict | None = None) -> list[str]:
     args = ["-p", "--output-format", "json", "--model", model, "--system-prompt", system_prompt,
             "--tools", READ_ONLY_TOOLS, "--allowedTools", READ_ONLY_TOOLS, "--disallowedTools", DENIED_TOOLS,
@@ -892,7 +909,7 @@ def run_once(binary: str, args: list[str], stdin: str, cwd: str, timeout_s: floa
     started = time.monotonic()
     try:
         proc = subprocess.run([binary, *args], input=stdin, capture_output=True, text=True, cwd=cwd,
-                              env=reviewer_env(), timeout=timeout_s)
+                              env=model_env(), timeout=timeout_s)
     except subprocess.TimeoutExpired:
         return {"kind": "timeout", "error": f"claude did not answer within {round(timeout_s)}s", "duration_ms": int((time.monotonic() - started) * 1000)}
     except OSError as exc:
