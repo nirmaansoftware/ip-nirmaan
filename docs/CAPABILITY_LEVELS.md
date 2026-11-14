@@ -39,6 +39,11 @@ run manifest and in the trial. Labelled off in either, it is taken out first,
 listed in `without_knowledge` with its outcome and the reason, and never counts
 toward any level; its skill digests are the cards alone, so with both labels
 edited back a skill with a document is still stale.
+A calibration trial (M76, `nirmaan eval outside`, an outside benchmark;
+`docs/OUTSIDE_CALIBRATION.md`) is labelled `"purpose": "calibration"` in its run
+manifest and in the trial. Labelled so in either, it is listed in `calibration`
+with the reason "outside calibration" and never counts toward any level; the
+record is not judged as evidence at all, so a replay of one is no refusal.
 
 Trials are grouped by skill, model, the skill digest recorded with the trial
 (card plus knowledge document, M58), the harness recorded with it (M73,
