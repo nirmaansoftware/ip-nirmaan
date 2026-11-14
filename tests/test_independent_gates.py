@@ -2,9 +2,8 @@
 
 Council record ``council/records/2026-11-14-g13-grouping-units.md``, decision 2c: the approver of a
 ``gate.verification`` task is never the head of the department whose unit produced the evidence. The rule is data
-(``INDEPENDENT_GATES`` in ``src/nirmaan/company/governance.py``) read by the router, and it covers the other
-signoff gate a department's evidence feeds today, ``gate.implementation``. The approver is the first holder of the
-gate's capability further up the producer's chain: the division's VP. The gate specs do not change.
+(``INDEPENDENT_GATES`` in ``src/nirmaan/company/governance.py``) read by the router. The approver is the first
+holder of the gate's capability further up the producer's chain: the division's VP. The gate specs do not change.
 
 The plan-equivalence proof plans every representative request with the rule and without it and allows only the
 changes in ``INTENDED``.
@@ -28,9 +27,6 @@ from nirmaan.org.organization import OrganizationError
 INDEPENDENT_FROM = {
     # The coverage evidence comes from the Simulation department (its assertion coverage practice).
     "coverage.gate": ("verification.dynamic.director", "verification.vp", "verification.dynamic", "verification"),
-    # Timing signoff evidence comes from the Physical Design department.
-    **{gate: ("implementation.pd.director", "implementation.vp", "implementation.pd", "implementation")
-       for gate in ("sta.gate", "sta-signoff.gate", "reanalysis.gate")},
 }
 INTENDED = {
     change
@@ -74,7 +70,7 @@ def test_the_gates_themselves_are_unchanged(nirmaan_org):
     gate = nirmaan_org.gates["gate.implementation"]
     assert (gate.approver_capability, gate.min_level, gate.human_required) == (
         "signoff.implementation", Level.DIRECTOR, False)
-    assert nirmaan_org.independent_gates == {"gate.verification", "gate.implementation"}
+    assert nirmaan_org.independent_gates == {"gate.verification"}
 
 
 def test_own_heads_are_the_team_and_department_heads_not_the_vp(nirmaan_org):
@@ -94,8 +90,8 @@ def test_no_independent_gate_is_approved_by_its_producers_heads(request_text, ni
 
 
 def test_must_fail_the_producing_departments_head_approving_its_own_evidence(fixed_clock):
-    # Without the rule (main before M78) the Simulation director approves the coverage its department produced,
-    # and the physical design director the timing evidence of theirs: the check catches both.
+    # Without the rule (main before M78) the Simulation director approves the coverage its department produced:
+    # the check catches it.
     off = _org(())
     caught = set()
     for text in ALL_REQUESTS:

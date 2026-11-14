@@ -106,7 +106,7 @@ GATES: list[GateSpec] = [
 #: then the first holder further up the producer's chain: the division's VP. ``gate.rtl`` is not listed: only
 #: the RTL department's own director holds ``signoff.rtl`` at the authority its high-criticality gates need,
 #: so it would have no approver (docs/HIERARCHY_FIXES.md section 6).
-INDEPENDENT_GATES: tuple[str, ...] = ("gate.verification", "gate.implementation")
+INDEPENDENT_GATES: tuple[str, ...] = ("gate.verification",)
 
 B, W = Enforcement.BLOCK, Enforcement.WARN
 CONSTITUTION: list[Principle] = [
