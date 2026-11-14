@@ -45,10 +45,9 @@ reasoning; a line marked "gate" names the repository code that backs it.
 
 Each warning below is in Verilator's list [VLW]; because the gate runs
 `-Wall`, each one fails `lint.run` (inference from the gate lines above).
-Checked on Verilator 5.052 with small files on 2026-11-15: an unused input
-bit, a module whose name differs from its file name, a 4-bit value assigned to
-a 2-bit register and an incomplete combinational `if` each failed the gate's
-parser.
+The `-Wall` option includes the style group, so an unused input bit or a module
+name that differs from its file name fails the gate, though a plain lint would not
+[VLA] (inference).
 
 - DECLFILENAME: a module name must match its file name, with path and
   extension stripped [VLW]. A file `foo.v` holding module `bar` fails.

@@ -55,9 +55,9 @@ that backs it. This card holds no tool; the tool it points to is `synth.run`.
   src/nirmaan/integrations/eda.py:602-607, registered at eda.py:812). It
   needs a top module (gate: src/nirmaan/company/tools.py:177-178).
 - It passes on exit 0 and no `ERROR` line. Warnings, including the latch
-  warning, do not fail it (gate: eda_parsers.py:263-287). On 2026-11-15 a
-  one-line latch design passed with "1 cells, 0 flip-flops, 1 latches, 1
-  warning". A pass is not a statement that the RTL has no latch; read the
+  warning, do not fail it (gate: eda_parsers.py:263-287; the pass test at
+  line 287 reads only the exit status and the errors, and latches are only
+  counted, at lines 282-283). A pass is not a statement that the RTL has no latch; read the
   latch count in the result (inference).
 - The numbers it keeps are the cell count, wire count, cells by type, and
   the flip-flop and latch counts, taken from type names that contain `FF` or
