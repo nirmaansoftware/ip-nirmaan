@@ -13,7 +13,8 @@ FIXTURES = Path(__file__).parent / "fixtures"
 #: M79: the SKY130 pilot runs only in its own workflow (.github/workflows/pd-sky130.yml), which sets
 #: NIRMAAN_PD_PILOT and installs Magic, Netgen, and the PDK files. Elsewhere it is not collected, so the
 #: required jobs neither run nor skip it (scripts/check_test_union.py). docs/PD_SKY130_PILOT.md.
-collect_ignore = [] if os.environ.get("NIRMAAN_PD_PILOT") else ["test_pd_sky130_pilot.py"]
+#: M81: the GF180MCU pilot likewise, in pd-gf180.yml (docs/PD_GF180_PILOT.md).
+collect_ignore = [] if os.environ.get("NIRMAAN_PD_PILOT") else ["test_pd_sky130_pilot.py", "test_pd_gf180_pilot.py"]
 
 
 # --- CI shards (scripts/shards.py) -----------------------------------------------------

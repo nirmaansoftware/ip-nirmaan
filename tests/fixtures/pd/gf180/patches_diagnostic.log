@@ -1,0 +1,10 @@
+# CAPTURED: the job log of a temporary diagnostic (commit 9bf6f5c, removed in 65d619d): the pilot's pnr.tcl rerun with write_def after each named command, and the count of RECT patches in each DEF's NETS section (d1 after detailed_route, d2 filler_placement, d3 check_antennas, d4 global_connect, d5 extract_parasitics; route.def is the one pnr.run wrote at the end); CI run 43615692267 (head 9bf6f5c), job gf180-pilot; excerpt: the pilot's summary lines and every diag line, the CI timestamp prefix removed.
+pilot pnr: openroad: place and route passed: routed and extracted, 0 DRC violations, wirelength 15268 um, utilization 34%, power grid connected, clock skew 0.010, worst setup slack 4.059, worst hold slack 1.000, TNS 0.000 on extracted parasitics
+pilot magic-netgen: magic-netgen: physical verification (Magic and Netgen) failed: 411 DRC violations (Metal2_minimum_area_<_0.1444um^2_(M2.3) 405, Metal3_minimum_area_<_0.1444um^2_(M3.3) 6)
+diag openroad rc 0 []
+diag d1.def RECT in NETS: 252
+diag d2.def RECT in NETS: 252
+diag d3.def RECT in NETS: 252
+diag d4.def RECT in NETS: 252
+diag d5.def RECT in NETS: 0
+diag route.def RECT in NETS: 0

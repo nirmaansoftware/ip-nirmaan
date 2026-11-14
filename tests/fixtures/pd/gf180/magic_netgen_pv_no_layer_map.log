@@ -1,0 +1,111 @@
+# CAPTURED: pv.run backend magic-netgen on gf180 streamed with the platform's KLayout technology alone (no layer_map) and the platform's vendor cell LEF and GDS; CI run 43612313722 (head 8383cfa), job gf180-pilot; excerpt: in order, every step line, the tools' banners, errors and warnings, Magic's DRC and GDS lines, Netgen's final result and every nirmaan- line; nothing else is edited; except that the stream step's in_gds list of the platform's per-cell GDS files is cut to its first two.
+$ klayout -zz -rd tech_file=/__w/_temp/pd/test_sync_fifo_from_rtl_to_drc0/pv_magic/klayout.lyt -rd in_def=/__w/_temp/pd/test_sync_fifo_from_rtl_to_drc0/pnr/route.def -rd 'in_gds=/OpenROAD-flow-scripts/flow/platforms/gf180/gds/9t/gf180mcu_fd_sc_mcu9t5v0__addf_1.gds /OpenROAD-flow-scripts/flow/platforms/gf180/gds/9t/gf180mcu_fd_sc_mcu9t5v0__addf_2.gds ...' -rd design_name=sync_fifo -rd fill_targets=34/0,35/0,36/0,38/0,40/0,41/0,42/0,46/0,81/0 -rd out_file=/__w/_temp/pd/test_sync_fifo_from_rtl_to_drc0/pv_magic/layout.gds -r stream.py
+Warning: DEF UNITS does not match reader DBU (DEF UNITS is 2000 and corresponds to a DBU of 0.0005, but reader DBU is set to 0.001) (line=5, cell=, file=route.def)
+nirmaan-gds-empty-cells: 0
+nirmaan-gds-fill-shapes: 0
+nirmaan-gds-fill-unmapped: 0 -
+$ magic -dnull -noconsole magic_drc.tcl
+Magic 8.3 revision 686 - Compiled on Sat Nov 14 14:47:48 UTC 2026.
+WARNING: RLIMIT_NOFILE is above 1024 and Tcl_Version<9 this may cause runtime issues [rlim_cur=65536]
+Input style import: scaleFactor=10, multiplier=2
+Warning: Calma reading is not undoable!  I hope that's OK.
+Error while reading cell "VIA_Via3_HV" (byte position 122): Unknown layer/datatype in boundary, layer=9 type=0
+Error while reading cell "VIA_Via3_HV" (byte position 186): Unknown layer/datatype in boundary, layer=7 type=0
+Error while reading cell "VIA_Via3_HV" (byte position 250): Unknown layer/datatype in boundary, layer=8 type=0
+Error while reading cell "VIA_Via2_VH" (byte position 362): Unknown layer/datatype in boundary, layer=7 type=0
+Error while reading cell "VIA_Via2_VH" (byte position 490): Unknown layer/datatype in boundary, layer=6 type=0
+Error while reading cell "VIA_Via1_HV" (byte position 602): Unknown layer/datatype in boundary, layer=3 type=0
+Error while reading cell "VIA_Via1_HV" (byte position 730): Unknown layer/datatype in boundary, layer=4 type=0
+Error while reading cell "VIA_Via1_VV" (byte position 842): Unknown layer/datatype in boundary, layer=3 type=0
+Error while reading cell "VIA_Via1_VV" (byte position 970): Unknown layer/datatype in boundary, layer=4 type=0
+Error while reading cell "VIA_via1_2_8960_1800_2_5_1040_1040" (byte position 1104): Unknown layer/datatype in boundary, layer=3 type=0
+Error while reading cell "VIA_via1_2_8960_1800_2_5_1040_1040" (byte position 1232): Unknown layer/datatype in boundary, layer=4 type=0
+Error while reading cell "VIA_via2_3_8960_1800_1_1_256_256" (byte position 1940): Unknown layer/datatype in boundary, layer=7 type=0
+Error while reading cell "VIA_via2_3_8960_1800_1_1_256_256" (byte position 2068): Unknown layer/datatype in boundary, layer=6 type=0
+Error while reading cell "VIA_via3_4_8960_1800_1_1_256_256" (byte position 2200): Unknown layer/datatype in boundary, layer=9 type=0
+Error while reading cell "VIA_via3_4_8960_1800_1_1_256_256" (byte position 2264): Unknown layer/datatype in boundary, layer=7 type=0
+Error while reading cell "VIA_via3_4_8960_1800_1_1_256_256" (byte position 2328): Unknown layer/datatype in boundary, layer=8 type=0
+Error while reading cell "VIA_via4_5_8960_8960_4_4_1240_1240" (byte position 2462): Unknown layer/datatype in boundary, layer=11 type=0
+Error while reading cell "VIA_via4_5_8960_8960_4_4_1240_1240" (byte position 2526): Unknown layer/datatype in boundary, layer=9 type=0
+Error while reading cell "VIA_via4_5_8960_8960_4_4_1240_1240" (byte position 2590): Unknown layer/datatype in boundary, layer=10 type=0
+Error while reading cell "sync_fifo" (byte position 1396108): Unknown layer/datatype in boundary, layer=14 type=0
+Error while reading cell "sync_fifo" (byte position 1399984): Unknown layer/datatype in path, layer=11 type=0
+Error while reading cell "sync_fifo" (byte position 1400324): Unknown layer/datatype in path, layer=9 type=0
+Error while reading cell "sync_fifo" (byte position 1404576): Unknown layer/datatype in path, layer=3 type=0
+Error while reading cell "sync_fifo" (byte position 1407908): Unknown layer/datatype in path, layer=7 type=0
+DRC style is now "drc(full)"
+nirmaan-magic-drc-style: drc(full)
+Loading DRC CIF style.
+nirmaan-drc-violations: 0
+$ magic -dnull -noconsole magic_extract.tcl
+Magic 8.3 revision 686 - Compiled on Sat Nov 14 14:47:48 UTC 2026.
+WARNING: RLIMIT_NOFILE is above 1024 and Tcl_Version<9 this may cause runtime issues [rlim_cur=65536]
+Input style import: scaleFactor=10, multiplier=2
+Warning: Calma reading is not undoable!  I hope that's OK.
+Error while reading cell "VIA_Via3_HV" (byte position 122): Unknown layer/datatype in boundary, layer=9 type=0
+Error while reading cell "VIA_Via3_HV" (byte position 186): Unknown layer/datatype in boundary, layer=7 type=0
+Error while reading cell "VIA_Via3_HV" (byte position 250): Unknown layer/datatype in boundary, layer=8 type=0
+Error while reading cell "VIA_Via2_VH" (byte position 362): Unknown layer/datatype in boundary, layer=7 type=0
+Error while reading cell "VIA_Via2_VH" (byte position 490): Unknown layer/datatype in boundary, layer=6 type=0
+Error while reading cell "VIA_Via1_HV" (byte position 602): Unknown layer/datatype in boundary, layer=3 type=0
+Error while reading cell "VIA_Via1_HV" (byte position 730): Unknown layer/datatype in boundary, layer=4 type=0
+Error while reading cell "VIA_Via1_VV" (byte position 842): Unknown layer/datatype in boundary, layer=3 type=0
+Error while reading cell "VIA_Via1_VV" (byte position 970): Unknown layer/datatype in boundary, layer=4 type=0
+Error while reading cell "VIA_via1_2_8960_1800_2_5_1040_1040" (byte position 1104): Unknown layer/datatype in boundary, layer=3 type=0
+Error while reading cell "VIA_via1_2_8960_1800_2_5_1040_1040" (byte position 1232): Unknown layer/datatype in boundary, layer=4 type=0
+Error while reading cell "VIA_via2_3_8960_1800_1_1_256_256" (byte position 1940): Unknown layer/datatype in boundary, layer=7 type=0
+Error while reading cell "VIA_via2_3_8960_1800_1_1_256_256" (byte position 2068): Unknown layer/datatype in boundary, layer=6 type=0
+Error while reading cell "VIA_via3_4_8960_1800_1_1_256_256" (byte position 2200): Unknown layer/datatype in boundary, layer=9 type=0
+Error while reading cell "VIA_via3_4_8960_1800_1_1_256_256" (byte position 2264): Unknown layer/datatype in boundary, layer=7 type=0
+Error while reading cell "VIA_via3_4_8960_1800_1_1_256_256" (byte position 2328): Unknown layer/datatype in boundary, layer=8 type=0
+Error while reading cell "VIA_via4_5_8960_8960_4_4_1240_1240" (byte position 2462): Unknown layer/datatype in boundary, layer=11 type=0
+Error while reading cell "VIA_via4_5_8960_8960_4_4_1240_1240" (byte position 2526): Unknown layer/datatype in boundary, layer=9 type=0
+Error while reading cell "VIA_via4_5_8960_8960_4_4_1240_1240" (byte position 2590): Unknown layer/datatype in boundary, layer=10 type=0
+Error while reading cell "sync_fifo" (byte position 1396108): Unknown layer/datatype in boundary, layer=14 type=0
+Error while reading cell "sync_fifo" (byte position 1399984): Unknown layer/datatype in path, layer=11 type=0
+Error while reading cell "sync_fifo" (byte position 1400324): Unknown layer/datatype in path, layer=9 type=0
+Error while reading cell "sync_fifo" (byte position 1404576): Unknown layer/datatype in path, layer=3 type=0
+Error while reading cell "sync_fifo" (byte position 1407908): Unknown layer/datatype in path, layer=7 type=0
+$ netgen -batch source netgen_lvs.tcl
+Netgen 1.5.325 compiled on Sat Nov 14 14:48:03 UTC 2026
+Warning: netgen command 'format' use fully-qualified name '::netgen::format'
+Warning: netgen command 'global' use fully-qualified name '::netgen::global'
+Warning:  A case-insensitive file has been read and so the	verilog file must be treated case-insensitive to match.
+Final result: 
+Top level cell failed pin matching.
+$ /__w/ip-nirmaan/ip-nirmaan/.venv/bin/python -I lvs_count.py /__w/_temp/pd/test_sync_fifo_from_rtl_to_drc0/pv_magic/lvs.report sync_fifo
+nirmaan-lvs-circuit: - - Match
+nirmaan-lvs-circuit: - - Match
+nirmaan-lvs-circuit: gf180mcu_fd_sc_mcu9t5v0__buf_4 gf180mcu_fd_sc_mcu9t5v0__buf_4 Mismatch
+nirmaan-lvs-circuit: gf180mcu_fd_sc_mcu9t5v0__aoi21_1 gf180mcu_fd_sc_mcu9t5v0__aoi21_1 Mismatch
+nirmaan-lvs-circuit: gf180mcu_fd_sc_mcu9t5v0__mux2_1 gf180mcu_fd_sc_mcu9t5v0__mux2_1 Mismatch
+nirmaan-lvs-circuit: gf180mcu_fd_sc_mcu9t5v0__dffq_1 gf180mcu_fd_sc_mcu9t5v0__dffq_1 Mismatch
+nirmaan-lvs-circuit: gf180mcu_fd_sc_mcu9t5v0__nor2_1 gf180mcu_fd_sc_mcu9t5v0__nor2_1 Mismatch
+nirmaan-lvs-circuit: gf180mcu_fd_sc_mcu9t5v0__clkinv_1 gf180mcu_fd_sc_mcu9t5v0__clkinv_1 Mismatch
+nirmaan-lvs-circuit: gf180mcu_fd_sc_mcu9t5v0__mux4_1 gf180mcu_fd_sc_mcu9t5v0__mux4_1 Mismatch
+nirmaan-lvs-circuit: gf180mcu_fd_sc_mcu9t5v0__nand2_1 gf180mcu_fd_sc_mcu9t5v0__nand2_1 Mismatch
+nirmaan-lvs-circuit: gf180mcu_fd_sc_mcu9t5v0__clkbuf_8 gf180mcu_fd_sc_mcu9t5v0__clkbuf_8 Mismatch
+nirmaan-lvs-circuit: gf180mcu_fd_sc_mcu9t5v0__or4_1 gf180mcu_fd_sc_mcu9t5v0__or4_1 Mismatch
+nirmaan-lvs-circuit: gf180mcu_fd_sc_mcu9t5v0__clkbuf_4 gf180mcu_fd_sc_mcu9t5v0__clkbuf_4 Mismatch
+nirmaan-lvs-circuit: gf180mcu_fd_sc_mcu9t5v0__inv_3 gf180mcu_fd_sc_mcu9t5v0__inv_3 Mismatch
+nirmaan-lvs-circuit: gf180mcu_fd_sc_mcu9t5v0__xor3_1 gf180mcu_fd_sc_mcu9t5v0__xor3_1 Mismatch
+nirmaan-lvs-circuit: gf180mcu_fd_sc_mcu9t5v0__aoi211_1 gf180mcu_fd_sc_mcu9t5v0__aoi211_1 Mismatch
+nirmaan-lvs-circuit: gf180mcu_fd_sc_mcu9t5v0__nand4_1 gf180mcu_fd_sc_mcu9t5v0__nand4_1 Mismatch
+nirmaan-lvs-circuit: gf180mcu_fd_sc_mcu9t5v0__xnor2_1 gf180mcu_fd_sc_mcu9t5v0__xnor2_1 Mismatch
+nirmaan-lvs-circuit: gf180mcu_fd_sc_mcu9t5v0__nor3_1 gf180mcu_fd_sc_mcu9t5v0__nor3_1 Mismatch
+nirmaan-lvs-circuit: gf180mcu_fd_sc_mcu9t5v0__and3_1 gf180mcu_fd_sc_mcu9t5v0__and3_1 Mismatch
+nirmaan-lvs-circuit: gf180mcu_fd_sc_mcu9t5v0__xor2_1 gf180mcu_fd_sc_mcu9t5v0__xor2_1 Mismatch
+nirmaan-lvs-circuit: gf180mcu_fd_sc_mcu9t5v0__nor4_2 gf180mcu_fd_sc_mcu9t5v0__nor4_2 Mismatch
+nirmaan-lvs-circuit: gf180mcu_fd_sc_mcu9t5v0__inv_4 gf180mcu_fd_sc_mcu9t5v0__inv_4 Mismatch
+nirmaan-lvs-circuit: gf180mcu_fd_sc_mcu9t5v0__oai21_1 gf180mcu_fd_sc_mcu9t5v0__oai21_1 Mismatch
+nirmaan-lvs-circuit: gf180mcu_fd_sc_mcu9t5v0__nand3_1 gf180mcu_fd_sc_mcu9t5v0__nand3_1 Mismatch
+nirmaan-lvs-circuit: gf180mcu_fd_sc_mcu9t5v0__or2_1 gf180mcu_fd_sc_mcu9t5v0__or2_1 Mismatch
+nirmaan-lvs-circuit: gf180mcu_fd_sc_mcu9t5v0__inv_2 gf180mcu_fd_sc_mcu9t5v0__inv_2 Mismatch
+nirmaan-lvs-circuit: gf180mcu_fd_sc_mcu9t5v0__and2_1 gf180mcu_fd_sc_mcu9t5v0__and2_1 Mismatch
+nirmaan-lvs-circuit: sync_fifo sync_fifo Mismatch
+nirmaan-netgen-final: Final result: Top level cell failed pin matching.
+nirmaan-lvs-mismatched-circuits: 27
+nirmaan-lvs-mismatched-nets: 20
+nirmaan-lvs-mismatched-devices: 0
+nirmaan-lvs-mismatched-pins: 80
+nirmaan-lvs-mismatched-subcircuits: 0
