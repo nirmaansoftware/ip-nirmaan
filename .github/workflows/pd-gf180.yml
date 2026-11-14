@@ -1,0 +1,162 @@
+name: pd-gf180
+
+# M81: the GF180MCU physical design pilot, the sibling of pd-sky130 (M79). The M26 synchronous FIFO
+# from RTL through synthesis, place and route, and DRC and LVS with Magic and Netgen over the
+# open_pdks gf180mcuC files (pv.run backend magic-netgen), on the OpenROAD-flow-scripts gf180
+# platform. GitHub-hosted runners only; nothing here runs on a development machine. Not a required
+# check: it runs on demand and when the physical design flow or the pilot block changes. See
+# docs/PD_GF180_PILOT.md.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/pd-gf180.yml
+      - src/nirmaan/integrations/physical.py
+      - src/nirmaan/integrations/pv_magic.py
+      - src/nirmaan/integrations/pd_parsers.py
+      - tests/test_pd_gf180_pilot.py
+      - tests/fixtures/pd/sync_fifo.sdc
+      - tests/fixtures/rtl/sync_fifo/sync_fifo.v
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/pd-gf180.yml
+      - src/nirmaan/integrations/physical.py
+      - src/nirmaan/integrations/pv_magic.py
+      - src/nirmaan/integrations/pd_parsers.py
+      - tests/test_pd_gf180_pilot.py
+      - tests/fixtures/pd/sync_fifo.sdc
+      - tests/fixtures/rtl/sync_fifo/sync_fifo.v
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  gf180-pilot:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    # The same pinned OpenROAD-flow-scripts image as ci.yml and pd-sky130: OpenROAD, Yosys, KLayout,
+    # and the gf180 platform, built together.
+    container:
+      image: openroad/orfs:26Q3-687-gc63a606f9@sha256:2e5bf6fe865e102ca2313aba1d849da50f5973bc91c4212a2f68e7d905a39c8f
+    env:
+      NIRMAAN_PDK_ROOT: /OpenROAD-flow-scripts/flow/platforms
+      NIRMAAN_PD_PILOT: "1"
+      # Magic and Netgen, built from the same release tags as pd-sky130 (commits checked), same cache.
+      MAGIC_TAG: 8.3.686
+      MAGIC_COMMIT: 56319630d4a304a55e1139fdfe59594ca00bf05c
+      NETGEN_TAG: 1.5.325
+      NETGEN_COMMIT: 85bddb8f273c00fb402f3492f5e2bb4337a568b4
+      # The open_pdks build of GF180MCU (open_pdks commit 792ef670, 2026-10-19), by release and sha256.
+      CIEL_RELEASE: gf180mcu-792ef67037d74c8c51811eab3ce23cf793491296
+    defaults:
+      run:
+        shell: bash  # the container defaults to sh, which has no pipefail
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
+        with:
+          python-version: "3.12"
+          activate-environment: true
+          enable-cache: true
+          cache-dependency-glob: pyproject.toml
+      - name: Tools on PATH
+        run: |
+          echo /OpenROAD-flow-scripts/tools/install/OpenROAD/bin >> "$GITHUB_PATH"
+          echo /OpenROAD-flow-scripts/tools/install/yosys/bin >> "$GITHUB_PATH"
+          echo /opt/magic-netgen/bin >> "$GITHUB_PATH"
+      # Tcl/Tk and Cairo for Magic and Netgen, from the image's Ubuntu archive (build and runtime).
+      - name: Magic and Netgen build dependencies
+        run: |
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
+            build-essential m4 tcsh csh tcl-dev tk-dev libx11-dev libcairo2-dev libglu1-mesa-dev zlib1g-dev git ca-certificates > /dev/null
+      - name: Cache Magic and Netgen
+        id: magic-netgen
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: /opt/magic-netgen
+          key: magic-netgen-${{ env.MAGIC_COMMIT }}-${{ env.NETGEN_COMMIT }}-orfs-26Q3-687
+      - name: Build Magic and Netgen
+        if: steps.magic-netgen.outputs.cache-hit != 'true'
+        run: |
+          set -o pipefail
+          for tool in magic netgen; do
+            upper=${tool^^}; tag_var=${upper}_TAG; commit_var=${upper}_COMMIT
+            git init -q "$RUNNER_TEMP/$tool" && cd "$RUNNER_TEMP/$tool"
+            git fetch -q --depth 1 "https://github.com/RTimothyEdwards/$tool.git" "refs/tags/${!tag_var}"
+            git checkout -q FETCH_HEAD
+            test "$(git rev-parse HEAD)" = "${!commit_var}"
+            ./configure --prefix=/opt/magic-netgen 2>&1 | tail -5
+            make -j "$(nproc)" 2>&1 | tail -5
+            make install 2>&1 | tail -3
+          done
+      # gf180mcuC is the open_pdks variant of the platform's metal stack: 5 metals, the top 0.9 um (9K).
+      - name: Cache the gf180mcuC files for Magic and Netgen
+        id: gf180mcuc
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: /opt/gf180mcuC
+          key: gf180mcuC-magic-netgen-1342fe46-2e5597f7
+      - name: Fetch the gf180mcuC files for Magic and Netgen
+        if: steps.gf180mcuc.outputs.cache-hit != 'true'
+        run: |
+          base="https://github.com/fossi-foundation/ciel-releases/releases/download/$CIEL_RELEASE"
+          curl -sSfL -o "$RUNNER_TEMP/common.tar.zst" "$base/common.tar.zst"
+          curl -sSfL -o "$RUNNER_TEMP/sc.tar.zst" "$base/gf180mcu_fd_sc_mcu9t5v0.tar.zst"
+          sha256sum -c <<SUMS
+          1342fe46866de6a3f1d8c3edb3193dafa4c3cf955cb987a17791b2287c41e39d  $RUNNER_TEMP/common.tar.zst
+          2e5597f73212f4453264170629c8f351fd482a8788473a25c945dd2823388fae  $RUNNER_TEMP/sc.tar.zst
+          SUMS
+          uv pip install zstandard
+          python - /opt <<'PY'
+          import os, sys, tarfile, zstandard
+          wanted = {"gf180mcuC/libs.tech/magic/gf180mcuC.tech", "gf180mcuC/libs.tech/netgen/gf180mcuC_setup.tcl",
+                    "gf180mcuC/libs.ref/gf180mcu_fd_sc_mcu9t5v0/spice/gf180mcu_fd_sc_mcu9t5v0.spice"}
+          for archive in ("common", "sc"):
+              path = os.path.join(os.environ["RUNNER_TEMP"], f"{archive}.tar.zst")
+              with open(path, "rb") as f, tarfile.open(fileobj=zstandard.ZstdDecompressor().stream_reader(f), mode="r|") as tar:
+                  for member in tar:
+                      if member.name in wanted and member.isfile():
+                          tar.extract(member, sys.argv[1], filter="data")
+                          wanted.discard(member.name)
+          sys.exit(f"missing from the release: {sorted(wanted)}" if wanted else 0)
+          PY
+      - name: gf180mcuC files into the PDK root
+        run: |
+          cp -r /opt/gf180mcuC "$NIRMAAN_PDK_ROOT/gf180mcuC"
+          find "$NIRMAAN_PDK_ROOT/gf180mcuC" -type f -exec sha256sum {} +
+      - name: Tool versions
+        run: |
+          which openroad yosys klayout magic netgen
+          openroad -version && yosys -V && klayout -v
+          echo 'puts "magic [version]"; quit -noprompt' > "$RUNNER_TEMP/v.tcl" && magic -dnull -noconsole "$RUNNER_TEMP/v.tcl" | tail -2
+          netgen -batch quit 2>&1 | head -3 || true
+      - name: Install
+        run: uv pip install -e ".[dev]"
+      - name: Pilot
+        env:
+          NIRMAAN_REQUIRE_EDA: yosys openroad klayout magic netgen
+        run: >-
+          python -m pytest -q -rs -s tests/test_pd_gf180_pilot.py
+          --basetemp="$RUNNER_TEMP/pd" --junitxml="$RUNNER_TEMP/junit/pd-gf180.xml"
+      # Text only (logs, scripts, reports, Netgen's comparison JSON, run records): no layout, netlist
+      # or PDK data.
+      - name: Collect the tool logs
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/pd-logs"
+          cd "$RUNNER_TEMP/pd" 2>/dev/null && find . -type f \( -name '*.log' -o -name '*.tcl' -o -name '*.report' \
+            -o -name '*.json' -o -name '*.rpt' \) -exec cp --parents {} "$RUNNER_TEMP/pd-logs" \; || true
+          cp -r "$RUNNER_TEMP/junit" "$RUNNER_TEMP/pd-logs/" 2>/dev/null || true
+      - name: Keep the tool logs
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: pd-gf180-logs
+          path: ${{ runner.temp }}/pd-logs
+          if-no-files-found: warn
