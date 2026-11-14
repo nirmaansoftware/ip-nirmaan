@@ -1069,10 +1069,33 @@ def test_interpret_classifies_results():
     "You've hit your Opus weekly limit",
     "You've hit your limit",
     "Claude usage limit reached. Your limit will reset at 5pm",
+    # Claude 2.1.325's own wordings (its limit names: 5-hour, weekly, Opus,
+    # Sonnet, Fable, usage credit), and its overloaded-model message.
+    "You've hit your Sonnet limit \u00b7 resets Nov 17, 9am (Asia/Calcutta)",
+    "You've hit your Fable limit \u00b7 resets Nov 17, 9am (Asia/Calcutta)",
+    "You've reached your Fable limit",
+    "Fable limit reached \u00b7 continuing on Sonnet uses usage credits \u00b7 Claude stopped here",
+    "Server is temporarily limiting requests (not your usage limit)",
+    "API Error: Request rejected (429) \u00b7 this may be a temporary capacity issue.",
+    "Opus is experiencing high load. Switch to Sonnet.",
+    "Fable is experiencing high load, please use /model to switch to Sonnet",
 ])
 def test_every_wording_of_the_plan_limit_is_a_rate_limit(text):
     out = json.dumps({"subtype": "success", "is_error": True, "result": text})
     assert pr_review.interpret(0, out, "")["kind"] == "rate_limit"
+
+
+@pytest.mark.parametrize("status", [429, 529])
+def test_an_api_error_status_of_429_or_529_is_a_rate_limit_whatever_the_wording(status):
+    # The status, not the text, decides (and not the exit code: 2.1.317 and later exit 1 on more failures).
+    out = json.dumps({"subtype": "success", "is_error": True, "api_error_status": status, "result": "API Error: a wording no pattern knows"})
+    assert pr_review.interpret(1, out, "")["kind"] == "rate_limit"
+
+
+def test_another_api_error_status_stays_an_error():
+    for status in (400, 401, 500, None):
+        out = json.dumps({"subtype": "success", "is_error": True, "api_error_status": status, "result": "API Error: bad request"})
+        assert pr_review.interpret(1, out, "")["kind"] == "error"
 
 
 def test_text_that_is_not_a_limit_stays_an_error():

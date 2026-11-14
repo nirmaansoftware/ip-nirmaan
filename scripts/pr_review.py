@@ -139,8 +139,13 @@ PROXY_DELEGATION = "Founder Proxy (agent), acting under the founder's delegation
 # A plan's session limit ("You've hit your session limit · resets 10pm") is a
 # rate limit too: claude reports it with subtype "success" and is_error set.
 # The plan's limits come in several wordings ("You've hit your 5-hour limit",
-# "hit your weekly limit", "hit your limit"), all a rate limit.
-RATE_LIMIT = re.compile(r"rate.?limit|usage limit|session limit|weekly limit|hit your (?:[\w-]+ ){0,3}limit|too many requests|\b429\b|overloaded|limit reached|try again later", re.I)
+# "hit your weekly limit", "hit your limit"), all a rate limit. Claude 2.1.325
+# also says "You've reached your Fable limit", and "Opus is experiencing high
+# load" for an overloaded model (a 529, like "overloaded").
+RATE_LIMIT = re.compile(r"rate.?limit|usage limit|session limit|weekly limit|(?:hit|reached) your (?:[\w-]+ ){0,3}limit|too many requests|\b429\b|overloaded|high load|limit reached|try again later", re.I)
+# The HTTP status of the API error that ended the call (claude's JSON result
+# field api_error_status): a 429 or a 529 is a rate limit whatever its wording.
+RATE_LIMIT_STATUS = (429, 529)
 
 VERDICT_SCHEMA = {
     "type": "object",
@@ -876,7 +881,8 @@ def interpret(code: int, stdout: str, stderr: str) -> dict:
     model = next(iter(data.get("modelUsage") or {}), None)
     if data.get("is_error") or data.get("subtype") != "success":
         text = str(data.get("result") or data.get("subtype") or "error")
-        return {"kind": "rate_limit" if RATE_LIMIT.search(text) else "error",
+        limited = data.get("api_error_status") in RATE_LIMIT_STATUS or bool(RATE_LIMIT.search(text))
+        return {"kind": "rate_limit" if limited else "error",
                 "error": f"claude reported {data.get('subtype') or 'an error'}: {text[:300]}", "tokens": tokens, "reported_model": model}
     return {"kind": "ok", "text": data.get("result") if isinstance(data.get("result"), str) else "",
             "structured": data.get("structured_output"), "tokens": tokens, "reported_model": model}
