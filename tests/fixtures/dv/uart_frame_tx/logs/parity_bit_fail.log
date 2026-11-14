@@ -1,0 +1,2 @@
+ERROR: uart_frame_tx_regress_tb.v:57: parity_bit: ones in data plus parity bit are odd, even parity expected
+uart_frame_tx_regress_tb.v:62: $finish called at 585000 (1ps)
