@@ -90,13 +90,16 @@ refuses is a failed trial.
 
 ## Mapping
 
-On the copy fetched for this milestone (upstream commit
-`51ed553d0ffd32797a1a0a13e051656bf302c81f`) 46 of the 50 designs map: the
-reference passes its own testbench under our simulator (Icarus). Four do not
-(`clkgenerator`, `freq_divbyeven`, `radix2_div`, `ring_counter`: constructs
-Icarus does not read, or a reference that fails there). They are left out of
-the run, and the record's manifest names them (`source`). A design is mapped
-by what the simulator does with it, not by a list kept here.
+A design maps when its reference passes its own testbench under our simulator
+(Icarus). A design that does not map is left out of the run, and the record's
+manifest names it (`source`). A design is mapped by what the simulator does
+with it, not by a list kept here.
+
+The count of mapped designs is unrecorded: the mapping was tried on a private
+copy outside the repository (upstream commit
+`51ed553d0ffd32797a1a0a13e051656bf302c81f`), and no run log from it is
+committed. CI runs only synthetic designs. A figure becomes a claim only when
+`nirmaan eval outside --check` output or a calibration record is committed.
 
 ## The record
 

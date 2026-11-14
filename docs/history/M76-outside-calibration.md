@@ -12,8 +12,9 @@ committed) and maps each design to a case for the `rtl-implementation` seat:
 the description is the approved interface specification, the benchmark's own
 testbench is the judge, run over the seat's RTL through `simulator.run` and the
 `held-out-run` scorer. A staged copy of the testbench also prints the verdict
-line the simulator gate (M53) reads, beside its own pass message. 46 of the 50
-designs map on the fetched copy; the rest are named in the record.
+line the simulator gate (M53) reads, beside its own pass message. How many of
+the 50 designs map is unrecorded (no run log is committed); designs that do not
+map are named in the record.
 `nirmaan eval outside --check` proves the mapping with no model;
 `--runtime` writes a calibration record.
 
