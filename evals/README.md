@@ -60,6 +60,7 @@ assertions can tell wrong RTL from right. Its fields beyond `held-out-run`'s:
 | `mutants` | Case file -> files that each stand in for it. Each mutant is one run of `tool` that must fail. A mutant must replace one of the check's `case_files`. |
 | `seat_entries` | Tool parameter -> artifact kinds whose declared entry fills it, as the seat's own passing runs of that file gave it (the seat's testbench top, for example). |
 | `cover_tool` | Optional. A tool that must also pass over the clean inputs, so the clean pass is not vacuous (`formal.cover`: every cover reached). |
+| `cover_bounds` | Optional. Metric bounds in the M48 text form (`line>=90`) the `cover_tool` run is checked against, as a requirement's bounds are: a coverage run (`coverage.read`) must meet them. Never applied to the clean run or a mutant run. |
 
 The check passes only when the clean run (the seat's files with the case
 files) passes, the `cover_tool` passes, and every mutant makes `tool` fail on a
