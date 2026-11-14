@@ -1,0 +1,24 @@
+$ iverilog -g2012 -o sim.vvp -s counter -f cmds.f /repo/tests/fixtures/rtl/counter.v
+$ env 'GPI_USERS=/usr/lib/libpython3.11.so;/opt/venv/lib/python3.11/site-packages/cocotb/simulator.cpython-311-linux.so,initialize' PYGPI_PYTHON_BIN=/opt/venv/bin/python PYTHONPATH=/tmp/run/cocotb_tests TOPLEVEL_LANG=verilog COCOTB_TOPLEVEL=counter COCOTB_TEST_MODULES=counter_cocotb COCOTB_RESULTS_FILE=/tmp/run/results.xml vvp -m /opt/venv/lib/python3.11/site-packages/cocotb/libs/libcocotbvpi_icarus.so sim.vvp -none
+     -.--ns INFO     gpi                                ../gpi/GpiCommon.cpp:242  in gpi_load_users                  Loaded entry library: '/usr/lib/libpython3.11.so'
+     -.--ns INFO     gpi                                ../gpi/GpiCommon.cpp:234  in gpi_load_users                  Running entry func 'initialize' from loaded library '/opt/venv/lib/python3.11/site-packages/cocotb/simulator.cpython-311-linux.so'
+     -.--ns INFO     pygpi                              ..ib/pygpi/embed.cpp:115  in initialize                      Using Python 3.11.9 interpreter at /opt/venv/bin/python
+     -.--ns INFO     gpi                                ../gpi/GpiCommon.cpp:74   in gpi_print_registered_impl       GPI: VPI support registered
+     0.00ns INFO     cocotb.initialize                  Seeding Python random module with 1794625565
+     0.00ns INFO     cocotb.initialize                  Initialized cocotb v2.1.0 from /opt/venv/lib/python3.11/site-packages/cocotb
+     0.00ns INFO     cocotb.initialize                  Running on Icarus Verilog version 13.0 (stable)
+     0.00ns INFO     cocotb.regression                  Running tests
+     0.00ns INFO     cocotb.regression                  running counter_cocotb.counts_and_wraps (1/2)
+                                                            With en high the count steps 1, 2, ... up to LIMIT, then wraps to 0.
+   110.00ns INFO     cocotb.regression                  counter_cocotb.counts_and_wraps passed
+   110.00ns INFO     cocotb.regression                  running counter_cocotb.reset_clears_while_idle (2/2)
+                                                            Reset clears the count even while en is low.
+   170.00ns INFO     cocotb.regression                  counter_cocotb.reset_clears_while_idle passed
+   170.00ns INFO     cocotb.regression                  ************************************************************************************************
+                                                        ** TEST                                    STATUS  SIM TIME (ns)  REAL TIME (s)  RATIO (ns/s) **
+                                                        ************************************************************************************************
+                                                        ** counter_cocotb.counts_and_wraps          PASS         110.00           0.00     101056.50  **
+                                                        ** counter_cocotb.reset_clears_while_idle   PASS          60.00           0.00     332179.94  **
+                                                        ************************************************************************************************
+                                                        ** TESTS=2 PASS=2 FAIL=0 SKIP=0                          170.00           0.00      95928.37  **
+                                                        ************************************************************************************************

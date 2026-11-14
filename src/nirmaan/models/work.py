@@ -249,6 +249,10 @@ class Attempt(BaseModel):
 #: M71: run parameters that change what a passing run means, with the value that means a plain pass
 #: (``simulator.run``'s ``expect``, docs/REPRO_GATES.md). Left out, a parameter has that value.
 VERDICT_PARAMS = {"expect": "pass"}
+#: M72: backends whose pass is judged another way than the testbench's nonce verdict (M53): ``cocotb``'s pass is
+#: cocotb's own count of passing Python tests (docs/COCOTB.md). A run made with one counts only where the
+#: requirement fixes that very backend, so it never meets a requirement for an HDL testbench's verdict.
+VERDICT_BACKENDS = frozenset({"cocotb"})
 
 
 class ToolRun(BaseModel):
@@ -289,9 +293,14 @@ class ToolRun(BaseModel):
 
         A parameter in :data:`VERDICT_PARAMS` changes what a passing run means (``expect=fail``: the failure
         reproduced), so a run made with one counts only where the requirement fixes it to the same value, and a
+        requirement that fixes one is met only by a run made with it. A run made with a backend in
+        :data:`VERDICT_BACKENDS` (M72) likewise counts only where the requirement fixes that backend, and a
         requirement that fixes one is met only by a run made with it.
         """
         wanted = dict(fixed)
+        backend, asked = text_value(self.params.get("backend")).strip(), str(wanted.get("backend", "")).strip()
+        if (backend in VERDICT_BACKENDS or asked in VERDICT_BACKENDS) and backend != asked:
+            return False
         return all((text_value(self.params.get(k)).strip() or plain) == (str(wanted.get(k, "")).strip() or plain)
                    for k, plain in VERDICT_PARAMS.items())
 

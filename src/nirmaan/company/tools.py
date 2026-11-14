@@ -20,7 +20,9 @@ Scan insertion, DFT rule checks, and scan chain simulation are AVAILABLE through
 Yosys and Icarus (``nirmaan/integrations/dft.py``, M25); so are stuck-at ATPG,
 graded by fault simulation, and March C- memory BIST (M27), and transition
 ATPG (M29). Logic equivalence is AVAILABLE through eqy
-(``nirmaan/integrations/equivalence.py``, M69).
+(``nirmaan/integrations/equivalence.py``, M69). Simulation also runs Python
+testbenches through cocotb on Icarus (backend ``cocotb``,
+``nirmaan/integrations/cocotb_runner.py``, M72).
 
 Code coverage is AVAILABLE through Verilator and verilator_coverage (``coverage.read``, M70).
 
@@ -58,6 +60,9 @@ FW_MAP = _p("map", PATH, "A register map (JSON): its header is generated, and th
 #: requirement that fixes it (``ToolRun.answers``), so a reproduction is never read as a passing simulation.
 EXPECT = _p("expect", TEXT, "pass (the default) or fail: with fail, the run passes only when the testbench's own "
                             "verdict reports a failed check, so the failure reproduced.")
+#: M72: Python testbenches (docs/COCOTB.md); read only by the ``cocotb`` backend, which ``backend`` names.
+COCOTB = _p("cocotb", PATHS, "Python test modules cocotb runs against the design (top), with backend cocotb: every "
+                             "test must pass, at least one.")
 #: What the EDA runner itself reads, for every tool it runs (integrations/eda.py).
 RUNNER = (
     _p("backend", TEXT, "Which backend to use, when the tool has several."),
@@ -123,7 +128,7 @@ TOOLS: list[ToolSpec] = [
     _tool("lint.run", "Lint", "eda", EXE, AV, "RTL lint against coding standards.",
           (SOURCES, TOP, *RUNNER)),
     _tool("simulator.run", "Simulator", "eda", EXE, AV, "Compile and simulate RTL and testbenches.",
-          (SOURCES, TOP_REQUIRED, EXPECT, *RUNNER)),
+          (SOURCES, TOP_REQUIRED, EXPECT, COCOTB, *RUNNER)),
     _tool("test.run", "Run tests", "eda", EXE, AV, "Run individual tests.",
           (SOURCES, TOP_REQUIRED, *RUNNER)),
     _tool("regression.run", "Run regressions", "eda", EXE, CO, "Launch and monitor regressions."),

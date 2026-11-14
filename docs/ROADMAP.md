@@ -124,6 +124,7 @@ new number. M1 to M42 are taken; see `docs/history/README.md`.
 | M69 | Logic equivalence through eqy: equivalence.run, and the block-verification equivalence gate | reserved |
 | M70 | Code coverage: `coverage.read` through Verilator and verilator_coverage, and block verification's coverage gate | reserved |
 | M71 | Repro gates: triage and root cause reproduce the failure on the handed-over RTL | reserved |
+| M72 | Python testbenches through cocotb: simulator.run's cocotb backend | reserved |
 | M73 | The harness in one place, and its fingerprint on every trial | reserved |
 | M77 | Verification in five departments (wave 2, W2-O1); number reserved after the branch was cut | reserved |
 

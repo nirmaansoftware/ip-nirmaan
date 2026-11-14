@@ -18,6 +18,7 @@ This milestone binds five tools to open-source backends:
 | `formal.run` | `symbiyosys` | `sby` (plus `yosys` and a solver, which `sby` finds itself) |
 | `equivalence.run` (M69) | `eqy` | `eqy`, `yosys` and `make`; see `docs/EQUIVALENCE.md` |
 | `coverage.read` (M70) | `verilator-coverage` | `verilator` and `verilator_coverage`: line, toggle and branch coverage of the design files from a passing self-checking simulation (`docs/COVERAGE_READ.md`) |
+| `simulator.run` (M72) | `cocotb`, by name only (`backend: cocotb`) | `iverilog` and `vvp`, with cocotb (the pinned `cocotb` extra) in this Python: Python testbenches, judged by cocotb's own results file; see `docs/COCOTB.md` |
 
 `sta.run` (OpenSTA) is not bound. It needs a liberty file and constraints that
 the fixture flow does not have yet, so it stays `CONTRACT_ONLY` for Stage 6.
@@ -142,6 +143,7 @@ captured outputs in `tests/fixtures/eda/` with no tool installed.
 | `parse_simulation` | every step exited 0, no error or fatal message (Icarus `ERROR:`/`FATAL:`, Verilator `%Error`), and `$finish` was reached | diagnostics, `finished`, the simulation end time when printed |
 | `parse_yosys` | exit code 0, no `ERROR:` | warnings, and from `stat -json`: cells, wires, and cell counts by type |
 | `parse_sby` | `DONE (PASS, ...)` | status (`PASS`, `FAIL`, `ERROR`, `UNKNOWN`, `TIMEOUT`), failed assertions with location, trace files |
+| `parse_cocotb` (M72) | cocotb's results file lists at least one test, all passed, and its one totals line agrees | tests passed, failed and skipped, the failed tests with their assertions, cocotb's version, the seed |
 
 Lint warnings fail lint: the RTL lint requirement means lint-clean. Waivers
 are the RTL's business (`/* verilator lint_off ... */`), where a reviewer can
