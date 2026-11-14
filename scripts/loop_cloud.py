@@ -63,6 +63,7 @@ STATE_REMOTE = os.environ.get("NIRMAAN_LOOP_STATE_REMOTE") or "git@github.com:ni
 GITHUB_HOST_KEY = "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl"
 COMMITTER = ("-c", "user.name=Nirmaan review loop", "-c", "user.email=41898282+github-actions[bot]@users.noreply.github.com")
 PUSH_TRIES = 5
+USAGE = "python scripts/loop_cloud.py (app-token | pull | has-work | auth-check | push | seed) [--clone DIR] [--state-dir DIR] [--from DIR] [--deny-probe]"
 
 
 class SyncError(RuntimeError):
@@ -293,7 +294,7 @@ def main(argv: list[str]) -> int:
     def arg(name):
         return Path(argv[argv.index(name) + 1]).expanduser() if name in argv and argv.index(name) + 1 < len(argv) else None
     cmd = argv[0] if argv else ""
-    clone, state_dir = arg("--clone"), arg("--state-dir")
+    clone, state_dir, source = arg("--clone"), arg("--state-dir"), arg("--from")
     try:
         if cmd == "app-token":
             cmd_app_token()
@@ -316,14 +317,14 @@ def main(argv: list[str]) -> int:
         elif cmd == "push" and clone and state_dir:
             export_state(clone, state_dir)
             print("loop-cloud: state pushed" if commit_and_push(clone) else "loop-cloud: no state change")
-        elif cmd == "seed" and clone and arg("--from"):
+        elif cmd == "seed" and clone and source:
             if (clone / WRITER / "writer.json").exists():
                 raise SyncError(f"{WRITER}/ is already seeded; seed runs once")
-            export_state(clone, arg("--from"), calls=False, runner="seed")
+            export_state(clone, source, calls=False, runner="seed")
             commit_and_push(clone, message=f"{WRITER}: seed from the Mac's loop state")
             print(f"loop-cloud: seeded {WRITER}/")
         else:
-            print(__doc__.split("Usage: ")[1], file=sys.stderr)
+            print(f"usage: {USAGE}", file=sys.stderr)
             return 2
     except (SyncError, OSError, subprocess.CalledProcessError, ValueError) as exc:
         print(f"loop-cloud: {cmd}: {pr_review.redact(str(exc))[:500]}", file=sys.stderr)

@@ -269,3 +269,9 @@ def test_the_workflow_lands_off_runs_from_main_only_and_keeps_secrets_in_the_env
     for s in steps:
         if "run: " in s:
             assert "${{" not in s.split("run: ", 1)[1], "inputs and outputs reach a script only through env"
+
+
+def test_a_missing_argument_prints_usage_and_exits_2(capsys):
+    for argv in ([], ["seed", "--clone", "x"], ["push", "--clone", "x"], ["pull"], ["has-work"], ["nope"]):
+        assert loop_cloud.main(argv) == 2, argv
+        assert "usage: python scripts/loop_cloud.py" in capsys.readouterr().err
