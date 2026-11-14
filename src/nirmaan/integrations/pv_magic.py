@@ -75,7 +75,7 @@ quit -noprompt
 #: Netgen: the extracted layout against the routed netlist read over the cells' SPICE, as JSON.
 LVS_SCRIPT = '''set layout [readnet spice {layout}]
 set source [readnet spice {cells}]
-readnet verilog {netlist} $source
+{more_cells}readnet verilog {netlist} $source
 lvs "$layout {top}" "$source {top}" {setup} {report} -json
 quit
 '''
@@ -126,12 +126,15 @@ def _steps(job: Job) -> list[list[str]]:
     for stale in ("layout.gds", "layout.spice", "lvs.report", "lvs.json"):
         (work / stale).unlink(missing_ok=True)
     tech, gds = _tcl(str(pdk_paths(p, "magic_tech")[0])), _tcl(str(work / "layout.gds"))
+    spice = pdk_paths(p, "spice")  # every cell SPICE file given, into the reference circuit
     scripts = {
         "stream.py": STREAM_SCRIPT,
         "magic_drc.tcl": DRC_SCRIPT.format(tech=tech, gds=gds, top=top),
         "magic_extract.tcl": EXTRACT_SCRIPT.format(tech=tech, gds=gds, top=top, spice=_tcl(str(work / "layout.spice"))),
         "netgen_lvs.tcl": LVS_SCRIPT.format(layout=_tcl(str(work / "layout.spice")),
-                                            cells=_tcl(str(pdk_paths(p, "spice")[0])),
+                                            cells=_tcl(str(spice[0])),
+                                            more_cells="".join(f"readnet spice {_tcl(str(f))} $source\n"
+                                                               for f in spice[1:]),
                                             netlist=_tcl(str(Path(p["netlist"]).resolve())), top=top,
                                             setup=_tcl(str(pdk_paths(p, "netgen_setup")[0])),
                                             report=_tcl(str(work / "lvs.report"))),
@@ -172,7 +175,7 @@ def _parse(run: RunRecord) -> EdaResult:
     summary = result.summary.replace("physical verification", "physical verification (Magic and Netgen)", 1)
     if skipped:
         why = f"{_plural(len(skipped), 'GDS record')} Magic could not read{_first(skipped)}"
-        rest = summary.split(": ", 1)[1] if not result.passed else ""
+        rest = summary.partition(": ")[2] if not result.passed else ""
         summary = f"physical verification (Magic and Netgen) failed: {why}" + (f"; {rest}" if rest else "")
         return EdaResult(False, summary, (*result.diagnostics, *skipped), metrics)
     return EdaResult(result.passed, summary, result.diagnostics, metrics)

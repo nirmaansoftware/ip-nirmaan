@@ -90,6 +90,12 @@ def test_it_streams_then_checks_in_magic_and_compares_in_netgen(project, tmp_pat
     lvs = (work / "netgen_lvs.tcl").read_text()
     assert f'readnet spice "{pdk["spice"]}"' in lvs and f'readnet verilog "{AXI}" $source' in lvs
     assert f'"{pdk["netgen_setup"]}"' in lvs and "-json" in lvs
+    # Every cell SPICE file given joins the reference, before the netlist is read over them.
+    extra = tmp_path / "pdk" / "more.spice"
+    extra.write_text("stand-in\n", encoding="utf-8")
+    invoke(project, "pv.run", {**params, "spice": f"{pdk['spice']},{extra}"}, tmp_path / "two")
+    two = (tmp_path / "two" / "netgen_lvs.tcl").read_text()
+    assert two.index(f'readnet spice "{extra}" $source') < two.index("readnet verilog")
 
 
 # --- Captured runs (CI, the pd-sky130 workflow) -----------------------------------------------
