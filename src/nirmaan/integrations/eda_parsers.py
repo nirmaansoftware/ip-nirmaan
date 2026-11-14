@@ -222,6 +222,37 @@ def parse_simulation(log: str, returncodes: tuple[int, ...], nonce: str | None =
     })
 
 
+def parse_reproduction(log: str, returncodes: tuple[int, ...], nonce: str) -> EdaResult:
+    """Pass means the failure reproduced (M71, docs/REPRO_GATES.md): the inverse question to a simulation's.
+
+    The design and the testbench built, the simulation ran to ``$finish``, and the testbench printed its one
+    verdict carrying this run's nonce, reporting at least one failed check. A build error, a run that never
+    finished, a verdict that is missing, repeated or forged, and a testbench whose checks all pass are not a
+    reproduction: each fails, so only the testbench's own failed check can stand for the failure.
+    """
+    sim = parse_simulation(log, returncodes, nonce=nonce)
+    m = sim.metrics
+    checks, failed = m["checks"], m["checks_failed"]
+    reasons = []
+    if not returncodes or returncodes[0] != 0:
+        reasons.append(f"the build did not succeed (exit status {returncodes[0] if returncodes else 'none'})")
+    if not m["finished"]:
+        reasons.append("$finish never reached")
+    if any(d.code == "VERDICT" for d in sim.diagnostics):
+        reasons.append("a verdict line was not printed by this run's testbench")
+    if failed is None:
+        reasons.append("the testbench printed no single verdict with this run's nonce")
+    elif not failed:
+        reasons.append(f"the testbench reports all {_plural(checks, 'check')} passed")
+    if reasons:
+        summary = f"failure not reproduced: {', '.join(reasons)}{_first(sim.errors)}"
+    else:
+        at = f" at time {m['end_time']}" if m["end_time"] else ""
+        summary = (f"failure reproduced: the testbench reports {failed} of {checks + failed} checks failed, "
+                   f"$finish reached{at}")
+    return EdaResult(not reasons, summary, sim.diagnostics, {**m, "reproduced": not reasons})
+
+
 # --- Yosys -----------------------------------------------------------------------------
 
 _YOSYS_ERROR_RE = re.compile(r"^ERROR:\s*(?P<msg>.*)$")

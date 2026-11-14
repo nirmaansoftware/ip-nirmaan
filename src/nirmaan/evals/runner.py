@@ -71,8 +71,9 @@ class ReplayLLM:
 
     name = REPLAY
 
-    def __init__(self, files: Sequence[tuple[str, str, str, str | None]]) -> None:
+    def __init__(self, files: Sequence[tuple[str, str, str, str | None]], outcome: str | None = None) -> None:
         self._files = list(files)  # (path, kind, content, entry)
+        self._outcome = outcome  # M71: a decision's answer records its outcome
         self.calls: list[WorkPrompt] = []
 
     def complete(self, prompt: WorkPrompt) -> Completion:
@@ -83,7 +84,7 @@ class ReplayLLM:
         meta = [{"path": path, "kind": kind, "title": path, "summary": f"{path}, from {' and '.join(cites)}.",
                  **({"entry": entry} if entry else {})} for path, kind, _, entry in self._files]
         head = json.dumps({"uncertainty": 0.0, "artifacts": [], "tool_runs": [], "claims": [], "files": meta,
-                           "escalation": None, "notes": "replayed answer"})
+                           "escalation": None, "notes": "replayed answer", "outcome": self._outcome})
         blocks = "".join(f"=== FILE: {path} ===\n{content}=== END FILE ===\n" for path, _, content, _ in self._files)
         return Completion(f"{head}\n{blocks}", self.name)
 
@@ -91,7 +92,14 @@ class ReplayLLM:
 def replay_llm(case: EvalCase, repo: Path) -> ReplayLLM:
     """The case's own reference answer, as a model would give it."""
     return ReplayLLM([(Path(f.path).name, f.kind, resolve(repo, f.path).read_text(encoding="utf-8"), f.entry)
-                      for f in case.reference])
+                      for f in case.reference], outcome=case.outcome)
+
+
+def _give_inputs(engine: TaskEngine, case: EvalCase, task: Task, repo: Path, actor: Actor) -> None:
+    """The task inputs the case gives this stage (M71), each a comma-joined list of the case's files."""
+    for key, paths in case.inputs.get(task.stage or "", {}).items():
+        engine.remember(MemoryScope.TASK, task.id, f"input.{key}", ",".join(str(resolve(repo, p)) for p in paths),
+                        actor)
 
 
 def _ancestors(engine: TaskEngine, task_id: str) -> list[Task]:
@@ -121,6 +129,7 @@ def _fix_upstream(engine: TaskEngine, case: EvalCase, task: Task, repo: Path, sa
         # reference files go through the unchanged run_task, so its gates run for real on them.
         engine.remember(MemoryScope.TASK, task.id, "input.workspace",
                         str(sandbox / "upstream" / _UNSAFE.sub("_", task.id)), actor(task.owner))
+        _give_inputs(engine, case, task, repo, actor(task.owner))
         fixed = [(Path(f.path).name, f.kind, resolve(repo, f.path).read_text(encoding="utf-8"), f.entry)
                  for f in files]
         run_task(engine, task.id, ModelRuntime(ReplayLLM(fixed), runtime_id=FIXTURE))
@@ -159,7 +168,8 @@ def _review_fixture(engine: TaskEngine, case: EvalCase, task: Task, files: Seque
 
 def _prepare(engine: TaskEngine, case: EvalCase, repo: Path, sandbox: Path) -> Task:
     """The seat task, READY, with every upstream work stage fixed to the case's documents."""
-    [seat] = [t for t in engine.state.tasks.values() if t.kind is TaskKind.WORK and t.stage == case.seat]
+    [seat] = [t for t in engine.state.tasks.values()
+              if t.kind in (TaskKind.WORK, TaskKind.DECISION) and t.stage == case.seat]  # M71: or a decision
     upstream = _ancestors(engine, seat.id)
     gates = [t.id for t in upstream if t.kind is TaskKind.GATE]
     if gates:
@@ -228,6 +238,7 @@ def evaluate(org: Organization, case: EvalCase, seat_runtime: AgentRuntime, *, r
     seat = _prepare(engine, case, repo, sandbox)
     engine.remember(MemoryScope.TASK, seat.id, "input.workspace", str(sandbox / "seat"),
                     Actor(role=str(seat.owner), kind=ActorKind.SYSTEM, name=FIXTURE))
+    _give_inputs(engine, case, seat, repo, Actor(role=str(seat.owner), kind=ActorKind.SYSTEM, name=FIXTURE))
     tool_runs: list[str] = []
     try:
         report = run_task(engine, seat.id, seat_runtime, attempts=attempts or case.attempts, knowledge=knowledge)

@@ -215,8 +215,12 @@ class Orchestrator:
                    instances, entry) -> Task:
         org = self._org
         features = observed | set(assumed)
-        refined = (s for r in stage.refinements if self._holds((r.when,), features) for s in r.skills)  # M65
+        refinements = [r for r in stage.refinements if self._holds((r.when,), features)]
+        refined = (s for r in refinements for s in r.skills)  # M65
         skills = tuple(dict.fromkeys((*stage.skills, *(variant.skills if variant else ()), *refined)))
+        # M71: a refinement may also add outputs and dependencies, after the stage's own.
+        depends_on = tuple(dict.fromkeys((*stage.depends_on, *(d for r in refinements for d in r.depends_on))))
+        outputs = tuple(dict.fromkeys((*stage.outputs, *(o for r in refinements for o in r.outputs))))
         owner = self._router.owner(stage.capability, stage.criticality, skills, self._context)
         inherited = self._owners.get((wf.id, stage.owner_from or ""), [])
         if inherited and org.holds(inherited[0], stage.capability):
@@ -234,7 +238,7 @@ class Orchestrator:
             )
             approver = self._router.approver(owner.chosen, stage.criticality, unit)
         depends: list[str] = []
-        for dep in stage.depends_on:
+        for dep in depends_on:
             depends += entry.get((wf.id, dep), [])
         branch = None
         if stage.branch:
@@ -254,8 +258,8 @@ class Orchestrator:
             escalation_path=_chain(org, owner.chosen), owner_routing=owner, reviewer_routing=reviewer,
             criticality=stage.criticality,
             risk=_risk(stage, variant, lambda c: self._holds((c,), observed), assumed, owner, reviewer),
-            inputs=tuple(dict.fromkeys(o for d in stage.depends_on for o in _outputs(wf, d))),
-            expected_outputs=stage.outputs,
+            inputs=tuple(dict.fromkeys(o for d in depends_on for o in _outputs(wf, d))),
+            expected_outputs=outputs,
             evidence_requirements=tuple(r for r in stage.evidence if self._holds(r.when, features)),
             outcomes=stage.outcomes, branch=branch,
             review_state=ReviewState.PENDING if stage.review else ReviewState.NOT_REQUIRED,
