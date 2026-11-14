@@ -118,7 +118,7 @@ of one is no refusal). Eval learning (M42) does not read these trials.
 
 ## What changed in code
 
-New: `src/nirmaan/evals/outside/` (the adapter) and `nirmaan eval outside`. A
+New: `src/nirmaan/evals/calibration/` (the adapter) and `nirmaan eval outside`. A
 `purpose` field on the run manifest and the trial, and `source` on the
 manifest, default to evidence and calibration respectively, so every record
 written before reads as before. `evals/levels.py` lists calibration trials.

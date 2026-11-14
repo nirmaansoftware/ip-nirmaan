@@ -1211,7 +1211,7 @@ def eval_outside(
     The record is labelled calibration and never counts toward a skill level. Exits 1 when any trial fails.
     """
     from nirmaan.evals import EvalError
-    from nirmaan.evals.outside import calibrate, check_reference
+    from nirmaan.evals.calibration import calibrate, check_reference
 
     if check == (runtime is not None):
         _fail("choose one: --runtime ID (a model in the seat) or --check (the reference RTL, no model)")

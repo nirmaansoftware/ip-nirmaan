@@ -21,7 +21,7 @@ from nirmaan.company import build_organization
 from nirmaan.eval_proposals import load_results
 from nirmaan.evals import EvalError, load_record
 from nirmaan.evals.levels import compute
-from nirmaan.evals.outside import OutsideError, calibrate, check_reference, locate, stage_cases, with_verdict
+from nirmaan.evals.calibration import OutsideError, calibrate, check_reference, locate, stage_cases, with_verdict
 from nirmaan.runtime.harness import harness_sha256
 
 SIM = needs("iverilog", "vvp")
