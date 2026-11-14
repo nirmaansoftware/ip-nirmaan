@@ -1,0 +1,21 @@
+{
+  "cases": [
+    "rtl/apb-regs"
+  ],
+  "command": "nirmaan eval run --runtime claude-code --trials 2 --seats rtl rtl/apb-regs",
+  "finished_at": "2026-11-14T10:06:32.092215Z",
+  "format": "nirmaan.eval-run",
+  "head_sha": "d5a7c04b6dfd9a6384ff7204b0c8e22197975dd5",
+  "id": "2026-11-14-claude-code-claude-opus-5-5-6",
+  "knowledge": "on",
+  "model": "claude-opus-5-5",
+  "nirmaan_version": "1.25.0",
+  "replay": false,
+  "runtime": "claude-code",
+  "seats": [
+    "rtl-implementation"
+  ],
+  "started_at": "2026-11-14T09:58:52.501587Z",
+  "trials": 2,
+  "version": 1
+}
