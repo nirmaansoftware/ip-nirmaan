@@ -44,6 +44,7 @@ from nirmaan.integrations.eda_antecedents import DERIVED, Definitions, definitio
 from nirmaan.integrations.eda_parsers import (
     Diagnostic,
     EdaResult,
+    parse_coverage,
     parse_reproduction,
     parse_sby,
     parse_sby_cover,
@@ -462,16 +463,26 @@ def simulation_problem(job: Job) -> str | None:
     return testbench_only_problem(job)
 
 
+def _code(source: str) -> str:
+    """A source file's text without its comments."""
+    return _COMMENT_RE.sub("", Path(source).read_text(encoding="utf-8", errors="replace"))
+
+
+def _top_re(job: Job) -> re.Pattern[str]:
+    """Matches the declaration of the run's top module: the file that has it is the testbench."""
+    return re.compile(rf"\bmodule\s+{re.escape(str(job.top))}\b")
+
+
 def testbench_only_problem(job: Job) -> str | None:
     """Why a simulation's sources cannot be judged by their testbench's verdict (M53), or None.
 
     The file that declares the top module is the testbench. No other file may end
     the simulation, read a plusarg, open a file, or reach outside the language.
     """
-    top = re.compile(rf"\bmodule\s+{re.escape(str(job.top))}\b")
+    top = _top_re(job)
     found = []
     for source in job.sources:
-        text = _COMMENT_RE.sub("", Path(source).read_text(encoding="utf-8", errors="replace"))
+        text = _code(source)
         if top.search(text):
             continue
         used = sorted(set(_TESTBENCH_ONLY_RE.findall(text)))
@@ -483,6 +494,81 @@ def testbench_only_problem(job: Job) -> str | None:
         return None
     return (f"only the testbench (the file that declares {job.top}) may end the simulation or read its "
             f"arguments, and {'; '.join(found)}; nothing was simulated")
+
+
+#: M70 (docs/COVERAGE_READ.md): where a coverage run records the files whose coverage it measures, for the
+#: parser, and the files it writes: the data the simulation wrote, that data as ``verilator_coverage`` writes
+#: it back, and the same as an lcov report.
+COVERAGE_DESIGN = "coverage_design.json"
+COVERAGE_RAW = "coverage_sim.dat"
+COVERAGE_DATA = "coverage.dat"
+COVERAGE_INFO = "coverage.info"
+#: What no source of a coverage run may use (M70), the testbench included: each could write the coverage file
+#: the run reads, or change the counts, from outside the design.
+COVERAGE_FORBIDDEN = ("$fopen", "$system", "$c", "DPI")
+_COVERAGE_FORBIDDEN_RE = re.compile(r"(?<![\w$])(?:" + "|".join(re.escape(t) for t in COVERAGE_FORBIDDEN)
+                                    + r")(?![\w$])")
+#: What only a design file may carry (M70): a Verilator configuration or a coverage pragma turns points off in any
+#: file, and an included file is text the check never read. In the approved RTL they are there for its reviewer.
+_COVERAGE_CONFIG_RE = re.compile(r"`verilator_config|`include\b|\bcoverage_(?:block_)?off\b")
+
+
+def coverage_design(job: Job) -> list[str]:
+    """The files whose coverage a run measures: ``design`` when given, else every source but the testbench."""
+    given = [str(Path(f).resolve()) for f in list_values(job.params.get("design", ""))]
+    if given:
+        return given
+    top = _top_re(job)
+    return [s for s in job.sources if not top.search(_code(s))]
+
+
+def coverage_problem(job: Job) -> str | None:
+    """Why a coverage run cannot be judged as given (M70), or None.
+
+    The sources are judged as a simulation's are (M53), every one is Verilog, and none uses what could forge
+    the coverage data. The design files are sources, none of them the testbench, and only they may carry a
+    Verilator configuration, a coverage pragma or an include.
+    """
+    problem = testbench_only_problem(job)
+    if problem:
+        return problem
+    other = [Path(s).name for s in job.sources if Path(s).suffix not in HDL_SUFFIXES]
+    if other:
+        return f"coverage runs read Verilog sources only, and {', '.join(other)} is not; nothing was simulated"
+    design = coverage_design(job)
+    top = _top_re(job)
+    if not design:
+        return "no design file to measure: every source is the testbench; nothing was simulated"
+    absent = [Path(f).name for f in design if f not in job.sources]
+    if absent:
+        return f"design files must be among the sources, and {', '.join(absent)} is not; nothing was simulated"
+    found = []
+    for source in job.sources:
+        raw = Path(source).read_text(encoding="utf-8", errors="replace")
+        text = _COMMENT_RE.sub("", raw)
+        if top.search(text) and source in design:
+            return f"{Path(source).name} declares {job.top}: the testbench is never measured; nothing was simulated"
+        used = sorted(set(_COVERAGE_FORBIDDEN_RE.findall(text)))
+        if source not in design:  # a pragma is a comment, so the whole text is read
+            used += sorted(set(_COVERAGE_CONFIG_RE.findall(raw)))
+        if used:
+            found.append(f"{Path(source).name} uses {', '.join(used)}")
+    if found:
+        return (f"a coverage run reads only the counts the design's own code reached, and {'; '.join(found)}; "
+                "nothing was simulated")
+    return None
+
+
+def _verilator_coverage(job: Job) -> list[list[str]]:
+    """Build the simulation with line and toggle coverage, run it, then have ``verilator_coverage`` read the data
+    the run wrote and write it back, as data and as an lcov report (M70)."""
+    (job.workdir / COVERAGE_DESIGN).write_text(json.dumps({"design": coverage_design(job)}) + "\n", encoding="utf-8")
+    raw, data = job.workdir / COVERAGE_RAW, job.workdir / COVERAGE_DATA
+    return [["verilator", "--binary", "--coverage-line", "--coverage-toggle", "-Wno-fatal", "-j", "0",
+             "--top-module", str(job.top), "-Mdir", "obj", *job.sources],
+            [str(job.workdir / "obj" / f"V{job.top}"), NONCE_ARG + new_nonce(), f"+verilator+coverage+file+{raw}"],
+            ["verilator_coverage", "--write", str(data), str(raw)],
+            ["verilator_coverage", "--write-info", str(job.workdir / COVERAGE_INFO), str(data)]]
 
 
 def _yosys(job: Job) -> list[list[str]]:
@@ -661,6 +747,19 @@ def _sim_parse(run: RunRecord) -> EdaResult:
     return parse_simulation(run.log, run.returncodes, nonce=run_nonce(run.log) or "")
 
 
+def _coverage_parse(run: RunRecord) -> EdaResult:
+    data = run.workdir / COVERAGE_DATA
+    manifest = run.workdir / COVERAGE_DESIGN
+    design = json.loads(manifest.read_text(encoding="utf-8"))["design"] if manifest.is_file() else []
+    result = parse_coverage(run.log, run.returncodes, nonce=run_nonce(run.log) or "",
+                            data=data.read_text(encoding="utf-8", errors="replace") if data.is_file() else None,
+                            design=design)
+    if not result.passed:
+        return result
+    outputs = {"coverage": str(data), "info": str(run.workdir / COVERAGE_INFO)}
+    return EdaResult(True, result.summary, result.diagnostics, {**result.metrics, "outputs": outputs})
+
+
 def _sby_parse(run: RunRecord) -> EdaResult:
     options = run.workdir / FORMAL_OPTIONS
     ran = json.loads(options.read_text(encoding="utf-8")) if options.is_file() else {}
@@ -679,6 +778,9 @@ for _tool in SIMULATION_TOOLS:
                              check=simulation_problem))
     register_backend(Backend("verilator-sim", _tool, ("verilator",), _verilator_sim, _sim_parse, ("sources", "top"),
                              check=simulation_problem))
+register_backend(Backend("verilator-coverage", "coverage.read", ("verilator", "verilator_coverage"),
+                         _verilator_coverage, _coverage_parse, ("sources", "top"), files=("design",),
+                         check=coverage_problem))
 register_backend(Backend("yosys", "synth.run", ("yosys",), _yosys, _yosys_parse, ("sources", "top")))
 register_backend(Backend("symbiyosys", "formal.run", ("sby", "yosys"), _sby, _sby_parse, ("sby",), _sby_dir,
                          check=_sby_check))
