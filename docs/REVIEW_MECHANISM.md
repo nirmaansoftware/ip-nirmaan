@@ -590,6 +590,9 @@ check the Claude login; run the loop once (its step times out at 50 minutes,
 inside the App token's hour); push the state, even after a failure. The state
 folder is `$RUNNER_TEMP/pr-review`, under the runner's home folder (mode 750),
 which the check account cannot enter.
+The OSS CAD Suite moves from `$RUNNER_TEMP` to `/opt/oss-cad-suite`, with its
+wrappers in `/opt/cad-bin` first on `PATH`, so the formal tests the checks
+select run as the check account instead of skipping.
 
 **Credentials.** All are environment secrets of the GitHub Environment
 `review-loop`, whose deployment branch rule allows only `main`. None is a
@@ -613,8 +616,9 @@ environment variables, and on Linux any process of the same account can read
 another's starting environment under `/proc/<pid>/environ`. So the login check
 and the loop step `exec` `scripts/loop_cloud.py`, which puts the secrets into
 a pipe and starts itself again without them (`handoff`). The loop keeps them in
-memory. It gives the GitHub tokens only to the `gh` and `git` processes it
-starts. It hands the plan token to each claude process through a fresh pipe
+memory. The GitHub tokens go into its own environment for the `gh` and `git`
+processes it starts; every claude process and every check gets an explicit
+allowlisted environment, so neither receives them. It hands the plan token to each claude process through a fresh pipe
 named by `CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR`, which Claude Code reads
 once (`pr_review.run_claude`). The reviewers' and the fixer's environment is
 the allowlist (`reviewer_env`) and holds no token. `--bare` ignores OAuth

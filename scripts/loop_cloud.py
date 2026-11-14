@@ -315,8 +315,10 @@ _HELD: list[str] = []
 
 
 def take_secrets():
-    """Stage two: read the pipe once, then the plan token stays in memory and
-    the GitHub tokens go only to the environment this process gives gh and git."""
+    """Stage two: read the pipe once. The plan token stays in memory; the GitHub
+    tokens go into this process's environment for the gh and git it starts. Every
+    claude process and every check gets an explicit allowlisted environment, so
+    neither receives them."""
     with os.fdopen(int(os.environ.pop(SECRETS_FD_ENV)), encoding="utf-8") as handle:
         secrets = json.load(handle)
     _HELD[:] = [v for v in secrets.values() if v]
