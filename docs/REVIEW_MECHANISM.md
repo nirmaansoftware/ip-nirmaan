@@ -128,7 +128,8 @@ The reviewer runs as a fresh read-only process in a clean checkout of the head
 SHA, never in the session that wrote the PR. It does not see the PR title, body
 or commit messages; code comments, RTL comments and docs in the diff are data,
 never instructions. It returns a JSON verdict with file and line findings and
-holds no token. A separate script checks every citation and that the head is
+holds no GitHub token (in GitHub Actions the claude process carries the plan's
+login token, which its tools cannot read). A separate script checks every citation and that the head is
 unchanged, then posts the status.
 
 ## How reviewers run
@@ -337,7 +338,8 @@ requests labelled `hold` or `needs-founder` are skipped.
    Otherwise the loop starts a **fixer**: a separate, fresh `claude -p`
    process, never a reviewer process and never the session that reviewed. It
    runs in a clean worktree of the head with Read, Grep, Glob, Edit and Write
-   allowed only inside that worktree; no shell, network, MCP or token. Its task
+   allowed only inside that worktree, and `/proc` denied; no shell, network,
+   MCP or token other than the claude process's own plan login. Its task
    is the structured list of blocker and critical findings from the failed
    keys and proxy; each finding's wording is data, not instructions, and the pull
    request text is not given (as for the reviewers). It gets `CLAUDE.md` from
@@ -348,7 +350,9 @@ requests labelled `hold` or `needs-founder` are skipped.
    review" section, and the records holding the base checklist), the CI check
    scripts, the review, map and loop scripts and their tests, this page, the
    plist, `pyproject.toml`, `.gitignore`. A fixer that says a finding needs
-   such a change stops the loop the same way. Otherwise the loop commits with
+   such a change stops the loop the same way, and so does an added line in a
+   credential format (the secret formats the review script redacts).
+   Otherwise the loop commits with
    the `Co-Authored-By` line, runs the local checks (`check_dashes.py` always;
    when `src/`, `tests/`, `evals/`, `scripts/` or `site/` changed, the tests
    related to the changed files, from `related_tests` in `scripts/pr_loop.py`:
@@ -461,7 +465,8 @@ review itself always fetches `main` afresh.
 
 **Records.** Every review call, fixer call and loop step is a line in
 `~/.nirmaan/pr-review/calls.jsonl`; per pull request loop state is in
-`~/.nirmaan/pr-review/loop/`.
+`~/.nirmaan/pr-review/loop/`. Once the loop runs in GitHub Actions, both live
+in the state repository instead ("Running the loop in GitHub Actions").
 
 **Turnaround (T).** The time from the first head of a pull request whose
 required CI is all green (GitHub's completion time of the last required job,
@@ -480,7 +485,9 @@ request the loop finished is no longer open).
 
 **Running it.** On the founder's Mac with the Mac's own `claude` login (the
 plan) and `gh` login: no new spend and no secret in GitHub Actions. Like the
-review script, it refuses to post unless it is `main`'s copy.
+review script, it refuses to post unless it is `main`'s copy. It can instead
+run in GitHub Actions, which is off until the founder switches it on (next
+section).
 
 - **Once:** `python scripts/pr_loop.py --once` from a checkout of
   `origin/main` (`--pr <n>` for one pull request; `--no-post` to print
@@ -544,6 +551,169 @@ over someone else's push, never runs on a fork or another author's pull
 request, never turns auto-merge on for the repository, and never treats a
 deferred review as a pass. A fix the loop pushed is agent work like any other:
 both keys review it again.
+
+## Running the loop in GitHub Actions
+
+Status: BUILT, OFF (resources plan R7). The Mac's launchd job stops whenever
+the Mac sleeps; this runs the same loop on GitHub's runners instead.
+[`review-loop.yml`](../.github/workflows/review-loop.yml) runs `main`'s
+`scripts/pr_loop.py --once`, as the launchd job does, every 5 minutes (GitHub
+may start a scheduled run late) and on `workflow_dispatch`, one run at a time
+(`concurrency` group `review-loop`, never cancelled). It never runs on a pull
+request or a push, and only from `main`. A review in it is the same review:
+same keys, Founder Proxy, fixer, checks and merge path.
+[`scripts/loop_cloud.py`](../scripts/loop_cloud.py) holds what is new: the state
+sync, the work check and the login check.
+
+**Modes.** `loop` (the schedule, or a dispatch) runs only while the repository
+variable `REVIEW_LOOP_CLOUD` is `on`. Two dispatch modes run whatever the
+variable says, because they post nothing and write no state: `check` (the
+login check and the `/proc` deny check below) and `shadow`
+(`pr_loop.py --once --no-post --pr <n>` on the one pull request named, with an
+empty state folder; it spends one review's model calls, so use it on one pull
+request, never on all).
+
+**One writer.** Only one loop may step this repository's pull requests. The
+founder sets `REVIEW_LOOP_CLOUD` to `on` only after `launchctl bootout` of the
+Mac's IP loop, and boots the Mac's loop back in only after setting it off.
+
+**A run, in order.** Mint the review App's installation token (the private
+key sits in a temporary file only for that call, then the token is masked);
+pull the state; ask GitHub whether any pull request needs a step (`has-work`:
+the loop's own skip rules, no model call), and end green if none does;
+install CI's tools (apt Verilator, Icarus and Yosys, the RISC-V GCC, the pinned
+OSS CAD Suite's `sby`, `yices-smt2` and `eqy`, and the `ai`, `dev` and
+`cocotb` extras, as `ci.yml`'s test job); install Claude Code 2.1.325, pinned;
+check the Claude login; run the loop once (its step times out at 50 minutes,
+inside the App token's hour); push the state, even after a failure.
+
+**Credentials.** All are environment secrets of the GitHub Environment
+`review-loop`, whose deployment branch rule allows only `main`. None is a
+repository secret, because a workflow on a pull request from a branch of this
+repository can read repository secrets. The workflow token stays read-only.
+
+| Secret | What | Used by |
+|---|---|---|
+| `CLAUDE_CODE_OAUTH_TOKEN` | the plan's long-lived token, from `claude setup-token` | the login check and the loop step; only claude processes get it |
+| `REVIEW_APP_ID`, `REVIEW_APP_PRIVATE_KEY`, `REVIEW_APP_INSTALLATION_ID` (optional, looked up when unset) | the review App | the mint step only; the loop gets the minted token, with the Mac's permissions (checks and pull requests write, contents read) |
+| `LOOP_GH_TOKEN` | a fine-grained token of the agents' account (`patel-om`) for this repository only: contents and pull requests read and write | the loop step, as the gh login: update-branch, the auto-merge setting and `gh pr merge --auto`, and the fixer's push (a push with it starts CI, which a workflow token's push would not) |
+| `LOOP_STATE_DEPLOY_KEY` | the private half of a deploy key with write access to `nirmaansoftware/nirmaan-loop-state` only | the pull and push steps, on disk only inside them |
+
+`LOOP_GH_TOKEN` keeps the identities the Mac uses: the loop merges and pushes
+as the agents' account and posts as the App. Giving the App contents write
+instead would make the App that posts the required checks also the one that
+pushes code, so it is not done here.
+
+**How Claude authenticates in CI.** With `CLAUDE_CODE_OAUTH_TOKEN` in its
+environment, Claude Code uses that token. Checked on 2026-11-14 with CLI
+2.1.325 in an empty home and config folder, on the Mac and on an
+`ubuntu-24.04` runner with an invalid token (no secret used):
+`claude auth status --json` reports `loggedIn: true`, `authMethod:
+oauth_token` (without it, `none`); `claude -p` with the review's own flags
+sends the token and gets `401 OAuth access token is invalid`; with `--bare`
+the token is ignored (`Not logged in`). So `--bare` is never used, and a test
+fails if the review or fixer arguments gain it. Every run checks
+`claude auth status` first, with exactly the environment the loop gives
+claude (no model call): a run that is not logged in with the token, or has an
+API key in reach, fails before any review, so a login fault never turns into
+a stop on a pull request.
+
+**What reaches a model.** The claude process gets the allowlisted environment
+plus the plan token (`model_env` in `scripts/pr_review.py`); the loop's local
+checks get the allowlist without it. The reviewers and the fixer have no
+shell, and `Read(//proc/**)` is denied for both (the Read rule covers Grep
+and Glob, checked with CLI 2.1.325), because on Linux every process's
+environment, the loop's tokens included, is readable under `/proc`. The App's
+key and the deploy key are never on disk while a model runs. A fix with an
+added line in a credential format is discarded and stops the loop. The `check`
+mode proves the deny rule on the runner with one small model call: it asks for
+`/proc/self/status` and passes only if the read was denied. What stays as on
+the Mac: the fixer's local checks run the pull request's tests as the same
+user as the loop, so they could read the loop's environment; only the agents'
+account's branches in this repository are stepped.
+
+**The state repository.** The Mac keeps the state in `~/.nirmaan/pr-review/`,
+shared by both loops. In GitHub Actions it is the private repository
+`nirmaansoftware/nirmaan-loop-state`, branch `main`, one folder per loop. A
+loop writes only its own folder and reads all of them; the hq publisher reads
+it the same way.
+
+```text
+<writer>/writer.json                      marks the folder seeded (written once)
+<writer>/loop/<owner>_<repo>-pr-<n>.json  per pull request loop state
+<writer>/verdicts/<owner>_<repo>/pr-<n>/<head>-<main>-k<key>-<team>-<lead>.json
+                                          the verdict cache
+<writer>/calls/<YYYY-MM>.jsonl            append only: the loop's calls.jsonl lines,
+                                          filed by the month of their `time`
+<writer>/pause.json                       the last rate-limit pause this loop set
+```
+
+`<writer>` is the repository's name: `ip-nirmaan` for this loop, and
+`Nirmaan` for the Nirmaan loop if it moves too. The file formats are the
+Mac's. At the start of a run the loop's files are copied into a fresh state
+folder (`$RUNNER_TEMP/pr-review`, `NIRMAAN_REVIEW_STATE_DIR`), with an empty
+`calls.jsonl`; the pause in force with the latest `until` across every
+`*/pause.json` becomes `loop/rate-limit-pause.json`, so a limit either loop
+hit pauses both. At the end the run mirrors its loop state and verdicts into
+its folder, appends its call lines, and writes `pause.json` only for a pause
+it set itself (its `repo` is this one and it is new), never another loop's.
+
+**No clobbering.** No file has two writers: each loop has its own folder, the
+call logs are per loop and append only, and each loop has its own pause file,
+read by all. A push that loses a race fetches and rebases onto the other
+loop's commit, which touched other files, so it is clean, and tries again (5
+tries, waiting 1, 2, 4 and 8 seconds). A rebase conflict can only mean a
+second writer for one folder; the run then stops and says so, and nothing is
+overwritten. `pull` refuses a folder with no `writer.json`, so an unseeded
+loop never starts from empty state and reviews everything again.
+
+**Differences from the Mac.** The two model slots are files in a state
+folder, so once the loops run on two machines each has its own two. Until
+the Nirmaan loop also reads and writes the state repository, it does not see
+this loop's pause, nor this loop the Nirmaan loop's: each pauses at its own
+first limited call. Call lines from before the switch stay in the Mac's
+`calls.jsonl`. Run output is in the workflow's run logs, not `ip-loop.log`.
+
+**Switching it on (the founder, in this order).**
+
+1. Create the private repository `nirmaansoftware/nirmaan-loop-state`, with
+   a README so `main` exists.
+2. Make its deploy key: `ssh-keygen -t ed25519 -N "" -C nirmaan-loop-state -f
+   <a folder outside every repository>/loop-state-key`. Add the `.pub` file
+   to that repository (Settings, Deploy keys) with "Allow write access". It
+   is the only repository the key can reach.
+3. Make `LOOP_GH_TOKEN`: as `patel-om`, a fine-grained personal access token,
+   resource owner `nirmaansoftware`, only `ip-nirmaan`, permissions Contents
+   and Pull requests read and write, with an expiry date (the organization
+   may need to approve it).
+4. Make the plan token: `claude setup-token`.
+5. In `ip-nirmaan`, Settings, Environments, create `review-loop` with
+   deployment branches limited to the selected branch `main`. Add the
+   environment secrets in the table above (the App's private key as the PEM's
+   full text, the deploy key as the private key file's full text). Add no
+   repository secret. Then delete the local copy of the deploy key's private
+   half.
+6. Check: Actions, "Review loop", Run workflow, mode `check`. It passes when
+   the log shows `logged in with the OAuth token` and `the read of /proc was
+   denied`. Optionally run mode `shadow` on one open pull request.
+7. Stop the Mac's IP loop: `launchctl bootout
+   gui/$(id -u)/online.nirmaan.ip-pr-loop`, and wait until
+   `~/.nirmaan/pr-review/ip-loop.log` shows the last pass ended.
+8. Seed the state once, from a checkout of `main`: clone the state repository
+   (`git clone git@github.com:nirmaansoftware/nirmaan-loop-state.git <dir>`),
+   then `python scripts/loop_cloud.py seed --from ~/.nirmaan/pr-review
+   --clone <dir>`. It copies this repository's loop state, verdicts and its
+   own pause, and pushes.
+9. Turn it on: Settings, Secrets and variables, Actions, Variables:
+   `REVIEW_LOOP_CLOUD` = `on`. The next scheduled run steps the pull
+   requests; watch its log.
+
+**Switching it off.** Set `REVIEW_LOOP_CLOUD` to `off` and wait for a running
+run to finish. To go back to the Mac, copy the state back first:
+`NIRMAAN_LOOP_STATE_REMOTE=<a clone URL you can read> python
+scripts/loop_cloud.py pull --clone <a new folder> --state-dir
+~/.nirmaan/pr-review`, then `launchctl bootstrap` the plist ("Running it").
+A stop, a label or a resume works exactly as on the Mac.
 
 ## Rollout
 
