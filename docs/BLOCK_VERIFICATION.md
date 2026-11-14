@@ -33,7 +33,7 @@ to judge, and gives "bring your RTL, we verify it" a workflow.
 | `testbench`: self-checking testbench | `dv.directed_tests` | interface-spec, design-under-test | `simulator.run` over the approved RTL and the seat's testbench, top from the testbench |
 | `assertions-formal`: properties and proof | `formal.prove` | interface-spec, design-under-test | `formal.run` over the seat's .sby, the approved RTL and the seat's property files, at least one property proven; `formal.cover` over the same: every cover reached |
 | `coverage` (when asked) | `dv.coverage` | testbench | none yet: `coverage.read` is a contract (recorded evidence) |
-| `equivalence` (when asked) | `formal.equivalence` | design-under-test | none yet: `equivalence.run` is a contract (recorded evidence) |
+| `equivalence` (when asked) | `formal.equivalence` | design-under-test | M69: `equivalence.run` over the seat's .eqy and the approved RTL versions, placed beside it (`docs/EQUIVALENCE.md`) |
 
 The RTL is never written here: `design-under-test` records the existing RTL
 and its review approves it, and every DV gate reads that approved file, never
@@ -139,9 +139,9 @@ a proof seat that ships its own `counter.v` and is refused.
 - Refinements that need new skill ids: scoreboard or reference model
   (`reference_modelling`) and cocotb (`python_verification`). Each is one
   feature and one `Refinement` when its skill lands.
-- The coverage and equivalence gates: they wait for `coverage.read`
-  (verilator_coverage) and `equivalence.run` (eqy) to be wrapped as
-  AVAILABLE tools, each its own milestone.
+- The coverage gate: it waits for `coverage.read` (verilator_coverage) to be
+  wrapped as an AVAILABLE tool, its own milestone. (The equivalence gate came
+  with `equivalence.run` through eqy, M69: `docs/EQUIVALENCE.md`.)
 - Repro testbenches on regression-investigation's root-cause and triage
   stages, and a scorer over several seat testbenches: M71,
   `docs/REPRO_GATES.md`.
