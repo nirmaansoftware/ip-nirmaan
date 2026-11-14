@@ -189,11 +189,10 @@ is planned blocked with the staffing reason, never routed back to them. The
 `GateSpec` of every gate is unchanged: `gate.verification` still needs a
 DIRECTOR or above holding `signoff.verification`, with `human_required`.
 
-**Which gates.** `gate.verification`, and `gate.implementation`, the other
-signoff gate whose evidence a department produces: its timing signoff tasks
-went to the Physical Design director, head of the department that produced
-the timing evidence, and now go to the Implementation VP. `gate.rtl` is not
-listed: only the RTL department's own director holds `signoff.rtl` at the
+**Which gates.** Only `gate.verification`. `gate.implementation` is not
+listed: its timing signoff tasks still go to the Physical Design director, and
+making that gate independent is left to a later pull request. `gate.rtl` is
+not listed either: only the RTL department's own director holds `signoff.rtl` at the
 authority its high-criticality gates need, so under the rule every RTL gate
 would be planned blocked (a test pins that). Giving it an independent approver
 is a change to the Design organization, left to a later pull request. The
@@ -203,9 +202,6 @@ outside the producing departments already.
 **What moves.** `tests/test_independent_gates.py` plans every representative
 request with the rule and without it and allows only these changes, each of
 the gate task's owner, approver and unit: the coverage gate (5 tasks) from
-the Simulation director to the Verification VP, and the `sta`, `sta-signoff`
-and `reanalysis` gates (8 tasks) from the Physical Design director to the
-Implementation VP. Every other task plans as before. The must-fail tests:
-planned without the rule, the check finds the Simulation director approving
-coverage evidence and the Physical Design director approving timing evidence;
-and with `gate.rtl` added, the RTL gate is blocked, not self-approved.
+the Simulation director to the Verification VP. Every other task plans as
+before. The must-fail tests: planned without the rule, the check finds the
+Simulation director approving coverage evidence; and with `gate.rtl` added, the RTL gate is blocked, not self-approved.

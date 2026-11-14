@@ -12,12 +12,12 @@ department produced the coverage they sign off. The gate spec was unchanged,
 so the record allowed the move in M77 and asked for this fix.
 
 **The rule.** `INDEPENDENT_GATES` in `src/nirmaan/company/governance.py`
-(`gate.verification` and `gate.implementation`), carried by
+(only `gate.verification`), carried by
 `CompanyDefinition.independent_gates`. On those gates the router drops the
 producers of the gated work and the heads of the units below the division
 that hold them (`Organization.own_heads`); the approver is the next holder up
 the chain, the division's VP. With no other holder the gate is planned
-blocked. `gate.rtl` is left out: only the RTL director holds `signoff.rtl` at
+blocked. `gate.implementation` and `gate.rtl` are left out: only the RTL director holds `signoff.rtl` at
 the authority its gates need.
 
 **The approver.** The VP, not Methodology and Signoff: Methodology and
@@ -25,6 +25,5 @@ Signoff's own signoff team produces the evidence on the other seven
 `gate.verification` tasks, which are critical and need VP authority.
 
 **What moves.** The coverage gate (5 tasks) goes back to the Verification VP;
-the `sta`, `sta-signoff` and `reanalysis` gates (8 tasks) go from the Physical
-Design director to the Implementation VP. Every other task plans as before.
+Every other task plans as before.
 No `GateSpec` changed.
