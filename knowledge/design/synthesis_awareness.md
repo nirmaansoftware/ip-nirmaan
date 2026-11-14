@@ -109,7 +109,7 @@ that backs it. This card holds no tool; the tool it points to is `synth.run`.
 - A latch inferred by a missed `else` or case item.
 - Simulation and synthesis disagreeing, from blocking and non-blocking
   assignments mixed in one block (inference).
-- Reading a cell count as a speed or area sign-off. It is neither.
+- Reading a cell count as a speed or area result. It is neither.
 
 ## How a result is checked
 
