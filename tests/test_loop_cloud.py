@@ -11,6 +11,7 @@ import json
 import re
 import subprocess
 import sys
+import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -343,3 +344,66 @@ def test_a_missing_argument_prints_usage_and_exits_2(capsys):
     for argv in ([], ["seed", "--clone", "x"], ["push", "--clone", "x"], ["pull"], ["has-work"], ["nope"]):
         assert loop_cloud.main(argv) == 2, argv
         assert "usage: python scripts/loop_cloud.py" in capsys.readouterr().err
+
+
+SCAN_CLAUDE = """#!/usr/bin/env python3
+import glob, json, os, sys
+fd = os.environ.get("CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR")
+token = os.read(int(fd), 4096).decode() if fd else ""
+hits = []
+for path in glob.glob("/proc/[0-9]*/environ"):
+    try:
+        data = open(path, "rb").read()
+    except OSError:
+        continue
+    hits += [path for s in SECRETS if s.encode() in data]
+with open(LOG, "a") as log:
+    log.write(json.dumps({"token": token, "hits": hits}) + "\\n")
+if sys.argv[1:3] == ["auth", "status"]:
+    print(json.dumps({"loggedIn": True, "authMethod": "oauth_token"}))
+else:
+    print(json.dumps({"subtype": "success", "is_error": False, "result": "", "structured_output": {"ok": True}}))
+"""
+
+
+@pytest.mark.skipif(not Path("/proc/self/environ").exists(), reason="Linux only: /proc/<pid>/environ (CI runs it on every head)")
+def test_on_linux_no_readable_process_environment_holds_a_secret_after_the_handoff(tmp_path):
+    secrets = {"CLAUDE_CODE_OAUTH_TOKEN": "plan-" + "P" * 30, "GH_TOKEN": "gh-" + "G" * 30, pr_review.APP_TOKEN_ENV: "app-" + "A" * 30}
+    log = tmp_path / "log.jsonl"
+    fake = tmp_path / "claude"
+    fake.write_text(SCAN_CLAUDE.replace("SECRETS", repr(list(secrets.values()))).replace("open(LOG,", f"open({str(log)!r},"))
+    fake.chmod(0o755)
+    env = {"PATH": "/usr/bin:/bin", "HOME": str(tmp_path), "NIRMAAN_CLAUDE_CODE": str(fake), **secrets}
+    proc = subprocess.run([sys.executable, str(ROOT / "scripts" / "loop_cloud.py"), "auth-check"], env=env, capture_output=True, text=True)
+    assert proc.returncode == 0, proc.stderr
+    calls = [json.loads(x) for x in log.read_text().splitlines()]
+    assert len(calls) == 2
+    assert all(c["token"] == secrets["CLAUDE_CODE_OAUTH_TOKEN"] for c in calls), "the token came through the pipe"
+    assert all(c["hits"] == [] for c in calls), calls
+
+
+def test_the_check_clone_has_its_own_objects_and_leaves_the_worktree_alone(tmp_path):
+    repo = tmp_path / "repo"
+    sh(tmp_path, "init", "-q", "-b", "main", str(repo))
+    (repo / "a.txt").write_text("one\n")
+    sh(repo, "add", "-A")
+    sh(repo, *loop_cloud.COMMITTER, "commit", "-qm", "one")
+    sha = sh(repo, "rev-parse", "HEAD").strip()
+    root = pr_loop.check_clone(str(repo), sha)
+    try:
+        clone = root / "repo"
+        assert root.parent == Path(tempfile.gettempdir()).resolve() or str(root).startswith(tempfile.gettempdir())
+        assert sh(clone, "rev-parse", "HEAD").strip() == sha and (clone / "a.txt").read_text() == "one\n"
+        assert not (clone / ".git" / "objects" / "info" / "alternates").exists(), "no alternates back to the loop's objects"
+        (clone / ".git" / "config").write_text("[core]\n\tsshCommand = evil\n")
+        (clone / "a.txt").write_text("changed\n")
+        assert "evil" not in (repo / ".git" / "config").read_text() and (repo / "a.txt").read_text() == "one\n"
+    finally:
+        pr_review._rmtree(root)
+
+
+def test_the_isolation_check_needs_linux_and_the_check_account():
+    if not Path("/proc/self/environ").exists():
+        assert loop_cloud.isolation_check("loopcheck")[0] is False
+    loop_cloud._HELD[:] = []
+    assert loop_cloud.environ_holders([]) == []

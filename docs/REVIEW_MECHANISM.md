@@ -582,14 +582,14 @@ key sits in a temporary file only for that call, then the token is masked);
 pull the state; ask GitHub whether any pull request needs a step (`has-work`:
 the loop's own skip rules, no model call), and end green if none does;
 install CI's tools (apt Verilator, Icarus and Yosys, the RISC-V GCC, the pinned
-OSS CAD Suite's `sby`, `yices-smt2` and `eqy`, as `ci.yml`'s test job); clone
-this commit to `/srv/loop/ip-nirmaan` (the loop's own clone, as on the Mac)
-and install it with the `ai`, `dev` and `cocotb` extras; install Claude Code
-2.1.325 with `npm ci` from `.github/review-loop/package-lock.json`, which
-checks the sha512 of the CLI and of its platform package; make the check
-account `loopcheck`; check the Claude login; run the loop once (its step times
-out at 50 minutes, inside the App token's hour); push the state, even after a
-failure. The state folder is `/srv/loop/pr-review`.
+OSS CAD Suite's `sby`, `yices-smt2` and `eqy`, and the `ai`, `dev` and
+`cocotb` extras, as `ci.yml`'s test job); install Claude Code 2.1.325 with
+`npm ci` from `.github/review-loop/package-lock.json`, which checks the sha512
+of the CLI and of its platform package; make the check account `loopcheck`;
+check the Claude login; run the loop once (its step times out at 50 minutes,
+inside the App token's hour); push the state, even after a failure. The state
+folder is `$RUNNER_TEMP/pr-review`, under the runner's home folder (mode 750),
+which the check account cannot enter.
 
 **Credentials.** All are environment secrets of the GitHub Environment
 `review-loop`, whose deployment branch rule allows only `main`. None is a
@@ -624,25 +624,31 @@ must report the OAuth token, then one tiny call must answer. `auth status`
 does not ask the server, so without that call a revoked token would turn into
 a stop on a pull request. A run that fails either check ends before the loop.
 
-Checked on 2026-11-14 with CLI 2.1.325, invalid tokens and no secret. On the
-Mac and on `ubuntu-24.04` runners, in an empty home and config folder:
+Checked on 2026-11-14 with CLI 2.1.325, invalid tokens and no secret, on
+the Mac and on `ubuntu-24.04` runners, in an empty home and config folder.
+The runner runs were throwaway branches, since deleted; their logs are
+Actions runs 43578438357, 43582156230, 43582267957 and 43582344492.
 
 - `claude auth status --json` reports `authMethod: oauth_token` for the token
   in the environment or through the descriptor, and `none` without one.
 - `claude -p` with the review's flags sends the token and gets
   `401 OAuth access token is invalid`.
 - `--bare` ignores the token (`Not logged in`).
-
-On a runner, with the real `loop_cloud.py`, `pr_review.py` and `pr_loop.py`:
-
-- After the handoff, no `/proc/*/environ` the runner account can read holds
-  any of the three secrets, and each claude process gets the token from its
-  pipe.
-- With a real CLI and an invalid token, the login check fails on the 401.
-- The local checks (`check_dashes.py`, then pytest) pass as `loopcheck` in a
-  fixer worktree under `/srv/loop`.
-- `loopcheck` cannot read the loop's `/proc/<pid>/environ` or the runner's
+- With the real scripts, the login check failed on the 401.
+- `loopcheck` could not read the loop's `/proc/<pid>/environ` or the runner's
   home folder.
+
+What is checked again, and where:
+
+- **On every head, in CI.** `tests/test_loop_cloud.py` runs `auth-check`
+  through the handoff with fake secrets and a fake claude that reads every
+  `/proc/*/environ` it can. The test passes only if none holds a secret and
+  the token came through the pipe. It is Linux only, so CI's test job is the
+  record; it is skipped on the Mac.
+- **On the runner, with the real secrets.** The `check` mode asks a model to
+  read `/proc/self/status` and passes only if the read was denied. It then
+  checks that no readable process environment holds a secret, and that
+  `loopcheck` cannot read the loop's.
 
 **What reaches a model or a check.**
 
@@ -651,20 +657,23 @@ On a runner, with the real `loop_cloud.py`, `pr_review.py` and `pr_loop.py`:
   `Read(//proc/**)` is denied for all of them. Read rules cover Grep and Glob
   too: a Read and a Grep under a denied absolute path were refused with CLI
   2.1.325. That denial is a second layer, not the only one.
-- **Checks run as another account.** The fixer's local checks run the pull
-  request's tests as `loopcheck` (`NIRMAAN_LOOP_CHECK_USER`; `sudo -u
-  loopcheck env -i` with exactly the allowlisted environment, a fresh home
-  and `safe.directory` for git). `loopcheck` cannot read the loop's or a
-  model's process environment or memory, the runner's home folder, or
-  anything outside world-readable files.
+- **Checks run as another account, in a separate clone.** The fixer's local
+  checks run the pull request's tests as `loopcheck`
+  (`NIRMAAN_LOOP_CHECK_USER`; `sudo -u loopcheck env -i` with exactly the
+  allowlisted environment, a fresh home and `safe.directory` for git). They
+  run in `check_clone`: a clone of the fix in the system temporary folder,
+  with its own copy of the objects. Nothing the tests write there, its `.git`
+  included, reaches the worktree, the repository or the git configuration the
+  loop commits and pushes from, and the loop runs no git command in it. After
+  each check, root kills every process of the account and takes back what it
+  made.
+- **What `loopcheck` cannot read.** It cannot read the loop's or a model's
+  process environment or memory, the state folder, or the runner's home.
 - **Keys on disk only in their own steps.** The App's key and the deploy key
   are on disk only inside the steps that use them, never while a model or a
   check runs.
 - **No credential in a fix.** A fix with an added line in a credential format
   is discarded and stops the loop.
-- **The `check` mode** proves the deny rule on the runner with one small model
-  call: it asks for `/proc/self/status` and passes only if the read was
-  denied.
 
 **The state repository.** The Mac keeps the state in `~/.nirmaan/pr-review/`,
 shared by both loops. In GitHub Actions it is the private repository

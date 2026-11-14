@@ -32,7 +32,9 @@ Subcommands (each exits non-zero with a reason on failure):
                 finished one not yet noted closed
     auth-check  the claude CLI, started as every review call is, is logged in with the
                 plan's OAuth token and one tiny call answers; --deny-probe also asks a model to read
-                /proc/self/status and passes only if the read is denied
+                /proc/self/status and passes only if the read is denied, then checks that no
+                readable process environment holds a secret and the check account cannot
+                read the loop's
     run         the loop once (pr_loop.py --once; --shadow N: --no-post on pull request N),
                 with the step's secrets moved out of the environment first
     push        write this loop's state back, commit, push, rebase and retry
@@ -309,15 +311,49 @@ def handoff(argv: list[str], env=None, execve=os.execve):
     execve(sys.executable, [sys.executable, str(Path(__file__).resolve()), *argv], env)
 
 
+_HELD: list[str] = []
+
+
 def take_secrets():
     """Stage two: read the pipe once, then the plan token stays in memory and
     the GitHub tokens go only to the environment this process gives gh and git."""
     with os.fdopen(int(os.environ.pop(SECRETS_FD_ENV)), encoding="utf-8") as handle:
         secrets = json.load(handle)
+    _HELD[:] = [v for v in secrets.values() if v]
     pr_review.set_plan_token(secrets.get("CLAUDE_CODE_OAUTH_TOKEN"))
     for name in ("GH_TOKEN", pr_review.APP_TOKEN_ENV):
         if secrets.get(name):
             os.environ[name] = secrets[name]
+
+
+def environ_holders(values: list[str]) -> list[str]:
+    """Every /proc/<pid>/environ this account can read that holds one of `values`."""
+    hits = []
+    for path in sorted(Path("/proc").glob("[0-9]*/environ")):
+        try:
+            data = path.read_bytes()
+        except OSError:
+            continue
+        hits += [str(path) for v in values if v and v.encode() in data]
+    return hits
+
+
+def isolation_check(user: str | None) -> tuple[bool, str]:
+    """On the runner (`check` mode): after the handoff no readable process
+    environment holds a secret, and the check account cannot read this one's."""
+    if not Path("/proc/self/environ").exists():
+        return False, "no /proc here (the isolation check is for the Linux runner)"
+    hits = environ_holders(_HELD)
+    if hits:
+        return False, f"a secret is in a readable process environment ({', '.join(hits[:5])})"
+    if not user:
+        return False, "NIRMAAN_LOOP_CHECK_USER is not set"
+    with tempfile.TemporaryDirectory() as tmp:
+        os.chmod(tmp, 0o755)
+        readable, detail = pr_loop._run_commands([["cat", f"/proc/{os.getpid()}/environ"]], tmp, {}, {}, 60, user)
+    if readable or "Permission denied" not in detail:
+        return False, f"the check account could read the loop's environment ({detail[:120] or 'it read it'})"
+    return True, "no readable process environment holds a secret; the check account cannot read the loop's"
 
 
 # --- Commands -------------------------------------------------------------------------
@@ -370,6 +406,8 @@ def main(argv: list[str]) -> int:
                 ok, why = login_call(binary, os.getcwd())
             if ok and "--deny-probe" in argv:
                 ok, why = deny_probe(binary, os.getcwd())
+            if ok and "--deny-probe" in argv:
+                ok, why = isolation_check(os.environ.get("NIRMAAN_LOOP_CHECK_USER"))
             print(f"loop-cloud: auth-check: {why}")
             return 0 if ok else 1
         elif cmd == "push" and clone and state_dir:

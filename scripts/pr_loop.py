@@ -456,11 +456,23 @@ def check_argv(args: list[str], env: dict, user: str | None) -> list[str]:
     return ["sudo", "-n", "-u", user, "--", "env", "-i", *[f"{k}={v}" for k, v in env.items()], *args]
 
 
+def check_clone(wt: str, sha: str) -> Path:
+    """A clone of `sha` for the check account, in the system temporary folder,
+    with its own copy of the objects (no hardlinks): nothing it writes there
+    reaches the worktree, the repository or the git configuration the loop
+    commits and pushes with, and it needs no access to the loop's state folder."""
+    root = Path(tempfile.mkdtemp(prefix="loop-check-", dir=tempfile.gettempdir()))
+    os.chmod(root, 0o755)
+    _git(wt, "clone", "--quiet", "--no-hardlinks", "--no-checkout", wt, str(root / "repo"))
+    _git(root / "repo", "-c", "advice.detachedHead=false", "checkout", "--quiet", "--detach", sha)
+    return root
+
+
 def _run_commands(commands, cwd, extra_env, variables, timeout_s, user=None) -> tuple[bool, str]:
     env = {**pr_review.reviewer_env(), **(extra_env or {})}
     home = None
     if user:
-        # The check account writes in the worktree and its own home; git trusts the loop's checkout.
+        # The check account writes in its clone (check_clone) and its own home; git trusts the clone.
         home = tempfile.mkdtemp(prefix="loop-check-home-")
         os.chmod(home, 0o777)
         subprocess.run(["chmod", "-R", "a+rwX", cwd], capture_output=True)
@@ -479,8 +491,9 @@ def _run_commands(commands, cwd, extra_env, variables, timeout_s, user=None) -> 
         return True, ""
     finally:
         if user and home:
-            # What the check account made, the loop can remove with the worktree.
-            subprocess.run(check_argv(["chmod", "-R", "a+rwX", cwd, home], env, user), env=pr_review.reviewer_env(), capture_output=True)
+            # Nothing the check account started outlives the check, and what it made goes back to the loop (as root).
+            subprocess.run(["sudo", "-n", "pkill", "-KILL", "-u", user], capture_output=True)
+            subprocess.run(["sudo", "-n", "chown", "-R", f"{os.getuid()}:{os.getgid()}", cwd, home], capture_output=True)
             pr_review._rmtree(Path(home))
 
 
@@ -1166,8 +1179,6 @@ class Loop:
         main_sha = _git(root, "rev-parse", "refs/pr-review/main").strip()
         (self.state_dir / "worktrees").mkdir(parents=True, exist_ok=True)
         wt_root = Path(tempfile.mkdtemp(prefix=f"{cfg['repo'].replace('/', '_')}-{n}-fix-", dir=self.state_dir / "worktrees"))
-        if o.get("check_user"):
-            os.chmod(wt_root, 0o755)  # the check account reaches the worktree
         wt = str(wt_root / "head")
         _git(root, "worktree", "add", "--quiet", "--detach", wt, head)
         try:
@@ -1260,23 +1271,31 @@ class Loop:
         commit_changed = [p for f in review_map.parse_name_status(_git(wt, "diff", "--name-status", "-z", head, new))
                           for p in ([f["old"], f["path"]] if f["old"] else [f["path"]])]
         ran = []
-        for c in lc["checks"]:
-            if not _applies(c, commit_changed):
-                continue
-            run, name = c["run"], c["name"]
-            if c.get("select") == "related_tests":
-                # Only the tests related to the changed files; CI runs the whole suite.
-                selected = related_tests(wt, commit_changed)
-                if selected is not None:
-                    run = [*run[:-1], [*run[-1], *selected]]
-                    name = f"{name} ({len(selected)} related file{'' if len(selected) == 1 else 's'})"
-                else:
-                    name = f"{name} (whole suite)"
-            ok, detail = _run_commands(run, wt, c.get("env"), {"python": sys.executable, "main": main_sha, "head": new}, o["check_timeout_s"],
-                                        o.get("check_user"))
-            if not ok:
-                return self._stop(ctx, head, f"fix round {rnd}: the local check {name} failed on the fix ({detail}); nothing was pushed")
-            ran.append(name)
+        # As the check account (GitHub Actions) the checks run in a clone of the fix with its own
+        # objects, which it may write; the worktree the loop commits and pushes from stays the loop's.
+        check_root = check_clone(wt, new) if o.get("check_user") else None
+        check_cwd = str(check_root / "repo") if check_root else wt
+        try:
+            for c in lc["checks"]:
+                if not _applies(c, commit_changed):
+                    continue
+                run, name = c["run"], c["name"]
+                if c.get("select") == "related_tests":
+                    # Only the tests related to the changed files; CI runs the whole suite.
+                    selected = related_tests(wt, commit_changed)
+                    if selected is not None:
+                        run = [*run[:-1], [*run[-1], *selected]]
+                        name = f"{name} ({len(selected)} related file{'' if len(selected) == 1 else 's'})"
+                    else:
+                        name = f"{name} (whole suite)"
+                ok, detail = _run_commands(run, check_cwd, c.get("env"), {"python": sys.executable, "main": main_sha, "head": new}, o["check_timeout_s"],
+                                            o.get("check_user"))
+                if not ok:
+                    return self._stop(ctx, head, f"fix round {rnd}: the local check {name} failed on the fix ({detail}); nothing was pushed")
+                ran.append(name)
+        finally:
+            if check_root:
+                pr_review._rmtree(check_root)
 
         now = o["github"].get_pull(n)["head_sha"]
         if now != head:
