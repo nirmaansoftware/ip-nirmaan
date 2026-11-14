@@ -82,10 +82,10 @@ Each group in `capability/levels.json` lists its records, cases, counts
 differs from what the records give. `tests/test_capability_levels.py` runs the
 check, so a record committed without regenerating the file fails CI.
 
-On main the file reports eight Knowledge (`apb`, `arbitration`, `axi`,
-`buffering_flow_control`, `control_logic_design`, `fsm_design`,
-`pipeline_design` and `rtl_design`, each from its check record under
-`capability/records/knowledge/`), zero Practised and zero Proven: no result
+A record whose document changed after its check is stale and counts for
+nothing until the document is checked again. On main the file reports as
+Knowledge each skill with a current check record under
+`capability/records/knowledge/`, zero Practised and zero Proven: no result
 record is committed.
 
 ## Tests
