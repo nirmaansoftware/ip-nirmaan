@@ -9,3 +9,4 @@ changes, the gates with their owner seats, open questions, and dissent. Process:
 - [2026-10-18: Founder Proxy replaces the founder as third reviewer (the founder's record)](2026-10-18-founder-proxy.md)
 - [2026-10-18: capability build-out and hierarchy](2026-10-18-capability-buildout.md)
 - [2026-10-18: two reviews per pull request head (review loop)](2026-10-18-review-loop.md)
+- [2026-11-14: grouping units and the activation rule (gate G13)](2026-11-14-g13-grouping-units.md)
