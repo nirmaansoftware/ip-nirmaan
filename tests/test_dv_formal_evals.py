@@ -45,8 +45,8 @@ CREDIT = "tests/fixtures/dv/credit_counter"
 DEEP = "tests/fixtures/dv/deep_counter"
 
 FORMAL_SKILLS = ("formal_verification", "sva", "assertion_coverage")
-PROPERTY = "verification.formal.property.senior"
-MODEL_CHECKING = "verification.formal.model_checking.senior"
+PROPERTY = "verification.formal.proof.property.senior"
+MODEL_CHECKING = "verification.formal.proof.model_checking.senior"
 
 #: Each case: its fixture folder, approved RTL, the proof task's skills, owner and reviewer
 #: (docs/BLOCK_VERIFICATION.md), and the status a mutant's failed run reports.

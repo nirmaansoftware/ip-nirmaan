@@ -55,8 +55,9 @@ def status_report(org: Organization, state: ProjectState) -> StatusReport:
         by_phase.setdefault(t.phase, Counter())[t.status.value] += 1
     live = [t for t in work if t.status is not TaskStatus.CANCELLED]
     done = sum(1 for t in live if t.status is TaskStatus.COMPLETED)
+    # A project saved under an earlier chart may name a unit that has since moved: show its saved id.
     teams = sorted({
-        org.units[t.unit].name
+        org.units[t.unit].name if t.unit in org.units else t.unit
         for t in work
         if t.unit and t.status not in (TaskStatus.CANCELLED, TaskStatus.COMPLETED)
     })

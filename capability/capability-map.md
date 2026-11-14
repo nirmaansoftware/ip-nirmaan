@@ -204,29 +204,31 @@ Unit: design.fpga (placeholder, a director only). No FPGA skill id exists.
 
 ## Verification
 
-Units: verification. Seat: verification-lead.
+Units: verification, in five departments: verification.methodology,
+verification.dynamic (Simulation), verification.formal, verification.debug, and
+verification.processor (placeholder, no skill). Seat: verification-lead.
 
 | Area | Status | Skill ids | Units | Notes |
 |---|---|---|---|---|
-| Planning, methodology and signoff | P | verification_planning, verification_architecture, verification_signoff, traceability | verification.planning, verification.architecture, verification.signoff, quality.reviews.verification_signoff | vplan.check runs against specification tags |
-| Directed and self-checking testbenches | P | directed_testing, systemverilog | verification.simulation.systemverilog, verification.simulation.testbench | Icarus and Verilator run; the RTL evals hold must-fail testbench checks but credit rtl_design |
-| UVM and constrained random | K | uvm, constrained_random, vip_integration | verification.simulation.uvm, verification.simulation.vip | No simulator here runs UVM. Free tool: a Verilator release with upstream UVM support |
+| Planning, methodology and signoff | P | verification_planning, verification_architecture, verification_signoff, traceability | verification.methodology.planning, verification.methodology.architecture, verification.methodology.signoff, quality.reviews.verification_signoff | vplan.check runs against specification tags |
+| Directed and self-checking testbenches | P | directed_testing, systemverilog | verification.dynamic.testbench.systemverilog, verification.dynamic.testbench.testing | Icarus and Verilator run; the RTL evals hold must-fail testbench checks but credit rtl_design |
+| UVM and constrained random | K | uvm, constrained_random, vip_integration | verification.dynamic.testbench.uvm, verification.dynamic.testbench.vip | No simulator here runs UVM. Free tool: a Verilator release with upstream UVM support |
 | Python-based verification | K | none | none | cocotb testbenches run on Icarus as simulator.run's cocotb backend (M72); cocotb on Verilator needs 5.036 or later |
-| Assertions and formal property checking | P | sva, formal_verification, model_checking, formal_coverage, assertion_coverage | verification.formal, verification.coverage.assertion | SBY proofs and covers run; open Yosys reads only a subset of SVA |
+| Assertions and formal property checking | P | sva, formal_verification, model_checking, formal_coverage, assertion_coverage | verification.formal.proof, verification.dynamic.coverage.assertion | SBY proofs and covers run; open Yosys reads only a subset of SVA |
 | Equivalence checking | K | equivalence_checking | verification.formal.equivalence | equivalence.run is contract only. Free tool: Yosys eqy |
-| Coverage and closure | K | code_coverage, functional_coverage, assertion_coverage | verification.coverage | coverage.read runs line, toggle and branch coverage through verilator_coverage (M70); covergroups are unreliable in open simulators. Includes UCIS |
-| Debug, triage and regression | P | failure_triage, log_analysis, waveform_debug, root_cause_analysis, regression_intelligence, regression_management | verification.debug, verification.simulation.regression, infrastructure.eda.regression | veritriage.investigate runs on real simulation logs; replayed-failure evals are writable |
-| CDC and RDC verification | K | cdc_verification | verification.cdc | cdc.run is contract only; no mature free structural CDC tool |
-| Processor and ISA verification | K | none | none | The cores already run. Free tool: riscv-arch-test, riscv-dv, riscv-formal |
-| Datapath and accelerator verification | K | none | none | Free tool: cocotb with Python golden models; Berkeley TestFloat |
+| Coverage and closure | K | code_coverage, functional_coverage, assertion_coverage | verification.dynamic.coverage | coverage.read runs line, toggle and branch coverage through verilator_coverage (M70); covergroups are unreliable in open simulators. Includes UCIS |
+| Debug, triage and regression | P | failure_triage, log_analysis, waveform_debug, root_cause_analysis, regression_intelligence, regression_management | verification.debug, infrastructure.eda.regression | veritriage.investigate runs on real simulation logs; replayed-failure evals are writable |
+| CDC and RDC verification | K | cdc_verification | verification.formal.cdc | cdc.run is contract only; no mature free structural CDC tool |
+| Processor and ISA verification | K | none | verification.processor.isa | The cores already run. Free tool: riscv-arch-test, riscv-dv, riscv-formal |
+| Datapath and accelerator verification | K | none | verification.processor.models, verification.processor.accelerator | Free tool: cocotb with Python golden models; Berkeley TestFloat |
 | Hardware/software co-verification | P | embedded_firmware, device_drivers, register_programming | software.validation, software.registers | fw.test and fw.soc_test; the firmware/axi4_lite_driver eval |
-| Gate-level simulation | P | none | none | Icarus simulates Yosys netlists in the DFT flow; SDF-annotated runs not yet |
-| Power-aware verification | K | none | none | No free UPF-aware simulator |
-| FPGA prototyping | K | none | design.fpga | Needs a board |
-| Hardware emulation | O | none | none | Emulators are paid hardware |
+| Gate-level simulation | P | none | verification.dynamic.gate_level_power | Icarus simulates Yosys netlists in the DFT flow; SDF-annotated runs not yet |
+| Power-aware verification | K | none | verification.dynamic.gate_level_power | No free UPF-aware simulator |
+| FPGA prototyping | K | none | design.fpga, verification.dynamic.emulation | Needs a board |
+| Hardware emulation | O | none | verification.dynamic.emulation | Emulators are paid hardware |
 | Security verification | K | security_verification | security.verification | Free tool: access-control properties in SBY and fuzzing on Verilator |
 | System-level and portable stimulus | K | none | none | No free PSS tool here |
-| AI-assisted verification | P | regression_intelligence | verification.debug.intelligence, infrastructure.ai | The eval harness and VeriTriage judge model output with real tool runs |
+| AI-assisted verification | P | regression_intelligence | verification.debug.analysis.intelligence, infrastructure.ai | The eval harness and VeriTriage judge model output with real tool runs |
 
 ## Implementation
 
