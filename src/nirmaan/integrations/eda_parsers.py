@@ -540,7 +540,8 @@ def _cocotb_cases(results: str) -> tuple[list[dict[str, str]], str | None]:
         bad = next((case.find(tag) for tag in ("failure", "error") if case.find(tag) is not None), None)
         status = "skip" if case.find("skipped") is not None else "fail" if bad is not None else "pass"
         message = "" if bad is None else (bad.get("message") or bad.text or "").strip()
-        seed = next((p.get("value", "") for p in case.iter("property") if p.get("name") == "random_seed"), "")
+        seed = next((prop.get("value", "") for prop in case.iter("property")
+                     if prop.get("name") == "random_seed"), "")
         cases.append({"name": ".".join(n for n in (case.get("classname", ""), case.get("name", "")) if n),
                       "status": status, "type": "" if bad is None else bad.get("type", ""),
                       "message": message.splitlines()[0] if message else "", "seed": seed})
