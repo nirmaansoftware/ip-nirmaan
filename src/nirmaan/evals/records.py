@@ -24,7 +24,7 @@ from typing import Any, Callable, Iterable, Mapping, Sequence
 
 import nirmaan
 from nirmaan.evals.cases import EvalError, case_digest, skill_digest
-from nirmaan.evals.runner import REPLAY, evaluate, replay_llm
+from nirmaan.evals.runner import REPLAY, evaluate, replay_llm, runtime_cli
 from nirmaan.models import EvalCase, EvalResult, EvalRunManifest, EvalTrial, JudgeRun, RecordedAnswer
 from nirmaan.org import Organization
 from nirmaan.runtime import AgentRuntime, Completion, ModelRuntime, WorkPrompt, get_runtime
@@ -129,10 +129,11 @@ def record_trial(org: Organization, case: EvalCase, seat_runtime: AgentRuntime, 
     """Run one case once with every model answer captured, and keep the tool runs behind each verdict.
 
     ``knowledge=False`` (M67) runs the seat without knowledge documents and labels the trial ``knowledge: off``.
-    Every answer, and the result, records the harness (M73).
+    Every answer, and the result, records the harness (M73), with the runtime's CLI version in it.
     """
     llm = getattr(seat_runtime, "llm", None)
-    recorder = RecordingLLM(llm, harness_sha256(attempts=attempts, knowledge=knowledge)) if llm is not None else None
+    harness = harness_sha256(attempts=attempts, knowledge=knowledge, cli=runtime_cli(seat_runtime))
+    recorder = RecordingLLM(llm, harness) if llm is not None else None
     if recorder is not None:
         seat_runtime.llm = recorder  # type: ignore[attr-defined]
     try:

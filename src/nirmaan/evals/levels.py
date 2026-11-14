@@ -18,7 +18,10 @@ fails when the committed file differs from what the records give.
   verification skill, a must-fail control in every case it rests on. A group
   whose digest is not the skill's current one is stale and never counts, and
   so is a group whose harness is not the current one; a trial that records no
-  harness (a record written before M73) never counts.
+  harness (a record written before M73) never counts. The harness of a trial on
+  the claude-code runtime carries the Claude Code version it ran, so trials from
+  two versions are two groups, each checked against the current harness at its
+  own version, and a version that could not be read never counts.
   Replays and attested trials are refused (``load_evidence``); a trial of a
   case not judged by a tool is listed apart and never counts. On a tool-judged
   case, a trial that no judge ran on (the work was blocked, declined or refused
@@ -47,6 +50,7 @@ from nirmaan.evals.scorers import scorer_spec
 from nirmaan.models import EvalCase
 from nirmaan.org import Organization
 from nirmaan.org.knowledge_files import check_document
+from nirmaan.runtime.claude_code import UNKNOWN_VERSION
 from nirmaan.runtime.harness import harness_sha256
 
 FORMAT = "nirmaan.capability-levels"
@@ -150,10 +154,10 @@ def _rejudged(record_dir: Path) -> dict[tuple[str, int], bool]:
 
 def practised(org: Organization, repo: Path,
               cases: dict[str, EvalCase]) -> tuple[dict[str, list], list[str], list, list]:
-    """Per skill, every (model, digest, harness) group of tool-judged cases' trials, a trial no judge ran on
-    counted as failed; the refused records; trials of cases not tool-judged; trials run without knowledge
+    """Per skill, every (model, digest, harness, CLI version) group of tool-judged cases' trials, a trial no judge
+    ran on counted as failed; the refused records; trials of cases not tool-judged; trials run without knowledge
     documents (M67), which never count."""
-    groups: dict[tuple[str, str | None, str | None, str | None], dict[str, Any]] = {}
+    groups: dict[tuple[str, str | None, str | None, str | None, str | None], dict[str, Any]] = {}
     refused: list[str] = []
     not_tool_judged: list[dict[str, Any]] = []
     without_knowledge: list[dict[str, Any]] = []
@@ -185,7 +189,7 @@ def practised(org: Organization, repo: Path,
             # as a failure, whatever it claims, so a blocked trial cannot drop out of the count.
             judged = bool(trial.judge_runs)
             for skill in case.skills:  # only the skills the case names get credit
-                key = (skill, trial.model, trial.skills.get(skill), _harness(trial))
+                key = (skill, trial.model, trial.skills.get(skill), _harness(trial), trial.result.cli)
                 g = groups.setdefault(key, {"n": 0, "passed": 0, "unjudged": 0, "records": set(), "cases": set(),
                                             "unrejudged": 0, "no_must_fail": set()})
                 g["n"] += 1
@@ -198,8 +202,10 @@ def practised(org: Organization, repo: Path,
                 if not _must_fail(case):
                     g["no_must_fail"].add(case.id)
     out: dict[str, list] = defaultdict(list)
-    current_harness = harness_sha256()  # M73: the current harness, with no run options
-    for (skill, model, digest, recorded), g in sorted(groups.items(), key=lambda kv: tuple(str(x) for x in kv[0])):
+    for (skill, model, digest, recorded, cli), g in sorted(groups.items(),
+                                                          key=lambda kv: tuple(str(x) for x in kv[0])):
+        # M73: the current harness, with no run options but the CLI version the trials ran (docs/HARNESS.md)
+        current_harness = harness_sha256(cli=cli)
         low = (wilson(g["passed"], g["n"]) or (0.0, 0.0))[0]
         current = skill_digest(org, skill, repo) if skill in org.skills else None
         reasons = []
@@ -211,6 +217,8 @@ def practised(org: Organization, repo: Path,
             reasons.append("harness not recorded: the trials carry no harness, or their answers disagree")
         elif recorded != current_harness:
             reasons.append("stale: the harness changed after these trials (docs/HARNESS.md)")
+        if cli == UNKNOWN_VERSION:
+            reasons.append("the CLI version the trials ran was not read")
         if model is None:
             reasons.append("no model is recorded")
         if g["n"] < MIN_TRIALS:
@@ -221,7 +229,8 @@ def practised(org: Organization, repo: Path,
             reasons.append(f"{g['unrejudged']} trials without a clean re-judge")
         if skill in org.skills and org.skills[skill].domain in MUST_FAIL_DOMAINS and g["no_must_fail"]:
             reasons.append(f"no must-fail control in {', '.join(sorted(g['no_must_fail']))}")
-        out[skill].append({"model": model, "digest": digest, "harness": recorded, "n": g["n"], "passed": g["passed"],
+        out[skill].append({"model": model, "digest": digest, "harness": recorded, "cli": cli, "n": g["n"],
+                           "passed": g["passed"],
                            "unjudged": g["unjudged"], "lower": round(low, 4), "records": sorted(g["records"]),
                            "cases": sorted(g["cases"]), "counts": not reasons, "reasons": reasons})
     return dict(out), refused, not_tool_judged, without_knowledge

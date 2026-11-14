@@ -41,8 +41,10 @@ toward any level; its skill digests are the cards alone, so with both labels
 edited back a skill with a document is still stale.
 
 Trials are grouped by skill, model, the skill digest recorded with the trial
-(card plus knowledge document, M58) and the harness recorded with it (M73,
-`docs/HARNESS.md`). A group counts when all hold:
+(card plus knowledge document, M58), the harness recorded with it (M73,
+`docs/HARNESS.md`) and the CLI version the runtime called the model through
+(the claude-code runtime's `claude --version`, which is in that harness). A
+group counts when all hold:
 
 - at least 5 trials;
 - a 95 percent Wilson lower bound of at least 0.5 (5 of 5 gives 0.566; 4 of 5
@@ -54,10 +56,12 @@ Trials are grouped by skill, model, the skill digest recorded with the trial
   a must-fail control (a held-out check with `mutants`, M58);
 - the group's digest is the skill's current digest. A changed card or
   document, including a knowledge document added later, makes the group stale;
-- the group's harness is the current default harness (`harness_sha256()`). A
-  changed harness setting or harness code file makes the group stale, and a
-  trial that records no harness ("harness not recorded", a record written
-  before M73) never counts.
+- the group's harness is the current default harness at the group's CLI
+  version (`harness_sha256(cli=...)`). A changed harness setting or harness
+  code file makes the group stale, and a trial that records no harness
+  ("harness not recorded", a record written before M73) never counts. Trials
+  on two Claude Code versions are two groups, never pooled; a version that
+  could not be read (`unknown`) never counts.
 
 Each group in `capability/levels.json` lists its records, cases, counts
 (`n`, `passed`, `unjudged`) and every reason it does not count.
@@ -85,7 +89,7 @@ judge run on a tool-judged case is a failure even when its result says passed;
 a changed card or a
 later document makes it stale; replays, attestations, trials of a case not
 judged by a tool and trials run without knowledge documents (either label)
-never count; a changed harness makes the group stale and a trial with no harness recorded never counts (M73); a case's other skills get nothing; nothing is Proven;
+never count; a changed harness makes the group stale and a trial with no harness recorded never counts (M73); trials on two CLI versions are two groups, a CLI version edited on the trials is stale, and an unread one never counts; a case's other skills get nothing; nothing is Proven;
 Knowledge needs a check record by a different session, with sources, naming the
 current document.
 

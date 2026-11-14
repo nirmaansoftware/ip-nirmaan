@@ -170,3 +170,11 @@ def test_every_trial_records_its_harness_on_the_result_and_each_answer(nirmaan_o
     ablation = load_record(record_run(nirmaan_org, [case], None, trials=1, repo=ROOT, out=tmp_path,
                                       clock=fixed_clock, knowledge=False, attempts=2))
     assert ablation.trials[0].result.harness == harness_sha256(attempts=2, knowledge=False)
+
+
+def test_the_cli_version_is_a_run_option_in_the_fingerprint():
+    # The claude-code runtime's behaviour depends on the Claude Code version, so the version is in the harness.
+    default = harness_sha256()
+    assert fingerprint(cli="2.1.325")["run"]["cli"] == "2.1.325" and fingerprint()["run"]["cli"] is None
+    assert len({default, harness_sha256(cli="2.1.311"), harness_sha256(cli="2.1.325")}) == 3
+    assert harness_sha256(cli="2.1.325") == harness_sha256(cli="2.1.325")

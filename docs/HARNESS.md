@@ -63,31 +63,43 @@ put in `CODE` or in that list, and those four files may not gain a constant.
 
 ## The fingerprint
 
-`harness_sha256(attempts=None, knowledge=True)` is the sha256 of
+`harness_sha256(attempts=None, knowledge=True, cli=None)` is the sha256 of
 `fingerprint()`: format, version, every setting by name and value, the code
-digests, and the run's own options (an `eval run --attempts` override, and
-whether the seat was given its knowledge documents, M67). With no options it
-is the current default harness.
+digests, and the run's own options (an `eval run --attempts` override,
+whether the seat was given its knowledge documents, M67, and `cli`, the
+version of the command-line program the runtime calls the model through).
+With no options it is the current default harness.
+
+`cli` is the Claude Code version on the claude-code runtime and None on every
+other. The runtime asks `claude --version` once per seat runtime, so once per
+trial (`ClaudeCodeLLM.cli_version`), before the seat runs; the trial records
+it as `EvalResult.cli` and it is in the harness on the result and on every
+answer. A version that cannot be read is recorded as `unknown`.
 
 Every eval trial records it: `EvalResult.harness` and `RecordedAnswer.harness`
-on each answer, written by `record_trial` and `evaluate`. A record written
-before this milestone has neither.
+on each answer, written by `record_trial` and `evaluate`, with `EvalResult.cli`
+beside it. A record written before this milestone has neither.
 
 ## How levels use it
 
-`practised()` groups trials by skill, model, skill digest and harness. A
-trial's harness is the one on its result when every answer records the same
-one; otherwise it has none. Each group in `capability/levels.json` shows its
-`harness`, and:
+`practised()` groups trials by skill, model, skill digest, harness and CLI
+version. A trial's harness is the one on its result when every answer records
+the same one; otherwise it has none. Each group in `capability/levels.json`
+shows its `harness` and `cli`, and:
 
-- a group whose harness is not the current default is stale ("stale: the
-  harness changed after these trials") and never counts, as a group whose skill
+- a group whose harness is not the current default at the group's own CLI
+  version (`harness_sha256(cli=...)`) is stale ("stale: the harness changed
+  after these trials") and never counts, as a group whose skill
   digest changed is stale. A run with `--attempts` (any value, even 1: the
   override is recorded as given, since what it changes depends on the stage)
   or without knowledge is a different harness, so it never pools with the
   default;
 - a group with no harness ("harness not recorded") never counts. No live
-  record exists yet (only replays, which never count), so nothing is lost.
+  record exists yet (only replays, which never count), so nothing is lost;
+- trials on two Claude Code versions have two harnesses, so they are two
+  groups, like trials on two models, and never pool. A version edited on the
+  trials no longer matches the harness it entered, so the group is stale; a
+  group whose version is `unknown` never counts.
 
 Five trials under one harness and three under another are two groups, never
 eight trials. Knowledge levels come from check records, not trials, and are
@@ -111,10 +123,32 @@ in the same pull request.
   for, not the first key of Claude Code's `modelUsage` (a side call on a small
   model was listed first). A `CODE` file changed, so the fingerprint changed.
   No live record existed, so no group went stale.
+- 2026-11-14, gate input contracts and the CLI version, in one change so the
+  fingerprint changes once:
+  - `runtime/context.py`, `runtime/prompt.py`: a work prompt states, after
+    each evidence requirement the platform runs over the seat's files, the
+    input contract of each of its tools: every parameter the requirement
+    fills, whether it takes one path or a list, whether it is required, the
+    tool's own description of it, and which file kinds fill it, with "submit
+    exactly one" where a one-path parameter is filled from the seat's files.
+    It is generated from the tool's definition (`ToolSpec.params`, carried in
+    the packet as `TaskScope.gates`) and the requirement's `FileInput`
+    bindings, never written per case, so a new tool is covered with no core
+    change. Cause: in the pilot's live batch, 3 of 5 rr-arbiter trials wrote
+    two `.sby` files and `formal.run` and `formal.cover` refused them before
+    review ("sby takes one path, not a list"); nothing the seat read said so.
+    The review prompt is unchanged: a reviewer submits no files.
+  - `runtime/harness.py`, `runtime/claude_code.py`, `evals/runner.py`,
+    `evals/records.py`, `evals/levels.py`: the Claude Code version is a run
+    option of the fingerprint (above). Cause: the CLI went from 2.1.311 to
+    2.1.325, and trials from the two would have pooled.
+  `CODE` files changed, so the fingerprint changed. No live record is
+  committed, so no group went stale.
 
 ## What is not the harness
 
-- The model: its own group key, recorded on the trial. On the claude-code
+- The model: its own group key, recorded on the trial. The program the
+  runtime calls it through is the harness: its version is a run option. On the claude-code
   runtime it is the model asked for when Claude Code reports it, never the
   first key of `modelUsage` (`docs/LIVE_EVAL_EVIDENCE.md`).
 - The skill card and knowledge document: the skill digest (M58).
@@ -140,6 +174,17 @@ disagree, never counts. `tests/test_review_teams.py`: `harness.py`,
 `evals/levels.py` and each file in `CODE` (read from `CODE`, so a new entry
 is checked too) is listed in the control-plane class, and a change to it is
 classified control-plane.
+
+Since M73: `tests/test_harness.py` also checks that the CLI version is a run
+option; `tests/test_nirmaan_claude_code.py`, with fake `claude` executables
+reporting 2.1.311 and 2.1.325, that the version is read, asked once per seat
+runtime, and in the harness of every trial and answer, two versions making two
+harnesses; `tests/test_capability_levels.py` that two versions are two groups
+never pooled, an edited version is stale and an unread one never counts;
+`tests/test_gate_contracts.py` that the rr-arbiter seat is told each proof
+gate takes one `.sby`, that every planned seat gets a contract for every gate
+tool its stage runs, that every gate tool declares the parameters its files
+fill, and that a new tool gets its contract with no core change.
 
 ## Not in this milestone
 

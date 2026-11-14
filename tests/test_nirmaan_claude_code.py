@@ -154,3 +154,78 @@ def test_an_evaluation_runs_on_the_claude_code_runtime(nirmaan_org, fixed_clock,
                       clock=fixed_clock)
     assert result.runtime == "claude-code" and result.model_calls == 1 and result.output_tokens == 345
     assert result.cost_usd is None and not result.passed
+
+
+# --- The CLI version is in the harness ----------------------------------------------------------
+
+
+def _versioned_claude(where: Path, version: str) -> tuple[Path, Path]:
+    """A ``claude`` that prints ``<version> (Claude Code)`` for ``--version`` and logs each such call."""
+    where.mkdir(parents=True, exist_ok=True)
+    log = where / "versions.log"
+    script = where / "claude"
+    script.write_text(f"""#!/usr/bin/env python3
+import sys
+if sys.argv[1:] == ["--version"]:
+    open({str(log)!r}, "a").write("asked\\n")
+    print({version + " (Claude Code)"!r})
+    sys.exit(0)
+sys.stdin.read()
+sys.stdout.write({json.dumps(_result("unusable"))!r})
+""")
+    script.chmod(script.stat().st_mode | stat.S_IEXEC)
+    return script, log
+
+
+@pytest.mark.parametrize("stdout, code, version", [
+    ("2.1.325 (Claude Code)\n", 0, "2.1.325"),
+    ("v2.1.311\n", 0, "2.1.311"),
+    ("Claude Code, a version we cannot read\n", 0, "unknown"),
+    ("2.1.325 (Claude Code)\n", 1, "unknown"),
+    ("", 0, "unknown"),
+])
+def test_the_version_is_the_dotted_number_claude_prints_first(tmp_path, stdout, code, version):
+    from nirmaan.runtime.claude_code import read_version
+
+    script = tmp_path / "claude"
+    script.write_text(f"#!/usr/bin/env python3\nimport sys\nsys.stdout.write({stdout!r})\nsys.exit({code})\n")
+    script.chmod(script.stat().st_mode | stat.S_IEXEC)
+    assert read_version(str(script)) == version
+    assert read_version(str(tmp_path / "no-such-claude")) == "unknown"
+
+
+def test_the_version_is_asked_once_per_seat_runtime(tmp_path):
+    script, log = _versioned_claude(tmp_path, "2.1.325")
+    llm = ClaudeCodeLLM(executable=str(script))
+    assert llm.cli_version() == "2.1.325" and llm.cli_version() == "2.1.325"
+    assert log.read_text().splitlines() == ["asked"]
+
+
+def test_with_no_executable_there_is_no_version(monkeypatch):
+    monkeypatch.delenv("NIRMAAN_CLAUDE_CODE", raising=False)
+    monkeypatch.setenv("PATH", "/nonexistent")
+    assert ClaudeCodeLLM().cli_version() is None
+
+
+def test_trials_on_two_claude_code_versions_record_two_harnesses(nirmaan_org, fixed_clock, tmp_path, monkeypatch):
+    # Claude Code went from 2.1.311 to 2.1.325: a trial on each records its version, and the version is in the
+    # harness on its result and on every answer, so the two never pool in a level.
+    from test_nirmaan_evals import _spec_case
+
+    from nirmaan.evals import load_case, load_record, record_run
+    from nirmaan.runtime.harness import harness_sha256
+
+    case = load_case(_spec_case(tmp_path, []))
+    recorded = {}
+    for version in ("2.1.311", "2.1.325"):
+        script, log = _versioned_claude(tmp_path / version, version)
+        monkeypatch.setenv("NIRMAAN_CLAUDE_CODE", str(script))
+        record = load_record(record_run(nirmaan_org, [case], "claude-code", trials=2, repo=tmp_path,
+                                        out=tmp_path / "out", clock=fixed_clock))
+        assert len(log.read_text().splitlines()) == 2  # once per trial's seat runtime, not once per call
+        for trial in record.trials:
+            assert trial.result.cli == version and trial.answers
+            assert trial.result.harness == harness_sha256(cli=version)
+            assert all(a.harness == trial.result.harness for a in trial.answers)
+        recorded[version] = record.trials[0].result.harness
+    assert len({*recorded.values(), harness_sha256()}) == 3

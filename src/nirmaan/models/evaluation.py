@@ -132,6 +132,9 @@ class EvalResult(BaseModel):
     #: M73: the harness the seat ran in (``nirmaan.runtime.harness.harness_sha256``). None in a record written
     #: before M73: such a trial never counts toward an evidence level.
     harness: str | None = None
+    #: The version of the command-line program the runtime called the model through (the claude-code
+    #: runtime's ``claude --version``), as it entered ``harness``; None for a runtime that calls none.
+    cli: str | None = None
 
 
 class RecordedAnswer(BaseModel):

@@ -20,7 +20,11 @@ How the call is kept honest and clean:
   list first), else the one that wrote the most output (``answered_by``);
 * tokens are recorded as Claude Code reports them, and the cost as unknown:
   a subscription has no per-call price, and its ``total_cost_usd`` is an
-  API-equivalent estimate, not a charge.
+  API-equivalent estimate, not a charge;
+* the version of Claude Code it runs is asked once per seat runtime
+  (``claude --version``, :meth:`ClaudeCodeLLM.cli_version`) and enters the
+  harness fingerprint of every trial on it, so trials from two versions are
+  two harnesses and never pool (``docs/HARNESS.md``).
 
 The executable is ``NIRMAAN_CLAUDE_CODE`` or ``claude`` on PATH; the model is
 ``NIRMAAN_CLAUDE_CODE_MODEL`` or the model profiles' ``DEFAULT_MODEL`` (Claude Opus 5.5). With no executable, the seat
@@ -32,6 +36,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -43,11 +48,31 @@ from nirmaan.runtime.model import NO_CALL, Completion, ModelRuntime
 from nirmaan.runtime.prompt import WorkPrompt
 
 PROVIDER = "claude-code"
+#: What a version is recorded as when ``claude --version`` gives none; a trial with it never counts.
+UNKNOWN_VERSION = "unknown"
+_VERSION = re.compile(r"\s*v?(\d+(?:\.\d+)+)")
 
 
 def find_claude() -> str | None:
     """The Claude Code executable: ``NIRMAAN_CLAUDE_CODE`` if set, else ``claude`` on PATH."""
     return os.environ.get("NIRMAAN_CLAUDE_CODE") or shutil.which("claude")
+
+
+def read_version(executable: str) -> str:
+    """The version ``executable --version`` prints first (``2.1.325 (Claude Code)`` gives ``2.1.325``).
+
+    Run like a seat's call: in an empty temporary directory, without the cleared credentials. Anything that
+    does not start with a dotted version number, or a run that fails, is ``UNKNOWN_VERSION``.
+    """
+    env = {k: v for k, v in os.environ.items() if k not in harness.CLAUDE_CODE_CLEARED_ENV}
+    with tempfile.TemporaryDirectory(prefix="nirmaan-claude-code-") as cwd:
+        try:
+            proc = subprocess.run([executable, "--version"], capture_output=True, text=True, cwd=cwd, env=env,
+                                  timeout=60)
+        except (OSError, subprocess.TimeoutExpired):
+            return UNKNOWN_VERSION
+    found = _VERSION.match(proc.stdout or "") if proc.returncode == 0 else None
+    return found.group(1) if found else UNKNOWN_VERSION
 
 
 def _int(value) -> int | None:
@@ -81,6 +106,16 @@ class ClaudeCodeLLM:
         self._executable = executable
         self.model = model or os.environ.get("NIRMAAN_CLAUDE_CODE_MODEL") or DEFAULT_MODEL
         self.timeout = harness.CLAUDE_CODE_TIMEOUT if timeout is None else timeout
+        self._versions: dict[str, str] = {}
+
+    def cli_version(self) -> str | None:
+        """The Claude Code version this seat runs, asked once (``claude --version``); None with no executable."""
+        executable = self._executable or find_claude()
+        if not executable:
+            return None
+        if executable not in self._versions:
+            self._versions[executable] = read_version(executable)
+        return self._versions[executable]
 
     def complete(self, prompt: WorkPrompt) -> Completion:
         from nirmaan.integrations.veritriage import render_parts

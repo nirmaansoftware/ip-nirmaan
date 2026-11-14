@@ -63,7 +63,7 @@ def _record(org, repo: Path, outcomes: list[bool], *, name: str = "run1", case_i
             replay: bool = False, attest: bool = False, rejudge: bool | None = True,
             digest: str | None = None, judged: bool = True, knowledge: str = "on",
             trial_knowledge: str | None = None, harness_digest=CURRENT,
-            answer_harness=CURRENT, blocked: frozenset[int] = frozenset()) -> Path:
+            answer_harness=CURRENT, blocked: frozenset[int] = frozenset(), cli: str | None = None) -> Path:
     record = repo / "evals" / "results" / name
     record.mkdir(parents=True)
     manifest = EvalRunManifest(id=name, runtime="claude-code", model=MODEL, replay=replay, nirmaan_version="t",
@@ -75,7 +75,7 @@ def _record(org, repo: Path, outcomes: list[bool], *, name: str = "run1", case_i
     digest = digest or skill_digest(org, SKILL, repo, knowledge=trial_knowledge == "on")
     # M73: as record_run writes it, on the result and on every answer.
     if harness_digest is CURRENT:
-        harness_digest = harness_sha256(knowledge=trial_knowledge == "on")
+        harness_digest = harness_sha256(knowledge=trial_knowledge == "on", cli=cli)
     if answer_harness is CURRENT:
         answer_harness = harness_digest
     for number, passed in enumerate(outcomes, start=1):
@@ -88,7 +88,7 @@ def _record(org, repo: Path, outcomes: list[bool], *, name: str = "run1", case_i
                             passed=passed and not stopped, audit_ok=True, sandbox="s",
                             attestations=("dv_ran",) if attest else (),
                             scores=(Score(scorer="held-out-run", name="reference testbench", status=status),),
-                            harness=harness_digest)
+                            harness=harness_digest, cli=cli)
         runs = (JudgeRun(check="reference testbench", run=f"run-{number}", tool="simulator.run",
                          succeeded=passed),) if judged and not stopped else ()
         trial = EvalTrial(record=name, trial=number, stage="rtl-implementation", model=MODEL,
@@ -339,6 +339,39 @@ def test_a_trial_with_no_harness_recorded_never_counts(org, tmp_path, result, an
     [group] = entry["practised"]
     assert entry["level"] is None and group["harness"] is None
     assert group["reasons"] == ["harness not recorded: the trials carry no harness, or their answers disagree"]
+
+
+def test_trials_on_two_cli_versions_are_two_groups_never_pooled(org, tmp_path):
+    # The claude-code runtime's Claude Code version is in the harness: three trials on 2.1.311 and three on
+    # 2.1.325 are two groups of three, never six, so neither counts.
+    _case(tmp_path)
+    _record(org, tmp_path, [True] * 3, name="old-cli", cli="2.1.311")
+    _record(org, tmp_path, [True] * 3, name="new-cli", cli="2.1.325")
+    entry = _level(org, tmp_path)
+    groups = {g["cli"]: g for g in entry["practised"]}
+    assert set(groups) == {"2.1.311", "2.1.325"} and entry["level"] is None
+    assert groups["2.1.311"]["harness"] == harness_sha256(cli="2.1.311") != groups["2.1.325"]["harness"]
+    assert all(g["n"] == 3 and g["reasons"][0] == "3 trials, fewer than 5" for g in groups.values())
+    # Five more on the new version make that group count on its own; the old group stays apart.
+    _record(org, tmp_path, [True] * 2, name="new-cli-more", cli="2.1.325")
+    groups = {g["cli"]: g for g in _level(org, tmp_path)["practised"]}
+    assert groups["2.1.325"]["n"] == 5 and groups["2.1.325"]["counts"] and groups["2.1.311"]["n"] == 3
+
+
+def test_a_cli_version_edited_on_the_trials_is_stale(org, tmp_path):
+    # The version is checked through the harness it entered: editing the field leaves the harness of the other.
+    _case(tmp_path)
+    _record(org, tmp_path, [True] * 5, cli="2.1.325", harness_digest=harness_sha256(cli="2.1.311"))
+    [group] = _level(org, tmp_path)["practised"]
+    assert not group["counts"] and group["reasons"] == ["stale: the harness changed after these trials "
+                                                        "(docs/HARNESS.md)"]
+
+
+def test_a_cli_version_that_could_not_be_read_never_counts(org, tmp_path):
+    _case(tmp_path)
+    _record(org, tmp_path, [True] * 5, cli="unknown")
+    [group] = _level(org, tmp_path)["practised"]
+    assert not group["counts"] and group["reasons"] == ["the CLI version the trials ran was not read"]
 
 
 def test_only_the_cases_own_skills_get_credit(org, tmp_path):
