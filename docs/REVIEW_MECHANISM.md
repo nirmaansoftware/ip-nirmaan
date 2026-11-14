@@ -417,7 +417,9 @@ the pass logs that GitHub or the network is unreachable and stops nothing.
 Founder Proxy) was deferred only by a rate limit (the plan's session,
 5-hour, weekly or usage limit in any of its wordings, such as "You've hit
 your 5-hour limit", told by the call's outcome or by the text of the failed
-call, or a 429, after its one retry), or by a limit and passing faults
+call, or a 429, after its one retry; an overloaded model, a 529 or
+"experiencing high load", counts too, and so does the result's
+`api_error_status` 429 or 529 whatever the text says), or by a limit and passing faults
 together, or the fixer hits one, the
 loop does not label the pull request and does not stop. The key's check
 stays pending, nothing is pushed, and the pass ends. Then the loop makes no
