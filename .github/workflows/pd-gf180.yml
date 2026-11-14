@@ -119,17 +119,14 @@ jobs:
           wanted = {"gf180mcuC/libs.tech/magic/gf180mcuC.tech", "gf180mcuC/libs.tech/netgen/gf180mcuC_setup.tcl",
                     f"{lib}/spice/gf180mcu_fd_sc_mcu9t5v0.spice", f"{lib}/techlef/gf180mcu_fd_sc_mcu9t5v0__nom.tlef",
                     f"{lib}/lef/gf180mcu_fd_sc_mcu9t5v0.lef", f"{lib}/gds/gf180mcu_fd_sc_mcu9t5v0.gds"}
-          seen = []
           for archive in ("common", "sc"):
               path = os.path.join(os.environ["RUNNER_TEMP"], f"{archive}.tar.zst")
               with open(path, "rb") as f, tarfile.open(fileobj=zstandard.ZstdDecompressor().stream_reader(f), mode="r|") as tar:
                   for member in tar:
-                      if member.name.startswith(f"{lib}/") and ("__" not in member.name or member.name.endswith(".tlef")):
-                          seen.append(member.name)
                       if member.name in wanted and member.isfile():
                           tar.extract(member, sys.argv[1], filter="data")
                           wanted.discard(member.name)
-          sys.exit(f"missing from the release: {sorted(wanted)}; under {lib}: {sorted(seen)[:80]}" if wanted else 0)
+          sys.exit(f"missing from the release: {sorted(wanted)}" if wanted else 0)
           PY
       - name: gf180mcuC files into the PDK root
         run: |

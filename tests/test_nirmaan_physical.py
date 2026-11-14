@@ -507,6 +507,22 @@ def test_pnr_stages_follow_stop_after(project, tmp_path, monkeypatch):
     assert not bad.succeeded and "stop_after" in bad.summary
 
 
+def test_pnr_writes_the_layout_before_extraction(project, tmp_path, monkeypatch):
+    """M81: OpenRCX drops the router's minimum-area patches, so the DEF and netlists are written before it."""
+    bin_dir = tmp_path / "bin"
+    fake_tool(bin_dir, "openroad", f"cat '{PD / 'openroad_route.log'}'")
+    only_on_path(monkeypatch, bin_dir)
+    pdk = fake_pdk(tmp_path / "pdk", rc=True)
+    (tmp_path / "pdk" / "rcx.rules").write_text("stand-in\n", encoding="utf-8")
+    params = {"netlist": str(AXI), "sdc": str(SDC), "top": TOP, **pdk, **PNR_PDK,
+              "rcx_rules": str(tmp_path / "pdk" / "rcx.rules")}
+    invoke(project, "pnr.run", params, tmp_path / "x")
+    script = (tmp_path / "x" / "pnr.tcl").read_text()
+    route_done, extract = script.index("nirmaan-stage-done: route"), script.index("nirmaan-stage: extract")
+    for line in ("write_def route.def", "write_verilog final.v", "write_verilog -include_pwr_gnd final_pg.v"):
+        assert route_done < script.index(line) < extract and script.count(line) == 1, line
+
+
 def test_sta_falls_back_to_openroads_embedded_opensta(project, tmp_path, monkeypatch):
     bin_dir = tmp_path / "bin"
     fake_tool(bin_dir, "openroad", f"cat '{PD / 'opensta_met.log'}'")

@@ -122,30 +122,6 @@ def test_sync_fifo_from_rtl_to_drc_and_lvs_on_gf180mcu(project, tmp_path, monkey
     clean, c_outcome = invoke(project, "pv.run", magic_pv, tmp_path / "pv_magic", bounds=SIGNOFF)
     cm = c_outcome.data["result"]["metrics"]
     print(f"pilot magic-netgen: {clean.summary}")
-    if cm["drc_violations"]:  # TEMPORARY diagnostic, removed before review: where the router's patches go
-        import shutil as sh
-        import subprocess
-        src = tmp_path / "pnr"
-        work = tmp_path / "pnr_diag"
-        sh.copytree(src, work)
-        script = (work / "pnr.tcl").read_text().splitlines()
-        marks = {"detailed_route": "d1", "filler_placement": "d2", "check_antennas": "d3", "global_connect": "d4",
-                 "extract_parasitics": "d5"}
-        outl = []
-        for ln in script:
-            outl.append(ln)
-            for key, name in marks.items():
-                if ln.strip().startswith(key):
-                    outl.append(f"write_def {name}.def")
-        (work / "pnr.tcl").write_text("\n".join(outl) + "\n")
-        r = subprocess.run(["openroad", "-no_init", "-no_splash", "-exit", "pnr.tcl"], cwd=work, capture_output=True,
-                           text=True)
-        print("diag openroad rc", r.returncode, [ln for ln in r.stdout.splitlines() if "patch" in ln.lower()][:5])
-        for name in [*marks.values(), "route"]:
-            f = work / f"{name}.def"
-            if f.is_file():
-                d = f.read_text()
-                print(f"diag {name}.def RECT in NETS:", d[d.index("\nNETS "):].count("RECT"))
     assert cm["drc_violations"] == 0 and cm["lvs_mismatches"] == 0 and cm["gds_empty_cells"] == 0, clean.summary
     assert cm["magic_drc_style"] == "drc(full)" and cm["gds_shapes_skipped"] == 0, clean.summary
     assert cm["netgen_final"] == "Final result: Circuits match uniquely.", clean.summary

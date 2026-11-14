@@ -487,6 +487,10 @@ def _pnr_steps(job: Job) -> list[list[str]]:
             _SUPPLY_NETS,
             *(["foreach net $nirmaan_supplies { check_power_grid -net $net }"] if grid else []),
             *ir])
+        # M81: the layout is written here, before extraction: OpenRCX reorders the routed wires and drops the
+        # router's minimum-area patches, so a DEF written after it lost every patch (252 on the GF180MCU
+        # pilot, which Magic then found as Metal2 and Metal3 islands under the minimum area).
+        script += _layout_outputs("route")
     if "extract" in plan:
         rules = pdk_paths(p, "rcx_rules")[0]
         script += _stage("extract", ["define_process_corner -ext_model_index 0 X",
@@ -498,13 +502,19 @@ def _pnr_steps(job: Job) -> list[list[str]]:
     parasitics = {"place": ["estimate_parasitics -placement"], "cts": ["estimate_parasitics -placement"],
                   "route": ["estimate_parasitics -global_routing"]}.get(last, [])
     script += _stage("timing", [*parasitics, *_timing_reports()])
-    final = "route" if last == "extract" else last
-    script.append(f"write_def {final}.def")
-    if final == "route":
-        # M34: and the same netlist with every supply pin connected, the reference LVS compares against.
-        script += ["write_verilog final.v", "write_verilog -include_pwr_gnd final_pg.v"]
+    if "route" not in plan:
+        script += _layout_outputs(last)
     (job.workdir / "pnr.tcl").write_text("\n".join(script) + "\n", encoding="utf-8")
     return [["openroad", "-no_init", "-no_splash", "-exit", "pnr.tcl"]]
+
+
+def _layout_outputs(final: str) -> list[str]:
+    """The layout as the last layout stage left it; after routing, M34: and the same netlist with every supply
+    pin connected, the reference LVS compares against."""
+    outputs = [f"write_def {final}.def"]
+    if final == "route":
+        outputs += ["write_verilog final.v", "write_verilog -include_pwr_gnd final_pg.v"]
+    return outputs
 
 
 def _planned_stages(workdir: Path) -> list[str]:
