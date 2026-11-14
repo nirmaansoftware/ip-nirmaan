@@ -23,6 +23,7 @@ import pytest
 
 from test_block_verification import EVERYTHING, NOT_BLOCK_VERIFICATION, PLAIN, RANDOM, SV, UNBOUNDED
 from test_nirmaan_applicability_golden import REQUESTS
+from test_repro_gates import NOT_REPRODUCTION, ROOT_CAUSE, TRIAGE
 from test_org_span import ACTIVE_AT_M60
 
 from nirmaan.company import builder, org_chart
@@ -146,13 +147,18 @@ INTENDED = {
     ("ws.formal", "owner", "verification.formal.proof.manager", "verification.formal.director"),
     ("ws.formal", "unit", "verification.formal.proof", "verification.formal"),
     ("equivalence", "approver", "verification.formal.proof.tech_lead", "verification.formal.equivalence.tech_lead"),
+    # With a reproduction (M71), triage carries failure_triage and goes to the Triage team, so the debug work
+    # stream spans two Debug and Regression teams and their director leads it.
+    ("ws.debug", "owner", "verification.debug.analysis.manager", "verification.debug.director"),
+    ("ws.debug", "unit", "verification.debug.analysis", "verification.debug"),
     # The coverage gate goes to the first approver in the coverage owner's chain: now the Simulation director.
     *{("coverage.gate", field, "verification.vp", "verification.dynamic.director") for field in ("owner", "approver")},
     ("coverage.gate", "unit", "verification", "verification.dynamic"),
 }
 
 BLOCK_VERIFICATION = (PLAIN, SV, RANDOM, UNBOUNDED, EVERYTHING)
-ALL_REQUESTS = tuple(dict.fromkeys((*REQUESTS, *NOT_BLOCK_VERIFICATION, *BLOCK_VERIFICATION)))
+ALL_REQUESTS = tuple(dict.fromkeys((*REQUESTS, *NOT_BLOCK_VERIFICATION, *BLOCK_VERIFICATION, ROOT_CAUSE, TRIAGE,
+                                    *NOT_REPRODUCTION)))
 
 _ID = re.compile(r"verification(?:\.[a-z_]+)+")
 
@@ -255,9 +261,11 @@ def test_the_frozen_active_list_moved_with_the_units(nirmaan_org):
     old = _pre_cut_org()
     was_active = {u.id for u in old.subtree("verification") if u.status is UnitStatus.ACTIVE}
     listed = {u for u in ACTIVE_AT_M60 if u == "verification" or u.startswith("verification.")}
-    active_departments = {u for u in DEPARTMENTS if nirmaan_org.units[u].status is UnitStatus.ACTIVE}
-    assert active_departments == set(DEPARTMENTS) - {"verification.processor"}
-    assert listed == {MOVES[u] for u in was_active} | active_departments
+    # Renames only: the list never gains a unit, so the four ACTIVE departments pass as grouping units
+    # (tests/test_org_span.py), and the reused ids verification.formal and verification.debug left it.
+    assert len(was_active) == len(listed) == 26
+    assert listed == {MOVES[u] for u in was_active}
+    assert not listed & set(DEPARTMENTS)
 
 
 # --- Nothing else moves -------------------------------------------------------------------------------------

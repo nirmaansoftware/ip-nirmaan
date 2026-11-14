@@ -1,7 +1,9 @@
 # The ACTIVE units when the activation rule took effect (M60, after M57). Frozen: a unit made ACTIVE later
-# must show a skill with an AVAILABLE tool and an eval case judged by it (tests/test_org_span.py).
-# Wave 2 (the five-department cut of Verification) moved the verification units to their new IDs and added
-# the four active departments that group them; tests/test_verification_departments.py checks the move.
+# must show a skill with an AVAILABLE tool and an eval case judged by it, or pass as a grouping unit
+# (tests/test_org_span.py).
+# Wave 2 (M77, the five-department cut of Verification) renamed the verification units through MOVES in
+# tests/test_verification_departments.py. Renames only: the list never gains a unit, and an id reused for a
+# different unit leaves it (council record 2026-11-14-g13-grouping-units).
 architecture
 architecture.interface
 architecture.interface.ace
@@ -182,7 +184,6 @@ software.tools.sdk
 software.tools.utilities
 software.validation
 verification
-verification.debug
 verification.debug.analysis
 verification.debug.analysis.intelligence
 verification.debug.analysis.logs
@@ -190,7 +191,6 @@ verification.debug.analysis.root_cause
 verification.debug.analysis.waveforms
 verification.debug.regression
 verification.debug.triage
-verification.dynamic
 verification.dynamic.coverage
 verification.dynamic.coverage.assertion
 verification.dynamic.coverage.code
@@ -200,14 +200,12 @@ verification.dynamic.testbench.systemverilog
 verification.dynamic.testbench.testing
 verification.dynamic.testbench.uvm
 verification.dynamic.testbench.vip
-verification.formal
 verification.formal.cdc
 verification.formal.equivalence
 verification.formal.proof
 verification.formal.proof.coverage
 verification.formal.proof.model_checking
 verification.formal.proof.property
-verification.methodology
 verification.methodology.architecture
 verification.methodology.planning
 verification.methodology.signoff

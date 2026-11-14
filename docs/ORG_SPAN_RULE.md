@@ -68,22 +68,36 @@ should not depend on; the test passes it.
 ## 4. The activation rule
 
 A unit added after the record enters as PLACEHOLDER. It becomes ACTIVE only
-in a pull request that shows one of its own skills uses an AVAILABLE tool and
-has an eval case judged by that tool: the case names the skill (`skills`, M58)
-and a held-out check runs that tool (`tool` or `cover_tool`).
+in a pull request that shows either (a) one of its own skills uses an
+AVAILABLE tool and has an eval case judged by that tool: the case names the
+skill (`skills`, M58) and a held-out check runs that tool (`tool` or
+`cover_tool`); or (b) it is a grouping unit: it has no skills, tools, ladder
+or explicit roles of its own; at least one of its children is ACTIVE, and
+every ACTIVE child is in the frozen list or meets (a); and its head
+(`Organization.head_of`) holds no capability or tool that the head of its
+parent unit does not hold. A new grouping unit never counts as the ACTIVE
+child of another new grouping unit, and PLACEHOLDER children are allowed. A
+grouping unit that gains a skill, tool, ladder or explicit role must then
+meet (a). This is record item 10 as amended by the council record
+`council/records/2026-11-14-g13-grouping-units.md`.
 
 The units that were ACTIVE when the rule took effect are frozen in
 `tests/fixtures/org/active-units-m60.txt` (205 units, after M57, including the
 two active teams M57 added under record item 6). The test fails on any ACTIVE
-unit outside that list that is not backed this way. The list is never
-extended by hand: a unit made ACTIVE later passes by its eval case, not by
-being added. The test pins the list's count and a sha256 of its sorted ids,
-so any edit to the file fails until the pin changes in the same pull request,
-where review sees it. Removing a unit from the chart, or moving one, is the
-only reason to edit it. The wave 2 cut of Verification into five departments
-moved its 26 active units to new IDs and added the four active departments
-that group them (209 units); `tests/test_verification_departments.py` checks
-that the list changed by exactly that move.
+unit outside that list that meets neither (a) nor (b), and names the
+condition it fails. The list never gains a unit: a unit made ACTIVE later
+passes by its eval case or as a grouping unit, not by being added. It changes
+only when a unit in it is removed or moved, and an id reused for a different
+unit leaves it. The test pins the list's count and a sha256 of its sorted
+ids, so any edit to the file fails until the pin changes in the same pull
+request, where review sees it. The wave 2 cut of Verification into five
+departments (M77) renamed its 26 active units and added none (still 205
+units): the four ACTIVE departments pass as grouping units, and the units
+that had the reused ids `verification.formal` and `verification.debug` are in
+the list under their new ids. `tests/test_verification_departments.py`
+checks that the list changed by exactly those renames, and the record's
+must-fail fixtures N1 to N9 in `tests/test_org_span.py` each break one
+condition of (b).
 
 The rule lives in the test, not in `org/`, because it reads the eval cases in
 `evals/`, and the organization layer does not depend on the evals package.

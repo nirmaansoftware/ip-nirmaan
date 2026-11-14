@@ -123,6 +123,7 @@ new number. M1 to M42 are taken; see `docs/history/README.md`.
 | M68 | Block verification: a workflow with DV gates over an existing block's RTL | reserved |
 | M71 | Repro gates: triage and root cause reproduce the failure on the handed-over RTL | reserved |
 | M73 | The harness in one place, and its fingerprint on every trial | reserved |
+| M77 | Verification in five departments (wave 2, W2-O1); number reserved after the branch was cut | reserved |
 
 <!-- review:milestone-numbers:end -->
 

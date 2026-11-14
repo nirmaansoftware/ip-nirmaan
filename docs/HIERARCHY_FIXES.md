@@ -124,6 +124,24 @@ regression team's tech lead; the verification work stream of a regression
 investigation is led by the regression manager (or the VP, when it spans
 other verification teams); proof plus equivalence work is led by the Formal
 and Static director, and equivalence work is approved by its own tech lead;
-the coverage gate is approved by the Simulation director; and a department
-director joins each verification escalation path below the VP. The site
-hero's role titles do not change.
+on a regression investigation asked for a reproduction (M71), the debug work
+stream spans the Debug Analysis and Triage teams, so the Debug and Regression
+director leads it; the coverage gate is approved by the Simulation director;
+and a department director joins each verification escalation path below the
+VP. The site hero's role titles do not change.
+
+Activation (M77). Four of the departments (Methodology and Signoff,
+Simulation, Formal and Static, Debug and Regression) have no skills, tools,
+ladder or explicit roles of their own and group units that were ACTIVE at
+M60, so they are ACTIVE as grouping units under record item 10 (b), as
+amended by the council record `council/records/2026-11-14-g13-grouping-units.md`;
+Processor and Accelerator stays a placeholder. Every ACTIVE child of the four
+is in the frozen list, and each director holds nothing the VP does not. The
+frozen list changes by renames only (205 ids, through `MOVES`): the
+departments are not added, and `verification.formal` and `verification.debug`,
+reused for departments, left it, their M60 units now listed as
+`verification.formal.proof` and `verification.debug.analysis`
+(`docs/ORG_SPAN_RULE.md` section 4). The coverage gate's move from the VP to
+the Simulation director stays, pinned in `INTENDED`; routing verification
+signoff so its approver is never the head of the department that produced the
+evidence is a separate wave 2 pull request (record decision 2c).

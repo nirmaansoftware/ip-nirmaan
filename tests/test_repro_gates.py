@@ -82,7 +82,7 @@ def test_a_reproduction_hands_over_the_rtl_and_gates_triage_and_root_cause(reque
 def test_each_debug_seat_carries_its_skill_and_may_run_the_reproduction(request_text, nirmaan_org, fixed_clock):
     engine = Orchestrator(nirmaan_org, clock=fixed_clock).plan(request_text)
     for stage, skill, owner in (("triage", "failure_triage", "verification.debug.triage.engineer"),
-                                ("root-cause", "root_cause_analysis", "verification.debug.root_cause.senior")):
+                                ("root-cause", "root_cause_analysis", "verification.debug.analysis.root_cause.senior")):
         task = _task(engine, stage)
         assert task.owner == owner
         assert "simulator.run" in nirmaan_org.tools_of(owner)
@@ -227,9 +227,14 @@ def test_a_reproduction_changes_only_the_handed_over_rtl_triage_and_root_cause(n
     changed = {tid for tid in before if before[tid] != after[tid]}
     assert {"triage", "root-cause"} <= changed
     # The path through the handed-over RTL is one stage longer, so later tasks' priorities move with it, and
-    # the debug workstream waits on that stage.
+    # the debug workstream waits on that stage. Triage now carries failure_triage and goes to the Triage team, a
+    # sibling of Debug Analysis since M77, so the debug workstream spans both and their director leads it.
+    lead = {"owner", "unit", "escalation_path", "owner_routing"}
+    assert (after["ws.debug"]["owner"], after["ws.debug"]["unit"]) == ("verification.debug.director",
+                                                                       "verification.debug")
     for tid in changed - {"triage", "root-cause"}:
-        assert {k for k in after[tid] if after[tid][k] != before[tid][k]} <= {"priority", "status"}, tid
+        allowed = {"priority", "status"} | (lead if tid == "ws.debug" else set())
+        assert {k for k in after[tid] if after[tid][k] != before[tid][k]} <= allowed, tid
 
 
 # --- The gates, for real, through the eval harness ---------------------------------------------------------
