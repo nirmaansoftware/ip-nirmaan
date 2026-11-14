@@ -91,7 +91,12 @@ shrunk to 0.1 um square at its own corner, under the layer's minimum width
 area rule, with LVS still clean. The clean run must have every fill shape on
 `67/28` to `72/28`, and as many fill shapes in the GDS as in the DEF.
 
-CI_RESULT_PLACEHOLDER
+**Result** (CI run 43608976791, head 6ad04cb, the `physical-design` job): the
+clean run is DRC 0 and LVS clean with every fill shape on 67/28 to 72/28 and as
+many in the GDS as in the DEF; the shrunk fill rectangle fails DRC on its
+layer's width or area rule with LVS clean; the factory line's layout signs off
+again. The job's shard with the sky130hd test took 6.7 minutes against 6.2 on
+`main` (one more `pv.run`).
 
 ## 5. Not in this milestone
 

@@ -33,7 +33,12 @@ rectangle shrunk to 0.1 um square must fail DRC on that layer's width or area
 rule, with LVS clean; the clean run must have every fill shape on 67/28 to
 72/28 and as many in the GDS as in the DEF.
 
-M80_RESULT_PLACEHOLDER
+**Result** (CI run 43608976791, head 6ad04cb, the `physical-design` job): the
+clean run is DRC 0 and LVS clean with every fill shape on 67/28 to 72/28 and as
+many in the GDS as in the DEF; the shrunk fill rectangle fails DRC on its
+layer's width or area rule with LVS clean; the factory line's layout signs off
+again. The job's shard with the sky130hd test took 6.7 minutes against 6.2 on
+`main` (one more `pv.run`).
 
 **Magic still reads no fill layer the KLayout deck reads** (open_pdks puts
 SKY130 fill on mask-numbered 36/28 to 59/28, or datatype 99), so the M79 pilot
