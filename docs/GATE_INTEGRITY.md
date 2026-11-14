@@ -70,6 +70,18 @@ The `rtl_design` skill tells seats to report failures with `$error` or
 and plusargs in the testbench; the prompt goldens show it. DFT's generated
 testbenches have their own result lines and are parsed without a nonce.
 
+**Exception: the cocotb backend.** A `simulator.run` with `backend: cocotb`
+does not print the `NIRMAAN-SIM` nonce line. It reports through cocotb's own
+result summary, and the run records that as a separate verdict. A cocotb pass
+is therefore not a nonce-verified pass, and it must not stand in for one: the
+backends that can answer a testbench-verdict gate are listed in
+`VERDICT_BACKENDS` (`src/nirmaan/models/work.py`), and `ToolRun.answers` is
+true only for those. Policy (`policy.satisfies`) and the engineering checks
+read `answers`, so a cocotb run never satisfies a gate that requires the
+nonce verdict. See `docs/COCOTB.md`. This is a gate-semantics change; its
+owner is verification-lead, and it is recorded here so the contract above is
+not read as covering cocotb.
+
 ---
 
 ## 2. The formal gate (F15, F17)
