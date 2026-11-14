@@ -4,8 +4,9 @@ On main no record exists, so the generator reports zero Knowledge, zero
 Practised and zero Proven, and the committed capability/levels.json says so.
 Fixture repositories show each rule: 5 of 5 tool-judged trials with a clean
 re-judge and a must-fail control make a skill Practised; 4 of 5 do not; a
-changed skill card makes the group stale; replays, attestations, trials not
-judged by a tool and trials run without knowledge documents (M67) never count;
+changed skill card makes the group stale; replays, attestations, trials of a
+case not judged by a tool and trials run without knowledge documents (M67)
+never count, while a blocked trial of a tool-judged case counts as failed;
 a changed harness makes the group stale and a trial with no harness recorded
 never counts (M73); only a case's own skills get credit; Knowledge
 needs a check record by a different session that names the current document.
@@ -26,6 +27,7 @@ from nirmaan.evals import skill_digest
 from nirmaan.evals.levels import (CHECKS, KNOWLEDGE_CHECK_FORMAT, LEVELS, REJUDGE, REJUDGE_FORMAT, compute,
                                   render)
 from nirmaan.evals.records import MANIFEST, trial_path
+from nirmaan.evals.scorers import register_scorer, unregister_scorer
 from nirmaan.models import EvalResult, EvalRunManifest, EvalTrial, JudgeRun, RecordedAnswer, Score, ScoreStatus
 from nirmaan.runtime import harness
 from nirmaan.runtime.harness import harness_sha256
@@ -61,7 +63,7 @@ def _record(org, repo: Path, outcomes: list[bool], *, name: str = "run1", case_i
             replay: bool = False, attest: bool = False, rejudge: bool | None = True,
             digest: str | None = None, judged: bool = True, knowledge: str = "on",
             trial_knowledge: str | None = None, harness_digest=CURRENT,
-            answer_harness=CURRENT) -> Path:
+            answer_harness=CURRENT, blocked: frozenset[int] = frozenset()) -> Path:
     record = repo / "evals" / "results" / name
     record.mkdir(parents=True)
     manifest = EvalRunManifest(id=name, runtime="claude-code", model=MODEL, replay=replay, nirmaan_version="t",
@@ -77,15 +79,18 @@ def _record(org, repo: Path, outcomes: list[bool], *, name: str = "run1", case_i
     if answer_harness is CURRENT:
         answer_harness = harness_digest
     for number, passed in enumerate(outcomes, start=1):
-        status = ScoreStatus.PASSED if passed else ScoreStatus.FAILED
+        # A blocked trial, as evaluate records it: the work never reached review, so no judge ran.
+        stopped = number in blocked
+        status = ScoreStatus.NOT_RUN if stopped else ScoreStatus.PASSED if passed else ScoreStatus.FAILED
         result = EvalResult(case=case_id, case_digest="sha256:x", runtime="claude-code", replay=replay, version="t",
-                            started_at=AT, duration_s=1.0, seat="rtl-implementation", seat_status="done",
-                            submitted=True, attempts=1, passed=passed, audit_ok=True, sandbox="s",
+                            started_at=AT, duration_s=1.0, seat="rtl-implementation",
+                            seat_status="blocked" if stopped else "done", submitted=not stopped, attempts=1,
+                            passed=passed and not stopped, audit_ok=True, sandbox="s",
                             attestations=("dv_ran",) if attest else (),
                             scores=(Score(scorer="held-out-run", name="reference testbench", status=status),),
                             harness=harness_digest)
         runs = (JudgeRun(check="reference testbench", run=f"run-{number}", tool="simulator.run",
-                         succeeded=passed),) if judged else ()
+                         succeeded=passed),) if judged and not stopped else ()
         trial = EvalTrial(record=name, trial=number, stage="rtl-implementation", model=MODEL,
                           skills={SKILL: digest}, knowledge=trial_knowledge, result=result, judge_runs=runs,
                           answers=(RecordedAnswer(mode="work", model=MODEL, prompt_sha256="p", packet_sha256="k",
@@ -200,11 +205,49 @@ def test_replays_and_attestations_never_raise_a_level(org, tmp_path):
     assert len(levels["refused_records"]) == 2
 
 
-def test_a_trial_no_tool_judged_is_listed_apart_and_never_counts(org, tmp_path):
+@pytest.fixture()
+def rubric():
+    """A scorer that needs no tool, so a case judged by it is not tool-judged."""
+    @register_scorer("rubric-fixture")
+    def _rubric(ctx):
+        return Score(scorer="rubric-fixture", name=ctx.check.name, status=ScoreStatus.PASSED)
+
+    yield "rubric-fixture"
+    unregister_scorer("rubric-fixture")
+
+
+def test_a_trial_of_a_case_not_tool_judged_is_listed_apart_and_never_counts(org, tmp_path, rubric):
+    _case(tmp_path, scorer=rubric)
+    _record(org, tmp_path, [True] * 5)
+    levels = compute(org, tmp_path)
+    assert SKILL not in levels["skills"] and len(levels["not_tool_judged"]) == 5
+    assert all(t["passed"] for t in levels["not_tool_judged"])
+
+
+def test_four_passes_and_one_blocked_trial_are_five_trials_four_passed_and_not_practised(org, tmp_path):
+    # The pilot's first live case: the blocked trial once dropped out and the group read 4 of 4.
+    _case(tmp_path)
+    _record(org, tmp_path, [True] * 5, blocked=frozenset({3}))
+    levels = compute(org, tmp_path)
+    entry = levels["skills"][SKILL]
+    [group] = entry["practised"]
+    assert (group["n"], group["passed"], group["unjudged"]) == (5, 4, 1)
+    assert entry["level"] is None and not group["counts"] and not levels["not_tool_judged"]
+    assert group["reasons"] == [f"Wilson lower bound {group['lower']:.3f}, under 0.5"]
+    # Five more clean passes beside it: 9 of 10 clears the bound, so the blocked trial costs a pass, no more.
+    _record(org, tmp_path, [True] * 5, name="run2")
+    [group] = _level(org, tmp_path)["practised"]
+    assert (group["n"], group["passed"], group["unjudged"]) == (10, 9, 1) and group["counts"]
+
+
+def test_a_trial_on_a_tool_judged_case_with_no_judge_run_is_a_failure_whatever_it_claims(org, tmp_path):
+    # A result that says passed with no judge run behind it is never a pass, and never drops out.
     _case(tmp_path)
     _record(org, tmp_path, [True] * 5, judged=False)
     levels = compute(org, tmp_path)
-    assert SKILL not in levels["skills"] and len(levels["not_tool_judged"]) == 5
+    [group] = levels["skills"][SKILL]["practised"]
+    assert (group["n"], group["passed"], group["unjudged"]) == (5, 0, 5) and not group["counts"]
+    assert levels["skills"][SKILL]["level"] is None and not levels["not_tool_judged"]
 
 
 # --- Without knowledge (M67) -------------------------------------------------------------------

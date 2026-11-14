@@ -45,6 +45,17 @@ the case IDs and the seats they evaluate, and the command line.
 | `judge_runs` | Every tool run behind a judge verdict: the check it judged, run ID, tool, succeeded, summary, and the parameters it ran with. |
 | `model` | The model the answers report (or the runtime's configured model when no answer reported one). |
 
+The claude-code runtime reports the model from Claude Code's `modelUsage`.
+Claude Code also makes a small side call on another model (claude-haiku-5-5
+today) on every `-p` run and may list it first, so the first key is never taken
+on its own: the model asked for (`--model`) is recorded when `modelUsage` names
+it; otherwise the one with the most output tokens, and a tie for most is
+recorded as every tied model joined with `+` (`answered_by` in
+`runtime/claude_code.py`). The token counts are the top-level `usage`, which is
+the seat's own call. Before this fix every claude-code trial would have been
+recorded as claude-haiku-5-5; the pilot's first live case showed it, and
+nothing from that case was committed.
+
 **The summary**: per case and per seat, trials `n`, passes `k`, the pass rate,
 and its 95% Wilson interval; totals of model calls, tokens, duration, and cost
 (`null` when any call had no price, as on a subscription).
@@ -69,7 +80,8 @@ difference.
 - **A committed re-judge (M63).** `--write` also writes `rejudge.json` into
   the record: each trial, same or with its differences. A skill's Practised
   level counts only trials that file shows re-judged clean
-  (`docs/CAPABILITY_LEVELS.md`).
+  (`docs/CAPABILITY_LEVELS.md`). A trial whose work never reached review has
+  no judge run; on a tool-judged case it still counts, as a failure.
 - **No invented answers.** When the replay asks for more answers than were
   recorded, the scripted model answers with an error that is not a model call,
   so the seat declines and the difference shows.
@@ -215,6 +227,10 @@ input, so roughly $13 to $20. Results land in
 
 - a run record is written with every field, and a fake `claude` run records
   its answers, hashes, model, and tokens;
+- `tests/test_nirmaan_claude_code.py`: with a side call listed first in
+  `modelUsage`, the model asked for is recorded, on a reply and on a failed
+  call; without it, the model that wrote most, a tie as every tied model, and
+  with nothing reported, the model asked for;
 - re-judging a record reproduces its verdicts, and a changed case is reported;
 - Wilson intervals and per case and per seat rates are computed correctly;
 - each new case passes with its reference answer and fails with a bad one;

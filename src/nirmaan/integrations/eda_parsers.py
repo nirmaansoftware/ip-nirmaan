@@ -435,3 +435,148 @@ def parse_sby_cover(log: str, returncode: int, antecedents: Sequence[Mapping[str
             if ante_reached else "")
     return EdaResult(True, f"not vacuous: every cover reached ({len(reached)} of {len(reached)}){also}",
                      tuple(diags), metrics)
+
+
+# --- eqy (M69) -------------------------------------------------------------------------
+
+# eqy prefixes every line it prints with its own tag, time and work directory:
+# EQY  7:26:45 [/tmp/run/eqy] Successfully proved equivalence of partition counter.count
+# EQY  7:26:45 [/tmp/run/eqy] Failed to prove equivalence of partition counter.wrap
+# EQY  7:26:45 [/tmp/run/eqy] run: Could not prove equivalence of partition 'counter.wrap' using strategy 'sat': ...
+# EQY  7:26:45 [/tmp/run/eqy] Successfully proved designs equivalent
+# EQY  7:26:45 [/tmp/run/eqy] DONE (PASS, rc=0)
+# What a step eqy started prints comes after that step's name ("read_gold: ", "run: "), so a design or a
+# script cannot print a line these patterns read as eqy's own.
+_EQY_LINE_RE = re.compile(r"^EQY\s+\S+\s+\[[^\]]*\]\s+(?P<msg>.*?)\s*$")
+_EQY_DONE_RE = re.compile(r"^DONE \((?P<status>[A-Z]+), rc=(?P<rc>\d+)\)$")
+_EQY_PROVED_RE = re.compile(r"^Successfully proved equivalence of partition (?P<name>\S+)$")
+_EQY_FAILED_RE = re.compile(r"^Failed to prove equivalence of partition (?P<name>\S+)$")
+_EQY_WHY_RE = re.compile(r"^run: Could not prove equivalence of partition '(?P<name>[^']+)' using strategy "
+                         r"'(?P<strategy>[^']+)': (?P<why>.+)$")
+_EQY_ERROR_RE = re.compile(r"\bERROR:\s*(?P<msg>.*)$")
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def parse_eqy(log: str, returncode: int, gold: Sequence[str] = (), gate: Sequence[str] = ()) -> EdaResult:
+    """Pass means eqy proved the gold and gate designs equivalent: every partition proved, at least one (M69).
+
+    ``gold`` and ``gate`` name the files each side read, so the result says which versions it compared.
+    A partition eqy could not prove (not equivalent, unknown, or out of time) fails the run, with the
+    reason its last strategy gave.
+    """
+    status, everything = "UNKNOWN", False
+    proved: list[str] = []
+    failed: list[str] = []
+    why: dict[str, str] = {}
+    errors: list[Diagnostic] = []
+    for raw in log.splitlines():
+        plain = _ANSI_RE.sub("", raw)
+        line = _EQY_LINE_RE.match(plain)
+        if not line:  # eqy's own fatal errors are printed bare
+            if plain.startswith("ERROR:"):
+                errors.append(Diagnostic("error", plain[len("ERROR:"):].strip()))
+            continue
+        msg = line["msg"]
+        if m := _EQY_DONE_RE.match(msg):
+            status = m["status"]
+        elif m := _EQY_PROVED_RE.match(msg):
+            proved.append(m["name"])
+        elif m := _EQY_FAILED_RE.match(msg):
+            failed.append(m["name"])
+        elif m := _EQY_WHY_RE.match(msg):
+            why[m["name"]] = f"{m['why']} (strategy {m['strategy']})"
+        elif msg == "Successfully proved designs equivalent":
+            everything = True
+        elif m := _EQY_ERROR_RE.search(msg):
+            errors.append(Diagnostic("error", m["msg"].strip()))
+    diags = [*errors, *(Diagnostic("error", f"partition {p} not proved equivalent: {why.get(p, 'no reason given')}",
+                                   "NOT_EQUIVALENT") for p in failed)]
+    total = len(proved) + len(failed)
+    passed = returncode == 0 and status == "PASS" and everything and bool(proved) and not failed
+    compared = f"gate {', '.join(gate)} against gold {', '.join(gold)}: " if gold and gate else ""
+    if passed:
+        summary = f"equivalent: {compared}every partition proved ({len(proved)} of {total})"
+    elif failed:
+        first = failed[0]
+        summary = (f"not equivalent: {compared}{len(failed)} of {_plural(total, 'partition')} not proved; "
+                   f"first: {first} ({why.get(first, 'no reason given')})")
+    elif status == "PASS" and not proved:
+        summary = "no partition was proved: a setup that compares nothing says nothing about equivalence"
+    elif errors:
+        summary = f"equivalence check {status.lower()}: {_plural(len(errors), 'error')}{_first(errors)}"
+    else:
+        last = next((ln.strip() for ln in reversed(log.splitlines()) if ln.strip()), "no output")
+        summary = f"equivalence check did not finish (exit status {returncode}): {last}"
+    metrics: dict[str, Any] = {"status": status, "exit_status": returncode, "partitions": total,
+                               "partitions_proved": len(proved), "partitions_failed": len(failed),
+                               "equivalent": int(passed), "gold": list(gold), "gate": list(gate)}
+    return EdaResult(passed, summary, tuple(diags), metrics)
+
+
+# --- Coverage (M70) --------------------------------------------------------------------
+
+#: One coverage point in a Verilator coverage data file (``SystemC::Coverage-3``): ``C '<keys>' <count>``,
+#: each key a ``\x01``-led name and a ``\x02``-led value (``f`` file, ``l`` line, ``t`` type, ``page``).
+_COVERAGE_POINT_RE = re.compile(r"^C '(?P<keys>.*)' (?P<count>\d+)$")
+_COVERAGE_PAGE_RE = re.compile(r"^v_(?P<type>[a-z_]+)/")
+
+
+def coverage_points(data: str) -> list[tuple[str, str, int]]:
+    """Every point in a coverage data file: its source file, its type (line, toggle, branch, ...) and its count.
+
+    The type is the point's ``t`` key, or, in data from a Verilator that writes none, the ``v_<type>/`` prefix
+    of its ``page``. A point with neither is skipped.
+    """
+    points = []
+    for line in data.splitlines():
+        m = _COVERAGE_POINT_RE.match(line.rstrip("\r"))
+        if not m:
+            continue
+        keys = dict(part.split("\x02", 1) for part in m["keys"].split("\x01") if "\x02" in part)
+        page = _COVERAGE_PAGE_RE.match(keys.get("page", ""))
+        kind = keys.get("t") or (page["type"] if page else "")
+        if kind and keys.get("f"):
+            points.append((keys["f"], kind, int(m["count"])))
+    return points
+
+
+def parse_coverage(log: str, returncodes: tuple[int, ...], nonce: str, data: str | None,
+                   design: Sequence[str]) -> EdaResult:
+    """Pass means the testbench passed and the coverage it reached on the design files was read (M70).
+
+    The simulation is judged as ``simulator.run`` judges it (the testbench's one verdict, with this run's
+    nonce, no check failed). ``data`` is the coverage file ``verilator_coverage`` wrote from the run; only
+    the points in ``design`` (the files under test, never the testbench) count. Each type's metric is the
+    percentage of its points hit at least once, rounded down to two places, so a run never rounds up into a
+    bound; a type with no point in the design files is not reported. No data, or a design file with no point
+    at all (not built under the top module), fails: coverage that measured nothing is not evidence.
+    The thresholds are a requirement's bounds on these metrics (``line``, ``toggle``, ``branch``), which the
+    broker checks after a passing run.
+    """
+    sim = parse_simulation(log, returncodes, nonce=nonce)
+    if not sim.passed:
+        return EdaResult(False, f"coverage not read: {sim.summary}", sim.diagnostics, sim.metrics)
+    if data is None:
+        return EdaResult(False, "coverage not read: the run wrote no coverage data", sim.diagnostics, sim.metrics)
+    wanted = {str(Path(f)) for f in design}
+    counts: dict[str, list[int]] = {}
+    files: set[str] = set()
+    for source, kind, count in coverage_points(data):
+        if str(Path(source)) in wanted:
+            files.add(str(Path(source)))
+            hit = counts.setdefault(kind, [0, 0])
+            hit[0] += count > 0
+            hit[1] += 1
+    unbuilt = sorted(Path(f).name for f in wanted - files)
+    if unbuilt:
+        return EdaResult(False, f"coverage not read: no coverage point in {', '.join(unbuilt)} (not built under "
+                                "the top module?)", sim.diagnostics, sim.metrics)
+    percent = {kind: int(hit * 10000 // total) / 100 for kind, (hit, total) in counts.items()}
+    shown = [kind for kind in ("line", "toggle", "branch") if kind in percent]
+    shown += sorted(k for k in percent if k not in shown)
+    read = ", ".join(f"{kind} {percent[kind]:.2f}% ({counts[kind][0]}/{counts[kind][1]})" for kind in shown)
+    names = ", ".join(sorted(Path(f).name for f in files))
+    return EdaResult(True, f"coverage read over {names}: {read}; {sim.summary}", sim.diagnostics, {
+        **sim.metrics, **percent,
+        "coverage": {kind: {"covered": hit, "points": total} for kind, (hit, total) in counts.items()},
+    })

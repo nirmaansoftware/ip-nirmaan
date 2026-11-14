@@ -105,9 +105,18 @@ control-plane founder class in `.github/review-teams.yml` lists `harness.py`,
 gets the Founder Proxy's review. A file added to `CODE` is added to that class
 in the same pull request.
 
+## Changes to the harness since M73
+
+- 2026-11-14, `runtime/claude_code.py`: the trial records the model asked
+  for, not the first key of Claude Code's `modelUsage` (a side call on a small
+  model was listed first). A `CODE` file changed, so the fingerprint changed.
+  No live record existed, so no group went stale.
+
 ## What is not the harness
 
-- The model: its own group key, recorded on the trial.
+- The model: its own group key, recorded on the trial. On the claude-code
+  runtime it is the model asked for when Claude Code reports it, never the
+  first key of `modelUsage` (`docs/LIVE_EVAL_EVIDENCE.md`).
 - The skill card and knowledge document: the skill digest (M58).
 - The case and its judges: the case digest, checked by `rejudge`.
 - The tools a seat or a judge runs: each run is recorded with its tool.

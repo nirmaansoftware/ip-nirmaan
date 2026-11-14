@@ -14,6 +14,7 @@ when CI names it in NIRMAAN_REQUIRE_EDA).
 from __future__ import annotations
 
 import json
+import shutil
 from functools import cache
 from pathlib import Path
 
@@ -111,6 +112,11 @@ def test_coverage_and_equivalence_are_planned_when_asked_for(nirmaan_org, fixed_
     stages = {t.stage for t in engine.state.tasks.values() if t.stage}
     assert {"coverage", "equivalence"} <= stages
     assert set(M68_FEATURES) <= set(engine.state.project.analysis.features)
+    # M69: equivalence.run runs, so the seat's eqy setup is gated over the approved RTL versions, placed beside it.
+    gate, = (r for r in _task(engine, "equivalence").evidence_requirements if r.before_review)
+    assert gate.tools == ("equivalence.run",) and gate.files == (
+        FileInput(param="eqy", kinds=("equivalence_setup",)),
+        FileInput(param="sources", kinds=("rtl_source",), upstream=True, beside=True))
 
 
 def test_beside_is_for_upstream_inputs_only():
@@ -294,3 +300,51 @@ def test_a_seat_file_named_like_the_approved_rtl_is_not_replaced_and_the_proof_i
     result = run_case(nirmaan_org, case, repo=REPO, sandbox=tmp_path / "sandbox", clock=fixed_clock)
     assert not result.submitted, result
     assert "does not read counter.v" in result.detail, result.detail
+
+
+# --- The equivalence gate, for real (M69) ------------------------------------------------------------------
+
+REFACTOR = "tests/fixtures/eqy/counter_refactor.v"
+#: The seat's setup: it names both approved versions by file name, as they are placed beside it.
+EQUIVALENCE_EQY = """\
+[gold]
+read_verilog -sv counter.v
+prep -top counter
+
+[gate]
+read_verilog -sv counter_refactor.v
+prep -top counter
+
+[strategy sby]
+use sby
+engine smtbmc
+depth 10
+"""
+
+
+@needs(*FORMAL_TOOLS, "eqy", "make")
+def test_an_equivalence_seat_passes_its_gate_on_the_approved_versions_and_fails_the_mutant(nirmaan_org,
+                                                                                          fixed_clock, tmp_path):
+    """The approved counter and its refactor are equivalent under the seat's setup; a refactor that wraps one
+    count early (tests/fixtures/eqy/counter_wraps_early.v) must fail it."""
+    mutant = tmp_path / "mutants" / "counter_refactor.v"
+    mutant.parent.mkdir(parents=True)
+    shutil.copy(REPO / "tests/fixtures/eqy/counter_wraps_early.v", mutant)
+    data = {"id": "tmp/block-verification-equivalence",
+            "request": "Verify the existing 4-bit counter RTL with an equivalence check of its refactor.",
+            "seat": "equivalence", "expected_behavior": "The seat's setup proves the approved versions equivalent "
+                                                       "and fails a refactor that changes behaviour.",
+            "upstream": {"interface-spec": [{"path": SPEC, "kind": "interface_spec"}],
+                         "design-under-test": [{"path": COUNTER, "kind": "rtl_source", "entry": "counter"},
+                                               {"path": REFACTOR, "kind": "rtl_source", "entry": "counter"}]},
+            "reference": [{"path": _write(tmp_path, "counter.eqy", EQUIVALENCE_EQY), "kind": "equivalence_setup"}],
+            "held_out": [{"name": "The seat's setup fails the non-equivalent refactor", "scorer": "must-fail",
+                          "tool": "equivalence.run", "seat_files": {"eqy": ["equivalence_setup"]},
+                          "case_files": {"sources": [COUNTER, REFACTOR]}, "mutants": {REFACTOR: [str(mutant)]}}]}
+    path = tmp_path / "case.json"
+    path.write_text(json.dumps(data), encoding="utf-8")
+    case = load_case(path)
+    assert validate_case(nirmaan_org, case, REPO) == []
+    result = run_case(nirmaan_org, case, repo=REPO, sandbox=tmp_path / "sandbox", clock=fixed_clock)
+    assert result.submitted, result
+    assert [s.status for s in result.scores] == [ScoreStatus.PASSED], result.scores

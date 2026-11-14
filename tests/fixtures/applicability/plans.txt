@@ -1474,7 +1474,7 @@ intent=block_verification features=coverage,equivalence,existing_design,random_s
     * The proof is not vacuous: every cover is reached | accepts=tool_run | tools=formal.cover | before-review | files=sby<-formal_spec sources<-rtl_source[upstream][beside] sources<-assertions | applies always
 - coverage [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
     * Independent review recorded | accepts=review_record | tools=- | applies always
-    * Coverage of the testbench on the approved RTL | accepts=tool_run,veritriage_session,human_attestation | tools=coverage.read,veritriage.investigate | applies always
+    * The seat's testbench passes on the approved RTL and reaches the coverage targets on it | accepts=tool_run | tools=coverage.read | before-review | files=sources<-rtl_source[upstream] design<-rtl_source[upstream] sources<-testbench top<-testbench[entry] | fixed=line>=90,toggle>=75 | applies always
 - design-under-test [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
     * Independent review recorded | accepts=review_record | tools=- | applies always
 - dv-plan [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
@@ -1482,7 +1482,7 @@ intent=block_verification features=coverage,equivalence,existing_design,random_s
     * The plan covers every requirement of the approved interface spec | accepts=tool_run | tools=vplan.check | before-review | files=plan<-verification_plan spec<-interface_spec[upstream] | applies always
 - equivalence [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
     * Independent review recorded | accepts=review_record | tools=- | applies always
-    * Equivalence result with the compared versions named | accepts=tool_run,human_attestation | tools=equivalence.run | applies always
+    * The seat's setup proves the approved RTL versions equivalent, with the compared versions named | accepts=tool_run | tools=equivalence.run | before-review | files=eqy<-equivalence_setup sources<-rtl_source[upstream][beside] | applies always
 - interface-spec [work] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
     * Independent review recorded | accepts=review_record | tools=- | applies always
 - program [program] retries=1 on_failure=retry_then_escalate attempts=1 review_rounds=1
