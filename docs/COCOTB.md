@@ -62,9 +62,10 @@ run fails, never passes.
    totals line (`** TESTS=n PASS=p FAIL=f SKIP=s`) was printed exactly once
    and agrees with the file, and both steps exited 0. The exit status alone
    says nothing: `vvp` exits 0 when tests fail, and when cocotb never
-   started. The design cannot write the file (it may not open one), and a
-   totals line it prints makes two, which fails the run: a forged line can
-   only fail a run. A results file with a DOCTYPE or an entity is refused
+   started. The HDL design cannot write the file (it may not open one), and a
+   totals line it prints makes two, which fails the run: a forged line from
+   the design can only fail a run. The Python testbench is not so bound (see
+   "Trust model" below). A results file with a DOCTYPE or an entity is refused
    unread.
 
 The result's metrics: `tests`, `tests_passed`, `tests_failed`,
@@ -76,6 +77,33 @@ or names the first failed test and its assertion. Each failed test is an
 error diagnostic (`TEST_FAILED`). The log and the result JSON are the run's
 references, as for every EDA tool (`docs/EDA_TOOLS.md`), and cocotb's results
 file is one of its outputs (`results`, M44).
+
+## Trust model: the Python testbench is not sandboxed
+
+The test modules are Python that runs inside the host's `vvp` process, with
+that process's full rights. This backend contains none of it: there is no
+sandbox, no import filter and no limit on what the Python can do (read or write
+files, spawn processes, use the network). The HDL check in step 1 refuses HDL
+constructs only; it says nothing about the Python.
+
+What is true instead:
+
+- **The Python is the testbench author's code, trusted as the host's own.** It
+  is as trusted as a `pytest` file a seat runs in the same checkout. The
+  controls are the ones around the tool, not inside the run: only roles that
+  may simulate can call `simulator.run`, the broker records every call, and the
+  run has a `timeout` and its own working directory. Running cocotb on text
+  from an untrusted source is outside this milestone and must not be done
+  without a container or VM boundary, which this repository does not provide.
+- **The Python can forge the verdict.** It could write `results.xml` or print a
+  totals line itself. "The design cannot write the file" in step 4 holds for
+  the HDL only, since the HDL check forbids file access and printing a verdict.
+  A passing cocotb run therefore proves "the testbench author's Python reported
+  success", never "an independent check passed".
+- **What backs the verdict is not the run but the scorer.** The must-fail
+  scorer (M58) runs the same testbench on broken RTL and requires it to fail;
+  a testbench that always reports success is caught there, not by this parser.
+  Nothing here claims otherwise.
 
 **A limit, stated.** cocotb counts tests, not checks: a test that asserts
 nothing passes. An HDL testbench's verdict counts checks and fails at zero
