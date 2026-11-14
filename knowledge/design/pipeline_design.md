@@ -8,6 +8,7 @@ sources:
   - open | Gisselquist, Strategies for pipelining logic, ZipCPU blog, 2017 [Pipe] | https://zipcpu.com/blog/2017/08/14/strategies-for-pipelining.html
   - open | LaForest, Pipeline Skid Buffer, FPGA Design Elements (MIT) [LaF] | https://fpgacpu.ca/fpga/Pipeline_Skid_Buffer.html
   - open | Gisselquist, AXI Handshaking Rules, ZipCPU blog, 2021 [Rules] | https://zipcpu.com/blog/2021/08/28/axi-rules.html
+  - open | IP Nirmaan, formal gate: docs/FORMAL_GATE.md section 3 and src/nirmaan/integrations/eda.py (_sby_tasks and _sby_check L644-L655, _sby_cover_check L743) [Gate] | this repository, same commit as the document
 licence_check: original writing that summarises and cites; no text, table, figure or code copied from any source
 export_screen: clear
 writer: IP-P3-K2 session (P3 pilot, item K2, 2026-11-03)
@@ -95,9 +96,11 @@ marked "inference" is this document's own reasoning.
   - every accepted beat goes straight out or into the buffer;
   - after the last beat the output returns to idle;
   - a full buffer with downstream ready empties on the next clock.
-- Prove every parameter combination as its own task. Cover a trace that
-  drops downstream ready more than once, sends counting data and ends idle;
-  short depths suffice [Skid].
+- Prove one setup at the default parameters: the proof gate takes one `.sby`
+  with no `[tasks]`, so a task per parameter combination is refused [Gate];
+  check the other parameter points in simulation. Cover a trace that drops
+  downstream ready more than once, sends counting data and ends idle; short
+  depths suffice [Skid].
 - Simulation: compare sent and received beats in a scoreboard, with random
   valid and ready on both sides; send back to back; hold ready low for one
   cycle and for several; reset during traffic. Upstream ready must change
