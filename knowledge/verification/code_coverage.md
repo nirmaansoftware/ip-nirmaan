@@ -83,9 +83,10 @@ backs it.
 - Do not use `coverage_off` or an assertion `$stop` branch to hide a gap:
   Verilator drops lines with `$stop` from coverage on the assumption that they
   are error checks [VCov] [VCovExe], so such a branch is invisible, not covered
-  (inference). The gate refuses `coverage_off` only in the testbench and other
-  non-design files, not in design files, so it does not catch a gap hidden
-  there (gate: eda.py:552-553).
+  (inference). The gate matches `coverage_off` (and `coverage_block_off`), not
+  `coverage_on`, and refuses it only in the testbench and other non-design
+  files, not in design files, so it does not catch a gap hidden there (gate:
+  eda.py:513, 552-553).
 - A fixed bound such as 90 percent is a requirement's choice, not a property of
   the tool. Report the number and the unexplained points together (inference).
 
