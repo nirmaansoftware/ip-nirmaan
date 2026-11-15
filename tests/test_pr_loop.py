@@ -1327,6 +1327,34 @@ def test_related_tests_map_changed_files_to_the_tests_that_use_them(tmp_path):
     assert rel(tmp_path, ["tests/test_gone.py"]) is None
 
 
+def test_a_records_only_fix_runs_the_record_tests_not_the_whole_suite(tmp_path):
+    # ip#227: a fix to eval records ran the whole suite (no test names trial-03.json or
+    # causes.md) and timed out; the record tests are the ones that read committed records.
+    run = "evals/results/2026-11-14-claude-code-claude-opus-5-5-without-knowledge"
+    _tree(tmp_path, {
+        "tests/test_capability_levels.py": "pass\n",
+        "tests/test_nirmaan_evals.py": "def test_every_shipped_case_is_valid(): pass\n",
+        "tests/test_live.py": 'record("trial-01.json")\n',
+        "tests/test_named.py": f'RECORD = "{run}/summary.json"\n',
+        "tests/test_other.py": "pass\n",
+    })
+    rel, case = pr_loop.related_tests, "tests/test_nirmaan_evals.py::test_every_shipped_case_is_valid"
+    records = [f"{run}/causes.md", f"{run}/rejudge.json", f"{run}/rtl_rr-arbiter/trial-01.json", f"{run}/rtl_rr-arbiter/trial-03.json"]
+    assert rel(tmp_path, records) == ["tests/test_capability_levels.py", case], "a file name match is chance"
+    assert rel(tmp_path, [f"{run}/summary.json"]) == ["tests/test_capability_levels.py", "tests/test_named.py", case]
+    assert rel(tmp_path, [f"{run}/manifest.json", "tests/test_nirmaan_evals.py"]) == [
+        "tests/test_capability_levels.py", "tests/test_nirmaan_evals.py"], "the whole file holds the node"
+    assert pr_loop.RECORD_TESTS[0] in pr_loop.related_tests(ROOT, [f"{run}/causes.md"]), "the record tests exist here"
+    for t in pr_loop.RECORD_TESTS:  # every named file and test function is there
+        file, _, func = t.partition("::")
+        assert (ROOT / file).is_file() and (not func or f"def {func}(" in (ROOT / file).read_text(encoding="utf-8")), t
+    # Outside evals/results the file-name rule stands; with no record test present, the whole suite.
+    assert rel(tmp_path, ["evals/rtl/case/trial-01.json"]) == ["tests/test_live.py"]
+    (tmp_path / "tests" / "test_capability_levels.py").unlink()
+    (tmp_path / "tests" / "test_nirmaan_evals.py").unlink()
+    assert rel(tmp_path, [f"{run}/causes.md"]) is None
+
+
 def test_the_fixers_test_check_runs_only_the_related_tests(repo, tmp_path):
     record = tmp_path / "pytest-args.json"
     loop = {**LOOP, "checks": [{"name": "test", "when": ["src/**", "tests/**"], "select": "related_tests", "env": {"RECORD": str(record)},
