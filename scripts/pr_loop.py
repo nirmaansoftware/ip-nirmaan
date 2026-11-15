@@ -133,7 +133,10 @@ TRANSIENT_TEXT = re.compile(
     r"\b5\d\d (?:internal server error|bad gateway|service unavailable)|"
     # main moved during `gh pr merge --auto`: a race, retried on the next pass
     # (a "Head branch was modified" is not this and still stops).
-    r"base branch was modified", re.I)
+    r"base branch was modified|"
+    # GitHub still settling the head's checks when auto-merge is asked for (it stopped ip#254):
+    # retried on the next pass, like the race above.
+    r"pull request is in unstable status \(enablepullrequestautomerge\)", re.I)
 
 
 def transient_error(exc) -> bool:

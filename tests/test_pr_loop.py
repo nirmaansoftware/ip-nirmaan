@@ -365,8 +365,10 @@ def test_both_keys_pass_and_any_other_merge_error_stops_with_needs_founder(repo)
     assert not any("Auto-merge is on" in c or "### Automated loop: ready" in c for c in r.comments())
 
 
-def test_a_base_branch_modified_merge_error_retries_and_is_not_a_stop(repo):
-    r = repo(gh={"merge_error": "GraphQL: Base branch was modified. Review and try the merge again. (mergePullRequest)"})
+@pytest.mark.parametrize("error", ["GraphQL: Base branch was modified. Review and try the merge again. (mergePullRequest)",
+                                   "GraphQL: Pull request is in unstable status (enablePullRequestAutoMerge)"])
+def test_a_base_branch_modified_or_unstable_status_merge_error_retries_and_is_not_a_stop(repo, error):
+    r = repo(gh={"merge_error": error})
     assert r.tick() == ["retry"]
     assert not r.labeled(), "never needs-founder for a race with main"
     assert len(r.github.merges) == 1
@@ -831,6 +833,7 @@ def test_transient_error_classification():
     assert not t(subprocess.CalledProcessError(1, ["gh"], stderr="GraphQL: Pull request is not mergeable"))
     assert t(subprocess.CalledProcessError(1, ["gh"], stderr="GraphQL: Base branch was modified. Review and try the merge again. (mergePullRequest)"))
     assert not t(subprocess.CalledProcessError(1, ["gh"], stderr="GraphQL: Head branch was modified. Review and try the merge again."))
+    assert t(subprocess.CalledProcessError(1, ["gh"], stderr="GraphQL: Pull request is in unstable status (enablePullRequestAutoMerge)"))
     assert not t(ValueError("x")) and not t(FileNotFoundError("gh"))
     assert pr_loop._transient_call("timeout", "claude did not answer within 1200s")
     assert pr_loop._transient_call("error", "API Error: 503 Service Unavailable")
