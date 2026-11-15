@@ -26,6 +26,7 @@ import shutil
 from pathlib import Path
 
 from nirmaan.integrations.eda import Backend, Job, RunRecord, register_backend
+from nirmaan.integrations.eda_guard import eqy_problem
 from nirmaan.integrations.eda_parsers import EdaResult, parse_eqy
 from nirmaan.models import text_value
 
@@ -84,6 +85,11 @@ def setup_files(eqy: Path) -> tuple[dict[str, list[str]], str | None]:
         if words[0].startswith("write") or words[0] in WRITES:
             return {}, (f"{eqy.name} uses {words[0]}, which writes a file, so one side could read what the other "
                         "wrote (refused, nothing ran)")
+    # M84 (docs/GATE_INPUTS.md): past the commands named above, every section, option, strategy key, Yosys
+    # command and engine on an allow list (eqy hands a strategy's engine line to SBY, which runs it in a shell).
+    problem = eqy_problem(eqy)
+    if problem:
+        return {}, problem
     gold = commands["gold"] + commands["script"]
     gate = commands["gate"] + commands["script"]
     if not commands["gold"] or not commands["gate"]:
