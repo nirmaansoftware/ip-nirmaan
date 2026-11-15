@@ -83,12 +83,11 @@ backs it.
 - The Verilator page says that with `--coverage` or `--coverage-user` it
   translates covergroups [VCov]; it does not say "only". The gate's own
   options are `--coverage-line --coverage-toggle` (gate:
-  src/nirmaan/integrations/eda.py:595). A run with exactly those options on a
-  small file with one covergroup wrote covergroup points, and
-  `coverage_points` read them as kind `covergroup` (run, Verilator 5.052). So
-  a covergroup in a design file can appear in the percentages as its own
-  kind (gate: src/nirmaan/integrations/eda_parsers.py:555-594, which reports
-  every kind it finds).
+  src/nirmaan/integrations/eda.py:595). No committed record shows whether a
+  covergroup in a design file is written under those options, so this is
+  unverified. If it is, the parser would report it as its own kind (inference
+  from src/nirmaan/integrations/eda_parsers.py:555-594, which reports every
+  kind it finds).
 - A covergroup in the testbench is still not read, but because only the
   design files count and the testbench is never measured (gate:
   src/nirmaan/integrations/eda_parsers.py:561; src/nirmaan/integrations/eda.py:549-550),
