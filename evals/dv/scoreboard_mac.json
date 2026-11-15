@@ -1,0 +1,77 @@
+{
+  "id": "dv/scoreboard-mac",
+  "request": "Verify the existing MAC block RTL with a scoreboard against a reference model.",
+  "seat": "testbench",
+  "skills": [
+    "directed_testing",
+    "reference_modelling"
+  ],
+  "expected_behavior": "A self-checking SystemVerilog testbench with a scoreboard for the approved mac8 RTL (unsigned 8-bit operands, a 24-bit total that saturates at 0xFFFFFF with a sticky flag, reset and clear loading zeros, clear winning over an accumulate, en low holding), written from the approved interface specification, that passes on the approved RTL under the testbench gate before review and fails on RTL that breaks any requirement of that specification. It carries a reference model of the specification that takes every edge's inputs, compares the total and the flag against the model after every edge, and fails itself when its run never saturated, never cleared a saturated total or never met a clear with an accumulate.",
+  "constraints": [
+    "Work only from the approved interface specification and the approved RTL; never change the RTL.",
+    "Write the testbench in SystemVerilog, self-checking, ending with the verdict line the simulation gate reads.",
+    "Write the reference model from the specification, not from the RTL, and compare both outputs against it after every edge, not only at the end of a phase."
+  ],
+  "known_failure_modes": [
+    "A testbench that never drives the total to the top, so a total that wraps instead of saturating passes.",
+    "A testbench that checks the total but never the flag, or reads the flag only on the edge it rises, so a flag that does not stay high passes.",
+    "A testbench that never clears a saturated total and then reads the flag, so a clear that leaves the flag set passes.",
+    "A testbench that never offers a clear together with an accumulate, so a clear that loses to the accumulate passes.",
+    "A testbench that uses only operands below 128, so operands read as signed numbers pass.",
+    "A reference model copied from the RTL, so a mistake in the RTL is repeated in the model and passes.",
+    "A testbench that cannot tell a total that wraps, a clear that loses to an accumulate, signed operands, a flag that does not stay high or a clear that leaves the flag set from the approved RTL; the must-fail control fails it."
+  ],
+  "upstream": {
+    "interface-spec": [
+      {
+        "path": "tests/fixtures/dv/mac8/interface_spec.md",
+        "kind": "interface_spec"
+      }
+    ],
+    "design-under-test": [
+      {
+        "path": "tests/fixtures/dv/mac8/mac8.v",
+        "kind": "rtl_source",
+        "entry": "mac8"
+      }
+    ]
+  },
+  "reference": [
+    {
+      "path": "tests/fixtures/dv/mac8/mac8_tb.sv",
+      "kind": "testbench",
+      "entry": "mac8_tb"
+    }
+  ],
+  "held_out": [
+    {
+      "name": "The seat's testbench passes the approved RTL and fails each MAC block mutant",
+      "scorer": "must-fail",
+      "tool": "simulator.run",
+      "seat_files": {
+        "sources": [
+          "testbench"
+        ]
+      },
+      "seat_entries": {
+        "top": [
+          "testbench"
+        ]
+      },
+      "case_files": {
+        "sources": [
+          "tests/fixtures/dv/mac8/mac8.v"
+        ]
+      },
+      "mutants": {
+        "tests/fixtures/dv/mac8/mac8.v": [
+          "tests/fixtures/dv/mac8/mutants/mac8_no_saturate.v",
+          "tests/fixtures/dv/mac8/mutants/mac8_clear_loses.v",
+          "tests/fixtures/dv/mac8/mutants/mac8_signed_operands.v",
+          "tests/fixtures/dv/mac8/mutants/mac8_flag_not_sticky.v",
+          "tests/fixtures/dv/mac8/mutants/mac8_clear_keeps_flag.v"
+        ]
+      }
+    }
+  ]
+}
