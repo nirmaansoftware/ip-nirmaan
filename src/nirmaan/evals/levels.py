@@ -30,9 +30,11 @@ fails when the committed file differs from what the records give.
   would turn 4 of 5 into 4 of 4. A trial run without
   knowledge documents (M67, the ablation: ``knowledge: off`` in its run
   manifest or in the trial itself) is listed apart with the reason and never
-  counts toward any level. A calibration record or trial (M76, an outside
-  benchmark: ``purpose: calibration`` in its manifest or the trial) is listed
-  under ``calibration`` as "outside calibration" and never counts. A trial run
+  counts toward any level. A calibration record or trial (``purpose:
+  calibration`` in its manifest or the trial: M76, an outside benchmark, or
+  ``eval run --purpose calibration`` on our own cases) is listed under
+  ``calibration``, as "outside calibration" when its manifest names an outside
+  source and as "calibration" otherwise, and never counts. A trial run
   on a named harness variant (M74, ``eval run --harness <name>``: any name but
   ``default`` in its run manifest or in the trial) is listed under
   ``variants`` with the name and never counts.
@@ -193,8 +195,8 @@ def practised(org: Organization, repo: Path,
               cases: dict[str, EvalCase]) -> tuple[dict[str, list], list[str], list, list, list, list]:
     """Per skill, every (model, digest, harness, CLI version) group of tool-judged cases' trials, a trial no judge
     ran on counted as failed; the refused records; trials of cases not tool-judged; trials run without knowledge
-    documents (M67), outside calibration trials (M76) and trials on a named harness variant (M74), which never
-    count."""
+    documents (M67), calibration trials (M76 and ``eval run --purpose calibration``) and trials on a named
+    harness variant (M74), which never count."""
     groups: dict[tuple[str, str | None, str | None, str | None, str | None], dict[str, Any]] = {}
     refused: list[str] = []
     not_tool_judged: list[dict[str, Any]] = []
@@ -212,12 +214,12 @@ def practised(org: Organization, repo: Path,
             if any(labelled) or (not record.trials and record.manifest.purpose != "evidence"):
                 # M76: a calibration record is listed, never judged as evidence (a replay of it is no refusal)
                 where = _rel(manifest.parent, repo)
+                kind = "outside calibration" if record.manifest.source else "calibration"
                 for trial in record.trials:
                     named = " and ".join(calibration_labels(record.manifest, trial))
                     calibration.append({"record": where, "case": trial.result.case, "trial": trial.trial,
                                         "passed": trial.result.passed,
-                                        "reason": f"outside calibration (labelled in {named}): "
-                                                  "never counts toward a level"})
+                                        "reason": f"{kind} (labelled in {named}): never counts toward a level"})
                 continue
             record = load_evidence(manifest.parent)
         except (EvalError, OSError, ValueError) as exc:

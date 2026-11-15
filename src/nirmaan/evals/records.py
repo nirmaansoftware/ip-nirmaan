@@ -20,7 +20,7 @@ import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Iterable, Mapping, Sequence
+from typing import Any, Callable, Iterable, Mapping, Sequence, get_args
 
 import nirmaan
 from nirmaan.evals.cases import EvalError, case_digest, skill_digest
@@ -41,6 +41,9 @@ Z95 = 1.959963984540054
 _UNSAFE = re.compile(r"[^A-Za-z0-9._\-]")
 #: M67: the label a run without knowledge documents carries in its record's name.
 WITHOUT_KNOWLEDGE = "without-knowledge"
+#: What a run record is for: evidence (the default, may count toward a level) or calibration (M76 outside
+#: benchmarks, and ``eval run --purpose calibration``), which never counts. The manifest's own field is the source.
+PURPOSES: tuple[str, ...] = get_args(EvalRunManifest.model_fields["purpose"].annotation)
 
 
 def _safe(text: str) -> str:
@@ -211,14 +214,17 @@ def record_run(org: Organization, cases: Sequence[EvalCase], runtime: str | None
     end, so a run cut short still leaves a readable record of the trials it finished. ``knowledge=False``
     (M67, the ablation) runs every seat without knowledge documents: the record's name ends in
     ``-without-knowledge`` and its manifest and every trial say ``knowledge: off``. ``purpose="calibration"``
-    (M76, ``eval outside``) labels the record, its manifest and every trial the same way, and ``source`` says where
-    the problems came from. ``variant`` (M74) runs every seat on that named harness variant: the record's name
-    ends in ``-harness-<name>`` and its manifest and every trial carry the name. ``stop_on_no_answer`` (RR5) ends
+    (M76, ``eval outside`` and ``eval run --purpose calibration``) labels the record, its manifest and every trial
+    the same way, and ``source`` says where the problems came from when they are an outside benchmark's.
+    ``variant`` (M74) runs every seat on that named harness variant: the record's name ends in
+    ``-harness-<name>`` and its manifest and every trial carry the name. ``stop_on_no_answer`` (RR5) ends
     a live run right after the first trial with no model answer (:func:`no_model_answer`): that trial is written
     like any other, the record is finished, and :class:`RunStopped` is raised with its path.
     """
     if trials < 1:
         raise ValueError("trials must be at least 1")
+    if purpose not in PURPOSES:
+        raise ValueError(f"unknown purpose {purpose!r}; known: {', '.join(PURPOSES)}")
     variant_options(variant)  # an unknown name is refused before anything runs
     now = clock or (lambda: datetime.now(timezone.utc))
     started = now()
