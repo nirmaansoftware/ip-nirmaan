@@ -1,0 +1,104 @@
+{
+  "format": "nirmaan.knowledge-check",
+  "skill": "sva",
+  "knowledge_document": "knowledge/verification/sva.md",
+  "document_sha256": "sha256:4bc5ccdf0609edca574d57ac0c1db52b3dd698597e75ff894320ee7a3633921d",
+  "writer": "IP-W2-K2B session (ip#271, fix after the W2-C2 findings)",
+  "checker": "IP-W2-C2B session (lane IP-W2-C2B, second check, not the writer)",
+  "sources_read": [
+    "[SbyVerilog] SymbiYosys documentation, Formal extensions to Verilog: the whole page, https://symbiyosys.readthedocs.io/en/latest/verilog.html",
+    "[YVerilog] YosysHQ Yosys documentation, Notes on Verilog support in Yosys: the whole page (attributes, formal features, SystemVerilog features), https://yosyshq.readthedocs.io/projects/yosys/en/latest/using_yosys/verilog.html",
+    "[SbyVerific] SymbiYosys documentation, SystemVerilog, VHDL, SVA: the whole page, https://symbiyosys.readthedocs.io/en/latest/verific.html",
+    "[ZFormal] Gisselquist, ZipCPU blog, My first experience with Formal Methods (the page at the cited formal-intro URL), 2017: the whole post, https://zipcpu.com/blog/2017/10/19/formal-intro.html",
+    "[OTDV] lowRISC, OpenTitan Design Verification Methodology: the whole page, https://opentitan.org/book/doc/contributing/dv/methodology/index.html",
+    "Repository code at the lines cited in gate_claims, run locally (derive on small files), and the eval case evals/dv/formal_credit_counter.json"
+  ],
+  "result": "every claim tagged with a source was found in that source, every line marked inference is a fair reading of the source it names or the document's own reasoning, and every sentence about the platform's gates matches the gate code at the lines cited in gate_claims",
+  "notes": [
+    "Recheck after ip#271 of the W2-C2 finding (ip#268). The 'same testplan [OTDV]' sentence is gone. [OTDV] is now cited once, for 'where possible the assertion monitors developed for FPV are reused in UVM testbenches when running dynamic simulations', which the OpenTitan Assertions section says in those words.",
+    "Tags: [SbyVerilog] gives the three immediate statements inside always @(*) or a clocked always, the clocked-assertion one-step-earlier note, $past/$stable/$changed/$rose/$fell in clocked blocks only, and $past undefined in the first cycle; [YVerilog] gives assert in its most basic form (assert property (expr) in module scope, assert(expr) in an always block) with assume, restrict and cover under the same limits; [SbyVerific] says sequences, |-> and |=> properties and clocking belong to the Verific front end of the commercial Tabby CAD Suite; [ZFormal] says an assume is forced true and not proved, and shows the f_past_valid guard.",
+    "Run: eda_antecedents.derive on a small file gave a cover (1'b1) wrapped in place for an assertion inside an if in a clocked block, 'cover property (@(posedge clk) a);' after a module-scope 'a |-> b', and refusals with the reason for the '##' sequence operator, a nested implication ('an implication inside parentheses is not supported'), an action block, a deferred assertion and a named sequence, as the document lists.",
+    "parse_sby_cover: unreached own cover fails 'vacuous'; an unreached derived antecedent fails with 'assertion never checked'; no cover reached fails with 'a setup with nothing to reach says nothing about its assumptions'; a derived cover not in the elaborated design is a warning and does not fail (eda_parsers.py:413-415, 432-434).",
+    "Eval case sentence: evals/dv/formal_credit_counter.json (skills include sva) says 'Use the SVA subset open Yosys reads: immediate assertions, assumptions and covers in always blocks, with $past; no implication or sequence operators', which is the constraint the document says it states.",
+    "The document says whether an open build accepts a clocked 'assert property (@(posedge clk) a |-> b)' is decided by its front end and no run is recorded; that is a hedge, not a claim, and is marked unverified in gate_claims."
+  ],
+  "gate_claims": [
+    {
+      "claim": "formal.run runs a single-task setup and refuses one with [tasks]",
+      "evidence": "src/nirmaan/integrations/eda.py:647"
+    },
+    {
+      "claim": "given sources, every source must be listed under [files] of the setup",
+      "evidence": "src/nirmaan/integrations/eda.py:669"
+    },
+    {
+      "claim": "prove proves every property: proven is 1 only for a passing proof in prove mode",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:337"
+    },
+    {
+      "claim": "bmc shows no counterexample within the depth only, and the summary says it is not a proof",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:338"
+    },
+    {
+      "claim": "the failing assertion and its step are recorded in the diagnostics",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:329"
+    },
+    {
+      "claim": "formal.cover runs the same setup in mode cover, from a copy",
+      "evidence": "src/nirmaan/integrations/eda.py:729"
+    },
+    {
+      "claim": "formal.cover fails when any cover is never reached",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:421"
+    },
+    {
+      "claim": "formal.cover fails when no cover is reached, so a setup with none fails",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:432"
+    },
+    {
+      "claim": "a cover is derived for the guard of each assertion, and a run in which a guard is never reached fails because the assertion is then never checked",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:425"
+    },
+    {
+      "claim": "for an assertion inside procedural code the derived cover sits on the same path under every enclosing if, case arm and loop (checked by running derive)",
+      "evidence": "src/nirmaan/integrations/eda_antecedents.py:7"
+    },
+    {
+      "claim": "for a module-scope A |-> B or A |=> B the derived cover is of A (checked by running derive)",
+      "evidence": "src/nirmaan/integrations/eda_antecedents.py:13"
+    },
+    {
+      "claim": "the derivation refuses a sequence operator, a nested implication, a named sequence, an action block, a deferred assertion and a macro that cannot be expanded (checked by running derive)",
+      "evidence": "src/nirmaan/integrations/eda_antecedents.py:23"
+    },
+    {
+      "claim": "the cover run is refused and lists each place it cannot derive",
+      "evidence": "src/nirmaan/integrations/eda.py:760"
+    },
+    {
+      "claim": "a setup that passes formal.run can still be refused by formal.cover",
+      "evidence": "src/nirmaan/integrations/eda.py:743"
+    },
+    {
+      "claim": "an assertion not in the elaborated design draws a warning that no proof checks it",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:413"
+    },
+    {
+      "claim": "the formal tools are available, so the document opens with Practising",
+      "evidence": "src/nirmaan/org/knowledge_files.py:53"
+    },
+    {
+      "claim": "the card lists Vacuous assertions among its failures",
+      "evidence": "src/nirmaan/company/skills.py:465"
+    },
+    {
+      "claim": "an eval case for this skill states the immediate-assertion constraint",
+      "evidence": "evals/dv/formal_credit_counter.json:9"
+    },
+    {
+      "claim": "whether a given open build accepts a clocked assert property with |-> is decided by its front end, not by the gate, and no run is recorded",
+      "evidence": "unverified"
+    }
+  ],
+  "checked_at": "2026-11-15"
+}
