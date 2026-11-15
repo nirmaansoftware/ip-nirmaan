@@ -60,9 +60,10 @@ backs it.
   places, so it never rounds up into a bound. A design file with no point at
   all fails the run, because coverage that measured nothing is not evidence
   (gate: eda_parsers.py:565-590).
-- No source may use `$fopen`, `$system`, `$c` or DPI, and design files may not
-  carry a Verilator configuration, an `include`, or a coverage on/off pragma,
-  since each could change the counts from outside the design (gate:
+- No source may use `$fopen`, `$system`, `$c` or DPI, and any source that is
+  not a design file (the testbench included) may not carry a Verilator
+  configuration, an `include`, or a coverage on/off pragma, since each could
+  change the counts from outside the design; design files may carry them (gate:
   eda.py:506-513, 525-559). The gate does not set thresholds; a requirement's
   bounds on `line`, `toggle` and `branch` are checked after a passing run
   (gate: eda_parsers.py:544-556).
@@ -82,7 +83,9 @@ backs it.
 - Do not use `coverage_off` or an assertion `$stop` branch to hide a gap:
   Verilator drops lines with `$stop` from coverage on the assumption that they
   are error checks [VCov] [VCovExe], so such a branch is invisible, not covered
-  (inference). The gate refuses `coverage_off` in design files.
+  (inference). The gate refuses `coverage_off` only in the testbench and other
+  non-design files, not in design files, so it does not catch a gap hidden
+  there (gate: eda.py:552-553).
 - A fixed bound such as 90 percent is a requirement's choice, not a property of
   the tool. Report the number and the unexplained points together (inference).
 
