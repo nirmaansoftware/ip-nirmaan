@@ -1,0 +1,100 @@
+{
+  "format": "nirmaan.knowledge-check",
+  "skill": "root_cause_analysis",
+  "knowledge_document": "knowledge/verification/root_cause_analysis.md",
+  "document_sha256": "sha256:ab360a7631e09021bb23788ef05a9683c098e7fe842cf83fbba910d99e4ee9f5",
+  "writer": "IP-W2-K5 session (wave 2 knowledge batch, plan row W2-K5, 2026-11-15)",
+  "checker": "IP-W2-C5 session (wave 2 check batch, lane IP-W2-C5)",
+  "sources_read": [
+    "[ZIntro] Zeller, The Debugging Book: Introduction to Debugging (CC BY-NC-SA 4.0), whole chapter read to the end, https://www.debuggingbook.org/html/Intro_Debugging.html",
+    "[ZDelta] Zeller, The Debugging Book: Reducing Failure-Inducing Inputs (CC BY-NC-SA 4.0), whole chapter read to the end including Lessons Learned and Background, https://www.debuggingbook.org/html/DeltaDebugger.html",
+    "[WER] Glerum et al., Debugging in the (Very) Large: Ten Years of Implementation and Experience, SOSP 2009 (conference copy), all 17 pages read to the end, https://www.sigops.org/s/conferences/sosp/2009/papers/glerum-sosp09.pdf"
+  ],
+  "checked_at": "2026-11-15",
+  "gate_claims": [
+    {
+      "claim": "When a regression investigation asks for a reproduction, the triage and root-cause stages also write testbench files and a before-review gate runs simulator.run with expect=fail over the approved RTL under investigation and one testbench at a time, its top taken from that testbench",
+      "evidence": "tests/test_repro_gates.py::test_a_reproduction_hands_over_the_rtl_and_gates_triage_and_root_cause"
+    },
+    {
+      "claim": "the reproduction gate is declared by REPRODUCES with each=True, entry=True, expect=fail and before_review",
+      "evidence": "src/nirmaan/company/workflows.py:449"
+    },
+    {
+      "claim": "the reproducing() refinement adds the testbench output to a stage when a reproduction is asked for",
+      "evidence": "src/nirmaan/company/workflows.py:457"
+    },
+    {
+      "claim": "the triage stage is gated by REPRODUCES and needs a veritriage.investigate session",
+      "evidence": "src/nirmaan/company/workflows.py:472"
+    },
+    {
+      "claim": "the root-cause stage names one of four outcomes: rtl_bug, testbench_bug, infrastructure, spec_ambiguity (RTL bug, testbench bug, infrastructure, specification question)",
+      "evidence": "src/nirmaan/company/workflows.py:484"
+    },
+    {
+      "claim": "the root-cause stage is gated by REVIEWED and REPRODUCES",
+      "evidence": "src/nirmaan/company/workflows.py:485"
+    },
+    {
+      "claim": "a decision seat must name one of the four outcomes",
+      "evidence": "tests/test_repro_gates.py::test_a_decision_seat_names_its_outcome"
+    },
+    {
+      "claim": "expect is restricted to pass (the default) or fail; any other value is refused before anything runs",
+      "evidence": "tests/test_repro_gates.py::test_an_expect_other_than_pass_or_fail_is_refused"
+    },
+    {
+      "claim": "expect restriction in the gate code",
+      "evidence": "src/nirmaan/integrations/eda.py:461"
+    },
+    {
+      "claim": "with expect=fail the run passes only when the build succeeded, $finish was reached and exactly one verdict line with this run's nonce reports at least one failed check",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:226"
+    },
+    {
+      "claim": "a testbench whose checks all pass, one that prints no verdict or two, and one that does not build all fail the reproduction gate",
+      "evidence": "tests/test_repro_gates.py::test_only_the_testbenchs_own_failed_check_is_a_reproduction"
+    },
+    {
+      "claim": "the verdict line format NIRMAAN-SIM <nonce> <n> passed, <m> failed",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:129"
+    },
+    {
+      "claim": "only the file that declares the top module may end the run, read plusargs or open files; a design file that does is refused before anything is simulated (code)",
+      "evidence": "src/nirmaan/integrations/eda.py:451"
+    },
+    {
+      "claim": "a design that ends the simulation fails the reference testbench",
+      "evidence": "tests/test_nirmaan_gate_integrity.py::test_rtl_that_ends_the_simulation_fails_the_reference_testbench"
+    },
+    {
+      "claim": "a design cannot read the nonce",
+      "evidence": "tests/test_nirmaan_gate_integrity.py::test_a_design_cannot_read_the_nonce"
+    },
+    {
+      "claim": "a repro that passes on the RTL under investigation stops the work before review",
+      "evidence": "tests/test_repro_gates.py::test_a_root_cause_whose_repro_passes_on_the_rtl_does_not_reach_review"
+    },
+    {
+      "claim": "in an evaluation the must-fail scorer runs the repro on the clean inputs (must pass) and on each mutant (must fail)",
+      "evidence": "tests/test_repro_gates.py::test_a_root_cause_seat_reproduces_the_failure_and_its_repro_is_judged_against_the_fix"
+    },
+    {
+      "claim": "must-fail scorer contract in code",
+      "evidence": "src/nirmaan/evals/scorers.py:136"
+    },
+    {
+      "claim": "veritriage.investigate reports a classification with a confidence and a top hypothesis",
+      "evidence": "src/nirmaan/integrations/veritriage.py:62"
+    },
+    {
+      "claim": "card: single-hypothesis tunnel vision is the root_cause_analysis failure mode",
+      "evidence": "src/nirmaan/company/skills.py:509"
+    },
+    {
+      "claim": "card: the conclusion names its evidence and the alternatives it rejects",
+      "evidence": "src/nirmaan/company/skills.py:510"
+    }
+  ]
+}

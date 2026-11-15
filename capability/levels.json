@@ -242,14 +242,12 @@
     },
     "failure_triage": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/failure_triage.json",
+        "counts": true,
         "knowledge_document": "knowledge/verification/failure_triage.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     },
     "formal_verification": {
@@ -330,14 +328,12 @@
     },
     "log_analysis": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/log_analysis.json",
+        "counts": true,
         "knowledge_document": "knowledge/verification/log_analysis.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     },
     "model_checking": {
@@ -433,14 +429,12 @@
     },
     "root_cause_analysis": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/root_cause_analysis.json",
+        "counts": true,
         "knowledge_document": "knowledge/verification/root_cause_analysis.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     },
     "rtl_design": {
@@ -595,7 +589,7 @@
     }
   },
   "totals": {
-    "knowledge": 23,
+    "knowledge": 26,
     "practised": 4,
     "proven": 0
   },

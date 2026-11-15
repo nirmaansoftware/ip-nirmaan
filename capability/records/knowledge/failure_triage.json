@@ -1,0 +1,80 @@
+{
+  "format": "nirmaan.knowledge-check",
+  "skill": "failure_triage",
+  "knowledge_document": "knowledge/verification/failure_triage.md",
+  "document_sha256": "sha256:cccd8d561c4fe86835859c51bbd1cc9c2d34903e45b28f02d82092b4c93dbf26",
+  "writer": "IP-W2-K5 session (wave 2 knowledge batch, plan row W2-K5, 2026-11-15)",
+  "checker": "IP-W2-C5 session (wave 2 check batch, lane IP-W2-C5)",
+  "sources_read": [
+    "[WER] Glerum et al., Debugging in the (Very) Large: Ten Years of Implementation and Experience, SOSP 2009 (conference copy), all 17 pages read to the end, https://www.sigops.org/s/conferences/sosp/2009/papers/glerum-sosp09.pdf",
+    "[ZDelta] Zeller, The Debugging Book: Reducing Failure-Inducing Inputs (CC BY-NC-SA 4.0), whole chapter read to the end including Lessons Learned and Background, https://www.debuggingbook.org/html/DeltaDebugger.html",
+    "[LogParse] Zhu et al., Tools and Benchmarks for Automated Log Parsing, ICSE-SEIP 2019 (open-access arXiv 1811.03509), all 8 pages read to the end, https://arxiv.org/abs/1811.03509"
+  ],
+  "checked_at": "2026-11-15",
+  "gate_claims": [
+    {
+      "claim": "When a regression investigation asks for a reproduction, the triage and root-cause stages also write testbench files and a before-review gate runs simulator.run with expect=fail over the approved RTL under investigation and one testbench at a time, its top taken from that testbench",
+      "evidence": "tests/test_repro_gates.py::test_a_reproduction_hands_over_the_rtl_and_gates_triage_and_root_cause"
+    },
+    {
+      "claim": "the reproduction gate is declared by REPRODUCES with each=True, entry=True, expect=fail and before_review",
+      "evidence": "src/nirmaan/company/workflows.py:449"
+    },
+    {
+      "claim": "the reproducing() refinement adds the testbench output to a stage when a reproduction is asked for",
+      "evidence": "src/nirmaan/company/workflows.py:457"
+    },
+    {
+      "claim": "the triage stage is gated by REPRODUCES and needs a veritriage.investigate session",
+      "evidence": "src/nirmaan/company/workflows.py:472"
+    },
+    {
+      "claim": "the triage stage needs a VeriTriage session over the failing artifacts, from veritriage.investigate",
+      "evidence": "src/nirmaan/company/workflows.py:474"
+    },
+    {
+      "claim": "veritriage.investigate takes files: no paths, a missing path or a directory is refused",
+      "evidence": "src/nirmaan/integrations/veritriage.py:50"
+    },
+    {
+      "claim": "veritriage.investigate refuses a directory (committed test)",
+      "evidence": "tests/test_nirmaan_gate_integrity.py::test_veritriage_refuses_a_directory_cleanly"
+    },
+    {
+      "claim": "one call makes one session over all the paths it is given, with one classification",
+      "evidence": "src/nirmaan/integrations/veritriage.py:58"
+    },
+    {
+      "claim": "every repro must reproduce on its own: one that does not stops the work, even beside one that does",
+      "evidence": "tests/test_repro_gates.py::test_a_triage_repro_that_does_not_reproduce_stops_the_work_even_beside_one_that_does"
+    },
+    {
+      "claim": "a triage seat's repros each reproduce on their own, one run per repro",
+      "evidence": "tests/test_repro_gates.py::test_a_triage_seat_reproduces_each_bucket_on_its_own_and_each_bug_fails_a_repro_of_its_own"
+    },
+    {
+      "claim": "with expect=fail a run passes only when the build succeeded, $finish was reached and the one verdict line with this run's nonce reports at least one failed check",
+      "evidence": "tests/test_repro_gates.py::test_only_the_testbenchs_own_failed_check_is_a_reproduction"
+    },
+    {
+      "claim": "the must-fail-each scorer: each repro must pass on the clean inputs and every seeded bug must fail a different repro",
+      "evidence": "src/nirmaan/evals/scorers.py:240"
+    },
+    {
+      "claim": "the matching of mutants to distinct repro files",
+      "evidence": "src/nirmaan/evals/scorers.py:337"
+    },
+    {
+      "claim": "one repro that fails every bug cannot stand for two buckets",
+      "evidence": "tests/test_repro_gates.py::test_one_repro_that_fails_every_bug_cannot_stand_for_two_buckets"
+    },
+    {
+      "claim": "card: classifying from the first error line only is the triage failure mode",
+      "evidence": "src/nirmaan/company/skills.py:494"
+    },
+    {
+      "claim": "card: triage cites a VeriTriage session and its evidence nodes",
+      "evidence": "src/nirmaan/company/skills.py:495"
+    }
+  ]
+}
