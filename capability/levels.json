@@ -125,17 +125,18 @@
           "counts": true,
           "digest": "sha256:9ce453d40894146149cbc0b239b46c96be234eb3e1d8657fede9b2e728bfb5e2",
           "harness": "sha256:35643990d58bf28264abe98752bd6c2750a391483ac43176b4748a38fbc32711",
-          "lower": 0.5777,
+          "lower": 0.6212,
           "model": "claude-opus-5-5",
-          "n": 13,
-          "passed": 11,
+          "n": 15,
+          "passed": 13,
           "reasons": [],
           "records": [
             "evals/results/2026-11-14-claude-code-claude-opus-5-5-10",
             "evals/results/2026-11-14-claude-code-claude-opus-5-5-3",
             "evals/results/2026-11-14-claude-code-claude-opus-5-5-4",
             "evals/results/2026-11-14-claude-code-claude-opus-5-5-9",
-            "evals/results/2026-11-15-claude-code-claude-opus-5-5-3"
+            "evals/results/2026-11-15-claude-code-claude-opus-5-5-3",
+            "evals/results/2026-11-15-claude-code-claude-opus-5-5-4"
           ],
           "unjudged": 2
         }
@@ -149,6 +150,18 @@
         "problems": []
       },
       "level": "knowledge",
+      "practised": []
+    },
+    "constrained_random": {
+      "knowledge": {
+        "check_record": null,
+        "counts": false,
+        "knowledge_document": "knowledge/verification/constrained_random.md",
+        "problems": [
+          "no check record"
+        ]
+      },
+      "level": null,
       "practised": []
     },
     "control_logic_design": {
@@ -194,6 +207,18 @@
       "level": "knowledge",
       "practised": []
     },
+    "equivalence_checking": {
+      "knowledge": {
+        "check_record": null,
+        "counts": false,
+        "knowledge_document": "knowledge/verification/equivalence_checking.md",
+        "problems": [
+          "no check record"
+        ]
+      },
+      "level": null,
+      "practised": []
+    },
     "formal_verification": {
       "knowledge": {
         "check_record": "capability/records/knowledge/formal_verification.json",
@@ -236,6 +261,18 @@
           "unjudged": 1
         }
       ]
+    },
+    "model_checking": {
+      "knowledge": {
+        "check_record": null,
+        "counts": false,
+        "knowledge_document": "knowledge/verification/model_checking.md",
+        "problems": [
+          "no check record"
+        ]
+      },
+      "level": null,
+      "practised": []
     },
     "pipeline_design": {
       "knowledge": {
@@ -297,15 +334,16 @@
           "counts": true,
           "digest": "sha256:012eb9b7155ed6eb7761adca880b338f10c8f978b15dfd92f5adbb3253307a52",
           "harness": "sha256:35643990d58bf28264abe98752bd6c2750a391483ac43176b4748a38fbc32711",
-          "lower": 0.6756,
+          "lower": 0.7225,
           "model": "claude-opus-5-5",
-          "n": 8,
-          "passed": 8,
+          "n": 10,
+          "passed": 10,
           "reasons": [],
           "records": [
             "evals/results/2026-11-15-claude-code-claude-opus-5-5",
             "evals/results/2026-11-15-claude-code-claude-opus-5-5-2",
-            "evals/results/2026-11-15-claude-code-claude-opus-5-5-3"
+            "evals/results/2026-11-15-claude-code-claude-opus-5-5-3",
+            "evals/results/2026-11-15-claude-code-claude-opus-5-5-4"
           ],
           "unjudged": 0
         },
@@ -368,6 +406,18 @@
         "problems": []
       },
       "level": "knowledge",
+      "practised": []
+    },
+    "sva": {
+      "knowledge": {
+        "check_record": null,
+        "counts": false,
+        "knowledge_document": "knowledge/verification/sva.md",
+        "problems": [
+          "no check record"
+        ]
+      },
+      "level": null,
       "practised": []
     },
     "synthesis_awareness": {
