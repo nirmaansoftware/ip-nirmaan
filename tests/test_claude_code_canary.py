@@ -109,7 +109,8 @@ def test_the_canary_fails_when_the_loop_call_gets_no_mcp_config_under_its_isolat
 
 
 def test_the_canary_fails_when_the_loop_command_keeps_safe_mode(tmp_path, monkeypatch, user_file):
-    # On Claude Code 2.1.325 --safe-mode turns off the server --mcp-config names (H3 hand-run call, 2026-11-16).
+    # On Claude Code 2.1.325 --safe-mode turns off the server --mcp-config names
+    # (docs/records/2026-11-15-claude-code-canary.json).
     monkeypatch.setenv("NIRMAAN_CLAUDE_CODE", str(_fake(tmp_path, "honours")))
     monkeypatch.setattr(harness, "LOOP_DROPPED_FLAGS", ())
     assert canary.canary("haiku") == (canary.NO_BROKER, "the tools-in-loop command carries --safe-mode, which "
@@ -122,6 +123,35 @@ def test_the_canary_fails_when_the_loop_call_loses_its_isolation(tmp_path, monke
     monkeypatch.setattr(harness, "LOOP_ENV", ())
     assert canary.canary("haiku") == (canary.LEAKED, "the tools-in-loop call quoted the user-level instruction "
                                                      "file")
+
+
+def test_the_record_shows_each_calls_command_and_the_loop_call_with_safe_mode_kept(
+        tmp_path, monkeypatch, user_file, capsys):
+    import json
+
+    monkeypatch.setenv("NIRMAAN_CLAUDE_CODE", str(_fake(tmp_path, "honours")))
+    out = tmp_path / "record.json"
+    assert canary.main(["--record", str(out)]) == canary.PASSED
+    record = json.loads(out.read_text())
+    control, seat, loop, kept = record["calls"]
+    assert record["exit"] == 0 and record["outcome"] == "passed" and record["model"] == "haiku"
+    assert control["quoted_user_file"] and "withheld" in control["answer"] and "Bonjour" not in out.read_text()
+    assert "--safe-mode" not in control["argv"] and "--safe-mode" in seat["argv"] and not seat["quoted_user_file"]
+    assert "--safe-mode" not in loop["argv"] and "--restricted" in loop["argv"] and "--mcp-config" in loop["argv"]
+    assert loop["env"] == {"CLAUDE_CODE_DISABLE_CLAUDE_MDS": "1"} and loop["brokered_calls"] == 1
+    assert "--safe-mode" in kept["argv"] and "--mcp-config" in kept["argv"] and kept["brokered_calls"] == 0
+    assert loop["argv"][loop["argv"].index("--mcp-config") + 1] == "<server config>"
+    assert harness.LOOP_DROPPED_FLAGS == ("--safe-mode",)  # restored after the kept call
+
+
+def test_the_record_gives_a_call_that_never_started_no_command(tmp_path, monkeypatch, user_file):
+    monkeypatch.setenv("NIRMAAN_CLAUDE_CODE", str(_fake(tmp_path, "honours")))
+    monkeypatch.setattr(canary, "_ask_loop", lambda model: ("", "Claude Code could not start", 0))
+    record: list = []
+    assert canary.canary("haiku", record)[0] == canary.INCONCLUSIVE
+    assert [c["call"] for c in record] == ["control", "seat", "tools-in-loop",
+                                           "tools-in-loop with --safe-mode kept (decides nothing)"]
+    assert record[1]["argv"] and record[2]["argv"] is None and record[3]["argv"] is None
 
 
 def test_with_no_user_level_file_or_no_executable_the_canary_is_inconclusive(tmp_path, monkeypatch, user_file):

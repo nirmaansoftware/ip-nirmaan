@@ -221,14 +221,16 @@ LOOP_SERVER = "nirmaan-broker"
 #: tool): only the allowed brokered tools run, and anything else that would ask for permission is refused.
 LOOP_FLAGS = ("--permission-mode", "dontAsk")
 #: Seat flags (``CLAUDE_CODE_FLAGS``) the variant drops: on Claude Code 2.1.325 ``--safe-mode`` turns every MCP
-#: server off, the one ``--mcp-config`` names included, so a seat under it never reaches the broker (H3 hand-run
-#: call, 2026-11-16: 0 brokered calls with it, 1 without). The default and ``attempts-3`` keep it.
+#: server off, the one ``--mcp-config`` names included, so a seat under it never reaches the broker (record
+#: docs/records/2026-11-15-claude-code-canary.json: 0 brokered calls with it, 1 without). The default and
+#: ``attempts-3`` keep it.
 LOOP_DROPPED_FLAGS = ("--safe-mode",)
 #: What keeps the user-level files out of the variant's call in its place. ``--restricted`` loads only managed
 #: settings and ``--settings``: no user, project or local settings file, so no hook, plugin, skill or permission
 #: rule of the person's own. ``CLAUDE_CODE_DISABLE_CLAUDE_MDS=1`` loads no CLAUDE.md memory file (user, project
 #: or auto memory). ``--mcp-config`` still loads, with ``--strict-mcp-config`` the only server
-#: (scripts/claude_code_canary.py checks both live). Never ``--bare``: it never reads the plan login.
+#: (scripts/claude_code_canary.py checks both live; the same record). Never ``--bare``: it never reads the plan
+#: login.
 LOOP_ISOLATION_FLAGS = ("--restricted",)
 LOOP_ENV = (("CLAUDE_CODE_DISABLE_CLAUDE_MDS", "1"),)
 #: Appended to the work system prompt in the variant: ``FILE_FORMAT`` says the seat cannot run checks itself.

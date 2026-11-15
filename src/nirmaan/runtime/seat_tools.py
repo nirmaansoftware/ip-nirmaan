@@ -465,10 +465,15 @@ def loop_command(argv: list[str], env: dict[str, str]) -> tuple[list[str], dict[
     """The seat's Claude Code command and environment for the variant (harness ``LOOP_DROPPED_FLAGS``,
     ``LOOP_ISOLATION_FLAGS``, ``LOOP_ENV``): ``--safe-mode`` out, since it turns off the brokered server too,
     and ``--restricted`` and ``CLAUDE_CODE_DISABLE_CLAUDE_MDS=1`` in, so no user-level file reaches the seat.
-    The value of ``--model`` or ``--system-prompt`` is never read as a flag."""
-    kept = [arg for i, arg in enumerate(argv)
-            if arg not in harness.LOOP_DROPPED_FLAGS or (i and argv[i - 1] in ("--model", "--system-prompt"))]
-    return [*kept, *harness.LOOP_ISOLATION_FLAGS], {**env, **dict(harness.LOOP_ENV)}
+    Only the seat's flags (``CLAUDE_CODE_FLAGS``, in order) are changed, so no other flag's value is read as a
+    flag; a command without them is a ValueError."""
+    flags = list(harness.CLAUDE_CODE_FLAGS)
+    at = next((i for i in range(len(argv) - len(flags) + 1) if argv[i:i + len(flags)] == flags), None)
+    if at is None:
+        raise ValueError("the seat's command does not carry harness.CLAUDE_CODE_FLAGS")
+    kept = [flag for flag in flags if flag not in harness.LOOP_DROPPED_FLAGS]
+    return ([*argv[:at], *kept, *harness.LOOP_ISOLATION_FLAGS, *argv[at + len(flags):]],
+            {**env, **dict(harness.LOOP_ENV)})
 
 
 def run_with_tools(argv: list[str], user: str, cwd: str, env: dict[str, str], session: SeatTools,

@@ -87,7 +87,7 @@ changes `tools-in-loop` and never `default` or `attempts-3`:
 | `LOOP_MAX_FILES`, `LOOP_MAX_CHARS` | 16, 200000 | one call's size |
 | `LOOP_SUFFIXES` | .v .sv .vh .svh .sby | HDL and proof setups only: no script, no memory image |
 | `LOOP_SERVER`, `LOOP_FLAGS` | nirmaan-broker; `--permission-mode dontAsk` | how Claude Code knows the server, and that nothing else is allowed |
-| `LOOP_DROPPED_FLAGS` | `--safe-mode` | it turns the brokered server off too (CLI 2.1.325, the H3 hand-run call of 2026-11-16) |
+| `LOOP_DROPPED_FLAGS` | `--safe-mode` | it turns the brokered server off too (CLI 2.1.325: `docs/records/2026-11-15-claude-code-canary.json`, 0 brokered calls with it) |
 | `LOOP_ISOLATION_FLAGS`, `LOOP_ENV` | `--restricted`; `CLAUDE_CODE_DISABLE_CLAUDE_MDS=1` | no user-level settings file or instruction file reaches the seat, and `--mcp-config` still loads; never `--bare`, which never reads the plan login |
 | `LOOP_SYSTEM` | the added system text | the default's `FILE_FORMAT` says the seat cannot run checks |
 
@@ -117,6 +117,10 @@ before it answers.
   server behind the real relay) and fails when it quotes the file (exit 1)
   or makes no brokered call (exit 3). It runs by hand, after a Claude Code
   update and before the variant's first trial; CI runs it only against fake
-  executables (`tests/test_claude_code_canary.py`).
+  executables (`tests/test_claude_code_canary.py`). Its run on Claude Code
+  2.1.325 (haiku, 2026-11-15) passed and is committed with `--record`:
+  `docs/records/2026-11-15-claude-code-canary.json` (the control quoted the
+  file; the seat call and the loop call quoted none of it; the loop call
+  made 1 brokered call, and the same call with `--safe-mode` kept made 0).
 - No live trial ran. The seat in every test is a mock or a fake `claude`
   that speaks MCP to the real relay.

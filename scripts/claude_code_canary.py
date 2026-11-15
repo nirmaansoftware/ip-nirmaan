@@ -25,6 +25,12 @@ does not depend on the model, so a small one is enough. Run it after a Claude
 Code update and before a batch. It is not run in CI, which calls no model;
 ``tests/test_claude_code_canary.py`` runs it against fake executables.
 
+``--record <file>`` also writes what each call was given and what came back
+(the command line, the loop variables, the answer, unless it quotes the
+user-level file, whether it quoted it, and the brokered calls) as JSON, and
+makes one more call that decides nothing: the loop call with ``--safe-mode``
+kept, to record whether this Claude Code still turns the server off under it.
+
 Exit 0: the control quoted the file and neither seat call did, and the loop
 call reached the broker. Exit 1: a seat call quoted it. Exit 2: inconclusive
 (no executable, no user-level file, a call failed, or the control quoted
@@ -34,9 +40,13 @@ nothing). Exit 3: the loop call made no brokered call.
 from __future__ import annotations
 
 import argparse
+import contextlib
+import datetime
+import json
 import os
 import re
 import secrets
+import subprocess
 import sys
 from pathlib import Path
 
@@ -44,7 +54,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
 from nirmaan.runtime import harness  # noqa: E402
-from nirmaan.runtime.claude_code import ClaudeCodeLLM, find_claude  # noqa: E402
+from nirmaan.runtime.claude_code import ClaudeCodeLLM, find_claude, read_version  # noqa: E402
 from nirmaan.runtime.prompt import WorkPrompt  # noqa: E402
 from nirmaan.runtime.seat_tools import loop_command  # noqa: E402
 
@@ -98,6 +108,46 @@ def quotes(answer: str, source: str, n: int = SHINGLE) -> bool:
     return any(tuple(said[i:i + n]) in runs for i in range(len(said) - n + 1))
 
 
+@contextlib.contextmanager
+def _watched(into: list[dict] | None):
+    """Note the command line and loop variables of each ``claude -p`` started inside (``subprocess.run`` and
+    the loop's ``Popen`` both start one through ``subprocess.Popen``)."""
+    if into is None:
+        yield
+        return
+    popen = subprocess.Popen
+
+    def watch(args, *rest, **kwargs):
+        if isinstance(args, (list, tuple)) and "-p" in args:
+            env = kwargs.get("env") or {}
+            argv = list(args[1:])
+            if "--mcp-config" in argv:  # a temporary file's path: the same on no two calls
+                argv[argv.index("--mcp-config") + 1] = "<server config>"
+            into.append({"argv": ["claude", *argv],
+                         "env": {k: env[k] for k, _ in harness.LOOP_ENV if k in env}})
+        return popen(args, *rest, **kwargs)
+
+    subprocess.Popen = watch
+    try:
+        yield
+    finally:
+        subprocess.Popen = popen
+
+
+def _note(record: list[dict] | None, name: str, started: list[dict], text: str, error: str | None,
+          source: str, calls: int | None = None) -> None:
+    """Append one call to ``record``: the command it started, if it started one since the last note."""
+    if record is None:
+        return
+    quoted = quotes(text, source)
+    begun = started[len(record):]  # what started since the last note: one command, or none if it never started
+    entry = begun[0] if len(begun) == 1 else {"argv": None, "env": {}}
+    started[len(record):] = [entry]  # one entry per noted call, so the next note reads only its own
+    record.append({"call": name, **entry,
+                   "answer": "(withheld: it quotes the user-level file)" if quoted else text, "error": error,
+                   "quoted_user_file": quoted, "brokered_calls": calls})
+
+
 def _ask(model: str, flags: tuple[str, ...]) -> tuple[str, str | None]:
     seat_flags = harness.CLAUDE_CODE_FLAGS
     harness.CLAUDE_CODE_FLAGS = flags
@@ -116,8 +166,15 @@ def _ask_loop(model: str) -> tuple[str, str | None, int]:
     return done.text, done.error, session.calls
 
 
-def canary(model: str) -> tuple[int, str]:
-    """The canary's outcome (``PASSED``, ``LEAKED`` or ``INCONCLUSIVE``) and why."""
+def canary(model: str, record: list[dict] | None = None) -> tuple[int, str]:
+    """The canary's outcome (``PASSED``, ``LEAKED``, ``INCONCLUSIVE`` or ``NO_BROKER``) and why. With
+    ``record``, a list, each call is appended to it, and the loop call with ``--safe-mode`` kept is made."""
+    started: list[dict] | None = None if record is None else []
+    with _watched(started):
+        return _canary(model, record, started)
+
+
+def _canary(model: str, record: list[dict] | None, started: list[dict] | None) -> tuple[int, str]:
     if SAFE not in harness.CLAUDE_CODE_FLAGS:
         return LEAKED, f"the seat's flags do not carry {SAFE}"
     if SAFE in loop_command(["claude", "-p", *harness.CLAUDE_CODE_FLAGS], {})[0]:
@@ -129,16 +186,28 @@ def canary(model: str) -> tuple[int, str]:
     if len(_words(text)) < SHINGLE:
         return INCONCLUSIVE, f"no user-level instruction file at {source}: nothing could leak"
     control, error = _ask(model, tuple(f for f in harness.CLAUDE_CODE_FLAGS if f != SAFE))
+    _note(record, "control", started, control, error, text)
     if error:
         return INCONCLUSIVE, f"the control call failed: {error}"
     if not quotes(control, text):
         return INCONCLUSIVE, "the control call quoted nothing of the user-level file: the canary cannot see a leak"
     seat, error = _ask(model, harness.CLAUDE_CODE_FLAGS)
+    _note(record, "seat", started, seat, error, text)
     if error:
         return INCONCLUSIVE, f"the seat call failed: {error}"
     if quotes(seat, text):
         return LEAKED, "a seat call quoted the user-level instruction file"
     loop, error, calls = _ask_loop(model)
+    _note(record, "tools-in-loop", started, loop, error, text, calls)
+    if record is not None:  # decides nothing: does this Claude Code still turn the server off under --safe-mode?
+        dropped = harness.LOOP_DROPPED_FLAGS
+        harness.LOOP_DROPPED_FLAGS = ()
+        try:
+            kept, kept_error, kept_calls = _ask_loop(model)
+        finally:
+            harness.LOOP_DROPPED_FLAGS = dropped
+        _note(record, f"tools-in-loop with {SAFE} kept (decides nothing)", started, kept, kept_error, text,
+              kept_calls)
     if error:
         return INCONCLUSIVE, f"the tools-in-loop call failed: {error}"
     if quotes(loop, text):
@@ -152,10 +221,21 @@ def canary(model: str) -> tuple[int, str]:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("--model", default="haiku", help="The model both calls ask (default: haiku).")
+    parser.add_argument("--model", default="haiku", help="The model every call asks (default: haiku).")
+    parser.add_argument("--record", type=Path, help="Write each call and the outcome to this JSON file.")
     args = parser.parse_args(argv)
-    code, why = canary(args.model)
-    print(f"{('passed', 'LEAKED', 'inconclusive', 'NO BROKER')[code]}: {why}")
+    calls: list[dict] | None = None if args.record is None else []
+    code, why = canary(args.model, calls)
+    outcome = ("passed", "LEAKED", "inconclusive", "NO BROKER")[code]
+    print(f"{outcome}: {why}")
+    if args.record is not None:
+        executable = find_claude()
+        home = str(Path.home())
+        args.record.write_text(json.dumps({
+            "canary": "scripts/claude_code_canary.py", "cli": read_version(executable) if executable else None,
+            "model": args.model, "at": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "user_file": str(user_instruction_file()), "calls": calls, "exit": code, "outcome": outcome,
+            "why": why}, indent=2).replace(home, "~") + "\n", encoding="utf-8")
     return code
 
 

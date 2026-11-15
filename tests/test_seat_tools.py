@@ -462,8 +462,10 @@ def test_the_loop_command_swaps_safe_mode_for_restricted_and_keeps_every_other_s
     seat = ["claude", "-p", *harness.CLAUDE_CODE_FLAGS, "--model", "haiku", "--system-prompt", "--safe-mode"]
     argv, env = loop_command(seat, {"HOME": "/h"})
     assert argv == ["claude", "-p", "--output-format", "json", "--tools", "", "--no-session-persistence",
-                    "--strict-mcp-config", "--model", "haiku", "--system-prompt", "--safe-mode", "--restricted"]
+                    "--strict-mcp-config", "--restricted", "--model", "haiku", "--system-prompt", "--safe-mode"]
     assert env == {"HOME": "/h", "CLAUDE_CODE_DISABLE_CLAUDE_MDS": "1"}
+    with pytest.raises(ValueError, match="CLAUDE_CODE_FLAGS"):  # never a guess at which token is a flag
+        loop_command(["claude", "-p", "--safe-mode", "--model", "haiku"], {})
     assert "--bare" not in argv  # --bare never reads the plan login
     assert "--safe-mode" in harness.CLAUDE_CODE_FLAGS  # the default and attempts-3 keep it
 
