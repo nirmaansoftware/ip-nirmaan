@@ -1,0 +1,21 @@
+{
+  "cases": [
+    "rtl/axil-timer"
+  ],
+  "command": "nirmaan eval run --runtime claude-code --trials 2 --seats rtl rtl/axil-timer",
+  "finished_at": "2026-11-14T12:05:38.015667Z",
+  "format": "nirmaan.eval-run",
+  "head_sha": "0ff1f905241fbec345997588c008dd64cc49fd89",
+  "id": "2026-11-14-claude-code-claude-opus-5-5-12",
+  "knowledge": "on",
+  "model": "claude-opus-5-5",
+  "nirmaan_version": "1.25.0",
+  "replay": false,
+  "runtime": "claude-code",
+  "seats": [
+    "rtl-implementation"
+  ],
+  "started_at": "2026-11-14T11:56:36.874910Z",
+  "trials": 2,
+  "version": 1
+}

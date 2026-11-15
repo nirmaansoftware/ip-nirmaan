@@ -207,6 +207,8 @@ def test_only_the_three_approved_seats_may_wait_for_their_files(teams_map):
         ("src/nirmaan/integrations/eda.py", {"eda-platform", "verification"}),
         ("src/nirmaan/integrations/eda_parsers.py", {"eda-platform"}),
         ("src/nirmaan/work/policy.py", {"eda-platform", "verification"}),
+        ("src/nirmaan/company/evidence.py", {"eda-platform", "verification"}),
+        ("src/nirmaan/evals/levels.py", {"verification"}),
         ("src/nirmaan/runtime/tools.py", {"eda-platform", "verification"}),
         ("src/nirmaan/runtime/loop.py", {"eda-platform"}),
         ("scripts/check_dashes.py", {"eda-platform", "verification"}),
@@ -366,6 +368,17 @@ def test_gate_files_are_founder_class_and_reviewed_by_verification(teams_map):
     for glob in gates:
         for path in [p for p in tracked_files() if matches(glob, p)]:
             assert "verification" in owning_teams(teams_map, path), path
+
+
+@pytest.mark.parametrize("path", ["src/nirmaan/company/evidence.py", "src/nirmaan/evals/levels.py"])
+def test_a_level_rule_change_is_gate_semantics(teams_map, files, path):
+    """The level rules decide what a skill level needs (MUST_FAIL_DOMAINS in
+    evidence.py, the rest in levels.py), so a change to them is a gate change:
+    gate semantics, which the Founder Proxy reviews (ip#212 changed
+    MUST_FAIL_DOMAINS while evidence.py was in no founder class)."""
+    assert path in files, f"{path} is not tracked"
+    diff = f"diff --git a/{path} b/{path}\n--- a/{path}\n+++ b/{path}\n@@ -1,1 +1,1 @@\n-# old\n+# new\n"
+    assert "gate-semantics" in _classify(teams_map, path, diff, status="M")["founder"], path
 
 
 def _harness_files() -> list[str]:
