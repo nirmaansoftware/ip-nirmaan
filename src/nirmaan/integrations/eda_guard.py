@@ -253,6 +253,55 @@ def sby_problem(sby: Path) -> str | None:
     return yosys_problem(script, f"{sby.name}'s [script]") or verilog_problem(sources)
 
 
+# --- eqy setups -------------------------------------------------------------------------------
+
+#: The sections an eqy setup may have; ``gold``, ``gate`` and ``script`` hold Yosys commands.
+EQY_SECTIONS = frozenset({"options", "gold", "gate", "script", "match", "collect", "partition", "recode", "strategy"})
+EQY_SCRIPTS = ("gold", "gate", "script")
+#: eqy's own ``[options]``, each on or off.
+EQY_OPTIONS = frozenset({"splitnets", "insbuf"})
+#: What a ``[strategy]`` may set, and the values each takes; ``engine`` is checked as an SBY engine line (eqy writes
+#: it into the ``.sby`` it runs). A strategy's ``option`` lines would go into that ``.sby``'s ``[options]``
+#: unchecked, so a gate does not take them.
+EQY_STRATEGY = {
+    "use": re.compile(r"^(sat|sby)$"),
+    "depth": re.compile(r"^\d+$"),
+    "timeout": re.compile(r"^\d+$"),
+    "xprop": re.compile(r"^(on|off)$"),
+}
+
+
+def eqy_problem(eqy: Path) -> str | None:
+    """Why an eqy setup cannot be run by a gate, or None (docs/GATE_INPUTS.md, section 2)."""
+    section, scripts = None, []
+    for line in eqy.read_text(encoding="utf-8", errors="replace").splitlines():
+        text = line.strip()
+        if not text or text.startswith("#"):
+            continue
+        header = _header(text)
+        if header:
+            section = header[0]
+            if section not in EQY_SECTIONS:
+                return (f"{eqy.name} has a [{text[1:-1].strip()}] section; a gate runs setups with "
+                        f"{', '.join(f'[{s}]' for s in sorted(EQY_SECTIONS))} only {REFUSED}")
+            continue
+        words = text.split()
+        if section in EQY_SCRIPTS:
+            scripts.append(text)
+        elif section == "options" and not (len(words) == 2 and words[0] in EQY_OPTIONS and words[1] in ("on", "off")):
+            return f"{eqy.name} sets the option {text!r}; a gate runs {', '.join(sorted(EQY_OPTIONS))} on or off {REFUSED}"
+        elif section == "strategy" and words[0] == "engine":
+            problem = engine_problem(words[1:], f"{eqy.name}'s strategy")
+            if problem:
+                return problem
+        elif section == "strategy":
+            rule = EQY_STRATEGY.get(words[0])
+            if rule is None or len(words) != 2 or not rule.match(words[1]):
+                return (f"{eqy.name}'s strategy sets {text!r}; a gate takes {', '.join(sorted(EQY_STRATEGY))} and "
+                        f"engine, each with a plain value {REFUSED}")
+    return yosys_problem(scripts, eqy.name)
+
+
 # --- Timing constraints (SDC, which OpenSTA and OpenROAD read as Tcl) -------------------------
 
 #: The Tcl commands a constraints file may use: SDC's own, the object queries, and plain variables, lists and

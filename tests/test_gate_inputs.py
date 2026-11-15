@@ -1,7 +1,7 @@
 """M84 (docs/GATE_INPUTS.md): a gate runs nothing a seat's file asks of the host outside its run.
 
 Must-fail: each construct that reached a shell (or other code) through a gate is refused before any step runs,
-and the marker file its payload would create is never there. Two controls show the payload is live: with the
+and the marker file its payload would create is never there. Three controls show the payloads are live: with the
 check bypassed, the marker appears. Must-pass: every committed gate input still passes the checks, and an
 ordinary testbench still simulates.
 
@@ -21,6 +21,7 @@ from nirmaan.integrations.eda import backends_for, execute
 from nirmaan.integrations.eda_guard import (
     SAFE_SYSTEM,
     check_inputs,
+    eqy_problem,
     name_problem,
     sby_problem,
     sdc_problem,
@@ -240,7 +241,9 @@ def test_an_ordinary_setup_still_proves(tmp_path):
 
 @pytest.mark.parametrize("gold,strategy", [("read_verilog -sv m.v; abc -exe touch", "engine smtbmc"),
                                            ("read_verilog -sv m.v\nshow -viewer touch", "engine smtbmc"),
-                                           ("read_verilog -sv m.v", "engine smtbmc yices;touch")])
+                                           ("read_verilog -sv m.v", "engine smtbmc yices;touch"),
+                                           ("read_verilog -sv m.v", "engine smtbmc\noption tbtop m;touch"),
+                                           ("read_verilog -sv m.v", "engine smtbmc\n[pycode x]")])
 def test_an_equivalence_setup_that_reaches_outside_yosys_is_refused(tmp_path, gold, strategy):
     write(tmp_path / "m.v", DESIGN)
     write(tmp_path / "n.v", DESIGN.replace("module m", "module n"))
@@ -293,6 +296,11 @@ def test_every_committed_single_task_setup_and_constraints_file_passes():
     assert setups and [p for p in setups if sby_problem(p)] == []
     constraints = committed(".sdc")
     assert constraints and [p for p in constraints if sdc_problem(p)] == []
+
+
+def test_every_committed_equivalence_setup_passes():
+    setups = committed(".eqy")
+    assert setups and [p for p in setups if eqy_problem(p)] == []
 
 
 def test_the_yosys_allow_list_writes_nothing_and_runs_nothing():

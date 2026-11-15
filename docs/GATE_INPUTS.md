@@ -17,8 +17,8 @@ file whose payload would create a marker file in the test's own temporary
 directory, and asserts the run is refused and the marker is not there. Three
 controls bypass the check and assert the marker does appear (Yosys through
 `top`, Verilator through `$system`, SBY through a `!` line), so the payloads
-are live. Must-pass tests run every committed Verilog file, single-task `.sby`
-and `.sdc` under `tests/fixtures/` and `evals/` through the checks, and an
+are live. Must-pass tests run every committed Verilog file, single-task `.sby`,
+`.eqy` and `.sdc` under `tests/fixtures/` and `evals/` through the checks, and an
 ordinary testbench, setup and synthesis through the real tools.
 
 ## 1. What was exposed
@@ -63,8 +63,12 @@ refused `$system`, `$fopen`, `$c` and DPI in every source.
   (and `[tasks]`, which the formal backends refuse themselves); the options in
   `SBY_OPTIONS`, each with a plain value; engines in `SBY_ENGINES`, each word a
   known solver or option; no `--pycode` line; no `[files]` destination
-  outside the run's folder and no folder copied. An `.eqy` strategy's
-  `engine` line is checked as an SBY engine line.
+  outside the run's folder and no folder copied.
+- **eqy setups**: the sections in `EQY_SECTIONS`, eqy's own options on or off,
+  a strategy's `use`, `depth`, `timeout` and `xprop` with plain values and its
+  `engine` line checked as an SBY engine line (a strategy's `option` lines,
+  which eqy writes into the `.sby` it runs, are refused), and the Yosys
+  allow list in `[gold]`, `[gate]` and `[script]`.
 - **Constraints**: no quote, no backslash but a line continuation, no brace
   inside a word (so braces are the only quoting, and the check reads the
   commands Tcl would run), and every command, at a line's start, after a `;`
@@ -104,6 +108,11 @@ use it. That is not enough for a seat's code: on the founder's Mac it can read
 and write what the founder's account can. Until those runs get an account or
 sandbox of their own, run cocotb and firmware cases in CI, not on a personal
 machine. This milestone does not change them.
+
+Reading is not covered either: an `.sby` `[files]` source may still name an
+absolute path or one outside its folder, so a seat's setup can copy a file of
+the host into its run, where Yosys may print part of it to a log. That is a read,
+not a run, and a follow-up for the platform's security owner.
 
 ## 5. The harness
 
