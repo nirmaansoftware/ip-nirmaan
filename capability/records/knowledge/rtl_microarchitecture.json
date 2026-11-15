@@ -1,0 +1,59 @@
+{
+  "format": "nirmaan.knowledge-check",
+  "skill": "rtl_microarchitecture",
+  "knowledge_document": "knowledge/architecture/rtl_microarchitecture.md",
+  "document_sha256": "sha256:b9aaf9a5e28252603808a6b2d64bb313410e46b3fc28f0022bb1c36d8d3d1e49",
+  "writer": "RETRO-A5 session (retrospective action A5, item P3-K3, 2026-11-15)",
+  "checker": "RETRO-A4 session (retrospective action A4, item P3-C3, 2026-11-15)",
+  "sources_read": [
+    "[Pipe] Gisselquist, Strategies for pipelining logic, ZipCPU blog, 2017: the whole article, https://zipcpu.com/blog/2017/08/14/strategies-for-pipelining.html",
+    "[Skid] Gisselquist, Building a Skid Buffer for AXI processing, ZipCPU blog, 2019: the whole article with its properties and SymbiYosys script, https://zipcpu.com/blog/2019/05/22/skidbuffer.html",
+    "[Ibex] lowRISC, Ibex documentation, Pipeline Details (Apache 2.0): the whole page including the stall-cycle table, https://ibex-core.readthedocs.io/en/latest/03_reference/pipeline_details.html",
+    "[Rules] Gisselquist, Rules for new FPGA designers (the document's source row titles it Rules for FPGA development, for new students), ZipCPU blog, 2017: the whole post, https://zipcpu.com/blog/2017/08/21/rules-for-newbies.html",
+    "Repository code at the lines cited in gate_claims (company/workflows.py, company/skills.py, company/governance.py)"
+  ],
+  "result": "every claim tagged with a source was found in that source, every line marked inference is a fair reading of the source it names or the document's own reasoning, and every sentence about the platform's gates matches the gate code at the lines cited in gate_claims",
+  "notes": [
+    "The signalling section follows Pipe: global valid, traveling CE (cannot handle stalls, valid cleared on reset, data a don't care on reset), the simple valid and busy handshake (valid raised without waiting for busy, busy idles low, data held until the clock after the transfer), and the buffered handshake with a registered busy. That the global valid cannot stall is a fair reading of Pipe (fixed-rate data, one valid per sample); Pipe says outright only that the traveling CE cannot handle stalls.",
+    "Backpressure: combinational busy accumulating delay per stage and a registered busy costing an idle cycle or a buffer are in Pipe; the ZipCPU stall chain (op_stall, dcd_stall, pf_stall) and the two skid-buffer criteria (data constant while valid and not ready, no item lost) are in Skid. Ibex stalls its single ID/EX stage until a multi-cycle instruction finishes, and loads and stores stall at least one cycle, in the Multi- and Single-Cycle Instructions table.",
+    "Clocking: Rules says one clock, no falling-edge transitions, no rising edge of anything but the system clock, and points to enables inside clocked logic. The failure mode of a valid raised only after ready is Pipe's deadlock note.",
+    "The document's source row gives the title of the Rules post as Rules for FPGA development, for new students; the page is titled Rules for new FPGA designers. The URL is right and the content cited is there; the title in the document's front matter is inexact.",
+    "Gate: the microarchitecture step needs an independent review record and no tool run (REVIEWED at workflows.py:63, the stage at workflows.py:195-197), and the skill holds no tool. The same stage also carries gate.architecture, an architecture approval that requires a human (governance.py:87-89); the document does not mention it, which is an omission, not a false statement.",
+    "The card lines the document quotes (Underspecified backpressure, Unbounded queues, Every buffer has a depth justification, Backpressure is specified end to end) are in skills.py:232-237."
+  ],
+  "gate_claims": [
+    {
+      "claim": "the step that holds the microarchitecture needs an independent review record",
+      "evidence": "src/nirmaan/company/workflows.py:197"
+    },
+    {
+      "claim": "the review record requirement is REVIEWED (Independent review recorded)",
+      "evidence": "src/nirmaan/company/workflows.py:63"
+    },
+    {
+      "claim": "the microarchitecture stage is the arch.microarchitecture capability producing a microarchitecture_spec",
+      "evidence": "src/nirmaan/company/workflows.py:195"
+    },
+    {
+      "claim": "no tool run is required for the microarchitecture step (its evidence is the review record only)",
+      "evidence": "src/nirmaan/company/workflows.py:197"
+    },
+    {
+      "claim": "the skill holds no tool",
+      "evidence": "src/nirmaan/company/skills.py:232"
+    },
+    {
+      "claim": "the card's fails and valid lines (underspecified backpressure, unbounded queues, a depth justification per buffer)",
+      "evidence": "src/nirmaan/company/skills.py:236"
+    },
+    {
+      "claim": "the document is Knowledge only because the skill has no available tool",
+      "evidence": "src/nirmaan/org/knowledge_files.py:53"
+    },
+    {
+      "claim": "the same stage carries an architecture approval gate that needs a human (not stated in the document)",
+      "evidence": "src/nirmaan/company/governance.py:87"
+    }
+  ],
+  "checked_at": "2026-11-15"
+}
