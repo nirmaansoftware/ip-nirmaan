@@ -4,7 +4,7 @@ skill: synthesis_awareness
 as_of: 2026-11-15
 review_by: 2027-05-15
 sources:
-  - open | YosysHQ, Yosys documentation: Synth commands, and the synth command reference [Synth] | https://yosyshq.readthedocs.io/projects/yosys/en/latest/cmd/index_passes_synth.html
+  - open | YosysHQ, Yosys command reference: Technology libraries, Generic (the synth command) [Synth] | https://yosyshq.readthedocs.io/projects/yosys/en/latest/cmd/index_techlibs_common.html
   - open | YosysHQ, Yosys command reference: Converting process blocks (the proc passes) [Proc] | https://yosyshq.readthedocs.io/projects/yosys/en/latest/cmd/index_passes_proc.html
   - open | YosysHQ, Yosys command reference: Optimization passes [Opt] | https://yosyshq.readthedocs.io/projects/yosys/en/latest/cmd/index_passes_opt.html
   - open | YosysHQ, Yosys documentation: A primer on digital circuit synthesis [Primer] | https://yosyshq.readthedocs.io/projects/yosys/en/latest/appendix/primer.html
@@ -70,10 +70,16 @@ that backs it. This card holds no tool; the tool it points to is `synth.run`.
   are Yosys's internal gate types, not a library's cells, so the count is a
   relative size, not an area in a unit, and there is no delay figure
   (inference from [Synth]; gate lines above).
-- The `yosys-liberty` backend, when a Liberty file is given, maps flip-flops
-  and logic to library cells and also records an area figure from
-  `stat -liberty` and writes a netlist (gate: src/nirmaan/integrations/physical.py:160-197,
-  backend registered at physical.py:540). Timing comes from a separate tool,
+- The `yosys-liberty` backend runs only when it is named: `select_backend`
+  keeps every backend of the tool when no `backend` parameter is given, or only
+  the one with that name when it is, and returns the first candidate whose
+  executables and environment are present (gate: src/nirmaan/integrations/eda.py:163-179).
+  The plain `yosys` backend is registered first (eda.py:812; `yosys-liberty` at
+  physical.py:540), so without `backend=yosys-liberty` the plain run is what
+  happens, even if a Liberty file is given. Named, `yosys-liberty` needs a
+  Liberty file, maps flip-flops and logic to library cells, records an area
+  figure from `stat -liberty` and writes a netlist (gate:
+  src/nirmaan/integrations/physical.py:161-197). Timing comes from a separate tool,
   `sta.run` (gate: src/nirmaan/company/tools.py:183), not from synthesis.
 
 ## Estimating depth and area before a run
