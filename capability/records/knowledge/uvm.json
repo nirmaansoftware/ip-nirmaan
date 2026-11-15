@@ -1,0 +1,35 @@
+{
+  "format": "nirmaan.knowledge-check",
+  "skill": "uvm",
+  "knowledge_document": "knowledge/verification/uvm.md",
+  "document_sha256": "sha256:23a317bbfd7bbc47816157bf9d223fd870e76ad1b26485bb7ba6c9b9235ce20f",
+  "writer": "IP-W2-K7 session (wave 2 knowledge batch, plan row W2-K7, 2026-11-15)",
+  "checker": "IP-W2-C8 session (wave 2 check batch, lane IP-W2-C8)",
+  "sources_read": [
+    "[PyUVM] pyuvm project, Introduction and TinyALU example, pyuvm documentation: the whole page to its last section, including the AluEnv connect_phase, Monitor, Scoreboard, Coverage, Driver and sequence code and the reporting section, https://pyuvm.readthedocs.io/en/latest/docsources/README.html",
+    "[OTDV] lowRISC, OpenTitan Design Verification Methodology: the whole page to its last section, https://opentitan.org/book/doc/contributing/dv/methodology/index.html",
+    "[OTChk] lowRISC, OpenTitan Signoff Checklist: the whole page, D1 to the S stages, https://opentitan.org/book/doc/project_governance/checklist/index.html",
+    "[OTLib] lowRISC, OpenTitan DV library classes: the whole page (agent and environment extension sections are TODO), https://opentitan.org/book/hw/dv/sv/dv_lib/index.html",
+    "[OTCsr] lowRISC, OpenTitan CSR utilities: the whole page, https://opentitan.org/book/hw/dv/sv/csr_utils/index.html"
+  ],
+  "result": "every claim tagged with a source was found in that source, and every line marked inference is a fair reading of the source it names or the document's own reasoning",
+  "notes": [
+    "The sentence W2-C7 held back (monitor, scoreboard and coverage wiring) now reads as the pyuvm AluEnv.connect_phase does: driver.seq_item_port to seqr.seq_item_export; cmd_mon.ap to scoreboard.cmd_export and to coverage.analysis_export; driver.ap to scoreboard.result_export. The Driver class writes each result to its own analysis port (self.ap.write(result)), as the document says. The prose on that page says two monitors exist (command and result) while the code shown instantiates only cmd_mon; the document says only that the example has two monitors, which the prose states, and its wiring sentence follows the code.",
+    "Build top down and connect bottom up, the objection raise and drop in AluTest.run_phase, the forever loop of the driver run phase ended by cocotb, check_phase predicting and comparing, the critical log for a result with no command, common phasing only, and the register-support gaps (memory not implemented, predictor note, backdoor) are each stated on the page.",
+    "The document says no open source it read explains what an unbalanced objection does; none of the five pages does, and a wanted-sources row exists for it.",
+    "OpenTitan statements (V1 and V2 items, the CSR test suite list with back to back and partial accesses, csr_rd_check, the pseudo pure virtual build function, the uvm_info and X-propagation note, the three reuse layers) were each found on the page tagged."
+  ],
+  "checked_at": "2026-11-15",
+  "gate_claims": [
+    {"claim": "this skill's card holds no tool", "evidence": "src/nirmaan/company/skills.py:370"},
+    {"claim": "the first body line states the tier Knowledge only because no tool of the skill is available", "evidence": "src/nirmaan/org/knowledge_files.py:172"},
+    {"claim": "the document passes the knowledge-file checks (front matter, sources, no dash, size, tier line)", "evidence": "tests/test_knowledge_files.py::test_every_knowledge_document_passes"},
+    {"claim": "the tier follows from tool status (no available tool means knowledge only)", "evidence": "tests/test_knowledge_files.py::test_the_tier_is_computed_from_tool_status"},
+    {"claim": "this repository's cocotb backend is the Python-testbench route (M72); whether a Python UVM port runs on it is not claimed", "evidence": "src/nirmaan/company/tools.py:24"},
+    {"claim": "no open source explaining objection termination was read, recorded in the wanted-sources list", "evidence": "unverified"},
+    {"claim": "pyuvm implements only the common phasing, and its register support is partial", "evidence": "unverified"},
+    {"claim": "OpenTitan checks in the generated RAL model and relies on a CI consistency check", "evidence": "unverified"},
+    {"claim": "csr_rd_check compares against a passed-in prediction or the register model", "evidence": "unverified"},
+    {"claim": "calling tasks or functions with side effects such as uvm_info blocks VCS X-propagation instrumentation", "evidence": "unverified"}
+  ]
+}

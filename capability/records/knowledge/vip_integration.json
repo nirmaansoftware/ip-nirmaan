@@ -1,0 +1,38 @@
+{
+  "format": "nirmaan.knowledge-check",
+  "skill": "vip_integration",
+  "knowledge_document": "knowledge/verification/vip_integration.md",
+  "document_sha256": "sha256:66fde02c9f70263b8b899ce10eb73a7d78859355271cd811b0d6e5dba4ec8068",
+  "writer": "IP-W2-K8 session (wave 2 knowledge batch, plan row W2-K8, 2026-11-15)",
+  "checker": "IP-W2-C8 session (wave 2 check batch, lane IP-W2-C8)",
+  "sources_read": [
+    "[OTJtag] lowRISC, OpenTitan JTAG DV UVM Agent: the whole page, https://opentitan.org/book/hw/dv/sv/jtag_agent/index.html",
+    "[OTAlert] lowRISC, OpenTitan Alert agent: the whole page (a short page: description, device agent pointer), https://opentitan.org/book/hw/dv/sv/alert_agent/index.html",
+    "[OTStub] lowRISC, OpenTitan TileLink agent, I2C agent and UART agent pages: the whole of each; the TileLink and UART pages hold only a TODO marker and the I2C page one sentence, https://opentitan.org/book/hw/dv/sv/tl_agent/index.html, https://opentitan.org/book/hw/dv/sv/i2c_agent/index.html, https://opentitan.org/book/hw/dv/sv/uart_agent/index.html",
+    "[OTCip] lowRISC, OpenTitan Comportable IP Testbench Architecture (cip_lib): the whole page to its last section, https://opentitan.org/book/hw/dv/sv/cip_lib/index.html",
+    "[OTUart] lowRISC, OpenTitan UART DV document: the whole page, https://opentitan.org/book/hw/ip/uart/dv/index.html",
+    "[OTDV] lowRISC, OpenTitan Design Verification Methodology: the whole page to its last section, https://opentitan.org/book/doc/contributing/dv/methodology/index.html",
+    "[OTLib] lowRISC, OpenTitan DV Library Classes: the whole page, https://opentitan.org/book/hw/dv/sv/dv_lib/index.html"
+  ],
+  "result": "every claim tagged with a source was found in that source, and every line marked inference is a fair reading of the source it names or the document's own reasoning; the document's own statement that three of the agent pages are stubs is true of the pages as fetched on 2026-11-15",
+  "notes": [
+    "The three stub pages were fetched live: tl_agent and uart_agent show only the heading and the word TODO, i2c_agent shows the one sentence the document reports. The document claims nothing about those agents, as it says.",
+    "The page for the UART agent's baud rates sits in the UART DV document under the heading UART agent (not the design section); the document's phrase the design supports is read as the agent supports, which the page's list under that heading permits.",
+    "The OTDV coverage exclusion rule is read from its UNSUPPORTED category: the sub-bullet on an agent with detailed coverage items where the design supports a subset (TileLink burst sizes) carries a mandatory explanation, as the document says.",
+    "The document rests on one project's agents and library pages. Where the sources are thin (alert agent, stubs, the OTLib agent section marked TODO) the document says so, tags only what the pages state, and marks its own reasoning inference.",
+    "Not a gate: the sentences about what the OpenTitan agents do are source statements about another project's code; this repository has no tool or gate behind them, so they are listed as unverified."
+  ],
+  "checked_at": "2026-11-15",
+  "gate_claims": [
+    {"claim": "this skill's card holds no tool", "evidence": "src/nirmaan/company/skills.py:477"},
+    {"claim": "the first body line states the tier Knowledge only because no tool of the skill is available", "evidence": "src/nirmaan/org/knowledge_files.py:172"},
+    {"claim": "the document passes the knowledge-file checks (front matter, sources, no dash, size, tier line)", "evidence": "tests/test_knowledge_files.py::test_every_knowledge_document_passes"},
+    {"claim": "the tier follows from tool status (no available tool means knowledge only)", "evidence": "tests/test_knowledge_files.py::test_the_tier_is_computed_from_tool_status"},
+    {"claim": "no commercial VIP manual was read, recorded in the wanted-sources list", "evidence": "unverified"},
+    {"claim": "the JTAG driver reports an error when both ir_len and dr_len are zero", "evidence": "unverified"},
+    {"claim": "alert device agents default to device mode, asynchronous, active, ping coverage off", "evidence": "unverified"},
+    {"claim": "adding alert agents needs LIST_OF_ALERTS, assignment before the base initialisation, and the DV_ALERT_IF_CONNECT macro", "evidence": "unverified"},
+    {"claim": "a TileLink agent coverage item outside the supported burst sizes is excluded as UNSUPPORTED with a mandatory explanation", "evidence": "unverified"},
+    {"claim": "the project's generator script can also generate the skeleton of a new agent", "evidence": "unverified"}
+  ]
+}
