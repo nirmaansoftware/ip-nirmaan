@@ -2,22 +2,52 @@
   "format": "nirmaan.knowledge-check",
   "skill": "rtl_design",
   "knowledge_document": "knowledge/design/rtl_design.md",
-  "document_sha256": "sha256:d5904d22db5ddb4bb00b1b6a5413d81c7cf4317daea42dbc9ee423bed2530eab",
-  "writer": "IP-P3-K1 session (P3 pilot, item K1, 2026-10-31)",
-  "checker": "IP-P3-C1 session (P3 pilot, item C1)",
+  "document_sha256": "sha256:db1d48c29fdb222e4d01322dc8abfbc3fd68f06b03e73eb1b21370aca15eda8d",
+  "writer": "IP-P3-K1 session (P3 pilot, item K1, 2026-10-31), corrected by the RETRO-A2 session (ip#220)",
+  "checker": "RETRO-A4 session (retrospective action A4, item P3-C1 recheck, 2026-11-15)",
   "sources_read": [
-    "[lowRISC] lowRISC, Verilog Coding Style Guide (CC BY 4.0): the whole guide, VerilogCodingStyle.md on the master branch of https://github.com/lowRISC/style-guides",
+    "[lowRISC] lowRISC, Verilog Coding Style Guide (CC BY 4.0): the whole guide, VerilogCodingStyle.md on the master branch of https://github.com/lowRISC/style-guides, every section from Basics to the condensed appendix, including formatting, naming, language features and design conventions",
     "[Yosys] YosysHQ, Yosys command reference, Converting process blocks (proc and every proc_* pass): the whole page, https://yosyshq.readthedocs.io/projects/yosys/en/latest/cmd/index_passes_proc.html",
     "[Verilator] Verilator manual, Input Languages: the whole page, https://verilator.org/guide/latest/languages.html",
     "[SBY] YosysHQ SBY documentation: Reference for .sby file format (https://yosyshq.readthedocs.io/projects/sby/en/latest/reference.html) and Formal extensions to Verilog (https://yosyshq.readthedocs.io/projects/sby/en/latest/verilog.html), both pages whole",
-    "[ZipCPU] Gisselquist, AXI Handshaking Rules, ZipCPU blog, 2021: the whole post, https://zipcpu.com/blog/2021/08/28/axi-rules.html"
+    "[ZipCPU] Gisselquist, AXI Handshaking Rules, ZipCPU blog, 2021: the whole post, https://zipcpu.com/blog/2021/08/28/axi-rules.html",
+    "[Gate] IP Nirmaan, formal gate, same commit as the document: docs/FORMAL_GATE.md sections 1 to 3 read in full, and src/nirmaan/integrations/eda.py, eda_parsers.py, company/workflows.py and runtime/harness.py at the lines cited in gate_claims"
   ],
-  "result": "every claim tagged with a source was found in that source, and every line marked inference is a fair reading of the source it names or the document's own reasoning",
+  "result": "every claim tagged with a source was found in that source, every line marked inference is a fair reading of the source it names or the document's own reasoning, and every sentence about the platform's gates matches the gate code at the lines cited in gate_claims",
   "notes": [
-    "Reset every flop: lowRISC says sequential statements for state assignments should contain only reset values and the next-state assignment, and its resets are active-low and asynchronous by default; the document's rule that every flop holding state gets a reset value is read from that line.",
-    "No latches: lowRISC requires a default case item to avoid accidental latch inference and, without defaults before the case, every variable assigned in one item assigned in all items including the default; the document's first sentence on how a latch is inferred summarises those rules.",
-    "Proof setup: SBY gives depth a default of 20 for bmc and cover, and in prove mode it is the k-induction depth of the smtbmc engine (other engines ignore it), the engine the document uses.",
-    "The f_past_valid guard and the assumption of reset on the first cycle are in the section of the ZipCPU post on capturing the rules in formal properties."
+    "Rechecked after ip#220, which changed the proof-setup and latch sentences to match the gate. The earlier record (2026-11-13) named the previous bytes and is replaced.",
+    "Reset every flop: lowRISC says sequential statements for state assignments should contain only reset values and the next-state assignment, and its resets are active-low and asynchronous by default; the document's rule that every flop holding state gets a reset value is read from that line. lowRISC does not itself say every flop must be reset.",
+    "Verilator: always @(x) is recomputed on a possible change of its inputs as Design Compiler would synthesize it, where a compliant simulator recomputes only when x changes; full_case, parallel_case, unique and priority are proven or asserted at run time unless --no-assert-case is given (the document does not mention the option, which is fine). The two-state notes and the zeros, ones, random reset check are in the Unknown States section.",
+    "SBY: depth defaults to 20 for bmc and cover and is the k-induction depth for the smtbmc engine in prove mode; a cover run fails if a cover cannot be reached within depth or only by breaking an assertion; always @(*) and clocked assertions differ by one step; (* anyconst *) is the solver-chosen constant used for memories. The reference page lists [tasks], [options], [engines], [script] and [files]; that [engines] and [script] are required by the gate is not claimed by the gate code (see gate_claims).",
+    "ZipCPU: the f_past_valid register and the assumption that reset is active on the first cycle are in the section Capturing the rules in formal properties.",
+    "Checked against the gate: the cover run reuses the proof's [options] lines except mode, so the proof's depth is also the cover's depth (eda.py:726-731). The document says a cover fails if it cannot be reached within the depth, which is correct for the gate, and it makes no claim that a short depth suffices."
   ],
-  "checked_at": "2026-11-13"
+  "gate_claims": [
+    {"claim": "the lint, simulation, synthesis and formal tools are run by the platform and the seat has none", "evidence": "src/nirmaan/runtime/harness.py:128"},
+    {"claim": "the platform runs lint, simulation, synthesis, formal and cover as brokered backends", "evidence": "src/nirmaan/integrations/eda.py:812"},
+    {"claim": "the platform's synthesis script is fixed (read_verilog, synth -top, stat), so the seat cannot pass -latches error", "evidence": "src/nirmaan/integrations/eda.py:602"},
+    {"claim": "any latch fails the gate: synthesis counts latch cells and the rtl stage bounds them at 0", "evidence": "src/nirmaan/integrations/eda_parsers.py:283"},
+    {"claim": "any latch fails the gate: the bound on latches is at most 0 on the rtl stage", "evidence": "src/nirmaan/company/workflows.py:114"},
+    {"claim": "the card's procedures fix the verdict line and who may call $finish", "evidence": "src/nirmaan/company/skills.py:289"},
+    {"claim": "the verdict line is NIRMAAN-SIM nonce passed, failed, printed once before $finish", "evidence": "src/nirmaan/integrations/eda_parsers.py:129"},
+    {"claim": "only the testbench may call $finish, $stop or read plusargs; a design that does is refused", "evidence": "src/nirmaan/integrations/eda.py:451"},
+    {"claim": "Verilator simulation is built with --binary so $value$plusargs works", "evidence": "src/nirmaan/integrations/eda.py:444"},
+    {"claim": "submit one .sby with no [tasks]; a setup with [tasks] is refused and nothing runs", "evidence": "src/nirmaan/integrations/eda.py:644"},
+    {"claim": "the formal check refuses a [tasks] setup before running", "evidence": "src/nirmaan/integrations/eda.py:652"},
+    {"claim": "the cover check also refuses a [tasks] setup", "evidence": "src/nirmaan/integrations/eda.py:750"},
+    {"claim": "[options] needs mode prove; bmc is a bounded check and fails (proven is 0 in bmc mode)", "evidence": "src/nirmaan/integrations/eda_parsers.py:337"},
+    {"claim": "[options] needs mode prove; the requirement carries the bound proven at least 1", "evidence": "src/nirmaan/company/workflows.py:119"},
+    {"claim": "[files] must list every RTL file submitted, by path from the .sby's directory", "evidence": "src/nirmaan/integrations/eda.py:657"},
+    {"claim": "sby runs in the .sby file's own directory, so [files] paths resolve there", "evidence": "src/nirmaan/integrations/eda.py:639"},
+    {"claim": "depth defaults to 20 when [options] names none", "evidence": "src/nirmaan/integrations/eda.py:616"},
+    {"claim": "the platform runs the cover separately in cover mode, rewriting only mode and the file paths", "evidence": "src/nirmaan/integrations/eda.py:702"},
+    {"claim": "the cover run needs an [options] section to rewrite", "evidence": "src/nirmaan/integrations/eda.py:752"},
+    {"claim": "write at least one cover: a run that reaches no cover fails", "evidence": "src/nirmaan/integrations/eda_parsers.py:432"},
+    {"claim": "every cover must be reachable: an unreached cover fails the run as vacuous", "evidence": "src/nirmaan/integrations/eda_parsers.py:421"},
+    {"claim": "every assertion's antecedent must be reachable: an unreached antecedent fails the run", "evidence": "src/nirmaan/integrations/eda_parsers.py:425"},
+    {"claim": "the cover check is required when a .sby is produced", "evidence": "src/nirmaan/company/workflows.py:95"},
+    {"claim": "[engines] and [script] (read the sources, then prep -top) are part of the setup", "evidence": "unverified"},
+    {"claim": "depth is the induction depth in prove mode, per the SBY reference", "evidence": "unverified"}
+  ],
+  "checked_at": "2026-11-15"
 }
