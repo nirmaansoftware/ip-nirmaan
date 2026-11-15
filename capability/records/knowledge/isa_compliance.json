@@ -1,0 +1,53 @@
+{
+  "format": "nirmaan.knowledge-check",
+  "skill": "isa_compliance",
+  "knowledge_document": "knowledge/verification/isa_compliance.md",
+  "document_sha256": "sha256:dd318e63309fec6a187edd9b75b63cf576b4eef2e8e29e81b48ef74406a1ff4c",
+  "writer": "IP-W2-K6 session (wave 2 knowledge batch, plan row W2-K6, 2026-11-15)",
+  "checker": "IP-W2-C6 session (wave 2 checker batch, 2026-11-15)",
+  "sources_read": [
+    "[ACT] riscv-arch-test README (riscv-non-isa/riscv-arch-test, main): the whole file, https://github.com/riscv-non-isa/riscv-arch-test",
+    "[CTP] RISC-V Certification Test Plan v0.0.0 draft 2026-11-14: front matter, chapters 1 to 5, 7 and 8 and the openings of appendices A, C and E read in full, the Table 1 profile matrix and the per-extension test plans skimmed, https://riscv.github.io/riscv-arch-test/ctp.html",
+    "[Sail] sail-riscv README: the whole file, https://github.com/riscv/sail-riscv",
+    "Repository code at the lines cited in gate_claims"
+  ],
+  "result": "every claim tagged with a source was found in that source, every line marked inference is a fair reading of the source it names or the document's own reasoning, and every sentence about the platform's gates matches the code at the lines cited in gate_claims",
+  "notes": [
+    "The README (ACT) names three DUT files in its opening and a longer list (test_config.yaml, sail.json, rvtest_config files) in Configuration; the document's three-file sentence follows the opening and CTP chapter 5, tagged [ACT] [CTP].",
+    "The plan's 'design verification must cover it' (step 4) is CTP chapter 7: DV should test interrupt arrival time, pipeline hazards, multicycle instructions, MMU and memory system. 'Every limitation is documented' is CTP chapter 5 ('All limitations must be documented in CTP'); rules marked not tested are the 'Untestable:' lines in the appendices and chapter 5's 'explicitly marked as not tested'.",
+    "The draft date 2026-11-14 matches the CTP front matter; the plan calls itself a work in progress with TODO notes, as the document says.",
+    "Sail: TestRIG protocol, RVFI traces and cross-testing against Spike and RVBS are in the README section 'Use as test oracle in tandem verification'; the extension list and the Extension Roadmap link are in 'Supported RISC-V ISA features'.",
+    "The document's own run-nothing statement holds: it cites no run, no tool and no test of its own; its only platform claims are the card lines in gate_claims."
+  ],
+  "gate_claims": [
+    {
+      "claim": "the document's first body line reads Knowledge only, which is the tier the gate computes for a skill with no available tool",
+      "evidence": "src/nirmaan/org/knowledge_files.py:172"
+    },
+    {
+      "claim": "the gate computes the tier from tool status and the skill card names no tool (the sk() default for tools is empty)",
+      "evidence": "src/nirmaan/company/skills.py:31"
+    },
+    {
+      "claim": "every document under knowledge/ passes the first-body-line tier rule",
+      "evidence": "tests/test_knowledge_files.py::test_every_knowledge_document_passes"
+    },
+    {
+      "claim": "this skill's card holds no tool (card lines 446 to 452)",
+      "evidence": "src/nirmaan/company/skills.py:446"
+    },
+    {
+      "claim": "the card step: map each ISA clause to a compliance test, a formal check or a random stream",
+      "evidence": "src/nirmaan/company/skills.py:449"
+    },
+    {
+      "claim": "the card's failure mode: claiming compliance from a suite never run on the core",
+      "evidence": "src/nirmaan/company/skills.py:451"
+    },
+    {
+      "claim": "the card's check: every claimed instruction and feature traces to a result and each gap is stated",
+      "evidence": "src/nirmaan/company/skills.py:452"
+    }
+  ],
+  "checked_at": "2026-11-15"
+}
