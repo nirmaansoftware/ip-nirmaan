@@ -1,0 +1,133 @@
+{
+  "format": "nirmaan.knowledge-check",
+  "skill": "constrained_random",
+  "knowledge_document": "knowledge/verification/constrained_random.md",
+  "document_sha256": "sha256:72f8fb70eb51c4d4aaa8189867a86ef64652e1905aedae294eb623e0ec64bba8",
+  "writer": "IP-W2-K2 session (wave 2 knowledge batch, plan row W2-K2, 2026-11-15), corrected by the ip#275 and ip#277 fix sessions",
+  "checker": "IP-W2-C2C session (wave 2 check records, third check of constrained_random after ip#277, 2026-11-15)",
+  "sources_read": [
+    "[OTDV] lowRISC, OpenTitan Design Verification Methodology (Apache 2.0): the whole page, 460 lines of saved text, https://opentitan.org/book/doc/contributing/dv/methodology/index.html",
+    "[VLang] Verilator manual, Input Languages (languages), version 5.054 text: the whole page, 370 lines of saved text, https://verilator.org/guide/latest/languages.html",
+    "[VSim] Verilator manual, Simulating (Verilated-Model Runtime), version 5.054 text: the whole page, 535 lines of saved text, https://verilator.org/guide/latest/simulating.html",
+    "[VArg] Verilator manual, Arguments (verilator executable), version 5.054 text: the whole page, all 2027 lines of the saved text from the summary table to the -y entry, https://verilator.org/guide/latest/exe_verilator.html",
+    "[ZVer] Gisselquist, Building a Verilator test bench, ZipCPU blog, 2017: the whole page, 752 lines of saved text, https://zipcpu.com/blog/2017/06/21/looking-at-verilator.html",
+    "Repository code at the lines cited in gate_claims (worktree at origin/main 7b2cf3e, after ip#277), and runs of that code on this machine: parse_simulation, Bound.parse, within_bounds and simulation_problem through short scripts, plus tests/test_nirmaan_gate_integrity.py and tests/test_nirmaan_unified_applicability.py"
+  ],
+  "result": "pass. The three ip#268 findings and the two ip#275 findings are fixed. (1) The [ZVer] tag is gone from the body; no sentence cites that page. (2) The checks>=N sentence is now right: the gate asks only for one passed check, a workflow requirement can add the bound checks>=N, no shipped workflow does, and a run of ten passed checks passes with no bound (run locally; with the bound checks>=100 the same ten checks fail and 100 pass). (3) The --binary sentence cites [VArg], whose entry reads 'Create a Verilated simulator binary. Alias for --main --exe --build --timing.', and 'no hand-written C++ harness' is marked as an inference from --main, whose entry says it generates the C++ main(). (4) The OTDV sentences are split: each says only what the page says, and the document's own steps carry 'inference'. Every other source-tagged claim was found in its source and every gate sentence matches the code at the lines cited in gate_claims.",
+  "notes": [
+    "[OTDV]: constrained random at IP level with an independent model of the DUT (lines 118-119 of the saved text); error tests handled by directed tests because error-checking scoreboards under unconstrained random are costly, and the TileLink illegal-access example constrains a random sequence (168-170); stress-test knobs eased step by step (180-181); each constrained random test run over 100 seeds with completely random seed values (205-206); coverage closure as the way to know when testing is done (215-233). The document's 'adjusting constraints where holes remain' is marked this document's own inference; the page (294-297) says holes are closed by updating the spec, the testplan or the tests, or by removing unreachable logic, so the marking is right.",
+    "[OTDV] wording, not a failure: 'Random stimulus is poor at error handling' is the document's gloss. The page says the scoreboard for error checking under completely unconstrained random is prohibitively time consuming to write. The colon clause after it states what the page says.",
+    "[VLang]: the $random, $urandom and $urandom_range entry (353-356) says the seed comes from an argument of the call or the +verilator+seed+<value> runtime option, with one seed per C thread, not per module; the Unknown States section (214-222) says to run once with variables initialised to zero, once to one, then randomly, and 'if the results match, reset works', and names the --x-initial setting. Both match the document. The Time section (125-128) also says --main with --timing removes the need to write driving C++ code, which supports the inference about --binary.",
+    "[VArg]: --binary at lines 381-384 matches the document word for word. The --main entry (1193-1204) says it 'generates a top-level C++ main() file that supports parsing arguments, but does not drive any inputs', typically used with --timing and --build; the --exe entry (761-763) says additional .cpp files are needed for the main loop when --main is not used. So a self-driving SystemVerilog testbench needs no hand-written C++ file, which is what the inference says; the inference is not a claim about a testbench that needs C++ inputs. The --timing, --build and --x-initial entries agree (the --x-initial default on this page is unique; the document does not state a default). The page was read to its last line.",
+    "[VSim] and [ZVer]: both pages were read in full. No sentence of the document cites either: [VSim] and [ZVer] stay in the sources list and no body line is tagged with them. Neither page contradicts any sentence of the document. A source listed and never cited is not a Knowledge-rule failure; it could be dropped by the document's owner.",
+    "Imprecision in the document's citations, not a failure: workflow.py:120-145 stops before the end of Bound.parse (141-150) and before problem() (152-161); tools.py:188 is the docstring line of within_bounds (187), whose code runs to 199. The claims themselves hold at the lines cited in gate_claims. Reported to the document's owner, not edited here.",
+    "The sentence 'the testbench is the file that declares the run's top module; only it may call $finish ...' was run: a design file d.v with $finish and a testbench tb.v declaring tb gave 'only the testbench (the file that declares tb) may end the simulation or read its arguments, and d.v uses $finish; nothing was simulated'."
+  ],
+  "gate_claims": [
+    {
+      "claim": "the card also lists regression.run, which is not available here (the tool is CONTRACT_ONLY)",
+      "evidence": "src/nirmaan/company/tools.py:135"
+    },
+    {
+      "claim": "the card lists test.run and regression.run and the phrases 'Over-constrained stimulus' and 'Stimulus reaches coverage goals' (the document says 'reaches coverage goals')",
+      "evidence": "src/nirmaan/company/skills.py:402"
+    },
+    {
+      "claim": "the test tool this skill holds (test.run) is available",
+      "evidence": "src/nirmaan/company/tools.py:133"
+    },
+    {
+      "claim": "the simulation gate passes only its own nonce argument to the run: Icarus gets '+nirmaan_nonce=<nonce>' and nothing else (so a seed has to live in the testbench source)",
+      "evidence": "src/nirmaan/integrations/eda.py:439"
+    },
+    {
+      "claim": "the same for the Verilator simulation: the built binary gets only the nonce argument",
+      "evidence": "src/nirmaan/integrations/eda.py:446"
+    },
+    {
+      "claim": "the Verilator simulation builds with 'verilator --binary' and the sources alone, no hand-written C++ file (supports the inference that no C++ harness is needed)",
+      "evidence": "src/nirmaan/integrations/eda.py:443"
+    },
+    {
+      "claim": "the testbench is the file that declares the run's top module",
+      "evidence": "src/nirmaan/integrations/eda.py:471"
+    },
+    {
+      "claim": "only the testbench may call $finish, $stop, $exit, read plusargs ($value$plusargs, $test$plusargs), open files, or use $system, $c or DPI; the list is TESTBENCH_ONLY",
+      "evidence": "src/nirmaan/integrations/eda.py:451"
+    },
+    {
+      "claim": "a design file using any of them is refused before anything runs (the file declaring the top is skipped, every other file is scanned, and the refusal says 'nothing was simulated'; run locally with $finish in a design file)",
+      "evidence": "src/nirmaan/integrations/eda.py:486"
+    },
+    {
+      "claim": "the same refusal is the check of both simulators for both simulation tools",
+      "evidence": "src/nirmaan/integrations/eda.py:806"
+    },
+    {
+      "claim": "a design file that reads the nonce plusarg is refused (test: spy design with $value$plusargs, both simulators)",
+      "evidence": "tests/test_nirmaan_gate_integrity.py::test_a_design_cannot_read_the_nonce"
+    },
+    {
+      "claim": "the verdict line is 'NIRMAAN-SIM <nonce> <passed> passed, <failed> failed': the nonce, a count passed and a count failed",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:129"
+    },
+    {
+      "claim": "a verdict with another nonce is not counted as the run's verdict and fails the run",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:185"
+    },
+    {
+      "claim": "the run fails when the verdict is missing, repeated, reports a failed check, or reports no passed check",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:190"
+    },
+    {
+      "claim": "the five verdict failures (no verdict, another nonce, no check passed, a failed check, two verdicts) each fail the run (test)",
+      "evidence": "tests/test_nirmaan_gate_integrity.py::test_the_verdict_must_carry_the_runs_nonce_and_a_passing_check"
+    },
+    {
+      "claim": "the gate by itself asks only for at least one passed check; a run of ten passed checks passes with no bound (run locally: parse_simulation of a verdict '10 passed, 0 failed' passed with checks 10)",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:200"
+    },
+    {
+      "claim": "the simulation result reports a 'checks' count (and checks_failed)",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:222"
+    },
+    {
+      "claim": "the backend hands the parser's metrics, including checks, to the tool outcome",
+      "evidence": "src/nirmaan/integrations/eda.py:279"
+    },
+    {
+      "claim": "a bound is a metric, a direction (max or min) and a value",
+      "evidence": "src/nirmaan/models/workflow.py:120"
+    },
+    {
+      "claim": "a bound is written metric>=value, so 'checks>=N' parses to metric checks, op min, value N (run locally: Bound.parse('checks>=100'))",
+      "evidence": "src/nirmaan/models/workflow.py:141"
+    },
+    {
+      "claim": "a workflow requirement can carry bounds, and a run counts only if checked against each",
+      "evidence": "src/nirmaan/models/workflow.py:216"
+    },
+    {
+      "claim": "the CLI takes a bound as --bound",
+      "evidence": "src/nirmaan/cli.py:842"
+    },
+    {
+      "claim": "a passing run that breaks a bound, or never reported the metric, is failed (run locally: checks>=100 with 10 checks failed 'checks 10 is below min_checks 100'; with 100 checks passed; with checks not reported failed 'checks was not reported')",
+      "evidence": "src/nirmaan/runtime/tools.py:187"
+    },
+    {
+      "claim": "a requirement counts only runs checked against its bounds (test)",
+      "evidence": "tests/test_nirmaan_unified_applicability.py::test_a_requirement_counts_only_runs_checked_against_its_bounds"
+    },
+    {
+      "claim": "no requirement in the shipped workflows sets a bound on a simulation run's checks: every bounds= use in the shipped workflows names latches, proven, test_coverage, text_bytes, drc_violations, unconnected_supply_pins, lvs_mismatches, fill_shapes, unannotated_nets, timing_corners, line or toggle, never checks (a search of src/nirmaan/company)",
+      "evidence": "src/nirmaan/company/workflows.py:114"
+    },
+    {
+      "claim": "coverage over the design files is a separate tool (coverage.read), not part of the simulation verdict",
+      "evidence": "src/nirmaan/company/tools.py:137"
+    }
+  ],
+  "checked_at": "2026-11-15"
+}

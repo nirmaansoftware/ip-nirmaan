@@ -170,14 +170,12 @@
     },
     "constrained_random": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/constrained_random.json",
+        "counts": true,
         "knowledge_document": "knowledge/verification/constrained_random.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     },
     "control_logic_design": {
