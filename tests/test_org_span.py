@@ -148,7 +148,7 @@ def test_the_frozen_list_is_pinned():
     # fixture fails here, so it has to change this pin in the same pull request, where review sees it.
     digest = hashlib.sha256("\n".join(sorted(ACTIVE_AT_M60)).encode()).hexdigest()
     assert (len(ACTIVE_AT_M60), digest) == (
-        205, "30905852b486f1f2aa6ebf5c767f61f8056f4ff8a4b25626c705053316b3ab43"
+        204, "82daddaf2b73488b82ad799e837929119ee0c5cca0d3bb493a5a698d300b3f50"
     )
 
 

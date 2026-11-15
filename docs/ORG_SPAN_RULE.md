@@ -82,8 +82,8 @@ meet (a). This is record item 10 as amended by the council record
 `council/records/2026-11-14-g13-grouping-units.md`.
 
 The units that were ACTIVE when the rule took effect are frozen in
-`tests/fixtures/org/active-units-m60.txt` (205 units, after M57, including the
-two active teams M57 added under record item 6). The test fails on any ACTIVE
+`tests/fixtures/org/active-units-m60.txt` (204 units: 205 after M57, including the
+two active teams M57 added under record item 6, less one removal). The test fails on any ACTIVE
 unit outside that list that meets neither (a) nor (b), and names the
 condition it fails. The list never gains a unit: a unit made ACTIVE later
 passes by its eval case or as a grouping unit, not by being added. It changes
@@ -97,7 +97,8 @@ that had the reused ids `verification.formal` and `verification.debug` are in
 the list under their new ids. `tests/test_verification_departments.py`
 checks that the list changed by exactly those renames, and the record's
 must-fail fixtures N1 to N9 in `tests/test_org_span.py` each break one
-condition of (b).
+condition of (b). The council record `council/records/2026-11-15-p3-o1-lint-and-standards.md` removed one unit from the list,
+`design.rtl.quality.standards`: its Coding Standards practice was merged into Lint (`design.rtl.quality.lint`), so the list went from 205 to 204.
 
 The rule lives in the test, not in `org/`, because it reads the eval cases in
 `evals/`, and the organization layer does not depend on the evals package.
