@@ -154,6 +154,18 @@
       "level": null,
       "practised": []
     },
+    "constrained_random": {
+      "knowledge": {
+        "check_record": null,
+        "counts": false,
+        "knowledge_document": "knowledge/verification/constrained_random.md",
+        "problems": [
+          "no check record"
+        ]
+      },
+      "level": null,
+      "practised": []
+    },
     "control_logic_design": {
       "knowledge": {
         "check_record": "capability/records/knowledge/control_logic_design.json",
@@ -192,6 +204,18 @@
         "check_record": null,
         "counts": false,
         "knowledge_document": "knowledge/verification/directed_testing.md",
+        "problems": [
+          "no check record"
+        ]
+      },
+      "level": null,
+      "practised": []
+    },
+    "equivalence_checking": {
+      "knowledge": {
+        "check_record": null,
+        "counts": false,
+        "knowledge_document": "knowledge/verification/equivalence_checking.md",
         "problems": [
           "no check record"
         ]
@@ -243,6 +267,18 @@
           "unjudged": 1
         }
       ]
+    },
+    "model_checking": {
+      "knowledge": {
+        "check_record": null,
+        "counts": false,
+        "knowledge_document": "knowledge/verification/model_checking.md",
+        "problems": [
+          "no check record"
+        ]
+      },
+      "level": null,
+      "practised": []
     },
     "pipeline_design": {
       "knowledge": {
@@ -354,6 +390,18 @@
         "problems": []
       },
       "level": "knowledge",
+      "practised": []
+    },
+    "sva": {
+      "knowledge": {
+        "check_record": null,
+        "counts": false,
+        "knowledge_document": "knowledge/verification/sva.md",
+        "problems": [
+          "no check record"
+        ]
+      },
+      "level": null,
       "practised": []
     },
     "synthesis_awareness": {
