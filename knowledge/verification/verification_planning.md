@@ -91,11 +91,9 @@ line marked "gate" names the repository code that backs it.
   test, a formal run or a quiet simulation for an assertion, and a coverage
   measurement for a cover point (gate:
   src/nirmaan/company/traceability.py:47-54).
-- Cover points are proven by `coverage.read` only. That tool reads line,
-  toggle and branch coverage of design files (gate:
-  src/nirmaan/integrations/eda_parsers.py:555-594), so a plan item of kind
-  `coverage_point` is a code coverage measurement here, not a covergroup bin
-  (inference from the same lines).
+- Cover points are proven by `coverage.read` only. That tool reads the
+  coverage of design files (gate:
+  src/nirmaan/integrations/eda_parsers.py:555-594).
 
 ## Common failure modes
 

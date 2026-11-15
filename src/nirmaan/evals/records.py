@@ -173,12 +173,34 @@ def _free(out: Path, name: str) -> Path:
     return candidate
 
 
+def no_model_answer(trial: EvalTrial) -> bool:
+    """A live trial whose model calls all failed with no answer (RR5): a plan or usage limit, a model out of reach.
+
+    Judged by the trial's structure, never by the wording of a message: at least one call is recorded, and every
+    recorded answer has no text and an error. A model that answers, however wrongly, is not this.
+    """
+    return (not trial.result.replay and bool(trial.answers)
+            and all(not a.text and a.error for a in trial.answers))
+
+
+class RunStopped(RuntimeError):
+    """A live run stopped at its first trial with no model answer (RR5). The record keeps that trial, as failed,
+    with every trial before it, a summary, and a finished manifest; no later trial started."""
+
+    def __init__(self, path: Path, trial: EvalTrial) -> None:
+        self.path, self.trial = path, trial
+        errors = "; ".join(dict.fromkeys(a.error or "" for a in trial.answers))
+        super().__init__(f"run stopped: {trial.result.case} trial {trial.trial} got no model answer, as on a plan or "
+                         f"usage limit ({errors}). No further trial started; that trial is recorded as failed in "
+                         f"{path}.")
+
+
 def record_run(org: Organization, cases: Sequence[EvalCase], runtime: str | None, *, trials: int, repo: Path,
                out: Path, attempts: int | None = None, command: str = "", head_sha: str | None = None,
                clock: Callable[[], datetime] | None = None,
                on_trial: Callable[[EvalTrial, Path], None] | None = None, knowledge: bool = True,
                purpose: str = "evidence", source: str = "", digest_repo: Path | None = None,
-               variant: str = "default") -> Path:
+               variant: str = "default", stop_on_no_answer: bool = False) -> Path:
     """Run every case ``trials`` times on a registered runtime (``None`` replays) and write a run record.
 
     Each trial gets a fresh runtime and its own sandbox. The manifest is written first and rewritten at the
@@ -187,7 +209,9 @@ def record_run(org: Organization, cases: Sequence[EvalCase], runtime: str | None
     ``-without-knowledge`` and its manifest and every trial say ``knowledge: off``. ``purpose="calibration"``
     (M76, ``eval outside``) labels the record, its manifest and every trial the same way, and ``source`` says where
     the problems came from. ``variant`` (M74) runs every seat on that named harness variant: the record's name
-    ends in ``-harness-<name>`` and its manifest and every trial carry the name.
+    ends in ``-harness-<name>`` and its manifest and every trial carry the name. ``stop_on_no_answer`` (RR5) ends
+    a live run right after the first trial with no model answer (:func:`no_model_answer`): that trial is written
+    like any other, the record is finished, and :class:`RunStopped` is raised with its path.
     """
     if trials < 1:
         raise ValueError("trials must be at least 1")
@@ -211,6 +235,11 @@ def record_run(org: Organization, cases: Sequence[EvalCase], runtime: str | None
 
     _write(path / MANIFEST, manifest(started).model_dump(mode="json"))
     done: list[EvalTrial] = []
+
+    def finish() -> None:
+        _write(path / MANIFEST, manifest(now()).model_dump(mode="json"))
+        _write(path / SUMMARY, summarize(done))
+
     for case in cases:
         for number in range(1, trials + 1):
             seat = get_runtime(runtime) if runtime else ModelRuntime(replay_llm(case, repo), runtime_id=REPLAY)
@@ -222,8 +251,10 @@ def record_run(org: Organization, cases: Sequence[EvalCase], runtime: str | None
             done.append(trial)
             if on_trial:
                 on_trial(trial, target)
-    _write(path / MANIFEST, manifest(now()).model_dump(mode="json"))
-    _write(path / SUMMARY, summarize(done))
+            if stop_on_no_answer and runtime and no_model_answer(trial):
+                finish()
+                raise RunStopped(path, trial)
+    finish()
     return path
 
 
