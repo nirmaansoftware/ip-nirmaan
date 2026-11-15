@@ -450,6 +450,30 @@
         }
       ]
     },
+    "portable_stimulus": {
+      "knowledge": {
+        "check_record": null,
+        "counts": false,
+        "knowledge_document": "knowledge/verification/portable_stimulus.md",
+        "problems": [
+          "no check record"
+        ]
+      },
+      "level": null,
+      "practised": []
+    },
+    "power_aware_verification": {
+      "knowledge": {
+        "check_record": null,
+        "counts": false,
+        "knowledge_document": "knowledge/verification/power_aware_verification.md",
+        "problems": [
+          "no check record"
+        ]
+      },
+      "level": null,
+      "practised": []
+    },
     "python_verification": {
       "knowledge": {
         "check_record": "capability/records/knowledge/python_verification.json",
@@ -645,6 +669,18 @@
       "level": null,
       "practised": []
     },
+    "verification_architecture": {
+      "knowledge": {
+        "check_record": null,
+        "counts": false,
+        "knowledge_document": "knowledge/verification/verification_architecture.md",
+        "problems": [
+          "no check record"
+        ]
+      },
+      "level": null,
+      "practised": []
+    },
     "verification_planning": {
       "knowledge": {
         "check_record": "capability/records/knowledge/verification_planning.json",
@@ -660,6 +696,18 @@
         "check_record": null,
         "counts": false,
         "knowledge_document": "knowledge/verification/verification_signoff.md",
+        "problems": [
+          "no check record"
+        ]
+      },
+      "level": null,
+      "practised": []
+    },
+    "vip_integration": {
+      "knowledge": {
+        "check_record": null,
+        "counts": false,
+        "knowledge_document": "knowledge/verification/vip_integration.md",
         "problems": [
           "no check record"
         ]
