@@ -57,15 +57,16 @@
           "counts": true,
           "digest": "sha256:53dff4b10deec145e18247fd490870321613e50b35a8da2f0e0a044b95b58e31",
           "harness": "sha256:35643990d58bf28264abe98752bd6c2750a391483ac43176b4748a38fbc32711",
-          "lower": 0.5291,
+          "lower": 0.5958,
           "model": "claude-opus-5-5",
-          "n": 8,
-          "passed": 7,
+          "n": 10,
+          "passed": 9,
           "reasons": [],
           "records": [
             "evals/results/2026-11-14-claude-code-claude-opus-5-5",
             "evals/results/2026-11-14-claude-code-claude-opus-5-5-2",
-            "evals/results/2026-11-15-claude-code-claude-opus-5-5"
+            "evals/results/2026-11-15-claude-code-claude-opus-5-5",
+            "evals/results/2026-11-15-claude-code-claude-opus-5-5-2"
           ],
           "unjudged": 1
         }
@@ -113,7 +114,7 @@
         "knowledge_document": "knowledge/design/buffering_flow_control.md",
         "problems": []
       },
-      "level": "practised",
+      "level": "knowledge",
       "practised": [
         {
           "cases": [
@@ -121,20 +122,21 @@
             "rtl/sync-fifo"
           ],
           "cli": "2.1.325",
-          "counts": true,
+          "counts": false,
           "digest": "sha256:9ce453d40894146149cbc0b239b46c96be234eb3e1d8657fede9b2e728bfb5e2",
           "harness": "sha256:35643990d58bf28264abe98752bd6c2750a391483ac43176b4748a38fbc32711",
-          "lower": 0.5777,
+          "lower": 0.4902,
           "model": "claude-opus-5-5",
-          "n": 13,
-          "passed": 11,
-          "reasons": [],
+          "n": 10,
+          "passed": 8,
+          "reasons": [
+            "Wilson lower bound 0.490, under 0.5"
+          ],
           "records": [
             "evals/results/2026-11-14-claude-code-claude-opus-5-5-10",
             "evals/results/2026-11-14-claude-code-claude-opus-5-5-3",
             "evals/results/2026-11-14-claude-code-claude-opus-5-5-4",
-            "evals/results/2026-11-14-claude-code-claude-opus-5-5-9",
-            "evals/results/2026-11-15-claude-code-claude-opus-5-5-3"
+            "evals/results/2026-11-14-claude-code-claude-opus-5-5-9"
           ],
           "unjudged": 2
         }
@@ -295,21 +297,20 @@
       "practised": [
         {
           "cases": [
-            "rtl/rr-arbiter",
-            "rtl/sync-fifo"
+            "rtl/rr-arbiter"
           ],
           "cli": "2.1.325",
           "counts": true,
           "digest": "sha256:012eb9b7155ed6eb7761adca880b338f10c8f978b15dfd92f5adbb3253307a52",
           "harness": "sha256:35643990d58bf28264abe98752bd6c2750a391483ac43176b4748a38fbc32711",
-          "lower": 0.6097,
+          "lower": 0.5655,
           "model": "claude-opus-5-5",
-          "n": 6,
-          "passed": 6,
+          "n": 5,
+          "passed": 5,
           "reasons": [],
           "records": [
             "evals/results/2026-11-15-claude-code-claude-opus-5-5",
-            "evals/results/2026-11-15-claude-code-claude-opus-5-5-3"
+            "evals/results/2026-11-15-claude-code-claude-opus-5-5-2"
           ],
           "unjudged": 0
         },
@@ -386,8 +387,8 @@
     }
   },
   "totals": {
-    "knowledge": 9,
-    "practised": 3,
+    "knowledge": 11,
+    "practised": 2,
     "proven": 0
   },
   "without_knowledge": [
