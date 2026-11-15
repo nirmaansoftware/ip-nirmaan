@@ -1,0 +1,52 @@
+{
+  "format": "nirmaan.knowledge-check",
+  "skill": "verification_signoff",
+  "knowledge_document": "knowledge/verification/verification_signoff.md",
+  "document_sha256": "sha256:439f670c45408381b52c30d7fb48f5406fdc472b06c0dabdb791a2d3ca552b06",
+  "writer": "IP-W2-K7 session (wave 2 knowledge batch, plan row W2-K7, 2026-11-15)",
+  "checker": "IP-W2-C7 session (wave 2 check records, plan row W2-C7, 2026-11-15)",
+  "sources_read": [
+    "[OTChk] lowRISC, OpenTitan Signoff Checklist: the whole page, https://opentitan.org/book/doc/project_governance/checklist/index.html",
+    "[OTStage] lowRISC, OpenTitan Hardware Development Stages: the whole page, https://opentitan.org/book/doc/project_governance/development_stages.html",
+    "[OTDV] lowRISC, OpenTitan Design Verification Methodology: the whole page, https://opentitan.org/book/doc/contributing/dv/methodology/index.html",
+    "Repository code at the lines cited in gate_claims; tests/test_knowledge_files.py, tests/test_knowledge_gate_claims.py, tests/test_capability_levels.py and tests/test_dv_coverage_irq_ctrl.py run locally (100 passed, none skipped, with Verilator installed)"
+  ],
+  "result": "every claim tagged with a source was found in that source, every line marked inference is a fair reading of the source it names or the document's own reasoning, and every sentence about the platform's card and tools matches the code at the lines cited in gate_claims",
+  "notes": [
+    "[OTChk]: the V1, V2 and V3 items behind the document's lists (SIM_NIGHTLY_REGRESSION_V2 at 90 percent, SIM_CODE_COVERAGE_V2 and SIM_FUNCTIONAL_COVERAGE_V2 at 90 percent, SIM_NIGHTLY_REGRESSION_AT_V3 at 100 percent with one week of soak, the 100 percent coverage items, NO_TOOL_WARNINGS_THROWN, ALL_TODOS_RESOLVED, TB_LINT_COMPLETE, X_PROP_ANALYSIS_COMPLETED, FPV_ASSERTIONS_PROVEN_AT_V3, FPV_CODE_COVERAGE_AT_100, FPV_COI_COVERAGE_AT_100, the PRE_VERIFIED_SUB_MODULES items, NO_HIGH_PRIORITY_ISSUES_PENDING, ALL_LOW_PRIORITY_ISSUES_ROOT_CAUSED, NO_ISSUES_PENDING) are each on the page as the document says. [OTStage]: the V0 to V3 stage names, '100% code and 100% functional coverage with waivers' for V3, and the signed-off life stage (frozen, a later bug returns it to Development) are on the page.",
+    "[OTDV]: verification complete when the checklist items for all stages are done; the AND gate with inputs 00 and 11 for code coverage and the cross for functional coverage; the doubled-AND coverage hole that code coverage shows; the UNR, NON_RTL, UNSUPPORTED, EXTERNAL and LOW_RISK categories (EXTERNAL and LOW_RISK always need an explanation); PR sign-off of exclusions by designers, annotation of all exclusions, no exclusions added to reach V2, redo after any RTL change, checksum kept, no reuse from IP to top; review flow and the final sign-off review wording. All as the document says. The 80 percent against 90 percent difference is on the page: OTDV says 'the 80% needed for V2' while OTChk and OTStage say 90 percent, as the document states.",
+    "Reported to the document's owner, not edited here: 'Some require a written explanation; the last two always do' is right for EXTERNAL and LOW_RISK; for UNSUPPORTED the page puts 'Additional explanation is optional' under the heading and 'mandatory' under its sub-items, so 'some' is the safe word and is used.",
+    "Behavioural run: tests/test_knowledge_files.py::test_every_knowledge_document_passes (which holds the tier statement to the tier computed from the card's tools), tests/test_dv_coverage_irq_ctrl.py (coverage.read run for real through Verilator, none skipped) and the other two suites: 100 passed."
+  ],
+  "gate_claims": [
+    {
+      "claim": "the card holds no tool (skills.py names no tools= for verification_signoff), so the document is Knowledge only",
+      "evidence": "src/nirmaan/company/skills.py:546"
+    },
+    {
+      "claim": "the document's tier line 'Knowledge only: no tool run backs this' matches the tier computed from the card",
+      "evidence": "tests/test_knowledge_files.py::test_every_knowledge_document_passes"
+    },
+    {
+      "claim": "coverage.read is AVAILABLE",
+      "evidence": "src/nirmaan/company/tools.py:137"
+    },
+    {
+      "claim": "coverage.read reads line, toggle and branch percentages of a self-checking simulation run with Verilator",
+      "evidence": "tests/test_dv_coverage_irq_ctrl.py::test_the_full_testbench_meets_the_bounds_and_fails_each_mutant"
+    },
+    {
+      "claim": "regression.run is contract only, so a regression pass rate has no tool behind it",
+      "evidence": "src/nirmaan/company/tools.py:135"
+    },
+    {
+      "claim": "the card's failure mode (percentages without looking at holes) and check (evidence for every criterion) are quoted",
+      "evidence": "src/nirmaan/company/skills.py:551"
+    },
+    {
+      "claim": "OpenTitan thresholds, stage names, waiver categories and review practice are one open project's policy, not a rule of this repository",
+      "evidence": "unverified"
+    }
+  ],
+  "checked_at": "2026-11-15"
+}
