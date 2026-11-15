@@ -1,7 +1,7 @@
 # Ablation records (P3-L2, knowledge documents off): trials and causes
 
 Records: `-without-knowledge` (rr-arbiter, 3 trials) and `-without-knowledge-2` (2 trials). Run without the knowledge documents (`--without-knowledge`; manifest and trials carry `"knowledge": "off"`), same commit, same harness
-`sha256:35643990d58bf28264abe98752bd6c2750a391483ac43176b4748a38fbc32711`, Claude Code 2.1.325, model claude-opus-5-5. These records never count toward a level.
+`sha256:e4dea03a8b802265a19b0215bae56c4e79b0af6203e2125ed5a930d3ec6458b1`, Claude Code 2.1.325, model claude-opus-5-5. These records never count toward a level.
 Authority: the founder decision on main 3c9fe7d (live eval batches).
 
 Failed trials:
