@@ -1,0 +1,83 @@
+{
+  "format": "nirmaan.knowledge-check",
+  "skill": "testbench_qualification",
+  "knowledge_document": "knowledge/verification/testbench_qualification.md",
+  "document_sha256": "sha256:03f72f5d7ba6ed9a0c03db2f2d44137531ce1ee8ed7043726a7d07a465b796cf",
+  "writer": "IP-W2-K3 session (wave 2 knowledge batch, plan row W2-K3, 2026-11-15)",
+  "checker": "IP-W2-C3 session (wave 2 check records, plan row W2-C3, 2026-11-15)",
+  "sources_read": [
+    "[McyIndex] YosysHQ MCY documentation, overview: the whole page, https://yosyshq.readthedocs.io/projects/mcy/en/latest/",
+    "[McyMeth] YosysHQ MCY documentation, Methodology: the whole page, https://yosyshq.readthedocs.io/projects/mcy/en/latest/methodology.html",
+    "[McyMutate] YosysHQ MCY documentation, Mutation export options and the Yosys mutate command: the whole page, https://yosyshq.readthedocs.io/projects/mcy/en/latest/mutate.html",
+    "[McyTest] YosysHQ MCY documentation, Writing a test script: the whole page, https://yosyshq.readthedocs.io/projects/mcy/en/latest/testsetup.html",
+    "Repository code at the lines cited in gate_claims, evals/dv/scoreboard_mac.json, and the must-fail tests run locally"
+  ],
+  "result": "every claim tagged with a source was found in that source, every line marked inference is a fair reading of the source it names or the document's own reasoning, and every sentence about the platform's must-fail scorer matches the code at the lines cited in gate_claims",
+  "notes": [
+    "[McyIndex]: a failing testbench shows a problem, a passing one shows nothing unless you know what it tests for; mcy modifies individual signals of a post-synthesis netlist, filters the mutations with formal verification, and runs the testbench on each. As the document says.",
+    "[McyMeth]: a mutation changes the value of a single bit; a bit that changes only on cycles where a valid signal is low need not be caught; the suite must pass the original design; the equivalence check is the 'reference standard against which your test suite is compared'; a single author writing both can blur the distinction; the example logic tags COVERED, UNCOVERED, NOCHANGE and EQGAP, and EQGAP (equivalence says no change, testbench fails) means one of them is wrong and must be investigated first. All as the document says. The page's own sample code names the fourth case's variable tb_okay while defining sim_okay; the document does not repeat that.",
+    "[McyMutate]: the mutate -list algorithm uses source-location coverage scoring and eight candidate lists (by wire, wire bit, cell, source location, and each grouped by module) to avoid leaving parts of the design untested; one mutation per task by default, or several selected by a mutsel input with maxbatchsize when the testbench has large setup costs, which needs the testbench changed to drive mutsel. As the document says. [McyTest]: the test script exports the mutated source, runs the testbench and writes PASS or FAIL per mutation; the second iverilog example selects mutations by a plusarg. As the document says.",
+    "Gate: the must-fail scorer (scorers.py:135-224) requires the clean inputs to pass, the named cover check to pass on the clean inputs when the check names one, and each mutant to fail on a run that executed; a refused mutant run is NOT_RUN, not caught (scorers.py:214-216), which is the document's 'a mutant that was never run counts as unknown'. A check with no mutant is NOT_RUN. The scorer is invoked by the evaluation harness, not offered as a tool: the tool catalog (src/nirmaan/company/tools.py) has no mutation tool (searched for 'mutat', no match), as the document says.",
+    "Behavioural: tests/test_nirmaan_eval_must_fail.py and tests/test_cocotb_runner.py ran (all passed): the reference testbench and proofs catch every mutant, a testbench that misses the mutants fails, clean inputs that fail are a failed control, and a check with no mutant is not run.",
+    "evals/dv/scoreboard_mac.json lines 66-74 name five mutant files in tests/fixtures/dv/mac8/mutants/ in advance, as the document says; the fixtures directory holds mutants for other blocks too (crc8, credit_counter)."
+  ],
+  "gate_claims": [
+    {
+      "claim": "no tool in the tool catalog generates or runs mutations (the catalog has no mutation entry; searched, none found), so mutants are written by hand",
+      "evidence": "src/nirmaan/company/tools.py:131"
+    },
+    {
+      "claim": "the must-fail scorer applies mutants of the design to a seat's testbench or assertions",
+      "evidence": "src/nirmaan/evals/scorers.py:135"
+    },
+    {
+      "claim": "the clean inputs must pass",
+      "evidence": "src/nirmaan/evals/scorers.py:197"
+    },
+    {
+      "claim": "any named cover check must be reached on the clean inputs",
+      "evidence": "src/nirmaan/evals/scorers.py:200"
+    },
+    {
+      "claim": "each mutant must make the tool fail on a run that executed",
+      "evidence": "src/nirmaan/evals/scorers.py:211"
+    },
+    {
+      "claim": "a refusal, which ran nothing, is never counted as a mutant caught",
+      "evidence": "src/nirmaan/evals/scorers.py:214"
+    },
+    {
+      "claim": "a check that names no mutant is not run (nothing has to fail)",
+      "evidence": "src/nirmaan/evals/scorers.py:154"
+    },
+    {
+      "claim": "a testbench that misses the mutants fails the control",
+      "evidence": "tests/test_nirmaan_eval_must_fail.py::test_a_testbench_that_misses_the_mutants_fails"
+    },
+    {
+      "claim": "the reference testbench and proofs catch the mutants",
+      "evidence": "tests/test_nirmaan_eval_must_fail.py::test_the_reference_testbench_and_proofs_catch_the_mutants"
+    },
+    {
+      "claim": "a mutant must stand in for a case file",
+      "evidence": "tests/test_nirmaan_eval_must_fail.py::test_a_mutant_must_stand_in_for_a_case_file"
+    },
+    {
+      "claim": "a must-fail check with no mutant is not run",
+      "evidence": "tests/test_nirmaan_eval_must_fail.py::test_a_must_fail_check_with_no_mutant_is_not_run"
+    },
+    {
+      "claim": "it is how the harness judges a seat's work, not a tool the seat calls (the scorer is registered with requires_tool and run by the evaluation, not the broker catalog)",
+      "evidence": "src/nirmaan/evals/scorers.py:135"
+    },
+    {
+      "claim": "the cases name their mutants in advance, files under tests/fixtures/dv/<block>/mutants/",
+      "evidence": "evals/dv/scoreboard_mac.json:66"
+    },
+    {
+      "claim": "every mutant is a separate staged run under its own name",
+      "evidence": "src/nirmaan/evals/scorers.py:209"
+    }
+  ],
+  "checked_at": "2026-11-15"
+}

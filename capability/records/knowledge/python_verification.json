@@ -1,0 +1,136 @@
+{
+  "format": "nirmaan.knowledge-check",
+  "skill": "python_verification",
+  "knowledge_document": "knowledge/verification/python_verification.md",
+  "document_sha256": "sha256:29b6d1a099d8c1ef36cb1da1057752b48fe275db1be8915f4f0826a2655787c8",
+  "writer": "IP-W2-K3 session (wave 2 knowledge batch, plan row W2-K3, 2026-11-15)",
+  "checker": "IP-W2-C3 session (wave 2 check records, plan row W2-C3, 2026-11-15)",
+  "sources_read": [
+    "[CocoFirst] cocotb documentation, First Steps: the whole page (version 2.1.0.dev3 text), https://docs.cocotb.org/en/stable/first_steps.html",
+    "[CocoRef] cocotb documentation, library reference: the whole page (version 2.1.0.dev3 text, cross-reference lists filtered out), https://docs.cocotb.org/en/stable/library_reference.html",
+    "[CocoTrouble] cocotb documentation, Troubleshooting: the whole page, https://docs.cocotb.org/en/stable/troubleshooting.html",
+    "[OTDV] lowRISC, OpenTitan Design Verification Methodology (Apache 2.0): the whole page, https://opentitan.org/book/doc/contributing/dv/methodology/index.html",
+    "Repository code at the lines cited in gate_claims, docs/COCOTB.md, and tests/test_cocotb_runner.py and tests/test_dv_scoreboard_cocotb_evals.py run locally with cocotb 2.1.0, Icarus Verilog and vvp (46 passed, none skipped)"
+  ],
+  "result": "every claim tagged with a source was found in that source, every line marked inference is a fair reading of the source it names or the document's own reasoning, and every sentence about the platform's cocotb backend and gate matches the code at the lines cited in gate_claims",
+  "notes": [
+    "[CocoFirst]: @cocotb.test with dut, value attribute reads and writes, inertial writes (the page says writes are inertial like non-blocking writes and the log still shows X straight after a write), start_soon concurrency with one task running at a time and cancellation of other tasks when the main test ends, Clock as the reusable clock, reset with every input given a value then three RisingEdge waits, plain assert, the Timer(1 ns) wait after RisingEdge because the value read right after the trigger is from the end of the last time step, and the expected_value counter whose wrap at 255 fails the naive model, are each on the page as the document says.",
+    "[CocoRef]: ReadOnly fires when no more delta steps remain, all signal values are stable and the simulator allows no more events in that step; the test decorator takes timeout_time and says it is for protection against deadlock; COCOTB_RANDOM_SEED recreates the stimulus and the seed is printed at the start of every test. All as the document says.",
+    "[CocoTrouble]: under Simulation Hangs the page asks whether an async def function was called, or a trigger created, without awaiting it. The document's 'the simulation then hangs' is that heading's reading.",
+    "[OTDV]: IP-level environments take a constrained random approach, and error and illegal stimulus is mostly handled by directed tests because a scoreboard for unconstrained error traffic is costly. On the page.",
+    "Behavioural run: tests/test_cocotb_runner.py and tests/test_dv_scoreboard_cocotb_evals.py, with cocotb 2.1.0 installed in a scratch venv and iverilog and vvp on PATH, ran the backend for real (a passing counter, each broken counter failing, a design printing cocotb's totals line failing the run, the timeout stopping a Python test that never returns): 46 passed. The backend's refusals, the results parser and the answers rule are each pinned by a test named in gate_claims.",
+    "Version: the pages read are cocotb 2.1.0.dev3; the repository pins cocotb==2.1.0 (pyproject.toml), and the installed 2.1.0 ran the tests above. No statement in the document depends on a dev-only feature.",
+    "Reported to the document's owner, not edited here: the line 'A cocotb run answers a requirement only when the requirement fixes backend: cocotb' is exact (work.py:302 returns false when exactly one side names a verdict backend), and the document's 'Each test file must be a .py file' is the check at cocotb_runner.py:71 (suffix and module-name pattern). Neither needs a change."
+  ],
+  "gate_claims": [
+    {
+      "claim": "cocotb is a backend of simulator.run chosen by backend: cocotb, and without that name the backend refuses to run",
+      "evidence": "src/nirmaan/integrations/cocotb_runner.py:64"
+    },
+    {
+      "claim": "a simulator.run without backend still means an HDL testbench (cocotb is registered after the HDL backends)",
+      "evidence": "tests/test_cocotb_runner.py::test_cocotb_is_a_simulator_backend_after_the_hdl_testbench_ones"
+    },
+    {
+      "claim": "the backend refuses unless named, so the run records backend: cocotb",
+      "evidence": "tests/test_cocotb_runner.py::test_the_backend_runs_only_when_named_so_the_run_records_it"
+    },
+    {
+      "claim": "the backend requires sources, top and cocotb",
+      "evidence": "src/nirmaan/integrations/cocotb_runner.py:118"
+    },
+    {
+      "claim": "simulator.run takes sources, top, expect and the cocotb parameter in the tool catalog",
+      "evidence": "src/nirmaan/company/tools.py:131"
+    },
+    {
+      "claim": "expect takes pass or no value, any other value is refused and nothing runs",
+      "evidence": "src/nirmaan/integrations/cocotb_runner.py:66"
+    },
+    {
+      "claim": "a test file must be a .py file named as a Python module and two files may not share a name, refused before anything runs",
+      "evidence": "src/nirmaan/integrations/cocotb_runner.py:71"
+    },
+    {
+      "claim": "two test modules with the same name are refused",
+      "evidence": "src/nirmaan/integrations/cocotb_runner.py:74"
+    },
+    {
+      "claim": "tests it cannot judge (expect other than pass, bad file names, duplicate names) are refused",
+      "evidence": "tests/test_cocotb_runner.py::test_tests_it_cannot_judge_are_refused"
+    },
+    {
+      "claim": "with cocotb every HDL source is design: one that ends the simulation, reads arguments, opens a file or reaches outside the language is refused",
+      "evidence": "src/nirmaan/integrations/cocotb_runner.py:75"
+    },
+    {
+      "claim": "HDL that could stand in for the verdict is refused (each listed construct and token pasting)",
+      "evidence": "tests/test_cocotb_runner.py::test_hdl_that_could_stand_in_for_the_verdict_is_refused"
+    },
+    {
+      "claim": "the run passes only when cocotb wrote its results file",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:640"
+    },
+    {
+      "claim": "at least one test passed",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:655"
+    },
+    {
+      "claim": "a failed test fails the run, with the failing test's assertion text in the summary",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:651"
+    },
+    {
+      "claim": "the totals line must be printed exactly once",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:657"
+    },
+    {
+      "claim": "the totals line must agree with the results file",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:659"
+    },
+    {
+      "claim": "the steps must exit zero, and passing results with a nonzero exit still fail",
+      "evidence": "tests/test_cocotb_runner.py::test_a_nonzero_exit_fails_even_with_passing_results"
+    },
+    {
+      "claim": "exit status alone is not read: a run with no results file fails whatever the exit status",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:640"
+    },
+    {
+      "claim": "a totals line printed by the design can only fail the run",
+      "evidence": "tests/test_cocotb_runner.py::test_a_design_that_prints_cocotbs_totals_fails_the_run"
+    },
+    {
+      "claim": "a run made with this backend answers a requirement only when the requirement fixes backend: cocotb",
+      "evidence": "src/nirmaan/models/work.py:302"
+    },
+    {
+      "claim": "cocotb is the one verdict backend, so it never stands in for an HDL testbench's verdict gate",
+      "evidence": "src/nirmaan/models/work.py:255"
+    },
+    {
+      "claim": "a cocotb pass never meets a gate for an HDL testbench's verdict",
+      "evidence": "tests/test_cocotb_runner.py::test_a_cocotb_pass_never_meets_a_gate_for_an_hdl_testbenchs_verdict"
+    },
+    {
+      "claim": "cocotb counts tests, not checks, so a test that asserts nothing passes",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:625"
+    },
+    {
+      "claim": "the Python is not sandboxed and could write a passing results file itself (the test modules are copied and run under vvp with no sandbox or filter)",
+      "evidence": "src/nirmaan/integrations/cocotb_runner.py:95"
+    },
+    {
+      "claim": "the must-fail scorer runs the same tests on a planted mutant of the RTL and requires them to fail",
+      "evidence": "src/nirmaan/evals/scorers.py:135"
+    },
+    {
+      "claim": "the tests must fail each broken counter (must-fail on cocotb tests)",
+      "evidence": "tests/test_cocotb_runner.py::test_the_testbench_must_fail_each_broken_counter"
+    },
+    {
+      "claim": "the timeout stops a Python test that never returns (the document's advice to bound a test)",
+      "evidence": "tests/test_cocotb_runner.py::test_the_timeout_stops_a_python_test_that_never_returns"
+    }
+  ],
+  "checked_at": "2026-11-15"
+}
