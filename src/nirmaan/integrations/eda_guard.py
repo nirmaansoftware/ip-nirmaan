@@ -373,5 +373,10 @@ def sdc_problem(sdc: Path) -> str | None:
 def check_inputs(top: object, params_files: dict[str, list[str]]) -> str | None:
     """Every run's own check (``eda.execute``): ``top`` is a name, and the Verilog it compiles is runnable."""
     files = [f for param in HDL_PARAMS for f in params_files.get(param, [])]
+    other = [Path(f).name for param in ("rtl", "design") for f in params_files.get(param, [])
+             if Path(f).suffix not in HDL_SUFFIXES]
+    if other:
+        return (f"{', '.join(other)} is not Verilog ({', '.join(HDL_SUFFIXES)}); a model build compiles rtl and "
+                f"design files, and a C++ or unknown-suffix file there would run on the host {REFUSED}")
     return (name_problem(top) or path_problem(files)
             or verilog_problem(f for f in files if Path(f).suffix in HDL_SUFFIXES))
