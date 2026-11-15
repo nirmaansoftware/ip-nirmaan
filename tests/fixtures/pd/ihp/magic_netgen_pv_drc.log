@@ -1,0 +1,186 @@
+# CAPTURED: pv.run backend magic-netgen, a flip-flop placed half a site over another; CI run 43639949127 (head 1465f3e), job ihp-pilot, test_sync_fifo_from_rtl_to_drc_and_lvs_on_ihp_sg13g2; excerpt: in order, every step line, the tools' banners, errors and warnings, Magic's DRC and GDS lines, Netgen's final result and every nirmaan- line; nothing else is edited.
+$ klayout -zz -rd tech_file=/__w/_temp/pd/test_sync_fifo_from_rtl_to_drc0/pv_magic_drc/klayout.lyt -rd layer_map=/OpenROAD-flow-scripts/flow/platforms/ihp-sg13g2/sg13g2.map -rd in_def=/__w/_temp/pd/test_sync_fifo_from_rtl_to_drc0/broken.def -rd in_gds=/OpenROAD-flow-scripts/flow/platforms/ihp-sg13g2/gds/sg13g2_stdcell.gds -rd design_name=sync_fifo -rd fill_targets=10/22,126/22,134/22,30/22,50/22,67/22,8/22 -rd out_file=/__w/_temp/pd/test_sync_fifo_from_rtl_to_drc0/pv_magic_drc/layout.gds -r stream.py
+nirmaan-gds-empty-cells: 0
+nirmaan-gds-fill-shapes: 3616
+nirmaan-gds-fill-layer: 10/22 571
+nirmaan-gds-fill-layer: 126/22 156
+nirmaan-gds-fill-layer: 134/22 156
+nirmaan-gds-fill-layer: 30/22 615
+nirmaan-gds-fill-layer: 50/22 1034
+nirmaan-gds-fill-layer: 67/22 1084
+nirmaan-gds-fill-unmapped: 0 -
+$ magic -dnull -noconsole magic_drc.tcl
+Magic 8.3 revision 686 - Compiled on Sat Nov 14 14:47:48 UTC 2026.
+WARNING: RLIMIT_NOFILE is above 1024 and Tcl_Version<9 this may cause runtime issues [rlim_cur=65536]
+Input style sg13g2(): scaleFactor=2, multiplier=2
+Warning: Calma reading is not undoable!  I hope that's OK.
+Library written using GDS-II Release 6.0
+Library name: LIB
+Reading "VIA_Via3_XY".
+Reading "VIA_Via1_YY".
+Reading "VIA_Via2_YX".
+Reading "VIA_Via1_XY".
+Reading "VIA_via1_2_2200_440_1_5_410_410".
+Reading "VIA_via2_3_2200_440_1_5_410_410".
+Reading "VIA_via3_4_2200_440_1_5_410_410".
+Reading "VIA_via4_5_2200_440_1_5_410_410".
+Reading "VIA_via5_6_2200_440_1_2_840_840".
+Reading "VIA_via1_2_5000_440_1_12_410_410".
+Reading "VIA_via2_3_5000_440_1_12_410_410".
+Reading "VIA_via3_4_5000_440_1_12_410_410".
+Reading "VIA_via4_5_5000_440_1_12_410_410".
+Reading "VIA_via5_6_5000_440_1_5_840_840".
+Reading "VIA_via6_7_2200_2200_1_1_1960_1960".
+Reading "VIA_via6_7_2200_5000_2_1_1960_1960".
+Reading "VIA_via6_7_5000_2200_1_2_1960_1960".
+Reading "VIA_via6_7_5000_5000_2_2_1960_1960".
+Reading "sync_fifo_DEF_FILL".
+CIF file read warning: Input off lambda grid by 1/2; grid redefined.
+Reading "sg13g2_buf_16".
+Reading "sg13g2_buf_8".
+Reading "sg13g2_buf_1".
+Reading "sg13g2_tiehi".
+CIF file read warning: CIF style sg13g2(): units rescaled by factor of 5 / 1
+Reading "sg13g2_dfrbpq_1".
+Reading "sg13g2_xor2_1".
+Reading "sg13g2_nand4_1".
+Reading "sg13g2_or2_1".
+Reading "sg13g2_a21o_1".
+Reading "sg13g2_o21ai_1".
+Reading "sg13g2_xnor2_1".
+Reading "sg13g2_nor2_1".
+Reading "sg13g2_nand2b_1".
+Reading "sg13g2_nor2b_1".
+Reading "sg13g2_nand3_1".
+Reading "sg13g2_nand2_1".
+Reading "sg13g2_a21oi_1".
+Reading "sg13g2_mux2_1".
+Reading "sg13g2_mux4_1".
+Reading "sg13g2_and2_1".
+Reading "sg13g2_nor4_1".
+Reading "sg13g2_nor3_1".
+Reading "sg13g2_inv_1".
+Reading "sg13g2_decap_4".
+Reading "sg13g2_fill_1".
+Reading "sg13g2_fill_2".
+Reading "sg13g2_decap_8".
+Reading "sync_fifo".
+DRC style is now "drc(full)"
+nirmaan-magic-drc-style: drc(full)
+nirmaan-drc-rule: Diffusion_spacing_<_0.21um_(Act.b) 25
+nirmaan-drc-rule: Diffusion_contact_spacing_to_poly_<_0.11um_(Cnt.f) 11
+nirmaan-drc-rule: Poly_spacing_to_Diffusion_<_0.07um_(Gat.d) 26
+nirmaan-drc-rule: This_layer_can't_abut_or_partially_overlap_between_subcells 62
+nirmaan-drc-rule: Metal1_spacing_<_0.18um_(M1.b) 652
+nirmaan-drc-rule: Poly_minimum_area_<_0.09um^2_(Gat.e) 64
+nirmaan-drc-rule: Can't_overlap_those_layers 75
+nirmaan-drc-rule: N-Diffusion_spacing_to_N-well_<_0.31um_(NW.d) 2
+nirmaan-drc-rule: Diffusion_contact_spacing_<_0.18um_(Cnt.b) 324
+nirmaan-drc-rule: Poly_contact_spacing_to_diffusion_<_0.14um_(Cnt.e) 6
+nirmaan-drc-rule: poly_spacing_<_0.18um_(Gat.b) 227
+nirmaan-drc-rule: Metal1_minimum_area_<_0.09um^2_(M1.d) 12
+nirmaan-drc-rule: Poly1_contact_spacing_<_0.18um_(Cnt.b) 33
+nirmaan-drc-rule: Poly_overhang_of_transistor_<_0.18um_(Gat.c) 5
+nirmaan-drc-violations: 1524
+$ magic -dnull -noconsole magic_extract.tcl
+Magic 8.3 revision 686 - Compiled on Sat Nov 14 14:47:48 UTC 2026.
+WARNING: RLIMIT_NOFILE is above 1024 and Tcl_Version<9 this may cause runtime issues [rlim_cur=65536]
+Input style sg13g2(): scaleFactor=2, multiplier=2
+Warning: Calma reading is not undoable!  I hope that's OK.
+Library written using GDS-II Release 6.0
+Library name: LIB
+Reading "VIA_Via3_XY".
+Reading "VIA_Via1_YY".
+Reading "VIA_Via2_YX".
+Reading "VIA_Via1_XY".
+Reading "VIA_via1_2_2200_440_1_5_410_410".
+Reading "VIA_via2_3_2200_440_1_5_410_410".
+Reading "VIA_via3_4_2200_440_1_5_410_410".
+Reading "VIA_via4_5_2200_440_1_5_410_410".
+Reading "VIA_via5_6_2200_440_1_2_840_840".
+Reading "VIA_via1_2_5000_440_1_12_410_410".
+Reading "VIA_via2_3_5000_440_1_12_410_410".
+Reading "VIA_via3_4_5000_440_1_12_410_410".
+Reading "VIA_via4_5_5000_440_1_12_410_410".
+Reading "VIA_via5_6_5000_440_1_5_840_840".
+Reading "VIA_via6_7_2200_2200_1_1_1960_1960".
+Reading "VIA_via6_7_2200_5000_2_1_1960_1960".
+Reading "VIA_via6_7_5000_2200_1_2_1960_1960".
+Reading "VIA_via6_7_5000_5000_2_2_1960_1960".
+Reading "sync_fifo_DEF_FILL".
+CIF file read warning: Input off lambda grid by 1/2; grid redefined.
+Reading "sg13g2_buf_16".
+Reading "sg13g2_buf_8".
+Reading "sg13g2_buf_1".
+Reading "sg13g2_tiehi".
+CIF file read warning: CIF style sg13g2(): units rescaled by factor of 5 / 1
+Reading "sg13g2_dfrbpq_1".
+Reading "sg13g2_xor2_1".
+Reading "sg13g2_nand4_1".
+Reading "sg13g2_or2_1".
+Reading "sg13g2_a21o_1".
+Reading "sg13g2_o21ai_1".
+Reading "sg13g2_xnor2_1".
+Reading "sg13g2_nor2_1".
+Reading "sg13g2_nand2b_1".
+Reading "sg13g2_nor2b_1".
+Reading "sg13g2_nand3_1".
+Reading "sg13g2_nand2_1".
+Reading "sg13g2_a21oi_1".
+Reading "sg13g2_mux2_1".
+Reading "sg13g2_mux4_1".
+Reading "sg13g2_and2_1".
+Reading "sg13g2_nor4_1".
+Reading "sg13g2_nor3_1".
+Reading "sg13g2_inv_1".
+Reading "sg13g2_decap_4".
+Reading "sg13g2_fill_1".
+Reading "sg13g2_fill_2".
+Reading "sg13g2_decap_8".
+Reading "sync_fifo".
+sg13g2_decap_8: 4 warnings
+sg13g2_decap_4: 2 warnings
+sync_fifo: 261 errors
+Total of 261 errors (check feedback entries).
+Total of 6 warnings.
+$ netgen -batch source netgen_lvs.tcl
+Netgen 1.5.325 compiled on Sat Nov 14 14:48:03 UTC 2026
+Warning: netgen command 'format' use fully-qualified name '::netgen::format'
+Warning: netgen command 'global' use fully-qualified name '::netgen::global'
+Warning:  A case-insensitive file has been read and so the	verilog file must be treated case-insensitive to match.
+Final result: 
+$ /__w/ip-nirmaan/ip-nirmaan/.venv/bin/python -I lvs_count.py /__w/_temp/pd/test_sync_fifo_from_rtl_to_drc0/pv_magic_drc/lvs.report sync_fifo
+nirmaan-lvs-circuit: - - Match
+nirmaan-lvs-circuit: - - Match
+nirmaan-lvs-circuit: sg13g2_and2_1 sg13g2_and2_1 Match
+nirmaan-lvs-circuit: sg13g2_decap_8 sg13g2_decap_8 Match
+nirmaan-lvs-circuit: sg13g2_nand2b_1 sg13g2_nand2b_1 Match
+nirmaan-lvs-circuit: sg13g2_buf_1 sg13g2_buf_1 Match
+nirmaan-lvs-circuit: sg13g2_inv_1 sg13g2_inv_1 Match
+nirmaan-lvs-circuit: sg13g2_nor2_1 sg13g2_nor2_1 Match
+nirmaan-lvs-circuit: sg13g2_dfrbpq_1 sg13g2_dfrbpq_1 Mismatch
+nirmaan-lvs-circuit: sg13g2_mux4_1 sg13g2_mux4_1 Match
+nirmaan-lvs-circuit: sg13g2_nand4_1 sg13g2_nand4_1 Match
+nirmaan-lvs-circuit: sg13g2_xnor2_1 sg13g2_xnor2_1 Match
+nirmaan-lvs-circuit: sg13g2_a21o_1 sg13g2_a21o_1 Match
+nirmaan-lvs-circuit: sg13g2_buf_16 sg13g2_buf_16 Match
+nirmaan-lvs-circuit: sg13g2_buf_8 sg13g2_buf_8 Match
+nirmaan-lvs-circuit: sg13g2_mux2_1 sg13g2_mux2_1 Match
+nirmaan-lvs-circuit: sg13g2_o21ai_1 sg13g2_o21ai_1 Match
+nirmaan-lvs-circuit: sg13g2_nor4_1 sg13g2_nor4_1 Match
+nirmaan-lvs-circuit: sg13g2_nand3_1 sg13g2_nand3_1 Match
+nirmaan-lvs-circuit: sg13g2_decap_4 sg13g2_decap_4 Match
+nirmaan-lvs-circuit: sg13g2_or2_1 sg13g2_or2_1 Match
+nirmaan-lvs-circuit: sg13g2_a21oi_1 sg13g2_a21oi_1 Match
+nirmaan-lvs-circuit: sg13g2_nor3_1 sg13g2_nor3_1 Match
+nirmaan-lvs-circuit: sg13g2_nand2_1 sg13g2_nand2_1 Match
+nirmaan-lvs-circuit: sg13g2_xor2_1 sg13g2_xor2_1 Match
+nirmaan-lvs-circuit: sg13g2_nor2b_1 sg13g2_nor2b_1 Match
+nirmaan-lvs-circuit: sg13g2_tiehi sg13g2_tiehi Match
+nirmaan-lvs-circuit: sync_fifo sync_fifo Mismatch
+nirmaan-netgen-final: Final result: Top level cell failed pin matching.
+nirmaan-lvs-mismatched-circuits: 2
+nirmaan-lvs-mismatched-nets: 36
+nirmaan-lvs-mismatched-devices: 0
+nirmaan-lvs-mismatched-pins: 18
+nirmaan-lvs-mismatched-subcircuits: 0

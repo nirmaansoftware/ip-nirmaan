@@ -296,6 +296,9 @@ def _concurrent_checks(monkeypatch, tmp_path, user):
     Returns the events and the most check commands seen running at once."""
     state = {"running": 0, "most": 0, "events": []}
     guard = threading.Lock()
+    # Without the check account both checks must be running together before either finishes, so the
+    # peak is exact on a slow runner. With it they are serialised and must never meet.
+    meet = threading.Barrier(2, timeout=30) if user is None else None
 
     def fake_run(argv, **kw):
         if "pkill" in argv or "chown" in argv:
@@ -305,6 +308,8 @@ def _concurrent_checks(monkeypatch, tmp_path, user):
             with guard:
                 state["running"] += 1
                 state["most"] = max(state["most"], state["running"])
+            if meet is not None:
+                meet.wait()
             time.sleep(0.2)
             with guard:
                 state["running"] -= 1
