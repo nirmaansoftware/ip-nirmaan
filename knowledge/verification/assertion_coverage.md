@@ -112,8 +112,9 @@ backs it.
   property (gate: eda.py:743-764).
 - Treating a reached cover as evidence that the property is correct.
 - Treating full coverage as a statement about the specification: coverage
-  addresses an incomplete test plan, and says nothing about missing
-  requirements [OTDV].
+  addresses an incomplete test plan [OTDV]. It does not show that the
+  requirements themselves are complete (this document's inference, not a
+  claim of that source).
 
 ## How a result is checked
 
