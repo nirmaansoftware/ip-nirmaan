@@ -371,7 +371,15 @@ def sdc_problem(sdc: Path) -> str | None:
 
 
 def check_inputs(top: object, params_files: dict[str, list[str]]) -> str | None:
-    """Every run's own check (``eda.execute``): ``top`` is a name, and the Verilog it compiles is runnable."""
+    """Every run's own check (``eda.execute``): ``top`` is a name, and what it compiles is runnable Verilog.
+
+    Every file in ``sources``, ``rtl`` and ``design`` is checked as Verilog whatever its name: Icarus and Verilator
+    read a file of any other name as Verilog. ``rtl`` and ``design`` name Verilog files only, since Verilator
+    compiles a C or C++ file given there into the program the run then starts (``fw.test``, ``regmap.verify``).
+    """
     files = [f for param in HDL_PARAMS for f in params_files.get(param, [])]
-    return (name_problem(top) or path_problem(files)
-            or verilog_problem(f for f in files if Path(f).suffix in HDL_SUFFIXES))
+    other = [Path(f).name for param in ("rtl", "design") for f in params_files.get(param, [])
+             if Path(f).suffix not in HDL_SUFFIXES]
+    if other:
+        return f"rtl and design name Verilog files only, and {', '.join(other)} is not {REFUSED}"
+    return name_problem(top) or path_problem(files) or verilog_problem(files)

@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from nirmaan.integrations import dft, eda, eda_guard, regmap  # noqa: F401  (dft, regmap: their backends)
+from nirmaan.integrations import dft, eda, eda_guard, firmware, regmap  # noqa: F401  (their backends)
 from nirmaan.integrations.eda import backends_for, execute
 from nirmaan.integrations.eda_guard import (
     SAFE_SYSTEM,
@@ -159,6 +159,24 @@ def test_the_rtl_a_cosimulation_compiles_is_checked(tmp_path):
     outcome = execute(backend("regmap.verify", "regmap-cosim"),
                       {"map": str(FIXTURES / "rtl" / "axi4_lite" / "register_map.json"), "rtl": str(rtl)})
     refused(outcome, marker, "regs.v uses $system")
+    regmap_map = str(FIXTURES / "rtl" / "axi4_lite" / "register_map.json")
+    cpp = write(tmp_path / "regs.cpp", f'#include <cstdlib>\nstatic int x = std::system("touch {marker}");\n')
+    renamed = write(tmp_path / "regs.txt", rtl.read_text())
+    for given, words in ((cpp, "regs.cpp is not"), (renamed, "regs.txt is not")):
+        for tool, name in (("regmap.verify", "regmap-cosim"), ("fw.test", "verilator-cosim")):
+            params = {"map": regmap_map, "rtl": str(given), "sources": str(FIXTURES / "fw" / "axi4_lite" /
+                                                                           "axi4_lite_regs_test.c")}
+            refused(execute(backend(tool, name), params if tool == "fw.test" else {"map": regmap_map,
+                                                                                   "rtl": str(given)}),
+                    marker, words)
+
+
+def test_a_source_of_any_name_is_checked_as_verilog(tmp_path):
+    """Icarus reads a file of any name as Verilog, so dft.scan_sim would simulate a tb.txt."""
+    marker = tmp_path / "MARKER"
+    renamed = write(tmp_path / "design.txt", "module m;\n  initial $system(\"touch " + str(marker) + "\");\nendmodule\n")
+    outcome = execute(backend("dft.scan_sim", "icarus-scan"), {"sources": str(renamed), "top": "m"})
+    refused(outcome, marker, "design.txt uses $system")
 
 
 def test_strings_and_comments_hold_no_construct_and_plain_dumpfiles_pass(tmp_path):
@@ -289,6 +307,13 @@ def test_every_committed_design_and_testbench_passes():
     paths = committed(".v", ".sv", ".vh") + sorted((ROOT / "evals").rglob("*.v"))
     assert paths
     assert [p for p in paths if verilog_problem([p])] == []
+
+
+def test_every_committed_c_file_passes_as_gate_sources():
+    """A firmware driver in ``sources`` is checked as Verilog too (docs/GATE_INPUTS.md, section 2)."""
+    roots = [ROOT / "tests" / "fixtures", ROOT / "evals", ROOT / "src" / "nirmaan" / "integrations"]
+    paths = sorted(p for root in roots for s in ("*.c", "*.h", "*.S", "*.cpp") for p in root.rglob(s))
+    assert paths and [p for p in paths if verilog_problem([p])] == []
 
 
 def test_every_committed_single_task_setup_and_constraints_file_passes():

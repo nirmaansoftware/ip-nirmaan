@@ -30,7 +30,7 @@ Verilator 5.052 and Icarus Verilog 13 with marker files.
 |---|---|---|
 | `synth.run` (yosys, yosys-liberty), `dft.*`, `sta.run` with `sources` | a file's `entry`, passed as `top`, written into the Yosys script as `synth -top <top>` | a new line then `!cmd`, or `; exec -- cmd`: a shell command |
 | `simulator.run` (icarus, verilator-sim), `test.run` | the testbench, which the M53 testbench rule let use `$system`, `$fopen`, `$c` and DPI | `$system` (Verilator; Icarus builds that define it), `$fopen`/`$fwrite` to any path, `$c` C++ (Verilator), a C++ source beside the Verilog (Verilator compiles it in) |
-| `regmap.verify`, `fw.test` | the RTL (`rtl`), compiled by Verilator into the program it runs | the same constructs in the RTL |
+| `regmap.verify`, `fw.test`, `fw.soc_test` | the RTL (`rtl`), compiled by Verilator into the program it runs | the same constructs in the RTL, and a C or C++ file given as RTL (Verilator compiles it in) |
 | `formal.run`, `formal.cover` | the `.sby` | `[script]` lines starting with `!`, or calling `exec`, `script`, `tcl`; a `--pycode-begin--` block (Python SBY runs as it reads the file); engine words and option values (SBY joins them into shell command lines unquoted); `[files]` destinations outside the run |
 | `equivalence.run` | the `.eqy` | M69 refused `!`, `exec`, `tcl`, `python`, `script`, `plugin` and writes; other Yosys commands that run programs (`abc -exe`, `show -viewer`) and a strategy's engine words were not refused |
 | `sta.run`, `pnr.run` | the constraints (`sdc`), which OpenSTA and OpenROAD read as Tcl | any Tcl, `exec` included |
@@ -45,8 +45,11 @@ refused `$system`, `$fopen`, `$c` and DPI in every source.
 
 - **`top`** is a plain module name (`[A-Za-z_][A-Za-z0-9_$]*`), and no file in
   `sources`, `rtl` or `design` has a quote or a control character in its path.
-- **Verilog** in `sources`, `rtl` and `design`, and every file a `.sby`'s
-  `[files]` names: the system tasks and functions in `SAFE_SYSTEM` only
+- **Verilog**: every file in `sources`, `rtl` and `design`, whatever its name
+  (Icarus and Verilator read a file of any other name as Verilog), and every
+  file a `.sby`'s `[files]` names, is checked as Verilog; `rtl` and `design`
+  take files with a Verilog suffix only. A firmware driver in `sources` is
+  checked too; every committed C file passes (no `$` name, no backtick). The checks: the system tasks and functions in `SAFE_SYSTEM` only
   (display, severity, time, arithmetic, random, plusargs, assertions and
   formal, waveform control); `$dumpfile` only with a plain file name, which
   lands in the run's own directory. Refused: any other `$` name (`$system`,
@@ -54,8 +57,8 @@ refused `$system`, `$fopen`, `$c` and DPI in every source.
   token pasting, and an `` `include `` of anything but a relative file in the
   includer's folder; an included file is checked whatever its name.
   Strings and comments are skipped. Which file may end a simulation or read a
-  plusarg is still the M53 testbench rule's matter. Simulations take Verilog
-  sources only.
+  plusarg is still the M53 testbench rule's matter. `simulator.run` and
+  `test.run` take Verilog sources only.
 - **Yosys scripts** (a `.sby`'s `[script]`, an `.eqy`'s `[gold]`, `[gate]` and
   `[script]`): no line starting with `!`, and every command in `YOSYS_SAFE`
   (reading designs and transforming the one in memory).
@@ -84,7 +87,7 @@ them through these checks. Run with `PYTHONPATH=src python
 scripts/gate_input_history.py` at `main` fe58379 plus this change, it printed:
 
 ```
-records 259, answers with files 95, seat files 209 (194 Verilog, 15 .sby), entries 202, refused 7
+records 259, answers with files 95, seat files 209 (194 checked as Verilog, 15 .sby), entries 202, refused 7
 ```
 
 The 7 refused are `.sby` setups that declare `[tasks]` (`sync_fifo.sby` in

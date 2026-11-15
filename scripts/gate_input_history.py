@@ -2,8 +2,8 @@
 
 Reads every eval trial record under ``evals/results/`` and every JSON fixture under ``tests/fixtures/``, takes
 each seat-written file from the answers' file blocks and each declared ``entry``, and runs them through
-``nirmaan.integrations.eda_guard``: a Verilog file through ``verilog_problem``, a ``.sby`` through
-``sby_problem``, an entry through ``name_problem``. It prints the counts and every refusal, and writes nothing.
+``nirmaan.integrations.eda_guard``: a ``.sby`` through ``sby_problem``, any other file through
+``verilog_problem``, an entry through ``name_problem``. It prints the counts and every refusal, and writes nothing.
 
     PYTHONPATH=src python scripts/gate_input_history.py [ROOT]
 """
@@ -75,11 +75,9 @@ def scan(root: Path) -> dict[str, object]:
                     if path.suffix == ".sby":
                         setups += 1
                         why = sby_problem(path)
-                    elif path.suffix in (".v", ".sv", ".vh", ".svh"):
+                    else:  # a gate reads any other file it is given as Verilog (eda_guard.check_inputs)
                         verilog += 1
                         why = verilog_problem([path])
-                    else:
-                        why = None
                 if why:
                     tasks = path.suffix == ".sby" and "[tasks]" in body
                     refused.append(f"{record.relative_to(root)}: {name}{' (declares [tasks])' if tasks else ''}: {why}")
@@ -90,7 +88,7 @@ def scan(root: Path) -> dict[str, object]:
 def main(argv: list[str]) -> int:
     found = scan(Path(argv[1]) if len(argv) > 1 else Path.cwd())
     print(f"records {found['records']}, answers with files {found['answers']}, seat files {found['files']} "
-          f"({found['verilog']} Verilog, {found['setups']} .sby), entries {found['entries']}, "
+          f"({found['verilog']} checked as Verilog, {found['setups']} .sby), entries {found['entries']}, "
           f"refused {len(found['refused'])}")
     for line in found["refused"]:
         print(f"  {line}")
