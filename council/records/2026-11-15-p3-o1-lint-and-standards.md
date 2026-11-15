@@ -184,8 +184,10 @@ changes; it did not choose it.
 ### 6. Item 11 for the RTL wave
 
 With the merge on `main`, item 11 is met for the Design division: fact 3 found
-no other pair. This closes the P3-O1 part of the retrospective's decision 1a.
-It does not by itself meet the pilot's exit, which decision 1 of the
+no other pair. This record rules on item 11 for the Design division only; it
+does not close any part of the retrospective's decision 1a, which is the
+Knowledge track (four documents and their check records) and does not mention
+P3-O1. It does not by itself meet the pilot's exit, which decision 1 of the
 retrospective reads from `capability/levels.json`.
 
 ### 7. A Coding Standards practice later
