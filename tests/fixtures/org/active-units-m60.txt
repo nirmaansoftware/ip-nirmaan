@@ -56,7 +56,6 @@ design.rtl.low_power
 design.rtl.quality
 design.rtl.quality.lint
 design.rtl.quality.review
-design.rtl.quality.standards
 design.rtl.quality.synthesis
 documentation
 documentation.engineering
