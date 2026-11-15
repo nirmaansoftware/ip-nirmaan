@@ -1,0 +1,175 @@
+name: pd-ihp
+
+# M82: the IHP SG13G2 physical design pilot, the sibling of pd-sky130 (M79) and pd-gf180 (M81). The
+# M26 synchronous FIFO from RTL through synthesis, place and route, and DRC and LVS with Magic and
+# Netgen over the IHP Open PDK's own Magic technology and Netgen setup (pv.run backend magic-netgen),
+# on the OpenROAD-flow-scripts ihp-sg13g2 platform. GitHub-hosted runners only; nothing here runs on
+# a development machine. Not a required check: it runs on demand and when the physical design flow,
+# the pilot or its committed records change. See docs/PD_IHP_PILOT.md.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/pd-ihp.yml
+      - src/nirmaan/integrations/physical.py
+      - src/nirmaan/integrations/pv_magic.py
+      - src/nirmaan/integrations/pd_parsers.py
+      - tests/test_pd_ihp_pilot.py
+      - tests/fixtures/pd/ihp/**
+      - tests/fixtures/pd/sync_fifo.sdc
+      - tests/fixtures/rtl/sync_fifo/sync_fifo.v
+      - docs/PD_IHP_PILOT.md
+      - docs/history/M82-pd-ihp-pilot.md
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/pd-ihp.yml
+      - src/nirmaan/integrations/physical.py
+      - src/nirmaan/integrations/pv_magic.py
+      - src/nirmaan/integrations/pd_parsers.py
+      - tests/test_pd_ihp_pilot.py
+      - tests/fixtures/pd/ihp/**
+      - tests/fixtures/pd/sync_fifo.sdc
+      - tests/fixtures/rtl/sync_fifo/sync_fifo.v
+      - docs/PD_IHP_PILOT.md
+      - docs/history/M82-pd-ihp-pilot.md
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  ihp-pilot:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    # The same pinned OpenROAD-flow-scripts image as ci.yml, pd-sky130 and pd-gf180: OpenROAD, Yosys,
+    # KLayout, and the ihp-sg13g2 platform, built together.
+    container:
+      image: openroad/orfs:26Q3-687-gc63a606f9@sha256:2e5bf6fe865e102ca2313aba1d849da50f5973bc91c4212a2f68e7d905a39c8f
+    env:
+      NIRMAAN_PDK_ROOT: /OpenROAD-flow-scripts/flow/platforms
+      NIRMAAN_PD_PILOT: "1"
+      # Magic and Netgen, built from the same release tags as pd-sky130 (commits checked), same cache.
+      MAGIC_TAG: 8.3.686
+      MAGIC_COMMIT: 56319630d4a304a55e1139fdfe59594ca00bf05c
+      NETGEN_TAG: 1.5.325
+      NETGEN_COMMIT: 85bddb8f273c00fb402f3492f5e2bb4337a568b4
+      # The IHP Open PDK (IHP-GmbH/IHP-Open-PDK commit 5e6d592e, 2026-09-01) as the ciel release packs it,
+      # by release and sha256.
+      CIEL_RELEASE: ihp-sg13g2-5e6d592e4002946a4616f798c357f0f3c06cf3b6
+    defaults:
+      run:
+        shell: bash  # the container defaults to sh, which has no pipefail
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
+        with:
+          python-version: "3.12"
+          activate-environment: true
+          enable-cache: true
+          cache-dependency-glob: pyproject.toml
+      - name: Tools on PATH
+        run: |
+          echo /OpenROAD-flow-scripts/tools/install/OpenROAD/bin >> "$GITHUB_PATH"
+          echo /OpenROAD-flow-scripts/tools/install/yosys/bin >> "$GITHUB_PATH"
+          echo /opt/magic-netgen/bin >> "$GITHUB_PATH"
+      # Tcl/Tk and Cairo for Magic and Netgen, from the image's Ubuntu archive (build and runtime).
+      - name: Magic and Netgen build dependencies
+        run: |
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
+            build-essential m4 tcsh csh tcl-dev tk-dev libx11-dev libcairo2-dev libglu1-mesa-dev zlib1g-dev git ca-certificates > /dev/null
+      - name: Cache Magic and Netgen
+        id: magic-netgen
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: /opt/magic-netgen
+          key: magic-netgen-${{ env.MAGIC_COMMIT }}-${{ env.NETGEN_COMMIT }}-orfs-26Q3-687
+      - name: Build Magic and Netgen
+        if: steps.magic-netgen.outputs.cache-hit != 'true'
+        run: |
+          set -o pipefail
+          for tool in magic netgen; do
+            upper=${tool^^}; tag_var=${upper}_TAG; commit_var=${upper}_COMMIT
+            git init -q "$RUNNER_TEMP/$tool" && cd "$RUNNER_TEMP/$tool"
+            git fetch -q --depth 1 "https://github.com/RTimothyEdwards/$tool.git" "refs/tags/${!tag_var}"
+            git checkout -q FETCH_HEAD
+            test "$(git rev-parse HEAD)" = "${!commit_var}"
+            ./configure --prefix=/opt/magic-netgen 2>&1 | tail -5
+            make -j "$(nproc)" 2>&1 | tail -5
+            make install 2>&1 | tail -3
+          done
+      # Magic's technology (the top file and the four it includes), Netgen's setup, and the standard
+      # cells' SPICE, from the PDK's own libs.tech and libs.ref.
+      - name: Cache the IHP Open PDK files for Magic and Netgen
+        id: ihp-open-pdk
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: /opt/ihp-open-pdk
+          key: ihp-open-pdk-magic-netgen-1d051529-2c98bd19
+      - name: Fetch the IHP Open PDK files for Magic and Netgen
+        if: steps.ihp-open-pdk.outputs.cache-hit != 'true'
+        run: |
+          base="https://github.com/fossi-foundation/ciel-releases/releases/download/$CIEL_RELEASE"
+          curl -sSfL -o "$RUNNER_TEMP/common.tar.zst" "$base/common.tar.zst"
+          curl -sSfL -o "$RUNNER_TEMP/sc.tar.zst" "$base/sg13g2_stdcell.tar.zst"
+          sha256sum -c <<SUMS
+          1d0515292819360b54bec5d60060b7fe9fd91f5e10c3a1450161a7339b9d37e9  $RUNNER_TEMP/common.tar.zst
+          2c98bd1985fd389c5058ca182a18048d4fcaa12d59971977e18bd9152067c0c3  $RUNNER_TEMP/sc.tar.zst
+          SUMS
+          # The decompressor, pinned by version and by the sha256 of its wheel and source archive (PyPI).
+          printf '%s\n' 'zstandard==0.25.0 --hash=sha256:5a56ba0db2d244117ed744dfa8f6f5b366e14148e00de44723413b2f3938a902 --hash=sha256:7713e1179d162cf5c7906da876ec2ccb9c3a9dcbdffef0cc7f70c3667a205f0b' \
+            > "$RUNNER_TEMP/zstd-requirements.txt"
+          uv pip install --require-hashes -r "$RUNNER_TEMP/zstd-requirements.txt"
+          python - /opt/ihp-open-pdk <<'PY'
+          import os, sys, tarfile, zstandard
+          tech = "ihp-sg13g2/libs.tech"
+          wanted = {f"{tech}/magic/ihp-sg13g2{part}.tech" for part in ("", "-cifin", "-cifout", "-drc", "-extract")}
+          wanted |= {f"{tech}/netgen/ihp-sg13g2_setup.tcl", "ihp-sg13g2/libs.ref/sg13g2_stdcell/spice/sg13g2_stdcell.spice"}
+          for archive in ("common", "sc"):
+              path = os.path.join(os.environ["RUNNER_TEMP"], f"{archive}.tar.zst")
+              with open(path, "rb") as f, tarfile.open(fileobj=zstandard.ZstdDecompressor().stream_reader(f), mode="r|") as tar:
+                  for member in tar:
+                      if member.name in wanted and member.isfile():
+                          tar.extract(member, sys.argv[1], filter="data")
+                          wanted.discard(member.name)
+          sys.exit(f"missing from the release: {sorted(wanted)}" if wanted else 0)
+          PY
+      # A directory of its own under the PDK root: the platform directory is also named ihp-sg13g2.
+      - name: IHP Open PDK files into the PDK root
+        run: |
+          cp -r /opt/ihp-open-pdk "$NIRMAAN_PDK_ROOT/ihp-open-pdk"
+          find "$NIRMAAN_PDK_ROOT/ihp-open-pdk" -type f -exec sha256sum {} +
+      - name: Tool versions
+        run: |
+          which openroad yosys klayout magic netgen
+          openroad -version && yosys -V && klayout -v
+          echo 'puts "magic [version]"; quit -noprompt' > "$RUNNER_TEMP/v.tcl" && magic -dnull -noconsole "$RUNNER_TEMP/v.tcl" | tail -2
+          netgen -batch quit 2>&1 | head -3 || true
+      - name: Install
+        run: uv pip install -e ".[dev]"
+      - name: Pilot
+        env:
+          NIRMAAN_REQUIRE_EDA: yosys openroad klayout magic netgen
+        run: >-
+          python -m pytest -q -rs -s tests/test_pd_ihp_pilot.py
+          --basetemp="$RUNNER_TEMP/pd" --junitxml="$RUNNER_TEMP/junit/pd-ihp.xml"
+      # Text only (logs, scripts, reports, Netgen's comparison JSON, run records): no layout, netlist
+      # or PDK data.
+      - name: Collect the tool logs
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/pd-logs"
+          cd "$RUNNER_TEMP/pd" 2>/dev/null && find . -type f \( -name '*.log' -o -name '*.tcl' -o -name '*.report' \
+            -o -name '*.json' -o -name '*.rpt' \) -exec cp --parents {} "$RUNNER_TEMP/pd-logs" \; || true
+          cp -r "$RUNNER_TEMP/junit" "$RUNNER_TEMP/pd-logs/" 2>/dev/null || true
+      - name: Keep the tool logs
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: pd-ihp-logs
+          path: ${{ runner.temp }}/pd-logs
+          if-no-files-found: warn

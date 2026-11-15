@@ -1,0 +1,765 @@
+# CAPTURED: the pd-ihp job's own records from CI run 43639949127 (head 1465f3e), job ihp-pilot, test_sync_fifo_from_rtl_to_drc_and_lvs_on_ihp_sg13g2; excerpt: the pytest junit report, then the result record of each tool run (pnr.run, the clean pv.run, the DRC must-fail pv.run, the LVS must-fail pv.run) exactly as the run wrote it; the run's code is the code of the commit that adds this file.
+== junit/pd-ihp.xml
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="0" skipped="0" tests="1" time="354.001" timestamp="2026-11-14T20:56:02.883880+00:00" hostname="cf1eac34039b"><testcase classname="tests.test_pd_ihp_pilot" name="test_sync_fifo_from_rtl_to_drc_and_lvs_on_ihp_sg13g2" time="353.388" /></testsuite></testsuites>
+== pnr/openroad.result.json
+{
+  "tool": "pnr.run",
+  "backend": "openroad",
+  "executables": {
+    "openroad": "/OpenROAD-flow-scripts/tools/install/OpenROAD/bin/openroad"
+  },
+  "commands": [
+    [
+      "openroad",
+      "-no_init",
+      "-no_splash",
+      "-exit",
+      "pnr.tcl"
+    ]
+  ],
+  "exit_statuses": [
+    0
+  ],
+  "log": "/__w/_temp/pd/test_sync_fifo_from_rtl_to_drc0/pnr/openroad.log",
+  "result": {
+    "passed": true,
+    "summary": "place and route passed: routed and extracted, 0 DRC violations, wirelength 11646 um, utilization 34%, power grid connected, metal fill 3616 shapes, clock skew 0.010, worst setup slack 6.052, worst hold slack 0.431, TNS 0.000 on extracted parasitics",
+    "metrics": {
+      "stop_after": "extract",
+      "stages_completed": [
+        "floorplan",
+        "place",
+        "cts",
+        "route",
+        "extract",
+        "timing"
+      ],
+      "failed_stage": null,
+      "design_area_um2": 8341.0,
+      "utilization_pct": 34.0,
+      "wirelength_um": 11646.0,
+      "drc_violations": 0,
+      "worst_slack": 6.052,
+      "worst_hold_slack": 0.431,
+      "tns": 0.0,
+      "wns": 0.0,
+      "violating_endpoints": [],
+      "exit_status": 0,
+      "slack_by_stage": {
+        "place": {
+          "setup": 6.142,
+          "hold": 0.423,
+          "tns": 0.0
+        },
+        "cts": {
+          "setup": 5.992,
+          "hold": 0.436,
+          "tns": 0.0
+        },
+        "route": {
+          "setup": 5.911,
+          "hold": 0.453,
+          "tns": 0.0
+        },
+        "extract": {
+          "setup": 6.052,
+          "hold": 0.431,
+          "tns": 0.0
+        }
+      },
+      "parasitics": "extracted",
+      "cts_buffers": 17,
+      "cts_sinks": 77,
+      "clock_skew": 0.01,
+      "clock_insertion_delay": 0.301,
+      "tap_cells": null,
+      "endcap_cells": null,
+      "power_grids": [
+        "grid"
+      ],
+      "supply_nets": [
+        "VDD",
+        "VSS"
+      ],
+      "unconnected_supply_pins": 0,
+      "filler_cells": 1500,
+      "antenna_net_violations": 0,
+      "antenna_pin_violations": 0,
+      "worst_ir_drop_v": {},
+      "fill_shapes": 3616,
+      "unannotated_drivers": 3,
+      "floating_outputs": 5,
+      "unannotated_nets": 0,
+      "outputs": {
+        "def": "/__w/_temp/pd/test_sync_fifo_from_rtl_to_drc0/pnr/route.def",
+        "netlist": "/__w/_temp/pd/test_sync_fifo_from_rtl_to_drc0/pnr/final.v",
+        "pg_netlist": "/__w/_temp/pd/test_sync_fifo_from_rtl_to_drc0/pnr/final_pg.v",
+        "spef": "/__w/_temp/pd/test_sync_fifo_from_rtl_to_drc0/pnr/route.spef"
+      }
+    },
+    "diagnostics": [
+      {
+        "severity": "warning",
+        "message": "Core area lower left (17.500, 17.500) snapped to (17.760, 18.900).",
+        "code": "IFP-0028",
+        "file": "",
+        "line": null,
+        "column": null
+      },
+      {
+        "severity": "warning",
+        "message": "LEF58_ENCLOSURE with no CUTCLASS is not supported. Skipping for layer Cont",
+        "code": "DRT-0349",
+        "file": "",
+        "line": null,
+        "column": null
+      },
+      {
+        "severity": "warning",
+        "message": "LEF58_ENCLOSURE with no CUTCLASS is not supported. Skipping for layer Via1",
+        "code": "DRT-0349",
+        "file": "",
+        "line": null,
+        "column": null
+      },
+      {
+        "severity": "warning",
+        "message": "LEF58_ENCLOSURE with no CUTCLASS is not supported. Skipping for layer Via1",
+        "code": "DRT-0349",
+        "file": "",
+        "line": null,
+        "column": null
+      },
+      {
+        "severity": "warning",
+        "message": "LEF58_ENCLOSURE with no CUTCLASS is not supported. Skipping for layer Via2",
+        "code": "DRT-0349",
+        "file": "",
+        "line": null,
+        "column": null
+      },
+      {
+        "severity": "warning",
+        "message": "LEF58_ENCLOSURE with no CUTCLASS is not supported. Skipping for layer Via3",
+        "code": "DRT-0349",
+        "file": "",
+        "line": null,
+        "column": null
+      },
+      {
+        "severity": "warning",
+        "message": "LEF58_ENCLOSURE with no CUTCLASS is not supported. Skipping for layer Via4",
+        "code": "DRT-0349",
+        "file": "",
+        "line": null,
+        "column": null
+      },
+      {
+        "severity": "warning",
+        "message": "LEF58_ENCLOSURE with no CUTCLASS is not supported. Skipping for layer TopVia1",
+        "code": "DRT-0349",
+        "file": "",
+        "line": null,
+        "column": null
+      },
+      {
+        "severity": "warning",
+        "message": "LEF58_ENCLOSURE with no CUTCLASS is not supported. Skipping for layer TopVia1",
+        "code": "DRT-0349",
+        "file": "",
+        "line": null,
+        "column": null
+      },
+      {
+        "severity": "warning",
+        "message": "LEF58_ENCLOSURE with no CUTCLASS is not supported. Skipping for layer TopVia2",
+        "code": "DRT-0349",
+        "file": "",
+        "line": null,
+        "column": null
+      },
+      {
+        "severity": "warning",
+        "message": "LEF58_ENCLOSURE with no CUTCLASS is not supported. Skipping for layer TopVia2",
+        "code": "DRT-0349",
+        "file": "",
+        "line": null,
+        "column": null
+      },
+      {
+        "severity": "warning",
+        "message": "Skipping layer OVERLAP.",
+        "code": "FIN-0010",
+        "file": "",
+        "line": null,
+        "column": null
+      },
+      {
+        "severity": "warning",
+        "message": "Skipping layer LOCKED.",
+        "code": "FIN-0010",
+        "file": "",
+        "line": null,
+        "column": null
+      },
+      {
+        "severity": "warning",
+        "message": "Skipping layer LOCKED1.",
+        "code": "FIN-0010",
+        "file": "",
+        "line": null,
+        "column": null
+      },
+      {
+        "severity": "warning",
+        "message": "Skipping layer LOCKED2.",
+        "code": "FIN-0010",
+        "file": "",
+        "line": null,
+        "column": null
+      },
+      {
+        "severity": "warning",
+        "message": "Skipping layer GatPoly.",
+        "code": "FIN-0010",
+        "file": "",
+        "line": null,
+        "column": null
+      },
+      {
+        "severity": "warning",
+        "message": "Skipping layer Cont.",
+        "code": "FIN-0010",
+        "file": "",
+        "line": null,
+        "column": null
+      },
+      {
+        "severity": "warning",
+        "message": "Skipping layer Via1.",
+        "code": "FIN-0010",
+        "file": "",
+        "line": null,
+        "column": null
+      },
+      {
+        "severity": "warning",
+        "message": "Skipping layer Via2.",
+        "code": "FIN-0010",
+        "file": "",
+        "line": null,
+        "column": null
+      },
+      {
+        "severity": "warning",
+        "message": "Skipping layer Via3.",
+        "code": "FIN-0010",
+        "file": "",
+        "line": null,
+        "column": null
+      },
+      {
+        "severity": "warning",
+        "message": "Skipping layer Via4.",
+        "code": "FIN-0010",
+        "file": "",
+        "line": null,
+        "column": null
+      },
+      {
+        "severity": "warning",
+        "message": "Skipping layer TopVia1.",
+        "code": "FIN-0010",
+        "file": "",
+        "line": null,
+        "column": null
+      },
+      {
+        "severity": "warning",
+        "message": "Skipping layer TopVia2.",
+        "code": "FIN-0010",
+        "file": "",
+        "line": null,
+        "column": null
+      },
+      {
+        "severity": "warning",
+        "message": "The ext_model_file option is deprecated. Use set_extraction_rules_file command instead.",
+        "code": "RCX-0514",
+        "file": "",
+        "line": null,
+        "column": null
+      }
+    ]
+  }
+}
+
+== pv_magic/magic-netgen.result.json
+{
+  "tool": "pv.run",
+  "backend": "magic-netgen",
+  "executables": {
+    "klayout": "/usr/bin/klayout",
+    "magic": "/opt/magic-netgen/bin/magic",
+    "netgen": "/opt/magic-netgen/bin/netgen"
+  },
+  "commands": [
+    [
+      "klayout",
+      "-zz",
+      "-rd",
+      "tech_file=/__w/_temp/pd/test_sync_fifo_from_rtl_to_drc0/pv_magic/klayout.lyt",
+      "-rd",
+      "layer_map=/OpenROAD-flow-scripts/flow/platforms/ihp-sg13g2/sg13g2.map",
+      "-rd",
+      "in_def=/__w/_temp/pd/test_sync_fifo_from_rtl_to_drc0/pnr/route.def",
+      "-rd",
+      "in_gds=/OpenROAD-flow-scripts/flow/platforms/ihp-sg13g2/gds/sg13g2_stdcell.gds",
+      "-rd",
+      "design_name=sync_fifo",
+      "-rd",
+      "fill_targets=10/22,126/22,134/22,30/22,50/22,67/22,8/22",
+      "-rd",
+      "out_file=/__w/_temp/pd/test_sync_fifo_from_rtl_to_drc0/pv_magic/layout.gds",
+      "-r",
+      "stream.py"
+    ],
+    [
+      "magic",
+      "-dnull",
+      "-noconsole",
+      "magic_drc.tcl"
+    ],
+    [
+      "magic",
+      "-dnull",
+      "-noconsole",
+      "magic_extract.tcl"
+    ],
+    [
+      "netgen",
+      "-batch",
+      "source",
+      "netgen_lvs.tcl"
+    ],
+    [
+      "/__w/ip-nirmaan/ip-nirmaan/.venv/bin/python",
+      "-I",
+      "lvs_count.py",
+      "/__w/_temp/pd/test_sync_fifo_from_rtl_to_drc0/pv_magic/lvs.report",
+      "sync_fifo"
+    ]
+  ],
+  "exit_statuses": [
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "log": "/__w/_temp/pd/test_sync_fifo_from_rtl_to_drc0/pv_magic/magic-netgen.log",
+  "result": {
+    "passed": true,
+    "summary": "physical verification (Magic and Netgen) passed: GDS written with 3616 fill shapes, DRC clean, LVS clean (layout matches the netlist)",
+    "metrics": {
+      "checks": [
+        "drc",
+        "lvs"
+      ],
+      "gds_empty_cells": 0,
+      "empty_cells": [],
+      "fill_shapes": 3616,
+      "fill_layers": {
+        "10/22": 571,
+        "126/22": 156,
+        "134/22": 156,
+        "30/22": 615,
+        "50/22": 1034,
+        "67/22": 1084
+      },
+      "fill_unmapped": 0,
+      "drc_violations": 0,
+      "drc_by_rule": {},
+      "lvs_mismatches": 0,
+      "lvs_mismatched": {
+        "circuits": 0,
+        "nets": 0,
+        "devices": 0,
+        "pins": 0,
+        "subcircuits": 0
+      },
+      "lvs_unmatched_circuits": [],
+      "exit_status": 0,
+      "magic_drc_style": "drc(full)",
+      "netgen_final": "Final result: Circuits match uniquely.",
+      "gds_shapes_skipped": 0,
+      "outputs": {
+        "gds": "/__w/_temp/pd/test_sync_fifo_from_rtl_to_drc0/pv_magic/layout.gds",
+        "layout_spice": "/__w/_temp/pd/test_sync_fifo_from_rtl_to_drc0/pv_magic/layout.spice",
+        "lvs_report": "/__w/_temp/pd/test_sync_fifo_from_rtl_to_drc0/pv_magic/lvs.report"
+      }
+    },
+    "diagnostics": [
+      {
+        "severity": "warning",
+        "message": "Calma reading is not undoable!  I hope that's OK.",
+        "code": "",
+        "file": "",
+        "line": null,
+        "column": null
+      },
+      {
+        "severity": "warning",
+        "message": "Calma reading is not undoable!  I hope that's OK.",
+        "code": "",
+        "file": "",
+        "line": null,
+        "column": null
+      },
+      {
+        "severity": "warning",
+        "message": "netgen command 'format' use fully-qualified name '::netgen::format'",
+        "code": "",
+        "file": "",
+        "line": null,
+        "column": null
+      },
+      {
+        "severity": "warning",
+        "message": "netgen command 'global' use fully-qualified name '::netgen::global'",
+        "code": "",
+        "file": "",
+        "line": null,
+        "column": null
+      },
+      {
+        "severity": "warning",
+        "message": "A case-insensitive file has been read and so the\tverilog file must be treated case-insensitive to match.",
+        "code": "",
+        "file": "",
+        "line": null,
+        "column": null
+      }
+    ]
+  }
+}
+
+== pv_magic_drc/magic-netgen.result.json
+{
+  "tool": "pv.run",
+  "backend": "magic-netgen",
+  "executables": {
+    "klayout": "/usr/bin/klayout",
+    "magic": "/opt/magic-netgen/bin/magic",
+    "netgen": "/opt/magic-netgen/bin/netgen"
+  },
+  "commands": [
+    [
+      "klayout",
+      "-zz",
+      "-rd",
+      "tech_file=/__w/_temp/pd/test_sync_fifo_from_rtl_to_drc0/pv_magic_drc/klayout.lyt",
+      "-rd",
+      "layer_map=/OpenROAD-flow-scripts/flow/platforms/ihp-sg13g2/sg13g2.map",
+      "-rd",
+      "in_def=/__w/_temp/pd/test_sync_fifo_from_rtl_to_drc0/broken.def",
+      "-rd",
+      "in_gds=/OpenROAD-flow-scripts/flow/platforms/ihp-sg13g2/gds/sg13g2_stdcell.gds",
+      "-rd",
+      "design_name=sync_fifo",
+      "-rd",
+      "fill_targets=10/22,126/22,134/22,30/22,50/22,67/22,8/22",
+      "-rd",
+      "out_file=/__w/_temp/pd/test_sync_fifo_from_rtl_to_drc0/pv_magic_drc/layout.gds",
+      "-r",
+      "stream.py"
+    ],
+    [
+      "magic",
+      "-dnull",
+      "-noconsole",
+      "magic_drc.tcl"
+    ],
+    [
+      "magic",
+      "-dnull",
+      "-noconsole",
+      "magic_extract.tcl"
+    ],
+    [
+      "netgen",
+      "-batch",
+      "source",
+      "netgen_lvs.tcl"
+    ],
+    [
+      "/__w/ip-nirmaan/ip-nirmaan/.venv/bin/python",
+      "-I",
+      "lvs_count.py",
+      "/__w/_temp/pd/test_sync_fifo_from_rtl_to_drc0/pv_magic_drc/lvs.report",
+      "sync_fifo"
+    ]
+  ],
+  "exit_statuses": [
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "log": "/__w/_temp/pd/test_sync_fifo_from_rtl_to_drc0/pv_magic_drc/magic-netgen.log",
+  "result": {
+    "passed": false,
+    "summary": "physical verification (Magic and Netgen) failed: 1524 DRC violations (Metal1_spacing_<_0.18um_(M1.b) 652, Diffusion_contact_spacing_<_0.18um_(Cnt.b) 324, poly_spacing_<_0.18um_(Gat.b) 227); LVS mismatch: 2 mismatched circuits, 36 mismatched nets, 18 mismatched pins; unmatched sg13g2_dfrbpq_1, sync_fifo",
+    "metrics": {
+      "checks": [
+        "drc",
+        "lvs"
+      ],
+      "gds_empty_cells": 0,
+      "empty_cells": [],
+      "fill_shapes": 3616,
+      "fill_layers": {
+        "10/22": 571,
+        "126/22": 156,
+        "134/22": 156,
+        "30/22": 615,
+        "50/22": 1034,
+        "67/22": 1084
+      },
+      "fill_unmapped": 0,
+      "drc_violations": 1524,
+      "drc_by_rule": {
+        "Metal1_spacing_<_0.18um_(M1.b)": 652,
+        "Diffusion_contact_spacing_<_0.18um_(Cnt.b)": 324,
+        "poly_spacing_<_0.18um_(Gat.b)": 227,
+        "Can't_overlap_those_layers": 75,
+        "Poly_minimum_area_<_0.09um^2_(Gat.e)": 64,
+        "This_layer_can't_abut_or_partially_overlap_between_subcells": 62,
+        "Poly1_contact_spacing_<_0.18um_(Cnt.b)": 33,
+        "Poly_spacing_to_Diffusion_<_0.07um_(Gat.d)": 26,
+        "Diffusion_spacing_<_0.21um_(Act.b)": 25,
+        "Metal1_minimum_area_<_0.09um^2_(M1.d)": 12,
+        "Diffusion_contact_spacing_to_poly_<_0.11um_(Cnt.f)": 11,
+        "Poly_contact_spacing_to_diffusion_<_0.14um_(Cnt.e)": 6,
+        "Poly_overhang_of_transistor_<_0.18um_(Gat.c)": 5,
+        "N-Diffusion_spacing_to_N-well_<_0.31um_(NW.d)": 2
+      },
+      "lvs_mismatches": 56,
+      "lvs_mismatched": {
+        "circuits": 2,
+        "nets": 36,
+        "devices": 0,
+        "pins": 18,
+        "subcircuits": 0
+      },
+      "lvs_unmatched_circuits": [
+        "sg13g2_dfrbpq_1",
+        "sync_fifo"
+      ],
+      "exit_status": 0,
+      "magic_drc_style": "drc(full)",
+      "netgen_final": "Final result: Top level cell failed pin matching.",
+      "gds_shapes_skipped": 0,
+      "outputs": {
+        "gds": "/__w/_temp/pd/test_sync_fifo_from_rtl_to_drc0/pv_magic_drc/layout.gds",
+        "layout_spice": "/__w/_temp/pd/test_sync_fifo_from_rtl_to_drc0/pv_magic_drc/layout.spice",
+        "lvs_report": "/__w/_temp/pd/test_sync_fifo_from_rtl_to_drc0/pv_magic_drc/lvs.report"
+      }
+    },
+    "diagnostics": [
+      {
+        "severity": "warning",
+        "message": "Calma reading is not undoable!  I hope that's OK.",
+        "code": "",
+        "file": "",
+        "line": null,
+        "column": null
+      },
+      {
+        "severity": "warning",
+        "message": "Calma reading is not undoable!  I hope that's OK.",
+        "code": "",
+        "file": "",
+        "line": null,
+        "column": null
+      },
+      {
+        "severity": "warning",
+        "message": "netgen command 'format' use fully-qualified name '::netgen::format'",
+        "code": "",
+        "file": "",
+        "line": null,
+        "column": null
+      },
+      {
+        "severity": "warning",
+        "message": "netgen command 'global' use fully-qualified name '::netgen::global'",
+        "code": "",
+        "file": "",
+        "line": null,
+        "column": null
+      },
+      {
+        "severity": "warning",
+        "message": "A case-insensitive file has been read and so the\tverilog file must be treated case-insensitive to match.",
+        "code": "",
+        "file": "",
+        "line": null,
+        "column": null
+      }
+    ]
+  }
+}
+
+== pv_magic_lvs/magic-netgen.result.json
+{
+  "tool": "pv.run",
+  "backend": "magic-netgen",
+  "executables": {
+    "klayout": "/usr/bin/klayout",
+    "magic": "/opt/magic-netgen/bin/magic",
+    "netgen": "/opt/magic-netgen/bin/netgen"
+  },
+  "commands": [
+    [
+      "klayout",
+      "-zz",
+      "-rd",
+      "tech_file=/__w/_temp/pd/test_sync_fifo_from_rtl_to_drc0/pv_magic_lvs/klayout.lyt",
+      "-rd",
+      "layer_map=/OpenROAD-flow-scripts/flow/platforms/ihp-sg13g2/sg13g2.map",
+      "-rd",
+      "in_def=/__w/_temp/pd/test_sync_fifo_from_rtl_to_drc0/pnr/route.def",
+      "-rd",
+      "in_gds=/OpenROAD-flow-scripts/flow/platforms/ihp-sg13g2/gds/sg13g2_stdcell.gds",
+      "-rd",
+      "design_name=sync_fifo",
+      "-rd",
+      "fill_targets=10/22,126/22,134/22,30/22,50/22,67/22,8/22",
+      "-rd",
+      "out_file=/__w/_temp/pd/test_sync_fifo_from_rtl_to_drc0/pv_magic_lvs/layout.gds",
+      "-r",
+      "stream.py"
+    ],
+    [
+      "magic",
+      "-dnull",
+      "-noconsole",
+      "magic_drc.tcl"
+    ],
+    [
+      "magic",
+      "-dnull",
+      "-noconsole",
+      "magic_extract.tcl"
+    ],
+    [
+      "netgen",
+      "-batch",
+      "source",
+      "netgen_lvs.tcl"
+    ],
+    [
+      "/__w/ip-nirmaan/ip-nirmaan/.venv/bin/python",
+      "-I",
+      "lvs_count.py",
+      "/__w/_temp/pd/test_sync_fifo_from_rtl_to_drc0/pv_magic_lvs/lvs.report",
+      "sync_fifo"
+    ]
+  ],
+  "exit_statuses": [
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "log": "/__w/_temp/pd/test_sync_fifo_from_rtl_to_drc0/pv_magic_lvs/magic-netgen.log",
+  "result": {
+    "passed": false,
+    "summary": "physical verification (Magic and Netgen) failed: LVS mismatch: 1 mismatched circuit, 1 mismatched net; unmatched sync_fifo",
+    "metrics": {
+      "checks": [
+        "drc",
+        "lvs"
+      ],
+      "gds_empty_cells": 0,
+      "empty_cells": [],
+      "fill_shapes": 3616,
+      "fill_layers": {
+        "10/22": 571,
+        "126/22": 156,
+        "134/22": 156,
+        "30/22": 615,
+        "50/22": 1034,
+        "67/22": 1084
+      },
+      "fill_unmapped": 0,
+      "drc_violations": 0,
+      "drc_by_rule": {},
+      "lvs_mismatches": 2,
+      "lvs_mismatched": {
+        "circuits": 1,
+        "nets": 1,
+        "devices": 0,
+        "pins": 0,
+        "subcircuits": 0
+      },
+      "lvs_unmatched_circuits": [
+        "sync_fifo"
+      ],
+      "exit_status": 0,
+      "magic_drc_style": "drc(full)",
+      "netgen_final": "Final result: Netlists do not match.",
+      "gds_shapes_skipped": 0,
+      "outputs": {
+        "gds": "/__w/_temp/pd/test_sync_fifo_from_rtl_to_drc0/pv_magic_lvs/layout.gds",
+        "layout_spice": "/__w/_temp/pd/test_sync_fifo_from_rtl_to_drc0/pv_magic_lvs/layout.spice",
+        "lvs_report": "/__w/_temp/pd/test_sync_fifo_from_rtl_to_drc0/pv_magic_lvs/lvs.report"
+      }
+    },
+    "diagnostics": [
+      {
+        "severity": "warning",
+        "message": "Calma reading is not undoable!  I hope that's OK.",
+        "code": "",
+        "file": "",
+        "line": null,
+        "column": null
+      },
+      {
+        "severity": "warning",
+        "message": "Calma reading is not undoable!  I hope that's OK.",
+        "code": "",
+        "file": "",
+        "line": null,
+        "column": null
+      },
+      {
+        "severity": "warning",
+        "message": "netgen command 'format' use fully-qualified name '::netgen::format'",
+        "code": "",
+        "file": "",
+        "line": null,
+        "column": null
+      },
+      {
+        "severity": "warning",
+        "message": "netgen command 'global' use fully-qualified name '::netgen::global'",
+        "code": "",
+        "file": "",
+        "line": null,
+        "column": null
+      },
+      {
+        "severity": "warning",
+        "message": "A case-insensitive file has been read and so the\tverilog file must be treated case-insensitive to match.",
+        "code": "",
+        "file": "",
+        "line": null,
+        "column": null
+      }
+    ]
+  }
+}
