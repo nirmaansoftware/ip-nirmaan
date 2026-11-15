@@ -358,7 +358,8 @@ requests labelled `hold` or `needs-founder` are skipped.
    related to the changed files, from `related_tests` in `scripts/pr_loop.py`:
    a changed test file itself, the tests that import a changed module or its
    package, or name a changed script or fixture, plus `tests/test_laws.py` for
-   `src/`; the whole suite when a changed file maps to no test or is
+   `src/`; for a committed eval record under `evals/results/`, the tests that
+   read committed records (`RECORD_TESTS`); the whole suite when a changed file maps to no test or is
    `tests/conftest.py`; CI runs the whole suite either way) with no token in
    the environment, checks the head has not moved,
    pushes to the branch with `--force-with-lease` on the reviewed head, and
