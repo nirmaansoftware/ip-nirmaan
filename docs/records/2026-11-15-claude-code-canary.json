@@ -1,0 +1,120 @@
+{
+  "canary": "scripts/claude_code_canary.py",
+  "cli": "2.1.325",
+  "model": "haiku",
+  "at": "2026-11-15T20:14:39Z",
+  "user_file": "~/.claude/CLAUDE.md",
+  "calls": [
+    {
+      "call": "control",
+      "argv": [
+        "claude",
+        "-p",
+        "--output-format",
+        "json",
+        "--tools",
+        "",
+        "--no-session-persistence",
+        "--strict-mcp-config",
+        "--model",
+        "haiku",
+        "--system-prompt",
+        "You answer one question about your own context. Answer in at most three lines."
+      ],
+      "env": {},
+      "answer": "(withheld: it quotes the user-level file)",
+      "error": null,
+      "quoted_user_file": true,
+      "brokered_calls": null
+    },
+    {
+      "call": "seat",
+      "argv": [
+        "claude",
+        "-p",
+        "--output-format",
+        "json",
+        "--tools",
+        "",
+        "--no-session-persistence",
+        "--strict-mcp-config",
+        "--safe-mode",
+        "--model",
+        "haiku",
+        "--system-prompt",
+        "You answer one question about your own context. Answer in at most three lines."
+      ],
+      "env": {},
+      "answer": "NONE",
+      "error": null,
+      "quoted_user_file": false,
+      "brokered_calls": null
+    },
+    {
+      "call": "tools-in-loop",
+      "argv": [
+        "claude",
+        "-p",
+        "--output-format",
+        "json",
+        "--tools",
+        "",
+        "--no-session-persistence",
+        "--strict-mcp-config",
+        "--restricted",
+        "--model",
+        "haiku",
+        "--system-prompt",
+        "You answer one question about your own context. Answer in at most three lines.",
+        "--mcp-config",
+        "<server config>",
+        "--permission-mode",
+        "dontAsk",
+        "--allowedTools",
+        "mcp__nirmaan-broker__ping"
+      ],
+      "env": {
+        "CLAUDE_CODE_DISABLE_CLAUDE_MDS": "1"
+      },
+      "answer": "NONE",
+      "error": null,
+      "quoted_user_file": false,
+      "brokered_calls": 1
+    },
+    {
+      "call": "tools-in-loop with --safe-mode kept (decides nothing)",
+      "argv": [
+        "claude",
+        "-p",
+        "--output-format",
+        "json",
+        "--tools",
+        "",
+        "--no-session-persistence",
+        "--strict-mcp-config",
+        "--safe-mode",
+        "--restricted",
+        "--model",
+        "haiku",
+        "--system-prompt",
+        "You answer one question about your own context. Answer in at most three lines.",
+        "--mcp-config",
+        "<server config>",
+        "--permission-mode",
+        "dontAsk",
+        "--allowedTools",
+        "mcp__nirmaan-broker__ping"
+      ],
+      "env": {
+        "CLAUDE_CODE_DISABLE_CLAUDE_MDS": "1"
+      },
+      "answer": "I can't call the ping tool because no ping tool is available in this session.\nNothing in my context other than the question and system prompt is text from an instruction file such as a CLAUDE.md.\nNONE",
+      "error": null,
+      "quoted_user_file": false,
+      "brokered_calls": 0
+    }
+  ],
+  "exit": 0,
+  "outcome": "passed",
+  "why": "the control call quoted ~/.claude/CLAUDE.md; the seat call (--safe-mode) quoted none of it; the tools-in-loop call (--restricted) quoted none of it and made 1 brokered call(s)"
+}

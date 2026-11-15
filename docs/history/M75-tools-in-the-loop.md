@@ -51,3 +51,29 @@ No model was called and no trial ran. The seat in every test is a mock or a
 fake `claude` that speaks MCP to the real relay. Whether Claude Code loads the
 server under `--safe-mode` needs one hand-run call before the variant's first
 trial.
+
+## Fix: the loop call without `--safe-mode` (M75-SAFEMODE-FIX, 2026-11-15)
+
+Before the variant's first trial, a hand-run call (not a trial) asked
+whether Claude Code 2.1.325 loads the brokered server under the seat's own
+flags. It does not: `--safe-mode`, whose help says it disables MCP servers,
+turns off the one `--mcp-config` names too, so the seat reached no broker.
+The committed canary record shows it:
+`docs/records/2026-11-15-claude-code-canary.json`, where the loop call with
+`--safe-mode` kept made 0 brokered calls and said it had no tool.
+
+The variant's command now drops `--safe-mode` (`LOOP_DROPPED_FLAGS`) and adds
+`--restricted` (`LOOP_ISOLATION_FLAGS`: only managed settings and
+`--settings` load, so no user, project or local settings file, hook or
+plugin) and `CLAUDE_CODE_DISABLE_CLAUDE_MDS=1` (`LOOP_ENV`: no CLAUDE.md
+memory file), in `seat_tools.loop_command`. `--bare` stays out: it never
+reads the plan login. In the same record the loop call made 1 brokered call
+and quoted nothing of the user-level file, which the control call quoted.
+
+Only the variant changes: `seat_tools.py` is a `LOOP_CODE` file and the three
+settings are `LOOP_SETTINGS`, so the default and `attempts-3` fingerprints
+are unchanged and the `tools-in-loop` fingerprint changes.
+`scripts/claude_code_canary.py` gains a third call, made as the variant makes
+it with a one-tool server behind the real relay: it fails when that call
+quotes the user-level file or makes no brokered call. `--record <file>`
+writes each call's command line and outcome as JSON.

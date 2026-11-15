@@ -5,14 +5,16 @@ the seat calls the platform's own lint, simulation and formal checks while it wo
 and then submits. The conditions the decision sets, and where each holds:
 
 * **Brokered tools only, under the seat's role; no shell, file or network tool.** Claude Code runs with
-  ``--tools ""`` (no built-in tool), ``--strict-mcp-config`` with one server, this one, and
-  ``--allowedTools`` naming only its tools, in ``dontAsk`` mode. The server Claude Code starts is a stdio
-  relay (``seat_tools_relay.py``, standard library only, started with an empty environment) that holds no
-  tool: it hands each request to :class:`SeatTools` over a private socket, and every call runs here, through
-  the seat's own :class:`ToolHandle`, so the broker checks the role's grant, the tool's contract and its
-  probe as for any run. A seat is offered only the loop tools (``harness.loop_tools()``, company data) the
-  platform runs over its own files for
-  this task and its role is granted; any other name is refused, and so is a call when nothing is offered.
+  ``--tools ""`` (no built-in tool), ``--strict-mcp-config`` with one server, this one, and ``--allowedTools``
+  naming only its tools, in ``dontAsk`` mode. ``--safe-mode`` would turn that server off too, so the variant
+  swaps it for ``--restricted`` and ``CLAUDE_CODE_DISABLE_CLAUDE_MDS=1`` (:func:`loop_command`), which keep
+  the person's own settings and instruction files out as well. The server Claude Code starts is a stdio relay
+  (``seat_tools_relay.py``, standard library only, started with an empty environment) that holds no tool: it
+  hands each request to :class:`SeatTools` over a private socket, and every call runs here, through the seat's
+  own :class:`ToolHandle`, so the broker checks the role's grant, the tool's contract and its probe as for any
+  run. A seat is offered only the loop tools (``harness.loop_tools()``, company data) the platform runs over
+  its own files for this task and its role is granted; any other name is refused, and so is a call when
+  nothing is offered.
 * **No credential in a tool run's environment.** The tools run through the EDA runner, whose steps see this
   process's environment with every credential removed (M53, ``run_environment``); the relay sees none.
 * **Paths limited to the seat's workspace, so held-out files are unreachable.** A call passes file
@@ -459,6 +461,21 @@ def _stop(proc: subprocess.Popen) -> None:
         proc.kill()
 
 
+def loop_command(argv: list[str], env: dict[str, str]) -> tuple[list[str], dict[str, str]]:
+    """The seat's Claude Code command and environment for the variant (harness ``LOOP_DROPPED_FLAGS``,
+    ``LOOP_ISOLATION_FLAGS``, ``LOOP_ENV``): ``--safe-mode`` out, since it turns off the brokered server too,
+    and ``--restricted`` and ``CLAUDE_CODE_DISABLE_CLAUDE_MDS=1`` in, so no user-level file reaches the seat.
+    Only the seat's flags (``CLAUDE_CODE_FLAGS``, in order) are changed, so no other flag's value is read as a
+    flag; a command without them is a ValueError."""
+    flags = list(harness.CLAUDE_CODE_FLAGS)
+    at = next((i for i in range(len(argv) - len(flags) + 1) if argv[i:i + len(flags)] == flags), None)
+    if at is None:
+        raise ValueError("the seat's command does not carry harness.CLAUDE_CODE_FLAGS")
+    kept = [flag for flag in flags if flag not in harness.LOOP_DROPPED_FLAGS]
+    return ([*argv[:at], *kept, *harness.LOOP_ISOLATION_FLAGS, *argv[at + len(flags):]],
+            {**env, **dict(harness.LOOP_ENV)})
+
+
 def run_with_tools(argv: list[str], user: str, cwd: str, env: dict[str, str], session: SeatTools,
                    timeout: float) -> tuple[int | None, str, str, str | None]:
     """Run Claude Code with the brokered server, serving its calls in this thread until it answers.
@@ -467,6 +484,7 @@ def run_with_tools(argv: list[str], user: str, cwd: str, env: dict[str, str], se
     ``timeout`` or the attempt's cap the seat is killed and the attempt fails. Calls are served in the calling
     thread, which holds the project's writer, so every advisory run is recorded in turn.
     """
+    argv, env = loop_command(argv, env)
     with Endpoint(session) as endpoint:
         proc = subprocess.Popen([*argv, *endpoint.flags()], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE, text=True, cwd=cwd, env=env, start_new_session=True)

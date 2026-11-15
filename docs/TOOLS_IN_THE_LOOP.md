@@ -32,10 +32,17 @@ Claude Code (the seat)  --MCP stdio-->  relay  --private socket-->  SeatTools  -
    `LOOP_SYSTEM` is added to the work system prompt.
 2. The claude-code runtime opens a private socket for the attempt, writes a
    server config naming the relay, and runs `claude -p` with the seat's
-   flags (`--tools ""`, `--strict-mcp-config`, `--safe-mode`) and
-   `--mcp-config <config> --permission-mode dontAsk --allowedTools
-   mcp__nirmaan-broker__<tool>,...`. It serves each request in the calling
-   thread until the seat answers.
+   flags (`--tools ""`, `--strict-mcp-config`) less `--safe-mode`, plus
+   `--restricted`, `--mcp-config <config> --permission-mode dontAsk
+   --allowedTools mcp__nirmaan-broker__<tool>,...` and
+   `CLAUDE_CODE_DISABLE_CLAUDE_MDS=1` in its environment
+   (`seat_tools.loop_command`). On Claude Code 2.1.325 `--safe-mode` turns
+   off every MCP server, the one `--mcp-config` names included, so it would
+   leave the seat with no tool; `--restricted` (no user, project or local
+   settings file) and the variable (no CLAUDE.md memory file) keep the
+   person's own files out in its place. The default and `attempts-3` keep
+   `--safe-mode`. It serves each request in the calling thread until the
+   seat answers.
 3. The relay answers MCP's handshake and hands `tools/list` and `tools/call`
    to the session with the attempt's token. It holds no tool.
 4. A call passes file contents. The session checks the caps, the name and
@@ -80,6 +87,8 @@ changes `tools-in-loop` and never `default` or `attempts-3`:
 | `LOOP_MAX_FILES`, `LOOP_MAX_CHARS` | 16, 200000 | one call's size |
 | `LOOP_SUFFIXES` | .v .sv .vh .svh .sby | HDL and proof setups only: no script, no memory image |
 | `LOOP_SERVER`, `LOOP_FLAGS` | nirmaan-broker; `--permission-mode dontAsk` | how Claude Code knows the server, and that nothing else is allowed |
+| `LOOP_DROPPED_FLAGS` | `--safe-mode` | it turns the brokered server off too (CLI 2.1.325: `docs/records/2026-11-15-claude-code-canary.json`, 0 brokered calls with it) |
+| `LOOP_ISOLATION_FLAGS`, `LOOP_ENV` | `--restricted`; `CLAUDE_CODE_DISABLE_CLAUDE_MDS=1` | no user-level settings file or instruction file reaches the seat, and `--mcp-config` still loads; never `--bare`, which never reads the plan login |
 | `LOOP_SYSTEM` | the added system text | the default's `FILE_FORMAT` says the seat cannot run checks |
 
 The variant keeps one attempt (the case's). Attempts 1 against 3 is the
@@ -102,10 +111,16 @@ before it answers.
 
 ## Not checked here
 
-- Whether Claude Code 2.1.325 loads a `--mcp-config` server under
-  `--safe-mode` can only be seen with a model call. Before the first trial
-  of the variant, one hand-run call (not a trial) must show a brokered run in
-  its record; until then a trial on the variant may have no tool at all,
-  which its record would show as no `tool_calls`.
+- That the variant's call keeps the user-level `CLAUDE.md` out and still
+  loads the brokered server can only be seen with a model call:
+  `scripts/claude_code_canary.py` makes one as the variant does (a one-tool
+  server behind the real relay) and fails when it quotes the file (exit 1)
+  or makes no brokered call (exit 3). It runs by hand, after a Claude Code
+  update and before the variant's first trial; CI runs it only against fake
+  executables (`tests/test_claude_code_canary.py`). Its run on Claude Code
+  2.1.325 (haiku, 2026-11-15) passed and is committed with `--record`:
+  `docs/records/2026-11-15-claude-code-canary.json` (the control quoted the
+  file; the seat call and the loop call quoted none of it; the loop call
+  made 1 brokered call, and the same call with `--safe-mode` kept made 0).
 - No live trial ran. The seat in every test is a mock or a fake `claude`
   that speaks MCP to the real relay.
