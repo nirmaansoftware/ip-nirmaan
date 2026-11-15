@@ -1,0 +1,90 @@
+{
+  "answers": [
+    {
+      "cache_read_tokens": 0,
+      "cache_write_tokens": 0,
+      "error": "Claude Code reported success: You've hit your 5-hour limit \u00b7 resets 7:10pm (Asia/Calcutta)",
+      "harness": "sha256:35643990d58bf28264abe98752bd6c2750a391483ac43176b4748a38fbc32711",
+      "input_tokens": 0,
+      "mode": "work",
+      "model": "claude-opus-5-5",
+      "output_tokens": 0,
+      "packet_sha256": "a8dc4a7656c61ff3bb06ee7834bdf3fd382fcccc0b71f44851bc192fb34deba0",
+      "prompt_sha256": "ff094e7363777c2aa9e94b34890ef7ca8001bc0cb020080f9118056439156278",
+      "provider": "claude-code",
+      "text": ""
+    }
+  ],
+  "format": "nirmaan.eval-trial",
+  "judge_runs": [],
+  "knowledge": "on",
+  "model": "claude-opus-5-5",
+  "record": "2026-11-14-claude-code-claude-opus-5-5-12",
+  "result": {
+    "attempts": 1,
+    "attestations": [],
+    "audit_ok": true,
+    "case": "rtl/axil-timer",
+    "case_digest": "sha256:277f853308b03d739b3bb1ced6af1376ac9fe0252360110a0d2660931fd78090",
+    "cli": "2.1.325",
+    "cost_usd": null,
+    "detail": "the model call failed: Claude Code reported success: You've hit your 5-hour limit \u00b7 resets 7:10pm (Asia/Calcutta)",
+    "duration_s": 1.841,
+    "gate_runs": [],
+    "harness": "sha256:35643990d58bf28264abe98752bd6c2750a391483ac43176b4748a38fbc32711",
+    "input_tokens": 0,
+    "model_calls": 1,
+    "output_tokens": 0,
+    "passed": false,
+    "replay": false,
+    "runtime": "claude-code",
+    "sandbox": "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-gr1mp2qe",
+    "scores": [
+      {
+        "failed_runs": [],
+        "name": "The reference testbench passes on the seat's RTL",
+        "runs": [],
+        "scorer": "held-out-run",
+        "status": "not_run",
+        "summary": "the work never reached review, so there is nothing to judge"
+      },
+      {
+        "failed_runs": [],
+        "name": "The seat's testbench fails each timer mutant",
+        "runs": [],
+        "scorer": "must-fail",
+        "status": "not_run",
+        "summary": "the work never reached review, so there is nothing to judge"
+      },
+      {
+        "failed_runs": [],
+        "name": "The case's ADDR_WIDTH 8 proof reaches every cover and fails each mutant",
+        "runs": [],
+        "scorer": "must-fail",
+        "status": "not_run",
+        "summary": "the work never reached review, so there is nothing to judge"
+      },
+      {
+        "failed_runs": [],
+        "name": "The case's ADDR_WIDTH 4 proof reaches every cover and fails each mutant wrong at ADDR_WIDTH 4",
+        "runs": [],
+        "scorer": "must-fail",
+        "status": "not_run",
+        "summary": "the work never reached review, so there is nothing to judge"
+      }
+    ],
+    "seat": "prj-f38ca11b11:rtl-implementation",
+    "seat_status": "in_progress",
+    "started_at": "2026-11-14T12:05:36.171206Z",
+    "submitted": false,
+    "version": "1.25.0"
+  },
+  "skills": {
+    "axi": "sha256:171d24465d795d0e8777da54e74430e2764fcdc089654579b42412934258c9cf",
+    "fsm_design": "sha256:c4aaa4ba8ed4f24373d4a09fffba720d73e81491cb15a0fc1084c3227c47d9b8",
+    "rtl_design": "sha256:81102d62aff3859dcecb679bc3bbbd342b815b374739d5fa70b97567a8b3b5f0"
+  },
+  "stage": "rtl-implementation",
+  "trial": 2,
+  "version": 1
+}

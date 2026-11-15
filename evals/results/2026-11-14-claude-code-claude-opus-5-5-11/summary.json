@@ -1,0 +1,29 @@
+{
+  "cases": {
+    "rtl/apb-gpio": {
+      "high": 0.9054687942657693,
+      "low": 0.09453120573423074,
+      "n": 2,
+      "passed": 1,
+      "rate": 0.5
+    }
+  },
+  "format": "nirmaan.eval-summary",
+  "seats": {
+    "rtl-implementation": {
+      "high": 0.9054687942657693,
+      "low": 0.09453120573423074,
+      "n": 2,
+      "passed": 1,
+      "rate": 0.5
+    }
+  },
+  "totals": {
+    "cost_usd": null,
+    "duration_s": 791.479,
+    "input_tokens": 4,
+    "model_calls": 2,
+    "output_tokens": 92983,
+    "trials": 2
+  }
+}
