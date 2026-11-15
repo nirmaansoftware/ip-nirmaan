@@ -1,0 +1,119 @@
+{
+  "format": "nirmaan.knowledge-check",
+  "skill": "directed_testing",
+  "knowledge_document": "knowledge/verification/directed_testing.md",
+  "document_sha256": "sha256:6a6c25a9233c8b863ea2b4ec628ce58c6265dbc02d971fd7a34888fa107d3c7a",
+  "writer": "IP-W2-K1 session (wave 2 knowledge batch, plan row W2-K1, 2026-11-15), corrected by IP-W2-K1B (ip#257)",
+  "checker": "IP-W2-C1B session (wave 2 check records, recheck after ip#257, 2026-11-15)",
+  "sources_read": [
+    "[OTDV] lowRISC, OpenTitan Design Verification Methodology (Apache 2.0): the whole page, https://opentitan.org/book/doc/contributing/dv/methodology/index.html",
+    "[VSim] Verilator manual, Simulating (Verilated-Model Runtime), version 5.054 text: the whole page, https://verilator.org/guide/latest/simulating.html",
+    "[VArg] Verilator manual, Arguments (verilator executable), version 5.054 text: the whole page, all 1997 lines of the saved text (the summary table and every option entry, from <file.v> through -y), https://verilator.org/guide/latest/exe_verilator.html",
+    "[ZVer] Gisselquist, Building a Verilator test bench, ZipCPU blog, 2017: the whole page, https://zipcpu.com/blog/2017/06/21/looking-at-verilator.html",
+    "Repository code at the lines cited in gate_claims (worktree at origin/main e846c39, after ip#257), and runs of that code on this machine: Icarus Verilog, Verilator 5.052 and SymbiYosys, through the tests named in gate_claims and short scripts calling check_params, simulation_problem, coverage_problem and parse_simulation"
+  ],
+  "result": "the three ip#253 findings are fixed. (1) `expect`: the document now says only simulator.run declares it and test.run takes sources, top and runner options; check_params refuses expect on test.run and accepts it on simulator.run (run locally). (2) The SystemVerilog claim about [ZVer] is gone: the page shows only a C++ harness toggling the clock and calling eval. (3) Verdict position: the document says just-before-$finish is a convention (inference) and the gate does not check where the line appears; a run locally with the verdict printed first and output after it passed. Every other source-tagged claim was found in its source and every gate sentence matches the code at the lines cited.",
+  "notes": [
+    "[OTDV]: the smoke test (clock, reset, outputs not unknown, one datapath with simple checks, kept in the sanity set), error tests handled by directed tests because error-checking scoreboards under unconstrained random are costly, and the testplan mapping tests to features are each on the page (the Basic Smoke Test, Security and Error Tests, Testplan and Regression Dashboard sections).",
+    "[ZVer]: the page's driver is C++ (a TESTBENCH class whose tick() sets the clock low, evals, raises it, evals, lowers it, evals). It names no SystemVerilog harness, so the corrected sentence 'a C++ harness toggles the clock and calls eval for each edge' is exactly what the page shows. The earlier-clause advice about driving inputs away from the sampled edge is the document's own reasoning, marked inference-level and a fair reading of tick() settling logic before the rising edge.",
+    "[VArg]: '--binary: Create a Verilated simulator binary. Alias for --main --exe --build --timing.' matches the document word for word; the --main, --exe, --build and --timing entries agree with it. The page was read in full (this corrects the first version of this record, which stopped at line 1024). Its -Wno-fatal entry ('When warnings are detected, print them, but do not terminate Verilator') supports 'a warning does not stop the build'. No other claim of the document cites this page.",
+    "[VSim]: the runtime chapter's Simulation Summary Report (printed at end of run, needs --main or statsPrintSummary) is the 'end-of-run behaviour' the document points to; fair.",
+    "Imprecision, not a failure: 'the build runs with -Wno-fatal' reads as true of both simulators, but only the Verilator command line carries it (eda.py:444); the Icarus command line (eda.py:437) has no such flag. The consequence stated, that a warning does not stop the build, holds for both runs. Reported to the document's owner, not edited here.",
+    "The document's statement 'the gate does not check where in the output [the verdict] appears' was checked by running Icarus on a testbench that prints the verdict, then 'later output', then $finish at time 20: parse_simulation returned passed with 2 checks. The parser keeps verdicts in a list and tests only their count, their nonce and their numbers (eda_parsers.py:150-154, 191-201)."
+  ],
+  "gate_claims": [
+    {
+      "claim": "the file that declares the run's top module is the testbench (the code is at lines 471-473)",
+      "evidence": "src/nirmaan/integrations/eda.py:471"
+    },
+    {
+      "claim": "only the testbench may call $finish, $stop or $exit, read plusargs, open files, or use $system, $c or DPI; the list the gate holds is $finish $stop $exit $value$plusargs $test$plusargs $fopen $system $c DPI (the code is at lines 451-453)",
+      "evidence": "src/nirmaan/integrations/eda.py:451"
+    },
+    {
+      "claim": "a design file using any of them is refused before anything runs (the backend's check runs before the job starts and a problem returns a failed outcome with nothing simulated; both simulators carry simulation_problem as their check; run locally with $finish, $stop, $exit, $test$plusargs and $fopen in a design file, each refused) (the code is at lines 231-233)",
+      "evidence": "src/nirmaan/integrations/eda.py:231"
+    },
+    {
+      "claim": "the same refusal for both simulation tools and both simulators (the code is at lines 804-808)",
+      "evidence": "src/nirmaan/integrations/eda.py:804"
+    },
+    {
+      "claim": "the testbench must print one verdict line NIRMAAN-SIM <nonce> <n> passed, <m> failed",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:129"
+    },
+    {
+      "claim": "the nonce is passed in as a plusarg (+nirmaan_nonce=) on the run command",
+      "evidence": "src/nirmaan/integrations/eda.py:73"
+    },
+    {
+      "claim": "the run fails when the verdict is missing, repeated, carries another nonce, reports a failed check, or reports no passed check",
+      "evidence": "tests/test_nirmaan_gate_integrity.py::test_the_verdict_must_carry_the_runs_nonce_and_a_passing_check"
+    },
+    {
+      "claim": "the same five verdict failures in code: no verdict, more than one, a failed count, no passed check, and a verdict line without this run's nonce counted as forged (the code is at lines 150-154, 185-201)",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:150"
+    },
+    {
+      "claim": "the gate does not check where in the output the verdict appears (the parser collects verdicts anywhere in the log; run locally: verdict first, later output, then $finish, passed) (the code is at lines 150-153)",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:150"
+    },
+    {
+      "claim": "printing the verdict just before $finish is a convention, not a gate rule (inference in the document)",
+      "evidence": "unverified"
+    },
+    {
+      "claim": "the run fails when $finish is not reached or any step exits nonzero (the code is at lines 202-203)",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:202"
+    },
+    {
+      "claim": "a test that checks nothing fails the gate ('no check passed') (the code is at lines 199-200)",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:199"
+    },
+    {
+      "claim": "a testbench must increment its failure count in every compare because the gate counts the failed checks the testbench itself reports (the code is at lines 197-198)",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:197"
+    },
+    {
+      "claim": "the simulators are Icarus Verilog or Verilator with --binary (the code is at lines 436-446)",
+      "evidence": "src/nirmaan/integrations/eda.py:436"
+    },
+    {
+      "claim": "the Verilator build runs with -Wno-fatal (Verilator only; the Icarus command has no such flag)",
+      "evidence": "src/nirmaan/integrations/eda.py:444"
+    },
+    {
+      "claim": "lint is a separate tool (lint.run, not simulator.run or test.run)",
+      "evidence": "src/nirmaan/company/tools.py:129"
+    },
+    {
+      "claim": "the expect parameter takes pass or fail only; any other value is refused with nothing simulated (run locally with expect=maybe) (the code is at lines 457-463)",
+      "evidence": "src/nirmaan/integrations/eda.py:457"
+    },
+    {
+      "claim": "fail inverts the question (a reproduction passes only when the testbench reports a failed check) (the code is at lines 771-774)",
+      "evidence": "src/nirmaan/integrations/eda.py:771"
+    },
+    {
+      "claim": "only the tool simulator.run declares expect (EXPECT is in its parameter list, not in test.run's) (the code is at lines 131-134)",
+      "evidence": "src/nirmaan/company/tools.py:131"
+    },
+    {
+      "claim": "test.run takes sources, top and runner options only, so a failure reproduction goes through simulator.run: the broker refuses expect on test.run ('test.run does not take expect (it takes sources, top, backend, workdir, timeout)') and accepts it on simulator.run (run locally through check_params) (the code is at lines 113-114)",
+      "evidence": "src/nirmaan/runtime/tools.py:113"
+    },
+    {
+      "claim": "expect=fail is read by the simulation parser from the expect file the backend wrote",
+      "evidence": "tests/test_repro_gates.py::test_an_expect_other_than_pass_or_fail_is_refused"
+    },
+    {
+      "claim": "the tool is available, so the document opens with Practising (skill_tier: AVAILABLE tool); the skill holds test.run, which is AVAILABLE (the code is at lines 51-54)",
+      "evidence": "src/nirmaan/org/knowledge_files.py:51"
+    },
+    {
+      "claim": "the skill directed_testing holds test.run",
+      "evidence": "src/nirmaan/company/skills.py:397"
+    }
+  ],
+  "checked_at": "2026-11-15"
+}
