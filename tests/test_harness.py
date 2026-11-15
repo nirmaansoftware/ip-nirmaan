@@ -193,8 +193,8 @@ def test_editing_any_tool_definition_changes_the_fingerprint(monkeypatch, edit):
 
 
 def test_seat_calls_run_claude_code_in_safe_mode():
-    # --safe-mode keeps the user-level CLAUDE.md, hooks, skills and plugins out of the seat's call; the live
-    # canary is scripts/claude_code_canary.py. --bare would too, but never reads the plan login.
+    # --safe-mode is meant to keep the user-level CLAUDE.md, hooks, skills and plugins out of the seat's call;
+    # this checks only the flag. The live check is scripts/claude_code_canary.py, unrecorded so far. --bare would too, but never reads the plan login.
     assert "--safe-mode" in harness.CLAUDE_CODE_FLAGS and "--bare" not in harness.CLAUDE_CODE_FLAGS
 
 

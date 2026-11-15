@@ -132,9 +132,10 @@ EXCERPT_NOTABLE = r"error|warning|fail|fatal|assert|mismatch"
 #: Seconds Claude Code may take to answer one prompt.
 CLAUDE_CODE_TIMEOUT = 1800
 #: The flags besides ``-p``, ``--model`` and ``--system-prompt``: JSON out, no tools, no session, no MCP servers,
-#: and (M74) ``--safe-mode``: Claude Code starts with its customizations off, so no user-level instruction file
-#: (``~/.claude/CLAUDE.md``), hook, skill or plugin reaches the seat (checked on 2.1.325; the canary,
-#: scripts/claude_code_canary.py). ``--bare`` also drops them but never reads the plan login.
+#: and (M74) ``--safe-mode``, meant to start Claude Code with its customizations off, so no user-level instruction
+#: file (``~/.claude/CLAUDE.md``), hook, skill or plugin reaches the seat. No committed record shows that yet: the
+#: effect is unverified until the canary, scripts/claude_code_canary.py, has run and its output is committed.
+#: ``--bare`` also drops them but never reads the plan login.
 CLAUDE_CODE_FLAGS = ("--output-format", "json", "--tools", "", "--no-session-persistence", "--strict-mcp-config",
                      "--safe-mode")
 #: Removed from Claude Code's environment, so it answers on the plan login rather than billing a key.

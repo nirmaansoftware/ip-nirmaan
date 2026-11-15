@@ -26,7 +26,7 @@ LLM differs.
 
 | Concern | What the runtime does |
 |---|---|
-| The prompt is the packet and nothing else | `--system-prompt` carries the system prompt, stdin the rest; the process runs in an empty temporary directory, so no project `CLAUDE.md` or project memory is loaded; `--safe-mode` (M74) keeps the user-level `CLAUDE.md`, hooks, skills and plugins out too (the canary, `scripts/claude_code_canary.py`); `--strict-mcp-config` loads no MCP servers; `--no-session-persistence` |
+| The prompt is the packet and nothing else | `--system-prompt` carries the system prompt, stdin the rest; the process runs in an empty temporary directory, so no project `CLAUDE.md` or project memory is loaded; `--safe-mode` (M74) is meant to keep the user-level `CLAUDE.md`, hooks, skills and plugins out too (unverified until the canary, `scripts/claude_code_canary.py`, has run and its output is committed); `--strict-mcp-config` loads no MCP servers; `--no-session-persistence` |
 | The seat answers, it does not act | `--tools ""`: no tools. Seats answer in text, and only the broker runs tools |
 | The plan pays, not a key | `ANTHROPIC_API_KEY` and `ANTHROPIC_AUTH_TOKEN` are removed from the process environment (with a key present, Claude Code bills the key) |
 | No invented cost | Tokens are recorded as Claude Code reports them; the cost is recorded as unknown. A subscription has no per-call price, and Claude Code's `total_cost_usd` is an API-equivalent estimate, not a charge (`Completion.priced = False`) |

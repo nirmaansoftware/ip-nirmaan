@@ -22,10 +22,13 @@ once:
   single-task rule, so the seat's input contract carries it;
 - the fingerprint carries a digest of every tool definition in the catalog
   (format version 2);
-- `CLAUDE_CODE_FLAGS` gains `--safe-mode`, checked on Claude Code 2.1.325:
-  without it a probe call quoted the user-level file, with it nothing; the
-  canary `scripts/claude_code_canary.py` (run by hand, since it calls a
-  model) repeats the check with a control call that must see the file;
+- `CLAUDE_CODE_FLAGS` gains `--safe-mode`, the flag whose help names
+  `CLAUDE.md`. No committed record yet shows that it keeps the user-level
+  file out: an earlier manual probe on Claude Code 2.1.325 was not recorded,
+  so the effect is unverified until the canary `scripts/claude_code_canary.py`
+  (run by hand, since it calls a model) has run and its output is committed.
+  The canary makes a control call that must see the file and a seat call that
+  must not;
 - `nirmaan eval run --harness <name>` runs on a named variant: `default`, or
   `attempts-3` (three attempts, a refused one answered again with the repair
   text). The variant's name is a run option of the fingerprint; its records
@@ -34,8 +37,10 @@ once:
 
 **Levels.** `capability/levels.json` is regenerated: every Practised group
 recorded before this milestone is now "stale: the harness changed after these
-trials". The totals change: practised goes from 4 to 0 and knowledge from
-20 to 24. Four groups go from `counts: true` to false and their level from
+trials". The totals change: practised goes from 4 to 0 and knowledge rises
+by 4 (23 to 27 against `main` at `6bd785b`; the counts are the ones
+`scripts/capability_levels.py` writes to `capability/levels.json`, not typed
+by hand). Four groups go from `counts: true` to false and their level from
 "practised" to "knowledge". Knowledge levels come from check records and are
 untouched.
 
@@ -44,5 +49,6 @@ one read of the pilot's levels; it merges only after that read, and opens the
 quiet window in which the other harness changes land and no evidence trial
 runs. Tools in the loop, the other variant, is its own milestone.
 
-No eval trial ran. The only model calls were the flag probe and the canary,
-on a small model.
+No eval trial ran. The model calls made while writing it (the flag probe
+and canary runs, on a small model) are not recorded, so none of them is
+evidence.
