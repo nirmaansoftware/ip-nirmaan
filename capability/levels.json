@@ -358,19 +358,17 @@
     },
     "synthesis_awareness": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/synthesis_awareness.json",
+        "counts": true,
         "knowledge_document": "knowledge/design/synthesis_awareness.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     }
   },
   "totals": {
-    "knowledge": 11,
+    "knowledge": 12,
     "practised": 0,
     "proven": 0
   },
