@@ -205,6 +205,7 @@ def test_only_the_three_approved_seats_may_wait_for_their_files(teams_map):
         ("src/nirmaan/company/evidence.py", {"eda-platform", "verification"}),
         ("src/nirmaan/evals/levels.py", {"verification"}),
         ("src/nirmaan/runtime/tools.py", {"eda-platform", "verification"}),
+        ("src/nirmaan/company/tools.py", {"eda-platform"}),
         ("src/nirmaan/runtime/loop.py", {"eda-platform"}),
         ("scripts/check_dashes.py", {"eda-platform", "verification"}),
         ("scripts/status.py", {"eda-platform", "product-site"}),
@@ -377,13 +378,16 @@ def test_a_level_rule_change_is_gate_semantics(teams_map, files, path):
 
 
 def _harness_files() -> list[str]:
-    """The harness settings, the level computation and every harness.CODE file,
-    from the repository root. Read from harness.CODE, so a file added there is
-    checked here without editing this test."""
+    """The harness settings, the level computation, the tool catalog and every
+    harness.CODE file, from the repository root. Read from harness.CODE, so a
+    file added there is checked here without editing this test. The tool
+    catalog is not a CODE file, but its parameter descriptions reach a seat's
+    work prompt as each gate's input contract (pilot retrospective,
+    fact 5), so a change to it is a harness change too."""
     from nirmaan.runtime import harness
 
     code = [(harness.SOURCE_ROOT / name).relative_to(ROOT).as_posix() for name in harness.CODE]
-    return ["src/nirmaan/runtime/harness.py", "src/nirmaan/evals/levels.py", *code]
+    return ["src/nirmaan/runtime/harness.py", "src/nirmaan/evals/levels.py", "src/nirmaan/company/tools.py", *code]
 
 
 @pytest.mark.parametrize("path", _harness_files())
