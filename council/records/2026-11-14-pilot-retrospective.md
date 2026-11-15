@@ -403,3 +403,159 @@ department's skills batch.
    usage (gate RT2).
 3. A lawyer's reading of the CVDP terms, if that set is wanted (decision 8).
 4. Names, if a practice lead is seated later (decision 12).
+
+## Addendum (2026-11-15): the one read, and the pilot exit
+
+This addendum is the record that decisions 1e and 1f call for. It adds the
+read and its outcome. It changes no decision, code, record, level or gate
+above.
+
+### Who decided what
+
+- The council fixed the rule: decision 1 above, and
+  `council/records/2026-11-15-pilot-topup-reruns.md` (the ruling) for the
+  top-up's re-run trials.
+- That the read ran now, and this addendum with it: orchestrator, on the
+  founder's in-session instruction of 2026-11-14. It is not a founder
+  decision, and the founder can overrule it.
+- Owner of the read: verification-lead; of gate G11: design-architect.
+  qa-evidence checks the claims below (the ruling, decision 3).
+
+### What was read
+
+Read once, on `main` at 482ff5a, after `scripts/capability_levels.py --check`
+reported that `capability/levels.json` matches the records. Gate RR1 of the
+ruling held: #287 was merged, and both sentences the ruling named were
+corrected (`causes.md` in
+`evals/results/2026-11-15-claude-code-claude-opus-5-5-limit-12` and in
+`evals/results/2026-11-15-claude-code-claude-opus-5-5-11`).
+
+`evals/results/` holds 45 records. Every trial is re-judged the same, and
+the levels generator refuses no record (`refused_records` is empty):
+
+| Set | Records | Trials | Passed | Counts toward a level |
+|---|---|---|---|---|
+| The batch, with documents | 14, dated 2026-11-14, ending `opus-5-5` to `opus-5-5-14` | 31 | 22 | yes |
+| The batch, without documents | 14, dated 2026-11-14, ending `without-knowledge` to `without-knowledge-14` | 31 | 27 | never (decision 2) |
+| The top-up, the planned 35 | 11, dated 2026-11-15, ending `opus-5-5` to `opus-5-5-11`, and 3 ending `-limit-12` to `-limit-14` | 35 | 26 | yes |
+| The top-up's re-runs | 3, dated 2026-11-15, ending `-12`, `-13`, `-14` | 7 | 6 | in the file, but they raise no level (the ruling) |
+
+Every trial that counts ran on model claude-opus-5-5, harness
+`sha256:35643990d58bf28264abe98752bd6c2750a391483ac43176b4748a38fbc32711`,
+Claude Code 2.1.325.
+
+### The plan-limit incident, in full
+
+1. Decision 1d fixed the top-up at 35 trials, 5 on each of the 7 pilot cases.
+2. On 2026-11-15 at 08:36Z the plan's usage limit was reached. The runner's
+   check did not recognise the message and ran on. Nine trials failed within
+   about 2 seconds each, with no model answer and no judge run.
+3. Two of the nine were recorded as failed at once: trials 2 and 3 of
+   `evals/results/2026-11-15-claude-code-claude-opus-5-5-11` (rtl/apb-gpio).
+4. The other seven (rtl/apb-gpio 2, rtl/axil-timer 5) were first held out of
+   the repository by the runner. They were committed later, in #287, as the
+   records ending `-limit-12`, `-limit-13` and `-limit-14`.
+5. After the limit reset the runner ran those seven slots again. The re-runs
+   were merged before the failures they followed, as the 2026-11-15 records
+   ending `-12` (rtl/apb-gpio, 1 of 2 passed), `-13` and `-14`
+   (rtl/axil-timer, 5 of 5 passed).
+6. So 42 top-up attempts exist: the planned 35, nine of them limit failures,
+   and 7 re-runs. Nothing was deleted, moved or relabelled.
+7. The ruling: the re-runs are attempts 36 to 42 and raise no level; the nine
+   limit failures stay failed trials of their groups (decision 11 above); a
+   skill is Practised at the read only if its group counts both in
+   `capability/levels.json` and on the planned 35.
+8. The batch of 2026-11-14 had one such trial of its own: trial 2 of
+   `evals/results/2026-11-14-claude-code-claude-opus-5-5-12` (rtl/axil-timer).
+   It was recorded as failed at the time and is counted so.
+
+The limit failures ran no model work. They say nothing about a skill either
+way, and they count as failed trials because the rule was fixed before the
+run.
+
+### The read
+
+Two counts per group, as gate RR2 requires. "All attempts" is
+`capability/levels.json` on `main`. "Planned 35" is the same script,
+unmodified, on a scratch copy without the three re-run records. Each cell is
+passed of trials, then the 95 percent Wilson lower bound. The bar is at least
+5 trials and a lower bound of at least 0.5 (`docs/CAPABILITY_LEVELS.md`).
+
+| Skill | Level | All attempts | Planned 35 | Trials no judge ran on | Digest | Why |
+|---|---|---|---|---|---|---|
+| rtl_design | Practised | 32 of 42, 0.615 | 26 of 35, 0.579 | 9 | 012eb9b7 | counts on both; all 7 cases, top-up only |
+| arbitration | Practised | 9 of 10, 0.596 | the same | 1 | 53dff4b1 | counts on both; rtl/rr-arbiter, batch and top-up pooled |
+| buffering_flow_control | Practised | 18 of 20, 0.699 | the same | 2 | 9ce453d4 | counts on both; rtl/skid-buffer and rtl/sync-fifo, pooled |
+| pipeline_design | Practised | 5 of 5, 0.566 | the same | 0 | 7a9c0840 | counts on both; rtl/skid-buffer, top-up only |
+| axi | Knowledge | 15 of 23, 0.449 | 10 of 18, 0.337 | 8 | 171d2446 | lower bound under 0.5 on both |
+| apb | Knowledge | 12 of 20, 0.387 | 11 of 18, 0.386 | 7 | 5eb05f03 | lower bound under 0.5 on both |
+| fsm_design | Knowledge | 7 of 13, 0.291 | 2 of 8, 0.071 | 6 | c4aaa4ba | lower bound under 0.5 on both; rests on rtl/axil-timer alone |
+| control_logic_design | Knowledge | 4 of 10, 0.168 | 3 of 8, 0.137 | 5 | 3979d44f | lower bound under 0.5 on both; rests on rtl/apb-gpio alone |
+| rtl_microarchitecture | Knowledge | no trial | no trial | | | document and check record count; no eval case names the skill |
+| rtl_lint | Knowledge | no trial | no trial | | | the same |
+| synthesis_awareness | Knowledge | no trial | no trial | | | the same |
+| reset_design | Knowledge | no trial | no trial | | | the same |
+
+Notes on the table:
+
+- The two counts give the same level for every skill, so the committed file
+  and the ruling agree.
+- A digest is the first 8 hex digits of the group's skill digest in
+  `capability/levels.json`. Every group above is on the harness, model and
+  Claude Code version named under "What was read".
+- rtl_design and pipeline_design were corrected under decision 1b, so their
+  batch groups are stale (rtl_design 22 of 31, pipeline_design 5 of 5) and
+  only the top-up counts for them. The other six digests did not change, so
+  the batch and the top-up pool, and every batch trial stays counted,
+  including the six refused `[tasks]` trials (decision 1e).
+- Every one of the twelve has a document under `knowledge/` and a check
+  record under `capability/records/knowledge/` that counts
+  (`knowledge/architecture/rtl_microarchitecture.md`; the other eleven under
+  `knowledge/design/`). The four written under decision 1a are at Knowledge
+  for the first time.
+- For axi and fsm_design the group fell short with limit failures in it.
+  Without the top-up's five rtl/axil-timer limit failures, and with every
+  other trial kept, axi is 15 of 18 and fsm_design 7 of 8: not a level, and
+  stated only under that label (the ruling, decision 3, which calls these
+  the judged-only counts).
+- apb and control_logic_design fall short on any reading. rtl/apb-gpio has
+  a model failure of its own (`causes.md` in the 2026-11-15 record ending
+  `-12`).
+- Nothing is Proven.
+
+### Outcome: the exit is not met
+
+Decision 1f needs six or more Practised with all twelve at Knowledge. The
+read gives twelve of twelve at Knowledge and four Practised (rtl_design,
+arbitration, buffering_flow_control, pipeline_design). The exit is short by
+two. This was the one read: there is no second round and no extension
+(decision 1e).
+
+The pilot closes with this shortfall recorded. The other exit items stand as
+decided above: the ablation run is met as a run (decision 2, its 14 records
+are on `main`), and this record is the retrospective.
+
+### What happens next, as already decided
+
+- The eight skills short of Practised (axi, apb, fsm_design,
+  control_logic_design, rtl_microarchitecture, rtl_lint, synthesis_awareness,
+  reset_design) are measured again in the first evidence batch on the harness
+  chosen under decision 4 (decision 1f; decision 13, the live batch). The four
+  from the Knowledge track need an eval case that names them before any trial
+  can count.
+- Gate RT3 no longer holds the bundle of decision 4: its pull request may be
+  made ready. From its merge until the pull request that names the default
+  harness, the quiet window of decision 4 applies and no evidence trial runs
+  (gate RT4).
+- No evidence batch starts until the runner stops at the first trial with no
+  model answer, shown by a test, and never holds a record out of the
+  repository (the ruling, decision 4 and gate RR5).
+- Whether an infrastructure failure gets its own class goes to a later
+  meeting and never applies to the pilot's records (the ruling, decision 4).
+- A second case for fsm_design and control_logic_design is a question for
+  that batch's plan (the ruling, positions not adopted).
+
+### Open, for the founder
+
+5. This read and its outcome, and the ruling it rests on, to confirm or
+   overrule.
