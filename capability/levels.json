@@ -244,14 +244,12 @@
     },
     "reset_design": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/reset_design.json",
+        "counts": true,
         "knowledge_document": "knowledge/design/reset_design.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     },
     "rtl_design": {
@@ -308,26 +306,22 @@
     },
     "rtl_lint": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/rtl_lint.json",
+        "counts": true,
         "knowledge_document": "knowledge/design/rtl_lint.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     },
     "rtl_microarchitecture": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/rtl_microarchitecture.json",
+        "counts": true,
         "knowledge_document": "knowledge/architecture/rtl_microarchitecture.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     },
     "synthesis_awareness": {
@@ -344,7 +338,7 @@
     }
   },
   "totals": {
-    "knowledge": 6,
+    "knowledge": 9,
     "practised": 0,
     "proven": 0
   },
