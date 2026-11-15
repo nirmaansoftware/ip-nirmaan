@@ -47,7 +47,7 @@ backs it.
   toggle coverage, runs it, and reads the data with `verilator_coverage`
   (gate: src/nirmaan/integrations/eda.py:588-599). Branch percentages in the
   result come from whatever points the data holds (gate:
-  src/nirmaan/integrations/eda_parsers.py:544-596); the build asks for line and
+  src/nirmaan/integrations/eda_parsers.py:544-583); the build asks for line and
   toggle only.
 - The simulation is judged first as `simulator.run` judges it: one verdict with
   the run's nonce and no failed check. If it fails, coverage is not read (gate:
@@ -59,13 +59,14 @@ backs it.
 - A percentage is points hit at least once over all points, rounded down to two
   places, so it never rounds up into a bound. A design file with no point at
   all fails the run, because coverage that measured nothing is not evidence
-  (gate: eda_parsers.py:565-590).
-- No source may use `$fopen`, `$system`, `$c` or DPI, and design files may not
+  (gate: eda_parsers.py:565-583).
+- No source may use `$fopen`, `$system`, `$c` or DPI (gate: eda.py:506-509,
+  552-555). A file that is not a design file, the testbench included, may not
   carry a Verilator configuration, an `include`, or a coverage on/off pragma,
-  since each could change the counts from outside the design (gate:
-  eda.py:506-513, 525-559). The gate does not set thresholds; a requirement's
-  bounds on `line`, `toggle` and `branch` are checked after a passing run
-  (gate: eda_parsers.py:544-556).
+  since each could change the counts from outside the design; a design file may
+  carry them, left for its reviewer (gate: eda.py:511-513, 552-553). The gate
+  sets no threshold; a requirement's bounds on `line`, `toggle` and `branch`
+  are checked after a passing run (gate: eda_parsers.py:544-556).
 
 ## Closing a gap
 
@@ -78,11 +79,12 @@ backs it.
   unreachable under the design's constraints; or mark it out of scope
   (inference). OpenTitan records every exclusion with a category tag
   (unreachable, non-RTL, unsupported, external, low risk), requires a written
-  reason for the last three kinds, and has the designer sign off [OTDV].
+  reason for the last three kinds, and has the designer sign off in its own review [OTDV].
 - Do not use `coverage_off` or an assertion `$stop` branch to hide a gap:
   Verilator drops lines with `$stop` from coverage on the assumption that they
   are error checks [VCov] [VCovExe], so such a branch is invisible, not covered
-  (inference). The gate refuses `coverage_off` in design files.
+  (inference). The gate does not stop a design file from carrying
+  `coverage_off` (gate: eda.py:552-553), so a reviewer must look for it.
 - A fixed bound such as 90 percent is a requirement's choice, not a property of
   the tool. Report the number and the unexplained points together (inference).
 
