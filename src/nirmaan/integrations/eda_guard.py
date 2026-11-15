@@ -381,5 +381,5 @@ def check_inputs(top: object, params_files: dict[str, list[str]]) -> str | None:
     other = [Path(f).name for param in ("rtl", "design") for f in params_files.get(param, [])
              if Path(f).suffix not in HDL_SUFFIXES]
     if other:
-        return f"rtl and design name Verilog files only, and {', '.join(other)} is not {REFUSED}"
+        return f"rtl and design take Verilog files only, and {', '.join(other)} is not Verilog {REFUSED}"
     return name_problem(top) or path_problem(files) or verilog_problem(files)

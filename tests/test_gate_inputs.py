@@ -93,6 +93,11 @@ def test_names_and_paths():
     assert check_inputs("m", {"sources": ['/tmp/a".v']})
 
 
+def test_rtl_and_design_refuse_non_verilog_files():
+    for param in ("rtl", "design"):
+        for name in ("/tmp/evil.cpp", "/tmp/regs.txt", "/tmp/x.c"):
+            assert "not Verilog" in check_inputs("m", {param: ["/tmp/regs.v", name]})
+
 # --- Verilog: what a simulation runs ---------------------------------------------------------------
 
 
