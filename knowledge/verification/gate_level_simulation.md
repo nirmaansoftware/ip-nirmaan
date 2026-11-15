@@ -21,8 +21,9 @@ Knowledge only: no tool run backs this.
 
 Running the same tests on a synthesized netlist as on the RTL, and reading the
 differences. Tags in brackets name the sources above; a line marked
-"inference" is this document's own reasoning. This skill holds no tool, so no
-gate line is cited, and nothing here has been run.
+"inference" is this document's own reasoning. This skill holds no tool of its
+own: the gate lines cited below describe the tools it relies on, and nothing
+here has been run.
 
 ## Why it is run
 
@@ -76,9 +77,13 @@ gate line is cited, and nothing here has been run.
   one at startup finds the most problems, since control signals are usually active
   high [VLang] [VArg]. So a Verilator run of a netlist is not the same
   experiment as a four-state run (inference).
-- Verilator converts the two-state gate primitives, does not support the
-  three-state and MOS primitives, and ignores specify blocks and timing checks,
-  using the typical value of any min:typ:max delay [VLang]. So Verilator
+- Verilator converts the two-state gate primitives [VLang]. The same page is
+  not consistent on the three-state and MOS primitives: its Gate Primitives
+  section lists them as unsupported, while its Tri/Inout section describes
+  support for bufif, pmos and nmos [VLang], so treat a netlist that uses them
+  as unchecked until a run shows how they behave (inference). Verilator
+  ignores specify blocks and timing checks, using the typical value of any
+  min:typ:max delay [VLang]. So Verilator
   results on a netlist carry no timing information from the library
   (inference).
 
