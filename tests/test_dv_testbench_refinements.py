@@ -165,7 +165,9 @@ def _prompts(org, text, clock):
 
 
 def _case_requests():
-    return sorted({c.request for sub in ("dv", "rtl", "firmware", "spec") for c in load_cases(REPO / "evals" / sub)})
+    """Every shipped case's request but the two that ask for the new words (the W2-E6 cases, written after them)."""
+    return sorted({c.request for sub in ("dv", "rtl", "firmware", "spec") for c in load_cases(REPO / "evals" / sub)}
+                  - {SCOREBOARD, COCOTB})
 
 
 #: Every request written before this change: the golden suite's, M68's, and every eval case's.

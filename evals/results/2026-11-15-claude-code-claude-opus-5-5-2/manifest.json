@@ -1,0 +1,23 @@
+{
+  "cases": [
+    "rtl/rr-arbiter"
+  ],
+  "command": "nirmaan eval run --runtime claude-code --trials 2 --seats rtl rtl/rr-arbiter",
+  "finished_at": "2026-11-15T06:41:03.297873Z",
+  "format": "nirmaan.eval-run",
+  "head_sha": "813cbce6934a1416e25697ce9cb288bd5947694a",
+  "id": "2026-11-15-claude-code-claude-opus-5-5-2",
+  "knowledge": "on",
+  "model": "claude-opus-5-5",
+  "nirmaan_version": "1.25.0",
+  "purpose": "evidence",
+  "replay": false,
+  "runtime": "claude-code",
+  "seats": [
+    "rtl-implementation"
+  ],
+  "source": "",
+  "started_at": "2026-11-15T06:25:39.540007Z",
+  "trials": 2,
+  "version": 1
+}
