@@ -48,8 +48,8 @@ a line marked "gate" names the repository code that backs it.
   time. A test with one requester passes when the priority order is reversed
   (inference).
 - Drive inputs away from the clock edge the design samples, and sample outputs
-  after it, so the test does not race the design; with Verilator a C++ or
-  SystemVerilog harness toggles the clock and calls eval for each edge [ZVer].
+  after it, so the test does not race the design; with Verilator a C++
+  harness toggles the clock and calls eval for each edge [ZVer].
 
 ## What the simulation gate demands
 
@@ -58,8 +58,9 @@ a line marked "gate" names the repository code that backs it.
   the language (`$system`, `$c`, DPI); a design file using any of them is refused
   before anything runs (gate: src/nirmaan/integrations/eda.py:451-452, 476-497).
 - The testbench must print one verdict line, `NIRMAAN-SIM <nonce> <n> passed,
-  <m> failed`, with the nonce the run passed in as a plusarg, just before
-  `$finish`. The run fails when the verdict is missing, repeated, carries
+  <m> failed`, with the nonce the run passed in as a plusarg. Printing it
+  just before `$finish` is the convention (inference); the gate does not check
+  where in the output it appears. The run fails when the verdict is missing, repeated, carries
   another nonce, reports a failed check, or reports no passed check; and when
   `$finish` is not reached or any step exits nonzero (gate:
   src/nirmaan/integrations/eda_parsers.py:132-224). A test that checks nothing
@@ -69,7 +70,10 @@ a line marked "gate" names the repository code that backs it.
   (gate: src/nirmaan/integrations/eda.py:436-448). Lint is a separate tool.
 - The `expect` parameter takes `pass` or `fail` only; `fail` is for a
   reproduction of a known failure and inverts the question (gate:
-  src/nirmaan/integrations/eda.py:457-464).
+  src/nirmaan/integrations/eda.py:457-464). Only the tool simulator.run
+  declares it; test.run takes sources, top and runner options only, so a
+  failure reproduction goes through simulator.run (gate:
+  src/nirmaan/company/tools.py:129-134).
 - `--binary` makes Verilator build a runnable simulator binary, an alias for
   `--main --exe --build --timing` [VArg], so a SystemVerilog testbench with
   delays and `$finish` needs no C++ harness; the model's end-of-run behaviour
