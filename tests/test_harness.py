@@ -30,7 +30,8 @@ SRC = ROOT / "src"
 HARNESS = SRC / "nirmaan" / "runtime" / "harness.py"
 #: Names in harness.py that are not settings: its bookkeeping, and the pieces WORK_SYSTEM and REVIEW_SYSTEM
 #: are built from (in the fingerprint through those two).
-BOOKKEEPING = {"FORMAT", "VERSION", "SETTINGS", "SOURCE_ROOT", "CODE", "OUTPUT_WORK", "FILE_FORMAT", "OUTPUT_REVIEW"}
+BOOKKEEPING = {"FORMAT", "VERSION", "SETTINGS", "SOURCE_ROOT", "CODE", "OUTPUT_WORK", "FILE_FORMAT", "OUTPUT_REVIEW",
+               "VARIANTS"}
 #: The runtime files that are not harness code, and why. A new runtime file must be put in ``CODE`` or here.
 NOT_HARNESS = {
     "nirmaan/runtime/__init__.py": "re-exports only",
@@ -152,9 +153,77 @@ def test_editing_any_harness_code_file_changes_the_fingerprint(monkeypatch, tmp_
 
 def test_the_run_options_are_in_the_fingerprint():
     default = harness_sha256()
-    assert harness_sha256(attempts=None, knowledge=True) == default
-    assert len({default, harness_sha256(attempts=3), harness_sha256(knowledge=False)}) == 3
+    assert harness_sha256(attempts=None, knowledge=True, variant="default") == default
+    assert len({default, harness_sha256(attempts=3), harness_sha256(knowledge=False),
+                harness_sha256(variant="attempts-3")}) == 4
     assert default.startswith("sha256:") and len(default) == len("sha256:") + 64
+
+
+# --- The tool definitions (M74) ------------------------------------------------------------------
+
+
+def test_every_tool_definition_is_in_the_fingerprint():
+    # Council record 2026-11-14 (pilot retrospective), fact 5: a tool's parameter descriptions reach the prompt
+    # as its input contract, so the catalog's definitions are harness.
+    from nirmaan.company.tools import TOOLS
+
+    assert set(fingerprint()["tools"]) == {spec.id for spec in TOOLS} and len(TOOLS) == len(fingerprint()["tools"])
+
+
+@pytest.mark.parametrize("edit", ["description", "param"])
+def test_editing_any_tool_definition_changes_the_fingerprint(monkeypatch, edit):
+    from nirmaan.company import tools
+
+    before = harness_sha256()
+    spec = next(s for s in tools.TOOLS if s.id == "formal.run")
+    if edit == "description":
+        changed = spec.model_copy(update={"description": spec.description + " changed"})
+    else:
+        sby = spec.param("sby")
+        changed = spec.model_copy(update={"params": tuple(
+            p.model_copy(update={"description": p.description + " changed"}) if p is sby else p
+            for p in spec.params)})
+    monkeypatch.setattr(tools, "TOOLS", [changed if s is spec else s for s in tools.TOOLS])
+    assert harness_sha256() != before
+    monkeypatch.undo()
+    assert harness_sha256() == before
+
+
+# --- No user-level instruction file (M74) ----------------------------------------------------------
+
+
+def test_seat_calls_run_claude_code_in_safe_mode():
+    # --safe-mode is meant to keep the user-level CLAUDE.md, hooks, skills and plugins out of the seat's call;
+    # this checks only the flag. The live check is scripts/claude_code_canary.py, unrecorded so far. --bare would too, but never reads the plan login.
+    assert "--safe-mode" in harness.CLAUDE_CODE_FLAGS and "--bare" not in harness.CLAUDE_CODE_FLAGS
+
+
+# --- Named variants (M74) --------------------------------------------------------------------------
+
+
+def test_the_named_variants_are_the_default_and_three_attempts_with_the_repair_text():
+    assert harness.VARIANTS == {"default": {}, "attempts-3": {"attempts": 3}}
+    assert fingerprint()["run"]["variant"] == "default"
+    assert fingerprint(variant="attempts-3")["run"] == {"attempts": 3, "knowledge": True, "cli": None,
+                                                        "variant": "attempts-3"}
+    # The variant's own attempts, given or not, is one harness; a plain --attempts 3 is not the variant.
+    assert harness_sha256(variant="attempts-3") == harness_sha256(attempts=3, variant="attempts-3")
+    assert harness_sha256(variant="attempts-3") != harness_sha256(attempts=3)
+    with pytest.raises(ValueError, match="unknown harness variant 'nope'; known: default, attempts-3"):
+        harness_sha256(variant="nope")
+
+
+def test_every_variant_sets_only_run_options_a_run_can_take():
+    # A variant is the default harness with run options; a setting it changed would hide in the variant table.
+    for name, options in harness.VARIANTS.items():
+        assert set(options) <= {"attempts"}, name
+        assert all(isinstance(v, int) and v >= 1 for v in options.values()), name
+
+
+def test_editing_a_variant_changes_its_fingerprint_and_never_the_default(monkeypatch):
+    default, before = harness_sha256(), harness_sha256(variant="attempts-3")
+    monkeypatch.setitem(harness.VARIANTS, "attempts-3", {"attempts": 4})
+    assert harness_sha256(variant="attempts-3") != before and harness_sha256() == default
 
 
 # --- Records -----------------------------------------------------------------------------------
@@ -172,9 +241,68 @@ def test_every_trial_records_its_harness_on_the_result_and_each_answer(nirmaan_o
     assert ablation.trials[0].result.harness == harness_sha256(attempts=2, knowledge=False)
 
 
+def test_a_trial_on_a_variant_records_the_variant_and_its_harness(nirmaan_org, fixed_clock, tmp_path):
+    case = next(c for c in load_cases(ROOT / "evals") if c.id == "spec/axi4-lite-interface")
+    record = load_record(record_run(nirmaan_org, [case], None, trials=1, repo=ROOT, out=tmp_path,
+                                    clock=fixed_clock, variant="attempts-3"))
+    [trial] = record.trials
+    assert record.path.name.endswith("-harness-attempts-3")
+    assert record.manifest.harness_variant == "attempts-3" and trial.harness_variant == "attempts-3"
+    assert trial.result.harness == harness_sha256(variant="attempts-3") != harness_sha256()
+    assert all(a.harness == trial.result.harness for a in trial.answers)
+    plain = load_record(record_run(nirmaan_org, [case], None, trials=1, repo=ROOT, out=tmp_path, clock=fixed_clock))
+    assert plain.manifest.harness_variant == "default" and plain.trials[0].harness_variant == "default"
+    with pytest.raises(ValueError, match="unknown harness variant"):
+        record_run(nirmaan_org, [case], None, trials=1, repo=ROOT, out=tmp_path, clock=fixed_clock, variant="nope")
+
+
 def test_the_cli_version_is_a_run_option_in_the_fingerprint():
     # The claude-code runtime's behaviour depends on the Claude Code version, so the version is in the harness.
     default = harness_sha256()
     assert fingerprint(cli="2.1.325")["run"]["cli"] == "2.1.325" and fingerprint()["run"]["cli"] is None
     assert len({default, harness_sha256(cli="2.1.311"), harness_sha256(cli="2.1.325")}) == 3
     assert harness_sha256(cli="2.1.325") == harness_sha256(cli="2.1.325")
+
+
+def test_the_attempts_variant_gives_the_seat_three_attempts(nirmaan_org, fixed_clock, tmp_path, monkeypatch):
+    # A refused attempt is then answered again with REPAIR_AFTER_REFUSAL and the log excerpt (M26's retry).
+    from nirmaan.evals import evaluate, replay_llm, runner
+    from nirmaan.runtime import ModelRuntime
+
+    case = next(c for c in load_cases(ROOT / "evals") if c.id == "spec/axi4-lite-interface")
+    asked: list = []
+    real = runner.run_task
+
+    def spy(*args, **kwargs):
+        asked.append(kwargs["attempts"])
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(runner, "run_task", spy)
+    for variant in ("attempts-3", "default"):
+        seat = ModelRuntime(replay_llm(case, ROOT), runtime_id="replay")
+        result, _ = evaluate(nirmaan_org, case, seat, replay=True, repo=ROOT, sandbox=tmp_path / variant,
+                             clock=fixed_clock, variant=variant)
+        assert result.harness == harness_sha256(variant=variant)
+    assert asked == [3, case.attempts]
+
+
+def test_the_cli_runs_a_named_variant_and_refuses_an_unknown_one_or_a_second_attempts(tmp_path):
+    from typer.testing import CliRunner
+
+    from nirmaan.cli import app
+
+    base = ["eval", "run", "--replay", "--seats", "spec", "--cases", str(ROOT / "evals"), "--repo", str(ROOT)]
+    ran = CliRunner().invoke(app, [*base, "--harness", "attempts-3", "--out", str(tmp_path / "out")])
+    assert ran.exit_code == 0, ran.output
+    assert "on the harness variant attempts-3" in ran.output and "never counts toward an" in ran.output
+    [path] = list((tmp_path / "out").iterdir())
+    record = load_record(path)
+    assert record.manifest.harness_variant == "attempts-3"
+    assert all(t.harness_variant == "attempts-3" and t.result.harness == harness_sha256(variant="attempts-3")
+               for t in record.trials)
+    unknown = CliRunner().invoke(app, [*base, "--harness", "nope", "--out", str(tmp_path / "none")])
+    assert unknown.exit_code != 0 and "unknown harness variant 'nope'; known: default, attempts-3" in unknown.output
+    twice = CliRunner().invoke(app, [*base, "--harness", "attempts-3", "--attempts", "2", "--out", str(tmp_path / "x")])
+    assert twice.exit_code != 0 and "--harness attempts-3 sets the attempts" in twice.output
+    assert not (tmp_path / "none").exists() and not (tmp_path / "x").exists()
+

@@ -63,6 +63,7 @@ def test_the_call_is_clean_and_uses_the_plan_not_a_key(triage, tmp_path, monkeyp
     assert argv[:3] == ["-p", "--output-format", "json"] and argv[argv.index("--model") + 1] == "claude-opus-5-5"
     assert argv[argv.index("--tools") + 1] == "" and "--no-session-persistence" in argv
     assert "--strict-mcp-config" in argv and argv[argv.index("--system-prompt") + 1]
+    assert "--safe-mode" in argv  # M74: no user-level CLAUDE.md, hook, skill or plugin reaches the seat
     assert "## Company" in call["stdin"] and argv[argv.index("--system-prompt") + 1] not in call["stdin"]
     assert call["key"] is None and call["token"] is None  # the plan login, never a key
     assert Path(call["cwd"]).name.startswith("nirmaan-claude-code-") and not Path(call["cwd"]).exists()
