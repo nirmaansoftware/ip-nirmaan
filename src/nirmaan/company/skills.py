@@ -369,6 +369,7 @@ SKILLS: list[Skill] = [
     # --- Verification ------------------------------------------------------------
     sk("uvm", "UVM", "verification", "methodology", provides=("dv.testbench",), includes=("systemverilog",),
        packs=("uvm", "uvm-phasing", "uvm-tlm", "uvm-ral"), specs=("IEEE 1800.2 (UVM)",),
+       docs=("verification/uvm",),
        procedures=("Build agents, scoreboards, and reference models.", "Use RAL for registers."),
        fails=("Objection leaks.", "Unconnected TLM ports.", "RAL mirror mismatches."),
        valid=("Environment compiles, runs a smoke test, and checks every interface.",)),
@@ -425,6 +426,7 @@ SKILLS: list[Skill] = [
        fails=("Power intent that the simulation never switches.",),
        valid=("Every power state transition is exercised and checked.",)),
     sk("emulation_prototyping", "Emulation and prototyping", "verification", "emulation",
+       docs=("verification/emulation_prototyping",),
        procedures=("Decide which tests move to an emulator or FPGA prototype and what each gains over simulation.",),
        fails=("Moving to a prototype with no debug visibility planned.",),
        valid=("Each moved test names the observation it adds and the debug access it keeps.",)),
@@ -543,6 +545,7 @@ SKILLS: list[Skill] = [
        fails=("Only positive testing.",), valid=("Negative (attack) scenarios are covered.",)),
     sk("verification_signoff", "Verification signoff", "verification", "signoff",
        provides=("dv.closure", "dv.review", "signoff.verification"),
+       docs=("verification/verification_signoff",),
        procedures=("Check plan, coverage, regression, formal, and waivers against criteria.",),
        fails=("Signing off on percentages without looking at holes.",),
        valid=("Signoff cites evidence for every criterion.",)),
