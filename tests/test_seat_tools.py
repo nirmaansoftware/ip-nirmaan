@@ -82,7 +82,9 @@ def test_tools_in_the_loop_is_a_named_variant_beside_the_default_and_attempts_3(
     loop = fingerprint(variant=VARIANT)["loop"]
     assert set(loop["settings"]) == set(harness.LOOP_SETTINGS)
     assert set(loop["code"]) == set(harness.LOOP_CODE) and all(d.startswith("sha256:") for d in loop["code"].values())
-    assert set(loop["pins"]) == set(harness.LOOP_TOOLS)
+    assert loop["tools"] == list(harness.loop_tools()) == ["lint.run", "simulator.run", "formal.run",
+                                                           "formal.cover"]
+    assert set(loop["pins"]) == set(harness.loop_tools())
     assert "loop" not in fingerprint() and "loop" not in fingerprint(variant="attempts-3")
 
 
@@ -106,6 +108,14 @@ def test_each_loop_setting_changes_the_variants_fingerprint_and_never_the_defaul
     value = getattr(harness, name)
     monkeypatch.setattr(harness, name, value + 1 if isinstance(value, int) else
                         (*value, "changed") if isinstance(value, tuple) else value + " changed")
+    assert harness_sha256(variant=VARIANT) != before and harness_sha256() == default
+
+
+def test_the_loop_tools_are_company_data_in_the_variants_fingerprint_only(monkeypatch):
+    from nirmaan.company import tools
+
+    default, before = harness_sha256(), harness_sha256(variant=VARIANT)
+    monkeypatch.setattr(tools, "IN_LOOP", ("lint.run",))
     assert harness_sha256(variant=VARIANT) != before and harness_sha256() == default
 
 

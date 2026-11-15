@@ -199,9 +199,8 @@ def run_tools(variant: str = "default") -> bool:
 # ``LOOP_CODE`` and the versions of the tools it can run (``tool_pins``), so editing one changes that variant's
 # harness and never the default's (docs/TOOLS_IN_THE_LOOP.md).
 
-#: The only tools the seat may call in the loop: lint, simulation and formal. A tool must also be one the
-#: platform runs over the seat's own files for this task, and granted to its role; anything else is refused.
-LOOP_TOOLS = ("lint.run", "simulator.run", "formal.run", "formal.cover")
+# The tools the seat may call are company data (``nirmaan.company.tools.IN_LOOP``, read by ``loop_tools``): the
+# runtime names no tool. They are in the variant's fingerprint with these settings.
 #: Calls per attempt, refused ones included; a call over the cap is refused and recorded.
 LOOP_MAX_CALLS = 8
 #: Seconds per attempt, the model's time and every brokered run together: past it the seat is stopped and the
@@ -230,7 +229,7 @@ listed in "tool_runs". At most {calls} calls and {seconds} seconds per attempt; 
 fails. You have no other tool: no shell, no file access, no network. Then answer as described above."""
 
 #: Every loop setting, by name: in the variant's fingerprint only.
-LOOP_SETTINGS = ("LOOP_TOOLS", "LOOP_MAX_CALLS", "LOOP_SECONDS", "LOOP_CALL_SECONDS", "LOOP_MAX_FILES",
+LOOP_SETTINGS = ("LOOP_MAX_CALLS", "LOOP_SECONDS", "LOOP_CALL_SECONDS", "LOOP_MAX_FILES",
                  "LOOP_MAX_CHARS", "LOOP_SUFFIXES", "LOOP_SERVER", "LOOP_FLAGS", "LOOP_SYSTEM")
 #: The brokered server's code, relative to ``SOURCE_ROOT``: the session, its screen and its socket (broker
 #: side), and the stdio relay Claude Code starts. In the variant's fingerprint only.
@@ -311,8 +310,15 @@ def fingerprint(*, attempts: int | None = None, knowledge: bool = True, cli: str
                    "variant": variant}}
     if run_tools(variant):  # M75: the brokered server's settings, its code, and the versions of its tools
         out["loop"] = {"settings": {name: _value(module[name]) for name in LOOP_SETTINGS},
-                       "code": code_digests(LOOP_CODE), "pins": tool_pins()}
+                       "tools": list(loop_tools()), "code": code_digests(LOOP_CODE), "pins": tool_pins()}
     return out
+
+
+def loop_tools() -> tuple[str, ...]:
+    """The tools a seat may call in the loop (M75): company data, ``nirmaan.company.tools.IN_LOOP``."""
+    from nirmaan.company.tools import IN_LOOP
+
+    return tuple(IN_LOOP)
 
 
 def tool_pins() -> dict[str, dict[str, str]]:
@@ -324,13 +330,17 @@ def tool_pins() -> dict[str, dict[str, str]]:
     return {tool: dict(found) for tool, found in _read_pins().items()}
 
 
-@functools.lru_cache(maxsize=1)
 def _read_pins() -> dict[str, dict[str, str]]:
+    return _pins(loop_tools())
+
+
+@functools.lru_cache(maxsize=4)
+def _pins(tools: tuple[str, ...]) -> dict[str, dict[str, str]]:
     from nirmaan.integrations.eda import backends_for, run_environment
 
     flag = {"iverilog": "-V", "vvp": "-V", "yosys": "-V"}  # the others take --version
     pins: dict[str, dict[str, str]] = {}
-    for tool in LOOP_TOOLS:
+    for tool in loop_tools():
         found: dict[str, str] = {}
         for exe in sorted({e for backend in backends_for(tool) for e in backend.executables}):
             path = shutil.which(exe)

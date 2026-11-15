@@ -10,7 +10,8 @@ and then submits. The conditions the decision sets, and where each holds:
   relay (``seat_tools_relay.py``, standard library only, started with an empty environment) that holds no
   tool: it hands each request to :class:`SeatTools` over a private socket, and every call runs here, through
   the seat's own :class:`ToolHandle`, so the broker checks the role's grant, the tool's contract and its
-  probe as for any run. A seat is offered only the ``LOOP_TOOLS`` the platform runs over its own files for
+  probe as for any run. A seat is offered only the loop tools (``harness.loop_tools()``, company data) the
+  platform runs over its own files for
   this task and its role is granted; any other name is refused, and so is a call when nothing is offered.
 * **No credential in a tool run's environment.** The tools run through the EDA runner, whose steps see this
   process's environment with every credential removed (M53, ``run_environment``); the relay sees none.
@@ -148,7 +149,7 @@ def screen(path: str, content: str) -> str | None:
 
 
 def mcp_name(tool: str) -> str:
-    """The name a tool has in the brokered server (``lint.run`` is ``lint_run``)."""
+    """The name a tool has in the brokered server: its ID with each dot an underscore."""
     return tool.replace(".", "_")
 
 
@@ -171,7 +172,7 @@ class SeatTools:
         granted = set(packet.tools)
         specs = {spec.id: spec for spec in packet.task.gates}
         self._offered: dict[str, tuple[str, list, list[str]]] = {}
-        for tool in harness.LOOP_TOOLS:
+        for tool in harness.loop_tools():
             reqs = [r for r in packet.task.evidence_requirements
                     if r.files and _TOOL_BACKED & set(r.accepts) and tool in r.tools]
             kinds = list(dict.fromkeys(k for r in reqs for b in r.files if not b.upstream for k in b.kinds))
