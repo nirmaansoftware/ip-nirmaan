@@ -198,7 +198,9 @@ in the same pull request.
     has: without the flag it quoted the file, with `--safe-mode` or
     `--setting-sources ""` it did not. `--safe-mode` is the flag whose help
     names `CLAUDE.md`; `--bare` drops the file too but never reads the plan
-    login. `tests/test_claude_code_canary.py` keeps the check (live, opt in).
+    login. `scripts/claude_code_canary.py` keeps the check: a control call
+    without the flag must quote the file, a seat call must not (it calls a
+    model, so it runs by hand after a Claude Code update, not in CI).
   - `evals/runner.py`, `evals/records.py`, `evals/levels.py`, `cli.py`:
     `--harness <name>`, the labels, and the `variants` list.
   The default fingerprint changed, so every Practised group recorded before
@@ -256,7 +258,8 @@ refusals; `tests/test_capability_levels.py` that variant trials are listed
 apart with the name and never count, either label being enough;
 `tests/test_gate_contracts.py` that the rr-arbiter seat is told the
 single-task rule and that both proof gates refuse a `[tasks]` setup;
-`tests/test_claude_code_canary.py` the live canary and its leak detector.
+`tests/test_claude_code_canary.py` the canary script against fake
+executables (clean, leaking, never quoting) and its leak detector.
 
 ## Not in this milestone
 
