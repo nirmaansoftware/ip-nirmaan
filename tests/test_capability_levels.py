@@ -69,14 +69,16 @@ def _record(org, repo: Path, outcomes: list[bool], *, name: str = "run1", case_i
             digest: str | None = None, judged: bool = True, knowledge: str = "on",
             trial_knowledge: str | None = None, harness_digest=CURRENT,
             answer_harness=CURRENT, blocked: frozenset[int] = frozenset(), cli: str | None = None,
-            skill: str = SKILL, variant: str = "default", trial_variant: str | None = None) -> Path:
+            skill: str = SKILL, variant: str = "default", trial_variant: str | None = None,
+            purpose: str = "evidence", trial_purpose: str | None = None) -> Path:
     record = repo / "evals" / "results" / name
     record.mkdir(parents=True)
     manifest = EvalRunManifest(id=name, runtime="claude-code", model=MODEL, replay=replay, nirmaan_version="t",
                                started_at=AT, finished_at=AT, trials=len(outcomes), cases=(case_id,),
                                seats=("rtl-implementation",), head_sha="0" * 40, knowledge=knowledge,
-                               harness_variant=variant)
+                               harness_variant=variant, purpose=purpose)
     trial_variant = trial_variant or variant
+    trial_purpose = trial_purpose or purpose
     (record / MANIFEST).write_text(manifest.model_dump_json(), encoding="utf-8")
     trial_knowledge = trial_knowledge or knowledge
     # As record_run writes it (M67): with knowledge off, the digest of the card alone.
@@ -101,7 +103,7 @@ def _record(org, repo: Path, outcomes: list[bool], *, name: str = "run1", case_i
                          succeeded=passed),) if judged and not stopped else ()
         trial = EvalTrial(record=name, trial=number, stage="rtl-implementation", model=MODEL,
                           skills={skill: digest}, knowledge=trial_knowledge, harness_variant=trial_variant,
-                          result=result, judge_runs=runs,
+                          purpose=trial_purpose, result=result, judge_runs=runs,
                           answers=(RecordedAnswer(mode="work", model=MODEL, prompt_sha256="p", packet_sha256="k",
                                                   harness=answer_harness),))
         path = trial_path(record, case_id, number)
@@ -325,6 +327,54 @@ def test_both_variant_labels_edited_leave_the_trials_stale(org, tmp_path):
             harness_digest=harness_sha256(variant="attempts-3"))
     [group] = _level(org, tmp_path)["practised"]
     assert not group["counts"] and "stale: the harness changed after these trials (docs/HARNESS.md)" in group["reasons"]
+
+
+# --- Calibration purpose (eval run --purpose calibration) ----------------------------------------
+
+
+def test_a_calibration_purpose_record_never_raises_a_level_and_is_listed_as_calibration(org, tmp_path):
+    # 5 of 5 with a clean re-judge and a must-fail control would be Practised as evidence.
+    _case(tmp_path)
+    _record(org, tmp_path, [True] * 5, name="pilot-calibration", purpose="calibration")
+    levels = compute(org, tmp_path)
+    assert SKILL not in levels["skills"] and levels["totals"]["practised"] == 0
+    listed = levels["calibration"]
+    assert [(t["record"], t["trial"], t["passed"]) for t in listed] == [("evals/results/pilot-calibration", n, True)
+                                                                         for n in range(1, 6)]
+    # Our own cases, no outside source: "calibration", never "outside calibration".
+    assert all(t["reason"] == "calibration (labelled in the run manifest and the trial): never counts toward a level"
+               for t in listed)
+    assert levels["refused_records"] == [] and levels["variants"] == [] and levels["without_knowledge"] == []
+
+
+def test_a_calibration_purpose_record_never_lowers_a_level(org, tmp_path):
+    _case(tmp_path)
+    _record(org, tmp_path, [True] * 5, name="run1")
+    _record(org, tmp_path, [False] * 5, name="pilot-calibration", purpose="calibration")
+    entry = _level(org, tmp_path)
+    assert entry["level"] == "practised", entry
+    [group] = entry["practised"]
+    assert group["counts"] and group["n"] == 5 and group["passed"] == 5 and group["records"] == ["evals/results/run1"]
+    assert len(compute(org, tmp_path)["calibration"]) == 5
+
+
+def test_an_evidence_purpose_record_counts_as_before(org, tmp_path):
+    _case(tmp_path)
+    _record(org, tmp_path, [True] * 5, purpose="evidence")
+    entry = _level(org, tmp_path)
+    assert entry["level"] == "practised" and entry["practised"][0]["records"] == ["evals/results/run1"]
+    assert compute(org, tmp_path)["calibration"] == []
+
+
+@pytest.mark.parametrize("manifest, trial, where", [("evidence", "calibration", "the trial"),
+                                                    ("calibration", "evidence", "the run manifest")])
+def test_one_purpose_label_edited_back_to_evidence_never_turns_calibration_into_evidence(org, tmp_path, manifest,
+                                                                                         trial, where):
+    _case(tmp_path)
+    _record(org, tmp_path, [True] * 5, name="pilot-calibration", purpose=manifest, trial_purpose=trial)
+    levels = compute(org, tmp_path)
+    assert SKILL not in levels["skills"] and len(levels["calibration"]) == 5
+    assert all(f"(labelled in {where})" in t["reason"] for t in levels["calibration"])
 
 
 # --- Without knowledge (M67) -------------------------------------------------------------------

@@ -40,9 +40,15 @@ listed in `without_knowledge` with its outcome and the reason, and never counts
 toward any level; its skill digests are the cards alone, so with both labels
 edited back a skill with a document is still stale.
 A calibration trial (M76, `nirmaan eval outside`, an outside benchmark;
-`docs/OUTSIDE_CALIBRATION.md`) is labelled `"purpose": "calibration"` in its run
-manifest and in the trial. Labelled so in either, it is listed in `calibration`
-with the reason "outside calibration" and never counts toward any level; the
+`docs/OUTSIDE_CALIBRATION.md`; or `nirmaan eval run --purpose calibration` on
+our own cases, such as a harness comparison's default arm) is labelled
+`"purpose": "calibration"` in its run manifest and in the trial, and its record
+name carries `-calibration`. `eval run` writes `"purpose": "evidence"` unless
+told otherwise, and a record written before the field existed reads as
+evidence. Labelled calibration in either the manifest or the trial, a trial is
+listed in `calibration` with the reason "outside calibration" (when the
+manifest names an outside `source`) or "calibration" and never counts toward
+any level; the
 record is not judged as evidence at all, so a replay of one is no refusal. A
 record that mixes calibration trials with evidence trials is refused, so one
 stray label never takes the other trials out of the levels. A calibration

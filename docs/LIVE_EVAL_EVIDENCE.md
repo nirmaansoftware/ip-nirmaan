@@ -34,7 +34,10 @@ suffix is used.
 
 **The manifest** (`EvalRunManifest`): record ID (the directory name), runtime,
 model, replay flag, Nirmaan version, start and finish time, trials per case,
-the case IDs and the seats they evaluate, and the command line.
+the case IDs and the seats they evaluate, and the command line. Its `purpose`
+is `evidence` unless the run was `eval run --purpose calibration` (or `eval
+outside`): a calibration record never counts toward a level
+(`docs/CAPABILITY_LEVELS.md`).
 
 **A trial** (`EvalTrial`), one per case per trial:
 

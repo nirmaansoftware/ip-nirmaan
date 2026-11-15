@@ -1137,6 +1137,11 @@ def eval_run(
              "one answered again with the repair text); or tools-in-loop (M75: the seat calls brokered lint, "
              "simulation and formal during its attempt, docs/TOOLS_IN_THE_LOOP.md). A variant's record carries its "
              "name and never counts toward an evidence level."),
+    purpose: str = typer.Option(
+        "evidence", "--purpose",
+        help="evidence (the default) or calibration: a calibration record, such as a harness comparison's "
+             "default arm on the pilot cases, is labelled purpose: calibration in its name, its manifest and every "
+             "trial, and never counts toward an evidence level (docs/CAPABILITY_LEVELS.md)."),
     cases: Path = CASES_OPTION,
     repo: Path = typer.Option(Path("."), "--repo", help="Root that case file paths are relative to."),
     out: Optional[Path] = typer.Option(None, "--out", help="Where the run record is written (default: "
@@ -1146,12 +1151,15 @@ def eval_run(
     """Run evaluation cases and write a run record (M45). Exits 1 when any trial fails, and 3 when a live run stops
     at a trial with no model answer, such as a plan or usage limit (RR5)."""
     from nirmaan.evals import LIVE_TRIALS, EvalError, RunStopped, record_run, select_cases
+    from nirmaan.evals.records import PURPOSES
     from nirmaan.runtime.harness import VARIANTS
 
     if replay == (runtime is not None):
         _fail("choose one: --runtime ID (a model in the seat) or --replay (the reference answer)")
     if harness_name not in VARIANTS:
         _fail(f"unknown harness variant {harness_name!r}; known: {', '.join(VARIANTS)}")
+    if purpose not in PURPOSES:
+        _fail(f"unknown purpose {purpose!r}; known: {', '.join(PURPOSES)}")
     if attempts is not None and "attempts" in VARIANTS[harness_name]:
         _fail(f"--harness {harness_name} sets the attempts; leave out --attempts")
     known = {case.id: case for case in _cases(cases)}
@@ -1177,6 +1185,9 @@ def eval_run(
     if harness_name != "default" and not as_json:
         console.print(f"note: on the harness variant {harness_name}; this record never counts toward an evidence "
                       "level", highlight=False, soft_wrap=True)
+    if purpose != "evidence" and not as_json:
+        console.print(f"note: purpose {purpose}; this record never counts toward an evidence level",
+                      highlight=False, soft_wrap=True)
     out = out or (repo / "evals" / "results" if runtime else Path(".nirmaan") / "evals")
     results = []
 
@@ -1199,7 +1210,8 @@ def eval_run(
     try:
         path = record_run(_org(), chosen, runtime, trials=trials, repo=repo, out=out, attempts=attempts,
                           command=" ".join(["nirmaan", *sys.argv[1:]]), head_sha=_head_sha(repo), on_trial=show,
-                          knowledge=not without_knowledge, variant=harness_name, stop_on_no_answer=True)
+                          knowledge=not without_knowledge, purpose=purpose, variant=harness_name,
+                          stop_on_no_answer=True)
     except RunStopped as exc:
         stopped, path = exc, exc.path
     except EvalError as exc:
@@ -1325,7 +1337,8 @@ def eval_history(
     for r in records:
         m = r.manifest
         kind = ("replay" if m.replay else f"{m.runtime}, model {m.model}") + (
-            ", without knowledge" if m.knowledge == "off" else "")
+            ", without knowledge" if m.knowledge == "off" else "") + (
+            f", purpose {m.purpose}" if m.purpose != "evidence" else "")
         console.print(escape(f"{m.id}  ({kind}, version {m.nirmaan_version}, {m.started_at:%Y-%m-%d %H:%M}, "
                              f"{m.trials} trials per case)"), highlight=False, soft_wrap=True)
         _print_summary(r.summary(), indent="  ")
