@@ -15,6 +15,7 @@ from pathlib import Path
 
 import pytest
 from test_nirmaan_applicability_golden import REQUESTS
+from test_knowledge_gate_claims import REFUSED_CONSTRUCTS, gate_problems
 
 from nirmaan.evals import load_cases
 from nirmaan.models import EvidenceKind, EvidenceRequirement, FileInput, ParamKind, ParamSpec, ToolRisk, ToolSpec
@@ -52,6 +53,20 @@ def test_the_arbiter_seat_is_told_that_each_proof_gate_takes_one_sby(arbiter):
                                                  "formal.cover")}
     assert not _lines(render_work_prompt(assemble(engine, rtl.id, role=rtl.reviewer), "review").render(),
                       "Input contract of ")
+
+
+def test_the_arbiter_seat_is_told_the_single_task_rule_that_both_proof_gates_enforce(arbiter, tmp_path):
+    # Council record 2026-11-14 (pilot retrospective), decisions 3 and 4: six pilot trials wrote a [tasks] setup
+    # and were refused before review, and nothing the seat read said so. The rule is in both tools' definitions,
+    # so it reaches the contract, and the gate's own checks refuse exactly that construct.
+    engine, rtl = arbiter
+    prompt = render_work_prompt(assemble(engine, rtl.id)).render()
+    for tool in ("formal.run", "formal.cover"):
+        [line] = _lines(prompt, f"Input contract of {tool},")
+        assert "a single-task setup: one with a [tasks] section is refused before anything runs" in line, tool
+    problems = gate_problems(REFUSED_CONSTRUCTS["[tasks]"], tmp_path / "tasks")
+    assert [p.split(":")[0] for p in problems] == ["formal.run", "formal.cover"]
+    assert all("declares [tasks]" in p and "single-task setups only" in p for p in problems)
 
 
 def test_every_gate_tool_of_every_stage_declares_the_parameters_its_files_fill(nirmaan_org):

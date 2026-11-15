@@ -28,7 +28,7 @@ from nirmaan.evals.runner import REPLAY, evaluate, replay_llm, runtime_cli
 from nirmaan.models import EvalCase, EvalResult, EvalRunManifest, EvalTrial, JudgeRun, RecordedAnswer
 from nirmaan.org import Organization
 from nirmaan.runtime import AgentRuntime, Completion, ModelRuntime, WorkPrompt, get_runtime
-from nirmaan.runtime.harness import harness_sha256
+from nirmaan.runtime.harness import harness_sha256, variant_options
 from nirmaan.runtime.model import NO_CALL
 
 MANIFEST = "manifest.json"
@@ -126,22 +126,23 @@ def select_cases(cases: Sequence[EvalCase], seats: Sequence[str]) -> list[EvalCa
 def record_trial(org: Organization, case: EvalCase, seat_runtime: AgentRuntime, *, replay: bool, record: str,
                  trial: int, repo: Path, attempts: int | None = None, sandbox: Path | None = None,
                  clock: Callable[[], datetime] | None = None, knowledge: bool = True,
-                 purpose: str = "evidence", digest_repo: Path | None = None) -> EvalTrial:
+                 purpose: str = "evidence", digest_repo: Path | None = None, variant: str = "default") -> EvalTrial:
     """Run one case once with every model answer captured, and keep the tool runs behind each verdict.
 
     ``knowledge=False`` (M67) runs the seat without knowledge documents and labels the trial ``knowledge: off``.
+    ``variant`` (M74) runs it on that named harness variant and labels the trial with the name.
     Every answer, and the result, records the harness (M73), with the runtime's CLI version in it.
     ``digest_repo`` is where the skills' knowledge documents are digested from (default ``repo``): a run that stages
     its cases elsewhere (M76) still digests the documents the seat was really given.
     """
     llm = getattr(seat_runtime, "llm", None)
-    harness = harness_sha256(attempts=attempts, knowledge=knowledge, cli=runtime_cli(seat_runtime))
+    harness = harness_sha256(attempts=attempts, knowledge=knowledge, cli=runtime_cli(seat_runtime), variant=variant)
     recorder = RecordingLLM(llm, harness) if llm is not None else None
     if recorder is not None:
         seat_runtime.llm = recorder  # type: ignore[attr-defined]
     try:
         result, engine = evaluate(org, case, seat_runtime, replay=replay, repo=repo, attempts=attempts,
-                                  sandbox=sandbox, clock=clock, knowledge=knowledge)
+                                  sandbox=sandbox, clock=clock, knowledge=knowledge, variant=variant)
     finally:
         if recorder is not None:
             seat_runtime.llm = llm  # type: ignore[attr-defined]
@@ -154,7 +155,7 @@ def record_trial(org: Organization, case: EvalCase, seat_runtime: AgentRuntime, 
     model = next((a.model for a in answers if a.model), None) or model_of(seat_runtime)
     return EvalTrial(record=record, trial=trial, stage=case.seat, model=model,
                      skills={s: skill_digest(org, s, digest_repo or repo, knowledge=knowledge) for s in case.skills},
-                     knowledge="on" if knowledge else "off", purpose=purpose, result=result,
+                     knowledge="on" if knowledge else "off", purpose=purpose, harness_variant=variant, result=result,
                      answers=answers, judge_runs=judge_runs)
 
 
@@ -199,7 +200,7 @@ def record_run(org: Organization, cases: Sequence[EvalCase], runtime: str | None
                clock: Callable[[], datetime] | None = None,
                on_trial: Callable[[EvalTrial, Path], None] | None = None, knowledge: bool = True,
                purpose: str = "evidence", source: str = "", digest_repo: Path | None = None,
-               stop_on_no_answer: bool = False) -> Path:
+               variant: str = "default", stop_on_no_answer: bool = False) -> Path:
     """Run every case ``trials`` times on a registered runtime (``None`` replays) and write a run record.
 
     Each trial gets a fresh runtime and its own sandbox. The manifest is written first and rewritten at the
@@ -207,17 +208,20 @@ def record_run(org: Organization, cases: Sequence[EvalCase], runtime: str | None
     (M67, the ablation) runs every seat without knowledge documents: the record's name ends in
     ``-without-knowledge`` and its manifest and every trial say ``knowledge: off``. ``purpose="calibration"``
     (M76, ``eval outside``) labels the record, its manifest and every trial the same way, and ``source`` says where
-    the problems came from. ``stop_on_no_answer`` (RR5) ends a live run right after the first trial with no model
-    answer (:func:`no_model_answer`): that trial is written like any other, the record is finished, and
-    :class:`RunStopped` is raised with its path.
+    the problems came from. ``variant`` (M74) runs every seat on that named harness variant: the record's name
+    ends in ``-harness-<name>`` and its manifest and every trial carry the name. ``stop_on_no_answer`` (RR5) ends
+    a live run right after the first trial with no model answer (:func:`no_model_answer`): that trial is written
+    like any other, the record is finished, and :class:`RunStopped` is raised with its path.
     """
     if trials < 1:
         raise ValueError("trials must be at least 1")
+    variant_options(variant)  # an unknown name is refused before anything runs
     now = clock or (lambda: datetime.now(timezone.utc))
     started = now()
     probe = get_runtime(runtime) if runtime else None
     runtime_id, model = (probe.runtime_id, model_of(probe)) if probe else (REPLAY, REPLAY)
-    label = ("" if knowledge else f"-{WITHOUT_KNOWLEDGE}") + ("-calibration" if purpose == "calibration" else "")
+    label = (("" if knowledge else f"-{WITHOUT_KNOWLEDGE}") + ("-calibration" if purpose == "calibration" else "")
+             + ("" if variant == "default" else f"-harness-{_safe(variant)}"))
     path = _free(out, f"{started:%Y-%m-%d}-{_safe(runtime_id)}-{_safe(model)}{label}")
     path.mkdir(parents=True)
 
@@ -227,7 +231,7 @@ def record_run(org: Organization, cases: Sequence[EvalCase], runtime: str | None
                                trials=trials, cases=tuple(c.id for c in cases),
                                seats=tuple(dict.fromkeys(c.seat for c in cases)), command=command,
                                head_sha=head_sha, knowledge="on" if knowledge else "off",
-                               purpose=purpose, source=source)
+                               purpose=purpose, source=source, harness_variant=variant)
 
     _write(path / MANIFEST, manifest(started).model_dump(mode="json"))
     done: list[EvalTrial] = []
@@ -241,7 +245,7 @@ def record_run(org: Organization, cases: Sequence[EvalCase], runtime: str | None
             seat = get_runtime(runtime) if runtime else ModelRuntime(replay_llm(case, repo), runtime_id=REPLAY)
             trial = record_trial(org, case, seat, replay=runtime is None, record=path.name, trial=number, repo=repo,
                                  attempts=attempts, clock=clock, knowledge=knowledge, purpose=purpose,
-                                 digest_repo=digest_repo)
+                                 digest_repo=digest_repo, variant=variant)
             target = trial_path(path, case.id, number)
             _write(target, trial.model_dump(mode="json"))
             done.append(trial)
@@ -310,6 +314,21 @@ def calibration_labels(manifest: EvalRunManifest, trial: EvalTrial) -> tuple[str
     """
     return tuple(where for where, value in (("the run manifest", manifest.purpose), ("the trial", trial.purpose))
                  if value != "evidence")
+
+
+def variant_labels(manifest: EvalRunManifest, trial: EvalTrial) -> tuple[str, ...]:
+    """Where a trial is labelled as run on a named harness variant other than the default (M74).
+
+    Either label is enough, so editing one of them never turns a variant trial into evidence.
+    """
+    return tuple(f"{where} ({value})" for where, value in (("the run manifest", manifest.harness_variant),
+                                                           ("the trial", trial.harness_variant))
+                 if value != "default")
+
+
+def trial_variant(manifest: EvalRunManifest, trial: EvalTrial) -> str:
+    """The harness variant a trial ran on: the trial's label, else the manifest's (M74)."""
+    return trial.harness_variant if trial.harness_variant != "default" else manifest.harness_variant
 
 
 def load_records(root: Path | str) -> list[EvalRecord]:
@@ -416,6 +435,7 @@ def rejudge(org: Organization, record: EvalRecord, cases: Mapping[str, EvalCase]
         result, _ = evaluate(org, case, runtime, replay=recorded.replay, repo=repo,
                              attempts=max(1, recorded.attempts), sandbox=where,
                              clock=lambda at=recorded.started_at: at,
-                             knowledge=not knowledge_off(record.manifest, trial))
+                             knowledge=not knowledge_off(record.manifest, trial),
+                             variant=trial_variant(record.manifest, trial))
         out.append(Rejudged(trial, result, _compare(recorded, result)))
     return out

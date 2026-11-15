@@ -32,7 +32,10 @@ fails when the committed file differs from what the records give.
   manifest or in the trial itself) is listed apart with the reason and never
   counts toward any level. A calibration record or trial (M76, an outside
   benchmark: ``purpose: calibration`` in its manifest or the trial) is listed
-  under ``calibration`` as "outside calibration" and never counts.
+  under ``calibration`` as "outside calibration" and never counts. A trial run
+  on a named harness variant (M74, ``eval run --harness <name>``: any name but
+  ``default`` in its run manifest or in the trial) is listed under
+  ``variants`` with the name and never counts.
 * **Proven**: only from the product's own seat run records on delivered work
   that passed review. No such record kind exists yet, so no skill is Proven.
 """
@@ -49,7 +52,8 @@ from typing import Any
 
 from nirmaan.company.evidence import MUST_FAIL_DOMAINS
 from nirmaan.evals.cases import EvalError, load_cases, skill_digest
-from nirmaan.evals.records import MANIFEST, calibration_labels, knowledge_off, load_evidence, load_record, wilson
+from nirmaan.evals.records import (MANIFEST, calibration_labels, knowledge_off, load_evidence, load_record,
+                                   variant_labels, wilson)
 from nirmaan.evals.scorers import scorer_spec
 from nirmaan.models import EvalCase
 from nirmaan.org import Organization
@@ -186,15 +190,17 @@ def _rejudged(record_dir: Path) -> dict[tuple[str, int], bool]:
 
 
 def practised(org: Organization, repo: Path,
-              cases: dict[str, EvalCase]) -> tuple[dict[str, list], list[str], list, list, list]:
+              cases: dict[str, EvalCase]) -> tuple[dict[str, list], list[str], list, list, list, list]:
     """Per skill, every (model, digest, harness, CLI version) group of tool-judged cases' trials, a trial no judge
     ran on counted as failed; the refused records; trials of cases not tool-judged; trials run without knowledge
-    documents (M67) and outside calibration trials (M76), which never count."""
+    documents (M67), outside calibration trials (M76) and trials on a named harness variant (M74), which never
+    count."""
     groups: dict[tuple[str, str | None, str | None, str | None, str | None], dict[str, Any]] = {}
     refused: list[str] = []
     not_tool_judged: list[dict[str, Any]] = []
     without_knowledge: list[dict[str, Any]] = []
     calibration: list[dict[str, Any]] = []
+    variants: list[dict[str, Any]] = []
     for manifest in sorted((repo / RESULTS).rglob(MANIFEST)):
         try:
             record = load_record(manifest.parent)
@@ -226,6 +232,13 @@ def practised(org: Organization, repo: Path,
                                           "passed": trial.result.passed,
                                           "reason": f"run without knowledge documents (knowledge: off in "
                                                     f"{' and '.join(off)}): never counts toward a level"})
+                continue
+            on_variant = variant_labels(record.manifest, trial)
+            if on_variant:  # M74: a variant is compared with the default, never evidence of a skill
+                variants.append({"record": where, "case": trial.result.case, "trial": trial.trial,
+                                 "passed": trial.result.passed,
+                                 "reason": f"run on a harness variant (labelled in {' and '.join(on_variant)}): "
+                                           "never counts toward a level"})
                 continue
             case = cases.get(trial.result.case)
             if case is None:
@@ -283,7 +296,7 @@ def practised(org: Organization, repo: Path,
                            "passed": g["passed"],
                            "unjudged": g["unjudged"], "lower": round(low, 4), "records": sorted(g["records"]),
                            "cases": sorted(g["cases"]), "counts": not reasons, "reasons": reasons})
-    return dict(out), refused, not_tool_judged, without_knowledge, calibration
+    return dict(out), refused, not_tool_judged, without_knowledge, calibration, variants
 
 
 # --- Levels ----------------------------------------------------------------------------------
@@ -293,7 +306,7 @@ def compute(org: Organization, repo: Path) -> dict[str, Any]:
     """Every skill's evidence level from the repository's committed records, as ``capability/levels.json``."""
     repo = Path(repo)
     cases = {c.id: c for c in load_cases(repo / "evals")} if (repo / "evals").is_dir() else {}
-    groups, refused, not_tool_judged, without_knowledge, calibration = practised(org, repo, cases)
+    groups, refused, not_tool_judged, without_knowledge, calibration, variants = practised(org, repo, cases)
     skills: dict[str, Any] = {}
     for skill_id in sorted(set(org.skills) | set(groups)):
         know = knowledge(org, skill_id, repo)
@@ -306,7 +319,7 @@ def compute(org: Organization, repo: Path) -> dict[str, Any]:
     totals = {lvl.value: sum(1 for s in skills.values() if s["level"] == lvl.value) for lvl in Level}
     return {"format": FORMAT, "totals": totals, "skills": skills,
             "refused_records": refused, "not_tool_judged": not_tool_judged, "without_knowledge": without_knowledge,
-            "calibration": calibration,
+            "calibration": calibration, "variants": variants,
             "proven": "No skill is Proven: no product seat run record of delivered work exists yet."}
 
 
