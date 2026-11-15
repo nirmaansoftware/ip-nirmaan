@@ -274,6 +274,42 @@
         }
       ]
     },
+    "functional_coverage": {
+      "knowledge": {
+        "check_record": null,
+        "counts": false,
+        "knowledge_document": "knowledge/verification/functional_coverage.md",
+        "problems": [
+          "no check record"
+        ]
+      },
+      "level": null,
+      "practised": []
+    },
+    "gate_level_simulation": {
+      "knowledge": {
+        "check_record": null,
+        "counts": false,
+        "knowledge_document": "knowledge/verification/gate_level_simulation.md",
+        "problems": [
+          "no check record"
+        ]
+      },
+      "level": null,
+      "practised": []
+    },
+    "hardware_fuzzing": {
+      "knowledge": {
+        "check_record": null,
+        "counts": false,
+        "knowledge_document": "knowledge/verification/hardware_fuzzing.md",
+        "problems": [
+          "no check record"
+        ]
+      },
+      "level": null,
+      "practised": []
+    },
     "model_checking": {
       "knowledge": {
         "check_record": "capability/records/knowledge/model_checking.json",
@@ -498,10 +534,22 @@
       },
       "level": "knowledge",
       "practised": []
+    },
+    "verification_planning": {
+      "knowledge": {
+        "check_record": null,
+        "counts": false,
+        "knowledge_document": "knowledge/verification/verification_planning.md",
+        "problems": [
+          "no check record"
+        ]
+      },
+      "level": null,
+      "practised": []
     }
   },
   "totals": {
-    "knowledge": 19,
+    "knowledge": 20,
     "practised": 3,
     "proven": 0
   },
