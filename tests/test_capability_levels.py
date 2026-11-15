@@ -69,19 +69,21 @@ def _record(org, repo: Path, outcomes: list[bool], *, name: str = "run1", case_i
             digest: str | None = None, judged: bool = True, knowledge: str = "on",
             trial_knowledge: str | None = None, harness_digest=CURRENT,
             answer_harness=CURRENT, blocked: frozenset[int] = frozenset(), cli: str | None = None,
-            skill: str = SKILL) -> Path:
+            skill: str = SKILL, variant: str = "default", trial_variant: str | None = None) -> Path:
     record = repo / "evals" / "results" / name
     record.mkdir(parents=True)
     manifest = EvalRunManifest(id=name, runtime="claude-code", model=MODEL, replay=replay, nirmaan_version="t",
                                started_at=AT, finished_at=AT, trials=len(outcomes), cases=(case_id,),
-                               seats=("rtl-implementation",), head_sha="0" * 40, knowledge=knowledge)
+                               seats=("rtl-implementation",), head_sha="0" * 40, knowledge=knowledge,
+                               harness_variant=variant)
+    trial_variant = trial_variant or variant
     (record / MANIFEST).write_text(manifest.model_dump_json(), encoding="utf-8")
     trial_knowledge = trial_knowledge or knowledge
     # As record_run writes it (M67): with knowledge off, the digest of the card alone.
     digest = digest or skill_digest(org, skill, repo, knowledge=trial_knowledge == "on")
     # M73: as record_run writes it, on the result and on every answer.
     if harness_digest is CURRENT:
-        harness_digest = harness_sha256(knowledge=trial_knowledge == "on", cli=cli)
+        harness_digest = harness_sha256(knowledge=trial_knowledge == "on", cli=cli, variant=trial_variant)
     if answer_harness is CURRENT:
         answer_harness = harness_digest
     for number, passed in enumerate(outcomes, start=1):
@@ -98,7 +100,8 @@ def _record(org, repo: Path, outcomes: list[bool], *, name: str = "run1", case_i
         runs = (JudgeRun(check="reference testbench", run=f"run-{number}", tool="simulator.run",
                          succeeded=passed),) if judged and not stopped else ()
         trial = EvalTrial(record=name, trial=number, stage="rtl-implementation", model=MODEL,
-                          skills={skill: digest}, knowledge=trial_knowledge, result=result, judge_runs=runs,
+                          skills={skill: digest}, knowledge=trial_knowledge, harness_variant=trial_variant,
+                          result=result, judge_runs=runs,
                           answers=(RecordedAnswer(mode="work", model=MODEL, prompt_sha256="p", packet_sha256="k",
                                                   harness=answer_harness),))
         path = trial_path(record, case_id, number)
@@ -283,6 +286,45 @@ def test_a_trial_on_a_tool_judged_case_with_no_judge_run_is_a_failure_whatever_i
     [group] = levels["skills"][SKILL]["practised"]
     assert (group["n"], group["passed"], group["unjudged"]) == (5, 0, 5) and not group["counts"]
     assert levels["skills"][SKILL]["level"] is None and not levels["not_tool_judged"]
+
+
+# --- Named harness variants (M74) ----------------------------------------------------------------
+
+
+def test_trials_on_a_harness_variant_never_count_and_are_listed_with_the_name(org, tmp_path):
+    _case(tmp_path)
+    _record(org, tmp_path, [True] * 5, name="variant", variant="attempts-3")
+    levels = compute(org, tmp_path)
+    assert SKILL not in levels["skills"] and levels["totals"]["practised"] == 0
+    listed = levels["variants"]
+    assert [(t["record"], t["trial"], t["passed"]) for t in listed] == [("evals/results/variant", n, True)
+                                                                         for n in range(1, 6)]
+    assert all("labelled in the run manifest (attempts-3) and the trial (attempts-3)" in t["reason"]
+               and "never counts toward a level" in t["reason"] for t in listed)
+    # Beside a record that counts, the variant adds nothing and takes nothing away.
+    _record(org, tmp_path, [True] * 5, name="run1")
+    [group] = _level(org, tmp_path)["practised"]
+    assert group["counts"] and group["n"] == 5 and group["records"] == ["evals/results/run1"]
+
+
+@pytest.mark.parametrize("manifest, trial, where", [("default", "attempts-3", "the trial (attempts-3)"),
+                                                    ("attempts-3", "default", "the run manifest (attempts-3)")])
+def test_one_variant_label_edited_back_to_default_never_relabels_a_variant_trial(org, tmp_path, manifest, trial,
+                                                                                where):
+    _case(tmp_path)
+    _record(org, tmp_path, [True] * 5, name="variant", variant=manifest, trial_variant=trial)
+    levels = compute(org, tmp_path)
+    assert SKILL not in levels["skills"] and len(levels["variants"]) == 5
+    assert all(f"labelled in {where})" in t["reason"] for t in levels["variants"])
+
+
+def test_both_variant_labels_edited_leave_the_trials_stale(org, tmp_path):
+    # The harness on the trials is the variant's, so relabelling them default never makes them count.
+    _case(tmp_path)
+    _record(org, tmp_path, [True] * 5, name="variant", variant="default",
+            harness_digest=harness_sha256(variant="attempts-3"))
+    [group] = _level(org, tmp_path)["practised"]
+    assert not group["counts"] and "stale: the harness changed after these trials (docs/HARNESS.md)" in group["reasons"]
 
 
 # --- Without knowledge (M67) -------------------------------------------------------------------
