@@ -1,0 +1,74 @@
+{
+  "format": "nirmaan.knowledge-check",
+  "skill": "gate_level_simulation",
+  "knowledge_document": "knowledge/verification/gate_level_simulation.md",
+  "document_sha256": "sha256:0ad761fe4606f6f51e81c718db4e81a6637b5d6e5255b22d583a60fee46e6fc9",
+  "writer": "IP-W2-K4 session (wave 2 knowledge batch, plan row W2-K4, 2026-11-15; fixed in ip#293)",
+  "checker": "IP-W2-C4C session (wave 2 recheck of the W2-C4B send-back after ip#293, 2026-11-15)",
+  "sources_read": [
+    "[OTDV] lowRISC, OpenTitan Design Verification Methodology (Apache 2.0): the whole page, 460 lines of saved text, read to the last line, https://opentitan.org/book/doc/contributing/dv/methodology/index.html",
+    "[OTPlan] lowRISC, OpenTitan DVSIM testplanner tool (Apache 2.0): the whole page, 200 lines, https://opentitan.org/book/util/dvsim/doc/testplanner.html",
+    "[VLang] Verilator manual, Input Languages, version 5.054 text: the whole page, 370 lines of saved text, read to the last line (Unknown States, Tri/Inout, Gate Primitives, Specify blocks, Time, and the keyword table), https://verilator.org/guide/latest/languages.html",
+    "[VArg] Verilator manual, verilator Arguments, version 5.054 text: the whole page, all 2027 lines, read to the closing -y entry and the page footer (the --x-assign, --x-initial and --x-initial-edge entries at lines 1926-1993 are the cited ones), https://verilator.org/guide/latest/exe_verilator.html",
+    "[YCell] Yosys manual, Mapping to cell libraries (0.71-dev text): the whole page, 259 lines, https://yosyshq.readthedocs.io/projects/yosys/en/latest/using_yosys/synthesis/cell_libs.html",
+    "[YWV] Yosys manual, Writing output files (command reference for backends): the whole page, 1194 lines, with write_verilog at lines 1008-1091, https://yosyshq.readthedocs.io/projects/yosys/en/latest/cmd/index_backends.html",
+    "Repository code at the lines cited in gate_claims (worktree at origin/main 6b33cea, after ip#293), and runs on this machine: tests/test_nirmaan_physical.py (real Yosys liberty-mapped synthesis tests pass; the six OpenROAD and KLayout tests skip, not on PATH) and the vplan and coverage tests"
+  ],
+  "checked_at": "2026-11-15",
+  "result": "pass. The two send-back items are fixed: the header says the gate lines cited describe tools and nothing was run, and one gate line is cited, so there is no contradiction; the document now states both conflicting [VLang] statements on three-state and MOS primitives and treats such a netlist as unchecked. Every source-tagged claim was found in its source, and every sentence about a repository tool matches the code.",
+  "notes": [
+    "Send-back item 1 (no gate line cited, yet the header said so): the body now cites physical.py:4-6 and tools.py:177-182 for synth.run mapping to a Liberty library that sta.run and pnr.run also take, and the header words ('the gate lines cited below describe the tools it relies on, and nothing here has been run') are true. Both gate lines match: physical.py:5-6 says the yosys-liberty backend serves synth.run and writes the gate-level netlist.v that STA and place-and-route consume; tools.py:177-182 defines synth.run with the PDK liberty parameter, and sta.run and pnr.run take liberty as a required parameter (tools.py:78, 189, 199). tests/test_nirmaan_physical.py::test_real_liberty_mapped_synthesis_writes_the_netlist passes with real Yosys.",
+    "Send-back item 2 (one of two conflicting statements): the page's Tri/Inout section reads 'Pullup, pulldown, bufif0, bufif1, notif0, notif1, pmos, nmos, tri0 and tri1 are also supported', and its Gate Primitives section reads 'The 3-state and MOS gate primitives are not supported'. The document reports both and does not pick one, as it should; 'listed them as unsupported' is the Gate Primitives wording and 'describes support for bufif, pmos and nmos' is the Tri/Inout wording.",
+    "[VLang]: 'mostly a two-state simulator'; === and !== converted to ==/!= when neither side is constant; assigning X gives a constant chosen by --x-assign; setting all variables to one at startup finds the most problems 'since control signals are typically active-high'; the two-state gate primitives (and, buf, nand, nor, not, or, xnor, xor) converted to behavioural equivalents; 'All specify blocks and timing checks are ignored. All min:typ:max delays use the typical value'. All as the document says.",
+    "[VArg] imprecision, no change needed to the Knowledge reading: the document says Verilator 'substitutes constants for explicit X values and random constants for initial values, controlled by --x-assign and --x-initial'. On the Arguments page --x-assign defaults to fast (whatever is best for performance, not random), and unique gives a runtime-chosen constant; --x-initial defaults to unique (random) and may be 0 or fast. The document's wording fits the defaults for --x-initial and the unique option for --x-assign; a reader should check the option values used. The repository's own simulation call (eda.py:444) passes neither option, so a repository run uses the defaults.",
+    "[OTDV] X-Propagation section: standard RTL simulation ignores the uncertainty of X-valued control signals; gate simulation can detect the problems; Xprop in RTL simulation finds them without gate simulation; optimistic mode 'closer to actual hardware behavior', pessimistic 'more pessimistic than a standard gate-sim'; OpenTitan chooses pessimistic 'as we want to avoid using X value in the condition'. All as the document says. [OTPlan]: tags example 'Run this testpoint in gate level and with power aware. tags: [\"gls\", \"pa\"]', as the document says.",
+    "[YCell]: the page's flow maps with dfflibmap -liberty and abc -liberty and ends with write_verilog so the file 'can then be loaded into another tool'. [YWV]: -noexpr ('without this option all internal cells are converted to Verilog expressions'), -siminit ('add initial statements with hierarchical refs to initialize FFs when in -noexpr mode'), -norename ('without this option all internal object names ... are changed to short names'). All as the document says. The repository's own synthesis script runs dfflibmap and abc with the Liberty and ends with write_verilog -noattr -noexpr -nohex -nodec (physical.py:170-176), so the repository's netlist keeps internal cells as cells.",
+    "Sources rule: all six sources are open pages read in full; no paid or unauthorised source."
+  ],
+  "gate_claims": [
+    {
+      "claim": "this skill holds no tool of its own; nothing here has been run",
+      "evidence": "unverified"
+    },
+    {
+      "claim": "synth.run maps to a Liberty library, which sta.run and pnr.run also take [lines 4-6]",
+      "evidence": "src/nirmaan/integrations/physical.py:4"
+    },
+    {
+      "claim": "synth.run maps to a Liberty library, which sta.run and pnr.run also take [lines 177-182]",
+      "evidence": "src/nirmaan/company/tools.py:177"
+    },
+    {
+      "claim": "synth.run maps to a Liberty library, which sta.run and pnr.run also take",
+      "evidence": "tests/test_nirmaan_physical.py::test_real_liberty_mapped_synthesis_writes_the_netlist"
+    },
+    {
+      "claim": "synthesis in Yosys ends with write_verilog after dfflibmap and abc with a Liberty file [lines 170-176]",
+      "evidence": "src/nirmaan/integrations/physical.py:170"
+    },
+    {
+      "claim": "write_verilog -noexpr is used by the repository's synthesis script; the meanings of the default, -noexpr, -siminit and -norename are Yosys behaviour read in [YWV], not a repository gate",
+      "evidence": "src/nirmaan/integrations/physical.py:176"
+    },
+    {
+      "claim": "write_verilog option meanings (default expressions, -siminit initial statements, -norename short names)",
+      "evidence": "unverified"
+    },
+    {
+      "claim": "OpenTitan's testplan lets an entry carry a gls tag",
+      "evidence": "unverified"
+    },
+    {
+      "claim": "Verilator --x-assign and --x-initial control X and initial values",
+      "evidence": "unverified"
+    },
+    {
+      "claim": "Verilator converts the two-state gate primitives, treats three-state and MOS primitives inconsistently, ignores specify blocks and timing checks and uses the typical delay",
+      "evidence": "unverified"
+    },
+    {
+      "claim": "the repository's Verilator simulation passes neither --x-assign nor --x-initial [lines 442-446]",
+      "evidence": "src/nirmaan/integrations/eda.py:442"
+    }
+  ]
+}
