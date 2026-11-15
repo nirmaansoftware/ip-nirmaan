@@ -2,22 +2,71 @@
   "format": "nirmaan.knowledge-check",
   "skill": "pipeline_design",
   "knowledge_document": "knowledge/design/pipeline_design.md",
-  "document_sha256": "sha256:2c56048ff7329e5016b5e6b79fe5333d4d1b807fdfad3eea3cce1448fe323f47",
-  "writer": "IP-P3-K2 session (P3 pilot, item K2, 2026-11-03)",
-  "checker": "IP-P3-C2 session (P3 pilot, item C2)",
+  "document_sha256": "sha256:836eadfd65fea0082e5186d9bf68e8962f778542b9322ddbe925b3ebef0f6536",
+  "writer": "IP-P3-K2 session (P3 pilot, item K2, 2026-11-03); corrected by the RETRO-A2B session (ip#242, 2026-11-15)",
+  "checker": "RETRO-A4B session (retrospective action A4, recheck of ip#242, 2026-11-15)",
   "sources_read": [
     "[Skid] Gisselquist, Building a Skid Buffer for AXI processing, ZipCPU blog, 2019: the whole article with its properties and SymbiYosys script, https://zipcpu.com/blog/2019/05/22/skidbuffer.html",
     "[Pipe] Gisselquist, Strategies for pipelining logic, ZipCPU blog, 2017: the whole article, https://zipcpu.com/blog/2017/08/14/strategies-for-pipelining.html",
     "[LaF] LaForest, Pipeline Skid Buffer, FPGA Design Elements (MIT): the whole page, https://fpgacpu.ca/fpga/Pipeline_Skid_Buffer.html",
-    "[Rules] Gisselquist, AXI Handshaking Rules, ZipCPU blog, 2021: the whole article, https://zipcpu.com/blog/2021/08/28/axi-rules.html"
+    "[Rules] Gisselquist, AXI Handshaking Rules, ZipCPU blog, 2021: the whole article, https://zipcpu.com/blog/2021/08/28/axi-rules.html",
+    "Repository code, docs/FORMAL_GATE.md section 3 and tests at the lines and ids cited in gate_claims"
   ],
-  "result": "every claim tagged with a source was found in that source, and every line marked inference is a fair reading of the source it names or the document's own reasoning",
+  "result": "every claim tagged with a source was found in that source, every line marked inference is a fair reading of the source it names or the document's own reasoning, and every sentence about the platform's formal and cover gates matches the gate code at the lines cited in gate_claims",
   "notes": [
     "The handshake rules (valid raised without waiting for ready to avoid deadlock, ready idling not busy, payload held until the clock after the transfer, data a don't care while valid is low, valid reset to 0) are rules 3 to 7 of the simple handshake in [Pipe]; [Rules] gives valid cleared after reset and the stalled-beat hold.",
     "Neither clock-enable style can stall: [Pipe] says the traveling CE cannot handle stalls and offers no stall for the global CE, which runs at a fixed rate.",
     "Upstream ready as the inverse of the buffer valid bit is the o_ready = !r_valid equivalence in [Skid]; the five moves and the two registered outputs from the next state are in [LaF].",
     "The buffered pipeline (a stall moves back one stage per clock, data bunching like an accordion, at least double the logic) is the buffered handshake section of [Pipe].",
-    "The four properties are [Skid] rules 1 to 4 with its reset assumption and assertion; each parameter combination is its own SymbiYosys task, proved at depth 3, with a cover that drops ready twice, counts data and ends idle."
+    "Cover depth (the recheck failure): [Skid] proves at depth 3 and covers at depth 20 in one [tasks] script, found in its SymbiYosys section. The gate refuses [tasks], so the document tells the author to prove one default-parameter setup and not to take the proof's depth for the cover, and says the gate writes the cover copy with only the mode swapped, so the proof's depth carries over. The code agrees: the cover copy drops the original mode line and adds mode cover, and the test shows depth 12 in both. The document's wording that the copy changes only the mode leaves out that [files] entries are also renamed by absolute path and the RTL is read as copies with a derived antecedent cover per assertion (eda.py:703-707, 733-737); the cover check refuses a setup whose antecedents cannot be derived and fails when a cover or antecedent is never reached (eda_parsers.py:402-409). Neither changes the depth guidance, which the document marks inference where the source gives no minimum.",
+    "Citation precision: the document cites eda.py:726-731 for the mode swap and the docstring at 704-706 for the same-depth statement. The swap is at 727-732 and the statement at 705-707 (depth on 706), so each range holds the cited text and is off by one line at an edge; not a failure.",
+    "The four parameter combinations and cover in [Skid] are run in the source as tasks of one script; the document's advice to check the other parameter points in simulation is the document's own and has no gate behind it."
   ],
-  "checked_at": "2026-11-13"
+  "checked_at": "2026-11-15",
+  "gate_claims": [
+    {
+      "claim": "the proof gate takes one .sby with no [tasks]; a setup with [tasks] is refused and nothing runs",
+      "evidence": "src/nirmaan/integrations/eda.py:644"
+    },
+    {
+      "claim": "a task per parameter combination is therefore refused by formal.run (the check combines the [tasks] refusal and the reads check)",
+      "evidence": "src/nirmaan/integrations/eda.py:652"
+    },
+    {
+      "claim": "a multi-task setup is refused with a reason and nothing ran",
+      "evidence": "tests/test_nirmaan_gate_integrity.py::test_a_multi_task_setup_is_refused_with_a_reason"
+    },
+    {
+      "claim": "docs/FORMAL_GATE.md section 3 states that a setup with [tasks] is refused",
+      "evidence": "docs/FORMAL_GATE.md:164"
+    },
+    {
+      "claim": "the gate runs the cover from a copy of the same .sby with mode cover swapped in",
+      "evidence": "src/nirmaan/integrations/eda.py:705"
+    },
+    {
+      "claim": "the cover copy drops the proof's mode line and adds mode cover under [options]",
+      "evidence": "src/nirmaan/integrations/eda.py:729"
+    },
+    {
+      "claim": "the cover therefore runs at the proof's depth and script (depth 12 in both)",
+      "evidence": "tests/test_nirmaan_gates_everywhere.py::test_the_cover_run_uses_the_seats_own_setup_and_writes_nothing_beside_it"
+    },
+    {
+      "claim": "a cover that is not reached fails the cover run, so a depth too small for the trace fails it",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:402"
+    },
+    {
+      "claim": "the cover check also refuses a setup with [tasks]",
+      "evidence": "src/nirmaan/integrations/eda.py:750"
+    },
+    {
+      "claim": "the cover run is the separate tool formal.cover, backed by the symbiyosys-cover backend",
+      "evidence": "src/nirmaan/integrations/eda.py:815"
+    },
+    {
+      "claim": "the document's [Gate] line cites _sby_tasks and _sby_check at L644-L655 and _sby_cover_check at L743",
+      "evidence": "src/nirmaan/integrations/eda.py:743"
+    }
+  ]
 }

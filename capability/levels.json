@@ -211,13 +211,11 @@
     "pipeline_design": {
       "knowledge": {
         "check_record": "capability/records/knowledge/pipeline_design.json",
-        "counts": false,
+        "counts": true,
         "knowledge_document": "knowledge/design/pipeline_design.md",
-        "problems": [
-          "stale: the document changed after its check"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": [
         {
           "cases": [
@@ -336,7 +334,7 @@
     }
   },
   "totals": {
-    "knowledge": 10,
+    "knowledge": 11,
     "practised": 0,
     "proven": 0
   },
