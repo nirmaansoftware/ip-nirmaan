@@ -657,14 +657,12 @@
     },
     "uvm": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/uvm.json",
+        "counts": true,
         "knowledge_document": "knowledge/verification/uvm.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     },
     "verification_architecture": {
@@ -701,19 +699,17 @@
     },
     "vip_integration": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/vip_integration.json",
+        "counts": true,
         "knowledge_document": "knowledge/verification/vip_integration.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     }
   },
   "totals": {
-    "knowledge": 35,
+    "knowledge": 37,
     "practised": 0,
     "proven": 0
   },
