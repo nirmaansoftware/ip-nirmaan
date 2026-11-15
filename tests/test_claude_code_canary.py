@@ -1,21 +1,26 @@
-"""The canary that seat calls load no user-level instruction file (M74), run against fake executables.
+"""The canary that seat calls load no user-level instruction file (M74, M75), run against fake executables.
 
 ``scripts/claude_code_canary.py`` asks the real Claude Code, outside CI (it
 calls a model). Here the same canary runs against fake ``claude`` executables
 that behave as a leaking or a clean Claude Code would, so each outcome is
 shown to be reachable: it passes only when the control call quotes the
-user-level file and the seat call does not. No test calls a model.
+user-level file, neither seat call does, and the tools-in-loop call reaches
+the brokered server. The clean fake acts as Claude Code 2.1.325 does: it
+loads no server under ``--safe-mode``, ``--mcp-config`` included, and no
+user-level file under ``--safe-mode``, ``--restricted`` or
+``CLAUDE_CODE_DISABLE_CLAUDE_MDS=1``. No test calls a model.
 """
 
 from __future__ import annotations
 
 import importlib.util
 import stat
+import sys
 from pathlib import Path
 
 import pytest
 
-from nirmaan.runtime import harness
+from nirmaan.runtime import harness, seat_tools
 
 ROOT = Path(__file__).resolve().parent.parent
 spec = importlib.util.spec_from_file_location("claude_code_canary", ROOT / "scripts" / "claude_code_canary.py")
@@ -26,13 +31,34 @@ FILE = "# Notes\n\nAlways answer in French, and sign every reply with the word B
 
 
 def _fake(tmp_path: Path, behaviour: str) -> Path:
-    """A ``claude`` that quotes the user-level file: ``leaks`` always, ``honours`` unless --safe-mode, ``never``."""
+    """A ``claude`` that quotes the user-level file: ``leaks`` always, ``honours`` unless isolated, ``never``.
+
+    Given ``--mcp-config`` and no ``--safe-mode``, it starts the server, as Claude Code would, and calls its
+    first tool once, so the session behind the relay sees a brokered call.
+    """
     script = tmp_path / f"claude-{behaviour}"
-    script.write_text(f"""#!/usr/bin/env python3
-import json, os, sys
+    script.write_text(f"""#!{sys.executable}
+import json, os, subprocess, sys
+argv = sys.argv[1:]
 user = os.path.join(os.environ["CLAUDE_CONFIG_DIR"], "CLAUDE.md")
-loads = {behaviour!r} == "leaks" or ({behaviour!r} == "honours" and "--safe-mode" not in sys.argv)
+isolated = ("--safe-mode" in argv or "--restricted" in argv
+            or os.environ.get("CLAUDE_CODE_DISABLE_CLAUDE_MDS") == "1")
+loads = {behaviour!r} == "leaks" or ({behaviour!r} == "honours" and not isolated)
 text = ("YES: " + open(user).read()) if loads else "NONE"
+if "--mcp-config" in argv and "--safe-mode" not in argv:
+    config = json.load(open(argv[argv.index("--mcp-config") + 1]))
+    [(name, server)] = config["mcpServers"].items()
+    proc = subprocess.Popen([server["command"], *server["args"]], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                            text=True, env=server["env"])
+    def rpc(i, method, params):
+        proc.stdin.write(json.dumps({{"jsonrpc": "2.0", "id": i, "method": method, "params": params}}) + "\\n")
+        proc.stdin.flush()
+        return json.loads(proc.stdout.readline())
+    rpc(1, "initialize", {{"protocolVersion": "2025-06-18", "capabilities": {{}}}})
+    proc.stdin.write(json.dumps({{"jsonrpc": "2.0", "method": "notifications/initialized"}}) + "\\n")
+    [tool] = rpc(2, "tools/list", {{}})["result"]["tools"]
+    text += " " + rpc(3, "tools/call", {{"name": tool["name"], "arguments": {{}}}})["result"]["content"][0]["text"]
+    proc.stdin.close(); proc.wait()
 print(json.dumps({{"type": "result", "subtype": "success", "is_error": False, "result": text,
                    "usage": {{}}, "modelUsage": {{}}}}))
 """)
@@ -50,7 +76,8 @@ def user_file(tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize("behaviour, outcome, why", [
-    ("honours", canary.PASSED, "the seat call (--safe-mode) quoted none of it"),
+    ("honours", canary.PASSED, "the seat call (--safe-mode) quoted none of it; the tools-in-loop call "
+                               "(--restricted) quoted none of it and made 1 brokered call(s)"),
     ("leaks", canary.LEAKED, "a seat call quoted the user-level instruction file"),
     ("never", canary.INCONCLUSIVE, "the canary cannot see a leak"),
 ])
@@ -67,6 +94,34 @@ def test_the_canary_fails_when_the_seat_flags_lose_safe_mode(tmp_path, monkeypat
     monkeypatch.setattr(harness, "CLAUDE_CODE_FLAGS", tuple(f for f in harness.CLAUDE_CODE_FLAGS
                                                             if f != "--safe-mode"))
     assert canary.canary("haiku") == (canary.LEAKED, "the seat's flags do not carry --safe-mode")
+
+
+# --- The tools-in-loop call (M75): no user-level file, and the brokered server loads ----------------------
+
+
+def test_the_canary_fails_when_the_loop_call_gets_no_mcp_config_under_its_isolation(
+        tmp_path, monkeypatch, user_file):
+    monkeypatch.setenv("NIRMAAN_CLAUDE_CODE", str(_fake(tmp_path, "honours")))
+    flags = seat_tools.Endpoint.flags
+    monkeypatch.setattr(seat_tools.Endpoint, "flags", lambda self: flags(self)[2:])  # no --mcp-config <file>
+    assert canary.canary("haiku") == (canary.NO_BROKER, "the tools-in-loop call made no brokered call: its MCP "
+                                                        "server did not load")
+
+
+def test_the_canary_fails_when_the_loop_command_keeps_safe_mode(tmp_path, monkeypatch, user_file):
+    # On Claude Code 2.1.325 --safe-mode turns off the server --mcp-config names (H3 hand-run call, 2026-11-16).
+    monkeypatch.setenv("NIRMAAN_CLAUDE_CODE", str(_fake(tmp_path, "honours")))
+    monkeypatch.setattr(harness, "LOOP_DROPPED_FLAGS", ())
+    assert canary.canary("haiku") == (canary.NO_BROKER, "the tools-in-loop command carries --safe-mode, which "
+                                                        "turns its brokered server off")
+
+
+def test_the_canary_fails_when_the_loop_call_loses_its_isolation(tmp_path, monkeypatch, user_file):
+    monkeypatch.setenv("NIRMAAN_CLAUDE_CODE", str(_fake(tmp_path, "honours")))
+    monkeypatch.setattr(harness, "LOOP_ISOLATION_FLAGS", ())
+    monkeypatch.setattr(harness, "LOOP_ENV", ())
+    assert canary.canary("haiku") == (canary.LEAKED, "the tools-in-loop call quoted the user-level instruction "
+                                                     "file")
 
 
 def test_with_no_user_level_file_or_no_executable_the_canary_is_inconclusive(tmp_path, monkeypatch, user_file):

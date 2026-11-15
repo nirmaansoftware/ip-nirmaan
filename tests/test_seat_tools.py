@@ -23,7 +23,7 @@ from nirmaan.models import EvidenceKind, SeatToolCall
 from nirmaan.runtime import ModelRuntime, harness
 from nirmaan.runtime.claude_code import ClaudeCodeLLM
 from nirmaan.runtime.harness import fingerprint, harness_sha256
-from nirmaan.runtime.seat_tools import RELAY, screen
+from nirmaan.runtime.seat_tools import RELAY, loop_command, screen
 from nirmaan.work.policy import satisfies
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -406,7 +406,7 @@ def _fake_claude(tmp_path: Path, calls: list, sleep: float = 0) -> tuple[Path, P
     record = tmp_path / "call.json"
     script = tmp_path / "claude"
     script.write_text(f"""#!{sys.executable}
-import json, subprocess, sys, time
+import json, os, subprocess, sys, time
 argv = sys.argv[1:]
 config = json.load(open(argv[argv.index("--mcp-config") + 1]))
 [(name, server)] = config["mcpServers"].items()
@@ -416,7 +416,8 @@ def rpc(i, method, params):
     proc.stdin.write(json.dumps({{"jsonrpc": "2.0", "id": i, "method": method, "params": params}}) + "\\n")
     proc.stdin.flush()
     return json.loads(proc.stdout.readline())
-out = {{"argv": argv, "stdin": sys.stdin.read(), "server": name}}
+out = {{"argv": argv, "stdin": sys.stdin.read(), "server": name,
+       "no_claude_mds": os.environ.get("CLAUDE_CODE_DISABLE_CLAUDE_MDS")}}
 out["init"] = rpc(1, "initialize", {{"protocolVersion": "2025-06-18", "capabilities": {{}}}})
 proc.stdin.write(json.dumps({{"jsonrpc": "2.0", "method": "notifications/initialized"}}) + "\\n")
 out["list"] = rpc(2, "tools/list", {{}})
@@ -440,7 +441,9 @@ def test_through_claude_code_only_the_brokered_server_and_its_tools_are_loaded(n
     call = json.loads(record.read_text())
     argv = call["argv"]
     assert argv[argv.index("--tools") + 1] == ""  # no built-in tool: no shell, file or web tool
-    assert "--strict-mcp-config" in argv and "--safe-mode" in argv and call["server"] == harness.LOOP_SERVER
+    assert "--strict-mcp-config" in argv and call["server"] == harness.LOOP_SERVER
+    # --safe-mode would turn the server off (CLI 2.1.325); --restricted and the variable keep user files out.
+    assert "--safe-mode" not in argv and "--restricted" in argv and call["no_claude_mds"] == "1"
     assert argv[argv.index("--permission-mode") + 1] == "dontAsk"
     allowed = argv[argv.index("--allowedTools") + 1].split(",")
     assert allowed == [f"mcp__{harness.LOOP_SERVER}__{n}" for n in ("lint_run", "simulator_run", "formal_run",
@@ -453,6 +456,16 @@ def test_through_claude_code_only_the_brokered_server_and_its_tools_are_loaded(n
     assert [(c.tool, c.succeeded) for c in result.tool_calls] == [("lint_run", True), ("Bash", None)]
     assert [r.tool for r in engine.state.tool_runs.values() if r.advisory] == ["lint.run"]
     assert harness.LOOP_SYSTEM.splitlines()[0] in argv[argv.index("--system-prompt") + 1]
+
+
+def test_the_loop_command_swaps_safe_mode_for_restricted_and_keeps_every_other_seat_flag():
+    seat = ["claude", "-p", *harness.CLAUDE_CODE_FLAGS, "--model", "haiku", "--system-prompt", "--safe-mode"]
+    argv, env = loop_command(seat, {"HOME": "/h"})
+    assert argv == ["claude", "-p", "--output-format", "json", "--tools", "", "--no-session-persistence",
+                    "--strict-mcp-config", "--model", "haiku", "--system-prompt", "--safe-mode", "--restricted"]
+    assert env == {"HOME": "/h", "CLAUDE_CODE_DISABLE_CLAUDE_MDS": "1"}
+    assert "--bare" not in argv  # --bare never reads the plan login
+    assert "--safe-mode" in harness.CLAUDE_CODE_FLAGS  # the default and attempts-3 keep it
 
 
 def test_through_claude_code_a_seat_past_the_time_cap_is_stopped_and_the_attempt_fails(

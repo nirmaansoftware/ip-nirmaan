@@ -220,6 +220,17 @@ LOOP_SERVER = "nirmaan-broker"
 #: Claude Code flags beside the seat's own (``CLAUDE_CODE_FLAGS``, ``--tools ""`` among them, so no built-in
 #: tool): only the allowed brokered tools run, and anything else that would ask for permission is refused.
 LOOP_FLAGS = ("--permission-mode", "dontAsk")
+#: Seat flags (``CLAUDE_CODE_FLAGS``) the variant drops: on Claude Code 2.1.325 ``--safe-mode`` turns every MCP
+#: server off, the one ``--mcp-config`` names included, so a seat under it never reaches the broker (H3 hand-run
+#: call, 2026-11-16: 0 brokered calls with it, 1 without). The default and ``attempts-3`` keep it.
+LOOP_DROPPED_FLAGS = ("--safe-mode",)
+#: What keeps the user-level files out of the variant's call in its place. ``--restricted`` loads only managed
+#: settings and ``--settings``: no user, project or local settings file, so no hook, plugin, skill or permission
+#: rule of the person's own. ``CLAUDE_CODE_DISABLE_CLAUDE_MDS=1`` loads no CLAUDE.md memory file (user, project
+#: or auto memory). ``--mcp-config`` still loads, with ``--strict-mcp-config`` the only server
+#: (scripts/claude_code_canary.py checks both live). Never ``--bare``: it never reads the plan login.
+LOOP_ISOLATION_FLAGS = ("--restricted",)
+LOOP_ENV = (("CLAUDE_CODE_DISABLE_CLAUDE_MDS", "1"),)
 #: Appended to the work system prompt in the variant: ``FILE_FORMAT`` says the seat cannot run checks itself.
 LOOP_SYSTEM = """\
 In this run you may call the tools you are given before you answer. Each runs one of the checks the
@@ -231,7 +242,8 @@ fails. You have no other tool: no shell, no file access, no network. Then answer
 
 #: Every loop setting, by name: in the variant's fingerprint only.
 LOOP_SETTINGS = ("LOOP_MAX_CALLS", "LOOP_SECONDS", "LOOP_CALL_SECONDS", "LOOP_MAX_FILES",
-                 "LOOP_MAX_CHARS", "LOOP_SUFFIXES", "LOOP_SERVER", "LOOP_FLAGS", "LOOP_SYSTEM")
+                 "LOOP_MAX_CHARS", "LOOP_SUFFIXES", "LOOP_SERVER", "LOOP_FLAGS", "LOOP_DROPPED_FLAGS",
+                 "LOOP_ISOLATION_FLAGS", "LOOP_ENV", "LOOP_SYSTEM")
 #: The brokered server's code, relative to ``SOURCE_ROOT``: the session, its screen and its socket (broker
 #: side), and the stdio relay Claude Code starts. In the variant's fingerprint only.
 LOOP_CODE = (

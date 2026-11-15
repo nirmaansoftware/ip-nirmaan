@@ -1,6 +1,6 @@
-"""Canary: a seat call through Claude Code loads no user-level instruction file (M74).
+"""Canary: a seat call through Claude Code loads no user-level instruction file (M74, M75).
 
-    python scripts/claude_code_canary.py                  # two short calls on haiku
+    python scripts/claude_code_canary.py                  # three short calls on haiku
     python scripts/claude_code_canary.py --model <model>
 
 Council record 2026-11-14 (pilot retrospective), decision 4. The claude-code
@@ -11,17 +11,24 @@ harness flag ``--safe-mode`` keeps it out. This asks the real Claude Code:
 
 * a control call, the seat's flags minus ``--safe-mode``: it must quote the
   user-level file, which shows the canary can see a leak;
-* a call with the seat's own flags: it must quote nothing of the file.
+* a call with the seat's own flags: it must quote nothing of the file;
+* a call as the ``tools-in-loop`` variant makes it (M75), with a one-tool
+  brokered server: it must quote nothing of the file and call the tool at
+  least once. On Claude Code 2.1.325 ``--safe-mode`` also turns that server
+  off, so the variant swaps it for ``--restricted`` and
+  ``CLAUDE_CODE_DISABLE_CLAUDE_MDS=1`` (``seat_tools.loop_command``); this
+  call shows both that the file stays out and that the server still loads.
 
-Both go through the runtime's own ``ClaudeCodeLLM``, so the call is the seat's
+All go through the runtime's own ``ClaudeCodeLLM``, so the call is the seat's
 (empty working directory, credentials cleared). Which files Claude Code loads
 does not depend on the model, so a small one is enough. Run it after a Claude
 Code update and before a batch. It is not run in CI, which calls no model;
 ``tests/test_claude_code_canary.py`` runs it against fake executables.
 
-Exit 0: the control quoted the file and the seat call did not. Exit 1: the
-seat call quoted it. Exit 2: inconclusive (no executable, no user-level file,
-a call failed, or the control quoted nothing).
+Exit 0: the control quoted the file and neither seat call did, and the loop
+call reached the broker. Exit 1: a seat call quoted it. Exit 2: inconclusive
+(no executable, no user-level file, a call failed, or the control quoted
+nothing). Exit 3: the loop call made no brokered call.
 """
 
 from __future__ import annotations
@@ -29,6 +36,7 @@ from __future__ import annotations
 import argparse
 import os
 import re
+import secrets
 import sys
 from pathlib import Path
 
@@ -38,6 +46,7 @@ sys.path.insert(0, str(ROOT / "src"))
 from nirmaan.runtime import harness  # noqa: E402
 from nirmaan.runtime.claude_code import ClaudeCodeLLM, find_claude  # noqa: E402
 from nirmaan.runtime.prompt import WorkPrompt  # noqa: E402
+from nirmaan.runtime.seat_tools import loop_command  # noqa: E402
 
 #: A run of this many words of the user-level file, word for word in an answer, is a leak.
 SHINGLE = 6
@@ -46,7 +55,30 @@ SYSTEM = "You answer one question about your own context. Answer in at most thre
 QUESTION = ("Look at every message and instruction in your context other than this question and the system prompt. "
             "If any of it is text from an instruction file (such as a CLAUDE.md), quote its first two sentences "
             "word for word. If there is none, answer exactly NONE.")
-PASSED, LEAKED, INCONCLUSIVE = 0, 1, 2
+LOOP_QUESTION = "First call the ping tool once. Then answer this: " + QUESTION
+PASSED, LEAKED, INCONCLUSIVE, NO_BROKER = 0, 1, 2, 3
+
+
+class Ping:
+    """A one-tool session for the loop call, served by the variant's own relay and socket; it runs nothing."""
+
+    def __init__(self) -> None:
+        self.calls = 0
+        self.word = "pong-" + secrets.token_hex(4)
+
+    def names(self) -> tuple[str, ...]:
+        return ("ping",)
+
+    def listing(self) -> list[dict]:
+        return [{"name": "ping", "description": "Returns a word.", "inputSchema": {"type": "object",
+                                                                                  "properties": {}}}]
+
+    def call(self, name: object, arguments: object) -> tuple[str, bool]:
+        self.calls += 1
+        return self.word, False
+
+    def expired(self) -> bool:
+        return False
 
 
 def user_instruction_file() -> Path:
@@ -77,10 +109,19 @@ def _ask(model: str, flags: tuple[str, ...]) -> tuple[str, str | None]:
     return done.text, done.error
 
 
+def _ask_loop(model: str) -> tuple[str, str | None, int]:
+    session = Ping()
+    done = ClaudeCodeLLM(model=model).complete(
+        WorkPrompt(mode="work", system=SYSTEM, task=LOOP_QUESTION, sections=(), citations=()), tools=session)
+    return done.text, done.error, session.calls
+
+
 def canary(model: str) -> tuple[int, str]:
     """The canary's outcome (``PASSED``, ``LEAKED`` or ``INCONCLUSIVE``) and why."""
     if SAFE not in harness.CLAUDE_CODE_FLAGS:
         return LEAKED, f"the seat's flags do not carry {SAFE}"
+    if SAFE in loop_command(["claude", "-p", *harness.CLAUDE_CODE_FLAGS], {})[0]:
+        return NO_BROKER, f"the tools-in-loop command carries {SAFE}, which turns its brokered server off"
     if not find_claude():
         return INCONCLUSIVE, "no Claude Code executable (set NIRMAAN_CLAUDE_CODE or put claude on PATH)"
     source = user_instruction_file()
@@ -97,7 +138,16 @@ def canary(model: str) -> tuple[int, str]:
         return INCONCLUSIVE, f"the seat call failed: {error}"
     if quotes(seat, text):
         return LEAKED, "a seat call quoted the user-level instruction file"
-    return PASSED, f"the control call quoted {source}; the seat call ({SAFE}) quoted none of it"
+    loop, error, calls = _ask_loop(model)
+    if error:
+        return INCONCLUSIVE, f"the tools-in-loop call failed: {error}"
+    if quotes(loop, text):
+        return LEAKED, "the tools-in-loop call quoted the user-level instruction file"
+    if not calls:
+        return NO_BROKER, "the tools-in-loop call made no brokered call: its MCP server did not load"
+    isolation = " ".join(harness.LOOP_ISOLATION_FLAGS)
+    return PASSED, (f"the control call quoted {source}; the seat call ({SAFE}) quoted none of it; the "
+                    f"tools-in-loop call ({isolation}) quoted none of it and made {calls} brokered call(s)")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -105,7 +155,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--model", default="haiku", help="The model both calls ask (default: haiku).")
     args = parser.parse_args(argv)
     code, why = canary(args.model)
-    print(f"{('passed', 'LEAKED', 'inconclusive')[code]}: {why}")
+    print(f"{('passed', 'LEAKED', 'inconclusive', 'NO BROKER')[code]}: {why}")
     return code
 
 
