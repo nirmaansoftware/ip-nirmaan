@@ -7,6 +7,7 @@ sources:
   - open | lowRISC, OpenTitan Design Verification Methodology (Apache 2.0) [OTDV] | https://opentitan.org/book/doc/contributing/dv/methodology/index.html
   - open | Verilator manual: Language reference, unknown states and random functions [VLang] | https://verilator.org/guide/latest/languages.html
   - open | Verilator manual: Simulating (Verilated-Model Runtime) [VSim] | https://verilator.org/guide/latest/simulating.html
+  - open | Verilator manual: Arguments (verilator executable) [VArg] | https://verilator.org/guide/latest/exe_verilator.html
   - open | Gisselquist, Building a Verilator test bench, ZipCPU blog, 2017 [ZVer] | https://zipcpu.com/blog/2017/06/21/looking-at-verilator.html
 licence_check: original writing that summarises and cites; no text, table, figure or code copied from any source
 export_screen: clear
@@ -62,7 +63,8 @@ line marked "gate" names the repository code that backs it. The card also lists
   so a failure can be replayed.
 - Verilator's `$urandom` and `$random` calls are described in the language
   chapter [VLang]; a SystemVerilog testbench with delays builds with
-  `--binary` and needs no C++ harness [VSim].
+  `--binary`, an alias for `--main --exe --build --timing` [VArg], so it needs
+  no hand-written C++ harness (inference from `--main`).
 
 ## What the simulation gate demands
 
@@ -123,7 +125,7 @@ line marked "gate" names the repository code that backs it. The card also lists
   every one should fail the gate. A mutant that passes names a missing check or
   a corner the generator does not reach (inference).
 - Count the corner events the run produced and compare with the plan. OpenTitan
-  closes the loop with coverage, then eases constraints where holes remain
-  [OTDV].
+  closes the loop with coverage [OTDV]. Adjusting constraints where holes remain
+  is this document's inference, not a claim of that source.
 - Change the seed and run again; a testbench that passes at one seed only is a
   testbench that was tuned to that seed (inference).

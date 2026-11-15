@@ -224,14 +224,12 @@
     },
     "equivalence_checking": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/equivalence_checking.json",
+        "counts": true,
         "knowledge_document": "knowledge/verification/equivalence_checking.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     },
     "formal_verification": {
@@ -472,14 +470,12 @@
     },
     "sva": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/sva.json",
+        "counts": true,
         "knowledge_document": "knowledge/verification/sva.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     },
     "synthesis_awareness": {
@@ -504,7 +500,7 @@
     }
   },
   "totals": {
-    "knowledge": 17,
+    "knowledge": 19,
     "practised": 3,
     "proven": 0
   },
