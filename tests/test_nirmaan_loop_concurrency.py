@@ -96,15 +96,43 @@ def ids(engine: TaskEngine) -> dict[str, str]:
     return {s: f"{engine.state.project.id}:fan-{s}" for s in "abcde"}
 
 
+def rendezvous_gate(expect: int, lock: threading.Lock, timeout: float = 60.0):
+    """Return ``arrive()``: the first ``expect`` callers block until all of them are in flight at once.
+
+    The peak overlap is then exact rather than a matter of thread scheduling on a busy runner. Later
+    callers pass straight through. A rendezvous that never completes fails loudly after ``timeout``.
+    """
+    state = {"arrived": 0}
+    everyone = threading.Event()
+
+    def arrive() -> None:
+        with lock:
+            if state["arrived"] >= expect:
+                return
+            state["arrived"] += 1
+            if state["arrived"] == expect:
+                everyone.set()
+        if not everyone.wait(timeout):
+            raise AssertionError(f"fewer than {expect} calls were in flight together within {timeout}s")
+
+    return arrive
+
+
 class Instrument:
-    """A model that takes a while, and records which task each call served and when."""
+    """A model that takes a while, and records which task each call served and when.
+
+    ``rendezvous`` makes the first that many calls wait until all are in flight together, so the peak
+    overlap the test reads is deterministic.
+    """
 
     name = "mock-llm"
 
-    def __init__(self, engine: TaskEngine, delay: float = 0.15, crash_on: str | None = None) -> None:
+    def __init__(self, engine: TaskEngine, delay: float = 0.15, crash_on: str | None = None,
+                 rendezvous: int = 0) -> None:
         self.engine, self.delay, self.crash_on = engine, delay, crash_on
         self.inner = MockLLM()
         self.lock = threading.Lock()
+        self.arrive = rendezvous_gate(rendezvous, self.lock) if rendezvous else (lambda: None)
         self.in_flight = self.most = self.answered = 0
         self.spans: list[tuple[str, str, float, float]] = []
 
@@ -119,6 +147,7 @@ class Instrument:
             self.most = max(self.most, self.in_flight)
         start = time.monotonic()
         try:
+            self.arrive()
             time.sleep(self.delay)
             if self.crash_on and task.endswith(self.crash_on) and prompt.mode == "review":
                 self.crash_on = None
@@ -178,7 +207,7 @@ def test_the_turns_interleave_tasks_in_plan_order(fan_org, fixed_clock):
 def test_independent_tasks_overlap_up_to_jobs_and_dependent_tasks_never_do(fan_org, fixed_clock, jobs, most):
     engine = plan(fan_org, fixed_clock)
     t = ids(engine)
-    llm = Instrument(engine)
+    llm = Instrument(engine, rendezvous=most)  # the first batch holds three independent tasks
     report = loop(engine, ModelRuntime(llm), ModelRuntime(llm), jobs=jobs)
     assert report.calls == 6 and llm.answered == 6
     assert llm.most == most
@@ -355,12 +384,14 @@ def test_a_new_runtime_on_a_new_workflow_runs_concurrently_with_no_core_changes(
 
     seen = {"in_flight": 0, "most": 0}
     lock = threading.Lock()
+    arrive = rendezvous_gate(3, lock)  # the first three independent tasks are in flight together
 
     def think() -> None:
         with outside_writer():  # the hook a runtime puts around work that touches no project state
             with lock:
                 seen["in_flight"] += 1
                 seen["most"] = max(seen["most"], seen["in_flight"])
+            arrive()
             time.sleep(0.1)
             with lock:
                 seen["in_flight"] -= 1
