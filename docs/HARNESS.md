@@ -193,12 +193,12 @@ in the same pull request.
     5); the named variants and the `variant` run option.
   - `runtime/harness.py`, `runtime/claude_code.py`: `--safe-mode` in
     `CLAUDE_CODE_FLAGS`. Cause: a seat call loaded the user-level
-    `~/.claude/CLAUDE.md`. Checked on Claude Code 2.1.325 with a short probe
-    that asked the model whether its context held a word only that file
-    has: without the flag it quoted the file, with `--safe-mode` or
-    `--setting-sources ""` it did not. `--safe-mode` is the flag whose help
-    names `CLAUDE.md`; `--bare` drops the file too but never reads the plan
-    login. `scripts/claude_code_canary.py` keeps the check: a control call
+    `~/.claude/CLAUDE.md`. No committed record yet shows that the flag
+    removes the file: an earlier manual probe on Claude Code 2.1.325 is not
+    recorded, so treat the effect as unverified until the canary has run and
+    its output is committed. `--safe-mode` is the flag whose help names
+    `CLAUDE.md`; `--bare` drops the file too but never reads the plan
+    login. `scripts/claude_code_canary.py` is the check: a control call
     without the flag must quote the file, a seat call must not (it calls a
     model, so it runs by hand after a Claude Code update, not in CI).
   - `evals/runner.py`, `evals/records.py`, `evals/levels.py`, `cli.py`:
