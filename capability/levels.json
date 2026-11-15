@@ -283,14 +283,12 @@
     },
     "model_checking": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/model_checking.json",
+        "counts": true,
         "knowledge_document": "knowledge/verification/model_checking.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     },
     "pipeline_design": {
@@ -489,7 +487,7 @@
     }
   },
   "totals": {
-    "knowledge": 9,
+    "knowledge": 10,
     "practised": 3,
     "proven": 0
   },
