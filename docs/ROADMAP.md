@@ -132,6 +132,7 @@ new number. M1 to M42 are taken; see `docs/history/README.md`.
 | M79 | SKY130 physical design pilot in CI: Magic DRC and Netgen LVS (`pv.run` backend `magic-netgen`), resources item R3 | reserved |
 | M80 | Metal fill streamed to the layers the DRC deck reads, with a must-fail fill control | reserved |
 | M81 | GF180MCU physical design pilot in CI: the M79 pilot on the ORFS gf180 platform, Magic DRC and Netgen LVS over open_pdks gf180mcuC | reserved |
+| M83 | Block verification's testbench refinements for a scoreboard and for cocotb, and the cocotb testbench gate (W2-R3) | reserved |
 
 <!-- review:milestone-numbers:end -->
 

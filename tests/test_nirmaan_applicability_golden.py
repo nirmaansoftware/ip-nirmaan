@@ -63,6 +63,9 @@ REQUESTS = (
     "Verify the existing interrupt controller RTL.",
     "Formally verify the existing CRC block RTL with an unbounded proof, a constrained-random SystemVerilog "
     "testbench, coverage and an equivalence check.",
+    # M83: the testbench's scoreboard and cocotb refinements, and cocotb's own gate.
+    "Verify the existing MAC block RTL with a scoreboard against a reference model.",
+    "Verify the existing CRC block RTL with a cocotb testbench.",
 )
 
 
