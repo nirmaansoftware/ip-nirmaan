@@ -104,19 +104,19 @@
           "counts": false,
           "digest": "sha256:171d24465d795d0e8777da54e74430e2764fcdc089654579b42412934258c9cf",
           "harness": "sha256:35643990d58bf28264abe98752bd6c2750a391483ac43176b4748a38fbc32711",
-          "lower": 0.4344,
+          "lower": 0.3968,
           "model": "claude-opus-5-5",
-          "n": 11,
-          "passed": 8,
+          "n": 10,
+          "passed": 7,
           "reasons": [
-            "Wilson lower bound 0.434, under 0.5"
+            "Wilson lower bound 0.397, under 0.5"
           ],
           "records": [
             "evals/results/2026-11-14-claude-code-claude-opus-5-5-12",
             "evals/results/2026-11-14-claude-code-claude-opus-5-5-14",
             "evals/results/2026-11-14-claude-code-claude-opus-5-5-7",
             "evals/results/2026-11-14-claude-code-claude-opus-5-5-8",
-            "evals/results/2026-11-15-claude-code-claude-opus-5-5-7"
+            "evals/results/2026-11-15-claude-code-claude-opus-5-5-8"
           ],
           "unjudged": 3
         }
@@ -279,14 +279,12 @@
     },
     "model_checking": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/model_checking.json",
+        "counts": true,
         "knowledge_document": "knowledge/verification/model_checking.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     },
     "pipeline_design": {
@@ -375,10 +373,10 @@
           "counts": true,
           "digest": "sha256:012eb9b7155ed6eb7761adca880b338f10c8f978b15dfd92f5adbb3253307a52",
           "harness": "sha256:35643990d58bf28264abe98752bd6c2750a391483ac43176b4748a38fbc32711",
-          "lower": 0.8241,
+          "lower": 0.8157,
           "model": "claude-opus-5-5",
-          "n": 18,
-          "passed": 18,
+          "n": 17,
+          "passed": 17,
           "reasons": [],
           "records": [
             "evals/results/2026-11-15-claude-code-claude-opus-5-5",
@@ -387,7 +385,7 @@
             "evals/results/2026-11-15-claude-code-claude-opus-5-5-4",
             "evals/results/2026-11-15-claude-code-claude-opus-5-5-5",
             "evals/results/2026-11-15-claude-code-claude-opus-5-5-6",
-            "evals/results/2026-11-15-claude-code-claude-opus-5-5-7"
+            "evals/results/2026-11-15-claude-code-claude-opus-5-5-8"
           ],
           "unjudged": 0
         },
@@ -488,7 +486,7 @@
     }
   },
   "totals": {
-    "knowledge": 12,
+    "knowledge": 13,
     "practised": 3,
     "proven": 0
   },

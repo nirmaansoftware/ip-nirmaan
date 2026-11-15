@@ -1,0 +1,93 @@
+{
+  "format": "nirmaan.knowledge-check",
+  "skill": "model_checking",
+  "knowledge_document": "knowledge/verification/model_checking.md",
+  "document_sha256": "sha256:633ceb9377dfa7bb83fdab2dbee34f8328a446a783ac71551f4c7a9f6bd53fbc",
+  "writer": "IP-W2-K2 session (wave 2 knowledge batch, plan row W2-K2, 2026-11-15)",
+  "checker": "IP-W2-C2 session (wave 2 check records, plan row W2-C2, 2026-11-15)",
+  "sources_read": [
+    "[SbyRef] SymbiYosys reference for the .sby file format: the whole page (modes table, options table with the depth defaults, engines section, mode and engine and solver table, smtbmc, btor, aiger, abc, itp and none engines, script, files, pycode), https://symbiyosys.readthedocs.io/en/latest/reference.html",
+    "[SbyVerilog] SymbiYosys, Formal extensions to Verilog: the whole page (immediate assertions, UNKNOWN on a failed induction step, functions, unconstrained variable attributes, global clock), https://symbiyosys.readthedocs.io/en/latest/verilog.html",
+    "[ZFormal] Gisselquist, My first experience with Formal Methods, ZipCPU blog 2017-10-19: the whole post to its footer, https://zipcpu.com/blog/2017/10/19/formal-intro.html",
+    "[ZInduct] Gisselquist, An Exercise in using Formal Induction, ZipCPU blog 2018-03-10: the whole post to its footer, https://zipcpu.com/blog/2018/03/10/induction-exercise.html",
+    "Repository code at the lines cited in gate_claims; tests/test_nirmaan_gate_integrity.py, tests/test_nirmaan_formal_gate.py, tests/test_dv_formal_evals.py and tests/test_knowledge_gate_claims.py run and passing; parse_sby run on a PASS, an UNKNOWN and a cover-mode log"
+  ],
+  "result": "every claim tagged with a source was found in that source (SbyRef: bmc depth, prove depth for smtbmc only, default 20, the prove engine list, first engine to finish decides; SbyVerilog: UNKNOWN when an assertion fails in the induction step; ZFormal: base case plus induction step, unreachable states are valid starting states; ZInduct: two shift registers pass bmc, fail induction until sa equals sb is asserted, the failed trace shows the chosen start state), every line marked inference is a fair reading, and every sentence about the formal gate matches the code at the lines cited in gate_claims",
+  "notes": [
+    "[SbyRef]: depth is 20 by default in bmc, cover and prove (smtbmc k-induction); other engines ignore it in prove mode, so the document's abc pdr sentence is on the page. The prove engine list in the document (smtbmc with any solver, abc pdr, several aiger and btor engines) matches the mode, engine and solver table. 'The first to return decides' is on the page.",
+    "[ZInduct]: the sentence 'each extra step costs solver time' under 'raise the depth' is not on the page, which only shows that a larger depth lets the proof pass; it is general knowledge and fair, but it carries the [ZInduct] tag. Reported to the owner, no effect on the Knowledge reading.",
+    "Behaviour run: parse_sby on a DONE (PASS) log gives 'formal passed: no counterexample within 20 steps (a bounded model check, not a proof)' with proven 0 in bmc and proven 1 in prove; a DONE (UNKNOWN, rc=4) log in prove mode gives 'formal did not finish', never a proof; a pass in cover mode says 'not a proof of the assertions'. All as the document says.",
+    "Gate detail the document leaves out and need not state: the depth is read only when its value is all digits (eda.py:628), otherwise the default 20 is kept."
+  ],
+  "gate_claims": [
+    {
+      "claim": "Practising tier line: formal.run, the one formal tool the skill holds, is AVAILABLE",
+      "evidence": "src/nirmaan/company/tools.py:144"
+    },
+    {
+      "claim": "the skill holds formal.run only; formal.cover is held by the formal verification skill",
+      "evidence": "src/nirmaan/company/skills.py:515"
+    },
+    {
+      "claim": "formal.cover is held by the formal verification skill",
+      "evidence": "src/nirmaan/company/skills.py:509"
+    },
+    {
+      "claim": "with mode prove a pass is reported as every property proven",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:343"
+    },
+    {
+      "claim": "with bmc a pass is reported as no counterexample within the depth, 'not a proof'",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:338"
+    },
+    {
+      "claim": "the metrics carry a proven flag that is 1 only for a passing proof (set only when the setup names a mode)",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:337"
+    },
+    {
+      "claim": "the bmc summary and the proven flag are tested: bmc passes as bounded and does not meet the formal gate",
+      "evidence": "tests/test_nirmaan_gate_integrity.py::test_bmc_is_reported_as_bounded_and_does_not_meet_the_formal_gate"
+    },
+    {
+      "claim": "a run that did not pass is reported as not finished or failed, never as a proof (an UNKNOWN status with no failed assertion reads 'did not finish')",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:345"
+    },
+    {
+      "claim": "the setup is read for its mode and depth",
+      "evidence": "src/nirmaan/integrations/eda.py:621"
+    },
+    {
+      "claim": "the depth is 20 when the setup gives none",
+      "evidence": "src/nirmaan/integrations/eda.py:616"
+    },
+    {
+      "claim": "formal.run takes a single-task setup: a setup that declares [tasks] is refused and nothing runs",
+      "evidence": "src/nirmaan/integrations/eda.py:644"
+    },
+    {
+      "claim": "the [tasks] refusal is part of formal.run's own check",
+      "evidence": "src/nirmaan/integrations/eda.py:652"
+    },
+    {
+      "claim": "a multi-task setup is refused with a reason",
+      "evidence": "tests/test_nirmaan_gate_integrity.py::test_a_multi_task_setup_is_refused_with_a_reason"
+    },
+    {
+      "claim": "the check step is to confirm mode prove in the log and the 'every property proven' summary",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:336"
+    },
+    {
+      "claim": "the vacuity check is formal.cover and a proof that passes formal.run can still be vacuous",
+      "evidence": "src/nirmaan/integrations/eda.py:815"
+    },
+    {
+      "claim": "a sentence about the card: abstraction is reviewed and state explosion is a named failure",
+      "evidence": "src/nirmaan/company/skills.py:518"
+    },
+    {
+      "claim": "the engines named for prove (smtbmc, abc pdr, aiger and btor engines) are taken from the SymbiYosys reference; the gate reads only mode and depth and does not restrict the engine",
+      "evidence": "unverified"
+    }
+  ],
+  "checked_at": "2026-11-15"
+}
