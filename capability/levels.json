@@ -247,6 +247,18 @@
       "level": "knowledge",
       "practised": []
     },
+    "emulation_prototyping": {
+      "knowledge": {
+        "check_record": null,
+        "counts": false,
+        "knowledge_document": "knowledge/verification/emulation_prototyping.md",
+        "problems": [
+          "no check record"
+        ]
+      },
+      "level": null,
+      "practised": []
+    },
     "equivalence_checking": {
       "knowledge": {
         "check_record": "capability/records/knowledge/equivalence_checking.json",
@@ -621,6 +633,18 @@
       "level": "knowledge",
       "practised": []
     },
+    "uvm": {
+      "knowledge": {
+        "check_record": null,
+        "counts": false,
+        "knowledge_document": "knowledge/verification/uvm.md",
+        "problems": [
+          "no check record"
+        ]
+      },
+      "level": null,
+      "practised": []
+    },
     "verification_planning": {
       "knowledge": {
         "check_record": "capability/records/knowledge/verification_planning.json",
@@ -630,10 +654,22 @@
       },
       "level": "knowledge",
       "practised": []
+    },
+    "verification_signoff": {
+      "knowledge": {
+        "check_record": null,
+        "counts": false,
+        "knowledge_document": "knowledge/verification/verification_signoff.md",
+        "problems": [
+          "no check record"
+        ]
+      },
+      "level": null,
+      "practised": []
     }
   },
   "totals": {
-    "knowledge": 30,
+    "knowledge": 33,
     "practised": 0,
     "proven": 0
   },
