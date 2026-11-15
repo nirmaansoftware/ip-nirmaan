@@ -296,14 +296,12 @@
     },
     "functional_coverage": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/functional_coverage.json",
+        "counts": true,
         "knowledge_document": "knowledge/verification/functional_coverage.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     },
     "gate_level_simulation": {
@@ -579,7 +577,7 @@
     }
   },
   "totals": {
-    "knowledge": 24,
+    "knowledge": 25,
     "practised": 0,
     "proven": 0
   },

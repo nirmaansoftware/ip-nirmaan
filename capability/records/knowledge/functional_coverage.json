@@ -1,0 +1,88 @@
+{
+  "format": "nirmaan.knowledge-check",
+  "skill": "functional_coverage",
+  "knowledge_document": "knowledge/verification/functional_coverage.md",
+  "document_sha256": "sha256:6dbc47bdbcfe4057bffa7a23e50621f2fd4d96492734b1bc522cd8e14d39eef6",
+  "writer": "IP-W2-K4 session (wave 2 knowledge batch, plan row W2-K4, 2026-11-15; fixed in ip#289)",
+  "checker": "IP-W2-C4B session (wave 2 recheck of the W2-C4 send-back, 2026-11-15)",
+  "sources_read": [
+    "[OTDV] lowRISC, OpenTitan Design Verification Methodology: the whole page (459 lines of saved text), https://opentitan.org/book/doc/contributing/dv/methodology/index.html",
+    "[OTPlan] lowRISC, OpenTitan DVSIM testplanner tool: the whole page (199 lines), https://opentitan.org/book/util/dvsim/doc/testplanner.html",
+    "[OTStage] lowRISC, OpenTitan Hardware Development Stages: the whole page (235 lines), https://opentitan.org/book/doc/project_governance/development_stages.html",
+    "[VCov] Verilator manual, Simulating, including Coverage Analysis (Property, Covergroup, Line, Branch, Toggle, Expression coverage, Suppressing Coverage, Coverage Collection): the whole page (489 lines, version 5.054 text), https://verilator.org/guide/latest/simulating.html",
+    "[VLang] Verilator manual, Input Languages: the whole page (316 lines, version 5.054 text), https://verilator.org/guide/latest/languages.html",
+    "Repository code at the lines cited in gate_claims (worktree at origin/main a12364c, after ip#289), the whole of src/nirmaan/integrations/eda_parsers.py:536-594 and eda.py:499-600, and a real coverage.read run (execute() on the coverage.read backend, Verilator 5.052) described in the notes"
+  ],
+  "result": "pass. Every source-tagged claim was found in its source and every gate sentence matches the code. The two sentences W2-C4 sent back are now correct and were confirmed by running coverage.read with the gate's own flags.",
+  "notes": [
+    "W2-C4 send-back, 'only': the document now says the Verilator page names --coverage or --coverage-user for covergroups and 'does not say only' (lines 83-84). The page text (Covergroup Coverage) reads 'With --coverage or --coverage-user, Verilator will translate covergroup coverage points'. Matches.",
+    "W2-C4 send-back, the code coverage line: line 126-128 now says percentages are 'measured on design files only, with the gate's line and toggle options' and that a covergroup kind is a point count, and the testbench sentence (lines 91-93) gives the true reason (design files only, the testbench is never measured; eda.py:549-550), not the options.",
+    "Run, gate's exact flags (eda.py:595: --coverage-line --coverage-toggle), counter.v with a covergroup (two coverpoints and a cross) and a cover property inside the DESIGN file, tested by the repository's counter_full_tb.v: the run passed and coverage.read reported 'line 100.00% (4/4), toggle 100.00% (16/16), branch 100.00% (2/2), covergroup 87.50% (7/8)'. So the document's inference 'the parser would report it as its own kind' (lines 88-90) is true, and its 'unverified' mark is honest and now also stale in the safe direction. The data file held only toggle, line, branch and covergroup types: no property type, so the cover property was not measured, as lines 94-96 say.",
+    "Run, covergroup in the TESTBENCH, design file the repository's counter.v: the data file held 16 covergroup points, and coverage.read reported only 'line 100.00% (3/3), toggle 100.00% (16/16), branch 100.00% (2/2)' over counter.v. A covergroup in a testbench is not read, because only design files count (eda_parsers.py:576-577), as lines 91-93 say.",
+    "Run, repository fixture with no covergroup: 'line 100.00% (3/3), toggle 100.00% (16/16), branch 100.00% (2/2)'. Line 79-80 says the build is line and toggle only yet branch percentages are read: both are true, since Verilator's line coverage also writes branch points (the data held type 'branch'). The document does not explain this; a reader could be puzzled but nothing is false.",
+    "Wording: 'Cover properties were not part of the run above' (line 94) refers to no run in the document; the document records no run. It reads as the hypothetical run of the sentence before. It is only a loose reference, and the run above (by this checker) confirms the substance: no cover property is measured under the gate's flags. A tidier sentence would drop 'the run above'.",
+    "[OTStage]: 'second verification stage asks for all planned covergroups to be written, and its last for 100 percent functional coverage with waivers' (lines 60-62). The page's tables put 'Functional coverage (written): all covergroups planned for in the testplan' in V2 (Testing Complete) and '100% code and 100% functional coverage with waivers' in V3 (Verification Complete). 'Second' means V2 counted from V1; counting V0 it is the third stage of the page's narrative. Imprecise ordinal, correct stage content.",
+    "[OTDV]: AND-gate example (two combinations give full code coverage, an OR gate would too, a cross tells them apart; a second gate added and never exercised leaves functional coverage at 100 percent while code coverage shows it), the ranking of what each metric says, the three ways to close a hole, the waiver categories (UNR, NON_RTL, UNSUPPORTED, EXTERNAL, LOW_RISK; explanation mandatory for the last three; designers sign off), 'VCS UNR doesn't support assertion or functional coverage', and illegal-value errors are each on the page as the document says.",
+    "[OTPlan]: covergroup attributes (name must map to the written covergroup so it can be audited; desc recommended to list points and crosses; _cg suffix per the DV style guide) match. [VCov]: at_least threshold recorded as the bin's threshold and used by verilator_coverage; property coverage under --coverage-user. [VLang]: 'partially supports SystemVerilog functional coverage with covergroup, coverpoint, bins, cross coverage, and transition bins'.",
+    "Unmarked lines: the failure-mode bullet 'Treating 100 percent functional coverage as done while code coverage shows a block untouched [OTDV]' is tagged; the other failure-mode bullets are marked inference. No untagged, unmarked claim about a source was found."
+  ],
+  "gate_claims": [
+    {
+      "claim": "coverage.read builds the run with Verilator's line and toggle coverage only (the gate passes --coverage-line --coverage-toggle, neither --coverage nor --coverage-user)",
+      "evidence": "src/nirmaan/integrations/eda.py:595"
+    },
+    {
+      "claim": "coverage.read reads line, toggle and branch percentages over the design files (run: branch is written by the line option)",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:586"
+    },
+    {
+      "claim": "the tool is described as line, toggle and branch percentages over design files, and is the skill's tool",
+      "evidence": "src/nirmaan/company/tools.py:137"
+    },
+    {
+      "claim": "a covergroup in a design file would be reported as its own kind, since the parser reports every kind it finds (run: 'covergroup 87.50% (7/8)')",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:587"
+    },
+    {
+      "claim": "a covergroup in the testbench is not read: only design files count and the testbench is never measured (a restriction of the gate)",
+      "evidence": "src/nirmaan/integrations/eda.py:549"
+    },
+    {
+      "claim": "only the points in the design files count in the percentages",
+      "evidence": "tests/test_coverage_read.py::test_only_the_design_files_count_and_percentages_round_down"
+    },
+    {
+      "claim": "the testbench is never measured and design files must be sources",
+      "evidence": "tests/test_coverage_read.py::test_the_testbench_is_never_measured_and_design_files_must_be_sources"
+    },
+    {
+      "claim": "percentages are of points hit at least once, never rounded up",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:586"
+    },
+    {
+      "claim": "the tool fails a run whose testbench fails or whose design files hold no point",
+      "evidence": "tests/test_coverage_read.py::test_coverage_that_measured_nothing_or_a_testbench_that_failed_is_no_evidence"
+    },
+    {
+      "claim": "cover properties are not part of the gate's run (Verilator places them under --coverage-user, which the gate does not pass; run: no property type in the data)",
+      "evidence": "src/nirmaan/integrations/eda.py:595"
+    },
+    {
+      "claim": "the plan format treats a coverage_point item as proven only by a coverage measurement",
+      "evidence": "src/nirmaan/company/traceability.py:52"
+    },
+    {
+      "claim": "Practising tier: the skill holds an AVAILABLE tool (coverage.read), so the first body line is the computed tier",
+      "evidence": "src/nirmaan/org/knowledge_files.py:51"
+    },
+    {
+      "claim": "Verilator translates covergroups with --coverage or --coverage-user, and its functional coverage is partial (a Verilator manual statement; no repository gate behind it)",
+      "evidence": "unverified"
+    },
+    {
+      "claim": "Verilator records a bin's option.at_least threshold and verilator_coverage uses it to decide whether the bin is covered (a Verilator manual statement; the repository sets no threshold)",
+      "evidence": "unverified"
+    }
+  ],
+  "checked_at": "2026-11-15"
+}
