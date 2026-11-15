@@ -1129,6 +1129,11 @@ def eval_run(
         False, "--without-knowledge",
         help="The ablation (M67): seat packets carry no knowledge documents (the skills stay). The record is "
              "labelled knowledge: off and never counts toward an evidence level."),
+    harness_name: str = typer.Option(
+        "default", "--harness",
+        help="A named harness variant (M74, docs/HARNESS.md): default, or attempts-3 (three attempts, a refused "
+             "one answered again with the repair text). A variant's record carries its name and never counts "
+             "toward an evidence level."),
     cases: Path = CASES_OPTION,
     repo: Path = typer.Option(Path("."), "--repo", help="Root that case file paths are relative to."),
     out: Optional[Path] = typer.Option(None, "--out", help="Where the run record is written (default: "
@@ -1137,9 +1142,14 @@ def eval_run(
 ) -> None:
     """Run evaluation cases and write a run record (M45). Exits 1 when any trial fails."""
     from nirmaan.evals import LIVE_TRIALS, EvalError, record_run, select_cases
+    from nirmaan.runtime.harness import VARIANTS
 
     if replay == (runtime is not None):
         _fail("choose one: --runtime ID (a model in the seat) or --replay (the reference answer)")
+    if harness_name not in VARIANTS:
+        _fail(f"unknown harness variant {harness_name!r}; known: {', '.join(VARIANTS)}")
+    if attempts is not None and "attempts" in VARIANTS[harness_name]:
+        _fail(f"--harness {harness_name} sets the attempts; leave out --attempts")
     known = {case.id: case for case in _cases(cases)}
     unknown = [c for c in case_ids or [] if c not in known]
     if unknown:
@@ -1160,6 +1170,9 @@ def eval_run(
     if without_knowledge and not as_json:
         console.print("note: without knowledge documents (the ablation); this record never counts toward an "
                       "evidence level", highlight=False, soft_wrap=True)
+    if harness_name != "default" and not as_json:
+        console.print(f"note: on the harness variant {harness_name}; this record never counts toward an evidence "
+                      "level", highlight=False, soft_wrap=True)
     out = out or (repo / "evals" / "results" if runtime else Path(".nirmaan") / "evals")
     results = []
 
@@ -1181,7 +1194,7 @@ def eval_run(
     try:
         path = record_run(_org(), chosen, runtime, trials=trials, repo=repo, out=out, attempts=attempts,
                           command=" ".join(["nirmaan", *sys.argv[1:]]), head_sha=_head_sha(repo), on_trial=show,
-                          knowledge=not without_knowledge)
+                          knowledge=not without_knowledge, variant=harness_name)
     except EvalError as exc:
         _fail(str(exc))
     if as_json:

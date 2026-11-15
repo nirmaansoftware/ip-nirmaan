@@ -28,6 +28,7 @@
           "n": 8,
           "passed": 5,
           "reasons": [
+            "stale: the harness changed after these trials (docs/HARNESS.md)",
             "Wilson lower bound 0.306, under 0.5"
           ],
           "records": [
@@ -62,6 +63,7 @@
           "n": 5,
           "passed": 4,
           "reasons": [
+            "stale: the harness changed after these trials (docs/HARNESS.md)",
             "Wilson lower bound 0.376, under 0.5"
           ],
           "records": [
@@ -95,6 +97,7 @@
           "n": 8,
           "passed": 5,
           "reasons": [
+            "stale: the harness changed after these trials (docs/HARNESS.md)",
             "Wilson lower bound 0.306, under 0.5"
           ],
           "records": [
@@ -130,6 +133,7 @@
           "n": 10,
           "passed": 8,
           "reasons": [
+            "stale: the harness changed after these trials (docs/HARNESS.md)",
             "Wilson lower bound 0.490, under 0.5"
           ],
           "records": [
@@ -164,6 +168,7 @@
           "n": 3,
           "passed": 2,
           "reasons": [
+            "stale: the harness changed after these trials (docs/HARNESS.md)",
             "3 trials, fewer than 5",
             "Wilson lower bound 0.208, under 0.5"
           ],
@@ -197,6 +202,7 @@
           "n": 3,
           "passed": 2,
           "reasons": [
+            "stale: the harness changed after these trials (docs/HARNESS.md)",
             "3 trials, fewer than 5",
             "Wilson lower bound 0.208, under 0.5"
           ],
@@ -232,7 +238,8 @@
           "n": 5,
           "passed": 5,
           "reasons": [
-            "stale: the skill card or document changed after these trials"
+            "stale: the skill card or document changed after these trials",
+            "stale: the harness changed after these trials (docs/HARNESS.md)"
           ],
           "records": [
             "evals/results/2026-11-14-claude-code-claude-opus-5-5-10",
@@ -280,7 +287,8 @@
           "n": 31,
           "passed": 22,
           "reasons": [
-            "stale: the skill card or document changed after these trials"
+            "stale: the skill card or document changed after these trials",
+            "stale: the harness changed after these trials (docs/HARNESS.md)"
           ],
           "records": [
             "evals/results/2026-11-14-claude-code-claude-opus-5-5",
@@ -340,6 +348,7 @@
     "practised": 0,
     "proven": 0
   },
+  "variants": [],
   "without_knowledge": [
     {
       "case": "rtl/rr-arbiter",

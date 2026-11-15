@@ -142,12 +142,14 @@ TOOLS: list[ToolSpec] = [
            _p("design", PATHS, "The files whose coverage is measured, each among the sources; by default every "
                                "source but the testbench (the file that declares the top module)."), *RUNNER)),
     _tool("formal.run", "Formal engine", "eda", EXE, AV, "Model checking and property proofs.",
-          (_p("sby", PATH, "The SymbiYosys job file.", required=True),
+          (_p("sby", PATH, "The SymbiYosys job file, a single-task setup: one with a [tasks] section is refused "
+                           "before anything runs.", required=True),
            _p("sources", PATHS, "RTL the proof must read; the job file must list each one."), *RUNNER)),
     _tool("formal.cover", "Formal cover check", "eda", EXE, AV,
           "Non-vacuity: every cover in a proof setup (M27), and a cover derived for every assertion "
           "antecedent (M29), is reached under its assumptions.",
-          (_p("sby", PATH, "The proof's SymbiYosys job file, run in cover mode.", required=True),
+          (_p("sby", PATH, "The proof's SymbiYosys job file, run in cover mode, a single-task setup: one with a "
+                           "[tasks] section is refused before anything runs.", required=True),
            _p("sources", PATHS, "RTL the setup reads."), *RUNNER)),
     _tool("regmap.check", "Register map check", "eda", RD, AV,
           "Validate a register map: alignment, overlaps, names, reset widths (M30).",

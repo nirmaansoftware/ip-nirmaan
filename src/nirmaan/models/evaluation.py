@@ -210,6 +210,9 @@ class EvalTrial(BaseModel):
     knowledge: Literal["on", "off"] = "on"
     #: M76: "calibration" for a trial run on an outside benchmark (``eval outside``); it never counts toward a level.
     purpose: Literal["evidence", "calibration"] = "evidence"
+    #: M74: the named harness variant the trial ran on (``eval run --harness``); any but "default" never counts
+    #: toward a level.
+    harness_variant: str = Field(default="default", min_length=1)
     result: EvalResult
     answers: tuple[RecordedAnswer, ...] = ()
     judge_runs: tuple[JudgeRun, ...] = ()
@@ -239,6 +242,8 @@ class EvalRunManifest(BaseModel):
     knowledge: Literal["on", "off"] = "on"
     #: M76: "calibration" for a run on an outside benchmark; every trial it writes says so too.
     purpose: Literal["evidence", "calibration"] = "evidence"
+    #: M74: the named harness variant the run chose; every trial it writes says so too.
+    harness_variant: str = Field(default="default", min_length=1)
     #: M76: where a calibration run's problems came from (name, upstream commit, licence), else empty.
     source: str = ""
 

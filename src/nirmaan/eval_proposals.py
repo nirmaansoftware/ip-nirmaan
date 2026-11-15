@@ -60,9 +60,11 @@ _TRIAL, _NOT_RESULTS = "nirmaan.eval-trial", ("nirmaan.eval-run", "nirmaan.eval-
 
 
 def _knowledge_off(data: Any, kind: str) -> bool:
-    """Not a result to learn from: run without knowledge documents (M67) or an outside calibration (M76)."""
+    """Not a result to learn from: run without knowledge documents (M67), an outside calibration (M76), or on a
+    named harness variant (M74)."""
     return isinstance(data, dict) and data.get("format") == kind and (
-        data.get("knowledge", "on") != "on" or data.get("purpose", "evidence") != "evidence")
+        data.get("knowledge", "on") != "on" or data.get("purpose", "evidence") != "evidence"
+        or data.get("harness_variant", "default") != "default")
 
 
 def load_results(root: Path | str) -> list[EvalRun]:
@@ -71,7 +73,8 @@ def load_results(root: Path | str) -> list[EvalRun]:
     The same run read twice is one. Each run is labelled with its source: ``record:<record ID>`` for a
     trial of a run record, ``file`` for a plain result file (such as the synthetic fixtures). A trial run
     without knowledge documents (M67, the ablation) is not read: its failures say what the documents add,
-    not that the seat regressed. A calibration trial (M76, an outside benchmark) is not read either.
+    not that the seat regressed. A calibration trial (M76, an outside benchmark) is not read either, nor a trial
+    on a named harness variant (M74), which is compared with the default harness, not learned from.
     """
     runs: dict[str, EvalRun] = {}
     # M67: a trial is an ablation trial when its run manifest or the trial itself says knowledge off.

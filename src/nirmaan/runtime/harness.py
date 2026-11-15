@@ -13,19 +13,26 @@ prompt line is worded (M68's "beside" line is one), how an answer is parsed
 and grounded, how the eval runner fixes the upstream stages. ``CODE`` names
 those files, and the fingerprint carries the sha256 of each file's bytes.
 
+The tool definitions a seat is shown are company data, not code: each gate
+tool's parameters and their descriptions reach the prompt as its input
+contract. The fingerprint carries a digest of every tool definition in the
+catalog (M74), so a changed description is a changed harness.
+
 ``harness_sha256`` is the sha256 of ``fingerprint()``: these settings, the
-code digests and the run's own options (an ``--attempts`` override, whether
-knowledge documents were given, M67, and the version of the command-line
-program the runtime calls the model through: Claude Code's ``claude
---version`` on the claude-code runtime, None on any other). Every eval trial records it
+code digests, the tool digests and the run's own options (an ``--attempts``
+override, whether knowledge documents were given, M67, the version of the
+command-line program the runtime calls the model through: Claude Code's
+``claude --version`` on the claude-code runtime, None on any other, and the
+named variant the run chose, M74, ``VARIANTS``). Every eval trial records it
 (``EvalResult.harness`` and each ``RecordedAnswer.harness``), and the levels
 generator groups trials by skill, model, skill digest and harness: a group
 whose harness is not the current one is stale, and a trial with no harness
 recorded never counts (``docs/HARNESS.md``).
 
-This module imports only the ``Limits`` model, so the lower layers that read a
-setting at call time (``nirmaan.models.limits``, ``nirmaan.org.knowledge``) do
-so without an import cycle.
+This module imports only the ``Limits`` model at load time (the tool catalog is
+read when a fingerprint is computed), so the lower layers that read a setting
+at call time (``nirmaan.models.limits``, ``nirmaan.org.knowledge``) do so
+without an import cycle.
 """
 
 from __future__ import annotations
@@ -38,7 +45,7 @@ from typing import Any
 from nirmaan.models.limits import Limits, OnFailure
 
 FORMAT = "nirmaan.harness"
-VERSION = 1
+VERSION = 2  # M74: the tool digests and the variant joined the fingerprint
 
 # --- Budgets ---------------------------------------------------------------------------------
 
@@ -124,8 +131,12 @@ EXCERPT_NOTABLE = r"error|warning|fail|fatal|assert|mismatch"
 
 #: Seconds Claude Code may take to answer one prompt.
 CLAUDE_CODE_TIMEOUT = 1800
-#: The flags besides ``-p``, ``--model`` and ``--system-prompt``: JSON out, no tools, no session, no MCP servers.
-CLAUDE_CODE_FLAGS = ("--output-format", "json", "--tools", "", "--no-session-persistence", "--strict-mcp-config")
+#: The flags besides ``-p``, ``--model`` and ``--system-prompt``: JSON out, no tools, no session, no MCP servers,
+#: and (M74) ``--safe-mode``: Claude Code starts with its customizations off, so no user-level instruction file
+#: (``~/.claude/CLAUDE.md``), hook, skill or plugin reaches the seat (checked on 2.1.325; the canary test in
+#: tests/test_claude_code_canary.py). ``--bare`` also drops them but never reads the plan login.
+CLAUDE_CODE_FLAGS = ("--output-format", "json", "--tools", "", "--no-session-persistence", "--strict-mcp-config",
+                     "--safe-mode")
 #: Removed from Claude Code's environment, so it answers on the plan login rather than billing a key.
 CLAUDE_CODE_CLEARED_ENV = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN")
 
@@ -142,6 +153,31 @@ SETTINGS = ("DOMAIN_CAP", "MAX_CONTENT", "DEFAULT_LIMITS", "SCOPES", "WORK_SYSTE
             "REPAIR_AFTER_REVIEW", "REPAIR_AFTER_REFUSAL", "EXCERPT_LINES", "EXCERPT_WIDTH", "EXCERPT_NOTABLE",
             "CLAUDE_CODE_TIMEOUT", "CLAUDE_CODE_FLAGS", "CLAUDE_CODE_CLEARED_ENV", "ANTHROPIC_MAX_TOKENS",
             "ANTHROPIC_THINKING", "ANTHROPIC_EFFORT", "MAX_OUTPUT_CHARS")
+
+# --- Named variants (M74) ---------------------------------------------------------------------
+
+#: The harnesses an eval run may name (``nirmaan eval run --harness <name>``): each is the default harness with
+#: the run options it sets, and its name is a run option of the fingerprint. A trial on any variant but
+#: ``default`` is labelled with its name and listed apart: it never counts toward a level. Council record
+#: 2026-11-14 (pilot retrospective), decision 4: ``attempts-3`` gives the seat three attempts, so a refused one is
+#: answered again with the repair text (``REPAIR_AFTER_REFUSAL``) and the failed run's log excerpt.
+VARIANTS: dict[str, dict[str, Any]] = {
+    "default": {},
+    "attempts-3": {"attempts": 3},
+}
+
+
+def variant_options(name: str) -> dict[str, Any]:
+    """The run options the named variant sets; ValueError for a name not in ``VARIANTS``."""
+    if name not in VARIANTS:
+        raise ValueError(f"unknown harness variant {name!r}; known: {', '.join(VARIANTS)}")
+    return dict(VARIANTS[name])
+
+
+def run_attempts(attempts: int | None, variant: str = "default") -> int | None:
+    """The attempts override a run makes: the one given, else the variant's, else None (the default limits)."""
+    return attempts if attempts is not None else variant_options(variant).get("attempts")
+
 
 # --- The code ----------------------------------------------------------------------------------
 
@@ -184,21 +220,39 @@ def code_digests() -> dict[str, str]:
     return out
 
 
-def fingerprint(*, attempts: int | None = None, knowledge: bool = True, cli: str | None = None) -> dict[str, Any]:
-    """The harness a trial runs in: every setting, the code digests, and the run's own options.
+def tool_digests() -> dict[str, str]:
+    """Tool ID -> sha256 of its definition (name, status, description, every parameter and its description).
+
+    A seat reads its gate tools' parameter descriptions as their input contract (M73's gate contracts), so the
+    catalog's definitions are harness: an edited description changes the fingerprint (M74).
+    """
+    from nirmaan.company.tools import TOOLS
+
+    return {spec.id: "sha256:" + hashlib.sha256(json.dumps(spec.model_dump(mode="json"), sort_keys=True,
+                                                           ensure_ascii=True).encode("utf-8")).hexdigest()
+            for spec in sorted(TOOLS, key=lambda spec: spec.id)}
+
+
+def fingerprint(*, attempts: int | None = None, knowledge: bool = True, cli: str | None = None,
+                variant: str = "default") -> dict[str, Any]:
+    """The harness a trial runs in: every setting, the code and tool digests, and the run's own options.
 
     ``cli`` is the version of the command-line program the runtime calls the model through (the claude-code
     runtime's ``claude --version``), None for a runtime that calls none: a changed CLI is a changed harness.
+    ``variant`` is a name in ``VARIANTS``; the attempts it sets apply when ``attempts`` is None.
     """
     module = globals()
     return {"format": FORMAT, "version": VERSION,
             "settings": {name: _value(module[name]) for name in SETTINGS},
             "code": code_digests(),
-            "run": {"attempts": attempts, "knowledge": knowledge, "cli": cli}}
+            "tools": tool_digests(),
+            "run": {"attempts": run_attempts(attempts, variant), "knowledge": knowledge, "cli": cli,
+                    "variant": variant}}
 
 
-def harness_sha256(*, attempts: int | None = None, knowledge: bool = True, cli: str | None = None) -> str:
+def harness_sha256(*, attempts: int | None = None, knowledge: bool = True, cli: str | None = None,
+                   variant: str = "default") -> str:
     """sha256 over ``fingerprint()``, as ``sha256:<hex>``. With no options: the current default harness."""
-    text = json.dumps(fingerprint(attempts=attempts, knowledge=knowledge, cli=cli), sort_keys=True,
-                      ensure_ascii=True)
+    text = json.dumps(fingerprint(attempts=attempts, knowledge=knowledge, cli=cli, variant=variant),
+                      sort_keys=True, ensure_ascii=True)
     return "sha256:" + hashlib.sha256(text.encode("utf-8")).hexdigest()

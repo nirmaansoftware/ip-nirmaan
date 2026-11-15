@@ -27,7 +27,7 @@ each and a test fails if another module defines one.
 | `EXCERPT_LINES`, `EXCERPT_WIDTH` | 20 lines, 240 characters | the failed run's log excerpt on a retry (M26) | `runtime/files.py` |
 | `EXCERPT_NOTABLE` | error, warning, fail, fatal, assert, mismatch | which log lines that excerpt shows first | `runtime/files.py` |
 | `CLAUDE_CODE_TIMEOUT` | 1,800 seconds | one Claude Code answer (M33) | `runtime/claude_code.py` |
-| `CLAUDE_CODE_FLAGS` | `--output-format json --tools "" --no-session-persistence --strict-mcp-config` | JSON out, no tools, no session, no MCP servers | `runtime/claude_code.py` |
+| `CLAUDE_CODE_FLAGS` | `--output-format json --tools "" --no-session-persistence --strict-mcp-config --safe-mode` | JSON out, no tools, no session, no MCP servers, no user-level instruction file, hook, skill or plugin (M74) | `runtime/claude_code.py` |
 | `CLAUDE_CODE_CLEARED_ENV` | `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN` | removed so Claude Code answers on the plan login | `runtime/claude_code.py` |
 | `ANTHROPIC_MAX_TOKENS` | 16,000 | the anthropic runtime's answer length | `integrations/veritriage.py` |
 | `ANTHROPIC_THINKING`, `ANTHROPIC_EFFORT` | adaptive, high | the anthropic runtime's thinking and effort | `integrations/veritriage.py` |
@@ -61,14 +61,26 @@ recorded on its own) and `writer.py` (the concurrency writer, which keeps
 state in the same order for any number of jobs). A new runtime file must be
 put in `CODE` or in that list, and those four files may not gain a constant.
 
+## The tool definitions (M74)
+
+A seat reads its gate tools' parameter descriptions as their input contract
+(below, "Changes to the harness since M73"), so the tool catalog is harness
+too, though it is company data, not code (`src/nirmaan/company/tools.py`). The
+fingerprint carries `tools`: each tool's ID and the sha256 of its definition
+(name, category, risk, status, description, and every parameter with its
+kind, whether it is required, and its description). An edited description
+changes the fingerprint; a comment in `tools.py` does not, since a comment
+reaches no prompt.
+
 ## The fingerprint
 
-`harness_sha256(attempts=None, knowledge=True, cli=None)` is the sha256 of
-`fingerprint()`: format, version, every setting by name and value, the code
-digests, and the run's own options (an `eval run --attempts` override,
-whether the seat was given its knowledge documents, M67, and `cli`, the
-version of the command-line program the runtime calls the model through).
-With no options it is the current default harness.
+`harness_sha256(attempts=None, knowledge=True, cli=None, variant="default")`
+is the sha256 of `fingerprint()`: format, version (2 since M74), every
+setting by name and value, the code digests, the tool digests, and the run's
+own options (an `eval run --attempts` override, whether the seat was given
+its knowledge documents, M67, `cli`, the version of the command-line program
+the runtime calls the model through, and `variant`, the named variant the run
+chose, M74). With no options it is the current default harness.
 
 `cli` is the Claude Code version on the claude-code runtime and None on every
 other. The runtime asks `claude --version` once per seat runtime, so once per
@@ -79,6 +91,31 @@ answer. A version that cannot be read is recorded as `unknown`.
 Every eval trial records it: `EvalResult.harness` and `RecordedAnswer.harness`
 on each answer, written by `record_trial` and `evaluate`, with `EvalResult.cli`
 beside it. A record written before this milestone has neither.
+
+## Named variants (M74)
+
+`nirmaan eval run --harness <name>` runs on a named variant from
+`harness.VARIANTS`: the default harness with the run options the variant
+sets. Council record 2026-11-14 (pilot retrospective), decision 4, chose the
+variants to compare; this milestone has two names:
+
+| Name | Run options | What changes for the seat |
+|---|---|---|
+| `default` | none | nothing: the default harness |
+| `attempts-3` | attempts 3 | a refused attempt is answered again, up to three, with the repair text (`REPAIR_AFTER_REFUSAL`) and the failed run's log excerpt (M26) |
+
+The variant's name is a run option of the fingerprint, so `--harness
+attempts-3` and a plain `--attempts 3` are two harnesses, and `--harness
+attempts-3` with `--attempts` is refused (the variant sets the attempts). An
+unknown name is refused before anything runs. The record's name ends in
+`-harness-<name>`, and its manifest and every trial carry `harness_variant`.
+A variant trial never counts toward a level: the levels generator lists it
+under `variants` in `capability/levels.json`, with the name and where it is
+labelled (either label is enough, as for the ablation), and M42 learning does
+not read it. A variant's settings can only be run options (a test checks it),
+so a setting cannot hide in the variant table; editing a variant changes its
+own fingerprint and never the default's. Tools in the loop, decision 4's
+other variant, is its own milestone.
 
 ## How levels use it
 
@@ -144,6 +181,30 @@ in the same pull request.
     2.1.325, and trials from the two would have pooled.
   `CODE` files changed, so the fingerprint changed. No live record is
   committed, so no group went stale.
+- M74, the bundle of council record 2026-11-14 (pilot retrospective),
+  decision 4, in one change so the fingerprint changes once:
+  - `company/tools.py`: the `sby` parameter of `formal.run` and
+    `formal.cover` says the job file is a single-task setup and that one with
+    a `[tasks]` section is refused before anything runs, so the rule reaches
+    the seat's input contract. Cause: the council record reports that 6 of
+    the batch's 9 failed trials with documents were refused before review for
+    a `[tasks]` setup, and the tool descriptions said nothing of it (fact 3).
+  - `runtime/harness.py`: the tool definitions are in the fingerprint (fact
+    5); the named variants and the `variant` run option.
+  - `runtime/harness.py`, `runtime/claude_code.py`: `--safe-mode` in
+    `CLAUDE_CODE_FLAGS`. Cause: a seat call loaded the user-level
+    `~/.claude/CLAUDE.md`. Checked on Claude Code 2.1.325 with a short probe
+    that asked the model whether its context held a word only that file
+    has: without the flag it quoted the file, with `--safe-mode` or
+    `--setting-sources ""` it did not. `--safe-mode` is the flag whose help
+    names `CLAUDE.md`; `--bare` drops the file too but never reads the plan
+    login. `tests/test_claude_code_canary.py` keeps the check (live, opt in).
+  - `evals/runner.py`, `evals/records.py`, `evals/levels.py`, `cli.py`:
+    `--harness <name>`, the labels, and the `variants` list.
+  The default fingerprint changed, so every Practised group recorded before
+  it is stale. The control-plane class in `.github/review-teams.yml` does not
+  list `company/tools.py`: an edit to a tool definition now changes the
+  fingerprint, but the file is reviewed as company data.
 
 ## What is not the harness
 
@@ -186,7 +247,19 @@ gate takes one `.sby`, that every planned seat gets a contract for every gate
 tool its stage runs, that every gate tool declares the parameters its files
 fill, and that a new tool gets its contract with no core change.
 
+Since M74: `tests/test_harness.py` checks that every tool definition is in
+the fingerprint and an edited one changes it, that seat calls run in safe
+mode, the two variants and their fingerprints, that a variant sets only run
+options, that a trial on a variant records its name and harness, that the
+attempts variant gives the seat three attempts, and the CLI switch and its
+refusals; `tests/test_capability_levels.py` that variant trials are listed
+apart with the name and never count, either label being enough;
+`tests/test_gate_contracts.py` that the rr-arbiter seat is told the
+single-task rule and that both proof gates refuse a `[tasks]` setup;
+`tests/test_claude_code_canary.py` the live canary and its leak detector.
+
 ## Not in this milestone
 
-No model call and no record. Named harness variants (`--harness <name>`) to
-compare two harnesses on the same cases are a later milestone.
+M73: no model call and no record. M74: no record; the only model calls were
+the flag probe and the canary, on a small model, and no eval trial ran.
+Tools in the loop (decision 4's first variant) is its own milestone.
