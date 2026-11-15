@@ -119,6 +119,15 @@ RENAMED = {
 #: The regression practice left the Simulation team, whose own skills it no longer inherits.
 LEFT_SIMULATION = {"verification.debug.regression": {"uvm", "sva"}}
 
+#: Skills the wave 2 batches (W2-S1 to S5) gave a moved unit after the cut.
+GAINED = {
+    "verification.methodology.architecture": {"testbench_qualification", "portable_stimulus", "isa_compliance",
+                                              "accelerator_verification", "performance_verification"},
+    "verification.dynamic.testbench.testing": {"python_verification", "gate_level_simulation",
+                                               "power_aware_verification", "emulation_prototyping",
+                                               "hardware_fuzzing", "reference_modelling"},
+}
+
 DEPARTMENTS = {
     "verification.methodology": ["architecture", "planning", "signoff"],
     "verification.dynamic": ["testbench", "coverage", "gate_level_power", "emulation"],
@@ -247,12 +256,13 @@ def test_every_moved_unit_keeps_its_skills_tools_and_ladder(nirmaan_org):
             after = {k: v for k, v in after.items() if k in before}
         assert set(after) == set(before), new_unit
         dropped = LEFT_SIMULATION.get(new_unit, set())
+        gained = GAINED.get(new_unit, set())
         for rid, role in before.items():
             mine = after[rid]
             assert mine.level == role.level, rid
             if role.level not in (Level.MANAGER, Level.TECH_LEAD):
                 assert mine.title == role.title, rid
-            assert set(nirmaan_org.effective_skills(rid)) == set(old.effective_skills(role.id)) - dropped, rid
+            assert set(nirmaan_org.effective_skills(rid)) == (set(old.effective_skills(role.id)) - dropped) | gained, rid
             assert set(mine.tools) == set(role.tools), rid
 
 

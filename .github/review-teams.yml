@@ -22,9 +22,11 @@
 #
 # tests/test_review_teams.py checks this file against `git ls-files`: every
 # tracked file maps to a team, every glob wins at least one tracked file (no
-# dead rule), every seat named here has a file in council/, every marker
-# below exists in its file, and no CODEOWNERS file exists (founder classes are
-# reviewed by the Founder Proxy agent, council/founder-proxy.md).
+# dead rule; a glob in PENDING_GLOBS in that test is exempt only while no
+# tracked file matches it), every seat named here has a file in council/,
+# every marker below exists in its file, and no CODEOWNERS file exists
+# (founder classes are reviewed by the Founder Proxy agent,
+# council/founder-proxy.md).
 #
 # Each team's `unit:` and `key2:` are derived values, stored here and checked
 # by tests/test_seat_map.py against council/seat-map.yml and the built
@@ -155,10 +157,15 @@ rules:
     co_owners: [product-site]
     paths: [scripts/status.py]
 
-  # Gate files: Verification reviews every gate change.
+  # Gate files: Verification reviews every gate change. The level rules
+  # count as gate files: company/evidence.py says which domains need a
+  # must-fail control before a skill is Practised (pilot retrospective,
+  # decision 11, calls a change to it a gate change); evals/levels.py is
+  # Verification's under src/nirmaan/evals/** below.
   - team: eda-platform
     co_owners: [verification]
     paths:
+      - src/nirmaan/company/evidence.py
       - src/nirmaan/integrations/eda.py
       - src/nirmaan/work/policy.py
       - src/nirmaan/work/engine.py
@@ -329,7 +336,9 @@ rules:
 
   # Capability programme (M64, docs/WORKED_EXAMPLES.md): the Knowledge PR
   # lists in the qa-evidence, legal-compliance and verification-lead seat files.
-  # A division rule (knowledge/<division>/**) lands with its first document.
+  # A division rule (knowledge/<division>/**) lands with its first document,
+  # except knowledge/verification/**, which lands before it (decision 12 of
+  # the pilot retrospective, below).
   - team: verification
     paths:
       - capability/**
@@ -348,6 +357,15 @@ rules:
     co_owners: [business, verification]
     paths:
       - knowledge/design/**
+  # Division rule (council/records/2026-11-14-pilot-retrospective.md, decision
+  # 12): verification knowledge goes to Verification (key 1 verification-lead),
+  # with Business as for other knowledge paths. It lands before the
+  # division's first document, so until one exists its glob waits in
+  # PENDING_GLOBS in tests/test_review_teams.py.
+  - team: verification
+    co_owners: [business]
+    paths:
+      - knowledge/verification/**
 
   # Business (legal-compliance leads these).
   - team: business
@@ -538,6 +556,8 @@ founder_classes:
       - src/nirmaan/work/engine.py
       - src/nirmaan/runtime/tools.py
       - src/nirmaan/company/workflows.py
+      - src/nirmaan/company/evidence.py
+      - src/nirmaan/evals/levels.py
       - scripts/check_*.py
       - scripts/live_eval_gate.py
     content:
@@ -546,6 +566,7 @@ founder_classes:
       - pattern: '\b(no-tools|physical-design|test-union|dashes)\b'
         in: [.github/workflows/**]
         example: '  test-union:'
+    note: Paths are the gate files of the council record of 2026-10-17 (section 1) and the level rules, which decide what a skill level needs; content is NIRMAAN_REQUIRE_EDA and the required check names. src/nirmaan/company/evidence.py holds MUST_FAIL_DOMAINS and src/nirmaan/evals/levels.py the rest (trial count, Wilson bound, re-judge, must-fail, stale and harness rules); decision 11 of the pilot retrospective calls a MUST_FAIL_DOMAINS change a gate change. scripts/capability_levels.py is not listed, because it holds no rule; it only prints, writes or compares the output of levels.py, and tests/test_capability_levels.py checks capability/levels.json against levels.py directly.
   - id: licence-and-third-party
     title: Licence and third-party
     paths:

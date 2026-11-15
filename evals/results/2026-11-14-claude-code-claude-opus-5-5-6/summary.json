@@ -1,0 +1,29 @@
+{
+  "cases": {
+    "rtl/apb-regs": {
+      "high": 1.0,
+      "low": 0.34238022750665303,
+      "n": 2,
+      "passed": 2,
+      "rate": 1.0
+    }
+  },
+  "format": "nirmaan.eval-summary",
+  "seats": {
+    "rtl-implementation": {
+      "high": 1.0,
+      "low": 0.34238022750665303,
+      "n": 2,
+      "passed": 2,
+      "rate": 1.0
+    }
+  },
+  "totals": {
+    "cost_usd": null,
+    "duration_s": 459.172,
+    "input_tokens": 4,
+    "model_calls": 2,
+    "output_tokens": 52582,
+    "trials": 2
+  }
+}

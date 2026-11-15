@@ -189,7 +189,7 @@ LOOP = {
     # Checks the loop runs on the fix commit, in the worktree (in GitHub Actions
     # as the check account, in check_clone), with the token-free environment
     # plus `env`. {python} is this interpreter.
-    # "select": "related_tests" appends the test files related to the changed
+    # "select": "related_tests" appends the tests related to the changed
     # paths (related_tests) to the last command, or nothing (the whole suite)
     # when they cannot be told; CI runs the whole suite either way.
     "checks": [
@@ -516,6 +516,11 @@ def _applies(entry: dict, changed: list[str]) -> bool:
 
 # The import-law tests run for every change under src/ (tests/test_laws.py).
 LAW_TESTS = ["tests/test_laws.py"]
+# A committed eval record (evals/results/<run>/...) is read by the level generator,
+# which these tests check against capability/levels.json, and skipped as data by the
+# case loader, which the shipped-case test checks (a record it took for a case would
+# add a case). No other test reads the committed records.
+RECORD_TESTS = ["tests/test_capability_levels.py", "tests/test_nirmaan_evals.py::test_every_shipped_case_is_valid"]
 
 
 def _imports_leaf(text: str, package: str, leaf: str) -> bool:
@@ -538,6 +543,7 @@ def related_tests(root, changed: list[str]) -> list[str] | None:
       tests that import its package (below the top level); plus the import-law
       tests.
     - tests/<helper>.py and scripts/<name>.py: tests that import it or name its file.
+    - evals/results/...: the record tests (RECORD_TESTS), plus tests that name its path.
     - anything else (fixtures, evals/, site/): tests that name its file.
     """
     root = Path(root)
@@ -570,12 +576,18 @@ def related_tests(root, changed: list[str]) -> list[str] | None:
             stem = rel.stem
             hits = {t for t, text in texts.items()
                     if f"{stem}.py" in text or re.search(rf"^\s*(import\s+{re.escape(stem)}\b|from\s+{re.escape(stem)}\s+import\b)", text, re.MULTILINE)}
+        elif rel.parts[:2] == ("evals", "results"):
+            # Record file names (trial-03.json, causes.md) are no test's business: by name
+            # they matched by chance or not at all, and then the whole suite ran.
+            hits = {t for t in RECORD_TESTS if t.split("::")[0] in texts}
+            hits |= {t for t, text in texts.items() if path in text}
         else:
             hits = {t for t, text in texts.items() if path in text or rel.name in text}
         if not hits:
             return None
         chosen |= hits
-    return sorted(chosen) or None
+    # A test chosen by node id is already in its file when the whole file runs.
+    return sorted(t for t in chosen if t.split("::")[0] == t or t.split("::")[0] not in chosen) or None
 
 
 def _worktree_changes(path: str) -> list[str]:
