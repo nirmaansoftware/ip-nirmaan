@@ -77,14 +77,12 @@
     },
     "assertion_coverage": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/assertion_coverage.json",
+        "counts": true,
         "knowledge_document": "knowledge/verification/assertion_coverage.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     },
     "axi": {
@@ -505,7 +503,7 @@
     }
   },
   "totals": {
-    "knowledge": 18,
+    "knowledge": 19,
     "practised": 3,
     "proven": 0
   },
