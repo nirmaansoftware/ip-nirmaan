@@ -31,6 +31,7 @@ from pathlib import Path
 from typing import Callable
 
 from nirmaan.integrations.eda import Backend, EdaResult, Job, RunRecord, register_backend
+from nirmaan.integrations.eda_guard import sdc_problem
 from nirmaan.integrations.eda_parsers import parse_yosys
 from nirmaan.integrations.pd_parsers import (
     PNR_STAGES,
@@ -322,7 +323,12 @@ def _sta_inputs(job: Job) -> str | None:
         return "give a netlist or sources, not both: the run times one design"
     if not netlist and not job.sources:
         return "missing parameter netlist (or sources, the RTL to synthesize and time)"
-    return None
+    return _sdc_check(job)
+
+
+def _sdc_check(job: Job) -> str | None:
+    """M84 (docs/GATE_INPUTS.md): the constraints, which the timer reads as Tcl, run nothing outside SDC."""
+    return sdc_problem(Path(job.params["sdc"]).resolve())
 
 
 def _sta_environment(**inputs: str) -> Callable[[dict[str, str]], str | None]:
@@ -565,7 +571,7 @@ def _pnr_environment(params: Params) -> str | None:
 
 
 register_backend(Backend("openroad", "pnr.run", ("openroad",), _pnr_steps, _pnr_parse, ("netlist", "sdc", "top"),
-                         files=("netlist", "sdc"), environment=_pnr_environment))
+                         files=("netlist", "sdc"), environment=_pnr_environment, check=_sdc_check))
 
 
 # --- pv.run: KLayout DRC and LVS (M34) ----------------------------------------------------

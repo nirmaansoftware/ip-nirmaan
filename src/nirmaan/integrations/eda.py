@@ -41,6 +41,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Callable
 
 from nirmaan.integrations.eda_antecedents import DERIVED, Definitions, definitions, derive
+from nirmaan.integrations.eda_guard import HDL_PARAMS, HDL_SUFFIXES, check_inputs, sby_problem
 from nirmaan.integrations.eda_parsers import (
     Diagnostic,
     EdaResult,
@@ -72,9 +73,6 @@ _REDACT_MIN = 16
 #: How a run passes its nonce to the program that reports the verdict (M53): a simulator plusarg.
 NONCE_ARG = "+nirmaan_nonce="
 _NONCE_ECHO_RE = re.compile(r"^\$ .*" + re.escape(NONCE_ARG) + r"(?P<nonce>[0-9a-f]+)\b", re.MULTILINE)
-
-#: The files a cover run derives antecedent covers in (M29).
-HDL_SUFFIXES = (".v", ".sv", ".vh", ".svh")
 
 
 @dataclass(frozen=True)
@@ -229,6 +227,8 @@ def execute(backend: Backend, params: Params) -> ToolOutcome:
     workdir = run_directory(backend.name, params.get("workdir"))
     job = Job(backend.tool, params, workdir, sources, params.get("top") or None)
     problem = backend.check(job) if backend.check else None
+    # M84 (docs/GATE_INPUTS.md): after the backend's own check, so its reasons stand where they apply.
+    problem = problem or check_inputs(job.top, {p: list_values(params.get(p, "")) for p in HDL_PARAMS})
     if problem:
         return ToolOutcome(False, f"{backend.name}: {problem}")
     timeout = int(text_value(params.get("timeout")).strip() or DEFAULT_TIMEOUT)
@@ -460,6 +460,10 @@ def simulation_problem(job: Job) -> str | None:
     expect = text_value(job.params.get("expect")).strip()
     if expect not in ("", "pass", "fail"):
         return f"expect must be pass or fail, not {expect!r}; nothing was simulated"
+    # M84: Verilator compiles a C or C++ source given beside the Verilog into the program it runs.
+    other = [Path(s).name for s in job.sources if Path(s).suffix not in HDL_SUFFIXES]
+    if other:
+        return f"simulations read Verilog sources only, and {', '.join(other)} is not; nothing was simulated"
     return testbench_only_problem(job)
 
 
@@ -650,8 +654,9 @@ def _sby_tasks(job: Job) -> str | None:
 
 
 def _sby_check(job: Job) -> str | None:
-    """``formal.run`` takes a single-task setup, over the sources it is given."""
-    return _sby_tasks(job) or _sby_reads(job)
+    """``formal.run`` takes a single-task setup, over the sources it is given, that runs nothing outside Yosys
+    and its solvers (M84)."""
+    return _sby_tasks(job) or _sby_reads(job) or sby_problem(Path(job.params["sby"]).resolve())
 
 
 def _sby_reads(job: Job) -> str | None:
@@ -755,7 +760,7 @@ def _sby_cover_check(job: Job) -> str | None:
         return f"{sby.name} declares [tasks]; the cover check runs single-task setups only"
     if "options" not in sections:
         return f"{sby.name} has no [options] section to run in cover mode"
-    unread = _sby_reads(job)
+    unread = _sby_reads(job) or sby_problem(sby.resolve())  # M84: as formal.run's
     if unread:
         return unread
     defs = _definitions(sby.resolve())

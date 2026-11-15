@@ -26,6 +26,7 @@ import shutil
 from pathlib import Path
 
 from nirmaan.integrations.eda import Backend, Job, RunRecord, register_backend
+from nirmaan.integrations.eda_guard import engine_problem, yosys_problem
 from nirmaan.integrations.eda_parsers import EdaResult, parse_eqy
 from nirmaan.models import text_value
 
@@ -59,6 +60,18 @@ def _commands(eqy: Path) -> dict[str, list[list[str]]]:
     return out
 
 
+def _strategy_engines(eqy: Path) -> list[list[str]]:
+    """The engine each ``[strategy]`` section names (``engine smtbmc yices``), as words after ``engine``."""
+    out, section = [], None
+    for line in eqy.read_text(encoding="utf-8", errors="replace").splitlines():
+        words = line.split()
+        if line.strip().startswith("[") and line.strip().endswith("]"):
+            section = line.strip()[1:-1].split()[0] if line.strip()[1:-1].split() else None
+        elif section == "strategy" and words and words[0] == "engine":
+            out.append(words[1:])
+    return out
+
+
 def _reads(words: list[str]) -> list[str]:
     """The files one read command names."""
     if not words[0].startswith("read"):
@@ -84,6 +97,13 @@ def setup_files(eqy: Path) -> tuple[dict[str, list[str]], str | None]:
         if words[0].startswith("write") or words[0] in WRITES:
             return {}, (f"{eqy.name} uses {words[0]}, which writes a file, so one side could read what the other "
                         "wrote (refused, nothing ran)")
+    # M84 (docs/GATE_INPUTS.md): past the commands named above, only those a gate runs, and only engines and
+    # solvers it passes on (eqy hands a strategy's engine line to SBY, which writes it into a shell command).
+    problem = yosys_problem((" ".join(w) for cmds in commands.values() for w in cmds), eqy.name)
+    for words in _strategy_engines(eqy):
+        problem = problem or engine_problem(words, f"{eqy.name}'s strategy")
+    if problem:
+        return {}, problem
     gold = commands["gold"] + commands["script"]
     gate = commands["gate"] + commands["script"]
     if not commands["gold"] or not commands["gate"]:
