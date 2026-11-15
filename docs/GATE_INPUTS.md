@@ -61,17 +61,34 @@ refused `$system`, `$fopen`, `$c` and DPI in every source.
   `test.run` take Verilog sources only.
 - **Yosys scripts** (a `.sby`'s `[script]`, an `.eqy`'s `[gold]`, `[gate]` and
   `[script]`): no line starting with `!`, and every command in `YOSYS_SAFE`
-  (reading designs and transforming the one in memory).
+  (reading designs and transforming the one in memory). M85: every file a read
+  command (`read`, `read_verilog`, `verilog_defaults`, `verilog_defines`)
+  names, every `-I` or `-incdir` include folder, and a `hierarchy -libdir`
+  folder is a relative name of ordinary characters with no `..`
+  (`relative_problem`): so no absolute path, no `~/` (Yosys reads it as the
+  home folder), no `+/` (its share folder), no glob and no quote. A command
+  file (`read -f`, `-F`) is refused, since it names files the check never
+  reads. The values of `-D`, `-U`, `-setattr`, `-define` and `-undef` are not
+  files and are not checked as such.
 - **SBY setups**: the sections `[options]`, `[engines]`, `[script]`, `[files]`
   (and `[tasks]`, which the formal backends refuse themselves); the options in
   `SBY_OPTIONS`, each with a plain value; engines in `SBY_ENGINES`, each word a
   known solver or option; no `--pycode` line; no `[files]` destination
-  outside the run's folder and no folder copied.
+  outside the run's folder and no folder copied. M85: each `[files]` name, the
+  source and the destination, is a relative name as above, and the source,
+  through any link, is in the setup's folder or is one of the files the run
+  was given (`sources`: an approved file the platform links beside the setup,
+  M68's `beside`, is one); a link to anything else is refused
+  (`inside_problem`). This is checked before the Verilog check reads any file
+  the setup names, so a refusal never quotes a file of the host.
 - **eqy setups**: the sections in `EQY_SECTIONS`, eqy's own options on or off,
   a strategy's `use`, `depth`, `timeout` and `xprop` with plain values and its
   `engine` line checked as an SBY engine line (a strategy's `option` lines,
   which eqy writes into the `.sby` it runs, are refused), and the Yosys
-  allow list in `[gold]`, `[gate]` and `[script]`.
+  allow list in `[gold]`, `[gate]` and `[script]`. M85: every file a script
+  reads is, through any link, in the setup's folder or one of the run's
+  `sources`, and is checked as Verilog (a `$readmemh` in it would read any
+  path while Yosys elaborates).
 - **Constraints**: no quote, no backslash but a line continuation, no brace
   inside a word (so braces are the only quoting, and the check reads the
   commands Tcl would run), and every command, at a line's start, after a `;`
@@ -112,10 +129,11 @@ and write what the founder's account can. Until those runs get an account or
 sandbox of their own, run cocotb and firmware cases in CI, not on a personal
 machine. This milestone does not change them.
 
-Reading is not covered either: an `.sby` `[files]` source may still name an
-absolute path or one outside its folder, so a seat's setup can copy a file of
-the host into its run, where Yosys may print part of it to a log. That is a read,
-not a run, and a follow-up for the platform's security owner.
+Reading was not covered by M84: an `.sby` `[files]` source could name an
+absolute path or one outside its folder, and a Yosys read command a file or
+include folder anywhere, so a seat's setup could copy a file of the host into
+its run, where Yosys printed part of it to the log and the summary. M85 closes
+that (section 6).
 
 ## 5. The harness
 
@@ -128,3 +146,57 @@ development machine `harness_sha256()` was
 same on both too. What changes is which
 inputs a gate refuses: a seat file using a refused construct now fails its gate
 with the reason, where before it ran.
+
+## 6. Reads (M85)
+
+M85 found, with a marker file outside the run on Yosys 0.69 and SBY 0.69,
+that a seat's `.sby` could read a file of the host, and that its content
+reached the run's summary and log: a `[files]` entry naming the file by
+absolute path (`leak.vh /<host>/leak.vh`), by `..`, or through a link; a
+`[script]` read of an absolute path; an include folder (`read -formal
+-I/<host> m.v`, where `m.v` includes `leak.vh`). A design that puts the
+included text where an expression goes, under `default_nettype none`, makes
+Yosys name it in an error, which became the summary ("Identifier
+`\<marker>` is implicitly declared"). The M84 Verilog check itself read a
+`[files]` source wherever it was and named the `$` words it found in the
+refusal. An eqy setup could do the same through `-I`, `hierarchy -libdir`, a
+link, or a `$readmemh` path in a file it reads.
+
+In the `tools-in-loop` variant (M75) that summary, and a failed run's log
+excerpt, go back to the seat. The M75 screen (`seat_tools.screen`) refuses a
+word that starts with `/` or `~`, but not `-I/<host>`, so the read above
+passed it, and the seat read the marker in its call's result
+(`tests/test_gate_reads.py`, `test_a_seat_in_the_loop_never_reads_a_host_file`,
+fails without this change). The checks of section 2 now refuse every one of
+these before any step runs, behind the screen as for every run, so the screen
+and the broker are unchanged.
+
+What the broker passes back (`SeatTools._report`): each run's summary (the
+backend's parsed result, with credentials redacted, M53) and, for a failed
+run, an excerpt of its log (`runtime/files.py`, `excerpt`: the first 20
+notable lines, else the last 20, each cut at 240 characters). Those can name
+the run's own paths (its temporary directory, the tools' install paths), and
+show the content of files in the run: the seat's own and the approved files
+it was given. With the reads refused they carry no other file's content.
+Redacting paths there would change `harness.CODE` and `harness.LOOP_CODE`, so
+M85 leaves it.
+
+Tests: `tests/test_gate_reads.py`. Must-fail: each read above, for
+`formal.run` and `formal.cover`, is refused before any step, and the marker's
+content is in no output (the summary, the run's data, any file under the
+test's directory but the host folder, or the seat's call result); two
+controls bypass the check and find the content in the summary. Must-pass: an
+ordinary setup proves, a setup over an approved file linked beside it and
+given as `sources` proves, ordinary read commands pass, and every committed
+setup still passes (`tests/test_gate_inputs.py`). The history scan of
+section 3, rerun at `main` 05bc78d plus this change, prints the same counts
+and the same 7 refusals: no committed seat setup names a file outside its
+folder.
+
+No file in `harness.CODE` or `harness.LOOP_CODE` changes
+(`test_gate_reads.py`, `test_no_file_this_milestone_changes_is_harness_code`):
+on the development machine `harness_sha256()` was
+`sha256:69d8ae47d1b3f44b9e49a2d8b539edbcbcb8a3a50f10774998ba7219ac7481d9`
+and the `tools-in-loop` variant's
+`sha256:d1fb57c9524e68570a38b7ce4b6ae5eacc48b2b54dcf22a235de44dc2664d067`,
+the same with and without this change.

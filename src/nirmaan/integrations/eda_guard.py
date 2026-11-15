@@ -7,6 +7,10 @@ lines from them), a testbench's ``$system``, ``$fopen`` or ``$c``, a Verilator `
 ``exec`` in timing constraints, and a ``top`` that is not a name (it reaches Yosys and Tcl scripts as text,
 where a ``;`` or a new line starts a command of its own).
 
+M85 adds reads: every file a setup names (an SBY ``[files]`` entry, a file or include folder a Yosys read command
+names) is inside the run's own folder, or one of the files the run was given, so a setup cannot copy a file of the
+host into its run, where a tool's log, and so what a seat reads, could carry part of it.
+
 Every check here is an allow list: a construct it does not name is refused, so a tool's next release that adds
 a way out does not open one here. The backends call these before any step runs, and a refused input is a
 recorded failed run with the reason, never an exception. Code that is code by design (a cocotb test module, a
@@ -40,6 +44,35 @@ def name_problem(top: object) -> str | None:
     if not text or _NAME_RE.match(text):
         return None
     return f"top must be a plain module name (letters, digits, _ and $), not {text!r} {REFUSED}"
+
+
+#: M85: a file name a setup may give: relative, ordinary characters, no parent folder (``runtime.files.safe_path``).
+#: So no ``/`` or ``~`` at the start (Yosys reads ``~/`` as the home folder, ``+/`` as its own share folder), no
+#: ``..``, no glob, no quote.
+_RELATIVE_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.\-]*(/[A-Za-z0-9_][A-Za-z0-9_.\-]*)*$")
+#: How a read refusal ends.
+_OUTSIDE = ("a setup reads no file outside its own folder but the files its run is given "
+            "(docs/GATE_INPUTS.md, section 2)")
+
+
+def relative_problem(name: str, where: str) -> str | None:
+    """Why a file name a setup gives could lead outside its run's folder by itself, or None (M85)."""
+    if _RELATIVE_RE.match(name) and ".." not in name.split("/"):
+        return None
+    return (f"{where} names {name!r}, not a relative file name of ordinary characters with no '..'; "
+            f"{_OUTSIDE} {REFUSED}")
+
+
+def inside_problem(path: Path, folder: Path, given: Iterable[str | Path], where: str, name: str) -> str | None:
+    """Why ``path`` is outside the run (M85): through a link it leads out of ``folder`` and is none of the files the
+    run was given (``sources``, an approved file the platform links beside the setup, M68), or None.
+
+    The reason never names where the link leads, and nothing here reads the file.
+    """
+    real = path.resolve()
+    if real.is_relative_to(folder.resolve()) or real in {Path(g).resolve() for g in given}:
+        return None
+    return f"{where} names {name!r}, which leads outside the run's own folder; {_OUTSIDE} {REFUSED}"
 
 
 def path_problem(paths: Iterable[str]) -> str | None:
@@ -148,8 +181,48 @@ YOSYS_SAFE = frozenset({
 })
 
 
+#: M85: the allowed Yosys commands that read files, and the options of theirs whose value is not a file: one word
+#: after each of ``_VALUE``, every word after ``-define`` and ``-undef``. A ``-I`` or ``-incdir`` folder is checked
+#: as a file name is; ``-f`` and ``-F`` (a command file, naming files this check never sees) are refused.
+_READS = frozenset({"read", "read_verilog", "verilog_defaults", "verilog_defines"})
+_VALUE = frozenset({"-D", "-U", "-setattr"})
+
+
+def _read_names(words: list[str]) -> list[str] | None:
+    """The files and include folders one Yosys command names, or None when it names a command file."""
+    command, rest, names, i = words[0], words[1:], [], 0
+    if command == "hierarchy":
+        return [rest[k + 1] if k + 1 < len(rest) else "" for k, w in enumerate(rest) if w == "-libdir"]
+    if command not in _READS:
+        return []
+    while i < len(rest):
+        word = rest[i]
+        if word in ("-f", "-F"):
+            return None
+        if word in ("-define", "-undef"):
+            break
+        if word == "-incdir":
+            names += rest[i + 1:] or [""]
+            break
+        if word == "-I":
+            names.append(rest[i + 1] if i + 1 < len(rest) else "")
+            i += 1
+        elif word in _VALUE:
+            i += 1
+        elif word.startswith("-I"):
+            names.append(word[2:])
+        elif not word.startswith("-"):
+            names.append(word)
+        i += 1
+    return names
+
+
 def yosys_problem(lines: Iterable[str], where: str) -> str | None:
-    """Why these Yosys script lines cannot run, or None. A line may hold several commands, split by ``;``."""
+    """Why these Yosys script lines cannot run, or None. A line may hold several commands, split by ``;``.
+
+    M85: a command that reads names its files and include folders by relative names only (``relative_problem``):
+    the script runs where the setup's files are copied, so such a name reaches nothing else.
+    """
     for line in lines:
         text = line.strip()
         if not text or text.startswith("#"):
@@ -161,6 +234,13 @@ def yosys_problem(lines: Iterable[str], where: str) -> str | None:
             if words and words[0] not in YOSYS_SAFE:
                 return (f"{where} uses the Yosys command {words[0]!r}, which is not one a gate runs (it may write a "
                         f"file or run a program; allowed: {', '.join(sorted(YOSYS_SAFE))}) {REFUSED}")
+            names = _read_names(words) if words else []
+            if names is None:
+                return f"{where} gives {words[0]} a command file (-f or -F), whose files a gate never checks {REFUSED}"
+            for name in names:
+                problem = relative_problem(name, f"{where}'s {words[0]}")
+                if problem:
+                    return problem
     return None
 
 
@@ -213,8 +293,12 @@ def _header(text: str) -> tuple[str, str] | None:
     return None
 
 
-def sby_problem(sby: Path) -> str | None:
-    """Why an SBY setup cannot be run by a gate, or None (docs/GATE_INPUTS.md, section 2)."""
+def sby_problem(sby: Path, given: Iterable[str | Path] = ()) -> str | None:
+    """Why an SBY setup cannot be run by a gate, or None (docs/GATE_INPUTS.md, section 2).
+
+    M85: each ``[files]`` entry is a relative name, and its file is in the setup's folder or one of ``given`` (the
+    run's ``sources``); this is checked before any file it names is read.
+    """
     section, script, sources = None, [], []
     for line in sby.read_text(encoding="utf-8", errors="replace").splitlines():
         text = line.strip()
@@ -246,6 +330,14 @@ def sby_problem(sby: Path) -> str | None:
             for name in dest:
                 if Path(name).is_absolute() or ".." in Path(name).parts:
                     return f"{sby.name} copies a file to {name!r}, outside the run's own folder {REFUSED}"
+            where = f"{sby.name}'s [files]"
+            for name in (*dest, src):
+                problem = relative_problem(name, where)
+                if problem:
+                    return problem
+            problem = inside_problem(sby.parent / src, sby.parent, given, where, src)
+            if problem:
+                return problem
             path = (sby.parent / src).resolve()
             if path.is_dir():
                 return f"{sby.name} copies the folder {src!r}; a gate copies files only, each one checked {REFUSED}"

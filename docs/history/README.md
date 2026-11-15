@@ -135,6 +135,7 @@ The original preface of the section:
 - [M82-pd-ihp-pilot](M82-pd-ihp-pilot.md): Milestone 82 - The IHP SG13G2 physical design pilot in CI
 - [M83-testbench-refinements](M83-testbench-refinements.md): Milestone 83 - Block verification's testbench refinements for a scoreboard and for cocotb, and the cocotb testbench gate
 - [M84-gate-inputs](M84-gate-inputs.md): Milestone 84 - Gate inputs that reach the host
+- [M85-gate-reads](M85-gate-reads.md): Milestone 85 - Gate reads of host files
 
 ## Before M43
 
