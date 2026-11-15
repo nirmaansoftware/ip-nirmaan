@@ -90,6 +90,12 @@ FEATURES: list[FeatureRule] = [
     FeatureRule(feature="coverage", patterns=(r"\bcoverage\b",), description="Measured coverage (M68)"),
     FeatureRule(feature="equivalence", patterns=(r"\bequivalen(ce|t)\b",),
                 description="An equivalence check between two versions of the RTL (M68)"),
+    # M83 (W2-R3): two more testbench asks, the same way (docs/BLOCK_VERIFICATION.md, "Scoreboard and cocotb"):
+    # a scoreboard checked against a reference model, and Python tests through cocotb, which also changes the gate.
+    FeatureRule(feature="scoreboard", patterns=(r"\bscoreboard(s|ing)?\b", r"\breference models?\b"),
+                description="A scoreboard that checks the RTL against a reference model of the spec (M83)"),
+    FeatureRule(feature="cocotb", patterns=(r"\bcocotb\b", r"\bpython (testbench(es)?|tests?)\b"),
+                description="A testbench of Python tests run through cocotb, not HDL (M83)"),
     # M71: a regression investigation asked to reproduce its failure. No routing context of its own: it hands
     # over the RTL under investigation and gates triage and root cause on repro testbenches that fail on it
     # (docs/REPRO_GATES.md), and no other workflow reads it.
