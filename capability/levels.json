@@ -257,13 +257,11 @@
     "rtl_design": {
       "knowledge": {
         "check_record": "capability/records/knowledge/rtl_design.json",
-        "counts": false,
+        "counts": true,
         "knowledge_document": "knowledge/design/rtl_design.md",
-        "problems": [
-          "stale: the document changed after its check"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": [
         {
           "cases": [
@@ -344,44 +342,44 @@
     }
   },
   "totals": {
-    "knowledge": 6,
+    "knowledge": 7,
     "practised": 0,
     "proven": 0
   },
   "without_knowledge": [
     {
-      "case": "rtl/sync-fifo",
+      "case": "rtl/apb-regs",
       "passed": true,
       "reason": "run without knowledge documents (knowledge: off in the run manifest and the trial): never counts toward a level",
-      "record": "evals/results/2026-11-14-claude-code-claude-opus-5-5-without-knowledge-3",
+      "record": "evals/results/2026-11-14-claude-code-claude-opus-5-5-without-knowledge-5",
       "trial": 1
     },
     {
-      "case": "rtl/sync-fifo",
+      "case": "rtl/apb-regs",
       "passed": true,
       "reason": "run without knowledge documents (knowledge: off in the run manifest and the trial): never counts toward a level",
-      "record": "evals/results/2026-11-14-claude-code-claude-opus-5-5-without-knowledge-3",
+      "record": "evals/results/2026-11-14-claude-code-claude-opus-5-5-without-knowledge-5",
       "trial": 2
     },
     {
-      "case": "rtl/sync-fifo",
+      "case": "rtl/apb-regs",
       "passed": true,
       "reason": "run without knowledge documents (knowledge: off in the run manifest and the trial): never counts toward a level",
-      "record": "evals/results/2026-11-14-claude-code-claude-opus-5-5-without-knowledge-3",
+      "record": "evals/results/2026-11-14-claude-code-claude-opus-5-5-without-knowledge-5",
       "trial": 3
     },
     {
-      "case": "rtl/sync-fifo",
+      "case": "rtl/apb-regs",
       "passed": true,
       "reason": "run without knowledge documents (knowledge: off in the run manifest and the trial): never counts toward a level",
-      "record": "evals/results/2026-11-14-claude-code-claude-opus-5-5-without-knowledge-4",
+      "record": "evals/results/2026-11-14-claude-code-claude-opus-5-5-without-knowledge-6",
       "trial": 1
     },
     {
-      "case": "rtl/sync-fifo",
+      "case": "rtl/apb-regs",
       "passed": true,
       "reason": "run without knowledge documents (knowledge: off in the run manifest and the trial): never counts toward a level",
-      "record": "evals/results/2026-11-14-claude-code-claude-opus-5-5-without-knowledge-4",
+      "record": "evals/results/2026-11-14-claude-code-claude-opus-5-5-without-knowledge-6",
       "trial": 2
     }
   ]
