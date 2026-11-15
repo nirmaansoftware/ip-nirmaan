@@ -41,9 +41,9 @@ repository code that backs it.
 - Sequences, the implication operators and clocked property syntax belong to the
   richer SVA support that SymbiYosys documents for the Verific front end, which
   is part of the commercial Tabby CAD Suite and not of the open tools
-  [SbyVerific]. A local run of the open Yosys here (version 0.69) rejected a
-  clocked `assert property (@(posedge clk) a |-> b)` as a syntax error
-  (inference from one build; the front end decides, not the gate).
+  [SbyVerific]. Whether a given open build accepts a clocked
+  `assert property (@(posedge clk) a |-> b)` is decided by its front end, not by
+  the gate, and no run is recorded here.
 - Write assertions in the immediate subset the open front end reads: guard an
   implication with an `if` inside a clocked block and use `$past` for history
   (inference). An eval case for this skill states the same constraint in its
