@@ -249,14 +249,12 @@
     },
     "emulation_prototyping": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/emulation_prototyping.json",
+        "counts": true,
         "knowledge_document": "knowledge/verification/emulation_prototyping.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     },
     "equivalence_checking": {
@@ -449,6 +447,30 @@
           "unjudged": 0
         }
       ]
+    },
+    "portable_stimulus": {
+      "knowledge": {
+        "check_record": null,
+        "counts": false,
+        "knowledge_document": "knowledge/verification/portable_stimulus.md",
+        "problems": [
+          "no check record"
+        ]
+      },
+      "level": null,
+      "practised": []
+    },
+    "power_aware_verification": {
+      "knowledge": {
+        "check_record": null,
+        "counts": false,
+        "knowledge_document": "knowledge/verification/power_aware_verification.md",
+        "problems": [
+          "no check record"
+        ]
+      },
+      "level": null,
+      "practised": []
     },
     "python_verification": {
       "knowledge": {
@@ -645,6 +667,18 @@
       "level": null,
       "practised": []
     },
+    "verification_architecture": {
+      "knowledge": {
+        "check_record": null,
+        "counts": false,
+        "knowledge_document": "knowledge/verification/verification_architecture.md",
+        "problems": [
+          "no check record"
+        ]
+      },
+      "level": null,
+      "practised": []
+    },
     "verification_planning": {
       "knowledge": {
         "check_record": "capability/records/knowledge/verification_planning.json",
@@ -657,9 +691,19 @@
     },
     "verification_signoff": {
       "knowledge": {
+        "check_record": "capability/records/knowledge/verification_signoff.json",
+        "counts": true,
+        "knowledge_document": "knowledge/verification/verification_signoff.md",
+        "problems": []
+      },
+      "level": "knowledge",
+      "practised": []
+    },
+    "vip_integration": {
+      "knowledge": {
         "check_record": null,
         "counts": false,
-        "knowledge_document": "knowledge/verification/verification_signoff.md",
+        "knowledge_document": "knowledge/verification/vip_integration.md",
         "problems": [
           "no check record"
         ]
@@ -669,7 +713,7 @@
     }
   },
   "totals": {
-    "knowledge": 33,
+    "knowledge": 35,
     "practised": 0,
     "proven": 0
   },
