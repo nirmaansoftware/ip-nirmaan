@@ -450,26 +450,22 @@
     },
     "portable_stimulus": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/portable_stimulus.json",
+        "counts": true,
         "knowledge_document": "knowledge/verification/portable_stimulus.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     },
     "power_aware_verification": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/power_aware_verification.json",
+        "counts": true,
         "knowledge_document": "knowledge/verification/power_aware_verification.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     },
     "python_verification": {
@@ -667,14 +663,12 @@
     },
     "verification_architecture": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/verification_architecture.json",
+        "counts": true,
         "knowledge_document": "knowledge/verification/verification_architecture.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     },
     "verification_planning": {
@@ -709,7 +703,7 @@
     }
   },
   "totals": {
-    "knowledge": 37,
+    "knowledge": 40,
     "practised": 0,
     "proven": 0
   },

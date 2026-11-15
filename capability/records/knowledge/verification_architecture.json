@@ -1,0 +1,48 @@
+{
+  "format": "nirmaan.knowledge-check",
+  "skill": "verification_architecture",
+  "knowledge_document": "knowledge/verification/verification_architecture.md",
+  "document_sha256": "sha256:7cf7764a0477adc6284dfc36e2a061a94558aa2cd617a498730e6ba9c531af35",
+  "writer": "IP-W2-K8 session (wave 2 knowledge batch, plan row W2-K8, 2026-11-15), sentences fixed by IP-W2-K8B (ip#306)",
+  "checker": "IP-W2-C8B session (wave 2 check batch, lane IP-W2-C8B)",
+  "sources_read": [
+    "[OTDV] lowRISC, OpenTitan Design Verification Methodology: the whole page to its last section (exclusion categories included), https://opentitan.org/book/doc/contributing/dv/methodology/index.html",
+    "[OTFpv] lowRISC, OpenTitan Assertions and formal property verification: the whole page to the references, https://opentitan.org/book/hw/formal/index.html",
+    "[OTCip] lowRISC, OpenTitan Comportable IP Testbench Architecture, cip_lib: the whole page to the formal section pointer, https://opentitan.org/book/hw/dv/sv/cip_lib/index.html",
+    "[OTUart] lowRISC, OpenTitan UART DV document: the whole page, https://opentitan.org/book/hw/ip/uart/dv/index.html",
+    "[OTChip] lowRISC, OpenTitan Earl Grey Chip DV Document: the whole page including the template placeholders, https://opentitan.org/book/hw/top_earlgrey/dv/index.html"
+  ],
+  "result": "every claim tagged with a source was found in that source, and every line marked inference is a fair reading of the source it names or the document's own reasoning",
+  "notes": [
+    "The sentence W2-C8 held back is fixed. OTDV exclusion categories: UNSUPPORTED says 'Additional explanation is optional.', then lists three examples, then a line 'Additional explanation is mandatory.' that sits after the UNSUPPORTED examples and before the EXTERNAL heading; EXTERNAL and LOW_RISK each say mandatory. The document now states mandatory for low risk, optional for unsupported, and notes the later mandatory line, which is what the page shows. It no longer says the explanation is mandatory for both.",
+    "Matched to source: techniques, artefacts, testplan parts, DV document contents (OTDV); block, core and chip level descriptions, C tests and the stub CPU knob (OTDV); the chip goals, the three configurations and the template placeholders (OTChip); the CIP library classes, common vseq tests and the security fault injection (OTCip); stopat and black-box fault injection and connectivity tests run through dvsim from a table (OTFpv); the UART goals giving simulation feature verification and FPV TileLink protocol compliance, and the bound tlul_assert (OTUart); layered libraries, assertion monitor reuse, bound assertions, the XBAR generic testbench plan, black-boxed pre-verified sub-modules with IO toggle coverage, exclusions not reused from block to top, and the sign-off review attendees (OTDV).",
+    "'Each exclusion carries its category and reason': OTDV requires annotations on all exclusions and recommends a category prefix; the document's wording is within that."
+  ],
+  "checked_at": "2026-11-15",
+  "gate_claims": [
+    {
+      "claim": "this skill's card holds no tool",
+      "evidence": "src/nirmaan/company/skills.py:376"
+    },
+    {
+      "claim": "the first body line states the tier Knowledge only because no tool of the skill is available",
+      "evidence": "src/nirmaan/org/knowledge_files.py:172"
+    },
+    {
+      "claim": "the document passes the knowledge-file checks (front matter, sources, no dash, size, tier line)",
+      "evidence": "tests/test_knowledge_files.py::test_every_knowledge_document_passes"
+    },
+    {
+      "claim": "the tier follows from tool status (no available tool means knowledge only)",
+      "evidence": "tests/test_knowledge_files.py::test_the_tier_is_computed_from_tool_status"
+    },
+    {
+      "claim": "every feature has a verification method (the card's own check)",
+      "evidence": "src/nirmaan/company/skills.py:380"
+    },
+    {
+      "claim": "no source read states a rule for deciding the simulation and formal split (split read from what the project does)",
+      "evidence": "unverified"
+    }
+  ]
+}
