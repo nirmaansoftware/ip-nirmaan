@@ -306,14 +306,12 @@
     },
     "gate_level_simulation": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/gate_level_simulation.json",
+        "counts": true,
         "knowledge_document": "knowledge/verification/gate_level_simulation.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     },
     "hardware_fuzzing": {
@@ -565,19 +563,17 @@
     },
     "verification_planning": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/verification_planning.json",
+        "counts": true,
         "knowledge_document": "knowledge/verification/verification_planning.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     }
   },
   "totals": {
-    "knowledge": 25,
+    "knowledge": 27,
     "practised": 0,
     "proven": 0
   },
