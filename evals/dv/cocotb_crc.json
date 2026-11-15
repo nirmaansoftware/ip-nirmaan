@@ -1,0 +1,78 @@
+{
+  "id": "dv/cocotb-crc",
+  "request": "Verify the existing CRC block RTL with a cocotb testbench.",
+  "seat": "testbench",
+  "skills": [
+    "directed_testing",
+    "python_verification"
+  ],
+  "expected_behavior": "Python tests for the approved crc8_block RTL (CRC-8, polynomial 0x07, start value 0xFF, bytes taken bit 7 first with no reflection, check value inverted; init reloads and wins over a byte, valid low holds), run by cocotb under the cocotb testbench gate before review, written from the approved interface specification, that pass on the approved RTL and fail on RTL that breaks any requirement of that specification. The tests drive the block from Python, compare the crc after every edge with a model of the specification written in Python, and fail themselves when the random run never reached init together with valid, an idle cycle or a reset mid-frame.",
+  "constraints": [
+    "Work only from the approved interface specification and the approved RTL; never change the RTL.",
+    "Write the testbench as Python tests that cocotb runs; the platform runs them with the cocotb backend, and the tests end only by passing or by a failed assertion.",
+    "Take stimulus from a fixed seed so a run repeats, and write the model from the specification, not from the RTL."
+  ],
+  "known_failure_modes": [
+    "Python tests that send one fixed message and check one check value, so a valid that is ignored or a reload that loses to a byte passes.",
+    "Python tests that assert nothing after the clock starts, so every mutant passes: cocotb reports a test that raises no error as passed.",
+    "A model copied from the RTL, so a wrong polynomial tap passes.",
+    "Python tests whose random run never offers init together with valid, so a reload that loses to a byte passes.",
+    "Python tests that cannot tell a wrong polynomial tap, a reflected byte, a missing final inversion, a reload that loses to a byte or a valid that is ignored from the approved RTL; the must-fail control fails them."
+  ],
+  "upstream": {
+    "interface-spec": [
+      {
+        "path": "tests/fixtures/dv/crc8/interface_spec.md",
+        "kind": "interface_spec"
+      }
+    ],
+    "design-under-test": [
+      {
+        "path": "tests/fixtures/dv/crc8/crc8_block.v",
+        "kind": "rtl_source",
+        "entry": "crc8_block"
+      }
+    ]
+  },
+  "reference": [
+    {
+      "path": "tests/fixtures/dv/crc8/crc8_block_cocotb.py",
+      "kind": "testbench",
+      "entry": "crc8_block"
+    }
+  ],
+  "held_out": [
+    {
+      "name": "The seat's cocotb tests pass the approved RTL and fail each CRC block mutant",
+      "scorer": "must-fail",
+      "tool": "simulator.run",
+      "params": {
+        "backend": "cocotb"
+      },
+      "seat_files": {
+        "cocotb": [
+          "testbench"
+        ]
+      },
+      "seat_entries": {
+        "top": [
+          "testbench"
+        ]
+      },
+      "case_files": {
+        "sources": [
+          "tests/fixtures/dv/crc8/crc8_block.v"
+        ]
+      },
+      "mutants": {
+        "tests/fixtures/dv/crc8/crc8_block.v": [
+          "tests/fixtures/dv/crc8/mutants/crc8_block_poly_tap.v",
+          "tests/fixtures/dv/crc8/mutants/crc8_block_reflected_input.v",
+          "tests/fixtures/dv/crc8/mutants/crc8_block_no_final_xor.v",
+          "tests/fixtures/dv/crc8/mutants/crc8_block_init_loses.v",
+          "tests/fixtures/dv/crc8/mutants/crc8_block_hold_ignored.v"
+        ]
+      }
+    }
+  ]
+}

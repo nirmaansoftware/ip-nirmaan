@@ -555,6 +555,7 @@ def test_the_runner_records_a_human_attestation_on_the_seat(nirmaan_org, fixed_c
 def test_the_shipped_cases_name_the_skills_they_judge(nirmaan_org):
     named = {c.id: c.skills for c in load_cases(EVALS)}
     assert named == {
+        "dv/cocotb-crc": ("directed_testing", "python_verification"),
         "dv/coverage-irq-ctrl": ("code_coverage",),
         "dv/directed-irq-ctrl": ("directed_testing", "systemverilog"),
         "dv/formal-credit-counter": ("formal_verification", "sva", "assertion_coverage"),
@@ -562,6 +563,7 @@ def test_the_shipped_cases_name_the_skills_they_judge(nirmaan_org):
         "dv/prove-deep-counter": ("model_checking",),
         "dv/random-crc": ("directed_testing", "constrained_random"),
         "dv/equiv-gray": ("equivalence_checking",),
+        "dv/scoreboard-mac": ("directed_testing", "reference_modelling"),
         "debug/root-cause-uart-tx": ("root_cause_analysis",),
         "debug/triage-three-bugs": ("failure_triage",),
         "firmware/axi4-lite-driver": ("device_drivers",),

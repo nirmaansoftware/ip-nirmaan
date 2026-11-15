@@ -150,7 +150,8 @@ a proof seat that ships its own `counter.v` and is refused.
   `dv/formal-credit-counter` and `dv/prove-deep-counter`, and W2-E3 the
   random-stimulus testbench `dv/random-crc` and the equivalence seat's
   `dv/equiv-gray`; W2-E4 added the two debug cases `debug/root-cause-uart-tx`
-  and `debug/triage-three-bugs`; W2-E5 the coverage seat's `dv/coverage-irq-ctrl`:
+  and `debug/triage-three-bugs`; W2-E5 the coverage seat's `dv/coverage-irq-ctrl`; W2-E6 the two M83
+  refinements' cases, `dv/scoreboard-mac` and `dv/cocotb-crc`:
   `docs/EVAL_SKILLS_MUST_FAIL.md`),
   and the department cut. The role ids
   in the tests are today's; a cut that renames them moves the tests with it.
@@ -208,4 +209,5 @@ are tested in their own file, so the department-cut comparison (M77) over the
 golden requests is untouched. No eval case, prompt fixture, harness file, tool
 or count changes.
 
-**Not here.** The two eval cases (W2-E6), and their knowledge documents.
+**Not here.** The knowledge documents of the two skills. The two eval cases came
+after (W2-E6, `docs/EVAL_SKILLS_MUST_FAIL.md`).
