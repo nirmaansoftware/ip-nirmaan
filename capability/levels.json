@@ -240,6 +240,18 @@
       "level": "knowledge",
       "practised": []
     },
+    "failure_triage": {
+      "knowledge": {
+        "check_record": null,
+        "counts": false,
+        "knowledge_document": "knowledge/verification/failure_triage.md",
+        "problems": [
+          "no check record"
+        ]
+      },
+      "level": null,
+      "practised": []
+    },
     "formal_verification": {
       "knowledge": {
         "check_record": "capability/records/knowledge/formal_verification.json",
@@ -318,6 +330,18 @@
         "problems": []
       },
       "level": "knowledge",
+      "practised": []
+    },
+    "log_analysis": {
+      "knowledge": {
+        "check_record": null,
+        "counts": false,
+        "knowledge_document": "knowledge/verification/log_analysis.md",
+        "problems": [
+          "no check record"
+        ]
+      },
+      "level": null,
       "practised": []
     },
     "model_checking": {
@@ -409,6 +433,18 @@
         "problems": []
       },
       "level": "knowledge",
+      "practised": []
+    },
+    "root_cause_analysis": {
+      "knowledge": {
+        "check_record": null,
+        "counts": false,
+        "knowledge_document": "knowledge/verification/root_cause_analysis.md",
+        "problems": [
+          "no check record"
+        ]
+      },
+      "level": null,
       "practised": []
     },
     "rtl_design": {
