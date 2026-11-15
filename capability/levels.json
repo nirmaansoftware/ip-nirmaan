@@ -144,14 +144,12 @@
     },
     "code_coverage": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/code_coverage.json",
+        "counts": true,
         "knowledge_document": "knowledge/verification/code_coverage.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     },
     "control_logic_design": {
