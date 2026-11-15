@@ -1,0 +1,95 @@
+{
+  "format": "nirmaan.knowledge-check",
+  "skill": "code_coverage",
+  "knowledge_document": "knowledge/verification/code_coverage.md",
+  "document_sha256": "sha256:f84f6293d2774b3522caaa5b9c61bede298781ba15b2b767f005a4ee1b30bda9",
+  "writer": "IP-W2-K1 session (wave 2 knowledge batch, plan row W2-K1, 2026-11-15)",
+  "checker": "IP-W2-C1 session (wave 2 check records, plan row W2-C1, 2026-11-15)",
+  "sources_read": [
+    "[VCov] Verilator manual, Simulating (Verilated-Model Runtime), Coverage Analysis through Coverage Collection: the whole page (version 5.054 text), https://verilator.org/guide/latest/simulating.html",
+    "[VCovExe] Verilator manual, verilator_coverage: the whole page, https://verilator.org/guide/latest/exe_verilator_coverage.html",
+    "[OTDV] lowRISC, OpenTitan Design Verification Methodology (Apache 2.0): the whole page, https://opentitan.org/book/doc/contributing/dv/methodology/index.html",
+    "Repository code at the lines cited in gate_claims, and Verilator 5.052 run locally on a small design with --coverage-line --coverage-toggle"
+  ],
+  "result": "every claim tagged with a source was found in that source, every line marked inference is a fair reading of the source it names or the document's own reasoning, and every sentence about the platform's gates matches the gate code at the lines cited in gate_claims, with one imprecision noted",
+  "notes": [
+    "[VCov]: line, branch and toggle definitions, the toggle exclusions (task or begin/end locals, leading underscore, integers, over 256 bits), per-parameter-set counting, edges near time zero with the advice to zero coverage before reset release, the UNOPTFLAT over-count and the $stop rule are each on the page as the document says.",
+    "[VCovExe]: --annotate marks a line below --annotate-min (default 10) with %, --annotate-points shows each point, the usage list holds the console report forms (--report summary, hier), and the page says to remove conditions that never occur with $stop or coverage_off. The closing line of the document, that point counts show whether new stimulus reached new points, is a reading of --report and --rank, which the page does not state in those words; it is inference-level and fair.",
+    "[OTDV]: the code metrics (line, toggle, FSM state and transition, conditional, branch), toggle closed on ports only, code coverage not a verdict, and the exclusion rules are on the page. The document says OpenTitan 'records every exclusion with a category tag'; the page says annotations 'can be prefixed' with a category tag and that exclusions 'almost always' fall in the five categories, and requires annotation of ALL exclusions. A fair summary. The explanation is mandatory for UNSUPPORTED, EXTERNAL and LOW_RISK, as the document says; the designer sign-off is on the page.",
+    "Version: the manual text read is 5.054; the repository's CI uses apt Verilator 5.020 and the local one is 5.052 (eda.py comment at COVERAGE_MAIN). The document's [VCov] statements are the long-standing ones; no FSM, expression or covergroup claim is made.",
+    "Run locally with Verilator 5.052 and --coverage-line --coverage-toggle on a design with one if/else: the data held line, toggle and also two points of type branch (the if and else arms), so a requirement's branch bound can be met from that build. This agrees with the document's hedge that branch percentages come from whatever points the data holds. The Arguments page says if/else branches are covered with --coverage-branch; the version run disagreed, and the gate reads the type from the data, as claimed.",
+    "Gate lines: the build is eda.py:595, the data steps eda.py:598-599, the pass and fail rules eda_parsers.py:557-580, the source and design rules eda.py:525-563. The tool's own description (tools.py:137-142) says the same as the document. Test cover: tests/test_coverage_read.py::test_only_the_design_files_count_and_percentages_round_down and ::test_the_testbench_is_never_measured_and_design_files_must_be_sources.",
+    "Reported to the document's owner, not edited here: (1) 'a coverage on/off pragma' is matched for off only; (2) the document cites eda_parsers.py:544-556 for bounds; the check itself is runtime/tools.py:187-199 with workflow.py:152-161, and the docstring at 554 only names it; (3) the page is 5.054, so a reader on 5.020 should expect small differences. None changes a Knowledge reading."
+  ],
+  "gate_claims": [
+    {
+      "claim": "coverage.read builds with Verilator --coverage-line and --coverage-toggle (line and toggle only), runs the testbench, then verilator_coverage reads the data",
+      "evidence": "src/nirmaan/integrations/eda.py:595"
+    },
+    {
+      "claim": "the data is written back with verilator_coverage --write and an lcov report with --write-info",
+      "evidence": "src/nirmaan/integrations/eda.py:598"
+    },
+    {
+      "claim": "branch percentages in the result come from whatever points the data holds (the type is the point's t key; the build does not ask for branch)",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:525"
+    },
+    {
+      "claim": "the simulation is judged first as simulator.run judges it (one verdict with the run's nonce, no failed check) and, if it fails, coverage is not read",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:557"
+    },
+    {
+      "claim": "only points in the design files count; the default design is every source except the file that declares the top module",
+      "evidence": "src/nirmaan/integrations/eda.py:516"
+    },
+    {
+      "claim": "a design parameter names the design files; each must be among the sources",
+      "evidence": "src/nirmaan/integrations/eda.py:542"
+    },
+    {
+      "claim": "none of the design files may declare the top module (the testbench is never measured)",
+      "evidence": "src/nirmaan/integrations/eda.py:549"
+    },
+    {
+      "claim": "a percentage is points hit at least once over all points, rounded down to two places, so it never rounds up into a bound",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:575"
+    },
+    {
+      "claim": "a design file with no coverage point at all fails the run",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:571"
+    },
+    {
+      "claim": "no source may use $fopen, $system, $c or DPI, the testbench included",
+      "evidence": "src/nirmaan/integrations/eda.py:508"
+    },
+    {
+      "claim": "a source that is not a design file may not carry a Verilator configuration, an include or a coverage off pragma (design files may)",
+      "evidence": "src/nirmaan/integrations/eda.py:513"
+    },
+    {
+      "claim": "a source that is not a design file may not carry a coverage on pragma: the gate matches coverage_off and coverage_block_off only, not coverage_on (the document says 'coverage on/off pragma'; a lone coverage_on turns nothing off, so the reason given holds)",
+      "evidence": "src/nirmaan/integrations/eda.py:513"
+    },
+    {
+      "claim": "the gate refuses coverage_off only outside design files, so a gap hidden in a design file is not caught",
+      "evidence": "src/nirmaan/integrations/eda.py:552"
+    },
+    {
+      "claim": "the gate sets no threshold; a requirement's bounds on line, toggle and branch are checked after a passing run",
+      "evidence": "src/nirmaan/runtime/tools.py:196"
+    },
+    {
+      "claim": "a bound on a metric the run did not report fails (so a branch bound needs branch points in the data)",
+      "evidence": "src/nirmaan/models/workflow.py:156"
+    },
+    {
+      "claim": "the tool is available, so the document opens with Practising",
+      "evidence": "src/nirmaan/org/knowledge_files.py:53"
+    },
+    {
+      "claim": "the skill holds coverage.read, which is AVAILABLE",
+      "evidence": "src/nirmaan/company/tools.py:137"
+    }
+  ],
+  "checked_at": "2026-11-15"
+}

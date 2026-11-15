@@ -1,0 +1,100 @@
+{
+  "format": "nirmaan.knowledge-check",
+  "skill": "synthesis_awareness",
+  "knowledge_document": "knowledge/design/synthesis_awareness.md",
+  "document_sha256": "sha256:58843f2dea555b388085a604214533761883c62ddc1abf1465911ad7d1bbad11",
+  "writer": "RETRO-A5 session (retrospective action A5, item P3-K3, 2026-11-15)",
+  "checker": "RETRO-A4C session (retrospective action A4, third recheck of P3-C3, 2026-11-15)",
+  "sources_read": [
+    "[Synth] YosysHQ, Yosys command reference, Technology libraries, Generic (the synth command): the whole page, https://yosyshq.readthedocs.io/projects/yosys/en/latest/cmd/index_techlibs_common.html",
+    "[Proc] YosysHQ, Yosys command reference, Converting process blocks (proc and every proc_* pass): the whole page, https://yosyshq.readthedocs.io/projects/yosys/en/latest/cmd/index_passes_proc.html",
+    "[Opt] YosysHQ, Yosys command reference, Optimization passes: the whole page, https://yosyshq.readthedocs.io/projects/yosys/en/latest/cmd/index_passes_opt.html",
+    "[Primer] YosysHQ, Yosys documentation, A primer on digital circuit synthesis: the whole page, https://yosyshq.readthedocs.io/projects/yosys/en/latest/appendix/primer.html",
+    "[Verilog] YosysHQ, Yosys documentation, Notes on Verilog support in Yosys: the whole page, https://yosyshq.readthedocs.io/projects/yosys/en/latest/using_yosys/verilog.html",
+    "[Pipe] Gisselquist, Strategies for pipelining logic, ZipCPU blog, 2017: the whole post, https://zipcpu.com/blog/2017/08/14/strategies-for-pipelining.html",
+    "Repository code at the lines cited in gate_claims"
+  ],
+  "result": "every cited URL answers 200; every claim tagged with a source was found in that source, every line marked inference is a fair reading of the source it names or the document's own reasoning, and every sentence about the platform's gates matches the gate code at the lines cited in gate_claims, with the backend selection and the latch behaviour confirmed by running the code",
+  "notes": [
+    "URLs: all six fetched with HTTP 200. The pages are the latest docs (0.71-dev); Yosys 0.69 was run locally and agrees on every behaviour used here.",
+    "Latch: a latch design (always @* if (en) q = d) run through synth -top and stat -json under Yosys 0.69 exits 0, prints 'Warning: Latch inferred for signal' and reports $_DLATCH_P_ 1. parse_yosys on that log and stat returned passed True with latches 1 and a one-warning summary, so the latch passes the backend and the rtl stage bound at_most latches 0 is what fails it. Also run: cells are internal gate types ($_DLATCH_P_), not library cells.",
+    "Backend selection, run with both backends registered (physical imported after eda): order is ['yosys','yosys-liberty']; select_backend with a liberty param and no backend returns yosys; backend=yosys-liberty with no liberty is refused ('needs a Liberty file'); with a missing file it is refused ('liberty not found'); an unknown backend name is refused. All match the document.",
+    "Async reset form: the Primer lists three forms (@* combinational or latched, clocked with synchronous reset, clocked with asynchronous reset whose sensitivity list holds only clock and reset edges and whose reset values are constant) and says only these are in the synthesis standard. The document says the same.",
+    "Proc: proc_arst, proc_dff, proc_dlatch and proc_memwr find asynchronous resets, flip-flops, latches and memory writes. Verilog page: tri, triand, trior, config, disable and the non-synthesizable features of IEC 62142 / IEEE 1364.1 are unsupported; full_case, parallel_case and translate_off are supported (ifdef recommended); the init attribute is set for FPGA-style initial values and 'can be used during synthesis to add the necessary reset logic'. The document's 'carries an initial value as an init attribute rather than as reset logic' is the first half plus an inference not to rely on it, and is marked so.",
+    "Citation gap, one tag short: 'use always_latch when a latch is intended' sits under [Primer] [Proc]; the support is the Verilog page (always_latch processes are exempt from the proc -latches policy), not Primer or Proc. The claim is true and the Verilog page is a listed source.",
+    "Opt: opt_balance_tree turns cascades of $and/$or/$xor/$add/$mul into trees to improve timing; opt_clean removes unused cells and wires; opt_merge consolidates identical cells; opt_expr folds constants. Synth: the script lists hierarchy, proc, fsm (fsm_recode), wreduce, memory, techmap. Pipe: a combinational BUSY accumulates stage by stage and can approach the clock period; registering it costs a clock and needs a buffer. The '(card)' tag on the timing-surprise line is the skill card, skills.py:346.",
+    "The cell-count-is-not-area line and the multiplier growth line are the document's own marked inference; no run record backs a measured figure and the document says so.",
+    "Not checked: the rtl_lint cross-reference only for existence (knowledge/design/rtl_lint.md exists)."
+  ],
+  "gate_claims": [
+    {
+      "claim": "the default synth.run backend reads the sources and runs synth -top <top> then stat -json, no flatten, no technology library",
+      "evidence": "src/nirmaan/integrations/eda.py:603"
+    },
+    {
+      "claim": "the plain yosys backend is registered for synth.run",
+      "evidence": "src/nirmaan/integrations/eda.py:812"
+    },
+    {
+      "claim": "synth.run needs a top module",
+      "evidence": "src/nirmaan/company/tools.py:178"
+    },
+    {
+      "claim": "the backend passes on exit 0 and no ERROR line; warnings including the latch warning do not fail it",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:287"
+    },
+    {
+      "claim": "the latch count is only counted, from type names containing LATCH, and flip-flops from names containing FF",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:283"
+    },
+    {
+      "claim": "the kept numbers are cells, wires, cells by type, flip-flops and latches",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:281"
+    },
+    {
+      "claim": "the rtl stage gate fails a latch: latch count at most 0",
+      "evidence": "src/nirmaan/company/workflows.py:114"
+    },
+    {
+      "claim": "there is no delay figure from synthesis; timing comes from sta.run",
+      "evidence": "src/nirmaan/company/tools.py:183"
+    },
+    {
+      "claim": "select_backend keeps all backends when no backend param, or only the named one, and returns the first whose executables and environment are present",
+      "evidence": "src/nirmaan/integrations/eda.py:166"
+    },
+    {
+      "claim": "yosys-liberty is registered after yosys, so without backend=yosys-liberty the plain run happens even if a Liberty file is given",
+      "evidence": "src/nirmaan/integrations/physical.py:540"
+    },
+    {
+      "claim": "backend yosys-liberty needs a Liberty file",
+      "evidence": "src/nirmaan/integrations/physical.py:541"
+    },
+    {
+      "claim": "yosys-liberty maps flip-flops (dfflibmap) and logic (abc) to library cells and writes a netlist",
+      "evidence": "src/nirmaan/integrations/physical.py:170"
+    },
+    {
+      "claim": "yosys-liberty records an area figure from stat -liberty",
+      "evidence": "src/nirmaan/integrations/physical.py:190"
+    },
+    {
+      "claim": "the backend selection for synth.run behaves as stated (run: yosys chosen with a liberty param; yosys-liberty refused without or with a missing Liberty file; unknown name refused)",
+      "evidence": "src/nirmaan/integrations/eda.py:166"
+    },
+    {
+      "claim": "a latch passes parse_yosys with latches counted (run on a Yosys 0.69 log and stat)",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:287"
+    },
+    {
+      "claim": "the synthesis_awareness skill card lists timing surprises as its failure and points to this document",
+      "evidence": "src/nirmaan/company/skills.py:346"
+    },
+    {
+      "claim": "the lint tool and the rtl_lint document are named for latch and width findings",
+      "evidence": "unverified"
+    }
+  ],
+  "checked_at": "2026-11-15"
+}

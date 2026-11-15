@@ -144,14 +144,12 @@
     },
     "code_coverage": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/code_coverage.json",
+        "counts": true,
         "knowledge_document": "knowledge/verification/code_coverage.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     },
     "constrained_random": {
@@ -406,19 +404,17 @@
     },
     "synthesis_awareness": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/synthesis_awareness.json",
+        "counts": true,
         "knowledge_document": "knowledge/design/synthesis_awareness.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     }
   },
   "totals": {
-    "knowledge": 11,
+    "knowledge": 12,
     "practised": 0,
     "proven": 0
   },
@@ -452,6 +448,27 @@
       "trial": 1
     },
     {
+      "case": "rtl/axil-timer",
+      "passed": true,
+      "reason": "run without knowledge documents (knowledge: off in the run manifest and the trial): never counts toward a level",
+      "record": "evals/results/2026-11-14-claude-code-claude-opus-5-5-without-knowledge-13",
+      "trial": 1
+    },
+    {
+      "case": "rtl/axil-timer",
+      "passed": true,
+      "reason": "run without knowledge documents (knowledge: off in the run manifest and the trial): never counts toward a level",
+      "record": "evals/results/2026-11-14-claude-code-claude-opus-5-5-without-knowledge-13",
+      "trial": 2
+    },
+    {
+      "case": "rtl/axil-timer",
+      "passed": false,
+      "reason": "run without knowledge documents (knowledge: off in the run manifest and the trial): never counts toward a level",
+      "record": "evals/results/2026-11-14-claude-code-claude-opus-5-5-without-knowledge-14",
+      "trial": 1
+    },
+    {
       "case": "rtl/rr-arbiter",
       "passed": true,
       "reason": "run without knowledge documents (knowledge: off in the run manifest and the trial): never counts toward a level",
@@ -569,6 +586,27 @@
       "reason": "run without knowledge documents (knowledge: off in the run manifest and the trial): never counts toward a level",
       "record": "evals/results/2026-11-14-claude-code-claude-opus-5-5-without-knowledge-8",
       "trial": 2
+    },
+    {
+      "case": "rtl/skid-buffer",
+      "passed": true,
+      "reason": "run without knowledge documents (knowledge: off in the run manifest and the trial): never counts toward a level",
+      "record": "evals/results/2026-11-14-claude-code-claude-opus-5-5-without-knowledge-9",
+      "trial": 1
+    },
+    {
+      "case": "rtl/skid-buffer",
+      "passed": true,
+      "reason": "run without knowledge documents (knowledge: off in the run manifest and the trial): never counts toward a level",
+      "record": "evals/results/2026-11-14-claude-code-claude-opus-5-5-without-knowledge-9",
+      "trial": 2
+    },
+    {
+      "case": "rtl/skid-buffer",
+      "passed": true,
+      "reason": "run without knowledge documents (knowledge: off in the run manifest and the trial): never counts toward a level",
+      "record": "evals/results/2026-11-14-claude-code-claude-opus-5-5-without-knowledge-9",
+      "trial": 3
     }
   ]
 }

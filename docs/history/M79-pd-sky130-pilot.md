@@ -27,3 +27,7 @@ release by sha256; `workflow_dispatch` plus a paths filter; not required.
 The pilot test is collected only under `NIRMAAN_PD_PILOT`.
 
 **Counts.** None change: `pv.run` was already `AVAILABLE`.
+
+Update (2026-11-15): the founder's decision is now recorded in
+`council/records/2026-10-18-capability-buildout.md` (Founder decisions,
+"Physical design tools in CI"); the "pending" wording above is kept as written at the time.
