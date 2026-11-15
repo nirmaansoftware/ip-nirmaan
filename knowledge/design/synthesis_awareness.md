@@ -79,7 +79,7 @@ that backs it. This card holds no tool; the tool it points to is `synth.run`.
   happens, even if a Liberty file is given. Named, `yosys-liberty` needs a
   Liberty file, maps flip-flops and logic to library cells, records an area
   figure from `stat -liberty` and writes a netlist (gate:
-  src/nirmaan/integrations/physical.py:161-197). Timing comes from a separate tool,
+  src/nirmaan/integrations/physical.py:161-198). Timing comes from a separate tool,
   `sta.run` (gate: src/nirmaan/company/tools.py:183), not from synthesis.
 
 ## Estimating depth and area before a run
@@ -106,7 +106,7 @@ that backs it. This card holds no tool; the tool it points to is `synth.run`.
 - Latches from incomplete assignment in combinational blocks; write a default
   or use `always_latch` when a latch is intended [Primer] [Proc].
 - Delays, `initial` values as the only reset, and testbench-only constructs in
-  RTL. Yosys carries an `initial` value as an `init` attribute rather than as
+  RTL (inference). Yosys carries an `initial` value as an `init` attribute rather than as
   reset logic [Verilog] (inference: do not rely on it for reset).
 - Attributes such as `full_case` and `parallel_case`, and the `translate_off`
   directives: Yosys honours them [Verilog], but they let simulation and
