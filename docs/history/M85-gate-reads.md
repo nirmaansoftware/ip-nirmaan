@@ -26,3 +26,13 @@ seat reads is the run's summary and a capped log excerpt, which can carry only
 the run's own paths and files now. The harness fingerprint is unchanged. The
 history scan finds no committed seat setup that reads outside its folder. No
 count changes.
+
+**Follow-up (ip#309's review).** Key 2 and the Founder Proxy found that the
+Verilog check still followed an `` `include `` beside a file through a link
+and named the `$` words of the host file it reached in the refusal, which
+reaches the seat in the attempts-3 repair text and the in-loop broker's
+report. Confirmed with a marker file. `verilog_problem` now reads an included
+file only when it resolves inside the folder of a file checked;
+any other include is refused by its name, "leads outside the sandbox",
+unread. The harness fingerprint is unchanged (`eda_guard.py` is in neither
+`harness.CODE` nor `harness.LOOP_CODE`).

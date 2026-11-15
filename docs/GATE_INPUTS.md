@@ -56,6 +56,11 @@ refused `$system`, `$fopen`, `$c` and DPI in every source.
   `$fopen`, `$readmem*`, `$writemem*`, `$c`), DPI, `` `systemc_* `` blocks,
   token pasting, and an `` `include `` of anything but a relative file in the
   includer's folder; an included file is checked whatever its name.
+  An included file is read only when, through any link, it is inside the
+  folder of one of the files checked: an include that leads
+  anywhere else (a link to a file or a folder of the host) is refused by
+  the name it is included as, "leads outside the sandbox", and is never
+  read (ip#309's follow-up).
   Strings and comments are skipped. Which file may end a simulation or read a
   plusarg is still the M53 testbench rule's matter. `simulator.run` and
   `test.run` take Verilog sources only.
@@ -80,7 +85,8 @@ refused `$system`, `$fopen`, `$c` and DPI in every source.
   was given (`sources`: an approved file the platform links beside the setup,
   M68's `beside`, is one); a link to anything else is refused
   (`inside_problem`). This is checked before the Verilog check reads any file
-  the setup names, so a refusal never quotes a file of the host.
+  the setup names, and an include is read only inside the run (the
+  Verilog check above), so a refusal never quotes a file of the host.
 - **eqy setups**: the sections in `EQY_SECTIONS`, eqy's own options on or off,
   a strategy's `use`, `depth`, `timeout` and `xprop` with plain values and its
   `engine` line checked as an SBY engine line (a strategy's `option` lines,
@@ -180,6 +186,17 @@ show the content of files in the run: the seat's own and the approved files
 it was given. With the reads refused they carry no other file's content.
 Redacting paths there would change `harness.CODE` and `harness.LOOP_CODE`, so
 M85 leaves it.
+
+ip#309's follow-up: the Verilog check followed an `` `include `` through a
+link, so a refusal could name the `$` words of a host file reached that
+way, and that refusal is what the attempts-3 repair text (M74,
+`prompt._repair`) and the broker's report (M75, `SeatTools._report`)
+pass to the seat. The check now refuses such an include unread
+(section 2), so both carry the include's name only. Neither path is
+changed: a refused run writes no log, so neither has an excerpt to
+redact. `tests/test_gate_reads.py`,
+`test_an_include_linked_out_of_the_run_is_refused_unread_and_quoted_nowhere`,
+checks the refusal, the repair text and the broker's report for the marker.
 
 Tests: `tests/test_gate_reads.py`. Must-fail: each read above, for
 `formal.run` and `formal.cover`, is refused before any step, and the marker's
