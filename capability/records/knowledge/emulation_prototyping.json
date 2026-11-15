@@ -1,0 +1,49 @@
+{
+  "format": "nirmaan.knowledge-check",
+  "skill": "emulation_prototyping",
+  "knowledge_document": "knowledge/verification/emulation_prototyping.md",
+  "document_sha256": "sha256:e8410854b0a41e962da6ff19502493b96ea58fa2ca02ae8781ab6d463ba1cde0",
+  "writer": "IP-W2-K7 session (wave 2 knowledge batch, plan row W2-K7, 2026-11-15)",
+  "checker": "IP-W2-C7 session (wave 2 check records, plan row W2-C7, 2026-11-15)",
+  "sources_read": [
+    "[FSBasics] FireSim documentation, FireSim Basics: the whole page, https://docs.fires.im/en/stable/firesim-basics/",
+    "[FSDebug] FireSim documentation, Debugging and Profiling on the FPGA: the whole page, https://docs.fires.im/en/stable/advanced-usage/debugging-and-profiling-on-fpga/",
+    "[FSHang] FireSim documentation, Debugging a Hanging Simulator: the whole page, https://docs.fires.im/en/stable/advanced-usage/debugging-and-profiling-on-fpga/debugging-hanging-simulators/",
+    "[FSILA] FireSim documentation, AutoILA: the whole page, https://docs.fires.im/en/stable/advanced-usage/debugging-and-profiling-on-fpga/debugging-hardware-using-ila/",
+    "[FSPrintf] FireSim documentation, Printf Synthesis: the whole page, https://docs.fires.im/en/stable/advanced-usage/debugging-and-profiling-on-fpga/printf-synthesis/",
+    "[FSAssert] FireSim documentation, Assertion Synthesis: the whole page, https://docs.fires.im/en/stable/advanced-usage/debugging-and-profiling-on-fpga/assertion-synthesis/",
+    "[FSMeta] FireSim documentation, Debugging and Testing with Metasimulation: the whole page, https://docs.fires.im/en/stable/advanced-usage/debugging-in-software/rtl-simulation/",
+    "Repository code at the lines cited in gate_claims; tests/test_knowledge_files.py, tests/test_knowledge_gate_claims.py, tests/test_capability_levels.py and tests/test_dv_coverage_irq_ctrl.py run locally (100 passed, none skipped)"
+  ],
+  "result": "every claim tagged with a source was found in that source, every line marked inference is a fair reading of the source it names or the document's own reasoning, and every sentence about the platform's card matches the code at the lines cited in gate_claims",
+  "notes": [
+    "[FSBasics]: 'tens to hundreds of MHz', '150+ MHz' for a single on-premises SoC target, scaling from one desktop FPGA to hundreds of cloud FPGAs, Chipyard recommended and use without it possible, SPECInt2017 with full reference inputs, and the board notes (V80 and Vitis-based flows do not support DMA-based bridges, TracerV and Synthesizable Printfs named; on AWS F2 high-speed bridges work at a slower speed) are each on the page as the document says.",
+    "[FSDebug] and [FSHang]: the FSDebug page's own table of contents lists TracerV, assertion synthesis, printf synthesis, AutoILA, AutoCounter, Spike co-simulation and the hanging-simulator page; the three hang cases, the heartbeat.csv file (target cycle count and timestamp) and 'the trickiest' wording for token starvation are on the FSHang page.",
+    "[FSILA]: Chisel annotations (FpgaDebug), wired out at build and bound to an ILA, depth as cycles captured around a trigger, larger depth uses more FPGA resources, default 1024; 'Sometimes it takes too long to simulate FireSim on RTL simulators' is the line behind 'the FPGA is for runs that RTL simulators take too long for'. [FSPrintf]: per-printf annotation, slowdown from many frequently active printfs, +print-start and +print-end. [FSAssert]: report of cause, instance path, source locator and cycle, then the simulation ends; identical inputs fire the same assertion at the same cycle. [FSMeta]: metasimulation with Verilator or VCS, 'most productive way to catch bugs before generating an AGFI' and a means to reproduce FPGA bugs, exact reproduction because simulations are robust against timing differences across hosts, only slightly slower than target-level simulation, contorted clock-edge timing, stalls found by filtering *sink_valid and *source_ready on the hub model. All as the document says.",
+    "Reported to the document's owner, not edited here: (a) 'The FPGA is for runs that RTL simulators take too long for [FSILA], such as full benchmark suites with reference inputs [FSBasics]' joins two pages with 'such as'; each half is on its own page, the link between them is the writer's reading. (b) 'co-simulation with the Spike reference model' calls Spike a reference model; the FireSim pages read name Spike co-simulation with BOOM designs and do not use the words reference model. Neither changes what a reader would plan from the document.",
+    "Behavioural run: tests/test_knowledge_files.py::test_every_knowledge_document_passes (which holds the document's tier statement to the tier computed from the card's tools) and the three related suites ran with the worktree's src on PYTHONPATH: 100 passed, none skipped. No sentence of the document claims a repository tool run."
+  ],
+  "gate_claims": [
+    {
+      "claim": "the card holds no tool (skills.py names no tools= for emulation_prototyping), so the document is Knowledge only",
+      "evidence": "src/nirmaan/company/skills.py:428"
+    },
+    {
+      "claim": "the card holds no tool and the document's tier line 'Knowledge only: no tool run backs this' matches the tier computed from the card",
+      "evidence": "tests/test_knowledge_files.py::test_every_knowledge_document_passes"
+    },
+    {
+      "claim": "the card's own failure mode and check are quoted: no debug visibility planned; each moved test names the observation it adds and the debug access it keeps",
+      "evidence": "src/nirmaan/company/skills.py:432"
+    },
+    {
+      "claim": "FireSim assertion synthesis, printf synthesis, AutoILA, heartbeat file, Spike co-simulation and metasimulation are named as the source's tools, not tools of this repository",
+      "evidence": "unverified"
+    },
+    {
+      "claim": "a Python or RTL flow of this repository runs on FireSim, or hand-written Verilog accepts the debug annotations (the document says this was not read)",
+      "evidence": "unverified"
+    }
+  ],
+  "checked_at": "2026-11-15"
+}

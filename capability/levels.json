@@ -249,14 +249,12 @@
     },
     "emulation_prototyping": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/emulation_prototyping.json",
+        "counts": true,
         "knowledge_document": "knowledge/verification/emulation_prototyping.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     },
     "equivalence_checking": {
@@ -657,19 +655,17 @@
     },
     "verification_signoff": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/verification_signoff.json",
+        "counts": true,
         "knowledge_document": "knowledge/verification/verification_signoff.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     }
   },
   "totals": {
-    "knowledge": 33,
+    "knowledge": 35,
     "practised": 0,
     "proven": 0
   },
