@@ -72,6 +72,18 @@
         }
       ]
     },
+    "assertion_coverage": {
+      "knowledge": {
+        "check_record": null,
+        "counts": false,
+        "knowledge_document": "knowledge/verification/assertion_coverage.md",
+        "problems": [
+          "no check record"
+        ]
+      },
+      "level": null,
+      "practised": []
+    },
     "axi": {
       "knowledge": {
         "check_record": "capability/records/knowledge/axi.json",
@@ -276,6 +288,30 @@
         }
       ]
     },
+    "python_verification": {
+      "knowledge": {
+        "check_record": null,
+        "counts": false,
+        "knowledge_document": "knowledge/verification/python_verification.md",
+        "problems": [
+          "no check record"
+        ]
+      },
+      "level": null,
+      "practised": []
+    },
+    "reference_modelling": {
+      "knowledge": {
+        "check_record": null,
+        "counts": false,
+        "knowledge_document": "knowledge/verification/reference_modelling.md",
+        "problems": [
+          "no check record"
+        ]
+      },
+      "level": null,
+      "practised": []
+    },
     "reset_design": {
       "knowledge": {
         "check_record": "capability/records/knowledge/reset_design.json",
@@ -384,10 +420,22 @@
       },
       "level": "knowledge",
       "practised": []
+    },
+    "testbench_qualification": {
+      "knowledge": {
+        "check_record": null,
+        "counts": false,
+        "knowledge_document": "knowledge/verification/testbench_qualification.md",
+        "problems": [
+          "no check record"
+        ]
+      },
+      "level": null,
+      "practised": []
     }
   },
   "totals": {
-    "knowledge": 11,
+    "knowledge": 10,
     "practised": 2,
     "proven": 0
   },
