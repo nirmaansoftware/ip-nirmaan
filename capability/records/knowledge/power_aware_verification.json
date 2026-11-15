@@ -1,0 +1,56 @@
+{
+  "format": "nirmaan.knowledge-check",
+  "skill": "power_aware_verification",
+  "knowledge_document": "knowledge/verification/power_aware_verification.md",
+  "document_sha256": "sha256:e862502e81472bffc670ed3ce5e3b94cde7460581f5d33738b7d96f79873fa03",
+  "writer": "IP-W2-K8 session (wave 2 knowledge batch, plan row W2-K8, 2026-11-15), sentences fixed by IP-W2-K8B (ip#306)",
+  "checker": "IP-W2-C8B session (wave 2 check batch, lane IP-W2-C8B)",
+  "sources_read": [
+    "[UPFTut] IEEE P1801 working group members, Low Power Design, Verification, and Implementation with IEEE 1801 UPF, Accellera tutorial slides 2013: all pages to the last (What's New in UPF 2.1 and summary), https://accellera.org/images/resources/videos/Low_Power_with_UPF_2013.pdf",
+    "[PST] Bhargava and Gairola, Power State to PST Conversion, DVCon proceedings: the whole paper, abstract to references, https://dvcon-proceedings.org/wp-content/uploads/power-state-to-pst-conversion-simplifying-static-analysis-and-debugging-of-power-aware-designs.pdf",
+    "[LPMet] Burns, Chidolue and Boillet, Comprehensive Metrics-Based Methodology to Achieve Low-Power System-on-Chips, DVCon tutorial 2018: all 88 slides to the last, https://dvcon-proceedings.org/wp-content/uploads/comprehensive-metrics-based-methodology-to-achieve-low-power-system-on-chips.pdf",
+    "[OTDV] lowRISC, OpenTitan Design Verification Methodology: the whole page to its last section, https://opentitan.org/book/doc/contributing/dv/methodology/index.html"
+  ],
+  "result": "every claim tagged with a source was found in that source, and every line marked inference is a fair reading of the source it names or the document's own reasoning",
+  "notes": [
+    "The two points W2-C8 held back are fixed. (1) Level shifter and isolation: PST section IV.A step 4 gives valid, missing or redundant for level shifters and then, 'further', incorrect from comparing specified and required level-shifter properties; section IV.B step 4 gives only valid, missing or redundant for isolation. The document now says incorrect applies to level shifters only. (2) The untagged claim about a transition marked illegal that a test performs is gone; the replacement 'a transition never marked legal or illegal' is marked as inference from the examples, which is fair (UPFTut slide 102 marks listed transitions legal or illegal; LPMet slide 20 says the complete option controls the transition space).",
+    "Matched to source: PST tool steps and the 'valid, missing, redundant' set; add_power_state and describe_state_transition with legal and illegal (PST section V); simstate range NORMAL to CORRUPT with intermediates (PST section III.A; UPFTut slide 56 names corrupt on change and on activity); guidelines on logic expressions and avoiding || for don't cares (PST section VIII); the illegal power state message (PST section V.B); the 2013 deck's isolation, retention (save and restore as two edges of SRb), level shifter definitions and its HDL-control-signal limitation versus logic port creation (slides 13, 41, 42, 48, 60); the all on, partial off and all off states and the illegal ALLOFF to ALLON transition (slides 101, 102); supply_on and supply_off in the testbench (slides 46, 105); the version list and the planned 2018 revision, -complete, mutual exclusivity with ERROR state, RTL and gate checks, dynamic verification list, coverage list, and the emulation example (LPMet slides 14 to 20, 27, 29, 35, 83, 84); the OpenTitan power tests sentence, which gives no method (OTDV Power Tests).",
+    "The emulation sentence says the power controller was software. No slide says so in one line: slide 82 traces the root cause to the power controller, slide 83 describes it as a counter of active processes that software updates with AXI exclusive access instructions, and slide 84 names a software power controller as the common case to address. Read together this supports the sentence; the document marks its lesson as inference.",
+    "The UPF standard was not read; the document says so, and a wanted-sources row exists in the internal folder."
+  ],
+  "checked_at": "2026-11-15",
+  "gate_claims": [
+    {
+      "claim": "this skill's card holds no tool",
+      "evidence": "src/nirmaan/company/skills.py:425"
+    },
+    {
+      "claim": "the first body line states the tier Knowledge only because no tool of the skill is available",
+      "evidence": "src/nirmaan/org/knowledge_files.py:172"
+    },
+    {
+      "claim": "the document passes the knowledge-file checks (front matter, sources, no dash, size, tier line)",
+      "evidence": "tests/test_knowledge_files.py::test_every_knowledge_document_passes"
+    },
+    {
+      "claim": "the tier follows from tool status (no available tool means knowledge only)",
+      "evidence": "tests/test_knowledge_files.py::test_the_tier_is_computed_from_tool_status"
+    },
+    {
+      "claim": "every power state transition is exercised and checked (the card's own check)",
+      "evidence": "src/nirmaan/company/skills.py:430"
+    },
+    {
+      "claim": "the UPF standard itself was not read, recorded in the wanted-sources list",
+      "evidence": "unverified"
+    },
+    {
+      "claim": "a pass with the simulator's power-aware mode off proves nothing about power intent",
+      "evidence": "unverified"
+    },
+    {
+      "claim": "the vendor decks name commercial tools and none is claimed to run here",
+      "evidence": "src/nirmaan/company/skills.py:425"
+    }
+  ]
+}

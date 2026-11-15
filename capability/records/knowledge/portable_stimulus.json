@@ -1,0 +1,44 @@
+{
+  "format": "nirmaan.knowledge-check",
+  "skill": "portable_stimulus",
+  "knowledge_document": "knowledge/verification/portable_stimulus.md",
+  "document_sha256": "sha256:2f835d7c9a7d589d51602f41d5a4b09e66a6f74dab8b1624ac7d0ceb572a987f",
+  "writer": "IP-W2-K8 session (wave 2 knowledge batch, plan row W2-K8, 2026-11-15), sentences fixed by IP-W2-K8B (ip#306)",
+  "checker": "IP-W2-C8B session (wave 2 check batch, lane IP-W2-C8B)",
+  "sources_read": [
+    "[PSSTut] Hosokawa (Canon U.S.A.), Portable Stimulus Standard Tutorial, DVCon proceedings: all 78 slides to the last (PSS 3.0 and summary), https://dvcon-proceedings.org/wp-content/uploads/Tutorial3-Portable-Stimulus-Standard-Tutorial.pdf"
+  ],
+  "result": "every claim tagged with a source was found in that source, and every line marked inference is a fair reading of the source it names or the document's own reasoning",
+  "notes": [
+    "The sentence W2-C8 held back is fixed: the document now states two separate points. Slide 70 says portability is a critical enabler for fast platforms with low observability (ATE, emulation, silicon boards, bare metal) and, as a separate bullet, that tools can predict coverage at generation time because PSS scenarios are declarative and can be solved up front. The two are no longer joined.",
+    "Every other [PSSTut] tag was matched to its slide: the declarative rules (slide 5), action, activity, buffer, stream and state (slides 8 to 13), the two layers (slide 6), UVM complement and sequences (slides 7, 13), composable constraints (slide 15), inference of initialisation (slide 37), abstract base action (slide 38), the three exec block styles and their stated costs (slides 19 to 21), the register access layer and the IP-XACT, SystemRDL and custom inputs (slides 28 to 32), BFM and UVM register model routes (slide 56), the top-level environment component (slide 55), the three ownership choices with pros and cons (slide 66), memory claim recycling and the concurrent allocation error (slide 71), the extend based register and driver realisations (slide 72), and PSS 3.0 behavioural coverage in public review (slides 74 to 76).",
+    "The trace to a plan item is marked inference in the document and is not stated by the slides; correct. The tutorial states no limits of the standard or failure rates, as the document says."
+  ],
+  "checked_at": "2026-11-15",
+  "gate_claims": [
+    {
+      "claim": "this skill's card holds no tool",
+      "evidence": "src/nirmaan/company/skills.py:394"
+    },
+    {
+      "claim": "the first body line states the tier Knowledge only because no tool of the skill is available",
+      "evidence": "src/nirmaan/org/knowledge_files.py:172"
+    },
+    {
+      "claim": "the document passes the knowledge-file checks (front matter, sources, no dash, size, tier line)",
+      "evidence": "tests/test_knowledge_files.py::test_every_knowledge_document_passes"
+    },
+    {
+      "claim": "the tier follows from tool status (no available tool means knowledge only)",
+      "evidence": "tests/test_knowledge_files.py::test_the_tier_is_computed_from_tool_status"
+    },
+    {
+      "claim": "each scenario traces to a plan item and names its target platform (the card's own check)",
+      "evidence": "src/nirmaan/company/skills.py:399"
+    },
+    {
+      "claim": "no tool in this repository predicts coverage at generation time (not claimed; the card holds no tool)",
+      "evidence": "src/nirmaan/company/skills.py:394"
+    }
+  ]
+}
