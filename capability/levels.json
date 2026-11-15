@@ -77,14 +77,12 @@
     },
     "assertion_coverage": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/assertion_coverage.json",
+        "counts": true,
         "knowledge_document": "knowledge/verification/assertion_coverage.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     },
     "axi": {
@@ -142,17 +140,16 @@
           "counts": true,
           "digest": "sha256:9ce453d40894146149cbc0b239b46c96be234eb3e1d8657fede9b2e728bfb5e2",
           "harness": "sha256:35643990d58bf28264abe98752bd6c2750a391483ac43176b4748a38fbc32711",
-          "lower": 0.699,
+          "lower": 0.672,
           "model": "claude-opus-5-5",
-          "n": 20,
-          "passed": 18,
+          "n": 18,
+          "passed": 16,
           "reasons": [],
           "records": [
             "evals/results/2026-11-14-claude-code-claude-opus-5-5-10",
             "evals/results/2026-11-14-claude-code-claude-opus-5-5-3",
             "evals/results/2026-11-14-claude-code-claude-opus-5-5-4",
             "evals/results/2026-11-14-claude-code-claude-opus-5-5-9",
-            "evals/results/2026-11-15-claude-code-claude-opus-5-5-10",
             "evals/results/2026-11-15-claude-code-claude-opus-5-5-3",
             "evals/results/2026-11-15-claude-code-claude-opus-5-5-4",
             "evals/results/2026-11-15-claude-code-claude-opus-5-5-9"
@@ -173,14 +170,12 @@
     },
     "constrained_random": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/constrained_random.json",
+        "counts": true,
         "knowledge_document": "knowledge/verification/constrained_random.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     },
     "control_logic_design": {
@@ -296,7 +291,7 @@
         "knowledge_document": "knowledge/design/pipeline_design.md",
         "problems": []
       },
-      "level": "practised",
+      "level": "knowledge",
       "practised": [
         {
           "cases": [
@@ -324,16 +319,18 @@
             "rtl/skid-buffer"
           ],
           "cli": "2.1.325",
-          "counts": true,
+          "counts": false,
           "digest": "sha256:7a9c0840844c1929aaeae397d090a070a7662d7ba2020a395a377e59b0061882",
           "harness": "sha256:35643990d58bf28264abe98752bd6c2750a391483ac43176b4748a38fbc32711",
-          "lower": 0.5655,
+          "lower": 0.4385,
           "model": "claude-opus-5-5",
-          "n": 5,
-          "passed": 5,
-          "reasons": [],
+          "n": 3,
+          "passed": 3,
+          "reasons": [
+            "3 trials, fewer than 5",
+            "Wilson lower bound 0.439, under 0.5"
+          ],
           "records": [
-            "evals/results/2026-11-15-claude-code-claude-opus-5-5-10",
             "evals/results/2026-11-15-claude-code-claude-opus-5-5-9"
           ],
           "unjudged": 0
@@ -392,14 +389,13 @@
           "counts": true,
           "digest": "sha256:012eb9b7155ed6eb7761adca880b338f10c8f978b15dfd92f5adbb3253307a52",
           "harness": "sha256:35643990d58bf28264abe98752bd6c2750a391483ac43176b4748a38fbc32711",
-          "lower": 0.7735,
+          "lower": 0.7586,
           "model": "claude-opus-5-5",
-          "n": 28,
-          "passed": 26,
+          "n": 26,
+          "passed": 24,
           "reasons": [],
           "records": [
             "evals/results/2026-11-15-claude-code-claude-opus-5-5",
-            "evals/results/2026-11-15-claude-code-claude-opus-5-5-10",
             "evals/results/2026-11-15-claude-code-claude-opus-5-5-11",
             "evals/results/2026-11-15-claude-code-claude-opus-5-5-2",
             "evals/results/2026-11-15-claude-code-claude-opus-5-5-3",
@@ -505,8 +501,8 @@
     }
   },
   "totals": {
-    "knowledge": 17,
-    "practised": 4,
+    "knowledge": 19,
+    "practised": 3,
     "proven": 0
   },
   "without_knowledge": [
