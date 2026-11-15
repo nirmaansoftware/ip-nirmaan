@@ -295,11 +295,35 @@
         }
       ]
     },
+    "rtl_lint": {
+      "knowledge": {
+        "check_record": null,
+        "counts": false,
+        "knowledge_document": "knowledge/design/rtl_lint.md",
+        "problems": [
+          "no check record"
+        ]
+      },
+      "level": null,
+      "practised": []
+    },
     "rtl_microarchitecture": {
       "knowledge": {
         "check_record": null,
         "counts": false,
         "knowledge_document": "knowledge/architecture/rtl_microarchitecture.md",
+        "problems": [
+          "no check record"
+        ]
+      },
+      "level": null,
+      "practised": []
+    },
+    "synthesis_awareness": {
+      "knowledge": {
+        "check_record": null,
+        "counts": false,
+        "knowledge_document": "knowledge/design/synthesis_awareness.md",
         "problems": [
           "no check record"
         ]
