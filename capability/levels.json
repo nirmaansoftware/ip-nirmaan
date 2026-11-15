@@ -244,14 +244,12 @@
     },
     "reset_design": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/reset_design.json",
+        "counts": true,
         "knowledge_document": "knowledge/design/reset_design.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     },
     "rtl_design": {
@@ -306,26 +304,22 @@
     },
     "rtl_lint": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/rtl_lint.json",
+        "counts": true,
         "knowledge_document": "knowledge/design/rtl_lint.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     },
     "rtl_microarchitecture": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/rtl_microarchitecture.json",
+        "counts": true,
         "knowledge_document": "knowledge/architecture/rtl_microarchitecture.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     },
     "synthesis_awareness": {
@@ -342,11 +336,46 @@
     }
   },
   "totals": {
-    "knowledge": 7,
+    "knowledge": 10,
     "practised": 0,
     "proven": 0
   },
   "without_knowledge": [
+    {
+      "case": "rtl/rr-arbiter",
+      "passed": true,
+      "reason": "run without knowledge documents (knowledge: off in the run manifest and the trial): never counts toward a level",
+      "record": "evals/results/2026-11-14-claude-code-claude-opus-5-5-without-knowledge",
+      "trial": 1
+    },
+    {
+      "case": "rtl/rr-arbiter",
+      "passed": true,
+      "reason": "run without knowledge documents (knowledge: off in the run manifest and the trial): never counts toward a level",
+      "record": "evals/results/2026-11-14-claude-code-claude-opus-5-5-without-knowledge",
+      "trial": 2
+    },
+    {
+      "case": "rtl/rr-arbiter",
+      "passed": true,
+      "reason": "run without knowledge documents (knowledge: off in the run manifest and the trial): never counts toward a level",
+      "record": "evals/results/2026-11-14-claude-code-claude-opus-5-5-without-knowledge",
+      "trial": 3
+    },
+    {
+      "case": "rtl/rr-arbiter",
+      "passed": true,
+      "reason": "run without knowledge documents (knowledge: off in the run manifest and the trial): never counts toward a level",
+      "record": "evals/results/2026-11-14-claude-code-claude-opus-5-5-without-knowledge-2",
+      "trial": 1
+    },
+    {
+      "case": "rtl/rr-arbiter",
+      "passed": false,
+      "reason": "run without knowledge documents (knowledge: off in the run manifest and the trial): never counts toward a level",
+      "record": "evals/results/2026-11-14-claude-code-claude-opus-5-5-without-knowledge-2",
+      "trial": 2
+    },
     {
       "case": "rtl/apb-regs",
       "passed": true,
