@@ -36,7 +36,9 @@ Verilator 5.052 and Icarus Verilog 13 with marker files.
 | `sta.run`, `pnr.run` | the constraints (`sdc`), which OpenSTA and OpenROAD read as Tcl | any Tcl, `exec` included |
 
 `lint.run` runs nothing from its sources, but its `top` is checked too, as is
-every run's. `coverage.read` (M70) and the cocotb backend's HDL (M72) already
+every run's. M75's screen (`runtime/seat_tools.py`, `screen`) refuses such
+files on the `tools-in-loop` variant's in-loop calls only; it is unchanged,
+and the runs behind it now get these checks too, as every run does. `coverage.read` (M70) and the cocotb backend's HDL (M72) already
 refused `$system`, `$fopen`, `$c` and DPI in every source.
 
 ## 2. The checks

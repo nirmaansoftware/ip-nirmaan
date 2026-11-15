@@ -136,6 +136,7 @@ new number. M1 to M42 are taken; see `docs/history/README.md`.
 | M81 | GF180MCU physical design pilot in CI: the M79 pilot on the ORFS gf180 platform, Magic DRC and Netgen LVS over open_pdks gf180mcuC | reserved |
 | M82 | IHP SG13G2 physical design pilot in CI: the M79 pilot on the ORFS ihp-sg13g2 platform, Magic DRC and Netgen LVS over the IHP Open PDK's own Magic and Netgen files | reserved |
 | M83 | Block verification's testbench refinements for a scoreboard and for cocotb, and the cocotb testbench gate (W2-R3) | reserved |
+| M84 | Gate inputs that reach the host: every gate refuses seat input that could run a shell command or other code outside its run (security, found in #296) | reserved |
 
 <!-- review:milestone-numbers:end -->
 
