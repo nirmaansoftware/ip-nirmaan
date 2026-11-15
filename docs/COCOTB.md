@@ -45,7 +45,9 @@ must not meet those gates. The policy changes in one place for this:
 the requirement fixes that very backend (`params: (("backend", "cocotb"),)`).
 So no existing gate is met by a cocotb run (a test walks every `simulator.run`
 requirement in every workflow), and a gate that wants cocotb says so. No
-existing gate changes; none names cocotb yet.
+existing gate changes. M83 adds the first gate that names cocotb: block
+verification's testbench, when the request asks for cocotb
+(`docs/BLOCK_VERIFICATION.md`, "Scoreboard and cocotb (M83)").
 
 ## What a run does
 
@@ -180,5 +182,5 @@ into the venv (or `pip install -e '.[cocotb]'`), with Icarus on PATH.
   and CI's apt Verilator on Ubuntu 24.04 is 5.020 (`docs/COVERAGE_READ.md`).
 - VHDL, mixed-language designs, and simulator parameters as inputs.
 - `expect: fail` for cocotb reproductions (M71).
-- A gate that names the backend, and the `dv/cocotb-crc` eval case (W2-E6),
-  with the `python_verification` skill card (wave 2's skill batch).
+- A gate that names the backend (M83 added one), and the `dv/cocotb-crc` eval
+  case (W2-E6), with the `python_verification` skill card (wave 2's skill batch).
