@@ -122,7 +122,10 @@ TRANSIENT_TEXT = re.compile(
     r"etimedout|timed out|time-?out|name resolution|could not resolve host|nodename nor servname|name or service not known|"
     r"network is unreachable|broken pipe|the remote end hung up|early eof|unexpected disconnect|error connecting to|"
     r"http error (?:401|429|5\d\d)|\bhttp (?:401|429|5\d\d)\b|api error:? 5\d\d|bad credentials|"
-    r"\b5\d\d (?:internal server error|bad gateway|service unavailable)", re.I)
+    r"\b5\d\d (?:internal server error|bad gateway|service unavailable)|"
+    # main moved during `gh pr merge --auto`: a race, retried on the next pass
+    # (a "Head branch was modified" is not this and still stops).
+    r"base branch was modified", re.I)
 
 
 def transient_error(exc) -> bool:
