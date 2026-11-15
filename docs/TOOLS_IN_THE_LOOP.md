@@ -85,6 +85,12 @@ changes `tools-in-loop` and never `default` or `attempts-3`:
 The variant keeps one attempt (the case's). Attempts 1 against 3 is the
 other variant.
 
+A seat stopped at the time cap leaves an answer with no text and an error,
+as a seat past the default's `CLAUDE_CODE_TIMEOUT` does. The trial is
+recorded as failed, and RR5's stop (`no_model_answer`) ends the run after it,
+as for the default: the batch's driver then goes on from the next slot it
+never attempted.
+
 ## What the screen does not claim
 
 The screen is for files the seat passes in the loop, where the seat reads the
