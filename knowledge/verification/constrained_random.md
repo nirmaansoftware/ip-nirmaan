@@ -62,7 +62,7 @@ line marked "gate" names the repository code that backs it. The card also lists
   so a failure can be replayed.
 - Verilator's `$urandom` and `$random` calls are described in the language
   chapter [VLang]; a SystemVerilog testbench with delays builds with
-  `--binary` and needs no C++ harness [VSim] [ZVer].
+  `--binary` and needs no C++ harness [VSim].
 
 ## What the simulation gate demands
 
@@ -74,9 +74,18 @@ line marked "gate" names the repository code that backs it. The card also lists
   passed checks and a count of failed ones. The run fails when the line is
   missing, repeated, carries another nonce, reports a failed check, or reports
   no passed check (gate: src/nirmaan/integrations/eda_parsers.py:132-224).
-- Nothing in the gate measures how many random items ran or whether any rare
-  case was reached. A random testbench that runs ten items and passes is a
-  passing run (inference). The testbench must fail itself when its run was too
+- By itself the gate asks only for at least one passed check, so it does not
+  measure how many random items ran or whether any rare case was reached. A
+  workflow requirement can add a bound on the reported check count, written
+  `checks>=N`: a bound is a metric, a direction and a value (gate:
+  src/nirmaan/models/workflow.py:120-145, the CLI's `--bound` at
+  src/nirmaan/cli.py:842), the simulation result reports a `checks` count
+  (gate: eda_parsers.py:222), and a passing run that breaks a bound, or never
+  reported the metric, is failed (gate: src/nirmaan/runtime/tools.py:188). No
+  requirement in the shipped workflows sets such a bound on a simulation run
+  (inference from a search of src/nirmaan), so unless one is added a random
+  testbench that runs ten items and passes is a passing run. The count says how
+  many checks passed, not how many distinct items or corners were produced. The testbench must fail itself when its run was too
   short or a corner case was never produced, by counting those events and
   comparing the counts at the end (inference; the card lists "Over-constrained
   stimulus" and requires stimulus that "reaches coverage goals").
@@ -90,7 +99,9 @@ line marked "gate" names the repository code that backs it. The card also lists
   never occurs, such as a clear that never lands on the same edge as a valid
   input.
 - A generator that cannot produce the illegal-but-allowed cases the
-  specification describes, which leaves error paths unexercised [OTDV].
+  specification describes, which leaves error paths unexercised (inference;
+  OpenTitan's error tests constrain a random sequence to produce illegal
+  accesses [OTDV]).
 - A reference model copied from the RTL, or one that checks only a summary of
   the outputs.
 - No seed in the log, so a failing run cannot be replayed (inference).
