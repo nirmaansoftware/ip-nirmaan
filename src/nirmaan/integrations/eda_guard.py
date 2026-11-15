@@ -299,7 +299,7 @@ def _tcl_commands(text: str) -> tuple[list[str], str]:
 
 
 def sdc_problem(sdc: Path) -> str | None:
-    """Why a constraints file cannot be read by a timer, or None (docs/GATE_INPUTS.md, section 3)."""
+    """Why a constraints file cannot be read by a timer, or None (docs/GATE_INPUTS.md, section 2)."""
     text = sdc.read_text(encoding="utf-8", errors="replace").replace("\\\n", " ")
     lexical = ('a quote' if '"' in text else 'a backslash' if "\\" in text
                else 'a brace inside a word' if _MID_BRACE_RE.search(text) else None)

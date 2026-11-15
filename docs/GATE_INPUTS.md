@@ -72,16 +72,24 @@ refused `$system`, `$fopen`, `$c` and DPI in every source.
 
 ## 3. The history
 
-Every committed eval record (`evals/results/`, 104 trials, 94 answers with
-text) and every fixture under `tests/fixtures/` was scanned for these
-constructs in seat-written files: 209 seat files (194 Verilog, 15 `.sby`), and
-every `entry` given. None used one: every `entry` is a plain module name, the
-seats' Verilog uses only `$past`, `$error`, `$display`, `$time`, `$finish`,
-`$value$plusargs`, `$random`, `$clog2`, `$stable`, `$fatal` and `$onehot0`, and
-their `.sby` files use only `mode`, `depth`, `smtbmc`, `read` and `prep` (seven
-of them declare `[tasks]`, which `formal.run` already refused). So no past
-trial reached the host, and no past trial would have been refused by M84 for
-anything but the `[tasks]` it was already refused for.
+`scripts/gate_input_history.py` (its logic tested in `tests/test_gate_inputs.py`,
+`test_the_history_scan_counts_and_reports_what_the_checks_refuse`) takes every
+seat-written file and every `entry` from the answers in the committed eval
+records (`evals/results/`) and the JSON fixtures (`tests/fixtures/`) and runs
+them through these checks. Run with `PYTHONPATH=src python
+scripts/gate_input_history.py` at `main` fe58379 plus this change, it printed:
+
+```
+records 259, answers with files 95, seat files 209 (194 Verilog, 15 .sby), entries 202, refused 7
+```
+
+The 7 refused are `.sby` setups that declare `[tasks]` (`sync_fifo.sby` in
+two trials of run `-4`, `apb_regs.sby` in two of run `-5`, `axi4_lite_regs.sby`
+in runs `-7`, `-8` and `without-knowledge-7`), which `formal.run` already
+refused for the `[tasks]` itself; that reason still comes first. Every `entry`
+is a plain module name, and no seat file used a construct of section 1. So no
+committed trial reached the host through a gate. Anyone can rerun the script
+on a later `main`.
 
 ## 4. Code by design
 
@@ -99,8 +107,12 @@ machine. This milestone does not change them.
 
 ## 5. The harness
 
-No file in `harness.CODE` or `harness.LOOP_CODE` changes, and no tool
-definition in `company/tools.py` does, so the harness fingerprint is unchanged
-(`harness_sha256()` is the same before and after). What changes is which
+No file in `harness.CODE` or `harness.LOOP_CODE` changes
+(`test_no_file_this_milestone_changes_is_harness_code`), and no tool definition
+in `company/tools.py` does, so the harness fingerprint is unchanged: on the
+development machine `harness_sha256()` was
+`sha256:69d8ae47d1b3f44b9e49a2d8b539edbcbcb8a3a50f10774998ba7219ac7481d9` on
+`main` fe58379 and on this change, and the `tools-in-loop` variant's was the
+same on both too. What changes is which
 inputs a gate refuses: a seat file using a refused construct now fails its gate
 with the reason, where before it ran.

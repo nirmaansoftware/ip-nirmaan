@@ -10,6 +10,7 @@ Every payload only creates a marker file inside the test's own temporary directo
 
 from __future__ import annotations
 
+import json
 import shutil
 from pathlib import Path
 
@@ -299,3 +300,34 @@ def test_the_yosys_allow_list_writes_nothing_and_runs_nothing():
                     "write_verilog", "dump", "log", "design", "sat", "sim"):
         assert command not in eda_guard.YOSYS_SAFE
         assert yosys_problem([f"{command} x"], "s")
+
+
+# --- The history scan and the harness -----------------------------------------------------------------
+
+
+def test_the_history_scan_counts_and_reports_what_the_checks_refuse(tmp_path):
+    """scripts/gate_input_history.py, the scan behind docs/GATE_INPUTS.md, section 3, on records made here."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("gate_input_history", ROOT / "scripts" / "gate_input_history.py")
+    history = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(history)
+    answer = ('{"files": [{"path": "m.v", "entry": "m"}, {"path": "tb.v", "entry": "tb; exec x"}]}\n'
+              f"=== FILE: m.v ===\n{DESIGN}=== END FILE ===\n"
+              "=== FILE: tb.v ===\n" + tb('    $system("x");') + "=== END FILE ===\n"
+              "=== FILE: f.sby ===\n[options]\nmode bmc\n[script]\n!touch x\n=== END FILE ===\n")
+    trial = tmp_path / "evals" / "results" / "run" / "case" / "trial-01.json"
+    trial.parent.mkdir(parents=True)
+    trial.write_text(json.dumps({"answers": [{"text": answer}]}), encoding="utf-8")
+    found = history.scan(tmp_path)
+    assert (found["answers"], found["files"], found["verilog"], found["setups"], found["entries"]) == (1, 3, 2, 1, 2)
+    assert [line.split(": ")[1] for line in found["refused"]] == ["entry 'tb; exec x'", "tb.v", "f.sby"]
+
+
+def test_no_file_this_milestone_changes_is_harness_code():
+    """docs/GATE_INPUTS.md, section 5: the gate files are not in the harness fingerprint, so it is unchanged."""
+    from nirmaan.runtime import harness
+
+    changed = {"nirmaan/integrations/eda_guard.py", "nirmaan/integrations/eda.py",
+               "nirmaan/integrations/equivalence.py", "nirmaan/integrations/physical.py"}
+    assert not changed & set(harness.CODE) and not changed & set(harness.LOOP_CODE)
