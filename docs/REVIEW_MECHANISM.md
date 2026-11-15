@@ -314,6 +314,25 @@ requests labelled `hold` or `needs-founder` are skipped.
    `main`, or GitHub refuses it), the loop stops with `needs-founder`. If
    someone pushed in between, the step is dropped without a label and the
    new head is reviewed. `--no-post` never updates a branch.
+
+   **The generated levels file.** `capability/levels.json` is generated
+   (`scripts/capability_levels.py --write`) and many pull requests regenerate
+   it, so each merge left the others conflicting or stale in it. When it is
+   the only file in a merge conflict with `main`, or CI failed and the file
+   is stale on the merge with `main` (the pull request changed it and `main`
+   moved), the loop updates the branch itself: it merges `main` into it (a
+   merge commit, never a rebase), regenerates the file, runs
+   `capability_levels.py --check` on the commit, and pushes with its usual
+   push identity, a plain push that GitHub refuses if the branch moved. That
+   is a branch update ("branch updated" comment), not a fix round and not a
+   stop; the new head is reviewed from scratch. A conflict in any other file
+   stops as before, naming the files. In GitHub Actions the generator, which
+   is the pull request's own code, runs as the check account in a separate
+   clone of a trial merge, as the fixer's checks do (step 6); the loop takes
+   back only that one file, as data (a regular file, no symlink, size-capped,
+   JSON, no text in a credential format), commits it in its own worktree, and
+   runs the check the same way before the push. CI may still fail on the new
+   head for another reason; that goes to the author as any CI failure does.
 2. **CI.** Until the five CI checks are green on the head, the loop waits and
    calls no model. CI failing on a head the loop pushed stops the loop; CI
    failing on the author's head only waits.
@@ -373,8 +392,9 @@ changes: one owning team per pull request where possible; founder-class paths
 not mixed with ordinary paths; mechanical renames (a rename with no content
 change) not mixed with other changes; and a soft cap of 400 changed lines
 outside `tests/fixtures/**` (`shape_soft_cap_lines` and `shape_uncounted` in
-`LOOP`). They never stop the loop. Generated files are not detected (nothing
-marks them in this repository), and stacked pull requests are never reviewed,
+`LOOP`). They never stop the loop. Generated files are not detected for
+these rules (nothing marks them in this repository; the levels file above is
+named in `LOOP` "generated" only for the branch update), and stacked pull requests are never reviewed,
 since the loop takes only pull requests to `main`. The one rule that stops a
 review is the size limit above.
 
