@@ -88,8 +88,14 @@ own reasoning; a line marked "gate" names the repository code that backs it.
 
 ## Common failure modes
 
-- Gold and gate reading the same file, or only the original: the gate refuses
-  the first; the second leaves nothing to compare (gate: equivalence.py:91-93).
+- Gold and gate running the same commands, or only the original: the gate
+  refuses a setup whose `[gold]` and `[gate]` sections hold identical command
+  lists, because it would compare a design with itself (gate:
+  src/nirmaan/integrations/equivalence.py:91-93); lines under `[script]` are
+  shared and are not part of that comparison. It does not refuse two sides that
+  read the same file with different commands, which it accepts (inference from
+  the same check, which compares scripts and not file names). Naming only the
+  original leaves nothing to compare.
 - Comparing before elaborating to the same top, or with different parameters,
   so the signal names do not line up.
 - A setup that proves a few matched points while the output cone is unmatched.
