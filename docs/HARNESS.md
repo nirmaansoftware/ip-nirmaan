@@ -27,7 +27,7 @@ each and a test fails if another module defines one.
 | `EXCERPT_LINES`, `EXCERPT_WIDTH` | 20 lines, 240 characters | the failed run's log excerpt on a retry (M26) | `runtime/files.py` |
 | `EXCERPT_NOTABLE` | error, warning, fail, fatal, assert, mismatch | which log lines that excerpt shows first | `runtime/files.py` |
 | `CLAUDE_CODE_TIMEOUT` | 1,800 seconds | one Claude Code answer (M33) | `runtime/claude_code.py` |
-| `CLAUDE_CODE_FLAGS` | `--output-format json --tools "" --no-session-persistence --strict-mcp-config --safe-mode` | JSON out, no tools, no session, no MCP servers, no user-level instruction file, hook, skill or plugin (M74) | `runtime/claude_code.py` |
+| `CLAUDE_CODE_FLAGS` | `--output-format json --tools "" --no-session-persistence --strict-mcp-config --safe-mode` | JSON out, no tools, no session, no MCP servers, no user-level instruction file, hook, skill or plugin (M74, intended; unverified until the canary's output is committed) | `runtime/claude_code.py` |
 | `CLAUDE_CODE_CLEARED_ENV` | `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN` | removed so Claude Code answers on the plan login | `runtime/claude_code.py` |
 | `ANTHROPIC_MAX_TOKENS` | 16,000 | the anthropic runtime's answer length | `integrations/veritriage.py` |
 | `ANTHROPIC_THINKING`, `ANTHROPIC_EFFORT` | adaptive, high | the anthropic runtime's thinking and effort | `integrations/veritriage.py` |

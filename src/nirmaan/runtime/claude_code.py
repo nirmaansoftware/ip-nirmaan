@@ -13,10 +13,11 @@ How the call is kept honest and clean:
   every seat does), and ``--strict-mcp-config`` loads no MCP servers;
 * it runs in an empty temporary directory, so no project ``CLAUDE.md`` or
   project memory reaches the prompt, with ``--no-session-persistence``; and
-  ``--safe-mode`` (M74) starts Claude Code with its customizations off, so the
-  user-level instruction file (``~/.claude/CLAUDE.md``), hooks, skills and
-  plugins do not reach it either (checked on 2.1.325 by the canary,
-  ``scripts/claude_code_canary.py``);
+  ``--safe-mode`` (M74) is meant to start Claude Code with its customizations
+  off, so the user-level instruction file (``~/.claude/CLAUDE.md``), hooks,
+  skills and plugins do not reach it either. No committed record shows that
+  yet: the effect is unverified until the canary,
+  ``scripts/claude_code_canary.py``, has run and its output is committed;
 * ``ANTHROPIC_API_KEY`` and ``ANTHROPIC_AUTH_TOKEN`` are removed from its
   environment, so Claude Code uses the plan login rather than billing a key;
 * the model recorded is the one asked for when Claude Code reports it (it

@@ -1,0 +1,119 @@
+{
+  "format": "nirmaan.knowledge-check",
+  "skill": "verification_planning",
+  "knowledge_document": "knowledge/verification/verification_planning.md",
+  "document_sha256": "sha256:948cf2fa051580484e67bc3051a3a7d662b4a4e192c42247f5fc015dde053db9",
+  "writer": "IP-W2-K4 session (wave 2 knowledge batch, plan row W2-K4, 2026-11-15; fixed in ip#293)",
+  "checker": "IP-W2-C4C session (wave 2 recheck of the W2-C4B send-back after ip#293, 2026-11-15)",
+  "sources_read": [
+    "[OTDV] lowRISC, OpenTitan Design Verification Methodology (Apache 2.0): the whole page, 460 lines of saved text, read to the last line, https://opentitan.org/book/doc/contributing/dv/methodology/index.html",
+    "[OTPlan] lowRISC, OpenTitan DVSIM testplanner tool (Apache 2.0): the whole page, 200 lines, https://opentitan.org/book/util/dvsim/doc/testplanner.html",
+    "[OTStage] lowRISC, OpenTitan Hardware Development Stages (Apache 2.0): the whole page, 236 lines, including the V0 to V3 tables for simulation-based DV and FPV, https://opentitan.org/book/doc/project_governance/development_stages.html",
+    "Repository code at the lines cited in gate_claims (worktree at origin/main 6b33cea, after ip#293), and runs on this machine: tests/test_nirmaan_verification_plan.py, tests/test_nirmaan_verification_plan_more.py, tests/test_coverage_read.py (real Verilator build) and a script calling vplan.check_files on the repository fixture tests/fixtures/vplan with edits"
+  ],
+  "checked_at": "2026-11-15",
+  "result": "pass. The unsupported coverage_point inference that W2-C4B sent back is gone from the document (no sentence says what coverage_point may or may not name beyond the registered kind list and the traceability descriptions). Every source-tagged claim was found in its source and every gate sentence matches the code and the runs.",
+  "notes": [
+    "Send-back item confirmed fixed: the document now says only that cover points are proven by coverage.read and that the tool reads the coverage of design files (eda_parsers.py:555-594, docstring 557-566 and the loop 573-581). Nothing infers what a coverage_point item may name.",
+    "vplan.check runs (vplan.check_files on the repository fixture): the fixture plan passes with 'no item yet for CNT-SYNTH'; the same plan with items emptied passes with 'no item yet for' all three requirements (a plan with no items can pass); an item with a status field fails ('a plan declares; it never records a result'); a file with a directory part fails; a paraphrased requirement fails with 'does not quote ... which says'; a spec that tags nothing fails without a line; an unknown kind 'cover' fails and names the registered kinds (assertion, coverage_point, test); empty or unknown proves fail. A coverage_point item passes the check with no further test of what it names, which is why the document leaves that to review.",
+    "coverage.read: tests/test_coverage_read.py passes (real Verilator build): only design files count, percentages round down, no data or a failed testbench reads no coverage.",
+    "[OTDV]: two-part testplan and functional coverage plan, Hjson so it can be inserted into the DV document and annotate nightly results, the key focus areas (smoke, CSR, power, performance, security and error, debug, stress), and the final review attendees (designer, DV peers, leads, chip-level engineers, software, architect) are on the page as the document says. The document lists smoke, register access, illegal and error, performance, security and stress; the page also names power and debug tests, which the document does not claim to list.",
+    "[OTPlan]: testpoint one-to-one with a unique design feature, lower_snake_case name with no 'test' affix, stage, desc recommended 'but not always necessary' for goal, stimulus and check, tests list initially empty and many-to-many, tags (gls and pa given as examples), covergroup name must map to the written covergroup, planned test names unique across the DUT plan and its imports. All as the document says. The document's phrase 'maps each planned test to exactly one feature' is the page's 'each testpoint maps one-to-one to a unique feature'.",
+    "[OTStage]: V0 ends when the verification environment can write tests and a testplan and a functional coverage plan exist (V1 'Under Test' begins), as the document says.",
+    "Sources rule: all three sources are open pages read in full; no paid or unauthorised source."
+  ],
+  "gate_claims": [
+    {
+      "claim": "vplan.check takes a plan file and the approved specification file or files, both required, each a list of paths [lines 160-163]",
+      "evidence": "src/nirmaan/company/tools.py:160"
+    },
+    {
+      "claim": "a specification tags a requirement with [req:ID] in the Markdown list item or paragraph that states it",
+      "evidence": "src/nirmaan/company/traceability.py:58"
+    },
+    {
+      "claim": "a specification tags a requirement with [req:ID] in the Markdown list item or paragraph that states it [lines 282-318]",
+      "evidence": "src/nirmaan/vplan.py:282"
+    },
+    {
+      "claim": "the plan passes only when it covers exactly the tagged requirements: source must be the spec, tagged there, text quoted after collapsing whitespace; a tagged requirement missing from the plan fails; a spec that tags nothing fails; a requirement tagged twice fails [lines 321-350]",
+      "evidence": "src/nirmaan/vplan.py:321"
+    },
+    {
+      "claim": "an item must name a plain file name with no directory part [lines 351-352]",
+      "evidence": "src/nirmaan/vplan.py:351"
+    },
+    {
+      "claim": "an item has a kind from the registered list (test, assertion, coverage_point), a non-empty proves list naming requirement IDs in the same plan, and may not claim a result such as passed or status",
+      "evidence": "src/nirmaan/vplan.py:49"
+    },
+    {
+      "claim": "an item has a kind from the registered list (test, assertion, coverage_point), a non-empty proves list naming requirement IDs in the same plan, and may not claim a result such as passed or status [lines 155-163]",
+      "evidence": "src/nirmaan/vplan.py:155"
+    },
+    {
+      "claim": "an item has a kind from the registered list (test, assertion, coverage_point), a non-empty proves list naming requirement IDs in the same plan, and may not claim a result such as passed or status [lines 219-235]",
+      "evidence": "src/nirmaan/vplan.py:219"
+    },
+    {
+      "claim": "an item has a kind from the registered list (test, assertion, coverage_point), a non-empty proves list naming requirement IDs in the same plan, and may not claim a result such as passed or status [lines 47-54]",
+      "evidence": "src/nirmaan/company/traceability.py:47"
+    },
+    {
+      "claim": "the check does not require every requirement to have an item: a requirement with no item only adds 'no item yet for' to a passing summary; a plan with no items at all can pass [lines 404-408]",
+      "evidence": "src/nirmaan/vplan.py:404"
+    },
+    {
+      "claim": "nothing in the plan is backed by being planned: only a passing, cited run backs a requirement",
+      "evidence": "src/nirmaan/vplan.py:21"
+    },
+    {
+      "claim": "the kinds name the run that backs them: a simulation of the file holding a test, a formal run or a quiet simulation for an assertion, a coverage measurement for a cover point [lines 47-54]",
+      "evidence": "src/nirmaan/company/traceability.py:47"
+    },
+    {
+      "claim": "cover points are proven by coverage.read only, and that tool reads the coverage of design files [lines 52-53]",
+      "evidence": "src/nirmaan/company/traceability.py:52"
+    },
+    {
+      "claim": "cover points are proven by coverage.read only, and that tool reads the coverage of design files [lines 555-594]",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:555"
+    },
+    {
+      "claim": "cover points are proven by coverage.read only, and that tool reads the coverage of design files",
+      "evidence": "tests/test_coverage_read.py::test_only_the_design_files_count_and_percentages_round_down"
+    },
+    {
+      "claim": "a paraphrased requirement fails the quote check; a changed source fails earlier as not the approved spec or an ID the source does not tag [lines 340-348]",
+      "evidence": "src/nirmaan/vplan.py:340"
+    },
+    {
+      "claim": "a requirement added from general knowledge that the specification does not tag fails [lines 343-344]",
+      "evidence": "src/nirmaan/vplan.py:343"
+    },
+    {
+      "claim": "a problem about a plan entry names that entry's line; a specification that tags no requirement is reported without a line",
+      "evidence": "src/nirmaan/vplan.py:341"
+    },
+    {
+      "claim": "a problem about a plan entry names that entry's line; a specification that tags no requirement is reported without a line",
+      "evidence": "src/nirmaan/vplan.py:344"
+    },
+    {
+      "claim": "a problem about a plan entry names that entry's line; a specification that tags no requirement is reported without a line",
+      "evidence": "src/nirmaan/vplan.py:347"
+    },
+    {
+      "claim": "a problem about a plan entry names that entry's line; a specification that tags no requirement is reported without a line",
+      "evidence": "src/nirmaan/vplan.py:332"
+    },
+    {
+      "claim": "the check reads IDs, not meaning, so a reviewer compares each item to its requirement; the check cannot tell whether a planned test would catch the failure",
+      "evidence": "unverified"
+    },
+    {
+      "claim": "the Practising line: the plan check tool this skill holds is available",
+      "evidence": "src/nirmaan/company/tools.py:160"
+    }
+  ]
+}

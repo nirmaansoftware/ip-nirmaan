@@ -5,6 +5,18 @@
   "proven": "No skill is Proven: no product seat run record of delivered work exists yet.",
   "refused_records": [],
   "skills": {
+    "accelerator_verification": {
+      "knowledge": {
+        "check_record": null,
+        "counts": false,
+        "knowledge_document": "knowledge/verification/accelerator_verification.md",
+        "problems": [
+          "no check record"
+        ]
+      },
+      "level": null,
+      "practised": []
+    },
     "apb": {
       "knowledge": {
         "check_record": "capability/records/knowledge/apb.json",
@@ -247,6 +259,18 @@
       "level": "knowledge",
       "practised": []
     },
+    "failure_triage": {
+      "knowledge": {
+        "check_record": null,
+        "counts": false,
+        "knowledge_document": "knowledge/verification/failure_triage.md",
+        "problems": [
+          "no check record"
+        ]
+      },
+      "level": null,
+      "practised": []
+    },
     "formal_verification": {
       "knowledge": {
         "check_record": "capability/records/knowledge/formal_verification.json",
@@ -306,14 +330,12 @@
     },
     "gate_level_simulation": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/gate_level_simulation.json",
+        "counts": true,
         "knowledge_document": "knowledge/verification/gate_level_simulation.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     },
     "hardware_fuzzing": {
@@ -326,6 +348,30 @@
       "level": "knowledge",
       "practised": []
     },
+    "isa_compliance": {
+      "knowledge": {
+        "check_record": null,
+        "counts": false,
+        "knowledge_document": "knowledge/verification/isa_compliance.md",
+        "problems": [
+          "no check record"
+        ]
+      },
+      "level": null,
+      "practised": []
+    },
+    "log_analysis": {
+      "knowledge": {
+        "check_record": null,
+        "counts": false,
+        "knowledge_document": "knowledge/verification/log_analysis.md",
+        "problems": [
+          "no check record"
+        ]
+      },
+      "level": null,
+      "practised": []
+    },
     "model_checking": {
       "knowledge": {
         "check_record": "capability/records/knowledge/model_checking.json",
@@ -334,6 +380,18 @@
         "problems": []
       },
       "level": "knowledge",
+      "practised": []
+    },
+    "performance_verification": {
+      "knowledge": {
+        "check_record": null,
+        "counts": false,
+        "knowledge_document": "knowledge/verification/performance_verification.md",
+        "problems": [
+          "no check record"
+        ]
+      },
+      "level": null,
       "practised": []
     },
     "pipeline_design": {
@@ -418,6 +476,18 @@
         "problems": []
       },
       "level": "knowledge",
+      "practised": []
+    },
+    "root_cause_analysis": {
+      "knowledge": {
+        "check_record": null,
+        "counts": false,
+        "knowledge_document": "knowledge/verification/root_cause_analysis.md",
+        "problems": [
+          "no check record"
+        ]
+      },
+      "level": null,
       "practised": []
     },
     "rtl_design": {
@@ -565,19 +635,17 @@
     },
     "verification_planning": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/verification_planning.json",
+        "counts": true,
         "knowledge_document": "knowledge/verification/verification_planning.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     }
   },
   "totals": {
-    "knowledge": 25,
+    "knowledge": 27,
     "practised": 0,
     "proven": 0
   },
