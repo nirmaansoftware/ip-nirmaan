@@ -240,6 +240,94 @@ def test_names_and_links(tmp_path):
     assert str(tmp_path / "elsewhere.v") not in inside_problem(inside / "out.v", inside, (), "s", "out.v")
 
 
+# --- Must-fail: an include that leads out of the run (ip#309's follow-up) ------------------------------
+
+#: What the host header holds: a ``$`` word, which the Verilog check names in a refusal when it reads the file.
+WORD = f"${SECRET}"
+#: A design that includes ``leak.vh`` (or ``inc/leak.vh``), which is not a ``[files]`` entry.
+INCLUDES = 'module m(input wire a, output wire b); assign b = a;\n  `include "{name}"\nendmodule\n'
+
+
+def linked_include(tmp_path: Path, how: str) -> Path:
+    """A setup folder whose ``m.v`` includes a host file through a link: the file itself, or a folder."""
+    folder = tmp_path / "host"
+    folder.mkdir()
+    (folder / "leak.vh").write_text(f"initial {WORD};\n", encoding="utf-8")
+    sby = setup(tmp_path, "read -formal m.v\nprep -top m", "m.v")
+    (sby.parent / "m.v").write_text(INCLUDES.format(name="leak.vh" if how == "file" else "inc/leak.vh"))
+    if how == "file":
+        (sby.parent / "leak.vh").symlink_to(folder / "leak.vh")
+    else:
+        (sby.parent / "inc").symlink_to(folder)
+    return sby
+
+
+def seat_texts(outcome) -> tuple[str, str]:
+    """What a seat reads of a failed run: the attempts-3 repair text (M74) and the in-loop broker's report (M75)."""
+    from types import SimpleNamespace
+
+    from nirmaan.runtime.context import AttemptView, FailedRun
+    from nirmaan.runtime.files import excerpt
+    from nirmaan.runtime.prompt import ToolNote, _repair
+    from nirmaan.runtime.seat_tools import SeatTools
+
+    log = outcome.references[0] if outcome.references else None
+    found, note = excerpt(log)
+    failed = FailedRun(run="run-1", tool="formal.run", summary=outcome.summary, log=log, evidence=None,
+                       excerpt=tuple(found), excerpt_note=note)
+    attempt = AttemptView(id="a-1", number=1, refusal=f"formal.run failed: {outcome.summary}", reviews=(),
+                          failed_runs=(failed,), artifacts=())
+    repair = "\n".join(_repair((attempt,), (), {"run-1": "[run:1]"}))
+    broker = SimpleNamespace(calls=[], remaining=lambda: 60,
+                             _handle=SimpleNamespace(recorded=lambda run: SimpleNamespace(references=outcome.references)))
+    report = SeatTools._report(broker, (ToolNote("formal.run", "run-1", outcome.succeeded, outcome.summary),))
+    return repair, report
+
+
+@pytest.mark.parametrize("how", ["file", "folder"])
+@pytest.mark.parametrize("tool,name", [("formal.run", "symbiyosys"), ("simulator.run", "icarus"),
+                                       ("lint.run", "verilator-lint")])
+def test_an_include_linked_out_of_the_run_is_refused_unread_and_quoted_nowhere(tmp_path, how, tool, name):
+    sby = linked_include(tmp_path, how)
+    params = ({"sby": str(sby)} if tool == "formal.run" else {"sources": str(sby.parent / "m.v"), "top": "m"})
+    outcome = execute(backend(tool, name), {**params, "workdir": str(tmp_path / "run")})
+    refused(outcome, tmp_path, "includes", "leads outside the sandbox")
+    assert "leak.vh" in outcome.summary and str(tmp_path / "host") not in outcome.summary, outcome.summary
+    for text in seat_texts(outcome):
+        assert SECRET not in text and "leads outside the sandbox" in text, text
+
+
+def test_control_an_include_inside_the_run_is_read_and_named(tmp_path):
+    """The check reads includes: the same header inside the setup's folder is read, and the refusal says why."""
+    sby = linked_include(tmp_path, "file")
+    (sby.parent / "leak.vh").unlink()
+    (sby.parent / "leak.vh").write_text('initial $fopen("x");\n', encoding="utf-8")
+    problem = sby_problem(sby)
+    assert problem and "leak.vh uses $fopen" in problem and "outside the sandbox" not in problem
+    outcome = execute(backend("formal.run", "symbiyosys"), {"sby": str(sby), "workdir": str(tmp_path / "run")})
+    for text in seat_texts(outcome):
+        assert "leak.vh uses $fopen" in text, text
+
+
+def test_includes_inside_the_run_still_pass(tmp_path):
+    """Must-pass: an include beside the file, in a folder of it, and beside an approved file given to the run."""
+    sby = linked_include(tmp_path, "file")
+    (sby.parent / "leak.vh").unlink()
+    (sby.parent / "leak.vh").write_text("// a header\n", encoding="utf-8")
+    assert sby_problem(sby) is None
+    (sby.parent / "sub").mkdir()
+    (sby.parent / "sub" / "leak.vh").write_text("// a header\n", encoding="utf-8")
+    (sby.parent / "m.v").write_text(INCLUDES.format(name="sub/leak.vh"))
+    assert sby_problem(sby) is None
+    approved = tmp_path / "approved"
+    approved.mkdir()
+    (approved / "m.v").write_text(INCLUDES.format(name="h.vh"), encoding="utf-8")
+    (approved / "h.vh").write_text("// a header\n", encoding="utf-8")
+    (sby.parent / "m.v").unlink()
+    (sby.parent / "m.v").symlink_to(approved / "m.v")
+    assert sby_problem(sby, [str(approved / "m.v")]) is None
+
+
 def test_no_file_this_milestone_changes_is_harness_code():
     """docs/GATE_INPUTS.md, section 5: the gate files are not in the harness fingerprint, so it is unchanged."""
     from nirmaan.runtime import harness

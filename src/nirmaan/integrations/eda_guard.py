@@ -152,16 +152,29 @@ def verilog_uses(text: str) -> tuple[set[str], list[str]]:
 
 
 def verilog_problem(files: Iterable[str | Path]) -> str | None:
-    """Why these Verilog files (and every file they include beside them) cannot be run by a gate, or None."""
+    """Why these Verilog files (and every file they include beside them) cannot be run by a gate, or None.
+
+    An included file is read only when, through any link, it is inside the folder of one of ``files`` (the run's
+    own folders). One that leads anywhere else is refused by the name it is included as, and is
+    never read, so a refusal quotes nothing of a file outside the run (ip#309's follow-up).
+    """
     found, seen = [], set()
-    todo = [Path(f) for f in files]
+    given = [Path(f).resolve() for f in files]
+    folders = {path.parent for path in given}
+    todo = list(given)
     while todo:
-        path = todo.pop(0).resolve()
+        path = todo.pop(0)
         if path in seen or not path.is_file():  # an absent file is the run's own failure
             continue
         seen.add(path)
         used, included = verilog_uses(path.read_text(encoding="utf-8", errors="replace"))
-        todo += [path.parent / name for name in included]
+        for name in included:
+            target = (path.parent / name).resolve()
+            if any(target.is_relative_to(folder) for folder in folders):
+                todo.append(target)
+            else:
+                return (f"{path.name} includes {name!r}, which leads outside the sandbox; a gate reads no included "
+                        f"file outside the run's own folders (docs/GATE_INPUTS.md, section 2) {REFUSED}")
         if used:
             found.append(f"{path.name} uses {', '.join(sorted(used))}")
     if not found:
