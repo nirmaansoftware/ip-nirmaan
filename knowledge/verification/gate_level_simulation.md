@@ -53,7 +53,9 @@ gate line is cited, and nothing here has been run.
 - A netlist that keeps library cells needs a simulation model of each cell to
   run (inference). For a cell library the model comes from the library's
   vendor, so what a run can read is limited by what that library allows
-  (inference; this repository uses no library and runs none).
+  (inference). In this repository `synth.run` maps to a Liberty library, which
+  `sta.run` and `pnr.run` also take (gate: src/nirmaan/integrations/physical.py:4-6;
+  src/nirmaan/company/tools.py:177-182).
 - Run the RTL's self-checking tests unchanged on the netlist, with the same
   stimulus and the same expected values. Differences are then in the
   design, not in the tests (inference).
@@ -99,7 +101,7 @@ gate line is cited, and nothing here has been run.
 - Confirm each difference from the RTL run is explained: a named flop, a
   reset, or an initial value (inference).
 - State the simulator and its X handling next to the result, since the same
-  netlist can pass in one and fail in another [VLang] [VArg].
+  netlist may pass in one and fail in another (inference).
 
 ## Sources
 

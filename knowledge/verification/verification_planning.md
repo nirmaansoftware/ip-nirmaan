@@ -41,8 +41,9 @@ line marked "gate" names the repository code that backs it.
 - One entry per design feature, named for the feature, not for the test: the
   OpenTitan testplanner maps each planned test to exactly one feature of the
   design [OTPlan].
-- Each entry carries a description of its goal, stimulus and check, and the
-  list of written tests that satisfy it. The list starts empty and fills as
+- An entry's description may state its goal, stimulus and check; the page
+  calls these recommended, but not always necessary [OTPlan]. Each entry also
+  has the list of written tests that satisfy it. The list starts empty and fills as
   tests are written; one written test may serve several entries, and one entry
   may need several tests [OTPlan].
 - Also plan the focus areas that apply to most blocks: a smoke test, register
@@ -92,16 +93,18 @@ line marked "gate" names the repository code that backs it.
   src/nirmaan/company/traceability.py:47-54).
 - Cover points are proven by `coverage.read` only. That tool reads line,
   toggle and branch coverage of design files (gate:
-  src/nirmaan/integrations/eda_parsers.py:544-590), so a plan item of kind
+  src/nirmaan/integrations/eda_parsers.py:555-594), so a plan item of kind
   `coverage_point` is a code coverage measurement here, not a covergroup bin
   (inference from the same lines).
 
 ## Common failure modes
 
-- A requirement paraphrased instead of quoted, or with a changed ID or source:
-  the quote check fails it (gate: src/nirmaan/vplan.py:345-348).
+- A requirement paraphrased instead of quoted: the quote check fails it (gate:
+  src/nirmaan/vplan.py:345-348). A changed source is failed earlier, as a
+  source that is not the approved spec (vplan.py:340-342) or an ID the source
+  does not tag (vplan.py:343-344).
 - A requirement added from general knowledge of the block type that the
-  specification does not tag: the check fails it (gate: src/nirmaan/vplan.py:342-344).
+  specification does not tag: the check fails it (gate: src/nirmaan/vplan.py:343-344).
 - A feature with a testpoint but no way to tell if it passed, because the
   planned test checks nothing. Plan the check along with the stimulus (inference).
 - An item whose `proves` names a requirement it does not exercise. The check
@@ -113,7 +116,9 @@ line marked "gate" names the repository code that backs it.
 ## How a plan is checked
 
 - Run `vplan.check` against the approved specification before review, then fix
-  every listed problem; each names its line (gate: src/nirmaan/vplan.py:174-176).
+  every listed problem. A problem about a plan entry names that entry's line
+  (gate: src/nirmaan/vplan.py:341, 344, 347), but a specification that tags no
+  requirement is reported without a line (gate: src/nirmaan/vplan.py:332).
 - Read the summary line for "no item yet" and decide, for each such
   requirement, whether the plan is incomplete or the requirement is verified
   another way (inference).
