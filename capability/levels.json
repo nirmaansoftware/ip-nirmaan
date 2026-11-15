@@ -57,15 +57,16 @@
           "counts": true,
           "digest": "sha256:53dff4b10deec145e18247fd490870321613e50b35a8da2f0e0a044b95b58e31",
           "harness": "sha256:35643990d58bf28264abe98752bd6c2750a391483ac43176b4748a38fbc32711",
-          "lower": 0.5291,
+          "lower": 0.5958,
           "model": "claude-opus-5-5",
-          "n": 8,
-          "passed": 7,
+          "n": 10,
+          "passed": 9,
           "reasons": [],
           "records": [
             "evals/results/2026-11-14-claude-code-claude-opus-5-5",
             "evals/results/2026-11-14-claude-code-claude-opus-5-5-2",
-            "evals/results/2026-11-15-claude-code-claude-opus-5-5"
+            "evals/results/2026-11-15-claude-code-claude-opus-5-5",
+            "evals/results/2026-11-15-claude-code-claude-opus-5-5-2"
           ],
           "unjudged": 1
         }
@@ -290,26 +291,24 @@
         "knowledge_document": "knowledge/design/rtl_design.md",
         "problems": []
       },
-      "level": "knowledge",
+      "level": "practised",
       "practised": [
         {
           "cases": [
             "rtl/rr-arbiter"
           ],
           "cli": "2.1.325",
-          "counts": false,
+          "counts": true,
           "digest": "sha256:012eb9b7155ed6eb7761adca880b338f10c8f978b15dfd92f5adbb3253307a52",
           "harness": "sha256:35643990d58bf28264abe98752bd6c2750a391483ac43176b4748a38fbc32711",
-          "lower": 0.4385,
+          "lower": 0.5655,
           "model": "claude-opus-5-5",
-          "n": 3,
-          "passed": 3,
-          "reasons": [
-            "3 trials, fewer than 5",
-            "Wilson lower bound 0.439, under 0.5"
-          ],
+          "n": 5,
+          "passed": 5,
+          "reasons": [],
           "records": [
-            "evals/results/2026-11-15-claude-code-claude-opus-5-5"
+            "evals/results/2026-11-15-claude-code-claude-opus-5-5",
+            "evals/results/2026-11-15-claude-code-claude-opus-5-5-2"
           ],
           "unjudged": 0
         },
@@ -387,7 +386,7 @@
   },
   "totals": {
     "knowledge": 11,
-    "practised": 1,
+    "practised": 2,
     "proven": 0
   },
   "without_knowledge": [
