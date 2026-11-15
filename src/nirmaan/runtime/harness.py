@@ -23,7 +23,10 @@ code digests, the tool digests and the run's own options (an ``--attempts``
 override, whether knowledge documents were given, M67, the version of the
 command-line program the runtime calls the model through: Claude Code's
 ``claude --version`` on the claude-code runtime, None on any other, and the
-named variant the run chose, M74, ``VARIANTS``). Every eval trial records it
+named variant the run chose, M74, ``VARIANTS``). The ``tools-in-loop`` variant
+(M75) adds a ``loop`` section: its own settings (``LOOP_SETTINGS``), the
+digests of the brokered server's code (``LOOP_CODE``) and the versions of the
+tools it runs (``tool_pins``). Every eval trial records it
 (``EvalResult.harness`` and each ``RecordedAnswer.harness``), and the levels
 generator groups trials by skill, model, skill digest and harness: a group
 whose harness is not the current one is stale, and a trial with no harness
@@ -37,8 +40,11 @@ without an import cycle.
 
 from __future__ import annotations
 
+import functools
 import hashlib
 import json
+import shutil
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -164,6 +170,7 @@ SETTINGS = ("DOMAIN_CAP", "MAX_CONTENT", "DEFAULT_LIMITS", "SCOPES", "WORK_SYSTE
 VARIANTS: dict[str, dict[str, Any]] = {
     "default": {},
     "attempts-3": {"attempts": 3},
+    "tools-in-loop": {"tools": True},  # M75: the seat calls brokered checks during its attempt (``LOOP_SETTINGS``)
 }
 
 
@@ -177,6 +184,60 @@ def variant_options(name: str) -> dict[str, Any]:
 def run_attempts(attempts: int | None, variant: str = "default") -> int | None:
     """The attempts override a run makes: the one given, else the variant's, else None (the default limits)."""
     return attempts if attempts is not None else variant_options(variant).get("attempts")
+
+
+def run_tools(variant: str = "default") -> bool:
+    """Whether the named variant gives the seat brokered tools during its attempt (M75, tools in the loop)."""
+    return bool(variant_options(variant).get("tools"))
+
+
+# --- Tools in the loop (M75) ---------------------------------------------------------------------
+#
+# Council record 2026-11-14 (pilot retrospective), decision 4, the first variant: during its attempt the seat
+# calls the platform's own checks through the tool broker, under its role, and then submits. These settings are
+# in the fingerprint of the ``tools-in-loop`` variant only (``fingerprint()["loop"]``), with the digests of
+# ``LOOP_CODE`` and the versions of the tools it can run (``tool_pins``), so editing one changes that variant's
+# harness and never the default's (docs/TOOLS_IN_THE_LOOP.md).
+
+#: The only tools the seat may call in the loop: lint, simulation and formal. A tool must also be one the
+#: platform runs over the seat's own files for this task, and granted to its role; anything else is refused.
+LOOP_TOOLS = ("lint.run", "simulator.run", "formal.run", "formal.cover")
+#: Calls per attempt, refused ones included; a call over the cap is refused and recorded.
+LOOP_MAX_CALLS = 8
+#: Seconds per attempt, the model's time and every brokered run together: past it the seat is stopped and the
+#: attempt fails. The same as ``CLAUDE_CODE_TIMEOUT``, so the variant gives the seat no more time than the default.
+LOOP_SECONDS = 1800
+#: The most seconds one brokered run may take (the tool's ``timeout``), and never more than the attempt has left.
+LOOP_CALL_SECONDS = 300
+#: The most files, and characters over all of them, one call may pass.
+LOOP_MAX_FILES = 16
+LOOP_MAX_CHARS = 200_000
+#: The only file suffixes a call may pass: HDL and SymbiYosys job files. No script, no testbench in another
+#: language, no memory image: nothing a tool would run or read as anything but HDL or a proof setup.
+LOOP_SUFFIXES = (".v", ".sv", ".vh", ".svh", ".sby")
+#: The name Claude Code knows the brokered server by; its tools are ``mcp__<name>__<tool>``.
+LOOP_SERVER = "nirmaan-broker"
+#: Claude Code flags beside the seat's own (``CLAUDE_CODE_FLAGS``, ``--tools ""`` among them, so no built-in
+#: tool): only the allowed brokered tools run, and anything else that would ask for permission is refused.
+LOOP_FLAGS = ("--permission-mode", "dontAsk")
+#: Appended to the work system prompt in the variant: ``FILE_FORMAT`` says the seat cannot run checks itself.
+LOOP_SYSTEM = """\
+In this run you may call the tools you are given before you answer. Each runs one of the checks the
+platform runs over your files for this task, on the files you pass it, through the platform's tool broker.
+Every call is recorded, and a run it makes is named [run:<id>]. The runs are advisory: only the checks the
+platform runs on the files of your final answer judge your work, and a run made in the loop cannot be
+listed in "tool_runs". At most {calls} calls and {seconds} seconds per attempt; past the time the attempt
+fails. You have no other tool: no shell, no file access, no network. Then answer as described above."""
+
+#: Every loop setting, by name: in the variant's fingerprint only.
+LOOP_SETTINGS = ("LOOP_TOOLS", "LOOP_MAX_CALLS", "LOOP_SECONDS", "LOOP_CALL_SECONDS", "LOOP_MAX_FILES",
+                 "LOOP_MAX_CHARS", "LOOP_SUFFIXES", "LOOP_SERVER", "LOOP_FLAGS", "LOOP_SYSTEM")
+#: The brokered server's code, relative to ``SOURCE_ROOT``: the session, its screen and its socket (broker
+#: side), and the stdio relay Claude Code starts. In the variant's fingerprint only.
+LOOP_CODE = (
+    "nirmaan/runtime/seat_tools.py",
+    "nirmaan/runtime/seat_tools_relay.py",
+)
 
 
 # --- The code ----------------------------------------------------------------------------------
@@ -209,10 +270,10 @@ def _value(value: Any) -> Any:
     return value
 
 
-def code_digests() -> dict[str, str]:
-    """``CODE`` file -> sha256 of its bytes; a file that cannot be read is named as missing."""
+def code_digests(files: tuple[str, ...] | None = None) -> dict[str, str]:
+    """``CODE`` file (or each of ``files``) -> sha256 of its bytes; a file that cannot be read is named missing."""
     out: dict[str, str] = {}
-    for rel in CODE:
+    for rel in CODE if files is None else files:
         try:
             out[rel] = "sha256:" + hashlib.sha256((SOURCE_ROOT / rel).read_bytes()).hexdigest()
         except OSError:
@@ -242,12 +303,49 @@ def fingerprint(*, attempts: int | None = None, knowledge: bool = True, cli: str
     ``variant`` is a name in ``VARIANTS``; the attempts it sets apply when ``attempts`` is None.
     """
     module = globals()
-    return {"format": FORMAT, "version": VERSION,
-            "settings": {name: _value(module[name]) for name in SETTINGS},
-            "code": code_digests(),
-            "tools": tool_digests(),
-            "run": {"attempts": run_attempts(attempts, variant), "knowledge": knowledge, "cli": cli,
-                    "variant": variant}}
+    out = {"format": FORMAT, "version": VERSION,
+           "settings": {name: _value(module[name]) for name in SETTINGS},
+           "code": code_digests(),
+           "tools": tool_digests(),
+           "run": {"attempts": run_attempts(attempts, variant), "knowledge": knowledge, "cli": cli,
+                   "variant": variant}}
+    if run_tools(variant):  # M75: the brokered server's settings, its code, and the versions of its tools
+        out["loop"] = {"settings": {name: _value(module[name]) for name in LOOP_SETTINGS},
+                       "code": code_digests(LOOP_CODE), "pins": tool_pins()}
+    return out
+
+
+def tool_pins() -> dict[str, dict[str, str]]:
+    """Each loop tool -> each executable its backends run -> the first line of its version (M75), or why none.
+
+    The seat reads these tools' output during its attempt, so a changed tool is a changed harness for the
+    variant. Asked once per process, with no credential in the environment, as a brokered run is.
+    """
+    return {tool: dict(found) for tool, found in _read_pins().items()}
+
+
+@functools.lru_cache(maxsize=1)
+def _read_pins() -> dict[str, dict[str, str]]:
+    from nirmaan.integrations.eda import backends_for, run_environment
+
+    flag = {"iverilog": "-V", "vvp": "-V", "yosys": "-V"}  # the others take --version
+    pins: dict[str, dict[str, str]] = {}
+    for tool in LOOP_TOOLS:
+        found: dict[str, str] = {}
+        for exe in sorted({e for backend in backends_for(tool) for e in backend.executables}):
+            path = shutil.which(exe)
+            if path is None:
+                found[exe] = "not on PATH"
+                continue
+            try:
+                proc = subprocess.run([path, flag.get(exe, "--version")], capture_output=True, text=True,
+                                      timeout=30, stdin=subprocess.DEVNULL, env=run_environment(Path.cwd()))
+                first = next((ln.strip() for ln in (proc.stdout + proc.stderr).splitlines() if ln.strip()), "")
+            except (OSError, subprocess.TimeoutExpired):
+                first = ""
+            found[exe] = first[:200] or "unknown"
+        pins[tool] = found
+    return pins
 
 
 def harness_sha256(*, attempts: int | None = None, knowledge: bool = True, cli: str | None = None,

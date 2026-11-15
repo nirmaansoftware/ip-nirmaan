@@ -141,13 +141,14 @@ def upstream_kinds(state: ProjectState, task: Task) -> set[str]:
 
 def satisfies(state: ProjectState, ev, req) -> bool:
     """Substantiated, of an accepted kind, and (if tool-backed) from a named tool run with the fixed params,
-    checked against every bound (M48)."""
+    checked against every bound (M48), and never an advisory run (M75)."""
     if not ev.substantiated or ev.kind not in req.accepts:
         return False
     # M71: every tool-backed kind is checked, so a reproduction never meets even a requirement that names no tool.
     if ev.kind in (EvidenceKind.TOOL_RUN, EvidenceKind.VERITRIAGE_SESSION):
         run = state.tool_runs.get(ev.tool_run or "")
-        return (run is not None and (not req.tools or run.tool in req.tools)
+        # M75: a run the seat asked for during its attempt is advisory; only the platform's own runs judge.
+        return (run is not None and not run.advisory and (not req.tools or run.tool in req.tools)
                 and all(param_matches(run.params.get(k), v) for k, v in req.params)
                 and run.answers(req.params)  # M71: a reproduction never meets a requirement for a passing run
                 and all(run.checked_against(b) for b in req.bounds))

@@ -80,8 +80,9 @@ class RecordingLLM:
     def __getattr__(self, item: str) -> Any:
         return getattr(self.inner, item)
 
-    def complete(self, prompt: WorkPrompt) -> Completion:
-        c = self.inner.complete(prompt)
+    def complete(self, prompt: WorkPrompt, tools: Any = None) -> Completion:
+        # M75: a seat with brokered tools gets them through the recorder; its calls are on the result.
+        c = self.inner.complete(prompt) if tools is None else self.inner.complete(prompt, tools)
         self.answers.append(RecordedAnswer(
             mode=prompt.mode, provider=c.provider or self.name, model=c.model, prompt_sha256=prompt_sha256(prompt),
             packet_sha256=packet_sha256(prompt), text=c.text, error=c.error, input_tokens=c.input_tokens,
@@ -94,11 +95,14 @@ class RecordedAnswers:
     """Answers with a trial's recorded answers, in order; never invents one when they run out."""
 
     name = "rejudge"
+    #: M75: a trial on the tools-in-loop variant is re-judged on its answers alone: the runs made in the loop
+    #: were advisory, so none is made again, and the gates and judges rule on the submitted files as recorded.
+    takes_seat_tools = True
 
     def __init__(self, answers: Sequence[RecordedAnswer]) -> None:
         self._left = list(answers)
 
-    def complete(self, prompt: WorkPrompt) -> Completion:
+    def complete(self, prompt: WorkPrompt, tools: Any = None) -> Completion:
         if not self._left:
             return Completion("", error=NO_CALL + "no recorded answer is left to replay")
         a = self._left.pop(0)

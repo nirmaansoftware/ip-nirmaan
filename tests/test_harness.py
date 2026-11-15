@@ -31,7 +31,7 @@ HARNESS = SRC / "nirmaan" / "runtime" / "harness.py"
 #: Names in harness.py that are not settings: its bookkeeping, and the pieces WORK_SYSTEM and REVIEW_SYSTEM
 #: are built from (in the fingerprint through those two).
 BOOKKEEPING = {"FORMAT", "VERSION", "SETTINGS", "SOURCE_ROOT", "CODE", "OUTPUT_WORK", "FILE_FORMAT", "OUTPUT_REVIEW",
-               "VARIANTS"}
+               "VARIANTS", "LOOP_SETTINGS", "LOOP_CODE"}
 #: The runtime files that are not harness code, and why. A new runtime file must be put in ``CODE`` or here.
 NOT_HARNESS = {
     "nirmaan/runtime/__init__.py": "re-exports only",
@@ -73,9 +73,12 @@ def _other(value):
 
 
 def test_every_constant_in_the_harness_module_is_a_setting_in_the_fingerprint():
+    # M75: the loop settings are in the fingerprint of the tools-in-loop variant only (tests/test_seat_tools.py).
     constants = _constants(HARNESS)
-    assert set(SETTINGS) == constants - BOOKKEEPING
+    assert set(SETTINGS) | set(harness.LOOP_SETTINGS) == constants - BOOKKEEPING
+    assert not set(SETTINGS) & set(harness.LOOP_SETTINGS)
     assert set(fingerprint()["settings"]) == set(SETTINGS)
+    assert set(fingerprint(variant="tools-in-loop")["loop"]["settings"]) == set(harness.LOOP_SETTINGS)
 
 
 def test_no_other_module_defines_a_harness_setting():
@@ -86,9 +89,10 @@ def test_no_other_module_defines_a_harness_setting():
 
 def test_every_runtime_file_is_harness_code_or_says_why_not():
     runtime = {p.relative_to(SRC).as_posix() for p in (SRC / "nirmaan" / "runtime").glob("*.py")}
-    assert runtime - set(CODE) == set(NOT_HARNESS), "put a new runtime file in harness.CODE or in NOT_HARNESS"
-    assert not set(NOT_HARNESS) & set(CODE)
-    assert all((SRC / rel).is_file() for rel in CODE), [rel for rel in CODE if not (SRC / rel).is_file()]
+    code = set(CODE) | set(harness.LOOP_CODE)  # M75: the brokered server's code is in the variant's fingerprint
+    assert runtime - code == set(NOT_HARNESS), "put a new runtime file in harness.CODE, LOOP_CODE or NOT_HARNESS"
+    assert not set(NOT_HARNESS) & code and not set(CODE) & set(harness.LOOP_CODE)
+    assert all((SRC / rel).is_file() for rel in code), [rel for rel in code if not (SRC / rel).is_file()]
 
 
 def test_the_runtime_files_outside_the_code_hold_no_new_constant():
@@ -202,22 +206,25 @@ def test_seat_calls_run_claude_code_in_safe_mode():
 
 
 def test_the_named_variants_are_the_default_and_three_attempts_with_the_repair_text():
-    assert harness.VARIANTS == {"default": {}, "attempts-3": {"attempts": 3}}
+    # M75 adds tools-in-loop (tests/test_seat_tools.py).
+    assert harness.VARIANTS == {"default": {}, "attempts-3": {"attempts": 3}, "tools-in-loop": {"tools": True}}
     assert fingerprint()["run"]["variant"] == "default"
     assert fingerprint(variant="attempts-3")["run"] == {"attempts": 3, "knowledge": True, "cli": None,
                                                         "variant": "attempts-3"}
     # The variant's own attempts, given or not, is one harness; a plain --attempts 3 is not the variant.
     assert harness_sha256(variant="attempts-3") == harness_sha256(attempts=3, variant="attempts-3")
     assert harness_sha256(variant="attempts-3") != harness_sha256(attempts=3)
-    with pytest.raises(ValueError, match="unknown harness variant 'nope'; known: default, attempts-3"):
+    with pytest.raises(ValueError, match="unknown harness variant 'nope'; known: default, attempts-3, tools-in-loop"):
         harness_sha256(variant="nope")
 
 
 def test_every_variant_sets_only_run_options_a_run_can_take():
     # A variant is the default harness with run options; a setting it changed would hide in the variant table.
     for name, options in harness.VARIANTS.items():
-        assert set(options) <= {"attempts"}, name
-        assert all(isinstance(v, int) and v >= 1 for v in options.values()), name
+        assert set(options) <= {"attempts", "tools"}, name
+        assert all(isinstance(v, int) and not isinstance(v, bool) and v >= 1
+                   for k, v in options.items() if k == "attempts"), name
+        assert all(v is True for k, v in options.items() if k == "tools"), name
 
 
 def test_editing_a_variant_changes_its_fingerprint_and_never_the_default(monkeypatch):

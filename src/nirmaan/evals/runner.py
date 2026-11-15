@@ -50,7 +50,7 @@ from nirmaan.orchestrator import Orchestrator
 from nirmaan.org import Organization
 from nirmaan.runtime import AgentRuntime, Completion, ModelRuntime, ToolBroker, ToolHandle, WorkPrompt, run_task
 from nirmaan.runtime.files import write_file
-from nirmaan.runtime.harness import harness_sha256, run_attempts
+from nirmaan.runtime.harness import harness_sha256, run_attempts, run_tools
 from nirmaan.work import PolicyViolationError, ProjectStore, TaskEngine, WorkError, verify_chain
 from nirmaan.work.policy import unsatisfied_requirements
 
@@ -70,13 +70,15 @@ class ReplayLLM:
     """
 
     name = REPLAY
+    #: M75: on the tools-in-loop variant a replay calls no tool; the reference answer is given as it is.
+    takes_seat_tools = True
 
     def __init__(self, files: Sequence[tuple[str, str, str, str | None]], outcome: str | None = None) -> None:
         self._files = list(files)  # (path, kind, content, entry)
         self._outcome = outcome  # M71: a decision's answer records its outcome
         self.calls: list[WorkPrompt] = []
 
-    def complete(self, prompt: WorkPrompt) -> Completion:
+    def complete(self, prompt: WorkPrompt, tools=None) -> Completion:
         self.calls.append(prompt)
         cites = [c.token for c in prompt.citations if c.kind == "artifact"]
         if not cites:
@@ -236,7 +238,9 @@ def evaluate(org: Organization, case: EvalCase, seat_runtime: AgentRuntime, *, r
     """``run_case`` with the runtime given and the replay flag stated, returning the sandbox engine too (M45).
 
     ``knowledge=False`` (M67, the ablation) seats the runtime with packets that carry no knowledge documents.
-    ``variant`` (M74) is a named harness variant: the attempts it sets apply when ``attempts`` is None.
+    ``variant`` (M74) is a named harness variant: the attempts it sets apply when ``attempts`` is None. On the
+    ``tools-in-loop`` variant (M75) the seat, whose model must be able to call tools, gets brokered tools during
+    its attempts, and every call it made is on the result (``tool_calls``).
     The result records the harness it ran in (M73): ``harness_sha256`` with this ``attempts``, ``knowledge`` and
     ``variant``, and the runtime's CLI version (``runtime_cli``), recorded beside it as ``cli``.
     """
@@ -244,6 +248,11 @@ def evaluate(org: Organization, case: EvalCase, seat_runtime: AgentRuntime, *, r
     problems = validate_case(org, case, repo)
     if problems:
         raise EvalError(f"case {case.id} cannot run: {'; '.join(problems)}")
+    loop = run_tools(variant)
+    if loop and not (isinstance(seat_runtime, ModelRuntime)
+                     and getattr(seat_runtime.llm, "takes_seat_tools", False)):
+        raise EvalError(f"the harness variant {variant} seats a model that can call brokered tools (the claude-code "
+                        f"runtime); runtime {seat_runtime.runtime_id!r} cannot")
     started_at, started = (clock or (lambda: datetime.now(timezone.utc)))(), time.monotonic()
     sandbox = Path(sandbox) if sandbox else Path(tempfile.mkdtemp(prefix="nirmaan-eval-"))
     sandbox.mkdir(parents=True, exist_ok=True)
@@ -255,11 +264,19 @@ def evaluate(org: Organization, case: EvalCase, seat_runtime: AgentRuntime, *, r
     _give_inputs(engine, case, seat, repo, Actor(role=str(seat.owner), kind=ActorKind.SYSTEM, name=FIXTURE))
     tool_runs: list[str] = []
     cli = runtime_cli(seat_runtime)  # before the seat runs, as the answers' harness is
+    sessions = len(seat_runtime.tool_sessions) if loop else 0
+    if loop:
+        seat_runtime.seat_tools = True  # type: ignore[attr-defined]
     try:
         report = run_task(engine, seat.id, seat_runtime, attempts=attempts or case.attempts, knowledge=knowledge)
         detail, used, tool_runs = report.detail, len(report.attempts), list(report.tool_runs)
     except (WorkError, PolicyViolationError, PermissionError) as exc:
         detail, used = f"the engine refused the seat's work: {exc}", 1
+    finally:
+        if loop:
+            seat_runtime.seat_tools = False  # type: ignore[attr-defined]
+    tool_calls = tuple(call for session in seat_runtime.tool_sessions[sessions:]  # type: ignore[attr-defined]
+                       for call in session.calls) if loop else ()
 
     task = engine.task(seat.id)
     reached_review = task.status in _REVIEWED
@@ -283,6 +300,7 @@ def evaluate(org: Organization, case: EvalCase, seat_runtime: AgentRuntime, *, r
         model_calls=spend.calls, input_tokens=spend.input_tokens, output_tokens=spend.output_tokens,
         cost_usd=None if spend.unknown_cost_calls else spend.cost_usd,
         harness=harness_sha256(attempts=attempts, knowledge=knowledge, cli=cli, variant=variant), cli=cli,
+        tool_calls=tool_calls,
     ), engine
 
 

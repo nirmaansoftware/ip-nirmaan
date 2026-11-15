@@ -275,6 +275,11 @@ class ToolRun(BaseModel):
         default=None,
         description="The metric bounds the broker checked the run against (M48). None: saved before M48, when "
                     "every max_/min_ parameter the run carried was a bound.")
+    advisory: bool = Field(
+        default=False,
+        description="M75: a run the seat asked for during its attempt (tools in the loop). Recorded like any run, "
+                    "but it never meets an evidence requirement: the platform's own runs on the submitted files "
+                    "alone judge the work.")
 
     _freeze = field_validator("params", "outputs", mode="after")(lambda v: deep_frozen(v))
 
@@ -286,6 +291,8 @@ class ToolRun(BaseModel):
             data.pop("outputs", None)
         if isinstance(data, dict) and data.get("bounds", ()) is None:
             data.pop("bounds", None)
+        if isinstance(data, dict) and data.get("advisory") is False:  # M75: runs saved before it round-trip
+            data.pop("advisory", None)
         return data
 
     def answers(self, fixed) -> bool:

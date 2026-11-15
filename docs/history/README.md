@@ -125,6 +125,7 @@ The original preface of the section:
 - [M72-cocotb](M72-cocotb.md): Milestone 72 - Python testbenches through cocotb: simulator.run's cocotb backend, judged by cocotb's own results
 - [M73-harness-fingerprint](M73-harness-fingerprint.md): Milestone 73 - The harness in one place, and its fingerprint on every trial; a changed harness makes a level's trials stale
 - [M74-harness-bundle](M74-harness-bundle.md): Milestone 74 - The harness bundle: the single-task rule in the formal tools' contract, the tool definitions in the fingerprint, seat calls with no user-level instruction file, and named variants
+- [M75-tools-in-the-loop](M75-tools-in-the-loop.md): Milestone 75 - Tools in the loop: the seat calls brokered lint, simulation and formal during its attempt, every call recorded and every run advisory
 - [M76-outside-calibration](M76-outside-calibration.md): Milestone 76 - Outside calibration: the RTLLM adapter, and calibration records that never count toward a level
 - [M77-verification-departments](M77-verification-departments.md): Milestone 77 - Verification in five departments; four of them ACTIVE as grouping units, the frozen list changed by renames only
 - [M78-independent-signoff-gates](M78-independent-signoff-gates.md): Milestone 78 - Signoff gates independent of the producing department
