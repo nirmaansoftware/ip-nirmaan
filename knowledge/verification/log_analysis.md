@@ -19,8 +19,8 @@ Practising: the VeriTriage tools this skill holds are available; this document i
 Reading simulation and regression logs as structured events before
 reasoning about them, and what the two VeriTriage tools return. Tags in
 brackets name the sources above; "inference" marks this document's own
-reasoning; "gate" names the repository code that backs a line; "run" names a
-tool run made while writing (listed in the pull request).
+reasoning; "gate" names the repository code that backs a line. No tool log is
+committed, so no line here states a measured tool result as fact.
 
 ## Parse before reading
 
@@ -59,10 +59,6 @@ tool run made while writing (listed in the pull request).
 - So the first error line in a log marks the first check that saw the fault,
   not the defect, and the last fatal line is often a consequence, such as a
   timeout after the design stopped responding (inference).
-- On the repository's fixture where an assertion fails at time 40000 and a
-  phase timeout follows at 10000000, veritriage.investigate classified the
-  log as assertion_failure at 90%, matching both an assertion-before-timeout
-  and a phase-timeout pattern (run R).
 - WER found that a bug it reported was 4.5 to 5.1 times more likely to be
   fixed than one reported by a person, and notes that its reports document
   internal state while people's document external symptoms [WER]. A check that
@@ -79,27 +75,16 @@ tool run made while writing (listed in the pull request).
 ## What the tools return
 
 - veritriage.explain_log takes one path to a file; a missing path or a
-  directory is refused (gate: src/nirmaan/integrations/veritriage.py:72-79;
-  runs M, N).
+  directory is refused (gate: src/nirmaan/integrations/veritriage.py:72-79).
 - It returns annotated regions, each with a line number, an origin, a phase
-  and the line's text (gate: src/nirmaan/integrations/veritriage.py:77-79;
-  run L).
-- On an Icarus log from simulator.run it annotated the one ERROR line, with
-  origin unknown, and not the verdict line or the $finish line (run L). On
-  the UVM scoreboard fixture it gave all five lines it annotated origin
-  testbench (run Q).
+  and the line's text (gate: src/nirmaan/integrations/veritriage.py:77-79).
 - veritriage.investigate reports a classification, a confidence, a count of
   evidence nodes and a top hypothesis, and saves a session whose id it returns
-  (gate: src/nirmaan/integrations/veritriage.py:58-68; run I).
-- Its confidence differs a great deal by log: 80% with a matched pattern on
-  the UVM scoreboard fixture, 30% with no pattern on a plain Icarus failure
-  log (runs P, I). A low-confidence class is a lead, not a finding
-  (inference).
+  (gate: src/nirmaan/integrations/veritriage.py:58-68).
+- A low-confidence class is a lead, not a finding (inference).
 - simulator.run reads the testbench's verdict line, `NIRMAAN-SIM <nonce> <n>
   passed, <m> failed`, carrying the run's nonce (gate:
-  src/nirmaan/integrations/eda_parsers.py:128-129). Its summary quoted the
-  first parsed error message, "count is 1, expected 0", on a failing run
-  (run C).
+  src/nirmaan/integrations/eda_parsers.py:128-129).
 
 ## Common failure modes
 
@@ -115,7 +100,7 @@ tool run made while writing (listed in the pull request).
 ## How a result is checked
 
 - Findings cite log lines (card: src/nirmaan/company/skills.py:500), by
-  file and line number, as explain_log's regions give them (run L).
+  file and line number, as explain_log's regions give them.
 - Every error and fatal message in the log is accounted for: the one chosen
   as the cause, and why each other one is a consequence or unrelated
   (inference).

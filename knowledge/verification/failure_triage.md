@@ -19,8 +19,8 @@ Practising: the VeriTriage tools and the simulator this skill holds are availabl
 Sorting a set of failures into groups that each have one cause, ranking the
 groups, and how the triage stage's gates read the result. Tags in brackets
 name the sources above; "inference" marks this document's own reasoning;
-"gate" or "test" names the repository code that backs a line; "run" names a
-tool run made while writing (listed in the pull request).
+"gate" or "test" names the repository code that backs a line. No tool log is
+committed, so no line here states a measured tool result as fact.
 
 ## Buckets
 
@@ -99,19 +99,13 @@ tool run made while writing (listed in the pull request).
 - The triage stage needs a VeriTriage session over the failing artifacts,
   from veritriage.investigate (gate: src/nirmaan/company/workflows.py:472-476).
 - veritriage.investigate takes files: no paths, a missing path, or a directory
-  is refused (gate: src/nirmaan/integrations/veritriage.py:49-57; runs K2, K,
-  J).
+  is refused (gate: src/nirmaan/integrations/veritriage.py:49-57).
 - One call makes one session over all the paths it is given, with one
-  classification (gate: src/nirmaan/integrations/veritriage.py:58-68). Given
-  the UVM scoreboard fixture and a plain Icarus failure log together, it
-  returned one class, testbench_failure, though the Icarus log alone gave
-  unknown_failure (runs T, I). Run it on each failing log as well as on the
-  set (inference).
-- Its classification comes with a confidence: on the repository's UVM
-  scoreboard fixture it reported testbench_failure at 80% with a matched
-  pattern, and on a plain Icarus failure log unknown_failure at 30% with
-  none (runs I, P). A class is a lead to test, not a bucket by itself
-  (inference).
+  classification (gate: src/nirmaan/integrations/veritriage.py:58-68). A
+  combined input may therefore hide a class that one log alone would show, so
+  run it on each failing log as well as on the set (inference).
+- Its classification comes with a confidence. A class is a lead to test, not
+  a bucket by itself (inference).
 - When the investigation asks for a reproduction, the triage stage also
   writes testbench files, and the gate runs simulator.run with expect=fail
   over the approved RTL under investigation and each of those testbenches on
@@ -123,7 +117,7 @@ tool run made while writing (listed in the pull request).
 - With expect=fail a run passes only when the build succeeded, $finish was
   reached and the testbench's one verdict line, with this run's nonce, reports
   at least one failed check (gate:
-  src/nirmaan/integrations/eda_parsers.py:226-256; runs A, B, E, F).
+  src/nirmaan/integrations/eda_parsers.py:226-256).
 - In an evaluation the must-fail-each scorer judges a triage seat's repros:
   each must pass on the clean inputs, and every seeded bug must fail a different
   repro, so one repro that fails every bug cannot stand for two buckets (gate:

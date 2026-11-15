@@ -19,8 +19,8 @@ Practising: the simulator and VeriTriage tools this skill holds are available; t
 From a failing test to the defect that causes it, and how the reproduction
 gate reads the result. Tags in brackets name the sources above; "inference"
 marks this document's own reasoning; "gate" or "test" names the repository
-code that backs a line; "run" names a tool run made while writing (listed in
-the pull request).
+code that backs a line. No tool log is committed, so no line here states a
+measured tool result as fact.
 
 ## From failure back to defect
 
@@ -122,32 +122,30 @@ the pull request).
   tests/test_repro_gates.py::test_a_reproduction_hands_over_the_rtl_and_gates_triage_and_root_cause).
 - expect is restricted to pass (the default) or fail; any other value is
   refused before anything runs (gate:
-  src/nirmaan/integrations/eda.py:457-462; run G).
+  src/nirmaan/integrations/eda.py:457-462).
 - With expect=fail the run passes only when the build succeeded, the
   simulation reached $finish, and the testbench printed exactly one verdict
   line `NIRMAAN-SIM <nonce> <n> passed, <m> failed` with this run's nonce and
   at least one failed check (gate:
   src/nirmaan/integrations/eda_parsers.py:128-129, 226-256). A testbench
   whose checks all pass, one that prints no verdict, and one that does not
-  build all fail it (runs B, F, E).
+  build are each expected to fail it by the parser rules above (inference).
 - Only the file that declares the top module may end the run, read plusargs
   or open files: a design file that used $finish, $stop, $fopen or
   $value$plusargs was refused before anything was simulated (gate:
-  src/nirmaan/integrations/eda.py:449-454, 476-497; runs H, W, U, V).
+  src/nirmaan/integrations/eda.py:449-454, 476-497).
 - A repro that passes on the RTL under investigation stops the work before
   review (test: tests/test_repro_gates.py::test_a_root_cause_whose_repro_passes_on_the_rtl_does_not_reach_review).
 - The gate counts failed checks; it does not know which behaviour a check
-  tests. A testbench with a wrong expected value reproduced "a failure" on
-  the clean counter RTL (run O). In an evaluation the must-fail scorer also
+  tests. A testbench with a wrong expected value would reproduce "a failure"
+  on clean RTL (inference). In an evaluation the must-fail scorer also
   runs the repro on the clean inputs, which must pass, and on each mutant,
   which must fail (gate: src/nirmaan/evals/scorers.py:136-147).
 - So write the repro as a self-checking test of the specified behaviour that
-  happens to fail now: the same testbench failed with expect=pass on the
-  buggy RTL and passed on the clean one (runs C, D).
+  happens to fail now: the same testbench should fail on the buggy RTL and
+  pass on the clean one (inference).
 - veritriage.investigate reports a classification with a confidence and a
-  top hypothesis (gate: src/nirmaan/integrations/veritriage.py:58-68). On a
-  plain Icarus failure log from simulator.run it reported unknown_failure at
-  30% confidence, top hypothesis "Likely RTL bug" (run I). Treat the top
+  top hypothesis (gate: src/nirmaan/integrations/veritriage.py:58-68). Treat the top
   hypothesis as one candidate to test (inference).
 
 ## Common failure modes
