@@ -312,14 +312,12 @@
     },
     "hardware_fuzzing": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/hardware_fuzzing.json",
+        "counts": true,
         "knowledge_document": "knowledge/verification/hardware_fuzzing.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     },
     "model_checking": {
@@ -567,7 +565,7 @@
     }
   },
   "totals": {
-    "knowledge": 19,
+    "knowledge": 20,
     "practised": 4,
     "proven": 0
   },
