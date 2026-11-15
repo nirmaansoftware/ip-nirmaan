@@ -1,0 +1,23 @@
+{
+  "cases": [
+    "rtl/apb-gpio"
+  ],
+  "command": "nirmaan eval run --runtime claude-code --trials 2 --seats rtl rtl/apb-gpio",
+  "finished_at": "2026-11-15T10:44:53.644699Z",
+  "format": "nirmaan.eval-run",
+  "head_sha": "55810bb05004a28962b67569d10523cbd4699de8",
+  "id": "2026-11-15-claude-code-claude-opus-5-5-12",
+  "knowledge": "on",
+  "model": "claude-opus-5-5",
+  "nirmaan_version": "1.25.0",
+  "purpose": "evidence",
+  "replay": false,
+  "runtime": "claude-code",
+  "seats": [
+    "rtl-implementation"
+  ],
+  "source": "",
+  "started_at": "2026-11-15T10:28:17.327280Z",
+  "trials": 2,
+  "version": 1
+}
