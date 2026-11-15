@@ -202,6 +202,7 @@ def test_only_the_three_approved_seats_may_wait_for_their_files(teams_map):
         ("src/nirmaan/integrations/eda.py", {"eda-platform", "verification"}),
         ("src/nirmaan/integrations/eda_parsers.py", {"eda-platform"}),
         ("src/nirmaan/work/policy.py", {"eda-platform", "verification"}),
+        ("src/nirmaan/integrations/eda_guard.py", {"eda-platform", "verification"}),
         ("src/nirmaan/company/evidence.py", {"eda-platform", "verification"}),
         ("src/nirmaan/evals/levels.py", {"verification"}),
         ("src/nirmaan/runtime/tools.py", {"eda-platform", "verification"}),
@@ -375,6 +376,21 @@ def test_a_level_rule_change_is_gate_semantics(teams_map, files, path):
     assert path in files, f"{path} is not tracked"
     diff = f"diff --git a/{path} b/{path}\n--- a/{path}\n+++ b/{path}\n@@ -1,1 +1,1 @@\n-# old\n+# new\n"
     assert "gate-semantics" in _classify(teams_map, path, diff, status="M")["founder"], path
+
+
+def test_the_gate_input_guard_is_gate_semantics(teams_map, files):
+    """eda_guard.py holds the allow lists that refuse seat input able to run a
+    shell command or other code before a gate runs (M84, GATE_INPUTS.md), so a
+    change to it changes what a gate refuses: gate semantics (ip#301, Founder
+    Proxy). evals/records.py decides no pass or fail and stays out."""
+    path = "src/nirmaan/integrations/eda_guard.py"
+    assert path in files, f"{path} is not tracked"
+    diff = f"diff --git a/{path} b/{path}\n--- a/{path}\n+++ b/{path}\n@@ -1,1 +1,1 @@\n-# old\n+# new\n"
+    assert "gate-semantics" in _classify(teams_map, path, diff, status="M")["founder"], path
+    assert "verification" in owning_teams(teams_map, path)
+    records = "src/nirmaan/evals/records.py"
+    diff = diff.replace(path, records)
+    assert "gate-semantics" not in _classify(teams_map, records, diff, status="M")["founder"]
 
 
 def _harness_files() -> list[str]:

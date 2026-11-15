@@ -160,13 +160,15 @@ rules:
   # Gate files: Verification reviews every gate change. The level rules
   # count as gate files: company/evidence.py says which domains need a
   # must-fail control before a skill is Practised (pilot retrospective,
-  # decision 11, calls a change to it a gate change); evals/levels.py is
+  # decision 11, calls a change to it a gate change); integrations/eda_guard.py
+  # holds the allow lists that refuse seat input to the gates (M84); evals/levels.py is
   # Verification's under src/nirmaan/evals/** below.
   - team: eda-platform
     co_owners: [verification]
     paths:
       - src/nirmaan/company/evidence.py
       - src/nirmaan/integrations/eda.py
+      - src/nirmaan/integrations/eda_guard.py
       - src/nirmaan/work/policy.py
       - src/nirmaan/work/engine.py
       - src/nirmaan/runtime/tools.py
@@ -555,6 +557,7 @@ founder_classes:
     title: Gate semantics
     paths:
       - src/nirmaan/integrations/eda.py
+      - src/nirmaan/integrations/eda_guard.py
       - src/nirmaan/work/policy.py
       - src/nirmaan/work/engine.py
       - src/nirmaan/runtime/tools.py
@@ -569,7 +572,7 @@ founder_classes:
       - pattern: '\b(no-tools|physical-design|test-union|dashes)\b'
         in: [.github/workflows/**]
         example: '  test-union:'
-    note: Paths are the gate files of the council record of 2026-10-17 (section 1) and the level rules, which decide what a skill level needs; content is NIRMAAN_REQUIRE_EDA and the required check names. src/nirmaan/company/evidence.py holds MUST_FAIL_DOMAINS and src/nirmaan/evals/levels.py the rest (trial count, Wilson bound, re-judge, must-fail, stale and harness rules); decision 11 of the pilot retrospective calls a MUST_FAIL_DOMAINS change a gate change. scripts/capability_levels.py is not listed, because it holds no rule; it only prints, writes or compares the output of levels.py, and tests/test_capability_levels.py checks capability/levels.json against levels.py directly.
+    note: Paths are the gate files of the council record of 2026-10-17 (section 1), the level rules and the gate input guard, which decide what a skill level needs; content is NIRMAAN_REQUIRE_EDA and the required check names. src/nirmaan/company/evidence.py holds MUST_FAIL_DOMAINS and src/nirmaan/evals/levels.py the rest (trial count, Wilson bound, re-judge, must-fail, stale and harness rules); decision 11 of the pilot retrospective calls a MUST_FAIL_DOMAINS change a gate change. src/nirmaan/integrations/eda_guard.py (M84) holds the allow lists that refuse seat input able to run a shell command or other code before a gate runs; a change to it changes which inputs a gate refuses, so it is a gate change (the Founder Proxy asked for it on ip#301). src/nirmaan/evals/records.py is not listed because it records trials and replays them, decides no pass or fail and no level, and is not in harness.CODE (RR5, ip#292, left the fingerprint unchanged), and the rules that read its records are in levels.py and evidence.py. scripts/capability_levels.py is not listed, because it holds no rule; it only prints, writes or compares the output of levels.py, and tests/test_capability_levels.py checks capability/levels.json against levels.py directly.
   - id: licence-and-third-party
     title: Licence and third-party
     paths:
