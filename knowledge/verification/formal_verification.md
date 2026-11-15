@@ -104,6 +104,6 @@ backs it.
   reached (gate: eda_parsers.py:369-458).
 - Run the proof against a mutant of the RTL with one behaviour broken; if it
   still passes, a property is missing (inference).
-- OpenTitan uses formal alongside simulation for a block and tracks it in the
-  same testplan [OTDV]; a proof does not replace the other tests where
+- OpenTitan's DV document for a block also covers its formal property
+  verification goals [OTDV]; a proof does not replace the other tests where
   assumptions leave behaviour unchecked (inference).

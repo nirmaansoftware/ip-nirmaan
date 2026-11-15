@@ -47,26 +47,25 @@
         "knowledge_document": "knowledge/design/arbitration.md",
         "problems": []
       },
-      "level": "knowledge",
+      "level": "practised",
       "practised": [
         {
           "cases": [
             "rtl/rr-arbiter"
           ],
           "cli": "2.1.325",
-          "counts": false,
+          "counts": true,
           "digest": "sha256:53dff4b10deec145e18247fd490870321613e50b35a8da2f0e0a044b95b58e31",
           "harness": "sha256:35643990d58bf28264abe98752bd6c2750a391483ac43176b4748a38fbc32711",
-          "lower": 0.3755,
+          "lower": 0.5291,
           "model": "claude-opus-5-5",
-          "n": 5,
-          "passed": 4,
-          "reasons": [
-            "Wilson lower bound 0.376, under 0.5"
-          ],
+          "n": 8,
+          "passed": 7,
+          "reasons": [],
           "records": [
             "evals/results/2026-11-14-claude-code-claude-opus-5-5",
-            "evals/results/2026-11-14-claude-code-claude-opus-5-5-2"
+            "evals/results/2026-11-14-claude-code-claude-opus-5-5-2",
+            "evals/results/2026-11-15-claude-code-claude-opus-5-5"
           ],
           "unjudged": 1
         }
@@ -145,11 +144,13 @@
     "code_coverage": {
       "knowledge": {
         "check_record": "capability/records/knowledge/code_coverage.json",
-        "counts": true,
+        "counts": false,
         "knowledge_document": "knowledge/verification/code_coverage.md",
-        "problems": []
+        "problems": [
+          "stale: the document changed after its check"
+        ]
       },
-      "level": "knowledge",
+      "level": null,
       "practised": []
     },
     "constrained_random": {
@@ -331,6 +332,27 @@
       "practised": [
         {
           "cases": [
+            "rtl/rr-arbiter"
+          ],
+          "cli": "2.1.325",
+          "counts": false,
+          "digest": "sha256:012eb9b7155ed6eb7761adca880b338f10c8f978b15dfd92f5adbb3253307a52",
+          "harness": "sha256:35643990d58bf28264abe98752bd6c2750a391483ac43176b4748a38fbc32711",
+          "lower": 0.4385,
+          "model": "claude-opus-5-5",
+          "n": 3,
+          "passed": 3,
+          "reasons": [
+            "3 trials, fewer than 5",
+            "Wilson lower bound 0.439, under 0.5"
+          ],
+          "records": [
+            "evals/results/2026-11-15-claude-code-claude-opus-5-5"
+          ],
+          "unjudged": 0
+        },
+        {
+          "cases": [
             "rtl/apb-gpio",
             "rtl/apb-regs",
             "rtl/axi4-lite-regs",
@@ -414,8 +436,8 @@
     }
   },
   "totals": {
-    "knowledge": 13,
-    "practised": 0,
+    "knowledge": 11,
+    "practised": 1,
     "proven": 0
   },
   "without_knowledge": [
