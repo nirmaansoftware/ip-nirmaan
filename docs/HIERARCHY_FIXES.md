@@ -205,3 +205,17 @@ the gate task's owner, approver and unit: the coverage gate (5 tasks) from
 the Simulation director to the Verification VP. Every other task plans as
 before. The must-fail tests: planned without the rule, the check finds the
 Simulation director approving coverage evidence; and with `gate.rtl` added, the RTL gate is blocked, not self-approved.
+
+## 7. Lint and Coding Standards merged (P3-O1)
+
+Council record `council/records/2026-11-15-p3-o1-lint-and-standards.md`. The
+Coding Standards practice `design.rtl.quality.standards` is removed from
+RTL Quality, and the Lint practice `design.rtl.quality.lint` now holds
+`rtl_lint` and `coding_standards`. Its id, name and role noun are unchanged,
+and `design.rtl.quality.standards` is not reused. RTL Quality keeps three child
+units, the span minimum. Only the four `design.rtl.quality.standards.*` roles
+go: the organization goes from 232 to 231 units and from 720 to 716 roles, and
+no surviving role changes in skills, effective skills, capabilities or tools.
+The frozen active-units list loses that one line (205 to 204) and its pin
+moves in the same pull request. No capability level moves and no L1 or check
+record goes stale. Lint holds no claim that code conforms to a coding standard.

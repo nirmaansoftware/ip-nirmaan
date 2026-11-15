@@ -154,7 +154,7 @@ What the earlier runs of this pull request found, in order:
 
 ## 6. Not in this milestone
 
-* IHP SG13G2 (pending the founder's decision; its own pull request).
+* IHP SG13G2: its own pull request, M82 (`docs/PD_IHP_PILOT.md`).
 * KLayout DRC and LVS on GF180MCU (section 5).
 * Metal fill and IR drop on GF180MCU (section 5).
 * Lifting sky130hd's met1 to met3 routing limit (section 5).

@@ -365,6 +365,16 @@ def test_both_keys_pass_and_any_other_merge_error_stops_with_needs_founder(repo)
     assert not any("Auto-merge is on" in c or "### Automated loop: ready" in c for c in r.comments())
 
 
+def test_a_base_branch_modified_merge_error_retries_and_is_not_a_stop(repo):
+    r = repo(gh={"merge_error": "GraphQL: Base branch was modified. Review and try the merge again. (mergePullRequest)"})
+    assert r.tick() == ["retry"]
+    assert not r.labeled(), "never needs-founder for a race with main"
+    assert len(r.github.merges) == 1
+    expire_backoff(r)
+    r.github.merge_error = None
+    assert r.tick() != ["stopped"]
+
+
 @pytest.mark.parametrize("gh", [{"settings_error": "gh: Not Found (HTTP 404)"}, {"auto_merge_allowed": "null"}])
 def test_an_unreadable_auto_merge_setting_stops_with_needs_founder_and_no_merge_call(repo, gh):
     r = repo(gh=gh)
@@ -819,6 +829,8 @@ def test_transient_error_classification():
     assert t(subprocess.CalledProcessError(128, ["git", "fetch"], stderr="fatal: unable to access 'https://github.com/': Could not resolve host: github.com"))
     assert t(subprocess.CalledProcessError(1, ["gh"], stderr="error connecting to api.github.com"))
     assert not t(subprocess.CalledProcessError(1, ["gh"], stderr="GraphQL: Pull request is not mergeable"))
+    assert t(subprocess.CalledProcessError(1, ["gh"], stderr="GraphQL: Base branch was modified. Review and try the merge again. (mergePullRequest)"))
+    assert not t(subprocess.CalledProcessError(1, ["gh"], stderr="GraphQL: Head branch was modified. Review and try the merge again."))
     assert not t(ValueError("x")) and not t(FileNotFoundError("gh"))
     assert pr_loop._transient_call("timeout", "claude did not answer within 1200s")
     assert pr_loop._transient_call("error", "API Error: 503 Service Unavailable")
@@ -1325,6 +1337,34 @@ def test_related_tests_map_changed_files_to_the_tests_that_use_them(tmp_path):
     assert rel(tmp_path, ["src/nirmaan/lonely.py"]) is None
     assert rel(tmp_path, ["tests/test_other.py", "src/nirmaan/lonely.py"]) is None
     assert rel(tmp_path, ["tests/test_gone.py"]) is None
+
+
+def test_a_records_only_fix_runs_the_record_tests_not_the_whole_suite(tmp_path):
+    # ip#227: a fix to eval records ran the whole suite (no test names trial-03.json or
+    # causes.md) and timed out; the record tests are the ones that read committed records.
+    run = "evals/results/2026-11-14-claude-code-claude-opus-5-5-without-knowledge"
+    _tree(tmp_path, {
+        "tests/test_capability_levels.py": "pass\n",
+        "tests/test_nirmaan_evals.py": "def test_every_shipped_case_is_valid(): pass\n",
+        "tests/test_live.py": 'record("trial-01.json")\n',
+        "tests/test_named.py": f'RECORD = "{run}/summary.json"\n',
+        "tests/test_other.py": "pass\n",
+    })
+    rel, case = pr_loop.related_tests, "tests/test_nirmaan_evals.py::test_every_shipped_case_is_valid"
+    records = [f"{run}/causes.md", f"{run}/rejudge.json", f"{run}/rtl_rr-arbiter/trial-01.json", f"{run}/rtl_rr-arbiter/trial-03.json"]
+    assert rel(tmp_path, records) == ["tests/test_capability_levels.py", case], "a file name match is chance"
+    assert rel(tmp_path, [f"{run}/summary.json"]) == ["tests/test_capability_levels.py", "tests/test_named.py", case]
+    assert rel(tmp_path, [f"{run}/manifest.json", "tests/test_nirmaan_evals.py"]) == [
+        "tests/test_capability_levels.py", "tests/test_nirmaan_evals.py"], "the whole file holds the node"
+    assert pr_loop.RECORD_TESTS[0] in pr_loop.related_tests(ROOT, [f"{run}/causes.md"]), "the record tests exist here"
+    for t in pr_loop.RECORD_TESTS:  # every named file and test function is there
+        file, _, func = t.partition("::")
+        assert (ROOT / file).is_file() and (not func or f"def {func}(" in (ROOT / file).read_text(encoding="utf-8")), t
+    # Outside evals/results the file-name rule stands; with no record test present, the whole suite.
+    assert rel(tmp_path, ["evals/rtl/case/trial-01.json"]) == ["tests/test_live.py"]
+    (tmp_path / "tests" / "test_capability_levels.py").unlink()
+    (tmp_path / "tests" / "test_nirmaan_evals.py").unlink()
+    assert rel(tmp_path, [f"{run}/causes.md"]) is None
 
 
 def test_the_fixers_test_check_runs_only_the_related_tests(repo, tmp_path):

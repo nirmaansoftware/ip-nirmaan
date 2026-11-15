@@ -1,0 +1,71 @@
+{
+  "format": "nirmaan.knowledge-check",
+  "skill": "reset_design",
+  "knowledge_document": "knowledge/design/reset_design.md",
+  "document_sha256": "sha256:7c86fea1f007843f3c720af3900d85d214a8270857a0544553d0c34447ef6202",
+  "writer": "RETRO-A5 session (retrospective action A5, item P3-K3, 2026-11-15)",
+  "checker": "RETRO-A4 session (retrospective action A4, item P3-C3, 2026-11-15)",
+  "sources_read": [
+    "[AReset] Gisselquist, Formally Verifying an Asynchronous Reset, ZipCPU blog, 2018: the whole post with its Verilog, properties and SymbiYosys script, https://zipcpu.com/formal/2018/04/12/areset.html",
+    "[AxiReset] Gisselquist, Resetting an AXI component (the page is titled Locally resetting an AXI component), ZipCPU blog, 2020: the whole post, https://zipcpu.com/blog/2020/03/14/axi-reset.html",
+    "[Rules] Gisselquist, Rules for new FPGA designers, ZipCPU blog, 2017: the whole post, https://zipcpu.com/blog/2017/08/21/rules-for-newbies.html",
+    "[Chase] Gisselquist, Chasing resets, ZipCPU blog, 2024: the whole post, https://zipcpu.com/blog/2024/04/01/chasing-resets.html",
+    "[lowRISC] lowRISC, Verilog Coding Style Guide (CC BY 4.0): the whole guide, https://github.com/lowRISC/style-guides/blob/master/VerilogCodingStyle.md",
+    "[CIP] lowRISC, OpenTitan Comportability Definition and Specification (Apache 2.0): the whole page, https://opentitan.org/book/doc/contributing/hw/comportability/index.html",
+    "[VLW] Verilator manual, Errors and Warnings: the whole page, https://verilator.org/guide/latest/warnings.html; and, to settle -Wall membership, the verilator Arguments page https://verilator.org/guide/latest/exe_verilator.html, read in full",
+    "[Proc] YosysHQ, Yosys command reference, Converting process blocks (proc and every proc_* pass): the whole page, https://yosyshq.readthedocs.io/projects/yosys/en/latest/cmd/index_passes_proc.html",
+    "Repository code at the lines cited in gate_claims"
+  ],
+  "result": "every claim tagged with a source was found in that source, every line marked inference is a fair reading of the source it names or the document's own reasoning, and every sentence about the platform's gates matches the gate code at the lines cited in gate_claims",
+  "notes": [
+    "Style choice: [CIP] says resets are asynchronous active low, assertion asynchronous and deassertion synchronised to the storage element's clock, chosen from a survey, team history and security analysis, with slightly more area and more care, and that the synchronous form needs a clock edge; [lowRISC] gives rst_n, the clock-qualified rst_domain_n and the always_ff form; [Rules] says not to use an asynchronous reset in a design and to test reset in the system-clock block. All found.",
+    "Release: AReset's three-flop synchroniser sets the flops and the output on the asynchronous reset and shifts a zero through on the clock; its contract (output high whenever input reset is active, high at least one clock before release, falls only on a rising clock edge, a cover of the release) is the property list in the document. The sentence that the reset must be active long enough to propagate is AReset's; the document tags the bullet [Chase], which has the one clock, two clocks, analogue lock and SDRAM figures. Both are in the bullet's sources, one tag short.",
+    "AxiReset: reset the registers and not the bus signals in an AXI-lite slave; the local reset may come from an input or a self-clearing bus register; retrofit with an AXI firewall rather than pulling the bus reset low; the local reset must reach the slave too, or a master can read results into the wrong address or hang. All found.",
+    "Gates: Verilator 5.052 was run with --lint-only -Wall over a small file with an asynchronous reset in one flop and a synchronous use of the same net in another; SYNCASYNCNET fired and the run failed. -Wall is -Wwarn-lint plus -Wwarn-style, and the style list on the Arguments page names SYNCASYNCNET; the Warnings page alone says only that it is a code-style warning off by default, so the document's [VLW] tag for -Wall membership leans on the Arguments page, which is not in this document's sources.",
+    "Chase's own story is that a three-cycle reset exposed a test that set constants during reset; the document does not use that and does not misstate it. Its testbench failure mode is tagged inference.",
+    "No gate checks reset sequencing; the skill has no tool (skills.py:356-359)."
+  ],
+  "gate_claims": [
+    {
+      "claim": "lint runs verilator --lint-only -Wall",
+      "evidence": "src/nirmaan/integrations/eda.py:428"
+    },
+    {
+      "claim": "lint passes only with exit 0, no error and no warning",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:97"
+    },
+    {
+      "claim": "the lint parser reads the log; a waiver lives in the RTL",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:93"
+    },
+    {
+      "claim": "the lint backend is registered for lint.run",
+      "evidence": "src/nirmaan/integrations/eda.py:803"
+    },
+    {
+      "claim": "SYNCASYNCNET fails lint.run under -Wall",
+      "evidence": "unverified"
+    },
+    {
+      "claim": "a formal setup with [tasks] is refused by the formal gate",
+      "evidence": "src/nirmaan/integrations/eda.py:644"
+    },
+    {
+      "claim": "the formal check refuses a [tasks] setup",
+      "evidence": "src/nirmaan/integrations/eda.py:652"
+    },
+    {
+      "claim": "no reset tool is registered for this skill",
+      "evidence": "src/nirmaan/company/skills.py:356"
+    },
+    {
+      "claim": "the document is Knowledge only because the skill has no available tool",
+      "evidence": "src/nirmaan/org/knowledge_files.py:53"
+    },
+    {
+      "claim": "the card's reset sequencing is documented and checked, a review matter",
+      "evidence": "src/nirmaan/company/skills.py:359"
+    }
+  ],
+  "checked_at": "2026-11-15"
+}

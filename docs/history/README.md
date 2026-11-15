@@ -130,6 +130,7 @@ The original preface of the section:
 - [M79-pd-sky130-pilot](M79-pd-sky130-pilot.md): Milestone 79 - The SKY130 physical design pilot in CI: Magic DRC and Netgen LVS
 - [M80-pd-fill-layers](M80-pd-fill-layers.md): Milestone 80 - Metal fill on the layers the DRC deck reads, and a must-fail fill control
 - [M81-pd-gf180-pilot](M81-pd-gf180-pilot.md): Milestone 81 - The GF180MCU physical design pilot in CI, and three signoff fixes it found
+- [M82-pd-ihp-pilot](M82-pd-ihp-pilot.md): Milestone 82 - The IHP SG13G2 physical design pilot in CI
 - [M83-testbench-refinements](M83-testbench-refinements.md): Milestone 83 - Block verification's testbench refinements for a scoreboard and for cocotb, and the cocotb testbench gate
 
 ## Before M43
