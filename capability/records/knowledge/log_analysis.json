@@ -1,0 +1,64 @@
+{
+  "format": "nirmaan.knowledge-check",
+  "skill": "log_analysis",
+  "knowledge_document": "knowledge/verification/log_analysis.md",
+  "document_sha256": "sha256:20be3ab22ecf26072d08ca722eea95104630907e5d6fb0a8e105e58453f18ffd",
+  "writer": "IP-W2-K5 session (wave 2 knowledge batch, plan row W2-K5, 2026-11-15)",
+  "checker": "IP-W2-C5 session (wave 2 check batch, lane IP-W2-C5)",
+  "sources_read": [
+    "[LogParse] Zhu et al., Tools and Benchmarks for Automated Log Parsing, ICSE-SEIP 2019 (open-access arXiv 1811.03509), all 8 pages read to the end, https://arxiv.org/abs/1811.03509",
+    "[WER] Glerum et al., Debugging in the (Very) Large: Ten Years of Implementation and Experience, SOSP 2009 (conference copy), all 17 pages read to the end, https://www.sigops.org/s/conferences/sosp/2009/papers/glerum-sosp09.pdf",
+    "[ZIntro] Zeller, The Debugging Book: Introduction to Debugging (CC BY-NC-SA 4.0), whole chapter read to the end, https://www.debuggingbook.org/html/Intro_Debugging.html"
+  ],
+  "checked_at": "2026-11-15",
+  "gate_claims": [
+    {
+      "claim": "veritriage.explain_log takes one path to a file; a missing path or a directory is refused",
+      "evidence": "src/nirmaan/integrations/veritriage.py:75"
+    },
+    {
+      "claim": "explain_log takes a single 'path' parameter",
+      "evidence": "src/nirmaan/company/tools.py:116"
+    },
+    {
+      "claim": "explain_log returns annotated regions, each with a line number, an origin, a phase and the line's text",
+      "evidence": "src/veritriage/models/project.py:99"
+    },
+    {
+      "claim": "explain_log annotates a log by origin and phase (committed test)",
+      "evidence": "tests/test_project.py::test_explain_log_classifies_origin_and_phase"
+    },
+    {
+      "claim": "explain_log returns its regions as data",
+      "evidence": "src/nirmaan/integrations/veritriage.py:77"
+    },
+    {
+      "claim": "veritriage.investigate reports a classification, a confidence, a count of evidence nodes and a top hypothesis, and saves a session whose id it returns",
+      "evidence": "src/nirmaan/integrations/veritriage.py:60"
+    },
+    {
+      "claim": "the investigate run returns a session reference (committed test)",
+      "evidence": "tests/test_nirmaan_runtime.py::test_an_agent_triages_with_real_veritriage"
+    },
+    {
+      "claim": "VeriTriage's SVA pack has the pattern sva.assertion-before-timeout and describes the timeout as a downstream consequence",
+      "evidence": "src/veritriage/knowledge/packs/sva.py:66"
+    },
+    {
+      "claim": "the fixture log of an assertion before a timeout matches the pattern",
+      "evidence": "tests/test_knowledge.py::test_pack_pattern_matches_realistic_evidence"
+    },
+    {
+      "claim": "simulator.run reads the testbench's verdict line NIRMAAN-SIM <nonce> <n> passed, <m> failed carrying the run's nonce",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:128"
+    },
+    {
+      "claim": "card: grepping for the first ERROR is the log_analysis failure mode",
+      "evidence": "src/nirmaan/company/skills.py:500"
+    },
+    {
+      "claim": "card: findings cite log lines",
+      "evidence": "src/nirmaan/company/skills.py:500"
+    }
+  ]
+}
