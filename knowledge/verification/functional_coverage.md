@@ -79,19 +79,29 @@ backs it.
 - `coverage.read` builds the run with Verilator's line and toggle coverage
   only and reads line, toggle and branch percentages over the design files
   (gate: src/nirmaan/integrations/eda.py:595;
-  src/nirmaan/integrations/eda_parsers.py:544-590; src/nirmaan/company/tools.py:137-143).
-- Verilator translates covergroups only when built with `--coverage` or
-  `--coverage-user` [VCov]. The gate passes neither, so a covergroup in a
-  testbench is not read by this tool (inference from eda.py:595 and [VCov]).
-  The same applies to cover properties, which [VCov] places under the same
-  two options.
+  src/nirmaan/integrations/eda_parsers.py:555-594; src/nirmaan/company/tools.py:137-143).
+- The Verilator page says that with `--coverage` or `--coverage-user` it
+  translates covergroups [VCov]; it does not say "only". The gate's own
+  options are `--coverage-line --coverage-toggle` (gate:
+  src/nirmaan/integrations/eda.py:595). A run with exactly those options on a
+  small file with one covergroup wrote covergroup points, and
+  `coverage_points` read them as kind `covergroup` (run, Verilator 5.052). So
+  a covergroup in a design file can appear in the percentages as its own
+  kind (gate: src/nirmaan/integrations/eda_parsers.py:555-594, which reports
+  every kind it finds).
+- A covergroup in the testbench is still not read, but because only the
+  design files count and the testbench is never measured (gate:
+  src/nirmaan/integrations/eda_parsers.py:561; src/nirmaan/integrations/eda.py:549-550),
+  not because of the options. Cover properties were not part of the run
+  above; [VCov] places them under `--coverage-user`, which the gate does not
+  pass (inference from eda.py:595 and [VCov]).
 - Verilator's own language page calls its functional coverage partial: it
   lists covergroup, coverpoint, bins, cross coverage and transition bins as
   supported [VLang]. Anything else a testbench uses may not be read, even
   under those options (inference).
 - The tool states its numbers as percentages of points hit at least once,
   never rounded up, and it fails a run whose testbench fails or whose design
-  files hold no point (gate: src/nirmaan/integrations/eda_parsers.py:544-590).
+  files hold no point (gate: src/nirmaan/integrations/eda_parsers.py:555-594).
 - The plan format treats a `coverage_point` item as proven only by a coverage
   measurement (gate: src/nirmaan/company/traceability.py:52-53). With this tool
   that measurement is code coverage (inference), so a functional claim needs
@@ -115,8 +125,10 @@ backs it.
 ## How a result is checked
 
 - Ask which tool measured it and with which options. Percentages from this
-  repository's `coverage.read` are code coverage, not functional coverage
-  (inference from the gate lines above).
+  repository's `coverage.read` are measured on design files only, with the
+  gate's line and toggle options (gate lines above). A `covergroup` kind in
+  them is a point count, not a judgement that the plan's scenarios happened
+  (inference).
 - List every cover point in the plan, with the test that reaches it and the
   scenario it stands for (inference).
 - Read each waiver and its category tag [OTDV].
