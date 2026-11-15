@@ -26,7 +26,7 @@ import shutil
 from pathlib import Path
 
 from nirmaan.integrations.eda import Backend, Job, RunRecord, register_backend
-from nirmaan.integrations.eda_guard import eqy_problem
+from nirmaan.integrations.eda_guard import eqy_problem, inside_problem, verilog_problem
 from nirmaan.integrations.eda_parsers import EdaResult, parse_eqy
 from nirmaan.models import text_value
 
@@ -117,8 +117,18 @@ def _check(job: Job) -> str | None:
     sides, problem = setup_files(eqy)
     if problem:
         return problem
+    names = list(dict.fromkeys(f for files in sides.values() for f in files))
+    # M85 (docs/GATE_INPUTS.md): a file read through a link is one the run was given (an approved file linked
+    # beside the setup), and every file read is Verilog a gate runs (a ``$readmemh`` would read any path).
+    for name in names:
+        problem = inside_problem(eqy.parent / name, eqy.parent, job.sources, eqy.name, name)
+        if problem:
+            return problem
+    problem = verilog_problem([eqy.parent / name for name in names])
+    if problem:
+        return problem
     # By resolved path on both sides (``execute`` resolves ``sources``), so a linked approved file matches itself.
-    read = {str((eqy.parent / f).resolve()) for files in sides.values() for f in files}
+    read = {str((eqy.parent / f).resolve()) for f in names}
     unread = [Path(src).name for src in job.sources if src not in read]
     return f"{eqy.name} does not read {', '.join(unread)}" if unread else None
 

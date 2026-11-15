@@ -655,8 +655,8 @@ def _sby_tasks(job: Job) -> str | None:
 
 def _sby_check(job: Job) -> str | None:
     """``formal.run`` takes a single-task setup, over the sources it is given, that runs nothing outside Yosys
-    and its solvers (M84)."""
-    return _sby_tasks(job) or _sby_reads(job) or sby_problem(Path(job.params["sby"]).resolve())
+    and its solvers (M84) and reads nothing outside its folder but those sources (M85)."""
+    return _sby_tasks(job) or _sby_reads(job) or sby_problem(Path(job.params["sby"]).resolve(), job.sources)
 
 
 def _sby_reads(job: Job) -> str | None:
@@ -760,7 +760,7 @@ def _sby_cover_check(job: Job) -> str | None:
         return f"{sby.name} declares [tasks]; the cover check runs single-task setups only"
     if "options" not in sections:
         return f"{sby.name} has no [options] section to run in cover mode"
-    unread = _sby_reads(job) or sby_problem(sby.resolve())  # M84: as formal.run's
+    unread = _sby_reads(job) or sby_problem(sby.resolve(), job.sources)  # M84, M85: as formal.run's
     if unread:
         return unread
     defs = _definitions(sby.resolve())
