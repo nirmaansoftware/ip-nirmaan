@@ -19,8 +19,8 @@ Practising: the VeriTriage tools this skill holds are available; this document i
 Reading simulation and regression logs as structured events before
 reasoning about them, and what the two VeriTriage tools return. Tags in
 brackets name the sources above; "inference" marks this document's own
-reasoning; "gate" names the repository code that backs a line. No tool log is
-committed, so no line here states a measured tool result as fact.
+reasoning; "gate" or "test" names the repository code or test that backs a
+line.
 
 ## Parse before reading
 
@@ -59,6 +59,13 @@ committed, so no line here states a measured tool result as fact.
 - So the first error line in a log marks the first check that saw the fault,
   not the defect, and the last fatal line is often a consequence, such as a
   timeout after the design stopped responding (inference).
+- VeriTriage's SVA pack has a pattern, sva.assertion-before-timeout, for an
+  assertion that fires before a later test timeout, and describes the
+  timeout as a downstream consequence (gate:
+  src/veritriage/knowledge/packs/sva.py:66-73). The repository's fixture log
+  of that order matches it (test:
+  tests/test_knowledge.py::test_pack_pattern_matches_realistic_evidence,
+  fixture sva_assertion_before_timeout.log).
 - WER found that a bug it reported was 4.5 to 5.1 times more likely to be
   fixed than one reported by a person, and notes that its reports document
   internal state while people's document external symptoms [WER]. A check that

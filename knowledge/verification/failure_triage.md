@@ -19,8 +19,7 @@ Practising: the VeriTriage tools and the simulator this skill holds are availabl
 Sorting a set of failures into groups that each have one cause, ranking the
 groups, and how the triage stage's gates read the result. Tags in brackets
 name the sources above; "inference" marks this document's own reasoning;
-"gate" or "test" names the repository code that backs a line. No tool log is
-committed, so no line here states a measured tool result as fact.
+"gate" or "test" names the repository code or test that backs a line.
 
 ## Buckets
 
@@ -99,7 +98,8 @@ committed, so no line here states a measured tool result as fact.
 - The triage stage needs a VeriTriage session over the failing artifacts,
   from veritriage.investigate (gate: src/nirmaan/company/workflows.py:472-476).
 - veritriage.investigate takes files: no paths, a missing path, or a directory
-  is refused (gate: src/nirmaan/integrations/veritriage.py:49-57).
+  is refused (gate: src/nirmaan/integrations/veritriage.py:49-57; test:
+  tests/test_nirmaan_gate_integrity.py::test_veritriage_refuses_a_directory_cleanly).
 - One call makes one session over all the paths it is given, with one
   classification (gate: src/nirmaan/integrations/veritriage.py:58-68). A
   combined input may therefore hide a class that one log alone would show, so
@@ -117,7 +117,8 @@ committed, so no line here states a measured tool result as fact.
 - With expect=fail a run passes only when the build succeeded, $finish was
   reached and the testbench's one verdict line, with this run's nonce, reports
   at least one failed check (gate:
-  src/nirmaan/integrations/eda_parsers.py:226-256).
+  src/nirmaan/integrations/eda_parsers.py:226-256; test:
+  tests/test_repro_gates.py::test_only_the_testbenchs_own_failed_check_is_a_reproduction).
 - In an evaluation the must-fail-each scorer judges a triage seat's repros:
   each must pass on the clean inputs, and every seeded bug must fail a different
   repro, so one repro that fails every bug cannot stand for two buckets (gate:
