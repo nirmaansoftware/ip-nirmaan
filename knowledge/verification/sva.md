@@ -65,8 +65,9 @@ repository code that backs it.
   value in cycle zero [SbyVerilog] [ZFormal].
 - Check the parts of a requirement separately, so a failure names one rule:
   one assertion for "no underflow", another for "error is sticky" (inference).
-- Run the same assertions in simulation if the testbench can use them; OpenTitan
-  places assertions in the same testplan as its tests [OTDV].
+- Run the same assertions in simulation if the testbench can use them; where
+  possible OpenTitan reuses the assertion monitors written for formal
+  verification in its simulation testbenches [OTDV].
 
 ## What the formal gates demand
 
