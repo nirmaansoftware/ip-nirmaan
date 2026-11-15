@@ -213,6 +213,59 @@ def test_gf180_the_pilot_ran_in_ci_with_its_must_fail_controls():
     assert not lvs["passed"] and lvs["metrics"]["drc_violations"] == 0 and lvs["metrics"]["lvs_mismatched"]["nets"] == 1
 
 
+# --- Captured runs (CI, the pd-ihp workflow, M82) ---------------------------------------------
+
+#: Every IHP fill shape on a FILL line of the platform's layer map file (datatype 22), so the M80 guard
+#: passes it and Magic reads it (its GDS input reads MET2FILL to MET7FILL from those layers).
+IHP_FILL = {"10/22": 571, "30/22": 615, "50/22": 1034, "67/22": 1084, "126/22": 156, "134/22": 156}
+
+
+def test_ihp_the_pilot_routes_fills_and_signs_off_clean():
+    """The pilot on the ORFS ihp-sg13g2 platform, with metal fill (docs/PD_IHP_PILOT.md)."""
+    pnr = parse_openroad(captured("ihp/openroad_ihp.log"), 0, "extract",
+                         ["floorplan", "place", "cts", "route", "extract"])
+    assert pnr.passed and pnr.metrics["drc_violations"] == 0 and pnr.metrics["fill_shapes"] == 3616, pnr.summary
+    assert "worst setup slack 6.052" in pnr.summary and "worst hold slack 0.431" in pnr.summary
+    assert "TNS 0.000 on extracted parasitics" in pnr.summary and pnr.metrics["unconnected_supply_pins"] == 0
+    clean = parse("ihp/magic_netgen_pv.log")
+    m = clean.metrics
+    assert clean.passed and m["drc_violations"] == 0 and m["lvs_mismatches"] == 0, clean.summary
+    assert m["magic_drc_style"] == "drc(full)" and m["gds_shapes_skipped"] == 0 and m["gds_empty_cells"] == 0
+    assert m["fill_shapes"] == 3616 and m["fill_layers"] == IHP_FILL and m["fill_unmapped"] == 0
+    assert m["netgen_final"] == "Final result: Circuits match uniquely."
+
+
+def test_ihp_both_must_fail_runs_fail():
+    overlap = parse("ihp/magic_netgen_pv_drc.log")
+    assert not overlap.passed and overlap.metrics["drc_violations"] == 1524, overlap.summary
+    assert overlap.metrics["drc_by_rule"]["Metal1_spacing_<_0.18um_(M1.b)"] == 652
+    rewired = parse("ihp/magic_netgen_pv_lvs.log")
+    assert not rewired.passed and rewired.metrics["drc_violations"] == 0, rewired.summary
+    assert rewired.metrics["lvs_mismatched"]["nets"] == 1 and rewired.metrics["lvs_unmatched_circuits"] == ["sync_fifo"]
+
+
+def test_ihp_the_pilot_ran_in_ci_with_its_must_fail_controls():
+    """The pd-ihp job's own records (docs/PD_IHP_PILOT.md); the pilot test also requires each later run to
+    reproduce these result lines (tests/test_pd_ihp_pilot.py)."""
+    import json
+
+    junit, *records = captured("ihp/pilot_run_records.log").removeprefix("== ").split("\n== ")
+    assert 'tests="1"' in junit and 'failures="0"' in junit and 'errors="0"' in junit and 'skipped="0"' in junit
+    assert "test_sync_fifo_from_rtl_to_drc_and_lvs_on_ihp_sg13g2" in junit
+    by_name = {r.split("\n", 1)[0]: json.loads(r.split("\n", 1)[1]) for r in records}
+    pnr, clean, drc, lvs = (by_name[f"{n}.result.json"]["result"] for n in
+                            ("pnr/openroad", "pv_magic/magic-netgen", "pv_magic_drc/magic-netgen",
+                             "pv_magic_lvs/magic-netgen"))
+    assert pnr["passed"] and "worst setup slack 6.052" in pnr["summary"] and "metal fill 3616 shapes" in pnr["summary"]
+    assert clean["passed"] and clean["metrics"]["drc_violations"] == 0 and clean["metrics"]["lvs_mismatches"] == 0
+    assert not drc["passed"] and drc["metrics"]["drc_violations"] == 1524
+    assert not lvs["passed"] and lvs["metrics"]["drc_violations"] == 0 and lvs["metrics"]["lvs_mismatched"]["nets"] == 1
+    # The excerpts are of the same run: each one parses to the result its run recorded.
+    assert parse("ihp/magic_netgen_pv.log").summary == clean["summary"]
+    assert parse("ihp/magic_netgen_pv_drc.log").summary == drc["summary"]
+    assert parse("ihp/magic_netgen_pv_lvs.log").summary == lvs["summary"]
+
+
 TOP_FIFO = "sync_fifo"
 
 
