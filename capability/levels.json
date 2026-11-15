@@ -235,6 +235,18 @@
         }
       ]
     },
+    "reset_design": {
+      "knowledge": {
+        "check_record": null,
+        "counts": false,
+        "knowledge_document": "knowledge/design/reset_design.md",
+        "problems": [
+          "no check record"
+        ]
+      },
+      "level": null,
+      "practised": []
+    },
     "rtl_design": {
       "knowledge": {
         "check_record": "capability/records/knowledge/rtl_design.json",
@@ -281,6 +293,18 @@
           "unjudged": 8
         }
       ]
+    },
+    "rtl_microarchitecture": {
+      "knowledge": {
+        "check_record": null,
+        "counts": false,
+        "knowledge_document": "knowledge/architecture/rtl_microarchitecture.md",
+        "problems": [
+          "no check record"
+        ]
+      },
+      "level": null,
+      "practised": []
     }
   },
   "totals": {
