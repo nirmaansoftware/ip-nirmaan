@@ -33,9 +33,11 @@ reasoning. This skill's card holds no tool
 - The pyuvm TinyALU example has a test, an environment, two monitors, a
   scoreboard, a coverage subscriber, a driver and a sequencer [PyUVM].
 - Components are created in the build phase, which runs top down, and
-  connected in the connect phase, which runs bottom up [PyUVM]. The driver's
-  item port connects to the sequencer's export; each monitor's analysis port
-  connects to the scoreboard and the coverage subscriber [PyUVM].
+  connected in the connect phase, which runs bottom up [PyUVM]. In pyuvm's
+  ALU example the driver's item port connects to the sequencer's export. The
+  command monitor's analysis port connects to the scoreboard's command export
+  and to the coverage subscriber. The driver's own analysis port, which
+  carries each result, connects to the scoreboard's result export [PyUVM].
 - Each interface monitor must reach the scoreboard through a TLM connection.
   OpenTitan lists "TLM port connections ... from UVC monitors to the
   scoreboard" as part of creating the environment [OTChk].
