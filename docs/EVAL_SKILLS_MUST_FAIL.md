@@ -416,6 +416,54 @@ second start carries the same byte, a repro that expects the
 wrong byte, a triage with repros for two of the three bugs, and one repro that
 checks the whole frame.
 
+Wave 2's sixth eval pull request (W2-E6) adds the two cases M83's routing
+made possible, both on the testbench seat:
+
+- `dv/scoreboard-mac` asks for "a scoreboard against a reference model", which
+  adds `reference_modelling` to `directed_testing`; the gate stays the HDL
+  testbench gate. Its block (`tests/fixtures/dv/mac8/`) is a multiply-accumulate
+  unit: unsigned 8-bit operands, a 24-bit total that saturates at 0xFFFFFF with
+  a sticky flag, reset and clear loading zeros, clear winning over an
+  accumulate, `en` low holding (6 tagged requirements). The reference testbench
+  (`mac8_tb.sv`) carries a model of the specification that takes every edge's
+  inputs and a scoreboard that compares `acc` and `sat` after every edge. It
+  drives directed phases to the top with the largest operands, through idle and
+  zero-product edges, and through a clear of a saturated total, then a seeded
+  random run, and fails itself when the run never saturated, never cleared a
+  saturated total or never met `clr` with `en`.
+- `dv/cocotb-crc` asks for "a cocotb testbench", which adds
+  `python_verification` and swaps the testbench gate for the cocotb backend's
+  (`simulator.run` with `backend: cocotb`). It judges Python tests on the CRC
+  engine of `dv/random-crc` (`tests/fixtures/dv/crc8/`, unchanged, with the
+  same five mutants, one folder for two seats). The reference
+  (`crc8_block_cocotb.py`, entry `crc8_block`) has a Python model of the
+  specification, directed tests for reset, reload, byte order and hold, and a
+  seeded random run that compares `crc` after every edge and fails itself when
+  it never reached `init` with `valid`, an idle cycle or a mid-frame reset.
+  Its control sets `params: {"backend": "cocotb"}` and takes the seat's tests
+  as the `cocotb` parameter. Each mutant fails a Python test, never a build.
+
+| File | The one change | Judge that fails it |
+|---|---|---|
+| `mac8/mutants/mac8_no_saturate.v` | the total wraps at 24 bits, the flag never rises | seat testbench (`simulator.run`), only if the total reaches the top |
+| `mac8/mutants/mac8_clear_loses.v` | an accumulate offered with `clr` wins over the clear | seat testbench, only if `clr` meets `en` |
+| `mac8/mutants/mac8_signed_operands.v` | the operands are read as signed numbers | seat testbench, only with an operand of 128 or more |
+| `mac8/mutants/mac8_flag_not_sticky.v` | the flag follows the latest accumulate | seat testbench, only if the flag is read after it rose |
+| `mac8/mutants/mac8_clear_keeps_flag.v` | a clear zeroes the total and leaves the flag | seat testbench, only if a saturated total is cleared and the flag read |
+| the five `crc8/mutants/` files of `dv/random-crc` | as above | seat's cocotb tests (`simulator.run`, `backend: cocotb`) |
+
+Paths are under `tests/fixtures/dv/`. The tests in
+`tests/test_dv_scoreboard_cocotb_evals.py` plan both requests and check each
+seat's skills, packets and gate, assert at run time (no figure is stated here)
+that each reference passes and each mutant fails a check, and show the control
+catches weak answers: a scoreboard that never offers the largest operands in a
+row lets the wrapping mutant survive; one that compares only the total lets the
+flag mutants survive; Python tests that send one fixed message pass their gate
+and the approved RTL and let `init_loses` survive; and Python tests that assert
+nothing (cocotb passes a test that raises no error) let the first mutant
+survive. The first M83 test of earlier requests leaves these two requests out,
+since they ask for the new words.
+
 ## 4. The evidence loader
 
 `load_evidence(path)` reads a run record (as `load_record` does) and raises
