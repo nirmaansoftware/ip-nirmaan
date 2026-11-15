@@ -1,0 +1,74 @@
+{
+  "format": "nirmaan.knowledge-check",
+  "skill": "rtl_lint",
+  "knowledge_document": "knowledge/design/rtl_lint.md",
+  "document_sha256": "sha256:e105cd4db9fdebadd14870eaa6538ac9b11483a2a41d9ae94f09a057ab84fa69",
+  "writer": "RETRO-A5 session (retrospective action A5, item P3-K3, 2026-11-15)",
+  "checker": "RETRO-A4 session (retrospective action A4, item P3-C3, 2026-11-15)",
+  "sources_read": [
+    "[VLW] Verilator manual, Errors and Warnings: the whole page (every warning entry from ALWCOMBORDER to ZEROREPL), https://verilator.org/guide/latest/warnings.html",
+    "[VLA] Verilator manual, Arguments (verilator executable): the whole page, summary and every option entry, https://verilator.org/guide/latest/exe_verilator.html",
+    "[lowRISC] lowRISC, Verilog Coding Style Guide (CC BY 4.0): the whole guide, https://github.com/lowRISC/style-guides/blob/master/VerilogCodingStyle.md",
+    "Repository code at the lines cited in gate_claims, and Verilator 5.052 run locally on small files"
+  ],
+  "result": "every claim tagged with a source was found in that source, every line marked inference is a fair reading of the source it names or the document's own reasoning, and every sentence about the platform's gates matches the gate code at the lines cited in gate_claims",
+  "notes": [
+    "-Wall is -Wwarn-lint plus -Wwarn-style and excludes some specialty warnings; -Wwarn-style lists DECLFILENAME, SYNCASYNCNET, UNDRIVEN, UNUSEDSIGNAL and the other style warnings; --lint-only checks and makes no other output; -Wno-<message> overrides lint_on; -Wno-fatal advice, --unused-regexp default *unused*; all on the Arguments page and as the document says.",
+    "Each warning the document lists was found in the Warnings page, with the fix it gives. A local run of verilator --lint-only -Wall 5.052 confirmed that a file with a mismatched name, an unused and an undriven signal, a width truncation, a latch, a blocking assignment in a clocked block, a delayed assignment in a combinational block, an incomplete, a casex and an overlapping case, an implicit net, a missing pin, an out-of-range select, SYNCASYNCNET and MULTIDRIVEN fails with the codes the document names, and that a misspelled metacomment is an error (BADVLTPRAGMA). BLKANDNBLK was not raised for a non-overlapping split of one vector in this version, as the page says since 5.038.",
+    "UNOPTFLAT: the document says it fails lint.run under -Wall, as an inference from the gate lines. On Verilator 5.052 with default flags the manual's own example, wire [2:0] x = {x[1:0], shift_in}, did not warn under --lint-only -Wall, because the DFG optimiser resolves it; with -fno-dfg the same file raises UNOPTFLAT under --lint-only. The gate passes no such flag, so the claim holds only where the optimiser leaves the loop. The sentence is an overstatement on 5.052 and is reported to the document's owner; it does not change a Knowledge reading of the rest.",
+    "Gate lines: eda.py:427-428 is the command, eda.py:803 the registration, eda_parsers.py:92-103 the pass rule and the docstring that waivers live in the RTL, tools.py:55-56 and 68-72 and 129-130 the tool's inputs (sources, top, backend, workdir, timeout), none of them a warning option. The only registered lint backend is verilator-lint.",
+    "The repository's own bridge RTL waives WIDTH with a lint_off and lint_on pair at src/nirmaan/integrations/firmware_soc/bridge_apb.v:34 and :44, as the document says.",
+    "The first body line says Practising, as the lint tool is available (tools.py:129); the document says it is knowledge, not evidence."
+  ],
+  "gate_claims": [
+    {
+      "claim": "lint.run runs verilator --lint-only -Wall, adding --top-module when a top is given",
+      "evidence": "src/nirmaan/integrations/eda.py:428"
+    },
+    {
+      "claim": "the lint backend is registered for lint.run and is the only lint backend",
+      "evidence": "src/nirmaan/integrations/eda.py:803"
+    },
+    {
+      "claim": "lint passes only when Verilator exits 0 with no error and no warning",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:97"
+    },
+    {
+      "claim": "the pass summary reads lint clean: 0 errors, 0 warnings",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:99"
+    },
+    {
+      "claim": "there is no severity threshold or accepted-warning list in the gate",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:93"
+    },
+    {
+      "claim": "the tool's inputs are sources and an optional top",
+      "evidence": "src/nirmaan/company/tools.py:55"
+    },
+    {
+      "claim": "the runner adds backend, workdir and timeout",
+      "evidence": "src/nirmaan/company/tools.py:68"
+    },
+    {
+      "claim": "the lint tool takes no warning option, so -Wno-<message>, -Wno-lint and -Wno-fatal cannot be passed",
+      "evidence": "src/nirmaan/company/tools.py:129"
+    },
+    {
+      "claim": "a waiver is a lint_off comment in the RTL, as the repository's bridge RTL does for WIDTH",
+      "evidence": "src/nirmaan/integrations/firmware_soc/bridge_apb.v:34"
+    },
+    {
+      "claim": "the gate does not read a waiver's reason (waivers live in the RTL)",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:93"
+    },
+    {
+      "claim": "each listed warning fails lint.run under -Wall (checked by running Verilator 5.052), UNOPTFLAT only where the optimiser leaves the loop",
+      "evidence": "unverified"
+    },
+    {
+      "claim": "the tool is available, so the document opens with Practising",
+      "evidence": "src/nirmaan/org/knowledge_files.py:53"
+    }
+  ],
+  "checked_at": "2026-11-15"
+}
