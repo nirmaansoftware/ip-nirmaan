@@ -381,8 +381,15 @@ def parse_sby_cover(log: str, returncode: int, antecedents: Sequence[Mapping[str
     never reached means its assertion is never checked, and the run fails. A
     derived cover that is not in the elaborated design at all (a generate
     branch not taken, a task never called) is listed as a warning.
+
+    The run checks the assertions on every cover trace (``cover_assert on``,
+    set by the backend): an assertion broken on one fails the run, since a
+    state reached by breaking an assertion is not a legal scenario. SymbiYosys
+    then stops searching, so the covers it lists as unreached after that are
+    not known to be unreachable, and the summary names the broken assertion.
     """
     base = parse_sby(log, returncode)
+    broken = [d for d in base.diagnostics if d.code == "ASSERT"]
     derived = {(Path(a["file"]).name, int(a["line"]), int(a["column"])): a for a in antecedents}
     reached: dict[str, None] = {}
     unreached: dict[str, None] = {}
@@ -418,6 +425,10 @@ def parse_sby_cover(log: str, returncode: int, antecedents: Sequence[Mapping[str
         metrics.update(antecedents_reached=len(ante_reached), antecedents_unreached=len(ante_missed),
                        antecedents_unelaborated=len(unelaborated))
     total = len(reached) + len(missed)
+    if broken:
+        summary = (f"cover run failed: {_plural(len(broken), 'assertion')} broken on a cover trace, and a state "
+                   f"reached by breaking an assertion is not a legal scenario{_first(broken)}")
+        return EdaResult(False, summary, tuple(diags), metrics)
     if missed:
         summary = (f"vacuous: {len(missed)} of {_plural(total, 'cover')} never reached under the "
                    f"assumptions{_first(diags[len(base.diagnostics):])}")

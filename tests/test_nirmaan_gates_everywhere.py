@@ -360,6 +360,61 @@ def test_a_cover_run_over_a_setup_that_does_not_read_the_rtl_fails(broker_owner,
     assert not run.succeeded and "does not read axi4_lite_regs.v" in run.summary
 
 
+#: A counter that saturates at 4, with one assertion bounding it and one cover (ip#278, W2-C3B): with the
+#: bound at 4 the cover at 3 is reached legally; with it at 2, only a trace that breaks the assertion
+#: reaches 3. The seat's setup is a proof, as a seat writes one.
+SATURATING = """module sat(input clk, input inc);
+    reg [2:0] cnt = 0;
+    always @(posedge clk) if (inc && cnt != 3'd4) cnt <= cnt + 3'd1;
+`ifdef FORMAL
+    always @(*) assert (cnt <= BOUND);
+    always @(*) cover (cnt == 3'd3);
+`endif
+endmodule
+"""
+SATURATING_SBY = """[options]
+mode prove
+depth 8
+{extra}
+[engines]
+smtbmc
+
+[script]
+read -formal sat.v
+prep -top sat
+
+[files]
+sat.v
+"""
+
+
+def _saturating(tmp_path: Path, bound: int, extra: str = "") -> dict[str, str]:
+    (tmp_path / "sat.v").write_text(SATURATING.replace("BOUND", f"3'd{bound}"))
+    (tmp_path / "sat.sby").write_text(SATURATING_SBY.format(extra=extra))
+    return {"sby": str(tmp_path / "sat.sby"), "sources": str(tmp_path / "sat.v"), "workdir": str(tmp_path / "run")}
+
+
+@needs("sby", "yosys", "yices-smt2")
+@pytest.mark.parametrize("extra", ["", "cover_assert off"], ids=["default", "seat-sets-off"])
+def test_a_cover_reached_only_by_breaking_an_assertion_fails(broker_owner, tmp_path, extra):
+    """The must-fail (ip#278): SymbiYosys removes assertions from a cover run unless ``cover_assert`` is on,
+    so this cover was counted as reached. The copy now sets it on, whatever the seat's setup says."""
+    engine, owner = broker_owner
+    run, _ = ToolBroker(engine).invoke(owner, "formal.cover", _saturating(tmp_path, 2, extra))
+    assert not run.succeeded
+    assert "cover run failed: 1 assertion broken on a cover trace" in run.summary, run.summary
+    derived = (tmp_path / "run" / "sat_cover.sby").read_text().splitlines()
+    assert "cover_assert on" in derived and "cover_assert off" not in derived
+
+
+@needs("sby", "yosys", "yices-smt2")
+def test_a_cover_reached_legally_still_passes_with_the_assertions_checked(broker_owner, tmp_path):
+    engine, owner = broker_owner
+    run, _ = ToolBroker(engine).invoke(owner, "formal.cover", _saturating(tmp_path, 4))
+    assert run.succeeded, run.summary
+    assert "cover_assert on" in (tmp_path / "run" / "sat_cover.sby").read_text().splitlines()
+
+
 # --- The parser, on captured output (no tools needed) -----------------------------------------------
 
 
@@ -381,6 +436,16 @@ def test_the_cover_parser_passes_only_when_every_cover_is_reached():
     assert not none.passed and "no cover statement" in none.summary
 
     assert not parse_sby_cover(_log("sby_cover_pass.log"), 1).passed  # a nonzero exit never passes
+
+
+def test_an_assertion_broken_on_a_cover_trace_fails_and_is_named_first():
+    """SymbiYosys stops at the broken assertion and lists the covers after it as unreached; the summary
+    names the assertion, not a vacuity it did not establish (ip#278)."""
+    broken = parse_sby_cover(_log("sby_cover_assert_broken.log"), 2)
+    assert not broken.passed
+    assert broken.summary.startswith("cover run failed: 1 assertion broken on a cover trace")
+    (diag,) = [d for d in broken.diagnostics if d.code == "ASSERT"]
+    assert diag.file == "broken.v" and diag.line == 5 and "step 3" in diag.message
 
 
 # --- Crown jewel: another workflow gains the gates by data alone -------------------------------------

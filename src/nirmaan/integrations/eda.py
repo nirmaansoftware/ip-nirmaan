@@ -702,10 +702,14 @@ def _definitions(sby: Path) -> Definitions:
 def _sby_cover(job: Job) -> list[list[str]]:
     """Run the seat's own setup in cover mode (M27), from a copy written into the run's directory.
 
-    The copy differs only in ``mode cover`` and in naming each ``[files]`` entry
-    by absolute path, so the script, the engines, the depth, and the
-    assumptions are exactly the ones the proof used, and nothing is written next
-    to the submitted files. Each Verilog file it reads is itself a copy with a
+    The copy differs only in ``mode cover``, in ``cover_assert on``, and in naming
+    each ``[files]`` entry by absolute path, so the script, the engines, the
+    depth, and the assumptions are exactly the ones the proof used, and nothing
+    is written next to the submitted files. ``cover_assert`` is off by default
+    in SymbiYosys, which then removes every assertion from a cover run, so a
+    cover reached only by breaking an assertion would count as reached; with
+    it on, an assertion broken on a cover trace fails the run (whatever the
+    seat's own setup says). Each Verilog file it reads is itself a copy with a
     cover derived for every assertion (M29, ``eda_antecedents``); the derived
     covers are listed in ``antecedents.json`` beside the run, for the parser.
     """
@@ -726,9 +730,9 @@ def _sby_cover(job: Job) -> list[list[str]]:
         if text.startswith("[") and text.endswith("]"):
             out.append(line)
             if section == "options":
-                out.append("mode cover")
+                out += ["mode cover", "cover_assert on"]
             continue
-        if section == "options" and text.split()[:1] == ["mode"]:
+        if section == "options" and text.split()[:1] in (["mode"], ["cover_assert"]):
             continue
         if section == "files" and text and not text.startswith("#"):
             *dest, src = text.split()
