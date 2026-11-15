@@ -204,9 +204,9 @@ in the same pull request.
   - `evals/runner.py`, `evals/records.py`, `evals/levels.py`, `cli.py`:
     `--harness <name>`, the labels, and the `variants` list.
   The default fingerprint changed, so every Practised group recorded before
-  it is stale. The control-plane class in `.github/review-teams.yml` does not
-  list `company/tools.py`: an edit to a tool definition now changes the
-  fingerprint, but the file is reviewed as company data.
+  it is stale. The control-plane class in `.github/review-teams.yml` lists
+  `src/nirmaan/company/tools.py`: an edit to a tool definition changes the
+  fingerprint, so the file is reviewed as control-plane.
 
 ## What is not the harness
 

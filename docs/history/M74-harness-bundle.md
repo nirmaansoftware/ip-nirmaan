@@ -34,8 +34,10 @@ once:
 
 **Levels.** `capability/levels.json` is regenerated: every Practised group
 recorded before this milestone is now "stale: the harness changed after these
-trials". The totals are unchanged (no group counted before), and Knowledge
-levels come from check records and are untouched.
+trials". The totals change: practised goes from 4 to 0 and knowledge from
+20 to 24. Four groups go from `counts: true` to false and their level from
+"practised" to "knowledge". Knowledge levels come from check records and are
+untouched.
 
 **Order.** The record's decision 1e holds this change off `main` until the
 one read of the pilot's levels; it merges only after that read, and opens the
