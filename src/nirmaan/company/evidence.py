@@ -4,10 +4,12 @@ The levels generator (`nirmaan.evals.levels`) may not name a unit, skill or
 domain itself (tests/test_nirmaan_evals.py), so the domains whose skills need
 a must-fail control before they can be Practised live here: RTL design and
 verification (capability build-out council record, 2026-10-18, section 9.7;
-council/records/2026-10-18-capability-buildout.md).
+council/records/2026-10-18-capability-buildout.md), and protocols (pilot
+retrospective, 2026-11-14, decision 11;
+council/records/2026-11-14-pilot-retrospective.md).
 """
 
 from __future__ import annotations
 
 #: Skill domains whose Practised level needs a must-fail control in every case it rests on.
-MUST_FAIL_DOMAINS: tuple[str, ...] = ("design", "verification")
+MUST_FAIL_DOMAINS: tuple[str, ...] = ("design", "verification", "protocols")

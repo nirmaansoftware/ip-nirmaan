@@ -348,6 +348,15 @@ rules:
     co_owners: [business, verification]
     paths:
       - knowledge/design/**
+  # Division rule (council/records/2026-11-14-pilot-retrospective.md, decision
+  # 12): verification knowledge goes to Verification (key 1 verification-lead),
+  # with Business as for other knowledge paths. It lands before the
+  # division's first document, so until one exists its glob waits in
+  # PENDING_GLOBS in tests/test_review_teams.py.
+  - team: verification
+    co_owners: [business]
+    paths:
+      - knowledge/verification/**
 
   # Business (legal-compliance leads these).
   - team: business

@@ -1,0 +1,21 @@
+{
+  "cases": [
+    "rtl/axi4-lite-regs"
+  ],
+  "command": "nirmaan eval run --runtime claude-code --trials 3 --seats rtl rtl/axi4-lite-regs",
+  "finished_at": "2026-11-14T10:35:10.174189Z",
+  "format": "nirmaan.eval-run",
+  "head_sha": "389c2dcfa1d9cf7d99ae78ac04a02f33416be4a4",
+  "id": "2026-11-14-claude-code-claude-opus-5-5-7",
+  "knowledge": "on",
+  "model": "claude-opus-5-5",
+  "nirmaan_version": "1.25.0",
+  "replay": false,
+  "runtime": "claude-code",
+  "seats": [
+    "rtl-implementation"
+  ],
+  "started_at": "2026-11-14T10:11:34.296753Z",
+  "trials": 3,
+  "version": 1
+}

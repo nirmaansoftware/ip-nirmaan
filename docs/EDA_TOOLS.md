@@ -19,7 +19,7 @@ This milestone binds five tools to open-source backends:
 | `equivalence.run` (M69) | `eqy` | `eqy`, `yosys` and `make`; see `docs/EQUIVALENCE.md` |
 | `coverage.read` (M70) | `verilator-coverage` | `verilator` and `verilator_coverage`: line, toggle and branch coverage of the design files from a passing self-checking simulation (`docs/COVERAGE_READ.md`) |
 | `simulator.run` (M72) | `cocotb`, by name only (`backend: cocotb`) | `iverilog` and `vvp`, with cocotb (the pinned `cocotb` extra) in this Python: Python testbenches, judged by cocotb's own results file; see `docs/COCOTB.md` |
-| `pv.run` (M79) | `magic-netgen`, by name only (`backend: magic-netgen`) | `klayout` (the M34 stream to GDS), `magic` (DRC and extraction) and `netgen` (LVS), with the PDK's Magic technology, Netgen setup and cell SPICE; see `docs/PD_SKY130_PILOT.md` |
+| `pv.run` (M79) | `magic-netgen`, by name only (`backend: magic-netgen`) | `klayout` (the M34 stream to GDS), `magic` (DRC and extraction) and `netgen` (LVS), with the PDK's Magic technology, Netgen setup and cell SPICE; see `docs/PD_SKY130_PILOT.md`, and on GF180MCU `docs/PD_GF180_PILOT.md` (M81) |
 
 `sta.run` (OpenSTA) is not bound. It needs a liberty file and constraints that
 the fixture flow does not have yet, so it stays `CONTRACT_ONLY` for Stage 6.
