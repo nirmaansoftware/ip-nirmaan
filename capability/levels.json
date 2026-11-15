@@ -5,6 +5,18 @@
   "proven": "No skill is Proven: no product seat run record of delivered work exists yet.",
   "refused_records": [],
   "skills": {
+    "accelerator_verification": {
+      "knowledge": {
+        "check_record": null,
+        "counts": false,
+        "knowledge_document": "knowledge/verification/accelerator_verification.md",
+        "problems": [
+          "no check record"
+        ]
+      },
+      "level": null,
+      "practised": []
+    },
     "apb": {
       "knowledge": {
         "check_record": "capability/records/knowledge/apb.json",
@@ -316,6 +328,18 @@
       "level": "knowledge",
       "practised": []
     },
+    "isa_compliance": {
+      "knowledge": {
+        "check_record": null,
+        "counts": false,
+        "knowledge_document": "knowledge/verification/isa_compliance.md",
+        "problems": [
+          "no check record"
+        ]
+      },
+      "level": null,
+      "practised": []
+    },
     "model_checking": {
       "knowledge": {
         "check_record": "capability/records/knowledge/model_checking.json",
@@ -324,6 +348,18 @@
         "problems": []
       },
       "level": "knowledge",
+      "practised": []
+    },
+    "performance_verification": {
+      "knowledge": {
+        "check_record": null,
+        "counts": false,
+        "knowledge_document": "knowledge/verification/performance_verification.md",
+        "problems": [
+          "no check record"
+        ]
+      },
+      "level": null,
       "practised": []
     },
     "pipeline_design": {
