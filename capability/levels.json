@@ -344,26 +344,22 @@
     },
     "python_verification": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/python_verification.json",
+        "counts": true,
         "knowledge_document": "knowledge/verification/python_verification.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     },
     "reference_modelling": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/reference_modelling.json",
+        "counts": true,
         "knowledge_document": "knowledge/verification/reference_modelling.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     },
     "reset_design": {
@@ -500,19 +496,17 @@
     },
     "testbench_qualification": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/testbench_qualification.json",
+        "counts": true,
         "knowledge_document": "knowledge/verification/testbench_qualification.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     }
   },
   "totals": {
-    "knowledge": 13,
+    "knowledge": 16,
     "practised": 3,
     "proven": 0
   },
