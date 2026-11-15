@@ -168,9 +168,8 @@ def _case_requests():
     return sorted({c.request for sub in ("dv", "rtl", "firmware", "spec") for c in load_cases(REPO / "evals" / sub)})
 
 
-#: Every request written before this change: the golden suite's (less the two it adds), M68's, and every case's.
-EARLIER = sorted({*REQUESTS, *NOT_BLOCK_VERIFICATION, *(text for text, _ in SEATS), *_case_requests()}
-                 - {SCOREBOARD, COCOTB})
+#: Every request written before this change: the golden suite's, M68's, and every eval case's.
+EARLIER = sorted({*REQUESTS, *NOT_BLOCK_VERIFICATION, *(text for text, _ in SEATS), *_case_requests()})
 
 
 def test_the_earlier_requests_name_neither_new_word(nirmaan_org, fixed_clock):

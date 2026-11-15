@@ -202,8 +202,10 @@ cocotb) stays within the domain cap for the owner and the reviewer.
 organization without this change (no new features, the testbench stage as
 before) and compares, for every request of the golden suite, M68's tests and
 every eval case: each task (the HDL gate's one new clause aside) and each
-stage's rendered work and review prompt. The golden file gains the two
-requests above only. No eval case, prompt fixture, harness file, tool or
-count changes.
+stage's rendered work and review prompt. The applicability golden file
+(`tests/fixtures/applicability/plans.txt`) does not change: the new requests
+are tested in their own file, so the department-cut comparison (M77) over the
+golden requests is untouched. No eval case, prompt fixture, harness file, tool
+or count changes.
 
 **Not here.** The two eval cases (W2-E6), and their knowledge documents.
