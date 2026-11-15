@@ -20,6 +20,7 @@ from nirmaan.models.evaluation import (
     RecordedAnswer,
     Score,
     ScoreStatus,
+    SeatToolCall,
 )
 from nirmaan.models.governance import (
     AuthorityRule,

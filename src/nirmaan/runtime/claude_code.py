@@ -26,6 +26,10 @@ How the call is kept honest and clean:
 * tokens are recorded as Claude Code reports them, and the cost as unknown:
   a subscription has no per-call price, and its ``total_cost_usd`` is an
   API-equivalent estimate, not a charge;
+* on the ``tools-in-loop`` harness variant (M75) it also loads one MCP
+  server, the brokered relay of :mod:`nirmaan.runtime.seat_tools`, and allows
+  only that server's tools (``--permission-mode dontAsk``); ``--tools ""``
+  still gives no built-in tool, and the attempt's cap stops the seat;
 * the version of Claude Code it runs is asked once per seat runtime
   (``claude --version``, :meth:`ClaudeCodeLLM.cli_version`) and enters the
   harness fingerprint of every trial on it, so trials from two versions are
@@ -106,6 +110,8 @@ class ClaudeCodeLLM:
     """An LLM that answers through ``claude -p --output-format json``."""
 
     name = PROVIDER
+    #: M75: it can call brokered tools during its attempt (the ``tools-in-loop`` variant, ``seat_tools``).
+    takes_seat_tools = True
 
     def __init__(self, executable: str | None = None, model: str | None = None, timeout: int | None = None):
         self._executable = executable
@@ -122,7 +128,9 @@ class ClaudeCodeLLM:
             self._versions[executable] = read_version(executable)
         return self._versions[executable]
 
-    def complete(self, prompt: WorkPrompt) -> Completion:
+    def complete(self, prompt: WorkPrompt, tools=None) -> Completion:
+        """Ask Claude Code once. With ``tools`` (M75, a ``SeatTools`` session) it also loads the brokered server,
+        and only it, and the call is served until the seat answers or the attempt's cap stops it."""
         from nirmaan.integrations.veritriage import render_parts
 
         executable = self._executable or find_claude()
@@ -134,8 +142,17 @@ class ClaudeCodeLLM:
         env = {k: v for k, v in os.environ.items() if k not in harness.CLAUDE_CODE_CLEARED_ENV}
         with tempfile.TemporaryDirectory(prefix="nirmaan-claude-code-") as cwd:
             try:
-                proc = subprocess.run(argv, input=user, capture_output=True, text=True, cwd=cwd, env=env,
-                                      timeout=self.timeout)
+                if tools is not None:
+                    from nirmaan.runtime.seat_tools import run_with_tools
+
+                    code, stdout, stderr, stopped = run_with_tools(argv, user, cwd, env, tools,
+                                                                   min(self.timeout, harness.LOOP_SECONDS))
+                    if stopped:  # a timeout is a failed attempt
+                        return Completion("", self.model, error=stopped, provider=PROVIDER, priced=False)
+                    proc = subprocess.CompletedProcess(argv, code, stdout, stderr)
+                else:
+                    proc = subprocess.run(argv, input=user, capture_output=True, text=True, cwd=cwd, env=env,
+                                          timeout=self.timeout)
             except subprocess.TimeoutExpired:
                 return Completion("", self.model, error=f"Claude Code did not answer within {self.timeout}s",
                                   provider=PROVIDER, priced=False)

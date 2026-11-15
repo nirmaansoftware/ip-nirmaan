@@ -293,6 +293,15 @@ class ModelRuntime:
     def __init__(self, llm: LLM, runtime_id: str | None = None) -> None:
         self.llm = llm
         self.runtime_id = runtime_id or llm.name
+        #: M75: give the seat brokered tools during its attempt (the ``tools-in-loop`` variant sets it), when its
+        #: model can call them (``takes_seat_tools``); each attempt's session, with every call, is kept.
+        self.seat_tools = False
+        self.tool_sessions: list[Any] = []
+
+    @property
+    def tool_calls(self) -> list[Any]:
+        """Every call the seat made to a brokered tool, in order, over every attempt (M75)."""
+        return [call for session in self.tool_sessions for call in session.calls]
 
     def accepts(self, packet: WorkPacket) -> bool:
         return True
@@ -315,10 +324,26 @@ class ModelRuntime:
         notes = self._preflight(packet, tools, inputs)
         runs = tuple(n.run for n in notes if n.run)
         prompt = render_work_prompt(packet, "work", notes)
-        data, files, problem = self._ask(prompt)
+        session = self._session(packet, tools, inputs)
+        if session is not None:  # M75: the seat is told what it may call, and the caps
+            prompt = dataclasses.replace(prompt, system=f"{prompt.system}\n\n{session.system_note()}")
+        data, files, problem = self._ask(prompt, session)
         if data is None:
             return WorkResult(ResultStatus.DECLINED, uncertainty=1.0, tool_runs=runs, notes=problem)
         return self._result(data, files, prompt, packet, tools, inputs, notes)
+
+    def _session(self, packet: WorkPacket, tools: ToolHandle, inputs: dict[str, str]) -> Any:
+        """This attempt's brokered tools (M75), or None: the variant is off, the model cannot call tools, or
+        nothing is offered (no lint, simulation or formal over the seat's own files, granted to its role)."""
+        if not self.seat_tools or not getattr(self.llm, "takes_seat_tools", False):
+            return None
+        from nirmaan.runtime.seat_tools import SeatTools
+
+        session = SeatTools(packet, tools, inputs, self._postflight, attempt=len(packet.task.attempts) + 1)
+        if not session.names():
+            return None
+        self.tool_sessions.append(session)
+        return session
 
     def _preflight(self, packet: WorkPacket, tools: ToolHandle, params: dict[str, str]) -> tuple[ToolNote, ...]:
         """Run the tools the task's evidence requirements name, as the seat, before asking.
@@ -369,6 +394,11 @@ class ModelRuntime:
         declared = [r for r in declared if r not in foreign]
         if foreign:
             remarks.append(f"dropped runs not made for this task: {', '.join(foreign)}")
+        # M75: a run the seat asked for in the loop is advisory: it backs nothing, so it never reaches the engine.
+        advisory = [r for r in declared if tools.is_advisory(r)]
+        declared = [r for r in declared if r not in advisory]
+        if advisory:
+            remarks.append(f"dropped advisory runs from the loop, which never count: {', '.join(advisory)}")
         runs = [n.run for n in notes if n.run]
         escalation = data.get("escalation")
         if isinstance(escalation, dict) and escalation:
@@ -553,12 +583,16 @@ class ModelRuntime:
         notes = f"stripped undeclared citations: {', '.join(stripped)}" if stripped else ""
         return ReviewResult(verdict, comments, uncertainty, notes)
 
-    def _ask(self, prompt: WorkPrompt) -> tuple[dict[str, Any] | None, _Files, str]:
+    def _ask(self, prompt: WorkPrompt, session: Any = None) -> tuple[dict[str, Any] | None, _Files, str]:
         too_big = over_context(len(prompt.render()), context_limit(self.llm))
         if too_big:  # M61: the seat declines with the reason; no model is called and nothing is cut
             return None, ({}, []), too_big
-        with outside_writer():  # the call touches no project state: other tasks of a batch take turns (M36)
-            completion = self.llm.complete(prompt)
+        if session is not None:
+            # M75: the seat's brokered calls record runs, so this call keeps the writer's turn (M36) throughout.
+            completion = self.llm.complete(prompt, session)
+        else:
+            with outside_writer():  # the call touches no project state: other tasks of a batch take turns (M36)
+                completion = self.llm.complete(prompt)
         if not (completion.error or "").startswith(NO_CALL):
             self._calls.append(call_record(completion, getattr(self, "_purpose", "work"), self.llm.name))
         if completion.error:

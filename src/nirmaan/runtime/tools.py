@@ -148,8 +148,12 @@ class ToolBroker:
         return self._engine.state.tool_runs.get(run_id)
 
     def invoke(self, actor: Actor, tool_id: str, params: dict[str, ParamInput] | None = None,
-               task_id: str | None = None, bounds: Sequence[Bound] = ()) -> tuple[ToolRun, ToolOutcome]:
-        """Run a tool for ``actor``; a passing run is then checked against ``bounds`` (M48)."""
+               task_id: str | None = None, bounds: Sequence[Bound] = (),
+               advisory: bool = False) -> tuple[ToolRun, ToolOutcome]:
+        """Run a tool for ``actor``; a passing run is then checked against ``bounds`` (M48).
+
+        ``advisory`` (M75) records a run the seat asked for during its attempt: it never meets a requirement.
+        """
         allowed, why = self._authority.may_use_tool(actor.role, tool_id)
         if not allowed:
             raise ToolAccessDenied(why)
@@ -179,6 +183,7 @@ class ToolBroker:
             references=outcome.references,
             outputs=dict(outcome.outputs),
             bounds=bounds,
+            advisory=advisory,
         )
         self._engine.record_tool_run(run, actor, seal=BROKER_SEAL)
         return run, outcome

@@ -123,6 +123,24 @@ class GateRun(BaseModel):
     summary: str = ""
 
 
+class SeatToolCall(BaseModel):
+    """One call the seat made to a brokered tool during its attempt (M75, tools in the loop), as the broker saw it.
+
+    Every call is recorded, a refused one too. Its runs are advisory: recorded in the sandbox with ``advisory``
+    set, citable as ``[run:<id>]``, and never evidence (docs/TOOLS_IN_THE_LOOP.md).
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    attempt: int = Field(description="The seat's attempt the call was made in, from 1.")
+    number: int = Field(description="The call's number in its attempt, from 1; refused calls are counted.")
+    tool: str = Field(description="The tool name the seat asked for, as it asked.")
+    runs: tuple[str, ...] = Field(default=(), description="The advisory runs the broker made for it.")
+    succeeded: bool | None = Field(default=None, description="Every run passed; None when the call was refused.")
+    refused: str | None = Field(default=None, description="Why the broker refused the call; nothing ran.")
+    seconds: float = 0.0
+
+
 class EvalResult(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -156,6 +174,8 @@ class EvalResult(BaseModel):
     #: The version of the command-line program the runtime called the model through (the claude-code
     #: runtime's ``claude --version``), as it entered ``harness``; None for a runtime that calls none.
     cli: str | None = None
+    #: M75: every call the seat made to a brokered tool during its attempts (the ``tools-in-loop`` variant).
+    tool_calls: tuple[SeatToolCall, ...] = ()
 
 
 class RecordedAnswer(BaseModel):

@@ -383,10 +383,13 @@ def _harness_files() -> list[str]:
     file added there is checked here without editing this test. The tool
     catalog is not a CODE file, but its parameter descriptions reach a seat's
     work prompt as each gate's input contract (pilot retrospective,
-    fact 5), so a change to it is a harness change too."""
+    fact 5), so a change to it is a harness change too. M75: every
+    harness.LOOP_CODE file, the brokered server in the tools-in-loop
+    variant's fingerprint, is checked the same way."""
     from nirmaan.runtime import harness
 
-    code = [(harness.SOURCE_ROOT / name).relative_to(ROOT).as_posix() for name in harness.CODE]
+    code = [(harness.SOURCE_ROOT / name).relative_to(ROOT).as_posix()
+            for name in (*harness.CODE, *harness.LOOP_CODE)]
     return ["src/nirmaan/runtime/harness.py", "src/nirmaan/evals/levels.py", "src/nirmaan/company/tools.py", *code]
 
 
