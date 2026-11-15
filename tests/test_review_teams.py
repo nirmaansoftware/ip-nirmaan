@@ -32,14 +32,9 @@ MAP = ROOT / ".github" / "review-teams.yml"
 # they are checked like every other seat.
 PENDING_SEATS = {"dft-engineer", "physical-design-engineer", "firmware-engineer"}
 
-# Decision 12 of council/records/2026-11-14-pilot-retrospective.md lands the
-# knowledge/verification/** rule by itself, before the division's first
-# document, so documents are not held up. While no tracked file matches it,
-# its dead-glob and dead-rule findings are tolerated for this glob only; the
-# first document makes it a checked rule, and that pull request removes the
-# glob from this set (test_a_pending_glob_matches_no_tracked_file fails until
-# it does).
-PENDING_GLOBS = {"knowledge/verification/**"}
+# Globs whose files do not exist yet are tolerated here, for those globs only. Empty since the
+# first knowledge/verification document (W2-K1); the glob is checked like every other one.
+PENDING_GLOBS: set[str] = set()
 
 
 # --- The loader and ownership rules, shared with scripts/pr_review.py -------------
