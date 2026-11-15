@@ -736,4 +736,11 @@ counted at the CEO (section 3). `ls evals/` at the same commit shows `firmware`,
   wave 2 Verification's batch (2026-11-13).
 - **New tools for wave 2 (2026-11-13):** eqy, verilator_coverage and cocotb may
   be wired into the tool broker, each in its own milestone PR. No spending.
+- **Physical design tools in CI (2026-11-14):** OpenROAD-flow-scripts, KLayout,
+  Magic and Netgen, with the open PDKs SKY130, GF180MCU and IHP SG13G2, may run
+  on GitHub-hosted CI runners only, never on the founder's Mac, and are never
+  redistributed. No spending. This is the approval the M79, M81 and M82 pilots
+  cite as "founder, in session, 2026-11-14". The founder asked the orchestrator
+  to write this entry, in session on 2026-11-15 ("am allowing you to do that,
+  can you please do that?").
 
