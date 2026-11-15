@@ -23,18 +23,19 @@
           "counts": false,
           "digest": "sha256:5eb05f03c1201b9bd2acd8e66fea165abd5ba773977cacaf015ddc071119c38e",
           "harness": "sha256:35643990d58bf28264abe98752bd6c2750a391483ac43176b4748a38fbc32711",
-          "lower": 0.3057,
+          "lower": 0.4344,
           "model": "claude-opus-5-5",
-          "n": 8,
-          "passed": 5,
+          "n": 11,
+          "passed": 8,
           "reasons": [
-            "Wilson lower bound 0.306, under 0.5"
+            "Wilson lower bound 0.434, under 0.5"
           ],
           "records": [
             "evals/results/2026-11-14-claude-code-claude-opus-5-5-11",
             "evals/results/2026-11-14-claude-code-claude-opus-5-5-13",
             "evals/results/2026-11-14-claude-code-claude-opus-5-5-5",
-            "evals/results/2026-11-14-claude-code-claude-opus-5-5-6"
+            "evals/results/2026-11-14-claude-code-claude-opus-5-5-6",
+            "evals/results/2026-11-15-claude-code-claude-opus-5-5-5"
           ],
           "unjudged": 3
         }
@@ -296,6 +297,7 @@
       "practised": [
         {
           "cases": [
+            "rtl/apb-regs",
             "rtl/rr-arbiter",
             "rtl/sync-fifo"
           ],
@@ -303,15 +305,16 @@
           "counts": true,
           "digest": "sha256:012eb9b7155ed6eb7761adca880b338f10c8f978b15dfd92f5adbb3253307a52",
           "harness": "sha256:35643990d58bf28264abe98752bd6c2750a391483ac43176b4748a38fbc32711",
-          "lower": 0.6756,
+          "lower": 0.7412,
           "model": "claude-opus-5-5",
-          "n": 8,
-          "passed": 8,
+          "n": 11,
+          "passed": 11,
           "reasons": [],
           "records": [
             "evals/results/2026-11-15-claude-code-claude-opus-5-5",
             "evals/results/2026-11-15-claude-code-claude-opus-5-5-2",
-            "evals/results/2026-11-15-claude-code-claude-opus-5-5-3"
+            "evals/results/2026-11-15-claude-code-claude-opus-5-5-3",
+            "evals/results/2026-11-15-claude-code-claude-opus-5-5-5"
           ],
           "unjudged": 0
         },
