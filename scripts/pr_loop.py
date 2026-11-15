@@ -1173,6 +1173,9 @@ class Loop:
             raise subprocess.CalledProcessError(merge.returncode, ["git", "merge", main_sha], merge.stdout, merge.stderr)
         if unmerged and unmerged != [rel]:
             return not_this(unmerged)
+        if conflict and not unmerged:
+            # GitHub reports a conflict this merge does not show: not the generated file's; a person looks.
+            return not_this()
         if unmerged:
             # Main's version for now; the generator rewrites it below.
             _git(wt, "checkout", "--theirs", "--", rel)

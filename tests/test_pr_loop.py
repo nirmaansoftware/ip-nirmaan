@@ -1317,6 +1317,13 @@ def test_a_conflict_that_includes_another_file_still_stops(repo):
     assert r.calls() == []
 
 
+def test_a_conflict_github_reports_that_the_merge_does_not_show_still_stops(repo):
+    r = levels_repo(repo, {"records/z.txt": "z\n"}, {"src/other.py": "main moved\n"})
+    r.github.mergeable = False
+    assert r.tick(loop=GENERATED) == ["stopped"]
+    assert r.labeled() and r.origin_head() == r.first_head and "merge conflict with main" in r.comments()[-1]
+
+
 def test_ci_failing_with_the_generated_file_stale_on_the_merge_with_main_is_updated_by_the_loop(repo):
     # Main adds a record the branch's regenerated file does not hold; git merges the two cleanly.
     r = levels_repo(repo, {"records/z.txt": "z\n"}, {"records/a.txt": "a\n"}, main_regen=False)
