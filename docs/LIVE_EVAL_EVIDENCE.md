@@ -106,6 +106,25 @@ normal approximation because it stays inside 0 to 1 and is honest at small n:
 averages across cases into a single headline number; per seat is the coarsest
 summary.
 
+**A run stops at a trial with no model answer (RR5).** A live `eval run`
+stops right after the first trial whose model calls all failed with no
+answer: at least one call is recorded, and every recorded answer has no text
+and an error. A plan or usage limit looks like this (on 2026-11-15 nine trials
+failed in two seconds each, "You've hit your 5-hour limit", because the run
+went on), and so does a model that cannot be reached. The rule reads the
+trial's structure, never the wording of the error. A model that answers,
+however wrongly, never stops a run. The stopped trial is written like any
+other and counts as failed (decision 11 of the pilot retrospective); no later
+trial starts; the record gets its summary and finished manifest, whose
+`trials` stays the planned count. The CLI prints `run stopped: <case> trial
+<n> got no model answer, as on a plan or usage limit (<the error>)` and exits
+**3** (1 still means a trial failed). Resuming after the limit resets is the
+batch plan's matter; the stopped trial is never re-run as a replacement
+without a council ruling (council record 2026-11-15-pilot-topup-reruns).
+`record_run(stop_on_no_answer=True)` is the
+library form; `eval outside` does not set it. The test is
+`tests/test_nirmaan_eval_run_stop.py`.
+
 ## 4. More cases: the spec seat and the firmware seat
 
 Six cases ship (four RTL from M27, and two new):

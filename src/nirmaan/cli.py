@@ -1097,6 +1097,8 @@ def budget_cmd(
 # --- Seat evaluation (M27) ---------------------------------------------------------------
 
 CASES_OPTION = typer.Option(Path("evals"), "--cases", help="Directory of evaluation case files.")
+#: RR5: ``eval run`` exits with this when a live run stops at a trial with no model answer (a plan or usage limit).
+STOPPED_EXIT = 3
 
 
 def _cases(cases: Path):
@@ -1141,8 +1143,9 @@ def eval_run(
                                                            "evals/results for a runtime, .nirmaan/evals for a replay)."),
     as_json: bool = typer.Option(False, "--json"),
 ) -> None:
-    """Run evaluation cases and write a run record (M45). Exits 1 when any trial fails."""
-    from nirmaan.evals import LIVE_TRIALS, EvalError, record_run, select_cases
+    """Run evaluation cases and write a run record (M45). Exits 1 when any trial fails, and 3 when a live run stops
+    at a trial with no model answer, such as a plan or usage limit (RR5)."""
+    from nirmaan.evals import LIVE_TRIALS, EvalError, RunStopped, record_run, select_cases
     from nirmaan.runtime.harness import VARIANTS
 
     if replay == (runtime is not None):
@@ -1192,10 +1195,13 @@ def eval_run(
         if not result.submitted and result.detail:
             console.print(f"  {escape(result.detail)}", highlight=False, soft_wrap=True)
 
+    stopped: RunStopped | None = None
     try:
         path = record_run(_org(), chosen, runtime, trials=trials, repo=repo, out=out, attempts=attempts,
                           command=" ".join(["nirmaan", *sys.argv[1:]]), head_sha=_head_sha(repo), on_trial=show,
-                          knowledge=not without_knowledge, variant=harness_name)
+                          knowledge=not without_knowledge, variant=harness_name, stop_on_no_answer=True)
+    except RunStopped as exc:
+        stopped, path = exc, exc.path
     except EvalError as exc:
         _fail(str(exc))
     if as_json:
@@ -1204,6 +1210,9 @@ def eval_run(
         summary = json.loads((path / "summary.json").read_text(encoding="utf-8"))
         _print_summary(summary)
         console.print(escape(f"run record: {path}"), highlight=False, soft_wrap=True)
+    if stopped is not None:
+        _err.print(f"[red]{escape(str(stopped))}[/red]")
+        raise typer.Exit(STOPPED_EXIT)
     if not all(r.passed for r in results):
         raise typer.Exit(1)
 
