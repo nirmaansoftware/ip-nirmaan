@@ -47,25 +47,26 @@
         "knowledge_document": "knowledge/design/arbitration.md",
         "problems": []
       },
-      "level": "practised",
+      "level": "knowledge",
       "practised": [
         {
           "cases": [
             "rtl/rr-arbiter"
           ],
           "cli": "2.1.325",
-          "counts": true,
+          "counts": false,
           "digest": "sha256:53dff4b10deec145e18247fd490870321613e50b35a8da2f0e0a044b95b58e31",
           "harness": "sha256:35643990d58bf28264abe98752bd6c2750a391483ac43176b4748a38fbc32711",
-          "lower": 0.5291,
+          "lower": 0.3755,
           "model": "claude-opus-5-5",
-          "n": 8,
-          "passed": 7,
-          "reasons": [],
+          "n": 5,
+          "passed": 4,
+          "reasons": [
+            "Wilson lower bound 0.376, under 0.5"
+          ],
           "records": [
             "evals/results/2026-11-14-claude-code-claude-opus-5-5",
-            "evals/results/2026-11-14-claude-code-claude-opus-5-5-2",
-            "evals/results/2026-11-15-claude-code-claude-opus-5-5"
+            "evals/results/2026-11-14-claude-code-claude-opus-5-5-2"
           ],
           "unjudged": 1
         }
@@ -296,27 +297,6 @@
       "practised": [
         {
           "cases": [
-            "rtl/rr-arbiter"
-          ],
-          "cli": "2.1.325",
-          "counts": false,
-          "digest": "sha256:012eb9b7155ed6eb7761adca880b338f10c8f978b15dfd92f5adbb3253307a52",
-          "harness": "sha256:35643990d58bf28264abe98752bd6c2750a391483ac43176b4748a38fbc32711",
-          "lower": 0.4385,
-          "model": "claude-opus-5-5",
-          "n": 3,
-          "passed": 3,
-          "reasons": [
-            "3 trials, fewer than 5",
-            "Wilson lower bound 0.439, under 0.5"
-          ],
-          "records": [
-            "evals/results/2026-11-15-claude-code-claude-opus-5-5"
-          ],
-          "unjudged": 0
-        },
-        {
-          "cases": [
             "rtl/apb-gpio",
             "rtl/apb-regs",
             "rtl/axi4-lite-regs",
@@ -378,20 +358,18 @@
     },
     "synthesis_awareness": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/synthesis_awareness.json",
+        "counts": true,
         "knowledge_document": "knowledge/design/synthesis_awareness.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     }
   },
   "totals": {
-    "knowledge": 10,
-    "practised": 1,
+    "knowledge": 12,
+    "practised": 0,
     "proven": 0
   },
   "without_knowledge": [
@@ -422,6 +400,20 @@
       "reason": "run without knowledge documents (knowledge: off in the run manifest and the trial): never counts toward a level",
       "record": "evals/results/2026-11-14-claude-code-claude-opus-5-5-without-knowledge-12",
       "trial": 1
+    },
+    {
+      "case": "rtl/axil-timer",
+      "passed": true,
+      "reason": "run without knowledge documents (knowledge: off in the run manifest and the trial): never counts toward a level",
+      "record": "evals/results/2026-11-14-claude-code-claude-opus-5-5-without-knowledge-13",
+      "trial": 1
+    },
+    {
+      "case": "rtl/axil-timer",
+      "passed": true,
+      "reason": "run without knowledge documents (knowledge: off in the run manifest and the trial): never counts toward a level",
+      "record": "evals/results/2026-11-14-claude-code-claude-opus-5-5-without-knowledge-13",
+      "trial": 2
     },
     {
       "case": "rtl/axil-timer",
