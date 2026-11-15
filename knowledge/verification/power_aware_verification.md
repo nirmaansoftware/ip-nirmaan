@@ -83,7 +83,9 @@ none is claimed to run here.
 - Static: the PST paper describes how a tool finds domain-crossing signals,
   reads the operating voltages or the switched supply on each side, and
   compares that with the declared level-shifter or isolation strategy to call
-  each one valid, missing, redundant or incorrect [PST]. The 2018 deck lists
+  each one valid, missing or redundant; for level shifters only, comparing
+  the properties of the specified and required cell also finds an incorrect
+  one [PST]. The 2018 deck lists
   RTL checks (missing, redundant or back-to-back cells) and gate-level checks
   (cells match the strategies; control signals come from an always-on
   domain) [LPMet].
@@ -124,9 +126,9 @@ none is claimed to run here.
   test drives the supplies into them, so isolation and retention are never
   exercised. The sources' answer is power-state and transition coverage
   [LPMet].
-- A transition marked illegal that a test performs, or one never marked, so
-  it is not checked [UPFTut]. State both the legal and illegal sets
-  (inference from the examples).
+- A transition never marked legal or illegal, so nothing says whether it is
+  allowed. State both the legal and illegal sets (inference from the
+  examples).
 - An isolation or retention control signal missing or driven wrongly. The
   2018 deck lists control-signal checks and sequencing checks for this
   [LPMet].

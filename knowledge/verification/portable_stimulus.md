@@ -111,8 +111,10 @@ is one author's account of the standard, not the standard itself.
   tutorial says IP models may be coarse (a vector of an existing test) or
   fine grained [PSSTut]; which to choose is a project decision (inference).
 - A realisation whose observation is invisible on the target. The tutorial
-  says low-observability platforms make portability and generation-time
-  coverage prediction important [PSSTut]; this document adds that each
+  says portability is a critical enabler for fast platforms with low
+  observability (ATE, emulation, silicon boards, bare metal), and, as a
+  separate point, that tools can predict coverage at generation time because
+  PSS scenarios are declarative [PSSTut]; this document adds that each
   scenario should name what is observed on its target (inference).
 
 ## How a result is checked
