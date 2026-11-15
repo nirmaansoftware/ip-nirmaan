@@ -340,5 +340,41 @@
     "practised": 2,
     "proven": 0
   },
-  "without_knowledge": []
+  "without_knowledge": [
+    {
+      "case": "rtl/apb-regs",
+      "passed": true,
+      "reason": "run without knowledge documents (knowledge: off in the run manifest and the trial): never counts toward a level",
+      "record": "evals/results/2026-11-14-claude-code-claude-opus-5-5-without-knowledge-5",
+      "trial": 1
+    },
+    {
+      "case": "rtl/apb-regs",
+      "passed": true,
+      "reason": "run without knowledge documents (knowledge: off in the run manifest and the trial): never counts toward a level",
+      "record": "evals/results/2026-11-14-claude-code-claude-opus-5-5-without-knowledge-5",
+      "trial": 2
+    },
+    {
+      "case": "rtl/apb-regs",
+      "passed": true,
+      "reason": "run without knowledge documents (knowledge: off in the run manifest and the trial): never counts toward a level",
+      "record": "evals/results/2026-11-14-claude-code-claude-opus-5-5-without-knowledge-5",
+      "trial": 3
+    },
+    {
+      "case": "rtl/apb-regs",
+      "passed": true,
+      "reason": "run without knowledge documents (knowledge: off in the run manifest and the trial): never counts toward a level",
+      "record": "evals/results/2026-11-14-claude-code-claude-opus-5-5-without-knowledge-6",
+      "trial": 1
+    },
+    {
+      "case": "rtl/apb-regs",
+      "passed": true,
+      "reason": "run without knowledge documents (knowledge: off in the run manifest and the trial): never counts toward a level",
+      "record": "evals/results/2026-11-14-claude-code-claude-opus-5-5-without-knowledge-6",
+      "trial": 2
+    }
+  ]
 }
