@@ -1,0 +1,52 @@
+{
+  "format": "nirmaan.knowledge-check",
+  "skill": "performance_verification",
+  "knowledge_document": "knowledge/verification/performance_verification.md",
+  "document_sha256": "sha256:4cfb292c93ba5ab988b701ca238bf20353621a169b6d3da025ab6fbd42ca9f33",
+  "writer": "IP-W2-K6 session (wave 2 knowledge batch, plan row W2-K6, 2026-11-15)",
+  "checker": "IP-W2-C6 session (wave 2 checker batch, 2026-11-15)",
+  "sources_read": [
+    "[CM] EEMBC CoreMark README: the whole file, https://github.com/eembc/coremark",
+    "[EmbR] Embench README: the whole file, https://github.com/embench/embench-iot",
+    "[EmbG] Embench User Guide issue 1.0 (doc/README.md): the whole file including principles, configuration, recording reliable results, statistics, reference platform and board sections (the GFDL text only skimmed), https://github.com/embench/embench-iot/blob/master/doc/README.md",
+    "Repository code at the lines cited in gate_claims"
+  ],
+  "result": "every claim tagged with a source was found in that source, every line marked inference is a fair reading of the source it names or the document's own reasoning, and every sentence about the platform's gates matches the code at the lines cited in gate_claims",
+  "notes": [
+    "CM: the per-MHz memory-parameter rule, the 10 second minimum, the ITERATIONS advice for a simulator, the validation run (seeds 0,0,0x66 and 0x3415,0x3415,0x66) and the controlled-output section are as the document says.",
+    "EmbR: hot caches, the 4 second scaling and the strictly cycle accurate simulator rule; EmbG: warmup_heat (configuration section, default 1), the recording list, start and stop triggers with an internal cycle counter, geometric mean and standard deviation against a reference platform, larger speed and smaller size is better.",
+    "Failure mode 'comparing runs with different flags... which the reporting rules are written to prevent [CM] [EmbG]': EmbG states the aim that anyone can duplicate a result and CM requires one flag set for all sources; the 'written to prevent' wording is a fair reading, not a sentence of either source.",
+    "The Dhrystone, CoreMark and Linpack sentence follows EmbG principle 2 (not good reputations, widely reported presumably because free and easy to port)."
+  ],
+  "gate_claims": [
+    {
+      "claim": "the document's first body line reads Knowledge only, which is the tier the gate computes for a skill with no available tool",
+      "evidence": "src/nirmaan/org/knowledge_files.py:172"
+    },
+    {
+      "claim": "the gate computes the tier from tool status and the skill card names no tool (the sk() default for tools is empty)",
+      "evidence": "src/nirmaan/company/skills.py:31"
+    },
+    {
+      "claim": "every document under knowledge/ passes the first-body-line tier rule",
+      "evidence": "tests/test_knowledge_files.py::test_every_knowledge_document_passes"
+    },
+    {
+      "claim": "this skill's card holds no tool (card lines 460 to 466)",
+      "evidence": "src/nirmaan/company/skills.py:460"
+    },
+    {
+      "claim": "the card's first step: state each performance claim as a measurable quantity with its workload and conditions",
+      "evidence": "src/nirmaan/company/skills.py:463"
+    },
+    {
+      "claim": "the card's two failure modes: a claim with no workload, and cycle counts from a non-representative test",
+      "evidence": "src/nirmaan/company/skills.py:465"
+    },
+    {
+      "claim": "the card's check: every claim names its workload, its measured value and how it was measured",
+      "evidence": "src/nirmaan/company/skills.py:466"
+    }
+  ],
+  "checked_at": "2026-11-15"
+}

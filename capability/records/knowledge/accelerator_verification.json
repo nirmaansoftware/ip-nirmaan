@@ -1,0 +1,67 @@
+{
+  "format": "nirmaan.knowledge-check",
+  "skill": "accelerator_verification",
+  "knowledge_document": "knowledge/verification/accelerator_verification.md",
+  "document_sha256": "sha256:24fd32772b1341456c3e3c714349e8ee31b137ebb72d8027e4eed6515e26e0d9",
+  "writer": "IP-W2-K6 session (wave 2 knowledge batch, plan row W2-K6, 2026-11-15)",
+  "checker": "IP-W2-C6 session (wave 2 checker batch, 2026-11-15)",
+  "sources_read": [
+    "[TFPage] Berkeley TestFloat web page (Release 3e): the whole page, http://www.jhauser.us/arithmetic/TestFloat.html",
+    "[TFGen] TestFloat Release 3e General Documentation: the whole page, http://www.jhauser.us/arithmetic/TestFloat-3/doc/TestFloat-general.html",
+    "[TFCmd] testfloat_gen documentation: the whole page, http://www.jhauser.us/arithmetic/TestFloat-3/doc/testfloat_gen.html",
+    "[ZGrow] ZipCPU, Bit growth in FPGA arithmetic: the whole post, https://zipcpu.com/dsp/2017/07/21/bit-growth.html",
+    "[ZRound] ZipCPU, Rounding Numbers without Adding a Bias: the whole post, https://zipcpu.com/dsp/2017/07/22/rounding.html",
+    "[ZDebug] ZipCPU, How to Debug a DSP algorithm: the whole post, https://zipcpu.com/dsp/2017/07/24/dsp-debugging.html",
+    "Repository code at the lines cited in gate_claims"
+  ],
+  "result": "every claim tagged with a source was found in that source, every line marked inference is a fair reading of the source it names or the document's own reasoning, and every sentence about the platform's gates matches the code at the lines cited in gate_claims",
+  "notes": [
+    "ZRound says convergent rounding is the IEEE 754 default by quoting Wikipedia; the document attributes it to the author's note, which is what the post does.",
+    "ZGrow: 'about N plus the base-2 logarithm of K, rounded up, which is less than N plus K' is the post's long-addition section (K+N bits is more than needed); the most-negative product as defining case is in the multiply section.",
+    "TFGen/TFCmd: -tininessbefore and -tininessafter, -checkNaNs and -checkInvInts are in TFGen sections 8.1 to 8.3, -seed, -level 1 or 2 and the function form that prints expected results are in TFCmd; the 'proves little on its own' wording is the document's reading of TFGen's 'in no way guarantees'.",
+    "The saturation paragraph says no open source read describes saturation and that this is in the wanted-sources list: the row exists at ~/Nirmaan-internal/2026-10-18-capability-buildout/wanted-sources.md:98 (outside the repository, so the evidence is a path, not a committed file)."
+  ],
+  "gate_claims": [
+    {
+      "claim": "the document's first body line reads Knowledge only, which is the tier the gate computes for a skill with no available tool",
+      "evidence": "src/nirmaan/org/knowledge_files.py:172"
+    },
+    {
+      "claim": "the gate computes the tier from tool status and the skill card names no tool (the sk() default for tools is empty)",
+      "evidence": "src/nirmaan/company/skills.py:31"
+    },
+    {
+      "claim": "every document under knowledge/ passes the first-body-line tier rule",
+      "evidence": "tests/test_knowledge_files.py::test_every_knowledge_document_passes"
+    },
+    {
+      "claim": "this skill's card holds no tool (card lines 453 to 459)",
+      "evidence": "src/nirmaan/company/skills.py:453"
+    },
+    {
+      "claim": "the card's first step: state the numeric format, rounding and saturation the datapath promises",
+      "evidence": "src/nirmaan/company/skills.py:456"
+    },
+    {
+      "claim": "the card's failure mode: checking only random values and missing the format corners",
+      "evidence": "src/nirmaan/company/skills.py:458"
+    },
+    {
+      "claim": "the card's check: each stated numeric behaviour has a corner test and a golden-model comparison",
+      "evidence": "src/nirmaan/company/skills.py:459"
+    },
+    {
+      "claim": "the verification-department documents on testbench qualification and reference modelling exist",
+      "evidence": "knowledge/verification/testbench_qualification.md:1"
+    },
+    {
+      "claim": "the reference modelling document exists",
+      "evidence": "knowledge/verification/reference_modelling.md:1"
+    },
+    {
+      "claim": "no open saturation source is recorded in the wanted-sources list",
+      "evidence": "~/Nirmaan-internal/2026-10-18-capability-buildout/wanted-sources.md:98"
+    }
+  ],
+  "checked_at": "2026-11-15"
+}

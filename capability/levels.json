@@ -7,14 +7,12 @@
   "skills": {
     "accelerator_verification": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/accelerator_verification.json",
+        "counts": true,
         "knowledge_document": "knowledge/verification/accelerator_verification.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     },
     "apb": {
@@ -342,14 +340,12 @@
     },
     "isa_compliance": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/isa_compliance.json",
+        "counts": true,
         "knowledge_document": "knowledge/verification/isa_compliance.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     },
     "log_analysis": {
@@ -376,14 +372,12 @@
     },
     "performance_verification": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/performance_verification.json",
+        "counts": true,
         "knowledge_document": "knowledge/verification/performance_verification.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     },
     "pipeline_design": {
@@ -631,7 +625,7 @@
     }
   },
   "totals": {
-    "knowledge": 23,
+    "knowledge": 26,
     "practised": 4,
     "proven": 0
   },
