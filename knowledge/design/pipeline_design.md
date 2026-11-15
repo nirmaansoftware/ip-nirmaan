@@ -99,8 +99,15 @@ marked "inference" is this document's own reasoning.
 - Prove one setup at the default parameters: the proof gate takes one `.sby`
   with no `[tasks]`, so a task per parameter combination is refused [Gate];
   check the other parameter points in simulation. Cover a trace that drops
-  downstream ready more than once, sends counting data and ends idle; short
-  depths suffice [Skid].
+  downstream ready more than once, sends counting data and ends idle. Do not
+  take the proof's short depth for the cover: the source proves at depth 3
+  but covers at depth 20, because a trace needs many more cycles than an
+  induction step [Skid]. The gate runs the cover from a copy of the same
+  `.sby`, changing only the mode, so the cover uses the proof's depth
+  (gate: src/nirmaan/integrations/eda.py:726-731, with the same-depth
+  statement in the docstring at lines 704-706). Set a depth long enough
+  for the trace you want, since a small one makes the cover unreachable
+  (inference; the source gives 20 for its trace, not a minimum).
 - Simulation: compare sent and received beats in a scoreboard, with random
   valid and ready on both sides; send back to back; hold ready low for one
   cycle and for several; reset during traffic. Upstream ready must change

@@ -4,7 +4,7 @@ skill: synthesis_awareness
 as_of: 2026-11-15
 review_by: 2027-05-15
 sources:
-  - open | YosysHQ, Yosys documentation: Synth commands, and the synth command reference [Synth] | https://yosyshq.readthedocs.io/projects/yosys/en/latest/using_yosys/synthesis/synth.html
+  - open | YosysHQ, Yosys documentation: Synth commands, and the synth command reference [Synth] | https://yosyshq.readthedocs.io/projects/yosys/en/latest/cmd/index_passes_synth.html
   - open | YosysHQ, Yosys command reference: Converting process blocks (the proc passes) [Proc] | https://yosyshq.readthedocs.io/projects/yosys/en/latest/cmd/index_passes_proc.html
   - open | YosysHQ, Yosys command reference: Optimization passes [Opt] | https://yosyshq.readthedocs.io/projects/yosys/en/latest/cmd/index_passes_opt.html
   - open | YosysHQ, Yosys documentation: A primer on digital circuit synthesis [Primer] | https://yosyshq.readthedocs.io/projects/yosys/en/latest/appendix/primer.html
@@ -37,8 +37,11 @@ that backs it. This card holds no tool; the tool it points to is `synth.run`.
   is written: a clocked block gives flip-flops, a combinational block not
   assigned on every path gives a latch [Proc] [Primer].
 - Only a few forms of `always` are in the synthesis standard: combinational
-  or latched logic with the full sensitivity list (`@*`), and clocked logic
-  with an optional synchronous reset. Write new designs inside them [Primer].
+  or latched logic with the full sensitivity list (`@*`), clocked logic
+  with a synchronous reset, and clocked logic with an asynchronous reset,
+  whose sensitivity list holds only the clock and reset edges and whose
+  reset values are constants (`always @(posedge clk, posedge reset)`).
+  Write new designs inside them [Primer].
 - The optimiser removes unused cells and wires, merges identical cells and
   folds constants [Opt]. Logic whose result nothing reads is removed, so a
   block that appears missing from the netlist may simply be unused
@@ -54,11 +57,13 @@ that backs it. This card holds no tool; the tool it points to is `synth.run`.
   then `stat -json`, with no flatten and no technology library (gate:
   src/nirmaan/integrations/eda.py:602-607, registered at eda.py:812). It
   needs a top module (gate: src/nirmaan/company/tools.py:177-178).
-- It passes on exit 0 and no `ERROR` line. Warnings, including the latch
-  warning, do not fail it (gate: eda_parsers.py:263-287; the pass test at
-  line 287 reads only the exit status and the errors, and latches are only
-  counted, at lines 282-283). A pass is not a statement that the RTL has no latch; read the
-  latch count in the result (inference).
+- The backend passes on exit 0 and no `ERROR` line. Warnings, including the
+  latch warning, do not fail the backend (gate: eda_parsers.py:263-287; the
+  pass test at line 287 reads only the exit status and the errors, and latches
+  are only counted, at lines 282-283). The rtl stage's gate does fail a
+  latch: it requires the latch count to be at most 0 (gate:
+  src/nirmaan/company/workflows.py:114). So a latch passes the backend but
+  not that stage; read the latch count in the result.
 - The numbers it keeps are the cell count, wire count, cells by type, and
   the flip-flop and latch counts, taken from type names that contain `FF` or
   `LATCH` (gate: eda_parsers.py:263-283). With the generic script the cells
@@ -68,7 +73,7 @@ that backs it. This card holds no tool; the tool it points to is `synth.run`.
 - The `yosys-liberty` backend, when a Liberty file is given, maps flip-flops
   and logic to library cells and also records an area figure from
   `stat -liberty` and writes a netlist (gate: src/nirmaan/integrations/physical.py:160-197,
-  backend registered at physical.py:529). Timing comes from a separate tool,
+  backend registered at physical.py:540). Timing comes from a separate tool,
   `sta.run` (gate: src/nirmaan/company/tools.py:183), not from synthesis.
 
 ## Estimating depth and area before a run
