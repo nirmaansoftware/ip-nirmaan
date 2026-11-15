@@ -127,6 +127,7 @@ new number. M1 to M42 are taken; see `docs/history/README.md`.
 | M72 | Python testbenches through cocotb: simulator.run's cocotb backend | reserved |
 | M73 | The harness in one place, and its fingerprint on every trial | reserved |
 | M74 | The harness bundle: the single-task rule in the formal contract, tool definitions and no user-level file in the harness, and named variants (`--harness`) | reserved |
+| M75 | Tools in the loop: the seat calls brokered lint, simulation and formal during its attempt (`--harness tools-in-loop`), under decision 4's conditions | reserved |
 | M76 | Outside calibration: the RTLLM adapter, and calibration records that never count toward a level | reserved |
 | M77 | Verification in five departments (wave 2, W2-O1); number reserved after the branch was cut | reserved |
 | M78 | Signoff gates independent of the producing department (G13 record, decision 2c) | reserved |

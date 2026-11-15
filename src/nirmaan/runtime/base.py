@@ -25,7 +25,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Protocol, Sequence
 
-from nirmaan.models import Actor, ActorKind, Bound, EscalationKind, EvidenceKind, Limits, TaskStatus, Verdict
+from nirmaan.models import Actor, ActorKind, Bound, EscalationKind, EvidenceKind, Limits, TaskStatus, ToolRun, Verdict
 from nirmaan.registry import Registry
 from nirmaan.runtime.context import WorkPacket, assemble
 from nirmaan.runtime.tools import ToolBroker, ToolOutcome
@@ -91,14 +91,29 @@ def _record_calls(engine: TaskEngine, task_id: str, actor: Actor, calls) -> None
 class ToolHandle:
     """What a runtime gets instead of the broker: bound to one actor and task."""
 
-    def __init__(self, broker: ToolBroker, actor: Actor, task_id: str) -> None:
+    def __init__(self, broker: ToolBroker, actor: Actor, task_id: str, advisory: bool = False) -> None:
         self._broker, self._actor, self._task = broker, actor, task_id
+        self._advisory = advisory
 
     def invoke(self, tool_id: str, bounds: Sequence[Bound] = (),
                **params: str | Sequence[str]) -> tuple[str, ToolOutcome]:
         """Run a tool as the task's seat; ``bounds`` are the metric bounds the run is checked against (M48)."""
-        run, outcome = self._broker.invoke(self._actor, tool_id, params, self._task, bounds=bounds)
+        run, outcome = self._broker.invoke(self._actor, tool_id, params, self._task, bounds=bounds,
+                                           advisory=self._advisory)
         return run.id, outcome
+
+    def advisory(self) -> "ToolHandle":
+        """The same seat and task, recording every run as advisory (M75): a run asked for during the attempt."""
+        return ToolHandle(self._broker, self._actor, self._task, advisory=True)
+
+    def recorded(self, run_id: str) -> ToolRun | None:
+        """A run already recorded in the project, if any."""
+        return self._broker.recorded(run_id)
+
+    def is_advisory(self, run_id: str) -> bool:
+        """Whether ``run_id`` is a recorded advisory run (M75): it can back nothing."""
+        run = self._broker.recorded(run_id)
+        return run is not None and run.advisory
 
     def foreign(self, run_id: str) -> bool:
         """Whether ``run_id`` is a recorded run made for another task (M50): it can back nothing here."""

@@ -1133,9 +1133,10 @@ def eval_run(
              "labelled knowledge: off and never counts toward an evidence level."),
     harness_name: str = typer.Option(
         "default", "--harness",
-        help="A named harness variant (M74, docs/HARNESS.md): default, or attempts-3 (three attempts, a refused "
-             "one answered again with the repair text). A variant's record carries its name and never counts "
-             "toward an evidence level."),
+        help="A named harness variant (M74, docs/HARNESS.md): default; attempts-3 (three attempts, a refused "
+             "one answered again with the repair text); or tools-in-loop (M75: the seat calls brokered lint, "
+             "simulation and formal during its attempt, docs/TOOLS_IN_THE_LOOP.md). A variant's record carries its "
+             "name and never counts toward an evidence level."),
     cases: Path = CASES_OPTION,
     repo: Path = typer.Option(Path("."), "--repo", help="Root that case file paths are relative to."),
     out: Optional[Path] = typer.Option(None, "--out", help="Where the run record is written (default: "

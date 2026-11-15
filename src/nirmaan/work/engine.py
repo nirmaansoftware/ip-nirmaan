@@ -636,7 +636,8 @@ class TaskEngine:
         runs[run.id] = run
         warnings = self._check("tool.run", actor)
         self._commit(actor, "tool.run", run.task or self._state.project.id, reason=run.summary,
-                     details={"tool": run.tool, "run": run.id, "succeeded": run.succeeded},
+                     details={"tool": run.tool, "run": run.id, "succeeded": run.succeeded,
+                              **({"advisory": True} if run.advisory else {})},
                      warnings=warnings, tool_runs=runs)
         return run
 

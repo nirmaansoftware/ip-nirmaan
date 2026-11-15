@@ -290,3 +290,9 @@ TOOLS: list[ToolSpec] = [
     _tool("farm.submit", "Compute farm", "infrastructure", EXE, CO, "Submit jobs to the compute farm."),
     _tool("doc.publish", "Publish documents", "documents", WR, CO, "Publish documents to the knowledge base."),
 ]
+
+#: M75, tools in the loop (council record 2026-11-14, decision 4: lint, simulation and formal): the only tools a
+#: seat may call during its attempt on the ``tools-in-loop`` harness variant. A seat is offered one only when the
+#: platform runs it over the seat's own files for the task and its role is granted it. In that variant's
+#: fingerprint (``harness.fingerprint()["loop"]["tools"]``), never in the default's.
+IN_LOOP: tuple[str, ...] = ("lint.run", "simulator.run", "formal.run", "formal.cover")

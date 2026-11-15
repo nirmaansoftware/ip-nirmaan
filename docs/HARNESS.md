@@ -97,12 +97,13 @@ beside it. A record written before this milestone has neither.
 `nirmaan eval run --harness <name>` runs on a named variant from
 `harness.VARIANTS`: the default harness with the run options the variant
 sets. Council record 2026-11-14 (pilot retrospective), decision 4, chose the
-variants to compare; this milestone has two names:
+variants to compare; M74 has two names and M75 adds the third:
 
 | Name | Run options | What changes for the seat |
 |---|---|---|
 | `default` | none | nothing: the default harness |
 | `attempts-3` | attempts 3 | a refused attempt is answered again, up to three, with the repair text (`REPAIR_AFTER_REFUSAL`) and the failed run's log excerpt (M26) |
+| `tools-in-loop` | tools | M75: during its attempt the seat calls brokered lint, simulation and formal on files it passes, every call recorded and every run advisory (`docs/TOOLS_IN_THE_LOOP.md`) |
 
 The variant's name is a run option of the fingerprint, so `--harness
 attempts-3` and a plain `--attempts 3` are two harnesses, and `--harness
@@ -115,7 +116,10 @@ labelled (either label is enough, as for the ablation), and M42 learning does
 not read it. A variant's settings can only be run options (a test checks it),
 so a setting cannot hide in the variant table; editing a variant changes its
 own fingerprint and never the default's. Tools in the loop, decision 4's
-other variant, is its own milestone.
+other variant, is its own milestone (M75): its fingerprint adds a `loop`
+section with its settings (`LOOP_SETTINGS`), the digests of the brokered
+server's code (`LOOP_CODE`) and the versions of the tools it runs
+(`tool_pins`), none of which is in the default's.
 
 ## How levels use it
 
@@ -208,6 +212,18 @@ in the same pull request.
   `src/nirmaan/company/tools.py`: an edit to a tool definition changes the
   fingerprint, so the file is reviewed as control-plane.
 
+- M75, tools in the loop (council record 2026-11-14, decision 4, the first
+  variant): `runtime/model.py` makes a session of brokered tools for an
+  attempt on the `tools-in-loop` variant and drops an advisory run the seat
+  names; `runtime/base.py` gives the tool handle an advisory form;
+  `runtime/claude_code.py` loads the brokered server for such an attempt;
+  `evals/runner.py` turns the variant on for the seat and records its calls;
+  `runtime/harness.py` adds the variant, the loop settings, `LOOP_CODE` and
+  `tool_pins`. `CODE` files changed, so the default fingerprint changed too,
+  inside decision 4's quiet window. New runtime files `runtime/seat_tools.py`
+  and `runtime/seat_tools_relay.py` are `LOOP_CODE`, in the variant's
+  fingerprint only.
+
 ## What is not the harness
 
 - The model: its own group key, recorded on the trial. The program the
@@ -260,6 +276,12 @@ apart with the name and never count, either label being enough;
 single-task rule and that both proof gates refuse a `[tasks]` setup;
 `tests/test_claude_code_canary.py` the canary script against fake
 executables (clean, leaking, never quoting) and its leak detector.
+
+Since M75: `tests/test_seat_tools.py` shows each condition of decision 4 (the
+table in `docs/TOOLS_IN_THE_LOOP.md`), and that the loop settings, the server
+code and the tool pins change the variant's fingerprint and never the
+default's; `tests/test_harness.py` that the loop settings are the harness
+module's other constants and the server files are `LOOP_CODE`.
 
 ## Not in this milestone
 
