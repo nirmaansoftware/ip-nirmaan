@@ -38,3 +38,7 @@ Netgen's only); no IR drop (via cut layers have no resistance at TC); no fill
 (ORFS fills only chips). Not re-tested, an open item for the owners: M29 and M34 also wrote their DEF after
 extraction, so by the same mechanism they would have lost patches; this milestone did not re-run them and
 claims nothing about them (including M34's met3 islands).
+
+Update (2026-11-15): the founder's decision is now recorded in
+`council/records/2026-10-18-capability-buildout.md` (Founder decisions,
+"Physical design tools in CI"); the "pending" wording above is kept as written at the time.

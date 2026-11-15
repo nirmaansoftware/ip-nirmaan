@@ -1,0 +1,104 @@
+{
+  "format": "nirmaan.knowledge-check",
+  "skill": "code_coverage",
+  "knowledge_document": "knowledge/verification/code_coverage.md",
+  "document_sha256": "sha256:3b5d0ff208db5a7a19b0fb7123e80a172917ac8c01e449e8369b89700850e011",
+  "writer": "IP-W2-K1 session (wave 2 knowledge batch, plan row W2-K1, 2026-11-15), corrected by IP-W2-K1B (ip#257)",
+  "checker": "IP-W2-C1B session (wave 2 check records, recheck after ip#257, 2026-11-15)",
+  "sources_read": [
+    "[VCov] Verilator manual, Simulating (Verilated-Model Runtime), Coverage Analysis through Coverage Collection, version 5.054 text: the whole page, https://verilator.org/guide/latest/simulating.html",
+    "[VCovExe] Verilator manual, verilator_coverage, version 5.054 text: the whole page, https://verilator.org/guide/latest/exe_verilator_coverage.html",
+    "[OTDV] lowRISC, OpenTitan Design Verification Methodology (Apache 2.0): the whole page, https://opentitan.org/book/doc/contributing/dv/methodology/index.html",
+    "[VArg] Verilator manual, Arguments (verilator executable), version 5.054 text: the whole page, all 1997 lines of the saved text; the document does not cite it, it was read to check the branch-point behaviour (the --coverage, --coverage-line, --coverage-branch, --coverage-toggle, --coverage-max-width and --coverage-underscore entries), https://verilator.org/guide/latest/exe_verilator.html",
+    "Repository code at the lines cited in gate_claims (worktree at origin/main e846c39, after ip#257), and runs of that code on this machine: Icarus Verilog, Verilator 5.052 and SymbiYosys, through the tests named in gate_claims and short scripts calling check_params, simulation_problem, coverage_problem and parse_simulation"
+  ],
+  "result": "the edit in ip#257 (coverage_off versus coverage_on) is right and the old record is replaced: the gate's pattern matches coverage_off and coverage_block_off, not coverage_on, and refuses them only outside design files. Run locally on a testbench: coverage_on alone accepted, coverage_off refused, coverage_block_off refused; in a design file coverage_off and coverage_on both accepted. Every other source-tagged claim was found in its source and every gate sentence matches the code at the lines cited, with the imprecisions noted.",
+  "notes": [
+    "[VCov]: line, branch and toggle definitions, the toggle exclusions (task or begin/end locals, leading underscore, integers, over 256 bits, with --coverage-max-width and --coverage-underscore), per-parameter-set counting, edges near time zero with the advice to zero coverage before reset release, the UNOPTFLAT over-count, and the $stop rule (Suppressing Coverage) are each on the page as the document says. The page says a coverage_off/coverage_on metacomment pair disables and enables coverage around a block, which is why the document's advice not to hide a gap with coverage_off is the document's inference and not the page's.",
+    "[VCovExe]: --annotate marks a line with % when all points are below --annotate-min (default 10), '-' marks a point below the min under --annotate-points, --report summary and hier are in the usage list, and the page tells a reader to remove conditions that never occur with $stop or coverage_off. The closing line of the document, that point counts show whether new stimulus reached new points, is a reading of --report and --rank, not stated in those words; inference-level and fair.",
+    "[OTDV]: the code metrics (line, toggle, FSM state and transition, conditional, branch), toggle closed on the IO ports only, code coverage not a verdict (the AND-gate example: 100 percent code coverage does not say the design works), and the exclusion rules (designer sign-off in a PR review; annotation of ALL exclusions; categories UNR, NON_RTL, UNSUPPORTED, EXTERNAL, LOW_RISK; the explanation mandatory for the last three, as the document says) are on the page. Imprecision: the document says OpenTitan 'records every exclusion with a category tag'; the page says annotations 'can be prefixed' with a category tag and that exclusions 'almost always' fall in those categories, and requires an annotation for every exclusion. A fair summary, slightly stronger than the page.",
+    "Branch points: the page for Arguments says --coverage-line covers basic blocks and branches of if/else are covered separately with --coverage-branch, and the gate's build asks for line and toggle only (eda.py:595). tests/test_coverage_read.py runs the real build on Verilator 5.052 and asserts branch 100.0, so the data holds branch points from that build; the document's hedge, 'branch percentages come from whatever points the data holds', is the correct reading, and a requirement's branch bound is met only if the installed Verilator emits them.",
+    "Version: the manual text read is 5.054; the repository's CI uses apt Verilator 5.020 and the local one is 5.052 (eda.py comment at COVERAGE_MAIN), so a reader on 5.020 should expect small differences. The document's [VCov] statements are the long-standing ones.",
+    "The record of ip#253 noted three items to the document's owner: the coverage on/off pragma wording (fixed by ip#257), the cited range eda_parsers.py:544-556 for bounds (the check itself is runtime/tools.py:187-200 with workflow.py:152-161; the document's line cites the docstring that names it, which is accurate as a pointer), and the 5.054 versus 5.020 point (above). No item changes a Knowledge reading.",
+    "Run locally: tests/test_coverage_read.py (all pass, with real Verilator builds) and the coverage_problem script described in gate_claims."
+  ],
+  "gate_claims": [
+    {
+      "claim": "coverage.read builds with Verilator --coverage-line and --coverage-toggle (line and toggle only), runs the testbench, then verilator_coverage reads the data",
+      "evidence": "src/nirmaan/integrations/eda.py:595"
+    },
+    {
+      "claim": "the data is written back with verilator_coverage --write and an lcov report with --write-info",
+      "evidence": "src/nirmaan/integrations/eda.py:598"
+    },
+    {
+      "claim": "branch percentages in the result come from whatever points the data holds (the type is the point's t key; the build does not ask for branch)",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:525"
+    },
+    {
+      "claim": "the simulation is judged first as simulator.run judges it (one verdict with the run's nonce, no failed check) and, if it fails, coverage is not read",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:557"
+    },
+    {
+      "claim": "only points in the design files count; the default design is every source except the file that declares the top module",
+      "evidence": "src/nirmaan/integrations/eda.py:516"
+    },
+    {
+      "claim": "a design parameter names the design files; each must be among the sources",
+      "evidence": "src/nirmaan/integrations/eda.py:542"
+    },
+    {
+      "claim": "none of the design files may declare the top module (the testbench is never measured)",
+      "evidence": "src/nirmaan/integrations/eda.py:549"
+    },
+    {
+      "claim": "a percentage is points hit at least once over all points, rounded down to two places, so it never rounds up into a bound",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:575"
+    },
+    {
+      "claim": "a design file with no coverage point at all fails the run",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:571"
+    },
+    {
+      "claim": "no source may use $fopen, $system, $c or DPI, the testbench included",
+      "evidence": "src/nirmaan/integrations/eda.py:508"
+    },
+    {
+      "claim": "a source that is not a design file may not carry a Verilator configuration (`verilator_config), an include, or a coverage_off or coverage_block_off pragma; design files may (run locally: a testbench with coverage_off or coverage_block_off is refused, a design file with coverage_off is accepted) (the code is at lines 513, 552-553)",
+      "evidence": "src/nirmaan/integrations/eda.py:513"
+    },
+    {
+      "claim": "the gate matches coverage_off and coverage_block_off only and does not match coverage_on: a testbench carrying coverage_on alone is accepted (run locally), and so is a design file carrying coverage_on; a lone coverage_on turns nothing off, so the reason the gate gives holds",
+      "evidence": "src/nirmaan/integrations/eda.py:513"
+    },
+    {
+      "claim": "the gate refuses coverage_off only outside design files, so a gap hidden in a design file is not caught",
+      "evidence": "src/nirmaan/integrations/eda.py:552"
+    },
+    {
+      "claim": "the gate sets no threshold; a requirement's bounds on line, toggle and branch are checked after a passing run",
+      "evidence": "src/nirmaan/runtime/tools.py:196"
+    },
+    {
+      "claim": "a bound on a metric the run did not report fails (so a branch bound needs branch points in the data)",
+      "evidence": "src/nirmaan/models/workflow.py:156"
+    },
+    {
+      "claim": "the tool is available, so the document opens with Practising",
+      "evidence": "src/nirmaan/org/knowledge_files.py:53"
+    },
+    {
+      "claim": "the skill holds coverage.read, which is AVAILABLE",
+      "evidence": "src/nirmaan/company/tools.py:137"
+    },
+    {
+      "claim": "a testbench that exercises the design meets the bounds and an idle one fails them, with branch points in the data from the real Verilator build",
+      "evidence": "tests/test_coverage_read.py::test_a_testbench_that_exercises_the_design_meets_the_bounds_and_an_idle_one_fails_them"
+    },
+    {
+      "claim": "a testbench that could forge the counts ($c, $fopen, DPI, coverage_off, an include, a verilator_config) is refused",
+      "evidence": "tests/test_coverage_read.py::test_a_testbench_that_could_forge_the_counts_is_refused"
+    }
+  ],
+  "checked_at": "2026-11-15"
+}

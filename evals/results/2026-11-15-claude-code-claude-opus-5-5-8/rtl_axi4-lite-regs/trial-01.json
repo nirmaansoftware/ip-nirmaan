@@ -1,0 +1,262 @@
+{
+  "answers": [
+    {
+      "cache_read_tokens": 14624,
+      "cache_write_tokens": 707,
+      "error": null,
+      "harness": "sha256:35643990d58bf28264abe98752bd6c2750a391483ac43176b4748a38fbc32711",
+      "input_tokens": 2,
+      "mode": "work",
+      "model": "claude-opus-5-5",
+      "output_tokens": 38039,
+      "packet_sha256": "1e37f53730e66f9a030a01bea0950d1b31f3d12e3bdc61534b135c52587e1a69",
+      "prompt_sha256": "0977c3d677d914aff3248875ad4adf150b4b057d44903450ed8d6fe43eece2f9",
+      "provider": "claude-code",
+      "text": "```json\n{\"uncertainty\": 0.3, \"outcome\": \"Wrote the RTL for axi4_lite_regs (axi4_lite_regs.v) and a self-checking testbench (axi4_lite_regs_tb.v). Both follow the approved interface and microarchitecture specifications. Neither file has been linted, simulated or synthesized yet: those checks are the platform's to run. No formal_spec was produced.\", \"artifacts\": [{\"kind\": \"design_decision\", \"title\": \"Recorded decisions and deviations for axi4_lite_regs RTL\", \"summary\": \"Decisions made while implementing the approved [artifact:prj-55105a9add.microarchitecture.a1] for [requirement:req-df40b5a460]. (1) The formal property block and .sby that [artifact:prj-55105a9add.microarchitecture.a1] section 7 lists, and the proof that [artifact:prj-55105a9add.interface-spec.a1] section 8 asks for (req:AXIL-FORMAL), are not part of this task. Its expected outputs are rtl_source and testbench only. A later formal task must produce them, so this task does not cover req:AXIL-FORMAL. (2) The failure-path testbench (axi4_lite_regs_tb_fail.v) in the same plan is also not produced. (3) aw_addr_q, w_data_q and w_strb_q have no reset, as [artifact:prj-55105a9add.microarchitecture.a1] section 2 says. Their held flags are reset. (4) A read and a write to the same register accepted on the same clock returns the register's old value. Neither spec defines this case, so the testbench only tests a simultaneous read and write to different registers.\"}], \"files\": [{\"path\": \"axi4_lite_regs.v\", \"kind\": \"rtl_source\", \"title\": \"axi4_lite_regs RTL\", \"summary\": \"AXI4-Lite subordinate with four 32-bit read/write registers, written to the approved [artifact:prj-55105a9add.microarchitecture.a1]. READY depends on state only: awready = !aw_held && !bvalid, wready = !w_held && !bvalid, arready = !rvalid. AW and W are held so they can arrive in any order, and do_write = (aw_held||aw_hs) && (w_held||w_hs). Bytes are merged per wstrb. Misaligned addresses get SLVERR and reads of them return zero, as [artifact:prj-55105a9add.interface-spec.a1] section 5 requires. Responses arrive one cycle after the request. aresetn is synchronous and active low. Serves [requirement:req-df40b5a460].\", \"entry\": \"axi4_lite_regs\"}, {\"path\": \"axi4_lite_regs_tb.v\", \"kind\": \"testbench\", \"title\": \"axi4_lite_regs self-checking testbench\", \"summary\": \"Directed self-checking testbench covering the list in [artifact:prj-55105a9add.interface-spec.a1] section 8: reset values, write and read of every register, partial and empty wstrb, AW before W, W before AW, both together, B and R back-pressure, requests held during a stalled response, back-to-back transactions, the SLVERR policy, the 2-cycle latency bound, a read and write on one clock, and reset during traffic. Inputs are driven at the falling edge, following [artifact:prj-55105a9add.microarchitecture.a1] section 7. Expected values come from a testbench register model. Each failure is reported with $error, passing checks are counted, and one NIRMAAN-SIM verdict line is printed before $finish.\", \"entry\": \"axi4_lite_regs_tb\"}], \"tool_runs\": [], \"claims\": [\"No lint, simulation or synthesis run has happened for these files. Whether they are lint-clean, pass simulation or have no latches is still unknown.\", \"The RTL was written to avoid latches: every combinational block has a default, and every case has a default branch.\", \"The RTL was written to be Verilator -Wall clean: explicit widths, named generate blocks, module name matching the file name, and every bit of every signal used.\", \"The testbench was written to avoid Verilator WIDTH warnings and needs a simulator that supports timing controls (for example Verilator --binary/--timing, or Icarus with SystemVerilog enabled for $error).\"], \"escalation\": null, \"notes\": \"Upstream inputs: [artifact:prj-55105a9add.interface-spec.a1] and [artifact:prj-55105a9add.microarchitecture.a1], independently reviewed per [evidence:prj-55105a9add.interface-spec.e1] and [evidence:prj-55105a9add.microarchitecture.e1]. No formal_spec file was submitted, so formal.run and formal.cover do not apply to this task. req:AXIL-FORMAL is still open for a downstream formal task. Every testbench loop has a fixed iteration limit so the run always ends with its verdict line. The verdict line uses a nonce read with $value$plusargs into reg [8*64-1:0].\"}\n```\n=== FILE: axi4_lite_regs.v ===\n// axi4_lite_regs: four 32-bit read/write registers behind an AXI4-Lite\n// subordinate port. Implements microarchitecture.md (holding registers,\n// READY from state only, one outstanding transaction per direction).\n`default_nettype none\n\nmodule axi4_lite_regs #(\n    parameter integer ADDR_WIDTH = 4,\n    parameter integer DATA_WIDTH = 32\n) (\n    input  wire                    aclk,\n    input  wire                    aresetn,\n\n    input  wire [ADDR_WIDTH-1:0]   s_axil_awaddr,\n    input  wire                    s_axil_awvalid,\n    output wire                    s_axil_awready,\n\n    input  wire [DATA_WIDTH-1:0]   s_axil_wdata,\n    input  wire [DATA_WIDTH/8-1:0] s_axil_wstrb,\n    input  wire                    s_axil_wvalid,\n    output wire                    s_axil_wready,\n\n    output wire [1:0]              s_axil_bresp,\n    output wire                    s_axil_bvalid,\n    input  wire                    s_axil_bready,\n\n    input  wire [ADDR_WIDTH-1:0]   s_axil_araddr,\n    input  wire                    s_axil_arvalid,\n    output wire                    s_axil_arready,\n\n    output wire [DATA_WIDTH-1:0]   s_axil_rdata,\n    output wire [1:0]              s_axil_rresp,\n    output wire                    s_axil_rvalid,\n    input  wire                    s_axil_rready\n);\n\n  localparam integer STRB_WIDTH = DATA_WIDTH / 8;\n  localparam [1:0] RESP_OKAY   = 2'b00;\n  localparam [1:0] RESP_SLVERR = 2'b10;\n\n  // ------------------------------------------------------------------\n  // State\n  // ------------------------------------------------------------------\n  reg                  aw_held;\n  reg                  w_held;\n  reg                  bvalid_q;\n  reg [1:0]            bresp_q;\n  reg                  rvalid_q;\n  reg [1:0]            rresp_q;\n  reg [DATA_WIDTH-1:0] rdata_q;\n\n  // Holding registers: datapath, not reset (their held flags are).\n  reg [ADDR_WIDTH-1:0] aw_addr_q;\n  reg [DATA_WIDTH-1:0] w_data_q;\n  reg [STRB_WIDTH-1:0] w_strb_q;\n\n  // Register file: separate flops.\n  reg [DATA_WIDTH-1:0] reg0;\n  reg [DATA_WIDTH-1:0] reg1;\n  reg [DATA_WIDTH-1:0] reg2;\n  reg [DATA_WIDTH-1:0] reg3;\n\n  // ------------------------------------------------------------------\n  // Handshakes (READY is a function of state only)\n  // ------------------------------------------------------------------\n  assign s_axil_awready = !aw_held && !bvalid_q;\n  assign s_axil_wready  = !w_held && !bvalid_q;\n  assign s_axil_arready = !rvalid_q;\n\n  assign s_axil_bvalid  = bvalid_q;\n  assign s_axil_bresp   = bresp_q;\n  assign s_axil_rvalid  = rvalid_q;\n  assign s_axil_rresp   = rresp_q;\n  assign s_axil_rdata   = rdata_q;\n\n  wire aw_hs = s_axil_awvalid && s_axil_awready;\n  wire w_hs  = s_axil_wvalid && s_axil_wready;\n  wire ar_hs = s_axil_arvalid && s_axil_arready;\n\n  // The write fires on the edge that completes the AW/W pair.\n  wire do_write = (aw_held || aw_hs) && (w_held || w_hs);\n\n  wire [ADDR_WIDTH-1:0] wr_addr = aw_held ? aw_addr_q : s_axil_awaddr;\n  wire [DATA_WIDTH-1:0] wr_data = w_held  ? w_data_q  : s_axil_wdata;\n  wire [STRB_WIDTH-1:0] wr_strb = w_held  ? w_strb_q  : s_axil_wstrb;\n\n  // ------------------------------------------------------------------\n  // Address decode: mapped when word aligned and within 0x0..0xC\n  // ------------------------------------------------------------------\n  wire wr_mapped = (wr_addr[1:0] == 2'b00) &&\n                   ((wr_addr >> 4) == {ADDR_WIDTH{1'b0}});\n  wire rd_mapped = (s_axil_araddr[1:0] == 2'b00) &&\n                   ((s_axil_araddr >> 4) == {ADDR_WIDTH{1'b0}});\n\n  // ------------------------------------------------------------------\n  // Write merge: copy bytes whose strobe is set, keep the others\n  // ------------------------------------------------------------------\n  reg  [DATA_WIDTH-1:0] wr_old;\n  wire [DATA_WIDTH-1:0] wr_merged;\n\n  always @* begin\n    case (wr_addr[3:2])\n      2'd0:    wr_old = reg0;\n      2'd1:    wr_old = reg1;\n      2'd2:    wr_old = reg2;\n      2'd3:    wr_old = reg3;\n      default: wr_old = {DATA_WIDTH{1'b0}};\n    endcase\n  end\n\n  genvar gi;\n  generate\n    for (gi = 0; gi < STRB_WIDTH; gi = gi + 1) begin : g_merge\n      assign wr_merged[8*gi +: 8] = wr_strb[gi] ? wr_data[8*gi +: 8]\n                                                : wr_old[8*gi +: 8];\n    end\n  endgenerate\n\n  // ------------------------------------------------------------------\n  // Read select\n  // ------------------------------------------------------------------\n  reg [DATA_WIDTH-1:0] rd_sel;\n\n  always @* begin\n    case (s_axil_araddr[3:2])\n      2'd0:    rd_sel = reg0;\n      2'd1:    rd_sel = reg1;\n      2'd2:    rd_sel = reg2;\n      2'd3:    rd_sel = reg3;\n      default: rd_sel = {DATA_WIDTH{1'b0}};\n    endcase\n  end\n\n  // ------------------------------------------------------------------\n  // Write channel state and B response\n  // ------------------------------------------------------------------\n  always @(posedge aclk) begin\n    if (!aresetn) begin\n      aw_held  <= 1'b0;\n      w_held   <= 1'b0;\n      bvalid_q <= 1'b0;\n      bresp_q  <= RESP_OKAY;\n    end else if (do_write) begin\n      aw_held  <= 1'b0;\n      w_held   <= 1'b0;\n      bvalid_q <= 1'b1;\n      bresp_q  <= wr_mapped ? RESP_OKAY : RESP_SLVERR;\n    end else begin\n      if (aw_hs) begin\n        aw_held <= 1'b1;\n      end\n      if (w_hs) begin\n        w_held <= 1'b1;\n      end\n      if (bvalid_q && s_axil_bready) begin\n        bvalid_q <= 1'b0;\n      end\n    end\n  end\n\n  // Holding registers (datapath, no reset).\n  always @(posedge aclk) begin\n    if (aw_hs) begin\n      aw_addr_q <= s_axil_awaddr;\n    end\n    if (w_hs) begin\n      w_data_q <= s_axil_wdata;\n      w_strb_q <= s_axil_wstrb;\n    end\n  end\n\n  // ------------------------------------------------------------------\n  // Register file\n  // ------------------------------------------------------------------\n  wire wr_en = do_write && wr_mapped;\n\n  always @(posedge aclk) begin\n    if (!aresetn) begin\n      reg0 <= {DATA_WIDTH{1'b0}};\n      reg1 <= {DATA_WIDTH{1'b0}};\n      reg2 <= {DATA_WIDTH{1'b0}};\n      reg3 <= {DATA_WIDTH{1'b0}};\n    end else if (wr_en) begin\n      case (wr_addr[3:2])\n        2'd0:    reg0 <= wr_merged;\n        2'd1:    reg1 <= wr_merged;\n        2'd2:    reg2 <= wr_merged;\n        2'd3:    reg3 <= wr_merged;\n        default: ;\n      endcase\n    end\n  end\n\n  // ------------------------------------------------------------------\n  // Read channel and R response\n  // ------------------------------------------------------------------\n  always @(posedge aclk) begin\n    if (!aresetn) begin\n      rvalid_q <= 1'b0;\n      rresp_q  <= RESP_OKAY;\n      rdata_q  <= {DATA_WIDTH{1'b0}};\n    end else if (ar_hs) begin\n      rvalid_q <= 1'b1;\n      rresp_q  <= rd_mapped ? RESP_OKAY : RESP_SLVERR;\n      rdata_q  <= rd_mapped ? rd_sel : {DATA_WIDTH{1'b0}};\n    end else if (rvalid_q && s_axil_rready) begin\n      rvalid_q <= 1'b0;\n    end\n  end\n\nendmodule\n\n`default_nettype wire\n=== END FILE ===\n=== FILE: axi4_lite_regs_tb.v ===\n// Self-checking testbench for axi4_lite_regs.\n// Inputs are driven just after the falling edge; handshakes are sampled at\n// the falling edge, before the rising edge that completes them.\n`timescale 1ns/1ps\n\nmodule axi4_lite_regs_tb;\n\n  localparam [1:0] RESP_OKAY   = 2'b00;\n  localparam [1:0] RESP_SLVERR = 2'b10;\n\n  reg         clk = 1'b0;\n  reg         aresetn;\n  reg  [3:0]  awaddr;\n  reg         awvalid;\n  wire        awready;\n  reg  [31:0] wdata;\n  reg  [3:0]  wstrb;\n  reg         wvalid;\n  wire        wready;\n  wire [1:0]  bresp;\n  wire        bvalid;\n  reg         bready;\n  reg  [3:0]  araddr;\n  reg         arvalid;\n  wire        arready;\n  wire [31:0] rdata;\n  wire [1:0]  rresp;\n  wire        rvalid;\n  reg         rready;\n\n  axi4_lite_regs dut (\n    .aclk           (clk),\n    .aresetn        (aresetn),\n    .s_axil_awaddr  (awaddr),\n    .s_axil_awvalid (awvalid),\n    .s_axil_awready (awready),\n    .s_axil_wdata   (wdata),\n    .s_axil_wstrb   (wstrb),\n    .s_axil_wvalid  (wvalid),\n    .s_axil_wready  (wready),\n    .s_axil_bresp   (bresp),\n    .s_axil_bvalid  (bvalid),\n    .s_axil_bready  (bready),\n    .s_axil_araddr  (araddr),\n    .s_axil_arvalid (arvalid),\n    .s_axil_arready (arready),\n    .s_axil_rdata   (rdata),\n    .s_axil_rresp   (rresp),\n    .s_axil_rvalid  (rvalid),\n    .s_axil_rready  (rready)\n  );\n\n  always #5 clk = ~clk;\n\n  // Expected-value model\n  reg [31:0] model [0:3];\n\n  integer passed;\n  integer failed;\n  integer test_no;\n  integer ok;\n  reg [8*64-1:0] nonce;\n\n  // ------------------------------------------------------------------\n  // Helpers\n  // ------------------------------------------------------------------\n  function [31:0] merge32;\n    input [31:0] o;\n    input [31:0] d;\n    input [3:0]  s;\n    begin\n      merge32[7:0]   = s[0] ? d[7:0]   : o[7:0];\n      merge32[15:8]  = s[1] ? d[15:8]  : o[15:8];\n      merge32[23:16] = s[2] ? d[23:16] : o[23:16];\n      merge32[31:24] = s[3] ? d[31:24] : o[31:24];\n    end\n  endfunction\n\n  function is_mapped_tb;\n    input [3:0] a;\n    begin\n      is_mapped_tb = (a[1:0] == 2'b00);\n    end\n  endfunction\n\n  task check;\n    input         cond;\n    input integer id;\n    begin\n      if (cond) begin\n        passed = passed + 1;\n      end else begin\n        failed = failed + 1;\n        $error(\"FAIL test %0d check %0d at time %0t\", test_no, id, $time);\n      end\n    end\n  endtask\n\n  task check_eq32;\n    input [31:0]  got;\n    input [31:0]  exp;\n    input integer id;\n    begin\n      if (got === exp) begin\n        passed = passed + 1;\n      end else begin\n        failed = failed + 1;\n        $error(\"FAIL test %0d check %0d at time %0t: got 0x%08h expected 0x%08h\",\n               test_no, id, $time, got, exp);\n      end\n    end\n  endtask\n\n  task check_eq2;\n    input [1:0]   got;\n    input [1:0]   exp;\n    input integer id;\n    begin\n      if (got === exp) begin\n        passed = passed + 1;\n      end else begin\n        failed = failed + 1;\n        $error(\"FAIL test %0d check %0d at time %0t: got %b expected %b\",\n               test_no, id, $time, got, exp);\n      end\n    end\n  endtask\n\n  // Called at the falling edge right after the edge that completed the write.\n  task b_phase;\n    input [1:0]   exp_resp;\n    input integer stall;\n    integer lat;\n    integer k;\n    begin\n      lat = 1;\n      while (!bvalid && lat < 8) begin\n        @(negedge clk);\n        lat = lat + 1;\n      end\n      check(bvalid === 1'b1, 100);\n      check(lat <= 2, 101);\n      check_eq2(bresp, exp_resp, 102);\n      for (k = 0; k < stall; k = k + 1) begin\n        check(awready === 1'b0 && wready === 1'b0, 103);\n        @(negedge clk);\n        check(bvalid === 1'b1, 104);\n        check_eq2(bresp, exp_resp, 105);\n      end\n      check(awready === 1'b0 && wready === 1'b0, 103);\n      bready = 1'b1;\n      @(negedge clk);\n      bready = 1'b0;\n      check(bvalid === 1'b0, 106);\n      check(awready === 1'b1 && wready === 1'b1, 107);\n    end\n  endtask\n\n  // Called at the falling edge right after the edge that accepted AR.\n  task r_phase;\n    input [31:0]  exp_data;\n    input [1:0]   exp_resp;\n    input integer stall;\n    integer lat;\n    integer k;\n    begin\n      lat = 1;\n      while (!rvalid && lat < 8) begin\n        @(negedge clk);\n        lat = lat + 1;\n      end\n      check(rvalid === 1'b1, 130);\n      check(lat <= 2, 131);\n      check_eq32(rdata, exp_data, 132);\n      check_eq2(rresp, exp_resp, 133);\n      for (k = 0; k < stall; k = k + 1) begin\n        check(arready === 1'b0, 134);\n        @(negedge clk);\n        check(rvalid === 1'b1, 135);\n        check_eq32(rdata, exp_data, 136);\n        check_eq2(rresp, exp_resp, 137);\n      end\n      check(arready === 1'b0, 134);\n      rready = 1'b1;\n      @(negedge clk);\n      rready = 1'b0;\n      check(rvalid === 1'b0, 138);\n      check(arready === 1'b1, 139);\n    end\n  endtask\n\n  // order: 0 = AW and W together, 1 = AW first, 2 = W first.\n  // gap: cycles (counted from the start) before the later channel is raised.\n  task do_write;\n    input [3:0]   addr;\n    input [31:0]  data;\n    input [3:0]   strb;\n    input integer order;\n    input integer gap;\n    input integer stall;\n    reg           aw_done;\n    reg           w_done;\n    reg           aw_fire;\n    reg           w_fire;\n    reg [1:0]     exp_resp;\n    integer       iter;\n    begin\n      exp_resp = is_mapped_tb(addr) ? RESP_OKAY : RESP_SLVERR;\n      check(bvalid === 1'b0, 110);\n      aw_done = 1'b0;\n      w_done  = 1'b0;\n      iter    = 0;\n      if (order != 2) begin\n        awaddr  = addr;\n        awvalid = 1'b1;\n      end\n      if (order != 1) begin\n        wdata  = data;\n        wstrb  = strb;\n        wvalid = 1'b1;\n      end\n      while (!(aw_done && w_done) && iter < 32) begin\n        check(bvalid === 1'b0, 111);\n        if (aw_done && !w_done) check(awready === 1'b0, 113);\n        if (w_done && !aw_done) check(wready === 1'b0, 114);\n        aw_fire = awvalid && awready;\n        w_fire  = wvalid && wready;\n        @(negedge clk);\n        iter = iter + 1;\n        if (aw_fire) begin\n          aw_done = 1'b1;\n          awvalid = 1'b0;\n        end\n        if (w_fire) begin\n          w_done = 1'b1;\n          wvalid = 1'b0;\n        end\n        if (!aw_done && !awvalid && iter >= gap) begin\n          awaddr  = addr;\n          awvalid = 1'b1;\n        end\n        if (!w_done && !wvalid && iter >= gap) begin\n          wdata  = data;\n          wstrb  = strb;\n          wvalid = 1'b1;\n        end\n      end\n      check(aw_done && w_done, 112);\n      if (order == 0) check(iter == 1, 115);\n      if (exp_resp == RESP_OKAY) begin\n        model[addr[3:2]] = merge32(model[addr[3:2]], data, strb);\n      end\n      b_phase(exp_resp, stall);\n    end\n  endtask\n\n  task do_read;\n    input [3:0]   addr;\n    input integer stall;\n    reg [31:0]    exp_data;\n    reg [1:0]     exp_resp;\n    reg           fired;\n    integer       iter;\n    begin\n      if (is_mapped_tb(addr)) begin\n        exp_data = model[addr[3:2]];\n        exp_resp = RESP_OKAY;\n      end else begin\n        exp_data = 32'h0000_0000;\n        exp_resp = RESP_SLVERR;\n      end\n      check(rvalid === 1'b0, 120);\n      araddr  = addr;\n      arvalid = 1'b1;\n      fired   = 1'b0;\n      iter    = 0;\n      while (!fired && iter < 32) begin\n        check(rvalid === 1'b0, 121);\n        fired = arvalid && arready;\n        @(negedge clk);\n        iter = iter + 1;\n      end\n      arvalid = 1'b0;\n      check(fired, 122);\n      check(iter == 1, 123);\n      r_phase(exp_data, exp_resp, stall);\n    end\n  endtask\n\n  task read_all;\n    begin\n      do_read(4'h0, 0);\n      do_read(4'h4, 0);\n      do_read(4'h8, 0);\n      do_read(4'hC, 0);\n    end\n  endtask\n\n  task model_reset;\n    begin\n      model[0] = 32'h0000_0000;\n      model[1] = 32'h0000_0000;\n      model[2] = 32'h0000_0000;\n      model[3] = 32'h0000_0000;\n    end\n  endtask\n\n  // ------------------------------------------------------------------\n  // Test sequence\n  // ------------------------------------------------------------------\n  initial begin\n    passed  = 0;\n    failed  = 0;\n    test_no = 0;\n    nonce   = {(8*64){1'b0}};\n    aresetn = 1'b0;\n    awaddr  = 4'h0;\n    awvalid = 1'b0;\n    wdata   = 32'h0000_0000;\n    wstrb   = 4'h0;\n    wvalid  = 1'b0;\n    bready  = 1'b0;\n    araddr  = 4'h0;\n    arvalid = 1'b0;\n    rready  = 1'b0;\n    model_reset;\n\n    // ---- Test 1: reset values -------------------------------------\n    test_no = 1;\n    repeat (3) @(negedge clk);\n    check(bvalid === 1'b0 && rvalid === 1'b0, 1);\n    aresetn = 1'b1;\n    @(negedge clk);\n    check(awready === 1'b1 && wready === 1'b1 && arready === 1'b1, 2);\n    check(bvalid === 1'b0 && rvalid === 1'b0, 3);\n    check_eq2(bresp, RESP_OKAY, 4);\n    check_eq2(rresp, RESP_OKAY, 5);\n    check_eq32(rdata, 32'h0000_0000, 6);\n    read_all;\n\n    // ---- Test 2: write then read every register --------------------\n    test_no = 2;\n    do_write(4'h0, 32'hDEAD_BEEF, 4'hF, 0, 0, 0);\n    do_write(4'h4, 32'h1234_5678, 4'hF, 0, 0, 0);\n    do_write(4'h8, 32'hA5A5_5A5A, 4'hF, 0, 0, 0);\n    do_write(4'hC, 32'h0F0F_F0F0, 4'hF, 0, 0, 0);\n    read_all;\n\n    // ---- Test 3: byte strobes ---------------------------------------\n    test_no = 3;\n    do_write(4'h8, 32'h1122_3344, 4'b0101, 0, 0, 0);\n    do_read(4'h8, 0);\n    do_write(4'h8, 32'h9988_7766, 4'b1010, 0, 0, 0);\n    do_read(4'h8, 0);\n    do_write(4'h8, 32'hFFFF_FFFF, 4'b0000, 0, 0, 0);\n    do_read(4'h8, 0);\n    do_write(4'h4, 32'hCC00_0000, 4'b1000, 0, 0, 0);\n    do_read(4'h4, 0);\n    do_write(4'hC, 32'h0000_00EE, 4'b0001, 0, 0, 0);\n    do_read(4'hC, 0);\n\n    // ---- Test 4: AW/W ordering ---------------------------------------\n    test_no = 4;\n    do_write(4'h0, 32'hA0A0_A0A0, 4'hF, 1, 1, 0);\n    do_write(4'h4, 32'hB1B1_B1B1, 4'hF, 1, 3, 0);\n    do_write(4'h8, 32'hC2C2_C2C2, 4'hF, 2, 1, 0);\n    do_write(4'hC, 32'hD3D3_D3D3, 4'hF, 2, 4, 0);\n    do_write(4'h0, 32'h0000_00FF, 4'b0001, 2, 2, 1);\n    do_write(4'h4, 32'h00FF_0000, 4'b0100, 1, 2, 1);\n    read_all;\n\n    // ---- Test 5: B and R back-pressure ---------------------------------\n    test_no = 5;\n    do_write(4'h8, 32'hFEED_FACE, 4'hF, 0, 0, 5);\n    do_read(4'h8, 6);\n    do_write(4'h0, 32'h1357_9BDF, 4'hF, 1, 2, 3);\n    do_read(4'h0, 3);\n    do_write(4'hC, 32'h2468_ACE0, 4'hF, 2, 2, 4);\n    do_read(4'hC, 1);\n\n    // ---- Test 6: back-to-back transactions ----------------------------\n    test_no = 6;\n    do_write(4'h0, 32'h0101_0101, 4'hF, 0, 0, 0);\n    do_write(4'h4, 32'h0202_0202, 4'hF, 0, 0, 0);\n    do_write(4'h8, 32'h0303_0303, 4'hF, 0, 0, 0);\n    do_write(4'hC, 32'h0404_0404, 4'hF, 0, 0, 0);\n    do_read(4'h0, 0);\n    do_read(4'h4, 0);\n    do_read(4'h8, 0);\n    do_read(4'hC, 0);\n    do_read(4'h0, 0);\n\n    // ---- Test 7: SLVERR policy -----------------------------------------\n    test_no = 7;\n    do_write(4'h5, 32'hFFFF_FFFF, 4'hF, 0, 0, 0);\n    do_write(4'hE, 32'hEEEE_EEEE, 4'hF, 1, 1, 2);\n    do_write(4'h3, 32'h3333_3333, 4'hF, 2, 1, 0);\n    do_write(4'h1, 32'h1111_1111, 4'b0000, 0, 0, 0);\n    read_all;\n    do_read(4'h5, 0);\n    do_read(4'hE, 2);\n    do_read(4'h1, 0);\n    do_read(4'h7, 1);\n    do_write(4'h4, 32'h5A5A_A5A5, 4'hF, 0, 0, 0);\n    do_read(4'h4, 0);\n\n    // ---- Test 8: requests held while the response is stalled -----------\n    test_no = 8;\n    awaddr  = 4'h0;\n    awvalid = 1'b1;\n    wdata   = 32'hCAFE_F00D;\n    wstrb   = 4'hF;\n    wvalid  = 1'b1;\n    check(awready === 1'b1 && wready === 1'b1, 800);\n    @(negedge clk);\n    model[0] = 32'hCAFE_F00D;\n    check(bvalid === 1'b1, 801);\n    check_eq2(bresp, RESP_OKAY, 802);\n    // next write presented while B is stalled\n    awaddr  = 4'h4;\n    awvalid = 1'b1;\n    wdata   = 32'h0BAD_C0DE;\n    wstrb   = 4'hF;\n    wvalid  = 1'b1;\n    repeat (3) begin\n      check(awready === 1'b0 && wready === 1'b0, 803);\n      @(negedge clk);\n      check(bvalid === 1'b1, 804);\n      check_eq2(bresp, RESP_OKAY, 805);\n    end\n    check(awready === 1'b0 && wready === 1'b0, 803);\n    bready = 1'b1;\n    @(negedge clk);\n    bready = 1'b0;\n    check(bvalid === 1'b0, 806);\n    check(awready === 1'b1 && wready === 1'b1, 807);\n    @(negedge clk);\n    awvalid = 1'b0;\n    wvalid  = 1'b0;\n    model[1] = 32'h0BAD_C0DE;\n    b_phase(RESP_OKAY, 0);\n    // next read presented while R is stalled\n    araddr  = 4'h0;\n    arvalid = 1'b1;\n    check(arready === 1'b1, 810);\n    @(negedge clk);\n    check(rvalid === 1'b1, 811);\n    check_eq32(rdata, model[0], 812);\n    araddr = 4'h4;\n    repeat (3) begin\n      check(arready === 1'b0, 813);\n      @(negedge clk);\n      check(rvalid === 1'b1, 814);\n      check_eq32(rdata, model[0], 815);\n      check_eq2(rresp, RESP_OKAY, 816);\n    end\n    rready = 1'b1;\n    @(negedge clk);\n    rready = 1'b0;\n    check(rvalid === 1'b0, 817);\n    check(arready === 1'b1, 818);\n    @(negedge clk);\n    arvalid = 1'b0;\n    r_phase(model[1], RESP_OKAY, 0);\n\n    // ---- Test 9: read and write accepted on the same clock --------------\n    test_no = 9;\n    awaddr  = 4'h8;\n    awvalid = 1'b1;\n    wdata   = 32'h5555_AAAA;\n    wstrb   = 4'hF;\n    wvalid  = 1'b1;\n    araddr  = 4'h0;\n    arvalid = 1'b1;\n    check(awready === 1'b1 && wready === 1'b1 && arready === 1'b1, 900);\n    @(negedge clk);\n    awvalid = 1'b0;\n    wvalid  = 1'b0;\n    arvalid = 1'b0;\n    check(bvalid === 1'b1 && rvalid === 1'b1, 901);\n    check_eq2(bresp, RESP_OKAY, 902);\n    check_eq32(rdata, model[0], 903);\n    check_eq2(rresp, RESP_OKAY, 904);\n    model[2] = 32'h5555_AAAA;\n    bready = 1'b1;\n    rready = 1'b1;\n    @(negedge clk);\n    bready = 1'b0;\n    rready = 1'b0;\n    check(bvalid === 1'b0 && rvalid === 1'b0, 905);\n    do_read(4'h8, 0);\n\n    // ---- Test 10: reset during traffic (half write, pending R) -----------\n    test_no = 10;\n    do_write(4'h4, 32'h1111_1111, 4'hF, 0, 0, 0);\n    awaddr  = 4'h8;\n    awvalid = 1'b1;\n    araddr  = 4'h4;\n    arvalid = 1'b1;\n    @(negedge clk);\n    awvalid = 1'b0;\n    arvalid = 1'b0;\n    check(awready === 1'b0, 1000);\n    check(bvalid === 1'b0, 1001);\n    check(rvalid === 1'b1, 1002);\n    aresetn = 1'b0;\n    @(negedge clk);\n    check(bvalid === 1'b0 && rvalid === 1'b0, 1003);\n    @(negedge clk);\n    aresetn = 1'b1;\n    model_reset;\n    check(awready === 1'b1 && wready === 1'b1 && arready === 1'b1, 1004);\n    check(bvalid === 1'b0 && rvalid === 1'b0, 1005);\n    // W alone: the AW from before reset was discarded, so no B may appear\n    wdata  = 32'h7777_7777;\n    wstrb  = 4'hF;\n    wvalid = 1'b1;\n    @(negedge clk);\n    wvalid = 1'b0;\n    repeat (3) begin\n      check(bvalid === 1'b0, 1006);\n      check(wready === 1'b0, 1007);\n      @(negedge clk);\n    end\n    check(bvalid === 1'b0, 1006);\n    awaddr  = 4'hC;\n    awvalid = 1'b1;\n    check(awready === 1'b1, 1008);\n    @(negedge clk);\n    awvalid = 1'b0;\n    model[3] = 32'h7777_7777;\n    b_phase(RESP_OKAY, 0);\n    read_all;\n\n    // ---- Test 11: reset while B is pending -------------------------------\n    test_no = 11;\n    awaddr  = 4'h0;\n    awvalid = 1'b1;\n    wdata   = 32'h8888_8888;\n    wstrb   = 4'hF;\n    wvalid  = 1'b1;\n    @(negedge clk);\n    awvalid = 1'b0;\n    wvalid  = 1'b0;\n    check(bvalid === 1'b1, 1100);\n    aresetn = 1'b0;\n    @(negedge clk);\n    check(bvalid === 1'b0, 1101);\n    aresetn = 1'b1;\n    model_reset;\n    check(awready === 1'b1 && wready === 1'b1 && arready === 1'b1, 1102);\n    read_all;\n\n    // ---- Verdict ----------------------------------------------------------\n    ok = $value$plusargs(\"nirmaan_nonce=%s\", nonce);\n    $display(\"NIRMAAN-SIM %0s %0d passed, %0d failed\", nonce, passed, failed);\n    $finish;\n  end\n\nendmodule\n=== END FILE ==="
+    }
+  ],
+  "format": "nirmaan.eval-trial",
+  "judge_runs": [
+    {
+      "check": "The reference testbench passes on the seat's RTL",
+      "params": {
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-fmxsee6b/seat/prj-55105a9add_rtl-implementation/1/axi4_lite_regs.v",
+          "tests/fixtures/rtl/axi4_lite/axi4_lite_regs_tb.v"
+        ],
+        "top": "axi4_lite_regs_tb"
+      },
+      "run": "run-0004",
+      "succeeded": true,
+      "summary": "icarus: simulation passed: 298 checks passed, $finish reached at time 1710000, 0 errors",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The RTL implements the register map (a test generated from the map, run over AXI4-Lite)",
+      "params": {
+        "map": "tests/fixtures/rtl/axi4_lite/register_map.json",
+        "rtl": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-fmxsee6b/seat/prj-55105a9add_rtl-implementation/1/axi4_lite_regs.v"
+        ],
+        "top": "axi4_lite_regs"
+      },
+      "run": "run-0005",
+      "succeeded": true,
+      "summary": "regmap-cosim: register map check passed: 4 checks, 0 failed (55 cycles, 25 bus transfers)",
+      "tool": "regmap.verify"
+    },
+    {
+      "check": "The seat's testbench fails each AXI4-Lite mutant",
+      "params": {
+        "sources": [
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-fmxsee6b/judge/check-3/must-fail-kqul21r6/clean/axi4_lite_regs_tb.v",
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-fmxsee6b/judge/check-3/must-fail-kqul21r6/clean/axi4_lite_regs.v"
+        ],
+        "top": "axi4_lite_regs_tb"
+      },
+      "run": "run-0006",
+      "succeeded": true,
+      "summary": "icarus: simulation passed: 961 checks passed, $finish reached at time 2210000, 0 errors",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The seat's testbench fails each AXI4-Lite mutant",
+      "params": {
+        "sources": [
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-fmxsee6b/judge/check-3/must-fail-kqul21r6/mutant-1-1/axi4_lite_regs_tb.v",
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-fmxsee6b/judge/check-3/must-fail-kqul21r6/mutant-1-1/axi4_lite_regs.v"
+        ],
+        "top": "axi4_lite_regs_tb"
+      },
+      "run": "run-0007",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: 7 errors, the testbench reports 7 of 961 checks failed; first: /private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-fmxsee6b/judge/check-3/must-fail-kqul21r6/mutant-1-1/axi4_lite_regs_tb.v:108: FAIL test 3 check 132 at time 310000: got 0x11223344 expected 0xa5225a44",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The seat's testbench fails each AXI4-Lite mutant",
+      "params": {
+        "sources": [
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-fmxsee6b/judge/check-3/must-fail-kqul21r6/mutant-1-2/axi4_lite_regs_tb.v",
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-fmxsee6b/judge/check-3/must-fail-kqul21r6/mutant-1-2/axi4_lite_regs.v"
+        ],
+        "top": "axi4_lite_regs_tb"
+      },
+      "run": "run-0008",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: 6 errors, the testbench reports 6 of 961 checks failed; first: /private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-fmxsee6b/judge/check-3/must-fail-kqul21r6/mutant-1-2/axi4_lite_regs_tb.v:123: FAIL test 7 check 102 at time 1400000: got 00 expected 10",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The seat's testbench fails each AXI4-Lite mutant",
+      "params": {
+        "sources": [
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-fmxsee6b/judge/check-3/must-fail-kqul21r6/mutant-1-3/axi4_lite_regs_tb.v",
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-fmxsee6b/judge/check-3/must-fail-kqul21r6/mutant-1-3/axi4_lite_regs.v"
+        ],
+        "top": "axi4_lite_regs_tb"
+      },
+      "run": "run-0009",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: 243 errors, the testbench reports 243 of 1371 checks failed; first: /private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-fmxsee6b/judge/check-3/must-fail-kqul21r6/mutant-1-3/axi4_lite_regs_tb.v:94: FAIL test 4 check 111 at time 490000",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The case's proof reaches every cover and fails each handshake or response mutant",
+      "params": {
+        "sby": "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-fmxsee6b/judge/check-4/must-fail-2prcemxu/clean/axi4_lite_regs.sby",
+        "sources": [
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-fmxsee6b/judge/check-4/must-fail-2prcemxu/clean/axi4_lite_regs.v"
+        ]
+      },
+      "run": "run-0010",
+      "succeeded": true,
+      "summary": "symbiyosys: formal passed: every property proven",
+      "tool": "formal.run"
+    },
+    {
+      "check": "The case's proof reaches every cover and fails each handshake or response mutant",
+      "params": {
+        "sby": "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-fmxsee6b/judge/check-4/must-fail-2prcemxu/cover/axi4_lite_regs.sby",
+        "sources": [
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-fmxsee6b/judge/check-4/must-fail-2prcemxu/cover/axi4_lite_regs.v"
+        ]
+      },
+      "run": "run-0011",
+      "succeeded": true,
+      "summary": "symbiyosys-cover: not vacuous: every cover reached (8 of 8); every assertion antecedent reached (14 of 14)",
+      "tool": "formal.cover"
+    },
+    {
+      "check": "The case's proof reaches every cover and fails each handshake or response mutant",
+      "params": {
+        "sby": "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-fmxsee6b/judge/check-4/must-fail-2prcemxu/mutant-1-1/axi4_lite_regs.sby",
+        "sources": [
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-fmxsee6b/judge/check-4/must-fail-2prcemxu/mutant-1-1/axi4_lite_regs.v"
+        ]
+      },
+      "run": "run-0012",
+      "succeeded": false,
+      "summary": "symbiyosys: formal fail: 1 error; first: axi4_lite_regs.v:235: [ASSERT] assertion axi4_lite_regs._witness_.check_assert_axi4_lite_regs_v_235_299 failed at step 3",
+      "tool": "formal.run"
+    },
+    {
+      "check": "The case's proof reaches every cover and fails each handshake or response mutant",
+      "params": {
+        "sby": "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-fmxsee6b/judge/check-4/must-fail-2prcemxu/mutant-1-2/axi4_lite_regs.sby",
+        "sources": [
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-fmxsee6b/judge/check-4/must-fail-2prcemxu/mutant-1-2/axi4_lite_regs.v"
+        ]
+      },
+      "run": "run-0013",
+      "succeeded": false,
+      "summary": "symbiyosys: formal fail: 1 error; first: axi4_lite_regs.v:226: [ASSERT] assertion axi4_lite_regs._witness_.check_assert_axi4_lite_regs_v_226_267 failed at step 3",
+      "tool": "formal.run"
+    }
+  ],
+  "knowledge": "on",
+  "model": "claude-opus-5-5",
+  "purpose": "evidence",
+  "record": "2026-11-15-claude-code-claude-opus-5-5-8",
+  "result": {
+    "attempts": 1,
+    "attestations": [],
+    "audit_ok": true,
+    "case": "rtl/axi4-lite-regs",
+    "case_digest": "sha256:ad1378e1b1b55047bed195840df674a206a6a83d6478177b0b34a8f0448d4c01",
+    "cli": "2.1.325",
+    "cost_usd": null,
+    "detail": "Upstream inputs: [artifact:prj-55105a9add.interface-spec.a1] and [artifact:prj-55105a9add.microarchitecture.a1], independently reviewed per [evidence:prj-55105a9add.interface-spec.e1] and [evidence:prj-55105a9add.microarchitecture.e1]. No formal_spec file was submitted, so formal.run and formal.cover do not apply to this task. req:AXIL-FORMAL is still open for a downstream formal task. Every testbench loop has a fixed iteration limit so the run always ends with its verdict line. The verdict line uses a nonce read with $value$plusargs into reg [8*64-1:0].",
+    "duration_s": 321.948,
+    "gate_runs": [
+      {
+        "run": "run-0001",
+        "succeeded": true,
+        "summary": "verilator-lint: lint clean: 0 errors, 0 warnings",
+        "tool": "lint.run"
+      },
+      {
+        "run": "run-0002",
+        "succeeded": true,
+        "summary": "icarus: simulation passed: 961 checks passed, $finish reached at time 2210000, 0 errors",
+        "tool": "simulator.run"
+      },
+      {
+        "run": "run-0003",
+        "succeeded": true,
+        "summary": "yosys: synthesis passed: 788 cells, 206 flip-flops, 0 latches, 0 warnings",
+        "tool": "synth.run"
+      }
+    ],
+    "harness": "sha256:35643990d58bf28264abe98752bd6c2750a391483ac43176b4748a38fbc32711",
+    "input_tokens": 2,
+    "model_calls": 1,
+    "output_tokens": 38039,
+    "passed": true,
+    "replay": false,
+    "runtime": "claude-code",
+    "sandbox": "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-fmxsee6b",
+    "scores": [
+      {
+        "failed_runs": [],
+        "name": "The reference testbench passes on the seat's RTL",
+        "runs": [
+          "run-0004"
+        ],
+        "scorer": "held-out-run",
+        "status": "passed",
+        "summary": "simulator.run run-0004: icarus: simulation passed: 298 checks passed, $finish reached at time 1710000, 0 errors"
+      },
+      {
+        "failed_runs": [],
+        "name": "The RTL implements the register map (a test generated from the map, run over AXI4-Lite)",
+        "runs": [
+          "run-0005"
+        ],
+        "scorer": "held-out-run",
+        "status": "passed",
+        "summary": "regmap.verify run-0005: regmap-cosim: register map check passed: 4 checks, 0 failed (55 cycles, 25 bus transfers)"
+      },
+      {
+        "failed_runs": [
+          "run-0007",
+          "run-0008",
+          "run-0009"
+        ],
+        "name": "The seat's testbench fails each AXI4-Lite mutant",
+        "runs": [
+          "run-0006"
+        ],
+        "scorer": "must-fail",
+        "status": "passed",
+        "summary": "simulator.run run-0006 passed on the clean inputs; 3 of 3 mutants failed it"
+      },
+      {
+        "failed_runs": [
+          "run-0012",
+          "run-0013"
+        ],
+        "name": "The case's proof reaches every cover and fails each handshake or response mutant",
+        "runs": [
+          "run-0010",
+          "run-0011"
+        ],
+        "scorer": "must-fail",
+        "status": "passed",
+        "summary": "formal.run run-0010 passed on the clean inputs with every cover reached; 2 of 2 mutants failed it"
+      }
+    ],
+    "seat": "prj-55105a9add:rtl-implementation",
+    "seat_status": "in_review",
+    "started_at": "2026-11-15T07:53:57.454775Z",
+    "submitted": true,
+    "version": "1.25.0"
+  },
+  "skills": {
+    "axi": "sha256:171d24465d795d0e8777da54e74430e2764fcdc089654579b42412934258c9cf",
+    "rtl_design": "sha256:012eb9b7155ed6eb7761adca880b338f10c8f978b15dfd92f5adbb3253307a52"
+  },
+  "stage": "rtl-implementation",
+  "trial": 1,
+  "version": 1
+}

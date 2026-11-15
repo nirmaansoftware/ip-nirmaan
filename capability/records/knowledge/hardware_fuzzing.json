@@ -1,0 +1,42 @@
+{
+  "format": "nirmaan.knowledge-check",
+  "skill": "hardware_fuzzing",
+  "knowledge_document": "knowledge/verification/hardware_fuzzing.md",
+  "document_sha256": "sha256:85f0fcc341d2c73a3d1c388e8bd4ef5de9865e4698ebbfcdbcd57b5d224ad22a",
+  "writer": "IP-W2-K4 session (wave 2 knowledge batch, plan row W2-K4, 2026-11-15)",
+  "checker": "IP-W2-C4 session (wave 2 check records, 2026-11-15)",
+  "sources_read": [
+    "[HWF] Trippel, Shin, Chernyakhovsky, Kelly, Rizzo and Hicks, Fuzzing Hardware Like Software, arXiv 2102.02308v1: the whole paper, all 14 pages, abstract to the reference list (pdftotext, 1079 lines), https://arxiv.org/abs/2102.02308",
+    "[VArg] Verilator manual, Executable and Argument Reference (verilator Arguments), version 5.054 text: the whole page, all 2022 lines of the saved text, including the --x-assign, --x-initial and --x-initial-edge entries, https://verilator.org/guide/latest/exe_verilator.html",
+    "[VLang] Verilator manual, Input Languages, version 5.054 text: the whole page, including Unknown States, https://verilator.org/guide/latest/languages.html",
+    "Repository code at the lines cited in gate_claims (worktree at origin/main 638a823, after ip#283), a search of src/ for any fuzzing tool, and a local Verilator 5.052 run of the --x-assign unique and --x-initial unique seed behaviour"
+  ],
+  "result": "pass. Every source-tagged claim was found in its source, with the imprecisions in notes. The document runs no tool and cites no gate line, as it says; the two gate claims below check that statement and the tier line.",
+  "notes": [
+    "[HWF]: the pipeline (Verilator to C++, compile and instrument, mutate, keep coverage-increasing tests, discard the rest, save crashes; Fig. 3), the claim that software coverage correlates with hardware coverage (Fig. 13 caption and Section III-A), the oracle limit (Section VII-4: no hardware sanitizer, so invariants or a golden model; assertion violations and golden-model mismatches raise SIGABRT, Section VII-1), the harness (Algorithm 1), the bus instruction format (Fig. 4, Table I: opcode, address, data, with wait, read and write), the variable-frame result and its AFL reason (Section VI-B3, worded 'seem to perform better' in the paper), the reset result (Section V-C2: only the 8 and 16 state locks differ at p<0.05), the instrumentation result (Section V-C1: DUT-only never handicaps the fuzzer, better for small DUTs), the two-orders-of-magnitude result against the authors' own cocotb CRV bench for medium to larger locks (Section V-D), the 88 percent in one hour from an empty seed on three of four OpenTitan cores (Section VI-C, Fig. 14) and the analog and side-channel limit (Section VII-4) are each on the page as the document says.",
+    "[VArg] and [VLang]: --x-assign unique and --x-initial unique, the seed advice (use +verilator+rand+reset+2 and +verilator+seed+<value>, print the seeds selected, so a failure can be reproduced) and 'mostly a two-state simulator' are on the pages as the document says. Run locally on Verilator 5.052: with both options set to unique, the same +verilator+seed gives the same values for a never-reset register and an explicit X, and different seeds give different values. Imprecision: the document does not say that initial values only vary when +verilator+rand+reset+2 is given (without it the never-reset register read 0 on every run while the explicit X still followed the --x-assign choice); the VArg entry says to use it. The document says 'follows a seed given at run time', which is true with that runtime option.",
+    "Unmarked lines: 'A fuzz target with no oracle only grows coverage and finds nothing.' (line 44) and the failure-mode bullets 'Counting coverage reached as bugs found.' and 'Findings that cannot be replayed because the seed or build options were not saved.' carry neither a tag nor the word inference. They are practice guidance consistent with the paper (it separates coverage from crash detection, Section VII-1) and with the skill card's own fails line, and the same style passed in code_coverage.md; not a failure, but a reader could take line 44 as part of the preceding tagged sentence.",
+    "Paraphrase strength: 'A reset. The model must be reset before each input' reads the paper's 'must be reset and initialized, prior to processing any inputs' per test execution; with AFL's fork server the reset can run once (Section V-C2), which the document's next sentence covers. 'Never slower' for DUT-only instrumentation is the paper's 'never handicaps' on medians over 50 runs.",
+    "No gate line is cited and none is needed: a search of src/ for fuzz, afl and libfuzzer finds only the skill catalog (src/nirmaan/company/skills.py) and the org chart, no tool; the hardware_fuzzing skill holds no tool (skills.py:431-437), so its tier line 'Knowledge only' is the computed one (src/nirmaan/org/knowledge_files.py:51-54). The repository passes no --x-assign or --x-initial option anywhere in src/.",
+    "Version: the Verilator manual text read is 5.054 and the local build is 5.052; the document makes no version-specific statement."
+  ],
+  "gate_claims": [
+    {
+      "claim": "no repository tool runs a fuzzer, so no gate line is cited (the hardware_fuzzing skill holds no tool)",
+      "evidence": "src/nirmaan/company/skills.py:431"
+    },
+    {
+      "claim": "Knowledge only: no tool run backs this (the first body line is the computed tier: a skill with no AVAILABLE tool is knowledge only)",
+      "evidence": "src/nirmaan/org/knowledge_files.py:51"
+    },
+    {
+      "claim": "Verilator's unique setting of --x-assign and --x-initial follows a run-time seed, and the manual says to print the seeds so a failure can be rerun (a Verilator option; the repository's own runs pass neither option)",
+      "evidence": "unverified"
+    },
+    {
+      "claim": "Verilator is mostly a two-state simulator, so a fuzz run does not see unknown propagation (a Verilator property; no repository gate behind it)",
+      "evidence": "unverified"
+    }
+  ],
+  "checked_at": "2026-11-15"
+}

@@ -17,7 +17,13 @@ per call, as a state machine that survives restarts:
             as Nirmaan's does): merge main into
             it with the gh login (update-branch, pinned to the head the loop
             saw) before any review, and again after the review when main moved
-            during it; a failed update stops, a push in between drops the step;
+            during it; a failed update stops, a push in between drops the step.
+            The generated capability/levels.json (LOOP "generated") the only
+            file in a merge conflict with main, or stale on the merge with main
+            when CI failed: the loop merges main into the branch itself (a
+            merge commit), regenerates the file, checks it and pushes (as the
+            check account in GitHub Actions); not a fix round and not a stop.
+            A conflict in any other file still stops;
     wait    the required CI is not finished on the head (no model call), or
             GitHub is still making the update's merge commit;
     review  both keys, and the Founder Proxy (agent) for a founder-class pull
@@ -73,12 +79,14 @@ import json
 import os
 import re
 import secrets
+import stat
 import subprocess
 import sys
 import tempfile
 import threading
 import time
 import urllib.error
+from contextlib import contextmanager
 from http.client import HTTPException
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -125,7 +133,10 @@ TRANSIENT_TEXT = re.compile(
     r"\b5\d\d (?:internal server error|bad gateway|service unavailable)|"
     # main moved during `gh pr merge --auto`: a race, retried on the next pass
     # (a "Head branch was modified" is not this and still stops).
-    r"base branch was modified", re.I)
+    r"base branch was modified|"
+    # GitHub still settling the head's checks when auto-merge is asked for (it stopped ip#254):
+    # retried on the next pass, like the race above.
+    r"pull request is in unstable status \(enablepullrequestautomerge\)", re.I)
 
 
 def transient_error(exc) -> bool:
@@ -200,7 +211,22 @@ LOOP = {
         {"name": "test", "when": ["src/**", "tests/**", "evals/**", "scripts/**", "site/**"], "env": {"PYTHONPATH": "src"},
          "select": "related_tests", "run": [["{python}", "-m", "pytest", "-q", "-x", "-p", "no:cacheprovider"]]},
     ],
+    # The generated file many pull requests regenerate, so a merge to main leaves the others
+    # conflicting or stale in it (ip#220, #213, #224, #227, #248, #254). When it is the only file
+    # in a merge conflict with main, or CI failed and it is stale on the merge with main, the loop
+    # merges main into the branch, regenerates it with `write`, runs `check` on the result and
+    # pushes: a branch update, not a fix round (Loop._update_generated). Both commands run as
+    # the checks do (in GitHub Actions as the check account, in check_clone), with `env`.
+    "generated": {
+        "path": "capability/levels.json",
+        "write": [["{python}", "scripts/capability_levels.py", "--write"]],
+        "check": [["{python}", "scripts/capability_levels.py", "--check"]],
+        "env": {"PYTHONPATH": "src"},
+    },
 }
+
+# The most the loop takes from the generated file the check account wrote (levels.json is ~21 KB).
+GENERATED_MAX_BYTES = 4 * 1024 * 1024
 
 FIXER_TOOLS = "Read,Grep,Glob,Edit,Write"
 FIXER_DENIED = f"Bash,NotebookEdit,WebFetch,WebSearch,Task,Agent,{pr_review.PROC_DENIED}"
@@ -470,6 +496,34 @@ def check_clone(wt: str, sha: str) -> Path:
     _git(wt, "clone", "--quiet", "--no-hardlinks", "--no-checkout", wt, str(root / "repo"))
     _git(root / "repo", "-c", "advice.detachedHead=false", "checkout", "--quiet", "--detach", sha)
     return root
+
+
+def read_generated(clone, rel: str, limit: int = GENERATED_MAX_BYTES) -> str:
+    """The file `rel` the check account wrote in its clone, read by the loop as
+    data only: every folder on its path a real folder and the file a regular
+    file (no symlink, so it can point at nothing of the loop's), at most `limit`
+    bytes, UTF-8. Read after the check account's processes are gone
+    (_run_commands_once), so nothing changes it while it is read. Raises
+    ValueError otherwise."""
+    cur = Path(clone)
+    for part in Path(rel).parts[:-1]:
+        cur = cur / part
+        if not stat.S_ISDIR(os.lstat(cur).st_mode):
+            raise ValueError(f"{cur.name} on the path of {rel} is not a folder")
+    fd = os.open(Path(clone) / rel, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+    try:
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode):
+            raise ValueError(f"{rel} is not a regular file")
+        if info.st_size > limit:
+            raise ValueError(f"{rel} is {info.st_size} bytes, over {limit}")
+        with os.fdopen(fd, "rb", closefd=False) as fh:
+            data = fh.read(limit + 1)
+    finally:
+        os.close(fd)
+    if len(data) > limit:
+        raise ValueError(f"{rel} is over {limit} bytes")
+    return data.decode("utf-8")
 
 
 # One check-account run at a time: its cleanup kills every process of the account,
@@ -933,10 +987,18 @@ class Loop:
             u = self._update_behind(ctx)
             if u:
                 return u
+        # A merge conflict with main only in the generated file: the loop updates
+        # the branch itself, also for a head that already finished.
+        dirty = pull.get("mergeable") is False or pull.get("mergeable_state") == "dirty"
+        if dirty and (st["done"] or {}).get("outcome") != "refused":
+            u = self._update_generated(ctx, pull, conflict=True)
+            if u:
+                return u
         if st["done"] and st["done"]["head"] == head:
             return {"outcome": "skip", "reason": f"{st['done']['outcome']} on this head"}
-        if pull.get("mergeable") is False or pull.get("mergeable_state") == "dirty":
-            return self._stop(ctx, head, "the branch has a merge conflict with main; a person resolves it")
+        if dirty:
+            files = f" ({', '.join(ctx['conflicts'])})" if ctx.get("conflicts") else ""
+            return self._stop(ctx, head, f"the branch has a merge conflict with main{files}; a person resolves it")
         runs = o["github"].list_check_runs(head)
         state, text = ci_state(cfg["required_ci"], runs)
         if state == "green" and st.get("ci_green_seen") != head:
@@ -949,6 +1011,9 @@ class Loop:
             self.out(f"pr-loop: #{n} waiting for CI on {head[:7]}: {text}")
             return {"outcome": "wait", "reason": text}
         if state == "failed":
+            u = self._update_generated(ctx, pull, conflict=False)
+            if u:
+                return u
             if st["last_fix_head"] == head:
                 return self._stop(ctx, head, f"CI failed after fix round {st['rounds']} ({text})")
             return {"outcome": "skip", "reason": f"CI failed on {head[:7]} ({text}); the author fixes it"}
@@ -976,6 +1041,9 @@ class Loop:
         if r.get("waiting"):
             return {"outcome": "wait", "reason": r["waiting"]}
         if r.get("ci_failed"):
+            u = self._update_generated(ctx, pull, conflict=False)
+            if u:
+                return u
             if st["last_fix_head"] == head:
                 return self._stop(ctx, head, f"CI failed after fix round {st['rounds']} ({r['ci_failed']})")
             return {"outcome": "skip", "reason": f"{r['ci_failed']}; the author fixes it"}
@@ -1050,6 +1118,167 @@ class Loop:
                      "and GitHub reported that as blocking the merge, so the loop asked GitHub to merge `main` into it "
                      f"(update-branch, a merge commit, only while the head was still `{sha7}`). The new head is reviewed from scratch.")
         return {"outcome": "updated"}
+
+    def _update_generated(self, ctx, pull, conflict: bool):
+        """The one merge problem the loop resolves itself: the generated file
+        (LOOP "generated", capability/levels.json) is the only file in a merge
+        conflict with main (`conflict`), or CI failed and the file is stale on
+        the merge with main. The loop merges main into the branch (a merge
+        commit, never a rebase), regenerates the file, runs its check and
+        pushes as it pushes a fix: a branch update, not a fix round and not a
+        stop. Returns the step's result, or None when it is not that case (the
+        caller goes on as before: a conflict stops, naming ctx["conflicts"]
+        when known). Tried once per head and main; --no-post never updates.
+
+        In GitHub Actions (check_user) the generator, which is the pull
+        request's code, runs as the check account in a check_clone of a trial
+        merge, as the fixer's checks do; the loop takes back only the one
+        file, read as data (read_generated), and commits it in its own
+        worktree. The check runs the same way on the commit before the push."""
+        gen, o, n, st, head = self.lc.get("generated"), self.o, ctx["n"], ctx["st"], ctx["head"]
+        if not gen or o["post"] == "none":
+            return None
+        tried = st.get("generated_tried") or {}
+        if tried.get("head") == head and tried.get("main") == self._main_on_origin():
+            ctx["conflicts"] = tried.get("conflicts")
+            return None
+        main_sha = self._fetch_head(n, head)
+        if main_sha is None:
+            self._log(ctx, "head-moved")
+            return {"outcome": "head-moved"}
+        root, rel = o["repo_root"], gen["path"]
+
+        def not_this(conflicts=None):
+            ctx["conflicts"] = conflicts
+            st["generated_tried"] = {"head": head, "main": main_sha, "conflicts": conflicts}
+            _save_state(self.state_dir, self.cfg["repo"], st)
+
+        try:
+            _git(root, "merge-base", "--is-ancestor", main_sha, head)
+            # Up to date with main: a stale file is the author's own, not main's doing.
+            return not_this()
+        except subprocess.CalledProcessError:
+            pass
+        if not conflict and not _git(root, "diff", "--name-only", _git(root, "merge-base", main_sha, head).strip(), head, "--", rel).strip():
+            return not_this()
+        with self._head_worktree(n, head, "update") as wt:
+            return self._update_generated_in(ctx, pull, wt, main_sha, conflict, not_this)
+
+    def _update_generated_in(self, ctx, pull, wt, main_sha, conflict, not_this):
+        gen, lc, o, n, st, head = self.lc["generated"], self.lc, self.o, ctx["n"], ctx["st"], ctx["head"]
+        rel, user = gen["path"], o.get("check_user")
+        name, email = self._identity(head)
+        ident = ["-c", f"user.name={name}", "-c", f"user.email={email}"]
+        merge = subprocess.run(["git", "-c", "core.hooksPath=/dev/null", "-c", "rerere.enabled=false", *ident,
+                                "merge", "--no-ff", "--no-commit", main_sha], cwd=wt, capture_output=True, text=True)
+        unmerged = sorted({p for p in _git(wt, "diff", "--name-only", "--diff-filter=U", "-z").split("\0") if p})
+        if merge.returncode != 0 and not unmerged:
+            raise subprocess.CalledProcessError(merge.returncode, ["git", "merge", main_sha], merge.stdout, merge.stderr)
+        if unmerged and unmerged != [rel]:
+            return not_this(unmerged)
+        if conflict and not unmerged:
+            # GitHub reports a conflict this merge does not show: not the generated file's; a person looks.
+            return not_this()
+        if unmerged:
+            # Main's version for now; the generator rewrites it below.
+            _git(wt, "checkout", "--theirs", "--", rel)
+            _git(wt, "add", "--", rel)
+        merged = _git(wt, "show", f":{rel}")
+        variables = {"python": sys.executable, "main": main_sha, "head": head}
+        what = " ".join(gen["write"][-1][1:])
+
+        if user:
+            # A trial commit of the merge (no ref, never pushed) for the check account's clone.
+            trial = _git(wt, *ident, "commit-tree", _git(wt, "write-tree").strip(), "-p", head, "-p", main_sha, "-m", "trial merge").strip()
+            check_root = check_clone(wt, trial)
+            try:
+                ok, detail = _run_commands(gen["write"], str(check_root / "repo"), gen.get("env"), variables, o["check_timeout_s"], user)
+                text = read_generated(check_root / "repo", rel) if ok else None
+            except (OSError, ValueError) as exc:
+                ok, detail = False, f"the file it wrote was refused: {exc}"
+            finally:
+                pr_review._rmtree(check_root)
+        else:
+            ok, detail = _run_commands(gen["write"], wt, gen.get("env"), variables, o["check_timeout_s"])
+            text = None
+            if ok:
+                other = {p for p in _git(wt, "diff", "--name-only", "-z").split("\0") + _git(wt, "ls-files", "--others", "--exclude-standard", "-z").split("\0")
+                         if p} - {rel}
+                if other:
+                    ok, detail = False, f"it changed other files too ({', '.join(sorted(other))})"
+                else:
+                    text = (Path(wt) / rel).read_text(encoding="utf-8")
+        if not ok:
+            return self._stop(ctx, head, f"updating the branch with main: regenerating {rel} ({what}) failed ({detail}); nothing was pushed")
+        try:
+            json.loads(text)
+        except ValueError as exc:
+            return self._stop(ctx, head, f"updating the branch with main: the regenerated {rel} is not JSON ({exc}); nothing was pushed")
+        if not conflict and text == merged:
+            # Not stale on the merge with main: CI failed for something else.
+            return not_this()
+        target = Path(wt)
+        for part in Path(rel).parts[:-1]:
+            target = target / part
+            if not stat.S_ISDIR(os.lstat(target).st_mode):
+                return self._stop(ctx, head, f"updating the branch with main: {rel} is not under a plain folder; nothing was pushed")
+        (Path(wt) / rel).unlink(missing_ok=True)  # never through a symlink the branch holds
+        (Path(wt) / rel).write_text(text, encoding="utf-8")
+        _git(wt, "add", "--", rel)
+        added = "\n".join(line[1:] for line in _git(wt, "diff", "--cached", "--no-color", "--no-ext-diff", "--no-textconv", "--unified=0", head, "--", rel).splitlines()
+                          if line.startswith("+") and not line.startswith("+++"))
+        if any(p.search(added) for p in pr_review.SECRET_PATTERNS):
+            return self._stop(ctx, head, f"updating the branch with main: the regenerated {rel} holds text in a credential format; nothing was pushed")
+        why = (f"{rel} was the only file in a merge conflict with main" if conflict else
+               f"CI failed and {rel} was stale on the merge with main")
+        message = "\n".join([
+            f"Merge main into {pull['head_ref']}; regenerate {rel}", "",
+            f"{rel} is generated ({what}), and {why}. The loop merged main ({main_sha[:7]}) into the branch, "
+            f"regenerated the file and checked it ({' '.join(gen['check'][-1][1:])}). A branch update, not a fix round.", "",
+            f"Co-Authored-By: {lc['co_author']}",
+        ])
+        _git(wt, *ident, "commit", "--quiet", "--no-verify", "-m", message)
+        new = _git(wt, "rev-parse", "HEAD").strip()
+        if _git(wt, "rev-list", "--parents", "-n", "1", new).split()[1:] != [head, main_sha]:
+            return self._stop(ctx, head, "updating the branch with main: the commit is not a merge of the head and main; nothing was pushed")
+        check_root = check_clone(wt, new) if user else None
+        try:
+            ok, detail = _run_commands(gen["check"], str(check_root / "repo") if check_root else wt, gen.get("env"),
+                                       {**variables, "head": new}, o["check_timeout_s"], user)
+        finally:
+            if check_root:
+                pr_review._rmtree(check_root)
+        if not ok:
+            return self._stop(ctx, head, f"updating the branch with main: the check of the regenerated {rel} failed ({detail}); nothing was pushed")
+
+        if o["github"].get_pull(n)["head_sha"] != head:
+            self._log(ctx, "head-moved")
+            return {"outcome": "head-moved"}
+        try:
+            # A plain push: the merge has the head as its first parent, and GitHub refuses it if the branch moved.
+            _git(wt, "push", "--quiet", "--no-verify", "origin", f"{new}:refs/heads/{pull['head_ref']}")
+        except subprocess.CalledProcessError as exc:
+            if o["github"].get_pull(n)["head_sha"] != head:
+                self._log(ctx, "head-moved")
+                return {"outcome": "head-moved"}
+            if transient_error(exc):
+                return self._retry(ctx, head, f"updating the branch with main: the push failed ({(exc.stderr or str(exc)).strip()[:300]})")
+            return self._stop(ctx, head, f"updating the branch with main: the push failed ({(exc.stderr or str(exc)).strip()[:300]})")
+        if st["last_fix_head"] == head:
+            # The update carries a fix round's head on: CI failing on it still stops.
+            st["last_fix_head"] = new
+        st["generated_tried"] = None
+        st["generated_update"] = {"from": head, "to": new, "main": main_sha, "at": _now()}
+        _save_state(self.state_dir, self.cfg["repo"], st)
+        self._log(ctx, "updated", how="generated", new_head=new)
+        self._say(n, "\n".join([
+            f"<!-- {MARK} updated from={head} to={new} -->", "### Automated loop: branch updated", "",
+            f"`{rel}` is generated (`{what}`), and {why}. The loop merged `main` (`{main_sha[:7]}`) into the branch "
+            f"(a merge commit on `{head[:7]}`), regenerated the file{' as the check account' if user else ''}, "
+            f"checked it (`{' '.join(gen['check'][-1][1:])}`: pass) and pushed `{new[:7]}`.", "",
+            "This is a branch update, not a fix round. The new head is reviewed from scratch.",
+        ]))
+        return {"outcome": "updated", "sha": new}
 
     def _merge_path(self, ctx, r):
         cfg, o, n, st, head = self.cfg, self.o, ctx["n"], ctx["st"], ctx["head"]
@@ -1195,22 +1424,25 @@ class Loop:
                 del st["seen"][f["fingerprint"]]
         _save_state(self.state_dir, self.cfg["repo"], st)
 
-    def _fix_round_in(self, ctx, pull, findings, slot):
-        cfg, lc, o, n, st, head = self.cfg, self.lc, self.o, ctx["n"], ctx["st"], ctx["head"]
-        rnd = st["rounds"] + 1
-        root = o["repo_root"]
-        _git(root, "fetch", "--no-tags", "--quiet", "origin", f"+refs/heads/{cfg['base_branch']}:refs/pr-review/main",
+    def _fetch_head(self, n, head) -> str | None:
+        """Fetches main and the pull request's head; main's sha, or None when the head moved."""
+        root = self.o["repo_root"]
+        _git(root, "fetch", "--no-tags", "--quiet", "origin", f"+refs/heads/{self.cfg['base_branch']}:refs/pr-review/main",
              f"+refs/pull/{n}/head:refs/pr-loop/pr-{n}")
         if _git(root, "rev-parse", f"refs/pr-loop/pr-{n}").strip() != head:
-            self._log(ctx, "head-moved")
-            return {"outcome": "head-moved"}
-        main_sha = _git(root, "rev-parse", "refs/pr-review/main").strip()
+            return None
+        return _git(root, "rev-parse", "refs/pr-review/main").strip()
+
+    @contextmanager
+    def _head_worktree(self, n, head, kind):
+        """A clean detached worktree of `head` in the state folder, removed after."""
+        root = self.o["repo_root"]
         (self.state_dir / "worktrees").mkdir(parents=True, exist_ok=True)
-        wt_root = Path(tempfile.mkdtemp(prefix=f"{cfg['repo'].replace('/', '_')}-{n}-fix-", dir=self.state_dir / "worktrees"))
+        wt_root = Path(tempfile.mkdtemp(prefix=f"{self.cfg['repo'].replace('/', '_')}-{n}-{kind}-", dir=self.state_dir / "worktrees"))
         wt = str(wt_root / "head")
         _git(root, "worktree", "add", "--quiet", "--detach", wt, head)
         try:
-            return self._fix_in(ctx, pull, findings, rnd, wt, main_sha, slot)
+            yield wt
         finally:
             try:
                 _git(root, "worktree", "remove", "--force", wt)
@@ -1221,6 +1453,16 @@ class Loop:
                 _git(root, "worktree", "prune")
             except subprocess.CalledProcessError:
                 pass
+
+    def _fix_round_in(self, ctx, pull, findings, slot):
+        n, st, head = ctx["n"], ctx["st"], ctx["head"]
+        rnd = st["rounds"] + 1
+        main_sha = self._fetch_head(n, head)
+        if main_sha is None:
+            self._log(ctx, "head-moved")
+            return {"outcome": "head-moved"}
+        with self._head_worktree(n, head, "fix") as wt:
+            return self._fix_in(ctx, pull, findings, rnd, wt, main_sha, slot)
 
     def _fix_in(self, ctx, pull, findings, rnd, wt, main_sha, slot):
         cfg, lc, o, n, st, head = self.cfg, self.lc, self.o, ctx["n"], ctx["st"], ctx["head"]

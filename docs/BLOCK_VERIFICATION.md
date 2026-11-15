@@ -137,8 +137,8 @@ a proof seat that ships its own `counter.v` and is refused.
 ## Not in this milestone
 
 - Refinements that need new skill ids: scoreboard or reference model
-  (`reference_modelling`) and cocotb (`python_verification`). Each is one
-  feature and one `Refinement` when its skill lands.
+  (`reference_modelling`) and cocotb (`python_verification`). M83 added both
+  once the skills landed (section "Scoreboard and cocotb (M83)").
 - The coverage and equivalence gates came with their tools: `coverage.read`
   through verilator_coverage (M70, `docs/COVERAGE_READ.md`) and
   `equivalence.run` through eqy (M69, `docs/EQUIVALENCE.md`).
@@ -150,10 +150,64 @@ a proof seat that ships its own `counter.v` and is refused.
   `dv/formal-credit-counter` and `dv/prove-deep-counter`, and W2-E3 the
   random-stimulus testbench `dv/random-crc` and the equivalence seat's
   `dv/equiv-gray`; W2-E4 added the two debug cases `debug/root-cause-uart-tx`
-  and `debug/triage-three-bugs`; W2-E5 the coverage seat's `dv/coverage-irq-ctrl`:
+  and `debug/triage-three-bugs`; W2-E5 the coverage seat's `dv/coverage-irq-ctrl`; W2-E6 the two M83
+  refinements' cases, `dv/scoreboard-mac` and `dv/cocotb-crc`:
   `docs/EVAL_SKILLS_MUST_FAIL.md`),
   and the department cut. The role ids
   in the tests are today's; a cut that renames them moves the tests with it.
 
 No count other than workflows changes (`scripts/status.py --write`): no new
 skill, tool, unit or principle.
+
+## Scoreboard and cocotb (M83)
+
+Wave 2 item W2-R3, for the eval cases `dv/scoreboard-mac` and `dv/cocotb-crc`
+(W2-E6). M68 left two refinements for when their skills landed;
+`reference_modelling` and `python_verification` are in the catalog now. Both
+refine the testbench task the M68 way: a feature with no routing context of
+its own, read by this workflow alone.
+
+| Feature (words) | Effect on the testbench task |
+|---|---|
+| `scoreboard` ("scoreboard", "scoreboarding", "reference model") | adds `reference_modelling`; the HDL testbench gate stays |
+| `cocotb` ("cocotb", "Python testbench", "Python tests") | adds `python_verification`; the gate runs the seat's Python tests through cocotb instead |
+
+**The cocotb gate (gate semantics).** A cocotb pass is cocotb's count of
+passing Python tests, not an HDL testbench's verdict line, and M72 lets it meet
+only a requirement that fixes `backend: cocotb` (`docs/COCOTB.md`, "Gates").
+So the testbench stage carries two gates, one per request:
+
+- the HDL gate as before (`simulator.run` over the approved RTL and the seat's
+  testbench, top from the testbench), now with the plan-time clause "the
+  request does not ask for cocotb";
+- the cocotb gate, only when it does: `simulator.run` with `backend: cocotb`
+  fixed, `sources` the approved RTL, `cocotb` the seat's testbench files (the
+  Python test modules), and `top` the entry the seat's first testbench file
+  declares (the design's top module the tests drive).
+
+A plan-time clause on features has no words in the prompt and is decided when
+the work is planned, so for every request without the word the HDL gate, the
+task and both rendered prompts are what they were. A Python file under the HDL
+gate, or an HDL testbench under the cocotb gate, does not pass, and the work
+does not reach review (tested through the eval harness).
+
+| Request | Task skills | Owner | Reviewer |
+|---|---|---|---|
+| Verify the existing MAC block RTL with a scoreboard against a reference model. | directed_testing, reference_modelling | simulation testbench senior | simulation tech lead |
+| Verify the existing CRC block RTL with a cocotb testbench (or with Python tests). | directed_testing, python_verification | simulation testbench senior | simulation tech lead |
+
+Every testbench word at once (SystemVerilog, constrained-random, scoreboard,
+cocotb) stays within the domain cap for the owner and the reviewer.
+
+**What does not change.** `tests/test_dv_testbench_refinements.py` builds the
+organization without this change (no new features, the testbench stage as
+before) and compares, for every request of the golden suite, M68's tests and
+every eval case: each task (the HDL gate's one new clause aside) and each
+stage's rendered work and review prompt. The applicability golden file
+(`tests/fixtures/applicability/plans.txt`) does not change: the new requests
+are tested in their own file, so the department-cut comparison (M77) over the
+golden requests is untouched. No eval case, prompt fixture, harness file, tool
+or count changes.
+
+**Not here.** The knowledge documents of the two skills. The two eval cases came
+after (W2-E6, `docs/EVAL_SKILLS_MUST_FAIL.md`).

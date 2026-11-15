@@ -124,6 +124,16 @@ A new tool, `formal.cover`, with one backend, `symbiyosys-cover`:
   engines, the depth, and therefore every assumption are exactly the proof's.
   The cover bound is the proof's `depth`, so "reached" means "reached within
   the bound the proof's base case explores".
+* **The assertions are checked on every cover trace** (ip#278). The copy also
+  sets `cover_assert on`, replacing any `cover_assert` the seat's setup has.
+  SymbiYosys's default is off, and then it removes every assertion from a
+  cover run, so a cover reached only by breaking an assertion counted as
+  reached. With it on, an assertion broken on a cover trace fails the run, and
+  the summary names that assertion: a state reached by breaking a property is
+  not a legal scenario. SymbiYosys stops searching there, so the covers it
+  lists as unreached after it are not counted as vacuity. A setup whose proof
+  passes breaks no assertion on any trace within its depth, so this changes
+  nothing for it.
 * **Covers live in the RTL** under `` `ifdef FORMAL ``, beside the assertions,
   as the properties do. The seat writes them; the reviewer reads them.
 * **Pass means:** SymbiYosys reports `DONE (PASS)` with exit status 0, at least

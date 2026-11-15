@@ -73,6 +73,7 @@ M66 adds the RTL pilot's refinements (APB, AXI, FIFO, skid buffer, timer,
 GPIO) on the same stage: `docs/RTL_PILOT_ROUTING.md`.
 M68 uses refinements on `block-verification`'s testbench and proof stages:
 `docs/BLOCK_VERIFICATION.md`.
+M83 adds two on its testbench stage (scoreboard, cocotb): the same document, section "Scoreboard and cocotb (M83)".
 M71 lets a refinement also add outputs and dependencies on earlier stages
 (regression investigation's repro testbenches over the handed-over RTL):
 `docs/REPRO_GATES.md`.

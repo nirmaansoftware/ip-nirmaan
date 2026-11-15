@@ -365,8 +365,10 @@ def test_both_keys_pass_and_any_other_merge_error_stops_with_needs_founder(repo)
     assert not any("Auto-merge is on" in c or "### Automated loop: ready" in c for c in r.comments())
 
 
-def test_a_base_branch_modified_merge_error_retries_and_is_not_a_stop(repo):
-    r = repo(gh={"merge_error": "GraphQL: Base branch was modified. Review and try the merge again. (mergePullRequest)"})
+@pytest.mark.parametrize("error", ["GraphQL: Base branch was modified. Review and try the merge again. (mergePullRequest)",
+                                   "GraphQL: Pull request is in unstable status (enablePullRequestAutoMerge)"])
+def test_a_base_branch_modified_or_unstable_status_merge_error_retries_and_is_not_a_stop(repo, error):
+    r = repo(gh={"merge_error": error})
     assert r.tick() == ["retry"]
     assert not r.labeled(), "never needs-founder for a race with main"
     assert len(r.github.merges) == 1
@@ -831,6 +833,7 @@ def test_transient_error_classification():
     assert not t(subprocess.CalledProcessError(1, ["gh"], stderr="GraphQL: Pull request is not mergeable"))
     assert t(subprocess.CalledProcessError(1, ["gh"], stderr="GraphQL: Base branch was modified. Review and try the merge again. (mergePullRequest)"))
     assert not t(subprocess.CalledProcessError(1, ["gh"], stderr="GraphQL: Head branch was modified. Review and try the merge again."))
+    assert t(subprocess.CalledProcessError(1, ["gh"], stderr="GraphQL: Pull request is in unstable status (enablePullRequestAutoMerge)"))
     assert not t(ValueError("x")) and not t(FileNotFoundError("gh"))
     assert pr_loop._transient_call("timeout", "claude did not answer within 1200s")
     assert pr_loop._transient_call("error", "API Error: 503 Service Unavailable")
@@ -1219,6 +1222,170 @@ def test_no_post_never_updates_a_branch(repo):
     r.advance_main()
     r.tick(post="none")
     assert r.github.updates == [] and r.origin_head() == r.first_head
+
+
+# --- The generated levels file ------------------------------------------------------
+
+# A stand-in for scripts/capability_levels.py: one JSON line per record file.
+GEN = """import json, pathlib, sys
+text = json.dumps({p.name: p.read_text().strip() for p in sorted(pathlib.Path("records").glob("*.txt"))}, indent=1, sort_keys=True) + "\\n"
+out = pathlib.Path("capability/levels.json")
+if "--check" in sys.argv:
+    sys.exit(0 if out.is_file() and out.read_text() == text else 1)
+out.parent.mkdir(exist_ok=True)
+out.write_text(text)
+"""
+LEVELS = "capability/levels.json"
+GENERATED = {**LOOP, "generated": {"path": LEVELS, "write": [["{python}", "gen.py", "--write"]],
+                                   "check": [["{python}", "gen.py", "--check"]]}}
+
+
+def regen(w):
+    subprocess.run([sys.executable, "gen.py", "--write"], cwd=w, check=True)
+
+
+def levels_repo(repo, feature: dict, main: dict, main_regen=True):
+    """Main and the branch each add files under records/ (and anything else in the
+    dicts) after a base with the generator and its file; each regenerates it,
+    main only with main_regen."""
+    r = repo()
+    w = r.work
+    sh(w, "checkout", "-q", "main")
+    write(w, "gen.py", GEN)
+    write(w, "records/m.txt", "m\n")
+    regen(w)
+    sh(w, "add", "-A")
+    sh(w, "commit", "-qm", "base with the generated file")
+    sh(w, "push", "-q", "origin", "main")
+    sh(w, "checkout", "-qB", "feature", "main")
+    for rel, text in feature.items():
+        write(w, rel, text)
+    regen(w)
+    sh(w, "add", "-A")
+    sh(w, "commit", "-qm", "the branch adds a record")
+    sh(w, "push", "-qf", "origin", "feature")  # the test's own origin: the fixture's first head is replaced
+    r.first_head = sh(w, "rev-parse", "HEAD")
+    sh(w, "checkout", "-q", "main")
+    for rel, text in main.items():
+        write(w, rel, text)
+    if main_regen:
+        regen(w)
+    sh(w, "add", "-A")
+    sh(w, "commit", "-qm", "main moves")
+    sh(w, "push", "-q", "origin", "main")
+    return r
+
+
+def conflicts(r) -> list[str]:
+    proc = subprocess.run(["git", "merge-tree", "--write-tree", "--name-only", "refs/heads/feature", "refs/heads/main"],
+                          cwd=r.origin, capture_output=True, text=True)
+    assert proc.returncode == 1, "the branch really conflicts with main"
+    return sorted(set(proc.stdout.split("\n\n")[0].splitlines()[1:]))
+
+
+def expected_levels(r, sha):
+    """What the generator gives for the tree at sha."""
+    names = sh(r.origin, "ls-tree", "--name-only", sha, "records/").split()
+    return json.dumps({Path(p).name: sh(r.origin, "show", f"{sha}:{p}").strip() for p in sorted(names)}, indent=1, sort_keys=True) + "\n"
+
+
+def test_a_conflict_only_in_the_generated_levels_file_is_resolved_by_the_loop_as_a_branch_update(repo):
+    r = levels_repo(repo, {"records/z.txt": "z\n"}, {"records/a.txt": "a\n"})
+    assert conflicts(r) == [LEVELS]
+    r.github.mergeable = False
+    assert r.tick(loop=GENERATED) == ["updated"]
+    new = r.origin_head()
+    assert is_merge_of(r, new, r.first_head), "main merged into the branch: a merge commit, not a rebase"
+    assert sh(r.origin, "show", f"{new}:{LEVELS}") == expected_levels(r, new).rstrip("\n")
+    assert '"a.txt"' in expected_levels(r, new) and '"z.txt"' in expected_levels(r, new)
+    assert sh(r.origin, "diff", "--name-only", f"{new}^1", new).split() == [LEVELS, "records/a.txt"], "only main's changes and the file"
+    body = r.comments()[-1]
+    assert "Automated loop: branch updated" in body and "only file in a merge conflict with main" in body
+    assert "not a fix round" in body
+    assert not r.labeled() and r.calls() == [], "no stop, no review of the stale head, no fixer"
+    assert r.st()["rounds"] == 0 and r.st()["last_fix_head"] is None and r.st()["stopped"] is None
+    assert [(l["event"], l.get("how")) for l in r.log() if l.get("kind") == "loop"] == [("updated", "generated")]
+    r.github.mergeable = True
+    assert r.tick(loop=GENERATED) == ["auto-merge"]
+    assert r.github.merges[0][-1] == new
+
+
+def test_a_conflict_that_includes_another_file_still_stops(repo):
+    r = levels_repo(repo, {"records/z.txt": "z\n", "src/app.py": "by the branch\n"}, {"records/a.txt": "a\n", "src/app.py": "by main\n"})
+    assert conflicts(r) == [LEVELS, "src/app.py"]
+    r.github.mergeable = False
+    assert r.tick(loop=GENERATED) == ["stopped"]
+    assert r.labeled() and r.origin_head() == r.first_head
+    assert "merge conflict with main (capability/levels.json, src/app.py)" in r.comments()[-1]
+    assert r.calls() == []
+
+
+def test_a_conflict_github_reports_that_the_merge_does_not_show_still_stops(repo):
+    r = levels_repo(repo, {"records/z.txt": "z\n"}, {"src/other.py": "main moved\n"})
+    r.github.mergeable = False
+    assert r.tick(loop=GENERATED) == ["stopped"]
+    assert r.labeled() and r.origin_head() == r.first_head and "merge conflict with main" in r.comments()[-1]
+
+
+def test_ci_failing_with_the_generated_file_stale_on_the_merge_with_main_is_updated_by_the_loop(repo):
+    # Main adds a record the branch's regenerated file does not hold; git merges the two cleanly.
+    r = levels_repo(repo, {"records/z.txt": "z\n"}, {"records/a.txt": "a\n"}, main_regen=False)
+    r.github.ci = lambda sha: "failure" if sha == r.first_head else "success"
+    assert r.tick(loop=GENERATED) == ["updated"]
+    new = r.origin_head()
+    assert is_merge_of(r, new, r.first_head)
+    assert sh(r.origin, "show", f"{new}:{LEVELS}") == expected_levels(r, new).rstrip("\n") and '"a.txt"' in expected_levels(r, new)
+    assert "CI failed and capability/levels.json was stale on the merge with main" in r.comments()[-1]
+    assert not r.labeled() and r.st()["rounds"] == 0
+    assert r.tick(loop=GENERATED) == ["auto-merge"]
+
+
+def test_ci_failing_for_another_reason_keeps_todays_behaviour_and_is_tried_once_per_head(repo, monkeypatch):
+    r = levels_repo(repo, {"records/z.txt": "z\n"}, {"src/other.py": "main moved\n"})
+    r.github.ci = lambda sha: "failure"
+    assert r.tick(loop=GENERATED) == ["skip"]
+    assert r.origin_head() == r.first_head and r.github.posts == []
+    assert r.st()["generated_tried"]["head"] == r.first_head
+    made = []
+    monkeypatch.setattr(pr_loop.Loop, "_head_worktree", lambda *a: made.append(a))
+    assert r.tick(loop=GENERATED) == ["skip"] and made == [], "the same head and main are not tried again"
+
+
+def test_in_github_actions_the_generator_and_its_check_run_as_the_check_account_in_a_clone(repo, monkeypatch):
+    r = levels_repo(repo, {"records/z.txt": "z\n"}, {"records/a.txt": "a\n"})
+    r.github.mergeable = False
+    seen, real = [], pr_loop._run_commands
+
+    def as_check_account(commands, cwd, extra_env, variables, timeout_s, user=None):
+        seen.append((commands[-1][-1], cwd, user))
+        return real(commands, cwd, extra_env, variables, timeout_s)  # sudo is not here; the place and the account are checked
+    monkeypatch.setattr(pr_loop, "_run_commands", as_check_account)
+    assert r.tick(loop=GENERATED, check_user="loopcheck") == ["updated"]
+    assert [(what, user) for what, _, user in seen] == [("--write", "loopcheck"), ("--check", "loopcheck")]
+    assert all(Path(cwd).parent.name.startswith("loop-check-") and str(r.state) not in cwd for _, cwd, _ in seen), \
+        "in a check clone, never the loop's worktree"
+    assert sh(r.origin, "show", f"{r.origin_head()}:{LEVELS}") == expected_levels(r, r.origin_head()).rstrip("\n")
+
+
+def test_the_generated_file_is_taken_back_only_as_a_plain_regular_file(tmp_path):
+    (tmp_path / "capability").mkdir()
+    (tmp_path / "capability" / "levels.json").write_text("{}\n")
+    assert pr_loop.read_generated(tmp_path, LEVELS) == "{}\n"
+    with pytest.raises(ValueError):
+        pr_loop.read_generated(tmp_path, LEVELS, limit=2)
+    secret = tmp_path / "secret"
+    secret.write_text("token\n")
+    (tmp_path / "capability" / "levels.json").unlink()
+    (tmp_path / "capability" / "levels.json").symlink_to(secret)
+    with pytest.raises(OSError):
+        pr_loop.read_generated(tmp_path, LEVELS)
+    other = tmp_path / "other"
+    other.mkdir()
+    (other / "levels.json").write_text("{}\n")
+    shutil.rmtree(tmp_path / "capability")
+    (tmp_path / "capability").symlink_to(other)
+    with pytest.raises(ValueError):
+        pr_loop.read_generated(tmp_path, LEVELS)
 
 
 # --- Every pull request each pass ---------------------------------------------------

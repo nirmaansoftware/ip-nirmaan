@@ -1,0 +1,86 @@
+{
+  "format": "nirmaan.knowledge-check",
+  "skill": "reference_modelling",
+  "knowledge_document": "knowledge/verification/reference_modelling.md",
+  "document_sha256": "sha256:f0df94004a36619a0a47bee2fe2b519cd090a5d6178ece3971f965f5ed9c3968",
+  "writer": "IP-W2-K3 session (wave 2 knowledge batch, plan row W2-K3, 2026-11-15)",
+  "checker": "IP-W2-C3 session (wave 2 check records, plan row W2-C3, 2026-11-15)",
+  "sources_read": [
+    "[OTDV] lowRISC, OpenTitan Design Verification Methodology (Apache 2.0): the whole page, https://opentitan.org/book/doc/contributing/dv/methodology/index.html",
+    "[OTUart] lowRISC, OpenTitan UART DV document (Apache 2.0): the whole page text (the testplan table the page loads by script is not in the text read), https://opentitan.org/book/hw/ip/uart/dv/index.html",
+    "[CocoFirst] cocotb documentation, First Steps: the whole page (version 2.1.0.dev3 text), https://docs.cocotb.org/en/stable/first_steps.html",
+    "Repository code at the lines cited in gate_claims, and the simulation-gate and must-fail tests run locally"
+  ],
+  "result": "every claim tagged with a source was found in that source, every line marked inference is a fair reading of the source it names or the document's own reasoning, and every sentence about the platform's simulation gate and scorer matches the code at the lines cited in gate_claims",
+  "notes": [
+    "[OTDV]: IP-level environments model the DUT's behaviour more closely than the stimulus and check in the scoreboard or SVAs independently of the stimulus; cryptographic IPs use open source C libraries as reference models through DPI-C; stress tests carry knobs on the constraints so the scoreboard is made robust step by step; error and illegal stimulus is handled by directed tests because a scoreboard for unconstrained error traffic is costly; code coverage shows code ran, functional coverage needs cover points the designer writes. Each is on the page as the document says.",
+    "[OTUart]: the scoreboard is described as the end-to-end checker, with analysis FIFOs for the TL address and data channels and for UART TX and RX items taken from the interface agents. The document's 'rather than reading the design's internals' is a fair reading of end-to-end checking from monitored items, not a sentence on the page.",
+    "Imprecision weighed and accepted: 'rather than reading the design's internals [OTUart]' is a contrast the page implies (items come from interface-agent monitors through analysis FIFOs) and does not state. It restates what the cited mechanism is, adds no new fact, and is fair; reported to the owner.",
+    "[CocoFirst]: expected_value kept in the test and incremented on each edge, compared after RisingEdge plus Timer(1 ns), and the wrap at 255 failing the naive model: as the document says.",
+    "Gate: the testbench-only rule is eda.py:451-497 (the file declaring the top module is the one file exempt), the nonce verdict line and the missing, repeated, failed-check and zero-check rules are eda_parsers.py:129 and 188-200, the must-fail scorer is scorers.py:135-224, and the cocotb rule that a test asserting nothing passes is eda_parsers.py:625 and 655. tests/test_cocotb_runner.py and tests/test_dv_scoreboard_cocotb_evals.py ran with cocotb 2.1.0 (46 passed).",
+    "No statement in the document names a tool or option that has no gate behind it."
+  ],
+  "gate_claims": [
+    {
+      "claim": "the testbench is the file that declares the run's top module",
+      "evidence": "src/nirmaan/integrations/eda.py:473"
+    },
+    {
+      "claim": "only the testbench may end the simulation, read arguments or open a file; another file that does is refused before anything runs",
+      "evidence": "src/nirmaan/integrations/eda.py:476"
+    },
+    {
+      "claim": "the simulation job is refused when a design file uses a testbench-only construct, with nothing simulated",
+      "evidence": "src/nirmaan/integrations/eda.py:457"
+    },
+    {
+      "claim": "the testbench-only constructs are the listed system tasks, plusargs, file opening, system calls and DPI",
+      "evidence": "src/nirmaan/integrations/eda.py:451"
+    },
+    {
+      "claim": "the testbench must print one verdict line NIRMAAN-SIM <nonce> <n> passed, <m> failed",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:129"
+    },
+    {
+      "claim": "the run fails when the verdict is missing",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:191"
+    },
+    {
+      "claim": "the run fails when the verdict is repeated",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:193"
+    },
+    {
+      "claim": "the run fails when the verdict reports a failed check",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:197"
+    },
+    {
+      "claim": "the run fails when the verdict reports no passed check",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:199"
+    },
+    {
+      "claim": "a verdict line without this run's nonce is not counted (forged)",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:185"
+    },
+    {
+      "claim": "the must-fail scorer: the clean RTL must pass and each planted mutant must fail the same testbench",
+      "evidence": "src/nirmaan/evals/scorers.py:195"
+    },
+    {
+      "claim": "each mutant must fail on a run that executed; a refused run is not a mutant caught",
+      "evidence": "src/nirmaan/evals/scorers.py:214"
+    },
+    {
+      "claim": "a scoreboard written in Python for cocotb has the same limit: cocotb counts tests, so a test with no assertion passes",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:625"
+    },
+    {
+      "claim": "cocotb requires at least one passing test",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:655"
+    },
+    {
+      "claim": "the sentence that a passing run does not say the model is right: the gate has no view of the model (no check on the model exists in the parser)",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:203"
+    }
+  ],
+  "checked_at": "2026-11-15"
+}

@@ -32,14 +32,9 @@ MAP = ROOT / ".github" / "review-teams.yml"
 # they are checked like every other seat.
 PENDING_SEATS = {"dft-engineer", "physical-design-engineer", "firmware-engineer"}
 
-# Decision 12 of council/records/2026-11-14-pilot-retrospective.md lands the
-# knowledge/verification/** rule by itself, before the division's first
-# document, so documents are not held up. While no tracked file matches it,
-# its dead-glob and dead-rule findings are tolerated for this glob only; the
-# first document makes it a checked rule, and that pull request removes the
-# glob from this set (test_a_pending_glob_matches_no_tracked_file fails until
-# it does).
-PENDING_GLOBS = {"knowledge/verification/**"}
+# Globs whose files do not exist yet are tolerated here, for those globs only. Empty since the
+# first knowledge/verification document (W2-K1); the glob is checked like every other one.
+PENDING_GLOBS: set[str] = set()
 
 
 # --- The loader and ownership rules, shared with scripts/pr_review.py -------------
@@ -210,6 +205,7 @@ def test_only_the_three_approved_seats_may_wait_for_their_files(teams_map):
         ("src/nirmaan/company/evidence.py", {"eda-platform", "verification"}),
         ("src/nirmaan/evals/levels.py", {"verification"}),
         ("src/nirmaan/runtime/tools.py", {"eda-platform", "verification"}),
+        ("src/nirmaan/company/tools.py", {"eda-platform"}),
         ("src/nirmaan/runtime/loop.py", {"eda-platform"}),
         ("scripts/check_dashes.py", {"eda-platform", "verification"}),
         ("scripts/status.py", {"eda-platform", "product-site"}),
@@ -382,13 +378,16 @@ def test_a_level_rule_change_is_gate_semantics(teams_map, files, path):
 
 
 def _harness_files() -> list[str]:
-    """The harness settings, the level computation and every harness.CODE file,
-    from the repository root. Read from harness.CODE, so a file added there is
-    checked here without editing this test."""
+    """The harness settings, the level computation, the tool catalog and every
+    harness.CODE file, from the repository root. Read from harness.CODE, so a
+    file added there is checked here without editing this test. The tool
+    catalog is not a CODE file, but its parameter descriptions reach a seat's
+    work prompt as each gate's input contract (pilot retrospective,
+    fact 5), so a change to it is a harness change too."""
     from nirmaan.runtime import harness
 
     code = [(harness.SOURCE_ROOT / name).relative_to(ROOT).as_posix() for name in harness.CODE]
-    return ["src/nirmaan/runtime/harness.py", "src/nirmaan/evals/levels.py", *code]
+    return ["src/nirmaan/runtime/harness.py", "src/nirmaan/evals/levels.py", "src/nirmaan/company/tools.py", *code]
 
 
 @pytest.mark.parametrize("path", _harness_files())

@@ -1,0 +1,23 @@
+{
+  "cases": [
+    "rtl/sync-fifo"
+  ],
+  "command": "nirmaan eval run --runtime claude-code --trials 2 --seats rtl rtl/sync-fifo",
+  "finished_at": "2026-11-15T07:08:36.351577Z",
+  "format": "nirmaan.eval-run",
+  "head_sha": "a3b289dc5df7f0ec3da3110ebdd7dff60442218b",
+  "id": "2026-11-15-claude-code-claude-opus-5-5-4",
+  "knowledge": "on",
+  "model": "claude-opus-5-5",
+  "nirmaan_version": "1.25.0",
+  "purpose": "evidence",
+  "replay": false,
+  "runtime": "claude-code",
+  "seats": [
+    "rtl-implementation"
+  ],
+  "source": "",
+  "started_at": "2026-11-15T06:55:44.147871Z",
+  "trials": 2,
+  "version": 1
+}
