@@ -116,9 +116,11 @@ Read from the sources, one case each:
 - The project's coverage exclusions have a category for features the design
   does not support, and one for low risk items that a collective upfront
   decision, with software, architecture, design and DV agreement, leaves
-  unverified because of resources. The explanation is mandatory for both
-  [OTDV]. This is how the project records a feature with no verification
-  method (inference from that rule).
+  unverified because of resources. The page says the explanation is
+  mandatory for the low risk category and optional for the unsupported one,
+  though it also places a "mandatory" line after the unsupported category's
+  examples [OTDV]. This is how the project records a feature with no
+  verification method (inference from that rule).
 - A feature already covered in another bench is excluded as EXTERNAL, with a
   mandatory explanation [OTDV].
 - In the first review the DV document and testplan are reviewed with the
