@@ -144,13 +144,11 @@
     "code_coverage": {
       "knowledge": {
         "check_record": "capability/records/knowledge/code_coverage.json",
-        "counts": false,
+        "counts": true,
         "knowledge_document": "knowledge/verification/code_coverage.md",
-        "problems": [
-          "stale: the document changed after its check"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     },
     "control_logic_design": {
@@ -188,26 +186,22 @@
     },
     "directed_testing": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/directed_testing.json",
+        "counts": true,
         "knowledge_document": "knowledge/verification/directed_testing.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     },
     "formal_verification": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/formal_verification.json",
+        "counts": true,
         "knowledge_document": "knowledge/verification/formal_verification.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     },
     "fsm_design": {
@@ -388,7 +382,7 @@
     }
   },
   "totals": {
-    "knowledge": 11,
+    "knowledge": 14,
     "practised": 1,
     "proven": 0
   },

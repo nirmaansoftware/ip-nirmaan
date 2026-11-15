@@ -1,0 +1,131 @@
+{
+  "format": "nirmaan.knowledge-check",
+  "skill": "formal_verification",
+  "knowledge_document": "knowledge/verification/formal_verification.md",
+  "document_sha256": "sha256:d53900c615810d95478df367911041409a754e88390da6665c9ecf264b168963",
+  "writer": "IP-W2-K1 session (wave 2 knowledge batch, plan row W2-K1, 2026-11-15), corrected by IP-W2-K1B (ip#257)",
+  "checker": "IP-W2-C1B session (wave 2 check records, recheck after ip#257, 2026-11-15)",
+  "sources_read": [
+    "[SbyRef] SymbiYosys documentation, reference: the whole page, https://symbiyosys.readthedocs.io/en/latest/reference.html",
+    "[SbyQuick] SymbiYosys documentation, getting started: the whole page, https://symbiyosys.readthedocs.io/en/latest/quickstart.html",
+    "[ZFormal] Gisselquist, Introduction to formal verification (My first experience with Formal Methods), ZipCPU blog, 2017: the whole page, https://zipcpu.com/blog/2017/10/19/formal-intro.html",
+    "[OTDV] lowRISC, OpenTitan Design Verification Methodology (Apache 2.0): the whole page, https://opentitan.org/book/doc/contributing/dv/methodology/index.html",
+    "Repository code at the lines cited in gate_claims (worktree at origin/main e846c39, after ip#257), and runs of that code on this machine: Icarus Verilog, Verilator 5.052 and SymbiYosys, through the tests named in gate_claims and short scripts calling check_params, simulation_problem, coverage_problem and parse_simulation"
+  ],
+  "result": "the ip#253 finding is fixed: the document now says OpenTitan's DV document for a block also covers its formal property verification goals, which the [OTDV] page states ('It also covers FPV goals, if applicable'); the false claim that formal is tracked in the same testplan is gone. Every other source-tagged claim was found in its source, every line marked inference is a fair reading, and every gate sentence matches the code at the lines cited, with the imprecisions noted.",
+  "notes": [
+    "[OTDV]: the DV document 'expands the testplan inline, in addition to capturing the overall strategy ... It also covers FPV goals, if applicable' (the DV document section). The page also names Formal Property Verification as one of two key techniques, with JasperGold and VC Formal as FPV tools; the document's sentence says nothing beyond the DV-document point, so it is supported as worded. The testplan is described as tests plus functional coverage; the page does not put FPV in the testplan, and the document no longer says it does.",
+    "[SbyRef]: the mode option is mandatory with values bmc, prove, live, cover, prep, as the document says for the three it names; depth: 'bmc, cover: Only the specified number of cycles are considered. Default: 20' and 'prove: Depth for the k-induction performed by the smtbmc engine. Other engines ignore this option in prove mode. Default: 20' match the document's depth sentence. The document does not name live or prep; the gate's 'another mode' branch covers them.",
+    "[SbyQuick]: 'Reached cover statement at w_underfill in step 2' with a trace written to a VCD file, and the first-cycle $past reading X (so a past_nwen register is used), support the cover-trace and $past-guard sentences. The page says the default tasks are basic and cover and that bmc and cover run to depth 20 by default, as the reference does.",
+    "[ZFormal]: a bounded check can miss states reached later than its depth; induction can start from an unreachable state unless unreachable states are declared invalid; assume() is forced true and not proven; $past is undefined before the first clock and the author uses an f_past_valid register; the FIFO example asserts helper relations (f_fill == r_fill and the pointer relations) beside the interface properties. All on the page. The sentence 'bounds on counters' is the document's reading of those helper asserts; fair, inference-level.",
+    "A check beyond the claims: real runs of the formal gate pass on this machine (tests/test_nirmaan_gate_integrity.py::test_bmc_is_reported_as_bounded_and_does_not_meet_the_formal_gate runs sby in bmc and prove mode on the same false assertion: bmc passes with 'no counterexample within 3 steps' and proven 0, prove fails). tests/test_nirmaan_gates_rest.py cover and antecedent tests (14 selected) run real sby cover and pass.",
+    "Imprecision, not a failure: 'a setup with no cover at all fails too' is true of the setup's own covers: parse_sby_cover tests `if not reached`, and `reached` holds only the seat's own covers, not the derived antecedent covers (eda_parsers.py:432-434). A setup with assertions but no own cover therefore fails even when every derived antecedent cover is reached. The sentence does not say otherwise."
+  ],
+  "gate_claims": [
+    {
+      "claim": "SymbiYosys needs a mode in [options]; bmc, prove and cover are the modes named (source claim; the gate reads mode from the [options] section's mode line) (the code is at lines 621-630)",
+      "evidence": "src/nirmaan/integrations/eda.py:621"
+    },
+    {
+      "claim": "the gate reads the mode and depth the setup ran: sby_options takes the last mode line and a numeric depth line in [options] (the code is at lines 621-630)",
+      "evidence": "src/nirmaan/integrations/eda.py:621"
+    },
+    {
+      "claim": "the depth defaults to 20 in the gate as in sby",
+      "evidence": "src/nirmaan/integrations/eda.py:616"
+    },
+    {
+      "claim": "the options the run used are recorded for the parser before sby starts (the code is at lines 633-636)",
+      "evidence": "src/nirmaan/integrations/eda.py:633"
+    },
+    {
+      "claim": "prove passing reports every property proven (mode prove, or no mode seen, counts as proven) (the code is at lines 336-337, 346-347)",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:336"
+    },
+    {
+      "claim": "bmc passing reports no counterexample within the depth, 'a bounded model check, not a proof' (the code is at lines 338-340)",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:338"
+    },
+    {
+      "claim": "another mode reports a pass that is not a proof ('formal passed in <mode> mode (not a proof of the assertions)') (the code is at lines 341-342)",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:341"
+    },
+    {
+      "claim": "a bmc pass has proven 0 and a prove pass proven 1, and a requirement asking for a proof rejects the bmc pass (run locally, real sby)",
+      "evidence": "tests/test_nirmaan_gate_integrity.py::test_bmc_is_reported_as_bounded_and_does_not_meet_the_formal_gate"
+    },
+    {
+      "claim": "a bmc result must be reported with its depth (the gate puts the depth in the summary; the rule that a report must carry it is the document's inference) (the code is at lines 338-340)",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:338"
+    },
+    {
+      "claim": "formal.run takes a single-task setup; a setup that declares [tasks] is refused and nothing runs (the code is at lines 644-649)",
+      "evidence": "src/nirmaan/integrations/eda.py:644"
+    },
+    {
+      "claim": "formal.run's check is the tasks check and then the reads check, run before the job starts (the code is at lines 652-654, 813-814)",
+      "evidence": "src/nirmaan/integrations/eda.py:652"
+    },
+    {
+      "claim": "a setup with [tasks] is refused by both formal.run and formal.cover checks (tested)",
+      "evidence": "tests/test_knowledge_gate_claims.py::test_a_construct_the_gate_refuses_is_refused_by_it"
+    },
+    {
+      "claim": "when sources are given, each must be listed in the setup's [files], so the proof reads the very files submitted (the code is at lines 657-670)",
+      "evidence": "src/nirmaan/integrations/eda.py:657"
+    },
+    {
+      "claim": "formal.cover re-runs the same setup with mode cover: the copy differs only in 'mode cover' and absolute [files] names, so script, engines and depth are the proof's (the code is at lines 702-740)",
+      "evidence": "src/nirmaan/integrations/eda.py:702"
+    },
+    {
+      "claim": "formal.cover fails when a cover in the setup is never reached ('vacuous: n of m covers never reached under the assumptions') (the code is at lines 421-424)",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:421"
+    },
+    {
+      "claim": "a proof whose assumptions contradict each other still passes in prove mode while the cover check fails it (run locally with real sby)",
+      "evidence": "tests/test_nirmaan_gates_everywhere.py::test_a_vacuous_proof_is_refused_as_a_recorded_failed_run"
+    },
+    {
+      "claim": "formal.cover derives a cover for the antecedent of every assertion and fails with 'assertion never checked, its antecedent is never reached' when one is never reached (the code is at lines 386, 399, 425-428)",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:386"
+    },
+    {
+      "claim": "an unreachable antecedent fails the cover run as a recorded run (real sby)",
+      "evidence": "tests/test_nirmaan_gates_rest.py::test_an_unreachable_antecedent_fails_the_cover_run_as_a_recorded_run"
+    },
+    {
+      "claim": "a setup with no cover statement of its own fails ('no cover statement was reached') (the code is at lines 432-434)",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:432"
+    },
+    {
+      "claim": "an assertion whose antecedent cannot be derived refuses the cover check before it runs (the code is at lines 757-764)",
+      "evidence": "src/nirmaan/integrations/eda.py:757"
+    },
+    {
+      "claim": "that refusal is tested through the broker",
+      "evidence": "tests/test_nirmaan_gates_rest.py::test_an_assertion_whose_antecedent_cannot_be_derived_is_refused"
+    },
+    {
+      "claim": "the cover check is not a proof of the properties, it shows only that the assertions are exercised (the gate returns 'not vacuous', not proven; the framing is the document's inference) (the code is at lines 435-437)",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:435"
+    },
+    {
+      "claim": "run the proof against a mutant: a proof that still passes means a property is missing",
+      "evidence": "unverified"
+    },
+    {
+      "claim": "the tools are available, so the document opens with Practising; the skill holds formal.run and formal.cover, both AVAILABLE (the code is at lines 144-148)",
+      "evidence": "src/nirmaan/company/tools.py:144"
+    },
+    {
+      "claim": "the skill formal_verification holds formal.run and formal.cover",
+      "evidence": "src/nirmaan/company/skills.py:503"
+    },
+    {
+      "claim": "Practising opening rule (an AVAILABLE tool makes the tier Practising) (the code is at lines 51-54)",
+      "evidence": "src/nirmaan/org/knowledge_files.py:51"
+    }
+  ],
+  "checked_at": "2026-11-15"
+}
