@@ -138,6 +138,7 @@ new number. M1 to M42 are taken; see `docs/history/README.md`.
 | M83 | Block verification's testbench refinements for a scoreboard and for cocotb, and the cocotb testbench gate (W2-R3) | reserved |
 | M84 | Gate inputs that reach the host: the gates refuse seat input that would make a tool run a shell command or other code outside its run; code by design (cocotb, firmware) is not covered (security, found in #296) | reserved |
 | M85 | Gate reads: a seat's setup (an SBY `[files]` entry, a Yosys read, include folder or `-libdir`, an eqy read) names only files inside its run's folder or given to the run, so no file of the host reaches a log or a seat (security, the M84 follow-up) | reserved |
+| M86 | Failures feed the curriculum: every model-labelled failed live trial is answered by a knowledge note, a must-fail case or a written reason, checked by `scripts/failure_curriculum.py` (G5) | reserved |
 
 <!-- review:milestone-numbers:end -->
 

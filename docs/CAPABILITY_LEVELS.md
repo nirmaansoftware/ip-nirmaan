@@ -108,6 +108,30 @@ never count; a changed harness makes the group stale and a trial with no harness
 Knowledge needs a check record by a different session, with sources, naming the
 current document.
 
+## Failures feed the curriculum (G5, M86)
+
+A knowledge note should also come from what the model got wrong, not only from
+sources. The standing rule: every failed live evidence trial that the failure
+labeller (H2, the `causes.md` beside a run record) marks "model" yields one of
+three things, listed in the pull request that commits the batch:
+
+- a new knowledge note, written from open sources only, read in full and
+  checked like the K batches (`docs/KNOWLEDGE_FILES.md`);
+- a new must-fail case (`docs/EVAL_SKILLS_MUST_FAIL.md`);
+- a written reason why neither.
+
+The PR body carries a "Failure curriculum" section with one line per failure,
+`- <record folder>:trial-NN: note: <path>`, `must-fail: <path>` or `no: <reason>`
+(a reason is at least 20 characters; a path must exist in the repository).
+`python scripts/failure_curriculum.py --records <the batch's folders> --pr <n>`
+lists the model-labelled failures of the batch and the answers, and exits 1 when
+one is unanswered. With no answers it is a dry run: it lists and exits 0
+(`--require` makes it fail). Failed trials that no `causes.md` labels are listed
+too (`--strict` fails on them). Causes other than "model" (harness, case defect,
+plan limit) need no answer here; they have their own owners. The checker reads
+committed records only and changes nothing the harness fingerprint covers.
+Tests: `tests/test_failure_curriculum.py`.
+
 ## Not in this milestone
 
 No level appears on a public page (section 9.1). Proven waits for a record kind
