@@ -366,22 +366,50 @@ def test_m42_reads_records_alongside_the_synthetic_fixtures_labelled_by_source(n
     assert f"record:{path.name}" in out.output and "source file" in out.output
 
 
-# --- The scheduled workflow ----------------------------------------------------------------
+# --- The dispatched workflow (W2-L1-CI) -----------------------------------------------------
 
 WORKFLOW = REPO / ".github" / "workflows" / "live-eval.yml"
 GATE = REPO / "scripts" / "live_eval_gate.py"
 
 
-def test_the_scheduled_workflow_never_runs_on_pull_requests():
+def _workflow_jobs(text: str) -> dict[str, str]:
+    block = text.split("\njobs:\n", 1)[1]
+    parts = re.split(r"^  ([\w-]+):\s*$", block, flags=re.MULTILINE)
+    return dict(zip(parts[1::2], parts[2::2]))
+
+
+def test_the_workflow_runs_only_on_dispatch_and_only_main_gets_the_token():
     text = WORKFLOW.read_text()
-    triggers = text.split("\non:", 1)[1].split("\njobs:", 1)[0]
-    assert "schedule:" in triggers and "cron:" in triggers and "workflow_dispatch:" in triggers
-    assert "pull_request" not in triggers and "push" not in triggers
-    steps = text.split("steps:", 1)[1].split("\n      - ")[1:]
+    triggers = text.split("\non:", 1)[1].split("\npermissions:", 1)[0]
+    assert "workflow_dispatch:" in triggers
+    for never in ("schedule", "cron", "pull_request", "push"):
+        assert never not in triggers, never
+    for name in ("case", "trials", "knowledge", "purpose", "harness", "expected_harness", "replay"):
+        assert f"\n      {name}:\n" in triggers, name
+    jobs = _workflow_jobs(text)
+    assert set(jobs) == {"replay", "live-eval"}
+    # A replay calls no model: no environment, no secret, from any branch.
+    assert "environment:" not in jobs["replay"] and "secrets." not in jobs["replay"]
+    # Live trials: only from main, in the live-eval environment, whose secret only main may read.
+    live = jobs["live-eval"]
+    assert "if: ${{ !inputs.replay && github.ref == 'refs/heads/main' }}" in live
+    assert "\n    environment: live-eval\n" in live
+    steps = live.split("\n      - ")[1:]
+    with_secret = [s for s in steps if "secrets." in s]
+    assert [s.splitlines()[0] for s in with_secret] == ["name: Gate on the secret",
+                                                        "name: Run the trials one at a time"]
+    assert all(re.findall(r"secrets\.(\w+)", s) == ["CLAUDE_CODE_OAUTH_TOKEN"] for s in with_secret)
     gate = next(i for i, s in enumerate(steps) if "id: gate" in s)
-    assert "live_eval_gate.py" in steps[gate] and "secrets.CLAUDE_CODE_OAUTH_TOKEN" in steps[gate]
-    for step in steps[gate + 1:]:
-        assert "if: steps.gate.outputs.enabled == 'true'" in step, step.splitlines()[0]
+    assert "live_eval_gate.py" in steps[gate]
+    # Without the secret the job stops before anything is installed or spent.
+    assert "if: steps.gate.outputs.enabled != 'true'" in steps[gate + 1] and "exit 1" in steps[gate + 1]
+    order = [s.splitlines()[0] for s in steps]
+    assert order.index("name: Check the harness fingerprint") < order.index("name: Run the trials one at a time")
+    assert "live_eval_ci.py check --require-expected" in live and "live_eval_ci.py trials" in live
+    # Inputs reach a run only through the environment, never expanded into a shell command.
+    for job in jobs.values():
+        for run in re.findall(r"run: ([^\n]*(?:\n {10,}[^\n]*)*)", job):
+            assert "${{" not in run, run
 
 
 @pytest.mark.parametrize("secret,enabled", [(None, "false"), ("", "false"), ("sk-ant-oat-fake", "true")])
