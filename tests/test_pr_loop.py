@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
+import re
 import shutil
 import stat
 import subprocess
@@ -1547,6 +1549,125 @@ def test_the_fixers_test_check_runs_only_the_related_tests(repo, tmp_path):
     assert r.tick(loop=loop) == ["fixed"]
     assert json.loads(record.read_text()) == ["tests/test_app.py"]
     assert "test (1 related file): pass" in r.comments()[-1]
+
+
+# --- The test check in shards (R7-FIX5) --------------------------------------------
+# ip#249: the whole suite on one runner outgrew the 1200 s check timeout, so a person fixed
+# the findings by hand. The loop now runs CI's test shards (scripts/shards.py) at once.
+
+SHARDED = {"name": "test", "when": ["src/**", "tests/**"], "select": "related_tests", "shards": {"count": 3, "profile": "test"},
+           "run": [["{python}", "-m", "pytest", "-q", "-x", "-p", "no:cacheprovider"]]}
+
+
+def _shard_project(root: Path, tests: dict):
+    """This repository's shard plugin (the top of tests/conftest.py), scripts/shards.py and
+    its weights, and `tests`."""
+    conftest = (ROOT / "tests" / "conftest.py").read_text(encoding="utf-8")
+    write(root, "tests/conftest.py", conftest.split("@pytest.fixture(autouse=True")[0])
+    for name in ("scripts/shards.py", "scripts/shard_weights.json"):
+        write(root, name, (ROOT / name).read_text(encoding="utf-8"))
+    for name, body in tests.items():
+        write(root, name, body)
+
+
+def test_the_real_test_check_is_split_into_cis_three_shards():
+    check = next(c for c in pr_loop.LOOP["checks"] if c["name"] == "test")
+    assert check["shards"] == {"count": 3, "profile": "test"} and check["select"] == "related_tests"
+    ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    assert 'shard: [1, 2, 3]' in ci and '--shard "$SHARD/3" --shard-profile test' in ci, "the same split as CI's test job"
+    assert "test" in json.loads((ROOT / "scripts" / "shard_weights.json").read_text())
+
+
+def test_shard_commands_split_the_whole_suite_or_a_selection_of_several_files():
+    run = [["prep"], ["pytest", "-q"]]
+    cmds, n = pr_loop.shard_commands(run, None, {"count": 3, "profile": "test"})
+    assert n == 3 and cmds[0] == ["prep"]
+    assert cmds[1] == {"parallel": [["pytest", "-q", "--shard", f"{k}/3", "--shard-profile", "test", "--shard-manifest", f"{{out}}/shard-{k}.json"]
+                                    for k in (1, 2, 3)], "ok": [0, 5]}
+    assert cmds[2] == ["{python}", "scripts/shards.py", "{out}/shard-1.json", "{out}/shard-2.json", "{out}/shard-3.json"]
+    assert pr_loop.shard_commands(run, 2, {"count": 3, "profile": "test"})[1] == 2, "never a shard with no file"
+    assert pr_loop.shard_commands(run, 1, {"count": 3, "profile": "test"}) == (run, 1)
+    assert pr_loop.shard_commands(run, None, None) == (run, 1)
+
+
+def test_sharded_checks_pass_only_when_every_shard_passes_and_they_ran_the_whole_collection(tmp_path):
+    _shard_project(tmp_path, {f"tests/test_{x}.py": f"def test_{x}():\n    assert True\n" for x in "abcde"})
+    cmds, n = pr_loop.shard_commands(SHARDED["run"], None, SHARDED["shards"])
+    assert n == 3
+    assert pr_loop._run_commands(cmds, str(tmp_path), None, {"python": sys.executable}, 120) == (True, "")
+
+    write(tmp_path, "tests/test_c.py", "def test_c():\n    assert False, 'broken'\n")
+    ok, detail = pr_loop._run_commands(cmds, str(tmp_path), None, {"python": sys.executable}, 120)
+    assert not ok and "--shard" in detail and "1 failed" in detail
+
+
+def test_the_split_check_fails_when_the_shards_do_not_account_for_the_collection(tmp_path):
+    # Every shard passing is not enough: shards.py must find one complete split in their manifests.
+    # Two test files in three shards: shard 3 keeps none (pytest exit 5), which alone is no failure.
+    _shard_project(tmp_path, {"tests/test_a.py": "def test_a():\n    pass\n", "tests/test_b.py": "def test_b():\n    pass\n"})
+    cmds, _ = pr_loop.shard_commands(SHARDED["run"], None, SHARDED["shards"])
+    assert pr_loop._run_commands(cmds, str(tmp_path), None, {"python": sys.executable}, 120) == (True, "")
+    conftest = (tmp_path / "tests" / "conftest.py").read_text()
+    for broken, why in ((conftest.replace("if path:", "if False:"), "No such file"),
+                        (conftest.replace('record = shards.manifest(', 'record = shards.manifest([] if k == 2 else '), "disagree on collected")):
+        write(tmp_path, "tests/conftest.py", broken)
+        ok, detail = pr_loop._run_commands(cmds, str(tmp_path), None, {"python": sys.executable}, 120)
+        assert not ok and "scripts/shards.py" in detail and why in detail, detail
+
+
+def test_a_failing_shard_ends_the_check_at_once_and_kills_the_others(tmp_path):
+    pidfile = tmp_path / "hang.pid"
+    _shard_project(tmp_path, {
+        "tests/test_fails.py": "import time\n\ndef test_fails():\n    time.sleep(1)\n    assert False\n",
+        "tests/test_hangs.py": f"import os, time\n\ndef test_hangs():\n    open({str(pidfile)!r}, 'w').write(str(os.getpid()))\n    time.sleep(600)\n",
+    })
+    cmds, n = pr_loop.shard_commands(SHARDED["run"], 2, SHARDED["shards"])
+    cmds[0]["parallel"] = [[*a, "tests/test_fails.py", "tests/test_hangs.py"] for a in cmds[0]["parallel"]]
+    started = time.monotonic()
+    ok, detail = pr_loop._run_commands(cmds, str(tmp_path), None, {"python": sys.executable}, 300)
+    assert not ok and "exit 1" in detail and time.monotonic() - started < 120
+    pid = int(pidfile.read_text())
+    with pytest.raises(ProcessLookupError):
+        os.kill(pid, 0)
+
+
+def test_a_shard_over_the_timeout_fails_the_check_and_is_killed(tmp_path):
+    pidfile = tmp_path / "hang.pid"
+    _shard_project(tmp_path, {
+        "tests/test_quick.py": "def test_quick():\n    pass\n",
+        "tests/test_hangs.py": f"import os, time\n\ndef test_hangs():\n    open({str(pidfile)!r}, 'w').write(str(os.getpid()))\n    time.sleep(600)\n",
+    })
+    cmds, _ = pr_loop.shard_commands(SHARDED["run"], 2, SHARDED["shards"])
+    started = time.monotonic()
+    ok, detail = pr_loop._run_commands(cmds, str(tmp_path), None, {"python": sys.executable}, 8)
+    assert not ok and "timed out after 8 seconds" in detail and time.monotonic() - started < 60
+    with pytest.raises(ProcessLookupError):
+        os.kill(int(pidfile.read_text()), 0)
+
+
+def _sharded_repo(repo, broken: bool):
+    def change(w):
+        write(w, "src/app.py", "one\ntwo changed\nthree\n")
+        _shard_project(w, {f"tests/test_{x}.py": f"def test_{x}():\n    pass\n" for x in "abcd"})
+        if broken:
+            write(w, "tests/test_c.py", "def test_c():\n    assert False\n")
+    # src/unmapped.py: no test uses it, so the whole suite runs.
+    return repo(reviews=[fail("Line two lost its test"), {"verdict": "pass"}], fixes=[{"edits": {"src/unmapped.py": "x = 1\n"}}], change=change)
+
+
+def test_a_fix_runs_the_whole_suite_as_three_shards_at_once_and_pushes_when_all_pass(repo):
+    r = _sharded_repo(repo, broken=False)
+    assert r.tick(loop={**LOOP, "checks": [SHARDED]}) == ["fixed"]
+    assert r.origin_head() != r.first_head
+    assert re.search(r"test \(whole suite, 3 shards at once\): pass \(\d+ s\)", r.comments()[-1])
+
+
+def test_a_fix_is_never_pushed_when_a_shard_fails(repo):
+    r = _sharded_repo(repo, broken=True)
+    assert r.tick(loop={**LOOP, "checks": [SHARDED]}) == ["stopped"]
+    assert r.origin_head() == r.first_head, "nothing pushed"
+    assert "the local check test (whole suite, 3 shards at once) failed on the fix" in r.comments()[-1]
+    assert "nothing was pushed" in r.comments()[-1]
 
 
 # --- The plist -------------------------------------------------------------------
