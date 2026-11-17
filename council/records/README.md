@@ -13,3 +13,4 @@ changes, the gates with their owner seats, open questions, and dissent. Process:
 - [2026-11-14: RTL pilot retrospective (P3-R)](2026-11-14-pilot-retrospective.md)
 - [2026-11-15: the lint and coding standards practices (P3-O1)](2026-11-15-p3-o1-lint-and-standards.md)
 - [2026-11-15: the top-up's re-run trials at the one read](2026-11-15-pilot-topup-reruns.md)
+- [2026-11-17: whole-flow cases (G3)](2026-11-17-g3-whole-flow-cases.md)
