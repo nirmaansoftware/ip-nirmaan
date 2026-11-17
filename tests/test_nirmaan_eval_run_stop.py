@@ -132,3 +132,30 @@ def test_the_rule_reads_structure_and_matches_the_committed_limit_failures():
         update={"error": None, "text": "{}"}))})
     assert not no_model_answer(answered)
     assert not no_model_answer(first.model_copy(update={"answers": ()}))  # no call made: nothing to stop on
+
+
+@pytest.mark.parametrize("k", [1, 2])
+def test_a_no_answer_on_attempt_one_stops_an_attempts_3_run_before_attempts_two_and_three(fixed_clock, tmp_path,
+                                                                                          monkeypatch, k):
+    """RR5 with ``--harness attempts-3`` (M74): the stop is judged on the trial, so a trial whose first attempt
+    gets no model answer ends the run there; the other two attempts of that trial are not used, and no later
+    trial starts."""
+    n = 3
+    bindir = tmp_path / "bin"
+    bindir.mkdir()
+    script, calls = _claude(bindir, limit_from=k)
+    monkeypatch.setenv("NIRMAAN_CLAUDE_CODE", str(script))
+    monkeypatch.delenv("NIRMAAN_CLAUDE_CODE_MODEL", raising=False)
+    out = tmp_path / "results"
+    ran = CliRunner().invoke(app, ["eval", "run", "--runtime", "claude-code", "--trials", str(n), "--seats", "spec",
+                                   "--harness", "attempts-3", "--cases", str(EVALS), "--repo", str(REPO),
+                                   "--out", str(out)])
+    assert ran.exit_code == STOPPED_EXIT == 3, ran.output
+    assert int(calls.read_text()) == k  # one call per trial, none for attempts 2 and 3 of the stopped trial
+    [path] = list(out.iterdir())
+    record = load_record(path)
+    assert record.manifest.harness_variant == "attempts-3"
+    assert [t.trial for t in record.trials] == list(range(1, k + 1))
+    last = record.trials[-1]
+    assert no_model_answer(last) and not last.result.passed and len(last.answers) == 1 and last.result.attempts == 1
+    assert f"run stopped: {SPEC_CASE} trial {k} got no model answer" in ran.output

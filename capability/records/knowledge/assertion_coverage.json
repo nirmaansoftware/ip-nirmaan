@@ -2,17 +2,17 @@
   "format": "nirmaan.knowledge-check",
   "skill": "assertion_coverage",
   "knowledge_document": "knowledge/verification/assertion_coverage.md",
-  "document_sha256": "sha256:c439b69b02af8a94c71b3325f5d9c2d787ed5300550d5cdf2198aa114673d384",
+  "document_sha256": "sha256:70b48b5a7c390c66b3dd5864daaf618191a6626c63f6c79888ac2a5576dcd034",
   "writer": "IP-W2-K3 session (wave 2 knowledge batch, plan row W2-K3, 2026-11-15), corrected by ip#274",
-  "checker": "IP-W2-C3C session (wave 2 check records, gate claims rechecked after ip#283, 2026-11-15)",
+  "checker": "K-ASSERTCOV-CHECK session (independent checker for ip#315, 2026-11-17)",
   "sources_read": [
     "[SbyVerilog] SymbiYosys documentation, Formal extensions to Verilog: the whole page, https://yosyshq.readthedocs.io/projects/sby/en/latest/verilog.html",
     "[SbyRef] SymbiYosys documentation, Reference for .sby file format: the whole page, https://yosyshq.readthedocs.io/projects/sby/en/latest/reference.html",
     "[SbyVerific] SymbiYosys documentation, SystemVerilog, VHDL, SVA: the whole page, https://yosyshq.readthedocs.io/projects/sby/en/latest/verific.html",
     "[OTDV] lowRISC, OpenTitan Design Verification Methodology (Apache 2.0): the whole page, all 460 lines of the saved text, https://opentitan.org/book/doc/contributing/dv/methodology/index.html",
-    "Repository code at the lines cited in gate_claims (worktree at origin/main 638a823, after ip#283), and runs of that code on this machine with sby, yosys and yices: the related tests named below, including the three added by ip#283"
+    "Repository code at the lines cited in gate_claims (branch k-assertcov-ranges of ip#315, on main b5b7967), and the related tests named in notes, rerun on this branch"
   ],
-  "result": "pass: the document is unchanged (same sha). After ip#283 every gate claim was re-read against the code and the line citations were refreshed. The one claim that changed meaning, about cover_assert, now matches the code: the cover copy forces cover_assert on and a cover reached only by breaking an assertion fails. The document says nothing false about the gate; the earlier source findings stand.",
+  "result": "pass: the document text is read in full again; ip#315 changed only the gate line ranges. Every cited range now matches the branch code (eda.py:707-749 _sby_cover, 752-773 _sby_cover_check, eda_antecedents.py:1-32 and 23-27, eda_parsers.py:369-449 parse_sby_cover, tools.py:148-153 formal.cover, scorers.py:135-143 and 200-205). All four sources were re-fetched and read to the end on 2026-11-17 and still say what the document attributes to them. The earlier source notes stand.",
   "notes": [
     "[OTDV] 'coverage addresses an incomplete test plan': the page says (Do we need both types of coverage) that code coverage will highlight if your testplan is incomplete, and that coverage holes are closed by updating the specification, augmenting the testplan or removing unreachable logic. The document says 'coverage' where the page says 'code coverage'; a fair reading in a line about full coverage, and the next sentence is marked as the document's inference, which the page does not say.",
     "[OTDV] cover property coverage: the page lists it as assertion coverage using SVA, observing events or series of events, with the valid and ready handshake of the TL UL bus as the example, reaching procedures and variables not visible on output pins, and 'an assertion precondition counts as a cover point'. All as the document says. Code coverage not showing behaviour was checked and 100 percent of either metric not being a verdict: the AND gate example and the second AND gate coverage hole on the page.",
@@ -22,12 +22,13 @@
     "Changed by ip#283, run locally (replaces the earlier note, which described the behaviour before it): the cover copy now writes 'mode cover' and 'cover_assert on' into [options] and drops the seat's own mode and cover_assert lines (eda.py:733-735), so a cover reachable only by breaking an assertion FAILS whether the proof's .sby leaves cover_assert out or sets it off, and the summary reads 'cover run failed: 1 assertion broken on a cover trace' (parse_sby_cover, eda_parsers.py:428-431, ahead of the unreached-cover check at 432). A legally reached cover still passes (tests/test_nirmaan_gates_everywhere.py, 4 cover tests, real sby). The document's two bullets ('fails if an assertion would have to be broken', and the cover_assert default of off) are both true of the tools as the sources describe them; the document makes no claim about what this gate sets, so nothing in it is false after ip#283. Its gate ranges eda.py:702-740 and eda.py:743-764 have drifted by about five lines (the function now ends at 745 and the refusals run 747-768), which changes no reading.",
     "Gate range imprecisions after ip#283, none changing a reading: eda_parsers.py:369-458 as cited takes in the start of the eqy section; parse_sby_cover now ends at line 449. The cited eda_antecedents.py:1-33 and 19-30 are the module docstring (ends at line 32). The scorer range scorers.py:135-143 is the docstring of must_fail and 195-199 the clean run; the cover_tool run that follows it is at 200-205, before the mutant loop at 207.",
     "The cover check's 'no antecedent is counted as always checked' maps to the docstring 'checked on every cycle: it has no antecedent, and is counted as unguarded' (eda_antecedents.py:17-18); the run with an assertion with no implication and no seat cover failed with 'no cover statement was reached', as the document's 'a setup with no cover at all fails' says (derived covers are counted apart from the seat's own, eda_parsers.py:398-418, and the no-cover test at 443 reads only the seat's own).",
-    "Run locally: tests/test_nirmaan_sta_antecedents.py and tests/test_nirmaan_gates_everywhere.py (the -k antecedent, vacuous, macro, named_property and cover selection, with real sby), tests/test_knowledge_gate_claims.py, tests/test_eval_cover_bounds.py and tests/test_nirmaan_eval_must_fail.py: all pass at 638a823 (PYTHONPATH=src, as the shared venv's editable install points at the main clone). The eight-setup script gave: no cover and no assertion fails; assertion with no implication and no seat cover fails; unreachable seat cover under assume(!en) fails ('1 of 1 cover never reached'); seat cover reached with an unreachable procedural antecedent fails ('assertion never checked'); cover and antecedent reached passes; a nested implication and a ## sequence are refused before sby runs with file, line and reason; a setup with no [options] and one with [tasks] are refused."
+    "Run locally: tests/test_nirmaan_sta_antecedents.py and tests/test_nirmaan_gates_everywhere.py (the -k antecedent, vacuous, macro, named_property and cover selection, with real sby), tests/test_knowledge_gate_claims.py, tests/test_eval_cover_bounds.py and tests/test_nirmaan_eval_must_fail.py: all pass at 638a823 (PYTHONPATH=src, as the shared venv's editable install points at the main clone). The eight-setup script gave: no cover and no assertion fails; assertion with no implication and no seat cover fails; unreachable seat cover under assume(!en) fails ('1 of 1 cover never reached'); seat cover reached with an unreachable procedural antecedent fails ('assertion never checked'); cover and antecedent reached passes; a nested implication and a ## sequence are refused before sby runs with file, line and reason; a setup with no [options] and one with [tasks] are refused.",
+    "ip#315 recheck 2026-11-17: gate claims refreshed to current lines. Evidence lines now: eda.py:707 (_sby_cover def), 738 (mode cover and cover_assert on written), 759 (tasks refusal), 761 (no options refusal), 771 (the cannot-derive refusal); eda_parsers.py:432 (unreached covers), 436 (unreached antecedents), 443 (no cover); tools.py:148; scorers.py:200. The antecedent-derivation refusal is invoked at eda.py:231 (backend.check). Source note: the failure-mode line 'assumptions that leave the interesting cases out, so every cover is unreachable while the proof passes [SbyVerilog]' joins two points the page makes separately (assumptions restrict the search space; a cover that cannot be reached fails); 'while the proof passes' is the document's own reading. It was accepted by the earlier check and is outside ip#315's scope; flagged for the next edit of the text."
   ],
   "gate_claims": [
     {
       "claim": "formal.cover takes the proof's own setup file and runs it in cover mode from a copy, so the script, engines, depth and assumptions are the proof's; the copy differs only in mode cover and absolute file names",
-      "evidence": "src/nirmaan/integrations/eda.py:702"
+      "evidence": "src/nirmaan/integrations/eda.py:707"
     },
     {
       "claim": "a cover for the antecedent of each assertion is written into a copy of the design file, and the run fails when one is never reached",
@@ -51,7 +52,7 @@
     },
     {
       "claim": "the refusal is made by _sby_cover_check from the derivation's underived list",
-      "evidence": "src/nirmaan/integrations/eda.py:764"
+      "evidence": "src/nirmaan/integrations/eda.py:771"
     },
     {
       "claim": "a setup with no cover at all fails (line 443), and one whose covers are all unreached fails (line 432) (run locally, setups A and C)",
@@ -71,19 +72,19 @@
     },
     {
       "claim": "the tool takes sby (required) and sources",
-      "evidence": "src/nirmaan/company/tools.py:147"
+      "evidence": "src/nirmaan/company/tools.py:148"
     },
     {
       "claim": "the cover check runs single-task setups only: a setup with [tasks] is refused",
-      "evidence": "src/nirmaan/integrations/eda.py:754"
+      "evidence": "src/nirmaan/integrations/eda.py:759"
     },
     {
       "claim": "a setup with no [options] section is refused",
-      "evidence": "src/nirmaan/integrations/eda.py:756"
+      "evidence": "src/nirmaan/integrations/eda.py:761"
     },
     {
       "claim": "the cover copy forces cover_assert on (and drops the seat's own mode and cover_assert lines), so a cover reached only by breaking an assertion FAILS whatever the proof's setup says, and the parser names the broken assertion first (run locally)",
-      "evidence": "src/nirmaan/integrations/eda.py:733"
+      "evidence": "src/nirmaan/integrations/eda.py:738"
     },
     {
       "claim": "the parser reports a broken assertion before an unreached cover: 'cover run failed: n assertion broken on a cover trace', since SymbiYosys stops searching there and the covers after it are not known to be unreachable",
@@ -118,5 +119,5 @@
       "evidence": "unverified"
     }
   ],
-  "checked_at": "2026-11-15"
+  "checked_at": "2026-11-17"
 }
