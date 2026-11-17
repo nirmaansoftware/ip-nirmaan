@@ -26,5 +26,12 @@ is touched, so the default, attempts-3 and tools-in-loop fingerprints are
 unchanged. A whole-flow case is in no default case set, and `record_run`
 refuses one until the whole-flow runner exists.
 
-**Not here.** The cases, fixed documents and judge controls, and the runner
-option (its `runner.py` dispatch waits for the H3 batch, gate WF1).
+**The cases (second pull request).** `flow/axil-timer` and
+`flow/axi4-lite-regs-driver` under `evals/flow/`, a new tagged timer
+requirements document, the register block's own copies of its requirements,
+driver interface and held-out test, a citation file per case, and the
+fixtures for the controls. A test settles fact 10: a document given through a
+case's `inputs` never reaches the requirements seat as text.
+
+**Not here.** The judge controls, and the runner option (its `runner.py`
+dispatch waits for the H3 batch, gate WF1).
