@@ -380,7 +380,14 @@ requests labelled `hold` or `needs-founder` are skipped.
    `src/`; for a committed eval record under `evals/results/`, the tests that
    read committed records (`RECORD_TESTS`); the whole suite when a changed file maps to no test or is
    `tests/conftest.py`; CI runs the whole suite either way) with no token in
-   the environment, checks the head has not moved,
+   the environment. The tests run as CI's `test` job splits them
+   (`pytest --shard K/3 --shard-profile test`, `scripts/shards.py`): the whole
+   suite, or related tests in more than one file, as up to three shards at
+   once, each within the check timeout, since the whole suite in one run
+   outgrew it (ip#249). A shard that fails or runs out of time fails the check
+   and the others are killed, and `scripts/shards.py` must find the shards ran
+   every collected test exactly once; otherwise nothing is pushed. The loop
+   then checks the head has not moved,
    pushes to the branch with `--force-with-lease` on the reviewed head, and
    posts "fix round N" listing the findings addressed.
 7. **Again from scratch.** The new head voids both keys, so the next step waits
