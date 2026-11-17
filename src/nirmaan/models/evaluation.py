@@ -15,6 +15,15 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_serializer
 
 
+def _omit_defaults(model: BaseModel, data: dict[str, Any], defaults: dict[str, Any]) -> dict[str, Any]:
+    """``data`` without each field in ``defaults`` that holds its default (M87: a single-seat case, manifest or
+    trial dumps byte for byte as it did before the whole-flow fields existed)."""
+    for name, default in defaults.items():
+        if getattr(model, name) == default:
+            data.pop(name, None)
+    return data
+
+
 class CaseFile(BaseModel):
     """A file a case supplies: a reference document or a reference answer's file."""
 
@@ -91,6 +100,16 @@ class EvalCase(BaseModel):
         default_factory=dict, description="Stage -> task input -> files the case supplies, comma-joined.")
     held_out: tuple[HeldOutCheck, ...] = ()
     attempts: int = Field(default=1, ge=1)
+    #: M87 (G3, council record 2026-11-17, decision 3): "whole" for a whole-flow case, where every work stage is
+    #: seated and only the final block is judged. Such a case credits no skill: it names none in ``skills``.
+    flow: Literal["seat", "whole"] = "seat"
+    #: M87: a whole-flow case's stage -> the skills that stage exercises. Listed, never credited.
+    exercised: dict[str, tuple[str, ...]] = Field(default_factory=dict)
+
+    @model_serializer(mode="wrap")
+    def _omit_seat_flow(self, handler):
+        """A single-seat case dumps as it did before M87, so no case digest changes (``case_digest``)."""
+        return _omit_defaults(self, handler(self), {"flow": "seat", "exercised": {}})
 
 
 class ScoreStatus(str, Enum):
@@ -211,6 +230,34 @@ class JudgeRun(BaseModel):
     params: dict[str, Any] = Field(default_factory=dict)
 
 
+class EvalStage(BaseModel):
+    """One seated stage of a whole-flow trial (M87, council record 2026-11-17, decision 3), as its record keeps it.
+
+    Defined with the label; the whole-flow runner fills it. A single-seat trial has none.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    stage: str
+    task: str
+    role: str | None = None
+    submitted_by: str | None = None
+    reviewed_by: str | None = None
+    approved_by: str | None = None
+    status: str = Field(description="The stage task's final status, or 'not run' when an earlier stage stopped "
+                                    "the flow.")
+    attempts: int = 0
+    gate_runs: tuple[GateRun, ...] = ()
+    #: Skill ID -> skill digest, for every skill the stage's seat was given, as it was given in the trial's arm.
+    skills: dict[str, str] = Field(default_factory=dict)
+    model: str | None = None
+    model_calls: int = 0
+    input_tokens: int = 0
+    output_tokens: int = 0
+    #: The pass-through note: the gate runs that passed, or "submitted, not checked"; never "reviewed".
+    note: str = ""
+
+
 class EvalTrial(BaseModel):
     """One case run once, as a run record keeps it (M45): the result, the raw answers, and the judge runs."""
 
@@ -236,6 +283,18 @@ class EvalTrial(BaseModel):
     result: EvalResult
     answers: tuple[RecordedAnswer, ...] = ()
     judge_runs: tuple[JudgeRun, ...] = ()
+    #: M87: "whole" for a whole-flow trial. Labelled whole here or in its manifest, it credits no skill and never
+    #: counts toward a level: it is listed under ``whole_flow`` (``nirmaan.evals.levels``).
+    flow: Literal["seat", "whole"] = "seat"
+    #: M87: a whole-flow trial's seated stages, in order.
+    stages: tuple[EvalStage, ...] = ()
+    #: M87: sha256 over the sorted (stage, skill, skill digest) of every skill each seated stage was given.
+    flow_digest: str | None = None
+
+    @model_serializer(mode="wrap")
+    def _omit_seat_flow(self, handler):
+        """A single-seat trial is written as it was before M87."""
+        return _omit_defaults(self, handler(self), {"flow": "seat", "stages": (), "flow_digest": None})
 
 
 class EvalRunManifest(BaseModel):
@@ -266,6 +325,13 @@ class EvalRunManifest(BaseModel):
     harness_variant: str = Field(default="default", min_length=1)
     #: M76: where a calibration run's problems came from (name, upstream commit, licence), else empty.
     source: str = ""
+    #: M87: "whole" for a run of whole-flow cases; every trial it writes says so too.
+    flow: Literal["seat", "whole"] = "seat"
+
+    @model_serializer(mode="wrap")
+    def _omit_seat_flow(self, handler):
+        """A single-seat run's manifest is written as it was before M87."""
+        return _omit_defaults(self, handler(self), {"flow": "seat"})
 
 
 class EvalProposalThresholds(BaseModel):

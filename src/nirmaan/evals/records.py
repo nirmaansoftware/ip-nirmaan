@@ -223,6 +223,10 @@ def record_run(org: Organization, cases: Sequence[EvalCase], runtime: str | None
     """
     if trials < 1:
         raise ValueError("trials must be at least 1")
+    whole = [c.id for c in cases if c.flow == "whole"]
+    if whole:  # M87: refused before anything is written or run
+        raise EvalError(f"{', '.join(whole)}: a whole-flow case needs the whole-flow runner, which is not merged "
+                        "yet; it never runs as a single-seat case (council record 2026-11-17, decision 3)")
     if purpose not in PURPOSES:
         raise ValueError(f"unknown purpose {purpose!r}; known: {', '.join(PURPOSES)}")
     variant_options(variant)  # an unknown name is refused before anything runs
@@ -334,6 +338,26 @@ def variant_labels(manifest: EvalRunManifest, trial: EvalTrial) -> tuple[str, ..
     return tuple(f"{where} ({value})" for where, value in (("the run manifest", manifest.harness_variant),
                                                            ("the trial", trial.harness_variant))
                  if value != "default")
+
+
+def flow_labels(manifest: EvalRunManifest, trial: EvalTrial) -> tuple[str, ...]:
+    """Where a trial is labelled as a whole-flow trial (M87): the manifest, the trial, or both.
+
+    Either label is enough, so editing one of them never turns a whole-flow trial into evidence of a skill.
+    The record's name is for a reader and is never read.
+    """
+    return tuple(where for where, value in (("the run manifest", manifest.flow), ("the trial", trial.flow))
+                 if value != "seat")
+
+
+def is_whole_flow(record: EvalRecord) -> bool:
+    """Whether a record holds whole-flow trials (M87), or :class:`EvalError` when it mixes them with single-seat
+    trials: each trial is one or the other, so one stray label never takes the other trials out of the levels."""
+    labelled = [bool(flow_labels(record.manifest, t)) for t in record.trials]
+    if any(labelled) and not all(labelled):
+        raise EvalError("the record mixes whole-flow trials with single-seat trials: each trial is one or the "
+                        "other, so the record is refused")
+    return any(labelled) or (not record.trials and record.manifest.flow != "seat")
 
 
 def trial_variant(manifest: EvalRunManifest, trial: EvalTrial) -> str:
