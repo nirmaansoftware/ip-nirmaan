@@ -69,3 +69,17 @@ def test_the_committed_records_parse_without_unplaced_rows():
     rows, problems = fc.labels(ROOT / "evals" / "results")
     assert problems == []
     assert any(f.is_model for f in rows)
+
+
+def test_a_row_with_a_missing_cause_or_record_is_skipped_not_a_crash(tmp_path):
+    results = _batch(tmp_path)
+    (results / "2026-01-01-x-m" / "causes.md").write_text(
+        "| Record | Trial | Outcome |\n|---|---|---|\n| this | 2 | no cause column |\n\n"
+        "| Trial | Cause |\n|---|---|\n| | model |\n")
+    rows, problems = fc.labels(results)
+    assert rows == [] and len(problems) == 1
+
+
+def test_main_survives_a_missing_module_docstring(tmp_path, monkeypatch):
+    monkeypatch.setattr(fc, "__doc__", None)
+    assert fc.main(["--results", str(_batch(tmp_path))]) == 0

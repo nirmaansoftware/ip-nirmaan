@@ -163,7 +163,7 @@ def run(results: Path, root: Path, records: list[str] | None, answers_text: str 
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    ap = argparse.ArgumentParser(description=(__doc__ or "").split("\n")[0])
     ap.add_argument("--results", type=Path, default=RESULTS)
     ap.add_argument("--records", nargs="*", help="record folder names of the batch (default: all)")
     ap.add_argument("--body-file", help="answers text; `-` is stdin")
