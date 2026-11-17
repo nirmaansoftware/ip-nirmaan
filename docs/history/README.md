@@ -136,6 +136,7 @@ The original preface of the section:
 - [M83-testbench-refinements](M83-testbench-refinements.md): Milestone 83 - Block verification's testbench refinements for a scoreboard and for cocotb, and the cocotb testbench gate
 - [M84-gate-inputs](M84-gate-inputs.md): Milestone 84 - Gate inputs that reach the host
 - [M85-gate-reads](M85-gate-reads.md): Milestone 85 - Gate reads of host files
+- [M86-failure-curriculum](M86-failure-curriculum.md): Milestone 86 - Failures feed the curriculum (G5)
 
 ## Before M43
 
