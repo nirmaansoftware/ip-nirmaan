@@ -119,15 +119,15 @@ def record_problem(record: Path, opts: dict, digest: str, cli: str) -> str | Non
     if not path.is_file():
         return f"no trial file {path.relative_to(record)} in {record.name}"
     trial = json.loads(path.read_text(encoding="utf-8"))
-    result = trial.get("result", {})
+    result = trial.get("result") or {}
     seen = {"purpose": trial.get("purpose"), "knowledge": trial.get("knowledge"),
             "harness variant": trial.get("harness_variant"), "harness": result.get("harness"),
             "Claude Code": result.get("cli")}
     wanted = {"purpose": opts["purpose"], "knowledge": opts["knowledge"], "harness variant": opts["harness"],
               "harness": digest, "Claude Code": cli}
     wrong = [f"{k} {seen[k]!r}, expected {wanted[k]!r}" for k in wanted if seen[k] != wanted[k]]
-    wrong += [f"an answer's harness {a.get('harness')!r}" for a in trial.get("answers", [])
-              if a.get("harness") != digest]
+    answers = [a if isinstance(a, dict) else {} for a in trial.get("answers") or []]
+    wrong += [f"an answer's harness {a.get('harness')!r}" for a in answers if a.get("harness") != digest]
     return "; ".join(wrong) or None
 
 
@@ -171,7 +171,8 @@ def run_trials(opts: dict, out: Path, digest: str, cli: str, run: Runner = strea
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    # Not the module docstring: ``python -OO`` strips it to None.
+    parser = argparse.ArgumentParser(description="Run live evaluation trials in GitHub Actions, one at a time.")
     sub = parser.add_subparsers(dest="mode", required=True)
     one = sub.add_parser("check", help="print the harness fingerprint and check it")
     one.add_argument("--require-expected", action="store_true")
@@ -181,7 +182,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         opts = options(dict(os.environ))
         cli = installed_cli()
-        digest = check(opts, require_expected=args.mode == "trials" or args.require_expected, cli=cli)
+        digest = check(opts, require_expected=args.mode == "trials" or getattr(args, "require_expected", False),
+                       cli=cli)
         if args.mode == "check":
             return 0
         return run_trials(opts, args.out, digest, cli or "")

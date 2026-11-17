@@ -387,7 +387,10 @@ def test_the_workflow_runs_only_on_dispatch_and_only_main_gets_the_token():
     for name in ("case", "trials", "knowledge", "purpose", "harness", "expected_harness", "replay"):
         assert f"\n      {name}:\n" in triggers, name
     jobs = _workflow_jobs(text)
-    assert set(jobs) == {"replay", "live-eval"}
+    assert set(jobs) == {"replay", "not-main", "live-eval"}
+    # Live trials asked for outside main fail loudly instead of running nothing.
+    assert "if: ${{ !inputs.replay && github.ref != 'refs/heads/main' }}" in jobs["not-main"]
+    assert "exit 1" in jobs["not-main"] and "secrets." not in jobs["not-main"]
     # A replay calls no model: no environment, no secret, from any branch.
     assert "environment:" not in jobs["replay"] and "secrets." not in jobs["replay"]
     # Live trials: only from main, in the live-eval environment, whose secret only main may read.

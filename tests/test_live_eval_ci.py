@@ -9,6 +9,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import stat
+import subprocess
 import sys
 from pathlib import Path
 
@@ -25,6 +26,7 @@ LIMIT = "You've hit your 5-hour limit"
 
 def _script():
     spec = importlib.util.spec_from_file_location("live_eval_ci", REPO / "scripts" / "live_eval_ci.py")
+    assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -129,7 +131,16 @@ def test_a_limit_or_an_odd_exit_stops_the_batch_and_nothing_is_run_again(tmp_pat
     assert "Trial 3 did not start" in str(stop.value)
 
 
+def test_the_script_runs_without_its_docstring():
+    # `python -OO` strips docstrings to None; the help text must not depend on one.
+    proc = subprocess.run([sys.executable, "-OO", str(REPO / "scripts" / "live_eval_ci.py"), "--help"],
+                          capture_output=True, text=True)
+    assert proc.returncode == 0, proc.stderr
+    assert "one at a time" in proc.stdout and "check" in proc.stdout and "trials" in proc.stdout
+
+
 @pytest.mark.parametrize("trial", [{"purpose": "calibration"}, {"knowledge": "off"}, {"harness_variant": "attempts-3"},
+                                   {"result": None}, {"answers": [None]},
                                    {"result": {"harness": "sha256:other", "cli": "2.1.325"}},
                                    {"result": {"harness": DIGEST, "cli": "2.1.283"}},
                                    {"answers": [{"harness": "sha256:other"}]}])
@@ -138,6 +149,13 @@ def test_a_record_that_is_not_the_trial_asked_for_stops_the_batch(tmp_path, tria
     with pytest.raises(ci.Stop) as stop:
         ci.run_trials(_opts(), tmp_path, DIGEST, "2.1.325", run)
     assert stop.value.code == ci.MISMATCH and len(calls) == 1
+
+
+def test_a_record_with_no_answers_is_read_by_its_result(tmp_path):
+    # A trial whose seat made no model call has no answers (null or empty); its result still names the harness.
+    for answers in (None, []):
+        run, calls = _runner([0], trial={"answers": answers})
+        assert ci.run_trials(_opts(TRIALS="1"), tmp_path / str(answers), DIGEST, "2.1.325", run) == 0
 
 
 def _claude(bindir: Path, limit_from: int) -> Path:

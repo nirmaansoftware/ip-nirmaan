@@ -85,6 +85,17 @@ jobs:
           name: live-eval-replay-${{ github.run_id }}
           path: ${{ runner.temp }}/replay
 
+  # Live trials from another branch: nothing would run, so the run fails and says why.
+  not-main:
+    if: ${{ !inputs.replay && github.ref != 'refs/heads/main' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Refuse live trials outside main
+        run: |
+          echo "::error::Live trials run only from main (the live-eval environment); dispatch from main, or set replay."
+          exit 1
+
   live-eval:
     if: ${{ !inputs.replay && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-24.04
