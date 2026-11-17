@@ -15,5 +15,3 @@ must-fail case or a written reason.
 in the PR body, and exits 1 when one is unanswered. It lists failed trials no
 `causes.md` labels. It touches nothing in `harness.CODE`, so no harness
 fingerprint changes.
-
-**Dry run on main.** Pilot and top-up records: see the PR text.
