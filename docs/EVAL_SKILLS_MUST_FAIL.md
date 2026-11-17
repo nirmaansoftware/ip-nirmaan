@@ -534,6 +534,22 @@ gate. The scorer's bounds are the second look: they let a coverage case be
 judged the same way when the testbench reaches it by another route, and the
 tests run the scorer directly on each (`tests/test_dv_coverage_irq_ctrl.py`).
 
+### A control for X after reset (G5)
+
+Two live trials of `rtl/apb-gpio` (one with knowledge documents, one without)
+failed the reference testbench on the same read, "DATA_IN after reset: got
+0xxxxxxxxx, expected 0x00000000", while the seat's own simulation passed. The
+records do not keep the seat's RTL, so the exact slip is not shown (the failure
+curriculum answer says so). The behaviour is checkable, and a case that
+changed `rtl/apb-gpio` would make its trials stale, so a new case
+`rtl/apb-gpio-reset` (`evals/rtl/apb_gpio_reset.json`) reuses that case's specs
+and reference and adds one control: the seat's testbench must fail
+`tests/fixtures/rtl/apb_gpio_reset/mutants/apb_gpio_sample_unreset.v`, whose
+input sample register has no reset and loads only under an unreset enable
+flop, so DATA_IN reads unknown. A testbench that compares with `!=` instead of
+`!==` lets it pass. The reference testbench fails it (63 of 1521 checks in
+the test). The case has no proof control.
+
 ## 5. The six shipped cases
 
 Six cases shipped when this milestone landed; P3-E2 added `rtl/axil-timer`

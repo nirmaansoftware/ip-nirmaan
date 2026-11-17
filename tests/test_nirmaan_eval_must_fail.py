@@ -317,6 +317,8 @@ SHIPPED_CONTROLS = {
     # P3-E2: two new cases, each with proofs at two parameter points.
     "rtl/axil-timer": {"simulator.run": [4], "formal.run": [4, 3]},
     "rtl/apb-gpio": {"simulator.run": [4], "formal.run": [4, 4]},
+    # G5: a control for X after reset, one seat-testbench check, no proof.
+    "rtl/apb-gpio-reset": {"simulator.run": [1]},
     # P3-E3: the skid buffer, with proofs at WIDTH 8 and 1.
     "rtl/skid-buffer": {"simulator.run": [4], "formal.run": [4, 4]},
 }
@@ -329,7 +331,8 @@ def test_a_shipped_case_controls_fail_every_mutant_for_a_real_reason(nirmaan_org
     case = next(c for c in load_cases(EVALS) if c.id == case_id)
     controls = [c for c in case.held_out if c.scorer == "must-fail"]
     listed = {m for c in controls for ms in c.mutants.values() for m in ms}
-    folder = REPO / next(iter(controls[0].mutants)).rsplit("/", 1)[0] / "mutants"
+    # The mutants folder: beside the case files, or (G5) the case's own folder when it borrows another case's RTL.
+    folder = REPO / next(iter(sorted(listed))).rsplit("/", 1)[0]
     # Every mutant in the case's folder is used by some control.
     assert listed == {str(f.relative_to(REPO)) for f in folder.glob("*.v")}
     trial = record_trial(nirmaan_org, case, ModelRuntime(replay_llm(case, REPO), runtime_id="replay"), replay=True,
@@ -568,6 +571,7 @@ def test_the_shipped_cases_name_the_skills_they_judge(nirmaan_org):
         "debug/triage-three-bugs": ("failure_triage",),
         "firmware/axi4-lite-driver": ("device_drivers",),
         "rtl/apb-gpio": ("rtl_design", "apb", "control_logic_design"),
+        "rtl/apb-gpio-reset": ("rtl_design", "apb", "control_logic_design"),
         "rtl/apb-regs": ("rtl_design", "apb"),
         "rtl/axi4-lite-regs": ("rtl_design", "axi"),
         "rtl/axil-timer": ("rtl_design", "axi", "fsm_design"),
