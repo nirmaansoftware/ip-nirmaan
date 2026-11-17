@@ -1,0 +1,71 @@
+{
+  "format": "nirmaan.flow-citations",
+  "case": "flow/axi4-lite-regs-driver",
+  "documents": [
+    "evals/flow/axi4_lite/requirements.md",
+    "evals/flow/axi4_lite/driver_api.md"
+  ],
+  "checks": {
+    "1. The reference testbench passes on the flow's RTL": [
+      "AXIL-MAP",
+      "AXIL-PORTS",
+      "AXIL-PARAMS",
+      "AXIL-ORDER",
+      "AXIL-WSTRB",
+      "AXIL-SLVERR",
+      "AXIL-LATENCY",
+      "AXIL-B2B",
+      "AXIL-RESET"
+    ],
+    "2. The flow's RTL implements the register map": [
+      "AXIL-MAP",
+      "AXIL-SLVERR"
+    ],
+    "3. The flow's testbench passes on the reference RTL and fails each register block mutant": [
+      "AXIL-MAP",
+      "AXIL-PORTS",
+      "AXIL-PARAMS",
+      "AXIL-ORDER",
+      "AXIL-WSTRB",
+      "AXIL-SLVERR",
+      "AXIL-LATENCY",
+      "AXIL-B2B",
+      "AXIL-RESET",
+      "AXIL-TEST-RANGE"
+    ],
+    "4. The flow's driver alone builds under strict C flags": [
+      "evals/flow/axi4_lite/driver_api.md: Files",
+      "evals/flow/axi4_lite/driver_api.md: `axi4_lite_regs_drv.h`"
+    ],
+    "5. The held-out test passes on the flow's driver against the flow's own RTL": [
+      "AXIL-MAP",
+      "AXIL-WSTRB",
+      "AXIL-SLVERR",
+      "evals/flow/axi4_lite/driver_api.md: Behavior"
+    ],
+    "6. The held-out test passes on the flow's driver against the reference RTL": [
+      "AXIL-MAP",
+      "AXIL-WSTRB",
+      "AXIL-SLVERR",
+      "evals/flow/axi4_lite/driver_api.md: Behavior"
+    ],
+    "7. The flow's driver and driver test pass on the reference RTL and fail the mutants visible through the driver": [
+      "AXIL-MAP",
+      "AXIL-WSTRB",
+      "AXIL-SLVERR",
+      "AXIL-TEST-RANGE",
+      "evals/flow/axi4_lite/driver_api.md: Behavior"
+    ]
+  },
+  "mutants": {
+    "tests/fixtures/rtl/axi4_lite/mutants/axi4_lite_regs_wstrb_ignored.v": [
+      "AXIL-WSTRB"
+    ],
+    "tests/fixtures/rtl/axi4_lite/mutants/axi4_lite_regs_okay_unmapped.v": [
+      "AXIL-SLVERR"
+    ],
+    "tests/fixtures/rtl/axi4_lite/mutants/axi4_lite_regs_b_before_w.v": [
+      "AXIL-ORDER"
+    ]
+  }
+}

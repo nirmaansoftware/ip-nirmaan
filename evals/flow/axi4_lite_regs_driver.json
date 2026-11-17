@@ -1,0 +1,191 @@
+{
+  "id": "flow/axi4-lite-regs-driver",
+  "request": "Create an AXI4-Lite register block and its driver.",
+  "seat": "firmware",
+  "flow": "whole",
+  "skills": [],
+  "exercised": {
+    "requirements": [
+      "requirements_engineering"
+    ],
+    "interface-spec": [
+      "interface_specification"
+    ],
+    "microarchitecture": [
+      "rtl_microarchitecture"
+    ],
+    "rtl-implementation": [
+      "axi",
+      "rtl_design"
+    ],
+    "firmware": [
+      "device_drivers"
+    ]
+  },
+  "expected_behavior": "Every work stage is seated: the requirements, the interface specification and the microarchitecture carry the customer's fixed requirements document forward, the RTL stage writes module axi4_lite_regs and its own testbench, and the firmware stage writes the driver to the customer's programming interface (evals/flow/axi4_lite/driver_api.md) from the flow's own approved interface specification and RTL, with no reference document handed to any seat. The trial is labelled driver interface fixed. Only the final block is judged, by all seven checks: the flow's RTL against the reference testbench and the register map; the flow's testbench against the reference RTL and its mutants; the flow's driver built alone, against the flow's own RTL and against the reference RTL; and the flow's driver test against the reference RTL and the mutants visible through the driver. A pass on the reference RTL alone is never a whole-flow pass. A whole-flow trial credits no skill and no level.",
+  "constraints": [
+    "The fixed requirements document and programming interface are the customer's input: no stage changes what they state.",
+    "The register map header is never trusted: the held-out test reads at the offsets the requirements document fixes.",
+    "Tests accept the whole allowed range ([req:AXIL-TEST-RANGE]): a response 1 or 2 cycles after its request.",
+    "Code-by-design: this case runs only in the CI job named in its batch plan, never on a person's machine."
+  ],
+  "known_failure_modes": [
+    "A requirement of the fixed document lost or changed before the RTL stage, so the RTL follows a different contract.",
+    "A flow testbench or driver test stricter than the contract (a fixed latency), which fails on the reference RTL: cause 'test stricter than the contract'.",
+    "A register offset copied wrong in the map header, so one index aliases another.",
+    "A bus error swallowed, last_response kept sticky, or write_byte sending every strobe bit.",
+    "A stage that never reaches review: the flow stops there and the trial is a failed trial."
+  ],
+  "inputs": {
+    "requirements": {
+      "customer_requirements": [
+        "evals/flow/axi4_lite/requirements.md",
+        "evals/flow/axi4_lite/driver_api.md"
+      ]
+    }
+  },
+  "held_out": [
+    {
+      "name": "1. The reference testbench passes on the flow's RTL",
+      "scorer": "held-out-run",
+      "tool": "simulator.run",
+      "seat_files": {
+        "sources": [
+          "rtl_source"
+        ]
+      },
+      "case_files": {
+        "sources": [
+          "tests/fixtures/rtl/axi4_lite/axi4_lite_regs_tb.v"
+        ]
+      },
+      "params": {
+        "top": "axi4_lite_regs_tb"
+      }
+    },
+    {
+      "name": "2. The flow's RTL implements the register map",
+      "scorer": "held-out-run",
+      "tool": "regmap.verify",
+      "seat_files": {
+        "rtl": [
+          "rtl_source"
+        ]
+      },
+      "case_files": {
+        "map": [
+          "tests/fixtures/rtl/axi4_lite/register_map.json"
+        ]
+      },
+      "params": {
+        "top": "axi4_lite_regs"
+      }
+    },
+    {
+      "name": "3. The flow's testbench passes on the reference RTL and fails each register block mutant",
+      "scorer": "must-fail",
+      "tool": "simulator.run",
+      "seat_files": {
+        "sources": [
+          "testbench"
+        ]
+      },
+      "seat_entries": {
+        "top": [
+          "testbench"
+        ]
+      },
+      "case_files": {
+        "sources": [
+          "tests/fixtures/rtl/axi4_lite/axi4_lite_regs.v"
+        ]
+      },
+      "mutants": {
+        "tests/fixtures/rtl/axi4_lite/axi4_lite_regs.v": [
+          "tests/fixtures/rtl/axi4_lite/mutants/axi4_lite_regs_wstrb_ignored.v",
+          "tests/fixtures/rtl/axi4_lite/mutants/axi4_lite_regs_okay_unmapped.v",
+          "tests/fixtures/rtl/axi4_lite/mutants/axi4_lite_regs_b_before_w.v"
+        ]
+      }
+    },
+    {
+      "name": "4. The flow's driver alone builds under strict C flags",
+      "scorer": "held-out-run",
+      "tool": "fw.build",
+      "seat_files": {
+        "sources": [
+          "driver"
+        ]
+      }
+    },
+    {
+      "name": "5. The held-out test passes on the flow's driver against the flow's own RTL",
+      "scorer": "held-out-run",
+      "tool": "fw.test",
+      "seat_files": {
+        "sources": [
+          "driver"
+        ],
+        "rtl": [
+          "rtl_source"
+        ]
+      },
+      "seat_entries": {
+        "top": [
+          "rtl_source"
+        ]
+      },
+      "case_files": {
+        "sources": [
+          "evals/flow/axi4_lite/held_out_test.c"
+        ]
+      }
+    },
+    {
+      "name": "6. The held-out test passes on the flow's driver against the reference RTL",
+      "scorer": "held-out-run",
+      "tool": "fw.test",
+      "seat_files": {
+        "sources": [
+          "driver"
+        ]
+      },
+      "case_files": {
+        "sources": [
+          "evals/flow/axi4_lite/held_out_test.c"
+        ],
+        "rtl": [
+          "tests/fixtures/rtl/axi4_lite/axi4_lite_regs.v"
+        ]
+      },
+      "params": {
+        "top": "axi4_lite_regs"
+      }
+    },
+    {
+      "name": "7. The flow's driver and driver test pass on the reference RTL and fail the mutants visible through the driver",
+      "scorer": "must-fail",
+      "tool": "fw.test",
+      "seat_files": {
+        "sources": [
+          "driver",
+          "driver_test"
+        ]
+      },
+      "case_files": {
+        "rtl": [
+          "tests/fixtures/rtl/axi4_lite/axi4_lite_regs.v"
+        ]
+      },
+      "params": {
+        "top": "axi4_lite_regs"
+      },
+      "mutants": {
+        "tests/fixtures/rtl/axi4_lite/axi4_lite_regs.v": [
+          "tests/fixtures/rtl/axi4_lite/mutants/axi4_lite_regs_wstrb_ignored.v",
+          "tests/fixtures/rtl/axi4_lite/mutants/axi4_lite_regs_okay_unmapped.v"
+        ]
+      }
+    }
+  ]
+}
