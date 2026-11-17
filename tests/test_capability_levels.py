@@ -377,6 +377,20 @@ def test_one_purpose_label_edited_back_to_evidence_never_turns_calibration_into_
     assert all(f"(labelled in {where})" in t["reason"] for t in levels["calibration"])
 
 
+def test_a_record_that_mixes_calibration_and_evidence_trials_is_refused_in_the_reason_the_manifest_gives(org,
+                                                                                                        tmp_path):
+    """Our own cases (no outside source) say "calibration" in the refusal, as in the listing, never "outside"."""
+    _case(tmp_path)
+    record = _record(org, tmp_path, [True] * 2, name="mixed", purpose="calibration")
+    for path in (trial_path(record, "rtl/fixture", 1), record / MANIFEST):  # one trial calibration, the rest evidence
+        path.write_text(path.read_text(encoding="utf-8").replace('"purpose":"calibration"', '"purpose":"evidence"'),
+                        encoding="utf-8")
+    levels = compute(org, tmp_path)
+    [why] = levels["refused_records"]
+    assert "the record mixes calibration trials with evidence trials" in why and "outside" not in why, why
+    assert levels["skills"] == {} and levels["calibration"] == []
+
+
 # --- Without knowledge (M67) -------------------------------------------------------------------
 
 

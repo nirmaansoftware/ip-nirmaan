@@ -64,28 +64,28 @@ backs it.
 
 - `formal.cover` takes the proof's own setup file and runs it in cover mode
   from a copy, so the script, engines, depth and assumptions are the proof's
-  (gate: src/nirmaan/integrations/eda.py:702-740).
+  (gate: src/nirmaan/integrations/eda.py:707-749).
 - It writes a cover for the antecedent of each assertion into a copy of the
   design file, and fails a run in which one is never reached. An assertion
   with no implication has no antecedent and is counted as always checked (gate:
-  src/nirmaan/integrations/eda_antecedents.py:1-33, eda_parsers.py:369-458).
+  src/nirmaan/integrations/eda_antecedents.py:1-32, eda_parsers.py:369-449).
 - It refuses to run, before anything is executed, when an antecedent cannot be
   derived. The forms listed there as not derived are a sequence operator, a
   nested implication, a named property inside an expression, a named sequence,
   an action block, a deferred assertion, and a macro that asserts and cannot be
   expanded. Write the property as a single top-level `|->` or `|=>`, or as a
-  procedural assertion, if it must pass this check (gate: eda_antecedents.py:19-30;
-  src/nirmaan/integrations/eda.py:743-764).
+  procedural assertion, if it must pass this check (gate: eda_antecedents.py:23-27;
+  src/nirmaan/integrations/eda.py:752-773).
 - A setup with no cover at all fails, as does one whose covers are all
-  unreached (gate: eda_parsers.py:369-458).
+  unreached (gate: eda_parsers.py:369-449).
 - The tool takes `sby` (required) and `sources`; it runs single-task setups
   only and refuses a setup that has no options section (gate:
-  src/nirmaan/company/tools.py:147-152; eda.py:743-764). A pass says the
+  src/nirmaan/company/tools.py:148-153; eda.py:752-773). A pass says the
   antecedents and covers are reachable under the assumptions; it does not say
   the properties hold (inference).
 - The must-fail scorer can require this check on the clean files before it
   tries any mutant, so every cover is reached and the pass is not vacuous
-  (gate: src/nirmaan/evals/scorers.py:135-143, 195-199).
+  (gate: src/nirmaan/evals/scorers.py:135-143, 200-205).
 
 ## What to do with a result
 
@@ -109,7 +109,7 @@ backs it.
 - A cover that is reached by breaking an assertion [SbyVerilog].
 - A property in a form the antecedent derivation cannot handle, so the cover
   check refuses and the author drops the cover check instead of rewriting the
-  property (gate: eda.py:743-764).
+  property (gate: eda.py:752-773).
 - Treating a reached cover as evidence that the property is correct.
 - Treating full coverage as a statement about the specification: coverage
   addresses an incomplete test plan [OTDV]. It does not show that the
@@ -119,8 +119,8 @@ backs it.
 ## How a result is checked
 
 - Read the summary line: it states whether every cover and antecedent was
-  reached, with counts (gate: eda_parsers.py:369-458).
+  reached, with counts (gate: eda_parsers.py:369-449).
 - Confirm the setup run is the proof's own, with the same files, depth and
-  assumptions (gate: eda.py:702-740).
+  assumptions (gate: eda.py:707-749).
 - For each unreached item, find the reason in the diagnostics, which carry the
-  file and line of the cover (gate: eda_parsers.py:369-458).
+  file and line of the cover (gate: eda_parsers.py:369-449).

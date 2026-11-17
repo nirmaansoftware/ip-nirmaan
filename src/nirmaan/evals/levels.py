@@ -209,7 +209,8 @@ def practised(org: Organization, repo: Path,
             labelled = [bool(calibration_labels(record.manifest, t)) for t in record.trials]
             if any(labelled) and not all(labelled):
                 # M76: one record never mixes the two; a stray label cannot take the other trials out of the levels
-                raise EvalError("the record mixes outside calibration trials with evidence trials: "
+                kind = "outside calibration" if record.manifest.source else "calibration"
+                raise EvalError(f"the record mixes {kind} trials with evidence trials: "
                                 "each trial is one or the other, so the record is refused")
             if any(labelled) or (not record.trials and record.manifest.purpose != "evidence"):
                 # M76: a calibration record is listed, never judged as evidence (a replay of it is no refusal)

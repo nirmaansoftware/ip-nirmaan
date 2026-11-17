@@ -285,14 +285,33 @@ def seat_texts(outcome) -> tuple[str, str]:
 
 
 @pytest.mark.parametrize("how", ["file", "folder"])
-@pytest.mark.parametrize("tool,name", [("formal.run", "symbiyosys"), ("simulator.run", "icarus"),
-                                       ("lint.run", "verilator-lint")])
+@pytest.mark.parametrize("tool,name", [("formal.run", "symbiyosys"), ("formal.cover", "symbiyosys-cover"),
+                                       ("simulator.run", "icarus"), ("lint.run", "verilator-lint")])
 def test_an_include_linked_out_of_the_run_is_refused_unread_and_quoted_nowhere(tmp_path, how, tool, name):
     sby = linked_include(tmp_path, how)
-    params = ({"sby": str(sby)} if tool == "formal.run" else {"sources": str(sby.parent / "m.v"), "top": "m"})
+    params = ({"sby": str(sby)} if tool.startswith("formal.") else {"sources": str(sby.parent / "m.v"), "top": "m"})
     outcome = execute(backend(tool, name), {**params, "workdir": str(tmp_path / "run")})
     refused(outcome, tmp_path, "includes", "leads outside the sandbox")
     assert "leak.vh" in outcome.summary and str(tmp_path / "host") not in outcome.summary, outcome.summary
+    for text in seat_texts(outcome):
+        assert SECRET not in text and "leads outside the sandbox" in text, text
+
+
+@pytest.mark.parametrize("how", ["file", "folder"])
+def test_an_equivalence_include_linked_out_of_the_run_is_refused_unread_and_quoted_nowhere(tmp_path, how):
+    folder = tmp_path / "host"
+    folder.mkdir()
+    (folder / "leak.vh").write_text(f"initial {WORD};\n", encoding="utf-8")
+    setup_path = eqy(tmp_path, "read_verilog -sv g.v")
+    (setup_path.parent / "g.v").write_text(INCLUDES.format(name="leak.vh" if how == "file" else "inc/leak.vh"),
+                                           encoding="utf-8")
+    if how == "file":
+        (setup_path.parent / "leak.vh").symlink_to(folder / "leak.vh")
+    else:
+        (setup_path.parent / "inc").symlink_to(folder)
+    outcome = execute(backend("equivalence.run", "eqy"), {"eqy": str(setup_path), "workdir": str(tmp_path / "run")})
+    refused(outcome, tmp_path, "includes", "leads outside the sandbox")
+    assert "leak.vh" in outcome.summary and str(folder) not in outcome.summary, outcome.summary
     for text in seat_texts(outcome):
         assert SECRET not in text and "leads outside the sandbox" in text, text
 
