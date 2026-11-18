@@ -90,7 +90,9 @@ def test_the_held_out_checks_are_as_ruled(cases):
     assert own.seat_files["rtl"] == ("rtl_source",) and own.seat_entries == {"top": ("rtl_source",)}
     assert "top" not in own.params and "rtl" not in own.case_files
     assert ref.case_files["rtl"] == ("tests/fixtures/rtl/axi4_lite/axi4_lite_regs.v",)
-    assert driver_test.scorer == "must-fail" and driver_test.seat_files["sources"] == ("driver", "driver_test")
+    # WF16 (second addendum, decision 2): checks 4 to 7 build or link seat C, so each runs after the object screen.
+    assert [c.scorer for c in regs.held_out[3:]] == ["screened-held-out-run"] * 3 + ["screened-must-fail"]
+    assert driver_test.seat_files["sources"] == ("driver", "driver_test")
     assert all("evals/flow/axi4_lite/held_out_test.c" in c.case_files.get("sources", ()) for c in (own, ref))
 
 
