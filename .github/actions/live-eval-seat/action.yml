@@ -2,7 +2,8 @@
 # `nirmaan-seat` account (no password, no sudo rule, no group but its own) and puts a `vvp` first on PATH that
 # runs the real one as that account, with no_new_privs, an environment holding only cocotb's settings, and write
 # access to the run's own directory only (scripts/live_eval_seat.py). The hosted runner's tool cache (the Python
-# the package is installed in) and some folders on PATH are writable by every account; it takes that away. Run
+# the package is installed in), its global node_modules (npm) and some folders on PATH are writable by every
+# account; it takes that away. Run
 # it after the tools are installed and before the reach test (scripts/live_eval_reach.py). It takes no secret.
 name: Live evaluation seat account
 description: Run seat code (cocotb's vvp) as an unprivileged account of its own.
@@ -14,6 +15,7 @@ runs:
       run: |
         sudo /usr/bin/python3 -I scripts/live_eval_seat.py install \
           --harden-tree "$RUNNER_TOOL_CACHE" --harden-tree "$(python -c 'import sys; print(sys.prefix)')" \
+          --harden-tree /usr/local/lib/node_modules \
           --harden-path "$PATH"
         echo "/opt/nirmaan-seat/bin" >> "$GITHUB_PATH"
         echo "TMPDIR=/tmp" >> "$GITHUB_ENV"

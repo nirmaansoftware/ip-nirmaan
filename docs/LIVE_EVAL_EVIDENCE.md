@@ -230,8 +230,9 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   pipe or other non-regular file it made there is removed first), every grant
   is taken back, and what it left in `/tmp`, `/var/tmp` and `/dev/shm` is
   removed. The hosted runner's tool cache (the Python the package is installed
-  in, with its `site-packages` and console scripts) and the folders on `PATH`
-  are writable by every account; the action takes that away. The harness code
+  in, with its `site-packages` and console scripts), its global `node_modules`
+  (npm) and folders on `PATH` were writable by every account (the reach test
+  found both); the action takes that away. The harness code
   is unchanged, and a record's `executables` names the wrapper
   (`/opt/nirmaan-seat/bin/vvp`).
 - **The reach test** (`scripts/live_eval_reach.py`) runs in every job that runs
