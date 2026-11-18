@@ -684,3 +684,17 @@ def test_firmware_and_physical_design_triggers():
 def test_legal_compliance_loads_on_every_head():
     plan = _plan("README.md", "# IP Nirmaan\n", "# IP Nirmaan\n\n")
     assert _loaded(plan)[-1] == "legal-compliance" and plan["checklists"][-1]["kind"] in ("always", "lead")
+
+
+def test_default_harness_surface_loads_the_ai_engineer_checklist():
+    code = _plan("src/nirmaan/runtime/harness.py", "def harness_sha256(*,", "def harness_sha256(  *,")
+    assert "ai-engineer" in _loaded(code)
+    doc = _plan("docs/HARNESS.md", "# The harness and its fingerprint (M73)", "# The harness and its fingerprint (M73) ")
+    assert "ai-engineer" in _loaded(doc)
+    flag = _plan("src/nirmaan/cli.py", '"default", "--harness",', '"default", "--harness", ')
+    assert "ai-engineer" in _loaded(flag)
+    other = _plan("src/nirmaan/cli.py", 'trials: Optional[int] = typer.Option(None, "--trials", min=1,',
+                  'trials: Optional[int] = typer.Option(None, "--trials", min=2,')
+    assert "ai-engineer" not in _loaded(other), "a cli.py change outside the harness flags does not load it"
+    unrelated = _plan("README.md", "# IP Nirmaan\n", "# IP Nirmaan\n\n")
+    assert "ai-engineer" not in _loaded(unrelated)
