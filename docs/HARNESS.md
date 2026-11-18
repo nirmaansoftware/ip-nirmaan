@@ -189,14 +189,17 @@ public, labelled calibration, and never count toward a level: they are the
 (the plain, `-harness-attempts-3` and `-harness-tools-in-loop` directories,
 dated 2026-11-15 to 2026-11-18).
 
-Pre-registration evidence (council record 2026-11-14, decision 31). The H3
-plan stays private, so only its fingerprint is committed. The rule above was
-fixed before the first trial: the sha256 of the plan file version that held
-the rule word for word is
-`3ec7b9f1ac4ace38cfab8ad4f037cd591265f0ea547a4af464a6872dd3721af9`. That
-version was committed to the private backup on 2026-11-15T16:26Z (UTC) and the
-first trial started at 2026-11-15T20:49Z, 4 hours 23 minutes later. Only the
-hash and the two times are published here, never the plan text.
+Pre-registration claim, unverified (the pilot retrospective, council record
+2026-11-14, decisions 4 and 11, rules the counts and levels before the first
+trial). The H3 plan stays private, so only its fingerprint is stated. The
+claim is that the sha256 of the plan file version that held the rule word for
+word is `3ec7b9f1ac4ace38cfab8ad4f037cd591265f0ea547a4af464a6872dd3721af9`,
+that this version was committed to the private backup on 2026-11-15T16:26Z
+(UTC), and that the first trial started at 2026-11-15T20:49Z, 4 hours 23
+minutes later. No committed record backs the hash or the two times, and no
+seat other than the author has checked them against the private backup, so
+treat them as unverified. Only the hash and the two times are stated here,
+never the plan text.
 
 What changed, and what each name means now:
 
