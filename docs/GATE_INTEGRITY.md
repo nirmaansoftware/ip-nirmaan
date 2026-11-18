@@ -233,9 +233,83 @@ anyway is redacted from logs and from the uploaded record.
 * **A per-run `TMPDIR`**, once the ABC hang it caused in the
   OpenROAD-flow-scripts image is understood.
 * **Leaked run directories.** A run with no `workdir` keeps its directory (its
-  log is the run's reference). Nothing removes them; a retention policy is a
-  product decision.
+  log is the run's reference). Since M88 an eval trial and a test remove the
+  ones they made (section 7); in a saved project they stay, and a retention
+  policy for them is a product decision.
+* **Saved projects' run folders (M88 follow-up).** Their retention is a
+  product decision, not made here: they stay until one is made.
+* **Tests that start `nirmaan` as a subprocess (M88 follow-up).** Such a
+  process makes its temporary folders in the real `TMPDIR`, outside the
+  suite's folder, so they are not removed by the suite; `TMPDIR` is not set
+  for subprocesses, since a private one hung Yosys's ABC step (section 4).
 * **F7** (`pv.run` needs `openroad` for DRC only), **F13** (cover runs read a
   rewritten copy), and the rest of F21: the duplicated `_plural` and `_first`
   helpers, the two `_VERILATOR_NOISE` lists, and the unused `unregister_bus`.
   (F21's docstring counts are fixed, and `_MBIST_GEN_RE` is now used, by F5.)
+
+---
+
+## 7. Bounded runs (M88)
+
+During an H3 live trial on the owner's machine a seat-written testbench made
+`vvp` print without stopping: the run's directory held `icarus.log` at 1.4 GB
+and `icarus.result.json` at 1.8 GB: the parser makes a diagnostic of every
+`ERROR:`, `WARNING:` or `%Error` line a simulation prints, and the record kept
+every one, so in effect it copied the log. The disk lost
+6 GB in an hour, and 4,757 run directories and eval sandboxes from runs
+without a `workdir` had piled up in `TMPDIR` in about two hours. Code a seat
+wrote runs in these steps, so none of it may be able to fill the disk.
+`integrations/eda.py` now bounds every run of every backend (Icarus, Verilator,
+Yosys, SymbiYosys, cocotb, eqy, the DFT, firmware and physical design flows):
+
+* **What a run prints.** `OUTPUT_CAP` (64 MB) covers what all of a run's steps
+  print, stdout and stderr together. The runner reads the output itself, and
+  the moment a step prints past the cap the step is stopped with every process
+  it started (as on a timeout, section 4). The log keeps what was printed up to
+  the cap and ends with `[nirmaan: output over 64 MB in <exe>: stopped, the run
+  fails]`; the run fails with that summary whatever the parser said, and the
+  record carries `output_bytes`, how much the steps printed.
+* **What a run writes.** `DISK_CAP` (2 GB) and `FILES_CAP` (100,000 files and
+  folders, which also bounds each measurement) bound the run's own directory,
+  measured every `DISK_CHECK_SECONDS` (1 s) while a step runs and once after
+  the last; no file any step writes can grow past it (`RLIMIT_FSIZE`), and no
+  step writes a core file. A small launcher sets both limits and then becomes
+  the step (`exec`, so the pid, the process group and the stop are unchanged),
+  rather than `preexec_fn`, which can deadlock a child forked while other
+  threads run; a step whose executable is missing fails with exit status 127. When the directory reaches the cap (a file stopped
+  at the file limit is at it) the run is stopped and fails: `wrote 2048 MB
+  or 100000 files or more in <exe>`.
+* **What a run reads back.** A file a run wrote that its parser reads (Yosys's
+  `stat.json`, the coverage data, cocotb's results file, the DFT reports) is
+  read through `read_output`, which refuses one past `OUTPUT_CAP`: the run
+  fails with `<file> is over 64 MB (<n> bytes): not read, the run fails`.
+* **What a record keeps.** Never the log: the record names it. Of the
+  diagnostics it keeps the first and the last `DIAGNOSTICS_KEPT` (50 each) and
+  says how many it left out (`diagnostics_not_kept`); a summary and each
+  diagnostic's text are cut to `TEXT_CAP` (2,000 characters). Parsed metrics
+  over `METRICS_CAP` (1 MB of JSON) are not kept and the run fails. The same
+  bounded result is what the broker records.
+* **Temporary directories.** A run with no `workdir` works in a directory of
+  the system's temporary folder, as before, and its record names its log,
+  which the seat's next attempt and VeriTriage read. So the directory lives
+  until the scope that made it ends (`temporary_runs`), however it ends: each
+  eval trial (`record_trial`, and each trial `rejudge` replays) makes its own
+  sandbox the same way, and both are removed when the trial is recorded, after
+  a timeout, a stop at a cap or an error. A run that raises, or that is refused
+  before any step runs, removes its directory at once, since no record refers
+  to it. A given `workdir` is the caller's and is never removed, and outside
+  any scope (a saved project's runs) nothing is removed. A scope is a context
+  variable, so two scopes in two threads never remove each other's
+  directories. The test suite puts
+  every temporary folder it makes in one folder inside pytest's own, removed
+  when the session ends, and each test removes its runs' directories when it
+  ends. Setting `NIRMAAN_KEEP_RUN_DIRS=1` keeps them all, for debugging.
+
+None of this is harness code (`docs/HARNESS.md`): no file in `harness.CODE` is
+touched, so the harness fingerprints are unchanged. A run under every cap
+behaves as before.
+
+Tests: `tests/test_tool_output_cap.py`, among them a testbench that prints an
+`ERROR:` line in a loop: with the caps lowered to 1 MB it fails long before its
+timeout, with its directory under 2 MB and a record under 64 KB that keeps 100
+diagnostics.

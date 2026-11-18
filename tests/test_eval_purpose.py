@@ -92,10 +92,14 @@ def test_the_manifest_field_round_trips(nirmaan_org, fixed_clock, tmp_path, purp
     assert again == manifest and again.purpose == purpose
 
 
-def test_every_committed_record_still_validates_and_reads_as_evidence():
+def test_every_committed_record_validates_and_its_label_matches_its_name():
+    """A record is evidence unless it is labelled calibration, and the label and the name agree: a record named
+    ``-calibration`` (harness comparison records, ``eval run --purpose calibration``) says calibration in its manifest
+    and in every trial; a record without it says evidence in both. A mislabelled record fails."""
     manifests = sorted((EVALS / "results").rglob(MANIFEST))
     assert manifests
     for manifest in manifests:
         record = load_record(manifest.parent)
-        assert record.manifest.purpose == "evidence", manifest
-        assert all(t.purpose == "evidence" for t in record.trials), manifest
+        expected = "calibration" if "-calibration" in manifest.parent.name else "evidence"
+        assert record.manifest.purpose == expected, manifest
+        assert all(t.purpose == expected for t in record.trials), manifest

@@ -257,9 +257,9 @@ def test_no_credential_reaches_a_brokered_run(nirmaan_org, fixed_clock, tmp_path
     seen: list[dict] = []
     real = eda._run_step
 
-    def spy(argv, cwd, env, deadline):
+    def spy(argv, cwd, env, *rest):
         seen.append(dict(env))
-        return real(argv, cwd, env, deadline)
+        return real(argv, cwd, env, *rest)
 
     monkeypatch.setattr(eda, "_run_step", spy)
     seat = LoopSeat(_case(), calls=[("lint_run", {"files": [_rtl()]})])

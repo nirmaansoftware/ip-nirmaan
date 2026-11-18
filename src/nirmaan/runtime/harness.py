@@ -253,6 +253,17 @@ LOOP_CODE = (
     "nirmaan/runtime/seat_tools_relay.py",
 )
 
+# --- Whole-flow runs (G3) ---------------------------------------------------------------------------
+#
+# Council record 2026-11-17 (whole-flow cases), decision 3: a whole flow is a property of the case. Its run
+# says so (``run["flow"]``), and the code that seats every stage is digested in a ``flow`` section present
+# only for a whole-flow run, as ``loop`` is for tools in the loop. So an edit to the flow module changes the
+# whole-flow fingerprint and never the default one, and every whole-flow trial still carries the digest of
+# the code that ran it.
+
+#: The whole-flow runner's code, relative to ``SOURCE_ROOT``. In a whole-flow run's fingerprint only.
+FLOW_CODE = ("nirmaan/evals/flow.py",)
+
 
 # --- The code ----------------------------------------------------------------------------------
 
@@ -309,12 +320,13 @@ def tool_digests() -> dict[str, str]:
 
 
 def fingerprint(*, attempts: int | None = None, knowledge: bool = True, cli: str | None = None,
-                variant: str = "default") -> dict[str, Any]:
+                variant: str = "default", flow: str = "seat") -> dict[str, Any]:
     """The harness a trial runs in: every setting, the code and tool digests, and the run's own options.
 
     ``cli`` is the version of the command-line program the runtime calls the model through (the claude-code
     runtime's ``claude --version``), None for a runtime that calls none: a changed CLI is a changed harness.
-    ``variant`` is a name in ``VARIANTS``; the attempts it sets apply when ``attempts`` is None.
+    ``variant`` is a name in ``VARIANTS``; the attempts it sets apply when ``attempts`` is None. ``flow`` is the
+    case's (``"seat"`` or ``"whole"``); only a whole flow adds to the fingerprint (``FLOW_CODE``).
     """
     module = globals()
     out = {"format": FORMAT, "version": VERSION,
@@ -326,6 +338,9 @@ def fingerprint(*, attempts: int | None = None, knowledge: bool = True, cli: str
     if run_tools(variant):  # M75: the brokered server's settings, its code, and the versions of its tools
         out["loop"] = {"settings": {name: _value(module[name]) for name in LOOP_SETTINGS},
                        "tools": list(loop_tools()), "code": code_digests(LOOP_CODE), "pins": tool_pins()}
+    if flow != "seat":  # G3: a whole flow, its own section; a single-seat run's fingerprint is as it was
+        out["run"]["flow"] = flow
+        out["flow"] = {"code": code_digests(FLOW_CODE)}
     return out
 
 
@@ -374,8 +389,8 @@ def _pins(tools: tuple[str, ...]) -> dict[str, dict[str, str]]:
 
 
 def harness_sha256(*, attempts: int | None = None, knowledge: bool = True, cli: str | None = None,
-                   variant: str = "default") -> str:
+                   variant: str = "default", flow: str = "seat") -> str:
     """sha256 over ``fingerprint()``, as ``sha256:<hex>``. With no options: the current default harness."""
-    text = json.dumps(fingerprint(attempts=attempts, knowledge=knowledge, cli=cli, variant=variant),
+    text = json.dumps(fingerprint(attempts=attempts, knowledge=knowledge, cli=cli, variant=variant, flow=flow),
                       sort_keys=True, ensure_ascii=True)
     return "sha256:" + hashlib.sha256(text.encode("utf-8")).hexdigest()

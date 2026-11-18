@@ -30,7 +30,7 @@ import shutil
 from pathlib import Path
 from typing import Callable
 
-from nirmaan.integrations.eda import Backend, EdaResult, Job, RunRecord, register_backend
+from nirmaan.integrations.eda import Backend, EdaResult, Job, RunRecord, read_output, register_backend
 from nirmaan.integrations.eda_guard import sdc_problem
 from nirmaan.integrations.eda_parsers import parse_yosys
 from nirmaan.integrations.pd_parsers import (
@@ -182,8 +182,7 @@ def _synth_steps(job: Job) -> list[list[str]]:
 
 
 def _synth_parse(run: RunRecord) -> EdaResult:
-    stat = run.workdir / "stat.json"
-    stat_json = stat.read_text(encoding="utf-8") if stat.is_file() else None
+    stat_json = read_output(run.workdir / "stat.json")  # M88: bounded
     result = parse_yosys(run.log, run.returncode, stat_json)
     metrics = dict(result.metrics)
     if stat_json:

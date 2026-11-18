@@ -45,7 +45,7 @@ from pathlib import Path
 from typing import Callable
 
 from nirmaan.integrations.dft_scan import SCAN_PORTS, Design, NetlistError, techmap_file
-from nirmaan.integrations.eda import Backend, Job, RunRecord, register_backend
+from nirmaan.integrations.eda import Backend, Job, RunRecord, read_output, register_backend
 from nirmaan.integrations.eda_parsers import Diagnostic, EdaResult, parse_simulation, parse_yosys
 from nirmaan.models import text_value
 from nirmaan.registry import Registry
@@ -273,7 +273,8 @@ def _yosys_errors(run: RunRecord) -> list[Diagnostic]:
 
 def _json(path: Path) -> dict | None:
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        text = read_output(path)  # M88: bounded
+        return json.loads(text) if text is not None else None
     except (OSError, json.JSONDecodeError):
         return None
 

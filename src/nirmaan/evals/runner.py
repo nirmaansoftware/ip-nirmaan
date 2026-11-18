@@ -243,7 +243,19 @@ def evaluate(org: Organization, case: EvalCase, seat_runtime: AgentRuntime, *, r
     its attempts, and every call it made is on the result (``tool_calls``).
     The result records the harness it ran in (M73): ``harness_sha256`` with this ``attempts``, ``knowledge`` and
     ``variant``, and the runtime's CLI version (``runtime_cli``), recorded beside it as ``cli``.
+    G3 (council record 2026-11-17, decision 3): a whole-flow case goes to the whole-flow runner, its own module
+    (``nirmaan.evals.flow``), with every argument as given; until that module exists it is refused.
     """
+    if case.flow == "whole":
+        try:
+            from nirmaan.evals import flow
+        except ModuleNotFoundError as exc:
+            if exc.name != "nirmaan.evals.flow":
+                raise
+            raise EvalError(f"case {case.id} is a whole-flow case, and the whole-flow runner is not merged yet: "
+                            "it never runs as a single-seat case") from None
+        return flow.evaluate(org, case, seat_runtime, replay=replay, repo=repo, attempts=attempts, sandbox=sandbox,
+                             clock=clock, knowledge=knowledge, variant=variant)
     attempts = run_attempts(attempts, variant)
     problems = validate_case(org, case, repo)
     if problems:
