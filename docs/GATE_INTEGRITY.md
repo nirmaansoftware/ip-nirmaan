@@ -149,6 +149,62 @@ likewise be written by any firmware. Neither can make transfers happen that
 did not, and a check cannot pass with fewer transfers than checks. Running
 test code out of process is the complete answer and is deferred.
 
+**Whose code holds that residual in a whole-flow trial.** In the register
+block's whole-flow checks 5, 6 and 7 (`evals/flow/axi4_lite_regs_driver.json`)
+the driver and the driver test are written by the model, and they share the
+harness's process; in checks 5 and 6 they share it with the judge's own
+held-out test. From there model-written C could reach the run's nonce and the
+harness's pass, fail and cycle counts, and print a verdict for the judge's
+test (an inference from the sources for the forged verdict, not run; what the
+address-arithmetic probe below really read is recorded). Council record
+`council/records/2026-11-17-g3-whole-flow-cases.md`, second addendum, decision
+2: running the driver and its tests in a process of their own is required
+before any second register block batch (gate WF18).
+
+**The object screen (gate WF16): a tripwire, not confinement.** A check that
+names the scorer `screened-held-out-run` or `screened-must-fail`
+(`src/nirmaan/evals/scorers.py`) runs the object screen before it builds or
+links seat-written C. The register block case's checks 4 to 7 take these
+scorers in the pull request that follows the one that adds them; until then no
+case names them, and nothing is screened. The screen
+(`src/nirmaan/evals/object_screen.py`) compiles every C file of the check
+exactly as `fw.test` does and refuses the check when an
+object leaves a symbol undefined that is off the allow list (however it was
+declared: an asm label, a weak reference, a mangled C++ name), defines a name
+the harness or the C library defines, carries code that runs before `main` or
+after the tests (constructors, `.init_array`, an indirect function,
+destructors), or when the seat's own preprocessed lines hold asm. A refusal is
+the check's failed verdict, with its reasons and nothing linked or run; it is
+never a removed or repeated trial. The allow list is the harness's own
+functions and the C library names that every committed host fixture,
+reference answer and held-out test leaves undefined, taken from a recorded CI
+run (`evals/flow/object_screen_record.json`, `tests/test_object_screen.py`).
+
+What it does NOT do, said plainly: it is a tripwire and it confines nothing.
+It stops reach by name only. It does not stop address arithmetic from an
+allowed pointer (`hal->read32` is an address in the harness's own code), a
+memory scan, anything the allowed C library calls can do, a system call made
+through an allowed function, or anything the account the run executes as may
+do (gate WF17 is about the account). The address-arithmetic probe
+(`tests/fixtures/fw/reach/address_arithmetic_probe.c`) passes the screen.
+Starting only from `hal->read32` and `hal->write32`, it decodes the harness's
+own machine code and, under `fw.test` on both register block RTLs, read the
+harness's cycle count (it timed `read32` and `write32` at 2 cycles each on the
+reference RTL and 3 on `axi4_lite_regs_lat2.v`), found its pass counter, and
+found the run's nonce (its first 8 digits matched the run's own). It only
+reads and prints no record line; no fixture that forges a verdict is
+committed. So the screen does not close the cycle count: the
+address-arithmetic route stays open, and by decision 1, item 3, a strict
+fixture of gate WF15 on it is owed when the case takes the screen, while the
+strict fixtures on the simulator's clock, the route the screen closes, then
+expect its refusal. The record is `evals/flow/object_screen_record.json`.
+Where it sits: in the whole-flow judge only (the scorers a case names), so the shared `fw.build` and `fw.test` tools, their
+definitions and every single-seat case are unchanged, and the seat's own
+before-review runs of those tools during a whole-flow trial are not screened.
+Its code is in no harness fingerprint (as the scorers are not): an edit to it
+changes what the whole-flow judge refuses without a fingerprint change, so
+every refusal names the screen in its summary and the record keeps it.
+
 ---
 
 ## 4. The runner (F16, F3, F22, F9, and the parallel-build flake)

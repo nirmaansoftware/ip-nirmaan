@@ -1,0 +1,363 @@
+{
+  "format": "nirmaan.object-screen-record",
+  "about": "The OBJECT-SCREEN and ADDRESS-PROBE lines of tests/test_object_screen.py, as one CI run printed them on ubuntu-24.04: the undefined and defined names of every committed host fixture, reference answer and held-out test (the allow list's source), each must-refuse input's refusal, check 7 refusing the simulator clock probe as a seat's driver test, and what the address-arithmetic probe read under fw.test. A check record for gate WF16 (council record 2026-11-17, second addendum), not an eval record.",
+  "run": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44396677076",
+  "head": "a22d27187fb6cc3aae0edde07cca4b0317795e6a",
+  "jobs": {
+    "address_probe": [
+      "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44396677076/job/135128335652"
+    ],
+    "judge": [
+      "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44396677076/job/135128335652"
+    ],
+    "refused": [
+      "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44396677076/job/135128335652"
+    ],
+    "symbols": [
+      "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44396677076/job/135128335652"
+    ]
+  },
+  "symbols": {
+    "evals/firmware/axi4_lite/held_out_test.c": {
+      "defined": [
+        "nirmaan_fw_test"
+      ],
+      "undefined": [
+        "__stack_chk_fail",
+        "axil_regs_init",
+        "axil_regs_read",
+        "axil_regs_read_offset",
+        "axil_regs_write",
+        "axil_regs_write_byte",
+        "nirmaan_test_result",
+        "snprintf"
+      ]
+    },
+    "evals/flow/axi4_lite/held_out_test.c": {
+      "defined": [
+        "nirmaan_fw_test"
+      ],
+      "undefined": [
+        "__stack_chk_fail",
+        "axil_regs_init",
+        "axil_regs_read",
+        "axil_regs_read_offset",
+        "axil_regs_write",
+        "axil_regs_write_byte",
+        "axil_regs_write_offset",
+        "nirmaan_test_result",
+        "snprintf"
+      ]
+    },
+    "tests/fixtures/fw/apb_csr/apb_csr_drv.c": {
+      "defined": [
+        "apb_csr_ack_reset",
+        "apb_csr_enable",
+        "apb_csr_id",
+        "apb_csr_init",
+        "apb_csr_mode",
+        "apb_csr_reset_seen",
+        "apb_csr_set_mode",
+        "apb_csr_version"
+      ],
+      "undefined": [
+        "__stack_chk_fail"
+      ]
+    },
+    "tests/fixtures/fw/apb_csr/apb_csr_test.c": {
+      "defined": [
+        "nirmaan_fw_test"
+      ],
+      "undefined": [
+        "__stack_chk_fail",
+        "apb_csr_ack_reset",
+        "apb_csr_enable",
+        "apb_csr_id",
+        "apb_csr_init",
+        "apb_csr_mode",
+        "apb_csr_reset_seen",
+        "apb_csr_set_mode",
+        "apb_csr_version",
+        "nirmaan_test_result",
+        "snprintf"
+      ]
+    },
+    "tests/fixtures/fw/apb_regs/apb_regs_drv.c": {
+      "defined": [
+        "apb_regs_init",
+        "apb_regs_read",
+        "apb_regs_read_offset",
+        "apb_regs_write",
+        "apb_regs_write_byte",
+        "apb_regs_write_offset"
+      ],
+      "undefined": []
+    },
+    "tests/fixtures/fw/apb_regs/apb_regs_test.c": {
+      "defined": [
+        "nirmaan_fw_test"
+      ],
+      "undefined": [
+        "__stack_chk_fail",
+        "apb_regs_init",
+        "apb_regs_read",
+        "apb_regs_read_offset",
+        "apb_regs_write",
+        "apb_regs_write_byte",
+        "apb_regs_write_offset",
+        "nirmaan_test_result",
+        "snprintf"
+      ]
+    },
+    "tests/fixtures/fw/axi4_lite/axi4_lite_regs_drv.c": {
+      "defined": [
+        "axil_regs_init",
+        "axil_regs_read",
+        "axil_regs_read_offset",
+        "axil_regs_write",
+        "axil_regs_write_byte",
+        "axil_regs_write_offset"
+      ],
+      "undefined": []
+    },
+    "tests/fixtures/fw/axi4_lite/axi4_lite_regs_drv_all_strobes.c": {
+      "defined": [
+        "axil_regs_init",
+        "axil_regs_read",
+        "axil_regs_read_offset",
+        "axil_regs_write",
+        "axil_regs_write_byte",
+        "axil_regs_write_offset"
+      ],
+      "undefined": []
+    },
+    "tests/fixtures/fw/axi4_lite/axi4_lite_regs_drv_sticky_response.c": {
+      "defined": [
+        "axil_regs_init",
+        "axil_regs_read",
+        "axil_regs_read_offset",
+        "axil_regs_write",
+        "axil_regs_write_byte",
+        "axil_regs_write_offset"
+      ],
+      "undefined": []
+    },
+    "tests/fixtures/fw/axi4_lite/axi4_lite_regs_drv_swallowed_error.c": {
+      "defined": [
+        "axil_regs_init",
+        "axil_regs_read",
+        "axil_regs_read_offset",
+        "axil_regs_write",
+        "axil_regs_write_byte",
+        "axil_regs_write_offset"
+      ],
+      "undefined": []
+    },
+    "tests/fixtures/fw/axi4_lite/axi4_lite_regs_test.c": {
+      "defined": [
+        "nirmaan_fw_test"
+      ],
+      "undefined": [
+        "__stack_chk_fail",
+        "axil_regs_init",
+        "axil_regs_read",
+        "axil_regs_read_offset",
+        "axil_regs_write",
+        "axil_regs_write_byte",
+        "axil_regs_write_offset",
+        "nirmaan_test_result",
+        "snprintf"
+      ]
+    },
+    "tests/fixtures/fw/axi4_lite/axi4_lite_regs_test_lenient.c": {
+      "defined": [
+        "nirmaan_fw_test"
+      ],
+      "undefined": [
+        "__stack_chk_fail",
+        "axil_regs_init",
+        "axil_regs_read",
+        "nirmaan_test_result"
+      ]
+    },
+    "tests/fixtures/fw/axi4_lite/axi4_lite_regs_test_wait_probe.c": {
+      "defined": [
+        "nirmaan_fw_test"
+      ],
+      "undefined": [
+        "__stack_chk_fail",
+        "axil_regs_init",
+        "axil_regs_read",
+        "axil_regs_read_offset",
+        "axil_regs_write",
+        "axil_regs_write_byte",
+        "nirmaan_irq_count",
+        "nirmaan_irq_wait",
+        "nirmaan_test_result",
+        "snprintf"
+      ]
+    },
+    "tests/fixtures/fw/axil_timer/axil_timer_drv.c": {
+      "defined": [
+        "axil_timer_ack",
+        "axil_timer_expired",
+        "axil_timer_init",
+        "axil_timer_irq_enable",
+        "axil_timer_read",
+        "axil_timer_start",
+        "axil_timer_write"
+      ],
+      "undefined": [
+        "__stack_chk_fail"
+      ]
+    },
+    "tests/fixtures/fw/axil_timer/axil_timer_fault_test.c": {
+      "defined": [
+        "nirmaan_fw_test"
+      ],
+      "undefined": [
+        "__stack_chk_fail",
+        "nirmaan_bus_fault_attach",
+        "nirmaan_bus_fault_count",
+        "nirmaan_test_result",
+        "snprintf"
+      ]
+    },
+    "tests/fixtures/fw/axil_timer/axil_timer_test.c": {
+      "defined": [
+        "nirmaan_fw_test"
+      ],
+      "undefined": [
+        "__stack_chk_fail",
+        "axil_timer_ack",
+        "axil_timer_expired",
+        "axil_timer_init",
+        "axil_timer_irq_enable",
+        "axil_timer_read",
+        "axil_timer_start",
+        "axil_timer_write",
+        "nirmaan_irq_attach",
+        "nirmaan_irq_count",
+        "nirmaan_irq_wait",
+        "nirmaan_test_result",
+        "snprintf"
+      ]
+    }
+  },
+  "refused": {
+    "asm_label.c": [
+      {
+        "detail": "asm in the seat's own lines (preprocessed line 10)",
+        "rule": "asm"
+      },
+      {
+        "detail": "undefined symbols not on the allow list: open",
+        "rule": "undefined"
+      }
+    ],
+    "asm_macro.c": [
+      {
+        "detail": "asm in the seat's own lines (preprocessed line 15)",
+        "rule": "asm"
+      }
+    ],
+    "collision_harness.c": [
+      {
+        "detail": "defines a global the harness, the C library or another object defines, or a reserved name: nirmaan_irq_wait",
+        "rule": "collision"
+      }
+    ],
+    "collision_library.c": [
+      {
+        "detail": "defines a global the harness, the C library or another object defines, or a reserved name: vprintf",
+        "rule": "collision"
+      }
+    ],
+    "constructor.c": [
+      {
+        "detail": "code that runs before main: .init_array",
+        "rule": "before-main"
+      }
+    ],
+    "destructor.c": [
+      {
+        "detail": "code that runs after the tests: .fini_array",
+        "rule": "after-main"
+      }
+    ],
+    "indirect_function.c": [
+      {
+        "detail": "code that runs before main: indirect function probe_indirect",
+        "rule": "before-main"
+      }
+    ],
+    "init_array_section.c": [
+      {
+        "detail": "code that runs before main: .init_array",
+        "rule": "before-main"
+      }
+    ],
+    "inline_asm.c": [
+      {
+        "detail": "asm in the seat's own lines (preprocessed line 13)",
+        "rule": "asm"
+      }
+    ],
+    "simulator_clock_probe.c": [
+      {
+        "detail": "asm in the seat's own lines (preprocessed line 33)",
+        "rule": "asm"
+      },
+      {
+        "detail": "undefined symbols not on the allow list: _GLOBAL_OFFSET_TABLE_, _ZN9Verilated14s_lastContextpE, fflush, memcpy, printf, stdout (weak: _ZN9Verilated14s_lastContextpE)",
+        "rule": "undefined"
+      }
+    ],
+    "undefined_fopen.c": [
+      {
+        "detail": "undefined symbols not on the allow list: fclose, fopen",
+        "rule": "undefined"
+      }
+    ],
+    "weak_reference.c": [
+      {
+        "detail": "undefined symbols not on the allow list: _GLOBAL_OFFSET_TABLE_, nirmaan_cycles (weak: nirmaan_cycles)",
+        "rule": "undefined"
+      }
+    ]
+  },
+  "judge": {
+    "runs": [],
+    "status": "failed",
+    "submitted": true,
+    "summary": "refused by the object screen (a tripwire: it stops reach by name; it is not confinement); nothing was linked or run: axi4_lite_regs_test.c: asm: asm in the seat's own lines (preprocessed line 33); axi4_lite_regs_test.c: undefined: undefined symbols not on the allow list: _GLOBAL_OFFSET_TABLE_, _ZN9Verilated14s_lastContextpE, fflush, memcpy, printf, stdout (weak: _ZN9Verilated14s_lastContextpE)"
+  },
+  "address_probe": {
+    "axi4_lite_regs.v": {
+      "cycle_words": "1",
+      "functions": "7",
+      "isa": "x86_64",
+      "nonce8_is_the_runs": "true",
+      "nonce_strings": "2",
+      "pages": "3",
+      "pass_words": "1",
+      "read32": "2",
+      "succeeded": true,
+      "summary": "verilator-cosim: co-simulation passed: 3 checks, 0 failed (31 cycles, 3 bus transfers)",
+      "write32": "2"
+    },
+    "axi4_lite_regs_lat2.v": {
+      "cycle_words": "1",
+      "functions": "7",
+      "isa": "x86_64",
+      "nonce8_is_the_runs": "true",
+      "nonce_strings": "2",
+      "pages": "3",
+      "pass_words": "1",
+      "read32": "3",
+      "succeeded": true,
+      "summary": "verilator-cosim: co-simulation passed: 3 checks, 0 failed (34 cycles, 3 bus transfers)",
+      "write32": "3"
+    }
+  }
+}
