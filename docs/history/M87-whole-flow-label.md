@@ -76,6 +76,15 @@ parameter defaults, the timer's widths 5 to 7 and the "no other ports" rules
 have their own tags, listed as not judged. Both documents wait for a fresh
 check.
 
+**The strict fixtures (gate WF15, follow-up).** The record's second addendum
+of 2026-11-18 found the fixture driver test owed again: a driver test's C
+reads the simulation time through Verilator's runtime. Four controls add a
+strict fixture driver test (fails check 7 on the reference RTL by its one
+timing check only), a strict fixture driver (passes check 5 on the conforming
+RTL, fails check 6), and the SoC's cycle counter refused before review, each
+on a flow whose RTL stage ended in the conforming RTL. The record keeps the
+cycle counts.
+
 **Both testbench copies strengthened again (follow-up).** Another independent
 check passed mutants through both copies: a write decode ignoring `addr[1]`,
 offsets with bit 5 or bit 7 set aliasing at `ADDR_WIDTH` 8, an `irq` that

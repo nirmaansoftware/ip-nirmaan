@@ -7,6 +7,8 @@ log and 1.8 GB of result JSON in one run on the owner's machine; these tests hol
 from __future__ import annotations
 
 import json
+import os
+import re
 import shutil
 import sys
 import time
@@ -97,12 +99,33 @@ def test_a_compiled_step_is_killed_at_the_file_limit(small_caps, tmp_path):
     assert (tmp_path / "run" / "big.bin").stat().st_size <= 4 * MB
 
 
-def test_a_missing_executable_is_a_failed_step(small_caps, tmp_path):
-    backend = Backend("capcheck", "cap.check", (), lambda job: [["no-such-tool-m88"]],
+def _missing(argv0: str, tmp_path: Path):
+    backend = Backend("capcheck", "cap.check", (), lambda job: [[argv0]],
                       lambda run: EdaResult(run.returncode == 0, "parsed"), required=())
-    out = execute(backend, {"workdir": str(tmp_path / "run")})
-    assert not out.succeeded and out.data["exit_statuses"] != [0]
+    return execute(backend, {"workdir": str(tmp_path / "run")})
+
+
+def test_a_missing_executable_is_a_failed_step(small_caps, tmp_path):
+    out = _missing(str(tmp_path / "no-such-tool-m88"), tmp_path)  # a path: no PATH search, so always not found
+    assert not out.succeeded and out.data["exit_statuses"] == [127]
     assert "FileNotFoundError" in Path(out.references[0]).read_text(encoding="utf-8")
+
+
+def test_a_missing_executable_found_through_path_is_a_failed_step_on_any_account(small_caps, tmp_path, monkeypatch):
+    """A bare name is looked up along PATH. When a PATH folder cannot be searched by the account (the review
+    loop's ``loopcheck`` cannot enter the runner's home), the lookup reports PermissionError, not
+    FileNotFoundError, as ``execvp`` and ``Popen`` both do; the step fails either way."""
+    locked = tmp_path / "locked"
+    locked.mkdir(mode=0o000)
+    try:
+        for path in (os.environ.get("PATH", ""), f"{locked}{os.pathsep}{os.environ.get('PATH', '')}"):
+            monkeypatch.setenv("PATH", path)
+            out = _missing("no-such-tool-m88", tmp_path)
+            log = Path(out.references[0]).read_text(encoding="utf-8")
+            assert not out.succeeded and out.data["exit_statuses"] == [127]
+            assert re.search(r"^(FileNotFoundError|PermissionError): .*'no-such-tool-m88'$", log, re.MULTILINE), log
+    finally:
+        locked.chmod(0o700)
 
 
 def test_a_step_that_writes_many_files_is_stopped(small_caps, tmp_path):

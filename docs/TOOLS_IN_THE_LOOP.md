@@ -106,8 +106,9 @@ The screen is for files the seat passes in the loop, where the seat reads the
 output. It is a list of refusals, so it is conservative: a sentence of RTL
 that names `/` in a string is refused even when harmless, and the seat is told
 why. The files of the final answer are not screened: they go through the
-gates as on every harness. On the default harness a seat reads no tool output
-before it answers.
+gates as on every harness. On the default harness a seat calls no tool: it
+reads a gate run's output only as the log excerpt in the repair text after a
+refused attempt (three attempts since H3, `docs/HARNESS.md`).
 
 ## Not checked here
 
