@@ -230,6 +230,8 @@ def _artifact(art, trusted: bool | None = None, content: bool = False) -> Artifa
 #: single-seat case gives one, so their packets are unchanged.
 DOCUMENT = "document."
 DOCUMENT_KIND = "customer_document"
+#: How a customer document is cited: as a document, never as an artifact (no draft derives from it).
+DOCUMENT_CITATION = "document"
 
 
 def _documents_given(state, task_id: str) -> list[ArtifactView]:
