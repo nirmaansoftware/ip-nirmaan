@@ -301,6 +301,8 @@ no model call, run in CI, committed with their records:
   reference RTL (3, 6 and 7) catch a test that does not. Those checks are
   fair by the rule, which the fixed document states to the seats, and not by
   the conforming RTL alone.
+  (Amended 2026-11-18 for the fixture driver test: see the addendum at the
+  end of this record.)
 
 Who disagreed. On the driver's RTL: design-architect and product-lead held
 that the flow's own RTL is the pass condition and the reference run a
@@ -475,6 +477,7 @@ trials only after the default harness is named.
 | WF3 | The fixed documents are committed before any trial; every held-out check and mutant cites a statement in them; the pull request that commits them changes no existing check | design-architect |
 | WF4 | For each case the judge controls are committed with recorded CI runs before the first trial: the reference passes; a planted fault fails; a conforming RTL passes the checks on the flow's RTL; the range-accepting reference tests pass on both RTLs and a test written to one choice fails on the reference RTL. The fixed document states the whole-range rule to the seats | verification-lead |
 | WF5 | The driver controls of decision 2 exist as fixtures and are shown failing in a recorded run, and the unmapped-write check is in the case's held-out test, before the first register block trial | firmware-engineer |
+| WF14 | Added 2026-11-18 by the addendum, which also amends what WF4 and WF5 ask for on the driver side: the reach guard test and the recorded wait-probe control are merged, and `docs/WHOLE_FLOW.md` and the `driver-reference` text in `evals/flow/controls.json` are corrected, before the first register block trial | firmware-engineer |
 | WF6 | The dispatch edit to `runner.py` merges after WF1 is met and before the pull request that names the default harness, or else only with a later change that restarts every group for another reason; the flow module may merge later; the runner option carries the true pass-through note, the per-stage record and a clean re-judge test | eda-tooling |
 | WF7 | A test shows the flow module's edit changes the whole-flow fingerprint and not the default; from the pull request that names the default harness onward, no whole-flow pull request changes the default fingerprint, shown by that test on each one | ai-engineer |
 | WF8 | The stop rule of decision 3 is shown by a test before any whole-flow trial | qa-evidence |
@@ -490,70 +493,147 @@ trials only after the default harness is named.
 2. The public name of the measure, if it is ever to appear outside the
    repository's records. Inside them it is "whole-flow pass count".
 
-## Addendum (2026-11-18): no strict driver test when latency is not visible
+## Addendum (2026-11-18): the fixture driver test of decision 2
 
-This addendum states one part of the chair's ruling of 2026-11-17 that the
-record above leaves out, and points to the run that part asks for. It adds
-no decision of its own. It changes no code, case, record or level, and no
-gate's wording.
+This addendum amends one control of decision 2 and what gates WF4 and WF5 ask
+for on the driver side, and adds gate WF14. It is a decision made on
+2026-11-18. It changes no code, case, eval record or level, and nothing else
+in the ruling.
 
 ### Who decided what
 
-- The chair ruled the part below on 2026-11-17, in its follow-up to decision
-  2 on the same day, together with the whole-range rule (decision 2, "Judge
-  controls", fourth item, and gate WF4). It was written into the internal
-  build notes for the code lane and not into this record. That was an
-  omission in the record, corrected here.
-- `council/README.md` gives no process for an addendum to a record. No seat
-  was convened for this one: it decides no new question, and it follows the
-  addendum of 2026-11-15 to
-  `council/records/2026-11-14-pilot-retrospective.md`, which was added
-  without convening seats for it and changed no decision. Like the ruling,
-  it is not a founder decision, and the founder can overrule it.
-- Owners are as in the ruling: firmware-engineer (driver checks and
-  controls, gate WF5), verification-lead (the controls as a rule, gate WF4).
+- Three seats gave round 1 positions independently (firmware-engineer,
+  verification-lead, qa-evidence); the chair decided. The meeting was kept to
+  the seats that own gate WF5, gate WF4 and the claims. Read against
+  ip-nirmaan `main` at ae48843. Seats were read only; nothing was simulated
+  for the meeting.
+- Why a meeting. Pull request #324 (the judge controls) built no fixture
+  driver test and said in `docs/WHOLE_FLOW.md` that none can exist. Key 2
+  and the Founder Proxy (agent) each recorded on #324 that a control the
+  council had decided was replaced without a recorded amendment. No earlier
+  committed record holds a ruling that allows it, so the council rules now.
+  `council/README.md` gives no shorter process for amending a record.
+- As for the ruling: the council decided; it is not a founder decision, and
+  the founder can overrule it. Nothing here is reserved for the founder.
 
-### The part left out
+### Facts checked
 
-Decision 2 asks for a fixture testbench and a fixture driver test written to
-the conforming RTL's one choice, each failing on the reference RTL. The
-chair's ruling went on, in substance: if a driver test cannot observe latency
-through the HAL at all, that is recorded by a run; then no strict driver test
-exists, checks 6 and 7 cannot fail for being stricter than the latency bound,
-and the controls record says so.
+1. Decision 2's fourth judge control asks for a fixture driver test written
+   to the conforming RTL's one choice that fails on the reference RTL. The
+   one choice the register block's document leaves open is response latency,
+   1 or 2 cycles (`evals/flow/axi4_lite/requirements.md`, lines 50 to 56).
+   The reference RTL answers after 1, the conforming RTL
+   `tests/fixtures/rtl/axi4_lite/variants/axi4_lite_regs_lat2.v` after 2.
+2. The run. `evals/flow/controls_record.json` (CI run 44243160870 on
+   fdc8e7c), control `driver-reference`: the reference driver and driver
+   test pass on the reference RTL (6 checks, 45 cycles, 20 bus transfers) and
+   on the conforming RTL (6 checks, 65 cycles, 20 bus transfers).
+   `tests/test_whole_flow_controls.py`
+   (`test_the_control_gets_the_verdict_it_expects`) requires the bus
+   transfers the two runs log to be identical: offset, value, strobe and
+   response. The record holds verdicts and summaries, not the transfers; the
+   equality is shown by that test passing in the named run. Control
+   `regs-tb-strict2`: the strict testbench fails check 3 on the reference
+   RTL.
+3. The run shows one test, the reference driver test, which is written to
+   accept the whole range. It does not show that no driver test can see
+   latency. That rests on reading the harness (facts 4 to 6), which no test
+   guards today.
+4. `src/nirmaan/integrations/firmware_harness/nirmaan_hal.h`: a driver test
+   gets `read32` and `write32`. Each returns only after the response
+   (`axil_manager.cpp`), with the data and the response code. The cycle
+   count is internal to the harness and printed only in the run's summary
+   line. The block has four plain registers and no state that depends on
+   elapsed cycles (firmware-engineer, verification-lead; inference from the
+   source).
+5. The sentence in `docs/WHOLE_FLOW.md` that the HAL "has no clock or cycle
+   count" is too wide for the harness as a whole. `nirmaan_irq.h`, on the
+   same include path, gives `nirmaan_irq_wait(seen, cycles)`, which advances
+   the clock, and the harness fails a run at 5000000 cycles
+   (`axil_manager.cpp`, `kMaxCycles`). A test that spends cycles to just
+   under that limit would pass on the reference RTL and fail on the
+   conforming RTL (inference; not run). That is the opposite direction to
+   the control: the reference RTL uses the fewest cycles the document
+   allows, so no test can fail it for using more.
+6. A driver test is host C linked into the harness process. A test could
+   read the host clock, or (firmware-engineer, inference, not run) reach the
+   harness's own output through the operating system. Neither is a test
+   written to the HAL and the driver interface, and wall time is not
+   latency. Not checked by any seat: whether a simulator symbol is reachable
+   from a test's C.
 
-So the strict driver test is owed only if a driver test can see latency. If a
-recorded run shows that it cannot, the fixture driver test is dropped from
-decision 2's controls and from what gates WF4 and WF5 ask for; the strict
-testbench stays. This holds while the HAL gives a driver test no clock and
-no cycle count.
+### Decision
 
-### The run
+**The fixture driver test is not required for the register block; three
+things are required in its place.** All three seats took this option; no
+seat held that the fixture can be built as decision 2 words it.
 
-Pull request #324 (merged 2026-11-18) recorded it in
-`evals/flow/controls_record.json`, control `driver-reference`, from CI run
-44236131264 on 2a87386:
+The control's purpose is to show that checks 6 and 7 catch a driver test
+stricter than the document. Through `read32`, `write32` and the driver
+interface, on this block, no driver test can be strict about latency in the
+direction that fails the reference RTL. This is shown by the harness's
+construction and by the recorded run together, not by the run alone. The
+control is therefore empty for this block, not merely hard to build.
 
-- The reference driver and driver test pass on the reference RTL (6 checks,
-  45 cycles, 20 bus transfers) and on the conforming RTL
-  `tests/fixtures/rtl/axi4_lite/variants/axi4_lite_regs_lat2.v` (6 checks,
-  65 cycles, 20 bus transfers). The two RTLs differ in cycles; the test sees
-  the same transfers.
-- `tests/test_whole_flow_controls.py`
-  (`test_the_control_gets_the_verdict_it_expects`) fails unless the bus
-  transfers logged by those two runs are identical, on every CI run. The
-  record keeps each run's verdict and summary, not the transfers themselves.
-- `src/nirmaan/integrations/firmware_harness/nirmaan_hal.h` gives a driver
-  test `read32` and `write32`, each returning a response code, and nothing
-  else: no clock and no cycle count.
+Decision 2's fourth judge control now reads, for the driver side: the
+reference driver test passes on both RTLs with identical bus transfers, in a
+recorded run. The fixture testbench written to one choice stays as ruled.
+The other driver controls of decision 2 (the wrong-map header, the two
+mutants, the three fixture drivers) stay as ruled. In place of the fixture
+driver test:
 
-The condition is therefore met, and no strict driver test is owed. The
-statement itself is not a field of the record file: it is in the
-`driver-reference` entry of the controls manifest, `evals/flow/controls.json`,
-whose verdicts the record holds, and in `docs/WHOLE_FLOW.md` ("Freedom left
-open", and the judge controls list). The strict testbench control is in the
-record (`regs-tb-strict2`: check 3 fails on the reference RTL).
+1. **A reach guard.** A test that needs no design tool pins what a driver
+   test can reach under `fw.test`: the members of `nirmaan_hal` and the
+   exported C functions of the host harness, as an exact listed set. Its
+   failure message names this addendum and the return condition.
+2. **A wait probe.** A fixture driver test that calls `nirmaan_irq_wait`
+   between transfers is recorded passing on both RTLs with identical bus
+   transfers. It is an expected pass, named as an attempt to see latency
+   that does not.
+3. **A return condition.** The fixture driver test of decision 2 is required
+   again, before the next trial, for any case where the HAL or the harness
+   gains a cycle count, a timeout or a non-blocking access that a driver
+   test can read, or where the block has a register whose value depends on
+   elapsed cycles, or where the fixed document leaves open a choice visible
+   in data or response codes.
 
-This addendum closes no gate. What WF4 still needs from the whole-flow runner
-(the reference flow through every seated stage, a planted upstream fault, and
-check 5) is unchanged.
+`docs/WHOLE_FLOW.md` ("Freedom left open" and the judge controls list) and
+the `driver-reference` text in `evals/flow/controls.json` are corrected to
+this scope: "through `read32` and `write32` on this block", shown by the
+harness's construction and the run, with the cycle limit's direction stated.
+
+Until gate WF14 is met, WF4 and WF5 are not met for the register block. This
+addendum closes no gate. What WF4 still needs from the whole-flow runner
+(the reference flow through every seated stage, a planted upstream fault,
+and check 5) is unchanged.
+
+Who disagreed. Not on the option. On what replaces the control:
+verification-lead asked for the wait probe; qa-evidence asked for a committed
+best-effort strict fixture using the wait and the cycle limit, recorded as
+passing on both RTLs; firmware-engineer asked for neither. The chair took
+the probe: it is one fixture that meets both requests, and it puts the one
+clock a test can advance on the record. A fixture that runs to the cycle
+limit is not required: it would fail the conforming RTL, which proves
+nothing about checks 6 and 7, and it is a long run for no control. All three
+asked for the guard and the return condition.
+
+Owners: firmware-engineer (the guard, the probe, the corrected texts);
+verification-lead (the control as a rule, gate WF4); qa-evidence checks the
+corrected claims.
+
+### Positions not adopted, and open
+
+- qa-evidence: a strict fixture that uses the cycle limit. Not required, for
+  the reason above.
+- Open, for security: whether a driver test's host C should be screened or
+  confined so that it cannot reach the harness's output or the host clock
+  (fact 6). It is a question about the gate's integrity, not about this
+  control, and it is not decided here.
+- Open, for firmware-engineer: whether a simulator symbol is reachable from
+  a test's C (fact 6). The reach guard's pull request answers it.
+
+### Gate
+
+| Gate | Condition | Owner seat |
+|---|---|---|
+| WF14 | The reach guard test and the recorded wait-probe control are merged, and `docs/WHOLE_FLOW.md` and the `driver-reference` text in `evals/flow/controls.json` are corrected, before the first register block trial | firmware-engineer |
