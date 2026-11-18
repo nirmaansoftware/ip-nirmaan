@@ -242,6 +242,8 @@ def _documents_given(state, task_id: str) -> list[ArtifactView]:
     for m in state.memory:
         if m.scope is MemoryScope.TASK and m.owner == task_id and m.key.startswith(DOCUMENT):
             expected, _, location = m.value.partition(" ")
+            if not expected.startswith("sha256:") or not location:
+                continue  # not "<digest> <path>": nothing to show or cite
             name = m.key.removeprefix(DOCUMENT)
             out.append(ArtifactView(id=f"{task_id}#{m.key}", kind=DOCUMENT_KIND, title=Path(location).name,
                                     assurance=DOCUMENT_ASSURANCE,

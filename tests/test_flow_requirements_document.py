@@ -90,6 +90,16 @@ def test_only_a_task_scoped_document_key_counts(org, tmp_path):
     assert "[req:TMR-MODULE]" not in _prompt(engine, task.id)
 
 
+@pytest.mark.parametrize("value", ["no-space-at-all", f"{DOCUMENT}", "sha256:abc "])
+def test_a_malformed_document_value_shows_nothing(org, value):
+    engine = Orchestrator(org).plan(TIMER)
+    task = _stages(engine)["requirements"]
+    actor = Actor(role=str(task.owner), kind=ActorKind.SYSTEM, name="eval-flow")
+    engine.remember(MemoryScope.TASK, task.id, "document.customer_requirements", str(value), actor)
+    packet = assemble(engine, task.id)
+    assert not [a for a in packet.task.upstream_artifacts if a.kind == context.DOCUMENT_KIND]
+
+
 @pytest.mark.parametrize("case", load_cases(ROOT / "evals"), ids=lambda c: c.id)
 def test_every_single_seat_cases_prompt_is_unchanged(org, monkeypatch, case):
     """With no document given, the packet and both prompts are byte for byte what they were without the route."""
