@@ -708,6 +708,7 @@
     "proven": 0
   },
   "variants": [],
+  "whole_flow": [],
   "without_knowledge": [
     {
       "case": "rtl/rr-arbiter",

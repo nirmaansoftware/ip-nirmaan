@@ -37,7 +37,10 @@ fails when the committed file differs from what the records give.
   source and as "calibration" otherwise, and never counts. A trial run
   on a named harness variant (M74, ``eval run --harness <name>``: any name but
   ``default`` in its run manifest or in the trial) is listed under
-  ``variants`` with the name and never counts.
+  ``variants`` with the name and never counts. A whole-flow trial (M87, ``flow: whole`` in its run manifest
+  or in the trial; council record 2026-11-17) is checked first, before every label above: it credits no skill,
+  is listed under ``whole_flow`` by group, and never counts toward any level. A record that mixes whole-flow and
+  single-seat trials is refused.
 * **Proven**: only from the product's own seat run records on delivered work
   that passed review. No such record kind exists yet, so no skill is Proven.
 """
@@ -54,8 +57,8 @@ from typing import Any
 
 from nirmaan.company.evidence import MUST_FAIL_DOMAINS
 from nirmaan.evals.cases import EvalError, load_cases, skill_digest
-from nirmaan.evals.records import (MANIFEST, calibration_labels, knowledge_off, load_evidence, load_record,
-                                   variant_labels, wilson)
+from nirmaan.evals.records import (MANIFEST, calibration_labels, flow_labels, is_whole_flow, knowledge_off,
+                                   load_evidence, load_record, variant_labels, wilson)
 from nirmaan.evals.scorers import scorer_spec
 from nirmaan.models import EvalCase
 from nirmaan.org import Organization
@@ -74,6 +77,10 @@ GATE_CLAIMS_FROM = "2026-11-15"  # a check record dated on or after this day car
 _GATE_EVIDENCE = re.compile(r"^(\S+:\d+|\S+::\S+|unverified)$")  # path:line, a test id, or "unverified"
 MIN_TRIALS = 5
 MIN_LOWER = 0.5
+#: M87 (council record 2026-11-17, decision 1): a whole-flow group's count is stated only from this many trials.
+#: Its own constant: it is not a level's minimum and never moves with ``MIN_TRIALS``.
+WHOLE_FLOW_MIN = 10
+WHOLE_FLOW_REASON = "whole-flow trial: credits no skill and never counts toward a level"
 
 
 class Level(str, Enum):
@@ -191,21 +198,62 @@ def _rejudged(record_dir: Path) -> dict[tuple[str, int], bool]:
     return {(t["case"], int(t["trial"])): bool(t.get("same")) for t in data.get("trials", [])}
 
 
+def _whole_flow_groups(trials: list[tuple[Any, Any, str]]) -> list[dict[str, Any]]:
+    """M87: whole-flow trials by group (case digest, model, harness, CLI, flow digest; and purpose, so a
+    calibration trial is never pooled with evidence), each trial listed one by one. A group's count (``n``,
+    ``passed``, ``unjudged`` and the 95 percent Wilson interval) is stated only from ``WHOLE_FLOW_MIN`` trials;
+    whether the group's planned count is complete is the committed plan's, which this file does not hold. A trial
+    no judge ran on is a failed trial of its group."""
+    groups: dict[tuple, dict[str, Any]] = {}
+    for manifest, trial, where in trials:
+        judged = bool(trial.judge_runs)
+        off = knowledge_off(manifest, trial)
+        purpose = trial.purpose if trial.purpose != "evidence" else manifest.purpose
+        key = (trial.result.case, trial.result.case_digest, trial.model, _harness(trial), trial.result.cli,
+               trial.flow_digest, purpose)
+        group = groups.setdefault(key, {"case": key[0], "case_digest": key[1], "model": key[2], "harness": key[3],
+                                        "cli": key[4], "flow_digest": key[5], "purpose": key[6], "trials": []})
+        named = " and ".join(flow_labels(manifest, trial))
+        group["trials"].append({"record": where, "case": trial.result.case, "trial": trial.trial,
+                                "passed": judged and trial.result.passed, "judged": judged,
+                                "knowledge": "off" if off else "on", "flow_digest": trial.flow_digest,
+                                "reason": f"{WHOLE_FLOW_REASON} (labelled in {named})"})
+    out = []
+    for key in sorted(groups, key=lambda k: tuple(str(x) for x in k)):
+        group = groups[key]
+        group["trials"].sort(key=lambda t: (t["record"], t["trial"]))
+        n = len(group["trials"])
+        if n >= WHOLE_FLOW_MIN:
+            passed = sum(t["passed"] for t in group["trials"])
+            low, high = wilson(passed, n) or (0.0, 0.0)
+            group["count"] = {"n": n, "passed": passed, "unjudged": sum(not t["judged"] for t in group["trials"]),
+                              "low": round(low, 4), "high": round(high, 4)}
+        out.append(group)
+    return out
+
+
 def practised(org: Organization, repo: Path,
-              cases: dict[str, EvalCase]) -> tuple[dict[str, list], list[str], list, list, list, list]:
+              cases: dict[str, EvalCase]) -> tuple[dict[str, list], list[str], list, list, list, list, list]:
     """Per skill, every (model, digest, harness, CLI version) group of tool-judged cases' trials, a trial no judge
     ran on counted as failed; the refused records; trials of cases not tool-judged; trials run without knowledge
     documents (M67), calibration trials (M76 and ``eval run --purpose calibration``) and trials on a named
-    harness variant (M74), which never count."""
+    harness variant (M74), which never count; and whole-flow trials (M87) by group, which never count either."""
     groups: dict[tuple[str, str | None, str | None, str | None, str | None], dict[str, Any]] = {}
     refused: list[str] = []
     not_tool_judged: list[dict[str, Any]] = []
     without_knowledge: list[dict[str, Any]] = []
     calibration: list[dict[str, Any]] = []
     variants: list[dict[str, Any]] = []
+    whole_flow: list[tuple[Any, Any, str]] = []
     for manifest in sorted((repo / RESULTS).rglob(MANIFEST)):
         try:
             record = load_record(manifest.parent)
+            if is_whole_flow(record):
+                # M87: first, before every other label and the skill loop, so a whole-flow trial lands here and
+                # in no other list. A replay or an attested whole-flow record is refused like any other.
+                record = load_evidence(manifest.parent)
+                whole_flow += [(record.manifest, t, _rel(manifest.parent, repo)) for t in record.trials]
+                continue
             labelled = [bool(calibration_labels(record.manifest, t)) for t in record.trials]
             if any(labelled) and not all(labelled):
                 # M76: one record never mixes the two; a stray label cannot take the other trials out of the levels
@@ -299,7 +347,8 @@ def practised(org: Organization, repo: Path,
                            "passed": g["passed"],
                            "unjudged": g["unjudged"], "lower": round(low, 4), "records": sorted(g["records"]),
                            "cases": sorted(g["cases"]), "counts": not reasons, "reasons": reasons})
-    return dict(out), refused, not_tool_judged, without_knowledge, calibration, variants
+    whole = _whole_flow_groups(whole_flow)
+    return dict(out), refused, not_tool_judged, without_knowledge, calibration, variants, whole
 
 
 # --- Levels ----------------------------------------------------------------------------------
@@ -309,7 +358,8 @@ def compute(org: Organization, repo: Path) -> dict[str, Any]:
     """Every skill's evidence level from the repository's committed records, as ``capability/levels.json``."""
     repo = Path(repo)
     cases = {c.id: c for c in load_cases(repo / "evals")} if (repo / "evals").is_dir() else {}
-    groups, refused, not_tool_judged, without_knowledge, calibration, variants = practised(org, repo, cases)
+    (groups, refused, not_tool_judged, without_knowledge, calibration, variants,
+     whole_flow) = practised(org, repo, cases)
     skills: dict[str, Any] = {}
     for skill_id in sorted(set(org.skills) | set(groups)):
         know = knowledge(org, skill_id, repo)
@@ -322,7 +372,7 @@ def compute(org: Organization, repo: Path) -> dict[str, Any]:
     totals = {lvl.value: sum(1 for s in skills.values() if s["level"] == lvl.value) for lvl in Level}
     return {"format": FORMAT, "totals": totals, "skills": skills,
             "refused_records": refused, "not_tool_judged": not_tool_judged, "without_knowledge": without_knowledge,
-            "calibration": calibration, "variants": variants,
+            "calibration": calibration, "variants": variants, "whole_flow": whole_flow,
             "proven": "No skill is Proven: no product seat run record of delivered work exists yet."}
 
 

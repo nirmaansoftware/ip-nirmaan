@@ -55,6 +55,16 @@ stray label never takes the other trials out of the levels. A calibration
 trial's skill digest covers the card and the knowledge document the seat was
 given, as for any trial.
 
+A whole-flow trial (M87, `docs/WHOLE_FLOW.md`; council record 2026-11-17) is
+labelled `"flow": "whole"` in its run manifest and in the trial. Labelled whole
+in either, it is taken out first, before the labels above and the skill loop,
+credits no skill and never counts toward any level: it is listed under
+`whole_flow`, by group (case, case digest, model, harness, CLI, flow digest and
+purpose), each trial one by one. A group's whole-flow pass count (`n`,
+`passed`, `unjudged`, Wilson interval) is written only from 10 trials, and a
+trial no judge ran on is a failed trial of its group. The record's name is
+never read. A record that mixes whole-flow and single-seat trials is refused.
+
 Trials are grouped by skill, model, the skill digest recorded with the trial
 (card plus knowledge document, M58), the harness recorded with it (M73,
 `docs/HARNESS.md`) and the CLI version the runtime called the model through
@@ -104,7 +114,9 @@ judge run on a tool-judged case is a failure even when its result says passed;
 a changed card or a
 later document makes it stale; replays, attestations, trials of a case not
 judged by a tool and trials run without knowledge documents (either label)
-never count; a changed harness makes the group stale and a trial with no harness recorded never counts (M73); trials on two CLI versions are two groups, a CLI version edited on the trials is stale, and an unread one never counts; a case's other skills get nothing; nothing is Proven;
+never count; a whole-flow trial (either label) lands in `whole_flow` and in no
+skill group, a mixed record is refused, and its count is written only from 10
+trials (M87); a changed harness makes the group stale and a trial with no harness recorded never counts (M73); trials on two CLI versions are two groups, a CLI version edited on the trials is stale, and an unread one never counts; a case's other skills get nothing; nothing is Proven;
 Knowledge needs a check record by a different session, with sources, naming the
 current document.
 

@@ -13,6 +13,7 @@ from nirmaan.models.evaluation import (
     EvalProposalThresholds,
     EvalResult,
     EvalRunManifest,
+    EvalStage,
     EvalTrial,
     GateRun,
     HeldOutCheck,
