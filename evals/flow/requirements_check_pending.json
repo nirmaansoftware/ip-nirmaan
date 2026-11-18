@@ -1,0 +1,8 @@
+{
+  "format": "nirmaan.flow-document-check-pending",
+  "about": "Whole-flow requirements documents whose first check record (requirements_check.json, by a session other than the writer) has not landed yet, each with the reason. tests/test_whole_flow_cases.py fails a listed document that already has a record, so an entry must go when its record lands.",
+  "pending": {
+    "evals/flow/axil_timer/requirements.md": "Rewritten after the independent check found overclaimed tags and open rules; a fresh checker session writes its record.",
+    "evals/flow/axi4_lite/requirements.md": "Never checked yet; a checker session writes its record."
+  }
+}

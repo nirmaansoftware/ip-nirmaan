@@ -143,14 +143,11 @@ def test_each_tag_is_stated_once_and_both_documents_state_the_whole_range_rule()
 # By convention a whole-flow requirements document is checked by a session other than its writer, and the check is
 # kept next to it as ``requirements_check.json`` (format ``nirmaan.flow-document-check``): the document's sha256, the
 # writer and the checker, when, the sources read, per-tag evidence (``path:line``, a test id, or ``unjudged``) and the
-# result. Any edit to the document makes the record stale. A document whose record has not landed yet is listed here
-# with the reason; the entry must go once its record lands. An author never writes the record for its own document.
+# result. Any edit to the document makes the record stale. A document whose first record has not landed yet is listed,
+# with the reason, in ``evals/flow/requirements_check_pending.json``; a listed document that has a record fails, so the
+# entry must go once its record lands. An author never writes the record for its own document.
 
-CHECK_PENDING = {
-    "evals/flow/axil_timer/requirements.md": "rewritten after the independent check found overclaimed tags; a fresh "
-                                             "checker session writes its record",
-    "evals/flow/axi4_lite/requirements.md": "no check record yet; a checker session writes it",
-}
+CHECK_PENDING = FLOW / "requirements_check_pending.json"
 CHECK_FIELDS = {"format", "case", "document", "document_sha256", "writer", "checker", "checked_at", "sources_read",
                 "evidence", "result"}
 _LINE = re.compile(r"^(?P<path>[^:\s]+):(?P<first>\d+)(?:-(?P<last>\d+))?$")
@@ -236,15 +233,27 @@ def _check_record_problems(doc: str, record: dict, citations: dict, root: Path =
     return problems
 
 
+def _pending() -> dict[str, str]:
+    data = json.loads(CHECK_PENDING.read_text(encoding="utf-8"))
+    assert data["format"] == "nirmaan.flow-document-check-pending"
+    return data["pending"]
+
+
+def test_the_pending_list_names_only_flow_requirements_documents_each_with_a_reason():
+    pending, documents = _pending(), set(_flow_requirements_documents())
+    assert set(pending) <= documents, sorted(set(pending) - documents)
+    assert all(isinstance(why, str) and why.strip() for why in pending.values())
+
+
 @pytest.mark.parametrize("doc", _flow_requirements_documents())
 def test_every_flow_requirements_document_has_a_current_check_record_by_another_session(doc):
     path = ROOT / doc
     record = path.with_name("requirements_check.json")
-    if not record.is_file():
-        if doc in CHECK_PENDING:
-            pytest.skip(f"{doc}: check record pending ({CHECK_PENDING[doc]})")
-        pytest.fail(f"{doc} has no check record: {record.relative_to(ROOT).as_posix()}")
-    assert doc not in CHECK_PENDING, f"{doc}: its record has landed, so remove it from CHECK_PENDING"
+    pending = _pending()
+    if doc in pending:  # its first record has not landed: it must not have one yet, or the entry is stale
+        assert not record.is_file(), f"{doc}: its record has landed, so remove it from {CHECK_PENDING.name}"
+        return
+    assert record.is_file(), f"{doc} has no check record ({record.relative_to(ROOT).as_posix()}) and is not pending"
     citations = json.loads(path.with_name("citations.json").read_text(encoding="utf-8"))
     problems = _check_record_problems(doc, json.loads(record.read_text(encoding="utf-8")), citations)
     assert problems == [], problems

@@ -210,8 +210,10 @@ An author never writes the record for its own document.
 
 `tests/test_whole_flow_cases.py` holds every `evals/flow/*/requirements.md`
 to this. Until a document's first record lands it is listed, with the reason,
-in `CHECK_PENDING` and its test skips; the entry must go when the record
-lands. Both documents are listed now: the timer document was rewritten after
+in `evals/flow/requirements_check_pending.json` (a data file); its test still
+runs and checks that it has no record yet, so the entry must go when the
+record lands, and a document neither listed nor recorded fails. No test
+skips. Both documents are listed now: the timer document was rewritten after
 an independent check found tags its checks do not reach and rules it left
 ambiguous, and the register block copy has never been checked. Another test
 shows the rule refuses a stale record, a record whose checker is its writer,
