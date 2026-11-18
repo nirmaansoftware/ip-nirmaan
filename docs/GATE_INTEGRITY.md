@@ -236,6 +236,12 @@ anyway is redacted from logs and from the uploaded record.
   log is the run's reference). Since M88 an eval trial and a test remove the
   ones they made (section 7); in a saved project they stay, and a retention
   policy for them is a product decision.
+* **Saved projects' run folders (M88 follow-up).** Their retention is a
+  product decision, not made here: they stay until one is made.
+* **Tests that start `nirmaan` as a subprocess (M88 follow-up).** Such a
+  process makes its temporary folders in the real `TMPDIR`, outside the
+  suite's folder, so they are not removed by the suite; `TMPDIR` is not set
+  for subprocesses, since a private one hung Yosys's ABC step (section 4).
 * **F7** (`pv.run` needs `openroad` for DRC only), **F13** (cover runs read a
   rewritten copy), and the rest of F21: the duplicated `_plural` and `_first`
   helpers, the two `_VERILATOR_NOISE` lists, and the unused `unregister_bus`.
