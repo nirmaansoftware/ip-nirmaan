@@ -172,8 +172,9 @@ def header_declarations(path: Path) -> set[str]:
     """Every top-level declaration of a C header, ``extern "C"`` blocks opened, struct members one by one."""
     raw = path.read_text(encoding="utf-8")
     code = _code(raw)
-    out = {_norm(f"#define {m[0]} {m[1]}") for m in re.findall(r"^\s*#\s*define\s+(\w+)[ \t]*([^\n]*)$", code,
-                                                                re.M)}
+    no_comments = re.sub(r"//[^\n]*|/\*.*?\*/", "", raw, flags=re.S)  # a macro's string value is kept
+    out = {_norm(f"#define {m[0]} {m[1]}")
+           for m in re.findall(r"^\s*#\s*define\s+(\w+)[ \t]*([^\n]*)$", no_comments, re.M)}
     pending = _top_level(_strip_preprocessor(code))
     while pending:
         head, body = pending.pop(0)

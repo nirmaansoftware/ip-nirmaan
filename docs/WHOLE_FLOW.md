@@ -230,16 +230,18 @@ The council record's addendum of 2026-11-18 replaced decision 2's fixture
 driver test for the register block with three things, which gate WF14 asks
 for before the first register block trial:
 
-- **The reach guard.** `tests/test_nirmaan_firmware_reach.py` needs no tool.
-  It pins, as exact lists: the members of `nirmaan_hal` and every declaration
-  of `nirmaan_hal.h` and `nirmaan_irq.h`; the external definitions of each
+- **The reach guard.** The guard tests in
+  `tests/test_nirmaan_firmware_reach.py` need no tool. They pin, as exact
+  lists: the members of `nirmaan_hal` and every declaration of
+  `nirmaan_hal.h` and `nirmaan_irq.h`; the external definitions of each
   host manager (`axil_manager.cpp`, `apb_manager.cpp`: the six `extern "C"`
   functions and `main`; everything else, and all of `harness_report.h`, is in
   an anonymous namespace); the files in the harness directory, which is on a
   driver test's include path; the registered managers; the headers each
   harness file includes; and the literal options of the Verilator build. Any
   addition, or an edit to a listed declaration, fails with the return
-  condition in its message.
+  condition in its message. (The same file's simulator test, below, needs the
+  firmware tools and runs in CI.)
 - **The wait probe**, the control above, recorded in
   `evals/flow/controls_record.json`.
 - **The return condition.** The fixture driver test is required again, before

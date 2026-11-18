@@ -3,7 +3,7 @@
   "controls": [
     {
       "id": "driver-all-strobes",
-      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44315985333/job/134842092511",
+      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44318772521/job/134851826753",
       "scores": [
         {
           "check": "6. The held-out test passes on the flow's driver against the reference RTL [driver-all-strobes 1]",
@@ -18,7 +18,7 @@
     },
     {
       "id": "driver-b-before-w",
-      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44315985333/job/134842092511",
+      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44318772521/job/134851826753",
       "scores": [
         {
           "check": "7. The flow's driver and driver test pass on the reference RTL and fail the mutants visible through the driver [driver-b-before-w 1]",
@@ -33,7 +33,7 @@
     },
     {
       "id": "driver-reference",
-      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44315985333/job/134842092511",
+      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44318772521/job/134851826753",
       "scores": [
         {
           "check": "4. The flow's driver alone builds under strict C flags [driver-reference 1]",
@@ -90,7 +90,7 @@
     },
     {
       "id": "driver-sticky-response",
-      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44315985333/job/134842092511",
+      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44318772521/job/134851826753",
       "scores": [
         {
           "check": "6. The held-out test passes on the flow's driver against the reference RTL [driver-sticky-response 1]",
@@ -105,7 +105,7 @@
     },
     {
       "id": "driver-swallowed-error",
-      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44315985333/job/134842092511",
+      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44318772521/job/134851826753",
       "scores": [
         {
           "check": "6. The held-out test passes on the flow's driver against the reference RTL [driver-swallowed-error 1]",
@@ -120,7 +120,7 @@
     },
     {
       "id": "driver-wait-probe",
-      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44315985333/job/134842092511",
+      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44318772521/job/134851826753",
       "scores": [
         {
           "check": "The seat's driver and driver test pass on this RTL [driver-wait-probe 1]",
@@ -141,7 +141,7 @@
     },
     {
       "id": "driver-wrong-map",
-      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44315985333/job/134842092511",
+      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44318772521/job/134851826753",
       "scores": [
         {
           "check": "6. The held-out test passes on the flow's driver against the reference RTL [driver-wrong-map 1]",
@@ -156,12 +156,12 @@
     },
     {
       "id": "regs-conforming-lat2",
-      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44315985333/job/134842092511",
+      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44318772521/job/134851826753",
       "scores": [
         {
           "check": "1. The reference testbench passes on the flow's RTL [regs-conforming-lat2 1]",
           "status": "passed",
-          "summary": "simulator.run run-0004: icarus: simulation passed: 298 checks passed, $finish reached at time 2320000, 0 errors"
+          "summary": "simulator.run run-0004: icarus: simulation passed: 414 checks passed, $finish reached at time 3300000, 0 errors"
         },
         {
           "check": "2. The flow's RTL implements the register map [regs-conforming-lat2 2]",
@@ -183,12 +183,12 @@
     },
     {
       "id": "regs-reference",
-      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44315985333/job/134842092511",
+      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44318772521/job/134851826753",
       "scores": [
         {
           "check": "1. The reference testbench passes on the flow's RTL [regs-reference 1]",
           "status": "passed",
-          "summary": "simulator.run run-0004: icarus: simulation passed: 298 checks passed, $finish reached at time 1710000, 0 errors"
+          "summary": "simulator.run run-0004: icarus: simulation passed: 414 checks passed, $finish reached at time 2490000, 0 errors"
         },
         {
           "check": "2. The flow's RTL implements the register map [regs-reference 2]",
@@ -210,12 +210,12 @@
     },
     {
       "id": "regs-rtl-b-before-w",
-      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44315985333/job/134842092511",
+      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44318772521/job/134851826753",
       "scores": [
         {
           "check": "1. The reference testbench passes on the flow's RTL [regs-rtl-b-before-w 1]",
           "status": "failed",
-          "summary": "simulator.run run-0004: icarus: simulation failed: 8 errors, the testbench reports 8 of 298 checks failed; first: /home/runner/work/ip-nirmaan/ip-nirmaan/tests/fixtures/rtl/axi4_lite/axi4_lite_regs_tb.v:92: write 0x0: BVALID before the request was accepted"
+          "summary": "simulator.run run-0004: icarus: simulation failed: 10 errors, the testbench reports 10 of 414 checks failed; first: /home/runner/work/ip-nirmaan/ip-nirmaan/evals/flow/axi4_lite/axi4_lite_regs_tb.v:103: write 0x0: BVALID before the request was accepted"
         }
       ],
       "submitted": true,
@@ -225,12 +225,12 @@
     },
     {
       "id": "regs-rtl-okay-unmapped",
-      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44315985333/job/134842092511",
+      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44318772521/job/134851826753",
       "scores": [
         {
           "check": "1. The reference testbench passes on the flow's RTL [regs-rtl-okay-unmapped 1]",
           "status": "failed",
-          "summary": "simulator.run run-0004: icarus: simulation failed: 2 errors, the testbench reports 2 of 298 checks failed; first: /home/runner/work/ip-nirmaan/ip-nirmaan/tests/fixtures/rtl/axi4_lite/axi4_lite_regs_tb.v:60: unmapped write SLVERR: got 0x00000000, expected 0x00000002"
+          "summary": "simulator.run run-0004: icarus: simulation failed: 2 errors, the testbench reports 2 of 414 checks failed; first: /home/runner/work/ip-nirmaan/ip-nirmaan/evals/flow/axi4_lite/axi4_lite_regs_tb.v:69: unmapped write SLVERR: got 0x00000000, expected 0x00000002"
         }
       ],
       "submitted": true,
@@ -240,12 +240,12 @@
     },
     {
       "id": "regs-rtl-wstrb-ignored",
-      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44315985333/job/134842092511",
+      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44318772521/job/134851826753",
       "scores": [
         {
           "check": "1. The reference testbench passes on the flow's RTL [regs-rtl-wstrb-ignored 1]",
           "status": "failed",
-          "summary": "simulator.run run-0004: icarus: simulation failed: 3 errors, the testbench reports 3 of 298 checks failed; first: /home/runner/work/ip-nirmaan/ip-nirmaan/tests/fixtures/rtl/axi4_lite/axi4_lite_regs_tb.v:60: wstrb 0101: got 0x11223344, expected 0xff22ff44"
+          "summary": "simulator.run run-0004: icarus: simulation failed: 3 errors, the testbench reports 3 of 414 checks failed; first: /home/runner/work/ip-nirmaan/ip-nirmaan/evals/flow/axi4_lite/axi4_lite_regs_tb.v:69: wstrb 0101: got 0x11223344, expected 0xff22ff44"
         }
       ],
       "submitted": true,
@@ -255,17 +255,17 @@
     },
     {
       "id": "regs-tb-strict2",
-      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44315985333/job/134842092511",
+      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44318772521/job/134851826753",
       "scores": [
         {
           "check": "1. The reference testbench passes on the flow's RTL [regs-tb-strict2 1]",
           "status": "passed",
-          "summary": "simulator.run run-0004: icarus: simulation passed: 298 checks passed, $finish reached at time 2320000, 0 errors"
+          "summary": "simulator.run run-0004: icarus: simulation passed: 414 checks passed, $finish reached at time 3300000, 0 errors"
         },
         {
           "check": "3. The flow's testbench passes on the reference RTL and fails each register block mutant [regs-tb-strict2 2]",
           "status": "failed",
-          "summary": "the clean inputs do not pass: simulator.run run-0005: icarus: simulation failed: 61 errors, the testbench reports 61 of 298 checks failed; first: /tmp/pytest-of-runner/pytest-0/test_the_control_gets_the_verd12/box/judge/check-2/must-fail-xfuhokv0/clean/axi4_lite_regs_tb_strict2.v:68: read latency exactly 2: got 0x00000000, expected 0x00000001"
+          "summary": "the clean inputs do not pass: simulator.run run-0005: icarus: simulation failed: 61 errors, the testbench reports 61 of 298 checks failed; first: /tmp/pytest-of-runner/pytest-0/test_the_control_gets_the_verd12/box/judge/check-2/must-fail-l2k_lkgd/clean/axi4_lite_regs_tb_strict2.v:68: read latency exactly 2: got 0x00000000, expected 0x00000001"
         }
       ],
       "submitted": true,
@@ -276,7 +276,7 @@
     },
     {
       "id": "regs-tb-trivial",
-      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44315985333/job/134842092511",
+      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44318772521/job/134851826753",
       "scores": [
         {
           "check": "3. The flow's testbench passes on the reference RTL and fails each register block mutant [regs-tb-trivial 1]",
@@ -291,12 +291,12 @@
     },
     {
       "id": "timer-reference",
-      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44315985333/job/134842092511",
+      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44318772521/job/134851826753",
       "scores": [
         {
           "check": "The reference testbench passes on the flow's RTL [timer-reference 1]",
           "status": "passed",
-          "summary": "simulator.run run-0004: icarus: simulation passed: 937 checks passed, $finish reached at time 4991000, 0 errors"
+          "summary": "simulator.run run-0004: icarus: simulation passed: 1065 checks passed, $finish reached at time 5451000, 0 errors"
         },
         {
           "check": "The flow's testbench passes on the reference RTL and fails each timer mutant [timer-reference 2]",
@@ -312,7 +312,7 @@
     },
     {
       "id": "timer-rtl-decode-alias",
-      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44315985333/job/134842092511",
+      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44318772521/job/134851826753",
       "scores": [
         {
           "check": "The reference testbench passes on the flow's RTL [timer-rtl-decode-alias 1]",
@@ -327,12 +327,12 @@
     },
     {
       "id": "timer-rtl-oneshot-runs-on",
-      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44315985333/job/134842092511",
+      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44318772521/job/134851826753",
       "scores": [
         {
           "check": "The reference testbench passes on the flow's RTL [timer-rtl-oneshot-runs-on 1]",
           "status": "failed",
-          "summary": "simulator.run run-0004: icarus: simulation failed: 48 errors, the testbench reports 48 of 937 checks failed; first: /home/runner/work/ip-nirmaan/ip-nirmaan/tests/fixtures/rtl/axil_timer/axil_timer_tb.v:87: lane AW=4: one-shot EN clears itself: got 0x00000003, expected 0x00000002"
+          "summary": "simulator.run run-0004: icarus: simulation failed: 50 errors, the testbench reports 50 of 1065 checks failed; first: /home/runner/work/ip-nirmaan/ip-nirmaan/evals/flow/axil_timer/axil_timer_tb.v:94: lane AW=4: one-shot EN clears itself: got 0x00000003, expected 0x00000002"
         }
       ],
       "submitted": true,
@@ -342,12 +342,12 @@
     },
     {
       "id": "timer-rtl-reload-off-by-one",
-      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44315985333/job/134842092511",
+      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44318772521/job/134851826753",
       "scores": [
         {
           "check": "The reference testbench passes on the flow's RTL [timer-rtl-reload-off-by-one 1]",
           "status": "failed",
-          "summary": "simulator.run run-0004: icarus: simulation failed: 6 errors, the testbench reports 6 of 937 checks failed; first: /home/runner/work/ip-nirmaan/ip-nirmaan/tests/fixtures/rtl/axil_timer/axil_timer_tb.v:87: lane AW=4: periodic period in cycles: got 0x00000008, expected 0x00000007"
+          "summary": "simulator.run run-0004: icarus: simulation failed: 6 errors, the testbench reports 6 of 1065 checks failed; first: /home/runner/work/ip-nirmaan/ip-nirmaan/evals/flow/axil_timer/axil_timer_tb.v:94: lane AW=4: periodic period in cycles: got 0x00000008, expected 0x00000007"
         }
       ],
       "submitted": true,
@@ -357,12 +357,12 @@
     },
     {
       "id": "timer-rtl-stop-ignored",
-      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44315985333/job/134842092511",
+      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44318772521/job/134851826753",
       "scores": [
         {
           "check": "The reference testbench passes on the flow's RTL [timer-rtl-stop-ignored 1]",
           "status": "failed",
-          "summary": "simulator.run run-0004: icarus: simulation failed: 8 errors, the testbench reports 8 of 937 checks failed; first: /home/runner/work/ip-nirmaan/ip-nirmaan/tests/fixtures/rtl/axil_timer/axil_timer_tb.v:87: lane AW=4: stop freezes COUNT: got 0x00000003, expected 0x00000006"
+          "summary": "simulator.run run-0004: icarus: simulation failed: 10 errors, the testbench reports 10 of 1065 checks failed; first: /home/runner/work/ip-nirmaan/ip-nirmaan/evals/flow/axil_timer/axil_timer_tb.v:94: lane AW=4: stop freezes COUNT: got 0x00000003, expected 0x00000006"
         }
       ],
       "submitted": true,
@@ -372,7 +372,7 @@
     },
     {
       "id": "timer-tb-trivial",
-      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44315985333/job/134842092511",
+      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44318772521/job/134851826753",
       "scores": [
         {
           "check": "The flow's testbench passes on the reference RTL and fails each timer mutant [timer-tb-trivial 1]",
@@ -387,7 +387,7 @@
     },
     {
       "id": "timer-tb-weak",
-      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44315985333/job/134842092511",
+      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44318772521/job/134851826753",
       "scores": [
         {
           "check": "The flow's testbench passes on the reference RTL and fails each timer mutant [timer-tb-weak 1]",
@@ -402,6 +402,6 @@
     }
   ],
   "format": "nirmaan.flow-controls-record",
-  "head": "6771b5627ffd8b37874c2802ca79080d051612f2",
-  "run": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44315985333"
+  "head": "dfce3a9abc9ca5473aecf5dfb97c1645c7d292d7",
+  "run": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44318772521"
 }
