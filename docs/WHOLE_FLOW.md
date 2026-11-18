@@ -65,9 +65,75 @@ case never runs as a single-seat case.
 Tests: `tests/test_whole_flow.py` and the whole-flow section of
 `tests/test_capability_levels.py`.
 
+## The two cases (M87, second pull request)
+
+Both live under `evals/flow/` and load only with `load_cases(..., flow="whole")`.
+Nothing existing is edited: the single-seat cases and their files keep their
+digests (WF3).
+
+| Case | Request | Seat (judged) | Fixed inputs | Checks |
+|---|---|---|---|---|
+| `flow/axil-timer` | "Create an AXI4-Lite timer peripheral with an interrupt." | rtl-implementation (RTL and its testbench) | `evals/flow/axil_timer/requirements.md` (new) | 2 |
+| `flow/axi4-lite-regs-driver` | "Create an AXI4-Lite register block and its driver." | firmware | `evals/flow/axi4_lite/requirements.md`, `evals/flow/axi4_lite/driver_api.md` (the case's copies) | 7 |
+
+**The fixed documents.** The timer document is new: it states, as behaviour
+at the ports, every rule the reference testbench checks and every rule a
+mutant breaks, each with a `[req:TMR-...]` tag. The register block document is
+a copy of `evals/spec/axi4_lite/requirements.md` with tags on section 1 and a
+section 4. Both state the rule that binds the flow's own tests: a test accepts
+every behaviour the document allows and never requires one choice inside a
+range (`TMR-TEST-RANGE`, `AXIL-TEST-RANGE`). The driver interface copy says the
+offsets and reset value are the requirements document's and that the map
+header must agree with the approved RTL; it never says "from the interface
+specification" or "derived from the RTL" (decision 2, "Where the register map
+comes from").
+
+**Citations.** `evals/flow/<block>/citations.json` (a data file, never a case)
+names, for every held-out check and every mutant, the tags or headings of the
+fixed documents it rests on. A test checks that each exists.
+
+**The held-out tests.** The register block case's held-out test is its own
+copy of the firmware case's, with an unmapped (misaligned) write added, so the
+`okay_unmapped` mutant is visible through the driver. Check 5 runs on the
+flow's own RTL with its top from the RTL stage's declared entry; the whole-flow
+runner resolves `rtl_source` from that stage.
+
+**Freedom left open.** The register block document allows a response 1 or 2
+cycles after its request. `tests/fixtures/rtl/axi4_lite/variants/` holds a
+second conforming RTL that answers after 2 (`axi4_lite_regs_lat2.v`) and a
+testbench written to that one choice (`axi4_lite_regs_tb_strict2.v`). The timer
+document leaves no choice open: its readiness, response timing, count length
+and every response are exact (the timer's interface specification already
+fixed them, and the reference testbench times a write to the edge,
+`axil_timer_tb.v` lines 380 to 383), so the timer has no conforming variant
+and no strict testbench. No strict driver test exists either: the HAL a driver
+test calls (`nirmaan_hal.h`) has no clock or cycle count, so a driver test
+cannot see latency; the judge controls record this by a run.
+
+**Fixtures for the controls.** Three wrong drivers (a swallowed bus error,
+`write_byte` with every strobe, a sticky `last_response`) under
+`tests/fixtures/fw/axi4_lite/`, and a weak timer testbench
+(`axil_timer_tb_fail.v`, both lanes at `ADDR_WIDTH` 4, so `decode_alias`
+passes it).
+
+**The requirements seat (fact 10, settled).** A file given through a case's
+`inputs` is task memory: it parameterizes the task's tools and is never
+rendered into a prompt (`runtime/prompt.py`), and the requirements task builds
+on no stage, so no approved upstream file carries it either.
+`tests/test_whole_flow_cases.py` shows neither the document's text nor its
+path reaches the requirements seat. Putting the document into the request
+text is no way out: the planner then reads other features from it
+(`existing_design`, `width_change`, `performance`), which changes what each
+seat is given. So the whole-flow runner must give the document as text by some
+other honest means, or fix the requirements stage and label every trial
+"seated from interface-spec" (decision 2). If that means an edit to
+`runtime/context.py` or `runtime/prompt.py`, both are `harness.CODE` files: the
+edit changes every fingerprint and belongs in the window with the runner's
+dispatch edit, never after it.
+
 ## Not yet
 
-The case files and fixed documents, the judge controls, the runner option (its
+The judge controls, the runner option (its
 dispatch edit to `runner.py` waits for the H3 batch, gate WF1), the record
 name suffix, the flow digest and the stop rule are later pull requests of the
 same record.

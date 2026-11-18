@@ -1,0 +1,91 @@
+{
+  "id": "flow/axil-timer",
+  "request": "Create an AXI4-Lite timer peripheral with an interrupt.",
+  "seat": "rtl-implementation",
+  "flow": "whole",
+  "skills": [],
+  "exercised": {
+    "requirements": [
+      "requirements_engineering"
+    ],
+    "interface-spec": [
+      "interface_specification"
+    ],
+    "microarchitecture": [
+      "rtl_microarchitecture"
+    ],
+    "rtl-implementation": [
+      "axi",
+      "fsm_design",
+      "rtl_design"
+    ]
+  },
+  "expected_behavior": "Every work stage is seated: the requirements, the interface specification and the microarchitecture carry the customer's fixed requirements document (evals/flow/axil_timer/requirements.md) forward, and the RTL stage writes module axil_timer and its own self-checking testbench, each stage gated by its own before-review checks. Only the final block is judged: the reference testbench on the flow's RTL, and the flow's testbench on the reference RTL and its four mutants. A whole-flow trial credits no skill and no level.",
+  "constraints": [
+    "The fixed requirements document is the customer's input: no stage changes what it states.",
+    "One seat writes the RTL and its testbench: this case is never described as specification, RTL, then independent verification.",
+    "Tests accept the whole allowed range ([req:TMR-TEST-RANGE]); this document leaves no timing or response choice open."
+  ],
+  "known_failure_modes": [
+    "A requirement of the fixed document lost or changed at the requirements, interface or microarchitecture stage, so the RTL follows a different contract.",
+    "A count one cycle long or short, or a first period that differs from the rest.",
+    "Offsets 0x10 and above aliasing the registers when ADDR_WIDTH is above 4.",
+    "A flow testbench that never instantiates a width above 4, or never times a count to the edge, so a mutant passes it.",
+    "A stage that never reaches review: the flow stops there and the trial is a failed trial."
+  ],
+  "inputs": {
+    "requirements": {
+      "customer_requirements": [
+        "evals/flow/axil_timer/requirements.md"
+      ]
+    }
+  },
+  "held_out": [
+    {
+      "name": "The reference testbench passes on the flow's RTL",
+      "scorer": "held-out-run",
+      "tool": "simulator.run",
+      "seat_files": {
+        "sources": [
+          "rtl_source"
+        ]
+      },
+      "case_files": {
+        "sources": [
+          "tests/fixtures/rtl/axil_timer/axil_timer_tb.v"
+        ]
+      },
+      "params": {
+        "top": "axil_timer_tb"
+      }
+    },
+    {
+      "name": "The flow's testbench passes on the reference RTL and fails each timer mutant",
+      "scorer": "must-fail",
+      "tool": "simulator.run",
+      "seat_files": {
+        "sources": [
+          "testbench"
+        ]
+      },
+      "seat_entries": {
+        "top": [
+          "testbench"
+        ]
+      },
+      "case_files": {
+        "sources": [
+          "tests/fixtures/rtl/axil_timer/axil_timer.v"
+        ]
+      },
+      "mutants": {
+        "tests/fixtures/rtl/axil_timer/axil_timer.v": [
+          "tests/fixtures/rtl/axil_timer/mutants/axil_timer_oneshot_runs_on.v",
+          "tests/fixtures/rtl/axil_timer/mutants/axil_timer_reload_off_by_one.v",
+          "tests/fixtures/rtl/axil_timer/mutants/axil_timer_stop_ignored.v",
+          "tests/fixtures/rtl/axil_timer/mutants/axil_timer_decode_alias.v"
+        ]
+      }
+    }
+  ]
+}
