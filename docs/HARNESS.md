@@ -258,6 +258,7 @@ label and the `whole_flow` list live in `models/evaluation.py`,
 `CODE` file, so adding them changed no fingerprint. For a whole-flow run only,
 the fingerprint's `run` section says `flow: whole` and a `flow` section digests
 `FLOW_CODE` (the flow module), as `loop` is for tools in the loop.
+On the default harness a whole flow gives each seated stage three attempts; the CI command has no attempts option, so a whole-flow trial in CI runs the default's three (council record 2026-11-17, third addendum, gate WF21).
 
 Five trials under one harness and three under another are two groups, never
 eight trials. Knowledge levels come from check records, not trials, and are

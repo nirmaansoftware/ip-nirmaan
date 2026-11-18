@@ -464,3 +464,43 @@ def test_the_recorded_credential_test_is_whole_and_the_register_block_flow_waits
     assert record["every_probe_denied"] == all(p["denied"] for p in record["probes"].values())
     if not record["every_probe_denied"]:
         assert ci.seat_c_problem(REGS_FLOW)
+
+
+# --- G3 third addendum (2026-11-19), gate WF21: no attempts option, and no whole-flow dispatch without its fingerprint
+
+def test_the_whole_flow_ci_command_carries_no_attempts_option(tmp_path):
+    for env in ({}, {"ATTEMPTS": "1"}, {"ATTEMPTS": "3"}):
+        opts = _opts(CASE=TIMER_FLOW, TRIALS="1", **env)
+        assert "attempts" not in opts
+        argv = ci.command(opts, tmp_path)
+        assert not any("attempt" in part for part in argv) and "--harness" not in argv
+    with pytest.raises(SystemExit):  # the script's own command line takes none either
+        ci.main(["check", "--attempts", "1"])
+    root = Path(ci.__file__).resolve().parents[1]
+    workflow = (root / ".github" / "workflows" / "live-eval.yml").read_text(encoding="utf-8")
+    assert "attempts:" not in workflow and "ATTEMPTS" not in workflow and "--attempts" not in workflow
+
+
+def test_a_whole_flow_dispatch_with_no_expected_fingerprint_is_refused_before_any_trial(monkeypatch, tmp_path,
+                                                                                         capsys):
+    monkeypatch.setattr(ci, "installed_cli", lambda: "2.1.325")
+    monkeypatch.setattr(ci, "run_trials", lambda *a, **k: pytest.fail("a trial started"))
+    monkeypatch.setattr(ci, "stream", lambda *a, **k: pytest.fail("a trial started"))
+    for key, value in {"CASE": TIMER_FLOW, "TRIALS": "1", "KNOWLEDGE": "on", "PURPOSE": "evidence",
+                       "HARNESS": "default"}.items():
+        monkeypatch.setenv(key, value)
+    for expected in (None, "", "  "):
+        if expected is None:
+            monkeypatch.delenv("EXPECTED", raising=False)
+        else:
+            monkeypatch.setenv("EXPECTED", expected)
+        for argv in (["check", "--require-expected"], ["trials", "--out", str(tmp_path / "out")]):
+            assert ci.main(argv) == ci.BAD_INPUT, argv
+        assert "name the expected harness fingerprint" in capsys.readouterr().err
+    assert not (tmp_path / "out").exists()
+    # With the whole-flow fingerprint named, the same check passes; the single-seat one is not accepted for it.
+    whole = harness_sha256(cli="2.1.325", flow="whole")
+    monkeypatch.setenv("EXPECTED", whole)
+    assert ci.main(["check", "--require-expected"]) == 0
+    monkeypatch.setenv("EXPECTED", harness_sha256(cli="2.1.325"))
+    assert ci.main(["check", "--require-expected"]) == ci.MISMATCH
