@@ -32,7 +32,7 @@ CASES = {"flow/axil-timer": FLOW / "axil_timer" / "citations.json",
 FIXTURES = ("tests/fixtures/fw/axi4_lite/axi4_lite_regs_drv_swallowed_error.c",
             "tests/fixtures/fw/axi4_lite/axi4_lite_regs_drv_all_strobes.c",
             "tests/fixtures/fw/axi4_lite/axi4_lite_regs_drv_sticky_response.c",
-            "tests/fixtures/rtl/axil_timer/axil_timer_tb_fail.v",
+            "tests/fixtures/rtl/axil_timer/axil_timer_tb_weak.v",
             "tests/fixtures/rtl/axi4_lite/variants/axi4_lite_regs_lat2.v",
             "tests/fixtures/rtl/axi4_lite/variants/axi4_lite_regs_tb_strict2.v")
 
@@ -119,6 +119,12 @@ def test_every_check_and_mutant_cites_a_statement_in_the_fixed_documents(cases, 
         assert cited
         for ref in cited:
             assert ref in tags or ref in headings, (case_id, ref)
+    # And the other way: every tag is cited by a check or a mutant, or listed as judged by none, with the reason.
+    cited_tags = {ref for refs in [*data["checks"].values(), *data["mutants"].values()] for ref in refs} & tags
+    not_judged = data["not_judged"]
+    assert all(isinstance(why, str) and why for why in not_judged.values())
+    assert set(not_judged) <= tags and not set(not_judged) & cited_tags
+    assert cited_tags | set(not_judged) == tags, sorted(tags - cited_tags - set(not_judged))
 
 
 def test_each_tag_is_stated_once_and_both_documents_state_the_whole_range_rule():

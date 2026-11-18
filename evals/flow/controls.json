@@ -1,0 +1,622 @@
+{
+  "format": "nirmaan.flow-controls",
+  "controls": [
+    {
+      "id": "timer-reference",
+      "case": "flow/axil-timer",
+      "what": "The reference RTL and testbench: the reference testbench passes on it, and it passes the must-fail check (clean pass, four mutants caught).",
+      "seat": [
+        {
+          "path": "tests/fixtures/rtl/axil_timer/axil_timer.v",
+          "kind": "rtl_source",
+          "as": "axil_timer.v",
+          "entry": "axil_timer"
+        },
+        {
+          "path": "tests/fixtures/rtl/axil_timer/axil_timer_tb.v",
+          "kind": "testbench",
+          "entry": "axil_timer_tb"
+        }
+      ],
+      "checks": [
+        {
+          "check": 1,
+          "expect": "passed"
+        },
+        {
+          "check": 2,
+          "expect": "passed"
+        }
+      ]
+    },
+    {
+      "id": "timer-rtl-oneshot-runs-on",
+      "case": "flow/axil-timer",
+      "what": "A flow ending in the oneshot_runs_on mutant RTL (with a testbench that lets it reach review): the reference testbench fails it.",
+      "seat": [
+        {
+          "path": "tests/fixtures/rtl/axil_timer/mutants/axil_timer_oneshot_runs_on.v",
+          "kind": "rtl_source",
+          "as": "axil_timer.v",
+          "entry": "axil_timer"
+        },
+        {
+          "path": "tests/fixtures/rtl/axil_timer/axil_timer_tb_trivial.v",
+          "kind": "testbench",
+          "entry": "axil_timer_tb_trivial"
+        }
+      ],
+      "checks": [
+        {
+          "check": 1,
+          "expect": "failed"
+        }
+      ]
+    },
+    {
+      "id": "timer-rtl-reload-off-by-one",
+      "case": "flow/axil-timer",
+      "what": "A flow ending in the reload_off_by_one mutant RTL (with a testbench that lets it reach review): the reference testbench fails it.",
+      "seat": [
+        {
+          "path": "tests/fixtures/rtl/axil_timer/mutants/axil_timer_reload_off_by_one.v",
+          "kind": "rtl_source",
+          "as": "axil_timer.v",
+          "entry": "axil_timer"
+        },
+        {
+          "path": "tests/fixtures/rtl/axil_timer/axil_timer_tb_trivial.v",
+          "kind": "testbench",
+          "entry": "axil_timer_tb_trivial"
+        }
+      ],
+      "checks": [
+        {
+          "check": 1,
+          "expect": "failed"
+        }
+      ]
+    },
+    {
+      "id": "timer-rtl-stop-ignored",
+      "case": "flow/axil-timer",
+      "what": "A flow ending in the stop_ignored mutant RTL (with a testbench that lets it reach review): the reference testbench fails it.",
+      "seat": [
+        {
+          "path": "tests/fixtures/rtl/axil_timer/mutants/axil_timer_stop_ignored.v",
+          "kind": "rtl_source",
+          "as": "axil_timer.v",
+          "entry": "axil_timer"
+        },
+        {
+          "path": "tests/fixtures/rtl/axil_timer/axil_timer_tb_trivial.v",
+          "kind": "testbench",
+          "entry": "axil_timer_tb_trivial"
+        }
+      ],
+      "checks": [
+        {
+          "check": 1,
+          "expect": "failed"
+        }
+      ]
+    },
+    {
+      "id": "timer-rtl-decode-alias",
+      "case": "flow/axil-timer",
+      "what": "A flow ending in the decode_alias mutant RTL: it never reaches review, because the seat's own lint gate refuses it (the address bits it ignores are unused), so the flow fails at that stage and no check runs. That the reference testbench fails it is shown by timer-reference's check 2.",
+      "seat": [
+        {
+          "path": "tests/fixtures/rtl/axil_timer/mutants/axil_timer_decode_alias.v",
+          "kind": "rtl_source",
+          "as": "axil_timer.v",
+          "entry": "axil_timer"
+        },
+        {
+          "path": "tests/fixtures/rtl/axil_timer/axil_timer_tb_trivial.v",
+          "kind": "testbench",
+          "entry": "axil_timer_tb_trivial"
+        }
+      ],
+      "checks": [
+        {
+          "check": 1,
+          "expect": "not_run"
+        }
+      ],
+      "reaches_review": false
+    },
+    {
+      "id": "timer-tb-weak",
+      "case": "flow/axil-timer",
+      "what": "The weak timer testbench (both lanes at ADDR_WIDTH 4): the must-fail check fails it (decode_alias survives).",
+      "seat": [
+        {
+          "path": "tests/fixtures/rtl/axil_timer/axil_timer.v",
+          "kind": "rtl_source",
+          "as": "axil_timer.v",
+          "entry": "axil_timer"
+        },
+        {
+          "path": "tests/fixtures/rtl/axil_timer/axil_timer_tb_weak.v",
+          "kind": "testbench",
+          "entry": "axil_timer_tb_weak"
+        }
+      ],
+      "checks": [
+        {
+          "check": 2,
+          "expect": "failed"
+        }
+      ]
+    },
+    {
+      "id": "timer-tb-trivial",
+      "case": "flow/axil-timer",
+      "what": "A testbench that checks next to nothing: the must-fail check fails it.",
+      "seat": [
+        {
+          "path": "tests/fixtures/rtl/axil_timer/axil_timer.v",
+          "kind": "rtl_source",
+          "as": "axil_timer.v",
+          "entry": "axil_timer"
+        },
+        {
+          "path": "tests/fixtures/rtl/axil_timer/axil_timer_tb_trivial.v",
+          "kind": "testbench",
+          "entry": "axil_timer_tb_trivial"
+        }
+      ],
+      "checks": [
+        {
+          "check": 2,
+          "expect": "failed"
+        }
+      ]
+    },
+    {
+      "id": "regs-reference",
+      "case": "flow/axi4-lite-regs-driver",
+      "what": "The reference RTL and testbench: checks 1, 2 and 3 pass.",
+      "seat": [
+        {
+          "path": "tests/fixtures/rtl/axi4_lite/axi4_lite_regs.v",
+          "kind": "rtl_source",
+          "as": "axi4_lite_regs.v",
+          "entry": "axi4_lite_regs"
+        },
+        {
+          "path": "tests/fixtures/rtl/axi4_lite/axi4_lite_regs_tb.v",
+          "kind": "testbench",
+          "entry": "axi4_lite_regs_tb"
+        }
+      ],
+      "checks": [
+        {
+          "check": 1,
+          "expect": "passed"
+        },
+        {
+          "check": 2,
+          "expect": "passed"
+        },
+        {
+          "check": 3,
+          "expect": "passed"
+        }
+      ]
+    },
+    {
+      "id": "regs-conforming-lat2",
+      "case": "flow/axi4-lite-regs-driver",
+      "what": "The second conforming RTL (responses after 2 cycles) with the reference testbench: checks 1 and 2 on it pass, and the reference testbench, which accepts the whole range, passes check 3 on the reference RTL too.",
+      "seat": [
+        {
+          "path": "tests/fixtures/rtl/axi4_lite/variants/axi4_lite_regs_lat2.v",
+          "kind": "rtl_source",
+          "as": "axi4_lite_regs.v",
+          "entry": "axi4_lite_regs"
+        },
+        {
+          "path": "tests/fixtures/rtl/axi4_lite/axi4_lite_regs_tb.v",
+          "kind": "testbench",
+          "entry": "axi4_lite_regs_tb"
+        }
+      ],
+      "checks": [
+        {
+          "check": 1,
+          "expect": "passed"
+        },
+        {
+          "check": 2,
+          "expect": "passed"
+        },
+        {
+          "check": 3,
+          "expect": "passed"
+        }
+      ]
+    },
+    {
+      "id": "regs-rtl-wstrb-ignored",
+      "case": "flow/axi4-lite-regs-driver",
+      "what": "A flow ending in the wstrb_ignored mutant RTL (with a testbench that lets it reach review): the reference testbench fails it.",
+      "seat": [
+        {
+          "path": "tests/fixtures/rtl/axi4_lite/mutants/axi4_lite_regs_wstrb_ignored.v",
+          "kind": "rtl_source",
+          "as": "axi4_lite_regs.v",
+          "entry": "axi4_lite_regs"
+        },
+        {
+          "path": "tests/fixtures/rtl/axi4_lite/axi4_lite_regs_tb_trivial.v",
+          "kind": "testbench",
+          "entry": "axi4_lite_regs_tb_trivial"
+        }
+      ],
+      "checks": [
+        {
+          "check": 1,
+          "expect": "failed"
+        }
+      ]
+    },
+    {
+      "id": "regs-rtl-okay-unmapped",
+      "case": "flow/axi4-lite-regs-driver",
+      "what": "A flow ending in the okay_unmapped mutant RTL (with a testbench that lets it reach review): the reference testbench fails it.",
+      "seat": [
+        {
+          "path": "tests/fixtures/rtl/axi4_lite/mutants/axi4_lite_regs_okay_unmapped.v",
+          "kind": "rtl_source",
+          "as": "axi4_lite_regs.v",
+          "entry": "axi4_lite_regs"
+        },
+        {
+          "path": "tests/fixtures/rtl/axi4_lite/axi4_lite_regs_tb_trivial.v",
+          "kind": "testbench",
+          "entry": "axi4_lite_regs_tb_trivial"
+        }
+      ],
+      "checks": [
+        {
+          "check": 1,
+          "expect": "failed"
+        }
+      ]
+    },
+    {
+      "id": "regs-rtl-b-before-w",
+      "case": "flow/axi4-lite-regs-driver",
+      "what": "A flow ending in the b_before_w mutant RTL (with a testbench that lets it reach review): the reference testbench fails it.",
+      "seat": [
+        {
+          "path": "tests/fixtures/rtl/axi4_lite/mutants/axi4_lite_regs_b_before_w.v",
+          "kind": "rtl_source",
+          "as": "axi4_lite_regs.v",
+          "entry": "axi4_lite_regs"
+        },
+        {
+          "path": "tests/fixtures/rtl/axi4_lite/axi4_lite_regs_tb_trivial.v",
+          "kind": "testbench",
+          "entry": "axi4_lite_regs_tb_trivial"
+        }
+      ],
+      "checks": [
+        {
+          "check": 1,
+          "expect": "failed"
+        }
+      ]
+    },
+    {
+      "id": "regs-tb-strict2",
+      "case": "flow/axi4-lite-regs-driver",
+      "what": "A testbench written to the conforming RTL's one choice (exactly 2 cycles), submitted with that RTL: check 1 passes, and check 3 fails it on the reference RTL.",
+      "seat": [
+        {
+          "path": "tests/fixtures/rtl/axi4_lite/variants/axi4_lite_regs_lat2.v",
+          "kind": "rtl_source",
+          "as": "axi4_lite_regs.v",
+          "entry": "axi4_lite_regs"
+        },
+        {
+          "path": "tests/fixtures/rtl/axi4_lite/variants/axi4_lite_regs_tb_strict2.v",
+          "kind": "testbench",
+          "entry": "axi4_lite_regs_tb_strict2"
+        }
+      ],
+      "checks": [
+        {
+          "check": 1,
+          "expect": "passed"
+        },
+        {
+          "check": 3,
+          "expect": "failed"
+        }
+      ]
+    },
+    {
+      "id": "regs-tb-trivial",
+      "case": "flow/axi4-lite-regs-driver",
+      "what": "A testbench that checks next to nothing: check 3 fails it.",
+      "seat": [
+        {
+          "path": "tests/fixtures/rtl/axi4_lite/axi4_lite_regs.v",
+          "kind": "rtl_source",
+          "as": "axi4_lite_regs.v",
+          "entry": "axi4_lite_regs"
+        },
+        {
+          "path": "tests/fixtures/rtl/axi4_lite/axi4_lite_regs_tb_trivial.v",
+          "kind": "testbench",
+          "entry": "axi4_lite_regs_tb_trivial"
+        }
+      ],
+      "checks": [
+        {
+          "check": 3,
+          "expect": "failed"
+        }
+      ]
+    },
+    {
+      "id": "driver-reference",
+      "case": "flow/axi4-lite-regs-driver",
+      "what": "The reference driver and driver test, upstream the reference RTL: it builds alone; the held-out test passes on the reference RTL and on the conforming RTL and fails on wstrb_ignored and okay_unmapped; fw.test works under the must-fail scorer (check 7: clean pass, wstrb_ignored and okay_unmapped caught); the reference driver test passes on both RTLs with the same bus transcript, so no driver test can see latency through the HAL.",
+      "seat": [
+        {
+          "path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_map.h",
+          "kind": "driver",
+          "as": "axi4_lite_regs_map.h"
+        },
+        {
+          "path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_drv.h",
+          "kind": "driver"
+        },
+        {
+          "path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_drv.c",
+          "kind": "driver",
+          "as": "axi4_lite_regs_drv.c"
+        },
+        {
+          "path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_test.c",
+          "kind": "driver_test",
+          "as": "axi4_lite_regs_test.c"
+        }
+      ],
+      "checks": [
+        {
+          "check": 4,
+          "expect": "passed"
+        },
+        {
+          "check": 6,
+          "expect": "passed"
+        },
+        {
+          "check": 6,
+          "rtl": "tests/fixtures/rtl/axi4_lite/variants/axi4_lite_regs_lat2.v",
+          "expect": "passed"
+        },
+        {
+          "check": 6,
+          "rtl": "tests/fixtures/rtl/axi4_lite/mutants/axi4_lite_regs_wstrb_ignored.v",
+          "expect": "failed"
+        },
+        {
+          "check": 6,
+          "rtl": "tests/fixtures/rtl/axi4_lite/mutants/axi4_lite_regs_okay_unmapped.v",
+          "expect": "failed"
+        },
+        {
+          "check": 7,
+          "expect": "passed"
+        },
+        {
+          "inline": {
+            "name": "The seat's driver and driver test pass on this RTL",
+            "scorer": "held-out-run",
+            "tool": "fw.test",
+            "seat_files": {
+              "sources": [
+                "driver",
+                "driver_test"
+              ]
+            },
+            "params": {
+              "top": "axi4_lite_regs"
+            }
+          },
+          "rtl": "tests/fixtures/rtl/axi4_lite/axi4_lite_regs.v",
+          "expect": "passed",
+          "transcript": "ref"
+        },
+        {
+          "inline": {
+            "name": "The seat's driver and driver test pass on this RTL",
+            "scorer": "held-out-run",
+            "tool": "fw.test",
+            "seat_files": {
+              "sources": [
+                "driver",
+                "driver_test"
+              ]
+            },
+            "params": {
+              "top": "axi4_lite_regs"
+            }
+          },
+          "rtl": "tests/fixtures/rtl/axi4_lite/variants/axi4_lite_regs_lat2.v",
+          "expect": "passed",
+          "transcript": "ref"
+        }
+      ]
+    },
+    {
+      "id": "driver-b-before-w",
+      "case": "flow/axi4-lite-regs-driver",
+      "what": "Whether the b_before_w mutant is visible through the HAL: the reference driver and driver test under the must-fail scorer with that mutant alone. The ruling assumed it is not (so check 7 leaves it out); this run records the answer either way.",
+      "seat": [
+        {
+          "path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_map.h",
+          "kind": "driver",
+          "as": "axi4_lite_regs_map.h"
+        },
+        {
+          "path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_drv.h",
+          "kind": "driver"
+        },
+        {
+          "path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_drv.c",
+          "kind": "driver",
+          "as": "axi4_lite_regs_drv.c"
+        },
+        {
+          "path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_test.c",
+          "kind": "driver_test",
+          "as": "axi4_lite_regs_test.c"
+        }
+      ],
+      "checks": [
+        {
+          "check": 7,
+          "mutants": [
+            "tests/fixtures/rtl/axi4_lite/mutants/axi4_lite_regs_b_before_w.v"
+          ],
+          "expect": "failed"
+        }
+      ]
+    },
+    {
+      "id": "driver-wrong-map",
+      "case": "flow/axi4-lite-regs-driver",
+      "what": "The reference driver with the wrong map header under the map's name (REG2 at REG1's offset): the held-out test fails it.",
+      "seat": [
+        {
+          "path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_map_wrong.h",
+          "kind": "driver",
+          "as": "axi4_lite_regs_map.h"
+        },
+        {
+          "path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_drv.h",
+          "kind": "driver"
+        },
+        {
+          "path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_drv.c",
+          "kind": "driver",
+          "as": "axi4_lite_regs_drv.c"
+        },
+        {
+          "path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_test_lenient.c",
+          "kind": "driver_test",
+          "as": "axi4_lite_regs_test.c"
+        }
+      ],
+      "checks": [
+        {
+          "check": 6,
+          "expect": "failed"
+        }
+      ]
+    },
+    {
+      "id": "driver-swallowed-error",
+      "case": "flow/axi4-lite-regs-driver",
+      "what": "The swallowed_error fixture driver: the held-out test fails it.",
+      "seat": [
+        {
+          "path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_map.h",
+          "kind": "driver",
+          "as": "axi4_lite_regs_map.h"
+        },
+        {
+          "path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_drv.h",
+          "kind": "driver"
+        },
+        {
+          "path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_drv_swallowed_error.c",
+          "kind": "driver",
+          "as": "axi4_lite_regs_drv.c"
+        },
+        {
+          "path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_test_lenient.c",
+          "kind": "driver_test",
+          "as": "axi4_lite_regs_test.c"
+        }
+      ],
+      "checks": [
+        {
+          "check": 6,
+          "expect": "failed"
+        }
+      ]
+    },
+    {
+      "id": "driver-all-strobes",
+      "case": "flow/axi4-lite-regs-driver",
+      "what": "The all_strobes fixture driver: the held-out test fails it.",
+      "seat": [
+        {
+          "path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_map.h",
+          "kind": "driver",
+          "as": "axi4_lite_regs_map.h"
+        },
+        {
+          "path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_drv.h",
+          "kind": "driver"
+        },
+        {
+          "path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_drv_all_strobes.c",
+          "kind": "driver",
+          "as": "axi4_lite_regs_drv.c"
+        },
+        {
+          "path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_test_lenient.c",
+          "kind": "driver_test",
+          "as": "axi4_lite_regs_test.c"
+        }
+      ],
+      "checks": [
+        {
+          "check": 6,
+          "expect": "failed"
+        }
+      ]
+    },
+    {
+      "id": "driver-sticky-response",
+      "case": "flow/axi4-lite-regs-driver",
+      "what": "The sticky_response fixture driver: the held-out test fails it.",
+      "seat": [
+        {
+          "path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_map.h",
+          "kind": "driver",
+          "as": "axi4_lite_regs_map.h"
+        },
+        {
+          "path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_drv.h",
+          "kind": "driver"
+        },
+        {
+          "path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_drv_sticky_response.c",
+          "kind": "driver",
+          "as": "axi4_lite_regs_drv.c"
+        },
+        {
+          "path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_test_lenient.c",
+          "kind": "driver_test",
+          "as": "axi4_lite_regs_test.c"
+        }
+      ],
+      "checks": [
+        {
+          "check": 6,
+          "expect": "failed"
+        }
+      ]
+    }
+  ]
+}

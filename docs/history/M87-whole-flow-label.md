@@ -33,5 +33,11 @@ driver interface and held-out test, a citation file per case, and the
 fixtures for the controls. A test settles fact 10: a document given through a
 case's `inputs` never reaches the requirements seat as text.
 
-**Not here.** The judge controls, and the runner option (its `runner.py`
-dispatch waits for the H3 batch, gate WF1).
+**The judge controls (third pull request).** `evals/flow/controls.json`, 20
+replays through the real gates and scorers with no model call, run in CI
+(`tests/test_whole_flow_controls.py`), and their recorded CI run in
+`evals/flow/controls_record.json`. They confirm by a run that `b_before_w` is
+not visible through the HAL and that no driver test can see latency.
+
+**Not here.** The runner option (its `runner.py` dispatch waits for the H3
+batch, gate WF1).

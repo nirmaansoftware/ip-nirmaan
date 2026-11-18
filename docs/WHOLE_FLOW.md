@@ -90,7 +90,11 @@ comes from").
 
 **Citations.** `evals/flow/<block>/citations.json` (a data file, never a case)
 names, for every held-out check and every mutant, the tags or headings of the
-fixed documents it rests on. A test checks that each exists.
+fixed documents it rests on, and lists under `not_judged`, with the reason,
+every tag no check or mutant rests on (the timer's `TMR-CTRL-WINS`, which the
+reference testbench never exercises, and the tags the RTL stage's own gates
+cover: `TMR-CLEAN`, `AXIL-SYNTH`, `AXIL-FORMAL`). A test checks both ways: each
+cited tag or heading exists, and each tag is cited or listed.
 
 **The held-out tests.** The register block case's held-out test is its own
 copy of the firmware case's, with an unmapped (misaligned) write added, so the
@@ -113,8 +117,9 @@ cannot see latency; the judge controls record this by a run.
 **Fixtures for the controls.** Three wrong drivers (a swallowed bus error,
 `write_byte` with every strobe, a sticky `last_response`) under
 `tests/fixtures/fw/axi4_lite/`, and a weak timer testbench
-(`axil_timer_tb_fail.v`, both lanes at `ADDR_WIDTH` 4, so `decode_alias`
-passes it).
+(`axil_timer_tb_weak.v`, named `_weak`, not `_tb_fail`, since it passes on the
+reference RTL, unlike every `_tb_fail.v` in `docs/IP_BLOCKS.md`; both lanes at
+`ADDR_WIDTH` 4, so `decode_alias` passes it).
 
 **The requirements seat (fact 10, settled).** A file given through a case's
 `inputs` is task memory: it parameterizes the task's tools and is never
@@ -131,9 +136,59 @@ other honest means, or fix the requirements stage and label every trial
 edit changes every fingerprint and belongs in the window with the runner's
 dispatch edit, never after it.
 
+## The judge controls (M87, third pull request)
+
+Gates WF4 and WF5 need each case's judge proven by replays with no model call,
+run in CI, before the first trial. `evals/flow/controls.json` lists 20
+controls. Each is a seat answer made of committed files and the whole-flow
+case's own held-out checks it must pass or fail, sometimes with the RTL a
+check runs on put in another's place. `tests/test_whole_flow_controls.py` runs
+each as a single-seat case through the real runner, gates, scorers and broker
+(`evaluate`), with no change to `runner.py`: the seat replays the files, its
+own before-review checks run, and the judge rules. A control's seat reaches
+review, so a failed check is the judge's verdict. The tool-backed tests need
+the EDA tools; CI's test job names them in `NIRMAAN_REQUIRE_EDA`, so there they
+run and never skip.
+
+What they show:
+
+- the reference passes: the timer's checks 1 and 2, the register block's
+  checks 1 to 3, and checks 4, 6 and 7 for the reference driver;
+- each planted fault fails: the reference testbench fails a flow ending in
+  each register block mutant and in three of the timer mutants; the fourth,
+  `decode_alias`, is refused by the seat's own lint gate, so that flow stops
+  before review (the reference testbench catching it is shown by the must-fail
+  check of `timer-reference`); the weak timer testbench and a testbench that
+  checks next to nothing fail the must-fail checks; the held-out test fails
+  the wrong map header under the map's name, the three wrong drivers, and the
+  reference driver on `wstrb_ignored` and `okay_unmapped`;
+- the conforming RTL (`axi4_lite_regs_lat2.v`) passes the checks that run on
+  the flow's RTL (1 and 2; check 5 waits for the runner), and the held-out
+  test passes on it;
+- the range-accepting reference tests pass on both RTLs, and the testbench
+  written to the variant's one choice fails check 3 on the reference RTL;
+- `fw.test` works under the must-fail scorer (check 7: the clean run passes
+  and `wstrb_ignored` and `okay_unmapped` are caught);
+- `b_before_w` is not visible through the HAL: under the must-fail scorer
+  with that mutant alone, the reference driver test passes on it. The ruling
+  assumed so and left it out of check 7; this run records it;
+- no driver test can see latency: the reference driver test passes on both
+  RTLs with the same bus transfers, and the HAL has no clock or cycle count.
+  So no strict driver test exists, and checks 6 and 7 cannot fail for being
+  stricter than the latency bound.
+
+Each control prints one `FLOW-CONTROL` line with its verdicts and run
+summaries. `evals/flow/controls_record.json` keeps those lines from a named
+CI run (the check record, not an eval record), and the test holds every later
+run to the verdicts it records.
+
+Left for the whole-flow runner: the reference flow replayed through every
+seated stage, a flow with a planted upstream fault, and check 5, which takes
+the RTL from another stage.
+
 ## Not yet
 
-The judge controls, the runner option (its
+The runner option (its
 dispatch edit to `runner.py` waits for the H3 batch, gate WF1), the record
 name suffix, the flow digest and the stop rule are later pull requests of the
 same record.
