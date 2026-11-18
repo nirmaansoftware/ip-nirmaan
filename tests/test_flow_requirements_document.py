@@ -61,7 +61,9 @@ def test_the_document_reaches_the_requirements_seat_whole_and_citable(org, tmp_p
     # Citable as a document, never as an artifact: no draft may derive from a record the engine does not hold.
     assert [c.kind for c in prompt.citations if c.target == view.id] == ["document"]
     text = "".join(render_parts(prompt))
-    assert DOCUMENT.read_text(encoding="utf-8") in text and "customer_document, approved" in text
+    assert DOCUMENT.read_text(encoding="utf-8") in text and "customer_document, customer input" in text
+    # Input from outside, never called approved by the organization.
+    assert view.assurance == context.DOCUMENT_ASSURANCE and "customer_document, approved" not in text
     for stage, task in stages.items():  # only the task it was given to
         if stage != "requirements":
             assert "[req:TMR-MODULE]" not in _prompt(engine, task.id), stage
@@ -86,6 +88,16 @@ def test_only_a_task_scoped_document_key_counts(org, tmp_path):
     engine.remember(MemoryScope.TASK, task.id, "input.customer_requirements", value, actor)  # an input: never shown
     engine.remember(MemoryScope.PROJECT, engine.state.project.id, "document.customer_requirements", value, actor)
     assert "[req:TMR-MODULE]" not in _prompt(engine, task.id)
+
+
+@pytest.mark.parametrize("value", ["no-space-at-all", f"{DOCUMENT}", "sha256:abc "])
+def test_a_malformed_document_value_shows_nothing(org, value):
+    engine = Orchestrator(org).plan(TIMER)
+    task = _stages(engine)["requirements"]
+    actor = Actor(role=str(task.owner), kind=ActorKind.SYSTEM, name="eval-flow")
+    engine.remember(MemoryScope.TASK, task.id, "document.customer_requirements", str(value), actor)
+    packet = assemble(engine, task.id)
+    assert not [a for a in packet.task.upstream_artifacts if a.kind == context.DOCUMENT_KIND]
 
 
 @pytest.mark.parametrize("case", load_cases(ROOT / "evals"), ids=lambda c: c.id)

@@ -301,6 +301,10 @@ no model call, run in CI, committed with their records:
   reference RTL (3, 6 and 7) catch a test that does not. Those checks are
   fair by the rule, which the fixed document states to the seats, and not by
   the conforming RTL alone.
+  (Amended 2026-11-18 for the fixture driver test: see the addendum at the
+  end of this record.)
+  (Amended again 2026-11-18: the fixture driver test is required again. See
+  the second addendum.)
 
 Who disagreed. On the driver's RTL: design-architect and product-lead held
 that the flow's own RTL is the pass condition and the reference run a
@@ -475,6 +479,12 @@ trials only after the default harness is named.
 | WF3 | The fixed documents are committed before any trial; every held-out check and mutant cites a statement in them; the pull request that commits them changes no existing check | design-architect |
 | WF4 | For each case the judge controls are committed with recorded CI runs before the first trial: the reference passes; a planted fault fails; a conforming RTL passes the checks on the flow's RTL; the range-accepting reference tests pass on both RTLs and a test written to one choice fails on the reference RTL. The fixed document states the whole-range rule to the seats | verification-lead |
 | WF5 | The driver controls of decision 2 exist as fixtures and are shown failing in a recorded run, and the unmapped-write check is in the case's held-out test, before the first register block trial | firmware-engineer |
+| WF14 | Added 2026-11-18 by the addendum, which also amends what WF4 and WF5 ask for on the driver side: the reach guard test and the recorded wait-probe control are merged, and `docs/WHOLE_FLOW.md` and the `driver-reference` text in `evals/flow/controls.json` are corrected, before the first register block trial | firmware-engineer |
+| WF15 | Added 2026-11-18 by the second addendum: the strict fixture driver test and the strict fixture driver are committed and recorded as that addendum's decision 1 asks, on the build the trials will use, before the first register block trial. WF4 and WF5 are not met for the register block before this | firmware-engineer |
+| WF16 | Added 2026-11-18 by the second addendum: the object screen of its decision 2 is merged and in force for every whole-flow check that links seat-written C, with its allow list, its refused fixtures and its probes of what it does not stop recorded, before the first register block trial | eda-tooling |
+| WF17 | Added 2026-11-18 by the second addendum, which states what WF9 needs: the reach test in the named job, the other account unless every probe is denied, and the counting re-judge in a job that ran no seat code, before the first register block trial | security |
+| WF18 | Added 2026-11-18 by the second addendum: the driver and its tests run in a process of their own with only the bus interface carried across, and the fixtures' expected results are recorded again, before any second register block batch and before any whole-flow figure leaves the repository's records | security |
+| WF19 | Added 2026-11-18 by the second addendum: the texts of its decision 3 are true on `main` before the first register block trial, and the register block count is never stated without the residual of decision 2 | qa-evidence |
 | WF6 | The dispatch edit to `runner.py` merges after WF1 is met and before the pull request that names the default harness, or else only with a later change that restarts every group for another reason; the flow module may merge later; the runner option carries the true pass-through note, the per-stage record and a clean re-judge test | eda-tooling |
 | WF7 | A test shows the flow module's edit changes the whole-flow fingerprint and not the default; from the pull request that names the default harness onward, no whole-flow pull request changes the default fingerprint, shown by that test on each one | ai-engineer |
 | WF8 | The stop rule of decision 3 is shown by a test before any whole-flow trial | qa-evidence |
@@ -489,3 +499,474 @@ trials only after the default harness is named.
 1. This ruling, to confirm or overrule.
 2. The public name of the measure, if it is ever to appear outside the
    repository's records. Inside them it is "whole-flow pass count".
+
+## Addendum (2026-11-18): the fixture driver test of decision 2
+
+This addendum amends one control of decision 2 and what gates WF4 and WF5 ask
+for on the driver side, and adds gate WF14. It is a decision made on
+2026-11-18. It changes no code, case, eval record or level, and nothing else
+in the ruling.
+
+### Who decided what
+
+- Three seats gave round 1 positions independently (firmware-engineer,
+  verification-lead, qa-evidence); the chair decided. The meeting was kept to
+  the seats that own gate WF5, gate WF4 and the claims. Read against
+  ip-nirmaan `main` at ae48843. Seats were read only; nothing was simulated
+  for the meeting.
+- Why a meeting. Pull request #324 (the judge controls) built no fixture
+  driver test and said in `docs/WHOLE_FLOW.md` that none can exist. Key 2
+  and the Founder Proxy (agent) each recorded on #324 that a control the
+  council had decided was replaced without a recorded amendment. No earlier
+  committed record holds a ruling that allows it, so the council rules now.
+  `council/README.md` gives no shorter process for amending a record.
+- As for the ruling: the council decided; it is not a founder decision, and
+  the founder can overrule it. Nothing here is reserved for the founder.
+
+### Facts checked
+
+1. Decision 2's fourth judge control asks for a fixture driver test written
+   to the conforming RTL's one choice that fails on the reference RTL. The
+   one choice the register block's document leaves open is response latency,
+   1 or 2 cycles (`evals/flow/axi4_lite/requirements.md`, lines 50 to 56).
+   The reference RTL answers after 1, the conforming RTL
+   `tests/fixtures/rtl/axi4_lite/variants/axi4_lite_regs_lat2.v` after 2.
+2. The run. `evals/flow/controls_record.json` (CI run 44243160870 on
+   fdc8e7c), control `driver-reference`: the reference driver and driver
+   test pass on the reference RTL (6 checks, 45 cycles, 20 bus transfers) and
+   on the conforming RTL (6 checks, 65 cycles, 20 bus transfers).
+   `tests/test_whole_flow_controls.py`
+   (`test_the_control_gets_the_verdict_it_expects`) requires the bus
+   transfers the two runs log to be identical: offset, value, strobe and
+   response. The record holds verdicts and summaries, not the transfers; the
+   equality is shown by that test passing in the named run. Control
+   `regs-tb-strict2`: the strict testbench fails check 3 on the reference
+   RTL.
+3. The run shows one test, the reference driver test, which is written to
+   accept the whole range. It does not show that no driver test can see
+   latency. That rests on reading the harness (facts 4 to 6), which no test
+   guards today.
+4. `src/nirmaan/integrations/firmware_harness/nirmaan_hal.h`: a driver test
+   gets `read32` and `write32`. Each returns only after the response
+   (`axil_manager.cpp`), with the data and the response code. The cycle
+   count is internal to the harness and printed only in the run's summary
+   line. The block has four plain registers and no state that depends on
+   elapsed cycles (firmware-engineer, verification-lead; inference from the
+   source).
+5. The sentence in `docs/WHOLE_FLOW.md` that the HAL "has no clock or cycle
+   count" is too wide for the harness as a whole. `nirmaan_irq.h`, on the
+   same include path, gives `nirmaan_irq_wait(seen, cycles)`, which advances
+   the clock, and the harness fails a run at 5000000 cycles
+   (`axil_manager.cpp`, `kMaxCycles`). A test that spends cycles to just
+   under that limit would pass on the reference RTL and fail on the
+   conforming RTL (inference; not run). That is the opposite direction to
+   the control: the reference RTL uses the fewest cycles the document
+   allows, so no test can fail it for using more.
+6. A driver test is host C linked into the harness process. A test could
+   read the host clock, or (firmware-engineer, inference, not run) reach the
+   harness's own output through the operating system. Neither is a test
+   written to the HAL and the driver interface, and wall time is not
+   latency. Not checked by any seat: whether a simulator symbol is reachable
+   from a test's C.
+
+### Decision
+
+**The fixture driver test is not required for the register block; three
+things are required in its place.** All three seats took this option; no
+seat held that the fixture can be built as decision 2 words it.
+
+The control's purpose is to show that checks 6 and 7 catch a driver test
+stricter than the document. Through `read32`, `write32` and the driver
+interface, on this block, no driver test can be strict about latency in the
+direction that fails the reference RTL. This is shown by the harness's
+construction and by the recorded run together, not by the run alone. The
+control is therefore empty for this block, not merely hard to build.
+(Withdrawn 2026-11-18 by the second addendum: a driver test's C can read a
+cycle count through the simulator's runtime, so the control is not empty.)
+
+Decision 2's fourth judge control now reads, for the driver side: the
+reference driver test passes on both RTLs with identical bus transfers, in a
+recorded run. The fixture testbench written to one choice stays as ruled.
+The other driver controls of decision 2 (the wrong-map header, the two
+mutants, the three fixture drivers) stay as ruled. In place of the fixture
+driver test:
+
+1. **A reach guard.** A test that needs no design tool pins what a driver
+   test can reach under `fw.test`: the members of `nirmaan_hal` and the
+   exported C functions of the host harness, as an exact listed set. Its
+   failure message names this addendum and the return condition.
+2. **A wait probe.** A fixture driver test that calls `nirmaan_irq_wait`
+   between transfers is recorded passing on both RTLs with identical bus
+   transfers. It is an expected pass, named as an attempt to see latency
+   that does not.
+3. **A return condition.** The fixture driver test of decision 2 is required
+   again, before the next trial, for any case where the HAL or the harness
+   gains a cycle count, a timeout or a non-blocking access that a driver
+   test can read, or where the block has a register whose value depends on
+   elapsed cycles, or where the fixed document leaves open a choice visible
+   in data or response codes.
+
+`docs/WHOLE_FLOW.md` ("Freedom left open" and the judge controls list) and
+the `driver-reference` text in `evals/flow/controls.json` are corrected to
+this scope: "through `read32` and `write32` on this block", shown by the
+harness's construction and the run, with the cycle limit's direction stated.
+
+Until gate WF14 is met, WF4 and WF5 are not met for the register block. This
+addendum closes no gate. What WF4 still needs from the whole-flow runner
+(the reference flow through every seated stage, a planted upstream fault,
+and check 5) is unchanged.
+
+Who disagreed. Not on the option. On what replaces the control:
+verification-lead asked for the wait probe; qa-evidence asked for a committed
+best-effort strict fixture using the wait and the cycle limit, recorded as
+passing on both RTLs; firmware-engineer asked for neither. The chair took
+the probe: it is one fixture that meets both requests, and it puts the one
+clock a test can advance on the record. A fixture that runs to the cycle
+limit is not required: it would fail the conforming RTL, which proves
+nothing about checks 6 and 7, and it is a long run for no control. All three
+asked for the guard and the return condition.
+
+Owners: firmware-engineer (the guard, the probe, the corrected texts);
+verification-lead (the control as a rule, gate WF4); qa-evidence checks the
+corrected claims.
+
+### Positions not adopted, and open
+
+- qa-evidence: a strict fixture that uses the cycle limit. Not required, for
+  the reason above.
+- Open, for security: whether a driver test's host C should be screened or
+  confined so that it cannot reach the harness's output or the host clock
+  (fact 6). It is a question about the gate's integrity, not about this
+  control, and it is not decided here.
+- Open, for firmware-engineer: whether a simulator symbol is reachable from
+  a test's C (fact 6). The reach guard's pull request answers it.
+- Both open items are decided in the second addendum, below.
+
+### Gate
+
+| Gate | Condition | Owner seat |
+|---|---|---|
+| WF14 | The reach guard test and the recorded wait-probe control are merged, and `docs/WHOLE_FLOW.md` and the `driver-reference` text in `evals/flow/controls.json` are corrected, before the first register block trial | firmware-engineer |
+
+## Second addendum (2026-11-18): what a driver test's host C can reach
+
+This addendum answers the two items the first addendum left open, withdraws
+one sentence of it, requires the fixture driver test of decision 2 again for
+the register block, and adds gates WF15 to WF19. It is a decision made on
+2026-11-18. It changes no code, case, eval record or level. Code it needs is
+listed as gates.
+
+### Who decided what
+
+- Five seats gave round 1 positions independently (security,
+  firmware-engineer, verification-lead, eda-tooling, qa-evidence); the chair
+  decided. The meeting was kept to the seats that own gate WF9 and the open
+  security item, gates WF5 and WF14, gate WF4, the build, and the claims.
+  Read against ip-nirmaan `main` at 3595450 and the draft pull request #336
+  (branch `g3-wf14`, head dfce3a9, not merged). Seats were read only; nothing
+  was compiled or simulated for the meeting.
+- Why a meeting. The pull request for gate WF14 answered the first addendum's
+  open question for firmware-engineer: a simulator symbol is reachable from a
+  test's C, and through it a cycle count. The first addendum's exemption
+  rested on the opposite, unchecked.
+- As for the ruling: the council decided; it is not a founder decision, and
+  the founder can overrule it. No seat found anything reserved for the
+  founder. The pull request that adds the screen of decision 2 changes what a
+  gate refuses, so it is in a founder class and goes to the Founder Proxy
+  (agent) by the usual rule.
+
+### Facts checked
+
+The chair checked each line below unless a seat is named as the source.
+
+1. The build. Under `fw.test` each C file of the seat is compiled by the host
+   `cc` with `-std=c11 -Wall -Wextra -Werror -pedantic`
+   (`src/nirmaan/integrations/firmware.py:43`, `:277-295`), and one
+   `verilator --cc --exe --build` step links the objects into one image with
+   the manager and Verilator's runtime (`:513-537`). No step inspects the
+   objects. `src/nirmaan/integrations/eda_guard.py` screens Verilog, Yosys,
+   SBY, EQY and SDC input; it screens no C.
+2. The channel. `tests/fixtures/fw/reach/simulator_clock_probe.c` on #336
+   declares `Verilated::s_lastContextp` by its mangled name, finds the
+   simulation time in the object it points to, and times one `read32` and one
+   `write32`. It includes only the two harness headers and three C library
+   headers. In CI run 44318772521 on dfce3a9, job 134851827249
+   (`test (shard 1/3)`, concluded success), it printed: reference RTL,
+   `read32 2 cycles, write32 2 cycles`; `axi4_lite_regs_lat2.v`,
+   `read32 3 cycles, write32 3 cycles`. One job of that run had not finished
+   when the chair read it, so the run had no conclusion. In run 44315985333
+   on the earlier head 6771b56 the same test is a pass in the junit file of
+   job 134842092762, with no timing line in the log. None of this is on
+   `main` or in a committed record; a CI log expires.
+3. The record on #336. `evals/flow/controls_record.json` there names run
+   44315985333 and job 134842092511 for all 21 controls. That job failed,
+   and in it the test of the new `driver-wait-probe` control failed on the
+   record entry that did not yet exist (qa-evidence; the chair confirmed the
+   job and its conclusion). The first addendum's standard is a test passing
+   in the named run.
+4. The image. The manager hands the test `{nullptr, bus_read, bus_write}`
+   (`firmware_harness/axil_manager.cpp:240`); the cycle count, the pass and
+   fail counts and the model pointer are file-local objects of the same image
+   (`:46-50`). A test or a driver can therefore reach them, and the run's
+   nonce, by address arithmetic from `hal->read32`, naming no symbol
+   (security, firmware-engineer; inference, not run).
+   `docs/GATE_INTEGRITY.md:144-150` states that residual and defers running
+   test code out of process.
+5. Whose code. In a register block trial the model writes the driver and the
+   driver test (decision 2 (b)). Checks 5 and 6 link the judge's held-out
+   test with the model's driver in one image; check 7 runs the model's driver
+   and driver test. Check 7 is the only check that runs the seat's driver
+   test. No recorded control fails check 7 on its clean run: the one control
+   that fails check 7 fails by a surviving mutant (verification-lead).
+6. The job. `.github/workflows/live-eval.yml` gives the plan token to the
+   trials step (131 to 135); a gate's steps run with credential names removed
+   from the environment, as the same user. The package is installed from the
+   checkout in place (`.github/actions/live-eval-setup/action.yml:28`), and
+   the re-judge step runs in the same job, on the same checkout, after the
+   trials (142 to 146). The workflow holds no changed-checkout check and no
+   fresh checkout, and the repository holds no credential test for this job
+   (security). So gate WF9 is not met today.
+7. The fingerprint. Neither `firmware.py` nor `firmware_harness/` is in
+   `CODE`, `LOOP_CODE` or `FLOW_CODE` (`src/nirmaan/runtime/harness.py:251-287`).
+   The default fingerprint digests every tool definition, so an edit to the
+   `fw.test` definition in `src/nirmaan/company/tools.py` restarts every
+   group (eda-tooling). A screen inside `firmware.py` restarts nothing and
+   still changes what the gate does for the committed single-seat firmware
+   case and for a re-judge of its records.
+8. The SoC run. `fw.soc_test` builds freestanding firmware for a simulated
+   CPU, which has no host reach, but any firmware can read
+   `NIRMAAN_SOC_CYCLES` (`firmware_soc/nirmaan_soc.h:18`). The case's checks
+   use host co-simulation.
+
+### Decision 1: the return condition is met; the fixture is owed again
+
+**By its words the condition is not met; by its purpose it is, and the
+purpose governs.** Nothing was gained: the HAL and the harness are as they
+were. But the control was dropped because it was held to be empty, and that
+rested on what a test written to the HAL can see, with the simulator symbol
+unchecked. A test's C reads a cycle count, and the count differs by RTL
+(fact 2). So the control was never empty, and decision 2 requires it. The
+four seats with a view all read it so; eda-tooling had none.
+
+The first addendum's sentence "The control is therefore empty for this
+block, not merely hard to build" is withdrawn. Its sentence about `read32`,
+`write32` and the driver interface stands only as a statement about a test
+that uses nothing else.
+
+The return condition now reads: the fixture driver test of decision 2 is
+required, before the next trial, for any case where a seat-written test can
+read a cycle count, a timeout or a non-blocking access by any means in the
+image or the machine it runs in, or where the block has a register whose
+value depends on elapsed cycles, or where the fixed document leaves open a
+choice visible in data or response codes. A case whose checks run on
+`fw.soc_test` meets it by fact 8.
+
+What is owed for the register block, before the first trial:
+
+1. **A strict fixture driver test.** The reference driver test with one
+   added, named check that times one `read32` and one `write32` and passes
+   only at the counts the conforming RTL gives. It is a judge control,
+   labelled in its file as reaching outside the HAL on purpose. With the
+   reference driver it passes on `axi4_lite_regs_lat2.v`, and in check 7's
+   own configuration it fails on the reference RTL: by a failed result of
+   that one named check, with no build error, no harness error and no crash,
+   and with the same bus transfers on both RTLs.
+2. **A strict fixture driver.** Decision 2 names checks 3, 6 and 7 as the
+   checks that catch strictness, and the driver is seat-written C in the
+   same image. A fixture driver that is strict the same way is recorded
+   passing check 5 on the conforming RTL and failing check 6 on the
+   reference RTL.
+3. **The control follows the channel.** On the build the trials will use,
+   for each route by which a recorded probe reads a cycle count, either the
+   route is recorded as refused or unreadable, or a strict fixture that uses
+   that route is recorded failing as in 1 and 2. A fixture may and must use
+   whatever route is open. When a route is closed, the same fixture files
+   stay and their expected result changes to the refusal, in a recorded run.
+   A screen of symbol names alone does not close the count unless a recorded
+   probe of address arithmetic shows it unreadable.
+4. The record is a committed one, from a CI run that concluded success, and
+   it holds the cycle counts.
+
+Who disagreed. On whether closing the channel ends the debt:
+verification-lead held that only a record ends it and the fixtures are built
+either way; security, firmware-engineer and qa-evidence held that a closed
+channel, shown by a recorded run, leaves the control empty with the files
+kept as must-refuse inputs. The chair took item 3, which is
+verification-lead's rule stated per route: the fixtures are committed in
+every case, and what they must do depends on what a recorded probe shows.
+On the strict driver: only verification-lead asked for it; the chair took
+it, because decision 2 names check 6.
+
+Owners: firmware-engineer (the fixtures and their record, gate WF15);
+verification-lead (the rule, gate WF4).
+
+### Decision 2: screen now, by account now, a process of its own next
+
+The rule this is weighed against: code a seat writes must not reach anything
+the judge does not intend it to reach. Today it does not hold inside the
+image (fact 4) or on the runner (fact 6), and the code is a model's. No
+screen of C makes it hold: `docs/GATE_INPUTS.md`, section 4, says so, and
+every seat that proposed a screen listed what it does not stop. So the
+answer is both, in a fixed order, and each part is claimed only for what a
+recorded must-fail fixture shows it stops.
+
+**Before the first register block trial.**
+
+1. **The account.** The test decision 4 asked for is run in the named job,
+   through `fw.test`, with compiled C: can it read the environment of its
+   parent or of any process it can see, run a command as another user
+   without a password, or write to the checkout, the installed package or
+   the records folder. The result is recorded. Unless every probe is denied,
+   seat-written C is built and run as another account that can do none of
+   these, with an empty environment; otherwise the batch waits. The re-judge
+   that counts runs in a job that ran no seat code, on a fresh checkout,
+   from the uploaded record, and the trial job fails on a changed checkout.
+   This is what gate WF9 already asks; it is now stated (gate WF17).
+2. **The object screen.** Between the compile steps and the link, the seat's
+   objects are checked: every undefined symbol is on an allow list, however
+   it was declared (an asm label, a weak reference, a mangled name); no
+   defined global collides with a name of the harness or of the C library
+   the harness reports through; no object carries code that runs before
+   `main`. The seat's own lines of the preprocessed source carry no asm. A
+   hit is a recorded failed check with its reason, with nothing run, decided
+   here in advance; it is never a removed or repeated trial. The allow list
+   is fixed from a recorded CI run that lists the undefined symbols of every
+   committed fixture, reference answer and held-out test.
+3. **What the screen is called.** A tripwire. It stops reach by name. It
+   does not stop address arithmetic from an allowed pointer, a memory scan,
+   what the allowed C library calls can do, or anything the account allows.
+   The simulator clock probe and one fixture per construct the screen
+   claims to refuse are recorded as refused, as a verdict distinct from a
+   failed test. A probe of address arithmetic toward the cycle count is
+   recorded with its real result, which decides decision 1, item 3.
+4. **Where the screen sits** is the build pull request's choice, on two
+   conditions. It is in force for every whole-flow check that builds or
+   links seat-written C. If it sits in the shared `fw.build` and `fw.test`
+   backends, that pull request shows by a recorded run that every committed
+   fixture, reference answer and held-out test still gets the result it got,
+   lists any committed firmware trial whose re-judge would change, and says
+   in `docs/GATE_INTEGRITY.md` that the gate changed without a fingerprint
+   change.
+5. **When it may merge.** Gate WF1 is read by its purpose to cover
+   `firmware.py` and `firmware_harness/`: no edit before the H3 batch's last
+   trial is recorded, unless the orchestrator records that H3 has no
+   `fw.test` case. No edit to the `fw.test` or `fw.build` tool definitions
+   outside the window of gate WF6.
+6. **The residual, stated.** `docs/GATE_INTEGRITY.md` and
+   `docs/WHOLE_FLOW.md` say, before the first trial: in checks 5, 6 and 7
+   model-written C shares the harness's process, and in 5 and 6 the judge's
+   own test; from there it could reach the nonce and the counts and print a
+   verdict (an inference from the sources, not run); the screen does not
+   stop that. Every counted trial keeps its driver and driver test in its
+   record. Before the read, security reads the seat C of every register
+   block trial that passed, and any reach outside the HAL it finds is stated
+   beside the count. That reading changes no trial's result: the count stays
+   what the judge recorded.
+
+**After the first batch.** Running the driver and its tests in a process of
+their own, with only `read32`, `write32`, the wait, the two handler
+callbacks and the test result carried across, is no longer left undated. It
+is required before any second register block batch and before any whole-flow
+figure leaves the repository's records (gate WF18). The handlers run before
+an access returns and may make bus accesses of their own, so what carries
+the calls across must allow that, and the interrupt and bus-error tests must
+still fail on a broken design (firmware-engineer). When it merges, the
+fixtures of decision 1 are recorded again with their new expected results.
+It still leaves the model's driver and the judge's test in one client
+process, and leaves the account as the only limit on files and system calls;
+its texts say so.
+
+Options not taken. Neither before the first trial: refused; security
+objected and no seat proposed it. Hiding the runtime's symbols at the link:
+it means leaving Verilator's own build step, stops no more than the allow
+list, and fails as a link error where a recorded refusal is wanted
+(eda-tooling). Moving the checks to the SoC run: a different case, and one
+with a cycle count in reach (fact 8).
+
+Who disagreed. On placement: security held that the screen can sit in the
+whole-flow judge alone; eda-tooling placed it in `firmware.py` and warned
+that the fingerprint would not show the change. The chair set the two
+conditions of item 4 and left the choice to the pull request. No seat asked
+for the separate process before the first trial. The chair records that the
+rule is therefore knowingly not met inside the image for the first batch,
+and that this is accepted only because the count credits no level, stays
+inside the repository's records, and keeps every seat file readable.
+
+Owners: security (the account, the reading, the conditions; gates WF17 and
+WF18); eda-tooling (the screen and the job; gate WF16); firmware-engineer
+(the HAL across a process boundary).
+
+### Decision 3: the gates, #336, and the claims
+
+Pull request #336 changes, then merges; it does not wait for the screen. It
+changes eight files, none under `src/` or `.github/`, so gates WF1, WF6, WF7
+and WF13 do not hold it (eda-tooling). Gate WF14 is met by it only when:
+
+- `evals/flow/controls_record.json` is taken from a run in which every
+  control's test passes, and names that run and job;
+- the probe's cycle counts are in a committed record with head and job, and
+  the reach test's text claims no more than it asserts;
+- `docs/WHOLE_FLOW.md` no longer says the simulator channel is "not the
+  fixture control" or that the guard "covers" it. The guard pins the files,
+  declarations and build options it lists. It closes nothing, and it does
+  not pin the simulator's version, which also decides the symbols
+  (qa-evidence, inference);
+- the texts cite this addendum and say the fixture driver test is owed.
+
+Meeting gate WF14 closes neither WF4 nor WF5.
+
+What the record and the documents may say, after a green run on the head
+that merges: the guard pins what it lists; the wait probe passes on both
+RTLs with the same bus transfers; a driver test's C reads the simulator's
+time through `Verilated::s_lastContextp` and measures more cycles per call
+on the conforming RTL, with the run and job named.
+
+What they must not say: that no driver test can be strict about latency,
+without the words "that uses only `read32`, `write32` and the driver
+interface"; that the control is empty; that the return condition was not met
+because nothing was gained; that the probe measures the document's latency
+of 1 or 2 (it reports 2 and 3 per call); that a seat's C is screened or
+confined, before the code and its must-fail fixtures are merged; that the
+screen confines; anything about a model-written test using the channel
+(none has run). `docs/WHOLE_FLOW.md` names gates WF1 to WF19.
+
+Owner: qa-evidence (gate WF19); firmware-engineer makes the changes to
+#336.
+
+### Positions not adopted, and open
+
+- security: the screen in the whole-flow judge only. Left to the pull
+  request (decision 2, item 4).
+- firmware-engineer, qa-evidence: a channel closed before the fixture is
+  built leaves nothing owed. Adopted only per route, with the files
+  committed either way (decision 1, item 3).
+- Not adopted: a reading by security that changes a trial's result. The
+  count stays the judge's; the finding is stated beside it.
+- Open, for security: whether a fixture that prints a forged verdict by
+  address arithmetic is committed to a public repository, or the path stays
+  a stated inference until the separate process closes it. Security decides
+  in the pull request for gate WF16.
+- Open, for eda-tooling: whether the other account needs a change to
+  `src/nirmaan/integrations/eda.py` or can be switched on from the workflow
+  alone.
+
+### Gates
+
+Each is met before the first register block trial unless it says otherwise.
+WF15, WF16 and WF18 do not hold the timer case, which links no seat-written
+C; gate WF9 holds both cases as before.
+
+| Gate | Condition | Owner seat |
+|---|---|---|
+| WF15 | The strict fixture driver test and the strict fixture driver are committed and recorded as decision 1 asks (items 1 to 4), on the build the trials will use. WF4 and WF5 are not met for the register block before this | firmware-engineer |
+| WF16 | The object screen of decision 2 (items 2 to 5) is merged and in force for every whole-flow check that builds or links seat-written C: the allow list from a recorded run; the clock probe and one fixture per refused construct recorded as refused; the address-arithmetic probe recorded with its real result | eda-tooling |
+| WF17 | Gate WF9, stated: the reach test of decision 2, item 1, is recorded from the named job; seat-written C runs as the other account unless every probe is denied; the counting re-judge runs in a job that ran no seat code, on a fresh checkout; the trial job fails on a changed checkout | security |
+| WF18 | The driver and its tests run in a process of their own with only the HAL's calls carried across; the interrupt and bus-error tests still fail on a broken design; the fixtures of decision 1 are recorded again. Before any second register block batch and before any whole-flow figure leaves the repository's records | security |
+| WF19 | The texts of decision 3 and the residual of decision 2, item 6, are true on `main`; #336 meets the four conditions of decision 3; the register block count is never stated without that residual; security's reading of the passed trials' seat C is done before the read | qa-evidence |
+
+Code these gates need, for the build lane (this meeting wrote none): the
+two strict fixtures, their controls and record (WF15); the object screen,
+its allow list, its fixtures and probes, and the corrected
+`docs/GATE_INTEGRITY.md` (WF16); the reach test, the other-account launch
+and the separate re-judge job in the workflow (WF17); the out-of-process
+harness (WF18); the changes to #336 and the document texts (WF14, WF19).

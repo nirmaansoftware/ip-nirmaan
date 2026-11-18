@@ -96,7 +96,7 @@
       },
       "case_files": {
         "sources": [
-          "tests/fixtures/rtl/axi4_lite/axi4_lite_regs_tb.v"
+          "evals/flow/axi4_lite/axi4_lite_regs_tb.v"
         ]
       },
       "params": {

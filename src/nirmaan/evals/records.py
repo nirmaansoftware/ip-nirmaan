@@ -142,31 +142,38 @@ def record_trial(org: Organization, case: EvalCase, seat_runtime: AgentRuntime, 
     ``digest_repo`` is where the skills' knowledge documents are digested from (default ``repo``): a run that stages
     its cases elsewhere (M76) still digests the documents the seat was really given.
     """
+    from nirmaan.integrations.eda import temporary_directory, temporary_runs
+
     llm = getattr(seat_runtime, "llm", None)
     harness = harness_sha256(attempts=attempts, knowledge=knowledge, cli=runtime_cli(seat_runtime), variant=variant,
                              flow=case.flow)
     recorder = RecordingLLM(llm, harness) if llm is not None else None
     if recorder is not None:
         seat_runtime.llm = recorder  # type: ignore[attr-defined]
+    # M88: the trial's own sandbox, and every tool run's temporary directory, are removed when the trial ends;
+    # what the record keeps is read from the engine before then.
     flow = None
-    try:
-        if case.flow == "whole":  # G3: every stage seated (nirmaan.evals.flow); the label comes from the case
-            from nirmaan.evals.flow import run_flow
+    with temporary_runs():
+        try:
+            if case.flow == "whole":  # G3: every stage seated (nirmaan.evals.flow); the label comes from the case
+                from nirmaan.evals.flow import run_flow
 
-            flow = run_flow(org, case, seat_runtime, replay=replay, repo=repo, attempts=attempts, sandbox=sandbox,
-                            clock=clock, knowledge=knowledge, variant=variant)
-            result, engine = flow.result, flow.engine
-        else:
-            result, engine = evaluate(org, case, seat_runtime, replay=replay, repo=repo, attempts=attempts,
-                                      sandbox=sandbox, clock=clock, knowledge=knowledge, variant=variant)
-    finally:
-        if recorder is not None:
-            seat_runtime.llm = llm  # type: ignore[attr-defined]
-    judge_runs = tuple(
-        JudgeRun(check=score.name, run=run.id, tool=run.tool, succeeded=run.succeeded, summary=run.summary,
-                 params=run.model_dump(mode="json")["params"])
-        for score in result.scores for run in (engine.state.tool_runs.get(r) for r in (*score.runs,
-                                                                                         *score.failed_runs)) if run)
+                flow = run_flow(org, case, seat_runtime, replay=replay, repo=repo, attempts=attempts,
+                                sandbox=sandbox or temporary_directory("nirmaan-eval-"), clock=clock,
+                                knowledge=knowledge, variant=variant)
+                result, engine = flow.result, flow.engine
+            else:
+                result, engine = evaluate(org, case, seat_runtime, replay=replay, repo=repo, attempts=attempts,
+                                          sandbox=sandbox or temporary_directory("nirmaan-eval-"), clock=clock,
+                                          knowledge=knowledge, variant=variant)
+        finally:
+            if recorder is not None:
+                seat_runtime.llm = llm  # type: ignore[attr-defined]
+        judge_runs = tuple(
+            JudgeRun(check=score.name, run=run.id, tool=run.tool, succeeded=run.succeeded, summary=run.summary,
+                     params=run.model_dump(mode="json")["params"])
+            for score in result.scores for run in (engine.state.tool_runs.get(r) for r in (*score.runs,
+                                                                                             *score.failed_runs)) if run)
     answers = tuple(recorder.answers) if recorder else ()
     model = next((a.model for a in answers if a.model), None) or model_of(seat_runtime)
     return EvalTrial(record=record, trial=trial, stage=case.seat, model=model,
@@ -479,6 +486,8 @@ def rejudge(org: Organization, record: EvalRecord, cases: Mapping[str, EvalCase]
     A trial whose case changed since it was recorded (its digest differs) is not comparable and is
     reported as a difference without being re-run.
     """
+    from nirmaan.integrations.eda import temporary_directory, temporary_runs
+
     out: list[Rejudged] = []
     for trial in record.trials:
         recorded = trial.result
@@ -493,10 +502,11 @@ def rejudge(org: Organization, record: EvalRecord, cases: Mapping[str, EvalCase]
             continue
         runtime = ModelRuntime(RecordedAnswers(trial.answers), runtime_id=recorded.runtime)
         where = Path(sandbox) / f"{_safe(recorded.case)}-{trial.trial:02d}" if sandbox else None
-        result, _ = evaluate(org, case, runtime, replay=recorded.replay, repo=repo,
-                             attempts=max(1, recorded.attempts), sandbox=where,
-                             clock=lambda at=recorded.started_at: at,
-                             knowledge=not knowledge_off(record.manifest, trial),
-                             variant=trial_variant(record.manifest, trial))
+        with temporary_runs():  # M88: as record_trial's
+            result, _ = evaluate(org, case, runtime, replay=recorded.replay, repo=repo,
+                                 attempts=max(1, recorded.attempts), sandbox=where or temporary_directory("nirmaan-eval-"),
+                                 clock=lambda at=recorded.started_at: at,
+                                 knowledge=not knowledge_off(record.manifest, trial),
+                                 variant=trial_variant(record.manifest, trial))
         out.append(Rejudged(trial, result, _compare(recorded, result)))
     return out

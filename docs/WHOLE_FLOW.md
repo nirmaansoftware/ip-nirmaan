@@ -1,7 +1,7 @@
 # Whole-flow cases (G3, M87)
 
 Source: `council/records/2026-11-17-g3-whole-flow-cases.md` (gates WF1 to
-WF13), which applies decision 6 of the pilot retrospective
+WF14), which applies decision 6 of the pilot retrospective
 (`council/records/2026-11-14-pilot-retrospective.md`). A whole-flow trial puts
 a request in, seats every work stage with the model, and judges only the final
 block. It credits no skill and no level.
@@ -79,8 +79,9 @@ digests (WF3).
 **The fixed documents.** The timer document is new: it states, as behaviour
 at the ports, every rule the reference testbench checks and every rule a
 mutant breaks, each with a `[req:TMR-...]` tag. The register block document is
-a copy of `evals/spec/axi4_lite/requirements.md` with tags on section 1 and a
-section 4. Both state the rule that binds the flow's own tests: a test accepts
+a copy of `evals/spec/axi4_lite/requirements.md` with tags on section 1, a
+section 4, and three rules split or made exact so that each tag states only
+what is judged (`AXIL-NO-PROT`, `AXIL-PARAMS-DEFAULT`, `AXIL-B2B`). Both state the rule that binds the flow's own tests: a test accepts
 every behaviour the document allows and never requires one choice inside a
 range (`TMR-TEST-RANGE`, `AXIL-TEST-RANGE`). The driver interface copy says the
 offsets and reset value are the requirements document's and that the map
@@ -95,7 +96,9 @@ every tag no check or mutant rests on: the tags the RTL stage's own gates
 cover (`TMR-CLEAN`, `AXIL-SYNTH`, `AXIL-FORMAL`), and the timer rules the
 reference testbench never exercises. Where the testbench reaches only part of
 a rule, the rule is split and the unreached part has its own tag, listed as
-not judged: readiness (`TMR-READY`), the read value at the accepting edge
+not judged: the parameter defaults (`TMR-ADDR-WIDTH-RANGE`, which also holds
+the timer's widths 5 to 7, and `AXIL-PARAMS-DEFAULT`), "no other ports"
+(`TMR-PORTS-ONLY`, `AXIL-NO-PROT`), and, for the timer, readiness (`TMR-READY`), the read value at the accepting edge
 (`TMR-READ-VALUE`), `COUNT` while a count runs (`TMR-COUNT-READ`), a periodic
 `LOAD` of 0, the value the stop edge gives `COUNT`, a `CTRL` write on a count
 end (`TMR-CTRL-WINS`), the edge `irq` changes on after a write, what a
@@ -104,6 +107,19 @@ synchronous reset does to a pending response or a held half write
 (`TMR-TB-ALL`; the must-fail check holds it only to the four mutants). A test
 checks both ways: each cited tag or heading exists, and each tag is cited or
 listed.
+
+**The reference testbenches.** Each case's check 1 runs its own copy of the
+single-seat reference testbench: `evals/flow/axil_timer/axil_timer_tb.v` and
+`evals/flow/axi4_lite/axi4_lite_regs_tb.v`. A copy keeps every check of the
+original, in order and word for word, and adds the checks an independent
+check found missing: for the timer, RDATA held still while a running `COUNT`
+is read under backpressure, a `STATUS` clear on the edge a one-shot count
+ends, and a reset while `EXPIRED` is set; for the register block, a new
+request accepted in the cycle after a response is taken, and reset while a
+write or read response waits or with only the address or only the data of a
+write accepted. The single-seat cases keep running the originals, so their
+digests, and the recorded trials that hold those digests, stay as they are.
+A test holds both.
 
 **The held-out tests.** The register block case's held-out test is its own
 copy of the firmware case's, with an unmapped (misaligned) write added, so the
@@ -118,10 +134,20 @@ testbench written to that one choice (`axi4_lite_regs_tb_strict2.v`). The timer
 document leaves no choice open: its readiness, response timing, count length
 and every response are exact (the timer's interface specification already
 fixed them, and the reference testbench times a write to the edge,
-`axil_timer_tb.v` lines 380 to 383), so the timer has no conforming variant
-and no strict testbench. No strict driver test exists either: the HAL a driver
-test calls (`nirmaan_hal.h`) has no clock or cycle count, so a driver test
-cannot see latency; the judge controls record this by a run.
+`evals/flow/axil_timer/axil_timer_tb.v` lines 387 to 390), so the timer has no
+conforming variant and no strict testbench. No strict driver test is
+required either (the council record's addendum of 2026-11-18): through `read32` and `write32` on
+this block, a driver test cannot be strict about latency. Each call returns
+only after the response, with the data and the response code, and nothing in
+the block depends on elapsed cycles. That is shown by the harness's
+construction, which the reach guard pins (gate WF14, below), and by the judge
+controls' run together, not by the run alone. The HAL is not all a driver test
+can reach: `nirmaan_irq_wait(seen, cycles)` (`nirmaan_irq.h`) lets cycles pass,
+and the harness ends a run at 5000000 cycles. A test that spends cycles near
+that limit fails the slower RTL, never the reference, which answers in the
+fewest cycles the document allows; so the limit cannot make a test that fails
+the reference RTL for latency. A test's host C can also reach the host C
+library and the simulator's runtime (below).
 
 **Fixtures for the controls.** Three wrong drivers (a swallowed bus error,
 `write_byte` with every strobe, a sticky `last_response`) under
@@ -135,26 +161,29 @@ reference RTL, unlike every `_tb_fail.v` in `docs/IP_BLOCKS.md`; both lanes at
 rendered into a prompt (`runtime/prompt.py`), and the requirements task builds
 on no stage, so no approved upstream file carries it either.
 `tests/test_whole_flow_cases.py` shows neither the document's text nor its
-path reaches the requirements seat. Putting the document into the request
-text is no way out: the planner then reads other features from it
+path reaches the requirements seat. Putting the document into the request text
+is no way out: the planner then reads other features from it
 (`existing_design`, `width_change`, `performance`), which changes what each
-seat is given. So the document is given another way: `runtime/context.py` carries task
-memory `document.<name>` (`<digest> <path>`) into that task's packet as an
-approved upstream file of kind `customer_document`, whole, citable (as a
-`document`, never an artifact, so the provenance check never refuses a draft
-that cites it) and withheld once its bytes change. Only the platform writes it (no seat answer
-writes memory, and the CLI writes only `input.` keys), only the task it is
-given to sees it, and no single-seat case gives one, so their prompts are byte
-for byte as before (`tests/test_flow_requirements_document.py`). The
-whole-flow runner gives the fixed documents to the requirements stage this
-way, so its trials are seated at every stage, never "seated from
-interface-spec". `runtime/context.py` is a `harness.CODE` file, so this change
-merges in the window with the dispatch edit.
+seat is given. So the document is to be given another way:
+`runtime/context.py` carries task memory `document.<name>` (`<digest> <path>`)
+into that task's packet as an upstream file of kind `customer_document`,
+marked as customer input, whole, citable (as a `document`, never an artifact,
+so the provenance check never refuses a draft that cites it) and withheld once
+its bytes change. Only the platform may write it (no seat answer writes
+memory, and the CLI and the eval runner write only `input.` keys), only the
+task it is given to sees it, and no single-seat case gives one, so their
+prompts are byte for byte as before
+(`tests/test_flow_requirements_document.py`). Nothing writes a `document.` key
+yet: the whole-flow runner (part 4b, not merged) is to give the fixed
+documents to the requirements stage this way, so that its trials are seated at
+every stage, never "seated from interface-spec". `runtime/context.py` and
+`runtime/prompt.py` are `harness.CODE` files, so this change merges in the
+window with the dispatch edit.
 
 ## The judge controls (M87, third pull request)
 
 Gates WF4 and WF5 need each case's judge proven by replays with no model call,
-run in CI, before the first trial. `evals/flow/controls.json` lists 20
+run in CI, before the first trial. `evals/flow/controls.json` lists 21
 controls. Each is a seat answer made of committed files and the whole-flow
 case's own held-out checks it must pass or fail, sometimes with the RTL a
 check runs on put in another's place. `tests/test_whole_flow_controls.py` runs
@@ -187,10 +216,13 @@ What they show:
 - `b_before_w` is not visible through the HAL: under the must-fail scorer
   with that mutant alone, the reference driver test passes on it. The ruling
   assumed so and left it out of check 7; this run records it;
-- no driver test can see latency: the reference driver test passes on both
-  RTLs with the same bus transfers, and the HAL has no clock or cycle count.
-  So no strict driver test exists, and checks 6 and 7 cannot fail for being
-  stricter than the latency bound.
+- the reference driver test passes on both RTLs with the same bus transfers.
+  That shows one test. That no driver test can be strict about latency
+  through `read32` and `write32` on this block rests on the harness's
+  construction (the reach guard) and this run together;
+- the wait probe (`driver-wait-probe`, gate WF14): a driver test that calls
+  `nirmaan_irq_wait` between transfers passes on both RTLs with the same bus
+  transfers, an attempt to see latency that does not.
 
 Each control prints one `FLOW-CONTROL` line with its verdicts and run
 summaries. `evals/flow/controls_record.json` keeps those lines from a named
@@ -200,6 +232,47 @@ run to the verdicts it records.
 Left for the whole-flow runner: the reference flow replayed through every
 seated stage, a flow with a planted upstream fault, and check 5, which takes
 the RTL from another stage.
+
+## What a driver test can reach (gate WF14)
+
+The council record's addendum of 2026-11-18 replaced decision 2's fixture
+driver test for the register block with three things, which gate WF14 asks
+for before the first register block trial:
+
+- **The reach guard.** The guard tests in
+  `tests/test_nirmaan_firmware_reach.py` need no tool. They pin, as exact
+  lists: the members of `nirmaan_hal` and every declaration of
+  `nirmaan_hal.h` and `nirmaan_irq.h`; the external definitions of each
+  host manager (`axil_manager.cpp`, `apb_manager.cpp`: the six `extern "C"`
+  functions and `main`; everything else, and all of `harness_report.h`, is in
+  an anonymous namespace); the files in the harness directory, which is on a
+  driver test's include path; the registered managers; the headers each
+  harness file includes; and the literal options of the Verilator build. Any
+  addition, or an edit to a listed declaration, fails with the return
+  condition in its message. (The same file's simulator test, below, needs the
+  firmware tools and runs in CI.)
+- **The wait probe**, the control above, recorded in
+  `evals/flow/controls_record.json`.
+- **The return condition.** The fixture driver test is required again, before
+  the next trial, for any case where the HAL or the harness gains a cycle
+  count, a timeout or a non-blocking access that a driver test can read, or
+  where the block has a register whose value depends on elapsed cycles, or
+  where the fixed document leaves open a choice visible in data or response
+  codes.
+
+The addendum left open whether a simulator symbol is reachable from a test's
+C. It is. Under `fw.test` a driver test is host C linked into one image with
+the harness and Verilator's runtime, and C can name a C++ symbol by its
+mangled name. `tests/fixtures/fw/reach/simulator_clock_probe.c` reads
+`Verilated::s_lastContextp`, the harness's own simulation context, finds the
+simulation time in it, and times a `read32` and a `write32` in cycles: each
+takes more cycles on `axi4_lite_regs_lat2.v` than on the reference RTL. The
+tool-backed test in the guard file runs it on both RTLs, in CI only. This is
+neither a HAL call nor the driver interface, so it is the addendum's open
+security question (whether a driver test's host C should be screened or
+confined), not the fixture control; the guard covers it by pinning the
+headers that bring in the runtime and the Verilator options, which decide
+which simulator symbols the image holds.
 
 ## The document check record (M87, follow-up)
 
@@ -219,9 +292,10 @@ to this. Until a document's first record lands it is listed, with the reason,
 in `evals/flow/requirements_check_pending.json` (a data file); its test still
 runs and checks that it has no record yet, so the entry must go when the
 record lands, and a document neither listed nor recorded fails. No test
-skips. Both documents are listed now: the timer document was rewritten after
-an independent check found tags its checks do not reach and rules it left
-ambiguous, and the register block copy has never been checked. Another test
+skips. Both documents are listed now: an independent check failed both, with
+mutants that pass the reference testbenches, and each was fixed by stronger
+checks in the case's own reference testbench and by splitting what stays
+unjudged into its own tags; neither has passed a fresh check yet. Another test
 shows the rule refuses a stale record, a record whose checker is its writer,
 a missing tag, a tag marked unjudged that a check cites, unreadable
 evidence, and a result that does not hold.
@@ -301,6 +375,25 @@ Tests (`tests/test_whole_flow_runner.py`):
 - the stop rule fires on (text, text, no text and an error) and not on three
   answers;
 - the whole-flow fingerprint digests this module.
+
+## Gate status
+
+The council record's gates are its own
+(`council/records/2026-11-17-g3-whole-flow-cases.md`, WF1 to WF13); this
+section only records, with dates, what the repository can show about them.
+
+- WF1 (no `CODE` change before the H3 batch's last trial is recorded),
+  2026-11-18. The H3 runner recorded its last slot, slot 69 of 69, at
+  2026-11-18T07:12:47Z; its ledger's last line reads "ALL DONE
+  2026-11-18T07:12:47Z: 69 slots, 66 done, 2 interrupted (slot 1 SIGKILL, slot
+  44 Mac reboot), 1 stopped (slot 35 plan limit)". That ledger and the
+  frontier-case records, slot 69's among them, are private (the record's fact
+  15); this rests on the orchestrator's account. The batch's pilot-case
+  records reach `main` by pull request in six parts (ip#332 and ip#333 are
+  open at this date); none is merged yet, so `main` holds no H3 record today.
+  The `CODE` changes made after it: the dispatch edit, ip#330, merged at
+  13:28Z (merge commit 91cb482), and the customer-document change, the second
+  half of the same window (decision 4).
 
 ## Not yet
 

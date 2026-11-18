@@ -37,7 +37,20 @@ case's `inputs` never reaches the requirements seat as text.
 replays through the real gates and scorers with no model call, run in CI
 (`tests/test_whole_flow_controls.py`), and their recorded CI run in
 `evals/flow/controls_record.json`. They confirm by a run that `b_before_w` is
-not visible through the HAL and that no driver test can see latency.
+not visible through the HAL and that the reference driver test makes the
+same bus transfers on both RTLs. (Their text first said that no driver test
+can see latency; the council record's addendum of 2026-11-18 narrowed that to
+`read32` and `write32` on this block, shown by the harness's construction and
+the run together.)
+
+**What a driver test can reach (gate WF14, follow-up).** The reach guard
+(`tests/test_nirmaan_firmware_reach.py`) pins the HAL, the two harness
+headers, each host manager's exports and includes, and the Verilator options;
+the wait probe (`driver-wait-probe`) is the 21st control, recorded passing on
+both RTLs with the same bus transfers; `docs/WHOLE_FLOW.md` and the
+`driver-reference` text are corrected. The addendum's open question is
+answered by a CI test: a driver test's C reaches Verilator's runtime by a
+mangled symbol and can read the simulation time.
 
 **The timer document fixed, and the check record rule (follow-up).** An
 independent check found that `evals/flow/axil_timer/requirements.md` claimed
@@ -48,6 +61,20 @@ does, splits every partly reached rule, and lists the unreached parts as not
 judged. Each flow requirements document gets a check record by another
 session (`requirements_check.json`), held by a test; both documents wait for
 theirs.
+
+**Both documents fixed again (follow-up).** A second independent check, with
+mutants that pass the reference testbenches, found tags still claimed beyond
+what is judged in both documents. Each case's check 1 now runs its own copy of
+the single-seat reference testbench (`evals/flow/axil_timer/axil_timer_tb.v`,
+`evals/flow/axi4_lite/axi4_lite_regs_tb.v`), which keeps every check of the
+original and adds the missing ones: RDATA held still while a running `COUNT`
+is read, a clear on the edge a one-shot count ends, a reset with `EXPIRED`
+set, a new request accepted in the cycle after a response is taken, and reset
+while a response waits or half a write is held. The single-seat cases keep the
+originals, so their digests and recorded trials stay as they are. The
+parameter defaults, the timer's widths 5 to 7 and the "no other ports" rules
+have their own tags, listed as not judged. Both documents wait for a fresh
+check.
 
 **The runner option.** Part 4a, the dispatch edit to `runner.py` and the
 fingerprint entries, merged in the window after the H3 batch. With it, a
