@@ -240,6 +240,13 @@ stage's own before-review checks run for real.
   attestations of any stage, and the flow digest. The flow digest is sha256
   over the sorted (stage, skill, skill digest) of every skill each seated
   stage was given, in the trial's arm.
+- **A test stricter than the contract.** When the clean run of a must-fail
+  check fails (the flow's own test on the reference block), or a check with no
+  mutants fails on a case file while the same tool on the flow's own file
+  passes (check 6 against check 5), the trial's detail names the candidate
+  cause "a flow test stricter than the contract", as an inference, not a fact.
+  A must-fail check whose mutants survive is a weak test and is never called
+  stricter.
 - **The stop rule (WF8).** A live whole-flow run stops right after a trial
   whose last recorded answer has no text and an error (`flow_stopped`). The
   single-seat rule (`no_model_answer`) is unchanged.
@@ -255,6 +262,8 @@ Tests (`tests/test_whole_flow_runner.py`):
 - a flow whose second stage never answers is a failed trial with the later
   stages and every check not run;
 - the requirements seat's prompt carries the fixed document;
+- a testbench written to the conforming RTL's one choice is named "stricter
+  than the contract" as an inference, and a plain fault never is;
 - the stop rule fires on (text, text, no text and an error) and not on three
   answers;
 - the whole-flow fingerprint digests this module.

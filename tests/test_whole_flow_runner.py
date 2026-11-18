@@ -147,6 +147,33 @@ def test_a_flow_on_the_conforming_rtl_passes_and_check_5_takes_the_rtl_stages_to
                                                      for p in params["rtl"])
 
 
+@TOOLS
+def test_a_flow_test_stricter_than_the_contract_is_named_as_an_inference(nirmaan_org, flows, tmp_path, fixed_clock):
+    """The conforming RTL with a testbench written to its one choice (exactly 2 cycles): the flow's block passes
+    the reference testbench, and its own testbench fails on the reference RTL; the cause is stated as an inference."""
+    case = _swap(flows["flow/axi4-lite-regs-driver"],
+                 **{"axi4_lite_regs.v": f"{A}/variants/axi4_lite_regs_lat2.v",
+                    "axi4_lite_regs_tb.v": f"{A}/variants/axi4_lite_regs_tb_strict2.v"})
+    case = (case[0].model_copy(update={"reference": tuple(
+        f.model_copy(update={"entry": "axi4_lite_regs_tb_strict2"}) if f.kind == "testbench" else f
+        for f in case[0].reference)}), case[1])
+    run, _ = _flow(nirmaan_org, case, tmp_path, fixed_clock)
+    verdicts = {s.name.split(".")[0]: s.status for s in run.result.scores}
+    assert verdicts["1"] is ScoreStatus.PASSED and verdicts["3"] is ScoreStatus.FAILED and not run.result.passed
+    assert "an inference, not a fact" in run.result.detail and "stricter than the contract" in run.result.detail
+
+
+@TOOLS
+def test_a_plain_fault_is_not_called_a_stricter_test(nirmaan_org, flows, tmp_path, fixed_clock):
+    case = _swap(flows["flow/axil-timer"], **{"axil_timer.v": f"{T}/mutants/axil_timer_reload_off_by_one.v",
+                                              "axil_timer_tb.v": f"{T}/axil_timer_tb_trivial.v"})
+    case = (case[0].model_copy(update={"reference": tuple(
+        f.model_copy(update={"entry": "axil_timer_tb_trivial"}) if f.kind == "testbench" else f
+        for f in case[0].reference)}), case[1])
+    run, _ = _flow(nirmaan_org, case, tmp_path, fixed_clock)
+    assert not run.result.passed and "stricter than the contract" not in run.result.detail
+
+
 # --- A stage that never reaches review ----------------------------------------------------------------------------
 
 

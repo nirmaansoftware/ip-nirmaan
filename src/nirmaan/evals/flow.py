@@ -116,6 +116,30 @@ def _judged(engine: TaskEngine, order: list[Task], check) -> Task:
     return producer.model_copy(update={"artifacts": tuple(dict.fromkeys(seen))})
 
 
+STRICTER = ("Candidate cause (an inference, not a fact): a flow test stricter than the contract. The fixed "
+            "document says a test accepts every behaviour it allows, so a test that fails on the reference block "
+            "while the flow's own block passes its checks is a failure of the flow (decision 2).")
+
+
+def stricter_than_the_contract(case: EvalCase, scores) -> bool:
+    """Whether the verdicts fit "test stricter than the contract" (chair follow-up to decision 2): the clean run
+    of a must-fail check failed (the flow's own test, on the reference block), or a check with no mutants run on
+    a case file failed while one with the same tool on the seat's file in that parameter passed. A must-fail check
+    whose mutants survive is a weak test, never a stricter one. Read from the checks' structure."""
+    by_check = list(zip(case.held_out, scores))
+    for check, score in by_check:
+        if check.mutants and score.status is ScoreStatus.FAILED and score.summary.startswith(
+                "the clean inputs do not pass"):
+            return True
+    for ref, ref_score in by_check:
+        for own, own_score in by_check:
+            shared = set(ref.case_files) & set(own.seat_files)
+            if (ref.tool == own.tool and shared and not ref.mutants and not own.mutants
+                    and ref_score.status is ScoreStatus.FAILED and own_score.status is ScoreStatus.PASSED):
+                return True
+    return False
+
+
 def flow_digest(given: dict[str, dict[str, str]]) -> str:
     """sha256 over the sorted (stage, skill, skill digest) of every skill each seated stage was given."""
     rows = sorted([stage, skill, d] for stage, skills in given.items() for skill, d in skills.items())
@@ -214,7 +238,8 @@ def run_flow(org: Organization, case: EvalCase, seat_runtime: AgentRuntime, *, r
                         for run in (engine.state.tool_runs[r] for r in dict.fromkeys(gate_runs)
                                     if r in engine.state.tool_runs)),
         scores=scores, passed=reached_review and all(s.status is ScoreStatus.PASSED for s in scores),
-        detail=detail if stopped is None else f"stage {stopped.stage} did not complete: {detail}",
+        detail=(f"stage {stopped.stage} did not complete: {detail}" if stopped is not None
+                else f"{detail} {STRICTER}".strip() if stricter_than_the_contract(case, scores) else detail),
         audit_ok=not verify_chain(engine.state.audit), sandbox=str(sandbox),
         attestations=tuple(e.id for e in engine.state.evidence.values()
                            if e.task in ids and e.kind is EvidenceKind.HUMAN_ATTESTATION),
