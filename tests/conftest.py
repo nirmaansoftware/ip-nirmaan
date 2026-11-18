@@ -53,7 +53,10 @@ def pytest_collection_modifyitems(config, items):
     path = config.getoption("--shard-manifest")
     if path:
         Path(path).parent.mkdir(parents=True, exist_ok=True)
-        Path(path).write_text(json.dumps(record, indent=1) + "\n", encoding="utf-8")
+        # O_NOFOLLOW: a symlink planted at the path fails the write instead of redirecting it.
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_NOFOLLOW", 0), 0o644)
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(json.dumps(record, indent=1) + "\n")
     keep = set(record["selected"])
     dropped = [item for item in items if item.nodeid not in keep]
     if dropped:
