@@ -79,6 +79,7 @@ def test_the_reference_flow_passes_every_check_and_re_judges_clean(nirmaan_org, 
     assert [s.status for s in trial.stages[:-1]] == ["completed"] * (len(trial.stages) - 1)
     assert trial.stages[-1].status == "in_review"  # the final block is judged, not approved
     assert trial.flow_digest and trial.flow_digest.startswith("sha256:") and trial.skills == {}
+    assert trial.result.attempts == max(s.attempts for s in trial.stages) == 1
     for stage in trial.stages:
         assert stage.skills and set(stage.skills) == set(case.exercised[stage.stage])
         assert "reviewed in the repository" not in stage.note and stage.note.startswith("Whole-flow evaluation: "

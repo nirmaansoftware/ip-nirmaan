@@ -233,7 +233,9 @@ def run_flow(org: Organization, case: EvalCase, seat_runtime: AgentRuntime, *, r
         case=case.id, case_digest=case_digest(case, repo), runtime=seat_runtime.runtime_id, replay=replay,
         version=nirmaan.__version__, started_at=started_at, duration_s=round(time.monotonic() - started, 3),
         seat=seat.id, seat_status=NOT_RUN if stopped not in (None, seat) else final.status.value,
-        submitted=reached_review, attempts=used,
+        # The most attempts any stage used (each stage's own count is in its EvalStage): rejudge passes this back
+        # as the per-stage limit, so a re-judge replays every stage's answers in the recorded order.
+        submitted=reached_review, attempts=max([s.attempts for s in stages] or [used]),
         gate_runs=tuple(GateRun(tool=run.tool, run=run.id, succeeded=run.succeeded, summary=run.summary)
                         for run in (engine.state.tool_runs[r] for r in dict.fromkeys(gate_runs)
                                     if r in engine.state.tool_runs)),
