@@ -137,6 +137,7 @@ The original preface of the section:
 - [M84-gate-inputs](M84-gate-inputs.md): Milestone 84 - Gate inputs that reach the host
 - [M85-gate-reads](M85-gate-reads.md): Milestone 85 - Gate reads of host files
 - [M86-failure-curriculum](M86-failure-curriculum.md): Milestone 86 - Failures feed the curriculum (G5)
+- [M87-whole-flow-label](M87-whole-flow-label.md): Milestone 87 - Whole-flow cases: the label and the list (G3)
 
 ## Before M43
 

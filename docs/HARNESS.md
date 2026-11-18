@@ -142,6 +142,13 @@ shows its `harness` and `cli`, and:
   trials no longer matches the harness it entered, so the group is stale; a
   group whose version is `unknown` never counts.
 
+A whole-flow trial (M87, `docs/WHOLE_FLOW.md`) is no skill group's trial: its
+label and the `whole_flow` list live in `models/evaluation.py`,
+`evals/records.py`, `evals/cases.py` and `evals/levels.py`, none of them a
+`CODE` file, so adding them changed no fingerprint. The whole-flow runner will
+add `flow` to the fingerprint's `run` section and a flow-only code section for
+a whole-flow run only, as `loop` is for tools in the loop.
+
 Five trials under one harness and three under another are two groups, never
 eight trials. Knowledge levels come from check records, not trials, and are
 unchanged.

@@ -70,14 +70,16 @@ def _record(org, repo: Path, outcomes: list[bool], *, name: str = "run1", case_i
             trial_knowledge: str | None = None, harness_digest=CURRENT,
             answer_harness=CURRENT, blocked: frozenset[int] = frozenset(), cli: str | None = None,
             skill: str = SKILL, variant: str = "default", trial_variant: str | None = None,
-            purpose: str = "evidence", trial_purpose: str | None = None) -> Path:
+            purpose: str = "evidence", trial_purpose: str | None = None, flow: str = "seat",
+            trial_flow: str | None = None, flow_digest: str | None = None) -> Path:
     record = repo / "evals" / "results" / name
     record.mkdir(parents=True)
     manifest = EvalRunManifest(id=name, runtime="claude-code", model=MODEL, replay=replay, nirmaan_version="t",
                                started_at=AT, finished_at=AT, trials=len(outcomes), cases=(case_id,),
                                seats=("rtl-implementation",), head_sha="0" * 40, knowledge=knowledge,
-                               harness_variant=variant, purpose=purpose)
+                               harness_variant=variant, purpose=purpose, flow=flow)
     trial_variant = trial_variant or variant
+    trial_flow = trial_flow or flow
     trial_purpose = trial_purpose or purpose
     (record / MANIFEST).write_text(manifest.model_dump_json(), encoding="utf-8")
     trial_knowledge = trial_knowledge or knowledge
@@ -103,7 +105,8 @@ def _record(org, repo: Path, outcomes: list[bool], *, name: str = "run1", case_i
                          succeeded=passed),) if judged and not stopped else ()
         trial = EvalTrial(record=name, trial=number, stage="rtl-implementation", model=MODEL,
                           skills={skill: digest}, knowledge=trial_knowledge, harness_variant=trial_variant,
-                          purpose=trial_purpose, result=result, judge_runs=runs,
+                          purpose=trial_purpose, flow=trial_flow, flow_digest=flow_digest, result=result,
+                          judge_runs=runs,
                           answers=(RecordedAnswer(mode="work", model=MODEL, prompt_sha256="p", packet_sha256="k",
                                                   harness=answer_harness),))
         path = trial_path(record, case_id, number)
@@ -389,6 +392,133 @@ def test_a_record_that_mixes_calibration_and_evidence_trials_is_refused_in_the_r
     [why] = levels["refused_records"]
     assert "the record mixes calibration trials with evidence trials" in why and "outside" not in why, why
     assert levels["skills"] == {} and levels["calibration"] == []
+
+
+# --- Whole-flow trials (M87, council record 2026-11-17) -------------------------------------------
+
+
+def test_main_lists_no_whole_flow_trial_and_the_key_is_always_present(org):
+    assert compute(org, ROOT)["whole_flow"] == []
+
+
+@pytest.mark.parametrize("manifest, trial, where", [("whole", "whole", "the run manifest and the trial"),
+                                                    ("whole", "seat", "the run manifest"),
+                                                    ("seat", "whole", "the trial")])
+def test_a_whole_flow_trial_never_enters_a_skill_group_even_when_its_case_names_skills(org, tmp_path, manifest,
+                                                                                       trial, where):
+    # A hand-built record: its case names a skill (a whole-flow case never would), 5 of 5 with a clean re-judge
+    # and a must-fail control, which would be Practised as single-seat evidence. Either label alone takes it out.
+    _case(tmp_path)
+    _record(org, tmp_path, [True] * 5, name="flow", flow=manifest, trial_flow=trial)
+    levels = compute(org, tmp_path)
+    assert levels["skills"].get(SKILL, {}).get("practised", []) == [] and levels["totals"]["practised"] == 0
+    [group] = levels["whole_flow"]
+    assert [(t["record"], t["trial"], t["passed"]) for t in group["trials"]] == [("evals/results/flow", n, True)
+                                                                                 for n in range(1, 6)]
+    assert all(t["reason"] == "whole-flow trial: credits no skill and never counts toward a level "
+                              f"(labelled in {where})" for t in group["trials"])
+    assert levels["refused_records"] == [] and levels["variants"] == [] and levels["calibration"] == []
+
+
+@pytest.mark.parametrize("label", [{"knowledge": "off"}, {"purpose": "calibration"}, {"variant": "attempts-3"}])
+def test_a_whole_flow_trial_lands_in_whole_flow_before_every_other_label(org, tmp_path, label):
+    _case(tmp_path)
+    _record(org, tmp_path, [True] * 5, name="flow", flow="whole", **label)
+    levels = compute(org, tmp_path)
+    assert len(levels["whole_flow"][0]["trials"]) == 5
+    assert levels["without_knowledge"] == [] and levels["calibration"] == [] and levels["variants"] == []
+    assert levels["skills"].get(SKILL, {}).get("practised", []) == []
+
+
+def test_a_whole_flow_trial_without_documents_is_listed_with_its_arm(org, tmp_path):
+    _case(tmp_path)
+    _record(org, tmp_path, [True] * 5, name="flow", flow="whole", knowledge="off")
+    [group] = compute(org, tmp_path)["whole_flow"]
+    assert {t["knowledge"] for t in group["trials"]} == {"off"}
+
+
+def test_the_arms_and_purposes_are_never_pooled(org, tmp_path):
+    _case(tmp_path)
+    _record(org, tmp_path, [True] * 10, name="on", flow="whole")
+    _record(org, tmp_path, [True] * 10, name="off", flow="whole", knowledge="off")
+    _record(org, tmp_path, [True] * 10, name="cal", flow="whole", purpose="calibration")
+    groups = compute(org, tmp_path)["whole_flow"]
+    assert sorted(g["count"]["n"] for g in groups) == [10, 10, 10]
+
+
+def test_a_record_that_mixes_whole_flow_and_single_seat_trials_is_refused(org, tmp_path):
+    _case(tmp_path)
+    record = _record(org, tmp_path, [True] * 5, name="mixed", flow="seat")
+    path = trial_path(record, "rtl/fixture", 1)  # one trial labelled whole, the rest single-seat
+    data = json.loads(path.read_text(encoding="utf-8"))
+    path.write_text(json.dumps({**data, "flow": "whole"}), encoding="utf-8")
+    levels = compute(org, tmp_path)
+    [why] = levels["refused_records"]
+    assert "the record mixes whole-flow trials with single-seat trials" in why, why
+    assert levels["skills"].get(SKILL, {}).get("practised", []) == [] and levels["whole_flow"] == []
+
+
+def test_a_whole_flow_replay_is_refused_like_any_other(org, tmp_path):
+    _case(tmp_path)
+    _record(org, tmp_path, [True] * 10, name="flow", flow="whole", replay=True)
+    levels = compute(org, tmp_path)
+    assert levels["whole_flow"] == [] and len(levels["refused_records"]) == 1
+
+
+def test_under_ten_trials_no_count_is_stated_and_at_ten_it_is(org, tmp_path):
+    _case(tmp_path)
+    _record(org, tmp_path, [True] * 9, name="flow", flow="whole", flow_digest="sha256:f")
+    [group] = compute(org, tmp_path)["whole_flow"]
+    assert "count" not in group and len(group["trials"]) == 9
+    _record(org, tmp_path, [True], name="flow-2", flow="whole", flow_digest="sha256:f")
+    [group] = compute(org, tmp_path)["whole_flow"]
+    assert group["count"] == {"n": 10, "passed": 10, "unjudged": 0, "low": 0.7225, "high": 1.0}
+    assert group["flow_digest"] == "sha256:f" and group["case"] == "rtl/fixture"
+
+
+def test_two_flow_digests_are_two_groups(org, tmp_path):
+    _case(tmp_path)
+    _record(org, tmp_path, [True] * 10, name="a", flow="whole", flow_digest="sha256:a")
+    _record(org, tmp_path, [True] * 10, name="b", flow="whole", flow_digest="sha256:b")
+    assert sorted(g["flow_digest"] for g in compute(org, tmp_path)["whole_flow"]) == ["sha256:a", "sha256:b"]
+
+
+def test_an_unjudged_whole_flow_trial_is_a_failed_trial_of_its_group(org, tmp_path):
+    _case(tmp_path)
+    _record(org, tmp_path, [True] * 10, name="flow", flow="whole", blocked=frozenset({3}))
+    [group] = compute(org, tmp_path)["whole_flow"]
+    assert group["count"]["n"] == 10 and group["count"]["passed"] == 9 and group["count"]["unjudged"] == 1
+    assert [t["passed"] for t in group["trials"] if not t["judged"]] == [False]
+
+
+def test_a_trial_with_no_judge_run_is_failed_whatever_it_claims(org, tmp_path):
+    _case(tmp_path)
+    _record(org, tmp_path, [True] * 10, name="flow", flow="whole", judged=False)
+    [group] = compute(org, tmp_path)["whole_flow"]
+    assert group["count"]["passed"] == 0 and group["count"]["unjudged"] == 10
+
+
+def test_the_record_name_is_never_read(org, tmp_path):
+    # Labelled in the manifest, a record whose name lacks the suffix is still whole-flow ...
+    _case(tmp_path)
+    _record(org, tmp_path, [True] * 5, name="2026-11-17-claude-code-m", flow="whole")
+    levels = compute(org, tmp_path)
+    assert len(levels["whole_flow"][0]["trials"]) == 5 and SKILL not in levels["skills"]
+    # ... and one whose name carries the suffix but no label is an ordinary record.
+    _record(org, tmp_path, [True] * 5, name="2026-11-17-claude-code-m-whole-flow")
+    levels = compute(org, tmp_path)
+    assert levels["skills"][SKILL]["practised"][0]["records"] == ["evals/results/2026-11-17-claude-code-m-whole-flow"]
+    assert len(levels["whole_flow"][0]["trials"]) == 5
+
+
+def test_whole_flow_trials_add_and_take_nothing_beside_a_record_that_counts(org, tmp_path):
+    _case(tmp_path)
+    _record(org, tmp_path, [True] * 5, name="run1")
+    _record(org, tmp_path, [False] * 10, name="flow", flow="whole")
+    entry = _level(org, tmp_path)
+    [group] = entry["practised"]
+    assert entry["level"] == "practised" and group["n"] == 5 and group["records"] == ["evals/results/run1"]
+    assert compute(org, tmp_path)["totals"]["practised"] == 1
 
 
 # --- Without knowledge (M67) -------------------------------------------------------------------

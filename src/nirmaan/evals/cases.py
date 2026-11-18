@@ -27,10 +27,12 @@ def is_data_file(path: Path) -> bool:
     return isinstance(data, dict) and "format" in data
 
 
-def load_cases(root: Path | str) -> list[EvalCase]:
-    """Every ``*.json`` case under ``root``, by ID. Two cases with one ID are an error.
+def load_cases(root: Path | str, *, flow: str | None = "seat") -> list[EvalCase]:
+    """Every ``*.json`` case under ``root`` of the given ``flow``, by ID. Two cases with one ID are an error.
 
-    Files with a ``format`` field (run records, checks files) are data, not cases, and are skipped.
+    Files with a ``format`` field (run records, checks files) are data, not cases, and are skipped. M87: only
+    single-seat cases unless asked (``flow="whole"``, or ``None`` for both), so a whole-flow case is in no
+    default case set: ``eval run``, the levels and the shipped-case checks never see one.
     """
     cases: dict[str, EvalCase] = {}
     for path in sorted(Path(root).rglob("*.json")):
@@ -40,7 +42,7 @@ def load_cases(root: Path | str) -> list[EvalCase]:
         if case.id in cases:
             raise EvalError(f"two cases are named {case.id!r}; the second is {path}")
         cases[case.id] = case
-    return [cases[key] for key in sorted(cases)]
+    return [cases[key] for key in sorted(cases) if flow is None or cases[key].flow == flow]
 
 
 def resolve(repo: Path, path: str) -> Path:
@@ -87,6 +89,28 @@ def skill_digest(org: Organization, skill_id: str, repo: Path, *, knowledge: boo
     return "sha256:" + digest.hexdigest()
 
 
+def _flow_problems(org: Organization, case: EvalCase) -> list[str]:
+    """M87 (council record 2026-11-17, decision 1): a whole-flow case credits no skill and fixes no stage.
+
+    It names no skill in ``skills`` (the second lock beside the ``flow`` label: the level rule credits nothing
+    even if a label is lost), lists the skills it exercises in ``exercised`` instead, and fixes no upstream
+    stage with a reference document: every work stage is seated. A single-seat case lists nothing exercised.
+    """
+    if case.flow != "whole":
+        return ["only a whole-flow case lists exercised skills"] if case.exercised else []
+    problems = []
+    if case.skills:
+        problems.append(f"a whole-flow case credits no skill, so it names none in skills, not {list(case.skills)}")
+    if case.upstream:
+        problems.append(f"a whole-flow case fixes no upstream stage: every work stage is seated, not "
+                        f"{sorted(case.upstream)}")
+    if not case.exercised:
+        problems.append("a whole-flow case lists the skills each stage exercises in exercised")
+    problems += [f"exercised skill {s!r} for stage {stage!r} is not in the skill catalog"
+                 for stage, skills in case.exercised.items() for s in skills if s not in org.skills]
+    return problems
+
+
 def validate_case(org: Organization, case: EvalCase, repo: Path) -> list[str]:
     """Every reason the case cannot run as written. Empty means it can."""
     from nirmaan.evals.scorers import scorer_spec
@@ -96,6 +120,7 @@ def validate_case(org: Organization, case: EvalCase, repo: Path) -> list[str]:
     problems += [f"unknown skill {s!r}: not in the skill catalog" for s in case.skills if s not in org.skills]
     if len(set(case.skills)) != len(case.skills):
         problems.append("a skill is named twice")
+    problems += _flow_problems(org, case)
     for check in case.held_out:
         given = {p for files in check.case_files.values() for p in files}
         problems += [f"check {check.name!r}: mutants stand in for {p}, which is not one of its case files"
@@ -127,6 +152,8 @@ def validate_case(org: Organization, case: EvalCase, repo: Path) -> list[str]:
     planned = {t.stage for t in work} | {case.seat}
     problems += [f"inputs for stage {stage!r}, which is not in the planned workflow"
                  for stage in case.inputs if stage not in planned]
+    problems += [f"exercised skills for stage {stage!r}, which is not in the planned workflow"
+                 for stage in case.exercised if stage not in planned]
     for stage, files in case.upstream.items():
         tasks = [t for t in work if t.stage == stage]
         if not tasks:
