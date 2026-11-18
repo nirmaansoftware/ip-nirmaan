@@ -263,7 +263,8 @@ Yosys, SymbiYosys, cocotb, eqy, the DFT, firmware and physical design flows):
   the cap and ends with `[nirmaan: output over 64 MB in <exe>: stopped, the run
   fails]`; the run fails with that summary whatever the parser said, and the
   record carries `output_bytes`, how much the steps printed.
-* **What a run writes.** `DISK_CAP` (2 GB) bounds the run's own directory,
+* **What a run writes.** `DISK_CAP` (2 GB) and `FILES_CAP` (100,000 files and
+  folders, which also bounds each measurement) bound the run's own directory,
   measured every `DISK_CHECK_SECONDS` (1 s) while a step runs and once after
   the last; no file any step writes can grow past it (`RLIMIT_FSIZE`), and no
   step writes a core file. A small launcher sets both limits and then becomes
@@ -271,7 +272,7 @@ Yosys, SymbiYosys, cocotb, eqy, the DFT, firmware and physical design flows):
   rather than `preexec_fn`, which can deadlock a child forked while other
   threads run; a step whose executable is missing fails with exit status 127. When the directory reaches the cap (a file stopped
   at the file limit is at it) the run is stopped and fails: `wrote 2048 MB
-  or more in <exe>`.
+  or 100000 files or more in <exe>`.
 * **What a run reads back.** A file a run wrote that its parser reads (Yosys's
   `stat.json`, the coverage data, cocotb's results file, the DFT reports) is
   read through `read_output`, which refuses one past `OUTPUT_CAP`: the run

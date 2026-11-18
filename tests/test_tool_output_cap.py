@@ -84,7 +84,7 @@ def test_a_run_under_the_cap_is_unchanged(small_caps, tmp_path):
 def test_a_step_that_writes_one_file_without_stopping_is_stopped(small_caps, tmp_path):
     code = "f = open('big.bin', 'wb')\nwhile True: f.write(b'z' * 65536)"
     out = execute(_backend(code), {"workdir": str(tmp_path / "run"), "timeout": "60"})
-    assert not out.succeeded and "wrote 4 MB or more" in out.summary
+    assert not out.succeeded and "wrote 4 MB or" in out.summary
     assert _size(tmp_path / "run") <= 4 * MB + 64 * 1024  # the file limit stops it at the cap
 
 
@@ -93,7 +93,7 @@ def test_a_compiled_step_is_killed_at_the_file_limit(small_caps, tmp_path):
     backend = Backend("capcheck", "cap.check", ("dd",), lambda job: [["dd", "if=/dev/zero", "of=big.bin", "bs=65536"]],
                       lambda run: EdaResult(True, "claimed a pass"), required=())
     out = execute(backend, {"workdir": str(tmp_path / "run"), "timeout": "60"})
-    assert not out.succeeded and "wrote 4 MB or more in dd" in out.summary
+    assert not out.succeeded and "wrote 4 MB or 100000 files or more in dd" in out.summary
     assert (tmp_path / "run" / "big.bin").stat().st_size <= 4 * MB
 
 
@@ -113,8 +113,17 @@ def test_a_step_that_writes_many_files_is_stopped(small_caps, tmp_path):
     started = time.monotonic()
     out = execute(_backend(code), {"workdir": str(tmp_path / "run"), "timeout": "60"})
     assert time.monotonic() - started < 20
-    assert not out.succeeded and "wrote 4 MB or more" in out.summary
+    assert not out.succeeded and "wrote 4 MB or" in out.summary
     assert _size(tmp_path / "run") < 16 * MB
+
+
+def test_a_step_that_makes_files_without_end_is_stopped(small_caps, monkeypatch, tmp_path):
+    monkeypatch.setattr(eda, "FILES_CAP", 500)
+    code = "import itertools\nfor n in itertools.count(): open(f'f{n}', 'w').close()"
+    started = time.monotonic()
+    out = execute(_backend(code), {"workdir": str(tmp_path / "run"), "timeout": "60"})
+    assert time.monotonic() - started < 20
+    assert not out.succeeded and "500 files or more" in out.summary
 
 
 def test_a_file_read_back_past_the_cap_fails_the_run(small_caps, tmp_path):

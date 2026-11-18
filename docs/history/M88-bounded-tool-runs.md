@@ -9,7 +9,7 @@ directories and eval sandboxes left in `TMPDIR` in about two hours. Design:
 **Output, disk and read-back caps.** Every run of every backend is bounded in
 `integrations/eda.py`: what its steps print (`OUTPUT_CAP`, 64 MB, read by the
 runner itself), its own directory and any file a step writes (`DISK_CAP`,
-2 GB), and each file its parser reads back (`read_output`). Past a cap the
+2 GB, and `FILES_CAP`, 100,000 files), and each file its parser reads back (`read_output`). Past a cap the
 step is stopped with its whole process tree and the run fails with a plain
 summary (`output over 64 MB in vvp: stopped, the run fails`), never a pass.
 

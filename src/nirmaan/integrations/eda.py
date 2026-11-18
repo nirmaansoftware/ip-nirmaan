@@ -79,7 +79,9 @@ DEFAULT_TIMEOUT = 300
 OUTPUT_CAP = 64 * 2**20
 #: M88: the most a run's own directory may hold, and the largest file any of its steps may write.
 DISK_CAP = 2 * 2**30
-#: M88: how often, in seconds, a running step's directory is measured against ``DISK_CAP``.
+#: M88: the most files and folders a run's own directory may hold.
+FILES_CAP = 100_000
+#: M88: how often, in seconds, a running step's directory is measured against ``DISK_CAP`` and ``FILES_CAP``.
 DISK_CHECK_SECONDS = 1.0
 #: M88: how many diagnostics a record keeps from the start of a result and from its end, and the longest text
 #: (a summary, a diagnostic's message) it keeps.
@@ -292,7 +294,7 @@ def _execute(backend: Backend, params: Params, sources: tuple[str, ...], workdir
         codes.append(step.code)
         if step.code != 0:
             break
-    if stopped is None and _size(workdir) >= DISK_CAP:  # M88: what a step wrote after its last measurement
+    if stopped is None and _full(workdir):  # M88: what a step wrote after its last measurement
         stopped = (DISK, commands[-1][0] if commands else backend.name)
     why = _stopped_summary(stopped, timeout)
     if stopped and stopped[0] != TIMEOUT:
@@ -512,7 +514,7 @@ def _stopped_summary(stopped: tuple[str, str] | None, timeout: int) -> str:
         return f"timed out after {timeout}s in {exe}"
     if why == OUTPUT:
         return f"output over {_mb(OUTPUT_CAP)} in {exe}: stopped, the run fails"
-    return f"wrote {_mb(DISK_CAP)} or more in {exe}: stopped, the run fails"
+    return f"wrote {_mb(DISK_CAP)} or {FILES_CAP} files or more in {exe}: stopped, the run fails"
 
 
 def _bounded(result: EdaResult) -> tuple[EdaResult, int]:
@@ -531,16 +533,24 @@ def _bounded(result: EdaResult) -> tuple[EdaResult, int]:
     return EdaResult(passed, summary, diags, metrics), cut
 
 
-def _size(root: Path) -> int:
-    """The bytes in the files under ``root`` (links not followed)."""
-    total = 0
-    for here, _, names in os.walk(root):
+def _full(root: Path) -> bool:
+    """Whether the run's directory is at its limits (M88): ``DISK_CAP`` bytes or ``FILES_CAP`` entries.
+
+    The count bounds the walk too: a step that makes files without end cannot make a measurement slow.
+    """
+    total = entries = 0
+    for here, dirs, names in os.walk(root):
+        entries += len(dirs) + len(names)
+        if entries >= FILES_CAP:
+            return True
         for name in names:
             try:
                 total += os.lstat(os.path.join(here, name)).st_size
             except OSError:  # removed while it was measured
                 pass
-    return total
+        if total >= DISK_CAP:
+            return True
+    return False
 
 
 #: M88: how a step starts. A small launcher sets the limits and then becomes the step (``exec``, so the pid, the
@@ -581,7 +591,7 @@ def _run_step(argv: list[str], cwd: Path, env: dict[str, str], deadline: float, 
     """Run one step in its own process group, keeping at most ``room`` bytes of what it prints (M88).
 
     The step is stopped, with every process it started, when the deadline passes, when it prints past
-    ``room``, or when ``watch`` (the run's directory) reaches ``DISK_CAP``; no file it writes can grow
+    ``room``, or when ``watch`` (the run's directory) reaches ``DISK_CAP`` or ``FILES_CAP``; no file it writes can grow
     past ``DISK_CAP``.
     """
     remaining = deadline - time.monotonic()
@@ -603,7 +613,7 @@ def _run_step(argv: list[str], cwd: Path, env: dict[str, str], deadline: float, 
                 break
             if now >= measure_at:
                 measure_at = now + DISK_CHECK_SECONDS
-                if _size(watch) >= DISK_CAP:
+                if _full(watch):
                     stopped = DISK
                     break
             if not selector.select(min(deadline, measure_at) - now):
