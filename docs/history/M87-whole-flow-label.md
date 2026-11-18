@@ -64,7 +64,11 @@ probe are recorded from CI. It sits in the whole-flow judge only: no tool
 definition, harness code or fingerprint changed, and single-seat cases are
 judged as before. It stops names, not address arithmetic: it confines nothing.
 The recorded address-arithmetic probe, starting from `hal->read32`, read the
-harness's cycle count, its pass counter and the run's nonce.
+harness's cycle count, its pass counter and the run's nonce. So the control
+follows the channel: the strict fixtures of WF15 on the simulator's clock are
+now refused by the screen (files kept, expected results changed, recorded),
+and two strict fixtures on the address-arithmetic route, which stays open, are
+the live controls (27 controls).
 
 **The timer document fixed, and the check record rule (follow-up).** An
 independent check found that `evals/flow/axil_timer/requirements.md` claimed

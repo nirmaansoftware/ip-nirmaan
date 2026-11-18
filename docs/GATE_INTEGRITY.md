@@ -190,9 +190,12 @@ harness's cycle count (it timed `read32` and `write32` at 2 cycles each on the
 reference RTL and 3 on `axi4_lite_regs_lat2.v`), found its pass counter, and
 found the run's nonce (its first 8 digits matched the run's own). It only
 reads and prints no record line; no fixture that forges a verdict is
-committed. So the screen does not close the cycle count: a strict fixture of
-the record's decision 1 may use this route (decision 1, item 3). The record
-is `evals/flow/object_screen_record.json`. Where it sits: in the
+committed. So the screen does not close the cycle count: the
+address-arithmetic route stays open, and the strict fixtures of gate WF15 on
+it (`driver-strict-address-test`, `driver-strict-address-driver` in
+`evals/flow/controls.json`) are its live controls; the strict fixtures on the
+simulator's clock, the route the screen does close, are recorded refused. The
+record is `evals/flow/object_screen_record.json`. Where it sits: in the
 whole-flow judge only, so the shared `fw.build` and `fw.test` tools, their
 definitions and every single-seat case are unchanged, and the seat's own
 before-review runs of those tools during a whole-flow trial are not screened.

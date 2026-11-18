@@ -22,6 +22,11 @@ check may name the counts it expects (``timing``) and the one check of a driver 
 (``fails_by``), and a control that never reaches review may name what refused it (``refused_by``, its gate runs are
 on the line). The record keeps the counts, and later runs are held to them.
 
+Gate WF16 (the same addendum, decision 2): the register block's checks 4 to 7 run after the object screen. A check
+that names ``screen_refuses`` must fail by the screen's refusal, with no run; every other check must not be refused,
+so a refusal never stands in for a failure a control expects. The strict fixtures on the simulator's clock are
+refused there; their siblings on the address-arithmetic route, which the screen leaves open, are the live controls.
+
 What waits for the whole-flow runner: replaying the reference flow through every seated stage, a flow with a
 planted upstream fault, and check 5 on the RTL another stage made.
 """
@@ -37,6 +42,7 @@ import pytest
 
 from laws import needs
 from nirmaan.evals import ReplayLLM, load_case, load_cases
+from nirmaan.evals.object_screen import REFUSED
 from nirmaan.evals.runner import evaluate
 from nirmaan.integrations.eda import run_nonce
 from nirmaan.integrations.firmware import parse_fw_test
@@ -213,10 +219,14 @@ def test_the_controls_cover_what_the_record_rules(flows):
 
 
 def test_the_strict_fixtures_follow_every_route_to_a_cycle_count():
-    """WF15 (second addendum 2026-11-18, decision 1): on a flow whose RTL stage ended in the conforming RTL, the
-    strict driver test passes there and fails check 7 on the reference RTL by its one added check, with the same bus
-    transfers; the strict driver passes check 5 there and fails check 6; and each route by which a recorded probe
-    reads a cycle count is either used by a strict fixture recorded failing, or refused before review."""
+    """WF15 (second addendum 2026-11-18, decision 1, item 3: the control follows the channel) with WF16 in force.
+
+    Each route by which a recorded probe reads a cycle count is either refused (recorded), or used by strict fixtures
+    recorded failing: on a flow whose RTL stage ended in the conforming RTL, the strict driver test passes there and
+    fails check 7 on the reference RTL by its one added check, with the same bus transfers, and the strict driver
+    passes check 5 there and fails check 6. The simulator's clock: refused by the object screen in checks 4 to 7
+    (the files stay). Address arithmetic from ``hal->read32``: open, so its strict fixtures are the live controls.
+    The SoC's CYCLES register: refused before review."""
     rtl, fw = "tests/fixtures/rtl/axi4_lite", "tests/fixtures/fw/axi4_lite"
     lat2 = f"{rtl}/variants/axi4_lite_regs_lat2.v"
     strict = "read32_and_write32_take_the_conforming_rtls_cycles"
@@ -226,22 +236,31 @@ def test_the_strict_fixtures_follow_every_route_to_a_cycle_count():
         assert found["upstream_rtl"] == lat2, found["id"]
         return found
 
+    # The simulator's clock: the screen refuses it in every screened check; the files and their lat2 pass stay.
     test = control(f"{fw}/axi4_lite_regs_test_strict_latency.c")
-    assert _uses(test, f"{fw}/axi4_lite_regs_drv.c")
     [on_lat2] = [s for s in test["checks"] if "inline" in s]
     [check7] = [s for s in test["checks"] if s.get("check") == 7]
     assert (on_lat2["rtl"], on_lat2["expect"], on_lat2["timing"]) == (lat2, "passed",
                                                                       ["test read32 3 cycles, write32 3 cycles"])
-    assert (check7["expect"], check7["fails_by"], check7["timing"]) == ("failed", strict,
-                                                                        ["test read32 2 cycles, write32 2 cycles"])
-    assert on_lat2["transcript"] == check7["transcript"]
-
+    assert (check7["expect"], check7.get("screen_refuses")) == ("failed", True) and "fails_by" not in check7
     driver = control(f"{fw}/axi4_lite_regs_drv_strict_latency.c")
-    assert _uses(driver, f"{fw}/axi4_lite_regs_test.c")
-    got = {(s["check"], s.get("rtl"), s["expect"]) for s in driver["checks"]}
-    assert {(5, lat2, "passed"), (6, None, "failed")} <= got
+    assert {(s["check"], s["expect"], s.get("screen_refuses")) for s in driver["checks"]} == {
+        (4, "failed", True), (5, "failed", True), (6, "failed", True)}
 
-    # The routes: the simulator's clock (used above), and the SoC's CYCLES register (refused or unreadable here).
+    # Address arithmetic: open, so the strict fixtures on it must fail as decision 1, items 1 and 2, ask.
+    test = control(f"{fw}/axi4_lite_regs_test_strict_address.c")
+    assert _uses(test, f"{fw}/axi4_lite_regs_drv.c")
+    [on_lat2] = [s for s in test["checks"] if "inline" in s]
+    [check7] = [s for s in test["checks"] if s.get("check") == 7]
+    assert (on_lat2["rtl"], on_lat2["expect"]) == (lat2, "passed")
+    assert (check7["expect"], check7["fails_by"]) == ("failed", strict) and not check7.get("screen_refuses")
+    assert on_lat2["transcript"] == check7["transcript"]
+    driver = control(f"{fw}/axi4_lite_regs_drv_strict_address.c")
+    assert _uses(driver, f"{fw}/axi4_lite_regs_test.c")
+    got = {(s["check"], s.get("rtl"), s["expect"]) for s in driver["checks"] if not s.get("screen_refuses")}
+    assert {(4, None, "passed"), (5, lat2, "passed"), (6, None, "failed")} == got
+
+    # The SoC's CYCLES register (refused or unreadable here).
     for path in (f"{fw}/axi4_lite_regs_test_strict_soc_cycles.c", f"{fw}/axi4_lite_regs_test_strict_soc_address.c"):
         soc = control(path)
         assert soc.get("reaches_review") is False and soc["refused_by"], soc["id"]
@@ -284,6 +303,10 @@ def test_the_control_gets_the_verdict_it_expects(nirmaan_org, fixed_clock, flows
     for spec, score, timed in zip(control["checks"], result.scores, timings):
         if "timing" in spec:  # the counts a strict fixture measured
             assert timed == spec["timing"], (score.name, timed)
+        if spec.get("screen_refuses"):  # WF16: refused before any build or link, with nothing run
+            assert score.summary.startswith(REFUSED) and not score.runs, (score.name, score.summary)
+        else:
+            assert not score.summary.startswith(REFUSED), (score.name, score.summary)
         if "fails_by" in spec:  # that one check failed, and nothing else went wrong: no build, harness or crash
             assert _how_it_failed(engine, score.runs[0]) == {"failed": [spec["fails_by"]], "errors": [],
                                                              "finished": True}, score.summary

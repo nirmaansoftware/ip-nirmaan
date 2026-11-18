@@ -46,6 +46,7 @@ RTL = REPO / "tests" / "fixtures" / "rtl" / "axi4_lite"
 LINUX = pytest.mark.skipif(sys.platform != "linux", reason="the allow list and the record are the CI toolchain's "
                                                             "(Linux); another host's C library names differ")
 
+
 def _answers(folder: Path) -> list[Path]:
     """A fixture folder's C, less the strict fixtures of gate WF15, which reach outside the HAL on purpose."""
     return sorted(p for p in folder.glob("*.c") if "_strict_" not in p.name)
