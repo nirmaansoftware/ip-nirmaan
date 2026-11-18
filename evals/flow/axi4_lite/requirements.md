@@ -5,7 +5,11 @@ with the request "Create an AXI4-Lite register block and its driver." to the
 whole-flow case `flow/axi4-lite-regs-driver` (council record 2026-11-17,
 decision 2). It is the case's own copy of `evals/spec/axi4_lite/requirements.md`
 (the single-seat specification case's document, which stays as it is), with
-tags added to section 1 and section 4 added. It is written before the flow and is no stage's output. Each
+tags added to section 1, section 4 added, and three rules split so that each
+tag states only what the case judges: the protection signals
+(`AXIL-NO-PROT`) and the parameter defaults (`AXIL-PARAMS-DEFAULT`) have
+their own tags, and `AXIL-B2B` says what accepting a new request in the next
+cycle means at the ports. It is written before the flow and is no stage's output. Each
 requirement ends with its tag. The requirements specification carries every
 requirement forward, and the interface specification restates every
 requirement below in the section where it belongs, in its own words and with
@@ -18,9 +22,10 @@ exactly once.
   offsets `0x0`, `0x4`, `0x8`, and `0xC`, each resetting to zero. [req:AXIL-MAP]
 * An AXI4-Lite subordinate port. Every port is named with the `s_axil_` prefix
   and the AXI4-Lite channel signal name (for example `s_axil_awaddr`,
-  `s_axil_bresp`), on clock `aclk` and active-low reset `aresetn`. There are no
-  protection signals. [req:AXIL-PORTS]
-* Parameters `ADDR_WIDTH` (default 4) and `DATA_WIDTH` (default 32). [req:AXIL-PARAMS]
+  `s_axil_bresp`), on clock `aclk` and active-low reset `aresetn`. [req:AXIL-PORTS]
+* There are no protection signals. [req:AXIL-NO-PROT]
+* Parameters `ADDR_WIDTH` and `DATA_WIDTH`. [req:AXIL-PARAMS]
+* `ADDR_WIDTH` defaults to 4 and `DATA_WIDTH` to 32. [req:AXIL-PARAMS-DEFAULT]
 
 ## 2. Behavior
 
@@ -34,7 +39,11 @@ exactly once.
 * A response is valid at most 2 cycles after its request completes, for both
   reads and writes. [req:AXIL-LATENCY]
 * After a response is taken, the channel accepts a new request in the next
-  cycle. [req:AXIL-B2B]
+  cycle: a write address and write data offered together in the cycle after
+  the edge that takes a write response are both accepted on the edge that
+  ends that cycle, and a read address offered in the cycle after the edge
+  that takes a read response is accepted on the edge that ends that cycle.
+  [req:AXIL-B2B]
 * During and after reset no response is valid, every register holds zero, and
   a write with only one of address or data accepted is discarded. [req:AXIL-RESET]
 
