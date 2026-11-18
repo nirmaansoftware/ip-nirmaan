@@ -1170,7 +1170,8 @@ def eval_run(
     chosen = select_cases([known[c] for c in case_ids or [c for c, case in known.items() if case.flow == "seat"]],
                           [x.strip() for x in (seats or "").split(",") if x.strip()])
     if not chosen:
-        _fail(f"no case matches --seats {seats}")
+        _fail(f"no case matches --seats {seats}" if case_ids or seats else
+              "no single-seat case to run by default; name a whole-flow case to run it")
     if runtime is not None:
         from nirmaan.runtime import available_runtimes
 

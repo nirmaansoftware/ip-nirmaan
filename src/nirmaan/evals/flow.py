@@ -59,7 +59,10 @@ class FlowRun:
 
 def _order(engine: TaskEngine, case: EvalCase) -> list[Task]:
     """Every work stage in dependency order, the case's seat last; a gate or a decision is refused."""
-    [seat] = [t for t in engine.state.tasks.values() if t.kind is TaskKind.WORK and t.stage == case.seat]
+    seats = [t for t in engine.state.tasks.values() if t.kind is TaskKind.WORK and t.stage == case.seat]
+    if len(seats) != 1:
+        raise EvalError(f"final stage {case.seat!r} is {len(seats)} work tasks in the planned workflow; it must be one")
+    [seat] = seats
     before = _ancestors(engine, seat.id)
     other = [t.id for t in before if t.kind is not TaskKind.WORK]
     if other:
