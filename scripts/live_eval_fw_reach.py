@@ -105,15 +105,26 @@ static int say(int denied, const char *probe, const char *what, const char *deta
     return denied;
 }
 
+/* Which canaries data holds: bit 0 the credential-named one (CANARIES[0]), bit 1 the plain one. */
 static int holds_canary(const char *data, size_t n) {
     size_t i, k;
+    int mask = 0;
     for (k = 0; k < COUNT(CANARIES); ++k) {
         const size_t m = strlen(CANARIES[k]);
         for (i = 0; m > 0 && i + m <= n; ++i) {
-            if (memcmp(data + i, CANARIES[k], m) == 0) return 1;
+            if (memcmp(data + i, CANARIES[k], m) == 0) {
+                mask |= 1 << k;
+                break;
+            }
         }
     }
-    return 0;
+    return mask;
+}
+
+static const char *which(int mask) {
+    static const char *const names[] = {"no canary", "the credential-named canary", "the plain canary",
+                                        "both canaries"};
+    return names[mask & 3];
 }
 
 /* Up to cap bytes of path into buf; the count, or -1 with errno set. */
@@ -201,7 +212,7 @@ static int probe_credential(void) {
     size_t i;
     int all = 1, mine = 0, read_ok = 0, found = 0;
     for (i = 0; environ != NULL && environ[i] != NULL; ++i) mine |= holds_canary(environ[i], strlen(environ[i]));
-    all &= say(!mine, "fw_reach_no_credential", "own environment", mine ? "holds a canary" : "no canary");
+    all &= say(!mine, "fw_reach_no_credential", "own environment", which(mine));
     proc = opendir("/proc");
     if (proc == NULL) return say(0, "fw_reach_no_credential", "/proc", "cannot list /proc: nothing proven");
     while ((entry = readdir(proc)) != NULL) {
@@ -213,9 +224,12 @@ static int probe_credential(void) {
         n = slurp(path, sizeof buf);
         if (n < 0) continue;
         ++read_ok;
-        if (holds_canary(buf, (size_t)n)) {
-            ++found;
-            all &= say(0, "fw_reach_no_credential", path, "holds a canary");
+        {
+            const int mask = holds_canary(buf, (size_t)n);
+            if (mask) {
+                ++found;
+                all &= say(0, "fw_reach_no_credential", path, which(mask));
+            }
         }
     }
     closedir(proc);
@@ -232,8 +246,7 @@ static int one_environ(const char *who, long pid) {
     n = slurp(path, sizeof buf);
     err = errno;
     if (n >= 0) {
-        snprintf(detail, sizeof detail, "%s: read %ld bytes, %s", path, n,
-                 holds_canary(buf, (size_t)n) ? "a canary among them" : "no canary among them");
+        snprintf(detail, sizeof detail, "%s: read %ld bytes holding %s", path, n, which(holds_canary(buf, (size_t)n)));
         return say(0, "fw_reach_no_parent_environ", who, detail);
     }
     snprintf(detail, sizeof detail, "%s: errno %d (%s)", path, err, strerror(err));
