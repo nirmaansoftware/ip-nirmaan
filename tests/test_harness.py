@@ -158,7 +158,9 @@ def test_editing_any_harness_code_file_changes_the_fingerprint(monkeypatch, tmp_
 def test_the_run_options_are_in_the_fingerprint():
     default = harness_sha256()
     assert harness_sha256(attempts=None, knowledge=True, variant="default") == default
-    assert len({default, harness_sha256(attempts=3), harness_sha256(knowledge=False),
+    # H3: the default sets three attempts, so a run given --attempts 3 is the default's own harness.
+    assert harness_sha256(attempts=3) == default
+    assert len({default, harness_sha256(attempts=1), harness_sha256(knowledge=False),
                 harness_sha256(variant="attempts-3")}) == 4
     assert default.startswith("sha256:") and len(default) == len("sha256:") + 64
 
@@ -206,14 +208,15 @@ def test_seat_calls_run_claude_code_in_safe_mode():
 
 
 def test_the_named_variants_are_the_default_and_three_attempts_with_the_repair_text():
-    # M75 adds tools-in-loop (tests/test_seat_tools.py).
-    assert harness.VARIANTS == {"default": {}, "attempts-3": {"attempts": 3}, "tools-in-loop": {"tools": True}}
-    assert fingerprint()["run"]["variant"] == "default"
+    # M75 adds tools-in-loop (tests/test_seat_tools.py). H3 named attempts-3 the default: both set three attempts.
+    assert harness.VARIANTS == {"default": {"attempts": 3}, "attempts-3": {"attempts": 3},
+                                "tools-in-loop": {"tools": True}}
+    assert fingerprint()["run"] == {"attempts": 3, "knowledge": True, "cli": None, "variant": "default"}
     assert fingerprint(variant="attempts-3")["run"] == {"attempts": 3, "knowledge": True, "cli": None,
                                                         "variant": "attempts-3"}
-    # The variant's own attempts, given or not, is one harness; a plain --attempts 3 is not the variant.
+    # The variant's own attempts, given or not, is one harness; a plain --attempts 3 is the default, not the variant.
     assert harness_sha256(variant="attempts-3") == harness_sha256(attempts=3, variant="attempts-3")
-    assert harness_sha256(variant="attempts-3") != harness_sha256(attempts=3)
+    assert harness_sha256(variant="attempts-3") != harness_sha256(attempts=3) == harness_sha256()
     with pytest.raises(ValueError, match="unknown harness variant 'nope'; known: default, attempts-3, tools-in-loop"):
         harness_sha256(variant="nope")
 
@@ -231,6 +234,15 @@ def test_editing_a_variant_changes_its_fingerprint_and_never_the_default(monkeyp
     default, before = harness_sha256(), harness_sha256(variant="attempts-3")
     monkeypatch.setitem(harness.VARIANTS, "attempts-3", {"attempts": 4})
     assert harness_sha256(variant="attempts-3") != before and harness_sha256() == default
+
+
+def test_naming_the_default_changed_the_defaults_fingerprint_and_no_other(monkeypatch):
+    # H3: the switch is the default's run option alone, so every other variant's fingerprint is as it was.
+    now = {name: harness_sha256(variant=name, cli="2.1.325") for name in harness.VARIANTS}
+    monkeypatch.setitem(harness.VARIANTS, "default", {})  # the default before H3
+    before = {name: harness_sha256(variant=name, cli="2.1.325") for name in harness.VARIANTS}
+    assert before["default"] != now["default"]
+    assert {k: v for k, v in before.items() if k != "default"} == {k: v for k, v in now.items() if k != "default"}
 
 
 # --- Records -----------------------------------------------------------------------------------
@@ -290,7 +302,52 @@ def test_the_attempts_variant_gives_the_seat_three_attempts(nirmaan_org, fixed_c
         result, _ = evaluate(nirmaan_org, case, seat, replay=True, repo=ROOT, sandbox=tmp_path / variant,
                              clock=fixed_clock, variant=variant)
         assert result.harness == harness_sha256(variant=variant)
-    assert asked == [3, case.attempts]
+    seat = ModelRuntime(replay_llm(case, ROOT), runtime_id="replay")  # an --attempts override still wins
+    evaluate(nirmaan_org, case, seat, replay=True, repo=ROOT, sandbox=tmp_path / "one", clock=fixed_clock, attempts=1)
+    # H3: the default gives the seat three attempts, as attempts-3 does, over the case's own (one).
+    assert case.attempts == 1 and asked == [3, 3, 1]
+
+
+def test_the_default_seat_is_the_attempts_3_seat_prompt_for_prompt(nirmaan_org, fixed_clock, tmp_path):
+    # H3 named attempts-3 the default (docs/HARNESS.md, "The default since H3"): a run with no --harness is the
+    # seat --harness attempts-3 ran. A seat whose first answer is refused is asked again with the repair text,
+    # and every prompt it reads is the same on both; only the variant's name, a run option, tells them apart.
+    import json
+
+    from nirmaan.evals import evaluate, replay_llm
+    from nirmaan.runtime import Completion, ModelRuntime
+
+    case = next(c for c in load_cases(ROOT / "evals") if c.id == "spec/axi4-lite-interface")
+
+    class RefusedFirst:
+        """The reference answer, except that the first one names a run that never happened (P5 refuses it)."""
+
+        name = "replay"
+
+        def __init__(self) -> None:
+            self.inner, self.calls = replay_llm(case, ROOT), []
+
+        def complete(self, prompt, tools=None):
+            self.calls.append(prompt.render())
+            done = self.inner.complete(prompt, tools)
+            if len(self.calls) > 1:
+                return done
+            head, _, blocks = done.text.partition("\n")
+            return Completion(json.dumps({**json.loads(head), "tool_runs": ["run-never"]}) + "\n" + blocks,
+                              done.model)
+
+    seen = {}
+    for variant in ("attempts-3", "default"):
+        llm = RefusedFirst()
+        result, _ = evaluate(nirmaan_org, case, ModelRuntime(llm, runtime_id="replay"), replay=True, repo=ROOT,
+                             sandbox=tmp_path / variant, clock=fixed_clock, variant=variant)
+        assert result.attempts == 2 and result.submitted and result.passed, result.detail
+        assert "Repair: your previous attempt 1 was refused" in llm.calls[1]
+        seen[variant] = (llm.calls, result.harness)
+    assert seen["default"][0] == seen["attempts-3"][0]
+    one, three = fingerprint(), fingerprint(variant="attempts-3")
+    assert {**one, "run": {**one["run"], "variant": "attempts-3"}} == three
+    assert seen["default"][1] == harness_sha256() != seen["attempts-3"][1] == harness_sha256(variant="attempts-3")
 
 
 def test_the_cli_runs_a_named_variant_and_refuses_an_unknown_one_or_a_second_attempts(tmp_path):
@@ -312,4 +369,12 @@ def test_the_cli_runs_a_named_variant_and_refuses_an_unknown_one_or_a_second_att
     twice = CliRunner().invoke(app, [*base, "--harness", "attempts-3", "--attempts", "2", "--out", str(tmp_path / "x")])
     assert twice.exit_code != 0 and "--harness attempts-3 sets the attempts" in twice.output
     assert not (tmp_path / "none").exists() and not (tmp_path / "x").exists()
+    # H3: the default sets three attempts too, yet --attempts still overrides it there, as another harness.
+    for given, out in ((None, "plain"), ("1", "one")):
+        ran = CliRunner().invoke(app, [*base, *(["--attempts", given] if given else []), "--out", str(tmp_path / out)])
+        assert ran.exit_code == 0 and "harness variant" not in ran.output, ran.output
+        [path] = list((tmp_path / out).iterdir())
+        want = harness_sha256(attempts=int(given) if given else None)
+        assert all(t.harness_variant == "default" and t.result.harness == want for t in load_record(path).trials)
+    assert harness_sha256(attempts=1) != harness_sha256()
 

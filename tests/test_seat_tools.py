@@ -77,8 +77,10 @@ def _run(nirmaan_org, fixed_clock, tmp_path, seat, case=None, variant=VARIANT):
 
 
 def test_tools_in_the_loop_is_a_named_variant_beside_the_default_and_attempts_3():
-    assert harness.VARIANTS == {"default": {}, "attempts-3": {"attempts": 3}, VARIANT: {"tools": True}}
+    # H3 named attempts-3 the default, so the default sets three attempts; the variant still sets none (H3's arm T).
+    assert harness.VARIANTS == {"default": {"attempts": 3}, "attempts-3": {"attempts": 3}, VARIANT: {"tools": True}}
     assert len({harness_sha256(), harness_sha256(variant="attempts-3"), harness_sha256(variant=VARIANT)}) == 3
+    assert fingerprint(variant=VARIANT)["run"]["attempts"] is None
     loop = fingerprint(variant=VARIANT)["loop"]
     assert set(loop["settings"]) == set(harness.LOOP_SETTINGS)
     assert set(loop["code"]) == set(harness.LOOP_CODE) and all(d.startswith("sha256:") for d in loop["code"].values())
