@@ -34,7 +34,7 @@ from dataclasses import dataclass
 from nirmaan.applicability import describe
 from nirmaan.models import EvidenceRequirement, FileInput, ParamKind, ToolSpec
 from nirmaan.runtime import harness
-from nirmaan.runtime.context import ArtifactView, AttemptView, ReviewView, WorkPacket
+from nirmaan.runtime.context import DOCUMENT_KIND, ArtifactView, AttemptView, ReviewView, WorkPacket
 
 _UNSAFE = re.compile(r"[^A-Za-z0-9._\-]")
 
@@ -133,7 +133,10 @@ def _citations(packet: WorkPacket, tools: tuple[ToolNote, ...]) -> list[Citable]
                                             f"{review.verdict} by {review.reviewer}"))
     for art in packet.task.upstream_artifacts:  # only what the organization approved is citable
         if art.trusted:
-            found.setdefault(art.id, Citable("artifact", _UNSAFE.sub(".", art.id), art.id,
+            # G3: a customer document is cited as a document, never as an artifact, so no draft derives from a
+            # record the engine does not hold (the provenance check refuses that).
+            kind = "document" if art.kind == DOCUMENT_KIND else "artifact"
+            found.setdefault(art.id, Citable(kind, _UNSAFE.sub(".", art.id), art.id,
                                              f"{art.kind}: {art.title} (approved)"))
     for attempt in packet.task.attempts:  # M52: a refused attempt's failed runs stay citable; they back nothing
         for failed in attempt.failed_runs:
