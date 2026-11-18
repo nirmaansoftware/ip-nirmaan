@@ -111,7 +111,8 @@ listed.
 **The reference testbenches.** Each case's check 1 runs its own copy of the
 single-seat reference testbench: `evals/flow/axil_timer/axil_timer_tb.v` and
 `evals/flow/axi4_lite/axi4_lite_regs_tb.v`. A copy keeps every check of the
-original, in order and word for word, and adds the checks an independent
+original, in order and word for word, except the named exemptions in
+`TB_COPY_EXEMPT` (`tests/test_whole_flow_cases.py`), and adds the checks an independent
 check found missing: for the timer, RDATA held still while a running `COUNT`
 is read under backpressure, a `STATUS` clear on the edge a one-shot count
 ends, and a reset while `EXPIRED` is set; for the register block, a new
@@ -133,7 +134,13 @@ waited on `READY`, and no response valid after the first reset edge. A rule
 over time ("stays high until", "any gap", "until `EN` is written 1 again") is
 checked over these bounded runs, as any simulation checks it. The single-seat
 cases keep running the originals, so their digests, and the recorded trials
-that hold those digests, stay as they are. A test holds both.
+that hold those digests, stay as they are. The one exemption is the register block original's "AWREADY in reset"
+check (decision #28): no flow document states READY during reset, the
+single-seat interface specification does not require it, and only the
+single-seat `microarchitecture.md` does, while in a whole flow the RTL stage
+writes its own microarchitecture; so a conforming block must not fail it. The
+original keeps it. A test holds both, and fails on any other dropped or
+altered check.
 
 **The held-out tests.** The register block case's held-out test is its own
 copy of the firmware case's, with an unmapped (misaligned) write added, so the
@@ -215,7 +222,14 @@ What they show:
   the flow's RTL (1 and 2; check 5 waits for the runner), and the held-out
   test passes on it;
 - the range-accepting reference tests pass on both RTLs, and the testbench
-  written to the variant's one choice fails check 3 on the reference RTL;
+  written to the variant's one choice fails check 3 on the reference RTL.
+  Known limit: check 3 runs the flow's testbench on the reference RTL alone,
+  so a testbench strict about the reference's own choice (a response exactly
+  1 cycle after its request) passes it, though it fails on the conforming
+  RTL. No change: the council record accepts this, since checks 3, 6 and 7
+  are "fair by the rule, which the fixed document states to the seats, and
+  not by the conforming RTL alone"
+  (`council/records/2026-11-17-g3-whole-flow-cases.md`, lines 301 to 303);
 - `fw.test` works under the must-fail scorer (check 7: the clean run passes
   and `wstrb_ignored` and `okay_unmapped` are caught);
 - `b_before_w` is not visible through the HAL: under the must-fail scorer

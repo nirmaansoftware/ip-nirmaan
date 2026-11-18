@@ -86,9 +86,10 @@ alone, runs long counts, stops and gaps, and leaves a write's address and data
 unknown while they are not offered; the timer's stop value is now judged
 (`TMR-STOP-EDGE`). The author swept every judged tag of both documents with
 its own scratch mutants before asking for review. The documents are unchanged,
-and both still wait for a fresh check. The register block testbench's check
-that `AWREADY` is high in reset is not stated by the single-seat interface
-specification, and is left for a decision.
+and both still wait for a fresh check. The register block copy drops the original's
+check that `AWREADY` is high in reset (decision #28): only the single-seat
+microarchitecture states it, so a conforming flow block must not fail it. The
+copy test now allows only named exemptions, each with its reason.
 
 **Not here.** The runner option (its `runner.py` dispatch waits for the H3
 batch, gate WF1).

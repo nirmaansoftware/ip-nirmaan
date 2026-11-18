@@ -323,20 +323,65 @@ TB_COPIES = {"flow/axil-timer": ("tests/fixtures/rtl/axil_timer/axil_timer_tb.v"
                                             "evals/flow/axi4_lite/axi4_lite_regs_tb.v")}
 
 
+#: Checks of an original a flow copy drops on purpose, by copy: the original's check line, word for word, and why.
+#: Each must be in the original and absent from the copy; any other dropped or altered check fails the test.
+TB_COPY_EXEMPT = {
+    "evals/flow/axi4_lite/axi4_lite_regs_tb.v": {
+        """check("AWREADY in reset", {31'd0, awready}, 32'd1);""":
+            "Decision #28 (orchestrator, 2026-11-18): no flow document states READY during reset, and the single-seat "
+            "interface specification (tests/fixtures/rtl/axi4_lite/interface_spec.md, sections 4 and 7) does not "
+            "require it; only the single-seat microarchitecture.md (line 74) does, and in a whole flow the RTL stage "
+            "writes its own microarchitecture. A conforming block must not fail it. The original keeps it.",
+    },
+}
+
+
 def _check_calls(path: str) -> list[str]:
     return [line.strip() for line in (ROOT / path).read_text(encoding="utf-8").splitlines()
             if re.match(r"\s*(check|expect_reg)\(", line)]
 
 
+def _copy_problems(kept: list[str], added: list[str], exempt: dict[str, str]) -> list[str]:
+    """What is wrong with a copy's check lines against the original's (empty when it keeps every one but the named
+    exemptions, in order, word for word, and adds some)."""
+    problems = [f"exemption not in the original: {line}" for line in exempt if line not in kept]
+    problems += [f"exempted check still in the copy: {line}" for line in exempt if line in added]
+    problems += [f"exemption without a reason: {line}" for line, why in exempt.items() if not why.strip()]
+    at = 0  # kept lines must appear in the copy in order: each is looked for after the one before it
+    for line in kept:
+        if line in exempt:
+            continue
+        if line in added[at:]:
+            at = added.index(line, at) + 1
+        else:
+            problems.append(f"check dropped, altered or out of order: {line}")
+    if len(added) <= len(kept) - len(exempt):
+        problems.append("the copy adds no check")
+    return problems
+
+
+def test_the_copy_rule_refuses_any_other_dropped_or_altered_check():
+    kept = ['check("a", x, 1);', 'check("b", y, 0);', 'expect_reg("c", 8\'h0, 0);']
+    exempt = {'check("b", y, 0);': "a named reason"}
+    good = ['check("a", x, 1);', 'check("new", z, 1);', 'expect_reg("c", 8\'h0, 0);']
+    assert _copy_problems(kept, good, exempt) == []
+    assert _copy_problems(kept, good, {})  # the same drop without its exemption fails
+    assert _copy_problems(kept, ['check("new", z, 1);', 'expect_reg("c", 8\'h0, 0);'], exempt)  # another drop
+    assert _copy_problems(kept, ['check("a", x, 2);', 'check("new", z, 1);', 'expect_reg("c", 8\'h0, 0);'], exempt)
+    assert _copy_problems(kept, ['expect_reg("c", 8\'h0, 0);', 'check("a", x, 1);', 'check("n", z, 1);'], exempt)
+    assert _copy_problems(kept, [*good, 'check("b", y, 0);'], exempt)  # an exempted check left in the copy
+    assert _copy_problems(kept, good, {**exempt, 'check("gone", q, 0);': "why"})  # a stale exemption
+    assert _copy_problems(kept, good, {'check("b", y, 0);': " "})  # no reason
+
+
 @pytest.mark.parametrize("case_id", sorted(TB_COPIES))
 def test_the_reference_testbench_copy_keeps_every_check_and_only_the_flow_case_runs_it(cases, case_id):
-    """The copy adds checks and keeps every one of the original's, in order, word for word; the single-seat case
-    keeps running the original, so its digest and its recorded trials stay as they are."""
+    """The copy adds checks and keeps every one of the original's, in order, word for word, except the named
+    exemptions in ``TB_COPY_EXEMPT``; the single-seat case keeps running the original, so its digest and its
+    recorded trials stay as they are."""
     original, copy = TB_COPIES[case_id]
-    kept, added = _check_calls(original), _check_calls(copy)
-    rest = iter(added)
-    assert all(any(line == other for other in rest) for line in kept)  # a subsequence
-    assert len(added) > len(kept)
+    assert set(TB_COPY_EXEMPT) <= {c for _, c in TB_COPIES.values()}
+    assert _copy_problems(_check_calls(original), _check_calls(copy), TB_COPY_EXEMPT.get(copy, {})) == []
     assert cases[case_id].held_out[0].case_files["sources"] == (copy,)
     single = {c.id: c for c in load_cases(EVALS)}
     assert any(original in c.case_files.get("sources", ()) for s in single.values() for c in s.held_out)
