@@ -181,20 +181,49 @@ CLI's provenance lines. `nirmaan learn --evals` may be given more than once,
 so `--evals evals/results --evals tests/fixtures/eval_results_synthetic` reads
 both, each labelled. Replays and broken audit chains stay excluded, as in M42.
 
-## 6. The scheduled workflow (disabled until a secret exists)
+## 6. The workflow in GitHub Actions (dispatch only)
 
-`.github/workflows/live-eval.yml` runs weekly (and on manual dispatch), never
-on a pull request or a push. Its first step, `scripts/live_eval_gate.py`,
-checks for the `CLAUDE_CODE_OAUTH_TOKEN` secret (from `claude setup-token`, so
-the run uses the owner's plan through the `claude-code` runtime). Without it
-the gate writes `enabled=false` and a notice, and every later step is skipped:
-the job is green and spends nothing. With it, the job installs the EDA tools
-and Claude Code, runs the batch, and uploads the run record as a workflow
-artifact. It never commits: the owner reviews the record and commits it in a
-pull request, as with any evidence.
+`.github/workflows/live-eval.yml` runs only on manual dispatch, never on a
+schedule, a pull request or a push. Cases whose seat output is executable code
+by design (cocotb tests, firmware) run only here, never on the owner's
+machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
+20), `knowledge` (`on`, or `off` for `--without-knowledge`), `purpose`
+(`evidence` or `calibration`), `harness` (the `--harness` variant),
+`expected_harness` (a `harness_sha256` value) and `replay`.
 
-To enable it: add the repository secret `CLAUDE_CODE_OAUTH_TOKEN`. To disable
-it again: delete the secret.
+- **Live trials** (the `live-eval` job) run only from `main`, in the GitHub
+  environment `live-eval`, which only `main` may deploy to. Its secret
+  `CLAUDE_CODE_OAUTH_TOKEN` (from `claude setup-token`, so the run uses the
+  owner's plan) is the only credential the job is given, and only the gate step
+  and the trials step get it; there is no repository secret. Without it,
+  `scripts/live_eval_gate.py` writes `enabled=false` and the job stops before
+  anything is installed or spent.
+- **The tools** come from `.github/actions/live-eval-setup`: the EDA tools,
+  SymbiYosys and Yices from the pinned OSS CAD Suite, Claude Code from
+  `.github/live-eval` (version 2.1.325, each package checked against the sha512
+  in its lockfile by `npm ci`), and the package with the `cocotb` extra.
+- **The fingerprint**: `scripts/live_eval_ci.py check` prints the
+  `harness_sha256` the trials will run in, from the installed CLI's version,
+  and refuses a CLI other than the pin or a fingerprint other than
+  `expected_harness`. No trial runs on a mismatch.
+- **The trials**: `scripts/live_eval_ci.py trials` runs `nirmaan eval run
+  <case> --trials 1` once per trial, in order, so each trial is its own record.
+  It stops at once on exit 3 (a trial with no model answer, as on a plan or
+  usage limit) or a limit line in the output, on any exit other than 0 or 1,
+  and when a record's purpose, knowledge label, harness variant, fingerprint or
+  CLI is not what was asked for. A stopped or failed trial stays as it is and
+  is never run again; no later trial of the dispatch starts. One dispatch runs
+  at a time (the `live-eval` concurrency group).
+- **The records** are uploaded as a workflow artifact, then re-judged. Nothing
+  here commits: the records are downloaded and committed by pull request like
+  any other evidence.
+- **A replay** (`replay: true`, the `replay` job) runs the case's reference
+  answer with no model, no token and no environment, from any branch, and
+  prints the fingerprint. It checks the tools before trials are spent.
+
+To enable live trials: create the `live-eval` environment, allow only `main`
+to deploy to it, and add the environment secret `CLAUDE_CODE_OAUTH_TOKEN`. To
+disable them: delete the secret.
 
 ## 7. The owner's first recorded batch
 
@@ -257,8 +286,11 @@ input, so roughly $13 to $20. Results land in
 - Wilson intervals and per case and per seat rates are computed correctly;
 - each new case passes with its reference answer and fails with a bad one;
 - M42 reads a run record, labelled by source, alongside the synthetic fixtures;
-- the scheduled workflow never runs on pull requests and skips without its
-  secret;
+- the workflow runs only on dispatch, gives the token only to two steps of
+  a job that runs from `main` in the `live-eval` environment, and stops
+  without its secret; its trials run one at a time and stop on a limit, an
+  odd exit or a record that is not the trial asked for, and none runs again
+  (`tests/test_live_eval_ci.py`);
 - crown jewel `test_a_new_seat_group_is_recorded_and_rejudged_with_no_core_changes`:
   a case and a scorer written in the test run with trials, are recorded,
   summarized, shown in history, and re-judged with no core change;
