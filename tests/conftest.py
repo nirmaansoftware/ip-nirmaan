@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -77,6 +79,35 @@ def _wide_cli_consoles():
 
     for console in (nirmaan_cli.console, nirmaan_cli._err, veritriage_cli.console, veritriage_cli._err):
         console.width = 1000
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _temporary_root(tmp_path_factory):
+    """M88: every temporary folder the suite makes in this process (tool runs, eval sandboxes) goes in one
+    folder inside pytest's own base folder, removed when the session ends; NIRMAAN_KEEP_RUN_DIRS keeps it.
+
+    Pytest's base folder is made first, so it stays where pytest keeps it.
+    """
+    from nirmaan.integrations.eda import keep_run_dirs
+
+    root = tmp_path_factory.getbasetemp() / "tmp"
+    root.mkdir()
+    before, tempfile.tempdir = tempfile.tempdir, str(root)
+    try:
+        yield root
+    finally:
+        tempfile.tempdir = before
+        if not keep_run_dirs():
+            shutil.rmtree(root, ignore_errors=True)
+
+
+@pytest.fixture(autouse=True)
+def _temporary_runs():
+    """M88: the temporary run directories a test makes are removed when it ends, as an eval trial's are."""
+    from nirmaan.integrations.eda import temporary_runs
+
+    with temporary_runs():
+        yield
 
 
 @pytest.fixture()
