@@ -163,13 +163,18 @@ SETTINGS = ("DOMAIN_CAP", "MAX_CONTENT", "DEFAULT_LIMITS", "SCOPES", "WORK_SYSTE
 
 # --- Named variants (M74) ---------------------------------------------------------------------
 
-#: The harnesses an eval run may name (``nirmaan eval run --harness <name>``): each is the default harness with
-#: the run options it sets, and its name is a run option of the fingerprint. A trial on any variant but
-#: ``default`` is labelled with its name and listed apart: it never counts toward a level. Council record
-#: 2026-11-14 (pilot retrospective), decision 4: ``attempts-3`` gives the seat three attempts, so a refused one is
-#: answered again with the repair text (``REPAIR_AFTER_REFUSAL``) and the failed run's log excerpt.
+#: The harnesses an eval run may name (``nirmaan eval run --harness <name>``): each is these settings with the
+#: run options it sets, and its name is a run option of the fingerprint. A trial on any variant but ``default``
+#: is labelled with its name and listed apart: it never counts toward a level. Council record 2026-11-14 (pilot
+#: retrospective), decision 4: ``attempts-3`` gives the seat three attempts, so a refused one is answered again
+#: with the repair text (``REPAIR_AFTER_REFUSAL``) and the failed run's log excerpt.
+#: H3, the comparison decision 4 asked for, named attempts-3 the default harness by the rule fixed before its
+#: first trial (docs/HARNESS.md, "The default since H3"): ``default`` now sets the same three attempts, so a run
+#: with no ``--harness`` is the seat ``--harness attempts-3`` ran. ``attempts-3`` stays a name of its own, so its
+#: records are read and re-judged as they ran and still never count; its fingerprint differs from the default's
+#: by the name alone. ``tools-in-loop`` sets no attempts: its seat has the case's attempts (one), as in H3.
 VARIANTS: dict[str, dict[str, Any]] = {
-    "default": {},
+    "default": {"attempts": 3},
     "attempts-3": {"attempts": 3},
     "tools-in-loop": {"tools": True},  # M75: the seat calls brokered checks during its attempt (``LOOP_SETTINGS``)
 }
@@ -183,7 +188,8 @@ def variant_options(name: str) -> dict[str, Any]:
 
 
 def run_attempts(attempts: int | None, variant: str = "default") -> int | None:
-    """The attempts override a run makes: the one given, else the variant's, else None (the default limits)."""
+    """The attempts override a run makes: the one given, else the variant's (three on ``default`` since H3),
+    else None (the case's attempts in an eval, the default limits elsewhere)."""
     return attempts if attempts is not None else variant_options(variant).get("attempts")
 
 

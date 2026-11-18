@@ -19,7 +19,7 @@ each and a test fails if another module defines one.
 |---|---|---|---|
 | `DOMAIN_CAP` | 40,000 characters | knowledge documents in one packet; over it the seat declines (M61) | `org/knowledge.py` |
 | `MAX_CONTENT` | 60,000 characters | one recorded file's content in a packet; larger is withheld | `runtime/context.py` |
-| `DEFAULT_LIMITS` | attempts 1, review rounds 1, retries 1, retry then escalate | the limits when no override, stage or capability sets one (M48) | `work/limits.py` |
+| `DEFAULT_LIMITS` | attempts 1, review rounds 1, retries 1, retry then escalate | the limits when no override, stage or capability sets one (M48); an eval seat's attempts come from the run instead (the default variant sets 3 since H3, below) | `work/limits.py` |
 | `SCOPES` | Company, Domain, Project, Task | the prompt's sections, in this order (M20) | `runtime/prompt.py` |
 | `WORK_SYSTEM`, `REVIEW_SYSTEM` | the system prompts, with the answer formats | every work and review prompt | `runtime/prompt.py` |
 | `REPAIR_AFTER_REVIEW` | "Repair after review: submission N was sent back ..." | the work prompt after a review sent it back (M27) | `runtime/prompt.py` |
@@ -77,10 +77,12 @@ reaches no prompt.
 `harness_sha256(attempts=None, knowledge=True, cli=None, variant="default")`
 is the sha256 of `fingerprint()`: format, version (2 since M74), every
 setting by name and value, the code digests, the tool digests, and the run's
-own options (an `eval run --attempts` override, whether the seat was given
-its knowledge documents, M67, `cli`, the version of the command-line program
-the runtime calls the model through, and `variant`, the named variant the run
-chose, M74). With no options it is the current default harness.
+own options (the attempts the run sets, from an `eval run --attempts`
+override or else the variant, whether the seat was given its knowledge
+documents, M67, `cli`, the version of the command-line program the runtime
+calls the model through, and `variant`, the named variant the run chose,
+M74). With no options it is the current default harness, whose `run`
+section has said `attempts: 3` since H3.
 
 `cli` is the Claude Code version on the claude-code runtime and None on every
 other. The runtime asks `claude --version` once per seat runtime, so once per
@@ -101,14 +103,16 @@ variants to compare; M74 has two names and M75 adds the third:
 
 | Name | Run options | What changes for the seat |
 |---|---|---|
-| `default` | none | nothing: the default harness |
-| `attempts-3` | attempts 3 | a refused attempt is answered again, up to three, with the repair text (`REPAIR_AFTER_REFUSAL`) and the failed run's log excerpt (M26) |
-| `tools-in-loop` | tools | M75: during its attempt the seat calls brokered lint, simulation and formal on files it passes, every call recorded and every run advisory (`docs/TOOLS_IN_THE_LOOP.md`) |
+| `default` | attempts 3 (since H3; none before) | the default harness: a refused attempt is answered again, up to three, with the repair text (`REPAIR_AFTER_REFUSAL`) and the failed run's log excerpt (M26) |
+| `attempts-3` | attempts 3 | the same seat as `default` since H3; H3's arm, kept so its records are read and re-judged as they ran |
+| `tools-in-loop` | tools | M75: during its attempt the seat calls brokered lint, simulation and formal on files it passes, every call recorded and every run advisory (`docs/TOOLS_IN_THE_LOOP.md`). It sets no attempts, so its seat has the case's attempts (one), as in H3 |
 
 The variant's name is a run option of the fingerprint, so `--harness
-attempts-3` and a plain `--attempts 3` are two harnesses, and `--harness
-attempts-3` with `--attempts` is refused (the variant sets the attempts). An
-unknown name is refused before anything runs. The record's name ends in
+attempts-3` and the default are two harnesses though their seats are the
+same, and `--harness attempts-3` with `--attempts` is refused (the variant
+sets the attempts). On the default, `--attempts` still overrides the three:
+`--attempts 3` is the default harness itself, and any other number is
+another harness. An unknown name is refused before anything runs. The record's name ends in
 `-harness-<name>`, and its manifest and every trial carry `harness_variant`.
 A variant trial never counts toward a level: the levels generator lists it
 under `variants` in `capability/levels.json`, with the name and where it is
@@ -121,6 +125,80 @@ section with its settings (`LOOP_SETTINGS`), the digests of the brokered
 server's code (`LOOP_CODE`) and the versions of the tools it runs
 (`tool_pins`), none of which is in the default's.
 
+## The default since H3
+
+Council record 2026-11-14 (pilot retrospective), decision 4, asked for the
+default harness and its two variants to be compared in one batch, on one
+commit, with the counts and the rule fixed before the first trial. That batch
+(H3) planned 69 trials, one per record, every one run with `--purpose
+calibration` on model claude-opus-5-5 and Claude Code 2.1.325. 66 ran to a
+verdict. 3 got no model verdict (a killed process, a plan-limit stop, a
+machine restart), one in each arm and all on the same frontier case; they
+count as failed and none was run again. The results were read once, after
+the last planned trial.
+
+The rule, fixed before the first trial: a variant qualifies when its
+frontier passes are at least the default's plus 3 (of 15) and its pilot
+passes at least the default's minus 1 (of 7). With no qualifier `default`
+stays; of two, more frontier passes wins, and a tie goes to `attempts-3`.
+
+| Arm | Frontier passes (of 15) | Wilson 95 percent | Pilot passes (of 7) | By the rule |
+|---|---|---|---|---|
+| `default` | 10 | 0.42 to 0.85 | 6 | the baseline: the bar is frontier 13, pilot 5 |
+| `attempts-3` | 13 | 0.62 to 0.96 | 6 | qualifies, at the frontier bar exactly |
+| `tools-in-loop` | 10 | 0.42 to 0.85 | 7 | does not: frontier 10, under 13 |
+
+So `attempts-3` is the default harness from this change. Plainly:
+
+- The margin is zero: 13 against a bar of 13. One pass fewer and no variant
+  would have qualified, and `default` would have stayed. The rule is a fixed
+  threshold, not a significance test, and the intervals overlap. The result
+  holds by the rule written before the first trial; as evidence it is weak.
+- The gain is on one of the three frontier cases (default 4 of 9,
+  `attempts-3` 7 of 9); the other two were already 3 of 3 on the default.
+- The pilot differences (6, 6 and 7 of 7) are inside one trial. The default
+  and `attempts-3` failed the same pilot check (rtl/apb-gpio: the reference
+  testbench reads `DATA_IN` after reset as x, expecting 0).
+- `attempts-3` used 1.27 attempts per frontier trial on average. The tools of
+  `tools-in-loop` were used (4.4 brokered calls per frontier trial), and it
+  still did not beat the default on the frontier.
+- An arm without knowledge documents (the default, 3 frontier trials, 2
+  passed) is too small to compare and is reported only.
+
+The frontier cases are private (decision 5, gate RT8): this file cites their
+pass counts only, never a case's text or records. The pilot-case records are
+public, labelled calibration, and never count toward a level: ip#332, #333,
+#338, #340, #341 and #344.
+
+What changed, and what each name means now:
+
+- `VARIANTS["default"]` sets attempts 3, the run option `attempts-3` sets. A
+  run with no `--harness` gives the seat what `--harness attempts-3` gave it
+  in H3: the same settings, code and tool definitions, three attempts over the
+  case's own, and the repair text with the failed run's log excerpt after a
+  refusal. Its prompts are the same, prompt for prompt
+  (`tests/test_harness.py`). The two fingerprints differ by the variant's name
+  alone.
+- A default record is still labelled `default` (no name suffix,
+  `harness_variant: default`); its fingerprint says which default it ran. A
+  default trial recorded before this change has the old default's harness
+  (`attempts: null` in its `run` section), so it is a group of its own, stale,
+  and never pools with trials on the new default.
+- `attempts-3` stays a name of its own, so H3's arm is read, re-judged and
+  listed under `variants` as it ran, and never counts. A new `--harness
+  attempts-3` trial is the default's seat under another name and never counts
+  either: run the default instead.
+- `tools-in-loop` is unchanged: it sets no attempts, so its seat has the
+  case's attempts (one), as in H3. It is not the new default with tools.
+- `--attempts` with the default still overrides the three; any number but 3
+  is another harness.
+- `DEFAULT_LIMITS` is unchanged (attempts 1). It is the limit a task gets
+  when nothing else sets one, in the product's own runs (`nirmaan run`, the
+  drive loop). An eval seat never reads its attempts: the runner passes the
+  run's attempts, else the case's (`EvalCase.attempts`, 1). H3 measured eval
+  seats only, so the product's own runs keep one attempt; giving them three
+  is a separate decision, since it changes how many model calls a run makes.
+
 ## How levels use it
 
 `practised()` groups trials by skill, model, skill digest, harness and CLI
@@ -131,10 +209,11 @@ shows its `harness` and `cli`, and:
 - a group whose harness is not the current default at the group's own CLI
   version (`harness_sha256(cli=...)`) is stale ("stale: the harness changed
   after these trials") and never counts, as a group whose skill
-  digest changed is stale. A run with `--attempts` (any value, even 1: the
-  override is recorded as given, since what it changes depends on the stage)
-  or without knowledge is a different harness, so it never pools with the
-  default;
+  digest changed is stale. A run whose attempts are not the default's (since
+  H3, `--attempts` with any number but 3) or without knowledge is a
+  different harness, so it never pools with the default. A default trial
+  recorded before H3 has the old default's harness (`attempts: null`), so it
+  is its own stale group and never pools with the new default's;
 - a group with no harness ("harness not recorded") never counts. No live
   record exists yet (only replays, which never count), so nothing is lost;
 - trials on two Claude Code versions have two harnesses, so they are two
@@ -242,6 +321,15 @@ in the same pull request.
   not a `CODE` file: an edit to it changes the whole-flow fingerprint and
   never the default (`tests/test_whole_flow_dispatch.py`).
 
+- H3, the default harness named (council record 2026-11-14, decision 4, by
+  the rule above): `runtime/harness.py`'s `VARIANTS["default"]` sets attempts
+  3, and `cli.py` lets `--attempts` override the default's attempts. No `CODE`
+  file changed and no setting: the default's `run` section changed
+  (`attempts: null` to `attempts: 3`), so the default fingerprint changed and
+  no other did. Every Practised group was already stale (M75 and G3 changed
+  `CODE` files), so no level moves. This change ends decision 4's quiet
+  window (gate RT4): evidence trials run on the new default.
+
 ## What is not the harness
 
 - The model: its own group key, recorded on the trial. The program the
@@ -300,6 +388,17 @@ table in `docs/TOOLS_IN_THE_LOOP.md`), and that the loop settings, the server
 code and the tool pins change the variant's fingerprint and never the
 default's; `tests/test_harness.py` that the loop settings are the harness
 module's other constants and the server files are `LOOP_CODE`.
+
+Since H3: `tests/test_harness.py` checks that the default sets three
+attempts, that a run with no `--harness` asks the seat for three attempts and
+sends it the same prompts as `attempts-3`, prompt for prompt, with the repair
+text after a refusal, that the two fingerprints differ by the name alone,
+that editing the default changes no other fingerprint, and that `--attempts`
+still overrides the default; `tests/test_capability_levels.py` that a default
+trial recorded before the change is its own stale group and never pools with
+the new default's, and that `--attempts 1` is now a run option other than the
+default; `tests/test_seat_tools.py` that `tools-in-loop` still sets no
+attempts.
 
 ## Not in this milestone
 
