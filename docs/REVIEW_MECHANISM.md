@@ -383,7 +383,8 @@ requests labelled `hold` or `needs-founder` are skipped.
    the environment. The tests run as CI's `test` job splits them
    (`pytest --shard K/3 --shard-profile test`, `scripts/shards.py`): the whole
    suite, or related tests in more than one file, as up to three shards at
-   once, each within the check timeout, since the whole suite in one run
+   once, each within the check timeout (`scripts/shards.py`, run after them, has its
+   own timeout, so in the worst case a check takes about twice the timeout), since the whole suite in one run
    outgrew it (ip#249). A shard that fails or runs out of time fails the check
    and the others are killed, and `scripts/shards.py` must find the shards ran
    every collected test exactly once; otherwise nothing is pushed. The loop

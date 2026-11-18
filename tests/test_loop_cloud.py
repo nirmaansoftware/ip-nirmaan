@@ -9,7 +9,9 @@ from __future__ import annotations
 import importlib.util
 import json
 import re
+import os
 import subprocess
+import types
 import sys
 import tempfile
 import threading
@@ -301,7 +303,7 @@ def _concurrent_checks(monkeypatch, tmp_path, user):
     meet = threading.Barrier(2, timeout=30) if user is None else None
 
     def fake_run(argv, **kw):
-        if "pkill" in argv or "chown" in argv:
+        if "pkill" in argv or ("chown" in argv and "-R" in argv):
             with guard:
                 state["events"].append(("cleanup", state["running"]))
         elif argv[-1] == "suite":
@@ -316,6 +318,7 @@ def _concurrent_checks(monkeypatch, tmp_path, user):
         return subprocess.CompletedProcess(argv, 0, "", "")
 
     monkeypatch.setattr(pr_loop.subprocess, "run", fake_run)
+    monkeypatch.setattr(pr_loop.pwd, "getpwnam", lambda name: types.SimpleNamespace(pw_gid=os.getgid()))
     results = []
     threads = [threading.Thread(target=lambda d=d: results.append(pr_loop._run_commands(
         [["suite"]], str(d), None, {}, 5, user))) for d in (tmp_path / "a", tmp_path / "b")]

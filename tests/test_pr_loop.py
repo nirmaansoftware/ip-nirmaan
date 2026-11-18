@@ -14,6 +14,7 @@ import re
 import shutil
 import stat
 import subprocess
+import types
 import sys
 import threading
 import time
@@ -1551,7 +1552,7 @@ def test_the_fixers_test_check_runs_only_the_related_tests(repo, tmp_path):
     assert "test (1 related file): pass" in r.comments()[-1]
 
 
-# --- The test check in shards (R7-FIX5) --------------------------------------------
+# --- The test check in shards (ip#318) --------------------------------------------
 # ip#249: the whole suite on one runner outgrew the 1200 s check timeout, so a person fixed
 # the findings by hand. The loop now runs CI's test shards (scripts/shards.py) at once.
 
@@ -1737,3 +1738,57 @@ def test_composite_findings_keep_one_fingerprint_identity():
     again = {"key1": [{**review["key1"][0], "role": "legal-compliance"}]}
     assert pr_loop.findings_to_fix(review)[0]["fingerprint"] == pr_loop.findings_to_fix(again)[0]["fingerprint"], \
         "a fix that adds an owning team (a new speaker) cannot make the same finding look new"
+
+
+# --- Shard output folder and manifest hardening (ip#318 review notes) ---------------
+
+def test_the_check_folders_are_group_shared_not_world_writable(monkeypatch, tmp_path):
+    seen = []
+
+    def fake_run(argv, **kw):
+        if "chown" in argv and "-R" not in argv:
+            seen.append((argv[-2], argv[-1], oct(os.stat(argv[-1]).st_mode & 0o777)))
+        return subprocess.CompletedProcess(argv, 0, "", "")
+
+    monkeypatch.setattr(pr_loop.subprocess, "run", fake_run)
+    monkeypatch.setattr(pr_loop.pwd, "getpwnam", lambda name: types.SimpleNamespace(pw_gid=os.getgid()))
+    modes = {}
+
+    def spy(path, mode):
+        modes[path] = mode
+        real_chmod(path, mode)
+
+    real_chmod = os.chmod
+    monkeypatch.setattr(pr_loop.os, "chmod", spy)
+    ok, _ = pr_loop._run_commands([["true"]], str(tmp_path), None, {}, 5, "loopcheck")
+    assert ok and len(seen) == 2
+    assert all(owner == f"{os.getuid()}:{os.getgid()}" for owner, _, _ in seen), "loop owns it, group is the account's"
+    assert {m for p, m in modes.items() if "loop-check-" in p} == {0o770}
+
+
+def test_the_check_fails_when_the_folders_cannot_be_shared_with_the_account(monkeypatch, tmp_path):
+    monkeypatch.setattr(pr_loop.subprocess, "run", lambda argv, **kw: subprocess.CompletedProcess(argv, 1 if "chown" in argv and "-R" not in argv else 0, "", ""))
+    monkeypatch.setattr(pr_loop.pwd, "getpwnam", lambda name: types.SimpleNamespace(pw_gid=os.getgid()))
+    ok, detail = pr_loop._run_commands([["true"]], str(tmp_path), None, {}, 5, "loopcheck")
+    assert not ok and "cannot share the check folders" in detail, "never falls back to a world-writable folder"
+    monkeypatch.setattr(pr_loop.pwd, "getpwnam", lambda name: (_ for _ in ()).throw(KeyError(name)))
+    ok, detail = pr_loop._run_commands([["true"]], str(tmp_path), None, {}, 5, "nobody-here")
+    assert not ok and "cannot share the check folders" in detail
+
+
+@pytest.mark.skipif(not hasattr(os, "O_NOFOLLOW"), reason="no O_NOFOLLOW")
+def test_the_shard_manifest_is_not_written_through_a_planted_symlink(tmp_path):
+    _shard_project(tmp_path, {"tests/test_a.py": "def test_a():\n    pass\n"})
+    target = tmp_path / "victim.txt"
+    target.write_text("keep", encoding="utf-8")
+    manifest = tmp_path / "out" / "shard-1.json"
+    manifest.parent.mkdir()
+    manifest.symlink_to(target)
+    done = subprocess.run([sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", "--shard", "1/1",
+                           "--shard-manifest", str(manifest), "tests"], cwd=tmp_path, capture_output=True, text=True,
+                          env={**os.environ, "PYTHONPATH": ""})
+    assert done.returncode != 0 and target.read_text(encoding="utf-8") == "keep"
+    manifest.unlink()
+    done = subprocess.run([sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", "--shard", "1/1",
+                           "--shard-manifest", str(manifest), "tests"], cwd=tmp_path, capture_output=True, text=True)
+    assert done.returncode == 0 and json.loads(manifest.read_text(encoding="utf-8"))

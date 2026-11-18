@@ -1,0 +1,57 @@
+{
+  "format": "nirmaan.flow-citations",
+  "case": "flow/axil-timer",
+  "checks": {
+    "The reference testbench passes on the flow's RTL": [
+      "TMR-MODULE",
+      "TMR-ADDR-WIDTH",
+      "TMR-PORTS",
+      "TMR-MAP",
+      "TMR-CTRL-STRB",
+      "TMR-LOAD",
+      "TMR-STATUS-CLEAR",
+      "TMR-START",
+      "TMR-LOAD-ZERO",
+      "TMR-COUNT",
+      "TMR-COUNT-LENGTH",
+      "TMR-ONESHOT",
+      "TMR-PERIODIC",
+      "TMR-STOP",
+      "TMR-END-BEATS-CLEAR",
+      "TMR-IRQ",
+      "TMR-ORDER",
+      "TMR-READY",
+      "TMR-RESPONSE",
+      "TMR-DECODE",
+      "TMR-SLVERR",
+      "TMR-RESET"
+    ],
+    "The flow's testbench passes on the reference RTL and fails each timer mutant": [
+      "TMR-TB",
+      "TMR-TEST-RANGE"
+    ]
+  },
+  "mutants": {
+    "tests/fixtures/rtl/axil_timer/mutants/axil_timer_oneshot_runs_on.v": [
+      "TMR-ONESHOT"
+    ],
+    "tests/fixtures/rtl/axil_timer/mutants/axil_timer_reload_off_by_one.v": [
+      "TMR-PERIODIC",
+      "TMR-COUNT-LENGTH"
+    ],
+    "tests/fixtures/rtl/axil_timer/mutants/axil_timer_stop_ignored.v": [
+      "TMR-STOP"
+    ],
+    "tests/fixtures/rtl/axil_timer/mutants/axil_timer_decode_alias.v": [
+      "TMR-DECODE",
+      "TMR-ADDR-WIDTH"
+    ]
+  },
+  "documents": [
+    "evals/flow/axil_timer/requirements.md"
+  ],
+  "not_judged": {
+    "TMR-CTRL-WINS": "Stated from the timer's interface specification for completeness; the reference testbench never lands a CTRL write on a count end and no mutant breaks it, so no held-out check rests on it.",
+    "TMR-CLEAN": "Lint and synthesis are the RTL stage's own before-review checks, not held-out checks."
+  }
+}

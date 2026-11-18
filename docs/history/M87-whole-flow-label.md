@@ -26,5 +26,18 @@ is touched, so the default, attempts-3 and tools-in-loop fingerprints are
 unchanged. A whole-flow case is in no default case set, and `record_run`
 refuses one until the whole-flow runner exists.
 
-**Not here.** The cases, fixed documents and judge controls, and the runner
-option (its `runner.py` dispatch waits for the H3 batch, gate WF1).
+**The cases (second pull request).** `flow/axil-timer` and
+`flow/axi4-lite-regs-driver` under `evals/flow/`, a new tagged timer
+requirements document, the register block's own copies of its requirements,
+driver interface and held-out test, a citation file per case, and the
+fixtures for the controls. A test settles fact 10: a document given through a
+case's `inputs` never reaches the requirements seat as text.
+
+**The judge controls (third pull request).** `evals/flow/controls.json`, 20
+replays through the real gates and scorers with no model call, run in CI
+(`tests/test_whole_flow_controls.py`), and their recorded CI run in
+`evals/flow/controls_record.json`. They confirm by a run that `b_before_w` is
+not visible through the HAL and that no driver test can see latency.
+
+**Not here.** The runner option (its `runner.py` dispatch waits for the H3
+batch, gate WF1).
