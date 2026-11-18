@@ -61,6 +61,23 @@ recorded on its own) and `writer.py` (the concurrency writer, which keeps
 state in the same order for any number of jobs). A new runtime file must be
 put in `CODE` or in that list, and those four files may not gain a constant.
 
+G3 (council record 2026-11-17, decision 2; fact 10): `context.py` also carries
+a customer document for one task. Task memory `document.<name>` (`<digest>
+<path>`) enters that task's packet as an upstream file of kind
+`customer_document`, marked as customer input (not as approved by the
+organization), read whole only while its bytes match. `prompt.py` makes it
+citable as a `document`, never as an artifact, so no draft derives from a
+record the engine does not hold. Nothing writes a `document.` key yet: seat
+answers write no memory, the CLI and the eval runner write only `input.` keys,
+and the whole-flow runner that is to give the requirements stage its case's
+fixed documents this way (part 4b, `evals/flow.py`) is not merged. No
+single-seat case gives one, so every shipped case's seat prompts are byte for
+byte as before (`tests/test_flow_requirements_document.py`). The change
+touched two `CODE` files, so every fingerprint changed. It is the second half
+of the window decision 4 of the council record allows: the dispatch edit
+merged as ip#330 (merge commit 91cb482); the gate WF1 status is in
+`docs/WHOLE_FLOW.md`, "Gate status".
+
 ## The tool definitions (M74)
 
 A seat reads its gate tools' parameter descriptions as their input contract
