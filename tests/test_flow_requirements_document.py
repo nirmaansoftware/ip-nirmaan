@@ -58,7 +58,8 @@ def test_the_document_reaches_the_requirements_seat_whole_and_citable(org, tmp_p
     [view] = [a for a in packet.task.upstream_artifacts if a.kind == context.DOCUMENT_KIND]
     assert view.trusted and view.content == DOCUMENT.read_text(encoding="utf-8")
     prompt = render_work_prompt(packet)
-    assert any(c.kind == "artifact" and c.target == view.id for c in prompt.citations)
+    # Citable as a document, never as an artifact: no draft may derive from a record the engine does not hold.
+    assert [c.kind for c in prompt.citations if c.target == view.id] == ["document"]
     text = "".join(render_parts(prompt))
     assert DOCUMENT.read_text(encoding="utf-8") in text and "customer_document, approved" in text
     for stage, task in stages.items():  # only the task it was given to
@@ -98,3 +99,36 @@ def test_every_single_seat_cases_prompt_is_unchanged(org, monkeypatch, case):
     now = {mode: _prompt(engine, seat.id, mode) for mode in ("work", "review")}
     monkeypatch.setattr(context, "_documents_given", lambda state, task_id: [])
     assert {mode: _prompt(engine, seat.id, mode) for mode in ("work", "review")} == now
+
+
+def test_a_seat_that_cites_the_document_is_not_refused_for_its_provenance(org, tmp_path):
+    """The provenance check refuses a draft derived from an artifact the engine does not hold; a document is cited
+    as a document, so a requirements seat grounding its work in the customer's document reaches review."""
+    import json
+
+    from nirmaan.runtime import Completion, ModelRuntime, run_task
+
+    engine = Orchestrator(org).plan(TIMER)
+    task = _stages(engine)["requirements"]
+    path = tmp_path / "requirements.md"
+    shutil.copyfile(DOCUMENT, path)
+    _give(engine, task, path)
+
+    class Seat:
+        name = "test"
+
+        def complete(self, prompt, tools=None):
+            [token] = [c.token for c in prompt.citations if c.kind == "document"]
+            head = json.dumps({"uncertainty": 0.0, "artifacts": [], "tool_runs": [], "claims": [], "escalation": None,
+                               "notes": "", "files": [{"path": "requirements_spec.md", "kind": "requirements_spec",
+                                                       "title": "requirements_spec.md",
+                                                       "summary": f"The customer's requirements {token}."}]})
+            return Completion(f"{head}\n=== FILE: requirements_spec.md ===\n{path.read_text()}=== END FILE ===\n",
+                              "test")
+
+    engine.remember(MemoryScope.TASK, task.id, "input.workspace", str(tmp_path / "seat"),
+                    Actor(role=str(task.owner), kind=ActorKind.SYSTEM, name="eval-flow"))
+    run_task(engine, task.id, ModelRuntime(Seat(), runtime_id="test"))
+    assert engine.task(task.id).status.value == "in_review"
+    [art] = [engine.state.artifacts[a] for a in engine.task(task.id).artifacts]
+    assert art.kind == "requirements_spec" and not art.derived_from

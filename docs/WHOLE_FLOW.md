@@ -131,8 +131,9 @@ text is no way out: the planner then reads other features from it
 (`existing_design`, `width_change`, `performance`), which changes what each
 seat is given. So the document is given another way: `runtime/context.py` carries task
 memory `document.<name>` (`<digest> <path>`) into that task's packet as an
-approved upstream file of kind `customer_document`, whole, citable and
-withheld once its bytes change. Only the platform writes it (no seat answer
+approved upstream file of kind `customer_document`, whole, citable (as a
+`document`, never an artifact, so the provenance check never refuses a draft
+that cites it) and withheld once its bytes change. Only the platform writes it (no seat answer
 writes memory, and the CLI writes only `input.` keys), only the task it is
 given to sees it, and no single-seat case gives one, so their prompts are byte
 for byte as before (`tests/test_flow_requirements_document.py`). The
