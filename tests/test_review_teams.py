@@ -401,11 +401,12 @@ def _harness_files() -> list[str]:
     work prompt as each gate's input contract (pilot retrospective,
     fact 5), so a change to it is a harness change too. M75: every
     harness.LOOP_CODE file, the brokered server in the tools-in-loop
-    variant's fingerprint, is checked the same way."""
+    variant's fingerprint, is checked the same way, and so is each
+    harness.FLOW_CODE file, the whole-flow runner (G3)."""
     from nirmaan.runtime import harness
 
     code = [(harness.SOURCE_ROOT / name).relative_to(ROOT).as_posix()
-            for name in (*harness.CODE, *harness.LOOP_CODE)]
+            for name in (*harness.CODE, *harness.LOOP_CODE, *harness.FLOW_CODE)]
     return ["src/nirmaan/runtime/harness.py", "src/nirmaan/evals/levels.py", "src/nirmaan/company/tools.py", *code]
 
 

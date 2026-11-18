@@ -90,7 +90,14 @@ def held_out_run(ctx: ScoreContext) -> Score:
         values.setdefault(param, []).extend(str(a.location) for a in files)
     for param, paths in check.case_files.items():
         values.setdefault(param, []).extend(str(resolve(ctx.repo, p)) for p in paths)
-    params = {**check.params, **values}  # lists: the broker holds them to the tool's contract (M28)
+    entries: dict[str, str] = {}
+    for param, kinds in check.seat_entries.items():  # G3: a whole flow's check takes the RTL stage's declared top
+        entry = _declared_entry(ctx, param, kinds)
+        if entry is None:
+            return score(ScoreStatus.NOT_RUN, f"no run of the seat's own declares {param} for its "
+                                              f"{' or '.join(kinds)} file")
+        entries[param] = entry
+    params = {**check.params, **entries, **values}  # lists: the broker holds them to the tool's contract (M28)
     try:
         run_id, outcome = ctx.tools.invoke(str(check.tool), **params)
     except ToolAccessDenied as exc:
@@ -107,10 +114,16 @@ def _values(value: object) -> list[str]:
 
 
 def _declared_entry(ctx: ScoreContext, param: str, kinds: tuple[str, ...]) -> str | None:
-    """The value the seat's own latest passing run over one of its files of these kinds gave ``param``."""
-    files = {str(a.location) for a in ctx.seat_files(kinds)}
+    """The value the seat's own latest passing run over one of its files of these kinds gave ``param``.
+
+    The seat's own: a run of the task that produced the file (G3: in a whole flow, the stage that wrote it, such as
+    the RTL stage for ``rtl_source``; for a single seat, the seat's task, as before).
+    """
+    arts = ctx.seat_files(kinds)
+    files = {str(a.location) for a in arts}
+    owners = {a.task for a in arts} | {ctx.task.id}
     for run in reversed(list(ctx.engine.state.tool_runs.values())):
-        if run.task == ctx.task.id and run.succeeded and param in run.params and not files.isdisjoint(
+        if run.task in owners and run.succeeded and param in run.params and not files.isdisjoint(
                 v for value in run.params.values() for v in _values(value)):
             return str(run.params[param])
     return None
