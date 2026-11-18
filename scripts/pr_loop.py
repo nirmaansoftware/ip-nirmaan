@@ -77,6 +77,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import pwd
 import re
 import secrets
 import signal
@@ -622,6 +623,18 @@ def _run_parallel(commands: list[list[str]], cwd, env: dict, timeout_s, user=Non
             out.close()
 
 
+def _share_with_check_user(path: str, user: str) -> None:
+    """`path` (the loop's own folder) readable and writable by the loop and the check account
+    only: group = the account's primary group, mode 0770, never world-writable. The loop
+    need not belong to that group (the cloud runner's user and `loopcheck` differ), so the
+    group is set with sudo, as the final chown already is."""
+    gid = pwd.getpwnam(user).pw_gid
+    done = subprocess.run(["sudo", "-n", "chown", f"{os.getuid()}:{gid}", path], capture_output=True)
+    if done.returncode != 0:
+        raise OSError(f"chown to group {gid} failed")
+    os.chmod(path, 0o770)
+
+
 def _run_commands_once(commands, cwd, extra_env, variables, timeout_s, user=None) -> tuple[bool, str]:
     """Each command in turn, stopping at the first that fails. A command
     {"parallel": [argv, ...]} runs its commands at once (_run_parallel). {out}
@@ -633,12 +646,16 @@ def _run_commands_once(commands, cwd, extra_env, variables, timeout_s, user=None
     variables = {**variables, "out": out}
     if user:
         # The check account writes in its clone (check_clone), its own home and {out}; git trusts the clone.
-        os.chmod(out, 0o777)
         home = tempfile.mkdtemp(prefix="loop-check-home-")
-        os.chmod(home, 0o777)
         subprocess.run(["chmod", "-R", "a+rwX", cwd], capture_output=True)
         env = {**env, "HOME": home, "GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": "safe.directory", "GIT_CONFIG_VALUE_0": "*"}
     try:
+        if user:
+            try:
+                _share_with_check_user(out, user)
+                _share_with_check_user(home, user)
+            except (OSError, KeyError) as exc:
+                return False, f"cannot share the check folders with {user}: {exc}"
         for argv in commands:
             if isinstance(argv, dict):
                 ok, detail = _run_parallel([_substitute(a, variables) for a in argv["parallel"]], cwd, env, timeout_s, user,

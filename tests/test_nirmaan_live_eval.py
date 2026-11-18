@@ -518,5 +518,7 @@ def test_records_and_spec_check_keep_the_laws(nirmaan_org):
 def test_the_case_loader_skips_data_files():
     """Checks files and run records under evals/ carry a format and are never read as cases."""
     ids = [c.id for c in load_cases(EVALS)]
-    assert SPEC_CASE in ids and FW_CASE in ids and len(ids) == 20
+    # The count follows the shipped case set (tests/test_nirmaan_evals.py SHIPPED pins it); data files add none.
+    assert SPEC_CASE in ids and FW_CASE in ids and len(ids) == len(set(ids))
+    assert not [i for i in ids if i.startswith(("results", "calibration"))]
     assert load_case(EVALS / "spec" / "axi4_lite_interface.json").seat == "interface-spec"
