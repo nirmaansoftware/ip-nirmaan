@@ -37,7 +37,7 @@ from nirmaan.models import (Actor, ActorKind, EvalCase, EvalResult, EvalStage, E
 from nirmaan.orchestrator import Orchestrator
 from nirmaan.org import Organization
 from nirmaan.runtime import AgentRuntime, Completion, run_task
-from nirmaan.runtime.context import DOCUMENT, assemble
+from nirmaan.runtime.context import DOCUMENT, DOCUMENT_CITATION, assemble
 from nirmaan.runtime.files import digest
 from nirmaan.runtime.harness import harness_sha256, run_attempts, run_tools
 from nirmaan.work import PolicyViolationError, ProjectStore, TaskEngine, WorkError, verify_chain
@@ -92,7 +92,7 @@ class FlowReplayLLM:
     def complete(self, prompt, tools=None):
         self.calls.append(prompt)
         cites = [c.token for c in prompt.citations if c.kind == "artifact"]
-        cites = cites or [c.token for c in prompt.citations if c.kind == "document"]  # the first stage's input
+        cites = cites or [c.token for c in prompt.citations if c.kind == DOCUMENT_CITATION]  # the first stage's
         if not cites:
             return Completion("", self.name, error="nothing approved upstream to cite")
         files = [f for f in self._files if f[1] in prompt.outputs]
@@ -190,7 +190,8 @@ def run_flow(org: Organization, case: EvalCase, seat_runtime: AgentRuntime, *, r
                                            for r in (engine.state.tool_runs[i] for i in dict.fromkeys(runs)
                                                      if i in engine.state.tool_runs)),
             skills=skills, model=next((c.model for c in calls if c.model), None), model_calls=len(calls),
-            input_tokens=sum(c.input_tokens or 0 for c in calls), output_tokens=sum(c.output_tokens or 0 for c in calls),
+            input_tokens=sum(c.input_tokens or 0 for c in calls),
+            output_tokens=sum(c.output_tokens or 0 for c in calls),
             note=note if reached else f"Did not complete: {detail}"))
         if not reached:
             stopped = task
