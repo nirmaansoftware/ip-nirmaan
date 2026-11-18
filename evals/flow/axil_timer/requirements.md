@@ -18,9 +18,12 @@ on an edge on which its VALID and READY are both high.
 * One Verilog module named `axil_timer`: a 32-bit down-counting timer with a
   one-shot and a periodic mode and a level interrupt, behind an AXI4-Lite
   subordinate port. [req:TMR-MODULE]
-* One parameter, `ADDR_WIDTH`, the byte address width: default 4, and the
-  block works at every value from 4 to 8. With a width above 4, every offset
-  from `0x10` up is unmapped (section 5). [req:TMR-ADDR-WIDTH]
+* One parameter, `ADDR_WIDTH`, the byte address width. The block works at
+  `ADDR_WIDTH` 4 and at 8; at 8, every offset from `0x10` up is unmapped
+  (section 5). [req:TMR-ADDR-WIDTH]
+* `ADDR_WIDTH` defaults to 4, and the block works at every width from 5 to 7
+  as well, where too every offset from `0x10` up is unmapped.
+  [req:TMR-ADDR-WIDTH-RANGE]
 * The ports, all synchronous to the rising edge of `aclk`: `aclk`;
   `aresetn` (active low; section 6); `s_axil_awaddr` (`ADDR_WIDTH` bits),
   `s_axil_awvalid`, `s_axil_awready`; `s_axil_wdata` (32 bits),
@@ -29,7 +32,8 @@ on an edge on which its VALID and READY are both high.
   `s_axil_araddr` (`ADDR_WIDTH` bits), `s_axil_arvalid`, `s_axil_arready`;
   `s_axil_rdata` (32 bits), `s_axil_rresp` (2 bits), `s_axil_rvalid`,
   `s_axil_rready`; and `irq` (1 bit, active high). The responses are `00`
-  OKAY and `10` SLVERR. There are no other ports. [req:TMR-PORTS]
+  OKAY and `10` SLVERR. [req:TMR-PORTS]
+* The block has no ports other than those above. [req:TMR-PORTS-ONLY]
 
 ## 2. Registers
 
@@ -99,7 +103,8 @@ on an edge on which its VALID and READY are both high.
   that value. `EXPIRED` is still set by the count that ended.
   [req:TMR-CTRL-WINS]
 * A count end beats a clear: when a `STATUS` clear takes effect on the edge
-  a count ends, `EXPIRED` stays set. [req:TMR-END-BEATS-CLEAR]
+  a count ends, in one-shot or periodic mode, `EXPIRED` stays set.
+  [req:TMR-END-BEATS-CLEAR]
 * `irq` is `EXPIRED` and `IE`, as a level: it is high when both are 1 and
   low otherwise, it stays high until `EXPIRED` is cleared or `IE` is written
   0, and writing `IE` 1 while `EXPIRED` is set raises it. [req:TMR-IRQ]

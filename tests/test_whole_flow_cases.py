@@ -316,6 +316,33 @@ def test_the_held_out_test_copy_adds_only_the_unmapped_write_check():
                                     *checks.findall(original)[4:]]
 
 
+#: Each whole-flow case's own copy of the single-seat reference testbench, which its check 1 runs (G3 follow-up).
+TB_COPIES = {"flow/axil-timer": ("tests/fixtures/rtl/axil_timer/axil_timer_tb.v",
+                                 "evals/flow/axil_timer/axil_timer_tb.v"),
+             "flow/axi4-lite-regs-driver": ("tests/fixtures/rtl/axi4_lite/axi4_lite_regs_tb.v",
+                                            "evals/flow/axi4_lite/axi4_lite_regs_tb.v")}
+
+
+def _check_calls(path: str) -> list[str]:
+    return [line.strip() for line in (ROOT / path).read_text(encoding="utf-8").splitlines()
+            if re.match(r"\s*(check|expect_reg)\(", line)]
+
+
+@pytest.mark.parametrize("case_id", sorted(TB_COPIES))
+def test_the_reference_testbench_copy_keeps_every_check_and_only_the_flow_case_runs_it(cases, case_id):
+    """The copy adds checks and keeps every one of the original's, in order, word for word; the single-seat case
+    keeps running the original, so its digest and its recorded trials stay as they are."""
+    original, copy = TB_COPIES[case_id]
+    kept, added = _check_calls(original), _check_calls(copy)
+    rest = iter(added)
+    assert all(any(line == other for other in rest) for line in kept)  # a subsequence
+    assert len(added) > len(kept)
+    assert cases[case_id].held_out[0].case_files["sources"] == (copy,)
+    single = {c.id: c for c in load_cases(EVALS)}
+    assert any(original in c.case_files.get("sources", ()) for s in single.values() for c in s.held_out)
+    assert not any(copy in files for s in single.values() for c in s.held_out for files in c.case_files.values())
+
+
 def test_the_fixtures_exist():
     for rel in FIXTURES:
         assert (ROOT / rel).is_file(), rel

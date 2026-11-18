@@ -49,5 +49,19 @@ judged. Each flow requirements document gets a check record by another
 session (`requirements_check.json`), held by a test; both documents wait for
 theirs.
 
+**Both documents fixed again (follow-up).** A second independent check, with
+mutants that pass the reference testbenches, found tags still claimed beyond
+what is judged in both documents. Each case's check 1 now runs its own copy of
+the single-seat reference testbench (`evals/flow/axil_timer/axil_timer_tb.v`,
+`evals/flow/axi4_lite/axi4_lite_regs_tb.v`), which keeps every check of the
+original and adds the missing ones: RDATA held still while a running `COUNT`
+is read, a clear on the edge a one-shot count ends, a reset with `EXPIRED`
+set, a new request accepted in the cycle after a response is taken, and reset
+while a response waits or half a write is held. The single-seat cases keep the
+originals, so their digests and recorded trials stay as they are. The
+parameter defaults, the timer's widths 5 to 7 and the "no other ports" rules
+have their own tags, listed as not judged. Both documents wait for a fresh
+check.
+
 **Not here.** The runner option (its `runner.py` dispatch waits for the H3
 batch, gate WF1).
