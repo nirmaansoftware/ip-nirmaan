@@ -23,6 +23,24 @@ Model selection, seat evaluation, providers and runtimes, AI cost per task, prom
 - docs/AI_PROVIDERS.md
 - docs/CLAUDE_CODE_RUNTIME.md
 
+## In a review (key 1, member of EDA and Platform)
+
+Loads in the composite key 1 only when a pull request touches the default-harness
+surface: `src/nirmaan/runtime/harness.py` (`VARIANTS`, `harness_sha256`),
+`docs/HARNESS.md`, `tests/test_harness.py`, or the harness flags (`--harness`,
+`--attempts`, `--review-rounds`) in `src/nirmaan/cli.py` and
+`scripts/live_eval_ci.py`. The seat owns the default harness and gate RT4
+(council record 2026-11-14, decision 4). Before its own list, every key 1 applies
+the base checklist in the council record 2026-10-17 (teams and PR review),
+section 3.
+
+Fails when:
+- the default variant or its fingerprint changes without the change saying so,
+  or a named variant changes the default's fingerprint;
+- a change to the harness does not state which evidence groups it makes stale;
+- a variant's trials can count toward an evidence level;
+- the harness fingerprint stops covering a setting that changes what a seat does.
+
 ## Never claims
 
 A pass rate or capability that no recorded evaluation shows.

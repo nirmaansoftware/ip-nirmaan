@@ -275,10 +275,26 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   as before; if a case ever hands one of them seat-written host code, it joins
   `SEAT_C_TOOLS` in `scripts/live_eval_ci.py`. `check
   --require-expected` and `trials` refuse a case that runs seat C (one whose
-  seat is `firmware`, or whose held-out checks use `fw.build` or `fw.test`)
-  with exit 6 before any trial. The `fw.test` probe lands with that
-  confinement. A replay of such a case still runs: its code is the reference
-  answer.
+  seat is `firmware`, whose held-out checks use `fw.build` or `fw.test`, or a
+  whole flow with a `firmware` stage) with exit 6 before any trial. A replay
+  of such a case still runs: its code is the reference answer.
+- **The credential test for seat C** (`scripts/live_eval_fw_reach.py`, G3
+  record, decision 4 and second addendum, decision 2, item 1) runs in the
+  `replay` and `live-eval` jobs of a whole-flow case, after the reach test and
+  before the checkout is hashed. It runs a C driver test through `fw.test`
+  under a parent holding two canaries in its real environment and records
+  whether that C can run as the runner, run `sudo -n`, write the checkout, the
+  package or the records folder, read any process's environment or a
+  runner-only file, or signal the harness. Today it records, and does not
+  gate, since `fw.test` runs seat C as the runner; with `--require-denied` it
+  becomes the gate when that changes. Its recorded result
+  (`evals/flow/credential_test_record.json`, run 44401041085): every probe
+  not denied, the parent's environment with the credential-named canary in
+  it readable.
+- **Whole-flow cases** (`docs/WHOLE_FLOW.md`, "The CI path") run in these
+  jobs when named: one trial per dispatch, on the default harness, in the
+  whole-flow fingerprint, each record checked for `flow: whole`; a `flow/`
+  case adds the RISC-V cross compiler and requires every tool.
 - **The checkout is hashed** before and after the trials
   (`scripts/live_eval_ci.py tree`): the commit, then every file git tracks or
   would add, and every file under `src/`, `scripts/` and `evals/` (ignored
@@ -398,6 +414,14 @@ input, so roughly $13 to $20. Results land in
   before any trial (`tests/test_live_eval_seat.py`,
   `tests/test_live_eval_ci.py`). What the account denies is shown only by the
   reach test in Actions, where the account exists;
+- whole-flow cases: known only when named, one trial per dispatch on the
+  default harness, checked in the whole-flow fingerprint and for the
+  `flow: whole` label; the register block flow refused live and the timer
+  flow not; the RISC-V compiler and every tool required for a `flow/` case;
+  the credential test for seat C compiles as `fw.test` compiles a driver test,
+  counts a probe denied only when every line of it is and never when it is
+  missing, and fails only in its gate mode (`tests/test_live_eval_ci.py`,
+  `tests/test_nirmaan_live_eval.py`). It runs only in Actions;
 - crown jewel `test_a_new_seat_group_is_recorded_and_rejudged_with_no_core_changes`:
   a case and a scorer written in the test run with trials, are recorded,
   summarized, shown in history, and re-judged with no core change;
