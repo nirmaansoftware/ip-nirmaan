@@ -278,8 +278,45 @@ def installed_exes() -> list[str]:
         return []
 
 
-def install(source: Path) -> None:
-    """Make the account and the wrappers. Fails unless the kernel guards against link tricks in shared folders."""
+def others_writable(path: str) -> bool:
+    """Whether any account may write ``path`` by its mode: a world-writable folder with the sticky bit (``/tmp``)
+    lets others add files but not replace the runner's, so it is not counted."""
+    info = os.lstat(path)
+    if stat.S_ISLNK(info.st_mode) or not info.st_mode & stat.S_IWOTH:
+        return False
+    return not (stat.S_ISDIR(info.st_mode) and info.st_mode & stat.S_ISVTX)
+
+
+def harden(trees: Sequence[str], folders: Sequence[str]) -> list[str]:
+    """Take write access from other accounts: everything in each of ``trees``, and each of ``folders`` with what is
+    directly in it. GitHub's hosted runner makes its tool cache (the Python the package is installed in, with its
+    ``site-packages`` and console scripts) writable by every account; seat code could otherwise replace the judge's
+    code or a tool a gate runs. Returns what it changed."""
+    changed = []
+
+    def fix(path: str) -> None:
+        if others_writable(path):
+            os.chmod(path, stat.S_IMODE(os.lstat(path).st_mode) & ~stat.S_IWOTH)
+            changed.append(path)
+
+    for tree in trees:
+        if not os.path.isdir(tree):
+            continue
+        fix(tree)
+        for top, dirs, files in os.walk(tree, followlinks=False):
+            for name in [*dirs, *files]:
+                fix(os.path.join(top, name))
+    for folder in folders:
+        if os.path.isdir(folder) and not os.path.islink(folder):
+            fix(folder)
+            for name in os.listdir(folder):
+                fix(os.path.join(folder, name))
+    return changed
+
+
+def install(source: Path, trees: Sequence[str] = (), folders: Sequence[str] = ()) -> None:
+    """Make the account and the wrappers, and take write access to ``trees`` and ``folders`` from other accounts.
+    Fails unless the kernel guards against link tricks in shared folders."""
     for name, want in SYSCTLS.items():
         have = Path("/proc/sys", name).read_text().strip()
         if have != want:
@@ -314,13 +351,18 @@ def install(source: Path) -> None:
         os.chown(path, 0, 0)
         os.chmod(path, 0o644)
     STATE.mkdir(mode=0o700, exist_ok=True)
+    changed = harden(trees, folders)
+    print(f"{SEAT}: took write access from other accounts on {len(changed)} paths in {', '.join(trees)} and the "
+          f"folders on PATH")
     print(f"{SEAT}: uid {seat.pw_uid}, groups {groups}; {', '.join(f'{BIN / n} runs {e}' for n, e in zip(WRAPPED, exes))}")
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run seat code in the live evaluation as an account of its own.")
     sub = parser.add_subparsers(dest="mode", required=True)
-    sub.add_parser("install")
+    setup = sub.add_parser("install")
+    setup.add_argument("--harden-tree", action="append", default=[], help="a tree other accounts may not write")
+    setup.add_argument("--harden-path", default="", help="a PATH whose folders other accounts may not write")
     wrap = sub.add_parser("wrap")
     wrap.add_argument("exe")
     wrap.add_argument("args", nargs=argparse.REMAINDER)
@@ -339,7 +381,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         if os.geteuid() != 0:
             raise Refused(f"{args.mode} runs as root")
         if args.mode == "install":
-            install(Path(__file__).resolve())
+            install(Path(__file__).resolve(), args.harden_tree,
+                    [f for f in args.harden_path.split(os.pathsep) if f and f != str(BIN)])
             return 0
         if args.mode == "cleanup":
             cleanup()

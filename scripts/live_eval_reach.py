@@ -7,8 +7,9 @@ as seat code would, to:
 - run as the runner, or with a group other than the seat account's own;
 - run a command through ``sudo`` without a password;
 - write to the checkout, the installed package (the ``nirmaan`` package, the Python it runs in, its
-  ``site-packages`` and console script), the seat account's own wrapper, the records folder, the runner's
-  temporary folder or the step's command files (``GITHUB_ENV``, ``GITHUB_OUTPUT``, ``GITHUB_PATH``);
+  ``site-packages`` and console script), any folder on ``PATH`` or any program a gate runs, the seat account's
+  own wrapper, the records folder, the runner's temporary folder or the step's command files (``GITHUB_ENV``,
+  ``GITHUB_OUTPUT``, ``GITHUB_PATH``);
 - find a credential: two canary values this script puts in its own environment (one under a credential's name,
   which the M53 runner removes, one under a plain name, which only the seat account's empty environment keeps
   out), in its own environment or in ``/proc/<pid>/environ`` of any process, or in a file only the runner may
@@ -46,6 +47,9 @@ CANARY_SECRET, CANARY_PLAIN = "CLAUDE_CODE_OAUTH_TOKEN", "NIRMAAN_REACH_CANARY"
 #: The probe tests, by name; each must be in cocotb's results and pass.
 PROBES = ("reach_identity", "reach_no_sudo", "reach_no_write", "reach_no_credential", "reach_no_signal",
           "reach_own_directory")
+#: The programs gates run (eda.py backends) and the harness's own entry point.
+TOOLS = ("nirmaan", "iverilog", "vvp", "verilator", "yosys", "sby", "yices-smt2", "make", "cc", "python", "python3",
+         "git", "node", "npm")
 DESIGN = "module reach_probe(input wire clk);\nendmodule\n"
 
 PROBE = r'''"""Reach probe (scripts/live_eval_reach.py): seat code trying what it must not do. Every test passes only on denial."""
@@ -158,9 +162,16 @@ def targets(records: Path, env: Mapping[str, str]) -> tuple[list[str], list[str]
               "live-eval.yml", package / "__init__.py", package / "integrations" / "cocotb_runner.py",
               Path(sys.executable).resolve(), WRAPPER, WRAPPER.parent.parent / "seat.py"]
     append += sorted(purelib.glob("__editable__*nirmaan*")) + sorted(purelib.glob("*nirmaan*.pth"))
-    console = shutil.which("nirmaan")
-    if console:
-        append.append(Path(console).resolve())
+    # Every folder on PATH and every program a gate or the harness runs: seat code that could put a program of its
+    # own there, or change one, would run as the runner at the next gate.
+    create += [Path(d) for d in env.get("PATH", "").split(os.pathsep) if d and Path(d).is_dir()]
+    for tool in TOOLS:
+        found = shutil.which(tool, path=env.get("PATH"))
+        if found:
+            append.append(Path(found).resolve())
+    exes = WRAPPER.parent.parent / "exes.json"
+    if exes.is_file():  # the programs the wrappers run as the seat account
+        append += [Path(e) for e in json.loads(exes.read_text(encoding="utf-8"))]
     try:
         import cocotb
 

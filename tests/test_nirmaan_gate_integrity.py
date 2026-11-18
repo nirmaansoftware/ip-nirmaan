@@ -428,7 +428,7 @@ def test_ci_pipes_fail_and_live_eval_is_pinned_and_keeps_the_token_away():
             assert "shell: bash" in block, block.splitlines()[0]
     live = (root / ".github" / "workflows" / "live-eval.yml").read_text()
     setup = (root / ".github" / "actions" / "live-eval-setup" / "action.yml").read_text()
-    assert live.count("uses: ./.github/actions/live-eval-setup") == 2 and "secrets." not in setup
+    assert live.count("uses: ./.github/actions/live-eval-setup") == 3 and "secrets." not in setup
     assert "uses: ./.github/actions/oss-cad-suite" in setup and "oss-cad-suite-build/releases" not in live + setup
     # Claude Code from its lockfile, every package checked against its sha512 by npm ci.
     assert "npm ci --prefix .github/live-eval" in setup and "npm install" not in live + setup
