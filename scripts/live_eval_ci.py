@@ -17,8 +17,14 @@ owner's machine. The workflow calls this script in two ways:
   whose two hashes differ.
 
 A live trial (``check --require-expected`` and ``trials``) of a case that runs seat-written C (``fw.build``,
-``fw.test``, the firmware seat) is refused before anything runs: that C runs by path, not as the seat account
-(``scripts/live_eval_seat.py``), so the reach test cannot cover it yet.
+``fw.test``, the firmware seat, or a whole flow with a firmware stage) is refused before anything runs: that C runs
+by path, not as the seat account (``scripts/live_eval_seat.py``), so the reach test cannot cover it yet.
+
+A whole-flow case (``flow/...``, G3 council record 2026-11-17, decision 4) runs only when named, one trial per
+dispatch (each dispatch is one slot of the committed batch plan), on the default harness, in the whole-flow
+fingerprint (``harness_sha256(flow="whole")``); every record must carry ``flow: whole``. The register block flow
+(``flow/axi4-lite-regs-driver``) has a firmware stage, so it stays refused until ``fw.test`` runs seat C as the
+seat account; the timer flow (``flow/axil-timer``) links no seat C and runs.
 
 The options come from the environment (CASE, TRIALS, KNOWLEDGE, PURPOSE, HARNESS, EXPECTED), as the workflow
 sets them, so no input is expanded inside a shell command. Nothing here prints a credential. Exit codes: 0 every
@@ -74,14 +80,13 @@ def installed_cli() -> str | None:
 
 def options(env: dict[str, str]) -> dict:
     """The run's options from the environment, each checked before anything runs."""
-    from nirmaan.evals import load_cases
     from nirmaan.evals.records import PURPOSES
     from nirmaan.runtime.harness import VARIANTS
 
     case = env.get("CASE", "").strip()
-    known = {c.id for c in load_cases(ROOT / "evals")}
+    known = {c.id: c.flow for c in _cases()}  # G3: a whole-flow case is known only when named
     if case not in known:
-        raise Stop(BAD_INPUT, f"unknown case {case!r}; name one case ID from `nirmaan eval list`")
+        raise Stop(BAD_INPUT, f"unknown case {case!r}; name one case ID from `nirmaan eval list` or a whole-flow case")
     trials = env.get("TRIALS", "1").strip()
     if not trials.isdigit() or not 1 <= int(trials) <= MAX_TRIALS:
         raise Stop(BAD_INPUT, f"trials must be a whole number from 1 to {MAX_TRIALS}, not {trials!r}")
@@ -94,20 +99,31 @@ def options(env: dict[str, str]) -> dict:
     harness = env.get("HARNESS", "default").strip()
     if harness not in VARIANTS:
         raise Stop(BAD_INPUT, f"unknown harness variant {harness!r}; known: {', '.join(VARIANTS)}")
+    if known[case] == "whole" and (int(trials) != 1 or harness != "default"):
+        raise Stop(BAD_INPUT, f"a whole-flow case runs one trial per dispatch on the default harness (gate WF9; each "
+                              f"dispatch is one slot of the batch plan), not trials {trials} on harness {harness}")
     return {"case": case, "trials": int(trials), "knowledge": knowledge, "purpose": purpose, "harness": harness,
-            "expected": env.get("EXPECTED", "").strip()}
+            "expected": env.get("EXPECTED", "").strip(), "flow": known[case]}
+
+
+def _cases() -> list:
+    from nirmaan.evals import load_cases
+
+    return load_cases(ROOT / "evals", flow=None)
 
 
 def seat_c_problem(case_id: str) -> str | None:
-    """Why a live trial of this case would run seat code outside the seat account, or None."""
-    from nirmaan.evals import load_cases
+    """Why a live trial of this case would run seat code outside the seat account, or None.
 
-    case = next(c for c in load_cases(ROOT / "evals") if c.id == case_id)
+    A whole flow seats every stage it lists, so a firmware stage anywhere in it runs seat C at its own
+    before-review checks, whichever stage is judged."""
+    case = next(c for c in _cases() if c.id == case_id)
     tools = sorted({h.tool for h in case.held_out if h.tool in SEAT_C_TOOLS})
-    if case.seat in SEAT_C_SEATS or tools:
-        return (f"case {case_id} runs seat-written C ({', '.join(tools) or 'the ' + case.seat + ' seat'}), which "
-                "fw.build and fw.test run by path, not as the seat account; live trials of it wait for that "
-                "(gate WF17). No trial ran")
+    seats = sorted({case.seat, *(case.exercised if case.flow == "whole" else ())} & set(SEAT_C_SEATS))
+    if seats or tools:
+        what = ", ".join([*tools, *(f"the {s} stage" if case.flow == "whole" else f"the {s} seat" for s in seats)])
+        return (f"case {case_id} runs seat-written C ({what}), which fw.build and fw.test run by path, not as the "
+                "seat account; live trials of it wait for that (gate WF17). No trial ran")
     return None
 
 
@@ -152,9 +168,10 @@ def check(opts: dict, *, require_expected: bool, cli: str | None) -> str:
     pin = pinned_cli()
     if cli != pin:
         raise Stop(MISMATCH, f"Claude Code is {cli or 'not installed'}, not the pinned {pin}")
-    digest = harness_sha256(knowledge=opts["knowledge"] == "on", cli=cli, variant=opts["harness"])
+    flow = opts.get("flow", "seat")
+    digest = harness_sha256(knowledge=opts["knowledge"] == "on", cli=cli, variant=opts["harness"], flow=flow)
     print(f"harness: {digest} (case {opts['case']}, harness {opts['harness']}, knowledge {opts['knowledge']}, "
-          f"purpose {opts['purpose']}, Claude Code {cli})", flush=True)
+          f"purpose {opts['purpose']}, flow {flow}, Claude Code {cli})", flush=True)
     if require_expected and not opts["expected"]:
         raise Stop(BAD_INPUT, "name the expected harness fingerprint (sha256:...) before any trial runs")
     if opts["expected"] and opts["expected"] != digest:
@@ -183,9 +200,9 @@ def record_problem(record: Path, opts: dict, digest: str, cli: str) -> str | Non
     result = trial.get("result") or {}
     seen = {"purpose": trial.get("purpose"), "knowledge": trial.get("knowledge"),
             "harness variant": trial.get("harness_variant"), "harness": result.get("harness"),
-            "Claude Code": result.get("cli")}
+            "Claude Code": result.get("cli"), "flow": trial.get("flow", "seat")}
     wanted = {"purpose": opts["purpose"], "knowledge": opts["knowledge"], "harness variant": opts["harness"],
-              "harness": digest, "Claude Code": cli}
+              "harness": digest, "Claude Code": cli, "flow": opts.get("flow", "seat")}
     wrong = [f"{k} {seen[k]!r}, expected {wanted[k]!r}" for k in wanted if seen[k] != wanted[k]]
     answers = [a if isinstance(a, dict) else {} for a in trial.get("answers") or []]
     wrong += [f"an answer's harness {a.get('harness')!r}" for a in answers if a.get("harness") != digest]

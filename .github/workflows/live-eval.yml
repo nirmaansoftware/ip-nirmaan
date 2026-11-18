@@ -23,6 +23,13 @@ name: Live evaluation
 # `main` may deploy to; there is no repository secret. Only the gate step and the trials step
 # get it. A replay (`replay: true`) runs the case's reference answer: no model, no token, no
 # environment, from any branch, to check the tools before trials are spent.
+#
+# Whole-flow cases (`flow/...`, G3 council record 2026-11-17, decision 4; gates WF9 and WF13) run in these same
+# jobs, one trial per dispatch on the default harness (scripts/live_eval_ci.py), with the RISC-V cross compiler
+# added and every tool required (.github/actions/live-eval-setup). Every job that runs one also runs the
+# credential test for seat C under fw.test (scripts/live_eval_fw_reach.py) and uploads its result: recorded, not
+# yet a gate, since fw.test runs seat C as the runner, so a live trial of the register block flow stays refused
+# (exit 6) and only the timer flow runs. No schedule can start one (gate WF13): this workflow has none.
 on:
   workflow_dispatch:
     inputs:
@@ -93,6 +100,8 @@ jobs:
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - name: Install the tools
         uses: ./.github/actions/live-eval-setup
+        with:
+          whole_flow: ${{ startsWith(inputs.case, 'flow/') }}
       - name: Give seat code its own account
         uses: ./.github/actions/live-eval-seat
       - name: Print the harness fingerprint
@@ -101,6 +110,18 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/replay"
           python scripts/live_eval_reach.py --records "$RUNNER_TEMP/replay"
+      # Decision 4 and the second addendum, decision 2, item 1: what compiled seat C can reach under fw.test in
+      # this job, recorded for every whole-flow case. Not a gate yet (see the header).
+      - name: Test what seat C can reach under fw.test
+        if: startsWith(inputs.case, 'flow/')
+        run: python scripts/live_eval_fw_reach.py --records "$RUNNER_TEMP/replay" --out "$RUNNER_TEMP/fw-reach/fw-reach.json"
+      - name: Upload the seat C reach record
+        if: always() && startsWith(inputs.case, 'flow/')
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: live-eval-fw-reach-replay-${{ github.run_id }}
+          path: ${{ runner.temp }}/fw-reach
+          if-no-files-found: ignore
       - name: Hash the checkout before the trials
         id: before
         run: echo "tree=$(python scripts/live_eval_ci.py tree --write "$RUNNER_TEMP/tree-before.txt")" >> "$GITHUB_OUTPUT"
@@ -179,6 +200,8 @@ jobs:
           exit 1
       - name: Install the tools
         uses: ./.github/actions/live-eval-setup
+        with:
+          whole_flow: ${{ startsWith(inputs.case, 'flow/') }}
       - name: Give seat code its own account
         uses: ./.github/actions/live-eval-seat
       - name: Check the harness fingerprint
@@ -187,6 +210,18 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/results"
           python scripts/live_eval_reach.py --records "$RUNNER_TEMP/results"
+      # Decision 4 and the second addendum, decision 2, item 1: what compiled seat C can reach under fw.test in
+      # this job, recorded for every whole-flow case. Not a gate yet (see the header).
+      - name: Test what seat C can reach under fw.test
+        if: startsWith(inputs.case, 'flow/')
+        run: python scripts/live_eval_fw_reach.py --records "$RUNNER_TEMP/results" --out "$RUNNER_TEMP/fw-reach/fw-reach.json"
+      - name: Upload the seat C reach record
+        if: always() && startsWith(inputs.case, 'flow/')
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: live-eval-fw-reach-trials-${{ github.run_id }}
+          path: ${{ runner.temp }}/fw-reach
+          if-no-files-found: ignore
       - name: Hash the checkout before the trials
         id: before
         run: echo "tree=$(python scripts/live_eval_ci.py tree --write "$RUNNER_TEMP/tree-before.txt")" >> "$GITHUB_OUTPUT"
@@ -258,6 +293,8 @@ jobs:
           fi
       - name: Install the tools
         uses: ./.github/actions/live-eval-setup
+        with:
+          whole_flow: ${{ startsWith(inputs.case, 'flow/') }}
       - name: Give seat code its own account
         uses: ./.github/actions/live-eval-seat
       - name: Download the records

@@ -21,7 +21,8 @@ a pass and every probe test is in the results, passed: every probe denied. Other
 stops before any trial.
 
 ``fw.test`` runs seat C by path, so the seat account does not reach it yet; ``scripts/live_eval_ci.py`` refuses a
-live trial of a case that runs seat C. Its probe lands with that confinement.
+live trial of a case that runs seat C. Its credential test (``scripts/live_eval_fw_reach.py``) records what
+that C reaches, and becomes a gate with that confinement.
 """
 
 from __future__ import annotations

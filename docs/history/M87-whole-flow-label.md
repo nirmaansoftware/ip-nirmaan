@@ -93,4 +93,16 @@ to its task's seat as text, citable as a document. Part 4b is
 failed stage stops the flow, the per-stage record, the flow digest, the label
 from the case, and the whole-flow stop rule.
 
-**Not here.** The CI workflow, the credential test and the batch plan.
+**The CI path (step 5).** Whole-flow cases run in the live evaluation's own
+jobs (`.github/workflows/live-eval.yml`, M89's seat account, reach test, tree
+hashes and separate re-judge job), named by ID, one trial per dispatch, on
+the default harness, in the whole-flow fingerprint, each record checked for
+`flow: whole`. A `flow/` case adds the RISC-V cross compiler and fails if any
+tool is missing. Every such job also runs the credential test for seat C
+under `fw.test` (`scripts/live_eval_fw_reach.py`) and uploads its result; it
+is recorded, not a gate, because `fw.test` still runs seat C as the runner.
+So the register block flow stays refused live (exit 6) and only the timer
+flow runs. Design: `docs/WHOLE_FLOW.md`, "The CI path".
+
+**Not here.** The batch plan and the trials, after wave 2's first live
+batch is read.

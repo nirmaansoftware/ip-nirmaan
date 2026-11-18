@@ -15,6 +15,8 @@ from pathlib import Path
 
 import pytest
 
+from laws import needs
+
 from nirmaan.evals import load_record
 from nirmaan.runtime.harness import harness_sha256
 
@@ -281,3 +283,146 @@ def test_main_refuses_seat_c_before_any_trial_but_a_replay_check_does_not(monkey
     assert ci.main(["trials", "--out", "/nonexistent"]) == ci.UNCONFINED
     assert "gate WF17" in capsys.readouterr().err
     assert ci.main(["check"]) == 0
+
+
+# --- G3 step 5: whole-flow cases on the same path (council record 2026-11-17, decision 4) ----------------------
+
+TIMER_FLOW, REGS_FLOW = "flow/axil-timer", "flow/axi4-lite-regs-driver"
+
+
+def test_a_whole_flow_case_is_known_when_named_one_trial_per_dispatch_on_the_default_harness():
+    opts = _opts(CASE=TIMER_FLOW, TRIALS="1")
+    assert opts["flow"] == "whole" and _opts()["flow"] == "seat"
+    for over in ({"TRIALS": "2"}, {"TRIALS": "1", "HARNESS": "attempts-3"}, {"TRIALS": "1", "HARNESS": "tools-in-loop"}):
+        with pytest.raises(ci.Stop) as stop:
+            _opts(CASE=TIMER_FLOW, **over)
+        assert stop.value.code == ci.BAD_INPUT and "one trial per dispatch" in str(stop.value)
+
+
+def test_a_whole_flow_case_runs_in_the_whole_flow_fingerprint_and_the_single_seat_one_is_unchanged(capsys):
+    for knowledge in ("on", "off"):
+        opts = _opts(CASE=TIMER_FLOW, TRIALS="1", KNOWLEDGE=knowledge)
+        want = harness_sha256(cli="2.1.325", knowledge=knowledge == "on", flow="whole")
+        assert want != harness_sha256(cli="2.1.325", knowledge=knowledge == "on")
+        assert ci.check({**opts, "expected": want}, require_expected=True, cli="2.1.325") == want
+        assert "flow whole" in capsys.readouterr().out
+    assert ci.check(_opts(), require_expected=False, cli="2.1.325") == DIGEST
+
+
+def test_the_register_block_flow_is_refused_live_and_the_timer_flow_is_not():
+    assert ci.seat_c_problem(TIMER_FLOW) is None
+    problem = ci.seat_c_problem(REGS_FLOW)
+    assert problem and "the firmware stage" in problem and "fw.test" in problem and "WF17" in problem
+
+
+def test_main_refuses_the_register_block_flow_before_any_trial_and_checks_the_timer_flow(monkeypatch, capsys):
+    monkeypatch.setattr(ci, "installed_cli", lambda: "2.1.325")
+    monkeypatch.setattr(ci, "run_trials", lambda *a, **k: pytest.fail("a trial started"))
+    for case, code in ((REGS_FLOW, ci.UNCONFINED), (TIMER_FLOW, 0)):
+        for key, value in {"CASE": case, "TRIALS": "1", "KNOWLEDGE": "on", "PURPOSE": "evidence",
+                           "HARNESS": "default", "EXPECTED": harness_sha256(cli="2.1.325", flow="whole")}.items():
+            monkeypatch.setenv(key, value)
+        assert ci.main(["check", "--require-expected"]) == code
+    assert "gate WF17" in capsys.readouterr().err
+
+
+def test_a_whole_flow_record_must_carry_the_label_and_the_whole_flow_fingerprint(tmp_path):
+    opts = _opts(CASE=TIMER_FLOW, TRIALS="1")
+    whole = harness_sha256(cli="2.1.325", flow="whole")
+    good = {"purpose": "evidence", "knowledge": "on", "harness_variant": "default", "flow": "whole",
+            "result": {"harness": whole, "cli": "2.1.325"}, "answers": [{"harness": whole}]}
+    from nirmaan.evals.records import trial_path
+
+    for n, (trial, ok) in enumerate([(good, True), ({**good, "flow": None}, False),
+                                     ({k: v for k, v in good.items() if k != "flow"}, False)]):
+        path = trial_path(tmp_path / str(n), TIMER_FLOW, 1)
+        path.parent.mkdir(parents=True)
+        path.write_text(json.dumps(trial))
+        problem = ci.record_problem(tmp_path / str(n), opts, whole, "2.1.325")
+        assert (problem is None) == ok, problem
+        assert ok or "flow" in problem
+
+
+# --- The credential test for seat C (scripts/live_eval_fw_reach.py) --------------------------------------------
+
+
+def _fw_reach():
+    spec = importlib.util.spec_from_file_location("live_eval_fw_reach", REPO / "scripts" / "live_eval_fw_reach.py")
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+fw = _fw_reach()
+CONFIG = {"canaries": ["0a1b", "2c3d"], "create_in": ["/tmp/a", "/tmp/b c"], "runner_uid": 1001,
+          "runner": "runner", "harness_pid": 4242, "secret_file": "/tmp/s/credential", "nonce": "beef"}
+
+
+def test_the_probe_names_every_target_and_refuses_a_name_it_cannot_write_as_a_literal():
+    text = fw.probe_source(CONFIG)
+    assert "__" not in text.split("#include \"nirmaan_hal.h\"", 1)[1].split("#define COUNT", 1)[0]
+    for value in ('"0a1b", "2c3d"', '"/tmp/a", "/tmp/b c"', "1001L", "4242L", '"/tmp/s/credential"', '"beef"'):
+        assert value in text, value
+    for name in fw.PROBES:
+        assert f'nirmaan_test_result("{name}", ' in text, name
+    assert fw.c_string('a"b\\c') == '"a\\"b\\\\c"'
+    with pytest.raises(SystemExit):
+        fw.c_string("a\nb")
+
+
+@needs("cc")
+def test_the_probe_compiles_as_fw_test_compiles_a_driver_test(tmp_path):
+    """Compiled only, never run here: it runs sudo and reads other processes, so it runs in CI's live-eval jobs."""
+    from nirmaan.integrations import firmware
+
+    source = tmp_path / "fw_reach_probe.c"
+    source.write_text(fw.probe_source(CONFIG))
+    proc = subprocess.run(["cc", "-std=c11", "-Wall", "-Wextra", "-Werror", "-pedantic", f"-I{firmware.HARNESS}",
+                           "-c", str(source), "-o", str(tmp_path / "probe.o")], capture_output=True, text=True)
+    assert proc.returncode == 0, proc.stderr
+
+
+def _log(denied=(), missing=(), done=True):
+    lines = []
+    for name in fw.PROBES:
+        if name in missing:
+            continue
+        lines.append(f"FW-REACH {'denied' if name in denied else 'NOT DENIED'}: {name}: what: detail")
+    lines.append("FW-REACH control ok: fw_reach_own_directory: wrote /tmp/x")
+    return "\n".join(["noise", *lines, *(["FW-REACH done"] if done else [])])
+
+
+def test_a_probe_is_denied_only_when_every_line_of_it_is_and_a_missing_probe_never_is():
+    every = fw.parse(_log(denied=fw.PROBES))
+    assert every["every_probe_denied"] and not every["missing"] and every["done"]
+    assert every["control"] == ["ok: wrote /tmp/x"]
+    mixed = fw.parse(_log(denied=fw.PROBES) + "\nFW-REACH NOT DENIED: fw_reach_no_write: /repo: created")
+    assert not mixed["every_probe_denied"] and not mixed["probes"]["fw_reach_no_write"]["denied"]
+    assert mixed["probes"]["fw_reach_identity"]["denied"]
+    gone = fw.parse(_log(denied=fw.PROBES, missing=("fw_reach_no_signal",), done=False))
+    assert gone["missing"] == ["fw_reach_no_signal"] and not gone["every_probe_denied"] and not gone["done"]
+    assert not gone["probes"]["fw_reach_no_signal"]["denied"]
+
+
+@pytest.mark.parametrize("found,require,code", [(dict(denied=fw.PROBES), True, 0), (dict(), False, 0),
+                                                (dict(), True, 1), (dict(missing=("fw_reach_no_sudo",)), False, 1),
+                                                (dict(denied=fw.PROBES, done=False), False, 1)])
+def test_the_record_mode_records_and_the_gate_mode_needs_every_probe_denied(tmp_path, monkeypatch, capsys, found,
+                                                                          require, code):
+    out = tmp_path / "fw-reach.json"
+
+    def fake(argv, env):
+        assert env[fw.CANARY_SECRET] and env[fw.CANARY_PLAIN] and env[fw.INNER] == "1"  # in the harness's real env
+        out.write_text(json.dumps({"format": fw.FORMAT, "account": {"user": "runner", "uid": 1001},
+                                   "summary": "s", **fw.parse(_log(**found))}))
+        return subprocess.CompletedProcess(argv, 0)
+
+    monkeypatch.setattr(fw.subprocess, "run", fake)
+    monkeypatch.setattr(fw, "git_head", lambda: "abc")
+    assert fw.run(tmp_path, out, require, {"GITHUB_RUN_ID": "7", "GITHUB_JOB": "replay"}) == code
+    record = json.loads(out.read_text())
+    assert record["head"] == "abc" and record["run"]["id"] == "7" and record["run"]["job"] == "replay"
+    printed = capsys.readouterr().out
+    assert ("NOT confined" in printed) == (not found.get("denied") and not found.get("missing"))
+    assert CONFIG["canaries"][0] not in printed
