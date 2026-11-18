@@ -159,8 +159,7 @@ def test_the_controls_cover_what_the_record_rules(flows):
 
 
 def test_the_record_names_a_ci_run_and_every_control_once():
-    if not RECORD.is_file():
-        pytest.skip("no CI run recorded yet")
+    assert RECORD.is_file(), "the controls' recorded CI run is missing (evals/flow/controls_record.json)"
     data = json.loads(RECORD.read_text(encoding="utf-8"))
     assert data["format"] == "nirmaan.flow-controls-record"
     assert re.fullmatch(r"https://github\.com/\S+/actions/runs/\d+(/job/\d+)?", data["run"])
@@ -193,6 +192,5 @@ def test_the_control_gets_the_verdict_it_expects(nirmaan_org, fixed_clock, flows
             transcripts.setdefault(spec["transcript"], []).append(_bus(engine, score.runs))
     for runs in transcripts.values():  # the same bus transfers on both RTLs: latency is not visible to the test
         assert runs[0] and all(r == runs[0] for r in runs), runs
-    if RECORD.is_file():
-        recorded = {c["id"]: c["verdicts"] for c in json.loads(RECORD.read_text(encoding="utf-8"))["controls"]}
-        assert recorded[control["id"]] == got
+    recorded = {c["id"]: c["verdicts"] for c in json.loads(RECORD.read_text(encoding="utf-8"))["controls"]}
+    assert recorded[control["id"]] == got
