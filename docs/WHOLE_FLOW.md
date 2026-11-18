@@ -129,12 +129,17 @@ on no stage, so no approved upstream file carries it either.
 path reaches the requirements seat. Putting the document into the request
 text is no way out: the planner then reads other features from it
 (`existing_design`, `width_change`, `performance`), which changes what each
-seat is given. So the whole-flow runner must give the document as text by some
-other honest means, or fix the requirements stage and label every trial
-"seated from interface-spec" (decision 2). If that means an edit to
-`runtime/context.py` or `runtime/prompt.py`, both are `harness.CODE` files: the
-edit changes every fingerprint and belongs in the window with the runner's
-dispatch edit, never after it.
+seat is given. So the document is given another way: `runtime/context.py` carries task
+memory `document.<name>` (`<digest> <path>`) into that task's packet as an
+approved upstream file of kind `customer_document`, whole, citable and
+withheld once its bytes change. Only the platform writes it (no seat answer
+writes memory, and the CLI writes only `input.` keys), only the task it is
+given to sees it, and no single-seat case gives one, so their prompts are byte
+for byte as before (`tests/test_flow_requirements_document.py`). The
+whole-flow runner gives the fixed documents to the requirements stage this
+way, so its trials are seated at every stage, never "seated from
+interface-spec". `runtime/context.py` is a `harness.CODE` file, so this change
+merges in the window with the dispatch edit.
 
 ## The judge controls (M87, third pull request)
 

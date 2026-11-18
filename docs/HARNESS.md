@@ -61,6 +61,18 @@ recorded on its own) and `writer.py` (the concurrency writer, which keeps
 state in the same order for any number of jobs). A new runtime file must be
 put in `CODE` or in that list, and those four files may not gain a constant.
 
+G3 (council record 2026-11-17, decision 2; fact 10): `context.py` also carries
+a customer document for one task. Task memory `document.<name>`
+(`<digest> <path>`, which only the platform writes: no seat answer writes
+memory and the CLI writes only `input.` keys) enters that task's packet as an
+approved upstream file of kind `customer_document`, read whole only while its
+bytes match. The whole-flow requirements seat reads its case's fixed
+requirements this way. No single-seat case gives one, so every shipped case's
+seat prompts are byte for byte as before
+(`tests/test_flow_requirements_document.py`). The change touched a `CODE`
+file, so every fingerprint changed, inside the window with the whole-flow
+dispatch edit.
+
 ## The tool definitions (M74)
 
 A seat reads its gate tools' parameter descriptions as their input contract

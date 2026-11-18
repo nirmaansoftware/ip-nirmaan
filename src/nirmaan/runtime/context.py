@@ -4,7 +4,8 @@ Knowledge is assembled per task from four separate scopes, never mixed into
 one prompt: company (constitution and standards), domain (the role's skills,
 the VeriTriage Knowledge Packs they cite, and the text of the knowledge
 documents they cite, M61), project (requirement, analysis,
-decisions, and approved upstream artifacts), and task (inputs, evidence
+decisions, and approved upstream artifacts, with any document the customer gave
+for this task, G3), and task (inputs, evidence
 requirements, permitted tools, and the definitions of the tools the platform
 runs over the task's files). Each item says where it came from.
 
@@ -13,6 +14,8 @@ attributes the type checker knows, never keys of an untyped dict.
 """
 
 from __future__ import annotations
+
+from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
 
@@ -206,16 +209,40 @@ class WorkPacket(_View):
     memory: tuple[MemoryEntry, ...] = ()
 
 
+def _verified(location: str | None, expected: str | None) -> dict[str, str | None]:
+    """A recorded file's content, read only if its bytes still match what was recorded, within the cap."""
+    text, problem = read_verified(location, expected)
+    if text is not None and len(text) > harness.MAX_CONTENT:
+        text, problem = None, f"too large to include ({len(text)} characters)"
+    return {"content": text, "content_problem": problem}
+
+
 def _artifact(art, trusted: bool | None = None, content: bool = False) -> ArtifactView:
-    entry = {}
-    if content and art.digest:
-        # A recorded file is read only if its bytes still match what was recorded.
-        text, problem = read_verified(art.location, art.digest)
-        if text is not None and len(text) > harness.MAX_CONTENT:
-            text, problem = None, f"too large to include ({len(text)} characters)"
-        entry = {"content": text, "content_problem": problem}
+    entry = _verified(art.location, art.digest) if content and art.digest else {}
     return ArtifactView(id=art.id, kind=art.kind, title=art.title, assurance=art.assurance.value,
                         summary=art.summary, location=art.location, digest=art.digest, trusted=trusted, **entry)
+
+
+#: G3 (council record 2026-11-17, decision 2): a document the customer gives with the request, for one task. The
+#: platform records it as task memory ``document.<name>`` = ``<sha256 digest> <path>`` (a whole-flow case's fixed
+#: requirements, given to the requirements stage); the seat sees it as an approved upstream file, read whole only
+#: while its bytes match. Nothing a seat answers writes memory, the CLI writes only ``input.`` keys, and no
+#: single-seat case gives one, so their packets are unchanged.
+DOCUMENT = "document."
+DOCUMENT_KIND = "customer_document"
+
+
+def _documents_given(state, task_id: str) -> list[ArtifactView]:
+    out = []
+    for m in state.memory:
+        if m.scope is MemoryScope.TASK and m.owner == task_id and m.key.startswith(DOCUMENT):
+            expected, _, location = m.value.partition(" ")
+            name = m.key.removeprefix(DOCUMENT)
+            out.append(ArtifactView(id=f"{task_id}#{m.key}", kind=DOCUMENT_KIND, title=Path(location).name,
+                                    assurance=Assurance.APPROVED.value,
+                                    summary=f"the customer's {name}, given with the request", location=location,
+                                    digest=expected, trusted=True, **_verified(location, expected)))
+    return out
 
 
 def _failed_run(state, run_id: str, evidence: tuple[str, ...]) -> FailedRun:
@@ -277,6 +304,7 @@ def assemble(engine: TaskEngine, task_id: str, role: str | None = None, *, knowl
     for art in built_on:
         approved = art.assurance is Assurance.APPROVED
         upstream.append(_artifact(art, trusted=approved, content=approved))
+    upstream += _documents_given(state, task_id)  # G3: none unless the platform gave this task a document
     # M52: the upstream evidence is the evidence of the tasks whose artifacts it builds on, so through gates too.
     sources = dict.fromkeys((*(art.task for art in built_on), task_id))
     evidence = tuple(
