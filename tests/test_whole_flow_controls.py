@@ -41,7 +41,6 @@ BASES = {("flow/axil-timer", "rtl"): EVALS / "rtl" / "axil_timer.json",
          ("flow/axi4-lite-regs-driver", "driver"): EVALS / "firmware" / "axi4_lite_driver.json"}
 #: The firmware seat reads the whole-flow case's own copy of the programming interface.
 DRIVER_API = ("evals/firmware/axi4_lite/driver_api.md", "evals/flow/axi4_lite/driver_api.md")
-REFERENCE_RTL = "tests/fixtures/rtl/axi4_lite/axi4_lite_regs.v"
 TOOLS = needs("verilator", "iverilog", "vvp", "yosys", "cc", "make")
 
 
@@ -64,10 +63,14 @@ def _checks(control: dict, flow: EvalCase) -> list[HeldOutCheck]:
     out = []
     for n, spec in enumerate(control["checks"], start=1):
         check = dict(spec["inline"]) if "inline" in spec else flow.held_out[spec["check"] - 1].model_dump(mode="json")
+        # The file a mutant stands in for: the RTL the control puts in place, else the one the check's mutants name.
+        original = spec.get("rtl") or next(iter(check.get("mutants") or {}), None)
         if "rtl" in spec:
             check["case_files"] = {**check.get("case_files", {}), "rtl": [spec["rtl"]]}
-        if "mutants" in spec:
-            check["mutants"] = {REFERENCE_RTL: spec["mutants"]}
+        mutants = spec.get("mutants", [m for files in (check.get("mutants") or {}).values() for m in files])
+        if mutants:
+            assert original, f"{control['id']}: mutants with no file to stand in for"
+            check["mutants"] = {original: mutants}
         check["name"] = f"{check['name']} [{control['id']} {n}]"
         out.append(HeldOutCheck.model_validate(check))
     return out
@@ -117,7 +120,7 @@ def test_every_control_names_a_whole_flow_case_its_checks_and_committed_files(fl
         for spec in control["checks"]:
             assert spec["expect"] in (("passed", "failed") if control.get("reaches_review", True) else ("not_run",))
             assert "inline" in spec or 1 <= spec["check"] <= len(flow.held_out)
-            for path in [spec.get("rtl", REFERENCE_RTL), *spec.get("mutants", [])]:
+            for path in [*([spec["rtl"]] if "rtl" in spec else []), *spec.get("mutants", [])]:
                 assert (REPO / path).is_file(), path
         assert _checks(control, flow)
 
