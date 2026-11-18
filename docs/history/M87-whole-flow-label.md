@@ -102,5 +102,12 @@ states it, and `AXIL-TEST-RANGE` holds a testbench to what the document states,
 so a conforming flow block must not fail it. The
 copy test now allows only named exemptions, each with its reason.
 
-**Not here.** The runner option (its `runner.py` dispatch waits for the H3
-batch, gate WF1).
+**The runner option.** Part 4a, the dispatch edit to `runner.py` and the
+fingerprint entries, merged in the window after the H3 batch. With it, a
+`runtime/context.py` and `runtime/prompt.py` change gives a customer document
+to its task's seat as text, citable as a document. Part 4b is
+`evals/flow.py`: every stage seated, the pass-through with a true note, a
+failed stage stops the flow, the per-stage record, the flow digest, the label
+from the case, and the whole-flow stop rule.
+
+**Not here.** The CI workflow, the credential test and the batch plan.

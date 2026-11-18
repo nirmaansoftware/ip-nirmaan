@@ -124,10 +124,11 @@ def test_one_id_is_one_case_across_both_flows(tmp_path):
         load_cases(tmp_path)
 
 
-def test_a_whole_flow_case_never_runs_as_a_single_seat_case(org, tmp_path):
+def test_a_run_never_mixes_whole_flow_and_single_seat_cases(org, tmp_path):
     out = tmp_path / "results"
-    with pytest.raises(EvalError, match="needs the whole-flow runner"):
-        record_run(org, [_whole()], None, trials=1, repo=ROOT, out=out)
+    single = EvalCase(id="spec/x", request=TIMER, seat="interface-spec")
+    with pytest.raises(EvalError, match="one record never mixes whole-flow and single-seat"):
+        record_run(org, [_whole(), single], None, trials=1, repo=ROOT, out=out)
     assert not out.exists()  # refused before anything was written
 
 

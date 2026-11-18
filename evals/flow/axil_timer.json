@@ -40,6 +40,30 @@
       ]
     }
   },
+  "reference": [
+    {
+      "path": "evals/flow/axil_timer/requirements.md",
+      "kind": "requirements_spec"
+    },
+    {
+      "path": "tests/fixtures/rtl/axil_timer/interface_spec.md",
+      "kind": "interface_spec"
+    },
+    {
+      "path": "tests/fixtures/rtl/axil_timer/microarchitecture.md",
+      "kind": "microarchitecture_spec"
+    },
+    {
+      "path": "tests/fixtures/rtl/axil_timer/axil_timer.v",
+      "kind": "rtl_source",
+      "entry": "axil_timer"
+    },
+    {
+      "path": "tests/fixtures/rtl/axil_timer/axil_timer_tb.v",
+      "kind": "testbench",
+      "entry": "axil_timer_tb"
+    }
+  ],
   "held_out": [
     {
       "name": "The reference testbench passes on the flow's RTL",
