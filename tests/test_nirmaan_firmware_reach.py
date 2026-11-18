@@ -226,7 +226,11 @@ def test_the_include_path_holds_only_the_listed_harness_files():
 def test_the_hal_has_only_read32_and_write32():
     members = [d.split(": ", 1)[1] for d in header_declarations(HARNESS / "nirmaan_hal.h")
                if d.startswith("struct nirmaan_hal: ")]
-    names = {(re.search(r"\(\*(\w+)\)", m) or re.search(r"(\w+)$", m)).group(1) for m in members}
+    names = set()
+    for member in members:
+        found = re.search(r"\(\*(\w+)\)", member) or re.search(r"(\w+)$", member)
+        assert found, f"{RETURN_CONDITION}\na nirmaan_hal member this guard cannot name: {member!r}"
+        names.add(found.group(1))
     assert names == {"ctx", "read32", "write32"}, f"{RETURN_CONDITION}\nnirmaan_hal members: {sorted(names)}"
 
 
