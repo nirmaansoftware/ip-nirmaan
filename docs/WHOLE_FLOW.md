@@ -161,15 +161,24 @@ reference RTL, unlike every `_tb_fail.v` in `docs/IP_BLOCKS.md`; both lanes at
 rendered into a prompt (`runtime/prompt.py`), and the requirements task builds
 on no stage, so no approved upstream file carries it either.
 `tests/test_whole_flow_cases.py` shows neither the document's text nor its
-path reaches the requirements seat. Putting the document into the request
-text is no way out: the planner then reads other features from it
+path reaches the requirements seat. Putting the document into the request text
+is no way out: the planner then reads other features from it
 (`existing_design`, `width_change`, `performance`), which changes what each
-seat is given. So the whole-flow runner must give the document as text by some
-other honest means, or fix the requirements stage and label every trial
-"seated from interface-spec" (decision 2). If that means an edit to
-`runtime/context.py` or `runtime/prompt.py`, both are `harness.CODE` files: the
-edit changes every fingerprint and belongs in the window with the runner's
-dispatch edit, never after it.
+seat is given. So the document is to be given another way:
+`runtime/context.py` carries task memory `document.<name>` (`<digest> <path>`)
+into that task's packet as an upstream file of kind `customer_document`,
+marked as customer input, whole, citable (as a `document`, never an artifact,
+so the provenance check never refuses a draft that cites it) and withheld once
+its bytes change. Only the platform may write it (no seat answer writes
+memory, and the CLI and the eval runner write only `input.` keys), only the
+task it is given to sees it, and no single-seat case gives one, so their
+prompts are byte for byte as before
+(`tests/test_flow_requirements_document.py`). Nothing writes a `document.` key
+yet: the whole-flow runner (part 4b, not merged) is to give the fixed
+documents to the requirements stage this way, so that its trials are seated at
+every stage, never "seated from interface-spec". `runtime/context.py` and
+`runtime/prompt.py` are `harness.CODE` files, so this change merges in the
+window with the dispatch edit.
 
 ## The judge controls (M87, third pull request)
 
@@ -304,6 +313,25 @@ fingerprint's `run` section says `flow: whole` and its `flow` section digests
 the one edit that changes every fingerprint; it merges only after the H3
 batch's last trial is recorded and before the pull request that names the
 default harness (WF1, WF6).
+
+## Gate status
+
+The council record's gates are its own
+(`council/records/2026-11-17-g3-whole-flow-cases.md`, WF1 to WF13); this
+section only records, with dates, what the repository can show about them.
+
+- WF1 (no `CODE` change before the H3 batch's last trial is recorded),
+  2026-11-18. The H3 runner recorded its last slot, slot 69 of 69, at
+  2026-11-18T07:12:47Z; its ledger's last line reads "ALL DONE
+  2026-11-18T07:12:47Z: 69 slots, 66 done, 2 interrupted (slot 1 SIGKILL, slot
+  44 Mac reboot), 1 stopped (slot 35 plan limit)". That ledger and the
+  frontier-case records, slot 69's among them, are private (the record's fact
+  15); this rests on the orchestrator's account. The batch's pilot-case
+  records reach `main` by pull request in six parts (ip#332 and ip#333 are
+  open at this date); none is merged yet, so `main` holds no H3 record today.
+  The `CODE` changes made after it: the dispatch edit, ip#330, merged at
+  13:28Z (merge commit 91cb482), and the customer-document change, the second
+  half of the same window (decision 4).
 
 ## Not yet
 
