@@ -627,7 +627,9 @@ SKILLS: list[Skill] = [
     sk("device_drivers", "Device drivers", "software", "drivers", provides=("sw.driver", "fw.driver"),
        includes=("c_programming",), tools=("fw.build", "fw.test", "fw.cross_build", "fw.soc_test"),
        procedures=("Implement drivers from the programming model.",
-                   "Write the register map header from the approved interface specification, never from the RTL.",
+                   "Write the register map header from the approved interface specification, and check it "
+                   "against the approved RTL: never copy it from the RTL, and escalate a disagreement between the "
+                   "two instead of choosing one.",
                    "When an approved register map exists, include <block>_map.h and do not write it: the firmware "
                    "tools generate it from the map (offsets, resets, field _SHIFT, _MASK, _RESET, _GET and _SET), "
                    "and a header you write instead must agree with it.",

@@ -195,7 +195,8 @@ runs without a `workdir`, with the disk 98% full; that leak is listed below.
 
 **The live evaluation** (`live-eval.yml`): the OSS CAD Suite comes from the
 same composite action as `ci.yml` (pinned, cached, sha256-checked), Claude
-Code is pinned (`@anthropic-ai/claude-code@2.1.283`), and the token is set only
+Code is pinned (`@anthropic-ai/claude-code@2.1.283` at M53; since W2-L1-CI,
+2.1.325 from the lockfile in `.github/live-eval`), and the token is set only
 on the gate step and the evaluation step. Inside the evaluation every gate
 and judge runs through the runner above, so model-written code compiles and
 runs with no credential in its environment, and a credential value it prints

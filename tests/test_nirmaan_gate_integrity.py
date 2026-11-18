@@ -14,6 +14,7 @@ failed before M53: a real run whose pass did not mean what its gate claims.
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import threading
@@ -426,8 +427,16 @@ def test_ci_pipes_fail_and_live_eval_is_pinned_and_keeps_the_token_away():
             # the container job's default sh is dash, which has no pipefail
             assert "shell: bash" in block, block.splitlines()[0]
     live = (root / ".github" / "workflows" / "live-eval.yml").read_text()
-    assert "uses: ./.github/actions/oss-cad-suite" in live and "oss-cad-suite-build/releases" not in live
-    assert "npm install -g @anthropic-ai/claude-code@" in live
+    setup = (root / ".github" / "actions" / "live-eval-setup" / "action.yml").read_text()
+    assert live.count("uses: ./.github/actions/live-eval-setup") == 2 and "secrets." not in setup
+    assert "uses: ./.github/actions/oss-cad-suite" in setup and "oss-cad-suite-build/releases" not in live + setup
+    # Claude Code from its lockfile, every package checked against its sha512 by npm ci.
+    assert "npm ci --prefix .github/live-eval" in setup and "npm install" not in live + setup
+    lock = json.loads((root / ".github" / "live-eval" / "package-lock.json").read_text())["packages"]
+    assert lock[""]["dependencies"] == {"@anthropic-ai/claude-code": "2.1.325"}
+    for name in ("node_modules/@anthropic-ai/claude-code", "node_modules/@anthropic-ai/claude-code-linux-x64"):
+        assert lock[name]["version"] == "2.1.325" and lock[name]["integrity"].startswith("sha512-")
+    assert 'pip install -e ".[dev,cocotb]"' in setup
     steps = live.split("- name:")[1:]
     with_token = [b.splitlines()[0].strip() for b in steps if "secrets.CLAUDE_CODE_OAUTH_TOKEN" in b]
-    assert with_token == ["Gate on the secret", "Run the live evaluation"]
+    assert with_token == ["Gate on the secret", "Run the trials one at a time"]

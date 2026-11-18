@@ -79,6 +79,7 @@ import json
 import os
 import re
 import secrets
+import signal
 import stat
 import subprocess
 import sys
@@ -206,10 +207,15 @@ LOOP = {
     # "select": "related_tests" appends the tests related to the changed
     # paths (related_tests) to the last command, or nothing (the whole suite)
     # when they cannot be told; CI runs the whole suite either way.
+    # "shards" runs the last command as CI's test job does (scripts/shards.py):
+    # the whole suite, or related tests in more than one file, as up to `count`
+    # shards of `profile` at once, each within the check timeout (shard_commands).
+    # The single-runner whole suite outgrew the 1200 s timeout (ip#249).
     "checks": [
         {"name": "dashes", "when": ["**"], "run": [["{python}", "scripts/check_dashes.py"]]},
         {"name": "test", "when": ["src/**", "tests/**", "evals/**", "scripts/**", "site/**"], "env": {"PYTHONPATH": "src"},
-         "select": "related_tests", "run": [["{python}", "-m", "pytest", "-q", "-x", "-p", "no:cacheprovider"]]},
+         "select": "related_tests", "shards": {"count": 3, "profile": "test"},
+         "run": [["{python}", "-m", "pytest", "-q", "-x", "-p", "no:cacheprovider"]]},
     ],
     # The generated file many pull requests regenerate, so a merge to main leaves the others
     # conflicting or stale in it (ip#220, #213, #224, #227, #248, #254). When it is the only file
@@ -538,33 +544,124 @@ def _run_commands(commands, cwd, extra_env, variables, timeout_s, user=None) -> 
         return _run_commands_once(commands, cwd, extra_env, variables, timeout_s, user)
 
 
+def shard_commands(run: list, files: int | None, shards: dict | None) -> tuple[list, int]:
+    """`run` with its last command split into shards as CI's test job splits the
+    suite (`pytest --shard K/N --shard-profile P`, tests/conftest.py and
+    scripts/shards.py): N = shards["count"] for the whole suite (`files` None),
+    else at most one shard per selected test file. The shards run at once
+    ({"parallel": [...]}, _run_parallel), each writes its manifest to {out},
+    and then `scripts/shards.py` must find that together they ran every
+    collected test exactly once. A shard may keep no test (pytest's exit 5:
+    a selected file whose tests all skip at import), since that check covers
+    it. With one shard or none, `run` as it was."""
+    if not shards:
+        return run, 1
+    n = shards["count"] if files is None else min(shards["count"], files)
+    if n <= 1:
+        return run, 1
+    manifests = [f"{{out}}/shard-{k}.json" for k in range(1, n + 1)]
+    parts = [[*run[-1], "--shard", f"{k}/{n}", "--shard-profile", shards["profile"], "--shard-manifest", manifests[k - 1]]
+             for k in range(1, n + 1)]
+    return [*run[:-1], {"parallel": parts, "ok": [0, 5]}, ["{python}", "scripts/shards.py", *manifests]], n
+
+
+def _substitute(argv: list[str], variables: dict) -> list[str]:
+    return [re.sub(r"\{(\w+)\}", lambda m: variables.get(m.group(1), m.group(0)), a) for a in argv]
+
+
+def _tail(text: str) -> str:
+    return " / ".join((text or "").strip().splitlines()[-5:])[:400]
+
+
+def _run_parallel(commands: list[list[str]], cwd, env: dict, timeout_s, user=None, ok_codes=(0,)) -> tuple[bool, str]:
+    """Every command at once (as `user` when given), each within `timeout_s`.
+    The first that fails (an exit code not in `ok_codes`) or runs out of time fails the lot, and the rest are
+    killed: every one must pass. Output goes to files, not pipes, so a busy
+    shard never blocks on a full pipe while another is waited on."""
+    running = []
+    try:
+        for args in commands:
+            out = tempfile.TemporaryFile(mode="w+", encoding="utf-8", errors="replace")
+            try:
+                proc = subprocess.Popen(check_argv(args, env, user), cwd=cwd, env=pr_review.reviewer_env() if user else env,
+                                        stdout=out, stderr=subprocess.STDOUT, text=True, start_new_session=True)
+            except OSError as exc:
+                out.close()
+                return False, f"{' '.join(args)}: {exc}"
+            running.append((args, proc, out))
+        deadline = time.monotonic() + timeout_s
+        pending = list(running)
+        while pending:
+            for item in list(pending):
+                args, proc, out = item
+                code = proc.poll()
+                if code is None:
+                    continue
+                pending.remove(item)
+                if code not in ok_codes:
+                    out.seek(0)
+                    return False, f"{' '.join(args)}: exit {code}: {_tail(out.read())}"
+            if pending and time.monotonic() > deadline:
+                return False, f"{' '.join(pending[0][0])}: timed out after {timeout_s:g} seconds"
+            if pending:
+                time.sleep(0.2)
+        return True, ""
+    finally:
+        if user and any(proc.poll() is None for _, proc, _ in running):
+            subprocess.run(["sudo", "-n", "pkill", "-KILL", "-u", user], capture_output=True)
+        for _, proc, out in running:
+            if proc.poll() is None:
+                try:
+                    os.killpg(proc.pid, signal.SIGKILL)
+                except OSError:
+                    pass
+                try:
+                    proc.wait(timeout=60)
+                except subprocess.TimeoutExpired:
+                    pass
+            out.close()
+
+
 def _run_commands_once(commands, cwd, extra_env, variables, timeout_s, user=None) -> tuple[bool, str]:
+    """Each command in turn, stopping at the first that fails. A command
+    {"parallel": [argv, ...]} runs its commands at once (_run_parallel). {out}
+    is a folder of this run's own, removed after it, for what checks write
+    (shard manifests)."""
     env = {**pr_review.reviewer_env(), **(extra_env or {})}
     home = None
+    out = tempfile.mkdtemp(prefix="loop-check-out-")
+    variables = {**variables, "out": out}
     if user:
-        # The check account writes in its clone (check_clone) and its own home; git trusts the clone.
+        # The check account writes in its clone (check_clone), its own home and {out}; git trusts the clone.
+        os.chmod(out, 0o777)
         home = tempfile.mkdtemp(prefix="loop-check-home-")
         os.chmod(home, 0o777)
         subprocess.run(["chmod", "-R", "a+rwX", cwd], capture_output=True)
         env = {**env, "HOME": home, "GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": "safe.directory", "GIT_CONFIG_VALUE_0": "*"}
     try:
         for argv in commands:
-            args = [re.sub(r"\{(\w+)\}", lambda m: variables.get(m.group(1), m.group(0)), a) for a in argv]
+            if isinstance(argv, dict):
+                ok, detail = _run_parallel([_substitute(a, variables) for a in argv["parallel"]], cwd, env, timeout_s, user,
+                                           tuple(argv.get("ok", (0,))))
+                if not ok:
+                    return False, detail
+                continue
+            args = _substitute(argv, variables)
             try:
                 proc = subprocess.run(check_argv(args, env, user), cwd=cwd, env=pr_review.reviewer_env() if user else env,
                                       capture_output=True, text=True, timeout=timeout_s)
             except (OSError, subprocess.TimeoutExpired) as exc:
                 return False, f"{' '.join(args)}: {exc}"
             if proc.returncode != 0:
-                tail = " / ".join(((proc.stderr or "") + "\n" + (proc.stdout or "")).strip().splitlines()[-5:])
-                return False, f"{' '.join(args)}: exit {proc.returncode}: {tail[:400]}"
+                return False, f"{' '.join(args)}: exit {proc.returncode}: {_tail((proc.stderr or '') + chr(10) + (proc.stdout or ''))}"
         return True, ""
     finally:
         if user and home:
             # Nothing the check account started outlives the check, and what it made goes back to the loop (as root).
             subprocess.run(["sudo", "-n", "pkill", "-KILL", "-u", user], capture_output=True)
-            subprocess.run(["sudo", "-n", "chown", "-R", f"{os.getuid()}:{os.getgid()}", cwd, home], capture_output=True)
+            subprocess.run(["sudo", "-n", "chown", "-R", f"{os.getuid()}:{os.getgid()}", cwd, home, out], capture_output=True)
             pr_review._rmtree(Path(home))
+        pr_review._rmtree(Path(out))
 
 
 def _applies(entry: dict, changed: list[str]) -> bool:
@@ -1549,20 +1646,25 @@ class Loop:
             for c in lc["checks"]:
                 if not _applies(c, commit_changed):
                     continue
-                run, name = c["run"], c["name"]
+                run, name, files = c["run"], c["name"], None
                 if c.get("select") == "related_tests":
                     # Only the tests related to the changed files; CI runs the whole suite.
                     selected = related_tests(wt, commit_changed)
                     if selected is not None:
                         run = [*run[:-1], [*run[-1], *selected]]
+                        files = len({t.split("::")[0] for t in selected})
                         name = f"{name} ({len(selected)} related file{'' if len(selected) == 1 else 's'})"
                     else:
                         name = f"{name} (whole suite)"
+                run, parts = shard_commands(run, files, c.get("shards"))
+                if parts > 1:
+                    name = f"{name[:-1]}, {parts} shards at once)" if name.endswith(")") else f"{name} ({parts} shards at once)"
+                started = time.monotonic()
                 ok, detail = _run_commands(run, check_cwd, c.get("env"), {"python": sys.executable, "main": main_sha, "head": new}, o["check_timeout_s"],
                                             o.get("check_user"))
                 if not ok:
                     return self._stop(ctx, head, f"fix round {rnd}: the local check {name} failed on the fix ({detail}); nothing was pushed")
-                ran.append(name)
+                ran.append((name, round(time.monotonic() - started)))
         finally:
             if check_root:
                 pr_review._rmtree(check_root)
@@ -1590,7 +1692,7 @@ class Loop:
             return self._stop(ctx, head, f"fix round {rnd}: the push failed ({(exc.stderr or str(exc)).strip()[:300]})")
         st["rounds"], st["last_fix_head"] = rnd, new
         _save_state(self.state_dir, cfg["repo"], st)
-        self._log(ctx, "fixed", round=rnd, new_head=new, addressed=",".join(fo["addressed"]), checks=",".join(ran))
+        self._log(ctx, "fixed", round=rnd, new_head=new, addressed=",".join(fo["addressed"]), checks=",".join(c for c, _ in ran))
         self._say(n, "\n".join([
             f"<!-- {MARK} round={rnd} head={new} from={head} -->",
             f"### Automated loop: fix round {rnd} of {lc['max_fix_rounds']}", "",
@@ -1599,7 +1701,7 @@ class Loop:
             f"| New head | `{new}` |",
             f"| Fixer | fresh `claude -p` process (Read, Grep, Glob, Edit and Write in a clean worktree of the head; no shell, "
             f"no network, no token), model {_cell(res.get('reported_model') or o['fixer_model'], 80)} |",
-            f"| Local checks | {', '.join(f'{c}: pass' for c in ran) or 'none applied'} |", "",
+            f"| Local checks | {', '.join(f'{c}: pass ({s} s)' for c, s in ran) or 'none applied'} |", "",
             "#### Findings addressed", "",
             "| Id | Key | Severity | Where | Finding |", "|---|---|---|---|---|",
             *[f"| {f['id']} | {f['key']} ({_cell(f['team'], 40)}) | {f['severity']} | `{_cell(f['file'], 200)}:{f['line']}` | {_cell(f['text'], 400)} |" for f in addressed],
