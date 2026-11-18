@@ -266,7 +266,10 @@ Yosys, SymbiYosys, cocotb, eqy, the DFT, firmware and physical design flows):
 * **What a run writes.** `DISK_CAP` (2 GB) bounds the run's own directory,
   measured every `DISK_CHECK_SECONDS` (1 s) while a step runs and once after
   the last; no file any step writes can grow past it (`RLIMIT_FSIZE`), and no
-  step writes a core file. When the directory reaches the cap (a file stopped
+  step writes a core file. A small launcher sets both limits and then becomes
+  the step (`exec`, so the pid, the process group and the stop are unchanged),
+  rather than `preexec_fn`, which can deadlock a child forked while other
+  threads run; a step whose executable is missing fails with exit status 127. When the directory reaches the cap (a file stopped
   at the file limit is at it) the run is stopped and fails: `wrote 2048 MB
   or more in <exe>`.
 * **What a run reads back.** A file a run wrote that its parser reads (Yosys's
@@ -288,7 +291,9 @@ Yosys, SymbiYosys, cocotb, eqy, the DFT, firmware and physical design flows):
   a timeout, a stop at a cap or an error. A run that raises, or that is refused
   before any step runs, removes its directory at once, since no record refers
   to it. A given `workdir` is the caller's and is never removed, and outside
-  any scope (a saved project's runs) nothing is removed. The test suite puts
+  any scope (a saved project's runs) nothing is removed. A scope is a context
+  variable, so two scopes in two threads never remove each other's
+  directories. The test suite puts
   every temporary folder it makes in one folder inside pytest's own, removed
   when the session ends, and each test removes its runs' directories when it
   ends. Setting `NIRMAAN_KEEP_RUN_DIRS=1` keeps them all, for debugging.

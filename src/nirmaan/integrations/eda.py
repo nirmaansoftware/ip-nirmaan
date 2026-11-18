@@ -31,18 +31,18 @@ to it.
 
 from __future__ import annotations
 
+import contextvars
 import json
 import os
 import re
-import resource
 import secrets
 import selectors
 import shlex
 import shutil
 import signal
 import subprocess
+import sys
 import tempfile
-import threading
 import time
 from collections.abc import Iterator, MutableMapping
 from contextlib import contextmanager
@@ -358,8 +358,10 @@ def run_directory(name: str, under: object = None) -> Path:
     return Path(tempfile.mkdtemp(prefix=f"nirmaan-{name}-", dir=root)).resolve()
 
 
-_TEMPORARY: list[Path] = []  # M88: the temporary directories made in this process, oldest first
-_TEMPORARY_LOCK = threading.Lock()
+#: M88: the temporary directories made in the current scope (:func:`temporary_runs`), or None outside one. A
+#: context variable, so two scopes in two threads never take each other's; the concurrency writer's workers
+#: run in a copy of their caller's context, so their runs belong to its scope.
+_SCOPE: contextvars.ContextVar[list[Path] | None] = contextvars.ContextVar("nirmaan_temporary_runs", default=None)
 
 
 def keep_run_dirs() -> bool:
@@ -370,16 +372,17 @@ def keep_run_dirs() -> bool:
 def temporary_directory(prefix: str) -> Path:
     """A new directory in the system's temporary directory, removed when the scope it was made in ends (M88)."""
     path = Path(tempfile.mkdtemp(prefix=prefix)).resolve()
-    with _TEMPORARY_LOCK:
-        _TEMPORARY.append(path)
+    scope = _SCOPE.get()
+    if scope is not None:
+        scope.append(path)
     return path
 
 
 def remove_temporary(path: Path) -> None:
     """Remove one temporary directory now, unless the debug setting keeps it (M88)."""
-    with _TEMPORARY_LOCK:
-        if path in _TEMPORARY:
-            _TEMPORARY.remove(path)
+    scope = _SCOPE.get()
+    if scope is not None and path in scope:
+        scope.remove(path)
     if not keep_run_dirs():
         shutil.rmtree(path, ignore_errors=True)
 
@@ -389,17 +392,15 @@ def temporary_runs() -> Iterator[None]:
     """Remove every temporary directory made in this block when it ends, however it ends (M88).
 
     A run's record names its log, which a seat's next attempt and VeriTriage read, so a run with no
-    ``workdir`` keeps its directory until the scope that made it ends: an eval trial, a test session. Outside
-    any such scope (a saved project's runs) nothing is removed.
+    ``workdir`` keeps its directory until the scope that made it ends: an eval trial, a test. Outside any
+    scope (a saved project's runs) nothing is removed. A scope inside another removes only its own.
     """
-    with _TEMPORARY_LOCK:
-        before = set(_TEMPORARY)
+    made: list[Path] = []
+    token = _SCOPE.set(made)
     try:
         yield
     finally:
-        with _TEMPORARY_LOCK:
-            made = [path for path in _TEMPORARY if path not in before]
-            _TEMPORARY[:] = [path for path in _TEMPORARY if path in before]
+        _SCOPE.reset(token)
         if not keep_run_dirs():
             for path in made:
                 shutil.rmtree(path, ignore_errors=True)
@@ -542,17 +543,30 @@ def _size(root: Path) -> int:
     return total
 
 
-def _file_limit() -> Callable[[], None]:
-    """What a step's process does before it starts (M88): no file it writes may grow past ``DISK_CAP``, and it
-    writes no core file (one killed at the limit would otherwise leave its memory on disk)."""
-    _, hard = resource.getrlimit(resource.RLIMIT_FSIZE)
-    cap = DISK_CAP if hard == resource.RLIM_INFINITY else min(DISK_CAP, hard)
+#: M88: how a step starts. A small launcher sets the limits and then becomes the step (``exec``, so the pid, the
+#: process group and the stop are the step's own): no file the step writes may grow past the size it is given,
+#: and it writes no core file (one killed at the limit would leave its memory on disk). A launcher rather than
+#: ``preexec_fn``, which can deadlock a child forked while other threads run. Python ignores SIGPIPE and SIGXFSZ,
+#: and an ignored signal survives ``exec``, so both are put back first.
+_LAUNCH = """\
+import os, resource, signal, sys
+cap = int(sys.argv[1])
+hard = resource.getrlimit(resource.RLIMIT_FSIZE)[1]
+resource.setrlimit(resource.RLIMIT_FSIZE, (cap if hard == resource.RLIM_INFINITY else min(cap, hard), hard))
+resource.setrlimit(resource.RLIMIT_CORE, (0, resource.getrlimit(resource.RLIMIT_CORE)[1]))
+signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+signal.signal(signal.SIGXFSZ, signal.SIG_DFL)
+try:
+    os.execvp(sys.argv[2], sys.argv[2:])
+except OSError as exc:
+    sys.stderr.write(f"{type(exc).__name__}: {exc}: {sys.argv[2]!r}\\n")
+    sys.exit(127)
+"""
 
-    def limit() -> None:
-        resource.setrlimit(resource.RLIMIT_FSIZE, (cap, hard))
-        resource.setrlimit(resource.RLIMIT_CORE, (0, resource.getrlimit(resource.RLIMIT_CORE)[1]))
 
-    return limit
+def _launch(argv: list[str]) -> list[str]:
+    """``argv`` started through the launcher, with ``DISK_CAP`` as its file size limit (M88)."""
+    return [sys.executable, "-I", "-S", "-c", _LAUNCH, str(DISK_CAP), *argv]
 
 
 @dataclass(frozen=True)
@@ -574,9 +588,9 @@ def _run_step(argv: list[str], cwd: Path, env: dict[str, str], deadline: float, 
     if remaining <= 0:
         return _Step("", None, TIMEOUT, 0)
     try:
-        proc = subprocess.Popen(argv, cwd=cwd, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                start_new_session=True, preexec_fn=_file_limit())
-    except (OSError, subprocess.SubprocessError) as exc:  # not executable, vanished mid-run
+        proc = subprocess.Popen(_launch(argv), cwd=cwd, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                start_new_session=True)
+    except OSError as exc:  # the working directory vanished mid-run
         return _Step(f"{type(exc).__name__}: {exc}\n", -1, None, 0)
     kept, printed, stopped = bytearray(), 0, None
     measure_at = time.monotonic() + DISK_CHECK_SECONDS

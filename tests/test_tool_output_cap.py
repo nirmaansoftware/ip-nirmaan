@@ -88,6 +88,23 @@ def test_a_step_that_writes_one_file_without_stopping_is_stopped(small_caps, tmp
     assert _size(tmp_path / "run") <= 4 * MB + 64 * 1024  # the file limit stops it at the cap
 
 
+@pytest.mark.skipif(shutil.which("dd") is None, reason="needs dd")
+def test_a_compiled_step_is_killed_at_the_file_limit(small_caps, tmp_path):
+    backend = Backend("capcheck", "cap.check", ("dd",), lambda job: [["dd", "if=/dev/zero", "of=big.bin", "bs=65536"]],
+                      lambda run: EdaResult(True, "claimed a pass"), required=())
+    out = execute(backend, {"workdir": str(tmp_path / "run"), "timeout": "60"})
+    assert not out.succeeded and "wrote 4 MB or more in dd" in out.summary
+    assert (tmp_path / "run" / "big.bin").stat().st_size <= 4 * MB
+
+
+def test_a_missing_executable_is_a_failed_step(small_caps, tmp_path):
+    backend = Backend("capcheck", "cap.check", (), lambda job: [["no-such-tool-m88"]],
+                      lambda run: EdaResult(run.returncode == 0, "parsed"), required=())
+    out = execute(backend, {"workdir": str(tmp_path / "run")})
+    assert not out.succeeded and out.data["exit_statuses"] != [0]
+    assert "FileNotFoundError" in Path(out.references[0]).read_text(encoding="utf-8")
+
+
 def test_a_step_that_writes_many_files_is_stopped(small_caps, tmp_path):
     code = ("import itertools, time\n"
             "for n in itertools.count():\n"
