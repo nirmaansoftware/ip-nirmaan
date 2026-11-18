@@ -231,8 +231,9 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   is taken back, and what it left in `/tmp`, `/var/tmp` and `/dev/shm` is
   removed. The hosted runner's tool cache (the Python the package is installed
   in, with its `site-packages` and console scripts), its global `node_modules`
-  (npm) and folders on `PATH` were writable by every account (the reach test
-  found both); the action takes that away. The harness code
+  (npm) and folders on `PATH` are assumed writable by every account on the
+  hosted runner (a design assumption, with no recorded run behind it yet; the
+  reach test checks it on each dispatched run); the action takes that away. The harness code
   is unchanged: the wrapper is `/opt/nirmaan-seat/bin/vvp`, first on `PATH`,
   and a tool run's own result file names it among its `executables`.
 - **The reach test** (`scripts/live_eval_reach.py`) runs in every job that runs
