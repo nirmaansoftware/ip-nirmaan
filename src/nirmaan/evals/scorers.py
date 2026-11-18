@@ -356,3 +356,66 @@ def _each_runs(ctx: ScoreContext, param: str, files: list[str], case_inputs: dic
                                          "own that fails them", tuple(passed), caught)
     return score(ScoreStatus.PASSED, f"each of {len(files)} files passed {check.tool} on the clean inputs; each of "
                                      f"{len(failed_by)} mutants fails a file of its own", tuple(passed), caught)
+
+
+# --- The object screen before a whole-flow check links seat C (G3, gate WF16) ------------------------------------
+
+#: What the screen reads of a check's inputs: C files and headers, whatever parameter names them.
+_C_SUFFIXES = (".c", ".h")
+
+
+def _screen(ctx: ScoreContext, staged: bool) -> Score | None:
+    """The object screen over the check's C (``nirmaan.evals.object_screen``): a failed check when it refuses.
+
+    The C files are the check's inputs that are C files or headers, the seat's and the case's, as the tool will
+    get them: in place for ``held-out-run``, copied into one folder under their own names for ``must-fail``, which
+    runs every input from such a staged copy. Which checks are screened is the case's data (the scorer it names),
+    never this code's. None when the screen finds nothing, or the seat gave the check no C.
+    """
+    from nirmaan.evals import object_screen
+
+    check = ctx.check
+    seat = [Path(str(a.location)) for kinds in check.seat_files.values() for a in ctx.seat_files(kinds)]
+    seat = [p for p in dict.fromkeys(seat) if p.suffix in _C_SUFFIXES]
+    case = [p for paths in check.case_files.values() for p in (resolve(ctx.repo, f) for f in paths)
+            if p.suffix in _C_SUFFIXES]
+    if not seat:
+        return None  # the scorer itself says the seat submitted no such file, or there is no seat C to screen
+    if staged and len({p.name for p in [*seat, *case]}) != len(seat) + len(case):
+        return None  # must-fail refuses two inputs that share a file name, and runs nothing
+
+    def judge(where: Path) -> Score | None:
+        sources, mine = [*seat, *case], set(seat)
+        if staged:
+            (where / "src").mkdir(parents=True)
+            copies = {p: where / "src" / p.name for p in sources}
+            for p, copy in copies.items():
+                shutil.copyfile(p, copy)
+            sources, mine = list(copies.values()), {copies[p] for p in seat}
+        hits = object_screen.screen(sources, mine, where / "screen")
+        if not hits:
+            return None
+        return Score(scorer=check.scorer, name=check.name, status=ScoreStatus.FAILED,
+                     summary=object_screen.summary(hits))
+
+    if ctx.work is not None:
+        ctx.work.mkdir(parents=True, exist_ok=True)
+        return judge(Path(tempfile.mkdtemp(prefix="object-screen-", dir=ctx.work)))
+    with tempfile.TemporaryDirectory(prefix="nirmaan-object-screen-") as where:
+        return judge(Path(where))
+
+
+def _screened(inner: Scorer, staged: bool) -> Scorer:
+    def scorer(ctx: ScoreContext) -> Score:
+        return _screen(ctx, staged) or inner(ctx)
+
+    scorer.__doc__ = (f"``{inner.__name__}`` after the object screen (gate WF16): a refusal is the check's failed "
+                      "verdict, with nothing linked or run; otherwise the inner scorer's score, unchanged.")
+    return scorer
+
+
+#: The whole-flow checks that build or link seat-written C name these (tests/test_object_screen.py holds every
+#: whole-flow case to it, and every single-seat case away from it). The scorers above are unchanged.
+SCREENED = {"screened-held-out-run": "held-out-run", "screened-must-fail": "must-fail"}
+screened_held_out_run = register_scorer("screened-held-out-run", requires_tool=True)(_screened(held_out_run, False))
+screened_must_fail = register_scorer("screened-must-fail", requires_tool=True)(_screened(must_fail, True))
