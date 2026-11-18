@@ -28,3 +28,12 @@ directories. `NIRMAAN_KEEP_RUN_DIRS=1` keeps everything, for debugging.
 **No harness change.** No file in `harness.CODE` is touched, so the default,
 attempts-3 and tools-in-loop fingerprints are unchanged; a run under every
 cap behaves as before.
+
+**Follow-up: a missing executable on another account.** The review loop's
+post-fix check runs the suite as `loopcheck`, which cannot search a folder on
+the runner's `PATH` (the runner's home). Looking up a bare name then reports
+`PermissionError`, not `FileNotFoundError` (`execvp` and `Popen` both keep the
+first error other than "not found"), so the test that named only
+`FileNotFoundError` failed there and stopped ip#339. The step failed in both
+cases; the tests now check a missing path (always `FileNotFoundError`) and a
+bare name with an unsearchable folder on `PATH` (either error, exit status 127).

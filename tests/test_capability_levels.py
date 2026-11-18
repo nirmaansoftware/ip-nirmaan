@@ -594,8 +594,31 @@ def test_trials_from_two_harnesses_are_two_groups_and_only_the_current_one_count
 
 def test_a_run_option_other_than_the_default_harness_is_stale(org, tmp_path):
     _case(tmp_path)
-    _record(org, tmp_path, [True] * 5, harness_digest=harness_sha256(attempts=3))
+    _record(org, tmp_path, [True] * 5, harness_digest=harness_sha256(attempts=1))  # the default sets 3 since H3
     assert _level(org, tmp_path)["level"] is None
+
+
+@pytest.mark.parametrize("cli", [None, "2.1.325"])
+def test_a_default_trial_from_before_h3_never_counts_in_the_new_defaults_group(org, tmp_path, monkeypatch, cli):
+    # H3 named attempts-3 the default (docs/HARNESS.md, "The default since H3"). A trial recorded on the default
+    # before the switch carries the label "default" and the old default's harness (one attempt, the case's): it
+    # is its own group, stale, and never pools with trials on the new default, whatever its count.
+    _case(tmp_path)
+    monkeypatch.setitem(harness.VARIANTS, "default", {})  # the default as it was before the switch
+    before = harness_sha256(cli=cli)
+    assert harness.fingerprint(cli=cli)["run"]["attempts"] is None
+    _record(org, tmp_path, [True] * 9, name="before", harness_digest=before, cli=cli)
+    monkeypatch.undo()
+    assert harness_sha256(cli=cli) != before and harness.fingerprint(cli=cli)["run"]["attempts"] == 3
+    _record(org, tmp_path, [True] * 5, name="after", cli=cli)
+    entry = _level(org, tmp_path)
+    groups = {g["harness"]: g for g in entry["practised"]}
+    assert set(groups) == {before, harness_sha256(cli=cli)}
+    old, new = groups[before], groups[harness_sha256(cli=cli)]
+    assert old["records"] == ["evals/results/before"] and not old["counts"]
+    assert old["reasons"] == ["stale: the harness changed after these trials (docs/HARNESS.md)"]
+    assert new["records"] == ["evals/results/after"] and new["n"] == 5 and new["counts"]
+    assert entry["level"] == "practised"
 
 
 @pytest.mark.parametrize("result, answer", [(None, None), (None, CURRENT), (CURRENT, None),

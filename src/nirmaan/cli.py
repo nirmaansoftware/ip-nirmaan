@@ -1127,17 +1127,21 @@ def eval_run(
                                          help="Trials per case (default: 5 with --runtime, 1 with --replay)."),
     seats: Optional[str] = typer.Option(None, "--seats",
                                         help="Comma-separated case groups or seat stages to run, e.g. rtl,spec."),
-    attempts: Optional[int] = typer.Option(None, "--attempts", min=1, help="Attempts when a submission is refused."),
+    attempts: Optional[int] = typer.Option(
+        None, "--attempts", min=1,
+        help="Attempts when a submission is refused (the default harness sets 3). Any other number is another "
+             "harness, so its trials never count toward an evidence level."),
     without_knowledge: bool = typer.Option(
         False, "--without-knowledge",
         help="The ablation (M67): seat packets carry no knowledge documents (the skills stay). The record is "
              "labelled knowledge: off and never counts toward an evidence level."),
     harness_name: str = typer.Option(
         "default", "--harness",
-        help="A named harness variant (M74, docs/HARNESS.md): default; attempts-3 (three attempts, a refused "
-             "one answered again with the repair text); or tools-in-loop (M75: the seat calls brokered lint, "
-             "simulation and formal during its attempt, docs/TOOLS_IN_THE_LOOP.md). A variant's record carries its "
-             "name and never counts toward an evidence level."),
+        help="A named harness variant (M74, docs/HARNESS.md): default (since H3, three attempts, a refused one "
+             "answered again with the repair text); attempts-3 (the same seat, H3's arm, kept so its records read "
+             "as they ran); or tools-in-loop (M75: the seat calls brokered lint, simulation and formal during its "
+             "attempt, docs/TOOLS_IN_THE_LOOP.md). A variant's record carries its name and never counts toward an "
+             "evidence level."),
     purpose: str = typer.Option(
         "evidence", "--purpose",
         help="evidence (the default) or calibration: a calibration record, such as a harness comparison's "
@@ -1161,7 +1165,7 @@ def eval_run(
         _fail(f"unknown harness variant {harness_name!r}; known: {', '.join(VARIANTS)}")
     if purpose not in PURPOSES:
         _fail(f"unknown purpose {purpose!r}; known: {', '.join(PURPOSES)}")
-    if attempts is not None and "attempts" in VARIANTS[harness_name]:
+    if attempts is not None and harness_name != "default" and "attempts" in VARIANTS[harness_name]:
         _fail(f"--harness {harness_name} sets the attempts; leave out --attempts")
     known = {case.id: case for case in _cases(cases, None)}  # G3: a whole-flow case runs only when named
     unknown = [c for c in case_ids or [] if c not in known]
