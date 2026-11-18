@@ -46,6 +46,7 @@ LIMIT = re.compile(r"hit your .*limit|usage limit|spend(ing)? limit", re.IGNOREC
 MAX_TRIALS = 20
 BAD_INPUT, STOPPED_LIMIT, MISMATCH, STOPPED_OTHER, UNCONFINED = 2, 3, 4, 5, 6
 #: Tools that build or run seat-written C by path, outside the seat account (gate WF17), and the seat that uses them.
+#: regmap.verify, fw.soc_test and Verilator's --binary run no seat-written host code (docs/LIVE_EVAL_EVIDENCE.md, 6).
 SEAT_C_TOOLS, SEAT_C_SEATS = ("fw.build", "fw.test"), ("firmware",)
 #: Folders hashed whole, ignored files included: the judge's code, the scripts the workflow runs, the cases.
 TREE_WHOLE = ("src", "scripts", "evals")

@@ -230,7 +230,7 @@ anyway is redacted from logs and from the uploaded record.
   is to pass the token to `nirmaan` through a file it reads and deletes, and
   hand it only to the `claude` subprocess, or to run tool steps as another
   user. Not done here; the runtime is outside this milestone's scope. Since
-  LIVE-EVAL-HARDEN (gate WF17), the live evaluation runs `vvp`, and so every
+  M89 (gate WF17), the live evaluation runs `vvp`, and so every
   cocotb test module, as another account, and a reach test in each job shows
   the token unreadable; seat C under `fw.test` still runs as the runner, so its
   live trials are refused (`docs/LIVE_EVAL_EVIDENCE.md`, section 6).

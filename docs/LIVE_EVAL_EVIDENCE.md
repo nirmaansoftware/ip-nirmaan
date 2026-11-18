@@ -230,10 +230,18 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   pipe or other non-regular file it made there is removed first), every grant
   is taken back, and what it left in `/tmp`, `/var/tmp` and `/dev/shm` is
   removed. The hosted runner's tool cache (the Python the package is installed
-  in, with its `site-packages` and console scripts), its global `node_modules`
-  (npm) and folders on `PATH` are assumed writable by every account on the
-  hosted runner (a design assumption, with no recorded run behind it yet; the
-  reach test checks it on each dispatched run); the action takes that away. The harness code
+  in, with its `site-packages` and console scripts) and its global
+  `node_modules` (npm) are writable by every account on the hosted runner.
+  Two replays of this change, before the action took that away, recorded it
+  in their reach tests: [run 44325101430](https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44325101430)
+  (`REACH NOT DENIED` on `site-packages`, the Python's `bin`, cocotb, the
+  editable install's `_editable_impl_ip_nirmaan.pth` and the `nirmaan`
+  console script) and [run 44326711465](https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44326711465)
+  (`REACH NOT DENIED` on `/usr/local/lib/node_modules/npm/bin/npm-cli.js`).
+  The action now takes other accounts' write access from both trees and from
+  every folder on `PATH`, and the reach test of
+  [run 44327170136](https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44327170136)
+  shows every one denied. The harness code
   is unchanged: the wrapper is `/opt/nirmaan-seat/bin/vvp`, first on `PATH`,
   and a tool run's own result file names it among its `executables`.
 - **The reach test** (`scripts/live_eval_reach.py`) runs in every job that runs
@@ -252,7 +260,20 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   first, so a refusal proves something. The job fails before any trial unless
   cocotb's verdict is a pass with every probe test in its results.
 - **Seat C waits.** `fw.build` and `fw.test` run the seat's C by path, not
-  through `PATH`, so the account does not reach them. `check
+  through `PATH`, so the account does not reach them.
+  Other backends build or run host code over seat files, and none of them runs
+  seat-written host code: `regmap.verify` builds a test the harness generates
+  from the seat's register map (`nirmaan.regmap.c_test`, after `validate`),
+  and the seat's RTL reaches its Verilator model only as HDL; `fw.soc_test`
+  cross-builds the seat's firmware for RV32I and runs it inside the simulated
+  PicoRV32, freestanding, with no host call (G3 record, second addendum, fact
+  8), and no case today uses it; the Verilator `--binary` simulator compiles
+  seat HDL, and every gate refuses, before it runs, HDL with a way out to
+  the host: a system task outside an allow list (so `$system`, `$fopen` and
+  `$c`), DPI, or a `` `systemc_ `` block (`eda_guard.verilog_uses`;
+  `docs/GATE_INPUTS.md`, section 2). Those runs stay with the runner account,
+  as before; if a case ever hands one of them seat-written host code, it joins
+  `SEAT_C_TOOLS` in `scripts/live_eval_ci.py`. `check
   --require-expected` and `trials` refuse a case that runs seat C (one whose
   seat is `firmware`, or whose held-out checks use `fw.build` or `fw.test`)
   with exit 6 before any trial. The `fw.test` probe lands with that
@@ -276,7 +297,18 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   checkout, runs `nirmaan eval rejudge <record> --write` on every record, and
   hashes the checkout again. Re-judging replays the recorded answers through
   the real gates, so seat code runs again there, as the seat account. Any
-  difference, a changed checkout or a failed reach test fails the job. The
+  difference, a changed checkout or a failed reach test fails the job.
+  **A reading of WF17, for security and the Founder Proxy to confirm.** The
+  council asks that "the re-judge that counts runs in a job that ran no seat
+  code". Re-judging is replaying the recorded answers through the real gates,
+  and a gate of a cocotb case runs the seat's test module, so no re-judge of
+  such a case can run no seat code at all. This change reads the gate as: the
+  job ran no seat code before the re-judge (nothing a seat wrote could have
+  changed its checkout, tools or records first), and the seat code the
+  re-judge itself runs does so as the seat account, after a reach test in that
+  job showed every probe denied, between two tree hashes of its checkout. That
+  reading is this change's, not the council's; if security or the Proxy reads
+  the gate otherwise, the `rejudge` job is where it changes. The
   re-judged records, each with its `rejudge.json`, are uploaded as
   `live-eval-rejudged-<run id>`; that is the re-judge a record is committed
   with.
