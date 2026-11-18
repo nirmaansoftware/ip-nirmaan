@@ -401,6 +401,8 @@ gate semantics or control plane, so the Founder Proxy reviews them.
   without; the named default harness only; one attempt. Two cases, so forty
   trials. The plan is committed before the first trial, with the arms
   interleaved, and is read once.
+  Amended 2026-11-19 by the third addendum: "one attempt" is removed; the
+  trials run with the attempts the named default harness sets.
 - **Code.** No runner or harness code changes until the H3 batch's last trial
   is recorded (fact 15). The runner option is then in two parts. The first
   is the one dispatch edit to `runner.py`, with the fingerprint entries: it
@@ -488,11 +490,15 @@ trials only after the default harness is named.
 | WF6 | The dispatch edit to `runner.py` merges after WF1 is met and before the pull request that names the default harness, or else only with a later change that restarts every group for another reason; the flow module may merge later; the runner option carries the true pass-through note, the per-stage record and a clean re-judge test | eda-tooling |
 | WF7 | A test shows the flow module's edit changes the whole-flow fingerprint and not the default; from the pull request that names the default harness onward, no whole-flow pull request changes the default fingerprint, shown by that test on each one | ai-engineer |
 | WF8 | The stop rule of decision 3 is shown by a test before any whole-flow trial | qa-evidence |
-| WF9 | Both cases run only in the named CI job, default harness, one attempt; the job fails on a changed checkout; the record is re-judged from a fresh checkout before the read; the credential test is recorded before the first register block trial | security |
+| WF9 | Both cases run only in the named CI job, default harness, one attempt; the job fails on a changed checkout; the record is re-judged from a fresh checkout before the read; the credential test is recorded before the first register block trial. Amended 2026-11-19 by the third addendum: "one attempt" is removed, the default's attempts apply | security |
 | WF10 | Forty trials, fixed in a committed plan before the first; never beside wave 2's first live batch; one read; no re-run counts | verification-lead |
 | WF11 | The count is stated only as k of n with its interval, per group, at ten or more planned trials complete; never pooled, never called a level; case (a) is never described as independent verification | qa-evidence |
 | WF12 | No whole-flow figure or measure name on the site, the README or the landing brief from this record; a later one needs a committed record, key 1 review and the founder's answer on the name | product-lead |
 | WF13 | The whole-flow job renames or skips no required check, adds no third-party action, pins actions by SHA, passes inputs through `env`, and the weekly scheduled run excludes whole-flow cases | eda-tooling |
+| WF20 | Added 2026-11-19 by the third addendum, which also amends WF9 ("one attempt" is removed; the default's attempts apply): the committed plan states the attempts, both expected fingerprints, the main count and the derived count word for word, before the first trial | verification-lead |
+| WF21 | Added 2026-11-19 by the third addendum: tests of the CI command (no attempts option, expected fingerprint required) and of a whole-flow stage's first-attempt prompt, and one line in `docs/HARNESS.md`, before the first trial | ai-engineer |
+| WF22 | Added 2026-11-19 by the third addendum: a test of the stop rule on three attempts, with an unanswered call inside a stage, before the first trial | qa-evidence |
+| WF23 | Added 2026-11-19 by the third addendum: what a failed run's log excerpt can carry back to a seat on a retry, stated from recorded reach tests, before the first trial of each case | security |
 
 ## Open, for the founder
 
@@ -970,3 +976,220 @@ its allow list, its fixtures and probes, and the corrected
 `docs/GATE_INTEGRITY.md` (WF16); the reach test, the other-account launch
 and the separate re-judge job in the workflow (WF17); the out-of-process
 harness (WF18); the changes to #336 and the document texts (WF14, WF19).
+
+## Third addendum (2026-11-19): attempts under the default harness named by H3
+
+This addendum amends two words of the ruling. Decision 4 and gate WF9 say
+"the named default harness only; one attempt". Since ip#347 the default
+harness gives three attempts, so the two can no longer both hold. The forty
+trials run on the default harness as it is named, three attempts for each
+seated stage, and "one attempt" is removed from decision 4 and gate WF9. One
+derived count, fixed before the first trial, is read beside the main count
+from the same records. It is a decision made on 2026-11-19. It changes no
+code, case, eval record or level. Code it needs is listed as gates. No
+whole-flow trial has run, and this addendum states no whole-flow result.
+
+### Who decided what
+
+- Three seats gave round 1 positions independently (verification-lead and
+  ai-engineer, who own decision 4's counts and its order against the default
+  harness, and qa-evidence for the claims); the chair decided. Read against
+  ip-nirmaan `main` at e5844ff. Seats were read only; no trial, design tool
+  or test ran for the meeting. The chair and two seats computed harness
+  fingerprints with the repository's own function on a read-only copy.
+- Why a meeting. The pull request that put the two cases on the CI job
+  (ip#354) runs them on the default harness and passes no attempts option.
+  Its check cites gate WF9 (`scripts/live_eval_ci.py:102-104`) while
+  enforcing only the harness name, so the merged path already departs from
+  WF9 as written. This addendum does not say ip#354 met WF9 as written.
+- This is an amendment, not a reading. No committed text says what the
+  record intended by "one attempt", and this addendum does not claim to
+  know. Either choice drops one of the record's two clauses: three attempts
+  drops "one attempt"; one attempt is, by `docs/HARNESS.md` ("any number but
+  3 is another harness"), not "the named default harness only".
+- As for the ruling: the council decided; it is not a founder decision, and
+  the founder can overrule it. No seat found anything reserved for the
+  founder.
+
+### Facts checked
+
+The chair checked each line below at e5844ff unless a seat is named.
+
+1. The words. Decision 4, "Counts" (lines 400 to 403) and gate WF9 (line
+   493) each name the default harness and one attempt as separate items.
+   Decision 4, "Trials" (line 420 on) makes the trials wait for the pull
+   request that names the default harness. The record's fact 5 notes that a
+   variant may set `attempts`, and its dissent list leaves "single-seat runs
+   with several attempts" undecided (line 469). The record says nothing on a
+   named default with more than one attempt.
+2. Then and now. At b5b7967, the commit the record was read against,
+   `VARIANTS["default"]` was empty, so a default run gave a seat the case's
+   attempts, one (qa-evidence, from `git show`). ip#347 merged on 2026-11-18
+   (01adfe9): `VARIANTS["default"]` sets attempts 3
+   (`src/nirmaan/runtime/harness.py:176-180`), with the repair text and an
+   excerpt of the failed run's log after a refusal
+   (`src/nirmaan/runtime/prompt.py:294-320`).
+3. The flow runner gives the run's attempts to every seated stage
+   (`src/nirmaan/evals/flow.py:159, 192`). The record keeps each stage's
+   attempts used (`flow.py:216`) and every raw answer in order; the trial's
+   `attempts` is the largest of its stages (`flow.py:239-241`). The held-out
+   judge runs after the stage loop (`flow.py:226-229`), so no retry follows a
+   held-out check (qa-evidence).
+4. Fingerprints, whole flow, Claude Code 2.1.325, computed by the chair and
+   recomputed by ai-engineer and qa-evidence. Default (three attempts): with
+   documents
+   `sha256:d90b3c1840870ae9434b90188dbb3078473140d56b2dec9e295c515c1832adfc`,
+   without
+   `sha256:8d6590f7a66ac771abf360790643763e8c43d3c267d94a5145f1e4c8bf3ae975`.
+   With `--attempts 1`: with documents
+   `sha256:d6723621041af1fcb2f7166ff70ee6739cbec61852dd509cc5401cb7e9da1ca5`,
+   without
+   `sha256:7d5ea9b54caf09a2617b28e1ae6ae6b7e73943e376db6383cee14e0138b07fe6`.
+   The single-seat default is
+   `sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00`
+   under either choice. These are today's values; the plan recomputes them on
+   the commit the trials run.
+5. Labels. An `--attempts 1` run keeps `harness_variant: default`
+   (`src/nirmaan/evals/records.py:367-374`), so only its fingerprint would
+   say it ran one attempt. Whole-flow trials group by case digest, model,
+   harness fingerprint, CLI, flow digest and purpose
+   (`src/nirmaan/evals/levels.py:201-232`), state a count only from ten
+   trials (`WHOLE_FLOW_MIN`), and never count toward a level.
+6. The CI path. `scripts/live_eval_ci.py:102-104` refuses a whole-flow case
+   on any harness but `default` and any trial count but one; lines 172 and
+   183 to 189 pass no attempts option; `.github/workflows/live-eval.yml` has
+   no attempts input. Neither file is in `harness.CODE`.
+7. The stop rule. `flow_stopped` reads the last recorded answer
+   (`src/nirmaan/evals/records.py:210-216`). Its test builds trials by hand
+   (`tests/test_whole_flow_runner.py:218-221`). What a model call with no
+   answer does in the middle of a stage that has attempts left is read from
+   the code by qa-evidence (declined, not retried), not shown by a test.
+8. Prompts. That the default's first attempt is the old default's prompt,
+   prompt for prompt, is tested for a single seat (`tests/test_harness.py`).
+   No test shows it for a stage of a whole flow.
+9. Not checked from the repository. The state of wave 2's first live batch is
+   in private plans; only its fingerprint (fact 4, the single-seat default)
+   is confirmed. The H3 figures in `docs/HARNESS.md` are that document's
+   statement; the frontier records are private. `evals/results` holds no
+   whole-flow record.
+
+### Decision 1: the default harness as named; "one attempt" is removed
+
+1. Decision 4, "Counts", now reads: ten trials per case per arm; two arms,
+   with documents and without; the named default harness only, with the
+   attempts that default sets, today three for each seated stage. Gate WF9
+   now reads "default harness, with the default's attempts" where it said
+   "default harness, one attempt". Nothing else in either changes: forty
+   trials, one committed plan, arms interleaved, one read.
+2. No whole-flow trial of the forty runs with an attempts option. The
+   dispatch expects the whole-flow default fingerprints (fact 4, recomputed
+   on the trials' commit and CLI pin).
+3. No split. Twenty trials on each attempts setting would leave five per
+   case per arm, under the ten at which decision 1 of the ruling allows a
+   count. All three seats opposed a split.
+4. The measured run. Decision 10 of the retrospective asks a wave with long
+   tool runs to measure one real run first. One whole-flow run of the timer
+   case, purpose calibration, on the same fingerprint, is that run. It is
+   outside the forty, groups apart by its purpose, never counts, and is not
+   stated as a result. It runs after the plan of gate WF10 is committed and
+   after wave 2's first live batch is read.
+
+Why. The record made the trials wait for the named default and on it only;
+that harness is what the product now runs and what wave 2's per-skill
+evidence runs on, so a stage's seat in a whole flow has the settings, code
+and attempts of the seat in that evidence, and the flow is the one thing
+that differs. On one attempt two things would differ, no per-skill evidence
+would exist on that setting, and the CI path would need an option that makes
+the trials another harness. The three-attempt record also holds what a
+one-attempt run would have needed at each stage (decision 2); a one-attempt
+record cannot be read the other way. No trial has run, so this changes no
+rule between a run and its read (ruling of 2026-11-15).
+
+What it costs, stated plainly. A trial may now make more model calls and run
+longer, so it is more exposed to an interruption, and an interrupted trial
+stays a failed trial of its group (decision 11). The main count measures
+completion with up to two repairs per stage after a machine refusal, not a
+first answer. H3's evidence for the default is weak by its own account
+(`docs/HARNESS.md`), and it measured single seats only.
+
+### Decision 2: one derived count, fixed before the first trial
+
+1. Definition. For each group, j of n: the trials that passed and in which
+   every stage records one attempt. n is the group's planned count, the same
+   n as the main count k of n. It is read from each stage's recorded
+   attempts, at the same single read, and the read lists each stage's
+   attempts for every trial.
+2. Its name in the repository's records: "passed with every stage on its
+   first attempt". It is a description of trials on the default
+   fingerprint.
+3. It is reported only if the committed plan (gate WF10) holds this
+   definition word for word before the first trial. It changes no main
+   figure, makes no group, arm or second read, and never enters a level.
+
+### Decision 3: what may and may not be claimed
+
+May be claimed: that this addendum amends decision 4 and gate WF9; the
+fingerprints of fact 4 as computed; the two counts as defined, per group.
+
+Never claimed, here or in the plan, the records or the read:
+
+- what the record "meant" by one attempt;
+- that the derived count is a result on a one-attempt harness: no trial on
+  that fingerprint exists. Unless the test of gate WF21 shows the two
+  first-attempt prompts the same, no sentence says such a trial took the
+  path a one-attempt trial takes;
+- a comparison of either count with the single-seat trials of the record's
+  fact 14 (one attempt, the old default, fixed upstream stages, stale
+  groups), or with wave 2's per-skill evidence as the same measure. The
+  counts are never pooled and never a level (gate WF11);
+- that retries help a whole flow: k against j at ten is no test of that; nor
+  any per-stage rate pooled across cases or arms;
+- H3's frontier figures as a committed record;
+- any time, usage or cost figure;
+- that forty trials can run today. The register block flow stays refused
+  until its own gates are met.
+
+### Positions not adopted, and open
+
+No seat dissented from the ruling: all three chose the default harness as
+named, with one derived count fixed in advance, and all three called it an
+amendment. Differences, and how the chair chose:
+
+- verification-lead read "named default" as the governing clause and "one
+  attempt" as a description of the default of its day. qa-evidence held that
+  no committed text supports any statement of intent. The chair sided with
+  qa-evidence: the addendum amends and claims no intent.
+- The wording of the derived count: "no stage refused" (qa-evidence), trial
+  attempts equal to one (ai-engineer), every stage on its first attempt
+  (verification-lead). The chair defined it by the recorded field (every
+  stage records one attempt), which is the same set under all three.
+- verification-lead: no timer trial before the register block flow can run,
+  unless "one read" is amended per case. Not decided here: it is outside
+  this meeting's question. Decision 4's one read of forty stands, and
+  starting or reading the timer's twenty alone needs its own ruling before
+  the plan is committed. Recorded as verification-lead's standing
+  condition.
+- Open, for security (not seated at this meeting): on a retry, an excerpt of
+  the failed run's log returns to the seat, which one attempt did not do.
+  For the register block that log comes from seat-written C, which today
+  runs as the runner's account (`evals/flow/credential_test_record.json`).
+  Gate WF23 puts the question to its owner.
+
+### Gates
+
+Each is met before the first whole-flow trial unless it says otherwise.
+
+| Gate | Condition | Owner seat |
+|---|---|---|
+| WF9 (amended) | As before, with "default harness, with the default's attempts" for "default harness, one attempt" | security |
+| WF20 | The committed plan of gate WF10 states: the default harness and its attempts for each seated stage; both expected fingerprints, recomputed on the trials' commit and CLI pin; the main count; the derived count of decision 2 word for word, and that it changes no main figure; the measured run of decision 1, item 4. A derived count not in the plan before the first trial is never reported | verification-lead |
+| WF21 | Tests show that the whole-flow CI command carries no attempts option and that a whole-flow dispatch with no expected fingerprint is refused; a test shows whether a whole-flow stage's first-attempt prompt is the same on one attempt and on three, and the texts follow its result (decision 3); `docs/HARNESS.md` says the default gives each seated stage of a whole flow three attempts. None touches a file in `harness.CODE` | ai-engineer |
+| WF22 | With gate WF8: a test on three attempts in which a stage's second model call returns no answer shows what the runner does and that the stop rule fires. If it shows a trial can pass with an unanswered call inside it, that returns to the council before the first trial | qa-evidence |
+| WF23 | Security states, from recorded reach tests, what a failed run's log excerpt can carry back to a seat on a retry: for the timer flow before the first trial; for the register block flow with gates WF17 to WF19, before its first trial | security |
+
+Code these gates need, for the build lane (this meeting wrote none): the
+tests of WF21 and WF22 and the one line in `docs/HARNESS.md`. No attempts option is added anywhere. If the test of
+WF21 finds that a whole-flow dispatch can run with no expected fingerprint
+(not checked by this meeting), that refusal is added to
+`scripts/live_eval_ci.py`, which is outside `harness.CODE`. No harness file
+changes, so no fingerprint changes. The plan of WF20 is a document.
