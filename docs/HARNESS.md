@@ -184,8 +184,19 @@ So `attempts-3` is the default harness from this change. Plainly:
 
 The frontier cases are private (decision 5, gate RT8): this file cites their
 pass counts only, never a case's text or records. The pilot-case records are
-public, labelled calibration, and never count toward a level: ip#332, #333,
-#338, #340, #341 and #344.
+public, labelled calibration, and never count toward a level: they are the
+`evals/results/*-claude-code-claude-opus-5-5-calibration*` records on main
+(the plain, `-harness-attempts-3` and `-harness-tools-in-loop` directories,
+dated 2026-11-15 to 2026-11-18).
+
+Pre-registration evidence (council record 2026-11-14, decision 31). The H3
+plan stays private, so only its fingerprint is committed. The rule above was
+fixed before the first trial: the sha256 of the plan file version that held
+the rule word for word is
+`3ec7b9f1ac4ace38cfab8ad4f037cd591265f0ea547a4af464a6872dd3721af9`. That
+version was committed to the private backup on 2026-11-15T16:26Z (UTC) and the
+first trial started at 2026-11-15T20:49Z, 4 hours 23 minutes later. Only the
+hash and the two times are published here, never the plan text.
 
 What changed, and what each name means now:
 
