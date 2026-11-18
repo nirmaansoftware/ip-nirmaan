@@ -1,7 +1,8 @@
 # Whole-flow cases (G3, M87)
 
 Source: `council/records/2026-11-17-g3-whole-flow-cases.md` (gates WF1 to
-WF19, with its two addenda of 2026-11-18), which applies decision 6 of the pilot retrospective
+WF19, with its two addenda of 2026-11-18), which applies decision 6 of the
+pilot retrospective
 (`council/records/2026-11-14-pilot-retrospective.md`). A whole-flow trial puts
 a request in, seats every work stage with the model, and judges only the final
 block. It credits no skill and no level.
@@ -143,7 +144,8 @@ shown by the harness's construction, which the reach guard pins (gate WF14,
 below), and by the judge controls' run together, not by the run alone. But the
 HAL is not all a driver test can reach, so the register block has a strict
 fixture driver test and a strict fixture driver after all (the record's second
-addendum of 2026-11-18, gate WF15, below). `nirmaan_irq_wait(seen, cycles)` (`nirmaan_irq.h`) lets cycles pass,
+addendum of 2026-11-18, gate WF15, below).
+`nirmaan_irq_wait(seen, cycles)` (`nirmaan_irq.h`) lets cycles pass,
 and the harness ends a run at 5000000 cycles. A test that spends cycles near
 that limit fails the slower RTL, never the reference, which answers in the
 fewest cycles the document allows; so the limit cannot make a test that fails
@@ -200,8 +202,8 @@ What they show:
   the wrong map header under the map's name, the three wrong drivers, and the
   reference driver on `wstrb_ignored` and `okay_unmapped`;
 - the conforming RTL (`axi4_lite_regs_lat2.v`) passes the checks that run on
-  the flow's RTL (1 and 2; check 5 waits for the runner), and the held-out
-  test passes on it;
+  the flow's RTL (1 and 2; check 5 runs on it only in the strict driver's
+  control, below), and the held-out test passes on it;
 - the range-accepting reference tests pass on both RTLs, and the testbench
   written to the variant's one choice fails check 3 on the reference RTL;
 - `fw.test` works under the must-fail scorer (check 7: the clean run passes
