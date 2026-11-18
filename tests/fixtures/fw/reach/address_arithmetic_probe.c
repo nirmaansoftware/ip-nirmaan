@@ -7,8 +7,9 @@
  * tests/test_object_screen.py runs under fw.test, in CI only. It names only what
  * the screen allows (the harness's functions and snprintf) and holds no asm, no
  * constructor and no definition of another's name, so the screen passes it. It
- * starts from code addresses a test is given or may name: hal->read32 and
- * hal->write32 (the harness's bus functions) and the harness's own functions.
+ * starts from the two code addresses every test is given: hal->read32 and
+ * hal->write32 (the harness's bus functions; it takes the address of no
+ * external name, which would add a reference to the GOT to its object).
  * On x86-64 it reads their machine code as bytes and decodes the data they
  * address relative to the instruction pointer, and the functions they call
  * (a call target is taken only when two call sites agree, a data page only when
@@ -184,10 +185,6 @@ static void probe(const nirmaan_hal *hal) {
 
     add_func((uintptr_t)hal->read32);
     add_func((uintptr_t)hal->write32);
-    add_func((uintptr_t)&nirmaan_test_result);
-    add_func((uintptr_t)&nirmaan_irq_wait);
-    add_func((uintptr_t)&nirmaan_irq_count);
-    add_func((uintptr_t)&nirmaan_bus_fault_count);
     f0 = n_funcs;
     for (i = 0; i < f0; ++i) decode(funcs[i], 1);
     for (i = 0; i < n_calls; ++i) {  /* a callee two sites agree on, near the harness's own functions */

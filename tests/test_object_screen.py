@@ -225,34 +225,41 @@ def test_the_allow_list_is_the_recorded_runs():
 # --- On the CI toolchain (tools) -------------------------------------------------------------------------------
 
 
-def _group_screen(files: list[Path], work: Path) -> list[Hit]:
-    include: tuple[str, ...] = (str(FW / "axi4_lite"),)
-    if files and files[0].parent.name == "apb_csr":
-        generated = work / "regmap"
-        generated.mkdir(parents=True)
-        (generated / "apb_csr_map.h").write_text(
-            lower(load_map(REPO / "tests" / "fixtures" / "rtl" / "apb_csr" / "register_map.json"), "c-header"),
-            encoding="utf-8")
-        include = (str(generated),)
-    return screen(files, set(files), work / "screen", include=include)
+def _include(group: str, work: Path) -> tuple[str, ...]:
+    """The include folders a group's files are built with: the driver headers, or the generated map header."""
+    if group != "apb_csr":
+        return (str(FW / "axi4_lite"),)
+    generated = work / "regmap"
+    generated.mkdir(parents=True, exist_ok=True)
+    (generated / "apb_csr_map.h").write_text(
+        lower(load_map(REPO / "tests" / "fixtures" / "rtl" / "apb_csr" / "register_map.json"), "c-header"),
+        encoding="utf-8")
+    return (str(generated),)
 
 
 @LINUX
 @needs("cc")
 @pytest.mark.parametrize("group", sorted(BASIS))
 def test_the_basis_passes_and_its_symbols_are_recorded(group, tmp_path, capsys):
-    """The allow list's source: each group's undefined and defined names, from the screen's own compile."""
-    files = BASIS[group]
-    hits = _group_screen(files, tmp_path)
-    symbols = {}
-    objects = sorted((tmp_path / "screen" / "obj").glob("*.o"), key=lambda p: int(p.name.split("_")[0]))
-    for f, obj in zip(files, objects):
-        table = object_screen.read_object(obj, tmp_path)
-        symbols[_rel(f)] = {"undefined": sorted(table.undefined | table.weak_undefined),
-                            "defined": sorted(table.defined)}
+    """The allow list's source: each file's undefined and defined names, from the screen's own compile. Each file
+    is then screened as a seat's would be, with the driver interface its group defines (a group holds alternative
+    drivers and tests, which are never linked all together)."""
+    files, include = BASIS[group], _include(group, tmp_path)
+    symbols, tables = {}, {}
+    for n, f in enumerate(files):
+        where = tmp_path / f"read-{n}"
+        screen([f], {f}, where, include=include, allowed=frozenset())  # builds the object; the verdict is below
+        objects = list((where / "obj").glob("*.o"))
+        assert len(objects) == 1, f"{_rel(f)} did not build"
+        tables[f] = object_screen.read_object(objects[0], where)
+        symbols[_rel(f)] = {"undefined": sorted(tables[f].undefined | tables[f].weak_undefined),
+                            "defined": sorted(tables[f].defined)}
     with capsys.disabled():
         print(f"\nOBJECT-SCREEN-SYMBOLS {json.dumps({'group': group, 'symbols': symbols}, sort_keys=True)}")
-    assert not hits, [h.text() for h in hits]
+    interface = frozenset(s for t in tables.values() for s in t.defined) - {"nirmaan_fw_test"}
+    for n, f in enumerate(files):
+        hits = screen([f], {f}, tmp_path / f"screen-{n}", include=include, allowed=object_screen.ALLOWED | interface)
+        assert not hits, [h.text() for h in hits]
     record = _record()
     if record is not None:
         assert {k: record["symbols"][k] for k in symbols} == symbols

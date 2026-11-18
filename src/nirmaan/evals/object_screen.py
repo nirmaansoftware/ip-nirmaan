@@ -56,7 +56,7 @@ HARNESS_CALLS = frozenset({
 
 #: The C library names the committed fixtures, reference answers and held-out tests leave undefined, compiled
 #: by ``fw.test``'s own compile on the CI toolchain (ubuntu-24.04): ``evals/flow/object_screen_record.json``.
-LIBRARY_CALLS = frozenset({"__stack_chk_fail", "memcpy", "memset", "snprintf"})
+LIBRARY_CALLS = frozenset({"__stack_chk_fail", "snprintf"})
 
 #: Every name a seat's object may leave undefined, beyond what another object of the same check defines.
 ALLOWED = HARNESS_CALLS | LIBRARY_CALLS
