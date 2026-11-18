@@ -261,7 +261,8 @@ def test_every_flow_requirements_document_has_a_current_check_record_by_another_
 
 def test_the_check_record_rule_refuses_a_stale_or_self_checked_record():
     """The rule works before any record lands: a record built here (never written to disk) holds, and editing the
-    document, naming the writer as the checker, dropping a tag or disagreeing with citations.json each fail it."""
+    document, naming the writer as the checker, dropping a tag, disagreeing with citations.json either way (a not judged
+    tag given evidence, a cited tag marked unjudged), unreadable evidence or a result that does not hold each fail it."""
     doc = "evals/flow/axil_timer/requirements.md"
     citations = json.loads((FLOW / "axil_timer" / "citations.json").read_text(encoding="utf-8"))
     tags = re.findall(r"\[req:([A-Z0-9-]+)\]", (ROOT / doc).read_text(encoding="utf-8"))
@@ -279,6 +280,8 @@ def test_the_check_record_rule_refuses_a_stale_or_self_checked_record():
         dict(good, evidence=good["evidence"][1:]),
         dict(good, evidence=[dict(e, evidence="tests/fixtures/rtl/axil_timer/axil_timer_tb.v:281")
                              for e in good["evidence"]]),
+        dict(good, evidence=[dict(e, evidence="unjudged" if e["tag"] == "TMR-ORDER" else e["evidence"])
+                             for e in good["evidence"]]),  # a tag a check cites, marked unjudged
         dict(good, evidence=[dict(good["evidence"][0], evidence="axil_timer_tb.v line 281"), *good["evidence"][1:]]),
         dict(good, result="does not hold"),
     ]
