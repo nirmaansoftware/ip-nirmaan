@@ -39,6 +39,16 @@ replays through the real gates and scorers with no model call, run in CI
 `evals/flow/controls_record.json`. They confirm by a run that `b_before_w` is
 not visible through the HAL and that no driver test can see latency.
 
+**The timer document fixed, and the check record rule (follow-up).** An
+independent check found that `evals/flow/axil_timer/requirements.md` claimed
+tags its checks do not reach and left rules open (readiness one way only, the
+response edge, the read value, `COUNT` after a stop and on a `CTRL` write at a
+count end). The document now states each rule exactly as the reference RTL
+does, splits every partly reached rule, and lists the unreached parts as not
+judged. Each flow requirements document gets a check record by another
+session (`requirements_check.json`), held by a test; both documents wait for
+theirs.
+
 **The runner option.** Part 4a, the dispatch edit to `runner.py` and the
 fingerprint entries, merged in the window after the H3 batch. With it, a
 `runtime/context.py` and `runtime/prompt.py` change gives a customer document
