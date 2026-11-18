@@ -688,6 +688,15 @@ composite_key1:
       content:
         - pattern: '\b(require_irq|require_bus_error_trap|text_bytes)\b|\bfw\.[a-z_]+'
           example: 'params=(("require_irq", "yes"),)'
+    - seat: ai-engineer
+      paths:
+        - src/nirmaan/runtime/harness.py
+        - docs/HARNESS.md
+        - tests/test_harness.py
+      content:
+        - pattern: '"--(harness|attempts|review-rounds)"|\bharness_name\b'
+          in: [src/nirmaan/cli.py, scripts/live_eval_ci.py]
+          example: '"default", "--harness",'
     - seat: site-engineer
       teams: [product-site]
     - seat: brand-content

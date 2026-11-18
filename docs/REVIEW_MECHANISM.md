@@ -250,7 +250,12 @@ trigger matches (team, path, changed-line content, or a line range such as the
 `physical-design` job in `ci.yml`), and of the `always` seats
 (legal-compliance). A member loads by trigger, not by membership: a
 firmware-only change no longer carries the DFT list, and a DFT bound changed in
-`src/nirmaan/company/workflows.py` now does. A selected checklist missing on
+`src/nirmaan/company/workflows.py` now does. The ai-engineer
+checklist loads when a pull request touches the default-harness surface
+(`src/nirmaan/runtime/harness.py`, `docs/HARNESS.md`, `tests/test_harness.py`,
+or the `--harness`, `--attempts` and `--review-rounds` flags in `src/nirmaan/cli.py`
+and `scripts/live_eval_ci.py`), because that seat owns the default harness and
+gate RT4 (council record 2026-11-14, decision 4). A selected checklist missing on
 `main` defers the review. The prompt puts the fixed text first (base
 checklist, seat file, loaded checklists, verdict rules) and the rules with the
 head's facts and fence marker last. The verdict adds one entry per loaded
