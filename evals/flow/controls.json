@@ -365,7 +365,7 @@
     {
       "id": "driver-reference",
       "case": "flow/axi4-lite-regs-driver",
-      "what": "The reference driver and driver test, upstream the reference RTL: it builds alone; the held-out test passes on the reference RTL and on the conforming RTL and fails on wstrb_ignored and okay_unmapped; fw.test works under the must-fail scorer (check 7: clean pass, wstrb_ignored and okay_unmapped caught); the reference driver test passes on both RTLs with the same bus transcript, so no driver test can see latency through the HAL.",
+      "what": "The reference driver and driver test, upstream the reference RTL: it builds alone; the held-out test passes on the reference RTL and on the conforming RTL and fails on wstrb_ignored and okay_unmapped; fw.test works under the must-fail scorer (check 7: clean pass, wstrb_ignored and okay_unmapped caught); the reference driver test passes on both RTLs with the same bus transfers. That shows one test. That no driver test can be strict about latency through read32 and write32 on this block is shown by the harness's construction (tests/test_nirmaan_firmware_reach.py, gate WF14) and this run together, not by the run alone; the harness's cycle limit can fail only the slower RTL, never the reference.",
       "seat": [
         {
           "path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_map.h",
@@ -452,6 +452,72 @@
           "rtl": "tests/fixtures/rtl/axi4_lite/variants/axi4_lite_regs_lat2.v",
           "expect": "passed",
           "transcript": "ref"
+        }
+      ]
+    },
+    {
+      "id": "driver-wait-probe",
+      "case": "flow/axi4-lite-regs-driver",
+      "what": "The wait probe (gate WF14): a driver test that calls nirmaan_irq_wait, the one clock a driver test can advance, between transfers, with the reference driver. An attempt to see latency that does not: it passes on the reference RTL and on the conforming RTL with the same bus transfers.",
+      "seat": [
+        {
+          "path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_map.h",
+          "kind": "driver",
+          "as": "axi4_lite_regs_map.h"
+        },
+        {
+          "path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_drv.h",
+          "kind": "driver"
+        },
+        {
+          "path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_drv.c",
+          "kind": "driver",
+          "as": "axi4_lite_regs_drv.c"
+        },
+        {
+          "path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_test_wait_probe.c",
+          "kind": "driver_test",
+          "as": "axi4_lite_regs_test.c"
+        }
+      ],
+      "checks": [
+        {
+          "inline": {
+            "name": "The seat's driver and driver test pass on this RTL",
+            "scorer": "held-out-run",
+            "tool": "fw.test",
+            "seat_files": {
+              "sources": [
+                "driver",
+                "driver_test"
+              ]
+            },
+            "params": {
+              "top": "axi4_lite_regs"
+            }
+          },
+          "rtl": "tests/fixtures/rtl/axi4_lite/axi4_lite_regs.v",
+          "expect": "passed",
+          "transcript": "probe"
+        },
+        {
+          "inline": {
+            "name": "The seat's driver and driver test pass on this RTL",
+            "scorer": "held-out-run",
+            "tool": "fw.test",
+            "seat_files": {
+              "sources": [
+                "driver",
+                "driver_test"
+              ]
+            },
+            "params": {
+              "top": "axi4_lite_regs"
+            }
+          },
+          "rtl": "tests/fixtures/rtl/axi4_lite/variants/axi4_lite_regs_lat2.v",
+          "expect": "passed",
+          "transcript": "probe"
         }
       ]
     },

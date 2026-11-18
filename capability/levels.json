@@ -57,6 +57,34 @@
       "trial": 1
     },
     {
+      "case": "rtl/apb-regs",
+      "passed": true,
+      "reason": "calibration (labelled in the run manifest and the trial): never counts toward a level",
+      "record": "evals/results/2026-11-16-claude-code-claude-opus-5-5-calibration-harness-attempts-3",
+      "trial": 1
+    },
+    {
+      "case": "rtl/axi4-lite-regs",
+      "passed": true,
+      "reason": "calibration (labelled in the run manifest and the trial): never counts toward a level",
+      "record": "evals/results/2026-11-16-claude-code-claude-opus-5-5-calibration-harness-attempts-3-2",
+      "trial": 1
+    },
+    {
+      "case": "rtl/apb-regs",
+      "passed": true,
+      "reason": "calibration (labelled in the run manifest and the trial): never counts toward a level",
+      "record": "evals/results/2026-11-16-claude-code-claude-opus-5-5-calibration-harness-tools-in-loop",
+      "trial": 1
+    },
+    {
+      "case": "rtl/axi4-lite-regs",
+      "passed": true,
+      "reason": "calibration (labelled in the run manifest and the trial): never counts toward a level",
+      "record": "evals/results/2026-11-16-claude-code-claude-opus-5-5-calibration-harness-tools-in-loop-2",
+      "trial": 1
+    },
+    {
       "case": "rtl/skid-buffer",
       "passed": true,
       "reason": "calibration (labelled in the run manifest and the trial): never counts toward a level",

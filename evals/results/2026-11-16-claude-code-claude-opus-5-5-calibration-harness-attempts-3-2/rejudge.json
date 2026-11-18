@@ -1,0 +1,13 @@
+{
+  "format": "nirmaan.eval-rejudge",
+  "record": "2026-11-16-claude-code-claude-opus-5-5-calibration-harness-attempts-3-2",
+  "nirmaan_version": "1.25.0",
+  "trials": [
+    {
+      "case": "rtl/axi4-lite-regs",
+      "trial": 1,
+      "same": true,
+      "differences": []
+    }
+  ]
+}
