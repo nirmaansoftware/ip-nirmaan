@@ -44,6 +44,46 @@
       ]
     }
   },
+  "reference": [
+    {
+      "path": "tests/fixtures/rtl/axi4_lite/requirements_spec.md",
+      "kind": "requirements_spec"
+    },
+    {
+      "path": "tests/fixtures/rtl/axi4_lite/interface_spec.md",
+      "kind": "interface_spec"
+    },
+    {
+      "path": "tests/fixtures/rtl/axi4_lite/microarchitecture.md",
+      "kind": "microarchitecture_spec"
+    },
+    {
+      "path": "tests/fixtures/rtl/axi4_lite/axi4_lite_regs.v",
+      "kind": "rtl_source",
+      "entry": "axi4_lite_regs"
+    },
+    {
+      "path": "tests/fixtures/rtl/axi4_lite/axi4_lite_regs_tb.v",
+      "kind": "testbench",
+      "entry": "axi4_lite_regs_tb"
+    },
+    {
+      "path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_map.h",
+      "kind": "driver"
+    },
+    {
+      "path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_drv.h",
+      "kind": "driver"
+    },
+    {
+      "path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_drv.c",
+      "kind": "driver"
+    },
+    {
+      "path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_test.c",
+      "kind": "driver_test"
+    }
+  ],
   "held_out": [
     {
       "name": "1. The reference testbench passes on the flow's RTL",
