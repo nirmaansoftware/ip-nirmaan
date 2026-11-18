@@ -1792,3 +1792,27 @@ def test_the_shard_manifest_is_not_written_through_a_planted_symlink(tmp_path):
     done = subprocess.run([sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", "--shard", "1/1",
                            "--shard-manifest", str(manifest), "tests"], cwd=tmp_path, capture_output=True, text=True)
     assert done.returncode == 0 and json.loads(manifest.read_text(encoding="utf-8"))
+
+
+def test_tail_keeps_the_first_failures_e_lines_and_the_failed_summary():
+    out = "\n".join([
+        "______ test_a ______", "def test_a():", ">   assert f() == 1", "E   AssertionError: bad value",
+        "E   assert 2 == 1", "tests/t.py:222: AssertionError",
+        "______ test_b ______", "E   RuntimeError: second", "tests/t.py:9: RuntimeError",
+        "=== short test summary info ===",
+        "FAILED tests/t.py::test_a - AssertionError: bad value",
+        "FAILED tests/t.py::test_b - RuntimeError: second",
+        "== 2 failed in 1s ==",
+    ])
+    got = pr_loop._tail(out)
+    assert "E   AssertionError: bad value" in got and "E   assert 2 == 1" in got
+    assert "FAILED tests/t.py::test_a - AssertionError: bad value" in got
+    assert "second" in got  # the summary line of the second failure
+    assert "E   RuntimeError: second" not in got.split(" / FAILED")[0]  # only the first failure's E lines
+    assert got.endswith("== 2 failed in 1s ==")
+
+
+def test_tail_stays_bounded_and_plain_output_is_unchanged():
+    assert pr_loop._tail("a\nb\nc") == "a / b / c"
+    big = "\n".join(["E   " + "x" * 5000] * 100 + ["FAILED t.py::t - " + "y" * 5000] * 100)
+    assert len(pr_loop._tail(big)) < 20 * 304 + 10 * 304 + 500
