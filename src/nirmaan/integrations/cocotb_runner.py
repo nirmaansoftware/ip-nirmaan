@@ -28,7 +28,7 @@ import shutil
 import sys
 from pathlib import Path
 
-from nirmaan.integrations.eda import TESTBENCH_ONLY, Backend, Job, RunRecord, register_backend
+from nirmaan.integrations.eda import TESTBENCH_ONLY, Backend, Job, RunRecord, read_output, register_backend
 from nirmaan.integrations.eda_parsers import EdaResult, parse_cocotb
 from nirmaan.models import list_values, text_value
 
@@ -108,8 +108,7 @@ def _cocotb(job: Job) -> list[list[str]]:
 def _cocotb_parse(run: RunRecord) -> EdaResult:
     """cocotb's verdict; its results file is one of the run's outputs (M44), kept beside the log."""
     results = run.workdir / RESULTS
-    result = parse_cocotb(run.log, run.returncodes,
-                          results.read_text(encoding="utf-8", errors="replace") if results.is_file() else None)
+    result = parse_cocotb(run.log, run.returncodes, read_output(results))  # M88: bounded
     if results.is_file():
         result.metrics["outputs"] = {"results": str(results)}
     return result

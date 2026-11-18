@@ -140,6 +140,7 @@ new number. M1 to M42 are taken; see `docs/history/README.md`.
 | M85 | Gate reads: a seat's setup (an SBY `[files]` entry, a Yosys read, include folder or `-libdir`, an eqy read) names only files inside its run's folder or given to the run, so no file of the host reaches a log or a seat (security, the M84 follow-up) | reserved |
 | M86 | Failures feed the curriculum: every model-labelled failed live trial is answered by a knowledge note, a must-fail case or a written reason, checked by `scripts/failure_curriculum.py` (G5) | reserved |
 | M87 | Whole-flow cases, the label and the list: `flow: whole` on the case, manifest and trial; a whole-flow trial credits no skill and is listed under `whole_flow`, its count written only from 10 trials (G3, council record 2026-11-17) | reserved |
+| M88 | Bounded tool runs: every EDA run's printed output, the files it reads back and its own directory have a byte cap, a record keeps a head and tail of the diagnostics, and temporary run directories and eval sandboxes are removed when the trial or test that made them ends (the H3 trial that filled the disk) | reserved |
 
 <!-- review:milestone-numbers:end -->
 
