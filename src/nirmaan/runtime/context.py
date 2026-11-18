@@ -225,13 +225,15 @@ def _artifact(art, trusted: bool | None = None, content: bool = False) -> Artifa
 
 #: G3 (council record 2026-11-17, decision 2): a document the customer gives with the request, for one task. The
 #: platform records it as task memory ``document.<name>`` = ``<sha256 digest> <path>`` (a whole-flow case's fixed
-#: requirements, given to the requirements stage); the seat sees it as an approved upstream file, read whole only
-#: while its bytes match. Nothing a seat answers writes memory, the CLI writes only ``input.`` keys, and no
+#: requirements, given to the requirements stage); the seat sees it as an upstream file marked as customer input,
+#: read whole only while its bytes match. Nothing a seat answers writes memory, the CLI writes only ``input.`` keys, and no
 #: single-seat case gives one, so their packets are unchanged.
 DOCUMENT = "document."
 DOCUMENT_KIND = "customer_document"
 #: How a customer document is cited: as a document, never as an artifact (no draft derives from it).
 DOCUMENT_CITATION = "document"
+#: What a customer document is: input from outside, given with the request; the organization did not approve it.
+DOCUMENT_ASSURANCE = "customer input"
 
 
 def _documents_given(state, task_id: str) -> list[ArtifactView]:
@@ -241,7 +243,7 @@ def _documents_given(state, task_id: str) -> list[ArtifactView]:
             expected, _, location = m.value.partition(" ")
             name = m.key.removeprefix(DOCUMENT)
             out.append(ArtifactView(id=f"{task_id}#{m.key}", kind=DOCUMENT_KIND, title=Path(location).name,
-                                    assurance=Assurance.APPROVED.value,
+                                    assurance=DOCUMENT_ASSURANCE,
                                     summary=f"the customer's {name}, given with the request", location=location,
                                     digest=expected, trusted=True, **_verified(location, expected)))
     return out
