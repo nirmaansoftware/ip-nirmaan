@@ -306,8 +306,10 @@ they would in a whole flow, and check 5 runs on it.
   copied into the test. The case's checks run on host co-simulation
   (`fw.test`); its request names no RISC-V, so no `fw.soc_test` check runs.
   The first is refused when the seat's own `fw.test` check builds it (the
-  header is not on the include path); the second ends the co-simulation
-  before the harness's summary. Neither reaches review.
+  header is not on the include path); the second kills the co-simulation
+  with signal 11 before any harness record is written out, which `fw.test`
+  reports as "build failed before co-simulation: 0 errors (exit status -11)"
+  although the build was clean. Neither reaches review.
 
 Each strict fixture prints what it timed on a line of its own
 (`STRICT-FIXTURE ...`). The `FLOW-CONTROL` line carries those lines per

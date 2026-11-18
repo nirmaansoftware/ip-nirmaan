@@ -20,10 +20,12 @@
  * not the SoC's counter.
  *
  * Expected (control driver-strict-soc-address in evals/flow/controls.json):
- * the route is unreadable. The read at that address ends the co-simulation
- * before the harness's summary, the seat's own fw.test check fails, the seat
- * never reaches review, and no check of the judge runs. The control records
- * the real result.
+ * the route is unreadable. The read at that address kills the co-simulation
+ * with signal 11 before any harness record is written out (fw.test reports
+ * "build failed before co-simulation: 0 errors (exit status -11)", its words
+ * for a run that left no record), the seat's own fw.test check fails, the
+ * seat never reaches review, and no check of the judge runs. The control
+ * records that real result.
  *
  * The flow's RTL stage ended in axi4_lite_regs_lat2.v, so the seat's own
  * fw.test check runs this test there before review. If this route ever opens
