@@ -37,7 +37,7 @@ file such as `spec/axi4_lite/interface_checks.json`) is data, never a case.
 | `outcome` | A decision seat's reference outcome (M71: root cause, e.g. `rtl_bug`), required for a decision seat and refused for any other. |
 | `inputs` | Stage ID to task input to case files (M71), given to that stage, seat or upstream, as a comma-joined list: the failing logs a triage investigates (`{"triage": {"paths": [...]}}`). The files are part of the case digest. |
 | `held_out` | Checks the seat never sees. The built-in scorer `held-out-run` runs `tool` with `params`, filling each parameter from the seat's submitted files of the kinds in `seat_files`, then the files in `case_files`. The scorer `must-fail` is a negative control (below). |
-| `attempts` | Attempts per run when the engine refuses a submission (default 1). |
+| `attempts` | Attempts per run when the engine refuses a submission (default 1), used only when the run sets none: the default harness sets 3 since H3, as does `--attempts` (`docs/HARNESS.md`). |
 
 ## Rules
 
