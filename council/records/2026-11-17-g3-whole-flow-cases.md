@@ -489,3 +489,71 @@ trials only after the default harness is named.
 1. This ruling, to confirm or overrule.
 2. The public name of the measure, if it is ever to appear outside the
    repository's records. Inside them it is "whole-flow pass count".
+
+## Addendum (2026-11-18): no strict driver test when latency is not visible
+
+This addendum states one part of the chair's ruling of 2026-11-17 that the
+record above leaves out, and points to the run that part asks for. It adds
+no decision of its own. It changes no code, case, record or level, and no
+gate's wording.
+
+### Who decided what
+
+- The chair ruled the part below on 2026-11-17, in its follow-up to decision
+  2 on the same day, together with the whole-range rule (decision 2, "Judge
+  controls", fourth item, and gate WF4). It was written into the internal
+  build notes for the code lane and not into this record. That was an
+  omission in the record, corrected here.
+- `council/README.md` gives no process for an addendum to a record. No seat
+  was convened for this one: it decides no new question, and it follows the
+  addendum of 2026-11-15 to
+  `council/records/2026-11-14-pilot-retrospective.md`, which was added
+  without convening seats for it and changed no decision. Like the ruling,
+  it is not a founder decision, and the founder can overrule it.
+- Owners are as in the ruling: firmware-engineer (driver checks and
+  controls, gate WF5), verification-lead (the controls as a rule, gate WF4).
+
+### The part left out
+
+Decision 2 asks for a fixture testbench and a fixture driver test written to
+the conforming RTL's one choice, each failing on the reference RTL. The
+chair's ruling went on, in substance: if a driver test cannot observe latency
+through the HAL at all, that is recorded by a run; then no strict driver test
+exists, checks 6 and 7 cannot fail for being stricter than the latency bound,
+and the controls record says so.
+
+So the strict driver test is owed only if a driver test can see latency. If a
+recorded run shows that it cannot, the fixture driver test is dropped from
+decision 2's controls and from what gates WF4 and WF5 ask for; the strict
+testbench stays. This holds while the HAL gives a driver test no clock and
+no cycle count.
+
+### The run
+
+Pull request #324 (merged 2026-11-18) recorded it in
+`evals/flow/controls_record.json`, control `driver-reference`, from CI run
+44236131264 on 2a87386:
+
+- The reference driver and driver test pass on the reference RTL (6 checks,
+  45 cycles, 20 bus transfers) and on the conforming RTL
+  `tests/fixtures/rtl/axi4_lite/variants/axi4_lite_regs_lat2.v` (6 checks,
+  65 cycles, 20 bus transfers). The two RTLs differ in cycles; the test sees
+  the same transfers.
+- `tests/test_whole_flow_controls.py`
+  (`test_the_control_gets_the_verdict_it_expects`) fails unless the bus
+  transfers logged by those two runs are identical, on every CI run. The
+  record keeps each run's verdict and summary, not the transfers themselves.
+- `src/nirmaan/integrations/firmware_harness/nirmaan_hal.h` gives a driver
+  test `read32` and `write32`, each returning a response code, and nothing
+  else: no clock and no cycle count.
+
+The condition is therefore met, and no strict driver test is owed. The
+statement itself is not a field of the record file: it is in the
+`driver-reference` entry of the controls manifest, `evals/flow/controls.json`,
+whose verdicts the record holds, and in `docs/WHOLE_FLOW.md` ("Freedom left
+open", and the judge controls list). The strict testbench control is in the
+record (`regs-tb-strict2`: check 3 fails on the reference RTL).
+
+This addendum closes no gate. What WF4 still needs from the whole-flow runner
+(the reference flow through every seated stage, a planted upstream fault, and
+check 5) is unchanged.
