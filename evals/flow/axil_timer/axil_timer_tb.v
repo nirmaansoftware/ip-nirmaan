@@ -542,7 +542,7 @@ module axil_timer_tb_lane #(
         write_ok(8'h00, IE | PERIODIC, 4'b1111);
         expect_reg("STATUS still set while irq is held", 8'h0C, 32'd1);
         hold_irq = 1'b0;
-        check("irq stays high until EXPIRED is cleared or IE is 0", irq_drops, 0);
+        check("irq high until EXPIRED cleared or IE 0", irq_drops, 0);
         write_ok(8'h00, PERIODIC, 4'h1);
         check("IE written 0 lowers irq", {31'd0, irq}, 32'd0);
         write_ok(8'h00, IE, 4'h1);
@@ -614,7 +614,7 @@ module axil_timer_tb_lane #(
             write_ok(8'h0C, 32'd1, 4'h1);
         end
         write_ok(8'h00, IE | PERIODIC, 4'h1);
-        check("the LOAD 300 stop lands before the next count end", {31'd0, write_edge < start + 300}, 32'd1);
+        check("LOAD 300 stop lands before next count end", {31'd0, write_edge < start + 300}, 32'd1);
         quiet("no interrupt after the LOAD 300 stop", 20);
 
         // Write address and data apart by 40 cycles either way, and responses

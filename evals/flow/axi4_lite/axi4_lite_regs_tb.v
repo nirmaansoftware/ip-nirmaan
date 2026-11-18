@@ -227,8 +227,8 @@ module axi4_lite_regs_tb;
             aresetn = 1'b0;
             @(negedge aclk);
             #1;
-            check("BVALID after the first reset edge", {31'd0, bvalid}, 32'd0);
-            check("RVALID after the first reset edge", {31'd0, rvalid}, 32'd0);
+            check("BVALID after first reset edge", {31'd0, bvalid}, 32'd0);
+            check("RVALID after first reset edge", {31'd0, rvalid}, 32'd0);
             repeat (2) @(negedge aclk);
             #1;
             // No AWREADY check here: the original's "AWREADY in reset" is a rule of
@@ -400,10 +400,10 @@ module axi4_lite_regs_tb;
         for (i = 0; i < 16; i = i + 1)
             if (i[1:0] != 2'b00) begin
                 write(i[3:0], 32'hFFFF_FFFF, 4'hF, 0, 0, 0, resp);
-                check("unmapped write SLVERR, every address", {30'd0, resp}, {30'd0, SLVERR});
+                check("unmapped write SLVERR, all addrs", {30'd0, resp}, {30'd0, SLVERR});
                 read(i[3:0], 0, 0, data, resp);
-                check("unmapped read SLVERR, every address", {30'd0, resp}, {30'd0, SLVERR});
-                check("unmapped read data, every address", data, 32'd0);
+                check("unmapped read SLVERR, all addrs", {30'd0, resp}, {30'd0, SLVERR});
+                check("unmapped read data, all addrs", data, 32'd0);
             end
         read_all(0);
 

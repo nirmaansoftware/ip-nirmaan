@@ -93,9 +93,12 @@ ignoring `addr[0]` on the register block. Each copy now drives every unmapped
 address, holds `irq` high for 100000 cycles, writes every bit and every strobe
 alone, runs long counts, stops and gaps, and leaves a write's address and data
 unknown while they are not offered; the timer's stop value is now judged
-(`TMR-STOP-EDGE`). The author's scratch mutant sweep of every judged tag is
-in the pull request's description (ip#339); the mutants are not committed, and
-the fresh check this document waits for is the evidence that counts. The documents are unchanged,
+(`TMR-STOP-EDGE`). The author's mutant sweep is a committed check record,
+`evals/flow/<block>/mutant_sweep.json`: every mutant `tests/flow_mutants.py`
+builds (74 for the timer, 29 for the register block, one tag each, every tag
+check 1 cites covered) fails the copy, and the conforming RTLs pass;
+`tests/test_whole_flow_cases.py` holds the record to the builders and reruns
+one mutant per tag. The fresh check the documents wait for is still owed. The documents are unchanged,
 and both still wait for a fresh check. The register block copy drops the original's
 check that `AWREADY` is high in reset: only the single-seat microarchitecture
 states it, and `AXIL-TEST-RANGE` holds a testbench to what the document states,

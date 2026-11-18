@@ -144,10 +144,24 @@ microarchitecture, so a conforming block may hold `AWREADY` low in reset.
 `AXIL-TEST-RANGE` says a testbench checks
 only what the document states, and the judge assumes only behaviour the fixed
 document states (the council record, lines 206 to 208); so a conforming block
-must not fail it. The
-original keeps it; a block that holds `AWREADY` low in reset passes the copy
-and fails the original (shown by run in ip#339). A test holds both, and fails on any other dropped or
-altered check.
+must not fail it. The original keeps it. A block that holds `AWREADY` low in
+reset (`tests/fixtures/rtl/axi4_lite/variants/axi4_lite_regs_awready_low_in_reset.v`)
+passes the copy and fails the original on that check
+(`tests/test_whole_flow_cases.py::test_a_block_holding_awready_low_in_reset_passes_the_flow_copy_and_fails_the_original`).
+A test holds both, and fails on any other dropped or altered check.
+
+**The mutant sweep record.** `evals/flow/<block>/mutant_sweep.json` (format
+`nirmaan.flow-mutant-sweep`, a data file) records the sweep run on each
+testbench copy: every mutant `tests/flow_mutants.py` builds from the reference
+RTL (74 for the timer, 29 for the register block), the tag each violates, its
+sha256, and its result, all failing; the reference and the conforming RTLs
+(`axi4_lite_regs_lat2.v` and the `AWREADY`-low block) pass.
+`test_each_sweep_record_matches_its_builders_and_fails_every_tag_the_testbench_check_cites`
+rebuilds each mutant and compares its sha256, holds the record to the
+testbench copy and reference RTL by sha256 (an edit to either makes it stale),
+and requires a failing mutant for every tag check 1 cites;
+`test_one_mutant_per_tag_fails_the_testbench_copy_and_the_conforming_rtl_passes`
+runs one mutant per tag, and the conforming RTLs, with the simulator.
 
 **The held-out tests.** The register block case's held-out test is its own
 copy of the firmware case's, with an unmapped (misaligned) write added, so the
