@@ -31,13 +31,12 @@ from typing import Callable
 
 import nirmaan
 from nirmaan.evals.cases import EvalError, case_digest, resolve, skill_digest, validate_case
-from nirmaan.evals.runner import (REPLAY, _REVIEWED, _UNSAFE, ReplayLLM, _ancestors, _give_inputs, _judge,
-                                  runtime_cli)
+from nirmaan.evals.runner import REPLAY, _REVIEWED, _UNSAFE, _ancestors, _give_inputs, _judge, runtime_cli
 from nirmaan.models import (Actor, ActorKind, EvalCase, EvalResult, EvalStage, EvidenceKind, GateRun, MemoryScope,
                             ScoreStatus, Task, TaskKind, TaskStatus, Verdict)
 from nirmaan.orchestrator import Orchestrator
 from nirmaan.org import Organization
-from nirmaan.runtime import AgentRuntime, run_task
+from nirmaan.runtime import AgentRuntime, Completion, run_task
 from nirmaan.runtime.context import DOCUMENT, assemble
 from nirmaan.runtime.files import digest
 from nirmaan.runtime.harness import harness_sha256, run_attempts, run_tools
@@ -92,7 +91,29 @@ class FlowReplayLLM:
 
     def complete(self, prompt, tools=None):
         self.calls.append(prompt)
-        return ReplayLLM([f for f in self._files if f[1] in prompt.outputs]).complete(prompt)
+        cites = [c.token for c in prompt.citations if c.kind == "artifact"]
+        cites = cites or [c.token for c in prompt.citations if c.kind == "document"]  # the first stage's input
+        if not cites:
+            return Completion("", self.name, error="nothing approved upstream to cite")
+        files = [f for f in self._files if f[1] in prompt.outputs]
+        meta = [{"path": path, "kind": kind, "title": path, "summary": f"{path}, from {' and '.join(cites)}.",
+                 **({"entry": entry} if entry else {})} for path, kind, _, entry in files]
+        head = json.dumps({"uncertainty": 0.0, "artifacts": [], "tool_runs": [], "claims": [], "files": meta,
+                           "escalation": None, "notes": "replayed whole-flow answer", "outcome": None})
+        blocks = "".join(f"=== FILE: {path} ===\n{content}=== END FILE ===\n" for path, _, content, _ in files)
+        return Completion(f"{head}\n{blocks}", self.name)
+
+
+def _judged(engine: TaskEngine, order: list[Task], check) -> Task:
+    """The task a check is judged under: the stage that produced the first kind it takes from the seat (so its
+    tool runs under the role that may run it), seeing every seated stage's files, that stage's own first."""
+    tasks = [engine.task(t.id) for t in order]
+    kinds = [k for wanted in check.seat_files.values() for k in wanted]
+    kind_of = {a: engine.state.artifacts[a].kind for t in tasks for a in t.artifacts}
+    producer = next((t for k in kinds[:1] for t in reversed(tasks) if any(kind_of[a] == k for a in t.artifacts)),
+                    tasks[-1])
+    seen = list(producer.artifacts) + [a for t in reversed(tasks) for a in t.artifacts]
+    return producer.model_copy(update={"artifacts": tuple(dict.fromkeys(seen))})
 
 
 def flow_digest(given: dict[str, dict[str, str]]) -> str:
@@ -176,11 +197,8 @@ def run_flow(org: Organization, case: EvalCase, seat_runtime: AgentRuntime, *, r
 
     final = engine.task(seat.id)
     reached_review = stopped is None and final.status in _REVIEWED
-    # The checks see every seated stage's files, the final stage's first, under the final stage's task.
-    seen = list(final.artifacts) + [a for t in order[:-1] for a in engine.task(t.id).artifacts]
-    judged = final.model_copy(update={"artifacts": tuple(dict.fromkeys(seen))})
-    scores = tuple(_judge(engine, judged, check, repo, reached_review, sandbox / "judge" / f"check-{n}")
-                   for n, check in enumerate(case.held_out, start=1))
+    scores = tuple(_judge(engine, _judged(engine, order, check), check, repo, reached_review,
+                          sandbox / "judge" / f"check-{n}") for n, check in enumerate(case.held_out, start=1))
     ids = {t.id for t in order}
     from nirmaan.costs import calls_cost
 

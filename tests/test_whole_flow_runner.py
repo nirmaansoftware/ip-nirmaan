@@ -38,12 +38,24 @@ def flows():
 
 
 def _swap(case, **files):
-    """The case with some reference files put in another's place (the planted fault, the conforming RTL)."""
+    """The case with some reference files put in another's place (the planted fault, the conforming RTL); each
+    stand-in is answered under the name of the file it replaces."""
     ref = [CaseFile(path=files.get(Path(f.path).name, f.path), kind=f.kind, entry=f.entry) for f in case.reference]
-    return case.model_copy(update={"reference": tuple(ref)})
+    names = {files[Path(f.path).name]: Path(f.path).name for f in case.reference if Path(f.path).name in files}
+    return case.model_copy(update={"reference": tuple(ref)}), names
+
+
+def _replay(case, names=None):
+    llm = FlowReplayLLM(case, ROOT)
+    renamed = {Path(p).name: n for p, n in (names or {}).items()}
+    llm._files = [(renamed.get(name, name), kind, text, entry) for name, kind, text, entry in llm._files]
+    return llm
 
 
 def _flow(nirmaan_org, case, tmp_path, fixed_clock, llm=None):
+    if isinstance(case, tuple):
+        case, names = case
+        llm = llm or _replay(case, names)
     llm = llm or FlowReplayLLM(case, ROOT)
     return run_flow(nirmaan_org, case, ModelRuntime(llm, runtime_id="replay"), replay=True, repo=ROOT,
                     sandbox=tmp_path / "flow", clock=fixed_clock), llm
@@ -71,8 +83,10 @@ def test_the_reference_flow_passes_every_check_and_re_judges_clean(nirmaan_org, 
         assert stage.skills and set(stage.skills) == set(case.exercised[stage.stage])
         assert "reviewed in the repository" not in stage.note and stage.note.startswith("Whole-flow evaluation: "
                                                                                        "not reviewed.")
-        assert stage.reviewed_by in (None, f"{stage.reviewed_by.split(' ')[0]} ({PASSTHROUGH})")
         assert FIXTURE not in (stage.reviewed_by or "") + (stage.approved_by or "")
+    for stage in trial.stages[:-1]:  # every stage before the last: the harness's pass-through, never the fixture
+        assert stage.reviewed_by.endswith(f"({PASSTHROUGH})") and stage.approved_by.endswith(f"({PASSTHROUGH})")
+    assert trial.stages[-1].reviewed_by is None
     # The specification stages have no before-review check: "submitted, not checked".
     assert next(s for s in trial.stages if s.stage == "interface-spec").note == NOTE_UNCHECKED
     rtl = next(s for s in trial.stages if s.stage == "rtl-implementation")
@@ -103,9 +117,9 @@ def test_the_requirements_seat_reads_the_fixed_document_as_text(nirmaan_org, flo
 def test_a_flow_ending_in_a_mutant_rtl_fails(nirmaan_org, flows, tmp_path, fixed_clock):
     case = _swap(flows["flow/axil-timer"], **{"axil_timer.v": f"{T}/mutants/axil_timer_reload_off_by_one.v",
                                               "axil_timer_tb.v": f"{T}/axil_timer_tb_trivial.v"})
-    case = case.model_copy(update={"reference": tuple(
+    case = (case[0].model_copy(update={"reference": tuple(
         f.model_copy(update={"entry": "axil_timer_tb_trivial"}) if f.kind == "testbench" else f
-        for f in case.reference)})
+        for f in case[0].reference)}), case[1])
     run, _ = _flow(nirmaan_org, case, tmp_path, fixed_clock)
     assert run.result.submitted and not run.result.passed
     assert [s.status for s in run.result.scores] == [ScoreStatus.FAILED, ScoreStatus.FAILED]
