@@ -84,7 +84,7 @@ def test_a_run_under_the_cap_is_unchanged(small_caps, tmp_path):
 def test_a_step_that_writes_one_file_without_stopping_is_stopped(small_caps, tmp_path):
     code = "f = open('big.bin', 'wb')\nwhile True: f.write(b'z' * 65536)"
     out = execute(_backend(code), {"workdir": str(tmp_path / "run"), "timeout": "60"})
-    assert not out.succeeded and "wrote over 4 MB" in out.summary
+    assert not out.succeeded and "wrote 4 MB or more" in out.summary
     assert _size(tmp_path / "run") <= 4 * MB + 64 * 1024  # the file limit stops it at the cap
 
 
@@ -96,7 +96,7 @@ def test_a_step_that_writes_many_files_is_stopped(small_caps, tmp_path):
     started = time.monotonic()
     out = execute(_backend(code), {"workdir": str(tmp_path / "run"), "timeout": "60"})
     assert time.monotonic() - started < 20
-    assert not out.succeeded and "wrote over 4 MB" in out.summary
+    assert not out.succeeded and "wrote 4 MB or more" in out.summary
     assert _size(tmp_path / "run") < 16 * MB
 
 
@@ -178,6 +178,14 @@ def test_a_run_that_raises_or_is_refused_removes_its_directory_at_once(small_cap
     refused = execute(_backend("print('ok')", check=lambda job: "refused for the test"), {})
     assert not refused.succeeded and "refused for the test" in refused.summary
     assert _runs() == before  # nothing waits for the scope
+
+
+def test_a_scope_removes_what_it_made_when_an_older_directory_goes_first(small_caps):
+    older = eda.temporary_directory("nirmaan-capcheck-")
+    with temporary_runs():
+        eda.remove_temporary(older)
+        newer = eda.temporary_directory("nirmaan-capcheck-")
+    assert not older.exists() and not newer.exists()
 
 
 def test_a_given_workdir_is_never_removed(small_caps, tmp_path):

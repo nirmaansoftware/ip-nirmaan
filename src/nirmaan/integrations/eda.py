@@ -393,13 +393,13 @@ def temporary_runs() -> Iterator[None]:
     any such scope (a saved project's runs) nothing is removed.
     """
     with _TEMPORARY_LOCK:
-        mark = len(_TEMPORARY)
+        before = set(_TEMPORARY)
     try:
         yield
     finally:
         with _TEMPORARY_LOCK:
-            made = _TEMPORARY[mark:]
-            del _TEMPORARY[mark:]
+            made = [path for path in _TEMPORARY if path not in before]
+            _TEMPORARY[:] = [path for path in _TEMPORARY if path in before]
         if not keep_run_dirs():
             for path in made:
                 shutil.rmtree(path, ignore_errors=True)
@@ -511,7 +511,7 @@ def _stopped_summary(stopped: tuple[str, str] | None, timeout: int) -> str:
         return f"timed out after {timeout}s in {exe}"
     if why == OUTPUT:
         return f"output over {_mb(OUTPUT_CAP)} in {exe}: stopped, the run fails"
-    return f"wrote over {_mb(DISK_CAP)} in {exe}: stopped, the run fails"
+    return f"wrote {_mb(DISK_CAP)} or more in {exe}: stopped, the run fails"
 
 
 def _bounded(result: EdaResult) -> tuple[EdaResult, int]:
@@ -567,7 +567,7 @@ def _run_step(argv: list[str], cwd: Path, env: dict[str, str], deadline: float, 
     """Run one step in its own process group, keeping at most ``room`` bytes of what it prints (M88).
 
     The step is stopped, with every process it started, when the deadline passes, when it prints past
-    ``room``, or when ``watch`` (the run's directory) holds more than ``DISK_CAP``; no file it writes can grow
+    ``room``, or when ``watch`` (the run's directory) reaches ``DISK_CAP``; no file it writes can grow
     past ``DISK_CAP``.
     """
     remaining = deadline - time.monotonic()
