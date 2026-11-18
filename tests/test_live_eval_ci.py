@@ -214,3 +214,70 @@ def test_the_real_eval_run_stops_at_the_limit_with_one_record_per_trial(tmp_path
     assert all(t[0].result.harness == DIGEST and t[0].result.cli == "2.1.325" for t in trials)
     err = capsys.readouterr().err
     assert "STOP: trial 3 hit a plan or usage limit" in err and "Trials 4 to 5 did not start" in err
+
+
+# --- Gate WF17: the checkout's tree hash and seat C ------------------------------------------------
+
+
+def _repo(tmp_path: Path) -> Path:
+    root = tmp_path / "repo"
+    (root / "src" / "pkg").mkdir(parents=True)
+    (root / "docs").mkdir()
+    (root / ".gitignore").write_text("__pycache__/\nbuild/\n")
+    (root / "src" / "pkg" / "judge.py").write_text("PASS = False\n")
+    (root / "docs" / "a.md").write_text("a\n")
+    for args in (["init", "-q"], ["add", "-A"], ["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "c"]):
+        subprocess.run(["git", "-C", str(root), *args], check=True)
+    return root
+
+
+def test_the_tree_hash_sees_every_change_to_the_checkout(tmp_path):
+    root = _repo(tmp_path)
+    base = ci.tree_digest(ci.tree_manifest(root))
+    assert ci.tree_digest(ci.tree_manifest(root)) == base
+    (root / "build").mkdir()
+    (root / "build" / "out.txt").write_text("ignored outside src, scripts and evals\n")
+    assert ci.tree_digest(ci.tree_manifest(root)) == base
+    changes = [
+        lambda: (root / "src" / "pkg" / "judge.py").write_text("PASS = True\n"),  # a tracked file edited
+        lambda: (root / "docs" / "new.md").write_text("x"),  # an untracked file
+        lambda: ((root / "src" / "pkg" / "__pycache__").mkdir(), (root / "src" / "pkg" / "__pycache__" /
+                                                                 "judge.cpython-312.pyc").write_bytes(b"x")),
+        lambda: (root / "docs" / "a.md").chmod(0o755),  # a mode
+        lambda: (root / "docs" / "a.md").unlink(),  # a deletion
+        lambda: (root / "src" / "link").symlink_to("/etc"),  # a link under src
+    ]
+    for change in changes:
+        root = _repo(tmp_path / str(len(list(tmp_path.iterdir()))))
+        before = ci.tree_digest(ci.tree_manifest(root))
+        change()
+        assert ci.tree_digest(ci.tree_manifest(root)) != before
+
+
+def test_the_tree_mode_needs_no_case_and_writes_its_manifest(tmp_path, monkeypatch, capsys):
+    for key in ("CASE", "TRIALS", "EXPECTED"):
+        monkeypatch.delenv(key, raising=False)
+    manifest = tmp_path / "tree.txt"
+    assert ci.main(["tree", "--write", str(manifest)]) == 0
+    lines = manifest.read_text().splitlines()
+    assert lines[0].startswith("commit ") and capsys.readouterr().out.strip() == ci.tree_digest(lines)
+    assert any(line.startswith("file ") and line.split()[2] == "scripts/live_eval_ci.py" for line in lines)
+
+
+def test_a_live_trial_of_a_case_that_runs_seat_c_is_refused():
+    assert ci.seat_c_problem("dv/cocotb-crc") is None and ci.seat_c_problem(SPEC_CASE) is None
+    problem = ci.seat_c_problem("firmware/axi4-lite-driver")
+    assert problem and "fw.test" in problem and "WF17" in problem
+
+
+def test_main_refuses_seat_c_before_any_trial_but_a_replay_check_does_not(monkeypatch, capsys):
+    monkeypatch.setattr(ci, "installed_cli", lambda: "2.1.325")
+    digest = harness_sha256(cli="2.1.325")
+    for key, value in {"CASE": "firmware/axi4-lite-driver", "TRIALS": "1", "KNOWLEDGE": "on", "PURPOSE": "evidence",
+                       "HARNESS": "default", "EXPECTED": digest}.items():
+        monkeypatch.setenv(key, value)
+    monkeypatch.setattr(ci, "run_trials", lambda *a, **k: pytest.fail("a trial started"))
+    assert ci.main(["check", "--require-expected"]) == ci.UNCONFINED
+    assert ci.main(["trials", "--out", "/nonexistent"]) == ci.UNCONFINED
+    assert "gate WF17" in capsys.readouterr().err
+    assert ci.main(["check"]) == 0

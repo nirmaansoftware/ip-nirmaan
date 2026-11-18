@@ -1,7 +1,8 @@
-# The tools a live evaluation runs with (.github/workflows/live-eval.yml), the same for a replay
-# and for live trials: Python 3.12, the open-source EDA tools, SymbiYosys and Yices from the
-# pinned OSS CAD Suite, Claude Code from .github/live-eval (npm ci checks each package against
-# the sha512 in its lockfile), and the package with the cocotb extra. It takes no secret.
+# The tools a live evaluation runs with (.github/workflows/live-eval.yml), the same for a replay,
+# live trials and the re-judge: Python 3.12, the open-source EDA tools (and acl, which the seat
+# account's grants use), SymbiYosys and Yices from the pinned OSS CAD Suite, Claude Code from
+# .github/live-eval (npm ci checks each package against the sha512 in its lockfile), and the
+# package with the cocotb extra. It takes no secret.
 name: Live evaluation tools
 description: Install what a live evaluation runs with, Claude Code pinned by lockfile and cocotb included.
 runs:
@@ -12,7 +13,7 @@ runs:
         python-version: "3.12"
     - name: Install open-source EDA tools
       shell: bash
-      run: sudo apt-get update && sudo apt-get install -y verilator iverilog yosys
+      run: sudo apt-get update && sudo apt-get install -y verilator iverilog yosys acl
     - name: Install SymbiYosys and Yices (OSS CAD Suite 2026-09-28)
       uses: ./.github/actions/oss-cad-suite
       with:

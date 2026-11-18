@@ -10,6 +10,15 @@ name: Live evaluation
 # before trial 1 and on every record. Records are uploaded as a workflow artifact and committed
 # later by pull request; nothing here commits.
 #
+# Gates WF9 and WF17: seat code (a cocotb test module, which runs inside vvp) runs as the account
+# `nirmaan-seat`, which has no sudo, no write access to the checkout, the installed package or the
+# records, and no credential in its environment (.github/actions/live-eval-seat). Every job that
+# runs seat code first runs the reach test (scripts/live_eval_reach.py), which tries each of those
+# through the real cocotb path, and stops before any trial unless every probe is denied. The trial
+# job hashes its checkout before and after the trials and fails on a change. The counting re-judge
+# runs in the `rejudge` job, which ran no seat code before it: a fresh checkout of the same commit,
+# the records only from the uploaded artifact, refused when the trial job's two hashes differ.
+#
 # The token is CLAUDE_CODE_OAUTH_TOKEN, a secret of the `live-eval` environment, which only
 # `main` may deploy to; there is no repository secret. Only the gate step and the trials step
 # get it. A replay (`replay: true`) runs the case's reference answer: no model, no token, no
@@ -61,6 +70,12 @@ jobs:
     if: ${{ inputs.replay }}
     runs-on: ubuntu-24.04
     timeout-minutes: 60
+    outputs:
+      records: ${{ steps.upload.outcome == 'success' }}
+      artifact: live-eval-replay-${{ github.run_id }}
+      commit: ${{ steps.commit.outputs.sha }}
+      tree_before: ${{ steps.before.outputs.tree }}
+      tree_after: ${{ steps.after.outputs.tree }}
     env:
       CASE: ${{ inputs.case }}
       TRIALS: ${{ inputs.trials }}
@@ -68,18 +83,48 @@ jobs:
       PURPOSE: ${{ inputs.purpose }}
       HARNESS: ${{ inputs.harness }}
       EXPECTED: ${{ inputs.expected_harness }}
+      PYTHONDONTWRITEBYTECODE: "1"
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
+      - name: Record the commit
+        id: commit
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - name: Install the tools
         uses: ./.github/actions/live-eval-setup
+      - name: Give seat code its own account
+        uses: ./.github/actions/live-eval-seat
       - name: Print the harness fingerprint
         run: python scripts/live_eval_ci.py check
+      - name: Test what seat code can reach
+        run: |
+          mkdir -p "$RUNNER_TEMP/replay"
+          python scripts/live_eval_reach.py --records "$RUNNER_TEMP/replay"
+      - name: Hash the checkout before the trials
+        id: before
+        run: echo "tree=$(python scripts/live_eval_ci.py tree --write "$RUNNER_TEMP/tree-before.txt")" >> "$GITHUB_OUTPUT"
       - name: Replay the reference answer
+        id: trials
         run: nirmaan eval run "$CASE" --replay --out "$RUNNER_TEMP/replay"
+      - name: Check the checkout did not change
+        id: after
+        if: always() && steps.before.outcome == 'success'
+        env:
+          BEFORE: ${{ steps.before.outputs.tree }}
+        run: |
+          sudo /usr/bin/python3 -I /opt/nirmaan-seat/seat.py cleanup
+          after=$(python scripts/live_eval_ci.py tree --write "$RUNNER_TEMP/tree-after.txt")
+          echo "tree=$after" >> "$GITHUB_OUTPUT"
+          echo "checkout before: $BEFORE, after: $after"
+          if [ "$after" != "$BEFORE" ]; then
+            diff "$RUNNER_TEMP/tree-before.txt" "$RUNNER_TEMP/tree-after.txt" || true
+            echo "::error::The checkout changed during the trials; the re-judge will refuse these records."
+            exit 1
+          fi
       - name: Upload the replay record
-        if: always()
+        id: upload
+        if: always() && steps.trials.outcome != 'skipped'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: live-eval-replay-${{ github.run_id }}
@@ -101,6 +146,12 @@ jobs:
     runs-on: ubuntu-24.04
     environment: live-eval
     timeout-minutes: 300
+    outputs:
+      records: ${{ steps.upload.outcome == 'success' }}
+      artifact: live-eval-records-${{ github.run_id }}
+      commit: ${{ steps.commit.outputs.sha }}
+      tree_before: ${{ steps.before.outputs.tree }}
+      tree_after: ${{ steps.after.outputs.tree }}
     env:
       CASE: ${{ inputs.case }}
       TRIALS: ${{ inputs.trials }}
@@ -108,10 +159,14 @@ jobs:
       PURPOSE: ${{ inputs.purpose }}
       HARNESS: ${{ inputs.harness }}
       EXPECTED: ${{ inputs.expected_harness }}
+      PYTHONDONTWRITEBYTECODE: "1"
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
+      - name: Record the commit
+        id: commit
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - name: Gate on the secret
         id: gate
         env:
@@ -124,23 +179,125 @@ jobs:
           exit 1
       - name: Install the tools
         uses: ./.github/actions/live-eval-setup
+      - name: Give seat code its own account
+        uses: ./.github/actions/live-eval-seat
       - name: Check the harness fingerprint
         run: python scripts/live_eval_ci.py check --require-expected
+      - name: Test what seat code can reach
+        run: |
+          mkdir -p "$RUNNER_TEMP/results"
+          python scripts/live_eval_reach.py --records "$RUNNER_TEMP/results"
+      - name: Hash the checkout before the trials
+        id: before
+        run: echo "tree=$(python scripts/live_eval_ci.py tree --write "$RUNNER_TEMP/tree-before.txt")" >> "$GITHUB_OUTPUT"
       # M53: inside this step every gate and judge runs with no credential in its environment, and a
       # credential value a run prints is redacted from logs and the record (docs/GATE_INTEGRITY.md).
+      # WF17: seat code runs as nirmaan-seat, which cannot read this step's environment.
       - name: Run the trials one at a time
         id: trials
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
         run: python scripts/live_eval_ci.py trials --out "$RUNNER_TEMP/results"
+      - name: Check the checkout did not change
+        id: after
+        if: always() && steps.before.outcome == 'success'
+        env:
+          BEFORE: ${{ steps.before.outputs.tree }}
+        run: |
+          sudo /usr/bin/python3 -I /opt/nirmaan-seat/seat.py cleanup
+          after=$(python scripts/live_eval_ci.py tree --write "$RUNNER_TEMP/tree-after.txt")
+          echo "tree=$after" >> "$GITHUB_OUTPUT"
+          echo "checkout before: $BEFORE, after: $after"
+          if [ "$after" != "$BEFORE" ]; then
+            diff "$RUNNER_TEMP/tree-before.txt" "$RUNNER_TEMP/tree-after.txt" || true
+            echo "::error::The checkout changed during the trials; the re-judge will refuse these records."
+            exit 1
+          fi
       - name: Upload the run records
+        id: upload
         if: always() && steps.trials.outcome != 'skipped'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: live-eval-records-${{ github.run_id }}
           path: ${{ runner.temp }}/results
+
+  # The counting re-judge (WF17): a job that ran no seat code before it, on a fresh checkout of the
+  # same commit, with the records only from the uploaded artifact. Re-judging replays the recorded
+  # answers through the real gates, so seat code runs again here, as nirmaan-seat, after the reach test.
+  rejudge:
+    needs: [replay, live-eval]
+    if: ${{ always() && (needs.replay.outputs.records == 'true' || needs.live-eval.outputs.records == 'true') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      COMMIT: ${{ needs.replay.outputs.commit || needs.live-eval.outputs.commit }}
+      TREE_BEFORE: ${{ needs.replay.outputs.tree_before || needs.live-eval.outputs.tree_before }}
+      TREE_AFTER: ${{ needs.replay.outputs.tree_after || needs.live-eval.outputs.tree_after }}
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - name: Refuse records from a changed checkout
+        run: |
+          echo "trial job: commit $COMMIT, checkout before $TREE_BEFORE, after $TREE_AFTER"
+          if [ -z "$TREE_BEFORE" ] || [ "$TREE_BEFORE" != "$TREE_AFTER" ]; then
+            echo "::error::The trial job's checkout changed, or was not hashed after the trials; these records are not re-judged."
+            exit 1
+          fi
+          if [ "$COMMIT" != "$GITHUB_SHA" ]; then
+            echo "::error::The trial job ran commit $COMMIT, not $GITHUB_SHA."
+            exit 1
+          fi
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Check the fresh checkout is the trial job's commit
+        run: |
+          if [ "$(git rev-parse HEAD)" != "$COMMIT" ]; then
+            echo "::error::The fresh checkout is $(git rev-parse HEAD), not the trial job's $COMMIT."
+            exit 1
+          fi
+      - name: Install the tools
+        uses: ./.github/actions/live-eval-setup
+      - name: Give seat code its own account
+        uses: ./.github/actions/live-eval-seat
+      - name: Download the records
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: ${{ needs.replay.outputs.artifact || needs.live-eval.outputs.artifact }}
+          path: ${{ runner.temp }}/records
+      - name: Test what seat code can reach
+        run: python scripts/live_eval_reach.py --records "$RUNNER_TEMP/records"
+      - name: Hash the checkout before the re-judge
+        id: before
+        run: echo "tree=$(python scripts/live_eval_ci.py tree --write "$RUNNER_TEMP/tree-before.txt")" >> "$GITHUB_OUTPUT"
       - name: Re-judge the records
-        if: always() && steps.trials.outcome != 'skipped'
+        id: rejudge
         run: |
           shopt -s nullglob
-          for record in "$RUNNER_TEMP"/results/*/; do nirmaan eval rejudge "$record"; done
+          records=("$RUNNER_TEMP"/records/*/)
+          if [ "${#records[@]}" -eq 0 ]; then
+            echo "::error::The artifact holds no record."
+            exit 1
+          fi
+          status=0
+          for record in "${records[@]}"; do nirmaan eval rejudge "$record" --write || status=1; done
+          exit "$status"
+      - name: Check the checkout did not change
+        if: always() && steps.before.outcome == 'success'
+        env:
+          BEFORE: ${{ steps.before.outputs.tree }}
+        run: |
+          sudo /usr/bin/python3 -I /opt/nirmaan-seat/seat.py cleanup
+          after=$(python scripts/live_eval_ci.py tree --write "$RUNNER_TEMP/tree-after.txt")
+          echo "checkout before: $BEFORE, after: $after"
+          if [ "$after" != "$BEFORE" ]; then
+            diff "$RUNNER_TEMP/tree-before.txt" "$RUNNER_TEMP/tree-after.txt" || true
+            echo "::error::The checkout changed during the re-judge; its verdicts do not count."
+            exit 1
+          fi
+      - name: Upload the re-judged records
+        if: always() && steps.rejudge.outcome != 'skipped'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: live-eval-rejudged-${{ github.run_id }}
+          path: ${{ runner.temp }}/records
