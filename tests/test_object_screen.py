@@ -3,8 +3,8 @@
 Council record ``council/records/2026-11-17-g3-whole-flow-cases.md``, second addendum (2026-11-18), decision 2,
 items 2 to 5. The screen (``nirmaan.evals.object_screen``) runs in the whole-flow judge path only: a check that
 names a screened scorer (``scorers.SCREENED``) runs the unchanged ``held-out-run`` or ``must-fail`` scorer only
-when the screen finds nothing. This pull request adds the screen and its scorers; the register block case's checks
-take them in the next one. No tool definition, no ``harness.CODE`` file and no harness code changes, so no
+when the screen finds nothing. The register block case's checks 4 to 7, the four that build or link the seat's C,
+name them. No tool definition, no ``harness.CODE`` file and no harness code changes, so no
 fingerprint moves, and no single-seat case is screened.
 
 What this file holds, and what ``evals/flow/object_screen_record.json`` records from one CI run (Linux, the
@@ -96,6 +96,17 @@ def _rel(path: Path) -> str:
 
 
 # --- Where the screen sits (no tools) --------------------------------------------------------------------------
+
+
+def test_every_whole_flow_check_that_builds_or_links_seat_c_is_screened():
+    """Decision 2, item 4: in force for every whole-flow check that builds or links seat-written C, and only there."""
+    screened = 0
+    for case in load_cases(EVALS, flow="whole"):
+        for check in case.held_out:
+            builds_seat_c = check.tool in C_TOOLS and bool(check.seat_files.get("sources"))
+            assert (check.scorer in scorers.SCREENED) is builds_seat_c, (case.id, check.name, check.scorer)
+            screened += builds_seat_c
+    assert screened == 4  # the register block's checks 4 to 7; the timer case links no seat C
 
 
 def test_no_single_seat_case_is_screened():

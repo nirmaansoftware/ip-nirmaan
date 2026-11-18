@@ -63,8 +63,12 @@ scorers. The allow list, one refused fixture per construct, the clock probe
 and the address-arithmetic probe are recorded from CI. No tool definition,
 harness code or fingerprint changed. It stops names, not address arithmetic:
 the recorded probe, starting from `hal->read32`, read the harness's cycle
-count, its pass counter and the run's nonce. The register block case takes the
-screen in a following pull request.
+count, its pass counter and the run's nonce. The register block case's checks
+4 to 7 then took the screen in a second pull request, and the control follows
+the channel: the strict fixtures of WF15 on the simulator's clock are refused
+by the screen (files kept, expected results changed, recorded), and two strict
+fixtures on the address-arithmetic route, which stays open, are the live
+controls (27 controls).
 
 **The timer document fixed, and the check record rule (follow-up).** An
 independent check found that `evals/flow/axil_timer/requirements.md` claimed
