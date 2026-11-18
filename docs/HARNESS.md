@@ -231,6 +231,16 @@ in the same pull request.
   and `runtime/seat_tools_relay.py` are `LOOP_CODE`, in the variant's
   fingerprint only.
 
+- G3, a customer document for one task (council record 2026-11-17,
+  decision 2; fact 10): `runtime/context.py` carries task memory
+  `document.<name>` (`<digest> <path>`, which only the platform writes) into
+  that task's packet as an approved upstream file (`customer_document`), read
+  whole only while its bytes match. It lets the whole-flow requirements seat
+  read the case's fixed requirements as text. No single-seat case gives one:
+  every shipped case's seat prompts are byte for byte as before
+  (`tests/test_flow_requirements_document.py`). A `CODE` file changed, so every
+  fingerprint changed, inside the same window as the whole-flow dispatch.
+
 ## What is not the harness
 
 - The model: its own group key, recorded on the trial. The program the
