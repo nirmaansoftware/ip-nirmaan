@@ -1,72 +1,146 @@
 name: Live evaluation
 
-# M45: a weekly live evaluation of the seats on the owner's Claude plan, kept as
-# a run record (docs/LIVE_EVAL_EVIDENCE.md). It never runs on a pull request or
-# a push. It is off until the repository secret CLAUDE_CODE_OAUTH_TOKEN exists
-# (from `claude setup-token`): without it the gate step writes enabled=false
-# and every later step is skipped, so the job is green and spends nothing. The
-# record is uploaded as a workflow artifact; it is never committed from here.
+# M45, W2-L1-CI: live evaluation trials on the owner's Claude plan, kept as run records
+# (docs/LIVE_EVAL_EVIDENCE.md, section 6). Cases whose seat output is code by design (cocotb
+# tests, firmware) run only here, never on the owner's machine. It runs only on manual dispatch,
+# never on a schedule, a pull request or a push. Each dispatch runs one case: `trials` trials,
+# one at a time, each its own record (scripts/live_eval_ci.py). The batch stops at the first
+# trial that hits a plan or usage limit (exit 3) or ends in any other way than pass or fail, and
+# no trial is ever run again. The harness fingerprint is printed and must equal `expected_harness`
+# before trial 1 and on every record. Records are uploaded as a workflow artifact and committed
+# later by pull request; nothing here commits.
+#
+# The token is CLAUDE_CODE_OAUTH_TOKEN, a secret of the `live-eval` environment, which only
+# `main` may deploy to; there is no repository secret. Only the gate step and the trials step
+# get it. A replay (`replay: true`) runs the case's reference answer: no model, no token, no
+# environment, from any branch, to check the tools before trials are spent.
 on:
-  schedule:
-    - cron: "17 6 * * 1"  # Mondays 06:17 UTC
   workflow_dispatch:
+    inputs:
+      case:
+        description: "One case ID (nirmaan eval list), e.g. dv/cocotb-crc"
+        type: string
+        required: true
+      trials:
+        description: "Trials to run, one at a time, one record each (1 to 20)"
+        type: number
+        default: 1
+      knowledge:
+        description: "on: with knowledge documents; off: without (--without-knowledge, never counts)"
+        type: choice
+        options: ["on", "off"]
+        default: "on"
+      purpose:
+        description: "evidence or calibration (--purpose)"
+        type: choice
+        options: [evidence, calibration]
+        default: evidence
+      harness:
+        description: "Harness variant (--harness); only default counts toward a level"
+        type: choice
+        options: [default, attempts-3, tools-in-loop]
+        default: default
+      expected_harness:
+        description: "The harness fingerprint the trials must run in (sha256:...); required unless replay"
+        type: string
+        default: ""
+      replay:
+        description: "Replay the reference answer instead: no model and no token"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
+concurrency:
+  group: live-eval
+  cancel-in-progress: false
+
 jobs:
-  live-eval:
+  replay:
+    if: ${{ inputs.replay }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 300
+    timeout-minutes: 60
+    env:
+      CASE: ${{ inputs.case }}
+      TRIALS: ${{ inputs.trials }}
+      KNOWLEDGE: ${{ inputs.knowledge }}
+      PURPOSE: ${{ inputs.purpose }}
+      HARNESS: ${{ inputs.harness }}
+      EXPECTED: ${{ inputs.expected_harness }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Install the tools
+        uses: ./.github/actions/live-eval-setup
+      - name: Print the harness fingerprint
+        run: python scripts/live_eval_ci.py check
+      - name: Replay the reference answer
+        run: nirmaan eval run "$CASE" --replay --out "$RUNNER_TEMP/replay"
+      - name: Upload the replay record
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: live-eval-replay-${{ github.run_id }}
+          path: ${{ runner.temp }}/replay
+
+  # Live trials from another branch: nothing would run, so the run fails and says why.
+  not-main:
+    if: ${{ !inputs.replay && github.ref != 'refs/heads/main' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Refuse live trials outside main
+        run: |
+          echo "::error::Live trials run only from main (the live-eval environment); dispatch from main, or set replay."
+          exit 1
+
+  live-eval:
+    if: ${{ !inputs.replay && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-24.04
+    environment: live-eval
+    timeout-minutes: 300
+    env:
+      CASE: ${{ inputs.case }}
+      TRIALS: ${{ inputs.trials }}
+      KNOWLEDGE: ${{ inputs.knowledge }}
+      PURPOSE: ${{ inputs.purpose }}
+      HARNESS: ${{ inputs.harness }}
+      EXPECTED: ${{ inputs.expected_harness }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
       - name: Gate on the secret
         id: gate
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
         run: python3 scripts/live_eval_gate.py
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
-        if: steps.gate.outputs.enabled == 'true'
-        with:
-          python-version: "3.12"
-      - name: Install open-source EDA tools
-        if: steps.gate.outputs.enabled == 'true'
-        run: sudo apt-get update && sudo apt-get install -y verilator iverilog yosys
-      # M53: the same pinned, sha256-checked OSS CAD Suite as ci.yml, for a seat that writes a proof.
-      - name: Install SymbiYosys and Yices (OSS CAD Suite 2026-09-28)
-        if: steps.gate.outputs.enabled == 'true'
-        uses: ./.github/actions/oss-cad-suite
-        with:
-          tools: sby yices-smt2
-      # M53: a pinned Claude Code, so a run records the client it used.
-      - name: Install Claude Code
-        if: steps.gate.outputs.enabled == 'true'
-        run: npm install -g @anthropic-ai/claude-code@2.1.283 && claude --version
-      - name: Install
-        if: steps.gate.outputs.enabled == 'true'
-        run: pip install -e ".[dev]"
-      # M53: the token reaches only this step and the gate. Every tool run inside it (the gates compile and
-      # run model-written code) gets an environment with no credential in it, and anything a run prints
-      # that matches a credential is redacted before it reaches a log or the record (docs/GATE_INTEGRITY.md).
-      - name: Run the live evaluation
-        id: run
-        if: steps.gate.outputs.enabled == 'true'
+      - name: Stop without the secret
+        if: steps.gate.outputs.enabled != 'true'
+        run: |
+          echo "::error::CLAUDE_CODE_OAUTH_TOKEN is not set in the live-eval environment; no trial ran."
+          exit 1
+      - name: Install the tools
+        uses: ./.github/actions/live-eval-setup
+      - name: Check the harness fingerprint
+        run: python scripts/live_eval_ci.py check --require-expected
+      # M53: inside this step every gate and judge runs with no credential in its environment, and a
+      # credential value a run prints is redacted from logs and the record (docs/GATE_INTEGRITY.md).
+      - name: Run the trials one at a time
+        id: trials
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-        run: |
-          set +e
-          NIRMAAN_CLAUDE_CODE="$(which claude)" nirmaan eval run --runtime claude-code --trials 5 \
-            --seats rtl,spec,firmware --out "$RUNNER_TEMP/results"
-          echo "exit=$?" >> "$GITHUB_OUTPUT"
-      - name: Upload the run record
-        if: steps.gate.outputs.enabled == 'true'
+        run: python scripts/live_eval_ci.py trials --out "$RUNNER_TEMP/results"
+      - name: Upload the run records
+        if: always() && steps.trials.outcome != 'skipped'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: live-eval-record
+          name: live-eval-records-${{ github.run_id }}
           path: ${{ runner.temp }}/results
-      - name: Re-judge the record
-        if: steps.gate.outputs.enabled == 'true'
-        run: nirmaan eval rejudge "$RUNNER_TEMP"/results/*/
-      - name: Fail when a trial failed
-        if: steps.gate.outputs.enabled == 'true'
-        run: test "${{ steps.run.outputs.exit }}" = "0"
+      - name: Re-judge the records
+        if: always() && steps.trials.outcome != 'skipped'
+        run: |
+          shopt -s nullglob
+          for record in "$RUNNER_TEMP"/results/*/; do nirmaan eval rejudge "$record"; done
