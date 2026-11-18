@@ -214,12 +214,75 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   CLI is not what was asked for. A stopped or failed trial stays as it is and
   is never run again; no later trial of the dispatch starts. One dispatch runs
   at a time (the `live-eval` concurrency group).
-- **The records** are uploaded as a workflow artifact, then re-judged. Nothing
-  here commits: the records are downloaded and committed by pull request like
-  any other evidence.
+- **Seat code runs as an account of its own** (gates WF9 and WF17 of the G3
+  council record, `council/records/2026-11-17-g3-whole-flow-cases.md`). The
+  runner user has passwordless sudo, owns the checkout, the installed package
+  and the records, and its `nirmaan` process holds the token, which any process
+  of the same user can read in `/proc/<pid>/environ`. A cocotb test module is
+  code by design and runs inside `vvp`. So every job first runs
+  `.github/actions/live-eval-seat` (`scripts/live_eval_seat.py`): it makes the
+  account `nirmaan-seat` (no password, no sudo rule, no group but its own) and
+  puts a `vvp` first on `PATH` that runs the real one as that account, with
+  `no_new_privs` (no setuid program, sudo included, gives it more), an
+  environment holding only cocotb's own settings, and write access to the
+  run's own directory only. When the run ends, every process of the account is
+  killed, what it made in the run's directory goes back to the runner (a link,
+  pipe or other non-regular file it made there is removed first), every grant
+  is taken back, and what it left in `/tmp`, `/var/tmp` and `/dev/shm` is
+  removed. The hosted runner's tool cache (the Python the package is installed
+  in, with its `site-packages` and console scripts) and the folders on `PATH`
+  are writable by every account; the action takes that away. The harness code
+  is unchanged, and a record's `executables` names the wrapper
+  (`/opt/nirmaan-seat/bin/vvp`).
+- **The reach test** (`scripts/live_eval_reach.py`) runs in every job that runs
+  seat code, before any trial or re-judge, through the real path: a cocotb
+  test module run by `simulator.run`'s cocotb backend, so through the same
+  `vvp`. Its tests try, as the seat account, to run as the runner or in another
+  group; to run `sudo -n` as root or as the runner; to write to the checkout,
+  the installed package, every folder on `PATH`, every program a gate runs,
+  the account's own wrapper, the records folder, the runner's temporary folder
+  and the step's command files (`GITHUB_ENV`, `GITHUB_OUTPUT`, `GITHUB_PATH`,
+  `GITHUB_STEP_SUMMARY`); to find either of two canary values the test puts in
+  the harness's environment (one under a credential's name, one under a plain
+  name) in its own environment or in any process's `/proc/<pid>/environ`, or
+  to read a file only the runner may read; and to signal the harness. A last
+  test, the control, writes the run's own directory. Each target must exist
+  first, so a refusal proves something. The job fails before any trial unless
+  cocotb's verdict is a pass with every probe test in its results.
+- **Seat C waits.** `fw.build` and `fw.test` run the seat's C by path, not
+  through `PATH`, so the account does not reach them. `check
+  --require-expected` and `trials` refuse a case that runs seat C (one whose
+  seat is `firmware`, or whose held-out checks use `fw.build` or `fw.test`)
+  with exit 6 before any trial. The `fw.test` probe lands with that
+  confinement. A replay of such a case still runs: its code is the reference
+  answer.
+- **The checkout is hashed** before and after the trials
+  (`scripts/live_eval_ci.py tree`): the commit, then every file git tracks or
+  would add, and every file under `src/`, `scripts/` and `evals/` (ignored
+  files included), by path, type, mode and content. Bytecode is not written
+  (`PYTHONDONTWRITEBYTECODE`). On any change the job fails and prints the
+  difference.
+- **The records** are uploaded as a workflow artifact. Nothing here commits:
+  the records are downloaded and committed by pull request like any other
+  evidence.
+- **The counting re-judge** runs in the `rejudge` job, which ran no seat code
+  before it. It refuses the records unless the trial job hashed its checkout
+  after the trials with the same result as before and ran this run's commit.
+  It then checks out that commit afresh, installs the tools, makes the seat
+  account, downloads the records (the artifact is the only way they reach it),
+  runs the reach test with the records folder as its target, hashes the
+  checkout, runs `nirmaan eval rejudge <record> --write` on every record, and
+  hashes the checkout again. Re-judging replays the recorded answers through
+  the real gates, so seat code runs again there, as the seat account. Any
+  difference, a changed checkout or a failed reach test fails the job. The
+  re-judged records, each with its `rejudge.json`, are uploaded as
+  `live-eval-rejudged-<run id>`; that is the re-judge a record is committed
+  with.
 - **A replay** (`replay: true`, the `replay` job) runs the case's reference
   answer with no model, no token and no environment, from any branch, and
-  prints the fingerprint. It checks the tools before trials are spent.
+  prints the fingerprint. It goes through the same account, reach test, tree
+  hashes and `rejudge` job, so it checks the tools and the whole path before
+  trials are spent.
 
 To enable live trials: create the `live-eval` environment, allow only `main`
 to deploy to it, and add the environment secret `CLAUDE_CODE_OAUTH_TOKEN`. To
@@ -291,6 +354,16 @@ input, so roughly $13 to $20. Results land in
   without its secret; its trials run one at a time and stop on a limit, an
   odd exit or a record that is not the trial asked for, and none runs again
   (`tests/test_live_eval_ci.py`);
+- gate WF17: every trial job makes the seat account and runs the reach test
+  before the trials, between two tree hashes; the counting re-judge is a job of
+  its own, on a fresh checkout of the trial job's commit, from the artifact
+  only; the seat's environment keeps cocotb's settings and nothing else; a run
+  directory must be one the harness made in `/tmp`; links the seat made there
+  are removed; the tree hash sees an edit, a new file, a mode, a deletion, a
+  link and a bytecode file; a live trial of a case that runs seat C is refused
+  before any trial (`tests/test_live_eval_seat.py`,
+  `tests/test_live_eval_ci.py`). What the account denies is shown only by the
+  reach test in Actions, where the account exists;
 - crown jewel `test_a_new_seat_group_is_recorded_and_rejudged_with_no_core_changes`:
   a case and a scorer written in the test run with trials, are recorded,
   summarized, shown in history, and re-judged with no core change;

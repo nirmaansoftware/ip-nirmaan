@@ -27,6 +27,7 @@ live trial of a case that runs seat C. Its probe lands with that confinement.
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import os
 import pwd
@@ -150,40 +151,61 @@ async def reach_own_directory(dut):
 '''
 
 
+class Unresolved(SystemExit):
+    """A target the reach test cannot name: the test fails, since a probe of nothing would read as denied."""
+
+    def __init__(self, what: str) -> None:
+        super().__init__(f"reach test: cannot determine {what}, so no probe of it can show it denied; no trial ran")
+
+
+def _need(value, what: str):
+    """``value``, or fail the reach test: a target never falls back to nothing."""
+    if value is None or value == "" or value == []:
+        raise Unresolved(what)
+    return value
+
+
 def targets(records: Path, env: Mapping[str, str]) -> tuple[list[str], list[str]]:
-    """Folders seat code must not create a file in, and files it must not open for writing; each one exists."""
+    """Folders seat code must not create a file in, and files it must not open for writing; each one exists.
+
+    Fails closed: a target it cannot determine (the package's file, cocotb, a program a gate runs, the programs
+    the seat account runs, and in Actions the runner's temporary folder, the step's command files and the
+    installed package's metadata) or one that does not exist stops the test, never shrinks it."""
     import nirmaan
 
-    package = Path(nirmaan.__file__).resolve().parent
-    purelib = Path(sysconfig.get_paths()["purelib"])
+    package = Path(_need(nirmaan.__file__, "the nirmaan package's file")).resolve().parent
+    purelib = Path(_need(sysconfig.get_paths().get("purelib"), "site-packages"))
     create = [ROOT, ROOT / "src" / "nirmaan", ROOT / "scripts", ROOT / "evals", ROOT / ".git", package, purelib,
-              Path(sys.executable).resolve().parent, WRAPPER.parent, records]
+              Path(_need(sys.executable, "the Python")).resolve().parent, WRAPPER.parent, records]
     append = [ROOT / "pyproject.toml", ROOT / "scripts" / "live_eval_ci.py", ROOT / ".github" / "workflows" /
               "live-eval.yml", package / "__init__.py", package / "integrations" / "cocotb_runner.py",
               Path(sys.executable).resolve(), WRAPPER, WRAPPER.parent.parent / "seat.py"]
-    append += sorted(purelib.glob("__editable__*nirmaan*")) + sorted(purelib.glob("*nirmaan*.pth"))
+    installed = sorted(purelib.glob("__editable__*nirmaan*")) + sorted(purelib.glob("*nirmaan*.pth"))
+    in_actions = env.get("GITHUB_ACTIONS") == "true"
+    append += _need(installed, f"the installed package's files in {purelib}") if in_actions else installed
     # Every folder on PATH and every program a gate or the harness runs: seat code that could put a program of its
     # own there, or change one, would run as the runner at the next gate.
-    create += [Path(d) for d in env.get("PATH", "").split(os.pathsep) if d and Path(d).is_dir()]
+    folders = [Path(d) for d in _need(env.get("PATH"), "PATH").split(os.pathsep) if d]
+    create += [d for d in folders if d.is_dir()]
     for tool in TOOLS:
-        found = shutil.which(tool, path=env.get("PATH"))
-        if found:
-            append.append(Path(found).resolve())
+        append.append(Path(_need(shutil.which(tool, path=env.get("PATH")), f"{tool} on PATH")).resolve())
     exes = WRAPPER.parent.parent / "exes.json"
-    if exes.is_file():  # the programs the wrappers run as the seat account
-        append += [Path(e) for e in json.loads(exes.read_text(encoding="utf-8"))]
-    try:
-        import cocotb
-
-        create.append(Path(cocotb.__file__).resolve().parent)
-    except ImportError:
-        pass
-    for name in ("RUNNER_TEMP",):
-        if env.get(name):
-            create.append(Path(env[name]))
-    for name in ("GITHUB_ENV", "GITHUB_OUTPUT", "GITHUB_PATH", "GITHUB_STEP_SUMMARY"):
-        if env.get(name):
-            path = Path(env[name])
+    try:  # the programs the wrappers run as the seat account
+        wrapped = json.loads(exes.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        wrapped = None
+    append += [Path(e) for e in _need(wrapped, f"the programs the seat account runs ({exes})")]
+    found = importlib.util.find_spec("cocotb")
+    create.append(Path(_need(found.origin if found else None, "the cocotb package")).resolve().parent)
+    names = ("RUNNER_TEMP", "GITHUB_ENV", "GITHUB_OUTPUT", "GITHUB_PATH", "GITHUB_STEP_SUMMARY")
+    for name in names:
+        value = _need(env.get(name), name) if in_actions else env.get(name)
+        if not value:
+            continue
+        path = Path(value)
+        if name == "RUNNER_TEMP":
+            create.append(path)
+        else:
             path.touch(exist_ok=True)
             append.append(path)
     missing = [str(p) for p in [*create, *append] if not p.exists()]
@@ -228,6 +250,7 @@ def precheck() -> str | None:
 def reach(records: Path) -> int:
     from nirmaan.integrations import cocotb_runner  # noqa: F401  (registers the backend)
     from nirmaan.integrations.eda import execute, read_output, select_backend, temporary_runs
+    from nirmaan.runtime.tools import Params
 
     problem = precheck()
     if problem:
@@ -247,7 +270,7 @@ def reach(records: Path) -> int:
     test.write_text(probe_module(config))
     design = work / "reach_probe.v"
     design.write_text(DESIGN)
-    params = {"backend": "cocotb", "sources": str(design), "top": "reach_probe", "cocotb": str(test), "timeout": "300"}
+    params: Params = {"backend": "cocotb", "sources": str(design), "top": "reach_probe", "cocotb": str(test), "timeout": "300"}
     backend, why = select_backend("simulator.run", params)
     if backend is None:
         print(f"::error::reach test: no cocotb backend: {why}", flush=True)

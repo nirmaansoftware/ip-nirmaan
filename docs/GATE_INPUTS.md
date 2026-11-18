@@ -133,7 +133,10 @@ user in GitHub Actions; `nirmaan eval run` on a development machine does not
 use it. That is not enough for a seat's code: on the founder's Mac it can read
 and write what the founder's account can. Until those runs get an account or
 sandbox of their own, run cocotb and firmware cases in CI, not on a personal
-machine. This milestone does not change them.
+machine. This milestone does not change them. In the live evaluation's CI jobs
+a cocotb test module now runs as an account of its own, and a live trial of a
+case that runs seat C is refused until `fw.test` does too
+(`docs/LIVE_EVAL_EVIDENCE.md`, section 6).
 
 Reading was not covered by M84: an `.sby` `[files]` source could name an
 absolute path or one outside its folder, and a Yosys read command a file or

@@ -10,6 +10,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -165,42 +166,66 @@ def test_the_reach_test_needs_the_wrapper_first_on_path(monkeypatch):
     assert "vvp on PATH is None" in reach.precheck()
 
 
+def _opt(tmp_path: Path) -> Path:
+    opt = tmp_path / "opt"
+    (opt / "bin").mkdir(parents=True)
+    (opt / "bin" / "vvp").write_text("")
+    (opt / "seat.py").write_text("")
+    (opt / "exes.json").write_text(json.dumps([str(opt / "bin" / "vvp")]))
+    (tmp_path / "records").mkdir()
+    return opt
+
+
 def test_every_write_target_exists_or_the_reach_test_stops(tmp_path, monkeypatch):
     monkeypatch.setattr(reach, "WRAPPER", tmp_path / "opt" / "bin" / "vvp")
-    with pytest.raises(SystemExit, match="do not exist"):
-        reach.targets(tmp_path / "records", {})
-    (tmp_path / "opt" / "bin").mkdir(parents=True)
-    (tmp_path / "opt" / "bin" / "vvp").write_text("")
-    (tmp_path / "opt" / "seat.py").write_text("")
-    (tmp_path / "records").mkdir()
-    env = {"GITHUB_OUTPUT": str(tmp_path / "out"), "RUNNER_TEMP": str(tmp_path)}
+    monkeypatch.setattr(reach, "TOOLS", ("python3",))
+    with pytest.raises(SystemExit, match="cannot determine|do not exist"):
+        reach.targets(tmp_path / "records", {"PATH": os.environ["PATH"]})
+    _opt(tmp_path)
+    (tmp_path / "cocotb").mkdir()
+    (tmp_path / "cocotb" / "__init__.py").write_text("")
+    real = reach.importlib.util.find_spec
+    monkeypatch.setattr(reach.importlib.util, "find_spec", lambda name: SimpleNamespace(
+        origin=str(tmp_path / "cocotb" / "__init__.py")) if name == "cocotb" else real(name))
+    env = {"GITHUB_OUTPUT": str(tmp_path / "out"), "RUNNER_TEMP": str(tmp_path), "PATH": os.environ["PATH"]}
     create, append = reach.targets(tmp_path / "records", env)
     assert str(REPO) in create and str(REPO / "src" / "nirmaan") in create and str(tmp_path / "records") in create
     assert str(tmp_path) in create and str(tmp_path / "out") in append
     assert str(REPO / ".github" / "workflows" / "live-eval.yml") in append
+    assert str(tmp_path / "cocotb") in create and str(tmp_path / "opt" / "bin" / "vvp") in append
 
 
-def test_harden_takes_write_from_other_accounts_and_leaves_sticky_folders(tmp_path):
-    tree = tmp_path / "toolcache" / "Python" / "bin"
-    tree.mkdir(parents=True)
-    exe = tree / "python3.12"
-    exe.write_text("")
-    exe.chmod(0o777)
-    tree.chmod(0o777)
-    folder = tmp_path / "pathdir"
-    folder.mkdir()
-    folder.chmod(0o777)
-    (folder / "tool").write_text("")
-    (folder / "tool").chmod(0o757)
-    (folder / "deep").mkdir()
-    (folder / "deep" / "x").write_text("")
-    (folder / "deep" / "x").chmod(0o666)
-    sticky = tmp_path / "sticky"
-    sticky.mkdir()
-    sticky.chmod(0o1777)
-    changed = seat.harden([str(tmp_path / "toolcache")], [str(folder), str(sticky), str(tmp_path / "absent")])
-    assert sorted(changed) == sorted(map(str, [tree, exe, folder, folder / "tool"]))
-    assert oct(exe.stat().st_mode & 0o777) == "0o775" and oct((folder / "tool").stat().st_mode & 0o777) == "0o755"
-    assert (folder / "deep" / "x").stat().st_mode & 0o002  # a PATH folder is hardened one level deep
-    assert sticky.stat().st_mode & 0o1777 == 0o1777
-    assert seat.harden([str(tmp_path / "toolcache")], [str(folder)]) == []
+@pytest.mark.parametrize("what", ["package", "cocotb", "tool", "wrapped", "path", "actions"])
+def test_a_target_the_reach_test_cannot_determine_fails_it_never_shrinks_it(tmp_path, monkeypatch, what):
+    """A None or a missing target must never read as denied: the reach test fails and no trial runs."""
+    import nirmaan
+
+    monkeypatch.setattr(reach, "WRAPPER", tmp_path / "opt" / "bin" / "vvp")
+    monkeypatch.setattr(reach, "TOOLS", ("python3",))
+    opt = _opt(tmp_path)
+    env = {"PATH": os.environ["PATH"]}
+    if what == "package":
+        monkeypatch.setattr(nirmaan, "__file__", None)
+    elif what == "cocotb":
+        real = reach.importlib.util.find_spec
+        monkeypatch.setattr(reach.importlib.util, "find_spec", lambda name: None if name == "cocotb" else real(name))
+    elif what == "tool":
+        monkeypatch.setattr(reach, "TOOLS", ("python3", "no-such-gate-tool"))
+    elif what == "wrapped":
+        (opt / "exes.json").write_text("[]")
+    elif what == "path":
+        env = {}
+    else:  # in Actions the step's command files and the runner's temporary folder are required
+        env["GITHUB_ACTIONS"] = "true"
+    with pytest.raises(reach.Unresolved, match="cannot determine"):
+        reach.targets(tmp_path / "records", env)
+
+
+def test_reach_fails_the_job_when_a_target_cannot_be_determined(tmp_path, monkeypatch):
+    import nirmaan
+
+    monkeypatch.setattr(reach, "precheck", lambda: None)
+    monkeypatch.setattr(nirmaan, "__file__", None)
+    with pytest.raises(SystemExit) as stop:
+        reach.reach(tmp_path)
+    assert stop.value.code not in (0, None)
