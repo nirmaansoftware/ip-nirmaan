@@ -232,7 +232,8 @@ DOCUMENT = "document."
 DOCUMENT_KIND = "customer_document"
 #: How a customer document is cited: as a document, never as an artifact (no draft derives from it).
 DOCUMENT_CITATION = "document"
-#: What a customer document is: input from outside, given with the request; the organization did not approve it.
+#: What a customer document is: input from outside, given with the request, never approved by the
+#: organization.
 DOCUMENT_ASSURANCE = "customer input"
 
 
