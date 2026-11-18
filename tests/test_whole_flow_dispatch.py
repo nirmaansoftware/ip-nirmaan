@@ -87,8 +87,19 @@ def test_the_real_default_fingerprint_does_not_read_the_flow_module(monkeypatch)
     assert harness.harness_sha256(cli="2.1.325") == before
 
 
+def _flow_module(monkeypatch, module) -> None:
+    """Stand in for ``nirmaan.evals.flow`` (None: absent), also as the package's attribute once it was imported."""
+    import nirmaan.evals
+
+    monkeypatch.setitem(sys.modules, "nirmaan.evals.flow", module)
+    if module is None:
+        monkeypatch.delattr(nirmaan.evals, "flow", raising=False)
+    else:
+        monkeypatch.setattr(nirmaan.evals, "flow", module, raising=False)
+
+
 def test_a_whole_flow_case_is_refused_plainly_while_the_flow_module_is_absent(org, monkeypatch):
-    monkeypatch.setitem(sys.modules, "nirmaan.evals.flow", None)  # as if the module were not there
+    _flow_module(monkeypatch, None)  # as if the module were not there
     with pytest.raises(EvalError, match="whole-flow runner is not merged yet"):
         evaluate(org, WHOLE, ModelRuntime(ReplayLLM([])), replay=True, repo=ROOT)
 
@@ -97,7 +108,7 @@ def test_a_whole_flow_case_goes_to_the_flow_module_with_every_argument(org, monk
     calls = []
     module = types.ModuleType("nirmaan.evals.flow")
     module.evaluate = lambda *args, **kwargs: calls.append((args, kwargs)) or ("result", "engine")
-    monkeypatch.setitem(sys.modules, "nirmaan.evals.flow", module)
+    _flow_module(monkeypatch, module)
     runtime = ModelRuntime(ReplayLLM([]))
     clock = object()
     assert evaluate(org, WHOLE, runtime, replay=False, repo=ROOT, attempts=1, sandbox=tmp_path, clock=clock,
@@ -111,7 +122,7 @@ def test_a_whole_flow_case_goes_to_the_flow_module_with_every_argument(org, monk
 def test_a_single_seat_case_never_reaches_the_flow_module(org, monkeypatch, tmp_path):
     module = types.ModuleType("nirmaan.evals.flow")
     module.evaluate = lambda *a, **k: pytest.fail("a single-seat case went to the flow module")
-    monkeypatch.setitem(sys.modules, "nirmaan.evals.flow", module)
+    _flow_module(monkeypatch, module)
     case = load_case(ROOT / "evals" / "spec" / "axi4_lite_interface.json")
     runtime = ModelRuntime(replay_llm(case, ROOT), runtime_id="replay")
     result, _ = evaluate(org, case, runtime, replay=True, repo=ROOT, sandbox=tmp_path)
