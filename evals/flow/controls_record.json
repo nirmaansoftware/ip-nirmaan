@@ -1,9 +1,9 @@
 {
-  "about": "The FLOW-CONTROL lines of tests/test_whole_flow_controls.py, as one CI run printed them, per control: whether its seat reached review, each check's verdict and summary, and the job it ran in. A check record for gates WF4, WF5 and WF14 (council record 2026-11-17 and its addendum of 2026-11-18), not an eval record.",
+  "about": "The FLOW-CONTROL lines of tests/test_whole_flow_controls.py, as one CI run printed them, per control: whether its seat reached review, each check's verdict and summary, and the job it ran in. A strict fixture's checks also carry the cycle counts it printed (timing), and a control that never reached review carries its gate runs (gates). A check record for gates WF4, WF5, WF14 and WF15 (council record 2026-11-17 and its two addenda of 2026-11-18), not an eval record.",
   "controls": [
     {
       "id": "driver-all-strobes",
-      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44318772521/job/134851826753",
+      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44336802790/job/134915919011",
       "scores": [
         {
           "check": "6. The held-out test passes on the flow's driver against the reference RTL [driver-all-strobes 1]",
@@ -18,7 +18,7 @@
     },
     {
       "id": "driver-b-before-w",
-      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44318772521/job/134851826753",
+      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44336802790/job/134915919011",
       "scores": [
         {
           "check": "7. The flow's driver and driver test pass on the reference RTL and fail the mutants visible through the driver [driver-b-before-w 1]",
@@ -33,7 +33,7 @@
     },
     {
       "id": "driver-reference",
-      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44318772521/job/134851826753",
+      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44336802790/job/134915919011",
       "scores": [
         {
           "check": "4. The flow's driver alone builds under strict C flags [driver-reference 1]",
@@ -90,7 +90,7 @@
     },
     {
       "id": "driver-sticky-response",
-      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44318772521/job/134851826753",
+      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44336802790/job/134915919011",
       "scores": [
         {
           "check": "6. The held-out test passes on the flow's driver against the reference RTL [driver-sticky-response 1]",
@@ -104,8 +104,125 @@
       ]
     },
     {
+      "id": "driver-strict-latency-driver",
+      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44336802790/job/134915919011",
+      "scores": [
+        {
+          "check": "4. The flow's driver alone builds under strict C flags [driver-strict-latency-driver 1]",
+          "status": "passed",
+          "summary": "fw.build run-0006: host-cc: built clean: 3 compiler runs, 0 errors, 0 warnings",
+          "timing": []
+        },
+        {
+          "check": "5. The held-out test passes on the flow's driver against the flow's own RTL [driver-strict-latency-driver 2]",
+          "status": "passed",
+          "summary": "fw.test run-0007: verilator-cosim: co-simulation passed: 6 checks, 0 failed (82 cycles, 19 bus transfers)",
+          "timing": [
+            "driver read32 3 cycles",
+            "driver write32 3 cycles"
+          ]
+        },
+        {
+          "check": "6. The held-out test passes on the flow's driver against the reference RTL [driver-strict-latency-driver 3]",
+          "status": "failed",
+          "summary": "fw.test run-0008: verilator-cosim: co-simulation failed: 4 of 6 checks failed; first: index_reaches_the_specified_offset: write of index 0 returned -1",
+          "timing": [
+            "driver read32 2 cycles",
+            "driver write32 2 cycles"
+          ]
+        }
+      ],
+      "submitted": true,
+      "verdicts": [
+        "passed",
+        "passed",
+        "failed"
+      ]
+    },
+    {
+      "id": "driver-strict-latency-test",
+      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44336802790/job/134915919011",
+      "scores": [
+        {
+          "check": "The seat's driver and driver test pass on this RTL [driver-strict-latency-test 1]",
+          "status": "passed",
+          "summary": "fw.test run-0006: verilator-cosim: co-simulation passed: 7 checks, 0 failed (91 cycles, 22 bus transfers)",
+          "timing": [
+            "test read32 3 cycles, write32 3 cycles"
+          ]
+        },
+        {
+          "check": "7. The flow's driver and driver test pass on the reference RTL and fail the mutants visible through the driver [driver-strict-latency-test 2]",
+          "status": "failed",
+          "summary": "the clean inputs do not pass: fw.test run-0007: verilator-cosim: co-simulation failed: 1 of 7 checks failed; first: read32_and_write32_take_the_conforming_rtls_cycles: read32 took 2 cycles and write32 2; this test accepts only 3 and 3",
+          "timing": [
+            "test read32 2 cycles, write32 2 cycles"
+          ]
+        }
+      ],
+      "submitted": true,
+      "verdicts": [
+        "passed",
+        "failed"
+      ]
+    },
+    {
+      "gates": [
+        {
+          "succeeded": true,
+          "summary": "host-cc: built clean: 3 compiler runs, 0 errors, 0 warnings",
+          "tool": "fw.build"
+        },
+        {
+          "succeeded": false,
+          "summary": "verilator-cosim: build failed before co-simulation: 0 errors (exit status -11)",
+          "tool": "fw.test"
+        }
+      ],
+      "id": "driver-strict-soc-address",
+      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44336802790/job/134915919011",
+      "scores": [
+        {
+          "check": "7. The flow's driver and driver test pass on the reference RTL and fail the mutants visible through the driver [driver-strict-soc-address 1]",
+          "status": "not_run",
+          "summary": "the work never reached review, so there is nothing to judge"
+        }
+      ],
+      "submitted": false,
+      "verdicts": [
+        "not_run"
+      ]
+    },
+    {
+      "gates": [
+        {
+          "succeeded": true,
+          "summary": "host-cc: built clean: 3 compiler runs, 0 errors, 0 warnings",
+          "tool": "fw.build"
+        },
+        {
+          "succeeded": false,
+          "summary": "verilator-cosim: build failed before co-simulation: 1 error; first: /tmp/pytest-of-runner/pytest-0/test_the_control_gets_the_verd18/box/seat/prj-24bcb8b6cc_firmware/1/axi4_lite_regs_test.c:39: nirmaan_soc.h: No such file or directory",
+          "tool": "fw.test"
+        }
+      ],
+      "id": "driver-strict-soc-cycles",
+      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44336802790/job/134915919011",
+      "scores": [
+        {
+          "check": "7. The flow's driver and driver test pass on the reference RTL and fail the mutants visible through the driver [driver-strict-soc-cycles 1]",
+          "status": "not_run",
+          "summary": "the work never reached review, so there is nothing to judge"
+        }
+      ],
+      "submitted": false,
+      "verdicts": [
+        "not_run"
+      ]
+    },
+    {
       "id": "driver-swallowed-error",
-      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44318772521/job/134851826753",
+      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44336802790/job/134915919011",
       "scores": [
         {
           "check": "6. The held-out test passes on the flow's driver against the reference RTL [driver-swallowed-error 1]",
@@ -120,7 +237,7 @@
     },
     {
       "id": "driver-wait-probe",
-      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44318772521/job/134851826753",
+      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44336802790/job/134915919011",
       "scores": [
         {
           "check": "The seat's driver and driver test pass on this RTL [driver-wait-probe 1]",
@@ -141,7 +258,7 @@
     },
     {
       "id": "driver-wrong-map",
-      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44318772521/job/134851826753",
+      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44336802790/job/134915919011",
       "scores": [
         {
           "check": "6. The held-out test passes on the flow's driver against the reference RTL [driver-wrong-map 1]",
@@ -156,7 +273,7 @@
     },
     {
       "id": "regs-conforming-lat2",
-      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44318772521/job/134851826753",
+      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44336802790/job/134915919011",
       "scores": [
         {
           "check": "1. The reference testbench passes on the flow's RTL [regs-conforming-lat2 1]",
@@ -183,7 +300,7 @@
     },
     {
       "id": "regs-reference",
-      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44318772521/job/134851826753",
+      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44336802790/job/134915919011",
       "scores": [
         {
           "check": "1. The reference testbench passes on the flow's RTL [regs-reference 1]",
@@ -210,7 +327,7 @@
     },
     {
       "id": "regs-rtl-b-before-w",
-      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44318772521/job/134851826753",
+      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44336802790/job/134915919011",
       "scores": [
         {
           "check": "1. The reference testbench passes on the flow's RTL [regs-rtl-b-before-w 1]",
@@ -225,7 +342,7 @@
     },
     {
       "id": "regs-rtl-okay-unmapped",
-      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44318772521/job/134851826753",
+      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44336802790/job/134915919011",
       "scores": [
         {
           "check": "1. The reference testbench passes on the flow's RTL [regs-rtl-okay-unmapped 1]",
@@ -240,7 +357,7 @@
     },
     {
       "id": "regs-rtl-wstrb-ignored",
-      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44318772521/job/134851826753",
+      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44336802790/job/134915919011",
       "scores": [
         {
           "check": "1. The reference testbench passes on the flow's RTL [regs-rtl-wstrb-ignored 1]",
@@ -255,7 +372,7 @@
     },
     {
       "id": "regs-tb-strict2",
-      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44318772521/job/134851826753",
+      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44336802790/job/134915919011",
       "scores": [
         {
           "check": "1. The reference testbench passes on the flow's RTL [regs-tb-strict2 1]",
@@ -265,7 +382,7 @@
         {
           "check": "3. The flow's testbench passes on the reference RTL and fails each register block mutant [regs-tb-strict2 2]",
           "status": "failed",
-          "summary": "the clean inputs do not pass: simulator.run run-0005: icarus: simulation failed: 61 errors, the testbench reports 61 of 298 checks failed; first: /tmp/pytest-of-runner/pytest-0/test_the_control_gets_the_verd12/box/judge/check-2/must-fail-l2k_lkgd/clean/axi4_lite_regs_tb_strict2.v:68: read latency exactly 2: got 0x00000000, expected 0x00000001"
+          "summary": "the clean inputs do not pass: simulator.run run-0005: icarus: simulation failed: 61 errors, the testbench reports 61 of 298 checks failed; first: /tmp/pytest-of-runner/pytest-0/test_the_control_gets_the_verd12/box/judge/check-2/must-fail-tk9cmf1p/clean/axi4_lite_regs_tb_strict2.v:68: read latency exactly 2: got 0x00000000, expected 0x00000001"
         }
       ],
       "submitted": true,
@@ -276,7 +393,7 @@
     },
     {
       "id": "regs-tb-trivial",
-      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44318772521/job/134851826753",
+      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44336802790/job/134915919011",
       "scores": [
         {
           "check": "3. The flow's testbench passes on the reference RTL and fails each register block mutant [regs-tb-trivial 1]",
@@ -291,7 +408,7 @@
     },
     {
       "id": "timer-reference",
-      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44318772521/job/134851826753",
+      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44336802790/job/134915919011",
       "scores": [
         {
           "check": "The reference testbench passes on the flow's RTL [timer-reference 1]",
@@ -311,8 +428,25 @@
       ]
     },
     {
+      "gates": [
+        {
+          "succeeded": false,
+          "summary": "verilator-lint: lint failed: 0 errors, 1 warning; first: /tmp/pytest-of-runner/pytest-0/test_the_control_gets_the_verd4/box/seat/prj-97dea43f5b_rtl-implementation/1/axil_timer.v:61: [UNUSEDSIGNAL] Bits of signal are not used: 'addr'[3:2]",
+          "tool": "lint.run"
+        },
+        {
+          "succeeded": true,
+          "summary": "icarus: simulation passed: 1 check passed, $finish reached at time 70000, 0 errors",
+          "tool": "simulator.run"
+        },
+        {
+          "succeeded": true,
+          "summary": "yosys: synthesis passed: 766 cells, 146 flip-flops, 0 latches, 0 warnings",
+          "tool": "synth.run"
+        }
+      ],
       "id": "timer-rtl-decode-alias",
-      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44318772521/job/134851826753",
+      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44336802790/job/134915919011",
       "scores": [
         {
           "check": "The reference testbench passes on the flow's RTL [timer-rtl-decode-alias 1]",
@@ -327,7 +461,7 @@
     },
     {
       "id": "timer-rtl-oneshot-runs-on",
-      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44318772521/job/134851826753",
+      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44336802790/job/134915919011",
       "scores": [
         {
           "check": "The reference testbench passes on the flow's RTL [timer-rtl-oneshot-runs-on 1]",
@@ -342,7 +476,7 @@
     },
     {
       "id": "timer-rtl-reload-off-by-one",
-      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44318772521/job/134851826753",
+      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44336802790/job/134915919011",
       "scores": [
         {
           "check": "The reference testbench passes on the flow's RTL [timer-rtl-reload-off-by-one 1]",
@@ -357,7 +491,7 @@
     },
     {
       "id": "timer-rtl-stop-ignored",
-      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44318772521/job/134851826753",
+      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44336802790/job/134915919011",
       "scores": [
         {
           "check": "The reference testbench passes on the flow's RTL [timer-rtl-stop-ignored 1]",
@@ -372,7 +506,7 @@
     },
     {
       "id": "timer-tb-trivial",
-      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44318772521/job/134851826753",
+      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44336802790/job/134915919011",
       "scores": [
         {
           "check": "The flow's testbench passes on the reference RTL and fails each timer mutant [timer-tb-trivial 1]",
@@ -387,7 +521,7 @@
     },
     {
       "id": "timer-tb-weak",
-      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44318772521/job/134851826753",
+      "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44336802790/job/134915919011",
       "scores": [
         {
           "check": "The flow's testbench passes on the reference RTL and fails each timer mutant [timer-tb-weak 1]",
@@ -402,6 +536,6 @@
     }
   ],
   "format": "nirmaan.flow-controls-record",
-  "head": "dfce3a9abc9ca5473aecf5dfb97c1645c7d292d7",
-  "run": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44318772521"
+  "head": "01943dc2433a06a43c999984af3108c3df762f8e",
+  "run": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44336802790"
 }
