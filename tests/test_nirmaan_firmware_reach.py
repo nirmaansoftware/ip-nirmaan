@@ -299,7 +299,7 @@ def _probe(rtl: Path):
 
 
 @needs("cc", "verilator", "make")
-def test_a_driver_tests_c_reaches_the_simulators_clock():
+def test_a_driver_tests_c_reaches_the_simulators_clock(capsys):
     """The answer to the addendum's open question (fact 6): yes. Through a mangled C++ symbol of Verilator's
     runtime a test's C reads the simulation time, and so times a read32: one cycle more on the RTL that answers
     after 2 than on the reference. Neither a HAL call nor the driver interface; the open security question."""
@@ -308,7 +308,8 @@ def test_a_driver_tests_c_reaches_the_simulators_clock():
         run = _probe(rtl)
         log = Path(run.references[0]).read_text(encoding="utf-8", errors="replace") if run.references else ""
         m = re.search(r"^REACH-PROBE read32 (\d+) cycles, write32 (\d+) cycles$", log, re.M)
-        print(f"\nREACH-PROBE {rtl.name}: {run.summary}; {m.group(0) if m else 'no timing line'}")
+        with capsys.disabled():  # into the CI log, as the controls' FLOW-CONTROL lines are
+            print(f"\nREACH-PROBE {rtl.name}: {run.summary}; {m.group(0) if m else 'no timing line'}")
         assert run.succeeded and m, f"{RETURN_CONDITION}\n{rtl.name}: {run.summary}"
         timed[rtl.name] = (int(m[1]), int(m[2]))
     ref, lat2 = timed["axi4_lite_regs.v"], timed["axi4_lite_regs_lat2.v"]

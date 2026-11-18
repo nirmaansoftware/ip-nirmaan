@@ -79,8 +79,9 @@ digests (WF3).
 **The fixed documents.** The timer document is new: it states, as behaviour
 at the ports, every rule the reference testbench checks and every rule a
 mutant breaks, each with a `[req:TMR-...]` tag. The register block document is
-a copy of `evals/spec/axi4_lite/requirements.md` with tags on section 1 and a
-section 4. Both state the rule that binds the flow's own tests: a test accepts
+a copy of `evals/spec/axi4_lite/requirements.md` with tags on section 1, a
+section 4, and three rules split or made exact so that each tag states only
+what is judged (`AXIL-NO-PROT`, `AXIL-PARAMS-DEFAULT`, `AXIL-B2B`). Both state the rule that binds the flow's own tests: a test accepts
 every behaviour the document allows and never requires one choice inside a
 range (`TMR-TEST-RANGE`, `AXIL-TEST-RANGE`). The driver interface copy says the
 offsets and reset value are the requirements document's and that the map
@@ -95,7 +96,9 @@ every tag no check or mutant rests on: the tags the RTL stage's own gates
 cover (`TMR-CLEAN`, `AXIL-SYNTH`, `AXIL-FORMAL`), and the timer rules the
 reference testbench never exercises. Where the testbench reaches only part of
 a rule, the rule is split and the unreached part has its own tag, listed as
-not judged: readiness (`TMR-READY`), the read value at the accepting edge
+not judged: the parameter defaults (`TMR-ADDR-WIDTH-RANGE`, which also holds
+the timer's widths 5 to 7, and `AXIL-PARAMS-DEFAULT`), "no other ports"
+(`TMR-PORTS-ONLY`, `AXIL-NO-PROT`), and, for the timer, readiness (`TMR-READY`), the read value at the accepting edge
 (`TMR-READ-VALUE`), `COUNT` while a count runs (`TMR-COUNT-READ`), a periodic
 `LOAD` of 0, the value the stop edge gives `COUNT`, a `CTRL` write on a count
 end (`TMR-CTRL-WINS`), the edge `irq` changes on after a write, what a
@@ -104,6 +107,19 @@ synchronous reset does to a pending response or a held half write
 (`TMR-TB-ALL`; the must-fail check holds it only to the four mutants). A test
 checks both ways: each cited tag or heading exists, and each tag is cited or
 listed.
+
+**The reference testbenches.** Each case's check 1 runs its own copy of the
+single-seat reference testbench: `evals/flow/axil_timer/axil_timer_tb.v` and
+`evals/flow/axi4_lite/axi4_lite_regs_tb.v`. A copy keeps every check of the
+original, in order and word for word, and adds the checks an independent
+check found missing: for the timer, RDATA held still while a running `COUNT`
+is read under backpressure, a `STATUS` clear on the edge a one-shot count
+ends, and a reset while `EXPIRED` is set; for the register block, a new
+request accepted in the cycle after a response is taken, and reset while a
+write or read response waits or with only the address or only the data of a
+write accepted. The single-seat cases keep running the originals, so their
+digests, and the recorded trials that hold those digests, stay as they are.
+A test holds both.
 
 **The held-out tests.** The register block case's held-out test is its own
 copy of the firmware case's, with an unmapped (misaligned) write added, so the
@@ -118,9 +134,9 @@ testbench written to that one choice (`axi4_lite_regs_tb_strict2.v`). The timer
 document leaves no choice open: its readiness, response timing, count length
 and every response are exact (the timer's interface specification already
 fixed them, and the reference testbench times a write to the edge,
-`axil_timer_tb.v` lines 380 to 383), so the timer has no conforming variant
-and no strict testbench. No strict driver test is required either (the
-council record's addendum of 2026-11-18): through `read32` and `write32` on
+`evals/flow/axil_timer/axil_timer_tb.v` lines 387 to 390), so the timer has no
+conforming variant and no strict testbench. No strict driver test is
+required either (the council record's addendum of 2026-11-18): through `read32` and `write32` on
 this block, a driver test cannot be strict about latency. Each call returns
 only after the response, with the data and the response code, and nothing in
 the block depends on elapsed cycles. That is shown by the harness's
@@ -265,9 +281,10 @@ to this. Until a document's first record lands it is listed, with the reason,
 in `evals/flow/requirements_check_pending.json` (a data file); its test still
 runs and checks that it has no record yet, so the entry must go when the
 record lands, and a document neither listed nor recorded fails. No test
-skips. Both documents are listed now: the timer document was rewritten after
-an independent check found tags its checks do not reach and rules it left
-ambiguous, and the register block copy has never been checked. Another test
+skips. Both documents are listed now: an independent check failed both, with
+mutants that pass the reference testbenches, and each was fixed by stronger
+checks in the case's own reference testbench and by splitting what stays
+unjudged into its own tags; neither has passed a fresh check yet. Another test
 shows the rule refuses a stale record, a record whose checker is its writer,
 a missing tag, a tag marked unjudged that a check cites, unreadable
 evidence, and a result that does not hold.
