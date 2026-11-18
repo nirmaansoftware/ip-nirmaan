@@ -1,7 +1,7 @@
 # Whole-flow cases (G3, M87)
 
 Source: `council/records/2026-11-17-g3-whole-flow-cases.md` (gates WF1 to
-WF13), which applies decision 6 of the pilot retrospective
+WF14), which applies decision 6 of the pilot retrospective
 (`council/records/2026-11-14-pilot-retrospective.md`). A whole-flow trial puts
 a request in, seats every work stage with the model, and judges only the final
 block. It credits no skill and no level.
@@ -148,10 +148,20 @@ testbench written to that one choice (`axi4_lite_regs_tb_strict2.v`). The timer
 document leaves no choice open: its readiness, response timing, count length
 and every response are exact (the timer's interface specification already
 fixed them, and the reference testbench times a write to the edge,
-`evals/flow/axil_timer/axil_timer_tb.v` lines 395 to 398), so the timer has no conforming variant
-and no strict testbench. No strict driver test exists either: the HAL a driver
-test calls (`nirmaan_hal.h`) has no clock or cycle count, so a driver test
-cannot see latency; the judge controls record this by a run.
+`evals/flow/axil_timer/axil_timer_tb.v` lines 395 to 398), so the timer has no
+conforming variant and no strict testbench. No strict driver test is
+required either (the council record's addendum of 2026-11-18): through `read32` and `write32` on
+this block, a driver test cannot be strict about latency. Each call returns
+only after the response, with the data and the response code, and nothing in
+the block depends on elapsed cycles. That is shown by the harness's
+construction, which the reach guard pins (gate WF14, below), and by the judge
+controls' run together, not by the run alone. The HAL is not all a driver test
+can reach: `nirmaan_irq_wait(seen, cycles)` (`nirmaan_irq.h`) lets cycles pass,
+and the harness ends a run at 5000000 cycles. A test that spends cycles near
+that limit fails the slower RTL, never the reference, which answers in the
+fewest cycles the document allows; so the limit cannot make a test that fails
+the reference RTL for latency. A test's host C can also reach the host C
+library and the simulator's runtime (below).
 
 **Fixtures for the controls.** Three wrong drivers (a swallowed bus error,
 `write_byte` with every strobe, a sticky `last_response`) under
@@ -178,7 +188,7 @@ dispatch edit, never after it.
 ## The judge controls (M87, third pull request)
 
 Gates WF4 and WF5 need each case's judge proven by replays with no model call,
-run in CI, before the first trial. `evals/flow/controls.json` lists 20
+run in CI, before the first trial. `evals/flow/controls.json` lists 21
 controls. Each is a seat answer made of committed files and the whole-flow
 case's own held-out checks it must pass or fail, sometimes with the RTL a
 check runs on put in another's place. `tests/test_whole_flow_controls.py` runs
@@ -211,10 +221,13 @@ What they show:
 - `b_before_w` is not visible through the HAL: under the must-fail scorer
   with that mutant alone, the reference driver test passes on it. The ruling
   assumed so and left it out of check 7; this run records it;
-- no driver test can see latency: the reference driver test passes on both
-  RTLs with the same bus transfers, and the HAL has no clock or cycle count.
-  So no strict driver test exists, and checks 6 and 7 cannot fail for being
-  stricter than the latency bound.
+- the reference driver test passes on both RTLs with the same bus transfers.
+  That shows one test. That no driver test can be strict about latency
+  through `read32` and `write32` on this block rests on the harness's
+  construction (the reach guard) and this run together;
+- the wait probe (`driver-wait-probe`, gate WF14): a driver test that calls
+  `nirmaan_irq_wait` between transfers passes on both RTLs with the same bus
+  transfers, an attempt to see latency that does not.
 
 Each control prints one `FLOW-CONTROL` line with its verdicts and run
 summaries. `evals/flow/controls_record.json` keeps those lines from a named
@@ -224,6 +237,47 @@ run to the verdicts it records.
 Left for the whole-flow runner: the reference flow replayed through every
 seated stage, a flow with a planted upstream fault, and check 5, which takes
 the RTL from another stage.
+
+## What a driver test can reach (gate WF14)
+
+The council record's addendum of 2026-11-18 replaced decision 2's fixture
+driver test for the register block with three things, which gate WF14 asks
+for before the first register block trial:
+
+- **The reach guard.** The guard tests in
+  `tests/test_nirmaan_firmware_reach.py` need no tool. They pin, as exact
+  lists: the members of `nirmaan_hal` and every declaration of
+  `nirmaan_hal.h` and `nirmaan_irq.h`; the external definitions of each
+  host manager (`axil_manager.cpp`, `apb_manager.cpp`: the six `extern "C"`
+  functions and `main`; everything else, and all of `harness_report.h`, is in
+  an anonymous namespace); the files in the harness directory, which is on a
+  driver test's include path; the registered managers; the headers each
+  harness file includes; and the literal options of the Verilator build. Any
+  addition, or an edit to a listed declaration, fails with the return
+  condition in its message. (The same file's simulator test, below, needs the
+  firmware tools and runs in CI.)
+- **The wait probe**, the control above, recorded in
+  `evals/flow/controls_record.json`.
+- **The return condition.** The fixture driver test is required again, before
+  the next trial, for any case where the HAL or the harness gains a cycle
+  count, a timeout or a non-blocking access that a driver test can read, or
+  where the block has a register whose value depends on elapsed cycles, or
+  where the fixed document leaves open a choice visible in data or response
+  codes.
+
+The addendum left open whether a simulator symbol is reachable from a test's
+C. It is. Under `fw.test` a driver test is host C linked into one image with
+the harness and Verilator's runtime, and C can name a C++ symbol by its
+mangled name. `tests/fixtures/fw/reach/simulator_clock_probe.c` reads
+`Verilated::s_lastContextp`, the harness's own simulation context, finds the
+simulation time in it, and times a `read32` and a `write32` in cycles: each
+takes more cycles on `axi4_lite_regs_lat2.v` than on the reference RTL. The
+tool-backed test in the guard file runs it on both RTLs, in CI only. This is
+neither a HAL call nor the driver interface, so it is the addendum's open
+security question (whether a driver test's host C should be screened or
+confined), not the fixture control; the guard covers it by pinning the
+headers that bring in the runtime and the Verilator options, which decide
+which simulator symbols the image holds.
 
 ## The document check record (M87, follow-up)
 

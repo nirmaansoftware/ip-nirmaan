@@ -37,7 +37,20 @@ case's `inputs` never reaches the requirements seat as text.
 replays through the real gates and scorers with no model call, run in CI
 (`tests/test_whole_flow_controls.py`), and their recorded CI run in
 `evals/flow/controls_record.json`. They confirm by a run that `b_before_w` is
-not visible through the HAL and that no driver test can see latency.
+not visible through the HAL and that the reference driver test makes the
+same bus transfers on both RTLs. (Their text first said that no driver test
+can see latency; the council record's addendum of 2026-11-18 narrowed that to
+`read32` and `write32` on this block, shown by the harness's construction and
+the run together.)
+
+**What a driver test can reach (gate WF14, follow-up).** The reach guard
+(`tests/test_nirmaan_firmware_reach.py`) pins the HAL, the two harness
+headers, each host manager's exports and includes, and the Verilator options;
+the wait probe (`driver-wait-probe`) is the 21st control, recorded passing on
+both RTLs with the same bus transfers; `docs/WHOLE_FLOW.md` and the
+`driver-reference` text are corrected. The addendum's open question is
+answered by a CI test: a driver test's C reaches Verilator's runtime by a
+mangled symbol and can read the simulation time.
 
 **The timer document fixed, and the check record rule (follow-up).** An
 independent check found that `evals/flow/axil_timer/requirements.md` claimed
