@@ -100,7 +100,7 @@ not judged: the parameter defaults (`TMR-ADDR-WIDTH-RANGE`, which also holds
 the timer's widths 5 to 7, and `AXIL-PARAMS-DEFAULT`), "no other ports"
 (`TMR-PORTS-ONLY`, `AXIL-NO-PROT`), and, for the timer, readiness (`TMR-READY`), the read value at the accepting edge
 (`TMR-READ-VALUE`), `COUNT` while a count runs (`TMR-COUNT-READ`), a periodic
-`LOAD` of 0, the value the stop edge gives `COUNT`, a `CTRL` write on a count
+`LOAD` of 0, a `CTRL` write on a count
 end (`TMR-CTRL-WINS`), the edge `irq` changes on after a write, what a
 synchronous reset does to a pending response or a held half write
 (`TMR-RESET-EDGE`), and the testbench checking every requirement
@@ -117,9 +117,23 @@ is read under backpressure, a `STATUS` clear on the edge a one-shot count
 ends, and a reset while `EXPIRED` is set; for the register block, a new
 request accepted in the cycle after a response is taken, and reset while a
 write or read response waits or with only the address or only the data of a
-write accepted. The single-seat cases keep running the originals, so their
-digests, and the recorded trials that hold those digests, stay as they are.
-A test holds both.
+write accepted. A second round, after another independent check, added for
+the timer: every port's width, each `LOAD` strobe alone and none, `CTRL` bits
+31:3 and `STATUS` bits 31:1 reading as zero, a write and a read at every
+unmapped address (all 256 at `ADDR_WIDTH` 8) with nothing changed, `irq` held
+high through 100000 cycles and through writes that neither clear `EXPIRED`
+nor write `IE` 0, timed counts of 300 and 65539 cycles, the value a stop
+leaves in `COUNT` from all 32 bits of `LOAD` (so `TMR-STOP-EDGE` is now
+judged), thirty periods and periods of 300, write halves 40 cycles apart,
+and 40 cycles of backpressure; and a write that leaves its address, data and
+strobes unknown while it does not offer them. For the register block: every
+register bit, each strobe alone, a write and a read at every unmapped address,
+write halves 40 cycles apart, back-to-back requests after responses that
+waited on `READY`, and no response valid after the first reset edge. A rule
+over time ("stays high until", "any gap", "until `EN` is written 1 again") is
+checked over these bounded runs, as any simulation checks it. The single-seat
+cases keep running the originals, so their digests, and the recorded trials
+that hold those digests, stay as they are. A test holds both.
 
 **The held-out tests.** The register block case's held-out test is its own
 copy of the firmware case's, with an unmapped (misaligned) write added, so the
@@ -134,7 +148,7 @@ testbench written to that one choice (`axi4_lite_regs_tb_strict2.v`). The timer
 document leaves no choice open: its readiness, response timing, count length
 and every response are exact (the timer's interface specification already
 fixed them, and the reference testbench times a write to the edge,
-`evals/flow/axil_timer/axil_timer_tb.v` lines 387 to 390), so the timer has no conforming variant
+`evals/flow/axil_timer/axil_timer_tb.v` lines 395 to 398), so the timer has no conforming variant
 and no strict testbench. No strict driver test exists either: the HAL a driver
 test calls (`nirmaan_hal.h`) has no clock or cycle count, so a driver test
 cannot see latency; the judge controls record this by a run.
@@ -229,10 +243,10 @@ to this. Until a document's first record lands it is listed, with the reason,
 in `evals/flow/requirements_check_pending.json` (a data file); its test still
 runs and checks that it has no record yet, so the entry must go when the
 record lands, and a document neither listed nor recorded fails. No test
-skips. Both documents are listed now: an independent check failed both, with
-mutants that pass the reference testbenches, and each was fixed by stronger
-checks in the case's own reference testbench and by splitting what stays
-unjudged into its own tags; neither has passed a fresh check yet. Another test
+skips. Both documents are listed now: independent checks failed both, each more than once,
+with mutants that pass the reference testbenches, and each was fixed by
+stronger checks in the case's own reference testbench and by splitting what
+stays unjudged into its own tags; neither has passed a fresh check yet. Another test
 shows the rule refuses a stale record, a record whose checker is its writer,
 a missing tag, a tag marked unjudged that a check cites, unreadable
 evidence, and a result that does not hold.

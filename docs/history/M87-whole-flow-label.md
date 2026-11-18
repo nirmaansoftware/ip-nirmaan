@@ -63,5 +63,19 @@ parameter defaults, the timer's widths 5 to 7 and the "no other ports" rules
 have their own tags, listed as not judged. Both documents wait for a fresh
 check.
 
+**Both testbench copies strengthened again (follow-up).** Another independent
+check passed mutants through both copies: a write decode ignoring `addr[1]`,
+offsets with bit 5 or bit 7 set aliasing at `ADDR_WIDTH` 8, an `irq` that
+drops after 20 cycles, `CTRL` bits above 2 that read back, and a read decode
+ignoring `addr[0]` on the register block. Each copy now drives every unmapped
+address, holds `irq` high for 100000 cycles, writes every bit and every strobe
+alone, runs long counts, stops and gaps, and leaves a write's address and data
+unknown while they are not offered; the timer's stop value is now judged
+(`TMR-STOP-EDGE`). The author swept every judged tag of both documents with
+its own scratch mutants before asking for review. The documents are unchanged,
+and both still wait for a fresh check. The register block testbench's check
+that `AWREADY` is high in reset is not stated by the single-seat interface
+specification, and is left for a decision.
+
 **Not here.** The runner option (its `runner.py` dispatch waits for the H3
 batch, gate WF1).

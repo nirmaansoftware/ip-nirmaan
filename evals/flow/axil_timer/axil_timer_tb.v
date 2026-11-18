@@ -1,9 +1,13 @@
 // Self-checking testbench for axil_timer.v: the whole-flow case flow/axil-timer's
 // reference (check 1). It is that case's own copy of the single-seat case's
 // tests/fixtures/rtl/axil_timer/axil_timer_tb.v (P3-E2), which stays as it is,
-// with every check of that file kept and three groups added: RDATA held still
-// under backpressure while COUNT runs, a STATUS clear on the edge a one-shot
-// count ends, and a reset while EXPIRED is set.
+// with every check of that file kept and groups added: RDATA held still under
+// backpressure while COUNT runs, a STATUS clear on the edge a one-shot count
+// ends, a reset while EXPIRED is set, and, at the end of each lane, the port
+// widths, every strobe of LOAD alone and none, CTRL and STATUS bits that read
+// as zero, every unmapped address, irq held for 100000 cycles, long counts
+// and stops, thirty periods, and long gaps and backpressure. A write leaves
+// its address, data and strobes unknown while it does not offer them.
 //
 // Two lanes run the same checks, one at ADDR_WIDTH 4 and one at ADDR_WIDTH 8
 // (where offsets 0x10 and up must get SLVERR, not alias the registers). Each
@@ -65,6 +69,8 @@ module axil_timer_tb_lane #(
     reg     rose;
     reg [1:0]  resp;
     reg [31:0] data;
+    reg        hold_irq = 1'b0;  // set: irq must stay high on every cycle
+    integer    irq_drops = 0;    // cycles irq was low while hold_irq was set
 
     axil_timer #(.ADDR_WIDTH(AW)) dut (
         .aclk(aclk), .aresetn(aresetn),
@@ -85,6 +91,8 @@ module axil_timer_tb_lane #(
         if (irq === 1'b1 && !irq_seen)
             rise_edge = edges;
         irq_seen = irq === 1'b1;
+        if (hold_irq && irq !== 1'b1)
+            irq_drops = irq_drops + 1;
     end
 
     task automatic check(input [8*48-1:0] what, input [31:0] got, input [31:0] expected);
@@ -115,10 +123,10 @@ module axil_timer_tb_lane #(
             held_resp = 2'bxx;
             while (!b_done && cyc < TIMEOUT) begin
                 awvalid = !aw_done && cyc >= aw_delay;
-                awaddr = addr[AW-1:0];
+                awaddr = awvalid ? addr[AW-1:0] : {AW{1'bx}};
                 wvalid = !w_done && cyc >= w_delay;
-                wdata = value;
-                wstrb = strb;
+                wdata = wvalid ? value : 32'hxxxxxxxx;
+                wstrb = wvalid ? strb : 4'hx;
                 bready = b_seen_cyc >= 0 && cyc - b_seen_cyc >= b_delay;
                 #1;
                 if (bvalid) begin
@@ -169,7 +177,7 @@ module axil_timer_tb_lane #(
             held_resp = 2'bxx;
             while (!r_done && cyc < TIMEOUT) begin
                 arvalid = !ar_done;
-                araddr = addr[AW-1:0];
+                araddr = arvalid ? addr[AW-1:0] : {AW{1'bx}};
                 rready = r_seen_cyc >= 0 && cyc - r_seen_cyc >= r_delay;
                 #1;
                 if (rvalid) begin
@@ -448,6 +456,185 @@ module axil_timer_tb_lane #(
         for (i = 0; i < 4; i = i + 1)
             expect_reg("value after reset", {i[5:0], 2'b00}, 32'd0);
         quiet("no interrupt after reset", 40);
+
+        // Every port has the width the document gives it.
+        check("s_axil_awaddr width", $bits(dut.s_axil_awaddr), AW);
+        check("s_axil_awvalid width", $bits(dut.s_axil_awvalid), 1);
+        check("s_axil_awready width", $bits(dut.s_axil_awready), 1);
+        check("s_axil_wdata width", $bits(dut.s_axil_wdata), 32);
+        check("s_axil_wstrb width", $bits(dut.s_axil_wstrb), 4);
+        check("s_axil_wvalid width", $bits(dut.s_axil_wvalid), 1);
+        check("s_axil_wready width", $bits(dut.s_axil_wready), 1);
+        check("s_axil_bresp width", $bits(dut.s_axil_bresp), 2);
+        check("s_axil_bvalid width", $bits(dut.s_axil_bvalid), 1);
+        check("s_axil_bready width", $bits(dut.s_axil_bready), 1);
+        check("s_axil_araddr width", $bits(dut.s_axil_araddr), AW);
+        check("s_axil_arvalid width", $bits(dut.s_axil_arvalid), 1);
+        check("s_axil_arready width", $bits(dut.s_axil_arready), 1);
+        check("s_axil_rdata width", $bits(dut.s_axil_rdata), 32);
+        check("s_axil_rresp width", $bits(dut.s_axil_rresp), 2);
+        check("s_axil_rvalid width", $bits(dut.s_axil_rvalid), 1);
+        check("s_axil_rready width", $bits(dut.s_axil_rready), 1);
+        check("irq width", $bits(dut.irq), 1);
+        check("aclk width", $bits(dut.aclk), 1);
+        check("aresetn width", $bits(dut.aresetn), 1);
+
+        // LOAD holds all 32 bits, and each strobe alone writes only its own byte.
+        write_ok(8'h04, 32'hFFFF_FFFF, 4'hF);
+        expect_reg("LOAD all ones", 8'h04, 32'hFFFF_FFFF);
+        write_ok(8'h04, 32'd0, 4'b0001);
+        expect_reg("LOAD wstrb 0001", 8'h04, 32'hFFFF_FF00);
+        write_ok(8'h04, 32'd0, 4'b0010);
+        expect_reg("LOAD wstrb 0010", 8'h04, 32'hFFFF_0000);
+        write_ok(8'h04, 32'd0, 4'b0100);
+        expect_reg("LOAD wstrb 0100", 8'h04, 32'hFF00_0000);
+        write_ok(8'h04, 32'd0, 4'b1000);
+        expect_reg("LOAD wstrb 1000", 8'h04, 32'h0000_0000);
+        write_ok(8'h04, 32'hA5C3_96E1, 4'b1010);
+        expect_reg("LOAD wstrb 1010", 8'h04, 32'hA500_9600);
+        write_ok(8'h04, 32'h1234_5678, 4'b0000);
+        expect_reg("LOAD wstrb 0000 writes nothing", 8'h04, 32'hA500_9600);
+        write_ok(8'h00, EN | IE | PERIODIC, 4'b0000);
+        expect_reg("CTRL wstrb 0000 writes nothing", 8'h00, 32'd0);
+        quiet("no count after a CTRL write with no strobe", 8);
+
+        // CTRL bits 31:3 and STATUS bits 31:1 read as zero, whatever is written.
+        write_ok(8'h00, 32'hFFFF_FFF8, 4'hF);
+        expect_reg("CTRL bits 31:3 read as zero", 8'h00, 32'd0);
+        write_ok(8'h00, 32'hFFFF_FFFE, 4'hF);
+        expect_reg("CTRL bits 31:3 read as zero, IE and MODE", 8'h00, IE | PERIODIC);
+        write_ok(8'h00, 32'd0, 4'hF);
+        write_ok(8'h0C, 32'hFFFF_FFFE, 4'hF);
+        expect_reg("STATUS bits 31:1 read as zero", 8'h0C, 32'd0);
+
+        // Every address but the four registers' is unmapped: with EXPIRED set,
+        // irq high and the count stopped, a write of all ones to each other
+        // address (COUNT too) gets SLVERR and changes nothing, and a read of
+        // each gets SLVERR and zero. irq stays high on every cycle of it.
+        write_ok(8'h04, 32'd3, 4'hF);
+        write_ok(8'h00, EN, 4'h1);
+        repeat (6) @(negedge aclk);
+        write_ok(8'h04, 32'h0000_0055, 4'hF);
+        write_ok(8'h00, IE | PERIODIC, 4'h1);
+        check("irq high before the address sweep", {31'd0, irq}, 32'd1);
+        hold_irq = 1'b1;
+        for (i = 0; i < (1 << AW); i = i + 1)
+            if (i[1:0] != 2'b00 || i >= 16 || i == 8) begin
+                write_err(i[7:0], 32'hFFFF_FFFF);
+                if (i != 8)
+                    read_err(i[7:0]);
+            end
+        expect_reg("LOAD unchanged by the address sweep", 8'h04, 32'h0000_0055);
+        expect_reg("CTRL unchanged by the address sweep", 8'h00, IE | PERIODIC);
+        expect_reg("COUNT unchanged by the address sweep", 8'h08, 32'd0);
+        expect_reg("STATUS unchanged by the address sweep", 8'h0C, 32'd1);
+        write_ok(8'h0C, 32'hFFFF_FFFE, 4'hF);
+        expect_reg("STATUS bits 31:1 read as zero, EXPIRED set", 8'h0C, 32'd1);
+
+        // irq stays high until EXPIRED is cleared or IE is written 0: through
+        // 100000 idle cycles and through writes that do neither.
+        repeat (100000) @(negedge aclk);
+        write_ok(8'h04, 32'd9, 4'hF);
+        write_ok(8'h0C, 32'd0, 4'hF);
+        write_ok(8'h0C, 32'd1, 4'b1110);
+        write_ok(8'h0C, 32'd1, 4'b0000);
+        write_ok(8'h00, IE, 4'h1);
+        write_ok(8'h00, IE | PERIODIC, 4'b1111);
+        expect_reg("STATUS still set while irq is held", 8'h0C, 32'd1);
+        hold_irq = 1'b0;
+        check("irq stays high until EXPIRED is cleared or IE is 0", irq_drops, 0);
+        write_ok(8'h00, PERIODIC, 4'h1);
+        check("IE written 0 lowers irq", {31'd0, irq}, 32'd0);
+        write_ok(8'h00, IE, 4'h1);
+        check("IE written 1 raises irq again", {31'd0, irq}, 32'd1);
+        write_ok(8'h0C, 32'd1, 4'h1);
+        check("the clear lowers irq", {31'd0, irq}, 32'd0);
+
+        // Long counts, timed to the edge: 300 cycles, and 65539 (above 16 bits).
+        one_shot(32'd300);
+        write_ok(8'h04, 32'h0001_0003, 4'hF);
+        write_ok(8'h00, EN | IE, 4'h1);
+        start = write_edge;
+        wait_irq(32'h0001_0003 + 4, rose);
+        check("long one-shot interrupt", {31'd0, rose}, 32'd1);
+        check("long one-shot length in cycles", rise_edge - start, 32'h0001_0003);
+        write_ok(8'h0C, 32'd1, 4'h1);
+        quiet("no second interrupt after the long one-shot", 70000);
+        expect_reg("the long one-shot stays stopped", 8'h00, IE);
+        expect_reg("no second count end after the long one-shot", 8'h0C, 32'd0);
+
+        // A stop: COUNT went down by one on every edge after the start, the
+        // stop edge too, from all 32 bits of LOAD. EN written 0 again leaves
+        // it, and no count ends while stopped.
+        write_ok(8'h04, 32'hFFFF_FFFF, 4'hF);
+        write_ok(8'h00, EN | IE, 4'h1);
+        start = write_edge;
+        repeat (40) @(negedge aclk);
+        write_ok(8'h00, IE, 4'h1);
+        first = 32'hFFFF_FFFF - (write_edge - start);
+        expect_reg("COUNT after a stop, all 32 bits", 8'h08, first);
+        write_ok(8'h00, IE, 4'h1);
+        expect_reg("EN written 0 again leaves COUNT", 8'h08, first);
+        quiet("no interrupt while stopped", 2000);
+        expect_reg("COUNT frozen while stopped", 8'h08, first);
+        expect_reg("EN stays 0 while stopped", 8'h00, IE);
+        expect_reg("no count end while stopped", 8'h0C, 32'd0);
+        write_ok(8'h04, 32'd25, 4'hF);
+        write_ok(8'h00, EN | IE, 4'h1);
+        start = write_edge;
+        repeat (10) @(negedge aclk);
+        write_ok(8'h00, IE, 4'h1);
+        expect_reg("COUNT after a stop", 8'h08, 25 - (write_edge - start));
+
+        // Thirty periods in a row, each LOAD cycles, with EN set throughout.
+        write_ok(8'h04, 32'd8, 4'hF);
+        write_ok(8'h00, EN | IE | PERIODIC, 4'h1);
+        start = write_edge;
+        for (i = 0; i < 30; i = i + 1) begin
+            wait_irq(12, rose);
+            check("periodic interrupt, thirty periods", {31'd0, rose}, 32'd1);
+            check("periodic period, thirty periods", rise_edge - start, 8);
+            start = rise_edge;
+            write_ok(8'h0C, 32'd1, 4'h1);
+        end
+        expect_reg("periodic EN set after thirty periods", 8'h00, EN | IE | PERIODIC);
+        write_ok(8'h00, IE | PERIODIC, 4'h1);
+        check("the stop lands before the next count end", {31'd0, write_edge < start + 8}, 32'd1);
+        quiet("no interrupt after the periodic stop", 20);
+
+        // Three periods of 300 cycles.
+        write_ok(8'h04, 32'd300, 4'hF);
+        write_ok(8'h00, EN | IE | PERIODIC, 4'h1);
+        start = write_edge;
+        for (i = 0; i < 3; i = i + 1) begin
+            wait_irq(304, rose);
+            check("periodic interrupt, LOAD 300", {31'd0, rose}, 32'd1);
+            check("periodic period, LOAD 300", rise_edge - start, 300);
+            start = rise_edge;
+            write_ok(8'h0C, 32'd1, 4'h1);
+        end
+        write_ok(8'h00, IE | PERIODIC, 4'h1);
+        check("the LOAD 300 stop lands before the next count end", {31'd0, write_edge < start + 300}, 32'd1);
+        quiet("no interrupt after the LOAD 300 stop", 20);
+
+        // Write address and data apart by 40 cycles either way, and responses
+        // held for 40 cycles of backpressure.
+        write(8'h04, 32'h0000_1234, 4'hF, 0, 40, 0, resp);
+        check("AW 40 cycles before W OKAY", {30'd0, resp}, {30'd0, OKAY});
+        expect_reg("LOAD after AW 40 cycles before W", 8'h04, 32'h0000_1234);
+        write(8'h04, 32'h0000_5678, 4'hF, 40, 0, 0, resp);
+        check("W 40 cycles before AW OKAY", {30'd0, resp}, {30'd0, OKAY});
+        expect_reg("LOAD after W 40 cycles before AW", 8'h04, 32'h0000_5678);
+        write(8'h04, 32'h0000_9ABC, 4'hF, 0, 0, 40, resp);
+        check("B backpressure 40 cycles OKAY", {30'd0, resp}, {30'd0, OKAY});
+        write(8'h05, 32'h0000_0000, 4'hF, 0, 0, 40, resp);
+        check("B backpressure 40 cycles SLVERR", {30'd0, resp}, {30'd0, SLVERR});
+        read(8'h04, 40, data, resp);
+        check("R backpressure 40 cycles", data, 32'h0000_9ABC);
+        check("R backpressure 40 cycles OKAY", {30'd0, resp}, {30'd0, OKAY});
+        read(8'h07, 40, data, resp);
+        check("R backpressure 40 cycles SLVERR", {30'd0, resp}, {30'd0, SLVERR});
+        check("R backpressure 40 cycles SLVERR data", data, 32'd0);
 
         done = 1'b1;
     end

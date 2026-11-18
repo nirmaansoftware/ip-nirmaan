@@ -1,9 +1,11 @@
 // Self-checking testbench for axi4_lite_regs.v: the whole-flow case
 // flow/axi4-lite-regs-driver's reference (check 1). It is that case's own copy
 // of the single-seat case's tests/fixtures/rtl/axi4_lite/axi4_lite_regs_tb.v,
-// which stays as it is, with every check of that file kept and two groups
-// added: back-to-back requests accepted in the cycle after the response is
-// taken, and reset in the middle of a transaction.
+// which stays as it is, with every check of that file kept and groups added:
+// back-to-back requests accepted in the cycle after the response is taken
+// (with and without a wait on READY), reset in the middle of a transaction,
+// responses dropped by the first reset edge, every register bit, each strobe
+// alone, every unmapped address, and write halves 40 cycles apart.
 //
 // Covers reset values, write then read of every register, wstrb partial
 // writes, AW before W, W before AW, both together, B and R backpressure,
@@ -221,7 +223,11 @@ module axi4_lite_regs_tb;
     task automatic reset_dut;
         begin
             aresetn = 1'b0;
-            repeat (3) @(negedge aclk);
+            @(negedge aclk);
+            #1;
+            check("BVALID after the first reset edge", {31'd0, bvalid}, 32'd0);
+            check("RVALID after the first reset edge", {31'd0, rvalid}, 32'd0);
+            repeat (2) @(negedge aclk);
             #1;
             check("AWREADY in reset", {31'd0, awready}, 32'd1);
             check("BVALID in reset", {31'd0, bvalid}, 32'd0);
@@ -360,6 +366,62 @@ module axi4_lite_regs_tb;
         reset_during(3);
         write_ok(4'hC, 32'h2468_ACE0, 4'hF, 0, 3, 0);
         read_all(0);
+
+        // Every register holds all 32 bits: all ones, then all zeros.
+        for (i = 0; i < 4; i = i + 1)
+            write_ok({i[1:0], 2'b00}, 32'hFFFF_FFFF, 4'hF, 0, 0, 0);
+        read_all(0);
+        for (i = 0; i < 4; i = i + 1)
+            write_ok({i[1:0], 2'b00}, 32'h0000_0000, 4'hF, 0, 0, 0);
+        read_all(0);
+
+        // Each strobe alone writes only its own byte.
+        write_ok(4'h4, 32'hFFFF_FFFF, 4'hF, 0, 0, 0);
+        for (i = 0; i < 4; i = i + 1) begin
+            write_ok(4'h4, 32'h0000_0000, 4'b0001 << i, 0, 0, 0);
+            read_all(0);
+        end
+        write_ok(4'h8, 32'hA5C3_96E1, 4'b0001, 0, 0, 0);
+        write_ok(4'h8, 32'hA5C3_96E1, 4'b0010, 0, 0, 0);
+        write_ok(4'h8, 32'hA5C3_96E1, 4'b0100, 0, 0, 0);
+        write_ok(4'h8, 32'hA5C3_96E1, 4'b1000, 0, 0, 0);
+        read_all(0);
+
+        // Every address but the four registers' is unmapped: a write of all
+        // ones to each gets SLVERR and changes no register, and a read of each
+        // gets SLVERR and zero.
+        write_ok(4'h0, 32'h0123_4567, 4'hF, 0, 0, 0);
+        write_ok(4'h4, 32'h89AB_CDEF, 4'hF, 0, 0, 0);
+        write_ok(4'h8, 32'h7654_3210, 4'hF, 0, 0, 0);
+        write_ok(4'hC, 32'hFEDC_BA98, 4'hF, 0, 0, 0);
+        for (i = 0; i < 16; i = i + 1)
+            if (i[1:0] != 2'b00) begin
+                write(i[3:0], 32'hFFFF_FFFF, 4'hF, 0, 0, 0, resp);
+                check("unmapped write SLVERR, every address", {30'd0, resp}, {30'd0, SLVERR});
+                read(i[3:0], 0, 0, data, resp);
+                check("unmapped read SLVERR, every address", {30'd0, resp}, {30'd0, SLVERR});
+                check("unmapped read data, every address", data, 32'd0);
+            end
+        read_all(0);
+
+        // Write address and data apart by 40 cycles either way.
+        write_ok(4'h4, 32'h1357_2468, 4'hF, 0, 40, 0);
+        write_ok(4'hC, 32'h8642_7531, 4'hF, 40, 0, 0);
+        read_all(0);
+
+        // Back-to-back after responses that waited on READY: each request
+        // after the first is offered in the cycle after the previous response
+        // was taken, and must be accepted on the next edge.
+        for (i = 0; i < 8; i = i + 1) begin
+            b2b = i > 0;
+            write_ok({i[1:0], 2'b00}, 32'h0300_0000 * i + 32'h55, 4'hF, 0, 0, 2);
+        end
+        for (i = 0; i < 4; i = i + 1) begin
+            b2b = i > 0;
+            read({i[1:0], 2'b00}, 0, 2, data, resp);
+            check("back-to-back read after a wait", data, model[i]);
+        end
+        b2b = 1'b0;
 
         if (errors == 0)
             $display("axi4_lite_regs_tb: PASS (%0d checks)", checks);
