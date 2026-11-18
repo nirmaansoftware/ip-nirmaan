@@ -9,8 +9,10 @@ never reaches that seat as text.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -134,6 +136,155 @@ def test_each_tag_is_stated_once_and_both_documents_state_the_whole_range_rule()
         assert len(found) == len(set(found)), path
         assert rule in found
         assert "Tests accept the whole allowed range" in path.read_text(encoding="utf-8")
+
+
+# --- Each fixed requirements document has a current check record by another session ------------------------------
+#
+# By convention a whole-flow requirements document is checked by a session other than its writer, and the check is
+# kept next to it as ``requirements_check.json`` (format ``nirmaan.flow-document-check``): the document's sha256, the
+# writer and the checker, when, the sources read, per-tag evidence (``path:line``, a test id, or ``unjudged``) and the
+# result. Any edit to the document makes the record stale. A document whose first record has not landed yet is listed,
+# with the reason, in ``evals/flow/requirements_check_pending.json``; a listed document that has a record fails, so the
+# entry must go once its record lands. An author never writes the record for its own document.
+
+CHECK_PENDING = FLOW / "requirements_check_pending.json"
+CHECK_FIELDS = {"format", "case", "document", "document_sha256", "writer", "checker", "checked_at", "sources_read",
+                "evidence", "result"}
+_LINE = re.compile(r"^(?P<path>[^:\s]+):(?P<first>\d+)(?:-(?P<last>\d+))?$")
+_TEST_ID = re.compile(r"^(?P<path>tests/[^:\s]+\.py)::(?P<name>\w+)(?:\[.*\])?$")
+
+
+def _flow_requirements_documents() -> list[str]:
+    return sorted(p.relative_to(ROOT).as_posix() for p in FLOW.glob("*/requirements.md"))
+
+
+def _evidence_problem(item: str, root: Path) -> str | None:
+    if item == "unjudged":
+        return None
+    if m := _TEST_ID.match(item):
+        path = root / m["path"]
+        if not path.is_file() or not re.search(rf"^def {m['name']}\(", path.read_text(encoding="utf-8"), re.M):
+            return f"no such test: {item}"
+        return None
+    if m := _LINE.match(item):
+        path = root / m["path"]
+        if not path.is_file():
+            return f"no such file: {item}"
+        lines = len(path.read_text(encoding="utf-8").splitlines())
+        first, last = int(m["first"]), int(m["last"] or m["first"])
+        if not 1 <= first <= last <= lines:
+            return f"line out of range: {item}"
+        return None
+    return f"evidence is not path:line, a test id or unjudged: {item!r}"
+
+
+def _check_record_problems(doc: str, record: dict, citations: dict, root: Path = ROOT) -> list[str]:
+    """What is wrong with a document's check record, as a list (empty when it holds)."""
+    problems = []
+    missing = CHECK_FIELDS - set(record)
+    if missing:
+        return [f"missing fields: {sorted(missing)}"]
+    if record["format"] != "nirmaan.flow-document-check":
+        problems.append(f"format is {record['format']!r}")
+    if record["case"] != citations["case"]:
+        problems.append(f"case {record['case']!r} is not {citations['case']!r}")
+    if record["document"] != doc:
+        problems.append(f"document {record['document']!r} is not {doc!r}")
+    if record["document_sha256"] != hashlib.sha256((root / doc).read_bytes()).hexdigest():
+        problems.append("stale: the document changed after it was checked (document_sha256 differs)")
+    writer, checker = record["writer"], record["checker"]
+    if not (isinstance(writer, str) and writer and isinstance(checker, str) and checker):
+        problems.append("writer and checker must be named")
+    elif writer == checker:
+        problems.append("the checker must be a session other than the writer")
+    try:
+        datetime.fromisoformat(str(record["checked_at"]))
+    except ValueError:
+        problems.append(f"checked_at is not an ISO date: {record['checked_at']!r}")
+    sources = record["sources_read"]
+    if not (isinstance(sources, list) and doc in sources and all((root / s).is_file() for s in sources)):
+        problems.append("sources_read must list the document and only files that exist")
+    tags = re.findall(r"\[req:([A-Z0-9-]+)\]", (root / doc).read_text(encoding="utf-8"))
+    entries = record["evidence"] if isinstance(record["evidence"], list) else []
+    seen = [e.get("tag") for e in entries if isinstance(e, dict)]
+    if sorted(seen) != sorted(tags):
+        extra = sorted({t for t in seen if t not in tags or seen.count(t) > 1}, key=str)
+        problems.append(f"evidence must name each tag of the document once: missing {sorted(set(tags) - set(seen))}, "
+                        f"extra or repeated {extra}")
+    unjudged = set()
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        items = entry.get("evidence")
+        items = [items] if isinstance(items, str) else items
+        if not items or not all(isinstance(i, str) for i in items):
+            problems.append(f"{entry.get('tag')}: no evidence")
+            continue
+        if "unjudged" in items:
+            if items != ["unjudged"]:
+                problems.append(f"{entry.get('tag')}: unjudged and judged at once")
+            unjudged.add(entry.get("tag"))
+        problems.extend(f"{entry.get('tag')}: {p}" for i in items if (p := _evidence_problem(i, root)))
+    if unjudged != set(citations["not_judged"]):
+        problems.append(f"tags marked unjudged {sorted(unjudged)} differ from citations.json not_judged "
+                        f"{sorted(citations['not_judged'])}")
+    if record["result"] != "holds":
+        problems.append(f"result is {record['result']!r}: a document that does not hold is fixed, not used")
+    return problems
+
+
+def _pending() -> dict[str, str]:
+    data = json.loads(CHECK_PENDING.read_text(encoding="utf-8"))
+    assert data["format"] == "nirmaan.flow-document-check-pending"
+    return data["pending"]
+
+
+def test_the_pending_list_names_only_flow_requirements_documents_each_with_a_reason():
+    pending, documents = _pending(), set(_flow_requirements_documents())
+    assert set(pending) <= documents, sorted(set(pending) - documents)
+    assert all(isinstance(why, str) and why.strip() for why in pending.values())
+
+
+@pytest.mark.parametrize("doc", _flow_requirements_documents())
+def test_every_flow_requirements_document_has_a_current_check_record_by_another_session(doc):
+    path = ROOT / doc
+    record = path.with_name("requirements_check.json")
+    pending = _pending()
+    if doc in pending:  # its first record has not landed: it must not have one yet, or the entry is stale
+        assert not record.is_file(), f"{doc}: its record has landed, so remove it from {CHECK_PENDING.name}"
+        return
+    assert record.is_file(), f"{doc} has no check record ({record.relative_to(ROOT).as_posix()}) and is not pending"
+    citations = json.loads(path.with_name("citations.json").read_text(encoding="utf-8"))
+    problems = _check_record_problems(doc, json.loads(record.read_text(encoding="utf-8")), citations)
+    assert problems == [], problems
+
+
+def test_the_check_record_rule_refuses_a_stale_or_self_checked_record():
+    """The rule works before any record lands: a record built here (never written to disk) holds, and editing the
+    document, naming the writer as the checker, dropping a tag or disagreeing with citations.json each fail it."""
+    doc = "evals/flow/axil_timer/requirements.md"
+    citations = json.loads((FLOW / "axil_timer" / "citations.json").read_text(encoding="utf-8"))
+    tags = re.findall(r"\[req:([A-Z0-9-]+)\]", (ROOT / doc).read_text(encoding="utf-8"))
+    good = {"format": "nirmaan.flow-document-check", "case": "flow/axil-timer", "document": doc,
+            "document_sha256": hashlib.sha256((ROOT / doc).read_bytes()).hexdigest(),
+            "writer": "writer-session", "checker": "checker-session", "checked_at": "2026-11-18T06:00:00+00:00",
+            "sources_read": [doc, "tests/fixtures/rtl/axil_timer/axil_timer_tb.v"],
+            "evidence": [{"tag": t, "evidence": "unjudged" if t in citations["not_judged"]
+                          else "tests/fixtures/rtl/axil_timer/axil_timer_tb.v:281"} for t in tags],
+            "result": "holds"}
+    assert _check_record_problems(doc, good, citations) == []
+    bad = [
+        dict(good, document_sha256=hashlib.sha256((ROOT / doc).read_bytes() + b"\n").hexdigest()),
+        dict(good, checker="writer-session"),
+        dict(good, evidence=good["evidence"][1:]),
+        dict(good, evidence=[dict(e, evidence="tests/fixtures/rtl/axil_timer/axil_timer_tb.v:281")
+                             for e in good["evidence"]]),
+        dict(good, evidence=[dict(good["evidence"][0], evidence="axil_timer_tb.v line 281"), *good["evidence"][1:]]),
+        dict(good, result="does not hold"),
+    ]
+    for record in bad:
+        assert _check_record_problems(doc, record, citations), record
+    assert "stale" in _check_record_problems(doc, bad[0], citations)[0]
 
 
 # --- The copies leave the single-seat cases as they are ------------------------------------------------------------
