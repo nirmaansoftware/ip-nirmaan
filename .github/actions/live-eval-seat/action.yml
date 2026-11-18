@@ -1,0 +1,16 @@
+# Gate WF17 (docs/LIVE_EVAL_EVIDENCE.md, section 6): seat code runs as an account of its own. This makes the
+# `nirmaan-seat` account (no password, no sudo rule, no group but its own) and puts a `vvp` first on PATH that
+# runs the real one as that account, with no_new_privs, an environment holding only cocotb's settings, and write
+# access to the run's own directory only (scripts/live_eval_seat.py). Run it after the tools are installed and
+# before the reach test (scripts/live_eval_reach.py). It takes no secret.
+name: Live evaluation seat account
+description: Run seat code (cocotb's vvp) as an unprivileged account of its own.
+runs:
+  using: composite
+  steps:
+    - name: Make the seat account and its vvp
+      shell: bash
+      run: |
+        sudo /usr/bin/python3 -I scripts/live_eval_seat.py install
+        echo "/opt/nirmaan-seat/bin" >> "$GITHUB_PATH"
+        echo "TMPDIR=/tmp" >> "$GITHUB_ENV"
