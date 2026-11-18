@@ -1,0 +1,13 @@
+{
+  "format": "nirmaan.eval-rejudge",
+  "record": "2026-11-17-claude-code-claude-opus-5-5-calibration-harness-attempts-3",
+  "nirmaan_version": "1.25.0",
+  "trials": [
+    {
+      "case": "rtl/skid-buffer",
+      "trial": 1,
+      "same": true,
+      "differences": []
+    }
+  ]
+}
