@@ -164,9 +164,8 @@ before any second register block batch (gate WF18).
 **The object screen (gate WF16): a tripwire, not confinement.** A check that
 names the scorer `screened-held-out-run` or `screened-must-fail`
 (`src/nirmaan/evals/scorers.py`) runs the object screen before it builds or
-links seat-written C. The register block case's checks 4 to 7 take these
-scorers in the pull request that follows the one that adds them; until then no
-case names them, and nothing is screened. The screen
+links seat-written C. The register block case's checks 4 to 7, the four that
+build or link the seat's C, name them. The screen
 (`src/nirmaan/evals/object_screen.py`) compiles every C file of the check
 exactly as `fw.test` does and refuses the check when an
 object leaves a symbol undefined that is off the allow list (however it was
@@ -194,10 +193,10 @@ reference RTL and 3 on `axi4_lite_regs_lat2.v`), found its pass counter, and
 found the run's nonce (its first 8 digits matched the run's own). It only
 reads and prints no record line; no fixture that forges a verdict is
 committed. So the screen does not close the cycle count: the
-address-arithmetic route stays open, and by decision 1, item 3, a strict
-fixture of gate WF15 on it is owed when the case takes the screen, while the
-strict fixtures on the simulator's clock, the route the screen closes, then
-expect its refusal. The record is `evals/flow/object_screen_record.json`.
+address-arithmetic route stays open, and the strict fixtures of gate WF15 on
+it (`driver-strict-address-test`, `driver-strict-address-driver` in
+`evals/flow/controls.json`) are its live controls; the strict fixtures on the
+simulator's clock, the route the screen does close, are recorded refused. The record is `evals/flow/object_screen_record.json`.
 Where it sits: in the whole-flow judge only (the scorers a case names), so the shared `fw.build` and `fw.test` tools, their
 definitions and every single-seat case are unchanged, and the seat's own
 before-review runs of those tools during a whole-flow trial are not screened.

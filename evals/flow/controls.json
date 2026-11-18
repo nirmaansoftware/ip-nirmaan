@@ -524,7 +524,7 @@
     {
       "id": "driver-strict-latency-test",
       "case": "flow/axi4-lite-regs-driver",
-      "what": "The strict fixture driver test (gate WF15, second addendum 2026-11-18, decision 1, item 1), on a flow whose RTL stage ended in the conforming RTL (axi4_lite_regs_lat2.v), with the reference driver: the reference driver test plus one check that times one read32 and one write32 through the simulator's clock (Verilated::s_lastContextp, the route of tests/fixtures/fw/reach/simulator_clock_probe.c) and passes only at that RTL's counts. It passes on axi4_lite_regs_lat2.v (3 and 3 cycles per call), and check 7 fails it on the reference RTL (2 and 2) by that one check only, with no build error, no harness error and no crash, and with the same bus transfers on both RTLs. A driver test can be strict about latency through this route; check 7 catches this one. If the route is closed, the file stays and the expected result changes to the refusal, in a recorded run.",
+      "what": "The strict fixture driver test (gate WF15, second addendum 2026-11-18, decision 1, item 1), on a flow whose RTL stage ended in the conforming RTL (axi4_lite_regs_lat2.v), with the reference driver: the reference driver test plus one check that times one read32 and one write32 through the simulator's clock (Verilated::s_lastContextp, the route of tests/fixtures/fw/reach/simulator_clock_probe.c) and passes only at that RTL's counts. It passes on axi4_lite_regs_lat2.v (3 and 3 cycles per call), and check 7 fails it on the reference RTL (2 and 2) by that one check only, with no build error, no harness error and no crash, and with the same bus transfers on both RTLs. The object screen of gate WF16 closes this route in the whole-flow checks: the file stays, it still passes on axi4_lite_regs_lat2.v outside the screened checks (the inline check, as the seat's own gate would run it), and check 7 refuses it before any link, with nothing run (the asm label and the simulator symbol). Its address-arithmetic sibling (driver-strict-address-test) is the live control.",
       "upstream_rtl": "tests/fixtures/rtl/axi4_lite/variants/axi4_lite_regs_lat2.v",
       "seat": [
         {
@@ -565,7 +565,6 @@
           },
           "rtl": "tests/fixtures/rtl/axi4_lite/variants/axi4_lite_regs_lat2.v",
           "expect": "passed",
-          "transcript": "strict",
           "timing": [
             "test read32 3 cycles, write32 3 cycles"
           ]
@@ -573,18 +572,14 @@
         {
           "check": 7,
           "expect": "failed",
-          "transcript": "strict",
-          "fails_by": "read32_and_write32_take_the_conforming_rtls_cycles",
-          "timing": [
-            "test read32 2 cycles, write32 2 cycles"
-          ]
+          "screen_refuses": true
         }
       ]
     },
     {
       "id": "driver-strict-latency-driver",
       "case": "flow/axi4-lite-regs-driver",
-      "what": "The strict fixture driver (gate WF15, second addendum 2026-11-18, decision 1, item 2), on a flow whose RTL stage ended in the conforming RTL (axi4_lite_regs_lat2.v), with the reference driver test: the reference driver, except that it times every transfer through the simulator's clock (Verilated::s_lastContextp) and reports any that took other than 3 cycles as a bus error. It builds alone (check 4), passes the held-out test on the flow's RTL (check 5: 3 cycles per call) and fails it on the reference RTL (check 6: 2 cycles per call). If the route is closed, the file stays and the expected result changes to the refusal, in a recorded run.",
+      "what": "The strict fixture driver (gate WF15, second addendum 2026-11-18, decision 1, item 2), on a flow whose RTL stage ended in the conforming RTL (axi4_lite_regs_lat2.v), with the reference driver test: the reference driver, except that it times every transfer through the simulator's clock (Verilated::s_lastContextp) and reports any that took other than 3 cycles as a bus error. The object screen of gate WF16 closes this route in the whole-flow checks: the file stays, and checks 4, 5 and 6 each refuse it before any build or link, with nothing run (the asm label and the simulator symbol). Its address-arithmetic sibling (driver-strict-address-driver) is the live control.",
       "upstream_rtl": "tests/fixtures/rtl/axi4_lite/variants/axi4_lite_regs_lat2.v",
       "seat": [
         {
@@ -610,24 +605,115 @@
       "checks": [
         {
           "check": 4,
+          "expect": "failed",
+          "screen_refuses": true
+        },
+        {
+          "check": 5,
+          "rtl": "tests/fixtures/rtl/axi4_lite/variants/axi4_lite_regs_lat2.v",
+          "expect": "failed",
+          "screen_refuses": true
+        },
+        {
+          "check": 6,
+          "expect": "failed",
+          "screen_refuses": true
+        }
+      ]
+    },
+    {
+      "id": "driver-strict-address-test",
+      "case": "flow/axi4-lite-regs-driver",
+      "what": "The strict fixture driver test on the address-arithmetic route (gate WF15, second addendum 2026-11-18, decision 1, items 1 and 3; the route the object screen of gate WF16 does not close), on a flow whose RTL stage ended in the conforming RTL (axi4_lite_regs_lat2.v), with the reference driver: the reference driver test plus one check that times one read32 and one write32 by the harness's own cycle count, found from hal->read32 and hal->write32 by address arithmetic (the route of tests/fixtures/fw/reach/address_arithmetic_probe.c), naming nothing the screen refuses, and passes only at that RTL's counts. It passes on axi4_lite_regs_lat2.v (3 and 3 cycles per call), and check 7 fails it on the reference RTL (2 and 2) by that one check only, with no build error, no harness error and no crash, and with the same bus transfers on both RTLs. This is the live control on this route: the screen leaves it open.",
+      "upstream_rtl": "tests/fixtures/rtl/axi4_lite/variants/axi4_lite_regs_lat2.v",
+      "seat": [
+        {
+          "path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_map.h",
+          "kind": "driver",
+          "as": "axi4_lite_regs_map.h"
+        },
+        {
+          "path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_drv.h",
+          "kind": "driver"
+        },
+        {
+          "path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_drv.c",
+          "kind": "driver",
+          "as": "axi4_lite_regs_drv.c"
+        },
+        {
+          "path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_test_strict_address.c",
+          "kind": "driver_test",
+          "as": "axi4_lite_regs_test.c"
+        }
+      ],
+      "checks": [
+        {
+          "inline": {
+            "name": "The seat's driver and driver test pass on this RTL",
+            "scorer": "held-out-run",
+            "tool": "fw.test",
+            "seat_files": {
+              "sources": [
+                "driver",
+                "driver_test"
+              ]
+            },
+            "params": {
+              "top": "axi4_lite_regs"
+            }
+          },
+          "rtl": "tests/fixtures/rtl/axi4_lite/variants/axi4_lite_regs_lat2.v",
+          "expect": "passed",
+          "transcript": "strict-address"
+        },
+        {
+          "check": 7,
+          "expect": "failed",
+          "transcript": "strict-address",
+          "fails_by": "read32_and_write32_take_the_conforming_rtls_cycles"
+        }
+      ]
+    },
+    {
+      "id": "driver-strict-address-driver",
+      "case": "flow/axi4-lite-regs-driver",
+      "what": "The strict fixture driver on the address-arithmetic route (gate WF15, second addendum 2026-11-18, decision 1, items 2 and 3; the route the object screen of gate WF16 does not close), on a flow whose RTL stage ended in the conforming RTL (axi4_lite_regs_lat2.v), with the reference driver test: the reference driver, except that it times every transfer by the harness's own cycle count, found from hal->read32 and hal->write32 by address arithmetic, and reports any that took other than 3 cycles as a bus error. It passes the object screen and builds alone (check 4), passes the held-out test on the flow's RTL (check 5: 3 cycles per call) and fails it on the reference RTL (check 6: 2 cycles per call). This is the live control on this route: the screen leaves it open.",
+      "upstream_rtl": "tests/fixtures/rtl/axi4_lite/variants/axi4_lite_regs_lat2.v",
+      "seat": [
+        {
+          "path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_map.h",
+          "kind": "driver",
+          "as": "axi4_lite_regs_map.h"
+        },
+        {
+          "path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_drv.h",
+          "kind": "driver"
+        },
+        {
+          "path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_drv_strict_address.c",
+          "kind": "driver",
+          "as": "axi4_lite_regs_drv.c"
+        },
+        {
+          "path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_test.c",
+          "kind": "driver_test",
+          "as": "axi4_lite_regs_test.c"
+        }
+      ],
+      "checks": [
+        {
+          "check": 4,
           "expect": "passed"
         },
         {
           "check": 5,
           "rtl": "tests/fixtures/rtl/axi4_lite/variants/axi4_lite_regs_lat2.v",
-          "expect": "passed",
-          "timing": [
-            "driver read32 3 cycles",
-            "driver write32 3 cycles"
-          ]
+          "expect": "passed"
         },
         {
           "check": 6,
-          "expect": "failed",
-          "timing": [
-            "driver read32 2 cycles",
-            "driver write32 2 cycles"
-          ]
+          "expect": "failed"
         }
       ]
     },

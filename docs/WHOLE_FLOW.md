@@ -187,7 +187,7 @@ edit.
 ## The judge controls (M87, third pull request)
 
 Gates WF4 and WF5 need each case's judge proven by replays with no model call,
-run in CI, before the first trial. `evals/flow/controls.json` lists 25
+run in CI, before the first trial. `evals/flow/controls.json` lists 27
 controls. Each is a seat answer made of committed files and the whole-flow
 case's own held-out checks it must pass or fail, sometimes with the RTL a
 check runs on put in another's place. `tests/test_whole_flow_controls.py` runs
@@ -228,9 +228,10 @@ What they show:
   `nirmaan_irq_wait` between transfers passes on both RTLs with the same bus
   transfers, an attempt to see latency that does not;
 - the strict fixtures (gate WF15, section below): a driver test and a driver
-  that are strict about latency through the simulator's clock pass on the
-  conforming RTL and fail checks 7 and 6 on the reference RTL, and the SoC's
-  cycle counter is refused before review.
+  that are strict about latency by address arithmetic pass on the conforming
+  RTL and fail checks 7 and 6 on the reference RTL; their siblings on the
+  simulator's clock are refused by the object screen (gate WF16) in checks 4
+  to 7; and the SoC's cycle counter is refused before review.
 
 Each control prints one `FLOW-CONTROL` line with its verdicts and run
 summaries. `evals/flow/controls_record.json` keeps those lines from a named
@@ -288,8 +289,8 @@ The record's second addendum of 2026-11-18 (decision 1) withdrew the first
 addendum's "the control is empty for this block" and requires, before the
 first register block trial, a strict fixture driver test and a strict fixture
 driver, and for each route by which a recorded probe reads a cycle count
-either the route refused or a strict fixture using it recorded failing. Four
-controls in `evals/flow/controls.json` do this. Each is a flow whose RTL stage
+either the route refused or a strict fixture using it recorded failing. Six
+controls in `evals/flow/controls.json` do this, one or two per route. Each is a flow whose RTL stage
 ended in the conforming RTL: the control's `upstream_rtl` replaces the base
 case's upstream RTL with a copy of `axi4_lite_regs_lat2.v` under the
 reference's file name, so the seat's own checks run on it before review, as
@@ -301,16 +302,28 @@ they would in a whole flow, and check 5 runs on it.
   `read32_and_write32_take_the_conforming_rtls_cycles`. It reads the
   simulation time through `Verilated::s_lastContextp`, as the reach probe
   does, times one `read32` and one `write32`, and passes only at the
-  conforming RTL's counts. It passes on that RTL, and check 7 fails it on the
-  reference RTL by that one check: the test asserts the run built, finished
-  with the harness's summary, reported no harness error, and failed no other
-  check, and that its bus transfers equal those of the run on the conforming
-  RTL.
+  conforming RTL's counts. It still passes on that RTL outside the screened
+  checks, but with the object screen in force (gate WF16) check 7 refuses it
+  before any link, with nothing run: this route, the simulator's clock, is
+  CLOSED in the screened checks. The file stays.
 - `driver-strict-latency-driver`: `axi4_lite_regs_drv_strict_latency.c`, the
   reference driver except that it times every transfer the same way and
   reports one that took other than the conforming RTL's count as a bus error,
-  with the reference driver test. It builds alone (check 4), passes check 5
-  on the conforming RTL and fails check 6.
+  with the reference driver test. Checks 4, 5 and 6 each refuse it by the
+  screen, with nothing run. The file stays.
+- `driver-strict-address-test`: the reference driver with
+  `axi4_lite_regs_test_strict_address.c`, the same strict test on the route
+  the screen leaves OPEN: address arithmetic. It names nothing the screen
+  refuses and finds the harness's own cycle count from `hal->read32` and
+  `hal->write32`, as the address-arithmetic probe does. It passes on the
+  conforming RTL, and check 7 fails it on the reference RTL by that one check:
+  the test asserts the run built, finished with the harness's summary,
+  reported no harness error, and failed no other check, and that its bus
+  transfers equal those of the run on the conforming RTL.
+- `driver-strict-address-driver`: `axi4_lite_regs_drv_strict_address.c`, the
+  strict driver on the same open route, with the reference driver test. It
+  passes the screen and builds alone (check 4), passes check 5 on the
+  conforming RTL and fails check 6.
 - `driver-strict-soc-cycles` and `driver-strict-soc-address`: the same
   strict test on the other route, the SoC run's `NIRMAAN_SOC_CYCLES`
   register, once named through `nirmaan_soc.h` and once by its address
@@ -322,14 +335,55 @@ they would in a whole flow, and check 5 runs on it.
   reports as "build failed before co-simulation: 0 errors (exit status -11)"
   although the build was clean. Neither reaches review.
 
-Each strict fixture prints what it timed on a line of its own
-(`STRICT-FIXTURE ...`). The `FLOW-CONTROL` line carries those lines per
+Each strict fixture on the simulator's clock prints what it timed on a line of
+its own (`STRICT-FIXTURE ...`); the address-route fixtures print nothing
+(`printf` is off the screen's allow list), and their counts are in the
+failed check's detail. The `FLOW-CONTROL` line carries those lines per
 check, a control that never reaches review carries its gate runs, and the
 record keeps both; the counts are in the manifest as expected values, and
 every later run is held to them. The fixture files stay when a route is
-closed; their expected result then changes to the refusal, in a recorded run.
-These are judge controls written by the platform. No model-written driver
-test has used either route.
+closed; their expected result then changes to the refusal, in a recorded run,
+as it did for the simulator's clock when the screen came in. The
+address-arithmetic route stays OPEN: the screen does not close it, so its strict
+fixtures are the live controls on it until the driver and its tests run in a
+process of their own (gate WF18). These are judge controls written by the
+platform. No model-written driver test has used any of these routes.
+
+## The object screen (gate WF16)
+
+The record's second addendum (2026-11-18), decision 2, asks for a screen of
+the seat's objects before the first register block trial, claimed only as a
+tripwire. The register block case's checks 4 to 7, the four that build or
+link the seat's C, name the scorers `screened-held-out-run` and
+`screened-must-fail` (`src/nirmaan/evals/scorers.py`). Each runs the object
+screen (`src/nirmaan/evals/object_screen.py`) over every C file of the check,
+compiled as `fw.test` compiles it, and only when it finds nothing runs the
+unchanged `held-out-run` or `must-fail` scorer. A hit fails the check with
+its reasons and runs nothing: an undefined symbol off the allow list (however
+declared), a definition of a harness or C library name, code that runs before
+`main` or after the tests, or asm in the seat's own preprocessed lines. It is
+the trial's recorded verdict, never a removed trial. The timer case links no
+seat C and is not screened; no single-seat case is screened.
+
+It is a tripwire, not confinement: it stops reach by name and nothing else.
+In checks 5, 6 and 7 model-written C still shares the harness's process (in 5
+and 6 with the judge's own held-out test), and from there could reach the run's
+nonce and the counts by address arithmetic, which the screen does not stop.
+`docs/GATE_INTEGRITY.md`, section 3, states the residual. What is recorded
+from CI, in `evals/flow/object_screen_record.json` (`tests/test_object_screen.py`):
+the allow list's source (the undefined symbols of every committed host
+fixture, reference answer and held-out test), one must-refuse fixture per
+refused construct (`tests/fixtures/fw/screen/`) and the simulator clock
+probe, each refused, check 7 refusing the clock probe as a seat's driver test,
+and the address-arithmetic probe (`tests/fixtures/fw/reach/address_arithmetic_probe.c`),
+which passes the screen, with what it really read: starting from `hal->read32`
+alone it read the cycle count (`read32` and `write32` take 2 cycles each on the
+reference RTL, 3 on `axi4_lite_regs_lat2.v`), the pass counter and the run's
+nonce. The screen therefore leaves the cycle count readable: the
+address-arithmetic route stays OPEN, and the strict fixtures on it
+(`driver-strict-address-test`, `driver-strict-address-driver`, above) are the
+live controls on that route (decision 1, item 3). The route it does close, the
+simulator's clock, has its strict fixtures recorded as refused.
 
 ## The document check record (M87, follow-up)
 

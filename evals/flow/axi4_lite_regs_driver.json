@@ -150,7 +150,7 @@
     },
     {
       "name": "4. The flow's driver alone builds under strict C flags",
-      "scorer": "held-out-run",
+      "scorer": "screened-held-out-run",
       "tool": "fw.build",
       "seat_files": {
         "sources": [
@@ -160,7 +160,7 @@
     },
     {
       "name": "5. The held-out test passes on the flow's driver against the flow's own RTL",
-      "scorer": "held-out-run",
+      "scorer": "screened-held-out-run",
       "tool": "fw.test",
       "seat_files": {
         "sources": [
@@ -183,7 +183,7 @@
     },
     {
       "name": "6. The held-out test passes on the flow's driver against the reference RTL",
-      "scorer": "held-out-run",
+      "scorer": "screened-held-out-run",
       "tool": "fw.test",
       "seat_files": {
         "sources": [
@@ -204,7 +204,7 @@
     },
     {
       "name": "7. The flow's driver and driver test pass on the reference RTL and fail the mutants visible through the driver",
-      "scorer": "must-fail",
+      "scorer": "screened-must-fail",
       "tool": "fw.test",
       "seat_files": {
         "sources": [
