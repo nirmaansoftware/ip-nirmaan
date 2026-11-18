@@ -403,6 +403,8 @@ gate semantics or control plane, so the Founder Proxy reviews them.
   interleaved, and is read once.
   Amended 2026-11-19 by the third addendum: "one attempt" is removed; the
   trials run with the attempts the named default harness sets.
+  Amended 2026-11-19 by the fourth addendum: "read once" becomes one read
+  per case; one plan still fixes all forty before the first trial.
 - **Code.** No runner or harness code changes until the H3 batch's last trial
   is recorded (fact 15). The runner option is then in two parts. The first
   is the one dispatch edit to `runner.py`, with the fingerprint entries: it
@@ -431,6 +433,8 @@ gate semantics or control plane, so the Founder Proxy reviews them.
   checkout before the read. Every record reaches the repository by a pull
   request, in plan order; none is held out. The weekly scheduled run never
   picks up a whole-flow case.
+  Amended 2026-11-19 by the fourth addendum: "so that one harness group
+  holds the batch" is struck; both cases still run only in the named job.
 - **Before the first register block trial.** Whether a seat's compiled code
   can read the plan credential from the parent process in that job is tested
   and the result recorded (security; not tested today). If it can, the seat's
@@ -491,7 +495,7 @@ trials only after the default harness is named.
 | WF7 | A test shows the flow module's edit changes the whole-flow fingerprint and not the default; from the pull request that names the default harness onward, no whole-flow pull request changes the default fingerprint, shown by that test on each one | ai-engineer |
 | WF8 | The stop rule of decision 3 is shown by a test before any whole-flow trial | qa-evidence |
 | WF9 | Both cases run only in the named CI job, default harness, one attempt; the job fails on a changed checkout; the record is re-judged from a fresh checkout before the read; the credential test is recorded before the first register block trial. Amended 2026-11-19 by the third addendum: "one attempt" is removed, the default's attempts apply | security |
-| WF10 | Forty trials, fixed in a committed plan before the first; never beside wave 2's first live batch; one read; no re-run counts | verification-lead |
+| WF10 | Forty trials, fixed in a committed plan before the first; never beside wave 2's first live batch; one read; no re-run counts. Amended 2026-11-19 by the fourth addendum: one read per case, after that case's last planned trial is recorded | verification-lead |
 | WF11 | The count is stated only as k of n with its interval, per group, at ten or more planned trials complete; never pooled, never called a level; case (a) is never described as independent verification | qa-evidence |
 | WF12 | No whole-flow figure or measure name on the site, the README or the landing brief from this record; a later one needs a committed record, key 1 review and the founder's answer on the name | product-lead |
 | WF13 | The whole-flow job renames or skips no required check, adds no third-party action, pins actions by SHA, passes inputs through `env`, and the weekly scheduled run excludes whole-flow cases | eda-tooling |
@@ -499,6 +503,9 @@ trials only after the default harness is named.
 | WF21 | Added 2026-11-19 by the third addendum: tests of the CI command (no attempts option, expected fingerprint required) and of a whole-flow stage's first-attempt prompt, and one line in `docs/HARNESS.md`, before the first trial | ai-engineer |
 | WF22 | Added 2026-11-19 by the third addendum: a test of the stop rule on three attempts, with an unanswered call inside a stage, before the first trial | qa-evidence |
 | WF23 | Added 2026-11-19 by the third addendum: what a failed run's log excerpt can carry back to a seat on a retry, stated from recorded reach tests, before the first trial of each case | security |
+| WF24 | Added 2026-11-19 by the fourth addendum, which also amends WF10 (one read per case): one committed plan fixes both cases' counts and rules before the timer's first trial; a dated plan addition states the register block's values and every difference before its first trial | verification-lead |
+| WF25 | Added 2026-11-19 by the fourth addendum: nothing that changes a batch's fingerprints, flow digests, case files or gate code merges between that case's first slot and its last planned trial; the `fw.test` change merges outside the timer's batch and shows the default fingerprint unchanged | ai-engineer |
+| WF26 | Added 2026-11-19 by the fourth addendum: no combined figure and no comparison between the two cases; the timer's read says the register block case has not run; the register block's read names the card and document changes made after the timer's results were known | qa-evidence |
 
 ## Open, for the founder
 
@@ -1193,3 +1200,297 @@ WF21 finds that a whole-flow dispatch can run with no expected fingerprint
 (not checked by this meeting), that refusal is added to
 `scripts/live_eval_ci.py`, which is outside `harness.CODE`. No harness file
 changes, so no fingerprint changes. The plan of WF20 is a document.
+
+## Fourth addendum (2026-11-19): one read per case
+
+This addendum amends "read once" in decision 4 and "one read" in gate WF10.
+The forty trials stay forty, ten per case per arm, fixed in one committed
+plan before the first trial of either case. Each case is now read once, by
+itself, after its own last planned trial is recorded, so the timer's twenty
+may run and be read before the register block flow can start. It adds gates
+WF24 to WF26. It is a decision made on 2026-11-19. It changes no code, case,
+eval record or level. No whole-flow trial has run, and this addendum states
+no whole-flow result.
+
+### Who decided what
+
+- Three seats gave round 1 positions independently (verification-lead, who
+  owns the plan, the counts and the read; qa-evidence for the claims;
+  ai-engineer for the harness, the fingerprint and the order); the chair
+  decided. Read against ip-nirmaan `main` at e5844ff and the third addendum.
+  Seats were read only; no trial, design tool or test ran for the meeting.
+  qa-evidence did not read the third addendum's text, so what it said on the
+  derived count was conditional; the chair read it.
+- Why a meeting. The third addendum recorded verification-lead's standing
+  condition, that no timer trial starts before the register block flow can
+  run unless "one read" is amended per case, and said that starting or
+  reading the timer's twenty alone needs its own ruling before the plan is
+  committed. This is that ruling.
+- This is an amendment, not a reading. The record as written is one plan of
+  forty, read once. All three seats called their answer an amendment.
+- Security was not seated. No seat found a reach question on the timer path
+  beyond gate WF23, which is already security's, and which stands.
+- As for the ruling: the council decided; it is not a founder decision, and
+  the founder can overrule it. No seat found anything reserved for the
+  founder.
+
+### Facts checked
+
+The chair checked each line below at e5844ff unless a seat is named.
+
+1. The words. Decision 4, "Counts": "The plan is committed before the first
+   trial, with the arms interleaved, and is read once." Gate WF10: "Forty
+   trials, fixed in a committed plan before the first; never beside wave 2's
+   first live batch; one read; no re-run counts". Decision 1, "Counting":
+   "one read". Decision 4, "Where": the timer flow runs in the named job
+   "so that one harness group holds the batch". The sources are decision 11
+   of the retrospective
+   (`council/records/2026-11-14-pilot-retrospective.md:326-328`: uniform,
+   fixed in a committed plan before the first trial, read once) and the
+   ruling of 2026-11-15 (no rule changes between a run and its read).
+2. Groups. Whole-flow trials group by case, case digest, model, harness
+   fingerprint, CLI, flow digest and purpose
+   (`src/nirmaan/evals/levels.py:212-213`), and a count is written only from
+   ten trials (`WHOLE_FLOW_MIN`, `levels.py:82`, `226-230`). Decision 1
+   forbids pooling across cases or arms. So under any option there are four
+   groups of ten and no figure for forty or for twenty. Nothing in the code
+   holds the plan or a read: a group's count is written to the generated
+   list when its tenth record is there (qa-evidence).
+3. Nothing is blind. Every record reaches `main` by a pull request, in plan
+   order, and none is held out (decision 4, "Where"). So each trial's
+   verdict is public when its record merges. With one read of forty the
+   timer's slots 1 to 20 would be as visible before slots 21 to 40 as they
+   are under this addendum (verification-lead, inference).
+4. What can run. `scripts/live_eval_ci.py:115-127` (`seat_c_problem`)
+   refuses the register block case, exit 6, and returns nothing for the
+   timer case, which links no seat-written C.
+   `evals/flow/credential_test_record.json` (run 44401041085, taken on the
+   branch of ip#354, in the `replay` job) records every probe not denied
+   for seat C under `fw.test`. The register block flow waits for `fw.test`
+   to run seat C as the seat account, for the credential test to show every
+   probe denied, and for gates WF15 to WF19. Neither case can start today:
+   wave 2's first live batch is not read, both requirements documents are
+   listed in `evals/flow/requirements_check_pending.json` (gate WF3), and
+   no plan is committed (gate WF10).
+5. What the fingerprint holds (ai-engineer; the chair read the lists). The
+   default fingerprint digests the twelve files of `harness.CODE`
+   (`src/nirmaan/runtime/harness.py:280-293`) and each tool definition's
+   fields, not the bytes of `tools.py`; a whole-flow fingerprint adds
+   `run.flow` and the digest of `FLOW_CODE`, `nirmaan/evals/flow.py`
+   (`harness.py:271`). It holds the knowledge flag, never a card's or a
+   document's text. `src/nirmaan/integrations/eda.py`,
+   `src/nirmaan/integrations/firmware.py`, `scripts/live_eval_seat.py`,
+   `scripts/live_eval_ci.py` and the workflow are outside it. The timer's
+   seat account was added with no harness edit
+   (`scripts/live_eval_seat.py:9`). So the `fw.test` change may show in no
+   fingerprint (inference: its files are eda-tooling's to choose), and two
+   trials with equal fingerprints need not have run the same gate code.
+6. What a card or document change moves. The skill digest covers the card
+   and the document (`src/nirmaan/evals/cases.py:78-90`), and the flow
+   digest covers every seated stage's skills
+   (`src/nirmaan/evals/flow.py:146-149`). A card change moves both arms'
+   flow digests, a document change the with-documents arm's only. The flow
+   digest is in the group key (fact 2), so such a change inside a group's
+   ten trials splits the group under ten, and no count can then be stated
+   (ai-engineer).
+7. The overlap. Field `exercised` of `evals/flow/axil_timer.json` and
+   `evals/flow/axi4_lite_regs_driver.json`: the three specification stages
+   are given the same skills in both cases; rtl-implementation is given
+   `axi`, `fsm_design` and `rtl_design` in the timer and `axi` and
+   `rtl_design` in the register block, which adds firmware with
+   `device_drivers`. Five skills are shared (verification-lead,
+   qa-evidence; the chair read both files).
+8. Not checked from the repository. The state of wave 2's first live batch,
+   and the build plan that orders the forty as timer slots 1 to 20 and
+   register block slots 21 to 40, are private.
+
+### Decision 1: one plan of forty, one read per case
+
+1. Decision 4, "Counts", now ends: the plan is committed before the first
+   trial of either case, with the arms interleaved within each case, and
+   each case is read once, after its last planned trial is recorded. Gate
+   WF10 now reads: forty trials, ten per case per arm, fixed in one
+   committed plan before the first trial of either case; never beside wave
+   2's first live batch; one read per case; no re-run counts. "One read" in
+   decision 1, "Counting", means one read of each case. Where gate WF9, gate
+   WF19 and the third addendum say "the read", they mean the read of the
+   case concerned.
+2. Decision 4, "Where": the words "so that one harness group holds the
+   batch" are struck. Both cases still run only in the one named CI job.
+   The two cases may now carry different dates, commits, flow digests and
+   gate code, and the plan states each (decision 2).
+3. The timer's twenty are slots 1 to 20 and may start when the timer's own
+   gates are met. This addendum lifts none of them: the read of wave 2's
+   first live batch, gates WF3, WF4, WF8, WF9 and WF17 for the timer, WF10
+   as amended, and what the third addendum requires before the first trial,
+   its measured run included. The register block's twenty are slots 21 to
+   40 and start when its gates are met.
+4. No split by arm, and no other split. Each read is of two complete groups
+   of ten.
+5. verification-lead's standing condition is met by its second half: "one
+   read" is amended per case. The seat withdrew the first half.
+
+Why. A single read of forty protects no number, because no figure may span
+the two cases (fact 2), and it hides nothing, because every record is public
+as it merges (fact 3). What "read once" protects is that a count is fixed
+before any outcome is known and that no rule changes between a run and its
+read. Both are kept, for each case, by fixing both cases' counts and rules
+in one plan before the timer's first trial (decision 2). No trial has run,
+so this changes no rule between a run and its read. Waiting would hold a
+case whose gates can be met behind a case whose remaining code has no date,
+and would leave no whole-flow evidence at all if the register block flow
+never becomes runnable.
+
+What it costs, stated plainly. The two cases are no longer one batch on one
+harness state. They are two measurements, taken at different times, and
+nothing may be said that treats them as one (decision 4). The register
+block's batch is planned and run by people and agents who know the timer's
+results; decision 2 limits what that knowledge can touch, and the register
+block's read says so.
+
+### Decision 2: what is fixed before the timer's first trial, and what may change
+
+1. **Fixed for both cases, in the one committed plan, before slot 1.** Ten
+   trials per arm; two arms; the interleave and the slot order within each
+   case; the default harness with its attempts; one trial per dispatch; the
+   main count and the third addendum's derived count, word for word; the
+   stop rule; that an interrupted or unjudged trial is a failed trial; no
+   re-run, no top-up, no early stop, no extension. None of these changes
+   for the register block after the timer's slot 1, except by a council
+   ruling that records that the timer's results were known.
+2. **The plan addition.** The values that cannot be computed until the
+   register block flow can run are not guessed. A dated addition to the
+   same plan, committed before slot 21, states for the register block: the
+   commit; the case digest; both expected fingerprints and both expected
+   flow digests, recomputed on that commit and CLI pin; the digests of the
+   gate code outside the fingerprint (fact 5); and, line by line, every one
+   of these that differs from the timer's, with the pull request that
+   caused it. The plan states the same values for the timer before slot 1.
+3. **What may change for the register block between the two batches.** Only
+   what a gate that exists today requires: its case files and controls
+   (gates WF3, WF15, WF16), `fw.test` as the seat account and the
+   credential test (WF17), the texts of WF19, and what WF23 finds. Its
+   held-out checks, mutants and scorers change only as those gates
+   require. Any other change to the case or its judge after the timer's
+   slot 1 returns to the council.
+4. **The freeze inside a batch.** From a case's first slot until its last
+   planned trial is recorded, nothing merges that changes a file in
+   `harness.CODE` or `FLOW_CODE`, a tool definition, the CLI pin, that
+   case's files, the card or document of a skill that case exercises, or
+   the gate code outside the fingerprint that the case's checks run
+   (`src/nirmaan/integrations/`, the seat account script,
+   `scripts/live_eval_ci.py`, the workflow). A slot is dispatched only on
+   the digests the plan states. The `fw.test` change therefore merges
+   before the timer's slot 1 or after the timer's last trial is recorded.
+5. **The `fw.test` change and the fingerprint.** Decision 4, "Code",
+   already rules that no whole-flow pull request changes the default
+   fingerprint after the default harness is named. That pull request shows
+   it by the test of gate WF7. If it cannot be built without a file in
+   `harness.CODE` or a tool definition, it returns to the council before it
+   merges.
+6. **The curriculum.** The failure-to-curriculum rule (decision 1,
+   "Failures"; retrospective, decision 7) applies to the timer's failed
+   trials labelled "model" as written. It is not suspended until the
+   register block's read. A change it produces merges only outside a
+   batch's freeze (item 4): after the timer's last trial is recorded and
+   before the register block's slot 21, or after slot 40. Every change,
+   from any cause, to the card or document of a skill given to a register
+   block stage between the timer's slot 1 and slot 21 is listed in the
+   plan addition with its pull request and the skill digest before and
+   after. The register block's read says that those cards or documents
+   were changed after the timer's results were known, and names the pull
+   requests.
+
+### Decision 3: if the register block flow never runs
+
+The timer's read stands alone. Slots 21 to 40 are then "not run": they are
+never failed trials, no count is stated for them, and the plan is not
+closed by counting them. No date is set by which the register block must
+start. Until its read exists, every statement of a timer count carries the
+sentence "the register block case has not run".
+
+### Decision 4: what may and may not be said
+
+May be said, after the timer's read: for each of its two groups, the
+whole-flow pass count as decision 1 of the ruling words it, k of 10 with
+its interval, with the case, case digest, model, harness fingerprint, CLI,
+flow digest and arm; the third addendum's derived count for the same
+groups, from the same records, at that read; that the register block case
+has not run. After the register block's read: the same for its two groups,
+always with the residual of the second addendum (decision 2, item 6), only
+after security's reading of the passed trials' seat C (gate WF19), and with
+the sentence of decision 2, item 6 above where it applies.
+
+Never said, in a plan, a record, a read or any other text:
+
+- a combined figure: none for forty, none for a case across its two arms,
+  none across the two reads; and no percentage without its n;
+- "the whole-flow batch", "the whole-flow result" or "the whole flow" for
+  the timer's twenty alone. They are "the timer case's twenty trials";
+- a comparison between the two cases, in either direction. They differ in
+  case, date, flow digest and possibly gate code;
+- that the two cases ran on the same harness because their fingerprints are
+  equal (fact 5). The plan's digests are what may be cited;
+- that a later register block count shows the effect of a curriculum
+  change, or that documents help beyond the two arm counts stated side by
+  side with their intervals;
+- a timer count in any text before the timer's read. The generated list in
+  `capability/levels.json` writes a group's count when its tenth record
+  merges (fact 2); that is not the read, and nothing cites it before the
+  read;
+- a count for slots that did not run, or those slots as failed trials;
+- anything the ruling and its addenda already forbid: a level, a score or a
+  bar, a per-stage skill rate, case (a) as independent verification (gate
+  WF11), any figure outside the repository's records (gates WF12 and
+  WF18), any time, usage or cost figure.
+
+### Positions not adopted, and open
+
+No seat chose to wait, and no seat dissented from one read per case. All
+three asked that both cases' counts and rules be fixed before the timer's
+first trial. Differences, and how the chair chose:
+
+- The plan. qa-evidence and verification-lead asked for one plan of forty
+  holding both cases' design; ai-engineer asked for two plans, because the
+  register block's fingerprints cannot be computed on a commit that does
+  not exist yet. The chair took one plan with a dated addition (decision
+  2, items 1 and 2): the design is fixed once, and no value is guessed.
+- The curriculum. qa-evidence's first position was that nothing which
+  alters a skill or document given to a register block stage merges before
+  the register block's read, with a stated plan amendment as the fallback.
+  verification-lead and ai-engineer applied the rule as written, with each
+  change listed. The chair took the rule as written with qa-evidence's
+  fallback made the requirement (decision 2, item 6): the register block
+  has no date, the measure credits no level, and holding the product's
+  curriculum for an undated case costs more than a stated difference
+  between two counts that are never compared. qa-evidence's first position
+  is recorded as dissent on this item.
+- One read after slot 40 with the timer run early. Named in the brief as
+  an option. Not taken: qa-evidence showed the generated list would hold
+  counts the council called unread, and if the register block never ran
+  the timer's records would be merged and never read.
+- ai-engineer: one pinned commit for each batch. Adopted as pinned digests
+  (decision 2, item 4), because every record merges to `main` during the
+  batch, so the commit moves while the listed files do not.
+- Open, for eda-tooling: which files the `fw.test` seat account change
+  touches (second addendum, same open item). Decision 2, item 5 says what
+  follows from the answer.
+- Open, for security (not seated): to confirm, in the plan's pull request,
+  that the timer path raises no reach question beyond gate WF23.
+
+### Gates
+
+Each is met before the timer's first trial unless it says otherwise.
+
+| Gate | Condition | Owner seat |
+|---|---|---|
+| WF10 (amended) | Forty trials, ten per case per arm, fixed in one committed plan before the first trial of either case; never beside wave 2's first live batch; one read per case, after that case's last planned trial is recorded; no re-run counts | verification-lead |
+| WF24 | The committed plan states this amendment, the items of decision 2, item 1 for both cases, and the timer's values of decision 2, item 2. The plan addition for the register block (decision 2, items 2 and 6) is committed before slot 21. A change to a fixed item after slot 1 is made only by a council ruling | verification-lead |
+| WF25 | The freeze of decision 2, item 4 holds for each batch, and each slot is dispatched only on the digests its plan states; the `fw.test` change merges outside the timer's batch and its pull request shows the default fingerprint unchanged by the test of gate WF7, or it returns to the council | ai-engineer |
+| WF26 | Every statement of a whole-flow count follows decision 4: the timer's read carries "the register block case has not run" until that case is read; the register block's read names the changes of decision 2, item 6; no combined figure and no comparison between the cases anywhere | qa-evidence |
+
+Code these gates need, for the build lane (this meeting wrote none): none
+is required. The plan and its addition are documents. If the build lane
+wants the pinned digests of decision 2, item 4 checked by the dispatch
+script, that check goes in `scripts/live_eval_ci.py`, outside
+`harness.CODE`, and merges before the timer's slot 1.
