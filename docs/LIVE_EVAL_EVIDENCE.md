@@ -287,7 +287,10 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   package or the records folder, read any process's environment or a
   runner-only file, or signal the harness. Today it records, and does not
   gate, since `fw.test` runs seat C as the runner; with `--require-denied` it
-  becomes the gate when that changes.
+  becomes the gate when that changes. Its recorded result
+  (`evals/flow/credential_test_record.json`, run 44401041085): every probe
+  not denied, the parent's environment with the credential-named canary in
+  it readable.
 - **Whole-flow cases** (`docs/WHOLE_FLOW.md`, "The CI path") run in these
   jobs when named: one trial per dispatch, on the default harness, in the
   whole-flow fingerprint, each record checked for `flow: whole`; a `flow/`

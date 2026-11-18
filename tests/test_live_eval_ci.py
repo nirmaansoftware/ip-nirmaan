@@ -449,3 +449,18 @@ def test_a_target_it_cannot_name_or_find_fails_the_test_and_a_crash_never_reads_
     for require in (False, True):
         assert fw.run(tmp_path, out, require, {}) == 1
         assert not out.exists() and "nothing is recorded as denied" in capsys.readouterr().out
+
+
+CREDENTIAL_RECORD = REPO / "evals" / "flow" / "credential_test_record.json"
+
+
+def test_the_recorded_credential_test_is_whole_and_the_register_block_flow_waits_while_it_shows_reach():
+    """Decision 4: the credential test's result is recorded before the first register block trial. While the record
+    shows any probe not denied, a live trial of the register block flow is refused (exit 6)."""
+    record = json.loads(CREDENTIAL_RECORD.read_text())
+    assert record["format"] == fw.FORMAT and record["tool"] == "fw.test" and record["done"] and record["control_ok"]
+    assert not record["missing"] and set(record["probes"]) == set(fw.PROBES)
+    assert record["run"]["id"] and record["run"]["job_id"] and record["head"]
+    assert record["every_probe_denied"] == all(p["denied"] for p in record["probes"].values())
+    if not record["every_probe_denied"]:
+        assert ci.seat_c_problem(REGS_FLOW)

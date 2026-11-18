@@ -487,8 +487,16 @@ checkout. No new workflow and no new action.
   parent's environment at all, read a runner-only file and signal the
   harness; a control writes its own run directory. The result is uploaded as
   `live-eval-fw-reach-<job>-<run id>`. It is recorded, not a gate:
-  `fw.test` runs seat C by path, as the runner, so the expected result is
-  "not denied". `--require-denied` makes it a gate.
+  `fw.test` runs seat C by path, as the runner. `--require-denied` makes it
+  a gate.
+- **The recorded result** (`evals/flow/credential_test_record.json`, run
+  44401041085, job `replay`, head feda503): every probe not denied. The C ran
+  as the runner (uid 1001), `sudo -n true` exited 0, it created a file in the
+  checkout, `src/nirmaan`, `scripts`, `evals`, `site-packages` and the records
+  folder, it read its parent's `/proc/<pid>/environ` holding both canaries
+  (the credential-named one included), its own environment held the plain
+  one, and it read the runner-only file and could signal the harness. So the
+  register block flow waits, as below.
 - **The register block flow stays refused.** Its firmware stage and its
   held-out checks run seat C, so `check --require-expected` and `trials`
   refuse it with exit 6 before any trial, as M89 refuses the single-seat
