@@ -173,12 +173,12 @@ its bytes change. Only the platform may write it (no seat answer writes
 memory, and the CLI and the eval runner write only `input.` keys), only the
 task it is given to sees it, and no single-seat case gives one, so their
 prompts are byte for byte as before
-(`tests/test_flow_requirements_document.py`). Nothing writes a `document.` key
-yet: the whole-flow runner (part 4b, not merged) is to give the fixed
-documents to the requirements stage this way, so that its trials are seated at
-every stage, never "seated from interface-spec". `runtime/context.py` and
-`runtime/prompt.py` are `harness.CODE` files, so this change merges in the
-window with the dispatch edit.
+(`tests/test_flow_requirements_document.py`). The whole-flow runner (part 4b)
+gives the fixed documents to the requirements stage this way and is the only
+writer of a `document.` key, so its trials are seated at every stage, never
+"seated from interface-spec". `runtime/context.py` and `runtime/prompt.py` are
+`harness.CODE` files, so this change merges in the window with the dispatch
+edit.
 
 ## The judge controls (M87, third pull request)
 
