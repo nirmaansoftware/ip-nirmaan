@@ -1,20 +1,20 @@
 {
   "format": "nirmaan.object-screen-record",
   "about": "The OBJECT-SCREEN and ADDRESS-PROBE lines of tests/test_object_screen.py, as one CI run printed them on ubuntu-24.04: the undefined and defined names of every committed host fixture, reference answer and held-out test (the allow list's source), each must-refuse input's refusal, check 7 refusing the simulator clock probe as a seat's driver test, and what the address-arithmetic probe read under fw.test. A check record for gate WF16 (council record 2026-11-17, second addendum), not an eval record.",
-  "run": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44342693471",
-  "head": "5110bafd1b452e41564fe174d703ee1816c7c51b",
+  "run": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44387059140",
+  "head": "ad1a2fc5cea2d6a1389edd460cf5eb9bb2446460",
   "jobs": {
     "address_probe": [
-      "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44342693471/job/134936994462"
+      "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44387059140/job/135094372107"
     ],
     "judge": [
-      "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44342693471/job/134936994462"
+      "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44387059140/job/135094372107"
     ],
     "refused": [
-      "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44342693471/job/134936994462"
+      "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44387059140/job/135094372107"
     ],
     "symbols": [
-      "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44342693471/job/134936994462"
+      "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44387059140/job/135094372107"
     ]
   },
   "symbols": {
