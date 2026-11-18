@@ -34,7 +34,7 @@ from dataclasses import dataclass
 from nirmaan.applicability import describe
 from nirmaan.models import EvidenceRequirement, FileInput, ParamKind, ToolSpec
 from nirmaan.runtime import harness
-from nirmaan.runtime.context import ArtifactView, AttemptView, ReviewView, WorkPacket
+from nirmaan.runtime.context import DOCUMENT_CITATION, DOCUMENT_KIND, ArtifactView, AttemptView, ReviewView, WorkPacket
 
 _UNSAFE = re.compile(r"[^A-Za-z0-9._\-]")
 
@@ -131,10 +131,14 @@ def _citations(packet: WorkPacket, tools: tuple[ToolNote, ...]) -> list[Citable]
     for review in packet.task.reviews:  # a recorded review is citable; it is not evidence (M27)
         found.setdefault(review.id, Citable("review", _UNSAFE.sub(".", review.id), review.id,
                                             f"{review.verdict} by {review.reviewer}"))
-    for art in packet.task.upstream_artifacts:  # only what the organization approved is citable
+    for art in packet.task.upstream_artifacts:  # only what the organization approved, or a customer gave, is citable
         if art.trusted:
-            found.setdefault(art.id, Citable("artifact", _UNSAFE.sub(".", art.id), art.id,
-                                             f"{art.kind}: {art.title} (approved)"))
+            # G3: a customer document is cited as a document, never as an artifact, so no draft derives from a
+            # record the engine does not hold (the provenance check refuses that), and it is not called approved.
+            document = art.kind == DOCUMENT_KIND
+            found.setdefault(art.id, Citable(DOCUMENT_CITATION if document else "artifact", _UNSAFE.sub(".", art.id),
+                                             art.id, f"{art.kind}: {art.title} "
+                                                     f"({'given by the customer' if document else 'approved'})"))
     for attempt in packet.task.attempts:  # M52: a refused attempt's failed runs stay citable; they back nothing
         for failed in attempt.failed_runs:
             if failed.evidence:
