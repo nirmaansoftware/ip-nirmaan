@@ -292,7 +292,11 @@ fixture, reference answer and held-out test), one must-refuse fixture per
 refused construct (`tests/fixtures/fw/screen/`) and the simulator clock
 probe, each refused, check 7 refusing the clock probe as a seat's driver test,
 and the address-arithmetic probe (`tests/fixtures/fw/reach/address_arithmetic_probe.c`),
-which passes the screen, with what it really read.
+which passes the screen, with what it really read: starting from `hal->read32`
+alone it read the cycle count (`read32` and `write32` take 2 cycles each on the
+reference RTL, 3 on `axi4_lite_regs_lat2.v`), the pass counter and the run's
+nonce. The screen therefore leaves the cycle count readable, and a strict
+fixture of decision 1 may use that route (decision 1, item 3).
 
 ## The document check record (M87, follow-up)
 

@@ -183,8 +183,16 @@ allowed pointer (`hal->read32` is an address in the harness's own code), a
 memory scan, anything the allowed C library calls can do, a system call made
 through an allowed function, or anything the account the run executes as may
 do (gate WF17 is about the account). The address-arithmetic probe
-(`tests/fixtures/fw/reach/address_arithmetic_probe.c`) passes the screen, and
-what it reached under `fw.test` is in the record. Where it sits: in the
+(`tests/fixtures/fw/reach/address_arithmetic_probe.c`) passes the screen.
+Starting only from `hal->read32` and `hal->write32`, it decodes the harness's
+own machine code and, under `fw.test` on both register block RTLs, read the
+harness's cycle count (it timed `read32` and `write32` at 2 cycles each on the
+reference RTL and 3 on `axi4_lite_regs_lat2.v`), found its pass counter, and
+found the run's nonce (its first 8 digits matched the run's own). It only
+reads and prints no record line; no fixture that forges a verdict is
+committed. So the screen does not close the cycle count: a strict fixture of
+the record's decision 1 may use this route (decision 1, item 3). The record
+is `evals/flow/object_screen_record.json`. Where it sits: in the
 whole-flow judge only, so the shared `fw.build` and `fw.test` tools, their
 definitions and every single-seat case are unchanged, and the seat's own
 before-review runs of those tools during a whole-flow trial are not screened.

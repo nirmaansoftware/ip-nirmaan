@@ -210,16 +210,22 @@ def _basis_library(symbols: dict[str, dict[str, list[str]]]) -> set[str]:
 
 
 def test_the_allow_list_is_the_recorded_runs():
+    """Gate WF16: the allow list from a recorded run; every must-refuse input recorded refused; check 7 recorded
+    refusing the clock probe; the address-arithmetic probe recorded with its real result."""
     record = _record()
-    if record is None:
-        pytest.skip("evals/flow/object_screen_record.json is not recorded yet")
-    assert record is not None, "no record: nothing is shown refused or allowed"
+    assert record is not None, "the screen's recorded CI run is missing (evals/flow/object_screen_record.json)"
     assert record["format"] == "nirmaan.object-screen-record"
+    assert re.fullmatch(r"https://github\.com/\S+/actions/runs/\d+", record["run"])
+    assert re.fullmatch(r"[0-9a-f]{40}", record["head"])
     assert set(record["symbols"]) == {_rel(f) for files in BASIS.values() for f in files}
     assert set(LIBRARY_CALLS) == _basis_library(record["symbols"])
     assert set(record["refused"]) == set(REFUSES)
     for name, hits in record["refused"].items():
         assert REFUSES[name] <= {h["rule"] for h in hits}, name
+    judge = record["judge"]
+    assert judge["submitted"] and judge["status"] == "failed" and judge["runs"] == []
+    assert judge["summary"].startswith(REFUSED)
+    assert set(record["address_probe"]) == {"axi4_lite_regs.v", "axi4_lite_regs_lat2.v"}
 
 
 # --- On the CI toolchain (tools) -------------------------------------------------------------------------------
@@ -309,8 +315,12 @@ def test_check_7_refuses_the_clock_probe_as_the_seats_driver_test(nirmaan_org, f
         print(f"\nOBJECT-SCREEN-JUDGE {json.dumps(line, sort_keys=True)}")
     assert result.submitted, result.detail
     assert score.status is ScoreStatus.FAILED and score.summary.startswith(REFUSED) and not score.runs, line
-    judged = [r for r in engine.state.tool_runs.values() if "eval-scorer" in r.actor]
-    assert not judged, [r.id for r in judged]
+    runs = list(engine.state.tool_runs.values())
+    judged = [r for r in runs if "eval-scorer" in r.actor]  # Actor.label: "<name>@<role>"
+    assert runs and not judged, [r.id for r in judged]  # the seat's own gate ran; the judge ran nothing
+    record = _record()
+    if record is not None:
+        assert record["judge"] == line
 
 
 _PROBE_LINE = re.compile(r"PASS (address_probe,\S+)$", re.M)

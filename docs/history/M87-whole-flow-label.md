@@ -63,6 +63,8 @@ refused fixture per construct, the clock probe and the address-arithmetic
 probe are recorded from CI. It sits in the whole-flow judge only: no tool
 definition, harness code or fingerprint changed, and single-seat cases are
 judged as before. It stops names, not address arithmetic: it confines nothing.
+The recorded address-arithmetic probe, starting from `hal->read32`, read the
+harness's cycle count, its pass counter and the run's nonce.
 
 **The timer document fixed, and the check record rule (follow-up).** An
 independent check found that `evals/flow/axil_timer/requirements.md` claimed
