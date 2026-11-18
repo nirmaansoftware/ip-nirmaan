@@ -31,7 +31,7 @@ HARNESS = SRC / "nirmaan" / "runtime" / "harness.py"
 #: Names in harness.py that are not settings: its bookkeeping, and the pieces WORK_SYSTEM and REVIEW_SYSTEM
 #: are built from (in the fingerprint through those two).
 BOOKKEEPING = {"FORMAT", "VERSION", "SETTINGS", "SOURCE_ROOT", "CODE", "OUTPUT_WORK", "FILE_FORMAT", "OUTPUT_REVIEW",
-               "VARIANTS", "LOOP_SETTINGS", "LOOP_CODE"}
+               "VARIANTS", "LOOP_SETTINGS", "LOOP_CODE", "FLOW_CODE"}
 #: The runtime files that are not harness code, and why. A new runtime file must be put in ``CODE`` or here.
 NOT_HARNESS = {
     "nirmaan/runtime/__init__.py": "re-exports only",

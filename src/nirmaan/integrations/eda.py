@@ -21,22 +21,32 @@ credential in it. The timeout covers the
 whole run, and stops every process a step started, not only the first. A
 simulation passes only on the testbench's own verdict, which carries a nonce
 the run passed in.
+
+M88 (docs/GATE_INTEGRITY.md, section 7): what a run's steps print, and what of the files it wrote is read
+back, is bounded, and so is the run's own directory; past a bound the run is stopped and fails. A record
+keeps a bounded head and tail of the diagnostics, never the whole log, and a temporary run directory is
+removed when the scope that made it ends (an eval trial, a test session), or at once when no record refers
+to it.
 """
 
 from __future__ import annotations
 
+import contextvars
 import json
 import os
 import re
 import secrets
+import selectors
 import shlex
 import shutil
 import signal
 import subprocess
+import sys
 import tempfile
 import time
-from collections.abc import MutableMapping
-from dataclasses import dataclass
+from collections.abc import Iterator, MutableMapping
+from contextlib import contextmanager
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable
 
@@ -63,6 +73,24 @@ if TYPE_CHECKING:
     from nirmaan.runtime.tools import ToolBroker
 
 DEFAULT_TIMEOUT = 300
+
+#: M88: the most a run's steps may print, all steps together, and the largest file a run wrote that is read
+#: back. Model-written code runs in these steps; past the cap the run is stopped and fails.
+OUTPUT_CAP = 64 * 2**20
+#: M88: the most a run's own directory may hold, and the largest file any of its steps may write.
+DISK_CAP = 2 * 2**30
+#: M88: the most files and folders a run's own directory may hold.
+FILES_CAP = 100_000
+#: M88: how often, in seconds, a running step's directory is measured against ``DISK_CAP`` and ``FILES_CAP``.
+DISK_CHECK_SECONDS = 1.0
+#: M88: how many diagnostics a record keeps from the start of a result and from its end, and the longest text
+#: (a summary, a diagnostic's message) it keeps.
+DIAGNOSTICS_KEPT = 50
+TEXT_CAP = 2000
+#: M88: the most a result's metrics may take as JSON; a run whose parsed metrics are larger fails.
+METRICS_CAP = 2**20
+#: M88: set to anything but empty or 0 and no temporary run directory or eval sandbox is removed (debugging).
+KEEP_ENV = "NIRMAAN_KEEP_RUN_DIRS"
 
 #: Environment variables no tool run sees (M53): code a seat wrote runs in these steps, and what it prints
 #: lands in logs and records, so a credential in its environment could be copied out.
@@ -224,7 +252,20 @@ def execute(backend: Backend, params: Params) -> ToolOutcome:
     too_short = timeout_problem(params)
     if too_short:
         return ToolOutcome(False, f"{backend.name}: {too_short}")
+    temporary = not text_value(params.get("workdir")).strip()
     workdir = run_directory(backend.name, params.get("workdir"))
+    try:
+        outcome = _execute(backend, params, sources, workdir)
+    except BaseException:  # M88: no record refers to the directory
+        if temporary:
+            remove_temporary(workdir)
+        raise
+    if temporary and not outcome.references:  # M88: refused before any step ran
+        remove_temporary(workdir)
+    return outcome
+
+
+def _execute(backend: Backend, params: Params, sources: tuple[str, ...], workdir: Path) -> ToolOutcome:
     job = Job(backend.tool, params, workdir, sources, params.get("top") or None)
     problem = backend.check(job) if backend.check else None
     # M84 (docs/GATE_INPUTS.md): after the backend's own check, so its reasons stand where they apply.
@@ -236,29 +277,39 @@ def execute(backend: Backend, params: Params) -> ToolOutcome:
     chunks: list[str] = []
     codes: list[int] = []
     commands: list[list[str]] = []
-    timed_out = None
+    stopped: tuple[str, str] | None = None  # why the run was stopped, and in which executable
+    printed = 0
     cwd = backend.cwd(job) if backend.cwd else workdir
     env = run_environment(workdir)
     deadline = time.monotonic() + timeout  # M53: one deadline for the whole run, not one per step
     for argv in backend.steps(job):
         commands.append(argv)
         chunks.append(f"$ {shlex.join(argv)}\n")
-        output, code = _run_step(argv, cwd, env, deadline)
-        chunks.append(output)
-        if code is None:
-            timed_out = argv[0]
+        step = _run_step(argv, cwd, env, deadline, OUTPUT_CAP - printed, workdir)
+        chunks.append(step.output)
+        printed += step.printed
+        if step.stopped:
+            stopped = (step.stopped, argv[0])
             break
-        codes.append(code)
-        if code != 0:
+        codes.append(step.code)
+        if step.code != 0:
             break
+    if stopped is None and _full(workdir):  # M88: what a step wrote after its last measurement
+        stopped = (DISK, commands[-1][0] if commands else backend.name)
+    why = _stopped_summary(stopped, timeout)
+    if stopped and stopped[0] != TIMEOUT:
+        chunks.append(f"[nirmaan: {why}]\n")
     log = redact("".join(chunks))
     log_path = workdir / f"{backend.name}.log"
     log_path.write_text(log, encoding="utf-8")
 
-    result = backend.parse(RunRecord(log, tuple(codes), workdir))
-    if timed_out:
-        result = EdaResult(False, f"timed out after {timeout}s in {timed_out}", result.diagnostics, result.metrics)
-    result = EdaResult(result.passed, redact(result.summary), result.diagnostics, result.metrics)
+    try:
+        result = backend.parse(RunRecord(log, tuple(codes), workdir))
+    except OutputTooLarge as exc:
+        result = EdaResult(False, str(exc))
+    if why:
+        result = EdaResult(False, why, result.diagnostics, result.metrics)
+    result, cut = _bounded(EdaResult(result.passed, redact(result.summary), result.diagnostics, result.metrics))
     record = {
         "tool": backend.tool,
         "backend": backend.name,
@@ -266,8 +317,11 @@ def execute(backend: Backend, params: Params) -> ToolOutcome:
         "commands": commands,
         "exit_statuses": codes,
         "log": str(log_path),
+        "output_bytes": printed,
         "result": result.to_dict(),
     }
+    if cut:
+        record["diagnostics_not_kept"] = cut
     result_path = workdir / f"{backend.name}.result.json"
     result_path.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
     # M44: what the run wrote, by name: its log, and the files its backend reports under ``outputs``.
@@ -286,7 +340,8 @@ RUN_CLAIM = ".nirmaan-run"
 def run_directory(name: str, under: object = None) -> Path:
     """The directory one run works in (M53).
 
-    Without ``under``, a new one in the system's temporary directory. With it, ``under``
+    Without ``under``, a new one in the system's temporary directory, removed when the scope that made it
+    ends (M88, :func:`temporary_runs`). With it, ``under``
     itself when it is new or empty and this run claims it first (an exclusive create of
     :data:`RUN_CLAIM`); otherwise a new directory inside it. So a run never deletes or
     overwrites a file it did not put there, and two runs given the same directory, at
@@ -294,7 +349,7 @@ def run_directory(name: str, under: object = None) -> Path:
     """
     root = Path(text_value(under).strip()) if text_value(under).strip() else None
     if root is None:
-        return Path(tempfile.mkdtemp(prefix=f"nirmaan-{name}-")).resolve()
+        return temporary_directory(f"nirmaan-{name}-")
     root.mkdir(parents=True, exist_ok=True)
     if not any(root.iterdir()):
         try:
@@ -303,6 +358,54 @@ def run_directory(name: str, under: object = None) -> Path:
         except FileExistsError:
             pass
     return Path(tempfile.mkdtemp(prefix=f"nirmaan-{name}-", dir=root)).resolve()
+
+
+#: M88: the temporary directories made in the current scope (:func:`temporary_runs`), or None outside one. A
+#: context variable, so two scopes in two threads never take each other's; the concurrency writer's workers
+#: run in a copy of their caller's context, so their runs belong to its scope.
+_SCOPE: contextvars.ContextVar[list[Path] | None] = contextvars.ContextVar("nirmaan_temporary_runs", default=None)
+
+
+def keep_run_dirs() -> bool:
+    """Whether the debug setting (``KEEP_ENV``) keeps temporary run directories and eval sandboxes (M88)."""
+    return os.environ.get(KEEP_ENV, "").strip() not in ("", "0")
+
+
+def temporary_directory(prefix: str) -> Path:
+    """A new directory in the system's temporary directory, removed when the scope it was made in ends (M88)."""
+    path = Path(tempfile.mkdtemp(prefix=prefix)).resolve()
+    scope = _SCOPE.get()
+    if scope is not None:
+        scope.append(path)
+    return path
+
+
+def remove_temporary(path: Path) -> None:
+    """Remove one temporary directory now, unless the debug setting keeps it (M88)."""
+    scope = _SCOPE.get()
+    if scope is not None and path in scope:
+        scope.remove(path)
+    if not keep_run_dirs():
+        shutil.rmtree(path, ignore_errors=True)
+
+
+@contextmanager
+def temporary_runs() -> Iterator[None]:
+    """Remove every temporary directory made in this block when it ends, however it ends (M88).
+
+    A run's record names its log, which a seat's next attempt and VeriTriage read, so a run with no
+    ``workdir`` keeps its directory until the scope that made it ends: an eval trial, a test. Outside any
+    scope (a saved project's runs) nothing is removed. A scope inside another removes only its own.
+    """
+    made: list[Path] = []
+    token = _SCOPE.set(made)
+    try:
+        yield
+    finally:
+        _SCOPE.reset(token)
+        if not keep_run_dirs():
+            for path in made:
+                shutil.rmtree(path, ignore_errors=True)
 
 
 def run_environment(workdir: Path) -> dict[str, str]:
@@ -377,26 +480,167 @@ def _stop_tree(proc: subprocess.Popen) -> None:
         _signal(pid, signal.SIGKILL)
 
 
-def _run_step(argv: list[str], cwd: Path, env: dict[str, str], deadline: float) -> tuple[str, int | None]:
-    """Run one step in its own process group; its output and exit status, or None when the deadline passed."""
+#: Why a step was stopped (M88): its deadline passed, it printed past ``OUTPUT_CAP``, or it wrote past ``DISK_CAP``.
+TIMEOUT, OUTPUT, DISK = "timeout", "output", "disk"
+
+
+class OutputTooLarge(Exception):
+    """A file a run wrote is over ``OUTPUT_CAP``, so it is not read back and the run fails (M88)."""
+
+
+def read_output(path: Path) -> str | None:
+    """The text of a file a run wrote, None when there is none, :class:`OutputTooLarge` past ``OUTPUT_CAP``."""
+    try:
+        size = path.stat().st_size
+    except OSError:
+        return None
+    if not path.is_file():
+        return None
+    if size > OUTPUT_CAP:
+        raise OutputTooLarge(f"{path.name} is over {_mb(OUTPUT_CAP)} ({size} bytes): not read, the run fails")
+    return path.read_text(encoding="utf-8", errors="replace")
+
+
+def _mb(size: int) -> str:
+    return f"{size / 2**20:g} MB"
+
+
+def _stopped_summary(stopped: tuple[str, str] | None, timeout: int) -> str:
+    """The failed run's summary when it was stopped, or empty."""
+    if stopped is None:
+        return ""
+    why, exe = stopped
+    if why == TIMEOUT:
+        return f"timed out after {timeout}s in {exe}"
+    if why == OUTPUT:
+        return f"output over {_mb(OUTPUT_CAP)} in {exe}: stopped, the run fails"
+    return f"wrote {_mb(DISK_CAP)} or {FILES_CAP} files or more in {exe}: stopped, the run fails"
+
+
+def _bounded(result: EdaResult) -> tuple[EdaResult, int]:
+    """``result`` as a record keeps it (M88): the first and last diagnostics, every text cut to ``TEXT_CAP``, and
+    no metrics past ``METRICS_CAP`` (the run then fails); with how many diagnostics were left out."""
+    diags = result.diagnostics
+    cut = max(0, len(diags) - 2 * DIAGNOSTICS_KEPT)
+    if cut:
+        diags = (*diags[:DIAGNOSTICS_KEPT], *diags[-DIAGNOSTICS_KEPT:])
+    diags = tuple(replace(d, message=d.message[:TEXT_CAP], file=d.file[:TEXT_CAP], code=d.code[:TEXT_CAP])
+                  for d in diags)
+    passed, summary, metrics = result.passed, result.summary[:TEXT_CAP], result.metrics
+    if len(json.dumps(metrics, default=str)) > METRICS_CAP:
+        passed, metrics = False, {}
+        summary = f"its parsed metrics are over {_mb(METRICS_CAP)}: not kept, the run fails"
+    return EdaResult(passed, summary, diags, metrics), cut
+
+
+def _full(root: Path) -> bool:
+    """Whether the run's directory is at its limits (M88): ``DISK_CAP`` bytes or ``FILES_CAP`` entries.
+
+    The count bounds the walk too: a step that makes files without end cannot make a measurement slow.
+    """
+    total = entries = 0
+    for here, dirs, names in os.walk(root):
+        entries += len(dirs) + len(names)
+        if entries >= FILES_CAP:
+            return True
+        for name in names:
+            try:
+                total += os.lstat(os.path.join(here, name)).st_size
+            except OSError:  # removed while it was measured
+                pass
+        if total >= DISK_CAP:
+            return True
+    return False
+
+
+#: M88: how a step starts. A small launcher sets the limits and then becomes the step (``exec``, so the pid, the
+#: process group and the stop are the step's own): no file the step writes may grow past the size it is given,
+#: and it writes no core file (one killed at the limit would leave its memory on disk). A launcher rather than
+#: ``preexec_fn``, which can deadlock a child forked while other threads run. Python ignores SIGPIPE and SIGXFSZ,
+#: and an ignored signal survives ``exec``, so both are put back first.
+_LAUNCH = """\
+import os, resource, signal, sys
+cap = int(sys.argv[1])
+hard = resource.getrlimit(resource.RLIMIT_FSIZE)[1]
+resource.setrlimit(resource.RLIMIT_FSIZE, (cap if hard == resource.RLIM_INFINITY else min(cap, hard), hard))
+resource.setrlimit(resource.RLIMIT_CORE, (0, resource.getrlimit(resource.RLIMIT_CORE)[1]))
+signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+signal.signal(signal.SIGXFSZ, signal.SIG_DFL)
+try:
+    os.execvp(sys.argv[2], sys.argv[2:])
+except OSError as exc:
+    sys.stderr.write(f"{type(exc).__name__}: {exc}: {sys.argv[2]!r}\\n")
+    sys.exit(127)
+"""
+
+
+def _launch(argv: list[str]) -> list[str]:
+    """``argv`` started through the launcher, with ``DISK_CAP`` as its file size limit (M88)."""
+    return [sys.executable, "-I", "-S", "-c", _LAUNCH, str(DISK_CAP), *argv]
+
+
+@dataclass(frozen=True)
+class _Step:
+    output: str  # what it printed, at most the room it was given
+    code: int | None  # its exit status, None when it was stopped
+    stopped: str | None  # TIMEOUT, OUTPUT, DISK, or None
+    printed: int  # how many bytes it printed, kept or not
+
+
+def _run_step(argv: list[str], cwd: Path, env: dict[str, str], deadline: float, room: int, watch: Path) -> _Step:
+    """Run one step in its own process group, keeping at most ``room`` bytes of what it prints (M88).
+
+    The step is stopped, with every process it started, when the deadline passes, when it prints past
+    ``room``, or when ``watch`` (the run's directory) reaches ``DISK_CAP`` or ``FILES_CAP``; no file it writes can grow
+    past ``DISK_CAP``.
+    """
     remaining = deadline - time.monotonic()
     if remaining <= 0:
-        return "", None
+        return _Step("", None, TIMEOUT, 0)
     try:
-        proc = subprocess.Popen(argv, cwd=cwd, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                text=True, errors="replace", start_new_session=True)
-    except OSError as exc:  # not executable, vanished mid-run
-        return f"{type(exc).__name__}: {exc}\n", -1
-    try:
-        output, _ = proc.communicate(timeout=remaining)
-    except subprocess.TimeoutExpired:
-        _stop_tree(proc)
-        try:
-            output, _ = proc.communicate(timeout=10)
-        except subprocess.TimeoutExpired:  # a process outside the group still holds the output open
-            output = ""
-        return output or "", None
-    return output or "", proc.returncode
+        proc = subprocess.Popen(_launch(argv), cwd=cwd, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                start_new_session=True)
+    except OSError as exc:  # the working directory vanished mid-run
+        return _Step(f"{type(exc).__name__}: {exc}\n", -1, None, 0)
+    kept, printed, stopped = bytearray(), 0, None
+    measure_at = time.monotonic() + DISK_CHECK_SECONDS
+    with proc.stdout, selectors.DefaultSelector() as selector:
+        selector.register(proc.stdout, selectors.EVENT_READ)
+        while True:
+            now = time.monotonic()
+            if now >= deadline:
+                stopped = TIMEOUT
+                break
+            if now >= measure_at:
+                measure_at = now + DISK_CHECK_SECONDS
+                if _full(watch):
+                    stopped = DISK
+                    break
+            if not selector.select(min(deadline, measure_at) - now):
+                continue
+            chunk = os.read(proc.stdout.fileno(), 1 << 16)
+            if not chunk:  # every writer closed it
+                break
+            printed += len(chunk)
+            kept += chunk[:max(0, room - len(kept))]
+            if printed > room:
+                stopped = OUTPUT
+                break
+        if stopped is None:
+            try:
+                proc.wait(timeout=max(0.0, deadline - time.monotonic()))
+            except subprocess.TimeoutExpired:
+                stopped = TIMEOUT
+        if stopped:
+            _stop_tree(proc)
+            try:
+                proc.wait(timeout=10)
+            except subprocess.TimeoutExpired:  # a process outside the group: the step is reported stopped anyway
+                pass
+    if stopped is None and proc.returncode == -signal.SIGXFSZ:  # a file grew past the limit
+        stopped = DISK
+    output = kept.decode("utf-8", errors="replace").replace("\r\n", "\n").replace("\r", "\n")
+    return _Step(output, None if stopped else proc.returncode, stopped, printed)
 
 
 def new_nonce() -> str:
@@ -612,8 +856,7 @@ def _yosys(job: Job) -> list[list[str]]:
 
 
 def _yosys_parse(run: RunRecord) -> EdaResult:
-    stat = run.workdir / "stat.json"
-    return parse_yosys(run.log, run.returncode, stat.read_text(encoding="utf-8") if stat.is_file() else None)
+    return parse_yosys(run.log, run.returncode, read_output(run.workdir / "stat.json"))
 
 
 #: sby's depth when ``[options]`` names none.
@@ -789,7 +1032,7 @@ def _coverage_parse(run: RunRecord) -> EdaResult:
     manifest = run.workdir / COVERAGE_DESIGN
     design = json.loads(manifest.read_text(encoding="utf-8"))["design"] if manifest.is_file() else []
     result = parse_coverage(run.log, run.returncodes, nonce=run_nonce(run.log) or "",
-                            data=data.read_text(encoding="utf-8", errors="replace") if data.is_file() else None,
+                            data=read_output(data),
                             design=design)
     if not result.passed:
         return result

@@ -138,6 +138,7 @@ The original preface of the section:
 - [M85-gate-reads](M85-gate-reads.md): Milestone 85 - Gate reads of host files
 - [M86-failure-curriculum](M86-failure-curriculum.md): Milestone 86 - Failures feed the curriculum (G5)
 - [M87-whole-flow-label](M87-whole-flow-label.md): Milestone 87 - Whole-flow cases: the label and the list (G3)
+- [M88-bounded-tool-runs](M88-bounded-tool-runs.md): Milestone 88 - Bounded tool runs: output, disk and record caps, and temporary directories removed
 
 ## Before M43
 
