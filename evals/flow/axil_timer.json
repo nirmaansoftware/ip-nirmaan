@@ -52,7 +52,7 @@
       },
       "case_files": {
         "sources": [
-          "tests/fixtures/rtl/axil_timer/axil_timer_tb.v"
+          "evals/flow/axil_timer/axil_timer_tb.v"
         ]
       },
       "params": {
