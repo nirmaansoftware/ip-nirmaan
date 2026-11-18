@@ -15,3 +15,11 @@ must-fail case or a written reason.
 in the PR body, and exits 1 when one is unanswered. It lists failed trials no
 `causes.md` labels. It touches nothing in `harness.CODE`, so no harness
 fingerprint changes.
+
+**The first backlog.** The six model-labelled failures on main when the rule
+merged were answered in one PR (the "Failure curriculum" section of its body).
+One became a new case, `rtl/apb-gpio-reset` (DATA_IN unknown after reset, seen
+twice), with one mutant; no existing case changed, so no trial went stale and no
+harness fingerprint moved. Two failures the seat's own simulation gate had
+already refused, and the knowledge-off ones where the knowledge-on arm passed,
+are answered with a reason.

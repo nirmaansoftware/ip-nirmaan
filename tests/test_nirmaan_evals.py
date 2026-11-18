@@ -41,8 +41,8 @@ from nirmaan.runtime import MockLLM, ModelRuntime
 REPO = Path(__file__).parents[1]
 EVALS = REPO / "evals"
 AXI = REPO / "tests" / "fixtures" / "rtl" / "axi4_lite"
-#: P3-E2 added rtl/apb-gpio and rtl/axil-timer to the four RTL cases of M27, and P3-E3 rtl/skid-buffer.
-RTL_CASES = ["rtl/apb-gpio", "rtl/apb-regs", "rtl/axi4-lite-regs", "rtl/axil-timer", "rtl/rr-arbiter",
+#: G5 added rtl/apb-gpio-reset (the X-after-reset control); P3-E2 added rtl/apb-gpio and rtl/axil-timer to the four RTL cases of M27, and P3-E3 rtl/skid-buffer.
+RTL_CASES = ["rtl/apb-gpio", "rtl/apb-gpio-reset", "rtl/apb-regs", "rtl/axi4-lite-regs", "rtl/axil-timer", "rtl/rr-arbiter",
              "rtl/skid-buffer", "rtl/sync-fifo"]
 #: M45: a spec seat case and a firmware seat case join the RTL cases; W2-E1, W2-E2 and W2-E3 add verification seat
 #: cases, W2-E4 two debug seat cases, W2-E5 a coverage seat case.
