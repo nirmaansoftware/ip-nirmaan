@@ -145,9 +145,9 @@ shows its `harness` and `cli`, and:
 A whole-flow trial (M87, `docs/WHOLE_FLOW.md`) is no skill group's trial: its
 label and the `whole_flow` list live in `models/evaluation.py`,
 `evals/records.py`, `evals/cases.py` and `evals/levels.py`, none of them a
-`CODE` file, so adding them changed no fingerprint. The whole-flow runner will
-add `flow` to the fingerprint's `run` section and a flow-only code section for
-a whole-flow run only, as `loop` is for tools in the loop.
+`CODE` file, so adding them changed no fingerprint. For a whole-flow run only,
+the fingerprint's `run` section says `flow: whole` and a `flow` section digests
+`FLOW_CODE` (the flow module), as `loop` is for tools in the loop.
 
 Five trials under one harness and three under another are two groups, never
 eight trials. Knowledge levels come from check records, not trials, and are
@@ -230,6 +230,17 @@ in the same pull request.
   inside decision 4's quiet window. New runtime files `runtime/seat_tools.py`
   and `runtime/seat_tools_relay.py` are `LOOP_CODE`, in the variant's
   fingerprint only.
+
+- G3, the whole-flow runner option, part 4a (council record 2026-11-17,
+  decision 3, gates WF6 and WF7): `evals/runner.py` sends a whole-flow case
+  (`flow: whole`) to its own module, `evals/flow.py`, with every argument as
+  given, and refuses one with a plain message while that module is absent;
+  `runtime/harness.py` adds `FLOW_CODE` and, for a whole-flow run only, `flow`
+  in the `run` section and a `flow` section with the flow module's digest. A
+  `CODE` file changed, so every fingerprint changed once, inside the window
+  before the pull request that names the default harness. The flow module is
+  not a `CODE` file: an edit to it changes the whole-flow fingerprint and
+  never the default (`tests/test_whole_flow_dispatch.py`).
 
 ## What is not the harness
 
