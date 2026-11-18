@@ -55,7 +55,9 @@ def test_the_two_cases_load_only_when_asked_for(cases):
 def test_each_case_is_valid_credits_nothing_and_fixes_no_stage(org, cases):
     for case in cases.values():
         assert validate_case(org, case, ROOT) == [], case.id
-        assert case.flow == "whole" and case.skills == () and case.upstream == {} and case.reference == ()
+        assert case.flow == "whole" and case.skills == () and case.upstream == {}
+        # The reference answers every stage, for a replay only; no seat is given it.
+        assert {f.kind for f in case.reference} >= {"requirements_spec", "interface_spec", "rtl_source"}
         assert case.expected_behavior and case.known_failure_modes and case.held_out
 
 

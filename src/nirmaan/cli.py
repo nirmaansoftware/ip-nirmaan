@@ -1101,11 +1101,11 @@ CASES_OPTION = typer.Option(Path("evals"), "--cases", help="Directory of evaluat
 STOPPED_EXIT = 3
 
 
-def _cases(cases: Path):
+def _cases(cases: Path, flow: str | None = "seat"):
     from nirmaan.evals import EvalError, load_cases
 
     try:
-        return load_cases(cases)
+        return load_cases(cases, flow=flow)
     except (EvalError, ValueError) as exc:
         _fail(str(exc))
 
@@ -1119,7 +1119,8 @@ def eval_list(cases: Path = CASES_OPTION) -> None:
 
 @eval_app.command("run")
 def eval_run(
-    case_ids: List[str] = typer.Argument(None, help="Case IDs to run (default: every case)."),
+    case_ids: List[str] = typer.Argument(None, help="Case IDs to run (default: every single-seat case; a "
+                                                     "whole-flow case runs only when named)."),
     runtime: Optional[str] = typer.Option(None, "--runtime", help="Registered runtime ID to put in the seat."),
     replay: bool = typer.Option(False, "--replay", help="Replay each case's reference answer instead."),
     trials: Optional[int] = typer.Option(None, "--trials", min=1,
@@ -1162,11 +1163,11 @@ def eval_run(
         _fail(f"unknown purpose {purpose!r}; known: {', '.join(PURPOSES)}")
     if attempts is not None and "attempts" in VARIANTS[harness_name]:
         _fail(f"--harness {harness_name} sets the attempts; leave out --attempts")
-    known = {case.id: case for case in _cases(cases)}
+    known = {case.id: case for case in _cases(cases, None)}  # G3: a whole-flow case runs only when named
     unknown = [c for c in case_ids or [] if c not in known]
     if unknown:
         _fail(f"unknown case {', '.join(unknown)}; known: {', '.join(known) or 'none'}")
-    chosen = select_cases([known[c] for c in case_ids or list(known)],
+    chosen = select_cases([known[c] for c in case_ids or [c for c, case in known.items() if case.flow == "seat"]],
                           [x.strip() for x in (seats or "").split(",") if x.strip()])
     if not chosen:
         _fail(f"no case matches --seats {seats}")
@@ -1359,7 +1360,7 @@ def eval_rejudge(
     except (OSError, ValueError) as exc:
         _fail(f"cannot read the run record {record}: {exc}")
     try:
-        outcomes = rejudge(_org(), loaded, {c.id: c for c in _cases(cases)}, repo=repo)
+        outcomes = rejudge(_org(), loaded, {c.id: c for c in _cases(cases, None)}, repo=repo)
     except EvalError as exc:
         _fail(str(exc))
     for o in outcomes:

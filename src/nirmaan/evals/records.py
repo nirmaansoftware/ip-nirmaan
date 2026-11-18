@@ -143,13 +143,22 @@ def record_trial(org: Organization, case: EvalCase, seat_runtime: AgentRuntime, 
     its cases elsewhere (M76) still digests the documents the seat was really given.
     """
     llm = getattr(seat_runtime, "llm", None)
-    harness = harness_sha256(attempts=attempts, knowledge=knowledge, cli=runtime_cli(seat_runtime), variant=variant)
+    harness = harness_sha256(attempts=attempts, knowledge=knowledge, cli=runtime_cli(seat_runtime), variant=variant,
+                             flow=case.flow)
     recorder = RecordingLLM(llm, harness) if llm is not None else None
     if recorder is not None:
         seat_runtime.llm = recorder  # type: ignore[attr-defined]
+    flow = None
     try:
-        result, engine = evaluate(org, case, seat_runtime, replay=replay, repo=repo, attempts=attempts,
-                                  sandbox=sandbox, clock=clock, knowledge=knowledge, variant=variant)
+        if case.flow == "whole":  # G3: every stage seated (nirmaan.evals.flow); the label comes from the case
+            from nirmaan.evals.flow import run_flow
+
+            flow = run_flow(org, case, seat_runtime, replay=replay, repo=repo, attempts=attempts, sandbox=sandbox,
+                            clock=clock, knowledge=knowledge, variant=variant)
+            result, engine = flow.result, flow.engine
+        else:
+            result, engine = evaluate(org, case, seat_runtime, replay=replay, repo=repo, attempts=attempts,
+                                      sandbox=sandbox, clock=clock, knowledge=knowledge, variant=variant)
     finally:
         if recorder is not None:
             seat_runtime.llm = llm  # type: ignore[attr-defined]
@@ -163,7 +172,8 @@ def record_trial(org: Organization, case: EvalCase, seat_runtime: AgentRuntime, 
     return EvalTrial(record=record, trial=trial, stage=case.seat, model=model,
                      skills={s: skill_digest(org, s, digest_repo or repo, knowledge=knowledge) for s in case.skills},
                      knowledge="on" if knowledge else "off", purpose=purpose, harness_variant=variant, result=result,
-                     answers=answers, judge_runs=judge_runs)
+                     answers=answers, judge_runs=judge_runs, flow=case.flow,
+                     stages=flow.stages if flow else (), flow_digest=flow.flow_digest if flow else None)
 
 
 def _write(path: Path, data: dict[str, Any]) -> None:
@@ -188,6 +198,15 @@ def no_model_answer(trial: EvalTrial) -> bool:
     """
     return (not trial.result.replay and bool(trial.answers)
             and all(not a.text and a.error for a in trial.answers))
+
+
+def flow_stopped(trial: EvalTrial) -> bool:
+    """A live whole-flow trial whose last model call returned no answer (G3, decision 3; WF8): a limit met at a
+    later stage leaves the earlier stages' answers with text, so :func:`no_model_answer` would not fire. Judged by
+    the trial's structure: the last recorded answer has no text and an error. Single-seat runs keep
+    :func:`no_model_answer`."""
+    return not trial.result.replay and bool(trial.answers) and not trial.answers[-1].text \
+        and bool(trial.answers[-1].error)
 
 
 class RunStopped(RuntimeError):
@@ -223,10 +242,11 @@ def record_run(org: Organization, cases: Sequence[EvalCase], runtime: str | None
     """
     if trials < 1:
         raise ValueError("trials must be at least 1")
-    whole = [c.id for c in cases if c.flow == "whole"]
-    if whole:  # M87: refused before anything is written or run
-        raise EvalError(f"{', '.join(whole)}: a whole-flow case needs the whole-flow runner, which is not merged "
-                        "yet; it never runs as a single-seat case (council record 2026-11-17, decision 3)")
+    flows = {c.flow for c in cases}
+    whole = flows == {"whole"}
+    if len(flows) > 1:  # G3: refused before anything is written or run
+        raise EvalError("a run is all whole-flow cases or none: one record never mixes whole-flow and single-seat "
+                        "trials (council record 2026-11-17, decision 3)")
     if purpose not in PURPOSES:
         raise ValueError(f"unknown purpose {purpose!r}; known: {', '.join(PURPOSES)}")
     variant_options(variant)  # an unknown name is refused before anything runs
@@ -235,7 +255,7 @@ def record_run(org: Organization, cases: Sequence[EvalCase], runtime: str | None
     probe = get_runtime(runtime) if runtime else None
     runtime_id, model = (probe.runtime_id, model_of(probe)) if probe else (REPLAY, REPLAY)
     label = (("" if knowledge else f"-{WITHOUT_KNOWLEDGE}") + ("-calibration" if purpose == "calibration" else "")
-             + ("" if variant == "default" else f"-harness-{_safe(variant)}"))
+             + ("" if variant == "default" else f"-harness-{_safe(variant)}") + ("-whole-flow" if whole else ""))
     path = _free(out, f"{started:%Y-%m-%d}-{_safe(runtime_id)}-{_safe(model)}{label}")
     path.mkdir(parents=True)
 
@@ -245,7 +265,8 @@ def record_run(org: Organization, cases: Sequence[EvalCase], runtime: str | None
                                trials=trials, cases=tuple(c.id for c in cases),
                                seats=tuple(dict.fromkeys(c.seat for c in cases)), command=command,
                                head_sha=head_sha, knowledge="on" if knowledge else "off",
-                               purpose=purpose, source=source, harness_variant=variant)
+                               purpose=purpose, source=source, harness_variant=variant,
+                               flow="whole" if whole else "seat")
 
     _write(path / MANIFEST, manifest(started).model_dump(mode="json"))
     done: list[EvalTrial] = []
@@ -256,7 +277,13 @@ def record_run(org: Organization, cases: Sequence[EvalCase], runtime: str | None
 
     for case in cases:
         for number in range(1, trials + 1):
-            seat = get_runtime(runtime) if runtime else ModelRuntime(replay_llm(case, repo), runtime_id=REPLAY)
+            if runtime:
+                seat = get_runtime(runtime)
+            else:  # a replay: the case's reference answer (a whole flow's, stage by stage)
+                from nirmaan.evals.flow import FlowReplayLLM
+
+                answer = FlowReplayLLM(case, repo) if whole else replay_llm(case, repo)
+                seat = ModelRuntime(answer, runtime_id=REPLAY)
             trial = record_trial(org, case, seat, replay=runtime is None, record=path.name, trial=number, repo=repo,
                                  attempts=attempts, clock=clock, knowledge=knowledge, purpose=purpose,
                                  digest_repo=digest_repo, variant=variant)
@@ -265,7 +292,7 @@ def record_run(org: Organization, cases: Sequence[EvalCase], runtime: str | None
             done.append(trial)
             if on_trial:
                 on_trial(trial, target)
-            if stop_on_no_answer and runtime and no_model_answer(trial):
+            if stop_on_no_answer and runtime and (flow_stopped(trial) if whole else no_model_answer(trial)):
                 finish()
                 raise RunStopped(path, trial)
     finish()
