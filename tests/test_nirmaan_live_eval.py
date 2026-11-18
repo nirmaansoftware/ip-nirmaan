@@ -387,7 +387,7 @@ def test_the_workflow_runs_only_on_dispatch_and_only_main_gets_the_token():
     for name in ("case", "trials", "knowledge", "purpose", "harness", "expected_harness", "replay"):
         assert f"\n      {name}:\n" in triggers, name
     jobs = _workflow_jobs(text)
-    assert set(jobs) == {"replay", "not-main", "live-eval"}
+    assert set(jobs) == {"replay", "not-main", "live-eval", "rejudge"}
     # Live trials asked for outside main fail loudly instead of running nothing.
     assert "if: ${{ !inputs.replay && github.ref != 'refs/heads/main' }}" in jobs["not-main"]
     assert "exit 1" in jobs["not-main"] and "secrets." not in jobs["not-main"]
@@ -409,10 +409,48 @@ def test_the_workflow_runs_only_on_dispatch_and_only_main_gets_the_token():
     order = [s.splitlines()[0] for s in steps]
     assert order.index("name: Check the harness fingerprint") < order.index("name: Run the trials one at a time")
     assert "live_eval_ci.py check --require-expected" in live and "live_eval_ci.py trials" in live
+    # The re-judge that counts is its own job: no environment, no secret, nothing re-judged where trials ran.
+    assert "environment:" not in jobs["rejudge"] and "secrets." not in jobs["rejudge"]
+    assert "eval rejudge" in jobs["rejudge"] and all("eval rejudge" not in jobs[j] for j in ("replay", "live-eval"))
     # Inputs reach a run only through the environment, never expanded into a shell command.
     for job in jobs.values():
         for run in re.findall(r"run: ([^\n]*(?:\n {10,}[^\n]*)*)", job):
             assert "${{" not in run, run
+
+
+def _steps(job: str) -> list[str]:
+    return [s.splitlines()[0].replace("name: ", "") for s in job.split("\n      - ")[1:]]
+
+
+@pytest.mark.parametrize("job", ["replay", "live-eval"])
+def test_seat_code_runs_as_its_own_account_and_the_checkout_is_hashed_around_the_trials(job):
+    """WF17: the account, then the reach test, then the trials between two tree hashes, in every trial job."""
+    text = _workflow_jobs(WORKFLOW.read_text())[job]
+    order = _steps(text)
+    trial = "Run the trials one at a time" if job == "live-eval" else "Replay the reference answer"
+    want = ["Install the tools", "Give seat code its own account", "Test what seat code can reach",
+            "Hash the checkout before the trials", trial, "Check the checkout did not change"]
+    assert [o for o in order if o in want] == want
+    assert "uses: ./.github/actions/live-eval-seat" in text
+    assert "live_eval_reach.py --records" in text and 'PYTHONDONTWRITEBYTECODE: "1"' in text
+    assert "if: always() && steps.before.outcome == 'success'" in text and "seat.py cleanup" in text
+    for output in ("records", "artifact", "commit", "tree_before", "tree_after"):
+        assert f"\n      {output}: " in text.split("\n    env:")[0], output
+
+
+def test_the_counting_rejudge_runs_on_a_fresh_checkout_from_the_artifact_only():
+    text = _workflow_jobs(WORKFLOW.read_text())["rejudge"]
+    assert "needs: [replay, live-eval]" in text
+    order = _steps(text)
+    assert order[0] == "Refuse records from a changed checkout" and order[1].startswith("uses: actions/checkout@")
+    assert order.index("Give seat code its own account") < order.index("Download the records") < order.index(
+        "Test what seat code can reach") < order.index("Re-judge the records")
+    assert 'if [ -z "$TREE_BEFORE" ] || [ "$TREE_BEFORE" != "$TREE_AFTER" ]' in text
+    assert 'if [ "$COMMIT" != "$GITHUB_SHA" ]' in text and "ref: ${{ github.sha }}" in text
+    assert "persist-credentials: false" in text and "uses: actions/download-artifact@" in text
+    assert "--records \"$RUNNER_TEMP/records\"" in text and 'nirmaan eval rejudge "$record" --write' in text
+    # The trial job's records reach it only as the artifact; no step here runs the trials.
+    assert "eval run" not in text and "live_eval_ci.py trials" not in text
 
 
 @pytest.mark.parametrize("secret,enabled", [(None, "false"), ("", "false"), ("sk-ant-oat-fake", "true")])
