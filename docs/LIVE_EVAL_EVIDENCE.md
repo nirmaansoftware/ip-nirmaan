@@ -233,8 +233,8 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   in, with its `site-packages` and console scripts), its global `node_modules`
   (npm) and folders on `PATH` were writable by every account (the reach test
   found both); the action takes that away. The harness code
-  is unchanged, and a record's `executables` names the wrapper
-  (`/opt/nirmaan-seat/bin/vvp`).
+  is unchanged: the wrapper is `/opt/nirmaan-seat/bin/vvp`, first on `PATH`,
+  and a tool run's own result file names it among its `executables`.
 - **The reach test** (`scripts/live_eval_reach.py`) runs in every job that runs
   seat code, before any trial or re-judge, through the real path: a cocotb
   test module run by `simulator.run`'s cocotb backend, so through the same
