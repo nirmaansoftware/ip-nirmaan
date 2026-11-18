@@ -1,4 +1,4 @@
-"""The whole-flow judge controls (G3, council record 2026-11-17, decision 2; gates WF4 and WF5), by replay.
+"""The whole-flow judge controls (G3, council record 2026-11-17, decision 2; gates WF4, WF5 and WF14), by replay.
 
 Each control in ``evals/flow/controls.json`` is a seat answer made of committed files (a reference, a mutant, a
 conforming variant or a deliberately wrong fixture) and the whole-flow case's own held-out checks it must pass or
@@ -130,8 +130,9 @@ def _uses(control: dict, path: str) -> bool:
 
 
 def test_the_controls_cover_what_the_record_rules(flows):
-    """WF4 and WF5: the reference passes, each planted fault fails, the conforming RTL passes the checks on the
-    flow's RTL, the range-accepting reference tests pass on both RTLs and a test written to one choice fails."""
+    """WF4, WF5 and WF14: the reference passes, each planted fault fails, the conforming RTL passes the checks on the
+    flow's RTL, the range-accepting reference tests pass on both RTLs, a testbench written to one choice fails, and
+    the wait probe passes on both RTLs."""
     def expects(path: str, check: int, verdict: str, **where) -> bool:
         return any(_uses(c, path) and any(s.get("check") == check and s["expect"] == verdict
                                           and all(s.get(k) == v for k, v in where.items()) for s in c["checks"])
@@ -156,6 +157,11 @@ def test_the_controls_cover_what_the_record_rules(flows):
     assert expects(ref, 6, "passed") and expects(ref, 6, "passed", rtl=lat2) and expects(ref, 7, "passed")
     for mutant in ("wstrb_ignored", "okay_unmapped"):
         assert expects(ref, 6, "failed", rtl=f"{rtl}/mutants/axi4_lite_regs_{mutant}.v"), mutant
+    # WF14 (addendum 2026-11-18): the wait probe passes on both RTLs, with one transcript name for both runs.
+    probe = [s for c in CONTROLS if _uses(c, f"{fw}/axi4_lite_regs_test_wait_probe.c") for s in c["checks"]]
+    assert sorted((s.get("rtl"), s["expect"]) for s in probe) == [(f"{rtl}/axi4_lite_regs.v", "passed"),
+                                                                  (lat2, "passed")]
+    assert len({s.get("transcript") for s in probe} - {None}) == 1 and all(s.get("transcript") for s in probe)
 
 
 def test_the_record_names_a_ci_run_and_every_control_once():
@@ -190,7 +196,7 @@ def test_the_control_gets_the_verdict_it_expects(nirmaan_org, fixed_clock, flows
     for spec, score in zip(control["checks"], result.scores):
         if "transcript" in spec:
             transcripts.setdefault(spec["transcript"], []).append(_bus(engine, score.runs))
-    for runs in transcripts.values():  # the same bus transfers on both RTLs: latency is not visible to the test
+    for runs in transcripts.values():  # the same bus transfers on both RTLs
         assert runs[0] and all(r == runs[0] for r in runs), runs
     recorded = {c["id"]: c["verdicts"] for c in json.loads(RECORD.read_text(encoding="utf-8"))["controls"]}
     assert recorded[control["id"]] == got
