@@ -46,11 +46,17 @@ RTL = REPO / "tests" / "fixtures" / "rtl" / "axi4_lite"
 LINUX = pytest.mark.skipif(sys.platform != "linux", reason="the allow list and the record are the CI toolchain's "
                                                             "(Linux); another host's C library names differ")
 
+def _answers(folder: Path) -> list[Path]:
+    """A fixture folder's C, less the strict fixtures of gate WF15, which reach outside the HAL on purpose."""
+    return sorted(p for p in folder.glob("*.c") if "_strict_" not in p.name)
+
+
 #: The committed host C the allow list is taken from, as groups linked together: each fixture folder's drivers and
 #: tests, with the held-out tests beside the register block driver they include. (The gate-integrity fixtures are
-#: the gate's own must-fail inputs, and the reach probes are probes: neither is an answer.)
+#: the gate's own must-fail inputs, the reach probes are probes, and the strict fixtures of gate WF15 reach outside
+#: the HAL on purpose: none is an answer.)
 BASIS = {
-    "axi4_lite": [*sorted((FW / "axi4_lite").glob("*.c")), EVALS / "firmware" / "axi4_lite" / "held_out_test.c",
+    "axi4_lite": [*_answers(FW / "axi4_lite"), EVALS / "firmware" / "axi4_lite" / "held_out_test.c",
                   EVALS / "flow" / "axi4_lite" / "held_out_test.c"],
     "apb_regs": sorted((FW / "apb_regs").glob("*.c")),
     "apb_csr": sorted((FW / "apb_csr").glob("*.c")),
