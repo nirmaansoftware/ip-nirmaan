@@ -69,8 +69,8 @@
     ]
   },
   "not_judged": {
-    "AXIL-NO-PROT": "The reference testbench (evals/flow/axi4_lite/axi4_lite_regs_tb.v) connects the ports by name (lines 56 to 63), and Icarus Verilog builds an instance that leaves a port of the block unconnected, so a block with a protection input such as s_axil_awprot passes it.",
-    "AXIL-PARAMS-DEFAULT": "The reference testbench (evals/flow/axi4_lite/axi4_lite_regs_tb.v) sets both parameters, ADDR_WIDTH to 4 and DATA_WIDTH to 32 (line 56), so the defaults are never used; a block whose ADDR_WIDTH defaults to 5 or whose DATA_WIDTH defaults to 64 passes it. Setting a parameter the block does not have fails to build, so the parameters themselves are judged (AXIL-PARAMS).",
+    "AXIL-NO-PROT": "The reference testbench (evals/flow/axi4_lite/axi4_lite_regs_tb.v) connects the ports by name (lines 58 to 65), and Icarus Verilog builds an instance that leaves a port of the block unconnected, so a block with a protection input such as s_axil_awprot passes it.",
+    "AXIL-PARAMS-DEFAULT": "The reference testbench (evals/flow/axi4_lite/axi4_lite_regs_tb.v) sets both parameters, ADDR_WIDTH to 4 and DATA_WIDTH to 32 (line 58), so the defaults are never used; a block whose ADDR_WIDTH defaults to 5 or whose DATA_WIDTH defaults to 64 passes it. Setting a parameter the block does not have fails to build, so the parameters themselves are judged (AXIL-PARAMS).",
     "AXIL-SYNTH": "Synthesis is the RTL stage's own before-review check, not a held-out check.",
     "AXIL-FORMAL": "The handshake proof is the RTL stage's own work; as for the timer (decision 2), the case proofs run on case files only and are not part of the whole-flow verdict."
   }

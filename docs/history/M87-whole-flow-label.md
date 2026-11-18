@@ -93,11 +93,13 @@ ignoring `addr[0]` on the register block. Each copy now drives every unmapped
 address, holds `irq` high for 100000 cycles, writes every bit and every strobe
 alone, runs long counts, stops and gaps, and leaves a write's address and data
 unknown while they are not offered; the timer's stop value is now judged
-(`TMR-STOP-EDGE`). The author swept every judged tag of both documents with
-its own scratch mutants before asking for review. The documents are unchanged,
+(`TMR-STOP-EDGE`). The author's scratch mutant sweep of every judged tag is
+in the pull request's description (ip#339); the mutants are not committed, and
+the fresh check this document waits for is the evidence that counts. The documents are unchanged,
 and both still wait for a fresh check. The register block copy drops the original's
-check that `AWREADY` is high in reset (decision #28): only the single-seat
-microarchitecture states it, so a conforming flow block must not fail it. The
+check that `AWREADY` is high in reset: only the single-seat microarchitecture
+states it, and `AXIL-TEST-RANGE` holds a testbench to what the document states,
+so a conforming flow block must not fail it. The
 copy test now allows only named exemptions, each with its reason.
 
 **Not here.** The runner option (its `runner.py` dispatch waits for the H3

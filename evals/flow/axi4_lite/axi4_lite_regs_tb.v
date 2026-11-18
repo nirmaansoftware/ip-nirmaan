@@ -7,7 +7,7 @@
 // responses dropped by the first reset edge, every register bit, each strobe
 // alone, every unmapped address, and write halves 40 cycles apart. It drops
 // one check of the original, "AWREADY in reset", which no flow document states
-// (decision #28; tests/test_whole_flow_cases.py lists it as the one exemption).
+// (AXIL-TEST-RANGE; tests/test_whole_flow_cases.py lists it as the exemption).
 //
 // Covers reset values, write then read of every register, wstrb partial
 // writes, AW before W, W before AW, both together, B and R backpressure,
@@ -232,7 +232,7 @@ module axi4_lite_regs_tb;
             repeat (2) @(negedge aclk);
             #1;
             // No AWREADY check here: the original's "AWREADY in reset" is a rule of
-            // the single-seat microarchitecture only (decision #28).
+            // the single-seat microarchitecture only (AXIL-TEST-RANGE).
             check("BVALID in reset", {31'd0, bvalid}, 32'd0);
             check("RVALID in reset", {31'd0, rvalid}, 32'd0);
             aresetn = 1'b1;

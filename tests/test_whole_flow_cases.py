@@ -328,10 +328,15 @@ TB_COPIES = {"flow/axil-timer": ("tests/fixtures/rtl/axil_timer/axil_timer_tb.v"
 TB_COPY_EXEMPT = {
     "evals/flow/axi4_lite/axi4_lite_regs_tb.v": {
         """check("AWREADY in reset", {31'd0, awready}, 32'd1);""":
-            "Decision #28 (orchestrator, 2026-11-18): no flow document states READY during reset, and the single-seat "
-            "interface specification (tests/fixtures/rtl/axi4_lite/interface_spec.md, sections 4 and 7) does not "
-            "require it; only the single-seat microarchitecture.md (line 74) does, and in a whole flow the RTL stage "
-            "writes its own microarchitecture. A conforming block must not fail it. The original keeps it.",
+            "No flow document states READY during reset (evals/flow/axi4_lite/requirements.md, section 2), and the "
+            "single-seat interface specification (tests/fixtures/rtl/axi4_lite/interface_spec.md, sections 4 and 7) "
+            "does not require it; only the single-seat microarchitecture.md (line 74) does, and in a whole flow the "
+            "RTL stage writes its own microarchitecture, a design choice given to that seat, so a conforming flow "
+            "block may hold AWREADY low in reset. AXIL-TEST-RANGE (requirements.md section 4) says a "
+            "testbench checks only what the document states, and the judge assumes only behaviour the fixed "
+            "document states (council/records/2026-11-17-g3-whole-flow-cases.md, lines 206 to 208), so a "
+            "conforming block must not fail it. The single-seat original keeps it. Shown by run in ip#339: a block "
+            "that holds AWREADY low in reset passes this copy and fails the original.",
     },
 }
 

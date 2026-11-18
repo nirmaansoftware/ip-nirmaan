@@ -136,11 +136,17 @@ over time ("stays high until", "any gap", "until `EN` is written 1 again") is
 checked over these bounded runs, as any simulation checks it. The single-seat
 cases keep running the originals, so their digests, and the recorded trials
 that hold those digests, stay as they are. The one exemption is the register block original's "AWREADY in reset"
-check (decision #28): no flow document states READY during reset, the
+check: no flow document states READY during reset, the
 single-seat interface specification does not require it, and only the
-single-seat `microarchitecture.md` does, while in a whole flow the RTL stage
-writes its own microarchitecture; so a conforming block must not fail it. The
-original keeps it. A test holds both, and fails on any other dropped or
+single-seat `microarchitecture.md` does (line 74, a design choice given to
+that seat), while in a whole flow the RTL stage writes its own
+microarchitecture, so a conforming block may hold `AWREADY` low in reset.
+`AXIL-TEST-RANGE` says a testbench checks
+only what the document states, and the judge assumes only behaviour the fixed
+document states (the council record, lines 206 to 208); so a conforming block
+must not fail it. The
+original keeps it; a block that holds `AWREADY` low in reset passes the copy
+and fails the original (shown by run in ip#339). A test holds both, and fails on any other dropped or
 altered check.
 
 **The held-out tests.** The register block case's held-out test is its own
