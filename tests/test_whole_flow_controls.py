@@ -144,7 +144,7 @@ def test_the_controls_cover_what_the_record_rules(flows):
     assert expects(lat2, 1, "passed") and expects(lat2, 2, "passed")  # the conforming RTL, checks 1 and 2
     assert expects(f"{rtl}/axi4_lite_regs_tb.v", 3, "passed")  # the reference testbench on the reference RTL
     assert expects(f"{rtl}/variants/axi4_lite_regs_tb_strict2.v", 3, "failed")
-    assert expects("tests/fixtures/rtl/axil_timer/axil_timer_tb_fail.v", 2, "failed")
+    assert expects("tests/fixtures/rtl/axil_timer/axil_timer_tb_weak.v", 2, "failed")
     fw = "tests/fixtures/fw/axi4_lite"
     for wrong in ("axi4_lite_regs_map_wrong.h", "axi4_lite_regs_drv_swallowed_error.c",
                   "axi4_lite_regs_drv_all_strobes.c", "axi4_lite_regs_drv_sticky_response.c"):

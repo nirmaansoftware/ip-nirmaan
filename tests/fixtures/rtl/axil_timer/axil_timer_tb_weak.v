@@ -424,7 +424,7 @@ module axil_timer_tb_lane #(
     end
 endmodule
 
-module axil_timer_tb_fail;
+module axil_timer_tb_weak;
     reg [8*64-1:0] nonce;  // the run's nonce (+nirmaan_nonce=), for the verdict line
     integer checks, errors;
 
@@ -440,7 +440,7 @@ module axil_timer_tb_fail;
             errors = errors + 1;
         end
         if (errors == 0)
-            $display("axil_timer_tb_fail: PASS (%0d checks)", checks);
+            $display("axil_timer_tb_weak: PASS (%0d checks)", checks);
         // The verdict the gate reads (docs/GATE_INTEGRITY.md): the run's nonce, then the counts.
         if (!$value$plusargs("nirmaan_nonce=%s", nonce))
             nonce = "none";

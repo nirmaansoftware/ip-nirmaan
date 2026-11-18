@@ -90,7 +90,11 @@ comes from").
 
 **Citations.** `evals/flow/<block>/citations.json` (a data file, never a case)
 names, for every held-out check and every mutant, the tags or headings of the
-fixed documents it rests on. A test checks that each exists.
+fixed documents it rests on, and lists under `not_judged`, with the reason,
+every tag no check or mutant rests on (the timer's `TMR-CTRL-WINS`, which the
+reference testbench never exercises, and the tags the RTL stage's own gates
+cover: `TMR-CLEAN`, `AXIL-SYNTH`, `AXIL-FORMAL`). A test checks both ways: each
+cited tag or heading exists, and each tag is cited or listed.
 
 **The held-out tests.** The register block case's held-out test is its own
 copy of the firmware case's, with an unmapped (misaligned) write added, so the
@@ -113,8 +117,9 @@ cannot see latency; the judge controls record this by a run.
 **Fixtures for the controls.** Three wrong drivers (a swallowed bus error,
 `write_byte` with every strobe, a sticky `last_response`) under
 `tests/fixtures/fw/axi4_lite/`, and a weak timer testbench
-(`axil_timer_tb_fail.v`, both lanes at `ADDR_WIDTH` 4, so `decode_alias`
-passes it).
+(`axil_timer_tb_weak.v`, named `_weak`, not `_tb_fail`, since it passes on the
+reference RTL, unlike every `_tb_fail.v` in `docs/IP_BLOCKS.md`; both lanes at
+`ADDR_WIDTH` 4, so `decode_alias` passes it).
 
 **The requirements seat (fact 10, settled).** A file given through a case's
 `inputs` is task memory: it parameterizes the task's tools and is never

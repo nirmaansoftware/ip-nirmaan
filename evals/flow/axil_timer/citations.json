@@ -49,5 +49,9 @@
   },
   "documents": [
     "evals/flow/axil_timer/requirements.md"
-  ]
+  ],
+  "not_judged": {
+    "TMR-CTRL-WINS": "Stated from the timer's interface specification for completeness; the reference testbench never lands a CTRL write on a count end and no mutant breaks it, so no held-out check rests on it.",
+    "TMR-CLEAN": "Lint and synthesis are the RTL stage's own before-review checks, not held-out checks."
+  }
 }

@@ -138,9 +138,9 @@
           "entry": "axil_timer"
         },
         {
-          "path": "tests/fixtures/rtl/axil_timer/axil_timer_tb_fail.v",
+          "path": "tests/fixtures/rtl/axil_timer/axil_timer_tb_weak.v",
           "kind": "testbench",
-          "entry": "axil_timer_tb_fail"
+          "entry": "axil_timer_tb_weak"
         }
       ],
       "checks": [

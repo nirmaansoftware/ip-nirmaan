@@ -67,5 +67,9 @@
     "tests/fixtures/rtl/axi4_lite/mutants/axi4_lite_regs_b_before_w.v": [
       "AXIL-ORDER"
     ]
+  },
+  "not_judged": {
+    "AXIL-SYNTH": "Synthesis is the RTL stage's own before-review check, not a held-out check.",
+    "AXIL-FORMAL": "The handshake proof is the RTL stage's own work; as for the timer (decision 2), the case proofs run on case files only and are not part of the whole-flow verdict."
   }
 }
