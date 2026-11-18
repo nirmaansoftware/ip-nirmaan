@@ -91,10 +91,19 @@ comes from").
 **Citations.** `evals/flow/<block>/citations.json` (a data file, never a case)
 names, for every held-out check and every mutant, the tags or headings of the
 fixed documents it rests on, and lists under `not_judged`, with the reason,
-every tag no check or mutant rests on (the timer's `TMR-CTRL-WINS`, which the
-reference testbench never exercises, and the tags the RTL stage's own gates
-cover: `TMR-CLEAN`, `AXIL-SYNTH`, `AXIL-FORMAL`). A test checks both ways: each
-cited tag or heading exists, and each tag is cited or listed.
+every tag no check or mutant rests on: the tags the RTL stage's own gates
+cover (`TMR-CLEAN`, `AXIL-SYNTH`, `AXIL-FORMAL`), and the timer rules the
+reference testbench never exercises. Where the testbench reaches only part of
+a rule, the rule is split and the unreached part has its own tag, listed as
+not judged: readiness (`TMR-READY`), the read value at the accepting edge
+(`TMR-READ-VALUE`), `COUNT` while a count runs (`TMR-COUNT-READ`), a periodic
+`LOAD` of 0, the value the stop edge gives `COUNT`, a `CTRL` write on a count
+end (`TMR-CTRL-WINS`), the edge `irq` changes on after a write, what a
+synchronous reset does to a pending response or a held half write
+(`TMR-RESET-EDGE`), and the testbench checking every requirement
+(`TMR-TB-ALL`; the must-fail check holds it only to the four mutants). A test
+checks both ways: each cited tag or heading exists, and each tag is cited or
+listed.
 
 **The held-out tests.** The register block case's held-out test is its own
 copy of the firmware case's, with an unmapped (misaligned) write added, so the
@@ -185,6 +194,31 @@ run to the verdicts it records.
 Left for the whole-flow runner: the reference flow replayed through every
 seated stage, a flow with a planted upstream fault, and check 5, which takes
 the RTL from another stage.
+
+## The document check record (M87, follow-up)
+
+A fixed requirements document is a contract, so a session other than its
+writer checks it, and the check is kept next to it as
+`evals/flow/<block>/requirements_check.json` (format
+`nirmaan.flow-document-check`): the case, the document's path and sha256, the
+writer and the checker, when it was checked, the sources read, the evidence
+for each tag (`path:line`, a test id, or `unjudged`) and the result. The
+tags marked `unjudged` must be the case's `not_judged`, and the result must be
+`holds`. Any edit to the document makes the record stale, and a flow
+requirements document with no record fails, so every edit gets a new check.
+An author never writes the record for its own document.
+
+`tests/test_whole_flow_cases.py` holds every `evals/flow/*/requirements.md`
+to this. Until a document's first record lands it is listed, with the reason,
+in `evals/flow/requirements_check_pending.json` (a data file); its test still
+runs and checks that it has no record yet, so the entry must go when the
+record lands, and a document neither listed nor recorded fails. No test
+skips. Both documents are listed now: the timer document was rewritten after
+an independent check found tags its checks do not reach and rules it left
+ambiguous, and the register block copy has never been checked. Another test
+shows the rule refuses a stale record, a record whose checker is its writer,
+a missing tag, a tag marked unjudged that a check cites, unreadable
+evidence, and a result that does not hold.
 
 ## The runner option, part 4a: the dispatch
 

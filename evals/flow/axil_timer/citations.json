@@ -20,8 +20,8 @@
       "TMR-END-BEATS-CLEAR",
       "TMR-IRQ",
       "TMR-ORDER",
-      "TMR-READY",
       "TMR-RESPONSE",
+      "TMR-RESPONSE-EDGE",
       "TMR-DECODE",
       "TMR-SLVERR",
       "TMR-RESET"
@@ -51,7 +51,15 @@
     "evals/flow/axil_timer/requirements.md"
   ],
   "not_judged": {
-    "TMR-CTRL-WINS": "Stated from the timer's interface specification for completeness; the reference testbench never lands a CTRL write on a count end and no mutant breaks it, so no held-out check rests on it.",
-    "TMR-CLEAN": "Lint and synthesis are the RTL stage's own before-review checks, not held-out checks."
+    "TMR-LOAD-ZERO-PERIODIC": "The reference testbench runs periodic counts only with LOAD 7 (axil_timer_tb.v lines 364 to 385) and LOAD 0 only in one-shot mode (line 341), so a periodic count with LOAD 0 is never run.",
+    "TMR-COUNT-READ": "The reference testbench never reads COUNT while a count runs: only at reset, after a one-shot count ends, after a COUNT write and after a stop (axil_timer_tb.v lines 299, 283, 316, 388 to 389, 394, 413). COUNT's value during a count is judged only through the edge the count ends on (TMR-COUNT, TMR-COUNT-LENGTH).",
+    "TMR-STOP-EDGE": "The reference testbench reads COUNT after a stop and checks only that later reads return the same value (axil_timer_tb.v lines 388, 389 and 394); it never compares it with COUNT before the stop edge, so the value the stop edge gives COUNT is not judged.",
+    "TMR-CTRL-WINS": "The reference testbench never lands a CTRL write on the edge a count ends (its only write timed to a count end is the STATUS clear at axil_timer_tb.v lines 380 to 383), and no mutant breaks this rule.",
+    "TMR-IRQ-EDGE": "The reference testbench reads irq after a write only once write_ok returns, after the response handshake two edges after the write takes effect (axil_timer_tb.v lines 286, 353 and 355), so an irq that follows an IE write or a STATUS clear one or two edges late is not caught. The rise after a count end is timed, under TMR-COUNT-LENGTH.",
+    "TMR-READY": "The reference testbench sees readiness only through the handshakes of the transfers it offers, one at a time: each write and each read runs to its response before the next starts (axil_timer_tb.v lines 96 to 197), and it never reads AWREADY, WREADY or ARREADY otherwise. So the 'only if' halves (no acceptance while a response waits or while the same half is held) and readiness across the two directions are never exercised; a block that drops AWREADY while RVALID is high is not caught. Writes completing in either order are judged under TMR-ORDER.",
+    "TMR-READ-VALUE": "The reference testbench never reads a register on an edge on which that register changes: COUNT only while it holds still (see TMR-COUNT-READ), CTRL and STATUS only on edges on which no count ends, LOAD never during a write. So a read that returns the value after the accepting edge is not caught.",
+    "TMR-RESET-EDGE": "The reference testbench drives aresetn low only at power up, where BVALID, RVALID and the held halves start unknown rather than high, and in the middle of a count with no transfer in progress (axil_timer_tb.v lines 259 to 267, 293 to 295 and 407 to 411), changing it only between rising edges. So it never sees a pending response or a held half write dropped by reset, and does not tell a synchronous reset from an asynchronous one. The manager rule is an assumption on the testbench, which keeps it.",
+    "TMR-CLEAN": "Lint and synthesis are the RTL stage's own before-review checks, not held-out checks.",
+    "TMR-TB-ALL": "The must-fail check holds the flow's testbench to passing on the reference RTL and failing the four committed timer mutants (cited under mutants), and to nothing more: a testbench that leaves any other requirement of sections 2 to 6 unchecked, or times only some counts to the edge, still passes it."
   }
 }
