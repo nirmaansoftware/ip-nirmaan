@@ -570,8 +570,26 @@ def _substitute(argv: list[str], variables: dict) -> list[str]:
     return [re.sub(r"\{(\w+)\}", lambda m: variables.get(m.group(1), m.group(0)), a) for a in argv]
 
 
+# What a failing check's text keeps besides its last lines (decision #32): pytest's own explanation of the first
+# failure and its one-line summaries, each bounded so a stop comment never blows up.
+_E_LINES, _FAILED_LINES, _LINE_CHARS = 20, 10, 300
+
+
 def _tail(text: str) -> str:
-    return " / ".join((text or "").strip().splitlines()[-5:])[:400]
+    lines = (text or "").strip().splitlines()
+    tail = " / ".join(lines[-5:])[:400]
+    first_e: list[str] = []
+    started = False
+    for line in lines:
+        if re.match(r"^_{3,} .* _{3,}$", line) and started:
+            break  # the next failure's header: only the first failure's E lines
+        if re.match(r"^E( |$)", line):
+            started = True
+            if len(first_e) < _E_LINES:
+                first_e.append(line.rstrip()[:_LINE_CHARS])
+    failed = [ln.rstrip()[:_LINE_CHARS] for ln in lines if ln.startswith("FAILED ")][:_FAILED_LINES]
+    extra = [ln for ln in [*first_e, *failed] if ln not in tail]
+    return " / ".join([*extra, tail]) if extra else tail
 
 
 def _run_parallel(commands: list[list[str]], cwd, env: dict, timeout_s, user=None, ok_codes=(0,)) -> tuple[bool, str]:
