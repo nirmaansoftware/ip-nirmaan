@@ -1,0 +1,378 @@
+{
+  "answers": [
+    {
+      "cache_read_tokens": 620,
+      "cache_write_tokens": 16516,
+      "error": null,
+      "harness": "sha256:6f0b8ffea3898d7e2f2ad4f80dd91d2a13b4d793de93d015a92435ae0573a2a2",
+      "input_tokens": 2,
+      "mode": "work",
+      "model": "claude-opus-5-5",
+      "output_tokens": 47551,
+      "packet_sha256": "a0fb2729aae3e867abf87235d6fc6fece59e901059772ba2aec8d8216b8c3f5b",
+      "prompt_sha256": "d0bea6194fea41575777d0c64694509df3c85d6b7178ecbed136790ab9fb79e2",
+      "provider": "claude-code",
+      "text": "```json\n{\"uncertainty\": 0.27, \"outcome\": \"Produced the apb_gpio RTL (apb_gpio.v) and a self-checking testbench (apb_gpio_tb.v). The testbench drives four instances, N = 1, 8, 13 and 32, from one APB bus. Both files follow the approved interface and microarchitecture specs. I did not produce a formal_spec (.sby), so the formal evidence requirements do not apply to this submission. See notes for this deviation from the microarchitecture verification plan.\", \"artifacts\": [{\"kind\": \"rtl_source\", \"title\": \"apb_gpio RTL\", \"summary\": \"Zero-wait-state APB4 GPIO completer implementing the interface spec [artifact:prj-eada6108d7.interface-spec.a1] by the plan in [artifact:prj-eada6108d7.microarchitecture.a1]. Its parts: pready tied high; access = psel && penable; decode of 9 word-aligned registers with pslverr for unmapped accesses and DATA_IN writes; strobe-masked merges limited to the PINS mask; two input samples; rise, fall, high and low detection where a detection beats a write-1-to-clear; and irq = |(status & enable). It serves [requirement:req-837b82982d].\"}, {\"kind\": \"testbench\", \"title\": \"apb_gpio self-checking testbench\", \"summary\": \"A directed testbench with hand-computed expected values checks N = 1, 8, 13 and 32 against [artifact:prj-eada6108d7.interface-spec.a1]. It covers reset values, partial strobes and bits above N on every read/write register, gpio_out and gpio_oe, DATA_IN timing and read-only behaviour, pslverr on unmapped and aliasing addresses, and pready only in the access phase. For interrupts it covers each detection kind with edge-exact irq timing, an edge firing once, a level re-setting after a clear, partial and strobe-limited W1C, a detection beating a coincident clear, both edges, a one-cycle pulse, the mask, and reset again. Transfers run back to back, as planned in [artifact:prj-eada6108d7.microarchitecture.a1].\"}], \"files\": [{\"path\": \"apb_gpio.v\", \"kind\": \"rtl_source\", \"title\": \"apb_gpio RTL\", \"summary\": \"Synthesizable Verilog-2001 for apb_gpio per [artifact:prj-eada6108d7.microarchitecture.a1]. It uses a synchronous active-low reset on every flop, always @* with defaults (no latches), and a default in every case. Formal intent assertions are guarded by `ifdef FORMAL`. Traces to [requirement:req-837b82982d].\", \"entry\": \"apb_gpio\"}, {\"path\": \"apb_gpio_tb.v\", \"kind\": \"testbench\", \"title\": \"apb_gpio testbench\", \"summary\": \"Self-checking testbench: every failure goes through $error, passes are counted, and it ends with the NIRMAAN-SIM verdict line read from the nirmaan_nonce plusarg. It checks the behaviours of [artifact:prj-eada6108d7.interface-spec.a1] section 8 at N = 1, 8, 13 and 32.\", \"entry\": \"apb_gpio_tb\"}], \"tool_runs\": [], \"claims\": [\"The testbench's expected values were computed by hand from the interface spec; I have not run the testbench and do not know whether it passes.\", \"I expect the RTL to be Verilator -Wall clean at N = 8 and N = 32, but no lint run backs this.\", \"I expect the RTL to synthesize without latches, but no synthesis run backs this.\"], \"escalation\": null, \"notes\": \"Deviation to record: microarchitecture section 5 plans SymbiYosys proofs (apb_gpio.sby and apb_gpio_n32.sby). This task's expected outputs are rtl_source and testbench, and formal.run accepts exactly one .sby, so I submitted no formal_spec. That leaves the planned proof as a follow-up item for the tech lead to schedule. The design-intent assertions in apb_gpio.v sit under `ifdef FORMAL` and are unexercised until a proof is set up. The platform lints and synthesizes with the default parameters (N = 8); the spec also asks for lint at N = 32. The testbench instantiates N = 32, so that width is at least elaborated in simulation. Under Verilator's default error limit, the first $error may end the run before the verdict line prints; it fails either way. The testbench uses #1 delays, so it needs Verilator timing support (--binary or --timing).\"}\n```\n=== FILE: apb_gpio.v ===\n// apb_gpio: APB4 general-purpose I/O block with interrupt detection.\n// Implements interface_spec.md through the plan in microarchitecture.md.\n// Zero wait states, synchronous active-low reset, single clock (pclk).\nmodule apb_gpio #(\n  parameter integer ADDR_WIDTH = 8,\n  parameter integer N          = 8\n) (\n  input  wire                  pclk,\n  input  wire                  presetn,\n  input  wire [ADDR_WIDTH-1:0] paddr,\n  input  wire                  psel,\n  input  wire                  penable,\n  input  wire                  pwrite,\n  input  wire [31:0]           pwdata,\n  input  wire [3:0]            pstrb,\n  output reg  [31:0]           prdata,\n  output wire                  pready,\n  output wire                  pslverr,\n  input  wire [N-1:0]          gpio_in,\n  output wire [N-1:0]          gpio_out,\n  output wire [N-1:0]          gpio_oe,\n  output wire                  irq\n);\n\n  // Bits 0 to N-1 set: the pins that exist.\n  localparam [31:0] PINS = (N >= 32) ? 32'hFFFF_FFFF : ((32'd1 << N) - 32'd1);\n\n  // Register indices (paddr[5:2]).\n  localparam [3:0] IDX_DATA_OUT    = 4'd0;\n  localparam [3:0] IDX_DIR         = 4'd1;\n  localparam [3:0] IDX_DATA_IN     = 4'd2;\n  localparam [3:0] IDX_INTR_RISE   = 4'd3;\n  localparam [3:0] IDX_INTR_FALL   = 4'd4;\n  localparam [3:0] IDX_INTR_HIGH   = 4'd5;\n  localparam [3:0] IDX_INTR_LOW    = 4'd6;\n  localparam [3:0] IDX_INTR_ENABLE = 4'd7;\n  localparam [3:0] IDX_INTR_STATUS = 4'd8;\n\n  // ---------------------------------------------------------------\n  // APB decode\n  // ---------------------------------------------------------------\n  wire [3:0] index         = paddr[5:2];\n  wire       addr_aligned  = (paddr[1:0] == 2'b00);\n  wire       addr_high_ok  = (paddr[ADDR_WIDTH-1:6] == {(ADDR_WIDTH-6){1'b0}});\n  wire       addr_index_ok = (index <= IDX_INTR_STATUS);\n  wire       mapped        = addr_aligned & addr_high_ok & addr_index_ok;\n\n  wire       access        = psel & penable;          // completing cycle (pready = 1)\n  wire       wr_access     = access & pwrite & mapped;\n  wire       rd_access     = access & ~pwrite & mapped;\n\n  assign pready  = 1'b1;\n  assign pslverr = access & (~mapped | (pwrite & (index == IDX_DATA_IN)));\n\n  // Byte strobes expanded to bits, limited to existing pins.\n  wire [31:0] strb_bits = {{8{pstrb[3]}}, {8{pstrb[2]}}, {8{pstrb[1]}}, {8{pstrb[0]}}};\n  wire [31:0] wmask     = strb_bits & PINS;\n\n  // ---------------------------------------------------------------\n  // State\n  // ---------------------------------------------------------------\n  reg [31:0] data_out_q, dir_q, rise_en_q, fall_en_q, high_en_q, low_en_q, int_en_q;\n  reg [31:0] status_q, in_q, in_prev_q;\n\n  reg [31:0] data_out_d, dir_d, rise_en_d, fall_en_d, high_en_d, low_en_d, int_en_d;\n  reg [31:0] in_ext;\n\n  // gpio_in widened to 32 bits, zeros above N.\n  always @* begin\n    in_ext          = 32'd0;\n    in_ext[N-1:0]   = gpio_in;\n  end\n\n  // Read/write register next state: merge under the write mask.\n  always @* begin\n    data_out_d = data_out_q;\n    dir_d      = dir_q;\n    rise_en_d  = rise_en_q;\n    fall_en_d  = fall_en_q;\n    high_en_d  = high_en_q;\n    low_en_d   = low_en_q;\n    int_en_d   = int_en_q;\n    if (wr_access) begin\n      case (index)\n        IDX_DATA_OUT:    data_out_d = (data_out_q & ~wmask) | (pwdata & wmask);\n        IDX_DIR:         dir_d      = (dir_q      & ~wmask) | (pwdata & wmask);\n        IDX_INTR_RISE:   rise_en_d  = (rise_en_q  & ~wmask) | (pwdata & wmask);\n        IDX_INTR_FALL:   fall_en_d  = (fall_en_q  & ~wmask) | (pwdata & wmask);\n        IDX_INTR_HIGH:   high_en_d  = (high_en_q  & ~wmask) | (pwdata & wmask);\n        IDX_INTR_LOW:    low_en_d   = (low_en_q   & ~wmask) | (pwdata & wmask);\n        IDX_INTR_ENABLE: int_en_d   = (int_en_q   & ~wmask) | (pwdata & wmask);\n        default: begin\n        end\n      endcase\n    end\n  end\n\n  // Detection and status: detection beats clear (OR applied last).\n  wire [31:0] rise_evt  = in_q & ~in_prev_q;\n  wire [31:0] fall_evt  = ~in_q & in_prev_q;\n  wire [31:0] detected  = ((rise_evt & rise_en_q) | (fall_evt & fall_en_q) |\n                           (in_q & high_en_q) | (~in_q & low_en_q)) & PINS;\n  wire [31:0] clear     = (wr_access && (index == IDX_INTR_STATUS)) ? (pwdata & wmask) : 32'd0;\n  wire [31:0] status_d  = (status_q & ~clear) | detected;\n\n  always @(posedge pclk) begin\n    if (!presetn) begin\n      data_out_q <= 32'd0;\n      dir_q      <= 32'd0;\n      rise_en_q  <= 32'd0;\n      fall_en_q  <= 32'd0;\n      high_en_q  <= 32'd0;\n      low_en_q   <= 32'd0;\n      int_en_q   <= 32'd0;\n      status_q   <= 32'd0;\n      in_q       <= 32'd0;\n      in_prev_q  <= 32'd0;\n    end else begin\n      data_out_q <= data_out_d;\n      dir_q      <= dir_d;\n      rise_en_q  <= rise_en_d;\n      fall_en_q  <= fall_en_d;\n      high_en_q  <= high_en_d;\n      low_en_q   <= low_en_d;\n      int_en_q   <= int_en_d;\n      status_q   <= status_d;\n      in_q       <= in_ext;\n      in_prev_q  <= in_q;\n    end\n  end\n\n  // ---------------------------------------------------------------\n  // Read data: zero unless a mapped read access\n  // ---------------------------------------------------------------\n  reg [31:0] rd_mux;\n  always @* begin\n    case (index)\n      IDX_DATA_OUT:    rd_mux = data_out_q;\n      IDX_DIR:         rd_mux = dir_q;\n      IDX_DATA_IN:     rd_mux = in_q;\n      IDX_INTR_RISE:   rd_mux = rise_en_q;\n      IDX_INTR_FALL:   rd_mux = fall_en_q;\n      IDX_INTR_HIGH:   rd_mux = high_en_q;\n      IDX_INTR_LOW:    rd_mux = low_en_q;\n      IDX_INTR_ENABLE: rd_mux = int_en_q;\n      IDX_INTR_STATUS: rd_mux = status_q;\n      default:         rd_mux = 32'd0;\n    endcase\n    prdata = rd_access ? rd_mux : 32'd0;\n  end\n\n  // ---------------------------------------------------------------\n  // Pins and interrupt\n  // ---------------------------------------------------------------\n  assign gpio_out = data_out_q[N-1:0];\n  assign gpio_oe  = dir_q[N-1:0];\n  assign irq      = |(status_q & int_en_q);\n\n`ifdef FORMAL\n  // Design-intent assertions (not yet bound to a proof job).\n  always @* begin\n    assert (pready == 1'b1);\n    if (!access) begin\n      assert (pslverr == 1'b0);\n      assert (prdata == 32'd0);\n    end\n    assert ((data_out_q & ~PINS) == 32'd0);\n    assert ((dir_q      & ~PINS) == 32'd0);\n    assert ((int_en_q   & ~PINS) == 32'd0);\n    assert ((status_q   & ~PINS) == 32'd0);\n    assert ((in_q       & ~PINS) == 32'd0);\n  end\n`endif\n\nendmodule\n=== END FILE ===\n=== FILE: apb_gpio_tb.v ===\n`timescale 1ns/1ps\n// Self-checking testbench for apb_gpio. One APB bus drives four instances\n// (N = 1, 8, 13, 32); each 32-bit expectation is masked to the instance's pins.\n// Check kinds: 1 prdata, 2 pslverr, 3 pready, 4 irq, 5 gpio_out, 6 gpio_oe.\nmodule apb_gpio_tb;\n\n  localparam [31:0] M1  = 32'h0000_0001;\n  localparam [31:0] M8  = 32'h0000_00FF;\n  localparam [31:0] M13 = 32'h0000_1FFF;\n  localparam [31:0] M32 = 32'hFFFF_FFFF;\n\n  localparam [7:0] A_OUT  = 8'h00;\n  localparam [7:0] A_DIR  = 8'h04;\n  localparam [7:0] A_IN   = 8'h08;\n  localparam [7:0] A_RISE = 8'h0C;\n  localparam [7:0] A_FALL = 8'h10;\n  localparam [7:0] A_HIGH = 8'h14;\n  localparam [7:0] A_LOW  = 8'h18;\n  localparam [7:0] A_EN   = 8'h1C;\n  localparam [7:0] A_ST   = 8'h20;\n\n  localparam [31:0] RISE_PINS = 32'h0010_0201;  // bits 0, 9, 20\n  localparam [31:0] FALL_PINS = 32'h0020_0402;  // bits 1, 10, 21\n  localparam [31:0] HIGH_PINS = 32'h0040_0804;  // bits 2, 11, 22\n  localparam [31:0] LOW_PINS  = 32'h0080_1008;  // bits 3, 12, 23\n  localparam [31:0] IN_PAT    = 32'h5A5A_C33C;\n\n  reg         pclk;\n  reg         presetn;\n  reg         psel;\n  reg         penable;\n  reg         pwrite;\n  reg  [7:0]  paddr;\n  reg  [31:0] pwdata;\n  reg  [3:0]  pstrb;\n  reg  [31:0] gin;\n\n  wire [31:0] prdata1, prdata8, prdata13, prdata32;\n  wire        pready1, pready8, pready13, pready32;\n  wire        pslverr1, pslverr8, pslverr13, pslverr32;\n  wire        irq1, irq8, irq13, irq32;\n  wire [0:0]  out1, oe1;\n  wire [7:0]  out8, oe8;\n  wire [12:0] out13, oe13;\n  wire [31:0] out32, oe32;\n\n  integer passed;\n  integer failed;\n  integer step;\n  reg [8*64-1:0] nonce;\n\n  apb_gpio #(.ADDR_WIDTH(8), .N(1)) u1 (\n    .pclk(pclk), .presetn(presetn), .paddr(paddr), .psel(psel), .penable(penable),\n    .pwrite(pwrite), .pwdata(pwdata), .pstrb(pstrb), .prdata(prdata1), .pready(pready1),\n    .pslverr(pslverr1), .gpio_in(gin[0:0]), .gpio_out(out1), .gpio_oe(oe1), .irq(irq1));\n\n  apb_gpio #(.ADDR_WIDTH(8), .N(8)) u8 (\n    .pclk(pclk), .presetn(presetn), .paddr(paddr), .psel(psel), .penable(penable),\n    .pwrite(pwrite), .pwdata(pwdata), .pstrb(pstrb), .prdata(prdata8), .pready(pready8),\n    .pslverr(pslverr8), .gpio_in(gin[7:0]), .gpio_out(out8), .gpio_oe(oe8), .irq(irq8));\n\n  apb_gpio #(.ADDR_WIDTH(8), .N(13)) u13 (\n    .pclk(pclk), .presetn(presetn), .paddr(paddr), .psel(psel), .penable(penable),\n    .pwrite(pwrite), .pwdata(pwdata), .pstrb(pstrb), .prdata(prdata13), .pready(pready13),\n    .pslverr(pslverr13), .gpio_in(gin[12:0]), .gpio_out(out13), .gpio_oe(oe13), .irq(irq13));\n\n  apb_gpio #(.ADDR_WIDTH(8), .N(32)) u32 (\n    .pclk(pclk), .presetn(presetn), .paddr(paddr), .psel(psel), .penable(penable),\n    .pwrite(pwrite), .pwdata(pwdata), .pstrb(pstrb), .prdata(prdata32), .pready(pready32),\n    .pslverr(pslverr32), .gpio_in(gin), .gpio_out(out32), .gpio_oe(oe32), .irq(irq32));\n\n  always #5 pclk = ~pclk;\n\n  // ------------------------------------------------------------------\n  // Check primitives\n  // ------------------------------------------------------------------\n  task chk32(input integer kind, input integer inst, input [31:0] got, input [31:0] want);\n    begin\n      if (got === want) passed = passed + 1;\n      else begin\n        failed = failed + 1;\n        $error(\"step %0d kind %0d N=%0d: got %h, expected %h\", step, kind, inst, got, want);\n      end\n    end\n  endtask\n\n  task chk1(input integer kind, input integer inst, input got, input want);\n    begin\n      if (got === want) passed = passed + 1;\n      else begin\n        failed = failed + 1;\n        $error(\"step %0d kind %0d N=%0d: got %b, expected %b\", step, kind, inst, got, want);\n      end\n    end\n  endtask\n\n  task chk_rd(input [31:0] e);\n    begin\n      chk32(1, 1,  prdata1,  e & M1);\n      chk32(1, 8,  prdata8,  e & M8);\n      chk32(1, 13, prdata13, e & M13);\n      chk32(1, 32, prdata32, e & M32);\n    end\n  endtask\n\n  task chk_err(input ee);\n    begin\n      chk1(2, 1,  pslverr1,  ee);\n      chk1(2, 8,  pslverr8,  ee);\n      chk1(2, 13, pslverr13, ee);\n      chk1(2, 32, pslverr32, ee);\n    end\n  endtask\n\n  task chk_rdy;\n    begin\n      chk1(3, 1,  pready1,  1'b1);\n      chk1(3, 8,  pready8,  1'b1);\n      chk1(3, 13, pready13, 1'b1);\n      chk1(3, 32, pready32, 1'b1);\n    end\n  endtask\n\n  // v = expected (status & enable) over 32 bits\n  task chk_irq(input [31:0] v);\n    begin\n      chk1(4, 1,  irq1,  |(v & M1));\n      chk1(4, 8,  irq8,  |(v & M8));\n      chk1(4, 13, irq13, |(v & M13));\n      chk1(4, 32, irq32, |(v & M32));\n    end\n  endtask\n\n  task chk_pins(input [31:0] eo, input [31:0] eoe);\n    begin\n      chk32(5, 1,  {31'd0, out1},  eo & M1);\n      chk32(5, 8,  {24'd0, out8},  eo & M8);\n      chk32(5, 13, {19'd0, out13}, eo & M13);\n      chk32(5, 32, out32,          eo & M32);\n      chk32(6, 1,  {31'd0, oe1},   eoe & M1);\n      chk32(6, 8,  {24'd0, oe8},   eoe & M8);\n      chk32(6, 13, {19'd0, oe13},  eoe & M13);\n      chk32(6, 32, oe32,           eoe & M32);\n    end\n  endtask\n\n  // ------------------------------------------------------------------\n  // APB transfers. Each starts with a setup phase at the next falling\n  // edge, so consecutive calls are back-to-back transfers.\n  // ------------------------------------------------------------------\n  task apb_xfer(input wr, input [7:0] a, input [31:0] d, input [3:0] s,\n                input [31:0] erd, input eerr, input pin, input [31:0] g);\n    begin\n      @(negedge pclk);\n      psel    = 1'b1;\n      penable = 1'b0;\n      pwrite  = wr;\n      paddr   = a;\n      pwdata  = wr ? d : 32'd0;\n      pstrb   = wr ? s : 4'd0;\n      if (pin) gin = g;\n      #1;\n      chk_rd(32'd0);\n      chk_err(1'b0);\n      @(negedge pclk);\n      penable = 1'b1;\n      #1;\n      chk_rdy;\n      chk_err(eerr);\n      if (!wr) chk_rd(erd);\n      @(posedge pclk);\n      #1;\n      psel    = 1'b0;\n      penable = 1'b0;\n      pwrite  = 1'b0;\n      pstrb   = 4'd0;\n    end\n  endtask\n\n  task apb_wr(input [7:0] a, input [31:0] d, input [3:0] s, input ee);\n    begin\n      apb_xfer(1'b1, a, d, s, 32'd0, ee, 1'b0, 32'd0);\n    end\n  endtask\n\n  task apb_wr_pin(input [7:0] a, input [31:0] d, input [3:0] s, input ee, input [31:0] g);\n    begin\n      apb_xfer(1'b1, a, d, s, 32'd0, ee, 1'b1, g);\n    end\n  endtask\n\n  task apb_rd(input [7:0] a, input [31:0] e, input ee);\n    begin\n      apb_xfer(1'b0, a, 32'd0, 4'd0, e, ee, 1'b0, 32'd0);\n    end\n  endtask\n\n  task apb_rd_pin(input [7:0] a, input [31:0] e, input ee, input [31:0] g);\n    begin\n      apb_xfer(1'b0, a, 32'd0, 4'd0, e, ee, 1'b1, g);\n    end\n  endtask\n\n  task idle(input integer n);\n    integer k;\n    begin\n      for (k = 0; k < n; k = k + 1) begin\n        @(negedge pclk);\n        #1;\n        chk_rd(32'd0);\n        chk_err(1'b0);\n      end\n    end\n  endtask\n\n  task drive_pins(input [31:0] g);\n    begin\n      @(negedge pclk);\n      gin = g;\n    end\n  endtask\n\n  task rw_pins(input [7:0] a, input [31:0] e);\n    begin\n      chk_pins((a == A_OUT) ? e : 32'd0, (a == A_DIR) ? e : 32'd0);\n      chk_irq(32'd0);\n    end\n  endtask\n\n  task rw_test(input [7:0] a);\n    begin\n      apb_wr(a, 32'hFFFF_FFFF, 4'hF, 1'b0); apb_rd(a, 32'hFFFF_FFFF, 1'b0); rw_pins(a, 32'hFFFF_FFFF);\n      apb_wr(a, 32'h0000_0000, 4'h5, 1'b0); apb_rd(a, 32'hFF00_FF00, 1'b0); rw_pins(a, 32'hFF00_FF00);\n      apb_wr(a, 32'hA5A5_A5A5, 4'hA, 1'b0); apb_rd(a, 32'hA500_A500, 1'b0); rw_pins(a, 32'hA500_A500);\n      apb_wr(a, 32'h1234_5678, 4'h0, 1'b0); apb_rd(a, 32'hA500_A500, 1'b0); rw_pins(a, 32'hA500_A500);\n      apb_wr(a, 32'h1234_5678, 4'h1, 1'b0); apb_rd(a, 32'hA500_A578, 1'b0); rw_pins(a, 32'hA500_A578);\n      apb_wr(a, 32'h0000_0000, 4'hF, 1'b0); apb_rd(a, 32'h0000_0000, 1'b0); rw_pins(a, 32'h0000_0000);\n    end\n  endtask\n\n  task rd_all_zero_except_in(input [31:0] ein);\n    begin\n      apb_rd(A_OUT,  32'd0, 1'b0);\n      apb_rd(A_DIR,  32'd0, 1'b0);\n      apb_rd(A_IN,   ein,   1'b0);\n      apb_rd(A_RISE, 32'd0, 1'b0);\n      apb_rd(A_FALL, 32'd0, 1'b0);\n      apb_rd(A_HIGH, 32'd0, 1'b0);\n      apb_rd(A_LOW,  32'd0, 1'b0);\n      apb_rd(A_EN,   32'd0, 1'b0);\n      apb_rd(A_ST,   32'd0, 1'b0);\n    end\n  endtask\n\n  // ------------------------------------------------------------------\n  // Test sequence\n  // ------------------------------------------------------------------\n  initial begin\n    passed  = 0;\n    failed  = 0;\n    step    = 0;\n    nonce   = {(8*64){1'b0}};\n    pclk    = 1'b0;\n    presetn = 1'b0;\n    psel    = 1'b0;\n    penable = 1'b0;\n    pwrite  = 1'b0;\n    paddr   = 8'd0;\n    pwdata  = 32'd0;\n    pstrb   = 4'd0;\n    gin     = 32'd0;\n\n    // ---- Step 1: reset values ----\n    step = 1;\n    repeat (2) @(posedge pclk);\n    #1;\n    chk_pins(32'd0, 32'd0);\n    chk_irq(32'd0);\n    @(negedge pclk);\n    presetn = 1'b1;\n    idle(2);\n    rd_all_zero_except_in(32'd0);\n    chk_pins(32'd0, 32'd0);\n    chk_irq(32'd0);\n\n    // ---- Step 2: read/write registers, partial strobes, bits above N ----\n    step = 2;  rw_test(A_OUT);\n    step = 3;  rw_test(A_DIR);\n    step = 4;  rw_test(A_RISE);\n    step = 5;  rw_test(A_FALL);\n    step = 6;  rw_test(A_HIGH);\n    step = 7;  rw_test(A_EN);\n    // LOW last: pins are low, so every enabled bit sets status (masked by EN = 0)\n    step = 8;  rw_test(A_LOW);\n    apb_rd(A_ST, 32'hFFFF_FFFF, 1'b0);\n    chk_irq(32'd0);\n\n    // ---- Step 9: write-1-to-clear with strobes ----\n    step = 9;\n    apb_wr(A_ST, 32'h0000_0001, 4'hF, 1'b0); apb_rd(A_ST, 32'hFFFF_FFFE, 1'b0);\n    apb_wr(A_ST, 32'hFFFF_FFFF, 4'h2, 1'b0); apb_rd(A_ST, 32'hFFFF_00FE, 1'b0);\n    apb_wr(A_ST, 32'h0000_0000, 4'hF, 1'b0); apb_rd(A_ST, 32'hFFFF_00FE, 1'b0);\n    apb_wr(A_ST, 32'hFFFF_0000, 4'h3, 1'b0); apb_rd(A_ST, 32'hFFFF_00FE, 1'b0);\n    apb_wr(A_ST, 32'h8000_0000, 4'h8, 1'b0); apb_rd(A_ST, 32'h7FFF_00FE, 1'b0);\n    apb_wr(A_ST, 32'hFFFF_FFFF, 4'hF, 1'b0); apb_rd(A_ST, 32'h0000_0000, 1'b0);\n    chk_irq(32'd0);\n\n    // ---- Step 10: DATA_IN sampling, read only; PSLVERR policy ----\n    step = 10;\n    apb_rd_pin(A_IN, IN_PAT, 1'b0, IN_PAT);       // pin set before edge E reads after E\n    apb_wr(A_IN, 32'hFFFF_FFFF, 4'hF, 1'b1);      // DATA_IN write: error, no change\n    apb_wr(A_IN, 32'h0000_0000, 4'h3, 1'b1);\n    apb_rd(A_IN, IN_PAT, 1'b0);\n    apb_wr(A_OUT, 32'h0F0F_0F0F, 4'hF, 1'b0);\n    chk_pins(32'h0F0F_0F0F, 32'd0);\n\n    step = 11;  // unmapped writes: error, nothing changes (incl. aliases of DATA_OUT)\n    apb_wr(8'h24, 32'hFFFF_FFFF, 4'hF, 1'b1);\n    apb_wr(8'h28, 32'hFFFF_FFFF, 4'hF, 1'b1);\n    apb_wr(8'h3C, 32'hFFFF_FFFF, 4'hF, 1'b1);\n    apb_wr(8'h40, 32'hFFFF_FFFF, 4'hF, 1'b1);\n    apb_wr(8'h80, 32'hFFFF_FFFF, 4'hF, 1'b1);\n    apb_wr(8'hC0, 32'hFFFF_FFFF, 4'hF, 1'b1);\n    apb_wr(8'hFC, 32'hFFFF_FFFF, 4'hF, 1'b1);\n    apb_wr(8'h01, 32'hFFFF_FFFF, 4'hF, 1'b1);\n    apb_wr(8'h02, 32'hFFFF_FFFF, 4'hF, 1'b1);\n    apb_wr(8'h03, 32'hFFFF_FFFF, 4'hF, 1'b1);\n    apb_wr(8'h41, 32'hFFFF_FFFF, 4'hF, 1'b1);\n    apb_wr(8'h05, 32'hFFFF_FFFF, 4'hF, 1'b1);\n    apb_wr(8'h0D, 32'hFFFF_FFFF, 4'hF, 1'b1);\n    apb_wr(8'h21, 32'hFFFF_FFFF, 4'hF, 1'b1);\n    chk_pins(32'h0F0F_0F0F, 32'd0);\n    apb_rd(A_OUT,  32'h0F0F_0F0F, 1'b0);\n    apb_rd(A_DIR,  32'd0, 1'b0);\n    apb_rd(A_IN,   IN_PAT, 1'b0);\n    apb_rd(A_RISE, 32'd0, 1'b0);\n    apb_rd(A_FALL, 32'd0, 1'b0);\n    apb_rd(A_HIGH, 32'd0, 1'b0);\n    apb_rd(A_LOW,  32'd0, 1'b0);\n    apb_rd(A_EN,   32'd0, 1'b0);\n    apb_rd(A_ST,   32'd0, 1'b0);\n\n    step = 12;  // unmapped reads: zero data, error\n    apb_rd(8'h24, 32'd0, 1'b1);\n    apb_rd(8'h3C, 32'd0, 1'b1);\n    apb_rd(8'h40, 32'd0, 1'b1);\n    apb_rd(8'h41, 32'd0, 1'b1);\n    apb_rd(8'h01, 32'd0, 1'b1);\n    apb_rd(8'h81, 32'd0, 1'b1);\n    apb_rd(8'hFC, 32'd0, 1'b1);\n    apb_rd(8'h0A, 32'd0, 1'b1);\n    apb_wr(A_OUT, 32'h0000_0000, 4'hF, 1'b0);\n    chk_pins(32'd0, 32'd0);\n    drive_pins(32'd0);\n    idle(3);\n\n    // ---- Step 13: rising edge, exact timing, fires once ----\n    step = 13;\n    apb_wr(A_RISE, RISE_PINS, 4'hF, 1'b0);\n    apb_wr(A_EN,   RISE_PINS, 4'hF, 1'b0);\n    chk_irq(32'd0);\n    @(negedge pclk); gin = RISE_PINS;     // before edge E\n    @(posedge pclk); #1; chk_irq(32'd0);  // after E: sampled, not yet detected\n    @(posedge pclk); #1; chk_irq(RISE_PINS); // after E+1: status set\n    apb_rd(A_ST, RISE_PINS, 1'b0);\n    apb_rd(A_IN, RISE_PINS, 1'b0);\n    apb_wr(A_ST, RISE_PINS, 4'hF, 1'b0);\n    apb_rd(A_ST, 32'd0, 1'b0);\n    chk_irq(32'd0);\n    idle(3);\n    apb_rd(A_ST, 32'd0, 1'b0);            // edge does not fire again\n    drive_pins(32'd0);\n    idle(2);\n    apb_rd(A_ST, 32'd0, 1'b0);\n\n    // ---- Step 14: falling edge ----\n    step = 14;\n    apb_wr(A_FALL, FALL_PINS, 4'hF, 1'b0);\n    apb_wr(A_EN,   FALL_PINS, 4'hF, 1'b0);\n    drive_pins(FALL_PINS);\n    idle(2);\n    apb_rd(A_ST, 32'd0, 1'b0);            // rise on these pins not enabled\n    @(negedge pclk); gin = 32'd0;\n    @(posedge pclk); #1; chk_irq(32'd0);\n    @(posedge pclk); #1; chk_irq(FALL_PINS);\n    apb_rd(A_ST, FALL_PINS, 1'b0);\n    apb_wr(A_ST, FALL_PINS, 4'hF, 1'b0);\n    apb_rd(A_ST, 32'd0, 1'b0);\n    idle(2);\n    apb_rd(A_ST, 32'd0, 1'b0);\n    chk_irq(32'd0);\n\n    // ---- Step 15: high level re-sets after a clear ----\n    step = 15;\n    apb_wr(A_HIGH, HIGH_PINS, 4'hF, 1'b0);\n    apb_wr(A_EN,   HIGH_PINS, 4'hF, 1'b0);\n    @(negedge pclk); gin = HIGH_PINS;\n    @(posedge pclk); #1; chk_irq(32'd0);\n    @(posedge pclk); #1; chk_irq(HIGH_PINS);\n    apb_rd(A_ST, HIGH_PINS, 1'b0);\n    apb_wr(A_ST, HIGH_PINS, 4'hF, 1'b0);\n    apb_rd(A_ST, HIGH_PINS, 1'b0);        // level still holds: set again\n    chk_irq(HIGH_PINS);\n    drive_pins(32'd0);\n    idle(2);\n    apb_wr(A_ST, HIGH_PINS, 4'hF, 1'b0);\n    apb_rd(A_ST, 32'd0, 1'b0);            // level gone: clear sticks\n    chk_irq(32'd0);\n\n    // ---- Step 16: low level, enables used as before the edge ----\n    step = 16;\n    apb_wr(A_EN, LOW_PINS, 4'hF, 1'b0);\n    chk_irq(32'd0);\n    apb_wr(A_LOW, LOW_PINS, 4'hF, 1'b0);  // commits at edge W\n    chk_irq(32'd0);                       // not detected at W\n    @(posedge pclk); #1; chk_irq(LOW_PINS); // detected at W+1\n    apb_rd(A_ST, LOW_PINS, 1'b0);\n    apb_wr(A_ST, LOW_PINS, 4'hF, 1'b0);\n    apb_rd(A_ST, LOW_PINS, 1'b0);         // level holds: set again\n    drive_pins(LOW_PINS);\n    idle(2);\n    apb_wr(A_ST, LOW_PINS, 4'hF, 1'b0);\n    apb_rd(A_ST, 32'd0, 1'b0);\n    chk_irq(32'd0);\n    apb_wr(A_LOW, 32'd0, 4'hF, 1'b0);\n    drive_pins(32'd0);\n    idle(2);\n    apb_rd(A_ST, 32'd0, 1'b0);\n\n    // ---- Step 17: clear some pending bits only; interrupt mask ----\n    step = 17;\n    apb_wr(A_EN, 32'd0, 4'hF, 1'b0);\n    drive_pins(RISE_PINS);\n    idle(2);\n    apb_rd(A_ST, RISE_PINS, 1'b0);        // masked condition still sets status\n    chk_irq(32'd0);\n    apb_wr(A_ST, 32'h0000_0200, 4'hF, 1'b0); apb_rd(A_ST, 32'h0010_0001, 1'b0);\n    apb_wr(A_ST, 32'hFFFF_FFFF, 4'h4, 1'b0); apb_rd(A_ST, 32'h0000_0001, 1'b0);\n    apb_wr(A_ST, 32'h0000_0001, 4'hE, 1'b0); apb_rd(A_ST, 32'h0000_0001, 1'b0);\n    apb_wr(A_EN, 32'h0000_0002, 4'hF, 1'b0); chk_irq(32'd0);\n    apb_wr(A_EN, 32'h0000_0001, 4'hF, 1'b0); chk_irq(32'h0000_0001);\n    apb_wr(A_EN, 32'h0000_0000, 4'hF, 1'b0); chk_irq(32'd0);\n    apb_rd(A_ST, 32'h0000_0001, 1'b0);\n    apb_wr(A_ST, 32'h0000_0001, 4'h1, 1'b0); apb_rd(A_ST, 32'd0, 1'b0);\n    drive_pins(32'd0);\n    idle(2);\n    apb_rd(A_ST, 32'd0, 1'b0);\n\n    // ---- Step 18: a detection beats a clear on the same edge ----\n    step = 18;\n    apb_wr(A_EN, 32'h0000_0201, 4'hF, 1'b0);\n    drive_pins(32'h0000_0201);\n    idle(2);\n    drive_pins(32'd0);\n    idle(2);\n    apb_rd(A_ST, 32'h0000_0201, 1'b0);\n    chk_irq(32'h0000_0201);\n    // pin 0 rises at the setup edge, so its edge is detected on the clear's edge\n    apb_wr_pin(A_ST, 32'h0000_0201, 4'hF, 1'b0, 32'h0000_0001);\n    apb_rd(A_ST, 32'h0000_0001, 1'b0);\n    chk_irq(32'h0000_0001);\n    apb_wr(A_ST, 32'h0000_0001, 4'hF, 1'b0);\n    apb_rd(A_ST, 32'd0, 1'b0);\n    chk_irq(32'd0);\n    drive_pins(32'd0);\n    idle(2);\n    apb_rd(A_ST, 32'd0, 1'b0);\n\n    // ---- Step 19: both edges on one pin; one-cycle pulse ----\n    step = 19;\n    apb_wr(A_RISE, 32'h0010_0211, 4'hF, 1'b0);\n    apb_wr(A_FALL, 32'h0020_0412, 4'hF, 1'b0);\n    apb_wr(A_EN,   32'h0000_0010, 4'hF, 1'b0);\n    drive_pins(32'h0000_0010);\n    idle(2);\n    apb_rd(A_ST, 32'h0000_0010, 1'b0);\n    chk_irq(32'h0000_0010);\n    apb_wr(A_ST, 32'h0000_0010, 4'hF, 1'b0); apb_rd(A_ST, 32'd0, 1'b0);\n    drive_pins(32'd0);\n    idle(2);\n    apb_rd(A_ST, 32'h0000_0010, 1'b0);\n    apb_wr(A_ST, 32'h0000_0010, 4'hF, 1'b0); apb_rd(A_ST, 32'd0, 1'b0);\n    apb_wr(A_EN, 32'd0, 4'hF, 1'b0);\n    @(negedge pclk); gin = 32'h0000_0200;\n    @(negedge pclk); gin = 32'd0;\n    idle(3);\n    apb_rd(A_ST, 32'h0000_0200, 1'b0);\n    apb_wr(A_ST, 32'h0000_0200, 4'hF, 1'b0); apb_rd(A_ST, 32'd0, 1'b0);\n\n    // ---- Step 20: reset again with state set ----\n    step = 20;\n    apb_wr(A_OUT, 32'h1234_5678, 4'hF, 1'b0);\n    apb_wr(A_DIR, 32'hFFFF_0000, 4'hF, 1'b0);\n    apb_wr(A_EN,  32'hFFFF_FFFF, 4'hF, 1'b0);\n    drive_pins(RISE_PINS);\n    idle(2);\n    apb_rd(A_ST, RISE_PINS, 1'b0);\n    chk_pins(32'h1234_5678, 32'hFFFF_0000);\n    chk_irq(RISE_PINS);\n    @(negedge pclk);\n    presetn = 1'b0;\n    gin     = 32'd0;\n    @(posedge pclk); #1;\n    chk_pins(32'd0, 32'd0);\n    chk_irq(32'd0);\n    repeat (2) @(posedge pclk);\n    @(negedge pclk);\n    presetn = 1'b1;\n    idle(2);\n    rd_all_zero_except_in(32'd0);\n    chk_pins(32'd0, 32'd0);\n    chk_irq(32'd0);\n    apb_wr(A_OUT, 32'h0000_00A5, 4'h1, 1'b0);\n    apb_rd(A_OUT, 32'h0000_00A5, 1'b0);\n    chk_pins(32'h0000_00A5, 32'd0);\n\n    // ---- Verdict ----\n    @(negedge pclk);\n    if (!$value$plusargs(\"nirmaan_nonce=%s\", nonce)) nonce = {(8*64){1'b0}};\n    $display(\"NIRMAAN-SIM %0s %0d passed, %0d failed\", nonce, passed, failed);\n    $finish;\n  end\n\nendmodule\n=== END FILE ==="
+    }
+  ],
+  "format": "nirmaan.eval-trial",
+  "harness_variant": "default",
+  "judge_runs": [
+    {
+      "check": "The reference testbench passes on the seat's RTL",
+      "params": {
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-k3d5jgre/seat/prj-eada6108d7_rtl-implementation/1/apb_gpio.v",
+          "tests/fixtures/rtl/apb_gpio/apb_gpio_tb.v"
+        ],
+        "top": "apb_gpio_tb"
+      },
+      "run": "run-0004",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: 2 errors, the testbench reports 2 of 1521 checks failed; first: /Users/ompatel/Nirmaan/.worktrees/ip-h3/tests/fixtures/rtl/apb_gpio/apb_gpio_tb.v:69: lane N=8: DATA_IN after reset: got 0xxxxxxxxx, expected 0x00000000",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The seat's testbench fails each GPIO mutant",
+      "params": {
+        "sources": [
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-k3d5jgre/judge/check-2/must-fail-xjtdcle7/clean/apb_gpio_tb.v",
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-k3d5jgre/judge/check-2/must-fail-xjtdcle7/clean/apb_gpio.v"
+        ],
+        "top": "apb_gpio_tb"
+      },
+      "run": "run-0005",
+      "succeeded": true,
+      "summary": "icarus: simulation passed: 5092 checks passed, $finish reached at time 5190000, 0 errors",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The seat's testbench fails each GPIO mutant",
+      "params": {
+        "sources": [
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-k3d5jgre/judge/check-2/must-fail-xjtdcle7/mutant-1-1/apb_gpio_tb.v",
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-k3d5jgre/judge/check-2/must-fail-xjtdcle7/mutant-1-1/apb_gpio.v"
+        ],
+        "top": "apb_gpio_tb"
+      },
+      "run": "run-0006",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: 35 errors, the testbench reports 35 of 5092 checks failed; first: /private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-k3d5jgre/judge/check-2/must-fail-xjtdcle7/mutant-1-1/apb_gpio_tb.v:82: step 9 kind 1 N=8: got 00000000, expected 000000fe",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The seat's testbench fails each GPIO mutant",
+      "params": {
+        "sources": [
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-k3d5jgre/judge/check-2/must-fail-xjtdcle7/mutant-1-2/apb_gpio_tb.v",
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-k3d5jgre/judge/check-2/must-fail-xjtdcle7/mutant-1-2/apb_gpio.v"
+        ],
+        "top": "apb_gpio_tb"
+      },
+      "run": "run-0007",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: 114 errors, the testbench reports 114 of 5092 checks failed; first: /private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-k3d5jgre/judge/check-2/must-fail-xjtdcle7/mutant-1-2/apb_gpio_tb.v:82: step 13 kind 1 N=1: got 00000001, expected 00000000",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The seat's testbench fails each GPIO mutant",
+      "params": {
+        "sources": [
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-k3d5jgre/judge/check-2/must-fail-xjtdcle7/mutant-1-3/apb_gpio_tb.v",
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-k3d5jgre/judge/check-2/must-fail-xjtdcle7/mutant-1-3/apb_gpio.v"
+        ],
+        "top": "apb_gpio_tb"
+      },
+      "run": "run-0008",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: 6 errors, the testbench reports 6 of 5092 checks failed; first: /private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-k3d5jgre/judge/check-2/must-fail-xjtdcle7/mutant-1-3/apb_gpio_tb.v:82: step 15 kind 1 N=8: got 00000000, expected 00000004",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The seat's testbench fails each GPIO mutant",
+      "params": {
+        "sources": [
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-k3d5jgre/judge/check-2/must-fail-xjtdcle7/mutant-1-4/apb_gpio_tb.v",
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-k3d5jgre/judge/check-2/must-fail-xjtdcle7/mutant-1-4/apb_gpio.v"
+        ],
+        "top": "apb_gpio_tb"
+      },
+      "run": "run-0009",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: 40 errors, the testbench reports 40 of 5092 checks failed; first: /private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-k3d5jgre/judge/check-2/must-fail-xjtdcle7/mutant-1-4/apb_gpio_tb.v:92: step 8 kind 4 N=1: got 1, expected 0",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The case's N 8 proof reaches every cover and fails each mutant",
+      "params": {
+        "sby": "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-k3d5jgre/judge/check-3/must-fail-4pnfosli/clean/apb_gpio.sby",
+        "sources": [
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-k3d5jgre/judge/check-3/must-fail-4pnfosli/clean/apb_gpio.v"
+        ]
+      },
+      "run": "run-0010",
+      "succeeded": true,
+      "summary": "symbiyosys: formal passed: every property proven",
+      "tool": "formal.run"
+    },
+    {
+      "check": "The case's N 8 proof reaches every cover and fails each mutant",
+      "params": {
+        "sby": "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-k3d5jgre/judge/check-3/must-fail-4pnfosli/cover/apb_gpio.sby",
+        "sources": [
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-k3d5jgre/judge/check-3/must-fail-4pnfosli/cover/apb_gpio.v"
+        ]
+      },
+      "run": "run-0011",
+      "succeeded": true,
+      "summary": "symbiyosys-cover: not vacuous: every cover reached (12 of 12); every assertion antecedent reached (10 of 10)",
+      "tool": "formal.cover"
+    },
+    {
+      "check": "The case's N 8 proof reaches every cover and fails each mutant",
+      "params": {
+        "sby": "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-k3d5jgre/judge/check-3/must-fail-4pnfosli/mutant-1-1/apb_gpio.sby",
+        "sources": [
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-k3d5jgre/judge/check-3/must-fail-4pnfosli/mutant-1-1/apb_gpio.v"
+        ]
+      },
+      "run": "run-0012",
+      "succeeded": false,
+      "summary": "symbiyosys: formal fail: 1 error; first: apb_gpio.v:271: [ASSERT] assertion apb_gpio._witness_.check_assert_apb_gpio_v_271_372 failed at step 6",
+      "tool": "formal.run"
+    },
+    {
+      "check": "The case's N 8 proof reaches every cover and fails each mutant",
+      "params": {
+        "sby": "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-k3d5jgre/judge/check-3/must-fail-4pnfosli/mutant-1-2/apb_gpio.sby",
+        "sources": [
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-k3d5jgre/judge/check-3/must-fail-4pnfosli/mutant-1-2/apb_gpio.v"
+        ]
+      },
+      "run": "run-0013",
+      "succeeded": false,
+      "summary": "symbiyosys: formal fail: 1 error; first: apb_gpio.v:271: [ASSERT] assertion apb_gpio._witness_.check_assert_apb_gpio_v_271_371 failed at step 5",
+      "tool": "formal.run"
+    },
+    {
+      "check": "The case's N 8 proof reaches every cover and fails each mutant",
+      "params": {
+        "sby": "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-k3d5jgre/judge/check-3/must-fail-4pnfosli/mutant-1-3/apb_gpio.sby",
+        "sources": [
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-k3d5jgre/judge/check-3/must-fail-4pnfosli/mutant-1-3/apb_gpio.v"
+        ]
+      },
+      "run": "run-0014",
+      "succeeded": false,
+      "summary": "symbiyosys: formal fail: 1 error; first: apb_gpio.v:271: [ASSERT] assertion apb_gpio._witness_.check_assert_apb_gpio_v_271_373 failed at step 5",
+      "tool": "formal.run"
+    },
+    {
+      "check": "The case's N 8 proof reaches every cover and fails each mutant",
+      "params": {
+        "sby": "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-k3d5jgre/judge/check-3/must-fail-4pnfosli/mutant-1-4/apb_gpio.sby",
+        "sources": [
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-k3d5jgre/judge/check-3/must-fail-4pnfosli/mutant-1-4/apb_gpio.v"
+        ]
+      },
+      "run": "run-0015",
+      "succeeded": false,
+      "summary": "symbiyosys: formal fail: 1 error; first: apb_gpio.v:272: [ASSERT] assertion apb_gpio._witness_.check_assert_apb_gpio_v_272_380 failed at step 5",
+      "tool": "formal.run"
+    },
+    {
+      "check": "The case's N 32 proof reaches every cover and fails each mutant",
+      "params": {
+        "sby": "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-k3d5jgre/judge/check-4/must-fail-fzbo78ef/clean/apb_gpio_n32.sby",
+        "sources": [
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-k3d5jgre/judge/check-4/must-fail-fzbo78ef/clean/apb_gpio.v"
+        ]
+      },
+      "run": "run-0016",
+      "succeeded": true,
+      "summary": "symbiyosys: formal passed: every property proven",
+      "tool": "formal.run"
+    },
+    {
+      "check": "The case's N 32 proof reaches every cover and fails each mutant",
+      "params": {
+        "sby": "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-k3d5jgre/judge/check-4/must-fail-fzbo78ef/cover/apb_gpio_n32.sby",
+        "sources": [
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-k3d5jgre/judge/check-4/must-fail-fzbo78ef/cover/apb_gpio.v"
+        ]
+      },
+      "run": "run-0017",
+      "succeeded": true,
+      "summary": "symbiyosys-cover: not vacuous: every cover reached (12 of 12); every assertion antecedent reached (10 of 10)",
+      "tool": "formal.cover"
+    },
+    {
+      "check": "The case's N 32 proof reaches every cover and fails each mutant",
+      "params": {
+        "sby": "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-k3d5jgre/judge/check-4/must-fail-fzbo78ef/mutant-1-1/apb_gpio_n32.sby",
+        "sources": [
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-k3d5jgre/judge/check-4/must-fail-fzbo78ef/mutant-1-1/apb_gpio.v"
+        ]
+      },
+      "run": "run-0018",
+      "succeeded": false,
+      "summary": "symbiyosys: formal fail: 1 error; first: apb_gpio.v:271: [ASSERT] assertion apb_gpio._witness_.check_assert_apb_gpio_v_271_828 failed at step 6",
+      "tool": "formal.run"
+    },
+    {
+      "check": "The case's N 32 proof reaches every cover and fails each mutant",
+      "params": {
+        "sby": "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-k3d5jgre/judge/check-4/must-fail-fzbo78ef/mutant-1-2/apb_gpio_n32.sby",
+        "sources": [
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-k3d5jgre/judge/check-4/must-fail-fzbo78ef/mutant-1-2/apb_gpio.v"
+        ]
+      },
+      "run": "run-0019",
+      "succeeded": false,
+      "summary": "symbiyosys: formal fail: 1 error; first: apb_gpio.v:271: [ASSERT] assertion apb_gpio._witness_.check_assert_apb_gpio_v_271_826 failed at step 5",
+      "tool": "formal.run"
+    },
+    {
+      "check": "The case's N 32 proof reaches every cover and fails each mutant",
+      "params": {
+        "sby": "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-k3d5jgre/judge/check-4/must-fail-fzbo78ef/mutant-1-3/apb_gpio_n32.sby",
+        "sources": [
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-k3d5jgre/judge/check-4/must-fail-fzbo78ef/mutant-1-3/apb_gpio.v"
+        ]
+      },
+      "run": "run-0020",
+      "succeeded": false,
+      "summary": "symbiyosys: formal fail: 2 errors; first: apb_gpio.v:265: [ASSERT] assertion apb_gpio._witness_.check_assert_apb_gpio_v_265_811 failed at step 5",
+      "tool": "formal.run"
+    },
+    {
+      "check": "The case's N 32 proof reaches every cover and fails each mutant",
+      "params": {
+        "sby": "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-k3d5jgre/judge/check-4/must-fail-fzbo78ef/mutant-1-4/apb_gpio_n32.sby",
+        "sources": [
+          "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-k3d5jgre/judge/check-4/must-fail-fzbo78ef/mutant-1-4/apb_gpio.v"
+        ]
+      },
+      "run": "run-0021",
+      "succeeded": false,
+      "summary": "symbiyosys: formal fail: 1 error; first: apb_gpio.v:272: [ASSERT] assertion apb_gpio._witness_.check_assert_apb_gpio_v_272_836 failed at step 5",
+      "tool": "formal.run"
+    }
+  ],
+  "knowledge": "on",
+  "model": "claude-opus-5-5",
+  "purpose": "calibration",
+  "record": "2026-11-18-claude-code-claude-opus-5-5-calibration",
+  "result": {
+    "attempts": 1,
+    "attestations": [],
+    "audit_ok": true,
+    "case": "rtl/apb-gpio",
+    "case_digest": "sha256:99f32bda9197066b2e7ab67ef4cbdb2793259ae556a38257b5035f2e82d04cd5",
+    "cli": "2.1.325",
+    "cost_usd": null,
+    "detail": "Deviation to record: microarchitecture section 5 plans SymbiYosys proofs (apb_gpio.sby and apb_gpio_n32.sby). This task's expected outputs are rtl_source and testbench, and formal.run accepts exactly one .sby, so I submitted no formal_spec. That leaves the planned proof as a follow-up item for the tech lead to schedule. The design-intent assertions in apb_gpio.v sit under `ifdef FORMAL` and are unexercised until a proof is set up. The platform lints and synthesizes with the default parameters (N = 8); the spec also asks for lint at N = 32. The testbench instantiates N = 32, so that width is at least elaborated in simulation. Under Verilator's default error limit, the first $error may end the run before the verdict line prints; it fails either way. The testbench uses #1 delays, so it needs Verilator timing support (--binary or --timing).",
+    "duration_s": 424.183,
+    "gate_runs": [
+      {
+        "run": "run-0001",
+        "succeeded": true,
+        "summary": "verilator-lint: lint clean: 0 errors, 0 warnings",
+        "tool": "lint.run"
+      },
+      {
+        "run": "run-0002",
+        "succeeded": true,
+        "summary": "icarus: simulation passed: 5092 checks passed, $finish reached at time 5190000, 0 errors",
+        "tool": "simulator.run"
+      },
+      {
+        "run": "run-0003",
+        "succeeded": true,
+        "summary": "yosys: synthesis passed: 420 cells, 80 flip-flops, 0 latches, 0 warnings",
+        "tool": "synth.run"
+      }
+    ],
+    "harness": "sha256:6f0b8ffea3898d7e2f2ad4f80dd91d2a13b4d793de93d015a92435ae0573a2a2",
+    "input_tokens": 2,
+    "model_calls": 1,
+    "output_tokens": 47551,
+    "passed": false,
+    "replay": false,
+    "runtime": "claude-code",
+    "sandbox": "/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-k3d5jgre",
+    "scores": [
+      {
+        "failed_runs": [],
+        "name": "The reference testbench passes on the seat's RTL",
+        "runs": [
+          "run-0004"
+        ],
+        "scorer": "held-out-run",
+        "status": "failed",
+        "summary": "simulator.run run-0004: icarus: simulation failed: 2 errors, the testbench reports 2 of 1521 checks failed; first: /Users/ompatel/Nirmaan/.worktrees/ip-h3/tests/fixtures/rtl/apb_gpio/apb_gpio_tb.v:69: lane N=8: DATA_IN after reset: got 0xxxxxxxxx, expected 0x00000000"
+      },
+      {
+        "failed_runs": [
+          "run-0006",
+          "run-0007",
+          "run-0008",
+          "run-0009"
+        ],
+        "name": "The seat's testbench fails each GPIO mutant",
+        "runs": [
+          "run-0005"
+        ],
+        "scorer": "must-fail",
+        "status": "passed",
+        "summary": "simulator.run run-0005 passed on the clean inputs; 4 of 4 mutants failed it"
+      },
+      {
+        "failed_runs": [
+          "run-0012",
+          "run-0013",
+          "run-0014",
+          "run-0015"
+        ],
+        "name": "The case's N 8 proof reaches every cover and fails each mutant",
+        "runs": [
+          "run-0010",
+          "run-0011"
+        ],
+        "scorer": "must-fail",
+        "status": "passed",
+        "summary": "formal.run run-0010 passed on the clean inputs with every cover reached; 4 of 4 mutants failed it"
+      },
+      {
+        "failed_runs": [
+          "run-0018",
+          "run-0019",
+          "run-0020",
+          "run-0021"
+        ],
+        "name": "The case's N 32 proof reaches every cover and fails each mutant",
+        "runs": [
+          "run-0016",
+          "run-0017"
+        ],
+        "scorer": "must-fail",
+        "status": "passed",
+        "summary": "formal.run run-0016 passed on the clean inputs with every cover reached; 4 of 4 mutants failed it"
+      }
+    ],
+    "seat": "prj-eada6108d7:rtl-implementation",
+    "seat_status": "in_review",
+    "started_at": "2026-11-18T03:40:59.910901Z",
+    "submitted": true,
+    "tool_calls": [],
+    "version": "1.25.0"
+  },
+  "skills": {
+    "apb": "sha256:5eb05f03c1201b9bd2acd8e66fea165abd5ba773977cacaf015ddc071119c38e",
+    "control_logic_design": "sha256:3979d44f5c2cf8d2e2a58df59884920fe9e691be04bc390df127dbd69e0516b7",
+    "rtl_design": "sha256:012eb9b7155ed6eb7761adca880b338f10c8f978b15dfd92f5adbb3253307a52"
+  },
+  "stage": "rtl-implementation",
+  "trial": 1,
+  "version": 1
+}
