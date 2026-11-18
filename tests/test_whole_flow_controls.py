@@ -12,15 +12,25 @@ Where it runs: the tool-backed tests need the EDA tools. CI's test job names eve
 ``FLOW-CONTROL`` line (its verdicts and run summaries) into the CI log; ``evals/flow/controls_record.json`` keeps
 those lines from a named CI run, and the test holds every later run to the verdicts it records.
 
+A control may also say which RTL the flow's RTL stage ended in (``upstream_rtl``): the base case's upstream RTL is
+replaced by a copy of it under the name of the file it stands in for, so the seat's own checks run on it before
+review, as they would in a whole flow. Check 5 runs here only on an RTL a control puts in place (``rtl``).
+
+Gate WF15 (council record 2026-11-17, second addendum 2026-11-18, decision 1): the strict fixtures print what they
+timed on lines of their own (``STRICT-FIXTURE ...``); the ``FLOW-CONTROL`` line carries those lines per check, a
+check may name the counts it expects (``timing``) and the one check of a driver test it must fail by
+(``fails_by``), and a control that never reaches review may name what refused it (``refused_by``, its gate runs are
+on the line). The record keeps the counts, and later runs are held to them.
+
 What waits for the whole-flow runner: replaying the reference flow through every seated stage, a flow with a
-planted upstream fault, and check 5 (the held-out test on the flow's own RTL), which takes the RTL from another
-stage.
+planted upstream fault, and check 5 on the RTL another stage made.
 """
 
 from __future__ import annotations
 
 import json
 import re
+import shutil
 from pathlib import Path
 
 import pytest
@@ -28,6 +38,8 @@ import pytest
 from laws import needs
 from nirmaan.evals import ReplayLLM, load_case, load_cases
 from nirmaan.evals.runner import evaluate
+from nirmaan.integrations.eda import run_nonce
+from nirmaan.integrations.firmware import parse_fw_test
 from nirmaan.models import EvalCase, HeldOutCheck
 from nirmaan.runtime import ModelRuntime
 
@@ -67,6 +79,10 @@ def _checks(control: dict, flow: EvalCase) -> list[HeldOutCheck]:
         original = spec.get("rtl") or next(iter(check.get("mutants") or {}), None)
         if "rtl" in spec:
             check["case_files"] = {**check.get("case_files", {}), "rtl": [spec["rtl"]]}
+            # A check that takes the flow's RTL from the seat (check 5) takes the one the control puts in place.
+            check["seat_files"] = {k: v for k, v in check.get("seat_files", {}).items() if k != "rtl"}
+            check["seat_entries"] = {k: v for k, v in check.get("seat_entries", {}).items()
+                                     if tuple(v) != ("rtl_source",)}
         mutants = spec.get("mutants", [m for files in (check.get("mutants") or {}).values() for m in files])
         if mutants:
             assert original, f"{control['id']}: mutants with no file to stand in for"
@@ -84,6 +100,12 @@ def _stand_in(control: dict, flow: EvalCase, tmp_path: Path) -> EvalCase:
         for f in files:
             if f["path"] == DRIVER_API[0]:
                 f["path"] = DRIVER_API[1]
+            elif f["kind"] == "rtl_source" and "upstream_rtl" in control:
+                # The flow's RTL stage ended in this RTL: a copy under the name of the file it stands in for.
+                staged = tmp_path / "upstream-rtl" / Path(f["path"]).name
+                staged.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(REPO / control["upstream_rtl"], staged)
+                f["path"] = str(staged)
     data.update(id=f"control/{control['id']}", skills=[], reference=[],
                 held_out=[c.model_dump(mode="json") for c in _checks(control, flow)])
     path = tmp_path / "case.json"
@@ -107,6 +129,30 @@ def _bus(engine, run_ids) -> list[str]:
     return lines
 
 
+def _logs(engine, run_ids) -> list[str]:
+    out = []
+    for run_id in run_ids:
+        run = engine.state.tool_runs[run_id]
+        out.append(Path(run.references[0]).read_text(encoding="utf-8", errors="replace") if run.references else "")
+    return out
+
+
+def _timings(engine, run_ids) -> list[str]:
+    """What a strict fixture timed, from the lines of its own it printed (gate WF15), sorted."""
+    return sorted(m for log in _logs(engine, run_ids) for m in re.findall(r"^STRICT-FIXTURE (.+)$", log, re.M))
+
+
+def _how_it_failed(engine, run_id) -> dict:
+    """A fw.test run's failed checks, its other errors (build, harness, forged lines), and whether it finished."""
+    [log] = _logs(engine, [run_id])
+    result = parse_fw_test(log, (1,))
+    failed = [c["name"] for c in result.metrics["checks"] if not c["passed"]]
+    nonce = re.escape(run_nonce(log) or "-")
+    finished = bool(re.search(rf"FWTEST:{nonce} SUMMARY ", log) and re.search(rf"FWTEST:{nonce} END ", log))
+    return {"failed": failed, "errors": [d.message for d in result.diagnostics if d.code not in failed],
+            "finished": finished}
+
+
 # --- The manifest (no tools) ------------------------------------------------------------------------------------
 
 
@@ -122,6 +168,8 @@ def test_every_control_names_a_whole_flow_case_its_checks_and_committed_files(fl
             assert "inline" in spec or 1 <= spec["check"] <= len(flow.held_out)
             for path in [*([spec["rtl"]] if "rtl" in spec else []), *spec.get("mutants", [])]:
                 assert (REPO / path).is_file(), path
+        assert "upstream_rtl" not in control or (REPO / control["upstream_rtl"]).is_file()
+        assert "refused_by" not in control or not control.get("reaches_review", True)
         assert _checks(control, flow)
 
 
@@ -164,6 +212,41 @@ def test_the_controls_cover_what_the_record_rules(flows):
     assert len({s.get("transcript") for s in probe} - {None}) == 1 and all(s.get("transcript") for s in probe)
 
 
+def test_the_strict_fixtures_follow_every_route_to_a_cycle_count():
+    """WF15 (second addendum 2026-11-18, decision 1): on a flow whose RTL stage ended in the conforming RTL, the
+    strict driver test passes there and fails check 7 on the reference RTL by its one added check, with the same bus
+    transfers; the strict driver passes check 5 there and fails check 6; and each route by which a recorded probe
+    reads a cycle count is either used by a strict fixture recorded failing, or refused before review."""
+    rtl, fw = "tests/fixtures/rtl/axi4_lite", "tests/fixtures/fw/axi4_lite"
+    lat2 = f"{rtl}/variants/axi4_lite_regs_lat2.v"
+    strict = "read32_and_write32_take_the_conforming_rtls_cycles"
+
+    def control(path: str) -> dict:
+        [found] = [c for c in CONTROLS if _uses(c, path)]
+        assert found["upstream_rtl"] == lat2, found["id"]
+        return found
+
+    test = control(f"{fw}/axi4_lite_regs_test_strict_latency.c")
+    assert _uses(test, f"{fw}/axi4_lite_regs_drv.c")
+    [on_lat2] = [s for s in test["checks"] if "inline" in s]
+    [check7] = [s for s in test["checks"] if s.get("check") == 7]
+    assert (on_lat2["rtl"], on_lat2["expect"], on_lat2["timing"]) == (lat2, "passed",
+                                                                      ["test read32 3 cycles, write32 3 cycles"])
+    assert (check7["expect"], check7["fails_by"], check7["timing"]) == ("failed", strict,
+                                                                        ["test read32 2 cycles, write32 2 cycles"])
+    assert on_lat2["transcript"] == check7["transcript"]
+
+    driver = control(f"{fw}/axi4_lite_regs_drv_strict_latency.c")
+    assert _uses(driver, f"{fw}/axi4_lite_regs_test.c")
+    got = {(s["check"], s.get("rtl"), s["expect"]) for s in driver["checks"]}
+    assert {(5, lat2, "passed"), (6, None, "failed")} <= got
+
+    # The routes: the simulator's clock (used above), and the SoC's CYCLES register (refused or unreadable here).
+    for path in (f"{fw}/axi4_lite_regs_test_strict_soc_cycles.c", f"{fw}/axi4_lite_regs_test_strict_soc_address.c"):
+        soc = control(path)
+        assert soc.get("reaches_review") is False and soc["refused_by"], soc["id"]
+
+
 def test_the_record_names_a_ci_run_and_every_control_once():
     assert RECORD.is_file(), "the controls' recorded CI run is missing (evals/flow/controls_record.json)"
     data = json.loads(RECORD.read_text(encoding="utf-8"))
@@ -189,14 +272,30 @@ def test_the_control_gets_the_verdict_it_expects(nirmaan_org, fixed_clock, flows
     got = [s.status.value for s in result.scores]
     line = {"id": control["id"], "submitted": result.submitted, "verdicts": got,
             "scores": [{"check": s.name, "status": s.status.value, "summary": s.summary} for s in result.scores]}
+    timings = [_timings(engine, s.runs) for s in result.scores]
+    if any(timings):
+        for entry, timed in zip(line["scores"], timings):
+            entry["timing"] = timed
+    if not result.submitted:
+        line["gates"] = [{"tool": g.tool, "succeeded": g.succeeded, "summary": g.summary} for g in result.gate_runs]
     with capsys.disabled():
         print(f"\nFLOW-CONTROL {json.dumps(line, sort_keys=True)}")
     assert got == [s["expect"] for s in control["checks"]], line
+    for spec, score, timed in zip(control["checks"], result.scores, timings):
+        if "timing" in spec:  # the counts a strict fixture measured
+            assert timed == spec["timing"], (score.name, timed)
+        if "fails_by" in spec:  # that one check failed, and nothing else went wrong: no build, harness or crash
+            assert _how_it_failed(engine, score.runs[0]) == {"failed": [spec["fails_by"]], "errors": [],
+                                                             "finished": True}, score.summary
+    if "refused_by" in control:  # what refused the seat before review
+        assert any(not g.succeeded and re.search(control["refused_by"], g.summary) for g in result.gate_runs), line
     transcripts: dict[str, list[list[str]]] = {}
     for spec, score in zip(control["checks"], result.scores):
         if "transcript" in spec:
             transcripts.setdefault(spec["transcript"], []).append(_bus(engine, score.runs))
     for runs in transcripts.values():  # the same bus transfers on both RTLs
         assert runs[0] and all(r == runs[0] for r in runs), runs
-    recorded = {c["id"]: c["verdicts"] for c in json.loads(RECORD.read_text(encoding="utf-8"))["controls"]}
-    assert recorded[control["id"]] == got
+    recorded = {c["id"]: c for c in json.loads(RECORD.read_text(encoding="utf-8"))["controls"]}
+    assert recorded[control["id"]]["verdicts"] == got
+    for entry, timed in zip(recorded[control["id"]]["scores"], timings):  # the recorded counts hold
+        assert entry.get("timing", []) == timed, (entry["check"], timed)

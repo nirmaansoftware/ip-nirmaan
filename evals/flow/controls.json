@@ -365,7 +365,7 @@
     {
       "id": "driver-reference",
       "case": "flow/axi4-lite-regs-driver",
-      "what": "The reference driver and driver test, upstream the reference RTL: it builds alone; the held-out test passes on the reference RTL and on the conforming RTL and fails on wstrb_ignored and okay_unmapped; fw.test works under the must-fail scorer (check 7: clean pass, wstrb_ignored and okay_unmapped caught); the reference driver test passes on both RTLs with the same bus transfers. That shows one test. That no driver test can be strict about latency through read32 and write32 on this block is shown by the harness's construction (tests/test_nirmaan_firmware_reach.py, gate WF14) and this run together, not by the run alone; the harness's cycle limit can fail only the slower RTL, never the reference.",
+      "what": "The reference driver and driver test, upstream the reference RTL: it builds alone; the held-out test passes on the reference RTL and on the conforming RTL and fails on wstrb_ignored and okay_unmapped; fw.test works under the must-fail scorer (check 7: clean pass, wstrb_ignored and okay_unmapped caught); the reference driver test passes on both RTLs with the same bus transfers. That shows one test. That a driver test that uses only read32, write32 and the driver interface cannot be strict about latency on this block rests on the harness's construction (tests/test_nirmaan_firmware_reach.py, gate WF14) and this run together, not on the run alone; the harness's cycle limit can fail only the slower RTL, never the reference. A driver test that reaches the simulator's clock can be strict: see driver-strict-latency-test (gate WF15).",
       "seat": [
         {
           "path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_map.h",
@@ -520,6 +520,186 @@
           "transcript": "probe"
         }
       ]
+    },
+    {
+      "id": "driver-strict-latency-test",
+      "case": "flow/axi4-lite-regs-driver",
+      "what": "The strict fixture driver test (gate WF15, second addendum 2026-11-18, decision 1, item 1), on a flow whose RTL stage ended in the conforming RTL (axi4_lite_regs_lat2.v), with the reference driver: the reference driver test plus one check that times one read32 and one write32 through the simulator's clock (Verilated::s_lastContextp, the route of tests/fixtures/fw/reach/simulator_clock_probe.c) and passes only at that RTL's counts. It passes on axi4_lite_regs_lat2.v (3 and 3 cycles per call), and check 7 fails it on the reference RTL (2 and 2) by that one check only, with no build error, no harness error and no crash, and with the same bus transfers on both RTLs. A driver test can be strict about latency through this route; check 7 catches this one. If the route is closed, the file stays and the expected result changes to the refusal, in a recorded run.",
+      "upstream_rtl": "tests/fixtures/rtl/axi4_lite/variants/axi4_lite_regs_lat2.v",
+      "seat": [
+        {
+          "path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_map.h",
+          "kind": "driver",
+          "as": "axi4_lite_regs_map.h"
+        },
+        {
+          "path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_drv.h",
+          "kind": "driver"
+        },
+        {
+          "path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_drv.c",
+          "kind": "driver",
+          "as": "axi4_lite_regs_drv.c"
+        },
+        {
+          "path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_test_strict_latency.c",
+          "kind": "driver_test",
+          "as": "axi4_lite_regs_test.c"
+        }
+      ],
+      "checks": [
+        {
+          "inline": {
+            "name": "The seat's driver and driver test pass on this RTL",
+            "scorer": "held-out-run",
+            "tool": "fw.test",
+            "seat_files": {
+              "sources": [
+                "driver",
+                "driver_test"
+              ]
+            },
+            "params": {
+              "top": "axi4_lite_regs"
+            }
+          },
+          "rtl": "tests/fixtures/rtl/axi4_lite/variants/axi4_lite_regs_lat2.v",
+          "expect": "passed",
+          "transcript": "strict",
+          "timing": [
+            "test read32 3 cycles, write32 3 cycles"
+          ]
+        },
+        {
+          "check": 7,
+          "expect": "failed",
+          "transcript": "strict",
+          "fails_by": "read32_and_write32_take_the_conforming_rtls_cycles",
+          "timing": [
+            "test read32 2 cycles, write32 2 cycles"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "driver-strict-latency-driver",
+      "case": "flow/axi4-lite-regs-driver",
+      "what": "The strict fixture driver (gate WF15, second addendum 2026-11-18, decision 1, item 2), on a flow whose RTL stage ended in the conforming RTL (axi4_lite_regs_lat2.v), with the reference driver test: the reference driver, except that it times every transfer through the simulator's clock (Verilated::s_lastContextp) and reports any that took other than 3 cycles as a bus error. It builds alone (check 4), passes the held-out test on the flow's RTL (check 5: 3 cycles per call) and fails it on the reference RTL (check 6: 2 cycles per call). If the route is closed, the file stays and the expected result changes to the refusal, in a recorded run.",
+      "upstream_rtl": "tests/fixtures/rtl/axi4_lite/variants/axi4_lite_regs_lat2.v",
+      "seat": [
+        {
+          "path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_map.h",
+          "kind": "driver",
+          "as": "axi4_lite_regs_map.h"
+        },
+        {
+          "path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_drv.h",
+          "kind": "driver"
+        },
+        {
+          "path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_drv_strict_latency.c",
+          "kind": "driver",
+          "as": "axi4_lite_regs_drv.c"
+        },
+        {
+          "path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_test.c",
+          "kind": "driver_test",
+          "as": "axi4_lite_regs_test.c"
+        }
+      ],
+      "checks": [
+        {
+          "check": 4,
+          "expect": "passed"
+        },
+        {
+          "check": 5,
+          "rtl": "tests/fixtures/rtl/axi4_lite/variants/axi4_lite_regs_lat2.v",
+          "expect": "passed",
+          "timing": [
+            "driver read32 3 cycles",
+            "driver write32 3 cycles"
+          ]
+        },
+        {
+          "check": 6,
+          "expect": "failed",
+          "timing": [
+            "driver read32 2 cycles",
+            "driver write32 2 cycles"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "driver-strict-soc-cycles",
+      "case": "flow/axi4-lite-regs-driver",
+      "what": "The other route a recorded probe reads a cycle count by (gate WF15, second addendum 2026-11-18, decision 1, item 3): NIRMAAN_SOC_CYCLES, the SoC run's CYCLES register, named through nirmaan_soc.h by a strict driver test otherwise like driver-strict-latency-test. The case's checks run on host co-simulation (fw.test), which has no SoC and does not put that header on the include path, so the route is refused: the seat's own fw.test check fails to build the test, the seat never reaches review, and no check runs. If the route opens on the build the trials use, the file stays and the expected result changes to a failed check 7, in a recorded run.",
+      "upstream_rtl": "tests/fixtures/rtl/axi4_lite/variants/axi4_lite_regs_lat2.v",
+      "seat": [
+        {
+          "path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_map.h",
+          "kind": "driver",
+          "as": "axi4_lite_regs_map.h"
+        },
+        {
+          "path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_drv.h",
+          "kind": "driver"
+        },
+        {
+          "path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_drv.c",
+          "kind": "driver",
+          "as": "axi4_lite_regs_drv.c"
+        },
+        {
+          "path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_test_strict_soc_cycles.c",
+          "kind": "driver_test",
+          "as": "axi4_lite_regs_test.c"
+        }
+      ],
+      "checks": [
+        {
+          "check": 7,
+          "expect": "not_run"
+        }
+      ],
+      "reaches_review": false,
+      "refused_by": "^build failed before co-simulation: .*nirmaan_soc\\.h"
+    },
+    {
+      "id": "driver-strict-soc-address",
+      "case": "flow/axi4-lite-regs-driver",
+      "what": "The same route without the header (gate WF15, second addendum 2026-11-18, decision 1, item 3): a strict driver test that copies the CYCLES register's address (0x2000000C) from nirmaan_soc.h and reads the word there. In host co-simulation that address is not the SoC's counter; the read ends the run before the harness's summary, so the route is unreadable: the seat's own fw.test check fails, the seat never reaches review, and no check runs. The real result is recorded. If the route opens on the build the trials use, the file stays and the expected result changes to a failed check 7, in a recorded run.",
+      "upstream_rtl": "tests/fixtures/rtl/axi4_lite/variants/axi4_lite_regs_lat2.v",
+      "seat": [
+        {
+          "path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_map.h",
+          "kind": "driver",
+          "as": "axi4_lite_regs_map.h"
+        },
+        {
+          "path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_drv.h",
+          "kind": "driver"
+        },
+        {
+          "path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_drv.c",
+          "kind": "driver",
+          "as": "axi4_lite_regs_drv.c"
+        },
+        {
+          "path": "tests/fixtures/fw/axi4_lite/axi4_lite_regs_test_strict_soc_address.c",
+          "kind": "driver_test",
+          "as": "axi4_lite_regs_test.c"
+        }
+      ],
+      "checks": [
+        {
+          "check": 7,
+          "expect": "not_run"
+        }
+      ],
+      "reaches_review": false,
+      "refused_by": "^co-simulation did not finish"
     },
     {
       "id": "driver-b-before-w",

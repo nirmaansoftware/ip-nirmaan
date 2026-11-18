@@ -104,6 +104,98 @@
       ]
     },
     {
+      "id": "driver-strict-latency-driver",
+      "job": "placeholder",
+      "scores": [
+        {
+          "check": "placeholder",
+          "status": "passed",
+          "summary": "placeholder until the CI run"
+        },
+        {
+          "check": "placeholder",
+          "status": "passed",
+          "summary": "placeholder until the CI run",
+          "timing": [
+            "driver read32 3 cycles",
+            "driver write32 3 cycles"
+          ]
+        },
+        {
+          "check": "placeholder",
+          "status": "failed",
+          "summary": "placeholder until the CI run",
+          "timing": [
+            "driver read32 2 cycles",
+            "driver write32 2 cycles"
+          ]
+        }
+      ],
+      "submitted": true,
+      "verdicts": [
+        "passed",
+        "passed",
+        "failed"
+      ]
+    },
+    {
+      "id": "driver-strict-latency-test",
+      "job": "placeholder",
+      "scores": [
+        {
+          "check": "placeholder",
+          "status": "passed",
+          "summary": "placeholder until the CI run",
+          "timing": [
+            "test read32 3 cycles, write32 3 cycles"
+          ]
+        },
+        {
+          "check": "placeholder",
+          "status": "failed",
+          "summary": "placeholder until the CI run",
+          "timing": [
+            "test read32 2 cycles, write32 2 cycles"
+          ]
+        }
+      ],
+      "submitted": true,
+      "verdicts": [
+        "passed",
+        "failed"
+      ]
+    },
+    {
+      "id": "driver-strict-soc-address",
+      "job": "placeholder",
+      "scores": [
+        {
+          "check": "placeholder",
+          "status": "not_run",
+          "summary": "placeholder until the CI run"
+        }
+      ],
+      "submitted": false,
+      "verdicts": [
+        "not_run"
+      ]
+    },
+    {
+      "id": "driver-strict-soc-cycles",
+      "job": "placeholder",
+      "scores": [
+        {
+          "check": "placeholder",
+          "status": "not_run",
+          "summary": "placeholder until the CI run"
+        }
+      ],
+      "submitted": false,
+      "verdicts": [
+        "not_run"
+      ]
+    },
+    {
       "id": "driver-swallowed-error",
       "job": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44318772521/job/134851826753",
       "scores": [
