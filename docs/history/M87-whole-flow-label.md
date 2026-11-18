@@ -52,6 +52,20 @@ both RTLs with the same bus transfers; `docs/WHOLE_FLOW.md` and the
 answered by a CI test: a driver test's C reaches Verilator's runtime by a
 mangled symbol and can read the simulation time.
 
+**The object screen (gate WF16, follow-up).** The council record's second
+addendum asks for a tripwire on seat-written C before the first register block
+trial. Two scorers, `screened-held-out-run` and `screened-must-fail`, compile
+a check's C as `fw.test` does and refuse it, as a failed check with nothing
+run, on an undefined symbol off the allow list, a definition of a harness or C
+library name, code outside the tests (constructors, destructors, indirect
+functions) or asm in the seat's own lines; otherwise they run the unchanged
+scorers. The allow list, one refused fixture per construct, the clock probe
+and the address-arithmetic probe are recorded from CI. No tool definition,
+harness code or fingerprint changed. It stops names, not address arithmetic:
+the recorded probe, starting from `hal->read32`, read the harness's cycle
+count, its pass counter and the run's nonce. The register block case takes the
+screen in a following pull request.
+
 **The timer document fixed, and the check record rule (follow-up).** An
 independent check found that `evals/flow/axil_timer/requirements.md` claimed
 tags its checks do not reach and left rules open (readiness one way only, the
