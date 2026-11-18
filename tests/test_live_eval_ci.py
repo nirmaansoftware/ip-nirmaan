@@ -383,20 +383,22 @@ def test_the_probe_compiles_as_fw_test_compiles_a_driver_test(tmp_path):
     assert proc.returncode == 0, proc.stderr
 
 
-def _log(denied=(), missing=(), done=True):
+def _log(denied=(), missing=(), done=True, control="ok"):
     lines = []
     for name in fw.PROBES:
         if name in missing:
             continue
         lines.append(f"FW-REACH {'denied' if name in denied else 'NOT DENIED'}: {name}: what: detail")
-    lines.append("FW-REACH control ok: fw_reach_own_directory: wrote /tmp/x")
+    if control:
+        lines.append(f"FW-REACH control {control}: fw_reach_own_directory: wrote /tmp/x")
     return "\n".join(["noise", *lines, *(["FW-REACH done"] if done else [])])
 
 
 def test_a_probe_is_denied_only_when_every_line_of_it_is_and_a_missing_probe_never_is():
     every = fw.parse(_log(denied=fw.PROBES))
     assert every["every_probe_denied"] and not every["missing"] and every["done"]
-    assert every["control"] == ["ok: wrote /tmp/x"]
+    assert every["control"] == ["ok: wrote /tmp/x"] and every["control_ok"]
+    assert not fw.parse(_log(control="FAILED"))["control_ok"] and not fw.parse(_log(control=None))["control_ok"]
     mixed = fw.parse(_log(denied=fw.PROBES) + "\nFW-REACH NOT DENIED: fw_reach_no_write: /repo: created")
     assert not mixed["every_probe_denied"] and not mixed["probes"]["fw_reach_no_write"]["denied"]
     assert mixed["probes"]["fw_reach_identity"]["denied"]
@@ -407,7 +409,10 @@ def test_a_probe_is_denied_only_when_every_line_of_it_is_and_a_missing_probe_nev
 
 @pytest.mark.parametrize("found,require,code", [(dict(denied=fw.PROBES), True, 0), (dict(), False, 0),
                                                 (dict(), True, 1), (dict(missing=("fw_reach_no_sudo",)), False, 1),
-                                                (dict(denied=fw.PROBES, done=False), False, 1)])
+                                                (dict(denied=fw.PROBES, done=False), False, 1),
+                                                (dict(denied=fw.PROBES, control="FAILED"), True, 1),
+                                                (dict(denied=fw.PROBES, control=None), True, 1),
+                                                (dict(control="FAILED"), False, 1)])
 def test_the_record_mode_records_and_the_gate_mode_needs_every_probe_denied(tmp_path, monkeypatch, capsys, found,
                                                                           require, code):
     out = tmp_path / "fw-reach.json"
@@ -424,5 +429,23 @@ def test_the_record_mode_records_and_the_gate_mode_needs_every_probe_denied(tmp_
     record = json.loads(out.read_text())
     assert record["head"] == "abc" and record["run"]["id"] == "7" and record["run"]["job"] == "replay"
     printed = capsys.readouterr().out
-    assert ("NOT confined" in printed) == (not found.get("denied") and not found.get("missing"))
+    control_ok = found.get("control", "ok") == "ok"
+    assert ("NOT confined" in printed) == (not found.get("denied") and not found.get("missing") and control_ok)
     assert CONFIG["canaries"][0] not in printed
+
+
+def test_a_target_it_cannot_name_or_find_fails_the_test_and_a_crash_never_reads_as_denied(tmp_path, monkeypatch,
+                                                                                        capsys):
+    assert str(tmp_path) in fw.targets(tmp_path)
+    for over in ({"package_file": ""}, {"purelib": ""}):
+        with pytest.raises(fw.Unresolved):
+            fw.targets(tmp_path, **over)
+    with pytest.raises(SystemExit, match="do not exist"):
+        fw.targets(tmp_path / "missing")
+    # The probe process crashed (or never wrote): exit 1, whatever an older file said.
+    out = tmp_path / "fw-reach.json"
+    out.write_text(json.dumps({"every_probe_denied": True}))
+    monkeypatch.setattr(fw.subprocess, "run", lambda argv, env: subprocess.CompletedProcess(argv, 1))
+    for require in (False, True):
+        assert fw.run(tmp_path, out, require, {}) == 1
+        assert not out.exists() and "nothing is recorded as denied" in capsys.readouterr().out

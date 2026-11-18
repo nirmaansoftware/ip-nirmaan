@@ -20,7 +20,7 @@ holds the plan token, and a runner-only file. Its tests try to:
 - read the runner-only file (``fw_reach_no_secret_file``);
 - signal the harness (``fw_reach_no_signal``);
 
-and, as the control, write its own run directory. A probe is denied only on EACCES, EPERM or EROFS (for sudo: a
+and, as the control, write its own run directory (the test fails unless it can). A probe is denied only on EACCES, EPERM or EROFS (for sudo: a
 refusal, not a missing program); anything else is "NOT DENIED", so a probe that proves nothing never reads as
 denied.
 
@@ -308,12 +308,31 @@ def c_string(value: str) -> str:
     return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
-def targets(records: Path) -> list[str]:
-    """Folders seat C must not create a file in; each must exist, so a refusal proves something."""
-    import nirmaan
+class Unresolved(SystemExit):
+    """A target the test cannot name: it fails, since a probe of nothing would read as denied."""
 
-    package = Path(nirmaan.__file__).resolve().parent
-    purelib = Path(sysconfig.get_paths()["purelib"])
+    def __init__(self, what: str) -> None:
+        super().__init__(f"fw reach test: cannot determine {what}, so no probe of it can show it denied; no probe ran")
+
+
+def _need(value, what: str):
+    """``value``, or fail the test: a target never falls back to nothing."""
+    if value is None or value == "":
+        raise Unresolved(what)
+    return value
+
+
+def targets(records: Path, package_file: str | None = None, purelib: str | None = None) -> list[str]:
+    """Folders seat C must not create a file in; each must be named and exist, so a refusal proves something.
+
+    Fails closed: the package's file or ``site-packages`` that cannot be determined, or a folder that does not
+    exist, stops the test (no probe runs, the job fails); it never shrinks the list."""
+    if package_file is None:
+        import nirmaan
+
+        package_file = nirmaan.__file__
+    package = Path(_need(package_file, "the nirmaan package's file")).resolve().parent
+    purelib = Path(_need(purelib if purelib is not None else sysconfig.get_paths().get("purelib"), "site-packages"))
     folders = [ROOT, ROOT / "src" / "nirmaan", ROOT / "scripts", ROOT / "evals", package, purelib, records]
     missing = [str(p) for p in folders if not p.is_dir()]
     if missing:
@@ -351,6 +370,7 @@ def parse(log: str) -> dict:
     probes = {p: {"denied": verdicts.get(p, False), "lines": lines.get(p, [])} for p in PROBES}
     missing = [p for p in PROBES if p not in lines]
     return {"probes": probes, "missing": missing, "control": control,
+            "control_ok": bool(control) and all(c.startswith("ok:") for c in control),
             "done": any(raw.strip() == "FW-REACH done" for raw in log.splitlines()),
             "every_probe_denied": not missing and all(v["denied"] for v in probes.values())}
 
@@ -406,6 +426,7 @@ def run(records: Path, out: Path, require_denied: bool, env: Mapping[str, str]) 
     if not records.is_dir():
         print(f"::error::fw reach test: the records folder {records} does not exist; no probe ran", flush=True)
         return 1
+    out.unlink(missing_ok=True)  # only what this run's probe writes is read
     child = {**env, CANARY_SECRET: secrets.token_hex(16), CANARY_PLAIN: secrets.token_hex(16), INNER: "1"}
     code = subprocess.run([sys.executable, str(Path(__file__).resolve()), "--records", str(records), "--out",
                            str(out)], env=child).returncode
@@ -422,6 +443,10 @@ def run(records: Path, out: Path, require_denied: bool, env: Mapping[str, str]) 
             print(f"FW-REACH {name}: {line}", flush=True)
     for line in result["control"]:
         print(f"FW-REACH {CONTROL} (control): {line}", flush=True)
+    if not result["control_ok"]:
+        print("::error::fw reach test: the control could not write its own run directory, so no refusal proves "
+              "anything; nothing is recorded as denied", flush=True)
+        return 1
     if not result["done"] or result["missing"]:
         print(f"::error::fw reach test: the probe did not finish (missing {', '.join(result['missing']) or 'none'}; "
               f"{result['summary']}); nothing is recorded as denied", flush=True)
