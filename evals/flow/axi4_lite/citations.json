@@ -69,6 +69,7 @@
     ]
   },
   "not_judged": {
+    "AXIL-PORTS-ONLY": "The reference testbench (evals/flow/axi4_lite/axi4_lite_regs_tb.v) connects the ports by name (lines 58 to 65), and Icarus Verilog builds an instance that leaves a port of the block unconnected, so a block with an extra port of any name, such as an output dbg, passes it: a simulation sees no port it does not connect, and a port's name is text no check reads. The named ports themselves are judged (AXIL-PORTS): a block that renames or lacks one fails to build.",
     "AXIL-NO-PROT": "The reference testbench (evals/flow/axi4_lite/axi4_lite_regs_tb.v) connects the ports by name (lines 58 to 65), and Icarus Verilog builds an instance that leaves a port of the block unconnected, so a block with a protection input such as s_axil_awprot passes it.",
     "AXIL-PARAMS-DEFAULT": "The reference testbench (evals/flow/axi4_lite/axi4_lite_regs_tb.v) sets both parameters, ADDR_WIDTH to 4 and DATA_WIDTH to 32 (line 58), so the defaults are never used; a block whose ADDR_WIDTH defaults to 5 or whose DATA_WIDTH defaults to 64 passes it. Setting a parameter the block does not have fails to build, so the parameters themselves are judged (AXIL-PARAMS).",
     "AXIL-SYNTH": "Synthesis is the RTL stage's own before-review check, not a held-out check.",

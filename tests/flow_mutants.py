@@ -17,7 +17,8 @@ TIMER_TAGS = {"MODULE": "TMR-MODULE", "ADDRW": "TMR-ADDR-WIDTH", "PORTS": "TMR-P
               "LOAD0": "TMR-LOAD-ZERO", "COUNT": "TMR-COUNT", "LENGTH": "TMR-COUNT-LENGTH", "ONESHOT": "TMR-ONESHOT",
               "PERIODIC": "TMR-PERIODIC", "STOP": "TMR-STOP", "STOPEDGE": "TMR-STOP-EDGE",
               "ENDCLEAR": "TMR-END-BEATS-CLEAR", "IRQ": "TMR-IRQ", "ORDER": "TMR-ORDER", "RESP": "TMR-RESPONSE",
-              "RESPEDGE": "TMR-RESPONSE-EDGE", "DECODE": "TMR-DECODE", "SLVERR": "TMR-SLVERR", "RESET": "TMR-RESET"}
+              "RESPEDGE": "TMR-RESPONSE-EDGE", "DECODE": "TMR-DECODE", "SLVERR": "TMR-SLVERR", "RESET": "TMR-RESET",
+              "LOAD0P": "TMR-LOAD-ZERO-PERIODIC", "READY": "TMR-READY", "IRQEDGE": "TMR-IRQ-EDGE"}
 REGS_TAGS = {"MAP": "AXIL-MAP", "PORTS": "AXIL-PORTS", "PARAMS": "AXIL-PARAMS", "ORDER": "AXIL-ORDER",
              "WSTRB": "AXIL-WSTRB", "SLVERR": "AXIL-SLVERR", "LATENCY": "AXIL-LATENCY", "B2B": "AXIL-B2B",
              "RESET": "AXIL-RESET"}
@@ -198,6 +199,70 @@ def timer_mutants(s: str) -> dict[str, str]:
     sub('STOPEDGE_nodec', ("            if (en) begin\n                if (count_end) begin", "            if (en && !(ctrl_write && !wr_data[0])) begin\n                if (count_end) begin"))
     sub('STOPEDGE_idle_dec', ("                    end else begin\n                        en <= 1'b0;\n                    end", "                    end else begin\n                        en <= 1'b0;\n                        if (!en && count != 0) count <= count - 32'd1;\n                    end"))
     sub('STOPEDGE_reload', ("                    end else begin\n                        en <= 1'b0;\n                    end", "                    end else begin\n                        en <= 1'b0;\n                        count <= load;\n                    end"))
+
+    # Fourth round (decision #37): the third checker's passing mutants, then one per new matrix dimension.
+    held = "aw_addr_q <= s_axil_awaddr;"
+    bresp = "                s_axil_bresp <= wr_ok ? RESP_OKAY : RESP_SLVERR;"
+    reload = "                    if (mode) begin\n                        count <= load;"
+    start = "                        en <= 1'b1;\n                        count <= load;"
+    ctrl = "wire                  ctrl_write = do_write && wr_ok && wr_addr[3:2] == CTRL && wr_strb[0];"
+    # TMR-ORDER: an AW-first write's held address loses addr[1:0], or every bit from bit 4 up.
+    sub('ORDER_held_addr_align', (held, "aw_addr_q <= {s_axil_awaddr[ADDR_WIDTH-1:2], 2'b00};"))
+    sub('ORDER_held_addr_low4', (held, "aw_addr_q <= s_axil_awaddr & {{(ADDR_WIDTH-4){1'b0}}, 4'hF};"))
+    # TMR-SLVERR: an unmapped or COUNT write answers OKAY with no strobe, with a partial strobe, or with data 0.
+    sub('SLVERR_strb0_okay', (bresp, "                s_axil_bresp <= (wr_ok || wr_strb == 4'd0) ? RESP_OKAY : RESP_SLVERR;"))
+    sub('SLVERR_strb_partial_okay', (bresp, "                s_axil_bresp <= (wr_ok || wr_strb != 4'hF) ? RESP_OKAY : RESP_SLVERR;"))
+    sub('SLVERR_data0_okay', (bresp, "                s_axil_bresp <= (wr_ok || wr_data == 32'd0) ? RESP_OKAY : RESP_SLVERR;"))
+    # TMR-COUNT: a LOAD write while the count runs reloads COUNT.
+    sub('COUNT_load_write_reloads', ("                if (wr_ok && wr_addr[3:2] == LOAD)\n                    load <= merge(load, wr_data, wr_strb);",
+        "                if (wr_ok && wr_addr[3:2] == LOAD) begin\n                    load <= merge(load, wr_data, wr_strb);\n                    if (en) count <= merge(load, wr_data, wr_strb);\n                end"))
+    # TMR-PERIODIC: the reload keeps 16 bits; LOAD 1 counts 2, LOAD 2 counts 3; LOAD below 7 one cycle long.
+    sub('PERIODIC_reload16', (reload, "                    if (mode) begin\n                        count <= load[15:0];"))
+    sub('PERIODIC_load1_as2', (reload, "                    if (mode) begin\n                        count <= (load == 32'd1) ? 32'd2 : load;"))
+    sub('PERIODIC_load2_as3', (reload, "                    if (mode) begin\n                        count <= (load == 32'd2) ? 32'd3 : load;"))
+    sub('PERIODIC_small_plus1', (reload, "                    if (mode) begin\n                        count <= (load < 32'd7) ? load + 32'd1 : load;"))
+    # TMR-START: a restart of a running periodic count is ignored.
+    sub('START_periodic_restart_ignored', (start, "                        en <= 1'b1;\n                        if (!(en && mode)) count <= load;"))
+    # TMR-STOP-EDGE: a stop that writes MODE 1 does not count down on the stop edge.
+    sub('STOPEDGE_periodic_nodec', ("                    count <= count - 32'd1;\n                end\n            end",
+        "                    count <= (ctrl_write && !wr_data[0] && wr_data[2]) ? count : count - 32'd1;\n                end\n            end"))
+    # TMR-CTRL-STRB: a CTRL write without wstrb[0] is taken when its EN is 0, or when the count runs and its EN is 1.
+    sub('CTRLSTRB_nostrb_stop', (ctrl, "wire                  ctrl_write = do_write && wr_ok && wr_addr[3:2] == CTRL && (wr_strb[0] || !wr_data[0]);"))
+    sub('CTRLSTRB_nostrb_running', (ctrl, "wire                  ctrl_write = do_write && wr_ok && wr_addr[3:2] == CTRL && (wr_strb[0] || (en && wr_data[0]));"))
+    # TMR-LOAD: a W-first LOAD write with wstrb 0110 writes byte 1 only.
+    sub('LOAD_wfirst_strb0110', ("                    load <= merge(load, wr_data, wr_strb);",
+        "                    load <= merge(load, wr_data, (w_held && wr_strb == 4'b0110) ? 4'b0010 : wr_strb);"))
+    # TMR-STATUS-CLEAR: an AW-first clear with wstrb[1] set too is ignored.
+    sub('STATUS_awfirst_strb1_ignored', ("wr_addr[3:2] == STATUS && wr_strb[0] && wr_data[0];", "wr_addr[3:2] == STATUS && wr_strb[0] && wr_data[0] && !(aw_held && wr_strb[1]);"))
+    # TMR-ADDR-WIDTH: at AW 8, a W-first write decodes only the low four address bits.
+    sub('ADDRW_wfirst_high_alias', ("wire                  wr_ok = is_mapped(wr_addr) &&", "wire                  wr_ok = is_mapped(w_held ? wr_addr & 4'hF : wr_addr) &&"))
+    # TMR-SLVERR: a W-first unaligned write to LOAD's word with wstrb 1100 writes LOAD (and answers SLVERR).
+    sub('SLVERR_wfirst_unm_writes', ("                if (wr_ok && wr_addr[3:2] == LOAD)",
+        "                if ((wr_ok || (w_held && wr_strb == 4'b1100 && (wr_addr >> 4) == 0)) && wr_addr[3:2] == LOAD)"))
+    # TMR-RESPONSE: RRESP of a read from 0x10 up turns OKAY while RVALID waits.
+    sub('RESP_rresp_flip_high', ("    reg [31:0] load, count;", "    reg [31:0] load, count; reg ar_high;"),
+        ("            if (s_axil_rvalid && s_axil_rready)\n                s_axil_rvalid <= 1'b0;\n            if (ar_hs) begin\n                s_axil_rvalid <= 1'b1;",
+         "            if (s_axil_rvalid && !s_axil_rready && ar_high) s_axil_rresp <= RESP_OKAY;\n            if (s_axil_rvalid && s_axil_rready)\n                s_axil_rvalid <= 1'b0;\n            if (ar_hs) begin\n                s_axil_rvalid <= 1'b1; ar_high <= (s_axil_araddr >> 4) != 0;"))
+    # TMR-READY: AWREADY and WREADY low for a cycle after an SLVERR write response is taken; ARREADY likewise
+    # after an SLVERR read response; ARREADY low while a write response waits.
+    sub('READY_w_gap_after_slverr', ("    assign s_axil_awready = !aw_held && !s_axil_bvalid;",
+        "    reg gap; always @(posedge aclk) gap <= aresetn && s_axil_bvalid && s_axil_bready && s_axil_bresp == RESP_SLVERR;\n    assign s_axil_awready = !aw_held && !s_axil_bvalid && !gap;"),
+        ("    assign s_axil_wready = !w_held && !s_axil_bvalid;", "    assign s_axil_wready = !w_held && !s_axil_bvalid && !gap;"))
+    sub('READY_ar_gap_after_slverr', ("    assign s_axil_arready = !s_axil_rvalid;",
+        "    reg rgap; always @(posedge aclk) rgap <= aresetn && s_axil_rvalid && s_axil_rready && s_axil_rresp == RESP_SLVERR;\n    assign s_axil_arready = !s_axil_rvalid && !rgap;"))
+    sub('READY_ar_low_while_bvalid', ("    assign s_axil_arready = !s_axil_rvalid;", "    assign s_axil_arready = !s_axil_rvalid && !s_axil_bvalid;"))
+    # TMR-RESPONSE-EDGE: BVALID one edge late when a read response waits as the write completes.
+    sub('RESPEDGE_b_late_under_read', ("    reg [31:0] load, count;", "    reg [31:0] load, count; reg bp; reg [1:0] bpr;"),
+        ("                s_axil_bvalid <= 1'b1;\n                s_axil_bresp <= wr_ok ? RESP_OKAY : RESP_SLVERR;",
+         "                if (s_axil_rvalid) begin bp <= 1'b1; bpr <= wr_ok ? RESP_OKAY : RESP_SLVERR; end\n                else begin s_axil_bvalid <= 1'b1; s_axil_bresp <= wr_ok ? RESP_OKAY : RESP_SLVERR; end"),
+        ("            if (s_axil_bvalid && s_axil_bready)\n                s_axil_bvalid <= 1'b0;", "            if (s_axil_bvalid && s_axil_bready)\n                s_axil_bvalid <= 1'b0;\n            if (bp) begin bp <= 1'b0; s_axil_bvalid <= 1'b1; s_axil_bresp <= bpr; end"),
+        ("            s_axil_bvalid <= 1'b0;\n            s_axil_bresp <= RESP_OKAY;", "            s_axil_bvalid <= 1'b0; bp <= 1'b0;\n            s_axil_bresp <= RESP_OKAY;"),
+        ("    assign s_axil_awready = !aw_held && !s_axil_bvalid;", "    assign s_axil_awready = !aw_held && !s_axil_bvalid && !bp;"),
+        ("    assign s_axil_wready = !w_held && !s_axil_bvalid;", "    assign s_axil_wready = !w_held && !s_axil_bvalid && !bp;"))
+    # TMR-LOAD-ZERO-PERIODIC: a periodic reload of LOAD 0 counts 2.
+    sub('LOAD0P_reload2', (reload, "                    if (mode) begin\n                        count <= (load == 32'd0) ? 32'd2 : load;"))
+    # TMR-IRQ-EDGE: irq follows a written IE one edge late.
+    sub('IRQEDGE_ie_late', ("    assign irq = expired && ie;", "    reg ie_q; always @(posedge aclk) ie_q <= aresetn && ie;\n    assign irq = expired && ie_q;"))
     return out
 
 
@@ -260,6 +325,43 @@ def regs_mutants(s: str) -> dict[str, str]:
     sub('RESET_keeps_reg3', ("            reg3 <= {DATA_WIDTH{1'b0}};", ""))
     sub('RESET_keeps_aw', ("        if (!aresetn) begin\n            aw_held <= 1'b0;", "        if (!aresetn) begin"))
     sub('RESET_keeps_w', ("            aw_held <= 1'b0;\n            w_held <= 1'b0;\n            s_axil_bvalid <= 1'b0;", "            aw_held <= 1'b0;\n            s_axil_bvalid <= 1'b0;"))
+
+    # Fourth round (decision #37): the third checker's passing mutants, then one per new matrix dimension.
+    bresp = "                s_axil_bresp <= wr_ok ? RESP_OKAY : RESP_SLVERR;"
+    # AXIL-ORDER: an AW-first write's held address loses addr[1:0]; the strobes are taken from the bus at completion.
+    sub('ORDER_held_addr_align', ("aw_addr_q <= s_axil_awaddr;", "aw_addr_q <= {s_axil_awaddr[ADDR_WIDTH-1:2], 2'b00};"))
+    sub('ORDER_wstrb_not_held', ("wire [STRB_WIDTH-1:0] wr_strb = w_held ? w_strb_q : s_axil_wstrb;", "wire [STRB_WIDTH-1:0] wr_strb = s_axil_wstrb;"))
+    # AXIL-SLVERR: an unmapped write answers OKAY with no strobe, or with a partial strobe.
+    sub('SLVERR_strb0_okay', (bresp, "                s_axil_bresp <= (wr_ok || wr_strb == 0) ? RESP_OKAY : RESP_SLVERR;"))
+    sub('SLVERR_strb_partial_okay', (bresp, "                s_axil_bresp <= (wr_ok || wr_strb != {STRB_WIDTH{1'b1}}) ? RESP_OKAY : RESP_SLVERR;"))
+    # AXIL-B2B: the channel takes no request in the cycle after an SLVERR response is taken (write; read).
+    sub('B2B_after_slverr_w', ("    assign s_axil_awready = !aw_held && !s_axil_bvalid;",
+        "    reg errq = 0; always @(posedge aclk) errq <= s_axil_bvalid && s_axil_bready && s_axil_bresp == RESP_SLVERR;\n    assign s_axil_awready = !aw_held && !s_axil_bvalid && !errq;"),
+        ("    assign s_axil_wready = !w_held && !s_axil_bvalid;", "    assign s_axil_wready = !w_held && !s_axil_bvalid && !errq;"))
+    sub('B2B_after_slverr_r', ("    assign s_axil_arready = !s_axil_rvalid;",
+        "    reg errr = 0; always @(posedge aclk) errr <= s_axil_rvalid && s_axil_rready && s_axil_rresp == RESP_SLVERR;\n    assign s_axil_arready = !s_axil_rvalid && !errr;"))
+    # AXIL-LATENCY: a write response 3 cycles after its request when a read response waits; a read response 3
+    # cycles after its request when a write response waits.
+    sub('LATENCY_b_read_pending', ("    reg                  aw_held;", "    reg                  aw_held; reg [1:0] bp = 0;"),
+        ("    assign s_axil_awready = !aw_held && !s_axil_bvalid;", "    assign s_axil_awready = !aw_held && !s_axil_bvalid && bp == 0;"),
+        ("    assign s_axil_wready = !w_held && !s_axil_bvalid;", "    assign s_axil_wready = !w_held && !s_axil_bvalid && bp == 0;"),
+        ("            if (s_axil_bvalid && s_axil_bready)\n                s_axil_bvalid <= 1'b0;\n            if (do_write) begin",
+         "            if (s_axil_bvalid && s_axil_bready)\n                s_axil_bvalid <= 1'b0;\n            if (bp == 2) bp <= 1; else if (bp == 1) begin bp <= 0; s_axil_bvalid <= 1'b1; end\n            if (do_write) begin"),
+        ("                s_axil_bvalid <= 1'b1;\n                s_axil_bresp", "                if (s_axil_rvalid) bp <= 2; else s_axil_bvalid <= 1'b1;\n                s_axil_bresp"))
+    sub('LATENCY_r_write_pending', ("    reg                  aw_held;", "    reg                  aw_held; reg rd, rp;"),
+        ("    assign s_axil_arready = !s_axil_rvalid;", "    assign s_axil_arready = !s_axil_rvalid && !rp;"),
+        ("        if (!aresetn) begin\n            s_axil_rvalid <= 1'b0;", "        if (!aresetn) begin\n            s_axil_rvalid <= 1'b0; rp <= 1'b0;"),
+        ("            if (ar_hs) begin\n                s_axil_rvalid <= 1'b1;",
+         "            if (rp) begin if (!rd) begin rp <= 1'b0; s_axil_rvalid <= 1'b1; end else rd <= 1'b0; end\n            if (ar_hs) begin\n                if (s_axil_bvalid) begin rp <= 1'b1; rd <= 1'b1; end else s_axil_rvalid <= 1'b1;"))
+    # AXIL-WSTRB: a W-first write to REG1 with wstrb 0110 writes byte 1 only.
+    sub('WSTRB_wfirst_strb0110', ("                        2'd1: reg1 <= merge(reg1, wr_data, wr_strb);",
+        "                        2'd1: reg1 <= merge(reg1, wr_data, (w_held && wr_strb == 4'b0110) ? 4'b0010 : wr_strb);"))
+    # AXIL-SLVERR: a W-first unmapped write with wstrb 1100 writes the register it would alias (and answers SLVERR);
+    # an unmapped read at 0xD returns REG3 once RREADY waits.
+    sub('SLVERR_wfirst_unm_writes', ("                if (wr_ok) begin", "                if (wr_ok || (w_held && wr_strb == 4'b1100)) begin"))
+    sub('SLVERR_rd_wait_data', ("    reg                  aw_held;", "    reg                  aw_held; reg ar_d;"),
+        ("            if (s_axil_rvalid && s_axil_rready)\n                s_axil_rvalid <= 1'b0;\n            if (ar_hs) begin\n                s_axil_rvalid <= 1'b1;",
+         "            if (s_axil_rvalid && !s_axil_rready && ar_d) s_axil_rdata <= reg3;\n            if (s_axil_rvalid && s_axil_rready)\n                s_axil_rvalid <= 1'b0;\n            if (ar_hs) begin\n                s_axil_rvalid <= 1'b1; ar_d <= s_axil_araddr == 4'hD;"))
     return out
 
 
