@@ -22,7 +22,10 @@ its own, and refuses the check when any of these holds:
 * ``asm``: a line of the preprocessed source that comes from one of the seat's own files holds ``asm``,
   ``__asm`` or ``__asm__`` (by the preprocessor's line markers, so a macro that expands to asm in the seat's
   line is caught and the C library's own headers are not);
-* ``build``: the screen could not build or read the objects. It never lets through C it could not inspect.
+* ``build``: the screen could not build or read the objects. It never lets through C it could not inspect;
+* ``reach``: before this screen compiles anything, the compile screen (``nirmaan.integrations.compile_screen``,
+  M91, gate SC1) refuses what the C may pull in: a directive or include it refuses, a file outside the run's
+  folders, or an assembler directive that reads a file. Then nothing is compiled, and that is the only hit.
 
 A hit is the check's verdict, decided in advance: the check fails with the reasons, and nothing is linked or run.
 It is never a removed or repeated trial.
@@ -42,7 +45,7 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
-from nirmaan.integrations import firmware
+from nirmaan.integrations import compile_screen, firmware
 from nirmaan.integrations.eda import run_environment
 
 #: The first words of every refusal's summary: a verdict of the screen, distinct from a failed test.
@@ -196,8 +199,14 @@ def screen(sources: list[Path], seat: set[Path], work: Path, include: tuple[str,
     work.mkdir(parents=True, exist_ok=True)
     sources = [Path(p).resolve() for p in sources]  # the steps run in ``work``
     include = tuple(str(Path(d).resolve()) for d in include)
-    steps, objects = firmware._compile("cc", (), tuple(str(p) for p in sources), firmware.HARNESS, work / "obj",
-                                       headers=False, include=include)
+    names = tuple(str(p) for p in sources)
+    flags = firmware.compile_flags("cc", (), names, firmware.HARNESS, include)
+    reach = compile_screen.screen(flags, names, names, (firmware.HARNESS, *map(Path, include)), work,
+                                  statements=False)  # M91: before this screen compiles; asm is its own rule below
+    if reach:
+        return [Hit("reach", "-", reach)]
+    steps, objects = firmware._compile("cc", (), names, firmware.HARNESS, work / "obj", headers=False,
+                                       include=include)
     c_files = [Path(p) for p in firmware._split(tuple(str(p) for p in sources))[0]]
     seat_paths = {p.resolve() for p in seat}
     hits: list[Hit] = []
