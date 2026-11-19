@@ -1726,6 +1726,34 @@
       "reason": "run without knowledge documents (knowledge: off in the run manifest and the trial): never counts toward a level",
       "record": "evals/results/2026-11-19-claude-code-claude-opus-5-5-without-knowledge-2",
       "trial": 1
+    },
+    {
+      "case": "rtl/axi4-lite-regs",
+      "passed": true,
+      "reason": "run without knowledge documents (knowledge: off in the run manifest and the trial): never counts toward a level",
+      "record": "evals/results/2026-11-19-claude-code-claude-opus-5-5-without-knowledge-5",
+      "trial": 1
+    },
+    {
+      "case": "dv/scoreboard-mac",
+      "passed": true,
+      "reason": "run without knowledge documents (knowledge: off in the run manifest and the trial): never counts toward a level",
+      "record": "evals/results/2026-11-19-claude-code-claude-opus-5-5-without-knowledge-6",
+      "trial": 1
+    },
+    {
+      "case": "dv/coverage-irq-ctrl",
+      "passed": true,
+      "reason": "run without knowledge documents (knowledge: off in the run manifest and the trial): never counts toward a level",
+      "record": "evals/results/2026-11-19-claude-code-claude-opus-5-5-without-knowledge-8",
+      "trial": 1
+    },
+    {
+      "case": "rtl/axil-timer",
+      "passed": true,
+      "reason": "run without knowledge documents (knowledge: off in the run manifest and the trial): never counts toward a level",
+      "record": "evals/results/2026-11-19-claude-code-claude-opus-5-5-without-knowledge-9",
+      "trial": 1
     }
   ]
 }
