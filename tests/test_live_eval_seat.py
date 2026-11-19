@@ -344,3 +344,171 @@ def test_seat_c_as_the_seat_account_changes_no_fingerprint():
     fw_specs = {spec.id: spec.model_dump(mode="json") for spec in TOOLS if spec.id in ("fw.build", "fw.test")}
     assert set(fw_specs) == {"fw.build", "fw.test"}
     assert not any(firmware.SEAT_EXEC in json.dumps(spec) for spec in fw_specs.values())  # no seat text reaches a seat
+
+
+# --- READ probes and the network (what the account may not read or reach) -------------------------------------
+
+
+def test_the_account_gets_no_read_access_to_the_named_folders_and_no_network(tmp_path, monkeypatch):
+    calls = []
+
+    def fake_run(argv, **kwargs):
+        calls.append(argv)
+        return SimpleNamespace(returncode=1 if argv[1] == "-C" and len([c for c in calls if c[0] == argv[0]]) == 1
+                               else 0)
+
+    monkeypatch.setattr(seat.subprocess, "run", fake_run)
+    monkeypatch.setattr(seat.shutil, "which", lambda name: f"/usr/sbin/{name}")
+    seat.deny(999, [str(tmp_path)])
+    assert calls[0] == ["setfacl", "-m", "u:nirmaan-seat:---", "--", str(tmp_path)]
+    owner = ["-m", "owner", "--uid-owner", "999"]
+    for tool, answer in (("iptables", "icmp-host-prohibited"), ("ip6tables", "icmp6-adm-prohibited")):
+        tcp = ["OUTPUT", "-p", "tcp", *owner, "-j", "REJECT", "--reject-with", answer]
+        drop = ["OUTPUT", *owner, "-j", "DROP"]
+        # each checked, inserted first in the chain in order where missing, then both checked again
+        assert [c for c in calls if c[0] == tool] == [[tool, "-C", *tcp], [tool, "-I", "OUTPUT", "1", *tcp[1:]],
+                                                     [tool, "-C", *drop], [tool, "-C", *tcp], [tool, "-C", *drop]]
+    (tmp_path / "file").write_text("x")
+    (tmp_path / "link").symlink_to(tmp_path)
+    for path in (tmp_path / "file", tmp_path / "link", tmp_path / "none"):
+        with pytest.raises(seat.Refused, match="is not a folder"):
+            seat.deny(999, [str(path)])
+    monkeypatch.setattr(seat.shutil, "which", lambda name: None)
+    with pytest.raises(seat.Refused, match="iptables is not installed"):
+        seat.deny(999, [])
+
+
+def test_the_action_takes_read_access_to_home_checkout_and_temporary_folder(monkeypatch):
+    text = (REPO / ".github" / "actions" / "live-eval-seat" / "action.yml").read_text(encoding="utf-8")
+    assert '--deny-read "$HOME" --deny-read "$GITHUB_WORKSPACE" --deny-read "$RUNNER_TEMP"' in text
+    calls = []
+    monkeypatch.setattr(seat, "install", lambda source, trees, folders, unreadable: calls.append(unreadable))
+    monkeypatch.setattr(seat.os, "geteuid", lambda: 0)
+    assert seat.main(["install", "--deny-read", "/home/runner", "--deny-read", "/x"]) == 0
+    assert calls == [["/home/runner", "/x"]]
+
+
+def test_the_held_out_files_are_every_reference_held_out_file_and_mutant():
+    files = reach.held_out_files()
+    for path in ("tests/fixtures/fw/axi4_lite/axi4_lite_regs_drv.c", "evals/firmware/axi4_lite/held_out_test.c",
+                 "tests/fixtures/dv/crc8/crc8_block_cocotb.py",
+                 "tests/fixtures/dv/crc8/mutants/crc8_block_poly_tap.v", "tests/fixtures/rtl/axi4_lite/axi4_lite_regs.v"):
+        assert str(REPO / path) in files
+    assert all(Path(f).is_file() for f in files) and len(files) == len(set(files))
+
+
+def test_a_held_out_file_that_does_not_exist_stops_the_reach_test(tmp_path):
+    case = json.loads((REPO / "evals" / "dv" / "cocotb_crc.json").read_text(encoding="utf-8"))
+    case["held_out"][0]["mutants"]["tests/fixtures/dv/crc8/crc8_block.v"].append("tests/fixtures/dv/crc8/none.v")
+    (tmp_path / "case.json").write_text(json.dumps(case), encoding="utf-8")
+    with pytest.raises(SystemExit, match="held-out files do not exist"):
+        reach.held_out_files(tmp_path)
+
+
+def test_the_read_canaries_are_readable_by_mode_and_removed(tmp_path, monkeypatch):
+    monkeypatch.setattr(reach, "held_out_files", lambda: ["/repo/held_out_test.c"])
+    monkeypatch.setattr(reach, "ROOT", tmp_path / "repo")
+    (tmp_path / "repo" / ".git").mkdir(parents=True)
+    (tmp_path / "home").mkdir()
+    (tmp_path / "temp").mkdir()
+    env = {"GITHUB_ACTIONS": "true", "HOME": str(tmp_path / "home"), "RUNNER_TEMP": str(tmp_path / "temp")}
+    files, dirs, canaries = reach.read_targets(env, "c4nary", "n0nce")
+    assert canaries == [tmp_path / "repo" / ".nirmaan-read-canary-n0nce", tmp_path / "temp" / ".nirmaan-read-canary-n0nce"]
+    for canary in canaries:  # only the account's own denial keeps it out
+        assert canary.read_text() == "c4nary\n" and canary.stat().st_mode & 0o777 == 0o644
+    assert files == ["/repo/held_out_test.c", *(str(c) for c in canaries)]
+    assert dirs == [str(tmp_path / "repo"), str(tmp_path / "repo" / ".git"), str(tmp_path / "home"),
+                    str(tmp_path / "temp")]
+    reach.remove_canaries(canaries)
+    assert not any(c.exists() for c in canaries)
+    for name in ("HOME", "RUNNER_TEMP"):  # in Actions both are required, never skipped
+        with pytest.raises(reach.Unresolved, match=f"cannot determine {name}"):
+            reach.read_targets({k: v for k, v in env.items() if k != name}, "c4nary", "n0nce")
+
+
+def _probes(config: dict, monkeypatch) -> dict:
+    """The probe module's tests as plain coroutines, with cocotb's decorator standing in."""
+    monkeypatch.setitem(__import__("sys").modules, "cocotb", SimpleNamespace(test=lambda: (lambda f: f)))
+    namespace: dict = {}
+    exec(compile(reach.probe_module(config), "reach_probe_test.py", "exec"), namespace)  # noqa: S102
+    return namespace
+
+
+def _drive(coroutine) -> None:
+    """Run a probe test that awaits nothing to its end (cocotb's scheduler is not needed for these)."""
+    try:
+        coroutine.send(None)
+    except StopIteration:
+        return
+    raise AssertionError("the probe test awaited something")
+
+
+def test_a_file_the_seat_can_read_is_never_counted_denied(tmp_path, monkeypatch, capsys):
+    readable = tmp_path / "held_out.c"
+    readable.write_text("secret")
+    config = {"read_files": [str(readable)], "list_dirs": [], "network": []}
+    with pytest.raises(AssertionError):
+        _drive(_probes(config, monkeypatch)["reach_no_read"](None))
+    assert f"REACH NOT DENIED: read {readable}: read 6 bytes" in capsys.readouterr().out
+    with pytest.raises(AssertionError):
+        _drive(_probes({**config, "read_files": [], "list_dirs": [str(tmp_path)]}, monkeypatch)["reach_no_read"](None))
+    assert f"REACH NOT DENIED: list {tmp_path}: 1 entries" in capsys.readouterr().out
+    if os.geteuid() != 0:  # a folder the account cannot enter: a permission error, so denied
+        closed = tmp_path / "closed"
+        closed.mkdir()
+        (closed / "f").write_text("x")
+        closed.chmod(0)
+        try:
+            config = {"read_files": [str(closed / "f")], "list_dirs": [str(closed)], "network": []}
+            _drive(_probes(config, monkeypatch)["reach_no_read"](None))
+        finally:
+            closed.chmod(0o700)
+        assert "REACH denied: read" in capsys.readouterr().out
+    with pytest.raises(AssertionError):  # no target proves nothing
+        _drive(_probes({"read_files": [], "list_dirs": [], "network": []}, monkeypatch)["reach_no_read"](None))
+
+
+def test_a_refused_or_timed_out_connection_is_not_a_denial(monkeypatch, capsys):
+    """Only EPERM or EACCES (the account's packets dropped) count, and ENETUNREACH for IPv6; a connection refused by
+    a closed port reached the host, so it is not denied."""
+    import errno
+    import socket
+
+    outcomes = {("1.1.1.1", 443): OSError(errno.EPERM, "x"), ("2606:4700:4700::1111", 443):
+                OSError(errno.ENETUNREACH, "x"), ("127.0.0.1", 9): ConnectionRefusedError(errno.ECONNREFUSED, "x"),
+                ("127.0.0.53", 53): None}
+
+    class Fake:
+        def __init__(self, *args):
+            pass
+
+        def settimeout(self, _):
+            pass
+
+        def connect(self, where):
+            raise outcomes[where]
+
+        def sendto(self, data, where):
+            if outcomes[where]:
+                raise outcomes[where]
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(socket, "socket", Fake)
+    config = {"network": [list(n) for n in reach.NETWORK]}
+    with pytest.raises(AssertionError):
+        _drive(_probes(config, monkeypatch)["reach_no_network"](None))
+    out = capsys.readouterr().out
+    assert f"REACH denied: tcp 1.1.1.1 port 443: PermissionError errno {errno.EPERM}" in out
+    assert f"REACH denied: tcp6 2606:4700:4700::1111 port 443: OSError errno {errno.ENETUNREACH}" in out
+    assert f"REACH NOT DENIED: tcp 127.0.0.1 port 9: ConnectionRefusedError errno {errno.ECONNREFUSED}" in out
+    assert "REACH NOT DENIED: udp 127.0.0.53 port 53: sent" in out
+    outcomes.update({("127.0.0.1", 9): OSError(errno.EPERM, "x"), ("127.0.0.53", 53): OSError(errno.EPERM, "x")})
+    _drive(_probes(config, monkeypatch)["reach_no_network"](None))
+    outcomes[("127.0.0.1", 9)] = OSError(errno.EHOSTUNREACH, "x")  # the rule's "prohibited" answer to TCP
+    _drive(_probes(config, monkeypatch)["reach_no_network"](None))
+    for kind_errno in (errno.ENETUNREACH, errno.ETIMEDOUT):  # IPv4 without a route, or a timeout: not shown denied
+        outcomes[("1.1.1.1", 443)] = OSError(kind_errno, "x")
+        with pytest.raises(AssertionError):
+            _drive(_probes(config, monkeypatch)["reach_no_network"](None))

@@ -13,7 +13,13 @@ as seat code would, to:
 - find a credential: two canary values this script puts in its own environment (one under a credential's name,
   which the M53 runner removes, one under a plain name, which only the seat account's empty environment keeps
   out), in its own environment or in ``/proc/<pid>/environ`` of any process, or in a file only the runner may
-  read; or signal the harness.
+  read; or signal the harness;
+- read what the judge keeps from the seat (READ probes): every reference answer, held-out case file and mutant
+  the eval cases name, all in the checkout, a canary file this script writes into the checkout and into the
+  runner's temporary folder (readable by every account by its mode, so only the account's own denial stops it),
+  and a listing of the checkout, its ``.git``, the runner's home and its temporary folder;
+- reach the network: a TCP connection out (IPv4 and IPv6), a TCP connection on the loopback address, and a UDP
+  packet to the local name server.
 
 and one control, that it can write its own run directory. The module runs through ``simulator.run``'s cocotb
 backend (``eda.execute``), so through the ``vvp`` the trials use. The test passes only when cocotb's verdict is
@@ -50,7 +56,12 @@ EXEC_NAME = "nirmaan-seat-exec"
 CANARY_SECRET, CANARY_PLAIN = "CLAUDE_CODE_OAUTH_TOKEN", "NIRMAAN_REACH_CANARY"
 #: The probe tests, by name; each must be in cocotb's results and pass.
 PROBES = ("reach_identity", "reach_no_sudo", "reach_no_write", "reach_no_credential", "reach_no_signal",
-          "reach_own_directory")
+          "reach_no_read", "reach_no_network", "reach_own_directory")
+#: Where the network probe tries to go: (kind, address, port). Each is denied only on EPERM or EACCES, or, for TCP,
+#: EHOSTUNREACH, the "prohibited" answer the seat account's rule gives at once (``scripts/live_eval_seat.py``; on the
+#: loopback address nothing else gives it), and for IPv6 ENETUNREACH (no route at all). A timeout proves nothing.
+NETWORK = (("tcp", "1.1.1.1", 443), ("tcp6", "2606:4700:4700::1111", 443), ("tcp", "127.0.0.1", 9),
+           ("udp", "127.0.0.53", 53))
 #: The programs gates run (eda.py backends) and the harness's own entry point.
 TOOLS = ("nirmaan", "iverilog", "vvp", "verilator", "yosys", "sby", "yices-smt2", "make", "cc", "python", "python3",
          "git", "node", "npm")
@@ -146,6 +157,52 @@ async def reach_no_signal(dut):
 
 
 @cocotb.test()
+async def reach_no_read(dut):
+    ok = []
+    for path in CONFIG["read_files"]:
+        try:
+            with open(path, "rb") as f:
+                data = f.read()
+        except OSError as exc:
+            ok.append(_say(exc.errno in DENIED, f"read {path}", f"{type(exc).__name__} errno {exc.errno}"))
+        else:
+            ok.append(_say(False, f"read {path}", f"read {len(data)} bytes"))
+    for path in CONFIG["list_dirs"]:
+        try:
+            names = os.listdir(path)
+        except OSError as exc:
+            ok.append(_say(exc.errno in DENIED, f"list {path}", f"{type(exc).__name__} errno {exc.errno}"))
+        else:
+            ok.append(_say(False, f"list {path}", f"{len(names)} entries"))
+    assert ok and all(ok)
+
+
+@cocotb.test()
+async def reach_no_network(dut):
+    import socket
+
+    ok = []
+    for kind, host, port in CONFIG["network"]:
+        family = socket.AF_INET6 if kind == "tcp6" else socket.AF_INET
+        sock = socket.socket(family, socket.SOCK_DGRAM if kind == "udp" else socket.SOCK_STREAM)
+        sock.settimeout(5)
+        try:
+            if kind == "udp":
+                sock.sendto(b"\x00", (host, port))
+            else:
+                sock.connect((host, port))
+        except OSError as exc:
+            denied = (exc.errno in DENIED or (kind != "udp" and exc.errno == errno.EHOSTUNREACH)
+                      or (kind == "tcp6" and exc.errno == errno.ENETUNREACH))
+            ok.append(_say(denied, f"{kind} {host} port {port}", f"{type(exc).__name__} errno {exc.errno}"))
+        else:
+            ok.append(_say(False, f"{kind} {host} port {port}", "sent" if kind == "udp" else "connected"))
+        finally:
+            sock.close()
+    assert ok and all(ok)
+
+
+@cocotb.test()
 async def reach_own_directory(dut):
     path = os.path.join(os.getcwd(), "reach-control.txt")
     with open(path, "w") as f:
@@ -217,6 +274,57 @@ def targets(records: Path, env: Mapping[str, str]) -> tuple[list[str], list[str]
     return [str(p) for p in dict.fromkeys(create)], [str(p) for p in dict.fromkeys(append)]
 
 
+def held_out_files(evals: Path = ROOT / "evals") -> list[str]:
+    """Every reference answer, held-out case file and mutant the eval cases name, as paths in the checkout.
+
+    Fails closed: a named file that does not exist stops the test, so a refusal of it proves something."""
+    from nirmaan.evals.cases import load_cases
+
+    named: list[str] = []
+    for case in load_cases(evals, flow=None):
+        named += [f.path for f in case.reference]
+        for check in case.held_out:
+            named += [p for paths in check.case_files.values() for p in paths]
+            named += [p for original, mutants in check.mutants.items() for p in (original, *mutants)]
+    files = [Path(p) if Path(p).is_absolute() else ROOT / p for p in dict.fromkeys(named)]
+    missing = [str(f) for f in files if not f.is_file()]
+    if missing:
+        raise SystemExit(f"reach test: these held-out files do not exist, so a refusal would prove nothing: {missing}")
+    return [str(f) for f in _need(files, "the held-out files of the eval cases")]
+
+
+def read_targets(env: Mapping[str, str], canary: str, nonce: str) -> tuple[list[str], list[str], list[Path]]:
+    """Files seat code must not read and folders it must not list, and the canary files written for the probe.
+
+    A canary file holds ``canary`` and is readable by every account by its mode (0644), in the checkout and, in
+    Actions, in the runner's temporary folder: only a denial of the account itself keeps it out. The caller removes
+    the canaries (``remove_canaries``) before the checkout is hashed."""
+    in_actions = env.get("GITHUB_ACTIONS") == "true"
+    homes = [Path(_need(env.get("HOME"), "HOME"))] if in_actions else [Path(p) for p in (env.get("HOME"),) if p]
+    temps = [Path(_need(env.get("RUNNER_TEMP"), "RUNNER_TEMP"))] if in_actions else []
+    dirs = [ROOT, ROOT / ".git", *homes, *temps]
+    missing = [str(d) for d in dirs if not d.is_dir()]
+    if missing:
+        raise SystemExit(f"reach test: these folders do not exist, so a refusal would prove nothing: {missing}")
+    files = held_out_files()
+    canaries = []
+    try:
+        for folder in (ROOT, *temps):
+            path = folder / f".nirmaan-read-canary-{nonce}"
+            canaries.append(path)
+            path.write_text(canary + "\n", encoding="utf-8")
+            path.chmod(0o644)
+    except OSError:
+        remove_canaries(canaries)
+        raise
+    return [*files, *(str(c) for c in canaries)], [str(d) for d in dict.fromkeys(dirs)], canaries
+
+
+def remove_canaries(canaries: Sequence[Path]) -> None:
+    for path in canaries:
+        path.unlink(missing_ok=True)
+
+
 def probe_module(config: dict) -> str:
     return PROBE.replace("__CONFIG__", repr(json.dumps(config)))
 
@@ -260,25 +368,30 @@ def reach(records: Path) -> int:
         print(f"::error::reach test: {problem}; no trial ran", flush=True)
         return 1
     create, append = targets(records, os.environ)
-    canaries = [secrets.token_hex(16), secrets.token_hex(16)]
-    os.environ[CANARY_SECRET], os.environ[CANARY_PLAIN] = canaries
-    work = Path(tempfile.mkdtemp(prefix="reach-probe-"))
-    secret_file = work / "credential"
-    secret_file.write_text(secrets.token_hex(16))
-    secret_file.chmod(0o600)
-    config = {"seat": SEAT, "runner": pwd.getpwuid(os.getuid()).pw_name, "runner_uid": os.getuid(),
-              "harness_pid": os.getpid(), "nonce": secrets.token_hex(8), "create_in": create, "append_to": append,
-              "canaries": canaries, "secret_file": str(secret_file)}
-    test = work / "reach_probe_test.py"
-    test.write_text(probe_module(config))
-    design = work / "reach_probe.v"
-    design.write_text(DESIGN)
-    params: Params = {"backend": "cocotb", "sources": str(design), "top": "reach_probe", "cocotb": str(test), "timeout": "300"}
+    params: Params = {"backend": "cocotb", "sources": "", "top": "reach_probe", "cocotb": "", "timeout": "300"}
     backend, why = select_backend("simulator.run", params)
     if backend is None:
         print(f"::error::reach test: no cocotb backend: {why}", flush=True)
         return 1
-    try:
+    canaries = [secrets.token_hex(16), secrets.token_hex(16)]
+    nonce, file_canary = secrets.token_hex(8), secrets.token_hex(16)
+    read_files, list_dirs, canary_files = read_targets(os.environ, file_canary, nonce)
+    os.environ[CANARY_SECRET], os.environ[CANARY_PLAIN] = canaries
+    work = None
+    try:  # the canaries leave the checkout and the environment whatever happens
+        work = Path(tempfile.mkdtemp(prefix="reach-probe-"))
+        secret_file = work / "credential"
+        secret_file.write_text(secrets.token_hex(16))
+        secret_file.chmod(0o600)
+        config = {"seat": SEAT, "runner": pwd.getpwuid(os.getuid()).pw_name, "runner_uid": os.getuid(),
+                  "harness_pid": os.getpid(), "nonce": nonce, "create_in": create, "append_to": append,
+                  "canaries": canaries, "secret_file": str(secret_file), "read_files": read_files,
+                  "list_dirs": list_dirs, "network": [list(n) for n in NETWORK]}
+        test = work / "reach_probe_test.py"
+        test.write_text(probe_module(config))
+        design = work / "reach_probe.v"
+        design.write_text(DESIGN)
+        params = {**params, "sources": str(design), "cocotb": str(test)}
         with temporary_runs():
             outcome = execute(backend, params)
             log = Path(outcome.outputs["log"]).read_text(encoding="utf-8") if "log" in outcome.outputs else ""
@@ -286,14 +399,19 @@ def reach(records: Path) -> int:
             xml_text = read_output(Path(results)) if results else None
     finally:
         del os.environ[CANARY_SECRET], os.environ[CANARY_PLAIN]
-        shutil.rmtree(work, ignore_errors=True)
+        if work is not None:
+            shutil.rmtree(work, ignore_errors=True)
+        remove_canaries(canary_files)
     for line in log.splitlines():
         if line.startswith("REACH ") or "TESTS=" in line:
             print(line, flush=True)
     problem = results_problem(xml_text)
+    if any(value in text for value in (*canaries, file_canary) for text in (log, xml_text or "")):
+        problem = "; ".join(filter(None, (problem, "a canary value is in the run's log or results")))
     if outcome.succeeded and problem is None:
-        print(f"reach test: every probe denied ({len(PROBES)} cocotb tests as {SEAT}, {len(create)} folders, "
-              f"{len(append)} files, {len(canaries)} canaries)", flush=True)
+        print(f"reach test: every probe denied ({len(PROBES)} cocotb tests as {SEAT}, {len(create)} folders and "
+              f"{len(append)} files not written, {len(read_files)} files not read and {len(list_dirs)} folders not "
+              f"listed, {len(NETWORK)} network targets not reached, {len(canaries) + 1} canaries in no log)", flush=True)
         return 0
     print(f"::error::reach test: {problem or outcome.summary}; no trial ran", flush=True)
     print(log, flush=True)
