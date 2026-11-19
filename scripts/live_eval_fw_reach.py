@@ -21,6 +21,13 @@ holds the plan token, and a runner-only file. Its tests try to:
 - read its parent's and the harness's ``/proc/<pid>/environ`` at all (``fw_reach_no_parent_environ``);
 - read the runner-only file (``fw_reach_no_secret_file``);
 - signal the harness (``fw_reach_no_signal``);
+- read what the judge keeps from the seat: every reference answer, held-out case file and mutant the eval cases
+  name, the reach test's canary files (readable by every account by their mode, in the checkout and, in Actions, the
+  runner's temporary folder), and list the checkout, its ``.git``, the runner's home and its temporary folder
+  (``fw_reach_no_read``; the same targets as ``scripts/live_eval_reach.py``, gate SC6 and the READ probes);
+- reach the network: TCP out over IPv4 and IPv6, TCP on the loopback address, UDP to the local name server
+  (``fw_reach_no_network``; the reach test's ``NETWORK``; denied only as there: EPERM or EACCES, for TCP the
+  rule's EHOSTUNREACH, for IPv6 ENETUNREACH, never a timeout);
 
 and, as the control, write its own run directory (the test fails unless it can). A probe is denied only on EACCES, EPERM or EROFS (for sudo: a
 refusal, not a missing program); anything else is "NOT DENIED", so a probe that proves nothing never reads as
@@ -61,7 +68,8 @@ CANARY_SECRET, CANARY_PLAIN = "CLAUDE_CODE_OAUTH_TOKEN", "NIRMAAN_FW_REACH_CANAR
 INNER = "NIRMAAN_FW_REACH_INNER"
 #: The probe tests, by name; each must report at least one line, and is denied only when every line is.
 PROBES = ("fw_reach_identity", "fw_reach_no_sudo", "fw_reach_no_write", "fw_reach_no_credential",
-          "fw_reach_no_parent_environ", "fw_reach_no_secret_file", "fw_reach_no_signal")
+          "fw_reach_no_parent_environ", "fw_reach_no_secret_file", "fw_reach_no_signal", "fw_reach_no_read",
+          "fw_reach_no_network")
 CONTROL = "fw_reach_own_directory"
 RTL = ROOT / "tests" / "fixtures" / "rtl" / "axi4_lite" / "axi4_lite_regs.v"
 TOP = "axi4_lite_regs"
@@ -81,6 +89,10 @@ PROBE = r"""/*
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <sys/time.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -92,6 +104,8 @@ extern char **environ;
 static const char *const CANARIES[] = {__CANARIES__};
 static const char *const CREATE_IN[] = {__CREATE_IN__};
 static const char *const APPEND_TO[] = {__APPEND_TO__NULL};
+static const char *const READ_FILES[] = {__READ_FILES__NULL};
+static const char *const LIST_DIRS[] = {__LIST_DIRS__NULL};
 static const long RUNNER_UID = __RUNNER_UID__;
 static const long SEAT_GID = __SEAT_GID__;
 static const long HARNESS_PID = __HARNESS_PID__;
@@ -313,6 +327,80 @@ static int probe_signal(void) {
     return say(code != 0 && err == EPERM, "fw_reach_no_signal", "signal 0 to the harness", detail);
 }
 
+static int probe_read(void) {
+    char detail[256];
+    size_t i;
+    int all = 1, any = 0;
+    for (i = 0; READ_FILES[i] != NULL; ++i) {
+        const int fd = open(READ_FILES[i], O_RDONLY);
+        const int err = errno;
+        any = 1;
+        if (fd >= 0) {
+            close(fd);
+            all &= say(0, "fw_reach_no_read", READ_FILES[i], "opened for reading");
+            continue;
+        }
+        snprintf(detail, sizeof detail, "errno %d (%s)", err, strerror(err));
+        all &= say(refused(err), "fw_reach_no_read", READ_FILES[i], detail);
+    }
+    for (i = 0; LIST_DIRS[i] != NULL; ++i) {
+        DIR *dir = opendir(LIST_DIRS[i]);
+        const int err = errno;
+        any = 1;
+        if (dir != NULL) {
+            closedir(dir);
+            all &= say(0, "fw_reach_no_read", LIST_DIRS[i], "listed");
+            continue;
+        }
+        snprintf(detail, sizeof detail, "errno %d (%s)", err, strerror(err));
+        all &= say(refused(err), "fw_reach_no_read", LIST_DIRS[i], detail);
+    }
+    return any ? all : say(0, "fw_reach_no_read", "no target", "nothing proven");
+}
+
+/* One network target: kind 0 TCP over IPv4, 1 TCP over IPv6, 2 UDP over IPv4. */
+static int one_target(int kind, const char *host, int port) {
+    char what[128], detail[256];
+    struct sockaddr_in in4;
+    struct sockaddr_in6 in6;
+    struct timeval wait = {5, 0};
+    int fd, code, err;
+    snprintf(what, sizeof what, "%s %s port %d", kind == 0 ? "tcp" : kind == 1 ? "tcp6" : "udp", host, port);
+    memset(&in4, 0, sizeof in4);
+    memset(&in6, 0, sizeof in6);
+    fd = socket(kind == 1 ? AF_INET6 : AF_INET, kind == 2 ? SOCK_DGRAM : SOCK_STREAM, 0);
+    if (fd < 0) {
+        err = errno;
+        snprintf(detail, sizeof detail, "socket: errno %d (%s)", err, strerror(err));
+        return say(refused(err), "fw_reach_no_network", what, detail);
+    }
+    setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &wait, sizeof wait);
+    if (kind == 1) {
+        in6.sin6_family = AF_INET6;
+        in6.sin6_port = htons((uint16_t)port);
+        inet_pton(AF_INET6, host, &in6.sin6_addr);
+        code = connect(fd, (const struct sockaddr *)&in6, sizeof in6);
+    } else {
+        in4.sin_family = AF_INET;
+        in4.sin_port = htons((uint16_t)port);
+        inet_pton(AF_INET, host, &in4.sin_addr);
+        code = kind == 2 ? (int)sendto(fd, "", 1, 0, (const struct sockaddr *)&in4, sizeof in4)
+                         : connect(fd, (const struct sockaddr *)&in4, sizeof in4);
+    }
+    err = errno;
+    close(fd);
+    if (code >= 0) return say(0, "fw_reach_no_network", what, kind == 2 ? "sent" : "connected");
+    snprintf(detail, sizeof detail, "errno %d (%s)", err, strerror(err));
+    return say(refused(err) || (kind != 2 && err == EHOSTUNREACH) || (kind == 1 && err == ENETUNREACH),
+               "fw_reach_no_network", what, detail);
+}
+
+static int probe_network(void) {
+    int all = 1;
+    (void)one_target; /* used once per target below; a probe with none prints no line, so it is missing */
+__NETWORK__    return all;
+}
+
 static void control(void) {
     char path[4096], here[3800];
     FILE *f;
@@ -339,6 +427,8 @@ void nirmaan_fw_test(const nirmaan_hal *hal) {
     nirmaan_test_result("fw_reach_no_parent_environ", probe_parent(), NULL);
     nirmaan_test_result("fw_reach_no_secret_file", probe_secret_file(), NULL);
     nirmaan_test_result("fw_reach_no_signal", probe_signal(), NULL);
+    nirmaan_test_result("fw_reach_no_read", probe_read(), NULL);
+    nirmaan_test_result("fw_reach_no_network", probe_network(), NULL);
     control();
     printf("FW-REACH done\n");
     fflush(stdout);
@@ -402,6 +492,9 @@ def targets(records: Path, package_file: str | None = None, purelib: str | None 
     return list(dict.fromkeys(create)), list(dict.fromkeys(append))
 
 
+_KINDS = {"tcp": 0, "tcp6": 1, "udp": 2}
+
+
 def probe_source(config: Mapping) -> str:
     fill = {"__CANARIES__": ", ".join(c_string(c) for c in config["canaries"]),
             "__CREATE_IN__": ", ".join(c_string(p) for p in config["create_in"]),
@@ -409,7 +502,11 @@ def probe_source(config: Mapping) -> str:
             "__RUNNER_UID__": f"{int(config['runner_uid'])}L", "__HARNESS_PID__": f"{int(config['harness_pid'])}L",
             "__SEAT_GID__": f"{int(config.get('seat_gid', -1))}L",
             "__SECRET_FILE__": c_string(config["secret_file"]), "__RUNNER__": c_string(config["runner"]),
-            "__NONCE__": c_string(config["nonce"])}
+            "__NONCE__": c_string(config["nonce"]),
+            "__READ_FILES__": "".join(f"{c_string(p)}, " for p in config.get("read_files", ())),
+            "__LIST_DIRS__": "".join(f"{c_string(p)}, " for p in config.get("list_dirs", ())),
+            "__NETWORK__": "".join(f"    all &= one_target({_KINDS[kind]}, {c_string(host)}, {int(port)});\n"
+                                   for kind, host, port in config.get("network", ()))}
     text = PROBE
     for key, value in fill.items():
         text = text.replace(key, value)
@@ -455,28 +552,34 @@ def inner(records: Path, out: Path) -> int:
     except KeyError:
         seat = None
     create, append = targets(records, env=os.environ)
-    config = {"canaries": canaries, "create_in": create, "append_to": append, "runner_uid": os.getuid(),
-              "runner": runner.pw_name, "harness_pid": os.getpid(), "secret_file": str(secret_file),
-              "nonce": secrets.token_hex(8), "seat_gid": seat.pw_gid if seat else -1}
-    probe = work / "fw_reach_probe.c"
-    probe.write_text(probe_source(config))
     backend, why = select_backend("fw.test", {})
     if backend is None:
         print(f"::error::fw reach test: no fw.test backend: {why}; no probe ran", flush=True)
         return 1
-    try:
+    reach = _reach()
+    nonce = secrets.token_hex(8)
+    read_files, list_dirs, canary_files = reach.read_targets(os.environ, secrets.token_hex(16), nonce)
+    config = {"canaries": canaries, "create_in": create, "append_to": append, "runner_uid": os.getuid(),
+              "runner": runner.pw_name, "harness_pid": os.getpid(), "secret_file": str(secret_file),
+              "nonce": nonce, "seat_gid": seat.pw_gid if seat else -1, "read_files": read_files,
+              "list_dirs": list_dirs, "network": [list(n) for n in reach.NETWORK]}
+    try:  # the canary files leave the checkout whatever happens
+        probe = work / "fw_reach_probe.c"
+        probe.write_text(probe_source(config))
         with temporary_runs():
             outcome = execute(backend, {"sources": str(probe), "rtl": str(RTL), "top": TOP, "timeout": "600"})
             log = (Path(outcome.references[0]).read_text(encoding="utf-8", errors="replace")
                    if outcome.references else "")
     finally:
         shutil.rmtree(work, ignore_errors=True)
+        reach.remove_canaries(canary_files)
     found = parse(log)
     result = {"format": FORMAT, "tool": "fw.test", "backend": backend.name, "rtl": str(RTL.relative_to(ROOT)),
               "account": {"user": runner.pw_name, "uid": os.getuid()},
               "seat_account": {"user": seat.pw_name, "uid": seat.pw_uid, "gid": seat.pw_gid} if seat else None,
-              "seat_exec": shutil.which(firmware.SEAT_EXEC), "run_step": (outcome.data or {}).get("commands", [[]])[-1:],
-              "summary": outcome.summary, "targets": config["create_in"], "append_targets": append, **found}
+              "seat_exec": os.environ.get(firmware.SEAT_EXEC_ENV, "").strip() or shutil.which(firmware.SEAT_EXEC), "run_step": (outcome.data or {}).get("commands", [[]])[-1:],
+              "summary": outcome.summary, "targets": config["create_in"], "append_targets": append,
+              "read_targets": read_files, "list_targets": list_dirs, "network_targets": config["network"], **found}
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     if not found["done"] or found["missing"]:

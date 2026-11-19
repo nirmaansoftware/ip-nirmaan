@@ -1457,6 +1457,13 @@ class Loop:
                     st["done"] = {"head": head, "outcome": "auto-merge"}
                     _save_state(self.state_dir, cfg["repo"], st)
                     return {"outcome": "auto-merge"}
+                # Main moved after the loop looked, and the only conflict is the generated file: the
+                # same branch update as in _step (ip#263), then the new head is reviewed as usual.
+                # Any other conflict, or a failed read, keeps the stop below.
+                if self._merge_conflict_error(exc):
+                    u = self._resolve_generated_after_merge_conflict(ctx)
+                    if u:
+                        return u
                 return self._stop(ctx, head, f"gh pr merge --auto failed {_gh_failure(exc)}")
         if why is None:
             self._log(ctx, "auto-merge")
@@ -1471,6 +1478,26 @@ class Loop:
             st["done"] = {"head": head, "outcome": "ready"}
         _save_state(self.state_dir, cfg["repo"], st)
         return {"outcome": st["done"]["outcome"]}
+
+    @staticmethod
+    def _merge_conflict_error(exc) -> bool:
+        text = f"{getattr(exc, 'stderr', '') or ''} {getattr(exc, 'output', '') or ''}".lower()
+        return "merge conflicts" in text
+
+    def _resolve_generated_after_merge_conflict(self, ctx):
+        """After a merge call refused for a merge conflict: read the pull request again and, when
+        GitHub reports the conflict and the loop's own detection says it is only the generated file,
+        update the branch as _step does. None when it is not that case (the caller stops)."""
+        n = ctx["n"]
+        try:
+            pull = self.o["github"].get_pull(n)
+        except Exception:  # noqa: BLE001 - an unreadable state keeps today's behaviour (stop)
+            return None
+        if pull.get("head_sha") != ctx["head"] or pull.get("state") != "open":
+            return None
+        if not (pull.get("mergeable") is False or pull.get("mergeable_state") == "dirty"):
+            return None
+        return self._update_generated(ctx, pull, conflict=True)
 
     def _already_merged(self, ctx, exc) -> bool:
         """After a failed `gh pr merge --auto`: True when GitHub already merged the pull request
