@@ -1577,6 +1577,7 @@ def test_the_real_test_check_is_split_into_cis_three_shards():
     ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
     assert 'shard: [1, 2, 3]' in ci and '--shard "$SHARD/3" --shard-profile test' in ci, "the same split as CI's test job"
     assert "test" in json.loads((ROOT / "scripts" / "shard_weights.json").read_text())
+    assert check["env"]["NIRMAAN_VERILATOR_JOBS"] == "2", "each Verilator build in the check starts at most 2 jobs"
 
 
 def test_shard_commands_split_the_whole_suite_or_a_selection_of_several_files():

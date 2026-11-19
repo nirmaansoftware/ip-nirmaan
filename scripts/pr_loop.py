@@ -214,7 +214,10 @@ LOOP = {
     # The single-runner whole suite outgrew the 1200 s timeout (ip#249).
     "checks": [
         {"name": "dashes", "when": ["**"], "run": [["{python}", "scripts/check_dashes.py"]]},
-        {"name": "test", "when": ["src/**", "tests/**", "evals/**", "scripts/**", "site/**"], "env": {"PYTHONPATH": "src"},
+        # NIRMAAN_VERILATOR_JOBS caps each Verilator build at 2 jobs (eda.VERILATOR_JOBS_ENV): three shards next to
+        # reviews ran a check out of memory with one job per core (decision #32 of 2026-11-19).
+        {"name": "test", "when": ["src/**", "tests/**", "evals/**", "scripts/**", "site/**"],
+         "env": {"PYTHONPATH": "src", "NIRMAAN_VERILATOR_JOBS": "2"},
          "select": "related_tests", "shards": {"count": 3, "profile": "test"},
          "run": [["{python}", "-m", "pytest", "-q", "-x", "-p", "no:cacheprovider"]]},
     ],
