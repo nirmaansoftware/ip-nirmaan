@@ -48,9 +48,10 @@ they would in a whole flow, and check 5 runs on it.
   header is not on the include path); the second kills the co-simulation
   with signal 11 before any harness record is written out, which `fw.test`
   reports as "co-simulation was killed by signal 11 before it reported
-  anything; the build was clean" (before this wording it read "build failed
-  before co-simulation: 0 errors (exit status -11)", as in the controls
-  record's run). Neither reaches review.
+  anything; the build was clean: 0 errors (exit status -11)" (before this
+  wording it read "build failed before co-simulation: 0 errors (exit status
+  -11)", as in the controls record's run; the control's `refused_by` matches
+  the tail both share). Neither reaches review.
 
 Each strict fixture on the simulator's clock prints what it timed on a line of
 its own (`STRICT-FIXTURE ...`); the address-route fixtures print nothing

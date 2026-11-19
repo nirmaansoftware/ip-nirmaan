@@ -23,7 +23,8 @@
  * the route is unreadable. The read at that address kills the co-simulation
  * with signal 11 before any harness record is written out (fw.test reports
  * "co-simulation was killed by signal 11 before it reported anything; the
- * build was clean"), the seat's own fw.test check fails, the
+ * build was clean: 0 errors (exit status -11)"), the seat's own fw.test
+ * check fails, the
  * seat never reaches review, and no check of the judge runs. The control
  * records that real result.
  *

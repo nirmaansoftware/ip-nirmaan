@@ -224,9 +224,11 @@ def test_a_clean_build_whose_program_is_killed_is_reported_as_killed_by_its_sign
     steps = f"$ cc -c drv.c -o drv.o\n$ verilator --cc --exe --build x.v drv.o\n$ cosim/Vdut +nirmaan_nonce={NONCE}\n"
     result = parse_fw_test(steps, (0, 0, -11))
     assert not result.passed
-    assert result.summary == "co-simulation was killed by signal 11 before it reported anything; the build was clean"
+    assert result.summary == ("co-simulation was killed by signal 11 before it reported anything; the build was clean: "
+                              "0 errors (exit status -11)")
     soc = parse_fw_test(steps, (0, 0, -6), what="SoC run")
-    assert soc.summary == "SoC run was killed by signal 6 before it reported anything; the build was clean"
+    assert soc.summary == ("SoC run was killed by signal 6 before it reported anything; the build was clean: 0 errors "
+                           "(exit status -6)")
     # A build step killed by a signal is still a failed build, now with the signal named.
     crashed = parse_fw_test("$ cc -c drv.c -o drv.o\n", (-11,))
     assert crashed.summary == "build failed before co-simulation: 0 errors (killed by signal 11)"
