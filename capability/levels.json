@@ -181,10 +181,10 @@
           "counts": true,
           "digest": "sha256:5eb05f03c1201b9bd2acd8e66fea165abd5ba773977cacaf015ddc071119c38e",
           "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
-          "lower": 0.6006,
+          "lower": 0.6212,
           "model": "claude-opus-5-5",
-          "n": 14,
-          "passed": 12,
+          "n": 15,
+          "passed": 13,
           "reasons": [],
           "records": [
             "evals/results/2026-11-18-claude-code-claude-opus-5-5",
@@ -200,6 +200,7 @@
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-41",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-55",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-68",
+            "evals/results/2026-11-19-claude-code-claude-opus-5-5-82",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-9"
           ],
           "unjudged": 0
@@ -563,12 +564,12 @@
           "counts": false,
           "digest": "sha256:3979d44f5c2cf8d2e2a58df59884920fe9e691be04bc390df127dbd69e0516b7",
           "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
-          "lower": 0.3589,
+          "lower": 0.4093,
           "model": "claude-opus-5-5",
-          "n": 7,
-          "passed": 5,
+          "n": 8,
+          "passed": 6,
           "reasons": [
-            "Wilson lower bound 0.359, under 0.5"
+            "Wilson lower bound 0.409, under 0.5"
           ],
           "records": [
             "evals/results/2026-11-18-claude-code-claude-opus-5-5",
@@ -577,6 +578,7 @@
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-23",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-37",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-68",
+            "evals/results/2026-11-19-claude-code-claude-opus-5-5-82",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-9"
           ],
           "unjudged": 0
@@ -727,7 +729,7 @@
           "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
           "lower": 0.0,
           "model": "claude-opus-5-5",
-          "n": 6,
+          "n": 7,
           "passed": 0,
           "reasons": [
             "Wilson lower bound 0.000, under 0.5"
@@ -738,9 +740,10 @@
             "evals/results/2026-11-18-claude-code-claude-opus-5-5-45",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-22",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-36",
-            "evals/results/2026-11-19-claude-code-claude-opus-5-5-8"
+            "evals/results/2026-11-19-claude-code-claude-opus-5-5-8",
+            "evals/results/2026-11-19-claude-code-claude-opus-5-5-81"
           ],
-          "unjudged": 6
+          "unjudged": 7
         }
       ]
     },
@@ -1149,10 +1152,10 @@
           "counts": true,
           "digest": "sha256:012eb9b7155ed6eb7761adca880b338f10c8f978b15dfd92f5adbb3253307a52",
           "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
-          "lower": 0.8629,
+          "lower": 0.8654,
           "model": "claude-opus-5-5",
-          "n": 49,
-          "passed": 47,
+          "n": 50,
+          "passed": 48,
           "reasons": [],
           "records": [
             "evals/results/2026-11-18-claude-code-claude-opus-5-5",
@@ -1203,6 +1206,7 @@
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-64",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-65",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-68",
+            "evals/results/2026-11-19-claude-code-claude-opus-5-5-82",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-9"
           ],
           "unjudged": 0
@@ -1433,12 +1437,12 @@
           "counts": false,
           "digest": "sha256:930e0e5ff02a926a5300db8242997dbeb449a43e1dc60ee25adefb23c60e6356",
           "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
-          "lower": 0.3589,
+          "lower": 0.4093,
           "model": "claude-opus-5-5",
-          "n": 7,
-          "passed": 5,
+          "n": 8,
+          "passed": 6,
           "reasons": [
-            "Wilson lower bound 0.359, under 0.5"
+            "Wilson lower bound 0.409, under 0.5"
           ],
           "records": [
             "evals/results/2026-11-18-claude-code-claude-opus-5-5-16",
@@ -1447,7 +1451,8 @@
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-21",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-35",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-66",
-            "evals/results/2026-11-19-claude-code-claude-opus-5-5-7"
+            "evals/results/2026-11-19-claude-code-claude-opus-5-5-7",
+            "evals/results/2026-11-19-claude-code-claude-opus-5-5-80"
           ],
           "unjudged": 2
         }
