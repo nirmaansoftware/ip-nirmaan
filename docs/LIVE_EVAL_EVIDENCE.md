@@ -358,7 +358,12 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   whether that C can run as the runner or in another group, run `sudo -n`,
   write the checkout, the package, the records folder or any other target of
   the reach test above, read any process's environment or a runner-only file,
-  or signal the harness. Since M90 the workflow runs it with
+  or signal the harness; and (gate SC6) read the reach test's read targets
+  (every reference answer, held-out case file and mutant, two canary files
+  readable by every account by their mode, listings of the checkout, its
+  `.git`, the runner's home and its temporary folder) or reach its network
+  targets. Reading files every account may read outside those targets is not
+  probed. Since M90 the workflow runs it with
   `--require-denied`: the job stops unless every probe is denied and
   `fw.test` found its wrapper. Gate WF17 covers every job that runs seat
   code, so every step that runs seat code of a case that runs seat C (the
