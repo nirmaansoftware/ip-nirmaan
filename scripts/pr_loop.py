@@ -1446,6 +1446,13 @@ class Loop:
             except (subprocess.SubprocessError, OSError) as exc:
                 if transient_error(exc):
                     return self._retry(ctx, head, f"gh pr merge --auto failed {_gh_failure(exc)}")
+                # GitHub auto-merges the moment both review checks go green, so this call can lose
+                # the race ("Pull Request is not mergeable" on a PR that is already MERGED; ip#348,
+                # ip#363). Read the pull request again: merged is done, with no stop and no label.
+                if self._already_merged(ctx, exc):
+                    st["done"] = {"head": head, "outcome": "auto-merge"}
+                    _save_state(self.state_dir, cfg["repo"], st)
+                    return {"outcome": "auto-merge"}
                 return self._stop(ctx, head, f"gh pr merge --auto failed {_gh_failure(exc)}")
         if why is None:
             self._log(ctx, "auto-merge")
@@ -1460,6 +1467,22 @@ class Loop:
             st["done"] = {"head": head, "outcome": "ready"}
         _save_state(self.state_dir, cfg["repo"], st)
         return {"outcome": st["done"]["outcome"]}
+
+    def _already_merged(self, ctx, exc) -> bool:
+        """After a failed `gh pr merge --auto`: True when GitHub already merged the pull request
+        (it merged on its own before the call). Logged plainly; the failure is not a stop. A read
+        that fails, or a pull request not merged, is False: the failure keeps its normal handling."""
+        n = ctx["n"]
+        try:
+            pull = self.o["github"].get_pull(n)
+        except Exception:  # noqa: BLE001 - an unreadable state keeps today's behaviour (stop)
+            return False
+        if pull.get("state") == "open" or not pull.get("merged_at"):
+            return False
+        self._log(ctx, "already-merged", merged_at=pull["merged_at"])
+        self.out(f"pr-loop: #{n}: gh pr merge --auto failed {_gh_failure(exc)}, but GitHub had already merged "
+                 f"the pull request at {pull['merged_at']}; nothing to do (no stop comment, no label)")
+        return True
 
     def _shape(self, ctx, r):
         """The soft shape rules, as one comment that names each rule broken;

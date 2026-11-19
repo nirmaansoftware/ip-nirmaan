@@ -1,0 +1,196 @@
+{
+  "format": "nirmaan.flow-document-check",
+  "case": "flow/axi4-lite-regs-driver",
+  "document": "evals/flow/axi4_lite/requirements.md",
+  "document_sha256": "119a90c1896b7cb1be07ca31d183cac169ea53a40108369b38adf7ff211c7c90",
+  "writer": "G3 requirements writers (G3-REQ-FIX, G3-REQ-SPLIT, G3-REQ-SCOPE)",
+  "checker": "G3-REQ-CONFIRM-2",
+  "checked_at": "2026-11-19T07:35:00+00:00",
+  "sources_read": [
+    "evals/flow/axi4_lite/requirements.md",
+    "evals/flow/axi4_lite/citations.json",
+    "evals/flow/axi4_lite/axi4_lite_regs_tb.v",
+    "evals/flow/axi4_lite/mutant_sweep.json",
+    "docs/whole_flow/02-two-cases.md",
+    "docs/whole_flow/07-document-check-record.md",
+    "tests/test_whole_flow_cases.py",
+    "tests/fixtures/rtl/axi4_lite/axi4_lite_regs.v",
+    "evals/flow/axi4_lite_regs_driver.json",
+    "evals/flow/axi4_lite/held_out_test.c"
+  ],
+  "judged_scope": {
+    "AXIL-MAP": "The testbench copy (evals/flow/axi4_lite/axi4_lite_regs_tb.v) judges the four offsets at ADDR_WIDTH 4 and DATA_WIDTH 32 only (line 58): each reads its reset value, zero, after the resets unless written since (lines 283 to 288, 348 to 350 and 352 to 371), and reads back what was written: 0x1111_1111 to 0x4444_4444 and later values (lines 290 to 314), all ones and all zeros (lines 373 to 379), and 0x9E37_79B9 times k with every wstrb value in all three orderings (lines 459 to 468). Check 2 runs the test regmap.verify generates from tests/fixtures/rtl/axi4_lite/register_map.json (evals/flow/axi4_lite_regs_driver.json lines 107 to 123), and checks 5 and 6 write each index and read it back at the document's offset (evals/flow/axi4_lite/held_out_test.c lines 25 to 50). Check 3 judges it only through the reference RTL and the three committed mutants (evals/flow/axi4_lite_regs_driver.json lines 125 to 149).",
+    "AXIL-PORTS": "The testbench copy (evals/flow/axi4_lite/axi4_lite_regs_tb.v) connects the ports by name with the s_axil_ prefix, aclk and aresetn (lines 58 to 65), built at ADDR_WIDTH 4 and DATA_WIDTH 32 only, so a block that lacks or renames one fails to build; their widths are judged only through the transfers the run makes. Ports beyond these: AXIL-PORTS-ONLY and AXIL-NO-PROT. Check 3 judges it only through the reference RTL and the three committed mutants (evals/flow/axi4_lite_regs_driver.json lines 125 to 149).",
+    "AXIL-PARAMS": "The testbench copy (evals/flow/axi4_lite/axi4_lite_regs_tb.v) sets ADDR_WIDTH to 4 and DATA_WIDTH to 32 (line 58), so a block without either parameter fails to build; no other value is ever built (the defaults: AXIL-PARAMS-DEFAULT). Check 3 judges it only through the reference RTL and the three committed mutants (evals/flow/axi4_lite_regs_driver.json lines 125 to 149).",
+    "AXIL-ORDER": "The testbench copy (evals/flow/axi4_lite/axi4_lite_regs_tb.v) offers write address and data together, the address first by 2, 3 or 40 cycles, or the data first by 1, 2, 3 or 40 cycles (lines 308 to 313, 366 to 370, 410 to 412 and 459 to 472), together after a wait of 2 cycles (line 311), and in the overlap with a read in flight (lines 512 to 545). The address first by 1 cycle is offered once (line 312), but that write is overwritten by the next write to the same register (line 313) before any read, so a block that drops or corrupts a write only when the address leads the data by exactly 1 cycle passes it: that gap is outside the scope. Gaps of 4 to 39 cycles, and of more than 40, are outside the scope. Check 3 judges it only through the reference RTL and the three committed mutants (evals/flow/axi4_lite_regs_driver.json lines 125 to 149).",
+    "AXIL-WSTRB": "The testbench copy (evals/flow/axi4_lite/axi4_lite_regs_tb.v) writes every wstrb value (0, the fourteen partial ones, full) at each of the four registers in all three orderings, data 0x9E37_79B9 times k, each read back merged (lines 459 to 468), plus wstrb 0101, 1000 and 0000 (lines 297 to 306) and each strobe alone (lines 381 to 391), at DATA_WIDTH 32. Checks 5 and 6 write each byte lane of REG3 alone through the driver (evals/flow/axi4_lite/held_out_test.c lines 52 to 65); check 7 holds the flow's driver test to the reference RTL and wstrb_ignored (evals/flow/axi4_lite_regs_driver.json lines 206 to 229). Check 3 judges it only through the reference RTL and the three committed mutants (evals/flow/axi4_lite_regs_driver.json lines 125 to 149).",
+    "AXIL-SLVERR": "The testbench copy (evals/flow/axi4_lite/axi4_lite_regs_tb.v) builds ADDR_WIDTH 4 only (line 58), so the unmapped addresses are the twelve unaligned offsets: each written with all ones (lines 393 to 407) and, in all three orderings with every wstrb value, with the complement of the register it would alias, all four registers read after each address's writes (lines 469 to 478), and each read with ARVALID 0 or 1 cycle late and RREADY 0 to 2 cycles late, data zero (lines 400 to 407 and 473 to 478). Checks 5 and 6 read at 0x2 and write at 0x5 through the driver (evals/flow/axi4_lite/held_out_test.c lines 67 to 96), check 2 uses the map's unmapped offsets (evals/flow/axi4_lite_regs_driver.json lines 107 to 123), and check 7 holds the flow's driver test to okay_unmapped (lines 206 to 229). Check 3 judges it only through the reference RTL and the three committed mutants (evals/flow/axi4_lite_regs_driver.json lines 125 to 149).",
+    "AXIL-LATENCY": "The testbench copy (evals/flow/axi4_lite/axi4_lite_regs_tb.v) checks the bound on every write and read of the run, with READY low until the response is valid (lines 101, 113, 160 and 173): writes in the orderings of AXIL-ORDER's scope with BREADY 0, 1, 2, 3 or 4 cycles after the response is first seen, reads with ARVALID 0 or 1 cycle late and RREADY 0, 1, 2 or 4 cycles after, at all sixteen addresses, after an idle cycle or back to back (AXIL-B2B's scope), and overlapping, the second started 0 to 3 cycles after the first, either first, with the other response waiting on READY (lines 512 to 545). Check 3 judges it only through the reference RTL and the three committed mutants (evals/flow/axi4_lite_regs_driver.json lines 125 to 149).",
+    "AXIL-B2B": "The testbench copy (evals/flow/axi4_lite/axi4_lite_regs_tb.v) offers a write after a write response, with address and data together, and a read after a read response, each in the cycle after the edge that takes the previous response, which waited 0 or 2 cycles on READY after it was first seen valid (lines 101 and 116, 160 and 177): lines 321 to 334 (wait 0, the four registers, OKAY), lines 415 to 427 (wait 2) and lines 483 to 509 (waits 0 and 2, OKAY and SLVERR alternating: writes at 0x0, 0x5, 0x6, 0x4, 0x8, 0xF, 0xC, 0x1, 0x0 and reads at 0x0, 0x6, 0x3, 0x4, 0x8, 0xD, 0xC, 0x2, 0x0), checked at lines 103 to 104 and 162 to 163. A request after a response that waited 1 or 3 or more cycles, or a read right after a write response and the reverse, is outside the scope. Check 3 judges it only through the reference RTL and the three committed mutants (evals/flow/axi4_lite_regs_driver.json lines 125 to 149).",
+    "AXIL-RESET": "The testbench copy (evals/flow/axi4_lite/axi4_lite_regs_tb.v) holds aresetn low for 3 edges (reset_dut, lines 225 to 243), checks that no response is valid after the first and the third reset edge (lines 230 to 231 and 236 to 237), and resets six times: at power up (line 285), between transfers (line 349), and after 4 cycles with a write response waiting, a read response waiting, only the write address accepted or only the write data accepted (lines 245 to 281 and 352 to 371). After each, the registers read zero or what was written since (read_all at lines 288, 350, 358, 362, 368 and 371), BVALID and RVALID are low (lines 357 and 361), and a held half is discarded: the next write, offered the other way round 3 cycles apart, completes with its own address and data (lines 366 to 371). Check 3 judges it only through the reference RTL and the three committed mutants (evals/flow/axi4_lite_regs_driver.json lines 125 to 149).",
+    "AXIL-TEST-RANGE": "Judged by check 3 (evals/flow/axi4_lite_regs_driver.json lines 125 to 149) and check 7 (lines 206 to 229) against the reference RTL only (tests/fixtures/rtl/axi4_lite/axi4_lite_regs.v, which answers 1 cycle after its request): a flow testbench or driver test that fails on it fails the case. A test that requires the reference's own choices, such as a response 1 cycle after its request, passes these checks; the second conforming RTL (tests/fixtures/rtl/axi4_lite/variants/axi4_lite_regs_lat2.v) and the strict fixtures are judge controls, not checks of a trial."
+  },
+  "evidence": [
+    {
+      "tag": "AXIL-MAP",
+      "evidence": [
+        "evals/flow/axi4_lite/axi4_lite_regs_tb.v:58",
+        "evals/flow/axi4_lite/axi4_lite_regs_tb.v:283-288",
+        "evals/flow/axi4_lite/axi4_lite_regs_tb.v:348-350",
+        "evals/flow/axi4_lite/axi4_lite_regs_tb.v:352-371",
+        "evals/flow/axi4_lite/axi4_lite_regs_tb.v:290-314",
+        "evals/flow/axi4_lite/axi4_lite_regs_tb.v:373-379",
+        "evals/flow/axi4_lite/axi4_lite_regs_tb.v:459-468",
+        "evals/flow/axi4_lite_regs_driver.json:107-123",
+        "evals/flow/axi4_lite/held_out_test.c:25-50",
+        "evals/flow/axi4_lite_regs_driver.json:125-149",
+        "evals/flow/axi4_lite/mutant_sweep.json:34"
+      ]
+    },
+    {
+      "tag": "AXIL-PORTS",
+      "evidence": [
+        "evals/flow/axi4_lite/axi4_lite_regs_tb.v:58-65",
+        "evals/flow/axi4_lite_regs_driver.json:125-149",
+        "evals/flow/axi4_lite/mutant_sweep.json:66"
+      ]
+    },
+    {
+      "tag": "AXIL-PORTS-ONLY",
+      "evidence": "unjudged"
+    },
+    {
+      "tag": "AXIL-NO-PROT",
+      "evidence": "unjudged"
+    },
+    {
+      "tag": "AXIL-PARAMS",
+      "evidence": [
+        "evals/flow/axi4_lite/axi4_lite_regs_tb.v:58",
+        "evals/flow/axi4_lite_regs_driver.json:125-149",
+        "evals/flow/axi4_lite/mutant_sweep.json:82"
+      ]
+    },
+    {
+      "tag": "AXIL-PARAMS-DEFAULT",
+      "evidence": "unjudged"
+    },
+    {
+      "tag": "AXIL-ORDER",
+      "evidence": [
+        "evals/flow/axi4_lite/axi4_lite_regs_tb.v:308-313",
+        "evals/flow/axi4_lite/axi4_lite_regs_tb.v:366-370",
+        "evals/flow/axi4_lite/axi4_lite_regs_tb.v:410-412",
+        "evals/flow/axi4_lite/axi4_lite_regs_tb.v:459-472",
+        "evals/flow/axi4_lite/axi4_lite_regs_tb.v:311",
+        "evals/flow/axi4_lite/axi4_lite_regs_tb.v:512-545",
+        "evals/flow/axi4_lite/axi4_lite_regs_tb.v:312",
+        "evals/flow/axi4_lite/axi4_lite_regs_tb.v:313",
+        "evals/flow/axi4_lite_regs_driver.json:125-149",
+        "evals/flow/axi4_lite/mutant_sweep.json:90"
+      ]
+    },
+    {
+      "tag": "AXIL-WSTRB",
+      "evidence": [
+        "evals/flow/axi4_lite/axi4_lite_regs_tb.v:459-468",
+        "evals/flow/axi4_lite/axi4_lite_regs_tb.v:297-306",
+        "evals/flow/axi4_lite/axi4_lite_regs_tb.v:381-391",
+        "evals/flow/axi4_lite/held_out_test.c:52-65",
+        "evals/flow/axi4_lite_regs_driver.json:206-229",
+        "evals/flow/axi4_lite_regs_driver.json:125-149",
+        "evals/flow/axi4_lite/mutant_sweep.json:138"
+      ]
+    },
+    {
+      "tag": "AXIL-SLVERR",
+      "evidence": [
+        "evals/flow/axi4_lite/axi4_lite_regs_tb.v:58",
+        "evals/flow/axi4_lite/axi4_lite_regs_tb.v:393-407",
+        "evals/flow/axi4_lite/axi4_lite_regs_tb.v:469-478",
+        "evals/flow/axi4_lite/axi4_lite_regs_tb.v:400-407",
+        "evals/flow/axi4_lite/axi4_lite_regs_tb.v:473-478",
+        "evals/flow/axi4_lite/held_out_test.c:67-96",
+        "evals/flow/axi4_lite_regs_driver.json:107-123",
+        "evals/flow/axi4_lite_regs_driver.json:206-229",
+        "evals/flow/axi4_lite_regs_driver.json:125-149",
+        "evals/flow/axi4_lite/mutant_sweep.json:178"
+      ]
+    },
+    {
+      "tag": "AXIL-LATENCY",
+      "evidence": [
+        "evals/flow/axi4_lite/axi4_lite_regs_tb.v:101",
+        "evals/flow/axi4_lite/axi4_lite_regs_tb.v:113",
+        "evals/flow/axi4_lite/axi4_lite_regs_tb.v:160",
+        "evals/flow/axi4_lite/axi4_lite_regs_tb.v:173",
+        "evals/flow/axi4_lite/axi4_lite_regs_tb.v:512-545",
+        "evals/flow/axi4_lite_regs_driver.json:125-149",
+        "evals/flow/axi4_lite/mutant_sweep.json:266"
+      ]
+    },
+    {
+      "tag": "AXIL-LATENCY-READY-HIGH",
+      "evidence": "unjudged"
+    },
+    {
+      "tag": "AXIL-B2B",
+      "evidence": [
+        "evals/flow/axi4_lite/axi4_lite_regs_tb.v:101",
+        "evals/flow/axi4_lite/axi4_lite_regs_tb.v:116",
+        "evals/flow/axi4_lite/axi4_lite_regs_tb.v:160",
+        "evals/flow/axi4_lite/axi4_lite_regs_tb.v:177",
+        "evals/flow/axi4_lite/axi4_lite_regs_tb.v:321-334",
+        "evals/flow/axi4_lite/axi4_lite_regs_tb.v:415-427",
+        "evals/flow/axi4_lite/axi4_lite_regs_tb.v:483-509",
+        "evals/flow/axi4_lite/axi4_lite_regs_tb.v:103-104",
+        "evals/flow/axi4_lite/axi4_lite_regs_tb.v:162-163",
+        "evals/flow/axi4_lite_regs_driver.json:125-149",
+        "evals/flow/axi4_lite/mutant_sweep.json:290"
+      ]
+    },
+    {
+      "tag": "AXIL-RESET",
+      "evidence": [
+        "evals/flow/axi4_lite/axi4_lite_regs_tb.v:225-243",
+        "evals/flow/axi4_lite/axi4_lite_regs_tb.v:230-231",
+        "evals/flow/axi4_lite/axi4_lite_regs_tb.v:236-237",
+        "evals/flow/axi4_lite/axi4_lite_regs_tb.v:285",
+        "evals/flow/axi4_lite/axi4_lite_regs_tb.v:349",
+        "evals/flow/axi4_lite/axi4_lite_regs_tb.v:245-281",
+        "evals/flow/axi4_lite/axi4_lite_regs_tb.v:352-371",
+        "evals/flow/axi4_lite/axi4_lite_regs_tb.v:288",
+        "evals/flow/axi4_lite/axi4_lite_regs_tb.v:350",
+        "evals/flow/axi4_lite/axi4_lite_regs_tb.v:358",
+        "evals/flow/axi4_lite/axi4_lite_regs_tb.v:362",
+        "evals/flow/axi4_lite/axi4_lite_regs_tb.v:368",
+        "evals/flow/axi4_lite/axi4_lite_regs_tb.v:371",
+        "evals/flow/axi4_lite/axi4_lite_regs_tb.v:357",
+        "evals/flow/axi4_lite/axi4_lite_regs_tb.v:361",
+        "evals/flow/axi4_lite/axi4_lite_regs_tb.v:366-371",
+        "evals/flow/axi4_lite_regs_driver.json:125-149",
+        "evals/flow/axi4_lite/mutant_sweep.json:322"
+      ]
+    },
+    {
+      "tag": "AXIL-RESET-REGS",
+      "evidence": "unjudged"
+    },
+    {
+      "tag": "AXIL-SYNTH",
+      "evidence": "unjudged"
+    },
+    {
+      "tag": "AXIL-FORMAL",
+      "evidence": "unjudged"
+    },
+    {
+      "tag": "AXIL-TEST-RANGE",
+      "evidence": [
+        "evals/flow/axi4_lite_regs_driver.json:125-149",
+        "evals/flow/axi4_lite_regs_driver.json:206-229"
+      ]
+    }
+  ],
+  "result": "holds"
+}

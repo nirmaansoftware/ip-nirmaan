@@ -1,0 +1,813 @@
+{
+  "format": "nirmaan.flow-mutant-sweep",
+  "about": "The author's adversarial sweep (ip#339): every mutant tests/flow_mutants.py builds from the reference RTL, each violating exactly the tag named, run on the case's own testbench copy. A check record for the reviewers and the next document checker, not an eval record; tests/test_whole_flow_cases.py holds it to the builders and to the testbench copy.",
+  "case": "flow/axil-timer",
+  "testbench": {
+    "path": "evals/flow/axil_timer/axil_timer_tb.v",
+    "sha256": "f20465683eb6da2d35d09468d401332066bb3ad406af471c55317b42428670ac",
+    "top": "axil_timer_tb"
+  },
+  "builder": "tests/flow_mutants.py::timer_mutants",
+  "simulator": "Icarus Verilog version 13.0 (stable) (v13_0), iverilog -g2012",
+  "reference": {
+    "path": "tests/fixtures/rtl/axil_timer/axil_timer.v",
+    "sha256": "725bee8325c228b8f7417dd9eee2a990aeee618cf9a993197c64a0b7dfffb22a",
+    "result": "passes",
+    "checks": 44959
+  },
+  "conforming": [],
+  "mutants": [
+    {
+      "tag": "TMR-MODULE",
+      "mutant": "MODULE_cnt16",
+      "sha256": "03667fd89b5c8dedd5295338436205ac807b4d0dc1791c8b42d6ddee31eceba6",
+      "result": "fails",
+      "errors": 1020,
+      "first_failure": "long one-shot length in cycles: got 0x00000003, expected 0x00010003"
+    },
+    {
+      "tag": "TMR-MODULE",
+      "mutant": "MODULE_cnt24",
+      "sha256": "6075ce164e8af01546bb25788f165370885dca445106f97e1daa28e7c64dd64e",
+      "result": "fails",
+      "errors": 6,
+      "first_failure": "COUNT after a stop, all 32 bits: got 0x00ffffd4, expected 0xffffffd4"
+    },
+    {
+      "tag": "TMR-MODULE",
+      "mutant": "MODULE_no_periodic",
+      "sha256": "9e4f408322f319dde2959f595361421ca3e85f53c51c5382337f29d076fca8c4",
+      "result": "fails",
+      "errors": 570,
+      "first_failure": "periodic interrupt: got 0x00000000, expected 0x00000001"
+    },
+    {
+      "tag": "TMR-MODULE",
+      "mutant": "MODULE_start31",
+      "sha256": "fc2b225e4b35887f28578de5b68f30a97ef7101828bda4649bcdd9cb9c655ece",
+      "result": "fails",
+      "errors": 6,
+      "first_failure": "COUNT after a stop, all 32 bits: got 0x7fffffd4, expected 0xffffffd4"
+    },
+    {
+      "tag": "TMR-ADDR-WIDTH",
+      "mutant": "ADDRW_ignore_bit4",
+      "sha256": "ba919e4da9d678ca684dee6a8ca083e844d63fc64d0115e4b360c5922d286a15",
+      "result": "fails",
+      "errors": 472,
+      "first_failure": "write SLVERR: got 0x00000000, expected 0x00000002"
+    },
+    {
+      "tag": "TMR-ADDR-WIDTH",
+      "mutant": "ADDRW_ignore_bit5",
+      "sha256": "a7ecef5ee5b2a6b6db3d3c84cbcf3e475d4d3baab4847cd7ccc8553b8346205c",
+      "result": "fails",
+      "errors": 440,
+      "first_failure": "write SLVERR: got 0x00000000, expected 0x00000002"
+    },
+    {
+      "tag": "TMR-ADDR-WIDTH",
+      "mutant": "ADDRW_ignore_bit6",
+      "sha256": "aeab42e1c8810b045e9125dfb9ad1db3a9685e3977b83f631e5a11103961452c",
+      "result": "fails",
+      "errors": 429,
+      "first_failure": "write SLVERR: got 0x00000000, expected 0x00000002"
+    },
+    {
+      "tag": "TMR-ADDR-WIDTH",
+      "mutant": "ADDRW_ignore_bit7",
+      "sha256": "a3c7882cad7ddc74055744a3db79a459e1653241c08dff70950d2017ba998e6f",
+      "result": "fails",
+      "errors": 408,
+      "first_failure": "write SLVERR: got 0x00000000, expected 0x00000002"
+    },
+    {
+      "tag": "TMR-ADDR-WIDTH",
+      "mutant": "ADDRW_wfirst_high_alias",
+      "sha256": "0525207d1f5d9de36978a6e9bf17033bdc8ffd24aaa3106af73ca3e202d79250",
+      "result": "fails",
+      "errors": 308,
+      "first_failure": "matrix: COUNT or unmapped write SLVERR: got 0x00000000, expected 0x00000002"
+    },
+    {
+      "tag": "TMR-ADDR-WIDTH",
+      "mutant": "ADDRW_wr_ignore_bit6",
+      "sha256": "e11e535531b460a1aca9b8f316109fc57cb4a1d2e10aec8f9ab0540706c002b4",
+      "result": "fails",
+      "errors": 403,
+      "first_failure": "write SLVERR: got 0x00000000, expected 0x00000002"
+    },
+    {
+      "tag": "TMR-PORTS",
+      "mutant": "PORTS_bresp_3bit",
+      "sha256": "304bcea49bad486d6fa73b8f9246ae5b3844aa9057c46e59b155580c4933acdb",
+      "result": "fails",
+      "errors": 2,
+      "first_failure": "s_axil_bresp width: got 0x00000003, expected 0x00000002"
+    },
+    {
+      "tag": "TMR-PORTS",
+      "mutant": "PORTS_irq_2bit",
+      "sha256": "c26f900fa11ed95a7ef01bbca381366eca403edbd38d2d4cf1d98b92a30392a6",
+      "result": "fails",
+      "errors": 2,
+      "first_failure": "irq width: got 0x00000002, expected 0x00000001"
+    },
+    {
+      "tag": "TMR-PORTS",
+      "mutant": "PORTS_rdata_33",
+      "sha256": "fd4aeb1399647740bbe6fc377da95943cad77d3dab8f1c477f7e65319d81e83e",
+      "result": "fails",
+      "errors": 2,
+      "first_failure": "s_axil_rdata width: got 0x00000021, expected 0x00000020"
+    },
+    {
+      "tag": "TMR-PORTS",
+      "mutant": "PORTS_slverr_11",
+      "sha256": "9672336c083eabd688da84cbe8a154e052a3ec4b62f546c648355f2244557990",
+      "result": "fails",
+      "errors": 3253,
+      "first_failure": "write SLVERR: got 0x00000003, expected 0x00000002"
+    },
+    {
+      "tag": "TMR-MAP",
+      "mutant": "MAP_ctrl_bit3",
+      "sha256": "f411db0fe86f205ddd02b031c87cfc1d90ac82586c9f4b5d89cb3116e851d9c8",
+      "result": "fails",
+      "errors": 196,
+      "first_failure": "CTRL bits 31:3 read as zero: got 0x00000008, expected 0x00000000"
+    },
+    {
+      "tag": "TMR-MAP",
+      "mutant": "MAP_ctrl_bit31",
+      "sha256": "c4155bbbb349f5ca50616555a0850ca945e4bf5ac24670b68b4edb93a1e5440f",
+      "result": "fails",
+      "errors": 196,
+      "first_failure": "CTRL bits 31:3 read as zero: got 0x80000000, expected 0x00000000"
+    },
+    {
+      "tag": "TMR-MAP",
+      "mutant": "MAP_load_bit31",
+      "sha256": "a79b8fa7d1a4477993133257a6cd43ce921a408226c4e54ae1ed02d57ccca616",
+      "result": "fails",
+      "errors": 74,
+      "first_failure": "LOAD all ones: got 0x7fffffff, expected 0xffffffff"
+    },
+    {
+      "tag": "TMR-MAP",
+      "mutant": "MAP_load_reset1",
+      "sha256": "24c6a15cb46e8b20c9d55793056813479115e9fdb4b04917bd076aee14ca7385",
+      "result": "fails",
+      "errors": 4,
+      "first_failure": "reset value: got 0x00000001, expected 0x00000000"
+    },
+    {
+      "tag": "TMR-MAP",
+      "mutant": "MAP_status_bit31",
+      "sha256": "4094fc46bbe9ed7f62f8adeedfb7a8da7e75a21feb812474b966a7e5a579e83a",
+      "result": "fails",
+      "errors": 168,
+      "first_failure": "STATUS bits 31:1 read as zero: got 0x80000000, expected 0x00000000"
+    },
+    {
+      "tag": "TMR-CTRL-STRB",
+      "mutant": "CTRLSTRB_any",
+      "sha256": "88c567edc4d0ae2a85763c19394fbb15951134b57929682eedec7b7d7166ea08",
+      "result": "fails",
+      "errors": 674,
+      "first_failure": "CTRL unchanged without wstrb[0]: got 0x00000007, expected 0x00000000"
+    },
+    {
+      "tag": "TMR-CTRL-STRB",
+      "mutant": "CTRLSTRB_nostrb_running",
+      "sha256": "856e0d22e1c500bc94d9700aaffbd5cf8bf0d01f714a64012c4080b88eee8016",
+      "result": "fails",
+      "errors": 192,
+      "first_failure": "matrix: CTRL after a CTRL write, by strobe: got 0x00000001, expected 0x00000007"
+    },
+    {
+      "tag": "TMR-CTRL-STRB",
+      "mutant": "CTRLSTRB_nostrb_stop",
+      "sha256": "008533be7eb7df87080e1bde44f3530ebb5c82fc42b938e6221523a32348ae51",
+      "result": "fails",
+      "errors": 288,
+      "first_failure": "matrix: CTRL after a CTRL write, by strobe: got 0x00000000, expected 0x00000006"
+    },
+    {
+      "tag": "TMR-CTRL-STRB",
+      "mutant": "CTRLSTRB_slverr",
+      "sha256": "a0d6d97a094366095d5ce15c546298cfc9398f18e8982b6da575a9f1b27e5e6b",
+      "result": "fails",
+      "errors": 388,
+      "first_failure": "write OKAY: got 0x00000002, expected 0x00000000"
+    },
+    {
+      "tag": "TMR-CTRL-STRB",
+      "mutant": "CTRLSTRB_zero_all",
+      "sha256": "70778db061dc65a63fb441768cc08eb9672c6b4131c40f94678faa7d5ad6840f",
+      "result": "fails",
+      "errors": 98,
+      "first_failure": "CTRL wstrb 0000 writes nothing: got 0x00000007, expected 0x00000000"
+    },
+    {
+      "tag": "TMR-LOAD",
+      "mutant": "LOAD_strb0_all",
+      "sha256": "28d537ad75863df4bd34ee634bae2848b05351478caadf4b28fa59a78885c37b",
+      "result": "fails",
+      "errors": 68,
+      "first_failure": "LOAD wstrb 0000 writes nothing: got 0x12345678, expected 0xa5009600"
+    },
+    {
+      "tag": "TMR-LOAD",
+      "mutant": "LOAD_strb1_swap",
+      "sha256": "b6edd768d3978a82e157e75e85e754aba25ee8dd07af40134f606438b224f595",
+      "result": "fails",
+      "errors": 60,
+      "first_failure": "LOAD wstrb 0101: got 0x12bbccdd, expected 0x12bb56dd"
+    },
+    {
+      "tag": "TMR-LOAD",
+      "mutant": "LOAD_strb3_needs0",
+      "sha256": "ad7eb726775dcedc71d140145568f642524d5ffd2deeaa13971a5aa5a389aa95",
+      "result": "fails",
+      "errors": 30,
+      "first_failure": "LOAD wstrb 1000: got 0xff000000, expected 0x00000000"
+    },
+    {
+      "tag": "TMR-LOAD",
+      "mutant": "LOAD_wfirst_strb0110",
+      "sha256": "5fbb1e6cdb89bc9cddb0218f444d2c2f6401efafeaf5baed0b86f33c480d5ecc",
+      "result": "fails",
+      "errors": 4,
+      "first_failure": "matrix: LOAD read back, by strobe: got 0xc63c8b76, expected 0xc6738b76"
+    },
+    {
+      "tag": "TMR-STATUS-CLEAR",
+      "mutant": "STATUS_any",
+      "sha256": "5c81dccaee8808d02725e79ae8a569d59a1bba9974b8fe7f17adc5474e9c14da",
+      "result": "fails",
+      "errors": 108,
+      "first_failure": "writing 0 to STATUS clears nothing: got 0x00000000, expected 0x00000001"
+    },
+    {
+      "tag": "TMR-STATUS-CLEAR",
+      "mutant": "STATUS_awfirst_strb1_ignored",
+      "sha256": "4f68260a362187fa688493ecc047ba57c9d58256e5917d7e8da956ca1fd16b0b",
+      "result": "fails",
+      "errors": 16,
+      "first_failure": "matrix: irq after the STATUS write edge: got 0x00000001, expected 0x00000000"
+    },
+    {
+      "tag": "TMR-STATUS-CLEAR",
+      "mutant": "STATUS_needs_all",
+      "sha256": "d0c27a28e0315cef9b83f44ea62573e3e56ee102acb20a3af16975efc5df8c47",
+      "result": "fails",
+      "errors": 1262,
+      "first_failure": "irq after the acknowledgement: got 0x00000001, expected 0x00000000"
+    },
+    {
+      "tag": "TMR-STATUS-CLEAR",
+      "mutant": "STATUS_strb0_clears",
+      "sha256": "3f944bd2ebc6a11d82a7b4e70284be5cd57714615308ed7cdb061ebd875ccb66",
+      "result": "fails",
+      "errors": 18,
+      "first_failure": "STATUS still set while irq is held: got 0x00000000, expected 0x00000001"
+    },
+    {
+      "tag": "TMR-START",
+      "mutant": "START_load_minus1",
+      "sha256": "235b71f1024f935060ad33d29ec58462264312ccc46e071700b242b52522ff54",
+      "result": "fails",
+      "errors": 1810,
+      "first_failure": "one-shot interrupt: got 0x00000000, expected 0x00000001"
+    },
+    {
+      "tag": "TMR-START",
+      "mutant": "START_periodic_restart_ignored",
+      "sha256": "839ee586c63db9f6318e7ccc5cf51630ed3ff0ec8fba5daedf50eabddcebd0b1",
+      "result": "fails",
+      "errors": 48,
+      "first_failure": "matrix: COUNT after the CTRL write: got 0x000ffff7, expected 0x000ffffa"
+    },
+    {
+      "tag": "TMR-START",
+      "mutant": "START_restart_ignored",
+      "sha256": "e7936093a9c508ca224213c3a736400e025746d247229e1801f6f374c42486ec",
+      "result": "fails",
+      "errors": 98,
+      "first_failure": "restart counts from the restart: got 0x00000004, expected 0x0000000c"
+    },
+    {
+      "tag": "TMR-LOAD-ZERO",
+      "mutant": "LOAD0_counts2",
+      "sha256": "584d6549265889861e6ca451de67874162df6ad731ac86dd10c338fd7691093e",
+      "result": "fails",
+      "errors": 6,
+      "first_failure": "one-shot length in cycles: got 0x00000002, expected 0x00000001"
+    },
+    {
+      "tag": "TMR-COUNT",
+      "mutant": "COUNT_dec2_high",
+      "sha256": "dce676e9036c307c2f2b5edbb0c702ae3d92b6263337451ea52b9a8c5c8be682",
+      "result": "fails",
+      "errors": 768,
+      "first_failure": "one-shot length in cycles: got 0x00000115, expected 0x0000012c"
+    },
+    {
+      "tag": "TMR-COUNT",
+      "mutant": "COUNT_dec2_veryhigh",
+      "sha256": "1235337b0d91a68e095dbb60f7cd39ea6fa24453a01bcec07b6902f1e6c38b45",
+      "result": "fails",
+      "errors": 760,
+      "first_failure": "long one-shot length in cycles: got 0x00010001, expected 0x00010003"
+    },
+    {
+      "tag": "TMR-COUNT",
+      "mutant": "COUNT_load_write_reloads",
+      "sha256": "d3f378b67c61bfd946898bd4cee30367fcabaa4d092afa7c2f1910b0b2d2e2b8",
+      "result": "fails",
+      "errors": 78,
+      "first_failure": "matrix: a LOAD write leaves the running count: got 0x00000020, expected 0x0000003c"
+    },
+    {
+      "tag": "TMR-COUNT",
+      "mutant": "COUNT_top_skip",
+      "sha256": "ad6bf722170bdaf00bff99d05c992b5aace922727116d2825284201768320c42",
+      "result": "fails",
+      "errors": 6,
+      "first_failure": "COUNT after a stop, all 32 bits: got 0xffffffff, expected 0xffffffd4"
+    },
+    {
+      "tag": "TMR-COUNT-LENGTH",
+      "mutant": "LENGTH_plus1_big",
+      "sha256": "6f4decc3dc5275a1a4951fb808b9f16ae326c7f8c5775834e16b566049d1a670",
+      "result": "fails",
+      "errors": 762,
+      "first_failure": "one-shot length in cycles: got 0x0000012d, expected 0x0000012c"
+    },
+    {
+      "tag": "TMR-ONESHOT",
+      "mutant": "ONESHOT_count1",
+      "sha256": "de4129e551e7cf95f02f90e023447f8a67ab75e778bd95e38370bfbb05f29b1d",
+      "result": "fails",
+      "errors": 202,
+      "first_failure": "one-shot COUNT at zero: got 0x00000001, expected 0x00000000"
+    },
+    {
+      "tag": "TMR-ONESHOT",
+      "mutant": "ONESHOT_refire_late",
+      "sha256": "fdad9c7dff9bd8a41c4117e600b56332fbf748db34d350480552656863869315",
+      "result": "fails",
+      "errors": 12,
+      "first_failure": "no second interrupt after the long one-shot: got 0x00010b97, expected 0x00000000"
+    },
+    {
+      "tag": "TMR-PERIODIC",
+      "mutant": "PERIODIC_len_big",
+      "sha256": "0cc01ab0f7d6d3d51615dff4723bf229ee4fb5c4a0c6b6c85dc6f37684fe4556",
+      "result": "fails",
+      "errors": 14,
+      "first_failure": "periodic period, LOAD 300: got 0x0000012d, expected 0x0000012c"
+    },
+    {
+      "tag": "TMR-PERIODIC",
+      "mutant": "PERIODIC_load1_as2",
+      "sha256": "3df3f1bc4aeaf0acd4b4dffc22ee780226201a0f41d68af7fb33f6f3d7f444dd",
+      "result": "fails",
+      "errors": 10,
+      "first_failure": "matrix: irq after each edge of a count: got 0x00000000, expected 0x00000001"
+    },
+    {
+      "tag": "TMR-PERIODIC",
+      "mutant": "PERIODIC_load2_as3",
+      "sha256": "5288e45492370e8ab6d6e1b85112f64602935286d4d709463476601e7c793ef0",
+      "result": "fails",
+      "errors": 32,
+      "first_failure": "matrix: irq after each edge of a count: got 0x00000000, expected 0x00000001"
+    },
+    {
+      "tag": "TMR-PERIODIC",
+      "mutant": "PERIODIC_reload16",
+      "sha256": "d84ba12849a7d8bf2e133bd43409525aa094f1f4e8d4db6e8e4b97fa8502bf07",
+      "result": "fails",
+      "errors": 10,
+      "first_failure": "matrix: COUNT after a periodic stop: got 0x00003438, expected 0x00123438"
+    },
+    {
+      "tag": "TMR-PERIODIC",
+      "mutant": "PERIODIC_small_plus1",
+      "sha256": "bd605afd369b187834732f09dc22b96aec0152ebd28490692eb7d30126a30f27",
+      "result": "fails",
+      "errors": 42,
+      "first_failure": "matrix: irq after each edge of a count: got 0x00000000, expected 0x00000001"
+    },
+    {
+      "tag": "TMR-PERIODIC",
+      "mutant": "PERIODIC_stops_6",
+      "sha256": "f2164f313013fc170a69faf331d327cbe77bfac8105d7af10836fd2acdc384cf",
+      "result": "fails",
+      "errors": 478,
+      "first_failure": "periodic interrupt, thirty periods: got 0x00000000, expected 0x00000001"
+    },
+    {
+      "tag": "TMR-STOP",
+      "mutant": "STOP_resumes",
+      "sha256": "0abbe19df7316227a6c6270b8e28d4cfa0b0416e2697509cb716e1826834f202",
+      "result": "fails",
+      "errors": 338,
+      "first_failure": "COUNT frozen while stopped: got 0xfffff804, expected 0xffffffd4"
+    },
+    {
+      "tag": "TMR-STOP",
+      "mutant": "STOP_resumes_late",
+      "sha256": "a7aab06c50d8b8e2e8772a78157d48617631f7111250f928a8913e4bf1afb0ab",
+      "result": "fails",
+      "errors": 4,
+      "first_failure": "COUNT frozen while stopped: got 0xfffffbe2, expected 0xffffffd4"
+    },
+    {
+      "tag": "TMR-STOP-EDGE",
+      "mutant": "STOPEDGE_idle_dec",
+      "sha256": "109d64ca694417e6968dc01d63b40c8d9d87f3eb484ceba41494c8565cd93f77",
+      "result": "fails",
+      "errors": 262,
+      "first_failure": "EN written 0 again leaves COUNT: got 0xffffffd3, expected 0xffffffd4"
+    },
+    {
+      "tag": "TMR-STOP-EDGE",
+      "mutant": "STOPEDGE_nodec",
+      "sha256": "84c8ca5c4733aaf656e6437132f38ede2092c70f5be0a6d2e3f8328e0619c19a",
+      "result": "fails",
+      "errors": 774,
+      "first_failure": "COUNT after a stop, all 32 bits: got 0xffffffd5, expected 0xffffffd4"
+    },
+    {
+      "tag": "TMR-STOP-EDGE",
+      "mutant": "STOPEDGE_periodic_nodec",
+      "sha256": "2cf03121d86d1bd7b951cb8c9170a24bbca5557af0fa20481917d1f486d30ca2",
+      "result": "fails",
+      "errors": 478,
+      "first_failure": "matrix: COUNT after the CTRL write: got 0x000ffffb, expected 0x000ffffa"
+    },
+    {
+      "tag": "TMR-STOP-EDGE",
+      "mutant": "STOPEDGE_reload",
+      "sha256": "356da2e6cd01e1830570e617ac3fadb43f1489b839a76ba5635231f0a6194b1a",
+      "result": "fails",
+      "errors": 806,
+      "first_failure": "COUNT unchanged by the address sweep: got 0x00000055, expected 0x00000000"
+    },
+    {
+      "tag": "TMR-END-BEATS-CLEAR",
+      "mutant": "ENDCLEAR_oneshot",
+      "sha256": "c59f5ab42210ff8b1c38e4e919427d0c8c6b7e4cac12ddb22e0713fb00784271",
+      "result": "fails",
+      "errors": 4,
+      "first_failure": "a one-shot count end beats a same-cycle clear: got 0x00000000, expected 0x00000001"
+    },
+    {
+      "tag": "TMR-IRQ",
+      "mutant": "IRQ_ageout20",
+      "sha256": "e15bb61374b1297e47266ff636bf0ac442c70e96ae1fc7e45269196ad346a16a",
+      "result": "fails",
+      "errors": 180,
+      "first_failure": "irq high until EXPIRED cleared or IE 0: got 0x00018701, expected 0x00000000"
+    },
+    {
+      "tag": "TMR-IRQ",
+      "mutant": "IRQ_ageout300",
+      "sha256": "cc9d1a67e35a93e2878df0defe5346b319b3136b8009d1fb214b5c7f16c3f585",
+      "result": "fails",
+      "errors": 4,
+      "first_failure": "irq high until EXPIRED cleared or IE 0: got 0x000185e9, expected 0x00000000"
+    },
+    {
+      "tag": "TMR-IRQ",
+      "mutant": "IRQ_ageout3000",
+      "sha256": "f740c197d2eed4bced6d38037386372da95c8d67578e7e918277633a1a9e6a87",
+      "result": "fails",
+      "errors": 4,
+      "first_failure": "irq high until EXPIRED cleared or IE 0: got 0x00017b5d, expected 0x00000000"
+    },
+    {
+      "tag": "TMR-IRQ",
+      "mutant": "IRQ_ie_no_raise",
+      "sha256": "6f133c67ee4fa0246c15e7d6e2abb74f25044214f14c232aed53f6e189e367f8",
+      "result": "fails",
+      "errors": 360,
+      "first_failure": "IE raises the pending interrupt: got 0x00000000, expected 0x00000001"
+    },
+    {
+      "tag": "TMR-IRQ",
+      "mutant": "IRQ_load_write_clears",
+      "sha256": "00f446307ebc29e5355aa6699ec923d25153337a4a94aad48316e78b175796a2",
+      "result": "fails",
+      "errors": 168,
+      "first_failure": "irq high, EXPIRED set, before the reset: got 0x00000000, expected 0x00000001"
+    },
+    {
+      "tag": "TMR-ORDER",
+      "mutant": "ORDER_aw_timeout",
+      "sha256": "bdbd3de0ae3b673d8dcca3b3e09b944991be253154da71fd30eeeb3a4ced6f17",
+      "result": "fails",
+      "errors": 14,
+      "first_failure": "monitor: AWREADY: got 0x00000001, expected 0x00000000"
+    },
+    {
+      "tag": "TMR-ORDER",
+      "mutant": "ORDER_awaddr_not_held",
+      "sha256": "eef4d02c83e25c027b65eb3c3e2a0ce10ab8d6c91dd24212b473cdb36b3c2a86",
+      "result": "fails",
+      "errors": 1530,
+      "first_failure": "AW before W OKAY: got 0x0000000X, expected 0x00000000"
+    },
+    {
+      "tag": "TMR-ORDER",
+      "mutant": "ORDER_held_addr_align",
+      "sha256": "7d862923e357e465f893e7bd08001e76e7e460c6de1632f8675e8fa02476ad1d",
+      "result": "fails",
+      "errors": 716,
+      "first_failure": "matrix: COUNT or unmapped write SLVERR: got 0x00000000, expected 0x00000002"
+    },
+    {
+      "tag": "TMR-ORDER",
+      "mutant": "ORDER_held_addr_low4",
+      "sha256": "b5a84336eca0fc9d180e423794a56134d3d0fc0355722660d661de1c13547d81",
+      "result": "fails",
+      "errors": 428,
+      "first_failure": "matrix: COUNT or unmapped write SLVERR: got 0x00000000, expected 0x00000002"
+    },
+    {
+      "tag": "TMR-ORDER",
+      "mutant": "ORDER_wdata_not_held",
+      "sha256": "e50c02ba9620a8ad9297956cb5bb5e63a47781b10c1e61d6751c13091fef5e20",
+      "result": "fails",
+      "errors": 568,
+      "first_failure": "LOAD after both orders, R backpressure: got 0xxxxx0200, expected 0x00000200"
+    },
+    {
+      "tag": "TMR-ORDER",
+      "mutant": "ORDER_wstrb_not_held",
+      "sha256": "d17b0ca9f28de6e6c78a44789683424a8ef33371abbf9f7687a6a2adcc7a4399",
+      "result": "fails",
+      "errors": 600,
+      "first_failure": "LOAD after both orders, R backpressure: got 0x12bb0200, expected 0x00000200"
+    },
+    {
+      "tag": "TMR-RESPONSE",
+      "mutant": "RESP_b_before_w",
+      "sha256": "d48d04da255963ae66ff606ac9619186cccf2b5f460639fc605f9915f9a3ea12",
+      "result": "fails",
+      "errors": 12,
+      "first_failure": "monitor: BVALID after the edge: got 0x00000001, expected 0x00000000"
+    },
+    {
+      "tag": "TMR-RESPONSE",
+      "mutant": "RESP_bresp_flip",
+      "sha256": "39170d7be413a03b6c97c6ec730bb9092ca8da1e6f97fbc957ee276e0ee238ca",
+      "result": "fails",
+      "errors": 3741,
+      "first_failure": "BRESP stable while BVALID waits: got 0x00000000, expected 0x00000002"
+    },
+    {
+      "tag": "TMR-RESPONSE",
+      "mutant": "RESP_bvalid_extra",
+      "sha256": "659e17fe5b9c764436f47498e7c2dabba3532a81fdbb1abec7dd2fa0edddf34c",
+      "result": "fails",
+      "errors": 21081,
+      "first_failure": "monitor: BVALID after the edge: got 0x00000001, expected 0x00000000"
+    },
+    {
+      "tag": "TMR-RESPONSE",
+      "mutant": "RESP_bvalid_timeout",
+      "sha256": "f5e3fe631d3d9779589b6bf65d3ece758d503b396ba79bd67d297936c49207a0",
+      "result": "fails",
+      "errors": 6,
+      "first_failure": "monitor: BVALID after the edge: got 0x00000000, expected 0x00000001"
+    },
+    {
+      "tag": "TMR-RESPONSE",
+      "mutant": "RESP_rdata_live",
+      "sha256": "1f8393c0d2c5f283759e126e20e33d0ec9730902e9c3239abc9418d3ce265b05",
+      "result": "fails",
+      "errors": 20,
+      "first_failure": "RDATA stable while RVALID waits: got 0x00000011, expected 0x00000012"
+    },
+    {
+      "tag": "TMR-RESPONSE",
+      "mutant": "RESP_rresp_flip_high",
+      "sha256": "88c15f1ef2c762629fb4cc3e197a530091d14cce7640f7f34796c7495bf1816f",
+      "result": "fails",
+      "errors": 344,
+      "first_failure": "RRESP stable while RVALID waits: got 0x00000000, expected 0x00000002"
+    },
+    {
+      "tag": "TMR-RESPONSE",
+      "mutant": "RESP_rvalid_extra",
+      "sha256": "5a0b93b5f7e3b0afe0e5a85d1f9caa0064c85edfb02792069b115031e5dee334",
+      "result": "fails",
+      "errors": 11864,
+      "first_failure": "monitor: RVALID after the edge: got 0x00000001, expected 0x00000000"
+    },
+    {
+      "tag": "TMR-RESPONSE",
+      "mutant": "RESP_rvalid_timeout",
+      "sha256": "0bc4c96ffe038a407d24abeb0ac224f87e810436b5749da39ffb662a03bd3511",
+      "result": "fails",
+      "errors": 6,
+      "first_failure": "monitor: RVALID after the edge: got 0x00000000, expected 0x00000001"
+    },
+    {
+      "tag": "TMR-RESPONSE-EDGE",
+      "mutant": "RESPEDGE_b_late",
+      "sha256": "73aec79b6caf63a49729bba686d6e7b1bb3789858e222152f533156c1cd4c285",
+      "result": "fails",
+      "errors": 246,
+      "first_failure": "monitor: BVALID after the edge: got 0x00000000, expected 0x00000001"
+    },
+    {
+      "tag": "TMR-RESPONSE-EDGE",
+      "mutant": "RESPEDGE_b_late_under_read",
+      "sha256": "d97f64eafc94017c9e4f791ca15821b59fe7e29891e20fb4ea13b14a201a870a",
+      "result": "fails",
+      "errors": 2,
+      "first_failure": "monitor: BVALID after the edge: got 0x00000000, expected 0x00000001"
+    },
+    {
+      "tag": "TMR-DECODE",
+      "mutant": "DECODE_rd_ignore_a0",
+      "sha256": "3d578ad0535e5fcbd52dc9f86b656701914e574d2498a29ad7b9b05ce75ff293",
+      "result": "fails",
+      "errors": 65,
+      "first_failure": "read SLVERR: got 0x00000000, expected 0x00000002"
+    },
+    {
+      "tag": "TMR-DECODE",
+      "mutant": "DECODE_rd_ignore_a1",
+      "sha256": "96ce8ab788e0266a126e25fcf80bb10549452d5a969c076a37079a29315fd0aa",
+      "result": "fails",
+      "errors": 162,
+      "first_failure": "read SLVERR: got 0x00000000, expected 0x00000002"
+    },
+    {
+      "tag": "TMR-DECODE",
+      "mutant": "DECODE_wr_ignore_a0",
+      "sha256": "ae40fce314c87dc6893b14d49b36f45859f1199156923972a74fde7cc5c9570b",
+      "result": "fails",
+      "errors": 895,
+      "first_failure": "write SLVERR: got 0x00000000, expected 0x00000002"
+    },
+    {
+      "tag": "TMR-DECODE",
+      "mutant": "DECODE_wr_ignore_a1",
+      "sha256": "00768f54bc470e65d0ca890cffddea7d47d3405146ea15c016c9bbdf9d4f1777",
+      "result": "fails",
+      "errors": 877,
+      "first_failure": "write SLVERR: got 0x00000000, expected 0x00000002"
+    },
+    {
+      "tag": "TMR-SLVERR",
+      "mutant": "SLVERR_count_okay",
+      "sha256": "f45d4ac263ef8798b30338eb7594a7363f5a472192007b90b3e7b64ba617e433",
+      "result": "fails",
+      "errors": 106,
+      "first_failure": "write SLVERR: got 0x00000000, expected 0x00000002"
+    },
+    {
+      "tag": "TMR-SLVERR",
+      "mutant": "SLVERR_count_write_effect",
+      "sha256": "711349daad0aa3ccb42116c981e13f5684eae396ca1eb898699320d12e01cc6f",
+      "result": "fails",
+      "errors": 96,
+      "first_failure": "COUNT unchanged by a write: got 0x00000005, expected 0x00000000"
+    },
+    {
+      "tag": "TMR-SLVERR",
+      "mutant": "SLVERR_data0_okay",
+      "sha256": "eeacb395d4791014f8903a8dc162563be3b97f5e88f58306e0154a038b104684",
+      "result": "fails",
+      "errors": 1202,
+      "first_failure": "B backpressure 40 cycles SLVERR: got 0x00000000, expected 0x00000002"
+    },
+    {
+      "tag": "TMR-SLVERR",
+      "mutant": "SLVERR_strb0_okay",
+      "sha256": "7275b34aaea2184bf709891d5b9a3bd144706bf4742b66b6e6d03cf167f42b56",
+      "result": "fails",
+      "errors": 150,
+      "first_failure": "matrix: COUNT or unmapped write SLVERR: got 0x00000000, expected 0x00000002"
+    },
+    {
+      "tag": "TMR-SLVERR",
+      "mutant": "SLVERR_strb_partial_okay",
+      "sha256": "e11b31b78524fb98887da8414fe6d2842eddd8b219f78e6b139cdd4ba0b5f284",
+      "result": "fails",
+      "errors": 2250,
+      "first_failure": "matrix: COUNT or unmapped write SLVERR: got 0x00000000, expected 0x00000002"
+    },
+    {
+      "tag": "TMR-SLVERR",
+      "mutant": "SLVERR_unm_clears",
+      "sha256": "9a058fe8fc1f531c91d1718563bd3293504b9fb0af9113faae71ce386f95b31b",
+      "result": "fails",
+      "errors": 140,
+      "first_failure": "STATUS unchanged by the address sweep: got 0x00000000, expected 0x00000001"
+    },
+    {
+      "tag": "TMR-SLVERR",
+      "mutant": "SLVERR_unm_rdata",
+      "sha256": "26d8bc9f346c7d0f0e89c491b96d74747a0e5d35c236dcdb76e1b13e746021a1",
+      "result": "fails",
+      "errors": 102,
+      "first_failure": "read SLVERR data: got 0x00000200, expected 0x00000000"
+    },
+    {
+      "tag": "TMR-SLVERR",
+      "mutant": "SLVERR_unm_writes_load",
+      "sha256": "a3123b9a997014039d65d145817f1eb2070cbc1341c49ff2bc2cd76125c4173d",
+      "result": "fails",
+      "errors": 160,
+      "first_failure": "LOAD unchanged by the address sweep: got 0xffffffff, expected 0x00000055"
+    },
+    {
+      "tag": "TMR-SLVERR",
+      "mutant": "SLVERR_wfirst_unm_writes",
+      "sha256": "816346da2df9f4f428d10dcc3e645eb4fd2326a6ccf5df8e9c4a5ca7053a96a5",
+      "result": "fails",
+      "errors": 58,
+      "first_failure": "matrix: LOAD unchanged: got 0xffff0055, expected 0x00000055"
+    },
+    {
+      "tag": "TMR-RESET",
+      "mutant": "RESET_keeps_count_running",
+      "sha256": "500fe16285da5f4d931d41cdd73a27686a1eeb8b253f7c53e1fd82b590436fa6",
+      "result": "fails",
+      "errors": 10,
+      "first_failure": "reset value: got 0x0000000X, expected 0x00000000"
+    },
+    {
+      "tag": "TMR-RESET",
+      "mutant": "RESET_keeps_expired",
+      "sha256": "99747c393b2498948f0e612ef36645da31097c20bec0a9e913633c3b17a58fa3",
+      "result": "fails",
+      "errors": 6,
+      "first_failure": "reset value: got 0x0000000X, expected 0x00000000"
+    },
+    {
+      "tag": "TMR-RESET",
+      "mutant": "RESET_keeps_load",
+      "sha256": "5cd40883df64cb9b6f3a10989da831d317b5f64abb9db47f2af3a7acdc534562",
+      "result": "fails",
+      "errors": 4,
+      "first_failure": "reset value: got 0xxxxxxxxx, expected 0x00000000"
+    },
+    {
+      "tag": "TMR-RESET",
+      "mutant": "RESET_keeps_mode",
+      "sha256": "0e108e1d2a4d42785065ce12ad33cbead09f6079363bf6dfe3b884b63784591c",
+      "result": "fails",
+      "errors": 10,
+      "first_failure": "reset value: got 0x0000000X, expected 0x00000000"
+    },
+    {
+      "tag": "TMR-LOAD-ZERO-PERIODIC",
+      "mutant": "LOAD0P_reload2",
+      "sha256": "d0a22037c670dbab0b58322703c3c06e74cb3bb4d2d409f98ad3054d917b9360",
+      "result": "fails",
+      "errors": 10,
+      "first_failure": "matrix: irq after each edge of a count: got 0x00000000, expected 0x00000001"
+    },
+    {
+      "tag": "TMR-READY",
+      "mutant": "READY_ar_gap_after_slverr",
+      "sha256": "560cdafd03f4d6a76fc43195bc3a2d5c66b948330c0ea840256b6ceae1f029da",
+      "result": "fails",
+      "errors": 2,
+      "first_failure": "monitor: ARREADY: got 0x00000000, expected 0x00000001"
+    },
+    {
+      "tag": "TMR-READY",
+      "mutant": "READY_ar_low_while_bvalid",
+      "sha256": "ce0b7b215f586aa81b3ba0ee33b44d38534cb01c1c451b7572b78675cb1f4569",
+      "result": "fails",
+      "errors": 2,
+      "first_failure": "monitor: ARREADY: got 0x00000000, expected 0x00000001"
+    },
+    {
+      "tag": "TMR-READY",
+      "mutant": "READY_w_gap_after_slverr",
+      "sha256": "935bee4141153cc69903a0fcae2cda77875b4b24521276e3155677226a0bdfaf",
+      "result": "fails",
+      "errors": 2,
+      "first_failure": "monitor: AWREADY: got 0x00000000, expected 0x00000001"
+    },
+    {
+      "tag": "TMR-IRQ-EDGE",
+      "mutant": "IRQEDGE_ie_late",
+      "sha256": "67727f75883aac6db990f87e0bf61bcdeb6fa464be8a6252ef95273d049bb34f",
+      "result": "fails",
+      "errors": 12,
+      "first_failure": "matrix: irq after the IE 1 edge: got 0x00000000, expected 0x00000001"
+    }
+  ]
+}

@@ -331,7 +331,11 @@ requests labelled `hold` or `needs-founder` are skipped.
    push identity, a plain push that GitHub refuses if the branch moved. That
    is a branch update ("branch updated" comment), not a fix round and not a
    stop; the new head is reviewed from scratch. A conflict in any other file
-   stops as before, naming the files. In GitHub Actions the generator, which
+   stops as before, naming the files. (Shared logs that every pull request
+   appended to were the other common conflict: a milestone's history file.
+   A follow-up pull request now adds its own fragment file instead,
+   `docs/history/fragments/MNN-<slug>/<YYYY-MM-DD>-<topic>.md`; see
+   `docs/STATUS_DOCS.md`.) In GitHub Actions the generator, which
    is the pull request's own code, runs as the check account in a separate
    clone of a trial merge, as the fixer's checks do (step 6); the loop takes
    back only that one file, as data (a regular file, no symlink, size-capped,
@@ -621,7 +625,8 @@ OSS CAD Suite's `sby`, `yices-smt2` and `eqy`, and the `ai`, `dev` and
 `npm ci` from `.github/review-loop/package-lock.json`, which checks the sha512
 of the CLI and of its platform package; make the check account `loopcheck`;
 check the Claude login; run the loop once (its step times out at 50 minutes,
-inside the App token's hour); push the state, even after a failure. The state
+inside the App token's hour; while a step is ready now it runs the next pass
+at once, below); push the state, even after a failure. The state
 folder is `$RUNNER_TEMP/pr-review`, under the runner's home folder (mode 750),
 which the check account cannot enter.
 The OSS CAD Suite moves from `$RUNNER_TEMP` to `/opt/oss-cad-suite`, with its
@@ -634,6 +639,33 @@ with `sby`, `yices-smt2` and `eqy` required.
 `review-loop`, whose deployment branch rule allows only `main`. None is a
 repository secret, because a workflow on a pull request from a branch of this
 repository can read repository secrets. The workflow token stays read-only.
+
+**Chained passes.** A pass that ends with a step ready now is followed at
+once by the next pass, in the same job and process, instead of waiting for
+the dispatcher's next tick (the Mac's launchd job, every 4 minutes, which
+stops when the Mac sleeps) and a second setup. After each pass,
+`loop_cloud.run_chained` reads, with the App token and no model call, whether
+any pull request the loop would step has a step it would take now
+(`ready_now`): a stop to post, a branch behind `main`, a merge conflict to
+handle, or required CI finished (green: a review is due; failed after a fix
+round: a stop). CI still running, a rate-limit pause, a backoff, a stop or an
+author-fix wait on the head, and a head already finished are not ready. If
+something is ready and `next_chain` allows it, `pr_loop.py --once` runs again.
+There is no chained pass after `loop_cloud.CHAIN_MAX` (5) in a row, once
+`CHAIN_BUDGET_S` (20 minutes) has passed since the first pass began (the step
+times out at 50 minutes, inside the App token's hour), when the ready set is
+the one the pass before already had (it made no progress on it), or when the
+read fails; the dispatcher's next tick runs the next pass then. A chained pass
+that pr_loop refuses because a merge changed the loop scripts on `main` (exit
+4) ends the chain without failing the job; the next run checks out the new
+`main`. Passes run one after another in one process, so two never run at
+once; the pass lock and the concurrency group are unchanged. It needs no
+permission, token or secret the job did not already have: the workflow token
+could not dispatch a run (it reads only, and `tests/test_ci.py` refuses a
+write permission in any workflow), and neither can the App token or
+`LOOP_GH_TOKEN`. A simulated timeline (`tests/test_loop_cloud.py`) shows the
+effect: with the 4-minute dispatcher a few minutes less per pull request;
+with no tick for an hour, open to merge about halved.
 
 | Secret | What | Used by |
 |---|---|---|
