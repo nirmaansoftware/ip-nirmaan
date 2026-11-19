@@ -132,7 +132,8 @@ strobes unknown while it does not offer them. For the register block: every
 register bit, each strobe alone, a write and a read at every unmapped address,
 write halves 40 cycles apart, back-to-back requests after responses that
 waited on `READY`, and no response valid after the first reset edge. A third
-round (decision #37), after a third independent check, closes classes instead
+round, after another independent check (the timer document's fourth, the
+register block's third), closes classes instead
 of single findings: each copy ends with a coverage matrix. Writes run in every
 ordering (address and data together, address first, data first) at every
 address class (each register, every unaligned offset, and for the timer at
