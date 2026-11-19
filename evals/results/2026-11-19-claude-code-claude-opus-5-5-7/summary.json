@@ -1,0 +1,29 @@
+{
+  "cases": {
+    "dv/plan-irq-ctrl": {
+      "high": 1.0,
+      "low": 0.20654931437723745,
+      "n": 1,
+      "passed": 1,
+      "rate": 1.0
+    }
+  },
+  "format": "nirmaan.eval-summary",
+  "seats": {
+    "dv-plan": {
+      "high": 1.0,
+      "low": 0.20654931437723745,
+      "n": 1,
+      "passed": 1,
+      "rate": 1.0
+    }
+  },
+  "totals": {
+    "cost_usd": null,
+    "duration_s": 181.325,
+    "input_tokens": 6,
+    "model_calls": 3,
+    "output_tokens": 22629,
+    "trials": 1
+  }
+}
