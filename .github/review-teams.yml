@@ -565,6 +565,18 @@ founder_classes:
       - src/nirmaan/company/workflows.py
       - src/nirmaan/company/evidence.py
       - src/nirmaan/evals/levels.py
+      - src/nirmaan/evals/scorers.py
+      - src/nirmaan/evals/object_screen.py
+      - src/nirmaan/evals/cases.py
+      - src/nirmaan/models/evaluation.py
+      - evals/dv/*.json
+      - evals/rtl/*.json
+      - evals/firmware/*.json
+      - evals/spec/*.json
+      - evals/flow/*.json
+      - evals/flow/*/**
+      - evals/firmware/*/**
+      - evals/spec/*/**
       - scripts/check_*.py
       - scripts/live_eval_gate.py
     content:
@@ -573,7 +585,7 @@ founder_classes:
       - pattern: '\b(no-tools|physical-design|test-union|dashes)\b'
         in: [.github/workflows/**]
         example: '  test-union:'
-    note: Paths are the gate files of the council record of 2026-10-17 (section 1), the level rules and the gate input guard, which decide what a skill level needs; content is NIRMAAN_REQUIRE_EDA and the required check names. src/nirmaan/company/evidence.py holds MUST_FAIL_DOMAINS and src/nirmaan/evals/levels.py the rest (trial count, Wilson bound, re-judge, must-fail, stale and harness rules); decision 11 of the pilot retrospective calls a MUST_FAIL_DOMAINS change a gate change. src/nirmaan/integrations/eda_guard.py (M84) holds the allow lists that refuse seat input able to run a shell command or other code before a gate runs; a change to it changes which inputs a gate refuses, so it is a gate change (the Founder Proxy asked for it on ip#301). src/nirmaan/evals/records.py is not listed because it records trials and replays them, decides no pass or fail and no level, and is not in harness.CODE (RR5, ip#292, left the fingerprint unchanged), and the rules that read its records are in levels.py and evidence.py. scripts/capability_levels.py is not listed, because it holds no rule; it only prints, writes or compares the output of levels.py, and tests/test_capability_levels.py checks capability/levels.json against levels.py directly.
+    note: Paths are the gate files of the council record of 2026-10-17 (section 1), the level rules and the gate input guard, which decide what a skill level needs; content is NIRMAAN_REQUIRE_EDA and the required check names. src/nirmaan/company/evidence.py holds MUST_FAIL_DOMAINS and src/nirmaan/evals/levels.py the rest (trial count, Wilson bound, re-judge, must-fail, stale and harness rules); decision 11 of the pilot retrospective calls a MUST_FAIL_DOMAINS change a gate change. src/nirmaan/integrations/eda_guard.py (M84) holds the allow lists that refuse seat input able to run a shell command or other code before a gate runs; a change to it changes which inputs a gate refuses, so it is a gate change (the Founder Proxy asked for it on ip#301). src/nirmaan/evals/records.py is not listed because it records trials and replays them, decides no pass or fail and no level, and is not in harness.CODE (RR5, ip#292, left the fingerprint unchanged), and the rules that read its records are in levels.py and evidence.py. scripts/capability_levels.py is not listed, because it holds no rule; it only prints, writes or compares the output of levels.py, and tests/test_capability_levels.py checks capability/levels.json against levels.py directly. The judging code of the evals is in this class too (ip#351 and ip#352 changed what the screened scorers and the flow checks refuse or pass, declared gate-semantics in their text, and merged without the Founder Proxy because the loop classifies by path only). It lists the scorers and their registry (src/nirmaan/evals/scorers.py), the object screen (src/nirmaan/evals/object_screen.py), the case loader and validator (src/nirmaan/evals/cases.py), the held-out check model (src/nirmaan/models/evaluation.py), every case and control file (evals/*/*.json, which takes in the evals/flow/*_record.json records of the screen and the controls) and the held-out files that cases name (testbenches, held-out tests, interface checks, requirements and citations under evals/flow/*/, evals/firmware/*/ and evals/spec/*/). Result records under evals/results/** are not listed, because they record trials and decide no pass or fail.
   - id: licence-and-third-party
     title: Licence and third-party
     paths:
