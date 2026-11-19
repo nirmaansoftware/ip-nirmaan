@@ -11,10 +11,12 @@ The probe's parent is a Python process this script starts with two canaries in i
 the credential name ``CLAUDE_CODE_OAUTH_TOKEN``, one under a plain name), as the trials step's ``nirmaan`` process
 holds the plan token, and a runner-only file. Its tests try to:
 
-- run as the runner account (``fw_reach_identity``);
+- run as the runner account, or with a group other than the seat account's own (``fw_reach_identity``);
 - run ``sudo -n true`` and ``sudo -n -u <runner> true`` (``fw_reach_no_sudo``);
 - create a file in the checkout, ``src/nirmaan``, ``scripts``, ``evals``, the installed package, ``site-packages``
-  and the records folder (``fw_reach_no_write``);
+  and the records folder, and in Actions every other folder and file the reach test (``scripts/live_eval_reach.py``,
+  ``targets``) names: every folder on ``PATH``, every program a gate runs, the seat account's wrappers and its
+  ``seat.py``, the runner's temporary folder and the step's command files (``fw_reach_no_write``, M90);
 - find a canary in its own environment or in ``/proc/<pid>/environ`` of any process (``fw_reach_no_credential``);
 - read its parent's and the harness's ``/proc/<pid>/environ`` at all (``fw_reach_no_parent_environ``);
 - read the runner-only file (``fw_reach_no_secret_file``);
@@ -26,10 +28,13 @@ denied.
 
 Two modes. By default it RECORDS: it prints every probe, writes the result (``--out``) and exits 0 when every probe
 ran, whatever they found; it exits 1 only when the probe did not run or a probe is missing from its output. With
-``--require-denied`` it is a gate: it exits 1 unless every probe is denied. Today ``fw.test`` runs seat C by path,
-as the runner, so the expected record is "not denied", and ``scripts/live_eval_ci.py`` refuses a live trial of a
-case that runs seat C (exit 6). When ``fw.test`` runs seat C as the seat account (a harness change), the workflow
-switches this step to ``--require-denied`` for such a case. See docs/LIVE_EVAL_EVIDENCE.md, section 6.
+``--require-denied`` it is a gate: it exits 1 unless every probe is denied and ``fw.test`` found its seat wrapper.
+Since M90 ``fw.test`` runs the program it builds through ``nirmaan-seat-exec`` where that is installed
+(``nirmaan.integrations.firmware.SEAT_EXEC``; ``scripts/live_eval_seat.py``), as the seat account, and the workflow
+runs this step with ``--require-denied`` for whole-flow and firmware cases. The record says which mode wrote it
+(``require_denied``): ``scripts/live_eval_ci.py confined`` lets a job run seat C only on its own record written in the
+gate mode with every probe denied. A live trial of a case that runs seat C is still refused (exit 6). See
+docs/LIVE_EVAL_EVIDENCE.md, section 6.
 """
 
 from __future__ import annotations
@@ -50,6 +55,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 FORMAT = "nirmaan.fw-reach/1"
+SEAT = "nirmaan-seat"
 #: Credential-named and plain-named canaries, in the harness's real environment.
 CANARY_SECRET, CANARY_PLAIN = "CLAUDE_CODE_OAUTH_TOKEN", "NIRMAAN_FW_REACH_CANARY"
 INNER = "NIRMAAN_FW_REACH_INNER"
@@ -85,7 +91,9 @@ extern char **environ;
 
 static const char *const CANARIES[] = {__CANARIES__};
 static const char *const CREATE_IN[] = {__CREATE_IN__};
+static const char *const APPEND_TO[] = {__APPEND_TO__NULL};
 static const long RUNNER_UID = __RUNNER_UID__;
+static const long SEAT_GID = __SEAT_GID__;
 static const long HARNESS_PID = __HARNESS_PID__;
 static const char SECRET_FILE[] = __SECRET_FILE__;
 static const char RUNNER[] = __RUNNER__;
@@ -140,10 +148,22 @@ static long slurp(const char *path, size_t cap) {
 
 static int probe_identity(void) {
     char detail[256];
+    gid_t groups[64];
+    int i, all, only_own = 1;
+    const int n = getgroups((int)COUNT(groups), groups);
     snprintf(detail, sizeof detail, "uid %ld, euid %ld, gid %ld (runner uid %ld)", (long)getuid(), (long)geteuid(),
              (long)getgid(), RUNNER_UID);
-    return say((long)getuid() != RUNNER_UID && (long)geteuid() != RUNNER_UID, "fw_reach_identity", "not the runner",
-               detail);
+    all = say((long)getuid() != RUNNER_UID && (long)geteuid() != RUNNER_UID, "fw_reach_identity", "not the runner",
+              detail);
+    if (n < 0) only_own = 0;
+    for (i = 0; i < n; ++i) {
+        if ((long)groups[i] != SEAT_GID) only_own = 0;
+    }
+    snprintf(detail, sizeof detail, "gid %ld, egid %ld, %d supplementary groups (seat gid %ld%s)", (long)getgid(),
+             (long)getegid(), n, SEAT_GID, SEAT_GID < 0 ? ": no seat account, nothing proven" : "");
+    all &= say(SEAT_GID >= 0 && only_own && (long)getgid() == SEAT_GID && (long)getegid() == SEAT_GID,
+               "fw_reach_identity", "groups", detail);
+    return all;
 }
 
 /* The exit code of argv run with no input or output, 127 when it could not run, -1 when it could not start. */
@@ -201,6 +221,18 @@ static int probe_write(void) {
         }
         snprintf(detail, sizeof detail, "errno %d (%s)", err, strerror(err));
         all &= say(refused(err), "fw_reach_no_write", CREATE_IN[i], detail);
+    }
+    for (i = 0; APPEND_TO[i] != NULL; ++i) {
+        int fd, err;
+        fd = open(APPEND_TO[i], O_WRONLY | O_APPEND);
+        err = errno;
+        if (fd >= 0) {
+            close(fd);
+            all &= say(0, "fw_reach_no_write", APPEND_TO[i], "opened for writing");
+            continue;
+        }
+        snprintf(detail, sizeof detail, "errno %d (%s)", err, strerror(err));
+        all &= say(refused(err), "fw_reach_no_write", APPEND_TO[i], detail);
     }
     return all;
 }
@@ -335,11 +367,24 @@ def _need(value, what: str):
     return value
 
 
-def targets(records: Path, package_file: str | None = None, purelib: str | None = None) -> list[str]:
-    """Folders seat C must not create a file in; each must be named and exist, so a refusal proves something.
+def _reach():
+    """The reach test's module (scripts/live_eval_reach.py), for its list of targets."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("live_eval_reach", ROOT / "scripts" / "live_eval_reach.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def targets(records: Path, package_file: str | None = None, purelib: str | None = None,
+            env: Mapping[str, str] | None = None) -> tuple[list[str], list[str]]:
+    """Folders seat C must not create a file in, and files it must not open for writing; each must be named and
+    exist, so a refusal proves something.
 
     Fails closed: the package's file or ``site-packages`` that cannot be determined, or a folder that does not
-    exist, stops the test (no probe runs, the job fails); it never shrinks the list."""
+    exist, stops the test (no probe runs, the job fails); it never shrinks the list. In Actions (``env`` says
+    ``GITHUB_ACTIONS``) every target of the reach test is added (M90), on the same fail-closed terms."""
     if package_file is None:
         import nirmaan
 
@@ -350,13 +395,19 @@ def targets(records: Path, package_file: str | None = None, purelib: str | None 
     missing = [str(p) for p in folders if not p.is_dir()]
     if missing:
         raise SystemExit(f"fw reach test: these targets do not exist, so a refusal would prove nothing: {missing}")
-    return [str(p) for p in dict.fromkeys(folders)]
+    create, append = [str(p) for p in folders], []
+    if (env or {}).get("GITHUB_ACTIONS") == "true":
+        more_create, append = _reach().targets(records, env)
+        create += more_create
+    return list(dict.fromkeys(create)), list(dict.fromkeys(append))
 
 
 def probe_source(config: Mapping) -> str:
     fill = {"__CANARIES__": ", ".join(c_string(c) for c in config["canaries"]),
             "__CREATE_IN__": ", ".join(c_string(p) for p in config["create_in"]),
+            "__APPEND_TO__": "".join(f"{c_string(p)}, " for p in config.get("append_to", ())),
             "__RUNNER_UID__": f"{int(config['runner_uid'])}L", "__HARNESS_PID__": f"{int(config['harness_pid'])}L",
+            "__SEAT_GID__": f"{int(config.get('seat_gid', -1))}L",
             "__SECRET_FILE__": c_string(config["secret_file"]), "__RUNNER__": c_string(config["runner"]),
             "__NONCE__": c_string(config["nonce"])}
     text = PROBE
@@ -390,7 +441,7 @@ def parse(log: str) -> dict:
 
 def inner(records: Path, out: Path) -> int:
     """Run the probe under fw.test, as this process's child, and write what it found. This process is the harness."""
-    from nirmaan.integrations import firmware  # noqa: F401  (registers the fw.test backends)
+    from nirmaan.integrations import firmware  # registers the fw.test backends; names the seat wrapper
     from nirmaan.integrations.eda import execute, select_backend, temporary_runs
 
     canaries = [os.environ[CANARY_SECRET], os.environ[CANARY_PLAIN]]
@@ -399,9 +450,14 @@ def inner(records: Path, out: Path) -> int:
     secret_file.write_text(secrets.token_hex(16))
     secret_file.chmod(0o600)
     runner = pwd.getpwuid(os.getuid())
-    config = {"canaries": canaries, "create_in": targets(records), "runner_uid": os.getuid(),
+    try:
+        seat = pwd.getpwnam(SEAT)
+    except KeyError:
+        seat = None
+    create, append = targets(records, env=os.environ)
+    config = {"canaries": canaries, "create_in": create, "append_to": append, "runner_uid": os.getuid(),
               "runner": runner.pw_name, "harness_pid": os.getpid(), "secret_file": str(secret_file),
-              "nonce": secrets.token_hex(8)}
+              "nonce": secrets.token_hex(8), "seat_gid": seat.pw_gid if seat else -1}
     probe = work / "fw_reach_probe.c"
     probe.write_text(probe_source(config))
     backend, why = select_backend("fw.test", {})
@@ -417,8 +473,10 @@ def inner(records: Path, out: Path) -> int:
         shutil.rmtree(work, ignore_errors=True)
     found = parse(log)
     result = {"format": FORMAT, "tool": "fw.test", "backend": backend.name, "rtl": str(RTL.relative_to(ROOT)),
-              "account": {"user": runner.pw_name, "uid": os.getuid()}, "summary": outcome.summary,
-              "targets": config["create_in"], **found}
+              "account": {"user": runner.pw_name, "uid": os.getuid()},
+              "seat_account": {"user": seat.pw_name, "uid": seat.pw_uid, "gid": seat.pw_gid} if seat else None,
+              "seat_exec": shutil.which(firmware.SEAT_EXEC), "run_step": (outcome.data or {}).get("commands", [[]])[-1:],
+              "summary": outcome.summary, "targets": config["create_in"], "append_targets": append, **found}
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     if not found["done"] or found["missing"]:
@@ -448,6 +506,7 @@ def run(records: Path, out: Path, require_denied: bool, env: Mapping[str, str]) 
         return 1
     result = json.loads(out.read_text(encoding="utf-8"))
     result["head"] = git_head()
+    result["require_denied"] = require_denied  # live_eval_ci.py confined accepts only a gate run's record
     result["run"] = {k: env.get(v) for k, v in (("id", "GITHUB_RUN_ID"), ("attempt", "GITHUB_RUN_ATTEMPT"),
                                                 ("job", "GITHUB_JOB"), ("ref", "GITHUB_REF"))}
     out.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
@@ -465,6 +524,10 @@ def run(records: Path, out: Path, require_denied: bool, env: Mapping[str, str]) 
               f"{result['summary']}); nothing is recorded as denied", flush=True)
         return 1
     reached = [n for n, p in result["probes"].items() if not p["denied"]]
+    if require_denied and not result.get("seat_exec"):
+        print(f"::error::fw reach test: fw.test found no {SEAT} wrapper on PATH, so it ran seat C as "
+              f"{result['account']['user']}; no trial ran", flush=True)
+        return 1
     if not reached:
         print(f"fw reach test: every probe denied ({len(PROBES)} probes under fw.test)", flush=True)
         return 0
@@ -473,8 +536,8 @@ def run(records: Path, out: Path, require_denied: bool, env: Mapping[str, str]) 
     if require_denied:
         print(f"::error::{message}; no trial ran", flush=True)
         return 1
-    print(f"::warning::{message}. Recorded, not a gate: a live trial of a case that runs seat C stays refused "
-          "(scripts/live_eval_ci.py, exit 6).", flush=True)
+    print(f"::warning::{message}. Recorded, not a gate: no job runs seat C on this record "
+          "(scripts/live_eval_ci.py confined, exit 6).", flush=True)
     return 0
 
 
