@@ -200,7 +200,7 @@ def timer_mutants(s: str) -> dict[str, str]:
     sub('STOPEDGE_idle_dec', ("                    end else begin\n                        en <= 1'b0;\n                    end", "                    end else begin\n                        en <= 1'b0;\n                        if (!en && count != 0) count <= count - 32'd1;\n                    end"))
     sub('STOPEDGE_reload', ("                    end else begin\n                        en <= 1'b0;\n                    end", "                    end else begin\n                        en <= 1'b0;\n                        count <= load;\n                    end"))
 
-    # Fourth round (decision #37): the third checker's passing mutants, then one per new matrix dimension.
+    # Fourth round (one round that closes classes): the third checker's passing mutants, then one per new matrix dimension.
     held = "aw_addr_q <= s_axil_awaddr;"
     bresp = "                s_axil_bresp <= wr_ok ? RESP_OKAY : RESP_SLVERR;"
     reload = "                    if (mode) begin\n                        count <= load;"
@@ -326,7 +326,7 @@ def regs_mutants(s: str) -> dict[str, str]:
     sub('RESET_keeps_aw', ("        if (!aresetn) begin\n            aw_held <= 1'b0;", "        if (!aresetn) begin"))
     sub('RESET_keeps_w', ("            aw_held <= 1'b0;\n            w_held <= 1'b0;\n            s_axil_bvalid <= 1'b0;", "            aw_held <= 1'b0;\n            s_axil_bvalid <= 1'b0;"))
 
-    # Fourth round (decision #37): the third checker's passing mutants, then one per new matrix dimension.
+    # Fourth round (one round that closes classes): the third checker's passing mutants, then one per new matrix dimension.
     bresp = "                s_axil_bresp <= wr_ok ? RESP_OKAY : RESP_SLVERR;"
     # AXIL-ORDER: an AW-first write's held address loses addr[1:0]; the strobes are taken from the bus at completion.
     sub('ORDER_held_addr_align', ("aw_addr_q <= s_axil_awaddr;", "aw_addr_q <= {s_axil_awaddr[ADDR_WIDTH-1:2], 2'b00};"))
