@@ -86,6 +86,7 @@ class FakeGitHub:
         self.auto_merge_allowed, self.settings_error = gh.get("auto_merge_allowed", "true"), gh.get("settings_error")
         self.labels = list(gh.get("labels", []))
         self.merge_error, self.body = gh.get("merge_error"), "Changes line two."
+        self.conflict_on_merge = gh.get("conflict_on_merge", False)
         # GitHub auto-merged the pull request just before the loop's own `gh pr merge` call.
         self.merged_first = gh.get("merged_first", False)
         self.merged_at = None
@@ -136,6 +137,10 @@ class FakeGitHub:
             self.merged_at = "2026-11-19T10:00:00Z"
             raise subprocess.CalledProcessError(1, ["gh", *args], output="",
                                                 stderr="GraphQL: Pull Request is not mergeable (enablePullRequestAutoMerge)")
+        if self.conflict_on_merge:
+            self.mergeable = False  # main moved after the loop looked: GitHub now reports the conflict
+            raise subprocess.CalledProcessError(1, ["gh", *args], output="",
+                                                stderr="GraphQL: Pull Request has merge conflicts (mergePullRequest)")
         if self.merge_error:
             raise subprocess.CalledProcessError(1, ["gh", *args], output="", stderr=self.merge_error)
 
@@ -1332,6 +1337,32 @@ def test_a_conflict_only_in_the_generated_levels_file_is_resolved_by_the_loop_as
     r.github.mergeable = True
     assert r.tick(loop=GENERATED) == ["auto-merge"]
     assert r.github.merges[0][-1] == new
+
+
+def test_a_merge_call_refused_for_a_conflict_only_in_the_generated_file_is_a_branch_update_not_a_stop(repo):
+    r = levels_repo(repo, {"records/z.txt": "z\n"}, {"records/a.txt": "a\n"})
+    r.github.mergeable = True  # the loop looked before main moved
+    r.github.conflict_on_merge = True
+    assert r.tick(loop=GENERATED) == ["updated"]
+    assert len(r.github.merges) == 1
+    new = r.origin_head()
+    assert is_merge_of(r, new, r.first_head)
+    assert sh(r.origin, "show", f"{new}:{LEVELS}") == expected_levels(r, new).rstrip("\n")
+    assert not r.labeled() and r.st()["stopped"] is None
+    assert not any("Automated loop stopped" in c for c in r.comments())
+    r.github.conflict_on_merge = False
+    r.github.mergeable = True
+    assert r.tick(loop=GENERATED) == ["auto-merge"]
+    assert r.github.merges[-1][-1] == new
+
+
+def test_a_merge_call_refused_for_a_conflict_in_another_file_too_still_stops(repo):
+    r = levels_repo(repo, {"records/z.txt": "z\n", "src/app.py": "by the branch\n"}, {"records/a.txt": "a\n", "src/app.py": "by main\n"})
+    r.github.mergeable = True
+    r.github.conflict_on_merge = True
+    assert r.tick(loop=GENERATED) == ["stopped"]
+    assert r.labeled() and r.origin_head() == r.first_head
+    assert "gh pr merge --auto failed" in r.comments()[-1]
 
 
 def test_a_conflict_that_includes_another_file_still_stops(repo):
