@@ -6,7 +6,11 @@ case `flow/axil-timer` (council record 2026-11-17, decision 2). It is written
 before the flow and is no stage's output. Every requirement states behaviour
 at the block's ports and ends with its tag. The requirements specification
 carries every requirement forward, and every later document restates each one
-where it belongs, with the same tag.
+where it belongs, with the same tag. Every requirement holds as stated, but the
+case judges each judged rule only within its stated scope: the values, waits,
+positions, widths and orderings its reference testbench exercises for that
+rule, listed by tag under `judged_scope` in `evals/flow/axil_timer/citations.json`
+(the rules no check rests on are listed there under `not_judged`).
 
 Words used for time: an edge is a rising edge of `aclk`. A value "after edge
 `E`" is the value in the clock cycle that follows `E`; a value "before edge
@@ -65,11 +69,24 @@ on an edge on which its VALID and READY are both high.
 * In periodic mode a `LOAD` of 0 counts as 1 as well: a count started on
   edge `E` with `LOAD` 0 ends on every edge `E + 1`, `E + 2`, and so on.
   [req:TMR-LOAD-ZERO-PERIODIC]
-* While `EN` is 1, `COUNT` goes down by one on every edge, except on two
-  kinds of edge: the edge that ends the count (an edge with `EN` 1 and
-  `COUNT` 1 or 0 before it), which sets `EXPIRED`; and the restart edge, an
-  edge on which a `CTRL` write with `EN` 1 takes effect, on which `COUNT`
-  takes the value of `LOAD` instead. [req:TMR-COUNT]
+* While `EN` is 1, `COUNT` goes down by one on every edge (what that needs
+  of bits 31:21 is `TMR-COUNT-32BIT`, and what other transfers leave of it
+  is `TMR-RUNNING-UNDISTURBED`), except on two kinds of edge: the edge that
+  ends the count (an edge with `EN` 1 and `COUNT` 1 or 0 before it), which
+  sets `EXPIRED`; and the restart edge, an edge on which a `CTRL` write with
+  `EN` 1 takes effect, on which `COUNT` takes the value of `LOAD` instead.
+  [req:TMR-COUNT]
+* `COUNT` is a full 32-bit value in every step: the decrement borrows
+  through every bit up to bit 31, an edge ends the count only when all 32
+  bits of `COUNT` are 1 or 0 before it (a high bit set is a count still
+  running), and the reload of a periodic count takes all 32 bits of `LOAD`.
+  [req:TMR-COUNT-32BIT]
+* A transfer that is not a `CTRL` write, a `LOAD` write or a `STATUS` clear
+  leaves a running count as it is: a read of any register, a write to
+  `COUNT`, a write to an unmapped address and a `STATUS` write that clears
+  nothing neither change `COUNT` nor stall, restart or stop its decrement,
+  so the count ends on the same edge as without the transfer.
+  [req:TMR-RUNNING-UNDISTURBED]
 * Count length, exactly: a write takes effect on the edge that completes it
   (section 4), the edge after which `s_axil_bvalid` is first high for it. A
   count started on edge `E` with `LOAD` of `N` (at least 1) ends on edge
@@ -87,6 +104,17 @@ on an edge on which its VALID and READY are both high.
   again and `EN` stays 1. With `LOAD` at least 1, every period is exactly
   `LOAD` cycles (a `LOAD` of 0: `TMR-LOAD-ZERO-PERIODIC`).
   [req:TMR-PERIODIC]
+* A periodic count ends and reloads at the end of every period whether or
+  not `EXPIRED` is already set: nothing has to clear `EXPIRED` between two
+  periods. [req:TMR-PERIODIC-EXPIRED-SET]
+* A `CTRL` write that writes `EN` 1 while a count runs (a restart) sets
+  `MODE` as well, and the restarted count ends as that `MODE` says, one-shot
+  or periodic, not as the `MODE` it was started with.
+  [req:TMR-RESTART-MODE]
+* A `LOAD` write that takes effect on the edge a periodic count ends: this
+  document states no rule for what that edge reloads, the value `LOAD` held
+  before the edge or the value the write gives it. A test accepts both.
+  [req:TMR-LOAD-END-EDGE]
 * `EN` written 0 stops the count: after the edge the write takes effect,
   `EN` reads 0, `COUNT` keeps the value that edge gave it, and no more counts
   end, until `EN` is written 1 again. [req:TMR-STOP]
@@ -125,18 +153,32 @@ on an edge on which its VALID and READY are both high.
   accepts it without its write data, until the edge that accepts that data;
   write data is held after the edge that accepts it without its address,
   until the edge that accepts that address; after the edge that completes a
-  write nothing is held. So no new write address or data is accepted while a
-  write response waits, and no new read address while a read response waits.
-  [req:TMR-READY]
+  write nothing is held. [req:TMR-READY]
+* A transfer is accepted only on an edge on which its VALID and READY are
+  both high, so no new write address or data is accepted while a write
+  response waits, and no new read address while a read response waits, even
+  when one is offered. [req:TMR-READY-HELD-REQUEST]
 * `s_axil_bvalid` never rises before the write completes; once high it
   stays high, with `s_axil_bresp` stable, until an edge on which
   `s_axil_bready` is high, and is low after that edge. `s_axil_rvalid` never
   rises before the read address is accepted; once high it stays high, with
-  `s_axil_rdata` and `s_axil_rresp` stable, until an edge on which
-  `s_axil_rready` is high, and is low after that edge. [req:TMR-RESPONSE]
+  `s_axil_rresp` stable, and `s_axil_rdata` stable too when the read is of
+  `COUNT`, until an edge on which `s_axil_rready` is high, and is low after
+  that edge. [req:TMR-RESPONSE]
+* For a read of `CTRL`, `LOAD`, `STATUS` or an unmapped address, `s_axil_rdata`
+  stays what it was when `s_axil_rvalid` rose for as long as `s_axil_rvalid`
+  waits, even if that register changes meanwhile (a count that ends sets
+  `EXPIRED`, a write changes `CTRL` or `LOAD`).
+  [req:TMR-RESPONSE-RDATA-STABLE]
 * `s_axil_bvalid` is high after the same edge that completes the write, not
   a later one; `s_axil_rvalid` is high after the same edge that accepts the
-  read address, not a later one. [req:TMR-RESPONSE-EDGE]
+  read address, not a later one; both while the response's READY is low on
+  that edge. [req:TMR-RESPONSE-EDGE]
+* When `s_axil_bready` is already high on the edge that completes a write,
+  `s_axil_bvalid` is high after that edge all the same, for the one cycle it
+  takes to be taken; likewise `s_axil_rvalid` after the edge that accepts a
+  read address with `s_axil_rready` already high. A response is not skipped
+  because its READY is early. [req:TMR-RESPONSE-EDGE-READY-HIGH]
 * A read returns the value the register holds before the edge that accepts
   its address, not the value that edge gives it. [req:TMR-READ-VALUE]
 
@@ -172,5 +214,6 @@ on an edge on which its VALID and READY are both high.
 * Tests accept the whole allowed range. A testbench checks only what this
   document states, and accepts every behaviour it allows; it never requires
   one choice where this document leaves a choice open. This document leaves
-  no timing or response choice open: every rule in sections 3 to 6 is exact.
+  no timing or response choice open but the one `TMR-LOAD-END-EDGE` names:
+  every other rule in sections 3 to 6 is exact.
   [req:TMR-TEST-RANGE]

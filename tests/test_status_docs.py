@@ -68,6 +68,63 @@ def test_this_milestone_has_its_own_history_file() -> None:
     assert (HISTORY / "M43-status-docs.md").is_file()
 
 
+def _load_history():
+    spec = importlib.util.spec_from_file_location("nirmaan_history", ROOT / "scripts" / "history.py")
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
+
+
+history = _load_history()
+
+
+def test_history_fragments_pass_the_check() -> None:
+    assert history.check() == []
+
+
+def test_a_milestone_reads_as_its_file_then_its_fragments_in_name_order(tmp_path) -> None:
+    (tmp_path / "M90-x.md").write_text("# Milestone 90 - X\n\nFirst.\n", encoding="utf-8")
+    folder = tmp_path / "fragments" / "M90-x"
+    folder.mkdir(parents=True)
+    (folder / "2026-11-20-later.md").write_text("**Later.** Two.\n", encoding="utf-8")
+    (folder / "2026-11-19-sooner.md").write_text("**Sooner.** One.\n", encoding="utf-8")
+    assert history.show("M90-x", tmp_path) == "# Milestone 90 - X\n\nFirst.\n\n**Sooner.** One.\n\n**Later.** Two.\n"
+    assert history.check(tmp_path) == []
+    (folder / "notes.md").write_text("x\n", encoding="utf-8")
+    (folder / "2026-11-21-heading.md").write_text("## A heading\n", encoding="utf-8")
+    (folder / "2026-11-22-empty.md").write_text("\n", encoding="utf-8")
+    (tmp_path / "fragments" / "M91-none").mkdir()
+    (tmp_path / "fragments" / "stray.md").write_text("x\n", encoding="utf-8")
+    problems = history.check(tmp_path)
+    assert len(problems) == 5, problems
+    assert any("M91-none: no docs/history/M91-none.md" in p for p in problems)
+    # The index links history files only: a fragment needs no index line.
+    assert all(p.parent == HISTORY for p in _history_files())
+
+
+def test_the_whole_flow_index_links_every_part_once() -> None:
+    """docs/WHOLE_FLOW.md is an index of the parts in docs/whole_flow/, so
+    parallel pull requests edit different files; gate status is one file per gate."""
+    index = (ROOT / "docs" / "WHOLE_FLOW.md").read_text(encoding="utf-8")
+    parts = ROOT / "docs" / "whole_flow"
+    links = re.findall(r"\]\(whole_flow/([^)]+\.md)\)", index)
+    assert sorted(links) == sorted(p.name for p in parts.glob("*.md")) and len(links) == len(set(links))
+    assert not re.search(r"^## (?!Parts$)", index, re.M), "the parts live in docs/whole_flow/, not here"
+    for path in parts.glob("*.md"):
+        assert re.fullmatch(r"\d\d-[a-z0-9-]+\.md", path.name), path.name
+        assert path.read_text(encoding="utf-8").startswith("# "), path.name
+    gates = sorted(p.name for p in (parts / "gates").iterdir())
+    assert gates and all(re.fullmatch(r"WF\d\d\.md", g) for g in gates), gates
+    for g in gates:
+        assert (parts / "gates" / g).read_text(encoding="utf-8").startswith(f"# WF{int(g[2:4])}\n"), g
+
+
+def test_the_convention_names_fragments() -> None:
+    for path in ("CLAUDE.md", "docs/STATUS_DOCS.md", "docs/history/README.md"):
+        assert "docs/history/fragments/" in (ROOT / path).read_text(encoding="utf-8"), path
+
+
 # --- context.md ---------------------------------------------------------------------
 
 

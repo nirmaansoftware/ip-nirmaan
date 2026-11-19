@@ -21,10 +21,10 @@ permissions:
 # See docs/TEST_CI_HARDENING.md.
 jobs:
   test-shard:
-    name: test (shard ${{ matrix.shard }}/3)
+    name: test (shard ${{ matrix.shard }}/4)
     timeout-minutes: 45
     # The full suite with every EDA tool required, once, on Python 3.12 (M46), split by
-    # test file across three runners (scripts/shards.py); the `test` job below checks
+    # test file across four runners (scripts/shards.py); the `test` job below checks
     # the split and carries the required name. The `no-tools` job covers 3.11, and
     # `test-union` checks that no test ran in no job.
     # 24.04 ships Verilator 5, which the `--binary` simulation backend needs.
@@ -32,7 +32,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3]
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
@@ -43,9 +43,26 @@ jobs:
       # M27: the driver cross-compiled for RV32I and run on PicoRV32 against the
       # RTL. Ubuntu's multilib GCC includes rv32i/ilp32; the SoC runtime carries
       # its own small libc, so no picolibc. See docs/RISCV_FIRMWARE.md.
+      # The Ubuntu mirror is sometimes throttled to about 70 kB/s, which made this step take
+      # up to 25 minutes (median 4 minutes; the same 84 MB). The downloaded packages are
+      # cached by ISO week, so the same package set is downloaded about once a week
+      # (apt still resolves versions from a fresh index, so a newer package is simply
+      # downloaded as before).
+      - name: Week of the package cache
+        id: week
+        run: echo "week=$(date -u +%G-W%V)" >> "$GITHUB_OUTPUT"
+      - name: Cache the downloaded apt packages
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/apt-debs
+          key: apt-eda-noble-${{ steps.week.outputs.week }}
+          restore-keys: apt-eda-noble-
       - name: Install open-source EDA tools and the RISC-V cross compiler
         run: |
-          sudo apt-get update && sudo apt-get install -y verilator iverilog yosys gcc-riscv64-unknown-elf
+          mkdir -p ~/apt-debs
+          sudo cp -n ~/apt-debs/*.deb /var/cache/apt/archives/ 2>/dev/null || true
+          sudo apt-get update && sudo apt-get install -y -o Acquire::Retries=3 verilator iverilog yosys gcc-riscv64-unknown-elf
+          cp -n /var/cache/apt/archives/*.deb ~/apt-debs/
           riscv64-unknown-elf-gcc --version | head -1
           riscv64-unknown-elf-gcc -print-multi-lib | grep rv32i/ilp32
       # M26: formal in CI. apt has no `sby`, so SymbiYosys and Yices come from the
@@ -78,7 +95,7 @@ jobs:
           NIRMAAN_REQUIRE_EDA: verilator verilator_coverage iverilog vvp yosys cc make sby yices-smt2 eqy riscv64-unknown-elf-gcc cocotb
           SHARD: ${{ matrix.shard }}
         run: >-
-          python -m pytest -q -rs --shard "$SHARD/3" --shard-profile test
+          python -m pytest -q -rs --shard "$SHARD/4" --shard-profile test
           --shard-manifest "$RUNNER_TEMP/shards/test-$SHARD.json" --junitxml="$RUNNER_TEMP/junit/test-$SHARD.xml"
       - name: Keep the test report
         if: always()
