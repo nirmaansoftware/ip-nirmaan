@@ -308,8 +308,10 @@ anyway is redacted from logs and from the uploaded record.
   the token unreadable. Since M90 the program `fw.test` builds from seat C
   executes as that account too, and a credential test in C gates each
   whole-flow and firmware job; seat C is still compiled as the runner, and
-  live trials of a case that runs seat C are still refused
-  (`docs/LIVE_EVAL_EVIDENCE.md`, section 6; `council/records/2026-11-19-seat-c-live-refusal.md`).
+  live trials of a case that runs seat C are still refused, except
+  `firmware/axi4-lite-driver`, which gate SC7 lifts on each job's own
+  credential test record (`docs/LIVE_EVAL_EVIDENCE.md`, section 6;
+  `council/records/2026-11-19-seat-c-live-refusal.md`).
 * **The compile residual** (`council/records/2026-11-19-seat-c-live-refusal.md`, fact 9 and decision 4). `fw.build`
   and `fw.test` compile seat C as the runner. The routes fact 9 found (an
   include of the committed reference driver by an absolute or `..` path, a

@@ -266,20 +266,32 @@ def test_the_tree_mode_needs_no_case_and_writes_its_manifest(tmp_path, monkeypat
     assert any(line.startswith("file ") and line.split()[2] == "scripts/live_eval_ci.py" for line in lines)
 
 
-def test_a_live_trial_of_a_case_that_runs_seat_c_is_refused():
+def test_a_live_trial_of_a_case_that_runs_seat_c_is_refused_but_the_lifted_single_seat_case():
+    """Gate SC7 (council record 2026-11-19, seat C and the live refusal): the lift covers firmware/axi4-lite-driver
+    only, a single-seat case; every other case that runs seat C is still refused live (exit 6)."""
+    assert ci.SEAT_C_LIVE == ("firmware/axi4-lite-driver",)
     assert ci.seat_c_problem("dv/cocotb-crc") is None and ci.seat_c_problem(SPEC_CASE) is None
-    problem = ci.seat_c_problem("firmware/axi4-lite-driver")
-    assert problem and "fw.test" in problem and "WF17" in problem
+    cases = {c.id: c for c in ci._cases()}
+    assert all(cases[case].flow == "seat" and ci.seat_c_use(case) for case in ci.SEAT_C_LIVE)
+    assert ci.seat_c_problem("firmware/axi4-lite-driver") is None
+    others = [case for case in cases if ci.seat_c_use(case) and case not in ci.SEAT_C_LIVE]
+    assert REGS_FLOW in others
+    for case in others:
+        problem = ci.seat_c_problem(case)
+        assert problem and "fw.test" in problem and "WF17" in problem and "No trial ran" in problem, case
 
 
-def test_main_refuses_seat_c_before_any_trial_but_a_replay_check_does_not(monkeypatch, capsys):
+def test_main_runs_the_lifted_case_only_on_this_jobs_record_and_a_replay_check_runs(monkeypatch, capsys):
     monkeypatch.setattr(ci, "installed_cli", lambda: "2.1.325")
     digest = harness_sha256(cli="2.1.325")
     for key, value in {"CASE": "firmware/axi4-lite-driver", "TRIALS": "1", "KNOWLEDGE": "on", "PURPOSE": "evidence",
                        "HARNESS": "default", "EXPECTED": digest}.items():
         monkeypatch.setenv(key, value)
+    for key in [*JOB_ENV, ci.FW_REACH_ENV]:
+        monkeypatch.delenv(key, raising=False)
     monkeypatch.setattr(ci, "run_trials", lambda *a, **k: pytest.fail("a trial started"))
-    assert ci.main(["check", "--require-expected"]) == ci.UNCONFINED
+    # check runs before the job's credential test, so it leaves the record to trials, which refuses without it.
+    assert ci.main(["check", "--require-expected"]) == 0
     assert ci.main(["trials", "--out", "/nonexistent"]) == ci.UNCONFINED
     assert "gate WF17" in capsys.readouterr().err
     assert ci.main(["check"]) == 0
@@ -349,15 +361,15 @@ def test_a_job_runs_a_cases_seat_c_only_on_its_own_credential_test_record(tmp_pa
     assert ci.main(["confined"]) == 0 and "runs no seat C" in capsys.readouterr().out
 
 
-def test_a_passing_credential_test_lifts_no_live_refusal(tmp_path, monkeypatch):
-    """M90 runs seat C as the seat account; it does not lift exit 6 (council record 2026-11-19, seat C and the live
-    refusal). Live trials of both seat-C cases stay refused."""
+def test_a_passing_credential_test_lifts_the_live_refusal_for_the_single_seat_case_only(tmp_path, monkeypatch):
+    """A record that counts does not lift exit 6 by itself: gate SC7 lifts it for firmware/axi4-lite-driver only
+    (council record 2026-11-19, seat C and the live refusal). The register block flow stays refused with it."""
     monkeypatch.setattr(ci, "_head", lambda: "c0ffee")
     for key, value in _fw_record(tmp_path).items():
         monkeypatch.setenv(key, value)
-    for case in ("firmware/axi4-lite-driver", REGS_FLOW_CASE):
-        problem = ci.seat_c_problem(case)
-        assert problem and "WF17" in problem and "No trial ran" in problem, case
+    assert ci.seat_c_problem("firmware/axi4-lite-driver") is None
+    problem = ci.seat_c_problem(REGS_FLOW_CASE)
+    assert problem and "WF17" in problem and "WF15 to WF19" in problem and "No trial ran" in problem
 
 
 # --- G3 step 5: whole-flow cases on the same path (council record 2026-11-17, decision 4) ----------------------
@@ -617,8 +629,8 @@ def test_the_committed_credential_record_is_from_main_in_gate_mode_for_the_repla
     # At or after ip#371's merge: the program ran through the wrapper ip#371 added (checked above), on main; CI's
     # shallow checkout has no history to walk, so the commit itself is named in the record's ``about``.
     assert record["head"] in record["about"] or record["head"][:7] in record["about"]
-    for case in ("firmware/axi4-lite-driver", REGS_FLOW):
-        assert ci.seat_c_problem(case)  # a record that counts lifts nothing: that is gate SC7
+    assert ci.seat_c_problem(REGS_FLOW)  # a record that counts lifts nothing for the flow case
+    assert ci.seat_c_problem("firmware/axi4-lite-driver") is None  # gate SC7, on this job's own record only
 
 
 # --- G3 third addendum (2026-11-19), gate WF21: no attempts option, and no whole-flow dispatch without its fingerprint
@@ -676,11 +688,12 @@ def test_every_case_that_runs_seat_c_gets_the_credential_test_in_every_job():
 
 
 def test_the_trials_step_refuses_on_a_missing_foreign_non_gate_or_not_denied_record(tmp_path, monkeypatch, capsys):
-    """SC4: exit 6 from the trials step, with the record's own reason, for each record that does not count; and a
-    record that counts still lifts nothing (the lift is gate SC7)."""
+    """SC4: exit 6 from the trials step, with the record's own reason, for each record that does not count. SC7: with
+    a record that counts, the trials of firmware/axi4-lite-driver start, and only then."""
     monkeypatch.setattr(ci, "installed_cli", lambda: "2.1.325")
     monkeypatch.setattr(ci, "_head", lambda: "c0ffee")
-    monkeypatch.setattr(ci, "run_trials", lambda *a, **k: pytest.fail("a trial started"))
+    ran = []
+    monkeypatch.setattr(ci, "run_trials", lambda *a, **k: ran.append(a) or 0)
     digest = harness_sha256(cli="2.1.325")
     base = {"CASE": "firmware/axi4-lite-driver", "TRIALS": "1", "KNOWLEDGE": "on", "PURPOSE": "evidence",
             "HARNESS": "default", "EXPECTED": digest}
@@ -699,10 +712,28 @@ def test_the_trials_step_refuses_on_a_missing_foreign_non_gate_or_not_denied_rec
         assert ci.main(["trials", "--out", str(tmp_path / "out")]) == ci.UNCONFINED, name
         err = capsys.readouterr().err
         assert reasons[name] in err and "Nothing ran" in err, (name, err)
+        assert not ran, name
     for key, value in {**base, **_fw_record(tmp_path)}.items():
         monkeypatch.setenv(key, value)
-    assert ci.main(["trials", "--out", str(tmp_path / "out")]) == ci.UNCONFINED  # still refused: no lift here
-    assert "live trials of it stay refused" in capsys.readouterr().err
+    assert ci.main(["trials", "--out", str(tmp_path / "out")]) == 0 and len(ran) == 1  # gate SC7: this case only
+
+
+def test_every_other_case_that_runs_seat_c_still_exits_6_with_a_record_that_counts(tmp_path, monkeypatch, capsys):
+    """Gate SC7 lifts firmware/axi4-lite-driver only: with this job's record showing every probe denied, a live trial
+    of every other case that runs seat C (the register block flow today) still exits 6 from check and trials."""
+    monkeypatch.setattr(ci, "installed_cli", lambda: "2.1.325")
+    monkeypatch.setattr(ci, "_head", lambda: "c0ffee")
+    monkeypatch.setattr(ci, "run_trials", lambda *a, **k: pytest.fail("a trial started"))
+    others = [c for c in ci._cases() if ci.seat_c_use(c.id) and c.id not in ci.SEAT_C_LIVE]
+    assert REGS_FLOW in [c.id for c in others]
+    for case in others:
+        for key, value in {"CASE": case.id, "TRIALS": "1", "KNOWLEDGE": "on", "PURPOSE": "evidence",
+                           "HARNESS": "default", "EXPECTED": harness_sha256(cli="2.1.325", flow=case.flow),
+                           **_fw_record(tmp_path)}.items():
+            monkeypatch.setenv(key, value)
+        for argv in (["check", "--require-expected"], ["trials", "--out", str(tmp_path / "out")]):
+            assert ci.main(argv) == ci.UNCONFINED, (case.id, argv)
+            assert "live trials of it stay refused" in capsys.readouterr().err, (case.id, argv)
 
 
 def test_every_job_names_the_seat_wrapper_and_the_trials_step_its_record():
