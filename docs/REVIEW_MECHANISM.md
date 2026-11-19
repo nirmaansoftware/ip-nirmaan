@@ -625,8 +625,8 @@ OSS CAD Suite's `sby`, `yices-smt2` and `eqy`, and the `ai`, `dev` and
 `npm ci` from `.github/review-loop/package-lock.json`, which checks the sha512
 of the CLI and of its platform package; make the check account `loopcheck`;
 check the Claude login; run the loop once (its step times out at 50 minutes,
-inside the App token's hour); push the state, even after a failure; then ask
-whether a step is ready now (below). The state
+inside the App token's hour; while a step is ready now it runs the next pass
+at once, below); push the state, even after a failure. The state
 folder is `$RUNNER_TEMP/pr-review`, under the runner's home folder (mode 750),
 which the check account cannot enter.
 The OSS CAD Suite moves from `$RUNNER_TEMP` to `/opt/oss-cad-suite`, with its
@@ -638,32 +638,34 @@ with `sby`, `yices-smt2` and `eqy` required.
 **Credentials.** All are environment secrets of the GitHub Environment
 `review-loop`, whose deployment branch rule allows only `main`. None is a
 repository secret, because a workflow on a pull request from a branch of this
-repository can read repository secrets. The workflow token stays read-only
-in the loop's job; only the separate `redispatch` job (below) gets
-`actions: write`.
+repository can read repository secrets. The workflow token stays read-only.
 
-**Chained passes.** A pass that ends with a step ready now starts the next
-pass at once instead of waiting for the dispatcher's next tick (the Mac's
-launchd job, every 4 minutes, which stops when the Mac sleeps). After the
-state is pushed, `loop_cloud.py ready-now` reads, with the App token and no
-model call, whether any pull request the loop would step has a step it would
-take now (`ready_now`): a stop to post, a branch behind `main`, a merge
-conflict to handle, or required CI finished (green: a review is due; failed
-after a fix round: a stop). CI still running, a rate-limit pause, a backoff, a
-stop or an author-fix wait on the head, and a head already finished are not
-ready. If something is ready, `next_chain` gives the next pass's `chain` input,
-`<n>:<digest>`, and the `redispatch` job dispatches `review-loop.yml` on `main`
-with it. It has no checkout, no secret and no model; its only permission is
-`actions: write`, through the workflow token (a `workflow_dispatch` made with
-that token starts a run). There is no chained pass after
-`loop_cloud.CHAIN_MAX` (5) in a row, when the ready set is the same as the
-pass before had (that pass made no progress on it), or when the read fails;
-the dispatcher's next tick runs the next pass then. Two passes still never run
-at once: the dispatched run waits in the `review-loop` concurrency group until
-this run ends, and the pass lock stays. A simulated timeline
-(`tests/test_loop_cloud.py`) shows the effect: with the 4-minute dispatcher
-about one or two minutes less per pull request; with no tick for an hour, open
-to merge about halved.
+**Chained passes.** A pass that ends with a step ready now is followed at
+once by the next pass, in the same job and process, instead of waiting for
+the dispatcher's next tick (the Mac's launchd job, every 4 minutes, which
+stops when the Mac sleeps) and a second setup. After each pass,
+`loop_cloud.run_chained` reads, with the App token and no model call, whether
+any pull request the loop would step has a step it would take now
+(`ready_now`): a stop to post, a branch behind `main`, a merge conflict to
+handle, or required CI finished (green: a review is due; failed after a fix
+round: a stop). CI still running, a rate-limit pause, a backoff, a stop or an
+author-fix wait on the head, and a head already finished are not ready. If
+something is ready and `next_chain` allows it, `pr_loop.py --once` runs again.
+There is no chained pass after `loop_cloud.CHAIN_MAX` (5) in a row, once
+`CHAIN_BUDGET_S` (20 minutes) has passed since the first pass began (the step
+times out at 50 minutes, inside the App token's hour), when the ready set is
+the one the pass before already had (it made no progress on it), or when the
+read fails; the dispatcher's next tick runs the next pass then. A chained pass
+that pr_loop refuses because a merge changed the loop scripts on `main` (exit
+4) ends the chain without failing the job; the next run checks out the new
+`main`. Passes run one after another in one process, so two never run at
+once; the pass lock and the concurrency group are unchanged. It needs no
+permission, token or secret the job did not already have: the workflow token
+could not dispatch a run (it reads only, and `tests/test_ci.py` refuses a
+write permission in any workflow), and neither can the App token or
+`LOOP_GH_TOKEN`. A simulated timeline (`tests/test_loop_cloud.py`) shows the
+effect: with the 4-minute dispatcher a few minutes less per pull request;
+with no tick for an hour, open to merge about halved.
 
 | Secret | What | Used by |
 |---|---|---|
