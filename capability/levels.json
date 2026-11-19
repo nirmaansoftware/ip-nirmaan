@@ -174,6 +174,29 @@
       "practised": [
         {
           "cases": [
+            "rtl/apb-gpio"
+          ],
+          "cli": "2.1.325",
+          "counts": false,
+          "digest": "sha256:5eb05f03c1201b9bd2acd8e66fea165abd5ba773977cacaf015ddc071119c38e",
+          "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+          "lower": 0.2077,
+          "model": "claude-opus-5-5",
+          "n": 3,
+          "passed": 2,
+          "reasons": [
+            "3 trials, fewer than 5",
+            "Wilson lower bound 0.208, under 0.5"
+          ],
+          "records": [
+            "evals/results/2026-11-18-claude-code-claude-opus-5-5",
+            "evals/results/2026-11-19-claude-code-claude-opus-5-5-68",
+            "evals/results/2026-11-19-claude-code-claude-opus-5-5-9"
+          ],
+          "unjudged": 0
+        },
+        {
+          "cases": [
             "rtl/apb-gpio",
             "rtl/apb-regs"
           ],
@@ -246,7 +269,30 @@
         "problems": []
       },
       "level": "knowledge",
-      "practised": []
+      "practised": [
+        {
+          "cases": [
+            "dv/formal-credit-counter"
+          ],
+          "cli": "2.1.325",
+          "counts": false,
+          "digest": "sha256:9a2e389eba23a86d1f98c45a933969b8cb2fd8dd38ff53d820dd31c0473d916f",
+          "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+          "lower": 0.3424,
+          "model": "claude-opus-5-5",
+          "n": 2,
+          "passed": 2,
+          "reasons": [
+            "2 trials, fewer than 5",
+            "Wilson lower bound 0.342, under 0.5"
+          ],
+          "records": [
+            "evals/results/2026-11-18-claude-code-claude-opus-5-5-4",
+            "evals/results/2026-11-19-claude-code-claude-opus-5-5-12"
+          ],
+          "unjudged": 0
+        }
+      ]
     },
     "axi": {
       "knowledge": {
@@ -257,6 +303,27 @@
       },
       "level": "knowledge",
       "practised": [
+        {
+          "cases": [
+            "rtl/axil-timer"
+          ],
+          "cli": "2.1.325",
+          "counts": false,
+          "digest": "sha256:171d24465d795d0e8777da54e74430e2764fcdc089654579b42412934258c9cf",
+          "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+          "lower": 0.2065,
+          "model": "claude-opus-5-5",
+          "n": 1,
+          "passed": 1,
+          "reasons": [
+            "1 trials, fewer than 5",
+            "Wilson lower bound 0.207, under 0.5"
+          ],
+          "records": [
+            "evals/results/2026-11-19-claude-code-claude-opus-5-5-50"
+          ],
+          "unjudged": 0
+        },
         {
           "cases": [
             "rtl/axi4-lite-regs",
@@ -337,7 +404,30 @@
         "problems": []
       },
       "level": "knowledge",
-      "practised": []
+      "practised": [
+        {
+          "cases": [
+            "dv/coverage-irq-ctrl"
+          ],
+          "cli": "2.1.325",
+          "counts": false,
+          "digest": "sha256:b5a1c9b8bb5f208c1e3ffcae7e9a5da4f26811e68a36954bf58fc612c481ea9b",
+          "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+          "lower": 0.0945,
+          "model": "claude-opus-5-5",
+          "n": 2,
+          "passed": 1,
+          "reasons": [
+            "2 trials, fewer than 5",
+            "Wilson lower bound 0.095, under 0.5"
+          ],
+          "records": [
+            "evals/results/2026-11-19-claude-code-claude-opus-5-5-18",
+            "evals/results/2026-11-19-claude-code-claude-opus-5-5-4"
+          ],
+          "unjudged": 0
+        }
+      ]
     },
     "constrained_random": {
       "knowledge": {
@@ -347,7 +437,29 @@
         "problems": []
       },
       "level": "knowledge",
-      "practised": []
+      "practised": [
+        {
+          "cases": [
+            "dv/random-crc"
+          ],
+          "cli": "2.1.325",
+          "counts": false,
+          "digest": "sha256:7e497fa212251a326867483715ab77db71f8afe73c11a2844f300155bea3b8a7",
+          "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+          "lower": 0.2065,
+          "model": "claude-opus-5-5",
+          "n": 1,
+          "passed": 1,
+          "reasons": [
+            "1 trials, fewer than 5",
+            "Wilson lower bound 0.207, under 0.5"
+          ],
+          "records": [
+            "evals/results/2026-11-19-claude-code-claude-opus-5-5-56"
+          ],
+          "unjudged": 0
+        }
+      ]
     },
     "control_logic_design": {
       "knowledge": {
@@ -358,6 +470,29 @@
       },
       "level": "knowledge",
       "practised": [
+        {
+          "cases": [
+            "rtl/apb-gpio"
+          ],
+          "cli": "2.1.325",
+          "counts": false,
+          "digest": "sha256:3979d44f5c2cf8d2e2a58df59884920fe9e691be04bc390df127dbd69e0516b7",
+          "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+          "lower": 0.2077,
+          "model": "claude-opus-5-5",
+          "n": 3,
+          "passed": 2,
+          "reasons": [
+            "3 trials, fewer than 5",
+            "Wilson lower bound 0.208, under 0.5"
+          ],
+          "records": [
+            "evals/results/2026-11-18-claude-code-claude-opus-5-5",
+            "evals/results/2026-11-19-claude-code-claude-opus-5-5-68",
+            "evals/results/2026-11-19-claude-code-claude-opus-5-5-9"
+          ],
+          "unjudged": 0
+        },
         {
           "cases": [
             "rtl/apb-gpio"
@@ -393,7 +528,33 @@
         "problems": []
       },
       "level": "knowledge",
-      "practised": []
+      "practised": [
+        {
+          "cases": [
+            "dv/directed-irq-ctrl",
+            "dv/random-crc",
+            "dv/scoreboard-mac"
+          ],
+          "cli": "2.1.325",
+          "counts": false,
+          "digest": "sha256:6bf35095b83cbd9b641919c5b59bacdf5fc87ce7c569c2ad7df593ecddff70d6",
+          "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+          "lower": 0.4385,
+          "model": "claude-opus-5-5",
+          "n": 3,
+          "passed": 3,
+          "reasons": [
+            "3 trials, fewer than 5",
+            "Wilson lower bound 0.439, under 0.5"
+          ],
+          "records": [
+            "evals/results/2026-11-18-claude-code-claude-opus-5-5-2",
+            "evals/results/2026-11-19-claude-code-claude-opus-5-5-56",
+            "evals/results/2026-11-19-claude-code-claude-opus-5-5-75"
+          ],
+          "unjudged": 0
+        }
+      ]
     },
     "emulation_prototyping": {
       "knowledge": {
@@ -433,7 +594,30 @@
         "problems": []
       },
       "level": "knowledge",
-      "practised": []
+      "practised": [
+        {
+          "cases": [
+            "dv/formal-credit-counter"
+          ],
+          "cli": "2.1.325",
+          "counts": false,
+          "digest": "sha256:496f8d92db14cfe796776c8c485fa2191df0c12e29c5a10bac2a86d7ac034dc7",
+          "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+          "lower": 0.3424,
+          "model": "claude-opus-5-5",
+          "n": 2,
+          "passed": 2,
+          "reasons": [
+            "2 trials, fewer than 5",
+            "Wilson lower bound 0.342, under 0.5"
+          ],
+          "records": [
+            "evals/results/2026-11-18-claude-code-claude-opus-5-5-4",
+            "evals/results/2026-11-19-claude-code-claude-opus-5-5-12"
+          ],
+          "unjudged": 0
+        }
+      ]
     },
     "fsm_design": {
       "knowledge": {
@@ -444,6 +628,27 @@
       },
       "level": "knowledge",
       "practised": [
+        {
+          "cases": [
+            "rtl/axil-timer"
+          ],
+          "cli": "2.1.325",
+          "counts": false,
+          "digest": "sha256:c4aaa4ba8ed4f24373d4a09fffba720d73e81491cb15a0fc1084c3227c47d9b8",
+          "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+          "lower": 0.2065,
+          "model": "claude-opus-5-5",
+          "n": 1,
+          "passed": 1,
+          "reasons": [
+            "1 trials, fewer than 5",
+            "Wilson lower bound 0.207, under 0.5"
+          ],
+          "records": [
+            "evals/results/2026-11-19-claude-code-claude-opus-5-5-50"
+          ],
+          "unjudged": 0
+        },
         {
           "cases": [
             "rtl/axil-timer"
@@ -634,7 +839,29 @@
         "problems": []
       },
       "level": "knowledge",
-      "practised": []
+      "practised": [
+        {
+          "cases": [
+            "dv/scoreboard-mac"
+          ],
+          "cli": "2.1.325",
+          "counts": false,
+          "digest": "sha256:69565f357fa8931088ac4108fddb83a86b869b0f8faf2c522e58d4e18ea298a8",
+          "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+          "lower": 0.2065,
+          "model": "claude-opus-5-5",
+          "n": 1,
+          "passed": 1,
+          "reasons": [
+            "1 trials, fewer than 5",
+            "Wilson lower bound 0.207, under 0.5"
+          ],
+          "records": [
+            "evals/results/2026-11-19-claude-code-claude-opus-5-5-75"
+          ],
+          "unjudged": 0
+        }
+      ]
     },
     "reset_design": {
       "knowledge": {
@@ -654,7 +881,31 @@
         "problems": []
       },
       "level": "knowledge",
-      "practised": []
+      "practised": [
+        {
+          "cases": [
+            "debug/root-cause-uart-tx"
+          ],
+          "cli": "2.1.325",
+          "counts": false,
+          "digest": "sha256:b65cd62f88597fc7ec2fcdd85730104dc5f6719b70e3513d59014af36060431f",
+          "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+          "lower": 0.4385,
+          "model": "claude-opus-5-5",
+          "n": 3,
+          "passed": 3,
+          "reasons": [
+            "3 trials, fewer than 5",
+            "Wilson lower bound 0.439, under 0.5"
+          ],
+          "records": [
+            "evals/results/2026-11-18-claude-code-claude-opus-5-5-22",
+            "evals/results/2026-11-18-claude-code-claude-opus-5-5-36",
+            "evals/results/2026-11-19-claude-code-claude-opus-5-5-72"
+          ],
+          "unjudged": 0
+        }
+      ]
     },
     "rtl_design": {
       "knowledge": {
@@ -665,6 +916,31 @@
       },
       "level": "knowledge",
       "practised": [
+        {
+          "cases": [
+            "rtl/apb-gpio",
+            "rtl/axil-timer"
+          ],
+          "cli": "2.1.325",
+          "counts": false,
+          "digest": "sha256:012eb9b7155ed6eb7761adca880b338f10c8f978b15dfd92f5adbb3253307a52",
+          "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+          "lower": 0.3006,
+          "model": "claude-opus-5-5",
+          "n": 4,
+          "passed": 3,
+          "reasons": [
+            "4 trials, fewer than 5",
+            "Wilson lower bound 0.301, under 0.5"
+          ],
+          "records": [
+            "evals/results/2026-11-18-claude-code-claude-opus-5-5",
+            "evals/results/2026-11-19-claude-code-claude-opus-5-5-50",
+            "evals/results/2026-11-19-claude-code-claude-opus-5-5-68",
+            "evals/results/2026-11-19-claude-code-claude-opus-5-5-9"
+          ],
+          "unjudged": 0
+        },
         {
           "cases": [
             "rtl/apb-gpio",
@@ -777,7 +1053,30 @@
         "problems": []
       },
       "level": "knowledge",
-      "practised": []
+      "practised": [
+        {
+          "cases": [
+            "dv/formal-credit-counter"
+          ],
+          "cli": "2.1.325",
+          "counts": false,
+          "digest": "sha256:dd2c6a58cb270577169dd2af6f053c57a72ac38aaecfd5449d234887c78606ee",
+          "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+          "lower": 0.3424,
+          "model": "claude-opus-5-5",
+          "n": 2,
+          "passed": 2,
+          "reasons": [
+            "2 trials, fewer than 5",
+            "Wilson lower bound 0.342, under 0.5"
+          ],
+          "records": [
+            "evals/results/2026-11-18-claude-code-claude-opus-5-5-4",
+            "evals/results/2026-11-19-claude-code-claude-opus-5-5-12"
+          ],
+          "unjudged": 0
+        }
+      ]
     },
     "synthesis_awareness": {
       "knowledge": {
@@ -788,6 +1087,33 @@
       },
       "level": "knowledge",
       "practised": []
+    },
+    "systemverilog": {
+      "knowledge": null,
+      "level": null,
+      "practised": [
+        {
+          "cases": [
+            "dv/directed-irq-ctrl"
+          ],
+          "cli": "2.1.325",
+          "counts": false,
+          "digest": "sha256:b6d97df51f05b4963ddc316fcfe265dc04208251a4f331971e5a6583ba6c1f96",
+          "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+          "lower": 0.2065,
+          "model": "claude-opus-5-5",
+          "n": 1,
+          "passed": 1,
+          "reasons": [
+            "1 trials, fewer than 5",
+            "Wilson lower bound 0.207, under 0.5"
+          ],
+          "records": [
+            "evals/results/2026-11-18-claude-code-claude-opus-5-5-2"
+          ],
+          "unjudged": 0
+        }
+      ]
     },
     "testbench_qualification": {
       "knowledge": {
@@ -827,7 +1153,29 @@
         "problems": []
       },
       "level": "knowledge",
-      "practised": []
+      "practised": [
+        {
+          "cases": [
+            "dv/plan-irq-ctrl"
+          ],
+          "cli": "2.1.325",
+          "counts": false,
+          "digest": "sha256:930e0e5ff02a926a5300db8242997dbeb449a43e1dc60ee25adefb23c60e6356",
+          "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+          "lower": 0.0,
+          "model": "claude-opus-5-5",
+          "n": 1,
+          "passed": 0,
+          "reasons": [
+            "1 trials, fewer than 5",
+            "Wilson lower bound 0.000, under 0.5"
+          ],
+          "records": [
+            "evals/results/2026-11-18-claude-code-claude-opus-5-5-30"
+          ],
+          "unjudged": 1
+        }
+      ]
     },
     "verification_signoff": {
       "knowledge": {
