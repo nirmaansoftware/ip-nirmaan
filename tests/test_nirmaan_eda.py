@@ -318,8 +318,10 @@ def test_the_verilator_jobs_cap_is_read_where_a_build_is_made_and_unset_is_one_j
     else:
         monkeypatch.setenv(eda.VERILATOR_JOBS_ENV, value)
     assert eda.verilator_jobs() == jobs
-    for module in (eda, firmware, firmware_riscv):  # no build keeps its own -j
+    for module in (eda, firmware_riscv):  # no build keeps its own -j
         assert module.verilator_jobs is eda.verilator_jobs and '"-j", "0"' not in Path(module.__file__).read_text()
+    # fw.test's build is pinned word for word by gate WF14's guard, so it keeps -j 0 whatever the setting says.
+    assert '"--build", "-j", "0"' in Path(firmware.__file__).read_text()
     job = eda.Job("simulator.run", {}, tmp_path, (str(tmp_path / "top.v"),), "top")
     for build in (eda._verilator_sim, eda._verilator_coverage):
         monkeypatch.setattr(eda, "_expect", lambda job: None)

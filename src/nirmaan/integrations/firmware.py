@@ -30,8 +30,7 @@ import shutil
 from collections.abc import MutableMapping
 from pathlib import Path
 
-from nirmaan.integrations.eda import (NONCE_ARG, Backend, Job, RunRecord, new_nonce, register_backend, run_nonce,
-                                      verilator_jobs)
+from nirmaan.integrations.eda import NONCE_ARG, Backend, Job, RunRecord, new_nonce, register_backend, run_nonce
 from nirmaan.integrations.eda_parsers import Diagnostic, EdaResult
 from nirmaan.models import RegisterMap, list_values, text_value
 from nirmaan.registry import Registry
@@ -531,7 +530,7 @@ def _cosim_steps(job: Job) -> list[list[str]]:
     steps, objects = _compile("cc", (), (*job.sources, *added), harness, job.workdir / "cobj", headers=False,
                               include=include)
     model = job.workdir / "cosim"
-    steps.append(["verilator", "--cc", "--exe", "--build", "-j", verilator_jobs(), "-Wno-fatal", "--prefix", MODEL,
+    steps.append(["verilator", "--cc", "--exe", "--build", "-j", "0", "-Wno-fatal", "--prefix", MODEL,
                   "-Mdir", str(model), *job.top_args("--top-module"), *rtl, str(harness / manager.name),
                   *objects, "-CFLAGS", f"-I{harness}", *irq])
     steps.append([str(model / MODEL), NONCE_ARG + new_nonce()])  # M53: the harness tags its lines with it

@@ -93,7 +93,9 @@ METRICS_CAP = 2**20
 KEEP_ENV = "NIRMAAN_KEEP_RUN_DIRS"
 #: The most build jobs a Verilator build starts (``-j N``), read where its command is made. Unset, empty, 0 or not a
 #: whole number: ``-j 0``, one job per core, as before. The review loop's checks set it, so a machine running several
-#: test shards and reviews at once does not run out of memory (decision #32 of 2026-11-19).
+#: test shards and reviews at once does not run out of memory (decision #32 of 2026-11-19). ``fw.test``'s
+#: co-simulation build keeps ``-j 0``: gate WF14's guard pins its options word for word
+#: (``tests/test_nirmaan_firmware_reach.py``), and a change there is the council's return condition.
 VERILATOR_JOBS_ENV = "NIRMAAN_VERILATOR_JOBS"
 
 #: Environment variables no tool run sees (M53): code a seat wrote runs in these steps, and what it prints
