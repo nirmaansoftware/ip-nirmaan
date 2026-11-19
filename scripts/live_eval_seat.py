@@ -14,6 +14,14 @@ program through it, in a folder of its own inside the run's directory (``nirmaan
 as the same account, with ``no_new_privs`` and an empty environment; the program must be one the runner built in the
 same run directory.
 
+The account may not read what the judge keeps from it: ``install`` gives it an ACL entry with no permission on
+each folder named by ``--deny-read`` (the workflow names the runner's home, the checkout and the runner's
+temporary folder, so every reference answer, held-out test and mutant in the checkout), whatever the folders'
+modes allow other accounts. And it has no network: every packet the account sends, IPv4 or IPv6, loopback
+included, is stopped (``owner`` rules first in ``OUTPUT``): a TCP connection is refused at once with an ICMP
+"prohibited" answer, and any other packet is dropped, so its send fails with EPERM. The
+reach test (``scripts/live_eval_reach.py``) probes both.
+
 Modes, each run by the workflow or by the wrapper:
 
 - ``install`` (as root, from ``.github/actions/live-eval-seat``): make the account, copy this file to
@@ -401,9 +409,48 @@ def harden(trees: Sequence[str], folders: Sequence[str]) -> list[str]:
     return changed
 
 
-def install(source: Path, trees: Sequence[str] = (), folders: Sequence[str] = ()) -> None:
-    """Make the account and the wrappers, and take write access to ``trees`` and ``folders`` from other accounts.
-    Fails unless the kernel guards against link tricks in shared folders."""
+#: The firewall programs whose ``OUTPUT`` chain drops the seat account's packets.
+FIREWALLS = ("iptables", "ip6tables")
+
+
+def deny_read_argv(path: str) -> list[str]:
+    """The ACL entry that takes every permission on ``path`` from the seat account, whatever the mode allows."""
+    return ["setfacl", "-m", f"u:{SEAT}:---", "--", path]
+
+
+def network_rules(uid: int, tool: str) -> list[list[str]]:
+    """The ``OUTPUT`` rules, in order, that stop every packet of ``uid``: a TCP connection is refused at once with an
+    ICMP "prohibited" answer (a dropped one would only time out, which proves nothing), and every other packet is
+    dropped, so its send fails with EPERM."""
+    prohibited = "icmp6-adm-prohibited" if tool == "ip6tables" else "icmp-host-prohibited"
+    owner = ["-m", "owner", "--uid-owner", str(uid)]
+    return [["OUTPUT", "-p", "tcp", *owner, "-j", "REJECT", "--reject-with", prohibited],
+            ["OUTPUT", *owner, "-j", "DROP"]]
+
+
+def deny(uid: int, unreadable: Sequence[str]) -> None:
+    """Take read access to each folder of ``unreadable`` and the network from the seat account. Fails closed: a
+    folder that is not one, or a rule that does not hold afterwards, stops the install."""
+    for path in unreadable:
+        if os.path.islink(path) or not os.path.isdir(path):
+            raise Refused(f"{path} is not a folder, so the account's read access to it cannot be taken")
+        subprocess.run(deny_read_argv(path), check=True)
+    for tool in FIREWALLS:
+        if shutil.which(tool) is None:
+            raise Refused(f"{tool} is not installed")
+        rules = network_rules(uid, tool)
+        for position, rule in enumerate(rules, start=1):
+            if subprocess.run([tool, "-C", *rule], capture_output=True).returncode != 0:
+                subprocess.run([tool, "-I", rule[0], str(position), *rule[1:]], check=True)
+        for rule in rules:
+            subprocess.run([tool, "-C", *rule], check=True)
+
+
+def install(source: Path, trees: Sequence[str] = (), folders: Sequence[str] = (),
+            unreadable: Sequence[str] = ()) -> None:
+    """Make the account and the wrappers, take write access to ``trees`` and ``folders`` from other accounts, and
+    take read access to ``unreadable`` and the network from the seat account (``deny``). Fails unless the kernel
+    guards against link tricks in shared folders."""
     for name, want in SYSCTLS.items():
         have = Path("/proc/sys", name).read_text().strip()
         if have != want:
@@ -442,6 +489,8 @@ def install(source: Path, trees: Sequence[str] = (), folders: Sequence[str] = ()
     changed = harden(trees, folders)
     print(f"{SEAT}: took write access from other accounts on {len(changed)} paths in {', '.join(trees)} and the "
           f"folders on PATH")
+    deny(seat.pw_uid, unreadable)
+    print(f"{SEAT}: no read access to {', '.join(unreadable) or 'no folder'}; every packet it sends is stopped")
     print(f"{SEAT}: uid {seat.pw_uid}, groups {groups}; {', '.join(f'{BIN / n} runs {e}' for n, e in zip(WRAPPED, exes))}; "
           f"{EXEC} runs what fw.test builds")
 
@@ -452,6 +501,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     setup = sub.add_parser("install")
     setup.add_argument("--harden-tree", action="append", default=[], help="a tree other accounts may not write")
     setup.add_argument("--harden-path", default="", help="a PATH whose folders other accounts may not write")
+    setup.add_argument("--deny-read", action="append", default=[], help="a folder the seat account may not read")
     wrap = sub.add_parser("wrap")
     wrap.add_argument("exe")
     wrap.add_argument("args", nargs=argparse.REMAINDER)
@@ -482,7 +532,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             raise Refused(f"{args.mode} runs as root")
         if args.mode == "install":
             install(Path(__file__).resolve(), args.harden_tree,
-                    [f for f in args.harden_path.split(os.pathsep) if f and f != str(BIN)])
+                    [f for f in args.harden_path.split(os.pathsep) if f and f != str(BIN)], args.deny_read)
             return 0
         if args.mode == "cleanup":
             cleanup()
