@@ -581,12 +581,7 @@ def test_the_recorded_credential_test_is_whole_and_the_register_block_flow_waits
     shows any probe not denied, a live trial of the register block flow is refused (exit 6)."""
     record = json.loads(CREDENTIAL_RECORD.read_text())
     assert record["format"] == fw.FORMAT and record["tool"] == "fw.test" and record["done"] and record["control_ok"]
-    # The record holds every probe. The one exception, named exactly: the record of run 44401041085, taken before the
-    # READ and network probes existed (gate SC6), lacks those two and no other, and shows reach. Gate SC3 replaces it
-    # with a record from main, which must hold them all.
-    older = set(fw.PROBES) - {"fw_reach_no_read", "fw_reach_no_network"}
-    assert not record["missing"] and (set(record["probes"]) == set(fw.PROBES) or (
-        record["run"]["id"] == "44401041085" and not record["every_probe_denied"] and set(record["probes"]) == older))
+    assert not record["missing"] and set(record["probes"]) == set(fw.PROBES)
     assert record["run"]["id"] and record["run"]["job_id"] and record["head"]
     assert record["every_probe_denied"] == all(p["denied"] for p in record["probes"].values())
     if not record["every_probe_denied"]:
@@ -596,6 +591,34 @@ def test_the_recorded_credential_test_is_whole_and_the_register_block_flow_waits
             record["account"]["uid"]
         assert record["run_step"][0][0] == record["seat_exec"] and record["append_targets"]
         assert ci.seat_c_problem(REGS_FLOW)  # still refused live: lifting that is a change of its own
+
+
+def test_the_committed_credential_record_is_from_main_in_gate_mode_for_the_replay_and_the_rejudge_job(tmp_path):
+    """Gate SC3 (council record 2026-11-19, seat C and the live refusal, decision 1, item 3): the committed record is
+    from a replay dispatched on main, holds the replay job's and the rejudge job's results, each in gate mode with every
+    probe denied, through the seat wrapper, of one run and one commit."""
+    record = json.loads(CREDENTIAL_RECORD.read_text())
+    jobs = {"replay": record, "rejudge": record["rejudge"]}
+    for job, part in jobs.items():
+        assert part["format"] == fw.FORMAT and part["tool"] == "fw.test", job
+        assert part["run"]["job"] == job and part["run"]["ref"] == "refs/heads/main" and part["run"]["job_id"], job
+        assert part["require_denied"] is True and part["every_probe_denied"] is True and part["done"] is True, job
+        assert part["control_ok"] is True and part["missing"] == [] and set(part["probes"]) == set(fw.PROBES), job
+        assert all(p["denied"] and p["lines"] for p in part["probes"].values()), job
+        assert part["seat_exec"] == "/opt/nirmaan-seat/bin/nirmaan-seat-exec" and part["run_step"][0][0] == \
+            part["seat_exec"], job
+        assert part["seat_account"]["uid"] != part["account"]["uid"], job
+        own = tmp_path / f"{job}.json"  # each part passes the check its own job ran before running seat C
+        own.write_text(json.dumps(part))
+        env = {"GITHUB_RUN_ID": part["run"]["id"], "GITHUB_RUN_ATTEMPT": part["run"]["attempt"], "GITHUB_JOB": job,
+               ci.FW_REACH_ENV: str(own)}
+        assert ci.fw_reach_problem(env, part["head"]) is None, job
+    assert record["run"]["id"] == record["rejudge"]["run"]["id"] and record["head"] == record["rejudge"]["head"]
+    # At or after ip#371's merge: the program ran through the wrapper ip#371 added (checked above), on main; CI's
+    # shallow checkout has no history to walk, so the commit itself is named in the record's ``about``.
+    assert record["head"] in record["about"] or record["head"][:7] in record["about"]
+    for case in ("firmware/axi4-lite-driver", REGS_FLOW):
+        assert ci.seat_c_problem(case)  # a record that counts lifts nothing: that is gate SC7
 
 
 # --- G3 third addendum (2026-11-19), gate WF21: no attempts option, and no whole-flow dispatch without its fingerprint
