@@ -181,10 +181,10 @@
           "counts": true,
           "digest": "sha256:5eb05f03c1201b9bd2acd8e66fea165abd5ba773977cacaf015ddc071119c38e",
           "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
-          "lower": 0.6226,
+          "lower": 0.6461,
           "model": "claude-opus-5-5",
-          "n": 11,
-          "passed": 10,
+          "n": 12,
+          "passed": 11,
           "reasons": [],
           "records": [
             "evals/results/2026-11-18-claude-code-claude-opus-5-5",
@@ -196,6 +196,7 @@
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-13",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-23",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-27",
+            "evals/results/2026-11-19-claude-code-claude-opus-5-5-55",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-68",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-9"
           ],
@@ -340,10 +341,10 @@
           "counts": true,
           "digest": "sha256:171d24465d795d0e8777da54e74430e2764fcdc089654579b42412934258c9cf",
           "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
-          "lower": 0.7225,
+          "lower": 0.7412,
           "model": "claude-opus-5-5",
-          "n": 10,
-          "passed": 10,
+          "n": 11,
+          "passed": 11,
           "reasons": [],
           "records": [
             "evals/results/2026-11-18-claude-code-claude-opus-5-5-10",
@@ -355,7 +356,8 @@
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-19",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-32",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-46",
-            "evals/results/2026-11-19-claude-code-claude-opus-5-5-50"
+            "evals/results/2026-11-19-claude-code-claude-opus-5-5-50",
+            "evals/results/2026-11-19-claude-code-claude-opus-5-5-60"
           ],
           "unjudged": 0
         },
@@ -609,10 +611,10 @@
           "counts": true,
           "digest": "sha256:6bf35095b83cbd9b641919c5b59bacdf5fc87ce7c569c2ad7df593ecddff70d6",
           "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
-          "lower": 0.8241,
+          "lower": 0.8318,
           "model": "claude-opus-5-5",
-          "n": 18,
-          "passed": 18,
+          "n": 19,
+          "passed": 19,
           "reasons": [],
           "records": [
             "evals/results/2026-11-18-claude-code-claude-opus-5-5-11",
@@ -632,6 +634,7 @@
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-33",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-42",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-56",
+            "evals/results/2026-11-19-claude-code-claude-opus-5-5-61",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-75"
           ],
           "unjudged": 0
@@ -868,28 +871,28 @@
         "knowledge_document": "knowledge/verification/model_checking.md",
         "problems": []
       },
-      "level": "knowledge",
+      "level": "practised",
       "practised": [
         {
           "cases": [
             "dv/prove-deep-counter"
           ],
           "cli": "2.1.325",
-          "counts": false,
+          "counts": true,
           "digest": "sha256:ad51c9e6c670d0972f510592ab3aadacd511cac6ee7606d2561a3ac380dd2572",
           "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
-          "lower": 0.5101,
+          "lower": 0.6097,
           "model": "claude-opus-5-5",
-          "n": 4,
-          "passed": 4,
-          "reasons": [
-            "4 trials, fewer than 5"
-          ],
+          "n": 6,
+          "passed": 6,
+          "reasons": [],
           "records": [
             "evals/results/2026-11-18-claude-code-claude-opus-5-5-12",
             "evals/results/2026-11-18-claude-code-claude-opus-5-5-26",
             "evals/results/2026-11-18-claude-code-claude-opus-5-5-40",
-            "evals/results/2026-11-19-claude-code-claude-opus-5-5-34"
+            "evals/results/2026-11-19-claude-code-claude-opus-5-5-34",
+            "evals/results/2026-11-19-claude-code-claude-opus-5-5-62",
+            "evals/results/2026-11-19-claude-code-claude-opus-5-5-76"
           ],
           "unjudged": 0
         }
@@ -1029,10 +1032,10 @@
           "counts": true,
           "digest": "sha256:69565f357fa8931088ac4108fddb83a86b869b0f8faf2c522e58d4e18ea298a8",
           "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
-          "lower": 0.6097,
+          "lower": 0.6457,
           "model": "claude-opus-5-5",
-          "n": 6,
-          "passed": 6,
+          "n": 7,
+          "passed": 7,
           "reasons": [],
           "records": [
             "evals/results/2026-11-18-claude-code-claude-opus-5-5-11",
@@ -1040,6 +1043,7 @@
             "evals/results/2026-11-18-claude-code-claude-opus-5-5-39",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-2",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-33",
+            "evals/results/2026-11-19-claude-code-claude-opus-5-5-61",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-75"
           ],
           "unjudged": 0
@@ -1073,12 +1077,12 @@
           "counts": false,
           "digest": "sha256:b65cd62f88597fc7ec2fcdd85730104dc5f6719b70e3513d59014af36060431f",
           "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
-          "lower": 0.4365,
+          "lower": 0.4869,
           "model": "claude-opus-5-5",
-          "n": 6,
-          "passed": 5,
+          "n": 7,
+          "passed": 6,
           "reasons": [
-            "Wilson lower bound 0.436, under 0.5"
+            "Wilson lower bound 0.487, under 0.5"
           ],
           "records": [
             "evals/results/2026-11-18-claude-code-claude-opus-5-5-22",
@@ -1086,6 +1090,7 @@
             "evals/results/2026-11-18-claude-code-claude-opus-5-5-8",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-16",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-30",
+            "evals/results/2026-11-19-claude-code-claude-opus-5-5-58",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-72"
           ],
           "unjudged": 1
@@ -1115,10 +1120,10 @@
           "counts": true,
           "digest": "sha256:012eb9b7155ed6eb7761adca880b338f10c8f978b15dfd92f5adbb3253307a52",
           "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
-          "lower": 0.8583,
+          "lower": 0.8651,
           "model": "claude-opus-5-5",
-          "n": 36,
-          "passed": 35,
+          "n": 38,
+          "passed": 37,
           "reasons": [],
           "records": [
             "evals/results/2026-11-18-claude-code-claude-opus-5-5",
@@ -1154,7 +1159,9 @@
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-32",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-46",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-50",
+            "evals/results/2026-11-19-claude-code-claude-opus-5-5-55",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-59",
+            "evals/results/2026-11-19-claude-code-claude-opus-5-5-60",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-68",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-9"
           ],
@@ -1423,8 +1430,8 @@
     }
   },
   "totals": {
-    "knowledge": 27,
-    "practised": 14,
+    "knowledge": 26,
+    "practised": 15,
     "proven": 0
   },
   "variants": [],
