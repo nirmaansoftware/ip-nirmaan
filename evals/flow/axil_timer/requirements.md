@@ -6,7 +6,11 @@ case `flow/axil-timer` (council record 2026-11-17, decision 2). It is written
 before the flow and is no stage's output. Every requirement states behaviour
 at the block's ports and ends with its tag. The requirements specification
 carries every requirement forward, and every later document restates each one
-where it belongs, with the same tag.
+where it belongs, with the same tag. Every requirement holds as stated, but the
+case judges each judged rule only within its stated scope: the values, waits,
+positions, widths and orderings its reference testbench exercises for that
+rule, listed by tag under `judged_scope` in `evals/flow/axil_timer/citations.json`
+(the rules no check rests on are listed there under `not_judged`).
 
 Words used for time: an edge is a rising edge of `aclk`. A value "after edge
 `E`" is the value in the clock cycle that follows `E`; a value "before edge
@@ -103,11 +107,6 @@ on an edge on which its VALID and READY are both high.
 * A periodic count ends and reloads at the end of every period whether or
   not `EXPIRED` is already set: nothing has to clear `EXPIRED` between two
   periods. [req:TMR-PERIODIC-EXPIRED-SET]
-* A one-shot count is exactly `LOAD` cycles at every value of `LOAD` of at
-  least 1, not at some values only. [req:TMR-ONESHOT-VALUES]
-* A periodic count, its first count and every period after it, is exactly
-  `LOAD` cycles at every value of `LOAD` of at least 1, not at some values
-  only. [req:TMR-PERIODIC-VALUES]
 * A `CTRL` write that writes `EN` 1 while a count runs (a restart) sets
   `MODE` as well, and the restarted count ends as that `MODE` says, one-shot
   or periodic, not as the `MODE` it was started with.

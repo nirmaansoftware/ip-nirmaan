@@ -48,13 +48,28 @@ keeps it for `COUNT`), transfers that must leave a running count alone
 (`TMR-RESTART-MODE`), a periodic end with `EXPIRED` already set
 (`TMR-PERIODIC-EXPIRED-SET`), the 32-bit width of the count above bit 20
 (`TMR-COUNT-32BIT`), and a `LOAD` write on a periodic end edge, on which the
-document gives no rule (`TMR-LOAD-END-EDGE`), and the `LOAD` values at which a one-shot count or a period is timed (`TMR-ONESHOT-VALUES`, `TMR-PERIODIC-VALUES`: the list is in `citations.json`); for the register block, the
+document gives no rule (`TMR-LOAD-END-EDGE`); for the register block, the
 latency bound with `READY` already high (`AXIL-LATENCY-READY-HIGH`) and the
 registers and held halves cleared from the first reset edge
-(`AXIL-RESET-REGS`). `TMR-IRQ` stays judged, for 100000 cycles
-(`judged_scope` in the timer's `citations.json`). A test
+(`AXIL-RESET-REGS`). A test
 checks both ways: each cited tag or heading exists, and each tag is cited or
 listed.
+
+**Judged scopes.** Any finite testbench can be escaped by a block that
+misbehaves only at values it never tries, so every judged tag carries its
+stimulus scope under `judged_scope` in its case's `citations.json`: the exact
+values, waits, positions, widths and orderings the case's checks exercise for
+that tag, with the testbench lines (for example `AXIL-B2B` only after a
+response that waited 0 or 2 cycles on `READY`, `TMR-STOP-EDGE` only at the
+`LOAD` values and stop positions listed, `TMR-START` restarts only at the
+`COUNT` values listed, `TMR-IRQ` for 100000 cycles). A judged tag is judged
+within its scope: a block that breaks the rule only outside it is not an
+escape, and one that breaks it inside it is. Each requirements document says
+so in its opening paragraph, and every requirement still holds as stated. The
+`LOAD` values at which a count is timed, once their own not judged tags, are
+now the scopes of `TMR-COUNT-LENGTH`, `TMR-ONESHOT` and `TMR-PERIODIC`.
+`tests/test_whole_flow_cases.py` requires a non-empty scope citing a line for
+every judged tag of both cases, and none for a tag that is not judged.
 
 **The reference testbenches.** Each case's check 1 runs its own copy of the
 single-seat reference testbench: `evals/flow/axil_timer/axil_timer_tb.v` and

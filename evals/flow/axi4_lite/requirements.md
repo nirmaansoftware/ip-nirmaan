@@ -17,6 +17,11 @@ requirement forward, and the interface specification restates every
 requirement below in the section where it belongs, in its own words and with
 the detail an RTL engineer needs, and ends that statement with the same tag,
 exactly once.
+Every requirement holds as stated, but the case judges each judged rule only
+within its stated scope: the values, waits, positions, widths and orderings its
+checks exercise for that rule, listed by tag under `judged_scope` in
+`evals/flow/axi4_lite/citations.json` (the rules no check rests on are listed
+there under `not_judged`).
 
 ## 1. The block
 
