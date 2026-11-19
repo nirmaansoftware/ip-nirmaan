@@ -214,8 +214,8 @@ LOOP = {
     # The single-runner whole suite outgrew the 1200 s timeout (ip#249).
     "checks": [
         {"name": "dashes", "when": ["**"], "run": [["{python}", "scripts/check_dashes.py"]]},
-        # NIRMAAN_VERILATOR_JOBS caps each Verilator build at 2 jobs (eda.VERILATOR_JOBS_ENV): three shards next to
-        # reviews ran a check out of memory with one job per core (decision #32 of 2026-11-19).
+        # NIRMAAN_VERILATOR_JOBS caps each Verilator build at 2 jobs (eda.VERILATOR_JOBS_ENV): the three shards run
+        # at once beside reviews, and with -j 0 each build starts one job per core (docs/TEST_CI_HARDENING.md, 9).
         {"name": "test", "when": ["src/**", "tests/**", "evals/**", "scripts/**", "site/**"],
          "env": {"PYTHONPATH": "src", "NIRMAAN_VERILATOR_JOBS": "2"},
          "select": "related_tests", "shards": {"count": 3, "profile": "test"},
@@ -573,8 +573,9 @@ def _substitute(argv: list[str], variables: dict) -> list[str]:
     return [re.sub(r"\{(\w+)\}", lambda m: variables.get(m.group(1), m.group(0)), a) for a in argv]
 
 
-# What a failing check's text keeps besides its last lines (decision #32): pytest's own explanation of the first
-# failure and its one-line summaries, each bounded so a stop comment never blows up.
+# What a failing check's text keeps besides its last lines: pytest's own explanation of the first failure and its
+# one-line summaries, so a stop comment names why the check failed, not only how the run ended (ip#353); each is
+# bounded so a stop comment never blows up.
 _E_LINES, _FAILED_LINES, _LINE_CHARS = 20, 10, 300
 
 
