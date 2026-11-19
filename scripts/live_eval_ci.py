@@ -20,12 +20,15 @@ owner's machine. The workflow calls this script in two ways:
   whose two hashes differ.
 
 A live trial (``check --require-expected`` and ``trials``) of a case that runs seat-written C (``fw.build``,
-``fw.test``, the firmware seat, or a whole flow with a firmware stage) is refused before anything runs. Since M90
-``fw.test`` runs the program it builds as the seat account in these jobs (``scripts/live_eval_seat.py``), and the
-credential test (``scripts/live_eval_fw_reach.py --require-denied``) gates every job that runs seat C; seat C is still
-compiled as the runner. The refusal stays (``council/records/2026-11-19-seat-c-live-refusal.md``): lifting it for the
-single-seat case is a pull request of its own after gates SC1 to SC7, and the register block flow also waits for
-gates WF15 to WF19 of the G3 council record.
+``fw.test``, the firmware seat, or a whole flow with a firmware stage) is refused before anything runs, with one
+exception. Since M90 ``fw.test`` runs the program it builds as the seat account in these jobs
+(``scripts/live_eval_seat.py``), and the credential test (``scripts/live_eval_fw_reach.py --require-denied``) gates
+every job that runs seat C; seat C is still compiled as the runner, behind the compile screen since M91. Gate SC7 of
+``council/records/2026-11-19-seat-c-live-refusal.md`` lifts the refusal for the single-seat case
+``firmware/axi4-lite-driver`` (``SEAT_C_LIVE``) only, and keeps the same-job record condition: ``trials`` starts it
+only on this job's own credential test record (``confined_problem``), and ``check``, which runs before the credential
+test, leaves that record to ``trials``. Every other case that runs seat C stays refused; the register block flow waits
+for gates WF15 to WF19 of the G3 council record and SC9.
 
 A whole-flow case (``flow/...``, G3 council record 2026-11-17, decision 4) runs only when named, one trial per
 dispatch (each dispatch is one slot of the committed batch plan), on the default harness, in the whole-flow
@@ -61,6 +64,9 @@ BAD_INPUT, STOPPED_LIMIT, MISMATCH, STOPPED_OTHER, UNCONFINED = 2, 3, 4, 5, 6
 #: Tools that build or run seat-written C, and the seat that uses them: a live trial of a case with either is refused.
 #: regmap.verify, fw.soc_test and Verilator's --binary run no seat-written host code (docs/LIVE_EVAL_EVIDENCE.md, 6).
 SEAT_C_TOOLS, SEAT_C_SEATS = ("fw.build", "fw.test"), ("firmware",)
+#: The cases that run seat C whose live refusal is lifted (gate SC7, council record 2026-11-19, seat C and the live
+#: refusal), each run only on its own job's credential test record. The register block flow is not one of them.
+SEAT_C_LIVE = ("firmware/axi4-lite-driver",)
 #: Where a step that runs seat code finds its job's credential test record (``live_eval_fw_reach.py --out``).
 FW_REACH_ENV = "FW_REACH"
 #: Folders hashed whole, ignored files included: the judge's code, the scripts the workflow runs, the cases.
@@ -187,13 +193,16 @@ def confined_problem(case_id: str, env: Mapping[str, str] | None = None) -> str 
 
 
 def seat_c_problem(case_id: str) -> str | None:
-    """Why a live trial of this case, which runs seat C, is refused, or None (``seat_c_use``)."""
+    """Why a live trial of this case, which runs seat C, is refused, or None (``seat_c_use``).
+
+    A case in ``SEAT_C_LIVE`` is not refused here: its trials step still runs it only on this job's own credential
+    test record (``confined_problem``, in ``main``), the condition gate SC7 keeps."""
     what = seat_c_use(case_id)
-    if what:
+    if what and case_id not in SEAT_C_LIVE:
         return (f"case {case_id} runs seat-written C ({what}); live trials of it stay refused (gate WF17: seat C "
                 "executes as the seat account since M90 and is compiled as the runner; council record 2026-11-19 "
-                "keeps this refusal until gates SC1 to SC7, and for the register block flow gates WF15 to WF19). "
-                "No trial ran")
+                "lifts this refusal for firmware/axi4-lite-driver only (gate SC7), and the register block flow waits "
+                "for gates WF15 to WF19 and SC9). No trial ran")
     return None
 
 
@@ -358,8 +367,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         cli = installed_cli()
         live = args.mode == "trials" or getattr(args, "require_expected", False)
         digest = check(opts, require_expected=live, cli=cli)
-        # Gate SC4: the trials step runs a case's seat C only on this job's own credential test record, and then
-        # still refuses it (``seat_c_problem``) until the lift (gate SC7). Council record 2026-11-19, decision 1.
+        # Gate SC4: the trials step runs a case's seat C only on this job's own credential test record; gate SC7
+        # then lifts the refusal (``seat_c_problem``) for the cases in ``SEAT_C_LIVE`` only. Council record
+        # 2026-11-19, decision 1. ``check`` runs before the credential test, so the record is left to ``trials``.
         unconfined = confined_problem(opts["case"]) if args.mode == "trials" else None
         unconfined = unconfined or (seat_c_problem(opts["case"]) if live else None)
         if unconfined:
