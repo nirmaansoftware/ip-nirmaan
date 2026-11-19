@@ -17,6 +17,8 @@ from pathlib import Path
 
 import pytest
 
+import flow_mutants
+from laws import needs
 from nirmaan.company import build_organization
 from nirmaan.evals import load_cases, validate_case
 from nirmaan.evals.cases import referenced_files
@@ -36,7 +38,8 @@ FIXTURES = ("tests/fixtures/fw/axi4_lite/axi4_lite_regs_drv_swallowed_error.c",
             "tests/fixtures/fw/axi4_lite/axi4_lite_regs_drv_sticky_response.c",
             "tests/fixtures/rtl/axil_timer/axil_timer_tb_weak.v",
             "tests/fixtures/rtl/axi4_lite/variants/axi4_lite_regs_lat2.v",
-            "tests/fixtures/rtl/axi4_lite/variants/axi4_lite_regs_tb_strict2.v")
+            "tests/fixtures/rtl/axi4_lite/variants/axi4_lite_regs_tb_strict2.v",
+            "tests/fixtures/rtl/axi4_lite/variants/axi4_lite_regs_awready_low_in_reset.v")
 
 
 @pytest.fixture(scope="module")
@@ -131,6 +134,14 @@ def test_every_check_and_mutant_cites_a_statement_in_the_fixed_documents(cases, 
     assert all(isinstance(why, str) and why for why in not_judged.values())
     assert set(not_judged) <= tags and not set(not_judged) & cited_tags
     assert cited_tags | set(not_judged) == tags, sorted(tags - cited_tags - set(not_judged))
+    # Every judged tag is judged within an explicit stimulus scope (WF3): the values, waits, positions, widths and
+    # orderings its checks exercise, with line references. A block that breaks a rule only outside its scope is no
+    # escape; one that breaks it inside the scope is. Not judged tags have no scope.
+    scope = data["judged_scope"]
+    assert set(scope) == cited_tags, (sorted(cited_tags - set(scope)), sorted(set(scope) - cited_tags))
+    for tag, text in scope.items():
+        assert isinstance(text, str) and text.strip(), tag
+        assert re.search(r"\blines? \d+", text), f"{tag}: the scope cites no line"
 
 
 def test_each_tag_is_stated_once_and_both_documents_state_the_whole_range_rule():
@@ -146,14 +157,15 @@ def test_each_tag_is_stated_once_and_both_documents_state_the_whole_range_rule()
 #
 # By convention a whole-flow requirements document is checked by a session other than its writer, and the check is
 # kept next to it as ``requirements_check.json`` (format ``nirmaan.flow-document-check``): the document's sha256, the
-# writer and the checker, when, the sources read, per-tag evidence (``path:line``, a test id, or ``unjudged``) and the
-# result. Any edit to the document makes the record stale. A document whose first record has not landed yet is listed,
-# with the reason, in ``evals/flow/requirements_check_pending.json``; a listed document that has a record fails, so the
-# entry must go once its record lands. An author never writes the record for its own document.
+# writer and the checker, when, the sources read, the judged scopes it checked within (a copy of ``judged_scope`` in
+# the case's ``citations.json``), per-tag evidence (``path:line``, a test id, or ``unjudged``) and the result. Any
+# edit to the document, or to a judged scope, makes the record stale. A document whose first record has not landed yet
+# is listed, with the reason, in ``evals/flow/requirements_check_pending.json``; a listed document that has a record
+# fails, so the entry must go once its record lands. An author never writes the record for its own document.
 
 CHECK_PENDING = FLOW / "requirements_check_pending.json"
 CHECK_FIELDS = {"format", "case", "document", "document_sha256", "writer", "checker", "checked_at", "sources_read",
-                "evidence", "result"}
+                "judged_scope", "evidence", "result"}
 _LINE = re.compile(r"^(?P<path>[^:\s]+):(?P<first>\d+)(?:-(?P<last>\d+))?$")
 _TEST_ID = re.compile(r"^(?P<path>tests/[^:\s]+\.py)::(?P<name>\w+)(?:\[.*\])?$")
 
@@ -196,6 +208,8 @@ def _check_record_problems(doc: str, record: dict, citations: dict, root: Path =
         problems.append(f"document {record['document']!r} is not {doc!r}")
     if record["document_sha256"] != hashlib.sha256((root / doc).read_bytes()).hexdigest():
         problems.append("stale: the document changed after it was checked (document_sha256 differs)")
+    if record["judged_scope"] != citations["judged_scope"]:
+        problems.append("stale: the judged scopes changed after the check (judged_scope differs from citations.json)")
     writer, checker = record["writer"], record["checker"]
     if not (isinstance(writer, str) and writer and isinstance(checker, str) and checker):
         problems.append("writer and checker must be named")
@@ -265,8 +279,9 @@ def test_every_flow_requirements_document_has_a_current_check_record_by_another_
 
 def test_the_check_record_rule_refuses_a_stale_or_self_checked_record():
     """The rule works before any record lands: a record built here (never written to disk) holds, and editing the
-    document, naming the writer as the checker, dropping a tag, disagreeing with citations.json either way (a not judged
-    tag given evidence, a cited tag marked unjudged), unreadable evidence or a result that does not hold each fail it."""
+    document, changing a judged scope, naming the writer as the checker, dropping a tag, disagreeing with citations.json
+    either way (a not judged tag given evidence, a cited tag marked unjudged), unreadable evidence or a result that does
+    not hold each fail it."""
     doc = "evals/flow/axil_timer/requirements.md"
     citations = json.loads((FLOW / "axil_timer" / "citations.json").read_text(encoding="utf-8"))
     tags = re.findall(r"\[req:([A-Z0-9-]+)\]", (ROOT / doc).read_text(encoding="utf-8"))
@@ -274,6 +289,7 @@ def test_the_check_record_rule_refuses_a_stale_or_self_checked_record():
             "document_sha256": hashlib.sha256((ROOT / doc).read_bytes()).hexdigest(),
             "writer": "writer-session", "checker": "checker-session", "checked_at": "2026-11-18T06:00:00+00:00",
             "sources_read": [doc, "tests/fixtures/rtl/axil_timer/axil_timer_tb.v"],
+            "judged_scope": citations["judged_scope"],
             "evidence": [{"tag": t, "evidence": "unjudged" if t in citations["not_judged"]
                           else "tests/fixtures/rtl/axil_timer/axil_timer_tb.v:281"} for t in tags],
             "result": "holds"}
@@ -281,6 +297,8 @@ def test_the_check_record_rule_refuses_a_stale_or_self_checked_record():
     bad = [
         dict(good, document_sha256=hashlib.sha256((ROOT / doc).read_bytes() + b"\n").hexdigest()),
         dict(good, checker="writer-session"),
+        dict(good, judged_scope=dict(citations["judged_scope"], **{"TMR-STOP-EDGE": "every LOAD value"})),
+        dict(good, judged_scope={k: v for k, v in citations["judged_scope"].items() if k != "TMR-START"}),
         dict(good, evidence=good["evidence"][1:]),
         dict(good, evidence=[dict(e, evidence="tests/fixtures/rtl/axil_timer/axil_timer_tb.v:281")
                              for e in good["evidence"]]),
@@ -327,20 +345,72 @@ TB_COPIES = {"flow/axil-timer": ("tests/fixtures/rtl/axil_timer/axil_timer_tb.v"
                                             "evals/flow/axi4_lite/axi4_lite_regs_tb.v")}
 
 
+#: Checks of an original a flow copy drops on purpose, by copy: the original's check line, word for word, and why.
+#: Each must be in the original and absent from the copy; any other dropped or altered check fails the test.
+TB_COPY_EXEMPT = {
+    "evals/flow/axi4_lite/axi4_lite_regs_tb.v": {
+        """check("AWREADY in reset", {31'd0, awready}, 32'd1);""":
+            "No flow document states READY during reset (evals/flow/axi4_lite/requirements.md, section 2), and the "
+            "single-seat interface specification (tests/fixtures/rtl/axi4_lite/interface_spec.md, sections 4 and 7) "
+            "does not require it; only the single-seat microarchitecture.md (line 74) does, and in a whole flow the "
+            "RTL stage writes its own microarchitecture, a design choice given to that seat, so a conforming flow "
+            "block may hold AWREADY low in reset. AXIL-TEST-RANGE (requirements.md section 4) says a "
+            "testbench checks only what the document states, and the judge assumes only behaviour the fixed "
+            "document states (council/records/2026-11-17-g3-whole-flow-cases.md, lines 206 to 208), so a "
+            "conforming block must not fail it. The single-seat original keeps it. A block that holds AWREADY low in "
+            "reset (tests/fixtures/rtl/axi4_lite/variants/axi4_lite_regs_awready_low_in_reset.v) passes this copy and "
+            "fails the original: tests/test_whole_flow_cases.py::"
+            "test_a_block_holding_awready_low_in_reset_passes_the_flow_copy_and_fails_the_original.",
+    },
+}
+
+
 def _check_calls(path: str) -> list[str]:
     return [line.strip() for line in (ROOT / path).read_text(encoding="utf-8").splitlines()
             if re.match(r"\s*(check|expect_reg)\(", line)]
 
 
+def _copy_problems(kept: list[str], added: list[str], exempt: dict[str, str]) -> list[str]:
+    """What is wrong with a copy's check lines against the original's (empty when it keeps every one but the named
+    exemptions, in order, word for word, and adds some)."""
+    problems = [f"exemption not in the original: {line}" for line in exempt if line not in kept]
+    problems += [f"exempted check still in the copy: {line}" for line in exempt if line in added]
+    problems += [f"exemption without a reason: {line}" for line, why in exempt.items() if not why.strip()]
+    at = 0  # kept lines must appear in the copy in order: each is looked for after the one before it
+    for line in kept:
+        if line in exempt:
+            continue
+        if line in added[at:]:
+            at = added.index(line, at) + 1
+        else:
+            problems.append(f"check dropped, altered or out of order: {line}")
+    if len(added) <= len(kept) - len(exempt):
+        problems.append("the copy adds no check")
+    return problems
+
+
+def test_the_copy_rule_refuses_any_other_dropped_or_altered_check():
+    kept = ['check("a", x, 1);', 'check("b", y, 0);', 'expect_reg("c", 8\'h0, 0);']
+    exempt = {'check("b", y, 0);': "a named reason"}
+    good = ['check("a", x, 1);', 'check("new", z, 1);', 'expect_reg("c", 8\'h0, 0);']
+    assert _copy_problems(kept, good, exempt) == []
+    assert _copy_problems(kept, good, {})  # the same drop without its exemption fails
+    assert _copy_problems(kept, ['check("new", z, 1);', 'expect_reg("c", 8\'h0, 0);'], exempt)  # another drop
+    assert _copy_problems(kept, ['check("a", x, 2);', 'check("new", z, 1);', 'expect_reg("c", 8\'h0, 0);'], exempt)
+    assert _copy_problems(kept, ['expect_reg("c", 8\'h0, 0);', 'check("a", x, 1);', 'check("n", z, 1);'], exempt)
+    assert _copy_problems(kept, [*good, 'check("b", y, 0);'], exempt)  # an exempted check left in the copy
+    assert _copy_problems(kept, good, {**exempt, 'check("gone", q, 0);': "why"})  # a stale exemption
+    assert _copy_problems(kept, good, {'check("b", y, 0);': " "})  # no reason
+
+
 @pytest.mark.parametrize("case_id", sorted(TB_COPIES))
 def test_the_reference_testbench_copy_keeps_every_check_and_only_the_flow_case_runs_it(cases, case_id):
-    """The copy adds checks and keeps every one of the original's, in order, word for word; the single-seat case
-    keeps running the original, so its digest and its recorded trials stay as they are."""
+    """The copy adds checks and keeps every one of the original's, in order, word for word, except the named
+    exemptions in ``TB_COPY_EXEMPT``; the single-seat case keeps running the original, so its digest and its
+    recorded trials stay as they are."""
     original, copy = TB_COPIES[case_id]
-    kept, added = _check_calls(original), _check_calls(copy)
-    rest = iter(added)
-    assert all(any(line == other for other in rest) for line in kept)  # a subsequence
-    assert len(added) > len(kept)
+    assert set(TB_COPY_EXEMPT) <= {c for _, c in TB_COPIES.values()}
+    assert _copy_problems(_check_calls(original), _check_calls(copy), TB_COPY_EXEMPT.get(copy, {})) == []
     assert cases[case_id].held_out[0].case_files["sources"] == (copy,)
     single = {c.id: c for c in load_cases(EVALS)}
     assert any(original in c.case_files.get("sources", ()) for s in single.values() for c in s.held_out)
@@ -378,3 +448,84 @@ def test_a_document_given_through_inputs_never_reaches_the_requirements_seat_as_
             line = max(text.splitlines(), key=len)  # the document's longest line stands for its text
             assert line.strip() not in prompt and rel not in prompt  # ... but neither its text nor its path is seen
     assert case.request in prompt  # the request itself is rendered
+
+
+# --- The author's mutant sweep, kept as a check record ----------------------------------------------------------------
+#
+# ``evals/flow/<block>/mutant_sweep.json`` records the sweep the author ran on each case's testbench copy (ip#339):
+# every mutant ``tests/flow_mutants.py`` builds from the reference RTL, the tag it violates, its sha256 and its result,
+# and the conforming RTLs, which must pass. The record is held to the builders (each mutant's text is rebuilt and its
+# sha256 compared), to the testbench copy and reference RTL it ran on (by sha256: an edit to either makes it stale), and
+# to the case: every tag the testbench check cites has a mutant that fails. One mutant per tag runs here with the
+# simulator; the whole sweep reruns with the scratch script that wrote the record.
+
+SWEEPS = {"flow/axil-timer": (FLOW / "axil_timer" / "mutant_sweep.json", flow_mutants.timer_mutants,
+                              flow_mutants.TIMER_TAGS),
+          "flow/axi4-lite-regs-driver": (FLOW / "axi4_lite" / "mutant_sweep.json", flow_mutants.regs_mutants,
+                                         flow_mutants.REGS_TAGS)}
+AWREADY_LOW = ROOT / "tests/fixtures/rtl/axi4_lite/variants/axi4_lite_regs_awready_low_in_reset.v"
+
+
+def _sha(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+@pytest.mark.parametrize("case_id", sorted(SWEEPS))
+def test_each_sweep_record_matches_its_builders_and_fails_every_tag_the_testbench_check_cites(cases, case_id):
+    path, build, tags = SWEEPS[case_id]
+    record = json.loads(path.read_text(encoding="utf-8"))
+    assert record["format"] == "nirmaan.flow-mutant-sweep" and record["case"] == case_id
+    case = cases[case_id]
+    check = case.held_out[0]  # check 1 runs the testbench copy
+    assert record["testbench"]["path"] == check.case_files["sources"][0] == TB_COPIES[case_id][1]
+    assert record["testbench"]["sha256"] == _sha(ROOT / record["testbench"]["path"]), "stale: rerun the sweep"
+    assert record["builder"] == f"tests/flow_mutants.py::{build.__name__}"
+    reference = ROOT / record["reference"]["path"]
+    assert record["reference"]["sha256"] == _sha(reference) and record["reference"]["result"] == "passes"
+    built = build(reference.read_text(encoding="utf-8"))
+    rows = record["mutants"]
+    assert [r["mutant"] for r in rows] and sorted(r["mutant"] for r in rows) == sorted(built)
+    for row in rows:
+        assert set(row) == {"tag", "mutant", "sha256", "result", "errors", "first_failure"}, row
+        assert row["tag"] == flow_mutants.tag_of(row["mutant"], tags)
+        assert row["sha256"] == hashlib.sha256(built[row["mutant"]].encode("utf-8")).hexdigest(), row["mutant"]
+        assert row["result"] == "fails" and row["first_failure"], row["mutant"]
+    for entry in record["conforming"]:
+        assert entry["result"] == "passes" and entry["sha256"] == _sha(ROOT / entry["path"]), entry
+    citations = json.loads(CASES[case_id].read_text(encoding="utf-8"))
+    judged = {t for t in citations["checks"][check.name] if t in set(tags.values())}
+    assert judged == set(tags.values())  # the builders name exactly the tags the testbench check cites
+    assert judged <= {r["tag"] for r in rows if r["result"] == "fails"}
+    if case_id == "flow/axi4-lite-regs-driver":
+        assert AWREADY_LOW.relative_to(ROOT).as_posix() in {e["path"] for e in record["conforming"]}
+
+
+@needs("iverilog", "vvp")
+@pytest.mark.parametrize("case_id", sorted(SWEEPS))
+def test_one_mutant_per_tag_fails_the_testbench_copy_and_the_conforming_rtl_passes(case_id, tmp_path):
+    path, build, _ = SWEEPS[case_id]
+    record = json.loads(path.read_text(encoding="utf-8"))
+    tb, top = ROOT / record["testbench"]["path"], record["testbench"]["top"]
+    built = build((ROOT / record["reference"]["path"]).read_text(encoding="utf-8"))
+    first = {}
+    for row in record["mutants"]:
+        first.setdefault(row["tag"], row["mutant"])
+    for tag, name in sorted(first.items()):
+        source = tmp_path / f"{name}.v"
+        source.write_text(built[name], encoding="utf-8")
+        passed, failed, why = flow_mutants.simulate(tb, top, source, tmp_path)
+        assert failed is None or failed > 0, (tag, name, passed)
+    for rel in [record["reference"]["path"], *(e["path"] for e in record["conforming"])]:
+        passed, failed, why = flow_mutants.simulate(tb, top, ROOT / rel, tmp_path)
+        assert failed == 0 and passed, (rel, why)
+
+
+@needs("iverilog", "vvp")
+def test_a_block_holding_awready_low_in_reset_passes_the_flow_copy_and_fails_the_original(tmp_path):
+    """The one exemption of the register block copy (``TB_COPY_EXEMPT``), shown by a run: the conforming block that
+    holds AWREADY low in reset passes the flow case's copy and fails the single-seat original on that check."""
+    original, copy = TB_COPIES["flow/axi4-lite-regs-driver"]
+    passed, failed, why = flow_mutants.simulate(ROOT / copy, "axi4_lite_regs_tb", AWREADY_LOW, tmp_path)
+    assert failed == 0 and passed, why
+    passed, failed, why = flow_mutants.simulate(ROOT / original, "axi4_lite_regs_tb", AWREADY_LOW, tmp_path)
+    assert failed and why.startswith("AWREADY in reset"), (failed, why)

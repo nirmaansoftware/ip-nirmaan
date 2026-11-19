@@ -43,8 +43,12 @@ observations on where LLM coding agents go wrong.
 - **Milestones ship complete:** code, tests, a design doc in `docs/`, and a
   history entry. Reserve the number in `docs/ROADMAP.md` ("Milestone numbers")
   before cutting the branch. The milestone adds its own
-  `docs/history/MNN-<slug>.md` file and one line in `docs/history/README.md`;
-  it does not append to `context.md`, which holds current facts only (edit it
+  `docs/history/MNN-<slug>.md` file and one line in `docs/history/README.md`.
+  A later pull request on a milestone that already has its file never edits
+  that file: it adds a fragment,
+  `docs/history/fragments/MNN-<slug>/<YYYY-MM-DD>-<topic>.md` (paragraphs, no
+  heading; `python scripts/history.py show MNN-<slug>` reads both). The
+  milestone does not append to `context.md`, which holds current facts only (edit it
   only when one changes). Counts in the roadmap are generated: run
   `python scripts/status.py --write` after adding a workflow, tool, unit,
   skill, or principle, never type them. See `docs/STATUS_DOCS.md`. Work on a

@@ -36,7 +36,8 @@ Subcommands (each exits non-zero with a reason on failure):
                 readable process environment holds a secret and the check account cannot
                 read the loop's
     run         the loop once (pr_loop.py --once; --shadow N: --no-post on pull request N),
-                with the step's secrets moved out of the environment first
+                with the step's secrets moved out of the environment first; then, while a
+                step is ready now, the next pass at once in the same job (run_chained)
     push        write this loop's state back, commit, push, rebase and retry
     seed        once, before the switch: the Mac's state for this repository into a clone
 
@@ -45,8 +46,10 @@ Usage: python scripts/loop_cloud.py <subcommand> [--clone DIR] [--state-dir DIR]
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -237,6 +240,129 @@ def has_work(pulls: list[dict], state_dir: Path, cfg: dict = pr_review.CONFIG, l
     return False
 
 
+# --- Chained passes -------------------------------------------------------------------
+
+# A pass that ends with a step ready now is followed at once by the next pass,
+# in the same job and process (run_chained), at most this many in a row, and
+# none started once CHAIN_BUDGET_S has passed since the first began (the step
+# times out at 50 minutes, inside the App token's hour); then the dispatcher's
+# next tick takes over. Passes run one after another, so never two at once.
+CHAIN_MAX = 5
+CHAIN_BUDGET_S = 20 * 60
+CHAIN_INPUT = re.compile(r"(\d{1,3})(?::([0-9a-f]{12}))?")
+
+
+def ready_now(pulls: list[dict], state_dir: Path, github, cfg: dict = pr_review.CONFIG, lc: dict = pr_loop.LOOP,
+              now: str | None = None) -> list[tuple[int, str, str]]:
+    """The pull requests whose next step a pass would take now, as (number,
+    head, why), read without a model call: a stop to post, a branch behind
+    main, a merge conflict to handle, or required CI finished (green: a review
+    is due; failed after a fix round: a stop). Not ready: a rate-limit pause in
+    force, CI still running, a stop or a backoff on this head, an author-fix
+    wait, or a head the loop already finished. Each `why` is a step pr_loop's
+    own rules would take (Loop.step, Loop._step)."""
+    now = now or pr_loop._now()
+    if pr_loop.read_pause(state_dir, datetime.fromisoformat(now)):
+        return []
+    skip_labels = {cfg["hold_label"], lc["needs_founder_label"], lc.get("stalled_label")} - {None}
+    ready = []
+    for p in pulls:
+        if p["draft"] or p["head_repo"] != cfg["repo"] or p["base_ref"] != cfg["base_branch"] or p["author"] not in lc["authors"]:
+            continue
+        n, head = p["number"], p["head_sha"]
+        st = pr_loop.load_state(state_dir, cfg["repo"], n)
+        stopped = st.get("stopped")
+        if stopped and stopped.get("visible") is False and stopped.get("head") == head:
+            ready.append((n, head, "a stop to post"))
+            continue
+        if skip_labels & set(p["labels"]):
+            continue
+        if stopped and stopped.get("head") == head and not stopped.get("labeled"):
+            continue
+        tr = st.get("transient") or {}
+        if tr.get("head") == head and tr.get("next_at") and now < tr["next_at"]:
+            continue
+        if (st.get("author_fix") or {}).get("head") == head:
+            continue
+        pull = github.get_pull(n)
+        head, done = pull["head_sha"], st.get("done") or {}
+        if pull.get("mergeable_state") == "behind" and done.get("outcome") != "refused":
+            ready.append((n, head, "behind main"))
+        elif done.get("head") == head:
+            continue
+        elif pull.get("mergeable") is False or pull.get("mergeable_state") == "dirty":
+            ready.append((n, head, "a merge conflict to handle"))
+        else:
+            state, _ = pr_loop.ci_state(cfg["required_ci"], github.list_check_runs(head))
+            if state == "green":
+                ready.append((n, head, "CI green: a review is due"))
+            elif state == "failed" and st.get("last_fix_head") == head:
+                ready.append((n, head, "CI failed after a fix round"))
+    return ready
+
+
+def ready_digest(ready: list[tuple[int, str, str]]) -> str:
+    return hashlib.sha256(json.dumps(sorted(ready)).encode()).hexdigest()[:12]
+
+
+def next_chain(chain: str | None, ready: list[tuple[int, str, str]], chain_max: int = CHAIN_MAX) -> str | None:
+    """The next pass's chain mark, or None to leave the next pass to the
+    dispatcher. `chain` is the mark of the pass just run: empty for the job's
+    first pass, else `<n>:<digest>` (the n-th chained pass, started on that
+    ready set). No next pass when nothing is ready, after chain_max chained
+    passes, when the ready set is the one the pass just run started on (it made
+    no progress on it), or on a mark not of this form."""
+    if not ready:
+        return None
+    m = CHAIN_INPUT.fullmatch((chain or "0").strip())
+    if not m:
+        return None
+    n, digest = int(m.group(1)), ready_digest(ready)
+    if n >= chain_max or digest == m.group(2):
+        return None
+    return f"{n + 1}:{digest}"
+
+
+def run_chained(once, ready, clock=time.monotonic, out=print, chain_max: int = CHAIN_MAX,
+                budget_s: float = CHAIN_BUDGET_S) -> int:
+    """One pass (`once`, pr_loop.main(["--once"])), then the next at once while
+    `ready()` (ready_now) names a step and next_chain allows one more. The first
+    pass's exit code is the job's. A chained pass that pr_loop refuses because
+    this checkout's loop scripts are no longer main's (exit 4, after a merge
+    changed them) ends the chain without failing the job: the dispatcher's
+    next run checks out the new main. A read error ends the chain too."""
+    start, chain, n = clock(), "", 0
+    while True:
+        code = once()
+        if code != 0:
+            if n and code == 4:
+                out("loop-cloud: the loop scripts changed on main; no more chained passes in this job")
+                return 0
+            return code
+        if clock() - start >= budget_s:
+            out("loop-cloud: the chained-pass time budget is spent; the dispatcher's next tick runs the next pass")
+            return 0
+        try:
+            found = ready()
+        except Exception as exc:  # noqa: BLE001 - no chained pass; the dispatcher's next tick runs one
+            out(f"loop-cloud: could not read what is ready ({pr_review.redact(str(exc))[:300]}); no chained pass")
+            return 0
+        for pr, head, why in found:
+            out(f"loop-cloud: ready now: #{pr} {head[:7]}: {why}")
+        chain = next_chain(chain, found, chain_max)
+        if not chain:
+            out("loop-cloud: no chained pass")
+            return 0
+        n = int(chain.split(":")[0])
+        out(f"loop-cloud: chained pass {n} of {chain_max}, now")
+
+
+def _ready_from_github() -> list[tuple[int, str, str]]:
+    token = os.environ.get(pr_review.APP_TOKEN_ENV) or pr_review._gh_token()
+    github = pr_review.GitHub(REPO, token)
+    return ready_now(github.list_open_pulls(), Path(pr_review.defaults()["state_dir"]), github)
+
+
 # --- The job's own checks -------------------------------------------------------------
 
 
@@ -400,7 +526,9 @@ def main(argv: list[str]) -> int:
             shadow = argv[argv.index("--shadow") + 1] if "--shadow" in argv and argv.index("--shadow") + 1 < len(argv) else None
             if shadow is not None and not shadow.isdigit():
                 raise SyncError("--shadow takes one pull request number")
-            return pr_loop.main(["--once", *(["--no-post", "--pr", shadow] if shadow else [])])
+            if shadow:
+                return pr_loop.main(["--once", "--no-post", "--pr", shadow])
+            return run_chained(lambda: pr_loop.main(["--once"]), _ready_from_github)
         elif cmd == "auth-check":
             binary = pr_review.defaults()["claude_bin"]
             ok, why = auth_status(binary)
