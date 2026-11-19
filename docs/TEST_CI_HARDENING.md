@@ -270,3 +270,14 @@ fix as before, with one more shard, and nothing is tested less:
   shard's 510 s, so the split stays by whole file and no test is moved to its own job.
 - The review loop's own local run of `test` keeps its three shards (`scripts/pr_loop.py`, one
   machine); it reads the same weights.
+
+## 9. Verilator build jobs in the loop's check (2026-11-19)
+
+The review loop runs its `test` check as up to three shards at once, on the machine that also
+runs reviews (`scripts/pr_loop.py`, `LOOP["checks"]`). A Verilator build given `-j 0` starts one
+job per core, so three shards that each build a Verilator model at the same moment start three
+jobs per core. The check's environment sets `NIRMAAN_VERILATOR_JOBS=2`, and the builds that read
+it (`simulator.run`'s Verilator backend, coverage and `fw.soc_test`;
+`nirmaan.integrations.eda.verilator_jobs`) start at most two jobs each. Unset, as in CI's own test
+jobs and on a developer's machine, it is `-j 0` as before. `fw.test`'s co-simulation build keeps
+`-j 0`: gate WF14's guard pins its options word for word (`tests/test_nirmaan_firmware_reach.py`).

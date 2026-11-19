@@ -110,6 +110,103 @@ def test_a_run_directory_is_one_the_harness_made_in_the_temporary_folder(tmp_pat
     assert "does not belong to the runner" in seat.run_dir_problem(run, me + 1, root)
 
 
+# --- M90: the program fw.test builds runs as the seat account ---------------------------------------------------
+
+
+def test_the_exec_wrapper_runs_sudo_with_no_environment_and_no_shell(monkeypatch, capsys):
+    argv = seat.exec_argv("/tmp/nirmaan-verilator-cosim-x/seat", "/tmp/nirmaan-verilator-cosim-x/cosim/Vdut",
+                          ["+nirmaan_nonce=ab"])
+    assert argv == ["/usr/bin/sudo", "-n", "/usr/bin/python3", "-I", "/opt/nirmaan-seat/seat.py", "run-built",
+                    "--cwd", "/tmp/nirmaan-verilator-cosim-x/seat", "--exe",
+                    "/tmp/nirmaan-verilator-cosim-x/cosim/Vdut", "--", "+nirmaan_nonce=ab"]
+    text = seat.exec_wrapper_text()
+    assert text.startswith("#!/bin/sh\n") and text.endswith('exec /usr/bin/python3 -I /opt/nirmaan-seat/seat.py exec -- "$@"\n')
+    assert seat.EXEC == Path("/opt/nirmaan-seat/bin/nirmaan-seat-exec") and seat.EXEC_NAME == "nirmaan-seat-exec"
+    from nirmaan.integrations import firmware
+
+    assert firmware.SEAT_EXEC == seat.EXEC_NAME  # fw.test looks for the wrapper this script installs
+    monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "canary")
+    execs = []
+    monkeypatch.setattr(seat.os, "execv", lambda path, argv: execs.append(argv) or (_ for _ in ()).throw(SystemExit(0)))
+    with pytest.raises(SystemExit):
+        seat.main(["exec", "--", "/tmp/nirmaan-x/seat", "/tmp/nirmaan-x/cosim/Vdut", "+nirmaan_nonce=ab"])
+    assert execs == [seat.exec_argv("/tmp/nirmaan-x/seat", "/tmp/nirmaan-x/cosim/Vdut", ["+nirmaan_nonce=ab"])]
+    assert "canary" not in " ".join(execs[0]) and "--env" not in execs[0]
+    assert seat.main(["exec", "--", "/tmp/nirmaan-x/seat"]) == 126
+    assert "nothing ran" in capsys.readouterr().err
+
+
+def test_run_built_runs_with_no_environment_and_passes_a_signal_on(monkeypatch, capsys):
+    calls = []
+    monkeypatch.setattr(seat, "run", lambda cwd, exe, env, rest, built=False: calls.append((cwd, exe, env, rest, built))
+                        or 7)
+    monkeypatch.setattr(seat.os, "geteuid", lambda: 0)
+    assert seat.main(seat.exec_argv("/tmp/nirmaan-x/seat", "/tmp/nirmaan-x/cosim/Vdut", ["a"])[5:]) == 7
+    assert calls == [("/tmp/nirmaan-x/seat", "/tmp/nirmaan-x/cosim/Vdut", [], ["a"], True)]
+    monkeypatch.setattr(seat.os, "geteuid", lambda: 1001)
+    assert seat.main(["run-built", "--cwd", "/tmp/nirmaan-x/seat", "--exe", "/tmp/nirmaan-x/cosim/Vdut"]) == 126
+    assert "runs as root" in capsys.readouterr().err
+
+
+def test_run_built_refuses_any_setting(monkeypatch):
+    monkeypatch.setenv("SUDO_UID", "1001")
+    monkeypatch.setenv("SUDO_GID", "1001")
+    monkeypatch.setattr(seat, "_seat", lambda: type("P", (), {"pw_uid": 999, "pw_gid": 999})())
+    for pair in ("COCOTB_TOPLEVEL=x", "PATH=/usr/bin"):
+        with pytest.raises(seat.Refused, match="refusing to pass"):
+            seat.run("/tmp/nirmaan-x/seat", "/tmp/nirmaan-x/cosim/Vdut", [pair], [], built=True)
+
+
+def test_a_signal_that_ends_the_seat_run_ends_the_wrapper_by_the_same_signal(tmp_path):
+    """So fw.test sees a crash under the account as it does without it (a negative exit status), not ``128 + N``."""
+    import signal
+    import subprocess
+    import sys
+
+    script = (f"import importlib.util, sys\nspec = importlib.util.spec_from_file_location('s', {str(REPO / 'scripts' / 'live_eval_seat.py')!r})\n"
+              "m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)\nsys.exit(m.passed_on(int(sys.argv[1])))\n")
+    for code, want in ((0, 0), (3, 3), (-signal.SIGSEGV, -signal.SIGSEGV), (-signal.SIGTERM, -signal.SIGTERM),
+                       (-signal.SIGKILL, -signal.SIGKILL)):
+        assert subprocess.run([sys.executable, "-I", "-c", script, str(code)], cwd=tmp_path).returncode == want, code
+
+
+def test_a_built_program_is_one_the_runner_made_in_the_same_run_directory(tmp_path):
+    me = os.getuid()
+    root = tmp_path / "tmp"
+    run = root / "nirmaan-verilator-cosim-abc"
+    here = run / "seat"
+    (run / "cosim").mkdir(parents=True)
+    here.mkdir()
+    exe = run / "cosim" / "Vdut"
+    exe.write_text("x")
+    exe.chmod(0o755)
+    assert seat.built_problem(exe, here, me, root) is None
+    nested = root / "nirmaan-eval-x" / "judge" / "fw-1"
+    (nested / "cosim").mkdir(parents=True)
+    (nested / "seat").mkdir()
+    (nested / "cosim" / "Vdut").write_text("x")
+    (nested / "cosim" / "Vdut").chmod(0o755)
+    assert seat.built_problem(nested / "cosim" / "Vdut", nested / "seat", me, root) is None
+    other = root / "nirmaan-other"
+    other.mkdir()
+    (other / "Vdut").write_text("x")
+    (other / "Vdut").chmod(0o755)
+    (run / "cosim" / "link").symlink_to(exe)
+    (run / "folder").mkdir()
+    (run / "fifo-dir").mkdir()
+    os.mkfifo(run / "fifo-dir" / "fifo")
+    for target, why in [(other / "Vdut", "is not inside the run directory"), (Path("/bin/sh"), "is not inside"),
+                        (run, "is the run directory"), (run / "cosim" / "link", "is a link"),
+                        (run / "folder", "is not a regular file"), (run / "fifo-dir" / "fifo", "is not a regular file")]:
+        problem = seat.built_problem(target, here, me, root)
+        assert problem and why in problem, (target, problem)
+    assert "does not belong to the runner" in seat.built_problem(exe, here, me + 1, root)
+    for mode, why in ((0o757, "writable by other accounts"), (0o4755, "set-id"), (0o750, "cannot be run by other")):
+        exe.chmod(mode)
+        problem = seat.built_problem(exe, here, me, root)
+        assert problem and why in problem, (oct(mode), problem)
+
+
 def test_the_checkout_is_never_a_run_directory():
     assert seat.run_dir_problem(REPO, os.getuid()) is not None
 
@@ -170,6 +267,7 @@ def _opt(tmp_path: Path) -> Path:
     opt = tmp_path / "opt"
     (opt / "bin").mkdir(parents=True)
     (opt / "bin" / "vvp").write_text("")
+    (opt / "bin" / "nirmaan-seat-exec").write_text("")
     (opt / "seat.py").write_text("")
     (opt / "exes.json").write_text(json.dumps([str(opt / "bin" / "vvp")]))
     (tmp_path / "records").mkdir()
@@ -193,6 +291,8 @@ def test_every_write_target_exists_or_the_reach_test_stops(tmp_path, monkeypatch
     assert str(tmp_path) in create and str(tmp_path / "out") in append
     assert str(REPO / ".github" / "workflows" / "live-eval.yml") in append
     assert str(tmp_path / "cocotb") in create and str(tmp_path / "opt" / "bin" / "vvp") in append
+    assert str(tmp_path / "opt" / "bin" / "nirmaan-seat-exec") in append  # M90: fw.test's wrapper
+    assert reach.EXEC_NAME == seat.EXEC_NAME
 
 
 @pytest.mark.parametrize("what", ["package", "cocotb", "tool", "wrapped", "path", "actions"])
@@ -229,3 +329,18 @@ def test_reach_fails_the_job_when_a_target_cannot_be_determined(tmp_path, monkey
     with pytest.raises(SystemExit) as stop:
         reach.reach(tmp_path)
     assert stop.value.code not in (0, None)
+
+
+def test_seat_c_as_the_seat_account_changes_no_fingerprint():
+    """M90 (G3 fourth addendum, decision 2, item 5; gate WF25): the fw.test change touches no file a fingerprint
+    digests and no tool definition, so the default and whole-flow fingerprints are what they were."""
+    from nirmaan.company.tools import TOOLS
+    from nirmaan.integrations import firmware
+    from nirmaan.runtime import harness
+
+    digested = {*harness.CODE, *harness.LOOP_CODE, *harness.FLOW_CODE}
+    for rel in ("nirmaan/integrations/firmware.py", "nirmaan/integrations/eda.py"):
+        assert rel not in digested, rel
+    fw_specs = {spec.id: spec.model_dump(mode="json") for spec in TOOLS if spec.id in ("fw.build", "fw.test")}
+    assert set(fw_specs) == {"fw.build", "fw.test"}
+    assert not any(firmware.SEAT_EXEC in json.dumps(spec) for spec in fw_specs.values())  # no seat text reaches a seat

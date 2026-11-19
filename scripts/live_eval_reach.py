@@ -20,9 +20,9 @@ backend (``eda.execute``), so through the ``vvp`` the trials use. The test passe
 a pass and every probe test is in the results, passed: every probe denied. Otherwise it exits 1 and the job
 stops before any trial.
 
-``fw.test`` runs seat C by path, so the seat account does not reach it yet; ``scripts/live_eval_ci.py`` refuses a
-live trial of a case that runs seat C. Its credential test (``scripts/live_eval_fw_reach.py``) records what
-that C reaches, and becomes a gate with that confinement.
+``fw.test`` runs the program it builds from seat C through a wrapper of its own, ``nirmaan-seat-exec``, as the same
+account (M90). Its credential test (``scripts/live_eval_fw_reach.py``) tries the same targets from compiled C through
+``fw.test``, and the workflow runs it as a gate (``--require-denied``) for a whole-flow case.
 """
 
 from __future__ import annotations
@@ -44,6 +44,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SEAT = "nirmaan-seat"
 WRAPPER = Path("/opt/nirmaan-seat/bin/vvp")
+#: The wrapper fw.test runs its built program through, beside ``WRAPPER`` (M90; scripts/live_eval_seat.py).
+EXEC_NAME = "nirmaan-seat-exec"
 #: Credential-named and plain-named canaries; neither may reach seat code.
 CANARY_SECRET, CANARY_PLAIN = "CLAUDE_CODE_OAUTH_TOKEN", "NIRMAAN_REACH_CANARY"
 #: The probe tests, by name; each must be in cocotb's results and pass.
@@ -180,7 +182,7 @@ def targets(records: Path, env: Mapping[str, str]) -> tuple[list[str], list[str]
               Path(_need(sys.executable, "the Python")).resolve().parent, WRAPPER.parent, records]
     append = [ROOT / "pyproject.toml", ROOT / "scripts" / "live_eval_ci.py", ROOT / ".github" / "workflows" /
               "live-eval.yml", package / "__init__.py", package / "integrations" / "cocotb_runner.py",
-              Path(sys.executable).resolve(), WRAPPER, WRAPPER.parent.parent / "seat.py"]
+              Path(sys.executable).resolve(), WRAPPER, WRAPPER.parent / EXEC_NAME, WRAPPER.parent.parent / "seat.py"]
     installed = sorted(purelib.glob("__editable__*nirmaan*")) + sorted(purelib.glob("*nirmaan*.pth"))
     in_actions = env.get("GITHUB_ACTIONS") == "true"
     append += _need(installed, f"the installed package's files in {purelib}") if in_actions else installed

@@ -19,6 +19,7 @@ import hashlib
 import json
 import re
 import shutil
+import sys
 from pathlib import Path
 
 import pytest
@@ -219,6 +220,32 @@ def test_the_fw_test_parser_fails_what_did_not_really_pass():
     assert result.errors[0].file == "x.v"
 
 
+def test_a_clean_build_whose_program_is_killed_is_reported_as_killed_by_its_signal():
+    """A run whose built program dies on a signal before it prints a record is not a failed build."""
+    steps = f"$ cc -c drv.c -o drv.o\n$ verilator --cc --exe --build x.v drv.o\n$ cosim/Vdut +nirmaan_nonce={NONCE}\n"
+    result = parse_fw_test(steps, (0, 0, -11))
+    assert not result.passed
+    assert result.summary == ("co-simulation was killed by signal 11 before it reported anything; the build was clean: "
+                              "0 errors (exit status -11)")
+    soc = parse_fw_test(steps, (0, 0, -6), what="SoC run")
+    assert soc.summary == ("SoC run was killed by signal 6 before it reported anything; the build was clean: 0 errors "
+                           "(exit status -6)")
+    # A build step killed by a signal is still a failed build, now with the signal named.
+    crashed = parse_fw_test("$ cc -c drv.c -o drv.o\n", (-11,))
+    assert crashed.summary == "build failed before co-simulation: 0 errors (killed by signal 11)"
+    assert parse_fw_test("$ cc -c drv.c -o drv.o\n", (1,)).summary.endswith("(exit status 1)")
+    # An earlier step that did not exit 0 means the build was not clean, whatever the last echo says.
+    assert parse_fw_test(steps, (0, 1, -11)).summary == "build failed before co-simulation: 0 errors (killed by signal 11)"
+    # -1 is also a step that could not start: never read as a signal.
+    assert parse_fw_test(steps, (0, 0, -1)).summary == "build failed before co-simulation: 0 errors (exit status -1)"
+    # Killed after it reported something: the signal is named beside what is missing.
+    partial = steps + f"FWTEST:{NONCE} BUS read 0x0 -> 0x00000000 OKAY\nFWTEST:{NONCE} PASS reset_values\n"
+    assert parse_fw_test(partial, (0, 0, -11)).summary == ("co-simulation did not finish: the harness printed no "
+                                                          "summary (killed by signal 11)")
+    assert parse_fw_test(partial, (0, 0, 1)).summary == "co-simulation did not finish: the harness printed no summary"
+    assert parse_c_build("$ cc -c drv.c\n", (-9,)).summary.endswith("(killed by signal 9)")
+
+
 # --- Refusals: a missing tool is never a simulated run ---------------------------------------
 
 
@@ -276,6 +303,62 @@ def test_the_driver_passes_against_the_real_rtl(block, tmp_path):
     assert " BUS write 0xe = 0xdeadbeef strobe 0xf -> SLVERR" in log
     assert " BUS write 0x4 = 0x00ab0000 strobe 0x4 -> OKAY" in log
     assert "verilator --cc --exe --build" in log and run.params["rtl"] == (str(RTL),)
+
+
+def _fake_seat_exec(folder: Path) -> Path:
+    """A stand-in for the live evaluation's ``nirmaan-seat-exec`` (scripts/live_eval_seat.py): it records how it was
+    called and runs the program in the seat's folder, as the caller (the account itself exists only in Actions)."""
+    folder.mkdir()
+    script = folder / "nirmaan-seat-exec"
+    script.write_text(f"#!{sys.executable}\nimport os, sys\nhere, argv = sys.argv[1], sys.argv[2:]\n"
+                      "open(os.path.join(here, 'called-with'), 'w').write('\\n'.join(sys.argv[1:]))\nos.chdir(here)\n"
+                      "open('ran-in', 'w').write(os.getcwd())\nos.execv(argv[0], argv)\n", encoding="utf-8")
+    script.chmod(0o755)
+    return script
+
+
+def test_without_the_seat_wrapper_the_built_program_runs_as_before(tmp_path, monkeypatch):
+    """M90: off the live evaluation's jobs nothing changes: the last step is the program and its nonce."""
+    from nirmaan.integrations import firmware
+    from nirmaan.integrations.eda import Job
+
+    monkeypatch.setattr(firmware.shutil, "which", lambda name, *a, **k: None)
+    job = Job("fw.test", {}, tmp_path, (), None)
+    assert firmware.seat_run(job, ["/run/cosim/Vdut", "+nirmaan_nonce=ab"]) == ["/run/cosim/Vdut", "+nirmaan_nonce=ab"]
+    assert not (tmp_path / firmware.SEAT_DIR).exists()
+
+
+def test_with_the_seat_wrapper_the_built_program_runs_through_it_in_a_folder_of_its_own(tmp_path, monkeypatch):
+    from nirmaan.integrations import firmware
+    from nirmaan.integrations.eda import Job
+
+    monkeypatch.setattr(firmware.shutil, "which",
+                        lambda name, *a, **k: "/opt/nirmaan-seat/bin/nirmaan-seat-exec" if name == firmware.SEAT_EXEC
+                        else None)
+    job = Job("fw.test", {}, tmp_path, (), None)
+    argv = firmware.seat_run(job, ["/run/cosim/Vdut", "+nirmaan_nonce=ab"])
+    assert argv == ["/opt/nirmaan-seat/bin/nirmaan-seat-exec", str(tmp_path / "seat"), "/run/cosim/Vdut",
+                    "+nirmaan_nonce=ab"]
+    assert (tmp_path / "seat").is_dir() and not any((tmp_path / "seat").iterdir())
+
+
+@needs(*COSIM)
+def test_the_driver_passes_through_the_seat_wrapper_with_the_same_checks(block, tmp_path, monkeypatch):
+    """M90: the wrapper changes only who runs the built program and where; the run, its checks and its nonce are
+    the same, and the requirements the harness reads afterwards stay outside the seat's folder."""
+    wrapper = _fake_seat_exec(tmp_path / "bin")
+    monkeypatch.setenv("PATH", f"{wrapper.parent}:{__import__('os').environ['PATH']}")
+    work = tmp_path / "run"
+    run, outcome = invoke(block, "fw.test", {"sources": joined(*DRIVER, TESTS), "rtl": str(RTL)}, work)
+    assert run.succeeded, run.summary
+    last = outcome.data["commands"][-1]
+    seat = Path(last[1])
+    assert last[0] == str(wrapper) and seat.name == "seat" and last[2].endswith("/cosim/Vdut")
+    assert last[3].startswith("+nirmaan_nonce=")
+    assert Path((seat / "ran-in").read_text()).resolve() == seat.resolve()
+    assert (seat / "called-with").read_text().split() == last[1:]
+    assert len(outcome.data["result"]["metrics"]["checks"]) == 6
+    assert not list(seat.glob("*.json")) and list(seat.parent.glob("*.json"))
 
 
 @needs(*COSIM)
