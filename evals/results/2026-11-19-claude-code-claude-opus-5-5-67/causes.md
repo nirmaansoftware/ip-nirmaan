@@ -1,0 +1,7 @@
+# Failed trial and its cause (debug/triage-three-bugs, arm E: the default harness)
+
+Record `2026-11-19-claude-code-claude-opus-5-5-67`, one trial, W2-L1 batch (slot 131 of 153), purpose evidence, knowledge on, harness `sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00` (the default harness, attempts-3, on main 01adfe9), Claude Code 2.1.325, seat model claude-opus-5-5. Rejudged: the verdict reproduces (`rejudge.json`).
+
+| Record | Trial | Outcome | Cause | What the record shows |
+|---|---|---|---|---|
+| this | 1 | not passed | knowledge/harness defect: missing input | The repro gate failed every testbench: "failure not reproduced: the testbench printed no single verdict with this run's nonce". The seat printed its own verdict line and guessed the plusarg name (NONCE, RUN_NONCE, TB_NONCE, VERDICT_NONCE, nonce). Nothing the triage seat receives names the plusarg (`nirmaan_nonce`) or the verdict format (`NIRMAAN-SIM <nonce> <n> passed, <m> failed`): the failure_triage card names neither, knowledge/verification/failure_triage.md says only "the testbench's one verdict line, with this run's nonce", the case's inputs (the buggy RTL and three logs) carry no example, and the repro gate's refusal text names neither. By contrast, the root-cause case (evals/dv/root_cause_uart_tx.json) hands its seat a working testbench, tests/fixtures/dv/uart_tx/uart_tx_triage_repro.v, that reads `nirmaan_nonce`. |

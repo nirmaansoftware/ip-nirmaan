@@ -1,0 +1,152 @@
+{
+  "answers": [
+    {
+      "cache_read_tokens": 620,
+      "cache_write_tokens": 7981,
+      "error": null,
+      "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+      "input_tokens": 2,
+      "mode": "work",
+      "model": "claude-opus-5-5",
+      "output_tokens": 15209,
+      "packet_sha256": "baa67104f225122a65109331e0f55ddd486faa27b3472f24f05f43d886676a18",
+      "prompt_sha256": "3bf86b60de2d063837776ee9fa35dc7b98c6deda5199dde787045071518ea6a8",
+      "provider": "claude-code",
+      "text": "```json\n{\"uncertainty\": 0.3, \"outcome\": \"A new self-checking SystemVerilog testbench, irq_ctrl_cov_tb.sv, is provided for the platform's coverage.read run over the approved irq_ctrl.v. A coverage_report artifact describes the stimulus plan and one design point that no stimulus can reach. No coverage numbers are reported because no coverage run has happened yet.\", \"artifacts\": [{\"kind\": \"coverage_report\", \"title\": \"irq_ctrl coverage plan and reachability analysis (pre-run, no measured numbers)\", \"summary\": \"Coverage plan for the approved RTL [artifact:prj-63d6b8e26c.design-under-test.a1], serving [requirement:req-1e26d9c190]. It replaces the approved idle testbench [artifact:prj-63d6b8e26c.testbench.a1]. That testbench passed 5 checks in [run:run-0001] [evidence:prj-63d6b8e26c.testbench.e1], but by its own header it never raises a source, so detection, claim and acknowledge never run. The new testbench builds the DUT with N=32, the largest size the RTL allows. With N=8, rdata[30:8], rdata[4:3] and irq_id[4:3] are fixed at zero by construction and their toggle points could never be hit, so those gaps would not be justified holes. With N=32 every register bit drives a port. Stimulus, by design point: (1) full-width writes and readback of ENABLE (all ones, all zeros, A5A5A5A5, 5A5A5A5A) and MODE, and an all-ones write to PENDING; this toggles wdata, enable, mode, w1c and rdata. (2) Level-mode detection on all 32 sources, then a claim/acknowledge sweep from source 0 to 31 that checks irq_id and the CLAIM read at each step; this toggles detect, pending, active, ack, ack_hit, irq, irq_id and rdata[4:0] and rdata[31]. (3) An edge-mode rising edge on all sources, followed by holding the sources high and clearing them; this checks that a held source does not trigger again. (4) A detection beating a clear on the same edge, in both edge and level mode. (5) Enable masking and priority among a subset of sources. A CLAIM write with wdata[31:5] nonzero must acknowledge only wdata[4:0], and an acknowledge of a non-pending source must have no effect. (6) A reset in mid-test with sources held high, which gives the 1-to-0 toggle on rst_n and covers the reset branch, followed by a check on source 31. Unreachable point: wire unused_wdata = &{1'b0, wdata} is always 0, so its toggle point cannot be hit. It is justified as unreachable by construction and is not excluded with a pragma. The integer i is outside Verilator toggle coverage. Measured line and toggle percentages, and any further uncovered points, can come only from the platform's coverage.read run.\"}], \"files\": [{\"path\": \"irq_ctrl_cov_tb.sv\", \"kind\": \"testbench\", \"title\": \"irq_ctrl_cov_tb.sv: self-checking coverage testbench for irq_ctrl (N=32)\", \"summary\": \"Self-checking testbench for the approved RTL [artifact:prj-63d6b8e26c.design-under-test.a1], written for [requirement:req-1e26d9c190]. It extends the approach of [artifact:prj-63d6b8e26c.testbench.a1] and keeps its verdict format: a single NIRMAAN-SIM line carrying the nonce plusarg. It exercises register readback, level and edge detection, W1C clearing, a full fixed-priority claim/acknowledge sweep over 32 sources, the rule that a detection beats a clear, enable masking, ignored upper wdata bits on acknowledge, and a mid-test reset. It contains no $fopen, $system, $c, DPI, include, Verilator configuration or coverage pragma.\", \"entry\": \"irq_ctrl_cov_tb\"}], \"tool_runs\": [], \"claims\": [\"The testbench is expected to pass all its checks on the approved irq_ctrl.v; this has not been run.\", \"Line coverage of irq_ctrl.v is expected to reach every statement, including both reset branches, both register-write conditions, every case arm and the priority loop; not measured.\", \"Toggle coverage is expected to miss only the constant wire unused_wdata, about 1 of roughly 365 bit points at N=32; not measured.\", \"Branch percentages, if any are reported, come from whatever points the line/toggle build produces and were not targeted separately.\"], \"escalation\": null, \"notes\": \"The DUT is instantiated with N=32 rather than the default N=8. This is deliberate: at N=8 about 28 toggle points on rdata and irq_id are tied to zero by the RTL, so they would cap toggle coverage near 82% whatever the stimulus. If the requirement's coverage targets must be met at N=8 specifically, that needs a decision from verification.dynamic.coverage.code.senior, because those points would then need written unreachable justifications. Every input changes 1 ns after a rising clock edge to avoid races with the sampling edge. Each check prints a MISMATCH line on failure, in addition to the single verdict line.\"}\n```\n=== FILE: irq_ctrl_cov_tb.sv ===\n// Coverage testbench for irq_ctrl.v: self-checking, N = 32 so that every\n// register bit reaches a port (at N = 8, rdata[30:8] and irq_id[4:3] are tied\n// to zero by construction). Inputs change 1 ns after a rising edge.\n`timescale 1ns / 1ps\nmodule irq_ctrl_cov_tb;\n    localparam int N = 32;\n    logic         clk = 1'b0;\n    logic         rst_n = 1'b0;\n    logic [N-1:0] src = '0;\n    logic         we = 1'b0;\n    logic [1:0]   addr = 2'd0;\n    logic [31:0]  wdata = 32'd0;\n    logic [31:0]  rdata;\n    logic         irq;\n    logic [4:0]   irq_id;\n    int checks = 0, errors = 0;\n    logic [8*64-1:0] nonce;\n\n    irq_ctrl #(.N(N)) dut (.clk(clk), .rst_n(rst_n), .src(src), .we(we), .addr(addr), .wdata(wdata),\n                           .rdata(rdata), .irq(irq), .irq_id(irq_id));\n    always #5 clk = ~clk;\n\n    task automatic tick();\n        @(posedge clk);\n        #1;\n    endtask\n\n    task automatic write_reg(input logic [1:0] a, input logic [31:0] d);\n        we = 1'b1;\n        addr = a;\n        wdata = d;\n        tick();\n        we = 1'b0;\n        wdata = 32'd0;\n    endtask\n\n    task automatic expect_reg(input logic [1:0] a, input logic [31:0] expected);\n        addr = a;\n        #1;\n        checks++;\n        if (rdata !== expected) begin\n            errors++;\n            $display(\"MISMATCH at %0t: addr %0d rdata %h expected %h\", $time, a, rdata, expected);\n        end\n    endtask\n\n    task automatic expect_irq(input logic e_irq, input logic [4:0] e_id);\n        #1;\n        checks++;\n        if (irq !== e_irq || irq_id !== e_id) begin\n            errors++;\n            $display(\"MISMATCH at %0t: irq %b irq_id %0d expected %b %0d\", $time, irq, irq_id, e_irq, e_id);\n        end\n    endtask\n\n    initial begin\n        // 1. Reset and reset values.\n        repeat (3) @(posedge clk);\n        #1;\n        rst_n = 1'b1;\n        tick();\n        expect_reg(2'd0, 32'd0);\n        expect_reg(2'd1, 32'd0);\n        expect_reg(2'd2, 32'd0);\n        expect_reg(2'd3, 32'd0);\n        expect_irq(1'b0, 5'd0);\n\n        // 2. Register read/write, full width.\n        write_reg(2'd0, 32'hFFFF_FFFF);\n        expect_reg(2'd0, 32'hFFFF_FFFF);\n        write_reg(2'd0, 32'h0000_0000);\n        expect_reg(2'd0, 32'h0000_0000);\n        write_reg(2'd0, 32'hA5A5_A5A5);\n        expect_reg(2'd0, 32'hA5A5_A5A5);\n        write_reg(2'd0, 32'h5A5A_5A5A);\n        expect_reg(2'd0, 32'h5A5A_5A5A);\n        write_reg(2'd0, 32'h0000_0000);\n        expect_reg(2'd0, 32'h0000_0000);\n        write_reg(2'd1, 32'hFFFF_FFFF);\n        expect_reg(2'd1, 32'hFFFF_FFFF);\n        write_reg(2'd1, 32'h0000_0000);\n        expect_reg(2'd1, 32'h0000_0000);\n        write_reg(2'd2, 32'hFFFF_FFFF);      // W1C with nothing pending\n        expect_reg(2'd2, 32'd0);\n        write_reg(2'd3, 32'd31);             // acknowledge with nothing pending\n        expect_reg(2'd2, 32'd0);\n        expect_reg(2'd3, 32'd0);\n\n        // 3. Level detection on every source, masked by enable, then a claim sweep.\n        src = '1;\n        tick();\n        expect_reg(2'd2, 32'hFFFF_FFFF);\n        expect_irq(1'b0, 5'd0);              // nothing enabled\n        src = '0;\n        tick();\n        expect_reg(2'd2, 32'hFFFF_FFFF);     // pending holds after the source drops\n        write_reg(2'd0, 32'hFFFF_FFFF);\n        expect_irq(1'b1, 5'd0);\n        for (int k = 0; k < N; k++) begin\n            expect_irq(1'b1, 5'(k));\n            expect_reg(2'd3, 32'h8000_0000 | 32'(k));\n            write_reg(2'd3, 32'(k));\n        end\n        expect_irq(1'b0, 5'd0);\n        expect_reg(2'd2, 32'd0);\n        expect_reg(2'd3, 32'd0);\n\n        // 4. Edge mode: a rising edge sets pending, a held source does not re-trigger.\n        write_reg(2'd1, 32'hFFFF_FFFF);\n        expect_reg(2'd1, 32'hFFFF_FFFF);\n        src = '1;\n        tick();\n        expect_reg(2'd2, 32'hFFFF_FFFF);\n        expect_irq(1'b1, 5'd0);\n        tick();\n        expect_reg(2'd2, 32'hFFFF_FFFF);\n        write_reg(2'd2, 32'hFFFF_FFFF);      // clear while the sources stay high\n        expect_reg(2'd2, 32'd0);\n        expect_irq(1'b0, 5'd0);\n        src = '0;\n        tick();                              // falling edge: no detection\n        expect_reg(2'd2, 32'd0);\n\n        // Edge detection wins over a clear at the same edge.\n        src = 32'h0000_0020;\n        write_reg(2'd2, 32'h0000_0020);\n        expect_reg(2'd2, 32'h0000_0020);\n        expect_irq(1'b1, 5'd5);\n        write_reg(2'd2, 32'h0000_0020);      // source still high, no new edge\n        expect_reg(2'd2, 32'd0);\n        src = '0;\n        tick();\n\n        // Level detection wins over a clear while the source is high.\n        write_reg(2'd1, 32'd0);\n        src = 32'h0000_0008;\n        tick();\n        expect_reg(2'd2, 32'h0000_0008);\n        expect_irq(1'b1, 5'd3);\n        write_reg(2'd2, 32'h0000_0008);\n        expect_reg(2'd2, 32'h0000_0008);\n        src = '0;\n        write_reg(2'd2, 32'h0000_0008);\n        expect_reg(2'd2, 32'd0);\n        expect_irq(1'b0, 5'd0);\n\n        // 5. Masking and priority among a subset.\n        src = 32'h0000_0F00;\n        tick();\n        src = '0;\n        tick();\n        expect_reg(2'd2, 32'h0000_0F00);\n        expect_irq(1'b1, 5'd8);\n        write_reg(2'd0, 32'h0000_0C00);\n        expect_irq(1'b1, 5'd10);\n        expect_reg(2'd3, 32'h8000_000A);\n        write_reg(2'd0, 32'd0);\n        expect_irq(1'b0, 5'd0);\n        expect_reg(2'd3, 32'd0);\n        expect_reg(2'd2, 32'h0000_0F00);\n        write_reg(2'd0, 32'h0000_0F00);\n        expect_irq(1'b1, 5'd8);\n        write_reg(2'd3, 32'hFFFF_FFE9);      // only wdata[4:0] = 9 counts\n        expect_reg(2'd2, 32'h0000_0D00);\n        expect_irq(1'b1, 5'd8);\n        write_reg(2'd3, 32'd0);              // acknowledge of a source not pending\n        expect_reg(2'd2, 32'h0000_0D00);\n        write_reg(2'd3, 32'd8);\n        expect_reg(2'd2, 32'h0000_0C00);\n        expect_irq(1'b1, 5'd10);\n\n        // 6. Reset in mid-test, with sources held high.\n        write_reg(2'd1, 32'h1234_5678);\n        expect_reg(2'd1, 32'h1234_5678);\n        rst_n = 1'b0;\n        src = '1;\n        tick();\n        tick();\n        expect_reg(2'd0, 32'd0);\n        expect_reg(2'd1, 32'd0);\n        expect_reg(2'd2, 32'd0);\n        expect_reg(2'd3, 32'd0);\n        expect_irq(1'b0, 5'd0);\n        src = '0;\n        tick();\n        rst_n = 1'b1;\n        tick();\n        expect_reg(2'd2, 32'd0);\n        expect_reg(2'd0, 32'd0);\n        expect_irq(1'b0, 5'd0);\n\n        // The highest source after reset.\n        src = 32'h8000_0000;\n        tick();\n        write_reg(2'd0, 32'h8000_0000);\n        expect_irq(1'b1, 5'd31);\n        expect_reg(2'd3, 32'h8000_001F);\n        src = '0;\n        write_reg(2'd3, 32'd31);\n        expect_irq(1'b0, 5'd0);\n        expect_reg(2'd2, 32'd0);\n\n        if (!$value$plusargs(\"nirmaan_nonce=%s\", nonce)) nonce = \"none\";\n        $display(\"NIRMAAN-SIM %0s %0d passed, %0d failed\", nonce, (checks > errors ? checks - errors : 0), errors);\n        $finish;\n    end\nendmodule\n=== END FILE ==="
+    }
+  ],
+  "format": "nirmaan.eval-trial",
+  "harness_variant": "default",
+  "judge_runs": [
+    {
+      "check": "The seat's testbench passes the approved RTL, meets the coverage bounds on it and fails each interrupt controller mutant",
+      "params": {
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-mk2kqzc1/judge/check-1/must-fail-1bskavon/clean/irq_ctrl_cov_tb.sv",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-mk2kqzc1/judge/check-1/must-fail-1bskavon/clean/irq_ctrl.v"
+        ],
+        "top": "irq_ctrl_cov_tb"
+      },
+      "run": "run-0003",
+      "succeeded": true,
+      "summary": "verilator-coverage: coverage read over irq_ctrl.v: line 100.00% (8/8), toggle 99.72% (728/730), branch 100.00% (12/12); simulation passed: 127 checks passed, $finish reached, 0 errors",
+      "tool": "coverage.read"
+    },
+    {
+      "check": "The seat's testbench passes the approved RTL, meets the coverage bounds on it and fails each interrupt controller mutant",
+      "params": {
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-mk2kqzc1/judge/check-1/must-fail-1bskavon/cover/irq_ctrl_cov_tb.sv",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-mk2kqzc1/judge/check-1/must-fail-1bskavon/cover/irq_ctrl.v"
+        ],
+        "top": "irq_ctrl_cov_tb"
+      },
+      "run": "run-0004",
+      "succeeded": true,
+      "summary": "verilator-coverage: coverage read over irq_ctrl.v: line 100.00% (8/8), toggle 99.72% (728/730), branch 100.00% (12/12); simulation passed: 127 checks passed, $finish reached, 0 errors",
+      "tool": "coverage.read"
+    },
+    {
+      "check": "The seat's testbench passes the approved RTL, meets the coverage bounds on it and fails each interrupt controller mutant",
+      "params": {
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-mk2kqzc1/judge/check-1/must-fail-1bskavon/mutant-1-1/irq_ctrl_cov_tb.sv",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-mk2kqzc1/judge/check-1/must-fail-1bskavon/mutant-1-1/irq_ctrl.v"
+        ],
+        "top": "irq_ctrl_cov_tb"
+      },
+      "run": "run-0005",
+      "succeeded": false,
+      "summary": "verilator-coverage: coverage not read: simulation failed: the testbench reports 70 of 127 checks failed",
+      "tool": "coverage.read"
+    },
+    {
+      "check": "The seat's testbench passes the approved RTL, meets the coverage bounds on it and fails each interrupt controller mutant",
+      "params": {
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-mk2kqzc1/judge/check-1/must-fail-1bskavon/mutant-1-2/irq_ctrl_cov_tb.sv",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-mk2kqzc1/judge/check-1/must-fail-1bskavon/mutant-1-2/irq_ctrl.v"
+        ],
+        "top": "irq_ctrl_cov_tb"
+      },
+      "run": "run-0006",
+      "succeeded": false,
+      "summary": "verilator-coverage: coverage not read: simulation failed: the testbench reports 71 of 127 checks failed",
+      "tool": "coverage.read"
+    },
+    {
+      "check": "The seat's testbench passes the approved RTL, meets the coverage bounds on it and fails each interrupt controller mutant",
+      "params": {
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-mk2kqzc1/judge/check-1/must-fail-1bskavon/mutant-1-3/irq_ctrl_cov_tb.sv",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-mk2kqzc1/judge/check-1/must-fail-1bskavon/mutant-1-3/irq_ctrl.v"
+        ],
+        "top": "irq_ctrl_cov_tb"
+      },
+      "run": "run-0007",
+      "succeeded": false,
+      "summary": "verilator-coverage: coverage not read: simulation failed: the testbench reports 5 of 127 checks failed",
+      "tool": "coverage.read"
+    }
+  ],
+  "knowledge": "on",
+  "model": "claude-opus-5-5",
+  "purpose": "evidence",
+  "record": "2026-11-19-claude-code-claude-opus-5-5-77",
+  "result": {
+    "attempts": 1,
+    "attestations": [],
+    "audit_ok": true,
+    "case": "dv/coverage-irq-ctrl",
+    "case_digest": "sha256:c828a43209fa717fd4de48b3cadd48ff275faefa3afed2b7523d96e6013f5696",
+    "cli": "2.1.325",
+    "cost_usd": null,
+    "detail": "The DUT is instantiated with N=32 rather than the default N=8. This is deliberate: at N=8 about 28 toggle points on rdata and irq_id are tied to zero by the RTL, so they would cap toggle coverage near 82% whatever the stimulus. If the requirement's coverage targets must be met at N=8 specifically, that needs a decision from verification.dynamic.coverage.code.senior, because those points would then need written unreachable justifications. Every input changes 1 ns after a rising clock edge to avoid races with the sampling edge. Each check prints a MISMATCH line on failure, in addition to the single verdict line.",
+    "duration_s": 200.442,
+    "gate_runs": [
+      {
+        "run": "run-0002",
+        "succeeded": true,
+        "summary": "verilator-coverage: coverage read over irq_ctrl.v: line 100.00% (8/8), toggle 99.72% (728/730), branch 100.00% (12/12); simulation passed: 127 checks passed, $finish reached, 0 errors",
+        "tool": "coverage.read"
+      }
+    ],
+    "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+    "input_tokens": 2,
+    "model_calls": 1,
+    "output_tokens": 15209,
+    "passed": true,
+    "replay": false,
+    "runtime": "claude-code",
+    "sandbox": "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-mk2kqzc1",
+    "scores": [
+      {
+        "failed_runs": [
+          "run-0005",
+          "run-0006",
+          "run-0007"
+        ],
+        "name": "The seat's testbench passes the approved RTL, meets the coverage bounds on it and fails each interrupt controller mutant",
+        "runs": [
+          "run-0003",
+          "run-0004"
+        ],
+        "scorer": "must-fail",
+        "status": "passed",
+        "summary": "coverage.read run-0003 passed on the clean inputs with every cover reached; 3 of 3 mutants failed it"
+      }
+    ],
+    "seat": "prj-63d6b8e26c:coverage",
+    "seat_status": "in_review",
+    "started_at": "2026-11-19T06:49:25.035283Z",
+    "submitted": true,
+    "tool_calls": [],
+    "version": "1.25.0"
+  },
+  "skills": {
+    "code_coverage": "sha256:b5a1c9b8bb5f208c1e3ffcae7e9a5da4f26811e68a36954bf58fc612c481ea9b"
+  },
+  "stage": "coverage",
+  "trial": 1,
+  "version": 1
+}
