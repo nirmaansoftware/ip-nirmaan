@@ -1,0 +1,24 @@
+{
+  "cases": [
+    "dv/directed-irq-ctrl"
+  ],
+  "command": "nirmaan eval run --runtime claude-code --trials 1 --purpose evidence dv/directed-irq-ctrl",
+  "finished_at": "2026-11-19T01:53:07.394518Z",
+  "format": "nirmaan.eval-run",
+  "harness_variant": "default",
+  "head_sha": "01adfe90b0f121ec3f9e71daaaafd048ee2e3199",
+  "id": "2026-11-19-claude-code-claude-opus-5-5-10",
+  "knowledge": "on",
+  "model": "claude-opus-5-5",
+  "nirmaan_version": "1.25.0",
+  "purpose": "evidence",
+  "replay": false,
+  "runtime": "claude-code",
+  "seats": [
+    "testbench"
+  ],
+  "source": "",
+  "started_at": "2026-11-19T01:47:30.466664Z",
+  "trials": 1,
+  "version": 1
+}
