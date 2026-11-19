@@ -402,7 +402,7 @@ def install(source: Path, trees: Sequence[str] = (), folders: Sequence[str] = ()
     print(f"{SEAT}: took write access from other accounts on {len(changed)} paths in {', '.join(trees)} and the "
           f"folders on PATH")
     deny(seat.pw_uid, unreadable)
-    print(f"{SEAT}: no read access to {', '.join(unreadable) or 'no folder'}; every packet it sends is dropped")
+    print(f"{SEAT}: no read access to {', '.join(unreadable) or 'no folder'}; every packet it sends is stopped")
     print(f"{SEAT}: uid {seat.pw_uid}, groups {groups}; {', '.join(f'{BIN / n} runs {e}' for n, e in zip(WRAPPED, exes))}")
 
 
