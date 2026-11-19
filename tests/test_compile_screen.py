@@ -2,8 +2,9 @@
 
 Council record ``council/records/2026-11-19-seat-c-live-refusal.md``, decision 4, items 2 and 3: an include by an
 absolute path, an include with ``..``, the assembler route and a ``#line`` line are recorded refused in CI, and a
-run with a runner-only canary shows the canary in no log, excerpt or record. Each tool-backed test prints one
-``COMPILE-SCREEN`` line into the CI log, the record of what it refused on the CI toolchain (GCC, ubuntu-24.04).
+run with a runner-only canary shows the canary in no log, excerpt or record. The record is the CI test job's JUnit
+file (GCC, ubuntu-24.04), which names each fixture's test and its outcome; each tool-backed test also prints one
+``COMPILE-SCREEN`` line, seen with ``pytest -s``.
 Decision 4, item 4: every committed fixture, reference answer and held-out test passes the screen, so its build
 runs exactly as before (``test_every_committed_c_file_passes_the_screen``).
 """

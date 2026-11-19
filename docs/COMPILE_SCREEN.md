@@ -12,9 +12,11 @@ by one of two measures. This milestone is the first: a screen before anything
 of the job is compiled.
 
 Code: `src/nirmaan/integrations/compile_screen.py`. Tests and the record:
-`tests/test_compile_screen.py` (each tool-backed test prints a
-`COMPILE-SCREEN-` line into the CI log). Must-refuse fixtures:
-`tests/fixtures/fw/compile_screen/`.
+`tests/test_compile_screen.py`, whose outcomes the CI test job keeps in its
+JUnit file (each fixture's test by name; each tool-backed test also prints a
+`COMPILE-SCREEN-` line under `pytest -s`). Must-refuse fixtures:
+`tests/fixtures/fw/compile_screen/`. First recorded: CI run 44557443798 (head
+636b02d), artifact `junit-test-1`: all 42 tests passed, none skipped.
 
 ## Why a screen, not the compile as the seat account
 
