@@ -103,6 +103,11 @@ on an edge on which its VALID and READY are both high.
 * A periodic count ends and reloads at the end of every period whether or
   not `EXPIRED` is already set: nothing has to clear `EXPIRED` between two
   periods. [req:TMR-PERIODIC-EXPIRED-SET]
+* A one-shot count is exactly `LOAD` cycles at every value of `LOAD` of at
+  least 1, not at some values only. [req:TMR-ONESHOT-VALUES]
+* A periodic count, its first count and every period after it, is exactly
+  `LOAD` cycles at every value of `LOAD` of at least 1, not at some values
+  only. [req:TMR-PERIODIC-VALUES]
 * A `CTRL` write that writes `EN` 1 while a count runs (a restart) sets
   `MODE` as well, and the restarted count ends as that `MODE` says, one-shot
   or periodic, not as the `MODE` it was started with.

@@ -48,7 +48,7 @@ keeps it for `COUNT`), transfers that must leave a running count alone
 (`TMR-RESTART-MODE`), a periodic end with `EXPIRED` already set
 (`TMR-PERIODIC-EXPIRED-SET`), the 32-bit width of the count above bit 20
 (`TMR-COUNT-32BIT`), and a `LOAD` write on a periodic end edge, on which the
-document gives no rule (`TMR-LOAD-END-EDGE`); for the register block, the
+document gives no rule (`TMR-LOAD-END-EDGE`), and the `LOAD` values at which a one-shot count or a period is timed (`TMR-ONESHOT-VALUES`, `TMR-PERIODIC-VALUES`: the list is in `citations.json`); for the register block, the
 latency bound with `READY` already high (`AXIL-LATENCY-READY-HIGH`) and the
 registers and held halves cleared from the first reset edge
 (`AXIL-RESET-REGS`). `TMR-IRQ` stays judged, for 100000 cycles
