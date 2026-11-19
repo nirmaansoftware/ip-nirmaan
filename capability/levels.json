@@ -341,10 +341,10 @@
           "counts": true,
           "digest": "sha256:171d24465d795d0e8777da54e74430e2764fcdc089654579b42412934258c9cf",
           "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
-          "lower": 0.7225,
+          "lower": 0.7412,
           "model": "claude-opus-5-5",
-          "n": 10,
-          "passed": 10,
+          "n": 11,
+          "passed": 11,
           "reasons": [],
           "records": [
             "evals/results/2026-11-18-claude-code-claude-opus-5-5-10",
@@ -354,6 +354,7 @@
             "evals/results/2026-11-18-claude-code-claude-opus-5-5-38",
             "evals/results/2026-11-18-claude-code-claude-opus-5-5-42",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5",
+            "evals/results/2026-11-19-claude-code-claude-opus-5-5-19",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-46",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-5",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-50"
@@ -411,10 +412,10 @@
           "counts": true,
           "digest": "sha256:9ce453d40894146149cbc0b239b46c96be234eb3e1d8657fede9b2e728bfb5e2",
           "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
-          "lower": 0.7225,
+          "lower": 0.7412,
           "model": "claude-opus-5-5",
-          "n": 10,
-          "passed": 10,
+          "n": 11,
+          "passed": 11,
           "reasons": [],
           "records": [
             "evals/results/2026-11-18-claude-code-claude-opus-5-5-15",
@@ -423,6 +424,7 @@
             "evals/results/2026-11-18-claude-code-claude-opus-5-5-37",
             "evals/results/2026-11-18-claude-code-claude-opus-5-5-43",
             "evals/results/2026-11-18-claude-code-claude-opus-5-5-9",
+            "evals/results/2026-11-19-claude-code-claude-opus-5-5-17",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-20",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-31",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-59",
@@ -661,19 +663,20 @@
           "counts": false,
           "digest": "sha256:98c09011ec8bf3f8292515da0049f217d15441840388191770aa9bfdb55a0f32",
           "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
-          "lower": 0.2307,
+          "lower": 0.3,
           "model": "claude-opus-5-5",
-          "n": 5,
-          "passed": 3,
+          "n": 6,
+          "passed": 4,
           "reasons": [
-            "Wilson lower bound 0.231, under 0.5"
+            "Wilson lower bound 0.300, under 0.5"
           ],
           "records": [
             "evals/results/2026-11-18-claude-code-claude-opus-5-5-21",
             "evals/results/2026-11-18-claude-code-claude-opus-5-5-35",
             "evals/results/2026-11-18-claude-code-claude-opus-5-5-7",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-15",
-            "evals/results/2026-11-19-claude-code-claude-opus-5-5-29"
+            "evals/results/2026-11-19-claude-code-claude-opus-5-5-29",
+            "evals/results/2026-11-19-claude-code-claude-opus-5-5-43"
           ],
           "unjudged": 0
         }
@@ -698,19 +701,19 @@
           "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
           "lower": 0.0,
           "model": "claude-opus-5-5",
-          "n": 4,
+          "n": 5,
           "passed": 0,
           "reasons": [
-            "4 trials, fewer than 5",
             "Wilson lower bound 0.000, under 0.5"
           ],
           "records": [
             "evals/results/2026-11-18-claude-code-claude-opus-5-5-17",
             "evals/results/2026-11-18-claude-code-claude-opus-5-5-31",
             "evals/results/2026-11-18-claude-code-claude-opus-5-5-45",
+            "evals/results/2026-11-19-claude-code-claude-opus-5-5-22",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-8"
           ],
-          "unjudged": 4
+          "unjudged": 5
         }
       ]
     },
@@ -765,15 +768,16 @@
           "counts": true,
           "digest": "sha256:c4aaa4ba8ed4f24373d4a09fffba720d73e81491cb15a0fc1084c3227c47d9b8",
           "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
-          "lower": 0.5655,
+          "lower": 0.6097,
           "model": "claude-opus-5-5",
-          "n": 5,
-          "passed": 5,
+          "n": 6,
+          "passed": 6,
           "reasons": [],
           "records": [
             "evals/results/2026-11-18-claude-code-claude-opus-5-5-14",
             "evals/results/2026-11-18-claude-code-claude-opus-5-5-28",
             "evals/results/2026-11-18-claude-code-claude-opus-5-5-42",
+            "evals/results/2026-11-19-claude-code-claude-opus-5-5-19",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-5",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-50"
           ],
@@ -940,15 +944,16 @@
           "counts": true,
           "digest": "sha256:7a9c0840844c1929aaeae397d090a070a7662d7ba2020a395a377e59b0061882",
           "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
-          "lower": 0.5655,
+          "lower": 0.6097,
           "model": "claude-opus-5-5",
-          "n": 5,
-          "passed": 5,
+          "n": 6,
+          "passed": 6,
           "reasons": [],
           "records": [
             "evals/results/2026-11-18-claude-code-claude-opus-5-5-23",
             "evals/results/2026-11-18-claude-code-claude-opus-5-5-37",
             "evals/results/2026-11-18-claude-code-claude-opus-5-5-9",
+            "evals/results/2026-11-19-claude-code-claude-opus-5-5-17",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-31",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-59"
           ],
@@ -1108,10 +1113,10 @@
           "counts": true,
           "digest": "sha256:012eb9b7155ed6eb7761adca880b338f10c8f978b15dfd92f5adbb3253307a52",
           "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
-          "lower": 0.8508,
+          "lower": 0.8583,
           "model": "claude-opus-5-5",
-          "n": 34,
-          "passed": 33,
+          "n": 36,
+          "passed": 35,
           "reasons": [],
           "records": [
             "evals/results/2026-11-18-claude-code-claude-opus-5-5",
@@ -1138,6 +1143,8 @@
             "evals/results/2026-11-19-claude-code-claude-opus-5-5",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-11",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-13",
+            "evals/results/2026-11-19-claude-code-claude-opus-5-5-17",
+            "evals/results/2026-11-19-claude-code-claude-opus-5-5-19",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-20",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-27",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-31",
@@ -1375,18 +1382,18 @@
           "counts": false,
           "digest": "sha256:930e0e5ff02a926a5300db8242997dbeb449a43e1dc60ee25adefb23c60e6356",
           "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
-          "lower": 0.15,
+          "lower": 0.2307,
           "model": "claude-opus-5-5",
-          "n": 4,
-          "passed": 2,
+          "n": 5,
+          "passed": 3,
           "reasons": [
-            "4 trials, fewer than 5",
-            "Wilson lower bound 0.150, under 0.5"
+            "Wilson lower bound 0.231, under 0.5"
           ],
           "records": [
             "evals/results/2026-11-18-claude-code-claude-opus-5-5-16",
             "evals/results/2026-11-18-claude-code-claude-opus-5-5-30",
             "evals/results/2026-11-18-claude-code-claude-opus-5-5-44",
+            "evals/results/2026-11-19-claude-code-claude-opus-5-5-21",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-7"
           ],
           "unjudged": 2
