@@ -19,10 +19,13 @@ to this. Until a document's first record lands it is listed, with the reason,
 in `evals/flow/requirements_check_pending.json` (a data file); its test still
 runs and checks that it has no record yet, so the entry must go when the
 record lands, and a document neither listed nor recorded fails. No test
-skips. Both documents are listed now: independent checks failed both, each more than once,
-with mutants that pass the reference testbenches, and each was fixed by
-stronger checks in the case's own reference testbench and by splitting what
-stays unjudged into its own tags; neither has passed a fresh check yet. Another test
+skips. The list is empty now: independent checks failed both documents, each more than once,
+with mutants that pass the reference testbenches, and each was fixed by stronger checks in the
+case's own reference testbench, by splitting what stays unjudged into its own tags and by giving
+each judged tag its stimulus scope. A fresh session then checked both within those scopes, with
+in-scope mutants at the values, waits, positions and orderings each scope names, and wrote the
+records (2026-11-19); it narrowed three scopes that claimed more than the testbench checks
+(`AXIL-ORDER`, `TMR-STOP`, `TMR-ONESHOT`). Another test
 shows the rule refuses a stale record (a changed document or a changed
 judged scope), a record whose checker is its writer,
 a missing tag, a tag marked unjudged that a check cites, unreadable

@@ -1,8 +1,5 @@
 {
   "format": "nirmaan.flow-document-check-pending",
   "about": "Whole-flow requirements documents whose first check record (requirements_check.json, by a session other than the writer) has not landed yet, each with the reason. tests/test_whole_flow_cases.py fails a listed document that already has a record, so an entry must go when its record lands.",
-  "pending": {
-    "evals/flow/axil_timer/requirements.md": "Failed a fifth independent check, and a confirm check after the splits found escapes at untested values (stop LOAD values, restart positions). Every judged tag now carries its stimulus scope (judged_scope in citations.json), with no testbench change. A fresh checker session checks it within those scopes and writes its record.",
-    "evals/flow/axi4_lite/requirements.md": "Failed a fourth independent check, and a confirm check after the splits found an escape at untested READY waits (AXIL-B2B). Every judged tag now carries its stimulus scope (judged_scope in citations.json), with no testbench change. A fresh checker session checks it within those scopes and writes its record."
-  }
+  "pending": {}
 }
