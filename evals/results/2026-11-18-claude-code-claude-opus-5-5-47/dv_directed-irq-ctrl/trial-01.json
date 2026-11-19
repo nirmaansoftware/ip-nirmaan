@@ -1,0 +1,168 @@
+{
+  "answers": [
+    {
+      "cache_read_tokens": 620,
+      "cache_write_tokens": 8640,
+      "error": null,
+      "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+      "input_tokens": 2,
+      "mode": "work",
+      "model": "claude-opus-5-5",
+      "output_tokens": 33540,
+      "packet_sha256": "c63e3f845cfed4ad5d838abe47cd91a31f0de8e58eab2f22000a771fa2d0a712",
+      "prompt_sha256": "7cd223e33eb86027018cb407c62ccc62ac4a4afdab7e0830143a6dd55827a451",
+      "provider": "claude-code",
+      "text": "```json\n{\"uncertainty\": 0.3, \"outcome\": \"Self-checking SystemVerilog testbench for irq_ctrl, written from the approved interface specification. It is ready for the platform's simulator.run over the approved RTL. It has not been run.\", \"artifacts\": [{\"kind\": \"testbench\", \"title\": \"irq_ctrl self-checking testbench (directed + seeded random)\", \"summary\": \"Testbench tb_irq_ctrl for the approved RTL [artifact:prj-486b52a6aa.design-under-test.a1], serving [requirement:req-efb85c3b8e]. Expected values come from two places: hand-derived constants and a per-cycle reference model (irq_ref), both written from the spec statements in [artifact:prj-486b52a6aa.interface-spec.a1]. Neither takes values from the RTL's outputs. Three instances (N=8, N=32, N=2) are compared every cycle on rdata, irq and irq_id. The testbench prints one NIRMAAN-SIM verdict line, then calls $finish.\"}], \"files\": [{\"path\": \"tb/tb_irq_ctrl.sv\", \"kind\": \"testbench\", \"title\": \"tb_irq_ctrl.sv\", \"summary\": \"Self-checking testbench for irq_ctrl [artifact:prj-486b52a6aa.design-under-test.a1], traced to [requirement:req-efb85c3b8e]. Directed phases each target one spec statement of [artifact:prj-486b52a6aa.interface-spec.a1]: IRQ-RESET, IRQ-REG-RW, IRQ-PARAM, IRQ-READ, IRQ-LEVEL, IRQ-EDGE, IRQ-DETECT-DISABLED, IRQ-W1C, IRQ-ACK, IRQ-SET-WINS, IRQ-MASK, IRQ-PRIORITY, IRQ-CLAIM and IRQ-LATENCY. A 4000-cycle seeded random phase with occasional resets follows. Every compare increments either the pass count or the fail count.\", \"entry\": \"tb_irq_ctrl\"}], \"tool_runs\": [], \"claims\": [\"I worked out the expected constants in the directed phases by hand from the interface spec and traced them cycle by cycle against the spec's timing. No simulation has confirmed them.\", \"The nonce plusarg name is not stated in the given sections. The testbench tries +nonce=, +NIRMAAN_NONCE=, +nirmaan_nonce= and +NIRMAAN_SIM_NONCE=. If the platform uses another name, the verdict line carries 'unset' and the gate will fail the run.\", \"The testbench uses SystemVerilog constructs: logic, string, automatic tasks and '0. It assumes the simulator is invoked in SystemVerilog mode (Verilator --binary, or Icarus with -g2012).\", \"IRQ-RESET's clearing of the remembered source level cannot be observed through the ports. MODE also resets to 0, so the first edge after reset always uses level detection. No test targets it directly.\"], \"escalation\": null, \"notes\": \"Timing: the clock period is 10 ns. The testbench drives inputs at the falling edge and checks outputs 1 ns later, so it never races the design's rising-edge sampling. The IRQ-READ check changes addr four times within one low half-cycle, with no clock edge in between. Priority is tested with several sources pending at once: sources 1, 4 and 6; sources 0 and 7 together; and source 0 pending but disabled. A reversed priority order or ignoring ENABLE would therefore fail. IRQ-PARAM is checked on N=2 and N=32 instances: upper register bits ignore writes, source 31 can be acknowledged, and an acknowledge number of N or more changes nothing. For the gate, the testbench must be listed with the approved irq_ctrl.v, and the top module is tb_irq_ctrl. The independent review record and the simulator.run evidence are still outstanding; the platform and a reviewer must supply them.\"}\n```\n=== FILE: tb/tb_irq_ctrl.sv ===\n`timescale 1ns / 1ps\n// Self-checking testbench for irq_ctrl (interface_spec.md).\n// Expected values come from (a) constants worked out by hand from the\n// specification and (b) the reference model irq_ref below, written from the\n// specification's behaviour statements. Nothing expected is read from the DUT.\n// Inputs are driven at the falling edge of clk; outputs are checked 1 ns later.\n\n// ---------------------------------------------------------------------------\n// Reference model, from interface_spec.md section 4.\n// ---------------------------------------------------------------------------\nmodule irq_ref #(\n    parameter integer N = 8\n) (\n    input  logic         clk,\n    input  logic         rst_n,\n    input  logic [N-1:0] src,\n    input  logic         we,\n    input  logic [1:0]   addr,\n    input  logic [31:0]  wdata,\n    output logic [31:0]  exp_rdata,\n    output logic         exp_irq,\n    output logic [4:0]   exp_id\n);\n    logic [N-1:0] en_r, md_r, pend_r, lvl_r;\n    logic [N-1:0] pend_n;\n    logic         det, clr, found;\n    integer       k, j;\n\n    // IRQ-RESET, IRQ-REG-RW, IRQ-LEVEL, IRQ-EDGE, IRQ-DETECT-DISABLED,\n    // IRQ-W1C, IRQ-ACK, IRQ-SET-WINS, stated per source.\n    always @(posedge clk) begin\n        if (!rst_n) begin\n            en_r   <= '0;\n            md_r   <= '0;\n            pend_r <= '0;\n            lvl_r  <= '0;\n        end else begin\n            pend_n = pend_r;\n            for (k = 0; k < N; k = k + 1) begin\n                if (md_r[k])\n                    det = src[k] && !lvl_r[k];   // rising edge\n                else\n                    det = src[k];                // high level\n                clr = (we && addr == 2'd2 && wdata[k]) ||\n                      (we && addr == 2'd3 && wdata[4:0] == k);\n                if (det)\n                    pend_n[k] = 1'b1;            // detection wins over a clear\n                else if (clr)\n                    pend_n[k] = 1'b0;\n            end\n            pend_r <= pend_n;\n            if (we && addr == 2'd0) en_r <= wdata[N-1:0];\n            if (we && addr == 2'd1) md_r <= wdata[N-1:0];\n            lvl_r <= src;\n        end\n    end\n\n    // IRQ-MASK, IRQ-PRIORITY, IRQ-CLAIM, IRQ-READ, IRQ-PARAM.\n    always @* begin\n        found  = 1'b0;\n        exp_id = 5'd0;\n        for (j = 0; j < N; j = j + 1)\n            if (!found && pend_r[j] && en_r[j]) begin\n                found  = 1'b1;\n                exp_id = j[4:0];\n            end\n        exp_irq   = found;\n        exp_rdata = 32'd0;\n        case (addr)\n            2'd0: for (j = 0; j < N; j = j + 1) exp_rdata[j] = en_r[j];\n            2'd1: for (j = 0; j < N; j = j + 1) exp_rdata[j] = md_r[j];\n            2'd2: for (j = 0; j < N; j = j + 1) exp_rdata[j] = pend_r[j];\n            default: exp_rdata = {found, 26'd0, exp_id};\n        endcase\n    end\nendmodule\n\n// ---------------------------------------------------------------------------\n// Top-level testbench.\n// ---------------------------------------------------------------------------\nmodule tb_irq_ctrl;\n    logic        clk = 1'b0;\n    logic        rst_n;\n    logic        we;\n    logic [1:0]  addr;\n    logic [31:0] wdata;\n    logic [31:0] src_w;\n\n    wire  [31:0] rdata8, rdata32, rdata2;\n    wire         irq8, irq32, irq2;\n    wire  [4:0]  id8, id32, id2;\n    wire  [31:0] e_rdata8, e_rdata32, e_rdata2;\n    wire         e_irq8, e_irq32, e_irq2;\n    wire  [4:0]  e_id8, e_id32, e_id2;\n\n    int          pass_cnt = 0;\n    int          fail_cnt = 0;\n    string       phase;\n    string       nonce;\n\n    integer      seed;\n    integer      n;\n    logic [31:0] r1, r2, r3, wd, src_v;\n\n    always #5 clk = ~clk;\n\n    irq_ctrl #(.N(8)) dut8 (\n        .clk(clk), .rst_n(rst_n), .src(src_w[7:0]), .we(we), .addr(addr),\n        .wdata(wdata), .rdata(rdata8), .irq(irq8), .irq_id(id8));\n    irq_ref #(.N(8)) ref8 (\n        .clk(clk), .rst_n(rst_n), .src(src_w[7:0]), .we(we), .addr(addr),\n        .wdata(wdata), .exp_rdata(e_rdata8), .exp_irq(e_irq8), .exp_id(e_id8));\n\n    irq_ctrl #(.N(32)) dut32 (\n        .clk(clk), .rst_n(rst_n), .src(src_w), .we(we), .addr(addr),\n        .wdata(wdata), .rdata(rdata32), .irq(irq32), .irq_id(id32));\n    irq_ref #(.N(32)) ref32 (\n        .clk(clk), .rst_n(rst_n), .src(src_w), .we(we), .addr(addr),\n        .wdata(wdata), .exp_rdata(e_rdata32), .exp_irq(e_irq32), .exp_id(e_id32));\n\n    irq_ctrl #(.N(2)) dut2 (\n        .clk(clk), .rst_n(rst_n), .src(src_w[1:0]), .we(we), .addr(addr),\n        .wdata(wdata), .rdata(rdata2), .irq(irq2), .irq_id(id2));\n    irq_ref #(.N(2)) ref2 (\n        .clk(clk), .rst_n(rst_n), .src(src_w[1:0]), .we(we), .addr(addr),\n        .wdata(wdata), .exp_rdata(e_rdata2), .exp_irq(e_irq2), .exp_id(e_id2));\n\n    // Every compare counts as a pass or a failure.\n    task automatic check(input string what, input logic [31:0] got, input logic [31:0] exp);\n        if (got === exp)\n            pass_cnt = pass_cnt + 1;\n        else begin\n            fail_cnt = fail_cnt + 1;\n            $display(\"FAIL [%s] %s: got %h, expected %h at %0t\", phase, what, got, exp, $time);\n        end\n    endtask\n\n    // All outputs of all instances against the reference model.\n    task automatic check_all();\n        check(\"N=8 rdata vs model\",   rdata8,  e_rdata8);\n        check(\"N=8 irq vs model\",     irq8,    e_irq8);\n        check(\"N=8 irq_id vs model\",  id8,     e_id8);\n        check(\"N=32 rdata vs model\",  rdata32, e_rdata32);\n        check(\"N=32 irq vs model\",    irq32,   e_irq32);\n        check(\"N=32 irq_id vs model\", id32,    e_id32);\n        check(\"N=2 rdata vs model\",   rdata2,  e_rdata2);\n        check(\"N=2 irq vs model\",     irq2,    e_irq2);\n        check(\"N=2 irq_id vs model\",  id2,     e_id2);\n    endtask\n\n    // One clock cycle: drive at the falling edge, check 1 ns later.\n    task automatic cyc(input logic w, input logic [1:0] a, input logic [31:0] d,\n                       input logic [31:0] s);\n        @(negedge clk);\n        we    = w;\n        addr  = a;\n        wdata = d;\n        src_w = s;\n        #1;\n        check_all();\n    endtask\n\n    task automatic wr(input logic [1:0] a, input logic [31:0] d);\n        cyc(1'b1, a, d, src_w);\n    endtask\n\n    task automatic rd(input logic [1:0] a);\n        cyc(1'b0, a, 32'd0, src_w);\n    endtask\n\n    task automatic rd8(input logic [1:0] a, input logic [31:0] exp, input string what);\n        rd(a);\n        check(what, rdata8, exp);\n    endtask\n\n    task automatic set_src(input logic [31:0] s);\n        cyc(1'b0, addr, 32'd0, s);\n    endtask\n\n    task automatic set_rst(input logic v);\n        @(negedge clk);\n        rst_n = v;\n        we    = 1'b0;\n        #1;\n        check_all();\n    endtask\n\n    initial begin\n        nonce = \"unset\";\n        if (!$value$plusargs(\"nonce=%s\", nonce))\n            if (!$value$plusargs(\"NIRMAAN_NONCE=%s\", nonce))\n                if (!$value$plusargs(\"nirmaan_nonce=%s\", nonce))\n                    if (!$value$plusargs(\"NIRMAAN_SIM_NONCE=%s\", nonce))\n                        $display(\"NOTE: no nonce plusarg found\");\n\n        rst_n = 1'b0;\n        we    = 1'b0;\n        addr  = 2'd0;\n        wdata = 32'd0;\n        src_w = 32'd0;\n        src_v = 32'd0;\n\n        // ---------------- IRQ-RESET ----------------\n        phase = \"reset\";\n        repeat (2) @(posedge clk);\n        @(negedge clk);\n        #1;\n        check_all();\n        rd8(2'd0, 32'h0, \"ENABLE is 0 in reset\");\n        rd8(2'd1, 32'h0, \"MODE is 0 in reset\");\n        rd8(2'd2, 32'h0, \"PENDING is 0 in reset\");\n        rd8(2'd3, 32'h0, \"CLAIM is 0 in reset\");\n        check(\"irq low in reset\", irq8, 1'b0);\n        check(\"irq_id 0 in reset\", id8, 5'd0);\n        set_rst(1'b1);\n\n        // ---------------- IRQ-REG-RW, IRQ-PARAM ----------------\n        phase = \"reg_rw\";\n        wr(2'd0, 32'hFFFF_FFA5);\n        rd(2'd0);\n        check(\"N=8 ENABLE keeps bits 7:0 only\", rdata8, 32'h0000_00A5);\n        check(\"N=32 ENABLE keeps all bits\", rdata32, 32'hFFFF_FFA5);\n        check(\"N=2 ENABLE keeps bits 1:0 only\", rdata2, 32'h0000_0001);\n        rd8(2'd1, 32'h0, \"MODE unchanged by ENABLE write\");\n        rd8(2'd2, 32'h0, \"PENDING unchanged by ENABLE write\");\n        wr(2'd1, 32'hFFFF_FF5A);\n        rd(2'd1);\n        check(\"N=8 MODE keeps bits 7:0 only\", rdata8, 32'h0000_005A);\n        check(\"N=32 MODE keeps all bits\", rdata32, 32'hFFFF_FF5A);\n        check(\"N=2 MODE keeps bits 1:0 only\", rdata2, 32'h0000_0002);\n        rd8(2'd0, 32'h0000_00A5, \"ENABLE unchanged by MODE write\");\n        wr(2'd2, 32'hFFFF_FFFF);\n        rd8(2'd2, 32'h0, \"PENDING write never sets a bit\");\n        wr(2'd3, 32'd0);\n        rd8(2'd2, 32'h0, \"ack with nothing pending changes nothing\");\n        wr(2'd1, 32'h0);\n        wr(2'd0, 32'h0);\n        rd8(2'd1, 32'h0, \"MODE cleared by write\");\n        rd8(2'd0, 32'h0, \"ENABLE cleared by write\");\n\n        // ---------------- IRQ-READ ----------------\n        phase = \"read\";\n        wr(2'd0, 32'h0F);\n        wr(2'd1, 32'hF0);\n        @(negedge clk);\n        we = 1'b0;\n        addr = 2'd0; #1; check_all(); check(\"rdata follows addr=0 without edge\", rdata8, 32'h0F);\n        addr = 2'd1; #1; check_all(); check(\"rdata follows addr=1 without edge\", rdata8, 32'hF0);\n        addr = 2'd2; #1; check_all(); check(\"rdata follows addr=2 without edge\", rdata8, 32'h00);\n        addr = 2'd3; #1; check_all(); check(\"rdata follows addr=3 without edge\", rdata8, 32'h00);\n        rd8(2'd0, 32'h0F, \"ENABLE unchanged by reads\");\n        rd8(2'd1, 32'hF0, \"MODE unchanged by reads\");\n        wr(2'd0, 32'h0);\n        wr(2'd1, 32'h0);\n\n        // ---------------- IRQ-LEVEL, IRQ-DETECT-DISABLED, IRQ-MASK, IRQ-LATENCY ----------------\n        phase = \"level\";\n        set_src(32'h08);\n        set_src(32'h00);\n        rd8(2'd2, 32'h08, \"disabled level source sets PENDING\");\n        check(\"irq low while source disabled\", irq8, 1'b0);\n        check(\"irq_id 0 while irq low\", id8, 5'd0);\n        rd8(2'd3, 32'h0, \"CLAIM reads 0 while irq low\");\n        rd8(2'd2, 32'h08, \"PENDING holds after source drops\");\n        wr(2'd0, 32'h08);\n        rd8(2'd3, 32'h8000_0003, \"CLAIM after enabling source 3\");\n        check(\"irq high once pending and enabled\", irq8, 1'b1);\n        check(\"irq_id names source 3\", id8, 5'd3);\n        wr(2'd2, 32'h08);\n        rd8(2'd2, 32'h0, \"W1C clears PENDING bit 3\");\n        check(\"irq low after clear\", irq8, 1'b0);\n        cyc(1'b0, 2'd3, 32'd0, 32'h08);\n        check(\"irq still low before the sampling edge\", irq8, 1'b0);\n        cyc(1'b0, 2'd3, 32'd0, 32'h00);\n        check(\"CLAIM one edge after detection\", rdata8, 32'h8000_0003);\n        check(\"irq high one edge after detection\", irq8, 1'b1);\n        wr(2'd2, 32'h08);\n        rd8(2'd2, 32'h0, \"PENDING cleared again\");\n\n        // ---------------- IRQ-SET-WINS (level) ----------------\n        phase = \"level_hold\";\n        set_src(32'h04);\n        rd8(2'd2, 32'h04, \"held level source pending\");\n        check(\"irq low: source 2 disabled\", irq8, 1'b0);\n        wr(2'd2, 32'h04);\n        rd8(2'd2, 32'h04, \"W1C loses to held level source\");\n        wr(2'd3, 32'd2);\n        rd8(2'd2, 32'h04, \"ack loses to held level source\");\n        set_src(32'h00);\n        wr(2'd3, 32'd2);\n        rd8(2'd2, 32'h0, \"ack clears once source low\");\n\n        // ---------------- IRQ-EDGE, IRQ-SET-WINS (edge) ----------------\n        phase = \"edge\";\n        wr(2'd1, 32'h20);\n        wr(2'd0, 32'h20);\n        set_src(32'h20);\n        rd8(2'd2, 32'h20, \"edge source sets on rising edge\");\n        rd8(2'd3, 32'h8000_0005, \"CLAIM names edge source 5\");\n        wr(2'd2, 32'h20);\n        rd8(2'd2, 32'h0, \"edge source held high does not set again\");\n        rd8(2'd2, 32'h0, \"edge source still clear while held\");\n        check(\"irq low after clearing edge source\", irq8, 1'b0);\n        set_src(32'h00);\n        rd8(2'd2, 32'h0, \"falling edge sets nothing\");\n        cyc(1'b1, 2'd2, 32'h20, 32'h20);\n        rd8(2'd2, 32'h20, \"edge detection wins over W1C at the same edge\");\n        wr(2'd3, 32'd5);\n        rd8(2'd2, 32'h0, \"ack clears held edge source\");\n        set_src(32'h00);\n        wr(2'd1, 32'h0);\n        wr(2'd0, 32'h0);\n\n        // ---------------- IRQ-PRIORITY, IRQ-CLAIM ----------------\n        phase = \"priority\";\n        wr(2'd0, 32'hFF);\n        set_src(32'h52);\n        set_src(32'h00);\n        rd8(2'd2, 32'h52, \"sources 1, 4, 6 pending together\");\n        rd8(2'd3, 32'h8000_0001, \"lowest-numbered source 1 wins\");\n        wr(2'd3, 32'd1);\n        rd8(2'd2, 32'h50, \"ack clears only source 1\");\n        rd8(2'd3, 32'h8000_0004, \"source 4 next after ack\");\n        wr(2'd0, 32'hFE);\n        set_src(32'h01);\n        set_src(32'h00);\n        rd8(2'd2, 32'h51, \"disabled source 0 still pending\");\n        rd8(2'd3, 32'h8000_0004, \"disabled source 0 does not win\");\n        wr(2'd0, 32'hFF);\n        rd8(2'd3, 32'h8000_0000, \"source 0 wins with irq high\");\n        check(\"irq high with source 0\", irq8, 1'b1);\n        check(\"irq_id 0 for source 0\", id8, 5'd0);\n        wr(2'd2, 32'hFF);\n        rd8(2'd3, 32'h0, \"CLAIM 0 after clearing all\");\n        set_src(32'h81);\n        set_src(32'h00);\n        rd8(2'd3, 32'h8000_0000, \"source 0 beats source 7 in the same cycle\");\n        wr(2'd3, 32'd0);\n        rd8(2'd3, 32'h8000_0007, \"source 7 after ack of source 0\");\n        wr(2'd3, 32'd7);\n        rd8(2'd3, 32'h0, \"CLAIM 0 after all acknowledged\");\n        check(\"irq low after all acknowledged\", irq8, 1'b0);\n\n        // ---------------- IRQ-ACK, IRQ-W1C ----------------\n        phase = \"ack\";\n        set_src(32'h3C);\n        set_src(32'h00);\n        rd8(2'd2, 32'h3C, \"sources 2 to 5 pending\");\n        wr(2'd3, 32'd8);\n        rd8(2'd2, 32'h3C, \"ack of source 8 (N or more) changes nothing\");\n        wr(2'd3, 32'd31);\n        rd8(2'd2, 32'h3C, \"ack of source 31 changes nothing at N=8\");\n        wr(2'd3, 32'hFFFF_FFE4);\n        rd8(2'd2, 32'h2C, \"ack uses wdata[4:0] only and clears source 4\");\n        wr(2'd2, 32'h24);\n        rd8(2'd2, 32'h08, \"W1C clears only bits written 1\");\n        wr(2'd2, 32'h00);\n        rd8(2'd2, 32'h08, \"W1C of zeros changes nothing\");\n        wr(2'd2, 32'hFFFF_FFFF);\n        rd8(2'd2, 32'h0, \"W1C of all ones clears all\");\n\n        // ---------------- IRQ-RESET in the middle of operation ----------------\n        phase = \"reset_mid\";\n        wr(2'd1, 32'hF0);\n        set_src(32'h0F);\n        rd8(2'd2, 32'h0F, \"level sources 0-3 pending before reset\");\n        check(\"irq high before reset\", irq8, 1'b1);\n        set_rst(1'b0);\n        rd8(2'd0, 32'h0, \"ENABLE cleared by reset\");\n        rd8(2'd1, 32'h0, \"MODE cleared by reset\");\n        rd8(2'd2, 32'h0, \"PENDING cleared by reset with sources high\");\n        rd8(2'd3, 32'h0, \"CLAIM 0 in reset\");\n        check(\"irq low in reset\", irq8, 1'b0);\n        set_rst(1'b1);\n        rd8(2'd2, 32'h0F, \"level sources detected again after reset\");\n        check(\"irq low: ENABLE 0 after reset\", irq8, 1'b0);\n        set_src(32'h00);\n        wr(2'd2, 32'hFF);\n\n        // ---------------- IRQ-PARAM on N=32 and N=2 ----------------\n        phase = \"param\";\n        wr(2'd0, 32'hFFFF_FFFF);\n        rd(2'd0);\n        check(\"N=8 ENABLE all ones\", rdata8, 32'h0000_00FF);\n        check(\"N=32 ENABLE all ones\", rdata32, 32'hFFFF_FFFF);\n        check(\"N=2 ENABLE all ones\", rdata2, 32'h0000_0003);\n        set_src(32'h8000_0000);\n        set_src(32'h0);\n        rd(2'd3);\n        check(\"N=32 CLAIM names source 31\", rdata32, 32'h8000_001F);\n        check(\"N=8 unaffected by source 31\", rdata8, 32'h0);\n        check(\"N=2 unaffected by source 31\", rdata2, 32'h0);\n        wr(2'd3, 32'd31);\n        rd(2'd3);\n        check(\"N=32 ack of source 31 clears it\", rdata32, 32'h0);\n        rd(2'd2);\n        check(\"N=32 PENDING 0 after ack 31\", rdata32, 32'h0);\n        set_src(32'h3);\n        set_src(32'h0);\n        rd(2'd2);\n        check(\"N=2 sources 0,1 pending\", rdata2, 32'h3);\n        check(\"N=8 sources 0,1 pending\", rdata8, 32'h3);\n        check(\"N=32 sources 0,1 pending\", rdata32, 32'h3);\n        wr(2'd3, 32'd2);\n        rd(2'd2);\n        check(\"N=2 ack of source 2 (N or more) changes nothing\", rdata2, 32'h3);\n        check(\"N=8 ack of non-pending source 2 changes nothing\", rdata8, 32'h3);\n        wr(2'd3, 32'd1);\n        rd(2'd2);\n        check(\"N=2 ack of source 1\", rdata2, 32'h1);\n        check(\"N=8 ack of source 1\", rdata8, 32'h1);\n        rd(2'd3);\n        check(\"N=2 CLAIM names source 0\", rdata2, 32'h8000_0000);\n        wr(2'd2, 32'hFFFF_FFFF);\n        wr(2'd0, 32'h0);\n        wr(2'd1, 32'h0);\n\n        // ---------------- Seeded random traffic against the model ----------------\n        phase = \"random\";\n        seed = 32'h1234_5678;\n        for (n = 0; n < 4000; n = n + 1) begin\n            r1 = $random(seed);\n            r2 = $random(seed);\n            r3 = $random(seed);\n            if (r1[15:8] == 8'd0) begin\n                set_rst(1'b0);\n                set_rst(1'b1);\n            end\n            if (r1[6:5] == 2'd0)\n                src_v = r3 & $random(seed);\n            wd = r2;\n            if (r1[7])\n                wd = {27'd0, r2[4:0]};\n            cyc((r1[1:0] == 2'd0), r1[3:2], wd, src_v);\n        end\n\n        phase = \"done\";\n        $display(\"irq_ctrl testbench: %0d checks passed, %0d failed\", pass_cnt, fail_cnt);\n        $display(\"NIRMAAN-SIM %s %0d passed, %0d failed\", nonce, pass_cnt, fail_cnt);\n        $finish;\n    end\nendmodule\n=== END FILE ==="
+    }
+  ],
+  "format": "nirmaan.eval-trial",
+  "harness_variant": "default",
+  "judge_runs": [
+    {
+      "check": "The seat's testbench passes the approved RTL and fails each interrupt controller mutant",
+      "params": {
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-o2yvb2nc/judge/check-1/must-fail-nf8usc9v/clean/tb_irq_ctrl.sv",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-o2yvb2nc/judge/check-1/must-fail-nf8usc9v/clean/irq_ctrl.v"
+        ],
+        "top": "tb_irq_ctrl"
+      },
+      "run": "run-0002",
+      "succeeded": true,
+      "summary": "icarus: simulation passed: 37592 checks passed, $finish reached at time 41641000, 0 errors",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The seat's testbench passes the approved RTL and fails each interrupt controller mutant",
+      "params": {
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-o2yvb2nc/judge/check-1/must-fail-nf8usc9v/mutant-1-1/tb_irq_ctrl.sv",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-o2yvb2nc/judge/check-1/must-fail-nf8usc9v/mutant-1-1/irq_ctrl.v"
+        ],
+        "top": "tb_irq_ctrl"
+      },
+      "run": "run-0003",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: the testbench reports 7829 of 37592 checks failed",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The seat's testbench passes the approved RTL and fails each interrupt controller mutant",
+      "params": {
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-o2yvb2nc/judge/check-1/must-fail-nf8usc9v/mutant-1-2/tb_irq_ctrl.sv",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-o2yvb2nc/judge/check-1/must-fail-nf8usc9v/mutant-1-2/irq_ctrl.v"
+        ],
+        "top": "tb_irq_ctrl"
+      },
+      "run": "run-0004",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: the testbench reports 898 of 37592 checks failed",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The seat's testbench passes the approved RTL and fails each interrupt controller mutant",
+      "params": {
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-o2yvb2nc/judge/check-1/must-fail-nf8usc9v/mutant-1-3/tb_irq_ctrl.sv",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-o2yvb2nc/judge/check-1/must-fail-nf8usc9v/mutant-1-3/irq_ctrl.v"
+        ],
+        "top": "tb_irq_ctrl"
+      },
+      "run": "run-0005",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: the testbench reports 6646 of 37592 checks failed",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The seat's testbench passes the approved RTL and fails each interrupt controller mutant",
+      "params": {
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-o2yvb2nc/judge/check-1/must-fail-nf8usc9v/mutant-1-4/tb_irq_ctrl.sv",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-o2yvb2nc/judge/check-1/must-fail-nf8usc9v/mutant-1-4/irq_ctrl.v"
+        ],
+        "top": "tb_irq_ctrl"
+      },
+      "run": "run-0006",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: the testbench reports 795 of 37592 checks failed",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The seat's testbench passes the approved RTL and fails each interrupt controller mutant",
+      "params": {
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-o2yvb2nc/judge/check-1/must-fail-nf8usc9v/mutant-1-5/tb_irq_ctrl.sv",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-o2yvb2nc/judge/check-1/must-fail-nf8usc9v/mutant-1-5/irq_ctrl.v"
+        ],
+        "top": "tb_irq_ctrl"
+      },
+      "run": "run-0007",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: the testbench reports 4581 of 37592 checks failed",
+      "tool": "simulator.run"
+    }
+  ],
+  "knowledge": "on",
+  "model": "claude-opus-5-5",
+  "purpose": "evidence",
+  "record": "2026-11-18-claude-code-claude-opus-5-5-47",
+  "result": {
+    "attempts": 1,
+    "attestations": [],
+    "audit_ok": true,
+    "case": "dv/directed-irq-ctrl",
+    "case_digest": "sha256:f260bf902e03ec8cf49919ebf5b8fc8f2b4013f27d7dccfda9af1bf613ea78ec",
+    "cli": "2.1.325",
+    "cost_usd": null,
+    "detail": "Timing: the clock period is 10 ns. The testbench drives inputs at the falling edge and checks outputs 1 ns later, so it never races the design's rising-edge sampling. The IRQ-READ check changes addr four times within one low half-cycle, with no clock edge in between. Priority is tested with several sources pending at once: sources 1, 4 and 6; sources 0 and 7 together; and source 0 pending but disabled. A reversed priority order or ignoring ENABLE would therefore fail. IRQ-PARAM is checked on N=2 and N=32 instances: upper register bits ignore writes, source 31 can be acknowledged, and an acknowledge number of N or more changes nothing. For the gate, the testbench must be listed with the approved irq_ctrl.v, and the top module is tb_irq_ctrl. The independent review record and the simulator.run evidence are still outstanding; the platform and a reviewer must supply them.",
+    "duration_s": 292.452,
+    "gate_runs": [
+      {
+        "run": "run-0001",
+        "succeeded": true,
+        "summary": "icarus: simulation passed: 37592 checks passed, $finish reached at time 41641000, 0 errors",
+        "tool": "simulator.run"
+      }
+    ],
+    "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+    "input_tokens": 2,
+    "model_calls": 1,
+    "output_tokens": 33540,
+    "passed": true,
+    "replay": false,
+    "runtime": "claude-code",
+    "sandbox": "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-o2yvb2nc",
+    "scores": [
+      {
+        "failed_runs": [
+          "run-0003",
+          "run-0004",
+          "run-0005",
+          "run-0006",
+          "run-0007"
+        ],
+        "name": "The seat's testbench passes the approved RTL and fails each interrupt controller mutant",
+        "runs": [
+          "run-0002"
+        ],
+        "scorer": "must-fail",
+        "status": "passed",
+        "summary": "simulator.run run-0002 passed on the clean inputs; 5 of 5 mutants failed it"
+      }
+    ],
+    "seat": "prj-486b52a6aa:testbench",
+    "seat_status": "in_review",
+    "started_at": "2026-11-18T23:37:59.478592Z",
+    "submitted": true,
+    "tool_calls": [],
+    "version": "1.25.0"
+  },
+  "skills": {
+    "directed_testing": "sha256:6bf35095b83cbd9b641919c5b59bacdf5fc87ce7c569c2ad7df593ecddff70d6",
+    "systemverilog": "sha256:b6d97df51f05b4963ddc316fcfe265dc04208251a4f331971e5a6583ba6c1f96"
+  },
+  "stage": "testbench",
+  "trial": 1,
+  "version": 1
+}
