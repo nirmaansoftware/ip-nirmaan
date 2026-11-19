@@ -455,7 +455,7 @@ def test_the_counting_rejudge_runs_on_a_fresh_checkout_from_the_artifact_only():
 
 def test_whole_flow_cases_get_one_tool_set_and_the_seat_c_credential_test_in_every_trial_job():
     """G3 step 5 (council record 2026-11-17, decision 4; WF9, WF13): same jobs, the RISC-V compiler and every tool
-    required for a flow/ case, and the fw.test credential test recorded before the checkout is hashed."""
+    required for a flow/ case, and the fw.test credential test, a gate since M90, before the checkout is hashed."""
     jobs = _workflow_jobs(WORKFLOW.read_text())
     flow = "startsWith(inputs.case, 'flow/')"
     for name in ("replay", "live-eval", "rejudge"):
@@ -470,8 +470,28 @@ def test_whole_flow_cases_get_one_tool_set_and_the_seat_c_credential_test_in_eve
         assert f'live_eval_fw_reach.py --records "$RUNNER_TEMP/{folder}" --out "$RUNNER_TEMP/fw-reach/' in steps[test]
         # Its own artifact, outside the records folder the re-judge reads.
         assert "name: live-eval-fw-reach-" in steps[upload] and "path: ${{ runner.temp }}/fw-reach" in steps[upload]
-        assert "--require-denied" not in steps[test]  # recorded, not a gate, until fw.test runs as the seat account
-    assert "live_eval_fw_reach.py" not in jobs["rejudge"]
+        assert steps[test].rstrip().endswith(" --require-denied")  # M90: a gate, now fw.test runs as the seat account
+        # Firmware cases run it too: their replays and re-judges run seat C.
+        assert "startsWith(inputs.case, 'firmware/')" in steps[test] and "startsWith(inputs.case, 'firmware/')" in steps[upload]
+    # Gate WF17 covers every job that runs seat code: the re-judge runs seat C again, so it runs the credential test as
+    # a gate too, after the cocotb
+    # reach test and before the checkout is hashed and anything is re-judged; its record stays outside the records.
+    order = _steps(jobs["rejudge"])
+    steps = {s.splitlines()[0].replace("name: ", ""): s for s in jobs["rejudge"].split("\n      - ")[1:]}
+    test, upload = "Test what seat C can reach under fw.test", "Upload the seat C reach record"
+    assert order.index("Test what seat code can reach") < order.index(test) < order.index(
+        "Hash the checkout before the re-judge") < order.index("Re-judge the records"), order
+    assert "startsWith(inputs.case, 'flow/') || startsWith(inputs.case, 'firmware/')" in steps[test]
+    assert ('live_eval_fw_reach.py --records "$RUNNER_TEMP/records" --out "$RUNNER_TEMP/fw-reach/fw-reach.json" '
+            "--require-denied") in steps[test] and "secrets." not in steps[test]
+    assert "name: live-eval-fw-reach-rejudge-" in steps[upload] and "path: ${{ runner.temp }}/fw-reach" in steps[upload]
+    assert "CASE: ${{ inputs.case }}" in jobs["rejudge"]
+    # Every step that runs seat code first refuses it without this job's record (live_eval_ci.py confined).
+    for job, step, runs in (("rejudge", "Re-judge the records", "nirmaan eval rejudge"),
+                            ("replay", "Replay the reference answer", "nirmaan eval run")):
+        body = {s.splitlines()[0].replace("name: ", ""): s for s in jobs[job].split("\n      - ")[1:]}[step]
+        assert "FW_REACH: ${{ runner.temp }}/fw-reach/fw-reach.json" in body, job
+        assert body.index("python scripts/live_eval_ci.py confined") < body.index(runs), job
     setup = (REPO / ".github" / "actions" / "live-eval-setup" / "action.yml").read_text()
     assert "default: \"false\"" in setup and "gcc-riscv64-unknown-elf" in setup
     assert setup.count("if: inputs.whole_flow == 'true'") == 2 and "rv32i/ilp32" in setup
