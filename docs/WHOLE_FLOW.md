@@ -552,8 +552,16 @@ checkout. No new workflow and no new action.
   `/proc/<pid>/environ` holding both canaries (the credential-named one
   included), its own environment held the plain one, and it read the
   runner-only file and could signal the harness.
-- **The recorded result** (`evals/flow/credential_test_record.json`):
-  RECORD_PENDING
+- **The recorded result** (`evals/flow/credential_test_record.json`, run
+  44436318890, job `replay`, head 91bbb2b, `--require-denied`, for
+  `flow/axi4-lite-regs-driver`): every probe denied. `fw.test` ran the
+  program it built through `/opt/nirmaan-seat/bin/nirmaan-seat-exec`; the C
+  ran as `nirmaan-seat` (uid 999, its own group only), `sudo -n` exited 1,
+  each of 26 folders and 26 files refused a write with `EACCES`, its own
+  environment held no canary, the parent's and the harness's
+  `/proc/<pid>/environ`, the runner-only file and a signal to the harness
+  were refused, and the control wrote only the seat's folder. The same job's
+  replay of the register block flow passed.
 - **The register block flow stays refused.** Its firmware stage and its
   held-out checks run seat C, so `check --require-expected` and `trials`
   refuse it with exit 6 before any trial, as M89 refuses the single-seat

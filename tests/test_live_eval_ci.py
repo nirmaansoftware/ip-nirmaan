@@ -502,6 +502,11 @@ def test_the_recorded_credential_test_is_whole_and_the_register_block_flow_waits
     assert record["every_probe_denied"] == all(p["denied"] for p in record["probes"].values())
     if not record["every_probe_denied"]:
         assert ci.seat_c_problem(REGS_FLOW)
+    else:  # M90: denied because fw.test ran the program as the seat account, through its wrapper, in a gate run
+        assert record["seat_exec"] == "/opt/nirmaan-seat/bin/nirmaan-seat-exec" and record["seat_account"]["uid"] != \
+            record["account"]["uid"]
+        assert record["run_step"][0][0] == record["seat_exec"] and record["append_targets"]
+        assert ci.seat_c_problem(REGS_FLOW)  # still refused live: lifting that is a change of its own
 
 
 # --- G3 third addendum (2026-11-19), gate WF21: no attempts option, and no whole-flow dispatch without its fingerprint
