@@ -17,10 +17,13 @@ owner's machine. The workflow calls this script in two ways:
   whose two hashes differ.
 
 A live trial (``check --require-expected`` and ``trials``) of a case that runs seat-written C (``fw.build``,
-``fw.test``, the firmware seat, or a whole flow with a firmware stage) is refused before anything runs. Since M90
-``fw.test`` runs the program it builds as the seat account in these jobs (``scripts/live_eval_seat.py``) and the
-credential test (``scripts/live_eval_fw_reach.py --require-denied``) gates it; the refusal stays until a change of
-its own lifts it (for the register block flow, after gates WF15 to WF19 of the G3 council record).
+``fw.test``, the firmware seat, or a whole flow with a firmware stage) is refused before anything runs, with one
+exception. Since M90 ``fw.test`` runs the program it builds as the seat account in these jobs
+(``scripts/live_eval_seat.py``), and the credential test (``scripts/live_eval_fw_reach.py --require-denied``) shows
+it. So the single-seat firmware case (``SEAT_C_LIVE``, decision #35 of 2026-11-19) runs live, but ``trials`` starts
+only on a credential test record from this same job (``FW_REACH``: this run, attempt, job and commit, the gate mode,
+every probe denied, the wrapper found); ``check`` leaves that to ``trials``, since the credential test runs after
+it. The register block flow stays refused (gates WF15 to WF19 of the G3 council record and the dated plan addition).
 
 A whole-flow case (``flow/...``, G3 council record 2026-11-17, decision 4) runs only when named, one trial per
 dispatch (each dispatch is one slot of the committed batch plan), on the default harness, in the whole-flow
@@ -31,7 +34,7 @@ fingerprint (``harness_sha256(flow="whole")``); every record must carry ``flow: 
 The options come from the environment (CASE, TRIALS, KNOWLEDGE, PURPOSE, HARNESS, EXPECTED), as the workflow
 sets them, so no input is expanded inside a shell command. Nothing here prints a credential. Exit codes: 0 every
 trial ran (passed or failed), 2 bad input, 3 stopped on a limit, 4 fingerprint or record mismatch, 5 stopped on
-another exit, 6 a case that runs seat C (refused, above). See docs/LIVE_EVAL_EVIDENCE.md, section 6.
+another exit, 6 a case that runs seat C refused (above). See docs/LIVE_EVAL_EVIDENCE.md, section 6.
 """
 
 from __future__ import annotations
@@ -43,7 +46,7 @@ import os
 import re
 import subprocess
 import sys
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -56,6 +59,10 @@ BAD_INPUT, STOPPED_LIMIT, MISMATCH, STOPPED_OTHER, UNCONFINED = 2, 3, 4, 5, 6
 #: Tools that build or run seat-written C, and the seat that uses them: a live trial of a case with either is refused.
 #: regmap.verify, fw.soc_test and Verilator's --binary run no seat-written host code (docs/LIVE_EVAL_EVIDENCE.md, 6).
 SEAT_C_TOOLS, SEAT_C_SEATS = ("fw.build", "fw.test"), ("firmware",)
+#: Cases that run seat C and may run live, on a credential test record from the same job (M90, decision #35).
+SEAT_C_LIVE = ("firmware/axi4-lite-driver",)
+#: Where the workflow's trials step finds that record (``live_eval_fw_reach.py --out``).
+FW_REACH_ENV = "FW_REACH"
 #: Folders hashed whole, ignored files included: the judge's code, the scripts the workflow runs, the cases.
 TREE_WHOLE = ("src", "scripts", "evals")
 NIRMAAN = ("nirmaan",)
@@ -114,19 +121,63 @@ def _cases() -> list:
     return load_cases(ROOT / "evals", flow=None)
 
 
-def seat_c_problem(case_id: str) -> str | None:
+def fw_reach_problem(env: Mapping[str, str], head: str | None) -> str | None:
+    """Why the credential test record named by ``FW_REACH`` does not show, for this job, that seat C under
+    ``fw.test`` runs confined, or None. Every field is required; a record that says nothing proves nothing."""
+    where = env.get(FW_REACH_ENV, "").strip()
+    if not where:
+        return f"no credential test record ({FW_REACH_ENV} is not set)"
+    try:
+        record = json.loads(Path(where).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        return f"the credential test record {where} cannot be read ({type(exc).__name__})"
+    run = record.get("run") or {}
+    want = {"id": env.get("GITHUB_RUN_ID"), "attempt": env.get("GITHUB_RUN_ATTEMPT"), "job": env.get("GITHUB_JOB")}
+    if not all(want.values()) or any(run.get(k) != v for k, v in want.items()):
+        return f"the credential test record is not this job's (run {run}, this job {want})"
+    if not head or record.get("head") != head:
+        return f"the credential test record is of commit {record.get('head')}, not this checkout's {head}"
+    if record.get("format") != "nirmaan.fw-reach/1" or record.get("tool") != "fw.test":
+        return "the credential test record is not one of scripts/live_eval_fw_reach.py's"
+    if record.get("require_denied") is not True:
+        return "the credential test ran without --require-denied"
+    if not (record.get("every_probe_denied") is True and record.get("done") is True and record.get("control_ok") is True
+            and record.get("missing") == [] and record.get("seat_exec")):
+        return "the credential test record does not show every probe denied with the seat wrapper in use"
+    return None
+
+
+def _head() -> str | None:
+    try:
+        return subprocess.run(["git", "-C", str(ROOT), "rev-parse", "HEAD"], check=True, capture_output=True,
+                              text=True).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        return None
+
+
+def seat_c_problem(case_id: str, env: Mapping[str, str] | None = None, defer: bool = False) -> str | None:
     """Why a live trial of this case, which runs seat C, is refused, or None.
 
     A whole flow seats every stage it lists, so a firmware stage anywhere in it runs seat C at its own
-    before-review checks, whichever stage is judged."""
+    before-review checks, whichever stage is judged. A case in ``SEAT_C_LIVE`` is refused only without a credential
+    test record of this job that shows every probe denied (``fw_reach_problem``); ``defer`` (``check``, which runs
+    before the credential test) leaves that to ``trials``."""
     case = next(c for c in _cases() if c.id == case_id)
     tools = sorted({h.tool for h in case.held_out if h.tool in SEAT_C_TOOLS})
     seats = sorted({case.seat, *(case.exercised if case.flow == "whole" else ())} & set(SEAT_C_SEATS))
+    if (seats or tools) and case_id in SEAT_C_LIVE:
+        if defer:
+            return None
+        problem = fw_reach_problem(os.environ if env is None else env, _head())
+        if problem is None:
+            return None
+        return (f"case {case_id} runs seat-written C; a live trial of it needs this job's credential test to show "
+                f"seat C confined under fw.test (gate WF17, M90): {problem}. No trial ran")
     if seats or tools:
         what = ", ".join([*tools, *(f"the {s} stage" if case.flow == "whole" else f"the {s} seat" for s in seats)])
         return (f"case {case_id} runs seat-written C ({what}); live trials of it stay refused (gate WF17: fw.test runs "
-                "it as the seat account since M90, and only a change of its own lifts this; for the register block "
-                "flow, after gates WF15 to WF19). No trial ran")
+                "it as the seat account since M90, but the register block flow waits for gates WF15 to WF19 and the "
+                "dated plan addition). No trial ran")
     return None
 
 
@@ -273,7 +324,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         cli = installed_cli()
         live = args.mode == "trials" or getattr(args, "require_expected", False)
         digest = check(opts, require_expected=live, cli=cli)
-        unconfined = seat_c_problem(opts["case"]) if live else None
+        unconfined = seat_c_problem(opts["case"], defer=args.mode == "check") if live else None
         if unconfined:
             raise Stop(UNCONFINED, unconfined)
         if args.mode == "check":

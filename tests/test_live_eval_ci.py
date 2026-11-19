@@ -278,16 +278,81 @@ def test_main_refuses_seat_c_before_any_trial_but_a_replay_check_does_not(monkey
     for key, value in {"CASE": "firmware/axi4-lite-driver", "TRIALS": "1", "KNOWLEDGE": "on", "PURPOSE": "evidence",
                        "HARNESS": "default", "EXPECTED": digest}.items():
         monkeypatch.setenv(key, value)
+    monkeypatch.delenv(ci.FW_REACH_ENV, raising=False)
     monkeypatch.setattr(ci, "run_trials", lambda *a, **k: pytest.fail("a trial started"))
-    assert ci.main(["check", "--require-expected"]) == ci.UNCONFINED
+    # Decision #35: check runs before the credential test, so it leaves the record to trials, which refuses without it.
+    assert ci.main(["check", "--require-expected"]) == 0
     assert ci.main(["trials", "--out", "/nonexistent"]) == ci.UNCONFINED
     assert "gate WF17" in capsys.readouterr().err
     assert ci.main(["check"]) == 0
 
 
+# --- M90, decision #35: the single-seat firmware case runs live on this job's credential test record ------------
+
+JOB_ENV = {"GITHUB_RUN_ID": "77", "GITHUB_RUN_ATTEMPT": "1", "GITHUB_JOB": "live-eval"}
+
+
+def _fw_record(tmp_path, **over):
+    record = {"format": "nirmaan.fw-reach/1", "tool": "fw.test", "head": "c0ffee",
+              "run": {"id": "77", "attempt": "1", "job": "live-eval", "ref": "refs/heads/main"},
+              "require_denied": True, "every_probe_denied": True, "done": True, "control_ok": True, "missing": [],
+              "seat_exec": "/opt/nirmaan-seat/bin/nirmaan-seat-exec", **over}
+    path = tmp_path / f"fw-reach-{len(list(tmp_path.glob('fw-reach-*.json')))}.json"  # one file per record
+    path.write_text(json.dumps(record))
+    return {**JOB_ENV, ci.FW_REACH_ENV: str(path)}
+
+
+def test_the_firmware_case_runs_live_only_on_this_jobs_credential_test_showing_every_probe_denied(tmp_path,
+                                                                                                    monkeypatch):
+    assert ci.SEAT_C_LIVE == ("firmware/axi4-lite-driver",)
+    monkeypatch.setattr(ci, "_head", lambda: "c0ffee")
+    assert ci.fw_reach_problem(_fw_record(tmp_path), "c0ffee") is None
+    assert ci.seat_c_problem("firmware/axi4-lite-driver", _fw_record(tmp_path)) is None
+    assert ci.seat_c_problem("firmware/axi4-lite-driver", {}, defer=True) is None  # check: left to trials
+    bad = [({}, "not set"), ({ci.FW_REACH_ENV: str(tmp_path / "none.json"), **JOB_ENV}, "cannot be read")]
+    for over, why in [({"run": {"id": "76", "attempt": "1", "job": "live-eval"}}, "not this job's"),
+                      ({"run": {"id": "77", "attempt": "2", "job": "live-eval"}}, "not this job's"),
+                      ({"run": {"id": "77", "attempt": "1", "job": "replay"}}, "not this job's"),
+                      ({"head": "beef"}, "not this checkout's"), ({"format": "x"}, "not one of"),
+                      ({"require_denied": False}, "without --require-denied"),
+                      ({"require_denied": None}, "without --require-denied"),
+                      ({"every_probe_denied": False}, "every probe denied"), ({"done": False}, "every probe denied"),
+                      ({"control_ok": False}, "every probe denied"), ({"missing": ["fw_reach_no_sudo"]}, "every probe"),
+                      ({"seat_exec": None}, "seat wrapper")]:
+        bad.append((_fw_record(tmp_path, **over), why))
+    for env, why in bad:
+        problem = ci.seat_c_problem("firmware/axi4-lite-driver", env)
+        assert problem and why in problem and "WF17" in problem and "No trial ran" in problem, (env, problem)
+    record = _fw_record(tmp_path)
+    for name in JOB_ENV:  # outside a job nothing names the job, so no record is this job's
+        assert "not this job's" in ci.fw_reach_problem({k: v for k, v in record.items() if k != name}, "c0ffee")
+    assert "not this checkout's" in ci.fw_reach_problem(record, None)
+
+
+def test_the_register_block_flow_stays_refused_with_a_passing_credential_test(tmp_path, monkeypatch):
+    monkeypatch.setattr(ci, "_head", lambda: "c0ffee")
+    problem = ci.seat_c_problem(REGS_FLOW_CASE, _fw_record(tmp_path))
+    assert problem and "WF15 to WF19" in problem and "dated plan addition" in problem
+
+
+def test_main_runs_the_firmware_case_only_with_this_jobs_record(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(ci, "installed_cli", lambda: "2.1.325")
+    monkeypatch.setattr(ci, "_head", lambda: "c0ffee")
+    ran = []
+    monkeypatch.setattr(ci, "run_trials", lambda *a, **k: ran.append(a) or 0)
+    for key, value in {"CASE": "firmware/axi4-lite-driver", "TRIALS": "1", "KNOWLEDGE": "on", "PURPOSE": "evidence",
+                       "HARNESS": "default", "EXPECTED": harness_sha256(cli="2.1.325"),
+                       **_fw_record(tmp_path, every_probe_denied=False)}.items():
+        monkeypatch.setenv(key, value)
+    assert ci.main(["trials", "--out", str(tmp_path)]) == ci.UNCONFINED and not ran
+    monkeypatch.setenv(ci.FW_REACH_ENV, _fw_record(tmp_path)[ci.FW_REACH_ENV])
+    assert ci.main(["trials", "--out", str(tmp_path)]) == 0 and len(ran) == 1
+
+
 # --- G3 step 5: whole-flow cases on the same path (council record 2026-11-17, decision 4) ----------------------
 
 TIMER_FLOW, REGS_FLOW = "flow/axil-timer", "flow/axi4-lite-regs-driver"
+REGS_FLOW_CASE = REGS_FLOW
 
 
 def test_a_whole_flow_case_is_known_when_named_one_trial_per_dispatch_on_the_default_harness():
@@ -437,6 +502,7 @@ def test_the_record_mode_records_and_the_gate_mode_needs_every_probe_denied(tmp_
     assert fw.run(tmp_path, out, require, {"GITHUB_RUN_ID": "7", "GITHUB_JOB": "replay"}) == code
     record = json.loads(out.read_text())
     assert record["head"] == "abc" and record["run"]["id"] == "7" and record["run"]["job"] == "replay"
+    assert record["require_denied"] is require  # what live_eval_ci.py's lift reads
     printed = capsys.readouterr().out
     control_ok = found.get("control", "ok") == "ok"
     assert ("NOT confined" in printed) == (not found.get("denied") and not found.get("missing") and control_ok)

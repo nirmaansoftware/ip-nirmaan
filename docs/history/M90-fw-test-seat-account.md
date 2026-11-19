@@ -31,9 +31,16 @@ the runner's temporary folder, the step's command files). The workflow runs
 it with `--require-denied`, which also fails when `fw.test` found no wrapper.
 
 **What stays.** The compile and link steps of `fw.build` and `fw.test` run
-the compiler as the runner over the seat's C (they run none of it). A live
-trial of a case that runs seat C is still refused (exit 6); lifting that is
-a change of its own, after gates WF15 to WF19 for the register block flow.
+the compiler as the runner over the seat's C (they run none of it); that
+residual is open for the security seat. The register block flow is still
+refused live (exit 6) until gates WF15 to WF19 and the dated plan addition.
+
+**The single-seat firmware case runs live (decision #35 of 2026-11-19).**
+`scripts/live_eval_ci.py` lets `firmware/axi4-lite-driver` (`SEAT_C_LIVE`)
+start trials only on the credential test record of the same job (the trials
+step's `FW_REACH`): this run, attempt, job and commit, written with
+`--require-denied`, every probe denied, the control written, the wrapper
+found. The workflow runs the credential test for `firmware/` cases too.
 
 **No fingerprint change.** The files changed are outside `harness.CODE`,
 `LOOP_CODE` and `FLOW_CODE`, and no tool definition changes. With Claude Code

@@ -564,11 +564,13 @@ checkout. No new workflow and no new action.
   replay of the register block flow passed.
 - **The register block flow stays refused.** Its firmware stage and its
   held-out checks run seat C, so `check --require-expected` and `trials`
-  refuse it with exit 6 before any trial, as M89 refuses the single-seat
-  firmware case. Since M90 `fw.test` runs the program it builds as the seat
-  account and the credential test is a gate; the refusal stays until gates
-  WF15 to WF19 are met and a change of its own lifts it. A replay of it still
-  runs: its code is the reference answer.
+  refuse it with exit 6 before any trial. Since M90 `fw.test` runs the
+  program it builds as the seat account and the credential test is a gate,
+  and the single-seat firmware case runs live on that test's record from the
+  same job (`docs/LIVE_EVAL_EVIDENCE.md`, section 6); the register block flow
+  stays refused until gates WF15 to WF19 and the dated plan addition are met
+  and a change of its own lifts it. A replay of it still runs: its code is
+  the reference answer.
 - **The timer flow** links no seat C (its checks and stages run HDL, and its
   testbenches run in `vvp` as the seat account), so it runs live now.
 

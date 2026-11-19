@@ -288,12 +288,19 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   `docs/GATE_INPUTS.md`, section 2). Those runs stay with the runner account,
   as before; if a case ever hands one of them seat-written host code, it joins
   `SEAT_C_TOOLS` in `scripts/live_eval_ci.py`. `check
-  --require-expected` and `trials` still refuse a case that runs seat C (one
-  whose seat is `firmware`, whose held-out checks use `fw.build` or `fw.test`,
-  or a whole flow with a `firmware` stage) with exit 6 before any trial;
-  lifting that is a change of its own (for the register block flow, after
-  gates WF15 to WF19 of the G3 council record). A replay of such a case still
-  runs: its code is the reference answer.
+  --require-expected` and `trials` refuse a case that runs seat C (one whose
+  seat is `firmware`, whose held-out checks use `fw.build` or `fw.test`, or a
+  whole flow with a `firmware` stage) with exit 6 before any trial, with one
+  exception (decision #35 of 2026-11-19): the single-seat
+  `firmware/axi4-lite-driver` (`SEAT_C_LIVE`) runs live, but `trials` starts
+  only on the credential test record of the same job (the trials step's
+  `FW_REACH`): this run, attempt, job and commit, written with
+  `--require-denied`, every probe denied, the control written, the wrapper
+  found. Otherwise it stops with exit 6. `check` leaves that to `trials`,
+  since the credential test runs after it. The register block flow stays
+  refused: the G3 council record still requires gates WF15 to WF19 and the
+  dated plan addition. A replay of such a case still runs: its code is the
+  reference answer.
 - **The credential test for seat C** (`scripts/live_eval_fw_reach.py`, G3
   record, decision 4 and second addendum, decision 2, item 1) runs in the
   `replay` and `live-eval` jobs of a whole-flow case, after the reach test and

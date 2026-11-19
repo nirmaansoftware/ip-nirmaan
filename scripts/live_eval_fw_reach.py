@@ -31,8 +31,10 @@ ran, whatever they found; it exits 1 only when the probe did not run or a probe 
 ``--require-denied`` it is a gate: it exits 1 unless every probe is denied and ``fw.test`` found its seat wrapper.
 Since M90 ``fw.test`` runs the program it builds through ``nirmaan-seat-exec`` where that is installed
 (``nirmaan.integrations.firmware.SEAT_EXEC``; ``scripts/live_eval_seat.py``), as the seat account, and the workflow
-runs this step with ``--require-denied``. ``scripts/live_eval_ci.py`` still refuses a live trial of a case that runs
-seat C (exit 6): lifting that is a change of its own. See docs/LIVE_EVAL_EVIDENCE.md, section 6.
+runs this step with ``--require-denied`` for whole-flow and firmware cases. The record says which mode wrote it
+(``require_denied``): ``scripts/live_eval_ci.py`` lets the single-seat firmware case run live only on a record of the
+same job written in the gate mode with every probe denied, and still refuses the register block flow (exit 6). See
+docs/LIVE_EVAL_EVIDENCE.md, section 6.
 """
 
 from __future__ import annotations
@@ -504,6 +506,7 @@ def run(records: Path, out: Path, require_denied: bool, env: Mapping[str, str]) 
         return 1
     result = json.loads(out.read_text(encoding="utf-8"))
     result["head"] = git_head()
+    result["require_denied"] = require_denied  # live_eval_ci.py lets a SEAT_C_LIVE case run only on a gate run's record
     result["run"] = {k: env.get(v) for k, v in (("id", "GITHUB_RUN_ID"), ("attempt", "GITHUB_RUN_ATTEMPT"),
                                                 ("job", "GITHUB_JOB"), ("ref", "GITHUB_REF"))}
     out.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
@@ -533,7 +536,7 @@ def run(records: Path, out: Path, require_denied: bool, env: Mapping[str, str]) 
     if require_denied:
         print(f"::error::{message}; no trial ran", flush=True)
         return 1
-    print(f"::warning::{message}. Recorded, not a gate: a live trial of a case that runs seat C stays refused "
+    print(f"::warning::{message}. Recorded, not a gate: no live trial of a case that runs seat C starts on this record "
           "(scripts/live_eval_ci.py, exit 6).", flush=True)
     return 0
 

@@ -471,6 +471,13 @@ def test_whole_flow_cases_get_one_tool_set_and_the_seat_c_credential_test_in_eve
         # Its own artifact, outside the records folder the re-judge reads.
         assert "name: live-eval-fw-reach-" in steps[upload] and "path: ${{ runner.temp }}/fw-reach" in steps[upload]
         assert steps[test].rstrip().endswith(" --require-denied")  # M90: a gate, now fw.test runs as the seat account
+        # Decision #35: firmware cases run it too, and the trials step reads this job's record (FW_REACH).
+        assert "startsWith(inputs.case, 'firmware/')" in steps[test] and "startsWith(inputs.case, 'firmware/')" in steps[upload]
+        if name == "live-eval":
+            run_trials = steps["Run the trials one at a time"]
+            assert "FW_REACH: ${{ runner.temp }}/fw-reach/fw-reach.json" in run_trials
+            assert f'--out "$RUNNER_TEMP/fw-reach/fw-reach.json"' in steps[test]
+            assert order.index(test) < order.index("Run the trials one at a time")
     assert "live_eval_fw_reach.py" not in jobs["rejudge"]
     setup = (REPO / ".github" / "actions" / "live-eval-setup" / "action.yml").read_text()
     assert "default: \"false\"" in setup and "gcc-riscv64-unknown-elf" in setup

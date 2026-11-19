@@ -142,7 +142,7 @@ new number. M1 to M42 are taken; see `docs/history/README.md`.
 | M87 | Whole-flow cases, the label and the list: `flow: whole` on the case, manifest and trial; a whole-flow trial credits no skill and is listed under `whole_flow`, its count written only from 10 trials (G3, council record 2026-11-17) | reserved |
 | M88 | Bounded tool runs: every EDA run's printed output, the files it reads back and its own directory have a byte cap, a record keeps a head and tail of the diagnostics, and temporary run directories and eval sandboxes are removed when the trial or test that made them ends (the H3 trial that filled the disk) | reserved |
 | M89 | Live evaluation seat account: seat code (cocotb's `vvp`) runs as `nirmaan-seat` in the live-eval jobs, a reach test proves what it cannot reach before any trial, the checkout is hashed around the trials, and the counting re-judge is a job of its own on a fresh checkout (gates WF9 and WF17) | reserved |
-| M90 | Seat C as the seat account: the program `fw.test` builds from seat C runs as `nirmaan-seat` in the live-eval jobs, and the credential test in C, given every target of the reach test, gates each whole-flow job (gate WF17; no fingerprint changes) | reserved |
+| M90 | Seat C as the seat account: the program `fw.test` builds from seat C runs as `nirmaan-seat` in the live-eval jobs, and the credential test in C, given every target of the reach test, gates each whole-flow and firmware job; the single-seat firmware case runs live on that test's record from the same job (gate WF17; no fingerprint changes) | reserved |
 
 <!-- review:milestone-numbers:end -->
 

@@ -29,9 +29,10 @@ name: Live evaluation
 # added and every tool required (.github/actions/live-eval-setup). Every job that runs one also runs the
 # credential test for seat C under fw.test (scripts/live_eval_fw_reach.py) as a gate (--require-denied) and uploads
 # its result: since M90 fw.test runs the program it builds, which holds seat C, as nirmaan-seat (through
-# nirmaan-seat-exec), and the job stops unless every probe is denied. A live trial of the register block flow stays
-# refused (exit 6) all the same; lifting that is a change of its own. No schedule can start one (gate WF13): this
-# workflow has none.
+# nirmaan-seat-exec), and the job stops unless every probe is denied. A firmware/ case runs the same test, and the
+# single-seat firmware case runs live only on that record from this job (FW_REACH; scripts/live_eval_ci.py,
+# SEAT_C_LIVE). A live trial of the register block flow stays refused (exit 6). No schedule can start one (gate
+# WF13): this workflow has none.
 on:
   workflow_dispatch:
     inputs:
@@ -113,12 +114,12 @@ jobs:
           mkdir -p "$RUNNER_TEMP/replay"
           python scripts/live_eval_reach.py --records "$RUNNER_TEMP/replay"
       # Decision 4 and the second addendum, decision 2, item 1: what compiled seat C can reach under fw.test in
-      # this job, for every whole-flow case. A gate since M90: every probe denied, or the job stops (see the header).
+      # this job, for every whole-flow and firmware case. A gate since M90: every probe denied, or the job stops.
       - name: Test what seat C can reach under fw.test
-        if: startsWith(inputs.case, 'flow/')
+        if: startsWith(inputs.case, 'flow/') || startsWith(inputs.case, 'firmware/')
         run: python scripts/live_eval_fw_reach.py --records "$RUNNER_TEMP/replay" --out "$RUNNER_TEMP/fw-reach/fw-reach.json" --require-denied
       - name: Upload the seat C reach record
-        if: always() && startsWith(inputs.case, 'flow/')
+        if: always() && (startsWith(inputs.case, 'flow/') || startsWith(inputs.case, 'firmware/'))
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: live-eval-fw-reach-replay-${{ github.run_id }}
@@ -213,12 +214,12 @@ jobs:
           mkdir -p "$RUNNER_TEMP/results"
           python scripts/live_eval_reach.py --records "$RUNNER_TEMP/results"
       # Decision 4 and the second addendum, decision 2, item 1: what compiled seat C can reach under fw.test in
-      # this job, for every whole-flow case. A gate since M90: every probe denied, or the job stops (see the header).
+      # this job, for every whole-flow and firmware case. A gate since M90: every probe denied, or the job stops.
       - name: Test what seat C can reach under fw.test
-        if: startsWith(inputs.case, 'flow/')
+        if: startsWith(inputs.case, 'flow/') || startsWith(inputs.case, 'firmware/')
         run: python scripts/live_eval_fw_reach.py --records "$RUNNER_TEMP/results" --out "$RUNNER_TEMP/fw-reach/fw-reach.json" --require-denied
       - name: Upload the seat C reach record
-        if: always() && startsWith(inputs.case, 'flow/')
+        if: always() && (startsWith(inputs.case, 'flow/') || startsWith(inputs.case, 'firmware/'))
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: live-eval-fw-reach-trials-${{ github.run_id }}
@@ -234,6 +235,7 @@ jobs:
         id: trials
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          FW_REACH: ${{ runner.temp }}/fw-reach/fw-reach.json
         run: python scripts/live_eval_ci.py trials --out "$RUNNER_TEMP/results"
       - name: Check the checkout did not change
         id: after
