@@ -1,0 +1,168 @@
+{
+  "answers": [
+    {
+      "cache_read_tokens": 620,
+      "cache_write_tokens": 15078,
+      "error": null,
+      "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+      "input_tokens": 2,
+      "mode": "work",
+      "model": "claude-opus-5-5",
+      "output_tokens": 13421,
+      "packet_sha256": "77a59624a74c64a4f5fcff9d5991e76a8ebe8a86b4d73e20baa366ede9af18bd",
+      "prompt_sha256": "023b3f7d6057539d5b261f9779c0cff2d3a99a9281febb17e5f3cb9f1bbc7f48",
+      "provider": "claude-code",
+      "text": "```json\n{\"uncertainty\": 0.3, \"outcome\": \"Self-checking constrained-random testbench for crc8_block delivered as tb/crc8_block_tb.v (top crc8_block_tb). It has not been run; the platform runs simulator.run over it with the approved RTL.\", \"artifacts\": [{\"kind\": \"testbench\", \"title\": \"Constrained-random self-checking testbench for crc8_block\", \"summary\": \"Serves [requirement:req-91ad500fdf]. A reference model written from the ports and behaviour clauses of [artifact:prj-dbb4754f2d.interface-spec.a1] drives a scoreboard against [artifact:prj-dbb4754f2d.design-under-test.a1]. The model uses a 9-bit x^8+x^2+x+1 reduction, a different form from the RTL's function. The scoreboard compares crc twice per cycle: 1 ns after inputs change at the falling edge (checks CRC-FINAL, no input-to-crc path) and 1 ns after each rising edge. A directed phase checks constants computed by hand from the spec: empty 0x00, byte 0x00 gives 0x0C, 0xFF gives 0xFF, 0x80 gives 0x85, 0x01 gives 0x0B, init beats valid, reset beats valid, and hold. Two random phases use a seeded xorshift32 generator and printed seed. Phase A has dense reloads; phase B has sparse reloads for long frames. The data generator is biased toward 0x00, 0xFF, 0x80 and 0x01. Coverage counters (bytes taken, init+valid, reset+valid, holds, long frames, corner bytes) fail the run if a corner was not reached.\"}], \"files\": [{\"path\": \"tb/crc8_block_tb.v\", \"kind\": \"testbench\", \"title\": \"crc8_block_tb: constrained-random scoreboard testbench\", \"summary\": \"Verilog-2001 testbench for [artifact:prj-dbb4754f2d.design-under-test.a1] against [artifact:prj-dbb4754f2d.interface-spec.a1], tracing [requirement:req-91ad500fdf]. It covers CRC-RESET, CRC-INIT, CRC-POLY, CRC-ORDER, CRC-HOLD, CRC-FINAL and CRC-EMPTY. It prints one NIRMAAN-SIM verdict line before $finish, and every compare adds to the passed or failed count.\", \"entry\": \"crc8_block_tb\"}], \"tool_runs\": [], \"claims\": [\"The hand-computed vectors are spec-derived arithmetic I did not run through a tool: from start value 0xFF, byte 0x00 gives crc 0x0C, 0xFF gives 0xFF, 0x80 gives 0x85 and 0x01 gives 0x0B, and byte 0x00 from running value 0x00 gives crc 0xFF.\", \"The plusarg that carries the run nonce is not named in the sections given. The testbench tries nonce=, NONCE=, nirmaan_nonce=, NIRMAAN_NONCE= and NIRMAAN_SIM_NONCE=, in that order. If the platform uses another name, the verdict line will carry the wrong nonce and the run will fail.\", \"The coverage thresholds were sized from expected rates at the fixed seed, not from an observed run.\"], \"escalation\": null, \"notes\": \"No tool was run by this seat. Things to check when the platform reports the simulator.run result: read the check count, not only pass, and confirm the nonce was picked up. If the gate reports a missing or mismatched nonce, the plusarg name is the cause; please send the correct name to verification.dynamic.testbench.tech_lead. Suggested follow-ups for the reviewer: planted mutants (polynomial 0x07 changed, byte bit order reversed, init priority below valid, final XOR removed) should each fail this testbench. The seed is the localparam SEED; change it to rerun at another seed.\"}\n```\n=== FILE: tb/crc8_block_tb.v ===\n// Constrained-random, self-checking testbench for crc8_block.\n// Requirement: Verify the existing CRC block RTL with constrained-random stimulus.\n// Reference model written from interface_spec.md sections 2.1-2.3, not from the RTL.\n// Inputs are driven at the falling edge; outputs are sampled 1 ns after each edge.\n`timescale 1ns / 1ps\nmodule crc8_block_tb;\n    reg        clk   = 1'b0;\n    reg        rst_n = 1'b0;\n    reg        init  = 1'b0;\n    reg        valid = 1'b0;\n    reg  [7:0] data  = 8'h00;\n    wire [7:0] crc;\n\n    crc8_block dut (\n        .clk   (clk),\n        .rst_n (rst_n),\n        .init  (init),\n        .valid (valid),\n        .data  (data),\n        .crc   (crc)\n    );\n\n    always #5 clk = ~clk;\n\n    // Knobs\n    localparam [31:0] SEED     = 32'h5EEDC8C8;\n    localparam integer CYCLES_A = 4000;  // dense reloads: init 1/16, reset 1/64\n    localparam integer CYCLES_B = 4000;  // sparse reloads: init 1/256, reset 1/512\n\n    reg [31:0]     rng;\n    reg [7:0]      model;     // the spec's running value\n    reg            armed;\n    integer        passed, failed;\n    integer        n_bytes, n_init_valid, n_rst_valid, n_hold, n_reload;\n    integer        n_long, frame_len, n_d00, n_dff, n_d80, n_d01;\n    integer        cyc;\n    reg [8*64-1:0] nonce;\n    reg            have_nonce;\n    reg            r_r, r_i, r_v, phase_b;\n    reg [7:0]      r_d;\n\n    // Spec 2.2: for each bit 7..0, XOR it into the top bit, shift left,\n    // and if the bit shifted out is 1, reduce by x^8 + x^2 + x + 1 (9'h107).\n    function [7:0] spec_take(input [7:0] run, input [7:0] b);\n        reg [8:0] w;\n        integer k;\n        begin\n            w = {1'b0, run};\n            for (k = 7; k >= 0; k = k - 1) begin\n                w[7] = w[7] ^ b[k];\n                w = w << 1;\n                if (w[8])\n                    w = w ^ 9'h107;\n            end\n            spec_take = w[7:0];\n        end\n    endfunction\n\n    task next_rng;\n        begin\n            rng = rng ^ (rng << 13);\n            rng = rng ^ (rng >> 17);\n            rng = rng ^ (rng << 5);\n        end\n    endtask\n\n    task check(input [7:0] got, input [7:0] exp, input [8*48-1:0] what);\n        begin\n            if (got === exp)\n                passed = passed + 1;\n            else begin\n                failed = failed + 1;\n                if (failed <= 20)\n                    $display(\"MISMATCH t=%0t %0s: got=%h expected=%h (rst_n=%b init=%b valid=%b data=%h)\",\n                             $time, what, got, exp, rst_n, init, valid, data);\n            end\n        end\n    endtask\n\n    task cover_check(input ok, input [8*48-1:0] what, input integer count);\n        begin\n            if (ok) begin\n                passed = passed + 1;\n                $display(\"COVER ok   %0s: %0d\", what, count);\n            end else begin\n                failed = failed + 1;\n                $display(\"COVER MISS %0s: %0d\", what, count);\n            end\n        end\n    endtask\n\n    // Check the DUT and the model against a constant computed from the spec.\n    task check_const(input [7:0] exp, input [8*48-1:0] what);\n        begin\n            check(crc, exp, what);\n            check(model ^ 8'hFF, exp, \"model vs hand-computed vector\");\n        end\n    endtask\n\n    task cycle(input r, input i, input v, input [7:0] d);\n        begin\n            @(negedge clk);\n            rst_n = r; init = i; valid = v; data = d;\n            // CRC-FINAL: crc follows the running value only, no edge yet.\n            #1 if (armed) check(crc, model ^ 8'hFF, \"no change before edge\");\n            @(posedge clk);\n            // Model update, priority per spec 2.1/2.2.\n            if (!r) begin\n                model = 8'hFF;\n            end else if (i) begin\n                model = 8'hFF;\n            end else if (v) begin\n                model = spec_take(model, d);\n            end\n            // Corner bookkeeping.\n            if (!r && v)       n_rst_valid  = n_rst_valid + 1;\n            if (r && i && v)   n_init_valid = n_init_valid + 1;\n            if (r && !i && !v) n_hold       = n_hold + 1;\n            if (r && !i && v) begin\n                n_bytes   = n_bytes + 1;\n                frame_len = frame_len + 1;\n                if (d == 8'h00) n_d00 = n_d00 + 1;\n                if (d == 8'hFF) n_dff = n_dff + 1;\n                if (d == 8'h80) n_d80 = n_d80 + 1;\n                if (d == 8'h01) n_d01 = n_d01 + 1;\n            end\n            if (!r || i) begin\n                n_reload = n_reload + 1;\n                if (frame_len >= 16) n_long = n_long + 1;\n                frame_len = 0;\n            end\n            #1 check(crc, model ^ 8'hFF, \"after edge\");\n            armed = 1'b1;\n        end\n    endtask\n\n    initial begin\n        passed = 0; failed = 0; armed = 1'b0;\n        n_bytes = 0; n_init_valid = 0; n_rst_valid = 0; n_hold = 0; n_reload = 0;\n        n_long = 0; frame_len = 0; n_d00 = 0; n_dff = 0; n_d80 = 0; n_d01 = 0;\n        model = 8'hFF;\n        rng = SEED;\n\n        have_nonce = 1'b1;\n        if (!$value$plusargs(\"nonce=%s\", nonce))\n        if (!$value$plusargs(\"NONCE=%s\", nonce))\n        if (!$value$plusargs(\"nirmaan_nonce=%s\", nonce))\n        if (!$value$plusargs(\"NIRMAAN_NONCE=%s\", nonce))\n        if (!$value$plusargs(\"NIRMAAN_SIM_NONCE=%s\", nonce))\n            have_nonce = 1'b0;\n\n        $display(\"crc8_block_tb: seed=%h cycles=%0d+%0d\", SEED, CYCLES_A, CYCLES_B);\n\n        // ---------------- Directed phase ----------------\n        // CRC-RESET, CRC-EMPTY\n        cycle(1'b0, 1'b0, 1'b0, 8'h00);\n        check_const(8'h00, \"CRC-EMPTY after reset\");\n        cycle(1'b0, 1'b1, 1'b1, 8'hA5);\n        check_const(8'h00, \"CRC-RESET with init and valid\");\n        // CRC-POLY: one byte 0x00 from start value\n        cycle(1'b1, 1'b0, 1'b1, 8'h00);\n        check_const(8'h0C, \"byte 00 from FF\");\n        // CRC-HOLD: valid low, data moving\n        cycle(1'b1, 1'b0, 1'b0, 8'h5A);\n        cycle(1'b1, 1'b0, 1'b0, 8'hC3);\n        check_const(8'h0C, \"CRC-HOLD\");\n        // CRC-INIT reload\n        cycle(1'b1, 1'b1, 1'b0, 8'h00);\n        check_const(8'h00, \"CRC-INIT reload\");\n        cycle(1'b1, 1'b0, 1'b1, 8'hFF);\n        check_const(8'hFF, \"byte FF from FF\");\n        cycle(1'b1, 1'b0, 1'b1, 8'h00);\n        check_const(8'hFF, \"byte 00 from 00\");\n        // CRC-INIT wins over a byte at the same edge\n        cycle(1'b1, 1'b1, 1'b1, 8'h3C);\n        check_const(8'h00, \"CRC-INIT wins over valid\");\n        // CRC-ORDER: bit 7 first, no reflection\n        cycle(1'b1, 1'b0, 1'b1, 8'h80);\n        check_const(8'h85, \"CRC-ORDER byte 80\");\n        cycle(1'b1, 1'b1, 1'b0, 8'h00);\n        cycle(1'b1, 1'b0, 1'b1, 8'h01);\n        check_const(8'h0B, \"CRC-ORDER byte 01\");\n        // Reset mid-frame with a byte offered\n        cycle(1'b1, 1'b0, 1'b1, 8'h77);\n        cycle(1'b0, 1'b0, 1'b1, 8'h77);\n        check_const(8'h00, \"CRC-RESET wins over valid\");\n        cycle(1'b1, 1'b0, 1'b0, 8'h00);\n        check_const(8'h00, \"CRC-EMPTY hold after reset\");\n\n        // ---------------- Constrained-random phase ----------------\n        for (cyc = 0; cyc < CYCLES_A + CYCLES_B; cyc = cyc + 1) begin\n            phase_b = (cyc >= CYCLES_A);\n            next_rng;\n            r_r = phase_b ? (rng[8:0] != 9'd0)   : (rng[5:0] != 6'd0);\n            r_i = phase_b ? (rng[19:12] == 8'd0) : (rng[15:12] == 4'd0);\n            r_v = (rng[21:20] != 2'd0);\n            case (rng[24:22])\n                3'd0:    r_d = 8'h00;\n                3'd1:    r_d = 8'hFF;\n                3'd2:    r_d = rng[25] ? 8'h80 : 8'h01;\n                default: begin next_rng; r_d = rng[7:0]; end\n            endcase\n            cycle(r_r, r_i, r_v, r_d);\n        end\n\n        // ---------------- Coverage closure ----------------\n        cover_check(n_bytes      >= 4000, \"bytes taken\",              n_bytes);\n        cover_check(n_init_valid >= 50,   \"init with valid same edge\", n_init_valid);\n        cover_check(n_rst_valid  >= 10,   \"reset with valid same edge\", n_rst_valid);\n        cover_check(n_hold       >= 500,  \"hold cycles\",              n_hold);\n        cover_check(n_reload     >= 100,  \"reloads\",                  n_reload);\n        cover_check(n_long       >= 5,    \"frames of 16+ bytes\",      n_long);\n        cover_check(n_d00        >= 100,  \"byte 00 taken\",            n_d00);\n        cover_check(n_dff        >= 100,  \"byte FF taken\",            n_dff);\n        cover_check(n_d80        >= 20,   \"byte 80 taken\",            n_d80);\n        cover_check(n_d01        >= 20,   \"byte 01 taken\",            n_d01);\n\n        if (!have_nonce) begin\n            failed = failed + 1;\n            nonce = \"missing\";\n            $display(\"ERROR: no nonce plusarg found\");\n        end\n        $display(\"NIRMAAN-SIM %0s %0d passed, %0d failed\", nonce, passed, failed);\n        $finish;\n    end\nendmodule\n=== END FILE ==="
+    }
+  ],
+  "format": "nirmaan.eval-trial",
+  "harness_variant": "default",
+  "judge_runs": [
+    {
+      "check": "The seat's testbench passes the approved RTL and fails each CRC block mutant",
+      "params": {
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-s2lomt_s/judge/check-1/must-fail-wio9jjy3/clean/crc8_block_tb.v",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-s2lomt_s/judge/check-1/must-fail-wio9jjy3/clean/crc8_block.v"
+        ],
+        "top": "crc8_block_tb"
+      },
+      "run": "run-0002",
+      "succeeded": true,
+      "summary": "icarus: simulation passed: 16063 checks passed, $finish reached at time 80156000, 0 errors",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The seat's testbench passes the approved RTL and fails each CRC block mutant",
+      "params": {
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-s2lomt_s/judge/check-1/must-fail-wio9jjy3/mutant-1-1/crc8_block_tb.v",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-s2lomt_s/judge/check-1/must-fail-wio9jjy3/mutant-1-1/crc8_block.v"
+        ],
+        "top": "crc8_block_tb"
+      },
+      "run": "run-0003",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: the testbench reports 14965 of 16063 checks failed",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The seat's testbench passes the approved RTL and fails each CRC block mutant",
+      "params": {
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-s2lomt_s/judge/check-1/must-fail-wio9jjy3/mutant-1-2/crc8_block_tb.v",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-s2lomt_s/judge/check-1/must-fail-wio9jjy3/mutant-1-2/crc8_block.v"
+        ],
+        "top": "crc8_block_tb"
+      },
+      "run": "run-0004",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: the testbench reports 14787 of 16063 checks failed",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The seat's testbench passes the approved RTL and fails each CRC block mutant",
+      "params": {
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-s2lomt_s/judge/check-1/must-fail-wio9jjy3/mutant-1-3/crc8_block_tb.v",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-s2lomt_s/judge/check-1/must-fail-wio9jjy3/mutant-1-3/crc8_block.v"
+        ],
+        "top": "crc8_block_tb"
+      },
+      "run": "run-0005",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: the testbench reports 16041 of 16063 checks failed",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The seat's testbench passes the approved RTL and fails each CRC block mutant",
+      "params": {
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-s2lomt_s/judge/check-1/must-fail-wio9jjy3/mutant-1-4/crc8_block_tb.v",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-s2lomt_s/judge/check-1/must-fail-wio9jjy3/mutant-1-4/crc8_block.v"
+        ],
+        "top": "crc8_block_tb"
+      },
+      "run": "run-0006",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: the testbench reports 7159 of 16063 checks failed",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The seat's testbench passes the approved RTL and fails each CRC block mutant",
+      "params": {
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-s2lomt_s/judge/check-1/must-fail-wio9jjy3/mutant-1-5/crc8_block_tb.v",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-s2lomt_s/judge/check-1/must-fail-wio9jjy3/mutant-1-5/crc8_block.v"
+        ],
+        "top": "crc8_block_tb"
+      },
+      "run": "run-0007",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: the testbench reports 13503 of 16063 checks failed",
+      "tool": "simulator.run"
+    }
+  ],
+  "knowledge": "on",
+  "model": "claude-opus-5-5",
+  "purpose": "evidence",
+  "record": "2026-11-19-claude-code-claude-opus-5-5-28",
+  "result": {
+    "attempts": 1,
+    "attestations": [],
+    "audit_ok": true,
+    "case": "dv/random-crc",
+    "case_digest": "sha256:027f42e941e8251caec8bba8e84951fedbefc02dd7896bad596ce6b901b21c22",
+    "cli": "2.1.325",
+    "cost_usd": null,
+    "detail": "No tool was run by this seat. Things to check when the platform reports the simulator.run result: read the check count, not only pass, and confirm the nonce was picked up. If the gate reports a missing or mismatched nonce, the plusarg name is the cause; please send the correct name to verification.dynamic.testbench.tech_lead. Suggested follow-ups for the reviewer: planted mutants (polynomial 0x07 changed, byte bit order reversed, init priority below valid, final XOR removed) should each fail this testbench. The seed is the localparam SEED; change it to rerun at another seed.",
+    "duration_s": 119.158,
+    "gate_runs": [
+      {
+        "run": "run-0001",
+        "succeeded": true,
+        "summary": "icarus: simulation passed: 16063 checks passed, $finish reached at time 80156000, 0 errors",
+        "tool": "simulator.run"
+      }
+    ],
+    "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+    "input_tokens": 2,
+    "model_calls": 1,
+    "output_tokens": 13421,
+    "passed": true,
+    "replay": false,
+    "runtime": "claude-code",
+    "sandbox": "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-s2lomt_s",
+    "scores": [
+      {
+        "failed_runs": [
+          "run-0003",
+          "run-0004",
+          "run-0005",
+          "run-0006",
+          "run-0007"
+        ],
+        "name": "The seat's testbench passes the approved RTL and fails each CRC block mutant",
+        "runs": [
+          "run-0002"
+        ],
+        "scorer": "must-fail",
+        "status": "passed",
+        "summary": "simulator.run run-0002 passed on the clean inputs; 5 of 5 mutants failed it"
+      }
+    ],
+    "seat": "prj-dbb4754f2d:testbench",
+    "seat_status": "in_review",
+    "started_at": "2026-11-19T03:06:09.135996Z",
+    "submitted": true,
+    "tool_calls": [],
+    "version": "1.25.0"
+  },
+  "skills": {
+    "constrained_random": "sha256:7e497fa212251a326867483715ab77db71f8afe73c11a2844f300155bea3b8a7",
+    "directed_testing": "sha256:6bf35095b83cbd9b641919c5b59bacdf5fc87ce7c569c2ad7df593ecddff70d6"
+  },
+  "stage": "testbench",
+  "trial": 1,
+  "version": 1
+}
