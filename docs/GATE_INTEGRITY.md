@@ -204,6 +204,24 @@ Its code is in no harness fingerprint (as the scorers are not): an edit to it
 changes what the whole-flow judge refuses without a fingerprint change, so
 every refusal names the screen in its summary and the record keeps it.
 
+**The compile screen (M91, gate SC1): what C may pull in.** Council record
+`council/records/2026-11-19-seat-c-live-refusal.md`, decision 4. Seat C is
+compiled and assembled as the runner, so an include of the reference driver
+by an absolute or `..` path, or an `.incbin` of any file the runner can read,
+compiled clean (fact 9). Since M91 every backend that compiles the C a job
+names (`fw.build`, `fw.test`, `fw.cross_build`, `fw.soc_test`), and the object
+screen above, first runs `nirmaan.integrations.compile_screen`: it refuses a
+directive outside a short list (so `#line` and line markers), an absolute or
+`..` include, a file the compiler pulls in from outside the run's folders and
+its own include folders, and an asm statement or a file-reading assembler
+directive in the compiler's assembly. A refusal is a failed run with nothing
+compiled. **This gate changed without a fingerprint change:** the screen is
+in the shared tools' backends, which no fingerprint digests, so a record's
+fingerprint does not say whether it ran; a refusal names the screen in its
+summary. Every committed fixture, reference answer and held-out test passes
+it and keeps its result (`tests/test_compile_screen.py`). Design, the recorded
+must-refuse fixtures and what it does not do: `docs/COMPILE_SCREEN.md`.
+
 ---
 
 ## 4. The runner (F16, F3, F22, F9, and the parallel-build flake)

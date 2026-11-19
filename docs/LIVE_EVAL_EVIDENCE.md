@@ -278,6 +278,15 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   seat is `firmware`, whose held-out checks use `fw.build` or `fw.test`, or a
   whole flow with a `firmware` stage) with exit 6 before any trial. A replay
   of such a case still runs: its code is the reference answer.
+- **The compile screen** (M91, gate SC1 of
+  `council/records/2026-11-19-seat-c-live-refusal.md`, decision 4). Seat C is
+  compiled and assembled as the runner. Before anything of a job is compiled,
+  every backend that compiles its C refuses `#line` and line markers, an
+  include written with an absolute or `..` path, a file the compiler pulls in
+  from outside the run's folders and its own include folders, and an asm
+  statement or a file-reading assembler directive in the compiler's assembly
+  (`docs/COMPILE_SCREEN.md`, which also lists what it does not do). It does
+  not lift the refusal above.
 - **The credential test for seat C** (`scripts/live_eval_fw_reach.py`, G3
   record, decision 4 and second addendum, decision 2, item 1) runs in the
   `replay` and `live-eval` jobs of a whole-flow case, after the reach test and

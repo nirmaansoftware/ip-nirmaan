@@ -274,12 +274,34 @@ def _includes(paths: tuple[str, ...], hal: Path) -> list[str]:
     return [f"-I{d}" for d in (*dirs, str(hal))]
 
 
+def compile_flags(compiler: str, extra: tuple[str, ...], sources: tuple[str, ...], hal: Path,
+                  include: tuple[str, ...] = ()) -> list[str]:
+    """The compiler, its strict flags and its include path. ``include`` is searched after the sources' directories."""
+    includes = _includes(sources, hal)
+    return [compiler, *STRICT_FLAGS, *extra, *includes[:-1], *(f"-I{d}" for d in include), includes[-1]]
+
+
+def compile_problem(job: Job, compiler: str, extra: tuple[str, ...] = (), hal: Path = HARNESS,
+                    sources: tuple[str, ...] = (), harness: tuple[Path, ...] = ()) -> str | None:
+    """Why the C the job names may not be compiled (the compile screen, M91, gate SC1), or None.
+
+    The job's C files and headers, with the agreement unit of a ``map``, are screened as ``_compile`` will compile
+    them: ``sources`` adds files the build compiles that the job does not name (a runtime), whose folders are the
+    harness's, as ``harness`` and ``hal`` are."""
+    from nirmaan.integrations import compile_screen
+
+    added, include = register_map_sources(job)
+    named = (*job.sources, *added)
+    flags = compile_flags(compiler, extra, (*named, *sources), hal, include)
+    return compile_screen.screen(flags, named, named, (hal, *harness, *(Path(s).parent for s in sources)),
+                                 job.workdir)
+
+
 def _compile(compiler: str, extra: tuple[str, ...], sources: tuple[str, ...], hal: Path, out: Path,
              headers: bool, include: tuple[str, ...] = ()) -> tuple[list[list[str]], list[str]]:
     """The strict compile steps, and the objects they write. ``include`` is searched after the sources' directories."""
     c_files, h_files = _split(sources)
-    includes = _includes(sources, hal)
-    flags = [compiler, *STRICT_FLAGS, *extra, *includes[:-1], *(f"-I{d}" for d in include), includes[-1]]
+    flags = compile_flags(compiler, extra, sources, hal, include)
     out.mkdir(parents=True, exist_ok=True)
     steps = []
     for i, header in enumerate(h_files if headers else ()):
@@ -507,7 +529,11 @@ def cosim_bus(job: Job) -> tuple[str, str | None]:
 
 
 def _cosim_check(job: Job) -> str | None:
-    return map_problem(job) or cosim_bus(job)[1] or require_problem(job)
+    return map_problem(job) or cosim_bus(job)[1] or require_problem(job) or compile_problem(job, "cc")
+
+
+def _build_check(job: Job) -> str | None:
+    return map_problem(job) or compile_problem(job, "cc")
 
 
 def _cosim_steps(job: Job) -> list[list[str]]:
@@ -545,7 +571,7 @@ register_cosim_bus("axi4-lite", HARNESS / "axil_manager.cpp")
 register_cosim_bus("apb", HARNESS / "apb_manager.cpp")
 
 register_backend(Backend("host-cc", "fw.build", ("cc",), build_steps("cc"), _parse_build, files=("map",),
-                         check=map_problem))
+                         check=_build_check))
 # fw.build's riscv-gcc backend is registered by firmware_riscv.py, from the one RISC-V GCC definition (M53).
 register_backend(Backend("verilator-cosim", "fw.test", ("cc", "verilator", "make"), _cosim_steps, _parse_cosim,
                          ("sources", "rtl"), files=("map",), check=_cosim_check))
