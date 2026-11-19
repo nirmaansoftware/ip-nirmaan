@@ -24,6 +24,10 @@ on:
         description: "shadow only: the pull request number"
         type: string
         default: ""
+      chain:
+        description: "set by the loop's redispatch job only: <n>:<digest> of the chained pass before; leave empty"
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -41,6 +45,8 @@ jobs:
     runs-on: ubuntu-24.04
     environment: review-loop
     timeout-minutes: 60
+    outputs:
+      next: ${{ steps.ready.outputs.next }}
     env:
       MODE: ${{ inputs.mode || 'loop' }}
     steps:
@@ -137,6 +143,7 @@ jobs:
           if [ "$MODE" = check ]; then exec python scripts/loop_cloud.py auth-check --deny-probe; fi
           exec python scripts/loop_cloud.py auth-check
       - name: Run the loop once
+        id: run
         if: steps.work.outputs.work == 'true' && env.MODE != 'check'
         timeout-minutes: 50
         env:
@@ -159,3 +166,35 @@ jobs:
           (umask 077; printf '%s\n' "$STATE_KEY" > "$key")
           export GIT_SSH_COMMAND="ssh -i $key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$RUNNER_TEMP/known_hosts"
           python3 scripts/loop_cloud.py push --clone "$STATE_CLONE" --state-dir "$NIRMAAN_REVIEW_STATE_DIR"
+      # After the state is pushed: a step ready now (CI finished during the pass, a branch behind
+      # main after a merge, a pull request the pass left for the next one) starts the next pass at
+      # once, at most loop_cloud.CHAIN_MAX in a row and never twice on the same ready set; else the
+      # dispatcher's next tick. The App token reads only; nothing here holds a secret.
+      - name: Ready now?
+        id: ready
+        if: env.MODE == 'loop' && steps.run.outcome == 'success'
+        env:
+          NIRMAAN_REVIEW_APP_TOKEN: ${{ steps.app.outputs.token }}
+          CHAIN: ${{ inputs.chain }}
+        run: python3 scripts/loop_cloud.py ready-now --state-dir "$NIRMAAN_REVIEW_STATE_DIR" --chain "$CHAIN"
+
+  # The next pass, queued at once: the workflow-level concurrency group holds it until this run
+  # ends, so two passes never run at once. Its only permission is actions: write, to dispatch this
+  # workflow on main (a workflow_dispatch with the workflow token starts a run); no checkout, no
+  # secret, no model.
+  redispatch:
+    needs: review-loop
+    if: needs.review-loop.outputs.next != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - name: Start the next pass
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NEXT: ${{ needs.review-loop.outputs.next }}
+        run: |
+          [[ "$NEXT" =~ ^[0-9]{1,3}:[0-9a-f]{12}$ ]] || { echo "bad chain value"; exit 1; }
+          gh workflow run review-loop.yml --repo "$GITHUB_REPOSITORY" --ref main -f mode=loop -f chain="$NEXT"
+          echo "dispatched chained pass $NEXT"

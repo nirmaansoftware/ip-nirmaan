@@ -11,6 +11,16 @@ the number in `docs/ROADMAP.md` ("Milestone numbers") before cutting a branch.
 Parts of one numbered batch take a letter after the number (`M27-c-...`), and
 work between milestones is `MNN-side-<n>-...` after the milestone it followed.
 
+**Adding to an entry.** A later pull request on a milestone that already has
+its file does not edit the file (parallel pull requests that appended to the
+same file kept conflicting). It adds a fragment,
+`docs/history/fragments/MNN-<slug>/<YYYY-MM-DD>-<topic>.md`, with no index line:
+one or a few paragraphs in the file's style (a bold lead-in, no heading). The
+milestone's history is the file and then its fragments in name order:
+`python scripts/history.py show MNN-<slug>`. `scripts/history.py check` (run
+by `tests/test_status_docs.py`) holds the names. What the files said before
+fragments stays where it is.
+
 The original preface of the section:
 
 > The project was built "brick by brick" - each milestone is a complete,

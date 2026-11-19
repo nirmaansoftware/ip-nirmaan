@@ -47,7 +47,15 @@ A milestone adds its own `docs/history/MNN-<slug>.md` and a line in
 `docs/history/README.md`. It does **not** append to `context.md`, and it does
 not edit numbers in the roadmap by hand. Two parallel PRs then touch different
 new files; the only shared line is the README index, where a conflict is two
-adjacent lines and is resolved by keeping both. `context.md` changes only when
+adjacent lines and is resolved by keeping both. A milestone with many pull
+requests (M87 had over ten) had them all append to its one file, which
+conflicted again and again; so a later pull request on a milestone adds its
+own fragment, `docs/history/fragments/MNN-<slug>/<YYYY-MM-DD>-<topic>.md`
+(paragraphs, no heading, no index line), and never edits the milestone's
+file. `python scripts/history.py show MNN-<slug>` prints the file and then its
+fragments in name order; `scripts/history.py check`, run by
+`tests/test_status_docs.py`, refuses a folder that names no history file, a
+misnamed or empty fragment, and a heading in one. `context.md` changes only when
 a current fact changes (a new top-level package, a new operational rule), which
 is rare and deliberate. This rule is written into `CLAUDE.md` ("Milestones ship
 complete").
