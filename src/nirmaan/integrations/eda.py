@@ -91,6 +91,12 @@ TEXT_CAP = 2000
 METRICS_CAP = 2**20
 #: M88: set to anything but empty or 0 and no temporary run directory or eval sandbox is removed (debugging).
 KEEP_ENV = "NIRMAAN_KEEP_RUN_DIRS"
+#: The most build jobs a Verilator build starts (``-j N``), read where its command is made. Unset, empty, 0 or not a
+#: whole number: ``-j 0``, one job per core, as before. The review loop's checks set it, so a machine running several
+#: test shards and reviews at once does not run out of memory (decision #32 of 2026-11-19). ``fw.test``'s
+#: co-simulation build keeps ``-j 0``: gate WF14's guard pins its options word for word
+#: (``tests/test_nirmaan_firmware_reach.py``), and a change there is the council's return condition.
+VERILATOR_JOBS_ENV = "NIRMAAN_VERILATOR_JOBS"
 
 #: Environment variables no tool run sees (M53): code a seat wrote runs in these steps, and what it prints
 #: lands in logs and records, so a credential in its environment could be copied out.
@@ -683,9 +689,15 @@ def _icarus(job: Job) -> list[list[str]]:
             ["vvp", "-n", "sim.vvp", NONCE_ARG + new_nonce()]]
 
 
+def verilator_jobs() -> str:
+    """``-j``'s value for a Verilator build: ``VERILATOR_JOBS_ENV`` when it is a whole number above 0, else ``0``."""
+    value = os.environ.get(VERILATOR_JOBS_ENV, "").strip()
+    return str(int(value)) if value.isdigit() and int(value) > 0 else "0"
+
+
 def _verilator_sim(job: Job) -> list[list[str]]:
     _expect(job)
-    return [["verilator", "--binary", "-Wno-fatal", "-j", "0", "--top-module", str(job.top),
+    return [["verilator", "--binary", "-Wno-fatal", "-j", verilator_jobs(), "--top-module", str(job.top),
              "-Mdir", "obj", *job.sources],
             [str(job.workdir / "obj" / f"V{job.top}"), NONCE_ARG + new_nonce()]]
 
@@ -841,7 +853,8 @@ def _verilator_coverage(job: Job) -> list[list[str]]:
     main = job.workdir / "coverage_main.cpp"
     main.write_text(COVERAGE_MAIN.format(top=job.top, data=json.dumps(str(raw))), encoding="utf-8")
     return [["verilator", "--cc", "--exe", "--build", "--timing", "--coverage-line", "--coverage-toggle",
-             "-Wno-fatal", "-j", "0", "--top-module", str(job.top), "-Mdir", "obj", str(main), *job.sources],
+             "-Wno-fatal", "-j", verilator_jobs(), "--top-module", str(job.top), "-Mdir", "obj", str(main),
+             *job.sources],
             [str(job.workdir / "obj" / f"V{job.top}"), NONCE_ARG + new_nonce()],
             ["verilator_coverage", "--write", str(data), str(raw)],
             ["verilator_coverage", "--write-info", str(job.workdir / COVERAGE_INFO), str(data)]]
