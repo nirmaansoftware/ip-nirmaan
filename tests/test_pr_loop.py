@@ -86,6 +86,9 @@ class FakeGitHub:
         self.auto_merge_allowed, self.settings_error = gh.get("auto_merge_allowed", "true"), gh.get("settings_error")
         self.labels = list(gh.get("labels", []))
         self.merge_error, self.body = gh.get("merge_error"), "Changes line two."
+        # GitHub auto-merged the pull request just before the loop's own `gh pr merge` call.
+        self.merged_first = gh.get("merged_first", False)
+        self.merged_at = None
         self.ci = gh.get("ci", lambda sha: "success")
         self.draft, self.author, self.mergeable = gh.get("draft", False), gh.get("author", "patel-om"), gh.get("mergeable", True)
         # GitHub's mergeable_state "behind" (main has commits the branch lacks
@@ -102,7 +105,7 @@ class FakeGitHub:
     def get_pull(self, n):
         head = self.head()
         sh(self.origin, "update-ref", "refs/pull/1/head", head)  # GitHub keeps this in step with the branch
-        return {"number": 1, "state": "open", "draft": self.draft, "title": "Change app", "body": self.body, "author": self.author,
+        return {"number": 1, "state": "closed" if self.merged_at else "open", "merged_at": self.merged_at, "draft": self.draft, "title": "Change app", "body": self.body, "author": self.author,
                 "labels": list(self.labels), "head_sha": head, "head_ref": "feature", "head_repo": CONFIG["repo"],
                 "base_ref": "main", "base_repo": CONFIG["repo"], "mergeable": self.mergeable,
                 "mergeable_state": "dirty" if self.mergeable is False else
@@ -129,6 +132,10 @@ class FakeGitHub:
                 raise subprocess.CalledProcessError(1, ["gh", *args], output="", stderr=self.settings_error)
             return f"{self.auto_merge_allowed}\n"
         self.merges.append(args)
+        if self.merged_first:
+            self.merged_at = "2026-11-19T10:00:00Z"
+            raise subprocess.CalledProcessError(1, ["gh", *args], output="",
+                                                stderr="GraphQL: Pull Request is not mergeable (enablePullRequestAutoMerge)")
         if self.merge_error:
             raise subprocess.CalledProcessError(1, ["gh", *args], output="", stderr=self.merge_error)
 
@@ -366,6 +373,20 @@ def test_both_keys_pass_and_any_other_merge_error_stops_with_needs_founder(repo)
     last = r.comments()[-1]
     assert "Automated loop stopped" in last and "gh pr merge --auto failed (exit 1)" in last and "Head branch was modified" in last
     assert not any("Auto-merge is on" in c or "### Automated loop: ready" in c for c in r.comments())
+
+
+def test_github_merged_the_pull_request_first_so_the_failed_merge_call_is_done_not_a_stop(repo):
+    r = repo(gh={"merged_first": True})
+    assert r.tick() == ["auto-merge"]
+    assert len(r.github.merges) == 1
+    assert not r.labeled(), "no needs-founder on a merged pull request"
+    assert not any("Automated loop stopped" in c for c in r.comments())
+
+
+def test_a_not_mergeable_error_on_a_pull_request_still_open_stops_as_before(repo):
+    r = repo(gh={"merge_error": "GraphQL: Pull Request is not mergeable (enablePullRequestAutoMerge)"})
+    assert r.tick() == ["stopped"]
+    assert r.labeled()
 
 
 @pytest.mark.parametrize("error", ["GraphQL: Base branch was modified. Review and try the merge again. (mergePullRequest)",
