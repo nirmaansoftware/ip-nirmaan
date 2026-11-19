@@ -246,10 +246,13 @@ def test_the_account_gets_no_read_access_to_the_named_folders_and_no_network(tmp
     monkeypatch.setattr(seat.shutil, "which", lambda name: f"/usr/sbin/{name}")
     seat.deny(999, [str(tmp_path)])
     assert calls[0] == ["setfacl", "-m", "u:nirmaan-seat:---", "--", str(tmp_path)]
-    rule = ["OUTPUT", "-m", "owner", "--uid-owner", "999", "-j", "DROP"]
-    for tool in ("iptables", "ip6tables"):  # checked, inserted first in the chain, and checked again
-        assert [c for c in calls if c[0] == tool] == [[tool, "-C", *rule], [tool, "-I", "OUTPUT", "1", *rule[1:]],
-                                                     [tool, "-C", *rule]]
+    owner = ["-m", "owner", "--uid-owner", "999"]
+    for tool, answer in (("iptables", "icmp-host-prohibited"), ("ip6tables", "icmp6-adm-prohibited")):
+        tcp = ["OUTPUT", "-p", "tcp", *owner, "-j", "REJECT", "--reject-with", answer]
+        drop = ["OUTPUT", *owner, "-j", "DROP"]
+        # each checked, inserted first in the chain in order where missing, then both checked again
+        assert [c for c in calls if c[0] == tool] == [[tool, "-C", *tcp], [tool, "-I", "OUTPUT", "1", *tcp[1:]],
+                                                     [tool, "-C", *drop], [tool, "-C", *tcp], [tool, "-C", *drop]]
     (tmp_path / "file").write_text("x")
     (tmp_path / "link").symlink_to(tmp_path)
     for path in (tmp_path / "file", tmp_path / "link", tmp_path / "none"):
@@ -388,6 +391,9 @@ def test_a_refused_or_timed_out_connection_is_not_a_denial(monkeypatch, capsys):
     assert "REACH NOT DENIED: udp 127.0.0.53 port 53: sent" in out
     outcomes.update({("127.0.0.1", 9): OSError(errno.EPERM, "x"), ("127.0.0.53", 53): OSError(errno.EPERM, "x")})
     _drive(_probes(config, monkeypatch)["reach_no_network"](None))
-    outcomes[("1.1.1.1", 443)] = OSError(errno.ENETUNREACH, "x")  # IPv4 without a route is not shown denied
-    with pytest.raises(AssertionError):
-        _drive(_probes(config, monkeypatch)["reach_no_network"](None))
+    outcomes[("127.0.0.1", 9)] = OSError(errno.EHOSTUNREACH, "x")  # the rule's "prohibited" answer to TCP
+    _drive(_probes(config, monkeypatch)["reach_no_network"](None))
+    for kind_errno in (errno.ENETUNREACH, errno.ETIMEDOUT):  # IPv4 without a route, or a timeout: not shown denied
+        outcomes[("1.1.1.1", 443)] = OSError(kind_errno, "x")
+        with pytest.raises(AssertionError):
+            _drive(_probes(config, monkeypatch)["reach_no_network"](None))

@@ -55,8 +55,9 @@ CANARY_SECRET, CANARY_PLAIN = "CLAUDE_CODE_OAUTH_TOKEN", "NIRMAAN_REACH_CANARY"
 #: The probe tests, by name; each must be in cocotb's results and pass.
 PROBES = ("reach_identity", "reach_no_sudo", "reach_no_write", "reach_no_credential", "reach_no_signal",
           "reach_no_read", "reach_no_network", "reach_own_directory")
-#: Where the network probe tries to go: (kind, address, port). Each is denied only on EPERM or EACCES (the seat
-#: account's packets are dropped, ``scripts/live_eval_seat.py``), or, for IPv6, on ENETUNREACH (no route at all).
+#: Where the network probe tries to go: (kind, address, port). Each is denied only on EPERM or EACCES, or, for TCP,
+#: EHOSTUNREACH, the "prohibited" answer the seat account's rule gives at once (``scripts/live_eval_seat.py``; on the
+#: loopback address nothing else gives it), and for IPv6 ENETUNREACH (no route at all). A timeout proves nothing.
 NETWORK = (("tcp", "1.1.1.1", 443), ("tcp6", "2606:4700:4700::1111", 443), ("tcp", "127.0.0.1", 9),
            ("udp", "127.0.0.53", 53))
 #: The programs gates run (eda.py backends) and the harness's own entry point.
@@ -189,7 +190,8 @@ async def reach_no_network(dut):
             else:
                 sock.connect((host, port))
         except OSError as exc:
-            denied = exc.errno in DENIED or (kind == "tcp6" and exc.errno == errno.ENETUNREACH)
+            denied = (exc.errno in DENIED or (kind != "udp" and exc.errno == errno.EHOSTUNREACH)
+                      or (kind == "tcp6" and exc.errno == errno.ENETUNREACH))
             ok.append(_say(denied, f"{kind} {host} port {port}", f"{type(exc).__name__} errno {exc.errno}"))
         else:
             ok.append(_say(False, f"{kind} {host} port {port}", "sent" if kind == "udp" else "connected"))

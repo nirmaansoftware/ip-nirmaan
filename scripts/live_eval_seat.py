@@ -12,7 +12,8 @@ The account may not read what the judge keeps from it: ``install`` gives it an A
 each folder named by ``--deny-read`` (the workflow names the runner's home, the checkout and the runner's
 temporary folder, so every reference answer, held-out test and mutant in the checkout), whatever the folders'
 modes allow other accounts. And it has no network: every packet the account sends, IPv4 or IPv6, loopback
-included, is dropped (an ``owner`` rule first in ``OUTPUT``), so a connection or a datagram fails with EPERM. The
+included, is stopped (``owner`` rules first in ``OUTPUT``): a TCP connection is refused at once with an ICMP
+"prohibited" answer, and any other packet is dropped, so its send fails with EPERM. The
 reach test (``scripts/live_eval_reach.py``) probes both.
 
 Modes, each run by the workflow or by the wrapper:
@@ -330,9 +331,14 @@ def deny_read_argv(path: str) -> list[str]:
     return ["setfacl", "-m", f"u:{SEAT}:---", "--", path]
 
 
-def network_rule(uid: int) -> list[str]:
-    """The ``OUTPUT`` rule that drops every packet of ``uid``: a send fails with EPERM."""
-    return ["OUTPUT", "-m", "owner", "--uid-owner", str(uid), "-j", "DROP"]
+def network_rules(uid: int, tool: str) -> list[list[str]]:
+    """The ``OUTPUT`` rules, in order, that stop every packet of ``uid``: a TCP connection is refused at once with an
+    ICMP "prohibited" answer (a dropped one would only time out, which proves nothing), and every other packet is
+    dropped, so its send fails with EPERM."""
+    prohibited = "icmp6-adm-prohibited" if tool == "ip6tables" else "icmp-host-prohibited"
+    owner = ["-m", "owner", "--uid-owner", str(uid)]
+    return [["OUTPUT", "-p", "tcp", *owner, "-j", "REJECT", "--reject-with", prohibited],
+            ["OUTPUT", *owner, "-j", "DROP"]]
 
 
 def deny(uid: int, unreadable: Sequence[str]) -> None:
@@ -345,10 +351,12 @@ def deny(uid: int, unreadable: Sequence[str]) -> None:
     for tool in FIREWALLS:
         if shutil.which(tool) is None:
             raise Refused(f"{tool} is not installed")
-        rule = network_rule(uid)
-        if subprocess.run([tool, "-C", *rule], capture_output=True).returncode != 0:
-            subprocess.run([tool, "-I", rule[0], "1", *rule[1:]], check=True)
-        subprocess.run([tool, "-C", *rule], check=True)
+        rules = network_rules(uid, tool)
+        for position, rule in enumerate(rules, start=1):
+            if subprocess.run([tool, "-C", *rule], capture_output=True).returncode != 0:
+                subprocess.run([tool, "-I", rule[0], str(position), *rule[1:]], check=True)
+        for rule in rules:
+            subprocess.run([tool, "-C", *rule], check=True)
 
 
 def install(source: Path, trees: Sequence[str] = (), folders: Sequence[str] = (),
