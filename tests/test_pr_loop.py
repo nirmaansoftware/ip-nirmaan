@@ -1571,11 +1571,13 @@ def _shard_project(root: Path, tests: dict):
         write(root, name, body)
 
 
-def test_the_real_test_check_is_split_into_cis_three_shards():
+def test_the_real_test_check_is_split_into_the_local_three_shards_on_cis_weights():
     check = next(c for c in pr_loop.LOOP["checks"] if c["name"] == "test")
     assert check["shards"] == {"count": 3, "profile": "test"} and check["select"] == "related_tests"
     ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
-    assert 'shard: [1, 2, 3]' in ci and '--shard "$SHARD/3" --shard-profile test' in ci, "the same split as CI's test job"
+    # CI runs more shards than the loop's one machine (see docs/TEST_CI_HARDENING.md section 8); the
+    # profile and weights are the same, so the split differs only in its count.
+    assert '--shard-profile test' in ci, "the same weights as CI's test job"
     assert "test" in json.loads((ROOT / "scripts" / "shard_weights.json").read_text())
 
 

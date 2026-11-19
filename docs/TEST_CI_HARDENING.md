@@ -246,3 +246,27 @@ Not changed, and why: the physical-design jobs cannot start only on relevant pat
 because `test-union` reads their reports to prove every test ran, and a required
 check that does not report blocks the merge; they run in parallel with the test
 shards, so they are not on the critical path.
+
+### Four test shards (2026-11-19)
+
+The balance above did not last. The flow testbench copies grew (the timer copy to 44,959
+checks, the register block to 8,357), so the same suite went from about 1630 s to 2030 s of
+tests (CI run 44460935888, main at 7d1cb0e), and the old weights, which did not know the new
+costs, left shard 1/3 at 24.5 minutes on one pull request run against 11 for shard 2/3. Same
+fix as before, with one more shard, and nothing is tested less:
+
+- `scripts/shard_weights.json` is regenerated from that run's JUnit reports (the three test
+  shards and the two physical-design shards). The biggest changes: `test_whole_flow_cases.py`
+  100 to 154 s, `test_whole_flow_controls.py` 133 to 197 s, `test_nirmaan_factory_e2e.py` 91 to 137 s.
+- `test-shard` runs as four shards (`test (shard K/4)`). Three balanced shards would still keep
+  about 680 s of tests each (over 11 minutes, before the 3 to 4 minute setup); four keep
+  about 510 s each. The required check names are unchanged: the branch ruleset requires
+  `test`, `no-tools`, `physical-design`, `test-union`, `dashes` and the two review contexts,
+  never an individual shard, so no required name is dropped or added. `test` still fails
+  unless all four shards passed and `scripts/shards.py` finds they kept every collected
+  test exactly once, and `test-union` reads all four JUnit reports (`junit-test-*`).
+- No file or test dominates: the largest file is `test_seat_tools.py` (253 s, an eighth of the
+  suite) and the largest single test is the per-tag mutant sweep (153 s), both well under one
+  shard's 510 s, so the split stays by whole file and no test is moved to its own job.
+- The review loop's own local run of `test` keeps its three shards (`scripts/pr_loop.py`, one
+  machine); it reads the same weights.

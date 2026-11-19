@@ -103,6 +103,23 @@ def test_a_milestone_reads_as_its_file_then_its_fragments_in_name_order(tmp_path
     assert all(p.parent == HISTORY for p in _history_files())
 
 
+def test_the_whole_flow_index_links_every_part_once() -> None:
+    """docs/WHOLE_FLOW.md is an index of the parts in docs/whole_flow/, so
+    parallel pull requests edit different files; gate status is one file per gate."""
+    index = (ROOT / "docs" / "WHOLE_FLOW.md").read_text(encoding="utf-8")
+    parts = ROOT / "docs" / "whole_flow"
+    links = re.findall(r"\]\(whole_flow/([^)]+\.md)\)", index)
+    assert sorted(links) == sorted(p.name for p in parts.glob("*.md")) and len(links) == len(set(links))
+    assert not re.search(r"^## (?!Parts$)", index, re.M), "the parts live in docs/whole_flow/, not here"
+    for path in parts.glob("*.md"):
+        assert re.fullmatch(r"\d\d-[a-z0-9-]+\.md", path.name), path.name
+        assert path.read_text(encoding="utf-8").startswith("# "), path.name
+    gates = sorted(p.name for p in (parts / "gates").iterdir())
+    assert gates and all(re.fullmatch(r"WF\d\d\.md", g) for g in gates), gates
+    for g in gates:
+        assert (parts / "gates" / g).read_text(encoding="utf-8").startswith(f"# WF{int(g[2:4])}\n"), g
+
+
 def test_the_convention_names_fragments() -> None:
     for path in ("CLAUDE.md", "docs/STATUS_DOCS.md", "docs/history/README.md"):
         assert "docs/history/fragments/" in (ROOT / path).read_text(encoding="utf-8"), path
