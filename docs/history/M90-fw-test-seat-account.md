@@ -32,10 +32,11 @@ it with `--require-denied`, which also fails when `fw.test` found no wrapper.
 
 **What stays.** The compile and link steps of `fw.build` and `fw.test` run
 the compiler as the runner over the seat's C (they run none of it); that
-residual is open for the security seat. A live trial of a case that runs
-seat C is still refused (exit 6); lifting that is a change of its own (for
-the register block flow, after gates WF15 to WF19 and the dated plan
-addition). The committed credential record is still the one from before
+residual is open (`council/records/2026-11-19-seat-c-live-refusal.md`, fact 9 and decision 4; gate SC1). A live trial
+of a case that runs seat C is still refused (exit 6). The same record keeps
+the refusal: a lift of the single-seat case waits for gates SC1 to SC7 in a
+pull request of its own, and the register block flow also for gates WF15 to
+WF19 and the dated plan addition. The committed credential record is still the one from before
 M90; a new one, from a replay on `main`, follows in its own pull request.
 
 **Every job that runs seat C (gate WF17).** The workflow runs the
@@ -43,8 +44,9 @@ credential test for `firmware/` cases as well as whole-flow ones, the
 `rejudge` job runs it as a gate too, and the replay and re-judge steps first
 run `scripts/live_eval_ci.py confined`: exit 6 for a case that runs seat C
 unless that job's own record (`--require-denied`, of that run, attempt, job
-and commit) shows it confined, so a skipped or failed credential test never
-lets seat C run.
+and commit) shows every probe denied, so seat C never executes after a
+skipped or failed credential test. The council ratified this re-judge gate
+and read WF17 (`council/records/2026-11-19-seat-c-live-refusal.md`, decision 3).
 
 **No fingerprint change.** The files changed are outside `harness.CODE`,
 `LOOP_CODE` and `FLOW_CODE`, and no tool definition changes. With Claude Code

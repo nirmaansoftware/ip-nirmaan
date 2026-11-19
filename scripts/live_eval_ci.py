@@ -11,9 +11,9 @@ owner's machine. The workflow calls this script in two ways:
   own record. It stops at once on exit 3 (a trial with no model answer, as on a plan or usage limit, RR5) or a
   limit line in the output, on any exit but 0 or 1, and when a record is not what was asked for. A stopped or
   failed trial is kept as it is and never run again; no later trial starts.
-- ``confined`` (gate WF17: every job that runs seat code): exit 6 unless the case named by CASE runs no seat C or
-  this job's credential test record (``FW_REACH``) shows it confined; the replay and re-judge steps run it before they
-  run seat code.
+- ``confined`` (gate WF17: every job that runs seat code; ``council/records/2026-11-19-seat-c-live-refusal.md``,
+  decision 3): exit 6 unless the case named by CASE runs no seat C or this job's credential test record
+  (``FW_REACH``) shows every probe denied; the replay and re-judge steps run it before they run seat code.
 - ``tree``: the checkout's tree hash (gate WF17): the commit, and every file git tracks or would add, plus every
   file under ``src/``, ``scripts/`` and ``evals/`` ignored or not, by path, type, mode and content. The workflow
   takes it before and after the trials and fails on any change; the counting re-judge refuses records from a job
@@ -22,8 +22,10 @@ owner's machine. The workflow calls this script in two ways:
 A live trial (``check --require-expected`` and ``trials``) of a case that runs seat-written C (``fw.build``,
 ``fw.test``, the firmware seat, or a whole flow with a firmware stage) is refused before anything runs. Since M90
 ``fw.test`` runs the program it builds as the seat account in these jobs (``scripts/live_eval_seat.py``), and the
-credential test (``scripts/live_eval_fw_reach.py --require-denied``) gates every job that runs seat C; lifting this
-refusal is a change of its own (for the register block flow, after gates WF15 to WF19 of the G3 council record).
+credential test (``scripts/live_eval_fw_reach.py --require-denied``) gates every job that runs seat C; seat C is still
+compiled as the runner. The refusal stays (``council/records/2026-11-19-seat-c-live-refusal.md``): lifting it for the
+single-seat case is a pull request of its own after gates SC1 to SC7, and the register block flow also waits for
+gates WF15 to WF19 of the G3 council record.
 
 A whole-flow case (``flow/...``, G3 council record 2026-11-17, decision 4) runs only when named, one trial per
 dispatch (each dispatch is one slot of the committed batch plan), on the default harness, in the whole-flow
@@ -120,8 +122,9 @@ def _cases() -> list:
 
 
 def fw_reach_problem(env: Mapping[str, str], head: str | None) -> str | None:
-    """Why the credential test record named by ``FW_REACH`` does not show, for this job, that seat C under
-    ``fw.test`` runs confined, or None. Every field is required; a record that says nothing proves nothing."""
+    """Why the credential test record named by ``FW_REACH`` does not show, for this job, every probe denied for seat
+    C under ``fw.test`` (it executes as the seat account), or None. Every field is required; a record that says
+    nothing proves nothing."""
     where = env.get(FW_REACH_ENV, "").strip()
     if not where:
         return f"no credential test record ({FW_REACH_ENV} is not set)"
@@ -170,8 +173,9 @@ def confined_problem(case_id: str, env: Mapping[str, str] | None = None) -> str 
 
     Gate WF17 (G3 council record 2026-11-17, second addendum, decision 2, item 1) covers every job that runs seat
     code, so every job that runs seat C (the replay of a reference answer, the counting re-judge) runs it only after
-    the credential test of that same job showed it confined (``fw_reach_problem``). A case that runs no seat C needs
-    nothing more than the cocotb reach test."""
+    the credential test of that same job showed every probe denied (``fw_reach_problem``); the council ratified this
+    for the re-judge (council record 2026-11-19, seat C and the live refusal, decision 3). A case that runs no seat C
+    needs nothing more than the cocotb reach test."""
     what = seat_c_use(case_id)
     if what is None:
         return None
@@ -179,16 +183,17 @@ def confined_problem(case_id: str, env: Mapping[str, str] | None = None) -> str 
     if problem is None:
         return None
     return (f"case {case_id} runs seat-written C ({what}); this job runs it only after its own credential test shows "
-            f"seat C confined under fw.test (gate WF17, M90): {problem}. Nothing ran")
+            f"every probe denied for seat C under fw.test (gate WF17, M90): {problem}. Nothing ran")
 
 
 def seat_c_problem(case_id: str) -> str | None:
     """Why a live trial of this case, which runs seat C, is refused, or None (``seat_c_use``)."""
     what = seat_c_use(case_id)
     if what:
-        return (f"case {case_id} runs seat-written C ({what}); live trials of it stay refused (gate WF17: fw.test runs "
-                "it as the seat account since M90, and only a change of its own lifts this; for the register block "
-                "flow, after gates WF15 to WF19). No trial ran")
+        return (f"case {case_id} runs seat-written C ({what}); live trials of it stay refused (gate WF17: seat C "
+                "executes as the seat account since M90 and is compiled as the runner; council record 2026-11-19 "
+                "keeps this refusal until gates SC1 to SC7, and for the register block flow gates WF15 to WF19). "
+                "No trial ran")
     return None
 
 
@@ -321,7 +326,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     one.add_argument("--require-expected", action="store_true")
     many = sub.add_parser("trials", help="run the trials one at a time")
     many.add_argument("--out", type=Path, required=True)
-    sub.add_parser("confined", help="exit 6 unless this job's credential test shows the case's seat C confined")
+    sub.add_parser("confined", help="exit 6 unless this job's credential test denied every probe for the case's seat C")
     tree = sub.add_parser("tree", help="print the checkout's tree hash")
     tree.add_argument("--write", type=Path, help="also write the manifest the hash is taken over")
     args = parser.parse_args(argv)
@@ -344,7 +349,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         if problem:
             print(f"::error::{problem}", file=sys.stderr, flush=True)
             return UNCONFINED
-        print(f"case {case}: " + ("seat C confined by this job's credential test" if seat_c_use(case)
+        print(f"case {case}: " + ("seat C executes as the seat account; this job's credential test denied every probe"
+                                  if seat_c_use(case)
                                   else "runs no seat C"), flush=True)
         return 0
     try:

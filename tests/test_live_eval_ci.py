@@ -344,13 +344,14 @@ def test_a_job_runs_a_cases_seat_c_only_on_its_own_credential_test_record(tmp_pa
     assert ci.main(["confined"]) == ci.UNCONFINED and "Nothing ran" in capsys.readouterr().err
     for key, value in _fw_record(tmp_path).items():
         monkeypatch.setenv(key, value)
-    assert ci.main(["confined"]) == 0 and "confined by this job's credential test" in capsys.readouterr().out
+    assert ci.main(["confined"]) == 0 and "executes as the seat account" in capsys.readouterr().out
     monkeypatch.setenv("CASE", TIMER_FLOW)
     assert ci.main(["confined"]) == 0 and "runs no seat C" in capsys.readouterr().out
 
 
 def test_a_passing_credential_test_lifts_no_live_refusal(tmp_path, monkeypatch):
-    """M90 confines seat C; it does not lift exit 6. Live trials of both seat-C cases stay refused."""
+    """M90 runs seat C as the seat account; it does not lift exit 6 (council record 2026-11-19, seat C and the live
+    refusal). Live trials of both seat-C cases stay refused."""
     monkeypatch.setattr(ci, "_head", lambda: "c0ffee")
     for key, value in _fw_record(tmp_path).items():
         monkeypatch.setenv(key, value)
@@ -630,6 +631,7 @@ def test_every_case_that_runs_seat_c_gets_the_credential_test_in_every_job():
     any other name would be stopped by ``confined`` in every job (fail closed), so none may exist."""
     workflow = (REPO / ".github" / "workflows" / "live-eval.yml").read_text(encoding="utf-8")
     condition = "if: startsWith(inputs.case, 'flow/') || startsWith(inputs.case, 'firmware/')"
-    assert workflow.count(condition + "\n        run: python scripts/live_eval_fw_reach.py") == 3  # replay, trials, rejudge
+    runs = condition + "\n        run: python scripts/live_eval_fw_reach.py"
+    assert workflow.count(runs) == 3  # replay, trials, rejudge
     seat_c = [c.id for c in ci._cases() if ci.seat_c_use(c.id)]
     assert seat_c and all(case.startswith(("flow/", "firmware/")) for case in seat_c), seat_c

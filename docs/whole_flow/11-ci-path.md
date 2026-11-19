@@ -51,11 +51,11 @@ checkout. No new workflow and no new action.
   of its own, so the record and the code it grades never change together.
 - **The register block flow stays refused.** Its firmware stage and its
   held-out checks run seat C, so `check --require-expected` and `trials`
-  refuse it with exit 6 before any trial. Since M90 `fw.test` runs the
-  program it builds as the seat account and the credential test is a gate
-  (`docs/LIVE_EVAL_EVIDENCE.md`, section 6); the refusal stays until gates
-  WF15 to WF19 and the dated plan addition are met and a change of its own
-  lifts it. A replay of it still runs: its code is
+  refuse it with exit 6 before any trial. Since M90 the program `fw.test`
+  builds executes as the seat account, seat C is still compiled as the
+  runner, and the credential test is a gate (`docs/LIVE_EVAL_EVIDENCE.md`,
+  section 6). The refusal stays until gates WF15 to WF19 and the dated plan
+  addition are met and a change of its own lifts it (`council/records/2026-11-19-seat-c-live-refusal.md`, decision 2). A replay of it still runs: its code is
   the reference answer.
 - **The timer flow** links no seat C (its checks and stages run HDL, and its
   testbenches run in `vvp` as the seat account), so it runs live now.
