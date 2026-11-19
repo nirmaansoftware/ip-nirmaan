@@ -1,0 +1,29 @@
+{
+  "cases": {
+    "debug/triage-three-bugs": {
+      "high": 0.7934506856227626,
+      "low": 0.0,
+      "n": 1,
+      "passed": 0,
+      "rate": 0.0
+    }
+  },
+  "format": "nirmaan.eval-summary",
+  "seats": {
+    "triage": {
+      "high": 0.7934506856227626,
+      "low": 0.0,
+      "n": 1,
+      "passed": 0,
+      "rate": 0.0
+    }
+  },
+  "totals": {
+    "cost_usd": null,
+    "duration_s": 164.228,
+    "input_tokens": 4,
+    "model_calls": 2,
+    "output_tokens": 18384,
+    "trials": 1
+  }
+}
