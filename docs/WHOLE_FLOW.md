@@ -101,7 +101,7 @@ not judged: the parameter defaults (`TMR-ADDR-WIDTH-RANGE`, which also holds
 the timer's widths 5 to 7, and `AXIL-PARAMS-DEFAULT`), "no other ports"
 (`TMR-PORTS-ONLY`, `AXIL-NO-PROT`), and, for the timer, readiness (`TMR-READY`), the read value at the accepting edge
 (`TMR-READ-VALUE`), `COUNT` while a count runs (`TMR-COUNT-READ`), a periodic
-`LOAD` of 0, the value the stop edge gives `COUNT`, a `CTRL` write on a count
+`LOAD` of 0, a `CTRL` write on a count
 end (`TMR-CTRL-WINS`), the edge `irq` changes on after a write, what a
 synchronous reset does to a pending response or a held half write
 (`TMR-RESET-EDGE`), and the testbench checking every requirement
@@ -112,15 +112,56 @@ listed.
 **The reference testbenches.** Each case's check 1 runs its own copy of the
 single-seat reference testbench: `evals/flow/axil_timer/axil_timer_tb.v` and
 `evals/flow/axi4_lite/axi4_lite_regs_tb.v`. A copy keeps every check of the
-original, in order and word for word, and adds the checks an independent
+original, in order and word for word, except the named exemptions in
+`TB_COPY_EXEMPT` (`tests/test_whole_flow_cases.py`), and adds the checks an independent
 check found missing: for the timer, RDATA held still while a running `COUNT`
 is read under backpressure, a `STATUS` clear on the edge a one-shot count
 ends, and a reset while `EXPIRED` is set; for the register block, a new
 request accepted in the cycle after a response is taken, and reset while a
 write or read response waits or with only the address or only the data of a
-write accepted. The single-seat cases keep running the originals, so their
-digests, and the recorded trials that hold those digests, stay as they are.
-A test holds both.
+write accepted. A second round, after another independent check, added for
+the timer: every port's width, each `LOAD` strobe alone and none, `CTRL` bits
+31:3 and `STATUS` bits 31:1 reading as zero, a write and a read at every
+unmapped address (all 256 at `ADDR_WIDTH` 8) with nothing changed, `irq` held
+high through 100000 cycles and through writes that neither clear `EXPIRED`
+nor write `IE` 0, timed counts of 300 and 65539 cycles, the value a stop
+leaves in `COUNT` from all 32 bits of `LOAD` (so `TMR-STOP-EDGE` is now
+judged), thirty periods and periods of 300, write halves 40 cycles apart,
+and 40 cycles of backpressure; and a write that leaves its address, data and
+strobes unknown while it does not offer them. For the register block: every
+register bit, each strobe alone, a write and a read at every unmapped address,
+write halves 40 cycles apart, back-to-back requests after responses that
+waited on `READY`, and no response valid after the first reset edge. A rule
+over time ("stays high until", "any gap", "until `EN` is written 1 again") is
+checked over these bounded runs, as any simulation checks it. The single-seat
+cases keep running the originals, so their digests, and the recorded trials
+that hold those digests, stay as they are. The one exemption is the register block original's "AWREADY in reset"
+check: no flow document states READY during reset, the
+single-seat interface specification does not require it, and only the
+single-seat `microarchitecture.md` does (line 74, a design choice given to
+that seat), while in a whole flow the RTL stage writes its own
+microarchitecture, so a conforming block may hold `AWREADY` low in reset.
+`AXIL-TEST-RANGE` says a testbench checks
+only what the document states, and the judge assumes only behaviour the fixed
+document states (the council record, lines 206 to 208); so a conforming block
+must not fail it. The original keeps it. A block that holds `AWREADY` low in
+reset (`tests/fixtures/rtl/axi4_lite/variants/axi4_lite_regs_awready_low_in_reset.v`)
+passes the copy and fails the original on that check
+(`tests/test_whole_flow_cases.py::test_a_block_holding_awready_low_in_reset_passes_the_flow_copy_and_fails_the_original`).
+A test holds both, and fails on any other dropped or altered check.
+
+**The mutant sweep record.** `evals/flow/<block>/mutant_sweep.json` (format
+`nirmaan.flow-mutant-sweep`, a data file) records the sweep run on each
+testbench copy: every mutant `tests/flow_mutants.py` builds from the reference
+RTL (74 for the timer, 29 for the register block), the tag each violates, its
+sha256, and its result, all failing; the reference and the conforming RTLs
+(`axi4_lite_regs_lat2.v` and the `AWREADY`-low block) pass.
+`test_each_sweep_record_matches_its_builders_and_fails_every_tag_the_testbench_check_cites`
+rebuilds each mutant and compares its sha256, holds the record to the
+testbench copy and reference RTL by sha256 (an edit to either makes it stale),
+and requires a failing mutant for every tag check 1 cites;
+`test_one_mutant_per_tag_fails_the_testbench_copy_and_the_conforming_rtl_passes`
+runs one mutant per tag, and the conforming RTLs, with the simulator.
 
 **The held-out tests.** The register block case's held-out test is its own
 copy of the firmware case's, with an unmapped (misaligned) write added, so the
@@ -135,7 +176,7 @@ testbench written to that one choice (`axi4_lite_regs_tb_strict2.v`). The timer
 document leaves no choice open: its readiness, response timing, count length
 and every response are exact (the timer's interface specification already
 fixed them, and the reference testbench times a write to the edge,
-`evals/flow/axil_timer/axil_timer_tb.v` lines 387 to 390), so the timer has no
+`evals/flow/axil_timer/axil_timer_tb.v` lines 395 to 398), so the timer has no
 conforming variant and no strict testbench. A driver test that uses only
 `read32`, `write32` and the driver interface cannot be strict about latency on
 this block: each call returns only after the response, with the data and the
@@ -214,7 +255,14 @@ What they show:
   the flow's RTL (1 and 2; check 5 runs on it only in the strict driver's
   control, below), and the held-out test passes on it;
 - the range-accepting reference tests pass on both RTLs, and the testbench
-  written to the variant's one choice fails check 3 on the reference RTL;
+  written to the variant's one choice fails check 3 on the reference RTL.
+  Known limit: check 3 runs the flow's testbench on the reference RTL alone,
+  so a testbench strict about the reference's own choice (a response exactly
+  1 cycle after its request) passes it, though it fails on the conforming
+  RTL. No change: the council record accepts this, since checks 3, 6 and 7
+  are "fair by the rule, which the fixed document states to the seats, and
+  not by the conforming RTL alone"
+  (`council/records/2026-11-17-g3-whole-flow-cases.md`, lines 301 to 303);
 - `fw.test` works under the must-fail scorer (check 7: the clean run passes
   and `wstrb_ignored` and `okay_unmapped` are caught);
 - `b_before_w` is not visible through the HAL: under the must-fail scorer
@@ -403,10 +451,10 @@ to this. Until a document's first record lands it is listed, with the reason,
 in `evals/flow/requirements_check_pending.json` (a data file); its test still
 runs and checks that it has no record yet, so the entry must go when the
 record lands, and a document neither listed nor recorded fails. No test
-skips. Both documents are listed now: an independent check failed both, with
-mutants that pass the reference testbenches, and each was fixed by stronger
-checks in the case's own reference testbench and by splitting what stays
-unjudged into its own tags; neither has passed a fresh check yet. Another test
+skips. Both documents are listed now: independent checks failed both, each more than once,
+with mutants that pass the reference testbenches, and each was fixed by
+stronger checks in the case's own reference testbench and by splitting what
+stays unjudged into its own tags; neither has passed a fresh check yet. Another test
 shows the rule refuses a stale record, a record whose checker is its writer,
 a missing tag, a tag marked unjudged that a check cites, unreadable
 evidence, and a result that does not hold.

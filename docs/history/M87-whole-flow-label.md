@@ -103,6 +103,26 @@ RTL, fails check 6), and the SoC's cycle counter refused before review, each
 on a flow whose RTL stage ended in the conforming RTL. The record keeps the
 cycle counts.
 
+**Both testbench copies strengthened again (follow-up).** Another independent
+check passed mutants through both copies: a write decode ignoring `addr[1]`,
+offsets with bit 5 or bit 7 set aliasing at `ADDR_WIDTH` 8, an `irq` that
+drops after 20 cycles, `CTRL` bits above 2 that read back, and a read decode
+ignoring `addr[0]` on the register block. Each copy now drives every unmapped
+address, holds `irq` high for 100000 cycles, writes every bit and every strobe
+alone, runs long counts, stops and gaps, and leaves a write's address and data
+unknown while they are not offered; the timer's stop value is now judged
+(`TMR-STOP-EDGE`). The author's mutant sweep is a committed check record,
+`evals/flow/<block>/mutant_sweep.json`: every mutant `tests/flow_mutants.py`
+builds (74 for the timer, 29 for the register block, one tag each, every tag
+check 1 cites covered) fails the copy, and the conforming RTLs pass;
+`tests/test_whole_flow_cases.py` holds the record to the builders and reruns
+one mutant per tag. The fresh check the documents wait for is still owed. The documents are unchanged,
+and both still wait for a fresh check. The register block copy drops the original's
+check that `AWREADY` is high in reset: only the single-seat microarchitecture
+states it, and `AXIL-TEST-RANGE` holds a testbench to what the document states,
+so a conforming flow block must not fail it. The
+copy test now allows only named exemptions, each with its reason.
+
 **The runner option.** Part 4a, the dispatch edit to `runner.py` and the
 fingerprint entries, merged in the window after the H3 batch. With it, a
 `runtime/context.py` and `runtime/prompt.py` change gives a customer document

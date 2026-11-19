@@ -17,6 +17,8 @@ from pathlib import Path
 
 import pytest
 
+import flow_mutants
+from laws import needs
 from nirmaan.company import build_organization
 from nirmaan.evals import load_cases, validate_case
 from nirmaan.evals.cases import referenced_files
@@ -36,7 +38,8 @@ FIXTURES = ("tests/fixtures/fw/axi4_lite/axi4_lite_regs_drv_swallowed_error.c",
             "tests/fixtures/fw/axi4_lite/axi4_lite_regs_drv_sticky_response.c",
             "tests/fixtures/rtl/axil_timer/axil_timer_tb_weak.v",
             "tests/fixtures/rtl/axi4_lite/variants/axi4_lite_regs_lat2.v",
-            "tests/fixtures/rtl/axi4_lite/variants/axi4_lite_regs_tb_strict2.v")
+            "tests/fixtures/rtl/axi4_lite/variants/axi4_lite_regs_tb_strict2.v",
+            "tests/fixtures/rtl/axi4_lite/variants/axi4_lite_regs_awready_low_in_reset.v")
 
 
 @pytest.fixture(scope="module")
@@ -327,20 +330,72 @@ TB_COPIES = {"flow/axil-timer": ("tests/fixtures/rtl/axil_timer/axil_timer_tb.v"
                                             "evals/flow/axi4_lite/axi4_lite_regs_tb.v")}
 
 
+#: Checks of an original a flow copy drops on purpose, by copy: the original's check line, word for word, and why.
+#: Each must be in the original and absent from the copy; any other dropped or altered check fails the test.
+TB_COPY_EXEMPT = {
+    "evals/flow/axi4_lite/axi4_lite_regs_tb.v": {
+        """check("AWREADY in reset", {31'd0, awready}, 32'd1);""":
+            "No flow document states READY during reset (evals/flow/axi4_lite/requirements.md, section 2), and the "
+            "single-seat interface specification (tests/fixtures/rtl/axi4_lite/interface_spec.md, sections 4 and 7) "
+            "does not require it; only the single-seat microarchitecture.md (line 74) does, and in a whole flow the "
+            "RTL stage writes its own microarchitecture, a design choice given to that seat, so a conforming flow "
+            "block may hold AWREADY low in reset. AXIL-TEST-RANGE (requirements.md section 4) says a "
+            "testbench checks only what the document states, and the judge assumes only behaviour the fixed "
+            "document states (council/records/2026-11-17-g3-whole-flow-cases.md, lines 206 to 208), so a "
+            "conforming block must not fail it. The single-seat original keeps it. A block that holds AWREADY low in "
+            "reset (tests/fixtures/rtl/axi4_lite/variants/axi4_lite_regs_awready_low_in_reset.v) passes this copy and "
+            "fails the original: tests/test_whole_flow_cases.py::"
+            "test_a_block_holding_awready_low_in_reset_passes_the_flow_copy_and_fails_the_original.",
+    },
+}
+
+
 def _check_calls(path: str) -> list[str]:
     return [line.strip() for line in (ROOT / path).read_text(encoding="utf-8").splitlines()
             if re.match(r"\s*(check|expect_reg)\(", line)]
 
 
+def _copy_problems(kept: list[str], added: list[str], exempt: dict[str, str]) -> list[str]:
+    """What is wrong with a copy's check lines against the original's (empty when it keeps every one but the named
+    exemptions, in order, word for word, and adds some)."""
+    problems = [f"exemption not in the original: {line}" for line in exempt if line not in kept]
+    problems += [f"exempted check still in the copy: {line}" for line in exempt if line in added]
+    problems += [f"exemption without a reason: {line}" for line, why in exempt.items() if not why.strip()]
+    at = 0  # kept lines must appear in the copy in order: each is looked for after the one before it
+    for line in kept:
+        if line in exempt:
+            continue
+        if line in added[at:]:
+            at = added.index(line, at) + 1
+        else:
+            problems.append(f"check dropped, altered or out of order: {line}")
+    if len(added) <= len(kept) - len(exempt):
+        problems.append("the copy adds no check")
+    return problems
+
+
+def test_the_copy_rule_refuses_any_other_dropped_or_altered_check():
+    kept = ['check("a", x, 1);', 'check("b", y, 0);', 'expect_reg("c", 8\'h0, 0);']
+    exempt = {'check("b", y, 0);': "a named reason"}
+    good = ['check("a", x, 1);', 'check("new", z, 1);', 'expect_reg("c", 8\'h0, 0);']
+    assert _copy_problems(kept, good, exempt) == []
+    assert _copy_problems(kept, good, {})  # the same drop without its exemption fails
+    assert _copy_problems(kept, ['check("new", z, 1);', 'expect_reg("c", 8\'h0, 0);'], exempt)  # another drop
+    assert _copy_problems(kept, ['check("a", x, 2);', 'check("new", z, 1);', 'expect_reg("c", 8\'h0, 0);'], exempt)
+    assert _copy_problems(kept, ['expect_reg("c", 8\'h0, 0);', 'check("a", x, 1);', 'check("n", z, 1);'], exempt)
+    assert _copy_problems(kept, [*good, 'check("b", y, 0);'], exempt)  # an exempted check left in the copy
+    assert _copy_problems(kept, good, {**exempt, 'check("gone", q, 0);': "why"})  # a stale exemption
+    assert _copy_problems(kept, good, {'check("b", y, 0);': " "})  # no reason
+
+
 @pytest.mark.parametrize("case_id", sorted(TB_COPIES))
 def test_the_reference_testbench_copy_keeps_every_check_and_only_the_flow_case_runs_it(cases, case_id):
-    """The copy adds checks and keeps every one of the original's, in order, word for word; the single-seat case
-    keeps running the original, so its digest and its recorded trials stay as they are."""
+    """The copy adds checks and keeps every one of the original's, in order, word for word, except the named
+    exemptions in ``TB_COPY_EXEMPT``; the single-seat case keeps running the original, so its digest and its
+    recorded trials stay as they are."""
     original, copy = TB_COPIES[case_id]
-    kept, added = _check_calls(original), _check_calls(copy)
-    rest = iter(added)
-    assert all(any(line == other for other in rest) for line in kept)  # a subsequence
-    assert len(added) > len(kept)
+    assert set(TB_COPY_EXEMPT) <= {c for _, c in TB_COPIES.values()}
+    assert _copy_problems(_check_calls(original), _check_calls(copy), TB_COPY_EXEMPT.get(copy, {})) == []
     assert cases[case_id].held_out[0].case_files["sources"] == (copy,)
     single = {c.id: c for c in load_cases(EVALS)}
     assert any(original in c.case_files.get("sources", ()) for s in single.values() for c in s.held_out)
@@ -378,3 +433,84 @@ def test_a_document_given_through_inputs_never_reaches_the_requirements_seat_as_
             line = max(text.splitlines(), key=len)  # the document's longest line stands for its text
             assert line.strip() not in prompt and rel not in prompt  # ... but neither its text nor its path is seen
     assert case.request in prompt  # the request itself is rendered
+
+
+# --- The author's mutant sweep, kept as a check record ----------------------------------------------------------------
+#
+# ``evals/flow/<block>/mutant_sweep.json`` records the sweep the author ran on each case's testbench copy (ip#339):
+# every mutant ``tests/flow_mutants.py`` builds from the reference RTL, the tag it violates, its sha256 and its result,
+# and the conforming RTLs, which must pass. The record is held to the builders (each mutant's text is rebuilt and its
+# sha256 compared), to the testbench copy and reference RTL it ran on (by sha256: an edit to either makes it stale), and
+# to the case: every tag the testbench check cites has a mutant that fails. One mutant per tag runs here with the
+# simulator; the whole sweep reruns with the scratch script that wrote the record.
+
+SWEEPS = {"flow/axil-timer": (FLOW / "axil_timer" / "mutant_sweep.json", flow_mutants.timer_mutants,
+                              flow_mutants.TIMER_TAGS),
+          "flow/axi4-lite-regs-driver": (FLOW / "axi4_lite" / "mutant_sweep.json", flow_mutants.regs_mutants,
+                                         flow_mutants.REGS_TAGS)}
+AWREADY_LOW = ROOT / "tests/fixtures/rtl/axi4_lite/variants/axi4_lite_regs_awready_low_in_reset.v"
+
+
+def _sha(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+@pytest.mark.parametrize("case_id", sorted(SWEEPS))
+def test_each_sweep_record_matches_its_builders_and_fails_every_tag_the_testbench_check_cites(cases, case_id):
+    path, build, tags = SWEEPS[case_id]
+    record = json.loads(path.read_text(encoding="utf-8"))
+    assert record["format"] == "nirmaan.flow-mutant-sweep" and record["case"] == case_id
+    case = cases[case_id]
+    check = case.held_out[0]  # check 1 runs the testbench copy
+    assert record["testbench"]["path"] == check.case_files["sources"][0] == TB_COPIES[case_id][1]
+    assert record["testbench"]["sha256"] == _sha(ROOT / record["testbench"]["path"]), "stale: rerun the sweep"
+    assert record["builder"] == f"tests/flow_mutants.py::{build.__name__}"
+    reference = ROOT / record["reference"]["path"]
+    assert record["reference"]["sha256"] == _sha(reference) and record["reference"]["result"] == "passes"
+    built = build(reference.read_text(encoding="utf-8"))
+    rows = record["mutants"]
+    assert [r["mutant"] for r in rows] and sorted(r["mutant"] for r in rows) == sorted(built)
+    for row in rows:
+        assert set(row) == {"tag", "mutant", "sha256", "result", "errors", "first_failure"}, row
+        assert row["tag"] == flow_mutants.tag_of(row["mutant"], tags)
+        assert row["sha256"] == hashlib.sha256(built[row["mutant"]].encode("utf-8")).hexdigest(), row["mutant"]
+        assert row["result"] == "fails" and row["first_failure"], row["mutant"]
+    for entry in record["conforming"]:
+        assert entry["result"] == "passes" and entry["sha256"] == _sha(ROOT / entry["path"]), entry
+    citations = json.loads(CASES[case_id].read_text(encoding="utf-8"))
+    judged = {t for t in citations["checks"][check.name] if t in set(tags.values())}
+    assert judged == set(tags.values())  # the builders name exactly the tags the testbench check cites
+    assert judged <= {r["tag"] for r in rows if r["result"] == "fails"}
+    if case_id == "flow/axi4-lite-regs-driver":
+        assert AWREADY_LOW.relative_to(ROOT).as_posix() in {e["path"] for e in record["conforming"]}
+
+
+@needs("iverilog", "vvp")
+@pytest.mark.parametrize("case_id", sorted(SWEEPS))
+def test_one_mutant_per_tag_fails_the_testbench_copy_and_the_conforming_rtl_passes(case_id, tmp_path):
+    path, build, _ = SWEEPS[case_id]
+    record = json.loads(path.read_text(encoding="utf-8"))
+    tb, top = ROOT / record["testbench"]["path"], record["testbench"]["top"]
+    built = build((ROOT / record["reference"]["path"]).read_text(encoding="utf-8"))
+    first = {}
+    for row in record["mutants"]:
+        first.setdefault(row["tag"], row["mutant"])
+    for tag, name in sorted(first.items()):
+        source = tmp_path / f"{name}.v"
+        source.write_text(built[name], encoding="utf-8")
+        passed, failed, why = flow_mutants.simulate(tb, top, source, tmp_path)
+        assert failed is None or failed > 0, (tag, name, passed)
+    for rel in [record["reference"]["path"], *(e["path"] for e in record["conforming"])]:
+        passed, failed, why = flow_mutants.simulate(tb, top, ROOT / rel, tmp_path)
+        assert failed == 0 and passed, (rel, why)
+
+
+@needs("iverilog", "vvp")
+def test_a_block_holding_awready_low_in_reset_passes_the_flow_copy_and_fails_the_original(tmp_path):
+    """The one exemption of the register block copy (``TB_COPY_EXEMPT``), shown by a run: the conforming block that
+    holds AWREADY low in reset passes the flow case's copy and fails the single-seat original on that check."""
+    original, copy = TB_COPIES["flow/axi4-lite-regs-driver"]
+    passed, failed, why = flow_mutants.simulate(ROOT / copy, "axi4_lite_regs_tb", AWREADY_LOW, tmp_path)
+    assert failed == 0 and passed, why
+    passed, failed, why = flow_mutants.simulate(ROOT / original, "axi4_lite_regs_tb", AWREADY_LOW, tmp_path)
+    assert failed and why.startswith("AWREADY in reset"), (failed, why)

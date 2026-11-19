@@ -2,7 +2,7 @@
   "format": "nirmaan.flow-document-check-pending",
   "about": "Whole-flow requirements documents whose first check record (requirements_check.json, by a session other than the writer) has not landed yet, each with the reason. tests/test_whole_flow_cases.py fails a listed document that already has a record, so an entry must go when its record lands.",
   "pending": {
-    "evals/flow/axil_timer/requirements.md": "Failed a second independent check (mutants passed the reference testbench); fixed by stronger checks in the case's own reference testbench and split tags. A fresh checker session writes its record.",
-    "evals/flow/axi4_lite/requirements.md": "Failed its first independent check (mutants passed the reference testbench); fixed by stronger checks in the case's own reference testbench and split tags. A fresh checker session writes its record."
+    "evals/flow/axil_timer/requirements.md": "Failed a third independent check (mutants passed the reference testbench copy after ip#335); fixed by stronger checks in the case's own reference testbench, with TMR-STOP-EDGE now judged. A fresh checker session writes its record.",
+    "evals/flow/axi4_lite/requirements.md": "Failed a second independent check (mutants passed the reference testbench copy after ip#335); fixed by stronger checks in the case's own reference testbench. A fresh checker session writes its record."
   }
 }

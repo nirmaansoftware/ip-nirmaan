@@ -1,0 +1,266 @@
+{
+  "format": "nirmaan.flow-mutant-sweep",
+  "about": "The author's adversarial sweep (ip#339): every mutant tests/flow_mutants.py builds from the reference RTL, each violating exactly the tag named, run on the case's own testbench copy. A check record for the reviewers and the next document checker, not an eval record; tests/test_whole_flow_cases.py holds it to the builders and to the testbench copy.",
+  "case": "flow/axi4-lite-regs-driver",
+  "testbench": {
+    "path": "evals/flow/axi4_lite/axi4_lite_regs_tb.v",
+    "sha256": "c98117b52b12a01dd90670f3ea1dbaaaeba5b847f424e61d3c5b3585f93e0523",
+    "top": "axi4_lite_regs_tb"
+  },
+  "builder": "tests/flow_mutants.py::regs_mutants",
+  "simulator": "Icarus Verilog version 13.0 (stable) (v13_0), iverilog -g2012",
+  "reference": {
+    "path": "tests/fixtures/rtl/axi4_lite/axi4_lite_regs.v",
+    "sha256": "92ff38c7100446da8115c8bd0129f09d9a2dbc78be10de80686b4e303fe68b88",
+    "result": "passes",
+    "checks": 847
+  },
+  "conforming": [
+    {
+      "path": "tests/fixtures/rtl/axi4_lite/variants/axi4_lite_regs_lat2.v",
+      "sha256": "436cd5a4adfd9391d7a8e85b848f7f50f54733a10f79d3c508f78026ab3d6001",
+      "result": "passes",
+      "checks": 847
+    },
+    {
+      "path": "tests/fixtures/rtl/axi4_lite/variants/axi4_lite_regs_awready_low_in_reset.v",
+      "sha256": "a7e836949ec5121ca90a08558e943610423e08d08b711ed0620af5e398ee6d26",
+      "result": "passes",
+      "checks": 847
+    }
+  ],
+  "mutants": [
+    {
+      "tag": "AXIL-MAP",
+      "mutant": "MAP_reg0_bit29_stuck",
+      "sha256": "504283498a9b1b0c39099a54af13ec010e175c6710e40d4a8e055de8f68e45e3",
+      "result": "fails",
+      "errors": 3,
+      "first_failure": "read data: got 0x80a0a0a0, expected 0xa0a0a0a0"
+    },
+    {
+      "tag": "AXIL-MAP",
+      "mutant": "MAP_reg1_bit6_stuck1",
+      "sha256": "fa389689ae57c43ab448d4713f3921178b54f727d035dc21a2068ea74fc84c31",
+      "result": "fails",
+      "errors": 11,
+      "first_failure": "read data: got 0x22222262, expected 0x22222222"
+    },
+    {
+      "tag": "AXIL-MAP",
+      "mutant": "MAP_reg2_16bit",
+      "sha256": "d9bb432f75f4c7eeb1db9767a757e79b2dc031581ed4aae7c9dad206f2e995f1",
+      "result": "fails",
+      "errors": 14,
+      "first_failure": "read data: got 0x00003333, expected 0x33333333"
+    },
+    {
+      "tag": "AXIL-MAP",
+      "mutant": "MAP_reg2_reset1",
+      "sha256": "32ecd36b8ce4c1b72020aa1136acb03d58130a3043344f5514b12a5248a97f0d",
+      "result": "fails",
+      "errors": 5,
+      "first_failure": "read data: got 0x00000001, expected 0x00000000"
+    },
+    {
+      "tag": "AXIL-PORTS",
+      "mutant": "PORTS_renamed",
+      "sha256": "1633d777e22f7955d119f16932a4ae715446cebbb74b515a7fd98b3c34c454b4",
+      "result": "fails",
+      "errors": null,
+      "first_failure": "axi4_lite_regs_tb.v:58: error: port ``s_axil_bready'' is not a port of dut."
+    },
+    {
+      "tag": "AXIL-PORTS",
+      "mutant": "PORTS_reset_active_high",
+      "sha256": "fc13e0c41b07930455bbc8e6808db075849fb3b7aea2d3e0601d4bde3100b021",
+      "result": "fails",
+      "errors": 261,
+      "first_failure": "BVALID after first reset edge: got 0x0000000X, expected 0x00000000"
+    },
+    {
+      "tag": "AXIL-PARAMS",
+      "mutant": "PARAMS_no_dw",
+      "sha256": "9b4ce0905fbb633b8be50ac9ecd91c7fb1d370976a8755ce789f18026fdc85a8",
+      "result": "fails",
+      "errors": null,
+      "first_failure": "axi4_lite_regs_tb.v:58: error: Cannot override localparam `DATA_WIDTH` in `axi4_lite_regs_tb.dut`."
+    },
+    {
+      "tag": "AXIL-ORDER",
+      "mutant": "ORDER_aw_timeout",
+      "sha256": "8da25f63a5db351f54f79e186563e8fd7134f5aa070cca1cf82a348db23e1a8d",
+      "result": "fails",
+      "errors": 6,
+      "first_failure": "write 0x4: no response within 50 cycles"
+    },
+    {
+      "tag": "AXIL-ORDER",
+      "mutant": "ORDER_awaddr_not_held",
+      "sha256": "6c151d84f6ac5eb3c0612296dd5c992947a39eb4f713c106b53249a5e5503d28",
+      "result": "fails",
+      "errors": 9,
+      "first_failure": "write response OKAY: got 0x0000000X, expected 0x00000000"
+    },
+    {
+      "tag": "AXIL-ORDER",
+      "mutant": "ORDER_w_timeout",
+      "sha256": "cf52e5e75234732eceb94bbe19523d778a1f693030a41c0dc80848ce20ce674a",
+      "result": "fails",
+      "errors": 6,
+      "first_failure": "write 0xc: no response within 50 cycles"
+    },
+    {
+      "tag": "AXIL-ORDER",
+      "mutant": "ORDER_wdata_not_held",
+      "sha256": "61fe66a07929600d3751fe4b12f71c11cdafe0607b9202ac66aaa244de8a2454",
+      "result": "fails",
+      "errors": 5,
+      "first_failure": "read data: got 0xxxxxxxxx, expected 0xb1b1b1b1"
+    },
+    {
+      "tag": "AXIL-WSTRB",
+      "mutant": "WSTRB_b0_alone_ignored",
+      "sha256": "d713fabfdfcce8f7225a7943480d8c405e3ad49f3014a369cd461ae42ab69759",
+      "result": "fails",
+      "errors": 6,
+      "first_failure": "read data: got 0xffffffff, expected 0xffffff00"
+    },
+    {
+      "tag": "AXIL-WSTRB",
+      "mutant": "WSTRB_b1_alone_ignored",
+      "sha256": "94e1e6dd72a845b55cba57bdd8148fded728cb6ab48a8ff46fe7c2e6ad5ce7aa",
+      "result": "fails",
+      "errors": 5,
+      "first_failure": "read data: got 0xffffff00, expected 0xffff0000"
+    },
+    {
+      "tag": "AXIL-WSTRB",
+      "mutant": "WSTRB_b3_needs_b0",
+      "sha256": "d6b4b42b2f92e4c8c5da835969a2103e663d03f13386a3030146caf93321d063",
+      "result": "fails",
+      "errors": 5,
+      "first_failure": "wstrb 1000 then 0000: got 0xff22ff44, expected 0xaa22ff44"
+    },
+    {
+      "tag": "AXIL-WSTRB",
+      "mutant": "WSTRB_zero_writes_all",
+      "sha256": "ce57928b6bed4833c3704bbd552fec40c08439cfeaeaeacf49af6b819b1f3498",
+      "result": "fails",
+      "errors": 2,
+      "first_failure": "wstrb 1000 then 0000: got 0x00000000, expected 0xaa22ff44"
+    },
+    {
+      "tag": "AXIL-SLVERR",
+      "mutant": "SLVERR_okay_at_d",
+      "sha256": "ffb288bbcedde734b0ab0dc47c55d25388fc6bca65b2b0aa8114e11f088c8148",
+      "result": "fails",
+      "errors": 1,
+      "first_failure": "unmapped write SLVERR, all addrs: got 0x00000000, expected 0x00000002"
+    },
+    {
+      "tag": "AXIL-SLVERR",
+      "mutant": "SLVERR_rd_ignore_a0",
+      "sha256": "74b3707faa12f6199c92e13d380f8dfdcd84d5bfc0cfd5e605e36cf7e4c9fc5b",
+      "result": "fails",
+      "errors": 8,
+      "first_failure": "unmapped read SLVERR, all addrs: got 0x00000000, expected 0x00000002"
+    },
+    {
+      "tag": "AXIL-SLVERR",
+      "mutant": "SLVERR_rd_ignore_a1",
+      "sha256": "a403087f019301810e7cc933c45b6286d06cf1ee1575665a6d7b35d3b74810f8",
+      "result": "fails",
+      "errors": 10,
+      "first_failure": "unmapped read SLVERR: got 0x00000000, expected 0x00000002"
+    },
+    {
+      "tag": "AXIL-SLVERR",
+      "mutant": "SLVERR_unm_rdata",
+      "sha256": "e5856590b55ae406b4ad884195681ab6841790a4126369e531cebfe2c4deef0e",
+      "result": "fails",
+      "errors": 1,
+      "first_failure": "unmapped read data, all addrs: got 0x76543210, expected 0x00000000"
+    },
+    {
+      "tag": "AXIL-SLVERR",
+      "mutant": "SLVERR_unm_write_changes",
+      "sha256": "bd8fac6e33dde4153c5403fba6547b29187a1f1ed733a69011bc2b4434ac3121",
+      "result": "fails",
+      "errors": 1,
+      "first_failure": "read data: got 0xffffffff, expected 0x89abcdef"
+    },
+    {
+      "tag": "AXIL-SLVERR",
+      "mutant": "SLVERR_wr_ignore_a0",
+      "sha256": "ec7b9ec5f0ae5dab2eeb5b39f5a8b3da8f1985875e723a02771e9c8feac8ba4e",
+      "result": "fails",
+      "errors": 12,
+      "first_failure": "unmapped write SLVERR: got 0x00000000, expected 0x00000002"
+    },
+    {
+      "tag": "AXIL-SLVERR",
+      "mutant": "SLVERR_wr_ignore_a1",
+      "sha256": "76b9032f73de5aeb58773f62c79b3658c114b6caa43f7f7a8a973e4cc7e35149",
+      "result": "fails",
+      "errors": 12,
+      "first_failure": "unmapped write SLVERR: got 0x00000000, expected 0x00000002"
+    },
+    {
+      "tag": "AXIL-LATENCY",
+      "mutant": "LATENCY_3_after_aw_first",
+      "sha256": "0cb08da13ad8aa90df9002927b4cfb1bd8b8d060e76b80ce1f3bdd40038338e4",
+      "result": "fails",
+      "errors": 5,
+      "first_failure": "write latency within bound: got 0x00000000, expected 0x00000001"
+    },
+    {
+      "tag": "AXIL-B2B",
+      "mutant": "B2B_gap_after_wait",
+      "sha256": "ac07f21186d8c6b3d166428f12b4280c94a669bfc7487007cb3d784a64899838",
+      "result": "fails",
+      "errors": 7,
+      "first_failure": "next-cycle write accepted: got 0x00000000, expected 0x00000001"
+    },
+    {
+      "tag": "AXIL-B2B",
+      "mutant": "B2B_read_gap_after_wait",
+      "sha256": "5b1365990de06288af2691806697c1a2176f3ac7c74d412216dbfc575ed53564",
+      "result": "fails",
+      "errors": 3,
+      "first_failure": "next-cycle read accepted: got 0x00000000, expected 0x00000001"
+    },
+    {
+      "tag": "AXIL-RESET",
+      "mutant": "RESET_keeps_aw",
+      "sha256": "34c5df336098045d3073bba9b58ba3548a0d780d2f2f71e208c3eb16ea7358c7",
+      "result": "fails",
+      "errors": 206,
+      "first_failure": "write 0x0: no response within 50 cycles"
+    },
+    {
+      "tag": "AXIL-RESET",
+      "mutant": "RESET_keeps_reg3",
+      "sha256": "b19f5b583a1d20eb8953ec63b154302acb37872cb3a8bf13d6ee1a8a87dce72b",
+      "result": "fails",
+      "errors": 5,
+      "first_failure": "read data: got 0xxxxxxxxx, expected 0x00000000"
+    },
+    {
+      "tag": "AXIL-RESET",
+      "mutant": "RESET_keeps_w",
+      "sha256": "c779ae905bf7d87948fe706dbd26c0af9a635dbc90f5223d7c49d0c4065439c7",
+      "result": "fails",
+      "errors": 206,
+      "first_failure": "write 0x0: no response within 50 cycles"
+    },
+    {
+      "tag": "AXIL-RESET",
+      "mutant": "RESET_two_edges",
+      "sha256": "9a4a0a906f915f8df3d747e5d718a8fe655e88ded2bb01a9fe12d448b4ef7185",
+      "result": "fails",
+      "errors": 2,
+      "first_failure": "BVALID after first reset edge: got 0x00000001, expected 0x00000000"
+    }
+  ]
+}
