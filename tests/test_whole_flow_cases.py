@@ -134,6 +134,14 @@ def test_every_check_and_mutant_cites_a_statement_in_the_fixed_documents(cases, 
     assert all(isinstance(why, str) and why for why in not_judged.values())
     assert set(not_judged) <= tags and not set(not_judged) & cited_tags
     assert cited_tags | set(not_judged) == tags, sorted(tags - cited_tags - set(not_judged))
+    # Every judged tag is judged within an explicit stimulus scope (WF3): the values, waits, positions, widths and
+    # orderings its checks exercise, with line references. A block that breaks a rule only outside its scope is no
+    # escape; one that breaks it inside the scope is. Not judged tags have no scope.
+    scope = data["judged_scope"]
+    assert set(scope) == cited_tags, (sorted(cited_tags - set(scope)), sorted(set(scope) - cited_tags))
+    for tag, text in scope.items():
+        assert isinstance(text, str) and text.strip(), tag
+        assert re.search(r"\blines? \d+", text), f"{tag}: the scope cites no line"
 
 
 def test_each_tag_is_stated_once_and_both_documents_state_the_whole_range_rule():
@@ -149,14 +157,15 @@ def test_each_tag_is_stated_once_and_both_documents_state_the_whole_range_rule()
 #
 # By convention a whole-flow requirements document is checked by a session other than its writer, and the check is
 # kept next to it as ``requirements_check.json`` (format ``nirmaan.flow-document-check``): the document's sha256, the
-# writer and the checker, when, the sources read, per-tag evidence (``path:line``, a test id, or ``unjudged``) and the
-# result. Any edit to the document makes the record stale. A document whose first record has not landed yet is listed,
-# with the reason, in ``evals/flow/requirements_check_pending.json``; a listed document that has a record fails, so the
-# entry must go once its record lands. An author never writes the record for its own document.
+# writer and the checker, when, the sources read, the judged scopes it checked within (a copy of ``judged_scope`` in
+# the case's ``citations.json``), per-tag evidence (``path:line``, a test id, or ``unjudged``) and the result. Any
+# edit to the document, or to a judged scope, makes the record stale. A document whose first record has not landed yet
+# is listed, with the reason, in ``evals/flow/requirements_check_pending.json``; a listed document that has a record
+# fails, so the entry must go once its record lands. An author never writes the record for its own document.
 
 CHECK_PENDING = FLOW / "requirements_check_pending.json"
 CHECK_FIELDS = {"format", "case", "document", "document_sha256", "writer", "checker", "checked_at", "sources_read",
-                "evidence", "result"}
+                "judged_scope", "evidence", "result"}
 _LINE = re.compile(r"^(?P<path>[^:\s]+):(?P<first>\d+)(?:-(?P<last>\d+))?$")
 _TEST_ID = re.compile(r"^(?P<path>tests/[^:\s]+\.py)::(?P<name>\w+)(?:\[.*\])?$")
 
@@ -199,6 +208,8 @@ def _check_record_problems(doc: str, record: dict, citations: dict, root: Path =
         problems.append(f"document {record['document']!r} is not {doc!r}")
     if record["document_sha256"] != hashlib.sha256((root / doc).read_bytes()).hexdigest():
         problems.append("stale: the document changed after it was checked (document_sha256 differs)")
+    if record["judged_scope"] != citations["judged_scope"]:
+        problems.append("stale: the judged scopes changed after the check (judged_scope differs from citations.json)")
     writer, checker = record["writer"], record["checker"]
     if not (isinstance(writer, str) and writer and isinstance(checker, str) and checker):
         problems.append("writer and checker must be named")
@@ -268,8 +279,9 @@ def test_every_flow_requirements_document_has_a_current_check_record_by_another_
 
 def test_the_check_record_rule_refuses_a_stale_or_self_checked_record():
     """The rule works before any record lands: a record built here (never written to disk) holds, and editing the
-    document, naming the writer as the checker, dropping a tag, disagreeing with citations.json either way (a not judged
-    tag given evidence, a cited tag marked unjudged), unreadable evidence or a result that does not hold each fail it."""
+    document, changing a judged scope, naming the writer as the checker, dropping a tag, disagreeing with citations.json
+    either way (a not judged tag given evidence, a cited tag marked unjudged), unreadable evidence or a result that does
+    not hold each fail it."""
     doc = "evals/flow/axil_timer/requirements.md"
     citations = json.loads((FLOW / "axil_timer" / "citations.json").read_text(encoding="utf-8"))
     tags = re.findall(r"\[req:([A-Z0-9-]+)\]", (ROOT / doc).read_text(encoding="utf-8"))
@@ -277,6 +289,7 @@ def test_the_check_record_rule_refuses_a_stale_or_self_checked_record():
             "document_sha256": hashlib.sha256((ROOT / doc).read_bytes()).hexdigest(),
             "writer": "writer-session", "checker": "checker-session", "checked_at": "2026-11-18T06:00:00+00:00",
             "sources_read": [doc, "tests/fixtures/rtl/axil_timer/axil_timer_tb.v"],
+            "judged_scope": citations["judged_scope"],
             "evidence": [{"tag": t, "evidence": "unjudged" if t in citations["not_judged"]
                           else "tests/fixtures/rtl/axil_timer/axil_timer_tb.v:281"} for t in tags],
             "result": "holds"}
@@ -284,6 +297,8 @@ def test_the_check_record_rule_refuses_a_stale_or_self_checked_record():
     bad = [
         dict(good, document_sha256=hashlib.sha256((ROOT / doc).read_bytes() + b"\n").hexdigest()),
         dict(good, checker="writer-session"),
+        dict(good, judged_scope=dict(citations["judged_scope"], **{"TMR-STOP-EDGE": "every LOAD value"})),
+        dict(good, judged_scope={k: v for k, v in citations["judged_scope"].items() if k != "TMR-START"}),
         dict(good, evidence=good["evidence"][1:]),
         dict(good, evidence=[dict(e, evidence="tests/fixtures/rtl/axil_timer/axil_timer_tb.v:281")
                              for e in good["evidence"]]),
