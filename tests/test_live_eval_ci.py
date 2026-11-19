@@ -466,8 +466,8 @@ def test_the_probe_compiles_as_fw_test_compiles_a_driver_test(tmp_path):
         assert proc.returncode == 0, proc.stderr
     text = fw.probe_source({**CONFIG, **reads})  # gate SC6: every read target and every network target is tried
     assert all(f'"{path}", ' in text for path in reads["read_files"] + reads["list_dirs"])
-    assert text.count("all &= one_target(") == len(reads["network"]) == 4
-    assert 'one_target(1, "2606:4700:4700::1111", 443)' in text and 'one_target(2, "127.0.0.53", 53)' in text
+    assert text.count("all &= one_target(") == len(reads["network"]) == 5
+    assert 'one_target(1, "::1", 9)' in text and 'one_target(2, "127.0.0.53", 53)' in text
 
 
 def _log(denied=(), missing=(), done=True, control="ok"):
