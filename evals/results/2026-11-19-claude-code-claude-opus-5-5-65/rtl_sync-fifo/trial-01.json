@@ -1,0 +1,289 @@
+{
+  "answers": [
+    {
+      "cache_read_tokens": 620,
+      "cache_write_tokens": 12287,
+      "error": null,
+      "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+      "input_tokens": 2,
+      "mode": "work",
+      "model": "claude-opus-5-5",
+      "output_tokens": 50584,
+      "packet_sha256": "f84ef41c477cc8fc7829b3e37befda314621d2479a48413d7136ee6db1ce0845",
+      "prompt_sha256": "4d8f89ee27cb342b1671612f68317d3d09f1c00f7d1e3b40c26f8be98b09e80e",
+      "provider": "claude-code",
+      "text": "```json\n{\n  \"uncertainty\": 0.3,\n  \"outcome\": \"Delivered three files for task prj-edb1c0f84a:rtl-implementation: the RTL (sync_fifo.v), its self-checking testbench (sync_fifo_tb.v), and one SymbiYosys job (sync_fifo.sby). They are ready for the platform's lint, simulation, synthesis and formal checks, and then independent review. No check has run, and nothing here is verified.\",\n  \"artifacts\": [\n    {\n      \"kind\": \"design_decision\",\n      \"title\": \"Recorded deviations from the verification plan in microarchitecture.md\",\n      \"summary\": \"The verification plan in [artifact:prj-edb1c0f84a.microarchitecture.a1] lists a second proof at DEPTH 5 (sync_fifo_depth5.sby) and a failure-path testbench (sync_fifo_tb_fail.v). Neither is delivered. formal.run and formal.cover accept exactly one formal_spec file, so only the default DEPTH 8 proof (sync_fifo.sby) is submitted. DEPTH 5 is still exercised in simulation, which [artifact:prj-edb1c0f84a.interface-spec.a1] section 7 requires at a depth that is not a power of two. The failure-path testbench is not among the expected outputs for this task. Design behaviour follows the approved specs with no deviation. A full write plus a read accepts only the read; an empty read plus a write accepts only the write; overflow and underflow are dropped; rd_data is first-word fall-through; rst_n is synchronous and active low. The work traces to [requirement:req-d57ae7630b].\"\n    }\n  ],\n  \"files\": [\n    {\n      \"path\": \"sync_fifo.v\",\n      \"kind\": \"rtl_source\",\n      \"title\": \"sync_fifo RTL: parameterizable synchronous first-word fall-through FIFO\",\n      \"summary\": \"Implements the ports, parameters and behaviour of [artifact:prj-edb1c0f84a.interface-spec.a1] using the plan in [artifact:prj-edb1c0f84a.microarchitecture.a1].\\n- Storage is an unreset mem array.\\n- wr_ptr and rd_ptr wrap at LAST = DEPTH-1 by compare, not by overflow.\\n- Occupancy is an explicit count register: full = count==DEPTH, empty = count==0.\\n- wr_acc = wr_en && !full and rd_acc = rd_en && !empty.\\n- rd_data = mem[rd_ptr], combinational.\\n- Synchronous active-low reset clears the pointers and count.\\n- Next-state logic sits in always @(*) blocks with defaults, so no latch should be inferred. Registers use only non-blocking assignments.\\n- A formal block under `ifdef FORMAL` holds the properties listed in the microarchitecture verification plan, plus covers.\\n- Traces to [requirement:req-d57ae7630b].\",\n      \"entry\": \"sync_fifo\"\n    },\n    {\n      \"path\": \"sync_fifo_tb.v\",\n      \"kind\": \"testbench\",\n      \"title\": \"Self-checking testbench for sync_fifo, DEPTH 8xWIDTH 8 and DEPTH 5xWIDTH 12\",\n      \"summary\": \"Runs two FIFOs on the same stimulus, as planned in [artifact:prj-edb1c0f84a.microarchitecture.a1].\\n- Each FIFO has a fifo_scoreboard reference queue that updates on posedge.\\n- On every negedge the scoreboard checks count, full, empty, never-both-high and (when not empty) rd_data. Every failure is reported with $error, and passing checks are counted.\\n- A directed phase covers the corner cases listed in [artifact:prj-edb1c0f84a.interface-spec.a1] section 7: read while empty, write+read when empty, fill past full, write+read when full and in between, drain past empty, pointer wrap, and reset during traffic.\\n- Six random phases follow, with different write/read biases and a mid-run reset.\\n- Ten coverage goals per FIFO fail the run if any goal is unreached.\\n- The verdict line is printed once using the nirmaan_nonce plusarg, followed by $finish.\\n- Traces to [requirement:req-d57ae7630b].\",\n      \"entry\": \"sync_fifo_tb\"\n    },\n    {\n      \"path\": \"sync_fifo.sby\",\n      \"kind\": \"formal_spec\",\n      \"title\": \"SymbiYosys prove job for sync_fifo at default DEPTH 8\",\n      \"summary\": \"Single-task job: mode prove, depth 24, smtbmc engine, reads sync_fifo.v with -formal and runs prep -top sync_fifo.\\n\\nIt targets the proof required by [artifact:prj-edb1c0f84a.interface-spec.a1] section 7:\\n- the flags are consistent and never both high;\\n- count and the pointers stay in range;\\n- wr_ptr equals rd_ptr plus count, mod DEPTH;\\n- count moves only by accepted requests;\\n- a write while full and a read while empty change nothing;\\n- a solver-chosen slot keeps its written word until it is read, and rd_data shows that word.\\n\\nCovers include full followed by empty, so the proof is not vacuous. Traces to [requirement:req-d57ae7630b].\",\n      \"entry\": \"sync_fifo\"\n    }\n  ],\n  \"tool_runs\": [],\n  \"claims\": [\n    \"The RTL is expected, but not shown, to be Verilator -Wall lint clean. Constants are given explicit widths through part-selects of integer localparams to avoid WIDTH warnings.\",\n    \"The design has no latch by construction: every combinational variable gets a default at the top of its always @(*) block. Yosys has not confirmed this.\",\n    \"The formal invariants are intended to be 1-inductive: count range, pointer range, the wr_ptr = rd_ptr + count (mod DEPTH) relation, and occupied-slot data equality. Whether k-induction closes at depth 24 is unproven.\",\n    \"Every cover in the formal block should be reachable within 24 steps at DEPTH 8. The longest, full followed by empty, needs about 18 steps.\",\n    \"The testbench needs Verilator --timing (or --binary) for its delays, and $value$plusargs needs --binary or --main. Icarus may need a SystemVerilog generation flag to accept $error.\"\n  ],\n  \"escalation\": null,\n  \"notes\": \"Sources: the approved interface spec [artifact:prj-edb1c0f84a.interface-spec.a1] and microarchitecture [artifact:prj-edb1c0f84a.microarchitecture.a1], both independently reviewed per [evidence:prj-edb1c0f84a.interface-spec.e1] and [evidence:prj-edb1c0f84a.microarchitecture.e1].\\n\\nRemaining gaps, recorded rather than escalated, because the one-sby limit is a platform constraint:\\n- The DEPTH 5 formal proof is not submitted, since formal.run takes one job file.\\n- The failure-path testbench is not produced.\\n\\nIf the induction step does not close, the likely fix is a tighter invariant on f_data or a different depth, and this seat should be told.\\n\\nNo elaboration-time guard rejects DEPTH < 2. The spec restricts DEPTH to 2 or more, and the testbench and proof use only legal values.\"\n}\n```\n=== FILE: sync_fifo.v ===\n`timescale 1ns/1ps\n// sync_fifo: parameterizable synchronous FIFO with first-word fall-through.\n// Interface: interface_spec.md. Implementation plan: microarchitecture.md.\n//  - Storage: mem[DEPTH] of WIDTH bits, not reset, written only outside reset.\n//  - Pointers: wr_ptr (next slot to write), rd_ptr (oldest entry), wrapping\n//    from LAST = DEPTH-1 to 0 by compare, so any DEPTH >= 2 works.\n//  - Occupancy: explicit count register; full/empty are compares on it.\n//  - Accept: wr_acc = wr_en && !full, rd_acc = rd_en && !empty.\n//  - Read port: rd_data = mem[rd_ptr] (combinational, first-word fall-through).\n//  - Reset: synchronous, active low; clears pointers and count.\nmodule sync_fifo #(\n    parameter integer DEPTH = 8,\n    parameter integer WIDTH = 8\n) (\n    input  wire                       clk,\n    input  wire                       rst_n,\n    input  wire                       wr_en,\n    input  wire [WIDTH-1:0]           wr_data,\n    output wire                       full,\n    input  wire                       rd_en,\n    output wire [WIDTH-1:0]           rd_data,\n    output wire                       empty,\n    output wire [$clog2(DEPTH+1)-1:0] count\n);\n\n    localparam integer  AW         = $clog2(DEPTH);\n    localparam integer  CW         = $clog2(DEPTH+1);\n    localparam integer  ONE        = 1;\n    localparam integer  LAST_I     = DEPTH - 1;\n    localparam [AW-1:0] LAST       = LAST_I[AW-1:0];\n    localparam [AW-1:0] PTR_ONE    = ONE[AW-1:0];\n    localparam [CW-1:0] CNT_ONE    = ONE[CW-1:0];\n    localparam [CW-1:0] FULL_COUNT = DEPTH[CW-1:0];\n\n    // Storage (datapath, not reset)\n    reg  [WIDTH-1:0] mem [0:DEPTH-1];\n\n    // State and next state\n    reg  [AW-1:0]    wr_ptr;\n    reg  [AW-1:0]    wr_ptr_d;\n    reg  [AW-1:0]    rd_ptr;\n    reg  [AW-1:0]    rd_ptr_d;\n    reg  [CW-1:0]    count_q;\n    reg  [CW-1:0]    count_d;\n\n    wire             wr_acc;\n    wire             rd_acc;\n\n    // Flags are compares on a register: no combinational path from inputs.\n    assign full    = (count_q == FULL_COUNT);\n    assign empty   = (count_q == {CW{1'b0}});\n    assign count   = count_q;\n\n    // The flags gate the requests: overflow and underflow policy.\n    assign wr_acc  = wr_en && !full;\n    assign rd_acc  = rd_en && !empty;\n\n    // First-word fall-through read port.\n    assign rd_data = mem[rd_ptr];\n\n    // Next write pointer\n    always @(*) begin\n        wr_ptr_d = wr_ptr;\n        if (wr_acc) begin\n            if (wr_ptr == LAST) begin\n                wr_ptr_d = {AW{1'b0}};\n            end else begin\n                wr_ptr_d = wr_ptr + PTR_ONE;\n            end\n        end\n    end\n\n    // Next read pointer\n    always @(*) begin\n        rd_ptr_d = rd_ptr;\n        if (rd_acc) begin\n            if (rd_ptr == LAST) begin\n                rd_ptr_d = {AW{1'b0}};\n            end else begin\n                rd_ptr_d = rd_ptr + PTR_ONE;\n            end\n        end\n    end\n\n    // Next count: +1 on write only, -1 on read only, hold otherwise.\n    always @(*) begin\n        count_d = count_q;\n        if (wr_acc && !rd_acc) begin\n            count_d = count_q + CNT_ONE;\n        end else if (rd_acc && !wr_acc) begin\n            count_d = count_q - CNT_ONE;\n        end\n    end\n\n    // Control registers: synchronous active-low reset.\n    always @(posedge clk) begin\n        if (!rst_n) begin\n            wr_ptr  <= {AW{1'b0}};\n            rd_ptr  <= {AW{1'b0}};\n            count_q <= {CW{1'b0}};\n        end else begin\n            wr_ptr  <= wr_ptr_d;\n            rd_ptr  <= rd_ptr_d;\n            count_q <= count_d;\n        end\n    end\n\n    // Storage write, only outside reset and only for an accepted write.\n    always @(posedge clk) begin\n        if (rst_n && wr_acc) begin\n            mem[wr_ptr] <= wr_data;\n        end\n    end\n\n`ifdef FORMAL\n    // ------------------------------------------------------------------\n    // Design-intent properties (microarchitecture.md section 6).\n    // ------------------------------------------------------------------\n    reg f_past_valid;\n    initial f_past_valid = 1'b0;\n    always @(posedge clk)\n        f_past_valid <= 1'b1;\n\n    // Reset is active in the first cycle.\n    always @(*)\n        if (!f_past_valid)\n            assume (!rst_n);\n\n    // One solver-chosen slot.\n    (* anyconst *) reg [AW-1:0] f_addr;\n    always @(*)\n        assume (f_addr <= LAST);\n\n    // The word most recently written to that slot.\n    reg [WIDTH-1:0] f_data;\n    always @(posedge clk)\n        if (rst_n && wr_acc && (wr_ptr == f_addr))\n            f_data <= wr_data;\n\n    wire [31:0] f_wr32   = {{(32-AW){1'b0}}, wr_ptr};\n    wire [31:0] f_rd32   = {{(32-AW){1'b0}}, rd_ptr};\n    wire [31:0] f_cnt32  = {{(32-CW){1'b0}}, count_q};\n    wire [31:0] f_adr32  = {{(32-AW){1'b0}}, f_addr};\n    wire [31:0] f_dep32  = DEPTH;\n    wire [31:0] f_sum32  = f_rd32 + f_cnt32;\n    wire [31:0] f_wr_exp = (f_sum32 >= f_dep32) ? (f_sum32 - f_dep32) : f_sum32;\n    wire [31:0] f_off    = (f_adr32 >= f_rd32) ? (f_adr32 - f_rd32)\n                                               : (f_adr32 + f_dep32 - f_rd32);\n    wire        f_occupied = (f_off < f_cnt32);\n\n    // State invariants\n    always @(*) begin\n        if (f_past_valid) begin\n            assert (f_cnt32 <= f_dep32);\n            assert (f_wr32 <= (f_dep32 - 32'd1));\n            assert (f_rd32 <= (f_dep32 - 32'd1));\n            assert (full  == (count_q == FULL_COUNT));\n            assert (empty == (count_q == {CW{1'b0}}));\n            assert (!(full && empty));\n            assert (f_wr32 == f_wr_exp);\n            if (f_occupied)\n                assert (mem[f_addr] == f_data);\n            if (f_occupied && (rd_ptr == f_addr))\n                assert (rd_data == f_data);\n        end\n    end\n\n    // Transition properties\n    always @(posedge clk) begin\n        if (f_past_valid) begin\n            if (!$past(rst_n)) begin\n                assert (count_q == {CW{1'b0}});\n                assert (wr_ptr  == {AW{1'b0}});\n                assert (rd_ptr  == {AW{1'b0}});\n                assert (empty);\n                assert (!full);\n            end else begin\n                // count moves by exactly the accepted requests\n                if ($past(wr_acc) && !$past(rd_acc))\n                    assert (count_q == ($past(count_q) + CNT_ONE));\n                else if ($past(rd_acc) && !$past(wr_acc))\n                    assert (count_q == ($past(count_q) - CNT_ONE));\n                else\n                    assert (count_q == $past(count_q));\n\n                // pointers move only on accepted requests\n                if ($past(wr_acc))\n                    assert (wr_ptr == (($past(wr_ptr) == LAST) ? {AW{1'b0}}\n                                                               : ($past(wr_ptr) + PTR_ONE)));\n                else\n                    assert (wr_ptr == $past(wr_ptr));\n                if ($past(rd_acc))\n                    assert (rd_ptr == (($past(rd_ptr) == LAST) ? {AW{1'b0}}\n                                                               : ($past(rd_ptr) + PTR_ONE)));\n                else\n                    assert (rd_ptr == $past(rd_ptr));\n\n                // a write while full changes nothing on the write side\n                if ($past(wr_en) && $past(full)) begin\n                    assert (wr_ptr == $past(wr_ptr));\n                    assert (mem[f_addr] == $past(mem[f_addr]));\n                    if (!$past(rd_en))\n                        assert (count_q == FULL_COUNT);\n                end\n\n                // a read while empty changes nothing on the read side\n                if ($past(rd_en) && $past(empty)) begin\n                    assert (rd_ptr == $past(rd_ptr));\n                    if (!$past(wr_en))\n                        assert (count_q == {CW{1'b0}});\n                end\n            end\n        end\n    end\n\n    // Covers: the proof must not be vacuous.\n    reg f_was_full;\n    always @(posedge clk)\n        if (!rst_n)\n            f_was_full <= 1'b0;\n        else if (full)\n            f_was_full <= 1'b1;\n\n    always @(*) begin\n        if (f_past_valid && rst_n) begin\n            cover (full);\n            cover (wr_en && !rd_en && full);\n            cover (rd_en && !wr_en && empty);\n            cover (wr_en && rd_en && empty);\n            cover (wr_en && rd_en && full);\n            cover (wr_acc && rd_acc);\n            cover (wr_acc && (wr_ptr == LAST));\n            cover (rd_acc && (rd_ptr == LAST));\n            cover (rd_acc && (rd_ptr == f_addr) && f_occupied);\n            cover (f_was_full && empty);\n        end\n    end\n`endif\n\nendmodule\n=== END FILE ===\n=== FILE: sync_fifo_tb.v ===\n`timescale 1ns/1ps\n// Self-checking testbench for sync_fifo (interface_spec.md section 7).\n// Two FIFOs share one stimulus: DEPTH 8 x WIDTH 8 and DEPTH 5 x WIDTH 12.\n// Each has a reference-queue scoreboard that checks count, full, empty and\n// rd_data on every cycle and counts coverage goals.\nmodule sync_fifo_tb;\n\n    localparam integer DEPTH_A = 8;\n    localparam integer WIDTH_A = 8;\n    localparam integer DEPTH_B = 5;\n    localparam integer WIDTH_B = 12;\n    localparam integer CW_A    = $clog2(DEPTH_A + 1);\n    localparam integer CW_B    = $clog2(DEPTH_B + 1);\n\n    reg                clk;\n    reg                rst_n;\n    reg                wr_en;\n    reg                rd_en;\n    reg  [WIDTH_B-1:0] wr_data;\n    reg                done;\n\n    wire               full_a;\n    wire               empty_a;\n    wire               full_b;\n    wire               empty_b;\n    wire [WIDTH_A-1:0] rd_data_a;\n    wire [WIDTH_B-1:0] rd_data_b;\n    wire [CW_A-1:0]    count_a;\n    wire [CW_B-1:0]    count_b;\n    wire [31:0]        passed_a;\n    wire [31:0]        failed_a;\n    wire [31:0]        passed_b;\n    wire [31:0]        failed_b;\n\n    reg  [8*64-1:0]    nonce;\n    reg  [31:0]        r;\n    reg  [31:0]        rr;\n    reg  [7:0]         wr_th;\n    reg  [7:0]         rd_th;\n    reg                rst_v;\n    reg  [31:0]        total_pass;\n    reg  [31:0]        total_fail;\n    integer            ok;\n    integer            i;\n    integer            phase;\n\n    initial clk = 1'b0;\n    always #5 clk = ~clk;\n\n    sync_fifo #(.DEPTH(DEPTH_A), .WIDTH(WIDTH_A)) dut_a (\n        .clk     (clk),\n        .rst_n   (rst_n),\n        .wr_en   (wr_en),\n        .wr_data (wr_data[WIDTH_A-1:0]),\n        .full    (full_a),\n        .rd_en   (rd_en),\n        .rd_data (rd_data_a),\n        .empty   (empty_a),\n        .count   (count_a)\n    );\n\n    sync_fifo #(.DEPTH(DEPTH_B), .WIDTH(WIDTH_B)) dut_b (\n        .clk     (clk),\n        .rst_n   (rst_n),\n        .wr_en   (wr_en),\n        .wr_data (wr_data),\n        .full    (full_b),\n        .rd_en   (rd_en),\n        .rd_data (rd_data_b),\n        .empty   (empty_b),\n        .count   (count_b)\n    );\n\n    fifo_scoreboard #(.DEPTH(DEPTH_A), .WIDTH(WIDTH_A)) sb_a (\n        .clk     (clk),\n        .rst_n   (rst_n),\n        .wr_en   (wr_en),\n        .rd_en   (rd_en),\n        .wr_data (wr_data[WIDTH_A-1:0]),\n        .full    (full_a),\n        .empty   (empty_a),\n        .rd_data (rd_data_a),\n        .count   (count_a),\n        .done    (done),\n        .passed  (passed_a),\n        .failed  (failed_a)\n    );\n\n    fifo_scoreboard #(.DEPTH(DEPTH_B), .WIDTH(WIDTH_B)) sb_b (\n        .clk     (clk),\n        .rst_n   (rst_n),\n        .wr_en   (wr_en),\n        .rd_en   (rd_en),\n        .wr_data (wr_data),\n        .full    (full_b),\n        .empty   (empty_b),\n        .rd_data (rd_data_b),\n        .count   (count_b),\n        .done    (done),\n        .passed  (passed_b),\n        .failed  (failed_b)\n    );\n\n    // Apply one cycle of stimulus, away from the rising edge.\n    task drive(input w, input rd_i, input rst_i);\n        begin\n            @(negedge clk);\n            #1;\n            r       = $random;\n            wr_data = r[WIDTH_B-1:0];\n            wr_en   = w;\n            rd_en   = rd_i;\n            rst_n   = rst_i;\n        end\n    endtask\n\n    initial begin\n        nonce      = {512{1'b0}};\n        ok         = $value$plusargs(\"nirmaan_nonce=%s\", nonce);\n        rst_n      = 1'b0;\n        wr_en      = 1'b0;\n        rd_en      = 1'b0;\n        wr_data    = {WIDTH_B{1'b0}};\n        done       = 1'b0;\n        wr_th      = 8'd0;\n        rd_th      = 8'd0;\n        rst_v      = 1'b1;\n        r          = 32'd0;\n        rr         = 32'd0;\n        total_pass = 32'd0;\n        total_fail = 32'd0;\n\n        // Reset\n        drive(1'b0, 1'b0, 1'b0);\n        drive(1'b0, 1'b0, 1'b0);\n\n        // Read while empty (ignored)\n        drive(1'b0, 1'b1, 1'b1);\n        drive(1'b0, 1'b1, 1'b1);\n\n        // Write and read together while empty (only the write is accepted)\n        drive(1'b1, 1'b1, 1'b1);\n\n        // Fill to full, then keep writing (writes while full are dropped);\n        // the write pointer wraps on both FIFOs.\n        for (i = 0; i < 10; i = i + 1)\n            drive(1'b1, 1'b0, 1'b1);\n\n        // Write and read together when full, then in between\n        for (i = 0; i < 3; i = i + 1)\n            drive(1'b1, 1'b1, 1'b1);\n\n        // Drain to empty, then keep reading (reads while empty ignored);\n        // the read pointer wraps on both FIFOs.\n        for (i = 0; i < 12; i = i + 1)\n            drive(1'b0, 1'b1, 1'b1);\n\n        // Reset during traffic\n        for (i = 0; i < 4; i = i + 1)\n            drive(1'b1, 1'b0, 1'b1);\n        drive(1'b1, 1'b1, 1'b0);\n        drive(1'b1, 1'b1, 1'b0);\n        drive(1'b0, 1'b0, 1'b1);\n\n        // Random traffic with stalls on both sides, several biases,\n        // and one reset in the middle of heavy traffic.\n        for (phase = 0; phase < 6; phase = phase + 1) begin\n            case (phase)\n                0:       begin wr_th = 8'd200; rd_th = 8'd60;  end\n                1:       begin wr_th = 8'd60;  rd_th = 8'd200; end\n                2:       begin wr_th = 8'd128; rd_th = 8'd128; end\n                3:       begin wr_th = 8'd230; rd_th = 8'd230; end\n                4:       begin wr_th = 8'd40;  rd_th = 8'd40;  end\n                5:       begin wr_th = 8'd180; rd_th = 8'd150; end\n                default: begin wr_th = 8'd128; rd_th = 8'd128; end\n            endcase\n            for (i = 0; i < 400; i = i + 1) begin\n                rr    = $random;\n                rst_v = !((phase == 3) && (i >= 200) && (i < 202));\n                drive(rr[7:0] < wr_th, rr[15:8] < rd_th, rst_v);\n            end\n        end\n\n        // Idle, then ask the scoreboards for their coverage verdicts.\n        drive(1'b0, 1'b0, 1'b1);\n        drive(1'b0, 1'b0, 1'b1);\n        drive(1'b0, 1'b0, 1'b1);\n        @(negedge clk);\n        #1;\n        done = 1'b1;\n        repeat (3) @(negedge clk);\n        #1;\n\n        total_pass = passed_a + passed_b;\n        total_fail = failed_a + failed_b;\n        $display(\"NIRMAAN-SIM %0s %0d passed, %0d failed\", nonce, total_pass, total_fail);\n        $finish;\n    end\n\nendmodule\n\n// Reference-queue scoreboard for one sync_fifo instance.\n// The model updates on the rising edge from the inputs and its own state;\n// the DUT outputs are compared with it on the falling edge.\n// Coverage goals: 1 full, 2 write while full, 3 drain to empty,\n// 4 read while empty, 5 write+read when empty, 6 write+read when full,\n// 7 write+read in between, 8 write pointer wrap, 9 read pointer wrap,\n// 10 reset during traffic.\nmodule fifo_scoreboard #(\n    parameter integer DEPTH = 8,\n    parameter integer WIDTH = 8\n) (\n    input  wire                       clk,\n    input  wire                       rst_n,\n    input  wire                       wr_en,\n    input  wire                       rd_en,\n    input  wire [WIDTH-1:0]           wr_data,\n    input  wire                       full,\n    input  wire                       empty,\n    input  wire [WIDTH-1:0]           rd_data,\n    input  wire [$clog2(DEPTH+1)-1:0] count,\n    input  wire                       done,\n    output reg  [31:0]                passed,\n    output reg  [31:0]                failed\n);\n\n    localparam integer CW = $clog2(DEPTH + 1);\n\n    reg  [WIDTH-1:0] q [0:DEPTH-1];\n    integer          head;\n    integer          tail;\n    reg  [31:0]      n;\n    reg              armed;\n    reg              reported;\n\n    reg  [31:0]      cov_full;\n    reg  [31:0]      cov_wr_full;\n    reg  [31:0]      cov_drain;\n    reg  [31:0]      cov_rd_empty;\n    reg  [31:0]      cov_both_empty;\n    reg  [31:0]      cov_both_full;\n    reg  [31:0]      cov_both_mid;\n    reg  [31:0]      cov_wr_wrap;\n    reg  [31:0]      cov_rd_wrap;\n    reg  [31:0]      cov_rst;\n\n    wire [31:0]      count32 = {{(32-CW){1'b0}}, count};\n    wire             m_wr    = wr_en && (n < DEPTH);\n    wire             m_rd    = rd_en && (n != 32'd0);\n\n    initial begin\n        passed          = 32'd0;\n        failed          = 32'd0;\n        reported        = 1'b0;\n        armed          <= 1'b0;\n        cov_full       <= 32'd0;\n        cov_wr_full    <= 32'd0;\n        cov_drain      <= 32'd0;\n        cov_rd_empty   <= 32'd0;\n        cov_both_empty <= 32'd0;\n        cov_both_full  <= 32'd0;\n        cov_both_mid   <= 32'd0;\n        cov_wr_wrap    <= 32'd0;\n        cov_rd_wrap    <= 32'd0;\n        cov_rst        <= 32'd0;\n    end\n\n    // Reference model and coverage, on the rising edge.\n    always @(posedge clk) begin\n        if (!rst_n) begin\n            if (armed && (n != 32'd0))\n                cov_rst <= cov_rst + 32'd1;\n            head  <= 0;\n            tail  <= 0;\n            n     <= 32'd0;\n            armed <= 1'b1;\n        end else if (armed) begin\n            if (m_wr) begin\n                q[tail] <= wr_data;\n                tail    <= (tail == DEPTH - 1) ? 0 : tail + 1;\n            end\n            if (m_rd)\n                head <= (head == DEPTH - 1) ? 0 : head + 1;\n            if (m_wr && !m_rd)\n                n <= n + 32'd1;\n            else if (m_rd && !m_wr)\n                n <= n - 32'd1;\n\n            if (n == DEPTH)\n                cov_full <= cov_full + 32'd1;\n            if (wr_en && !rd_en && (n == DEPTH))\n                cov_wr_full <= cov_wr_full + 32'd1;\n            if (m_rd && !m_wr && (n == 32'd1))\n                cov_drain <= cov_drain + 32'd1;\n            if (rd_en && !wr_en && (n == 32'd0))\n                cov_rd_empty <= cov_rd_empty + 32'd1;\n            if (wr_en && rd_en && (n == 32'd0))\n                cov_both_empty <= cov_both_empty + 32'd1;\n            if (wr_en && rd_en && (n == DEPTH))\n                cov_both_full <= cov_both_full + 32'd1;\n            if (wr_en && rd_en && (n != 32'd0) && (n < DEPTH))\n                cov_both_mid <= cov_both_mid + 32'd1;\n            if (m_wr && (tail == DEPTH - 1))\n                cov_wr_wrap <= cov_wr_wrap + 32'd1;\n            if (m_rd && (head == DEPTH - 1))\n                cov_rd_wrap <= cov_rd_wrap + 32'd1;\n        end\n    end\n\n    task goal(input [31:0] hits, input integer id);\n        begin\n            if (hits != 32'd0) begin\n                passed = passed + 32'd1;\n            end else begin\n                failed = failed + 32'd1;\n                $error(\"sync_fifo DEPTH=%0d: coverage goal %0d not reached (1 full, 2 write while full, 3 drain to empty, 4 read while empty, 5 write+read when empty, 6 write+read when full, 7 write+read in between, 8 write pointer wrap, 9 read pointer wrap, 10 reset during traffic)\", DEPTH, id);\n            end\n        end\n    endtask\n\n    // Output checks, on the falling edge.\n    always @(negedge clk) begin\n        if (armed) begin\n            if (count32 === n) begin\n                passed = passed + 32'd1;\n            end else begin\n                failed = failed + 32'd1;\n                $error(\"sync_fifo DEPTH=%0d: count is %0d, expected %0d at %0t\", DEPTH, count32, n, $time);\n            end\n\n            if (full === (n == DEPTH)) begin\n                passed = passed + 32'd1;\n            end else begin\n                failed = failed + 32'd1;\n                $error(\"sync_fifo DEPTH=%0d: full is %b, expected %b at %0t\", DEPTH, full, (n == DEPTH), $time);\n            end\n\n            if (empty === (n == 32'd0)) begin\n                passed = passed + 32'd1;\n            end else begin\n                failed = failed + 32'd1;\n                $error(\"sync_fifo DEPTH=%0d: empty is %b, expected %b at %0t\", DEPTH, empty, (n == 32'd0), $time);\n            end\n\n            if (!(full && empty)) begin\n                passed = passed + 32'd1;\n            end else begin\n                failed = failed + 32'd1;\n                $error(\"sync_fifo DEPTH=%0d: full and empty both high at %0t\", DEPTH, $time);\n            end\n\n            if (n != 32'd0) begin\n                if (rd_data === q[head]) begin\n                    passed = passed + 32'd1;\n                end else begin\n                    failed = failed + 32'd1;\n                    $error(\"sync_fifo DEPTH=%0d: rd_data is %h, expected %h at %0t\", DEPTH, rd_data, q[head], $time);\n                end\n            end\n        end\n\n        if (done && !reported) begin\n            reported = 1'b1;\n            goal(cov_full,       1);\n            goal(cov_wr_full,    2);\n            goal(cov_drain,      3);\n            goal(cov_rd_empty,   4);\n            goal(cov_both_empty, 5);\n            goal(cov_both_full,  6);\n            goal(cov_both_mid,   7);\n            goal(cov_wr_wrap,    8);\n            goal(cov_rd_wrap,    9);\n            goal(cov_rst,        10);\n        end\n    end\n\nendmodule\n=== END FILE ===\n=== FILE: sync_fifo.sby ===\n[options]\nmode prove\ndepth 24\n\n[engines]\nsmtbmc\n\n[script]\nread -formal sync_fifo.v\nprep -top sync_fifo\n\n[files]\nsync_fifo.v\n=== END FILE ==="
+    }
+  ],
+  "format": "nirmaan.eval-trial",
+  "harness_variant": "default",
+  "judge_runs": [
+    {
+      "check": "The reference testbench passes on the seat's RTL",
+      "params": {
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-iedlmeo4/seat/prj-edb1c0f84a_rtl-implementation/1/sync_fifo.v",
+          "tests/fixtures/rtl/sync_fifo/sync_fifo_tb.v"
+        ],
+        "top": "sync_fifo_tb"
+      },
+      "run": "run-0006",
+      "succeeded": true,
+      "summary": "icarus: simulation passed: 22507 checks passed, $finish reached at time 30650000, 0 errors",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The seat's testbench fails each FIFO mutant",
+      "params": {
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-iedlmeo4/judge/check-2/must-fail-q1f08k09/clean/sync_fifo_tb.v",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-iedlmeo4/judge/check-2/must-fail-q1f08k09/clean/sync_fifo.v"
+        ],
+        "top": "sync_fifo_tb"
+      },
+      "run": "run-0007",
+      "succeeded": true,
+      "summary": "icarus: simulation passed: 23842 checks passed, $finish reached at time 24441000, 0 errors",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The seat's testbench fails each FIFO mutant",
+      "params": {
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-iedlmeo4/judge/check-2/must-fail-q1f08k09/mutant-1-1/sync_fifo_tb.v",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-iedlmeo4/judge/check-2/must-fail-q1f08k09/mutant-1-1/sync_fifo.v"
+        ],
+        "top": "sync_fifo_tb"
+      },
+      "run": "run-0008",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: 7500 errors, the testbench reports 7500 of 23842 checks failed; first: /private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-iedlmeo4/judge/check-2/must-fail-q1f08k09/mutant-1-1/sync_fifo_tb.v:328: sync_fifo DEPTH=5: count is 6, expected 5 at 110000",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The seat's testbench fails each FIFO mutant",
+      "params": {
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-iedlmeo4/judge/check-2/must-fail-q1f08k09/mutant-1-2/sync_fifo_tb.v",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-iedlmeo4/judge/check-2/must-fail-q1f08k09/mutant-1-2/sync_fifo.v"
+        ],
+        "top": "sync_fifo_tb"
+      },
+      "run": "run-0009",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: 795 errors, the testbench reports 795 of 23842 checks failed; first: /private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-iedlmeo4/judge/check-2/must-fail-q1f08k09/mutant-1-2/sync_fifo_tb.v:357: sync_fifo DEPTH=5: rd_data is xxx, expected 4c5 at 210000",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The case's DEPTH 5 proof reaches every cover and fails each mutant",
+      "params": {
+        "sby": "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-iedlmeo4/judge/check-3/must-fail-6x31l5r6/clean/sync_fifo_depth5.sby",
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-iedlmeo4/judge/check-3/must-fail-6x31l5r6/clean/sync_fifo.v"
+        ]
+      },
+      "run": "run-0010",
+      "succeeded": true,
+      "summary": "symbiyosys: formal passed: every property proven",
+      "tool": "formal.run"
+    },
+    {
+      "check": "The case's DEPTH 5 proof reaches every cover and fails each mutant",
+      "params": {
+        "sby": "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-iedlmeo4/judge/check-3/must-fail-6x31l5r6/cover/sync_fifo_depth5.sby",
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-iedlmeo4/judge/check-3/must-fail-6x31l5r6/cover/sync_fifo.v"
+        ]
+      },
+      "run": "run-0011",
+      "succeeded": true,
+      "summary": "symbiyosys-cover: not vacuous: every cover reached (6 of 6); every assertion antecedent reached (18 of 18)",
+      "tool": "formal.cover"
+    },
+    {
+      "check": "The case's DEPTH 5 proof reaches every cover and fails each mutant",
+      "params": {
+        "sby": "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-iedlmeo4/judge/check-3/must-fail-6x31l5r6/mutant-1-1/sync_fifo_depth5.sby",
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-iedlmeo4/judge/check-3/must-fail-6x31l5r6/mutant-1-1/sync_fifo.v"
+        ]
+      },
+      "run": "run-0012",
+      "succeeded": false,
+      "summary": "symbiyosys: formal fail: 4 errors; first: sync_fifo.v:132: [ASSERT] assertion sync_fifo._witness_.check_assert_sync_fifo_v_132_301 failed at step 8",
+      "tool": "formal.run"
+    },
+    {
+      "check": "The case's DEPTH 5 proof reaches every cover and fails each mutant",
+      "params": {
+        "sby": "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-iedlmeo4/judge/check-3/must-fail-6x31l5r6/mutant-1-2/sync_fifo_depth5.sby",
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-iedlmeo4/judge/check-3/must-fail-6x31l5r6/mutant-1-2/sync_fifo.v"
+        ]
+      },
+      "run": "run-0013",
+      "succeeded": false,
+      "summary": "symbiyosys: formal fail: 2 errors; first: sync_fifo.v:132: [ASSERT] assertion sync_fifo._witness_.check_assert_sync_fifo_v_132_299 failed at step 7",
+      "tool": "formal.run"
+    },
+    {
+      "check": "The case's DEPTH 8 proof reaches every cover and fails each mutant wrong at DEPTH 8",
+      "params": {
+        "sby": "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-iedlmeo4/judge/check-4/must-fail-oznxfnew/clean/sync_fifo.sby",
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-iedlmeo4/judge/check-4/must-fail-oznxfnew/clean/sync_fifo.v"
+        ]
+      },
+      "run": "run-0014",
+      "succeeded": true,
+      "summary": "symbiyosys: formal passed: every property proven",
+      "tool": "formal.run"
+    },
+    {
+      "check": "The case's DEPTH 8 proof reaches every cover and fails each mutant wrong at DEPTH 8",
+      "params": {
+        "sby": "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-iedlmeo4/judge/check-4/must-fail-oznxfnew/cover/sync_fifo.sby",
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-iedlmeo4/judge/check-4/must-fail-oznxfnew/cover/sync_fifo.v"
+        ]
+      },
+      "run": "run-0015",
+      "succeeded": true,
+      "summary": "symbiyosys-cover: not vacuous: every cover reached (6 of 6); every assertion antecedent reached (18 of 18)",
+      "tool": "formal.cover"
+    },
+    {
+      "check": "The case's DEPTH 8 proof reaches every cover and fails each mutant wrong at DEPTH 8",
+      "params": {
+        "sby": "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-iedlmeo4/judge/check-4/must-fail-oznxfnew/mutant-1-1/sync_fifo.sby",
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-iedlmeo4/judge/check-4/must-fail-oznxfnew/mutant-1-1/sync_fifo.v"
+        ]
+      },
+      "run": "run-0016",
+      "succeeded": false,
+      "summary": "symbiyosys: formal fail: 3 errors; first: sync_fifo.v:132: [ASSERT] assertion sync_fifo._witness_.check_assert_sync_fifo_v_132_118 failed at step 11",
+      "tool": "formal.run"
+    }
+  ],
+  "knowledge": "on",
+  "model": "claude-opus-5-5",
+  "purpose": "evidence",
+  "record": "2026-11-19-claude-code-claude-opus-5-5-65",
+  "result": {
+    "attempts": 1,
+    "attestations": [],
+    "audit_ok": true,
+    "case": "rtl/sync-fifo",
+    "case_digest": "sha256:93124976cc6edbb466007420672ab31bdc92486c3af2696a2e700e6da85ae02f",
+    "cli": "2.1.325",
+    "cost_usd": null,
+    "detail": "Sources: the approved interface spec [artifact:prj-edb1c0f84a.interface-spec.a1] and microarchitecture [artifact:prj-edb1c0f84a.microarchitecture.a1], both independently reviewed per [evidence:prj-edb1c0f84a.interface-spec.e1] and [evidence:prj-edb1c0f84a.microarchitecture.e1].\n\nRemaining gaps, recorded rather than escalated, because the one-sby limit is a platform constraint:\n- The DEPTH 5 formal proof is not submitted, since formal.run takes one job file.\n- The failure-path testbench is not produced.\n\nIf the induction step does not close, the likely fix is a tighter invariant on f_data or a different depth, and this seat should be told.\n\nNo elaboration-time guard rejects DEPTH < 2. The spec restricts DEPTH to 2 or more, and the testbench and proof use only legal values.",
+    "duration_s": 447.503,
+    "gate_runs": [
+      {
+        "run": "run-0001",
+        "succeeded": true,
+        "summary": "verilator-lint: lint clean: 0 errors, 0 warnings",
+        "tool": "lint.run"
+      },
+      {
+        "run": "run-0002",
+        "succeeded": true,
+        "summary": "icarus: simulation passed: 23842 checks passed, $finish reached at time 24441000, 0 errors",
+        "tool": "simulator.run"
+      },
+      {
+        "run": "run-0003",
+        "succeeded": true,
+        "summary": "yosys: synthesis passed: 183 cells, 77 flip-flops, 0 latches, 0 warnings",
+        "tool": "synth.run"
+      },
+      {
+        "run": "run-0004",
+        "succeeded": true,
+        "summary": "symbiyosys: formal passed: every property proven",
+        "tool": "formal.run"
+      },
+      {
+        "run": "run-0005",
+        "succeeded": true,
+        "summary": "symbiyosys-cover: not vacuous: every cover reached (10 of 10); every assertion antecedent reached (26 of 26)",
+        "tool": "formal.cover"
+      }
+    ],
+    "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+    "input_tokens": 2,
+    "model_calls": 1,
+    "output_tokens": 50584,
+    "passed": true,
+    "replay": false,
+    "runtime": "claude-code",
+    "sandbox": "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-iedlmeo4",
+    "scores": [
+      {
+        "failed_runs": [],
+        "name": "The reference testbench passes on the seat's RTL",
+        "runs": [
+          "run-0006"
+        ],
+        "scorer": "held-out-run",
+        "status": "passed",
+        "summary": "simulator.run run-0006: icarus: simulation passed: 22507 checks passed, $finish reached at time 30650000, 0 errors"
+      },
+      {
+        "failed_runs": [
+          "run-0008",
+          "run-0009"
+        ],
+        "name": "The seat's testbench fails each FIFO mutant",
+        "runs": [
+          "run-0007"
+        ],
+        "scorer": "must-fail",
+        "status": "passed",
+        "summary": "simulator.run run-0007 passed on the clean inputs; 2 of 2 mutants failed it"
+      },
+      {
+        "failed_runs": [
+          "run-0012",
+          "run-0013"
+        ],
+        "name": "The case's DEPTH 5 proof reaches every cover and fails each mutant",
+        "runs": [
+          "run-0010",
+          "run-0011"
+        ],
+        "scorer": "must-fail",
+        "status": "passed",
+        "summary": "formal.run run-0010 passed on the clean inputs with every cover reached; 2 of 2 mutants failed it"
+      },
+      {
+        "failed_runs": [
+          "run-0016"
+        ],
+        "name": "The case's DEPTH 8 proof reaches every cover and fails each mutant wrong at DEPTH 8",
+        "runs": [
+          "run-0014",
+          "run-0015"
+        ],
+        "scorer": "must-fail",
+        "status": "passed",
+        "summary": "formal.run run-0014 passed on the clean inputs with every cover reached; 1 of 1 mutants failed it"
+      }
+    ],
+    "seat": "prj-edb1c0f84a:rtl-implementation",
+    "seat_status": "in_review",
+    "started_at": "2026-11-19T05:51:50.035090Z",
+    "submitted": true,
+    "tool_calls": [],
+    "version": "1.25.0"
+  },
+  "skills": {
+    "buffering_flow_control": "sha256:9ce453d40894146149cbc0b239b46c96be234eb3e1d8657fede9b2e728bfb5e2",
+    "rtl_design": "sha256:012eb9b7155ed6eb7761adca880b338f10c8f978b15dfd92f5adbb3253307a52"
+  },
+  "stage": "rtl-implementation",
+  "trial": 1,
+  "version": 1
+}
