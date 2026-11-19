@@ -229,7 +229,23 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   killed, what it made in the run's directory goes back to the runner (a link,
   pipe or other non-regular file it made there is removed first), every grant
   is taken back, and what it left in `/tmp`, `/var/tmp` and `/dev/shm` is
-  removed. The hosted runner's tool cache (the Python the package is installed
+  removed. The account has no read access to the runner's home, the checkout
+  and the runner's temporary folder (an ACL entry with no permission, whatever
+  their modes allow), and no network: its TCP connections are refused at once
+  with an ICMP "prohibited" answer and its other packets are dropped
+  (`owner` rules first in `OUTPUT`, IPv4 and IPv6). The reach test of
+  [run 44553476118](https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44553476118),
+  before either, recorded every read denied (by the home folder's own mode)
+  and the network open: `REACH NOT DENIED` on TCP to 1.1.1.1 port 443
+  (connected), TCP to 127.0.0.1 port 9 (refused by the closed port, so
+  reached) and UDP to 127.0.0.53 port 53 (sent). The replay job of
+  [run 44555981466](https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44555981466)
+  shows every probe denied: 130 files not read, 4 folders not listed, both
+  read canaries denied, TCP refused (errno 113) and UDP refused (errno 1), and
+  IPv6 with no route (errno 101). Since a TCP probe of `::1` was added, which
+  has a route, the IPv6 rule itself is shown: the replay job of
+  [run 44563164453](https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44563164453)
+  records it refused (errno 13), with every other probe denied as before. The hosted runner's tool cache (the Python the package is installed
   in, with its `site-packages` and console scripts) and its global
   `node_modules` (npm) are writable by every account on the hosted runner.
   Two replays of this change, before the action took that away, recorded it
@@ -255,7 +271,16 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   `GITHUB_STEP_SUMMARY`); to find either of two canary values the test puts in
   the harness's environment (one under a credential's name, one under a plain
   name) in its own environment or in any process's `/proc/<pid>/environ`, or
-  to read a file only the runner may read; and to signal the harness. A last
+  to read a file only the runner may read; to signal the harness; to read
+  what the judge keeps from the seat (READ probes: every reference answer,
+  held-out case file and mutant the eval cases name, all in the checkout, a
+  canary file the test writes, readable by every account by its mode, into
+  the checkout and into the runner's temporary folder, and a listing of the
+  checkout, its `.git`, the runner's home and its temporary folder); and to
+  reach the network (TCP out over IPv4 and IPv6, TCP on the loopback address
+  over IPv4 and IPv6,
+  and a UDP packet to the local name server). A canary value in the run's log
+  or results fails it too. A last
   test, the control, writes the run's own directory. Each target must exist
   first, so a refusal proves something. The job fails before any trial unless
   cocotb's verdict is a pass with every probe test in its results.
@@ -307,24 +332,26 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   own; the register block flow also waits for gates WF15 to WF19 of the G3
   council record. A replay of such a case still runs: its code is the
   reference answer.
-- **The compile residual** (`council/records/2026-11-19-seat-c-live-refusal.md`, fact 9 and decision 4, open until
-  gate SC1 is met). Seat C executes as the seat account, but `fw.build` and
-  `fw.test` compile it as the runner, and nothing screens what it includes.
-  Fact (compiled locally with the strict flags and `fw.test`'s include
-  order, not in CI): seat files that include the committed reference driver,
-  its header and its map by an absolute path or by a path with `..` compile
-  clean, and the held-out test compiles against them; a top-level asm line
-  that makes the assembler copy a file into the object also compiles clean.
-  Inference: such a driver passes both held-out checks of the single-seat
-  case without a driver being written, and including the held-out test
-  shows its text in diagnostics that a retry returns to the seat. Inference:
-  the assembler route copies any file the runner can read into the program.
-  Fact: the M53 redaction replaces only the exact value of a credential-named
-  variable. Inference: a `#line` line in seat text makes the object screen's
-  asm rule skip the lines after it. Assumption: the seat account can read
-  the checkout (only writes are probed). A re-judge compiles stored seat C
-  the way the trial did, so it cannot detect an included reference answer.
-  No live trial of a case that runs seat C runs before this is closed.
+- **The compile residual, and the compile screen** (M91, gate SC1 of
+  `council/records/2026-11-19-seat-c-live-refusal.md`, fact 9 and decision 4).
+  Seat C executes as the seat account, but `fw.build` and `fw.test` compile
+  and assemble it as the runner. The record found (compiled locally, not in
+  CI) that seat files including the committed reference driver by an
+  absolute or `..` path compile clean, and so does a top-level asm line that
+  makes the assembler copy a file into the object. Since M91, before anything
+  of a job is compiled, every backend that compiles its C refuses `#line` and
+  line markers, an include written with an absolute or `..` path, a file the
+  compiler pulls in from outside the run's folders and its own include
+  folders, and an asm statement or a file-reading assembler directive in the
+  compiler's assembly; each route is recorded refused in CI
+  (`docs/COMPILE_SCREEN.md`). The re-judge goes through the same backends, so
+  it refuses such stored seat C too. What stays, as that document lists: the
+  screen's own preprocessor opens what the seat names before the list is
+  checked (only file names come back); a seat header can break the held-out
+  test's own compile so that a diagnostic quotes its lines (inference); the
+  program `fw.test` builds holds the held-out test it is linked with; and the
+  M53 redaction replaces only the exact value of a credential-named variable
+  (fact). The live refusal above stays until gate SC7.
 - **The credential test for seat C** (`scripts/live_eval_fw_reach.py`, G3
   record, decision 4 and second addendum, decision 2, item 1) runs in the
   `replay`, `live-eval` and `rejudge` jobs of a whole-flow or firmware case,
@@ -377,9 +404,11 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   council reads the gate as: the job ran no seat code before the re-judge;
   the seat code the re-judge itself runs executes as the seat account, after
   that job's own reach and credential tests showed every probe denied,
-  between two hashes of its checkout; seat C is compiled as the runner. Until
-  gate SC1 is met, a re-judge compiles stored seat C the way the trial did,
-  so it cannot detect an included reference answer. The
+  between two hashes of its checkout; seat C is compiled as the runner. A
+  re-judge compiles stored seat C the way the trial did; since gate SC1 (the
+  compile screen, M91) both refuse an include of a file outside the run's
+  folders before anything is compiled, so an included reference answer is
+  refused, not repeated. The
   re-judged records, each with its `rejudge.json`, are uploaded as
   `live-eval-rejudged-<run id>`; that is the re-judge a record is committed
   with.
