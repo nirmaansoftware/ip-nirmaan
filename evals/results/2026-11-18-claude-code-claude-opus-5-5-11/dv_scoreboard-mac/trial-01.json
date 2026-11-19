@@ -1,0 +1,168 @@
+{
+  "answers": [
+    {
+      "cache_read_tokens": 620,
+      "cache_write_tokens": 11986,
+      "error": null,
+      "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+      "input_tokens": 2,
+      "mode": "work",
+      "model": "claude-opus-5-5",
+      "output_tokens": 17633,
+      "packet_sha256": "f01ace538be40c84df24ff4c6af1dafe1b32fd9d1eb03f2a32f2f42341c9278e",
+      "prompt_sha256": "620038b57ef50182eb99571988c3b71141e1cf22993678ac9c870aa89fa43657",
+      "provider": "claude-code",
+      "text": "```json\n{\"uncertainty\": 0.3, \"outcome\": \"Self-checking scoreboard testbench for mac8 submitted. Its reference model is written from the interface specification. It still needs the platform's simulator.run over the approved RTL and an independent review.\", \"artifacts\": [{\"kind\": \"testbench\", \"title\": \"mac8 scoreboard testbench (tb_mac8)\", \"summary\": \"Scoreboard testbench for requirement [requirement:req-fdee493310]. The reference model is written from the clauses MAC-RESET, MAC-CLEAR, MAC-ACC, MAC-HOLD, MAC-SAT and MAC-STICKY in [artifact:prj-de4daabcef.interface-spec.a1], not from the RTL. It drives the ports of [artifact:prj-de4daabcef.design-under-test.a1] and compares acc and sat with the model one step after every rising edge, and again between edges. Directed scenarios cover reset and clear with an accumulate at the same edge, unsigned high-bit operands, hold, the exact 0xFFFFFF boundary without saturation, overflow that would wrap, the sticky flag and a reset in the middle of a run. A seeded random phase follows. The test fails itself if any corner was never reached.\"}], \"files\": [{\"path\": \"tb/tb_mac8.v\", \"kind\": \"testbench\", \"title\": \"tb_mac8: scoreboard testbench for mac8\", \"summary\": \"Verilog testbench, top tb_mac8. It holds a spec-derived reference model of [artifact:prj-de4daabcef.interface-spec.a1] and a scoreboard against the approved RTL [artifact:prj-de4daabcef.design-under-test.a1]. It counts each comparison as one check, reports the first mismatches with their cycle, inputs and both values, counts corner events, and prints a single NIRMAAN-SIM verdict line before $finish. It serves [requirement:req-fdee493310].\", \"entry\": \"tb_mac8\"}], \"tool_runs\": [], \"claims\": [\"The reference model was written from interface_spec.md sections 2.1 to 2.3, not from mac8.v; for example, saturation is decided by comparing the 32-bit sum with 0xFFFFFF, not by a carry bit.\", \"This testbench has not been simulated by this seat; whether it passes on the approved RTL depends on the platform's simulator.run.\", \"Expected corner reach: the directed phase reaches every counted corner (saturation, sticky, reset with en, clear with en, hold, exact 0xFFFFFF without saturating, a zero product at 0xFFFFFF, clear of sat, reset of sat, high-bit operand). This is reasoning, not a measured result.\"], \"escalation\": null, \"notes\": \"Assumption to check: the knowledge documents say the nonce arrives as a plusarg but do not name it. The testbench tries +NIRMAAN_NONCE=, +nirmaan_nonce=, +NONCE= and +nonce= in that order. If none is present it counts a failure and prints the verdict with an empty nonce. If the platform uses another name, only the $value$plusargs lines need to change. The nonce is printed byte by byte with zero bytes skipped, so the output does not depend on how each simulator pads %s. Inputs are driven on the falling edge and outputs are sampled 1 ns after the rising edge. A check 1 ns after the inputs change also verifies the outputs do not respond to inputs between edges, since both are registers. Random stimulus uses an in-testbench xorshift with a fixed seed (32'h2545F491), so Icarus and Verilator see the same stimulus. Expected mutant sensitivity: dropping saturation, a non-sticky flag, en ignored, signed operands, clear losing to accumulate, saturating at >= instead of >, and a sat flag set when the sum reaches exactly 0xFFFFFF. The must-fail scorer would confirm this; it was not run here.\"}\n```\n=== FILE: tb/tb_mac8.v ===\n// Self-checking scoreboard testbench for mac8.\n// Reference model written from interface_spec.md (MAC-RESET, MAC-CLEAR, MAC-ACC,\n// MAC-HOLD, MAC-SAT, MAC-STICKY), not from the RTL.\n// Inputs are driven on the falling edge; outputs are compared 1 ns after the\n// rising edge (and also 1 ns after the inputs change, to confirm the registered\n// outputs do not follow the inputs between edges).\n`timescale 1ns / 1ps\nmodule tb_mac8;\n  reg         clk   = 1'b0;\n  reg         rst_n = 1'b0;\n  reg         clr   = 1'b0;\n  reg         en    = 1'b0;\n  reg  [7:0]  a     = 8'd0;\n  reg  [7:0]  b     = 8'd0;\n  wire [23:0] acc;\n  wire        sat;\n\n  mac8 dut (\n    .clk  (clk),\n    .rst_n(rst_n),\n    .clr  (clr),\n    .en   (en),\n    .a    (a),\n    .b    (b),\n    .acc  (acc),\n    .sat  (sat)\n  );\n\n  always #5 clk = ~clk;\n\n  localparam [31:0] ACC_MAX = 32'h00FFFFFF;\n\n  // ---------------- reference model state ----------------\n  reg [23:0] m_acc   = 24'd0;\n  reg        m_sat   = 1'b0;\n  reg        m_valid = 1'b0;   // model state is known once a reset edge was seen\n  reg [31:0] m_prod  = 32'd0;\n  reg [31:0] m_sum   = 32'd0;\n\n  // ---------------- scoreboard counters ----------------\n  integer n_pass     = 0;\n  integer n_fail     = 0;\n  integer n_cycle    = 0;\n  integer n_reported = 0;\n\n  // ---------------- corner counters ----------------\n  integer c_sat          = 0;  // saturation events (sum > 0xFFFFFF)\n  integer c_sticky       = 0;  // non-clear, non-reset edges with flag already 1\n  integer c_rst_en       = 0;  // reset edge with en high\n  integer c_clr_en       = 0;  // clear edge with en high\n  integer c_hold         = 0;  // en low, clr low, non-zero state\n  integer c_exact_max    = 0;  // total reached exactly 0xFFFFFF without saturating\n  integer c_zero_at_max  = 0;  // zero product accumulated at 0xFFFFFF, flag 0\n  integer c_clr_sat      = 0;  // clear while flag 1\n  integer c_rst_sat      = 0;  // reset while flag 1\n  integer c_hi_op        = 0;  // accumulate with an operand >= 128 (unsigned read)\n\n  // ---------------- misc ----------------\n  reg [31:0]       rng   = 32'h2545F491;\n  reg [8*128-1:0]  nonce = {8*128{1'b0}};\n  reg              nonce_ok = 1'b0;\n  reg [7:0]        ch;\n  integer          i;\n  integer          k;\n  reg              r_rst_n, r_clr, r_en;\n  reg [7:0]        r_a, r_b;\n  reg [31:0]       r1, r2;\n\n  // xorshift32 step\n  task rand_step;\n    begin\n      rng = rng ^ (rng << 13);\n      rng = rng ^ (rng >> 17);\n      rng = rng ^ (rng << 5);\n    end\n  endtask\n\n  // Reference model: one rising edge, from the specification.\n  task model_step;\n    begin\n      if (!rst_n) begin\n        // MAC-RESET\n        if (en) c_rst_en = c_rst_en + 1;\n        if (m_valid && m_sat) c_rst_sat = c_rst_sat + 1;\n        m_acc   = 24'd0;\n        m_sat   = 1'b0;\n        m_valid = 1'b1;\n      end else if (!m_valid) begin\n        // state unknown before the first reset; nothing to predict\n      end else if (clr) begin\n        // MAC-CLEAR: clear wins over an accumulate at the same edge\n        if (en) c_clr_en = c_clr_en + 1;\n        if (m_sat) c_clr_sat = c_clr_sat + 1;\n        m_acc = 24'd0;\n        m_sat = 1'b0;\n      end else if (en) begin\n        // MAC-ACC with MAC-SAT / MAC-STICKY\n        if (m_sat) c_sticky = c_sticky + 1;\n        if (a >= 8'd128 || b >= 8'd128) c_hi_op = c_hi_op + 1;\n        m_prod = {24'd0, a} * {24'd0, b};\n        m_sum  = {8'd0, m_acc} + m_prod;\n        if (m_sum > ACC_MAX) begin\n          m_acc = 24'hFFFFFF;\n          m_sat = 1'b1;\n          c_sat = c_sat + 1;\n        end else begin\n          if (m_acc == 24'hFFFFFF && m_prod == 32'd0 && !m_sat)\n            c_zero_at_max = c_zero_at_max + 1;\n          m_acc = m_sum[23:0];\n          if (m_acc == 24'hFFFFFF && !m_sat)\n            c_exact_max = c_exact_max + 1;\n          // flag unchanged (sticky if already 1)\n        end\n      end else begin\n        // MAC-HOLD\n        if (m_acc != 24'd0 || m_sat) c_hold = c_hold + 1;\n        if (m_sat) c_sticky = c_sticky + 1;\n      end\n    end\n  endtask\n\n  task report_mismatch;\n    input integer phase;   // 0: between edges, 1: after rising edge\n    begin\n      n_fail = n_fail + 1;\n      if (n_reported < 10) begin\n        n_reported = n_reported + 1;\n        if (phase == 0)\n          $display(\"MISMATCH (between edges) after cycle %0d: inputs rst_n=%b clr=%b en=%b a=%0d b=%0d | dut acc=%h sat=%b | model acc=%h sat=%b\",\n                   n_cycle, rst_n, clr, en, a, b, acc, sat, m_acc, m_sat);\n        else\n          $display(\"MISMATCH (after edge) cycle %0d: inputs rst_n=%b clr=%b en=%b a=%0d b=%0d | dut acc=%h sat=%b | model acc=%h sat=%b\",\n                   n_cycle, rst_n, clr, en, a, b, acc, sat, m_acc, m_sat);\n      end\n    end\n  endtask\n\n  task check_outputs;\n    input integer phase;\n    begin\n      if (m_valid) begin\n        if (acc === m_acc) n_pass = n_pass + 1;\n        else report_mismatch(phase);\n        if (sat === m_sat) n_pass = n_pass + 1;\n        else report_mismatch(phase);\n      end\n    end\n  endtask\n\n  // One clock cycle: drive on the falling edge, check, edge, model, check.\n  task cycle;\n    input       i_rst_n;\n    input       i_clr;\n    input       i_en;\n    input [7:0] i_a;\n    input [7:0] i_b;\n    begin\n      @(negedge clk);\n      rst_n = i_rst_n;\n      clr   = i_clr;\n      en    = i_en;\n      a     = i_a;\n      b     = i_b;\n      #1;\n      check_outputs(0);\n      @(posedge clk);\n      n_cycle = n_cycle + 1;\n      model_step;\n      #1;\n      check_outputs(1);\n    end\n  endtask\n\n  task acc_repeat;\n    input integer     count;\n    input [7:0]       i_a;\n    input [7:0]       i_b;\n    integer j;\n    begin\n      for (j = 0; j < count; j = j + 1)\n        cycle(1'b1, 1'b0, 1'b1, i_a, i_b);\n    end\n  endtask\n\n  task corner_check;\n    input integer count;\n    input integer id;\n    begin\n      if (count > 0) n_pass = n_pass + 1;\n      else begin\n        n_fail = n_fail + 1;\n        $display(\"CORNER NOT REACHED: id %0d (count 0)\", id);\n      end\n    end\n  endtask\n\n  initial begin\n    // ---- nonce ----\n    if ($value$plusargs(\"NIRMAAN_NONCE=%s\", nonce)) nonce_ok = 1'b1;\n    else if ($value$plusargs(\"nirmaan_nonce=%s\", nonce)) nonce_ok = 1'b1;\n    else if ($value$plusargs(\"NONCE=%s\", nonce)) nonce_ok = 1'b1;\n    else if ($value$plusargs(\"nonce=%s\", nonce)) nonce_ok = 1'b1;\n    if (!nonce_ok) begin\n      $display(\"ERROR: no nonce plusarg found\");\n      n_fail = n_fail + 1;\n    end\n\n    // ---- S1: reset wins over an accumulate offered at the same edge ----\n    cycle(1'b0, 1'b0, 1'b1, 8'd255, 8'd255);\n    cycle(1'b0, 1'b0, 1'b1, 8'd255, 8'd255);\n    cycle(1'b0, 1'b1, 1'b1, 8'd255, 8'd255);\n\n    // ---- S2: basic unsigned accumulation ----\n    cycle(1'b1, 1'b0, 1'b1, 8'd3,   8'd4);    // 12\n    cycle(1'b1, 1'b0, 1'b1, 8'd10,  8'd20);   // 212\n    cycle(1'b1, 1'b0, 1'b1, 8'd0,   8'd200);  // 212\n    cycle(1'b1, 1'b0, 1'b1, 8'd255, 8'd1);    // 467 (unsigned 255)\n    cycle(1'b1, 1'b0, 1'b1, 8'd128, 8'd2);    // 723\n    cycle(1'b1, 1'b0, 1'b1, 8'd200, 8'd200);  // 40723\n\n    // ---- S3: hold with operands present ----\n    cycle(1'b1, 1'b0, 1'b0, 8'd255, 8'd255);\n    cycle(1'b1, 1'b0, 1'b0, 8'd17,  8'd99);\n    cycle(1'b1, 1'b0, 1'b0, 8'd255, 8'd255);\n    cycle(1'b1, 1'b0, 1'b0, 8'd1,   8'd1);\n\n    // ---- S4: clear wins over accumulate; then accumulate again ----\n    cycle(1'b1, 1'b1, 1'b1, 8'd255, 8'd255);\n    cycle(1'b1, 1'b1, 1'b0, 8'd0,   8'd0);\n    cycle(1'b1, 1'b0, 1'b1, 8'd7,   8'd9);    // 63\n\n    // ---- S5: reset in the middle of a run ----\n    cycle(1'b0, 1'b0, 1'b1, 8'd17,  8'd3);\n    cycle(1'b1, 1'b0, 1'b1, 8'd17,  8'd3);    // 51\n\n    // ---- S6: reach exactly 0xFFFFFF without saturating ----\n    cycle(1'b1, 1'b1, 1'b0, 8'd0, 8'd0);\n    acc_repeat(258, 8'd255, 8'd255);           // 0xFFFD02\n    cycle(1'b1, 1'b0, 1'b1, 8'd255, 8'd3);    // 0xFFFFFF, sat 0\n    cycle(1'b1, 1'b0, 1'b1, 8'd0,   8'd0);    // stays 0xFFFFFF, sat 0\n    cycle(1'b1, 1'b0, 1'b1, 8'd200, 8'd0);    // stays, sat 0\n    cycle(1'b1, 1'b0, 1'b0, 8'd255, 8'd255);  // hold\n    cycle(1'b1, 1'b0, 1'b1, 8'd1,   8'd1);    // saturates, sat 1\n\n    // ---- S7: sticky flag ----\n    cycle(1'b1, 1'b0, 1'b0, 8'd0,   8'd0);\n    cycle(1'b1, 1'b0, 1'b0, 8'd9,   8'd9);\n    cycle(1'b1, 1'b0, 1'b1, 8'd0,   8'd0);    // no overflow, flag stays 1\n    cycle(1'b1, 1'b0, 1'b1, 8'd0,   8'd77);\n    cycle(1'b1, 1'b0, 1'b1, 8'd255, 8'd255);\n    cycle(1'b1, 1'b0, 1'b1, 8'd1,   8'd0);\n    cycle(1'b1, 1'b0, 1'b0, 8'd3,   8'd3);\n\n    // ---- S8: clear clears the flag ----\n    cycle(1'b1, 1'b1, 1'b0, 8'd0,   8'd0);\n    cycle(1'b1, 1'b0, 1'b1, 8'd1,   8'd1);    // 1, sat 0\n    cycle(1'b1, 1'b0, 1'b0, 8'd0,   8'd0);\n\n    // ---- S9: overflow far past the limit (wrap would give 0x00FD01) ----\n    cycle(1'b1, 1'b1, 1'b0, 8'd0,   8'd0);\n    acc_repeat(258, 8'd255, 8'd255);\n    cycle(1'b1, 1'b0, 1'b1, 8'd255, 8'd2);    // 0xFFFF00\n    cycle(1'b1, 1'b0, 1'b1, 8'd255, 8'd255);  // saturates\n    cycle(1'b1, 1'b0, 1'b1, 8'd255, 8'd255);  // stays saturated\n\n    // ---- S10: reset clears the flag ----\n    cycle(1'b0, 1'b0, 1'b0, 8'd0,   8'd0);\n    cycle(1'b1, 1'b0, 1'b1, 8'd2,   8'd2);    // 4, sat 0\n\n    // ---- S11: clear wins over a saturating accumulate ----\n    cycle(1'b1, 1'b1, 1'b0, 8'd0,   8'd0);\n    acc_repeat(259, 8'd255, 8'd255);           // saturates on the 259th\n    cycle(1'b1, 1'b1, 1'b1, 8'd255, 8'd255);  // clear wins: 0, sat 0\n    cycle(1'b1, 1'b0, 1'b1, 8'd255, 8'd255);  // 65025, sat 0\n\n    // ---- S12: seeded random traffic ----\n    for (k = 0; k < 4000; k = k + 1) begin\n      rand_step; r1 = rng;\n      rand_step; r2 = rng;\n      r_rst_n = (r1[9:0]   < 10'd3) ? 1'b0 : 1'b1;\n      r_clr   = (r1[19:10] < 10'd4) ? 1'b1 : 1'b0;\n      r_en    = (r1[23:20] < 4'd11) ? 1'b1 : 1'b0;\n      r_a     = (r2[2:0] == 3'd0) ? 8'hFF : r2[15:8];\n      r_b     = (r2[5:3] == 3'd0) ? 8'hFF : r2[23:16];\n      cycle(r_rst_n, r_clr, r_en, r_a, r_b);\n    end\n\n    // ---- corner reach: the test fails itself if a corner was not exercised ----\n    $display(\"CORNERS: sat=%0d sticky=%0d rst_en=%0d clr_en=%0d hold=%0d exact_max=%0d zero_at_max=%0d clr_sat=%0d rst_sat=%0d hi_op=%0d\",\n             c_sat, c_sticky, c_rst_en, c_clr_en, c_hold, c_exact_max,\n             c_zero_at_max, c_clr_sat, c_rst_sat, c_hi_op);\n    corner_check(c_sat,         1);\n    corner_check(c_sticky,      2);\n    corner_check(c_rst_en,      3);\n    corner_check(c_clr_en,      4);\n    corner_check(c_hold,        5);\n    corner_check(c_exact_max,   6);\n    corner_check(c_zero_at_max, 7);\n    corner_check(c_clr_sat,     8);\n    corner_check(c_rst_sat,     9);\n    corner_check(c_hi_op,       10);\n\n    $display(\"SUMMARY: %0d cycles, %0d checks passed, %0d failed\", n_cycle, n_pass, n_fail);\n\n    // ---- single verdict line ----\n    $write(\"NIRMAAN-SIM \");\n    for (i = 127; i >= 0; i = i - 1) begin\n      ch = nonce[i*8 +: 8];\n      if (ch != 8'd0) $write(\"%c\", ch);\n    end\n    $display(\" %0d passed, %0d failed\", n_pass, n_fail);\n    $finish;\n  end\nendmodule\n=== END FILE ==="
+    }
+  ],
+  "format": "nirmaan.eval-trial",
+  "harness_variant": "default",
+  "judge_runs": [
+    {
+      "check": "The seat's testbench passes the approved RTL and fails each MAC block mutant",
+      "params": {
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-5bznz2za/judge/check-1/must-fail-d87lq58r/clean/tb_mac8.v",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-5bznz2za/judge/check-1/must-fail-d87lq58r/clean/mac8.v"
+        ],
+        "top": "tb_mac8"
+      },
+      "run": "run-0002",
+      "succeeded": true,
+      "summary": "icarus: simulation passed: 19280 checks passed, $finish reached at time 48186000, 0 errors",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The seat's testbench passes the approved RTL and fails each MAC block mutant",
+      "params": {
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-5bznz2za/judge/check-1/must-fail-d87lq58r/mutant-1-1/tb_mac8.v",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-5bznz2za/judge/check-1/must-fail-d87lq58r/mutant-1-1/mac8.v"
+        ],
+        "top": "tb_mac8"
+      },
+      "run": "run-0003",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: the testbench reports 44 of 19280 checks failed",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The seat's testbench passes the approved RTL and fails each MAC block mutant",
+      "params": {
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-5bznz2za/judge/check-1/must-fail-d87lq58r/mutant-1-2/tb_mac8.v",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-5bznz2za/judge/check-1/must-fail-d87lq58r/mutant-1-2/mac8.v"
+        ],
+        "top": "tb_mac8"
+      },
+      "run": "run-0004",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: the testbench reports 5572 of 19280 checks failed",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The seat's testbench passes the approved RTL and fails each MAC block mutant",
+      "params": {
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-5bznz2za/judge/check-1/must-fail-d87lq58r/mutant-1-3/tb_mac8.v",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-5bznz2za/judge/check-1/must-fail-d87lq58r/mutant-1-3/mac8.v"
+        ],
+        "top": "tb_mac8"
+      },
+      "run": "run-0005",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: the testbench reports 16714 of 19280 checks failed",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The seat's testbench passes the approved RTL and fails each MAC block mutant",
+      "params": {
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-5bznz2za/judge/check-1/must-fail-d87lq58r/mutant-1-4/tb_mac8.v",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-5bznz2za/judge/check-1/must-fail-d87lq58r/mutant-1-4/mac8.v"
+        ],
+        "top": "tb_mac8"
+      },
+      "run": "run-0006",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: the testbench reports 8 of 19280 checks failed",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The seat's testbench passes the approved RTL and fails each MAC block mutant",
+      "params": {
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-5bznz2za/judge/check-1/must-fail-d87lq58r/mutant-1-5/tb_mac8.v",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-5bznz2za/judge/check-1/must-fail-d87lq58r/mutant-1-5/mac8.v"
+        ],
+        "top": "tb_mac8"
+      },
+      "run": "run-0007",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: the testbench reports 1980 of 19280 checks failed",
+      "tool": "simulator.run"
+    }
+  ],
+  "knowledge": "on",
+  "model": "claude-opus-5-5",
+  "purpose": "evidence",
+  "record": "2026-11-18-claude-code-claude-opus-5-5-11",
+  "result": {
+    "attempts": 1,
+    "attestations": [],
+    "audit_ok": true,
+    "case": "dv/scoreboard-mac",
+    "case_digest": "sha256:5cde4a8dca8bb5bea8ce74d32f218a5021a6166d9bee411fe8ccb30ac4b77cf2",
+    "cli": "2.1.325",
+    "cost_usd": null,
+    "detail": "Assumption to check: the knowledge documents say the nonce arrives as a plusarg but do not name it. The testbench tries +NIRMAAN_NONCE=, +nirmaan_nonce=, +NONCE= and +nonce= in that order. If none is present it counts a failure and prints the verdict with an empty nonce. If the platform uses another name, only the $value$plusargs lines need to change. The nonce is printed byte by byte with zero bytes skipped, so the output does not depend on how each simulator pads %s. Inputs are driven on the falling edge and outputs are sampled 1 ns after the rising edge. A check 1 ns after the inputs change also verifies the outputs do not respond to inputs between edges, since both are registers. Random stimulus uses an in-testbench xorshift with a fixed seed (32'h2545F491), so Icarus and Verilator see the same stimulus. Expected mutant sensitivity: dropping saturation, a non-sticky flag, en ignored, signed operands, clear losing to accumulate, saturating at >= instead of >, and a sat flag set when the sum reaches exactly 0xFFFFFF. The must-fail scorer would confirm this; it was not run here.",
+    "duration_s": 154.331,
+    "gate_runs": [
+      {
+        "run": "run-0001",
+        "succeeded": true,
+        "summary": "icarus: simulation passed: 19280 checks passed, $finish reached at time 48186000, 0 errors",
+        "tool": "simulator.run"
+      }
+    ],
+    "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+    "input_tokens": 2,
+    "model_calls": 1,
+    "output_tokens": 17633,
+    "passed": true,
+    "replay": false,
+    "runtime": "claude-code",
+    "sandbox": "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-5bznz2za",
+    "scores": [
+      {
+        "failed_runs": [
+          "run-0003",
+          "run-0004",
+          "run-0005",
+          "run-0006",
+          "run-0007"
+        ],
+        "name": "The seat's testbench passes the approved RTL and fails each MAC block mutant",
+        "runs": [
+          "run-0002"
+        ],
+        "scorer": "must-fail",
+        "status": "passed",
+        "summary": "simulator.run run-0002 passed on the clean inputs; 5 of 5 mutants failed it"
+      }
+    ],
+    "seat": "prj-de4daabcef:testbench",
+    "seat_status": "in_review",
+    "started_at": "2026-11-18T20:21:35.722692Z",
+    "submitted": true,
+    "tool_calls": [],
+    "version": "1.25.0"
+  },
+  "skills": {
+    "directed_testing": "sha256:6bf35095b83cbd9b641919c5b59bacdf5fc87ce7c569c2ad7df593ecddff70d6",
+    "reference_modelling": "sha256:69565f357fa8931088ac4108fddb83a86b869b0f8faf2c522e58d4e18ea298a8"
+  },
+  "stage": "testbench",
+  "trial": 1,
+  "version": 1
+}
