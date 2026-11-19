@@ -121,9 +121,9 @@ jobs:
       - name: Test what seat C can reach under fw.test
         if: startsWith(inputs.case, 'flow/') || startsWith(inputs.case, 'firmware/')
         run: python scripts/live_eval_fw_reach.py --records "$RUNNER_TEMP/replay" --out "$RUNNER_TEMP/fw-reach/fw-reach.json" --require-denied
-      # Gate SC5 (council record 2026-11-19, decision 1, item 5): the four committed broken fixtures fail the
-      # single-seat case's held-out checks with the program run as the seat account, on the trials' own build.
       - name: Show the judge fails the broken drivers
+        # Gate SC5 (council record 2026-11-19, decision 1, item 5): the four committed broken fixtures fail the
+        # single-seat case's held-out checks with the program run as the seat account, on the trials' own build.
         if: inputs.case == 'firmware/axi4-lite-driver'
         run: python scripts/live_eval_fw_broken.py --out "$RUNNER_TEMP/fw-reach/fw-broken.json" --require-seat
       - name: Upload the seat C reach record
