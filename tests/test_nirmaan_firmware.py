@@ -19,6 +19,7 @@ import hashlib
 import json
 import re
 import shutil
+import sys
 from pathlib import Path
 
 import pytest
@@ -283,8 +284,9 @@ def _fake_seat_exec(folder: Path) -> Path:
     called and runs the program in the seat's folder, as the caller (the account itself exists only in Actions)."""
     folder.mkdir()
     script = folder / "nirmaan-seat-exec"
-    script.write_text('#!/bin/sh\nprintf "%s\\n" "$@" > "$1/called-with"\nd="$1"; shift\n'
-                      'cd "$d" && pwd -P > ran-in && exec "$@"\n', encoding="utf-8")
+    script.write_text(f"#!{sys.executable}\nimport os, sys\nhere, argv = sys.argv[1], sys.argv[2:]\n"
+                      "open(os.path.join(here, 'called-with'), 'w').write('\\n'.join(sys.argv[1:]))\nos.chdir(here)\n"
+                      "open('ran-in', 'w').write(os.getcwd())\nos.execv(argv[0], argv)\n", encoding="utf-8")
     script.chmod(0o755)
     return script
 
@@ -327,7 +329,7 @@ def test_the_driver_passes_through_the_seat_wrapper_with_the_same_checks(block, 
     seat = Path(last[1])
     assert last[0] == str(wrapper) and seat.name == "seat" and last[2].endswith("/cosim/Vdut")
     assert last[3].startswith("+nirmaan_nonce=")
-    assert (seat / "ran-in").read_text().strip() == str(seat.resolve())
+    assert Path((seat / "ran-in").read_text()).resolve() == seat.resolve()
     assert (seat / "called-with").read_text().split() == last[1:]
     assert len(outcome.data["result"]["metrics"]["checks"]) == 6
     assert not list(seat.glob("*.json")) and list(seat.parent.glob("*.json"))

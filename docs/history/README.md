@@ -140,6 +140,7 @@ The original preface of the section:
 - [M87-whole-flow-label](M87-whole-flow-label.md): Milestone 87 - Whole-flow cases: the label and the list (G3)
 - [M88-bounded-tool-runs](M88-bounded-tool-runs.md): Milestone 88 - Bounded tool runs: output, disk and record caps, and temporary directories removed
 - [M89-live-eval-seat-account](M89-live-eval-seat-account.md): Milestone 89 - Live evaluation seat account: seat code as its own account, a reach test, and a separate counting re-judge
+- [M90-fw-test-seat-account](M90-fw-test-seat-account.md): Milestone 90 - Seat C as the seat account: the program fw.test builds runs as nirmaan-seat, and the credential test in C is a gate
 
 ## Before M43
 
