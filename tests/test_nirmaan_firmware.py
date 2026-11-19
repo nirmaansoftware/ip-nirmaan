@@ -342,6 +342,46 @@ def test_with_the_seat_wrapper_the_built_program_runs_through_it_in_a_folder_of_
     assert (tmp_path / "seat").is_dir() and not any((tmp_path / "seat").iterdir())
 
 
+def test_where_the_job_names_the_wrapper_fw_test_never_runs_as_the_caller(tmp_path, monkeypatch):
+    """Gate SC2 (council record 2026-11-19, decision 1, item 2): in the live evaluation's jobs a missing wrapper, one
+    that is not root's, or one others may write refuses the run before anything compiles (``_cosim_check``) and in
+    ``seat_run``; it never falls back to running the program as the caller, in any trial of the job."""
+    import stat
+    from types import SimpleNamespace
+
+    from nirmaan.integrations import firmware
+    from nirmaan.integrations.eda import Job
+
+    job = Job("fw.test", {}, tmp_path, (), None)
+    monkeypatch.setattr(firmware.shutil, "which", lambda name, *a, **k: None)  # not on PATH either
+    monkeypatch.delenv(firmware.SEAT_EXEC_ENV, raising=False)
+    assert firmware.seat_exec_problem() is None  # off the live evaluation: as before
+    want = "/opt/nirmaan-seat/bin/nirmaan-seat-exec"
+    monkeypatch.setenv(firmware.SEAT_EXEC_ENV, want)
+    real = firmware.os.lstat
+    for found, why in [(None, "not there"), (SimpleNamespace(st_mode=stat.S_IFREG | 0o755, st_uid=1001), "only root"),
+                       (SimpleNamespace(st_mode=stat.S_IFREG | 0o777, st_uid=0), "only root"),
+                       (SimpleNamespace(st_mode=stat.S_IFLNK | 0o777, st_uid=0), "only root")]:
+        def lstat(path, found=found):
+            if path != want:
+                return real(path)
+            if found is None:
+                raise FileNotFoundError(path)
+            return found
+
+        monkeypatch.setattr(firmware.os, "lstat", lstat)
+        problem = firmware.seat_exec_problem()
+        assert problem and why in problem and "never as the caller" in problem and "nothing ran" in problem
+        assert firmware._cosim_check(job) == problem  # refused before anything is compiled
+        with pytest.raises(RuntimeError, match="never as the caller"):
+            firmware.seat_run(job, ["/run/cosim/Vdut", "+nirmaan_nonce=ab"])
+    monkeypatch.setattr(firmware.os, "lstat", lambda path: SimpleNamespace(st_mode=stat.S_IFREG | 0o755, st_uid=0)
+                        if path == want else real(path))
+    assert firmware.seat_exec_problem() is None
+    assert firmware.seat_run(job, ["/run/cosim/Vdut", "+nirmaan_nonce=ab"]) == [
+        want, str(tmp_path / "seat"), "/run/cosim/Vdut", "+nirmaan_nonce=ab"]  # the named file, not PATH's
+
+
 @needs(*COSIM)
 def test_the_driver_passes_through_the_seat_wrapper_with_the_same_checks(block, tmp_path, monkeypatch):
     """M90: the wrapper changes only who runs the built program and where; the run, its checks and its nonce are

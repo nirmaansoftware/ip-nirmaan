@@ -635,3 +635,50 @@ def test_every_case_that_runs_seat_c_gets_the_credential_test_in_every_job():
     assert workflow.count(runs) == 3  # replay, trials, rejudge
     seat_c = [c.id for c in ci._cases() if ci.seat_c_use(c.id)]
     assert seat_c and all(case.startswith(("flow/", "firmware/")) for case in seat_c), seat_c
+
+
+# --- Gates SC2 and SC4 (council record 2026-11-19, seat C and the live refusal, decision 1) ------------------------
+
+
+def test_the_trials_step_refuses_on_a_missing_foreign_non_gate_or_not_denied_record(tmp_path, monkeypatch, capsys):
+    """SC4: exit 6 from the trials step, with the record's own reason, for each record that does not count; and a
+    record that counts still lifts nothing (the lift is gate SC7)."""
+    monkeypatch.setattr(ci, "installed_cli", lambda: "2.1.325")
+    monkeypatch.setattr(ci, "_head", lambda: "c0ffee")
+    monkeypatch.setattr(ci, "run_trials", lambda *a, **k: pytest.fail("a trial started"))
+    digest = harness_sha256(cli="2.1.325")
+    base = {"CASE": "firmware/axi4-lite-driver", "TRIALS": "1", "KNOWLEDGE": "on", "PURPOSE": "evidence",
+            "HARNESS": "default", "EXPECTED": digest}
+    cases = {"missing": {k: v for k, v in _fw_record(tmp_path).items() if k != ci.FW_REACH_ENV},
+             "foreign run": _fw_record(tmp_path, run={"id": "76", "attempt": "1", "job": "live-eval"}),
+             "foreign job": {**_fw_record(tmp_path), "GITHUB_JOB": "replay"},
+             "not gate": _fw_record(tmp_path, require_denied=False),
+             "not denied": _fw_record(tmp_path, every_probe_denied=False)}
+    reasons = {"missing": "not set", "foreign run": "not this job's", "foreign job": "not this job's",
+               "not gate": "without --require-denied", "not denied": "every probe denied"}
+    for name, env in cases.items():
+        for key in [*JOB_ENV, ci.FW_REACH_ENV]:
+            monkeypatch.delenv(key, raising=False)
+        for key, value in {**base, **env}.items():
+            monkeypatch.setenv(key, value)
+        assert ci.main(["trials", "--out", str(tmp_path / "out")]) == ci.UNCONFINED, name
+        err = capsys.readouterr().err
+        assert reasons[name] in err and "Nothing ran" in err, (name, err)
+    for key, value in {**base, **_fw_record(tmp_path)}.items():
+        monkeypatch.setenv(key, value)
+    assert ci.main(["trials", "--out", str(tmp_path / "out")]) == ci.UNCONFINED  # still refused: no lift here
+    assert "live trials of it stay refused" in capsys.readouterr().err
+
+
+def test_every_job_names_the_seat_wrapper_and_the_trials_step_its_record():
+    """SC2: each job that can run seat C sets NIRMAAN_SEAT_EXEC to the installed wrapper, so fw.test refuses rather
+    than run as the runner; the trials step gets the job's credential test record (SC4)."""
+    from nirmaan.integrations import firmware
+
+    spec = importlib.util.spec_from_file_location("live_eval_seat", REPO / "scripts" / "live_eval_seat.py")
+    seat = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(seat)
+    workflow = (REPO / ".github" / "workflows" / "live-eval.yml").read_text(encoding="utf-8")
+    assert workflow.count(f"      {firmware.SEAT_EXEC_ENV}: {seat.EXEC}\n") == 3  # replay, live-eval, rejudge
+    trials = workflow.split("- name: Run the trials one at a time")[1].split("- name:")[0]
+    assert "FW_REACH: ${{ runner.temp }}/fw-reach/fw-reach.json" in trials
