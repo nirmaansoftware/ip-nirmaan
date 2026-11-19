@@ -426,6 +426,9 @@ module axi4_lite_regs_tb;
         end
         b2b = 1'b0;
 
+        // The coverage matrix (G3, decision #37): the tasks after this block.
+        matrix;
+
         if (errors == 0)
             $display("axi4_lite_regs_tb: PASS (%0d checks)", checks);
         // The verdict the gate reads (docs/GATE_INTEGRITY.md): the run's nonce, then the counts.
@@ -434,4 +437,119 @@ module axi4_lite_regs_tb;
         $display("NIRMAAN-SIM %0s %0d passed, %0d failed", nonce, (checks > errors ? checks - errors : 0), errors);
         $finish;
     end
+
+    // --- The coverage matrix (G3, decision #37) ----------------------------------------------
+    // Each class is closed, not sampled:
+    // * writes: ordering (AW and W together, AW first, W first) x every address (the four
+    //   registers and all twelve unaligned offsets; the testbench instantiates ADDR_WIDTH 4 only)
+    //   x every wstrb value (0, the fourteen partial ones, full), with BREADY 0 to 2 cycles late;
+    //   a register write reads back merged, an unmapped one gets SLVERR, writes the complement of
+    //   the register it would alias, and read_all finds no register changed;
+    // * reads: every address, ARVALID 0 or 1 cycle late and RREADY 0 to 2 cycles late;
+    // * back to back after every response kind: writes and reads alternating OKAY and SLVERR,
+    //   each offered in the cycle after the previous response is taken (AXIL-B2B), with READY 0
+    //   and 2 cycles late;
+    // * reads and writes overlapping, either first, 0 to 3 cycles apart, each response waiting on
+    //   READY while the other completes: the latency bound holds for both (AXIL-LATENCY).
+    task automatic mx_writes;
+        integer o, a, s;
+        reg [31:0] value;
+        reg [3:0]  addr;
+        begin
+            for (o = 0; o < 3; o = o + 1)
+                for (a = 0; a < 16; a = a + 1) begin
+                    addr = a;
+                    for (s = 0; s < 16; s = s + 1)
+                        if (addr[1:0] == 2'b00) begin
+                            value = 32'h9E37_79B9 * (256 * o + 16 * a + s + 1);
+                            write_ok(addr, value, s[3:0], o == 2 ? 2 : 0, o == 1 ? 2 : 0, o);
+                            read(addr, o % 2, o, data, resp);
+                            check("matrix: read back, by strobe", data, model[addr[3:2]]);
+                            check("matrix: read back OKAY", {30'd0, resp}, {30'd0, OKAY});
+                        end else begin
+                            write(addr, ~model[addr[3:2]], s[3:0], o == 2 ? 2 : 0, o == 1 ? 2 : 0, o, resp);
+                            check("matrix: unmapped write SLVERR", {30'd0, resp}, {30'd0, SLVERR});
+                        end
+                    if (addr[1:0] != 2'b00) begin
+                        read_all(0);
+                        read(addr, o % 2, o, data, resp);
+                        check("matrix: unmapped read SLVERR", {30'd0, resp}, {30'd0, SLVERR});
+                        check("matrix: unmapped read data", data, 32'd0);
+                    end
+                end
+        end
+    endtask
+
+    task automatic mx_b2b;
+        integer bd, n;
+        reg [3:0] a;
+        begin
+            for (bd = 0; bd < 3; bd = bd + 2) begin
+                for (n = 0; n < 9; n = n + 1) begin
+                    a = n == 0 ? 4'h0 : n == 1 ? 4'h5 : n == 2 ? 4'h6 : n == 3 ? 4'h4 : n == 4 ? 4'h8 :
+                        n == 5 ? 4'hF : n == 6 ? 4'hC : n == 7 ? 4'h1 : 4'h0;
+                    b2b = n > 0;
+                    if (a[1:0] == 2'b00) begin
+                        write_ok(a, 32'h0500_0000 * n + bd, 4'hF, 0, 0, bd);
+                    end else begin
+                        write(a, 32'hFFFF_FFFF, 4'hF, 0, 0, bd, resp);
+                        check("matrix: b2b write SLVERR", {30'd0, resp}, {30'd0, SLVERR});
+                    end
+                end
+                for (n = 0; n < 9; n = n + 1) begin
+                    a = n == 0 ? 4'h0 : n == 1 ? 4'h6 : n == 2 ? 4'h3 : n == 3 ? 4'h4 : n == 4 ? 4'h8 :
+                        n == 5 ? 4'hD : n == 6 ? 4'hC : n == 7 ? 4'h2 : 4'h0;
+                    b2b = n > 0;
+                    read(a, 0, bd, data, resp);
+                    check("matrix: b2b read response", {30'd0, resp}, {30'd0, a[1:0] == 2'b00 ? OKAY : SLVERR});
+                    check("matrix: b2b read data", data, a[1:0] == 2'b00 ? model[a[3:2]] : 32'd0);
+                end
+            end
+            b2b = 1'b0;
+        end
+    endtask
+
+    // A write (to REG1, OKAY, or to 0x5, SLVERR) in each ordering with BREADY 3 cycles late, and a
+    // read (of REG2, or of 0x6) with RREADY 4 cycles late, the second started 0 to 3 cycles after
+    // the first, either way round. The write and read tasks check each latency.
+    task automatic mx_overlap;
+        integer o, k, v, w_first;
+        reg [1:0]  r1, r2;
+        reg [31:0] d2, value;
+        begin
+            for (o = 0; o < 3; o = o + 1)
+                for (k = 0; k < 4; k = k + 1)
+                    for (v = 0; v < 2; v = v + 1)
+                        for (w_first = 0; w_first < 2; w_first = w_first + 1) begin
+                            value = 32'h0101_0101 * (16 * o + 4 * k + 2 * v + w_first + 1);
+                            fork
+                                begin
+                                    if (!w_first)
+                                        repeat (k) @(negedge aclk);
+                                    write(v ? 4'h5 : 4'h4, value, 4'hF, o == 2 ? 2 : 0, o == 1 ? 2 : 0, 3, r1);
+                                end
+                                begin
+                                    if (w_first)
+                                        repeat (k) @(negedge aclk);
+                                    read(v ? 4'h6 : 4'h8, 0, 4, d2, r2);
+                                end
+                            join
+                            check("matrix: overlap write response", {30'd0, r1}, {30'd0, v ? SLVERR : OKAY});
+                            check("matrix: overlap read response", {30'd0, r2}, {30'd0, v ? SLVERR : OKAY});
+                            check("matrix: overlap read data", d2, v ? 32'd0 : model[2]);
+                            if (!v)
+                                model[1] = value;
+                            read_all(0);
+                        end
+        end
+    endtask
+
+    task automatic matrix;
+        begin
+            mx_writes;
+            mx_b2b;
+            mx_overlap;
+            read_all(0);
+        end
+    endtask
 endmodule

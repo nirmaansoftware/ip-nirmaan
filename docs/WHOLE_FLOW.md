@@ -99,10 +99,10 @@ reference testbench never exercises. Where the testbench reaches only part of
 a rule, the rule is split and the unreached part has its own tag, listed as
 not judged: the parameter defaults (`TMR-ADDR-WIDTH-RANGE`, which also holds
 the timer's widths 5 to 7, and `AXIL-PARAMS-DEFAULT`), "no other ports"
-(`TMR-PORTS-ONLY`, `AXIL-NO-PROT`), and, for the timer, readiness (`TMR-READY`), the read value at the accepting edge
-(`TMR-READ-VALUE`), `COUNT` while a count runs (`TMR-COUNT-READ`), a periodic
-`LOAD` of 0, a `CTRL` write on a count
-end (`TMR-CTRL-WINS`), the edge `irq` changes on after a write, what a
+(`TMR-PORTS-ONLY`, `AXIL-PORTS-ONLY`, `AXIL-NO-PROT`: a simulation sees no
+port it does not connect), and, for the timer, the read value at the
+accepting edge (`TMR-READ-VALUE`), `COUNT` while a count runs
+(`TMR-COUNT-READ`), a `CTRL` write on a count end (`TMR-CTRL-WINS`), what a
 synchronous reset does to a pending response or a held half write
 (`TMR-RESET-EDGE`), and the testbench checking every requirement
 (`TMR-TB-ALL`; the must-fail check holds it only to the four mutants). A test
@@ -131,7 +131,25 @@ and 40 cycles of backpressure; and a write that leaves its address, data and
 strobes unknown while it does not offer them. For the register block: every
 register bit, each strobe alone, a write and a read at every unmapped address,
 write halves 40 cycles apart, back-to-back requests after responses that
-waited on `READY`, and no response valid after the first reset edge. A rule
+waited on `READY`, and no response valid after the first reset edge. A third
+round (decision #37), after a third independent check, closes classes instead
+of single findings: each copy ends with a coverage matrix. Writes run in every
+ordering (address and data together, address first, data first) at every
+address class (each register, every unaligned offset, and for the timer at
+`ADDR_WIDTH` 8 offsets from `0x10` up with each high bit) with every `wstrb`
+value; reads run at every address class with `READY` late by 0 to 2 cycles;
+writes and reads alternate `OKAY` and `SLVERR` back to back; and a write and a
+read overlap, either first, each response waiting while the other completes.
+For the timer, a protocol monitor judges `READY` and the response edges on
+every edge of the run (so `TMR-READY` is now judged), one-shot and periodic
+counts with `LOAD` 0, 1, 2, 37 and `0x0001_0005` are checked edge by edge
+against `STATUS` clears landed on every phase (so `TMR-LOAD-ZERO-PERIODIC` is
+judged), restarts, stops and `LOAD` writes land in the middle of a count in
+both modes, `CTRL` is written with every strobe and with `EN` 0 and 1 while
+running and stopped, and `irq` is checked after the very edge of an `IE`
+write or a clear (`TMR-IRQ-EDGE`). For the register block, the overlap holds
+the latency bound for both directions, which the reference meets. "No other
+ports" is split out of `AXIL-PORTS` as `AXIL-PORTS-ONLY`, not judged. A rule
 over time ("stays high until", "any gap", "until `EN` is written 1 again") is
 checked over these bounded runs, as any simulation checks it. The single-seat
 cases keep running the originals, so their digests, and the recorded trials
@@ -153,7 +171,7 @@ A test holds both, and fails on any other dropped or altered check.
 **The mutant sweep record.** `evals/flow/<block>/mutant_sweep.json` (format
 `nirmaan.flow-mutant-sweep`, a data file) records the sweep run on each
 testbench copy: every mutant `tests/flow_mutants.py` builds from the reference
-RTL (74 for the timer, 29 for the register block), the tag each violates, its
+RTL (99 for the timer, 40 for the register block), the tag each violates, its
 sha256, and its result, all failing; the reference and the conforming RTLs
 (`axi4_lite_regs_lat2.v` and the `AWREADY`-low block) pass.
 `test_each_sweep_record_matches_its_builders_and_fails_every_tag_the_testbench_check_cites`
