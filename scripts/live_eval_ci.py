@@ -358,7 +358,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         cli = installed_cli()
         live = args.mode == "trials" or getattr(args, "require_expected", False)
         digest = check(opts, require_expected=live, cli=cli)
-        unconfined = seat_c_problem(opts["case"]) if live else None
+        # Gate SC4: the trials step runs a case's seat C only on this job's own credential test record, and then
+        # still refuses it (``seat_c_problem``) until the lift (gate SC7). Council record 2026-11-19, decision 1.
+        unconfined = confined_problem(opts["case"]) if args.mode == "trials" else None
+        unconfined = unconfined or (seat_c_problem(opts["case"]) if live else None)
         if unconfined:
             raise Stop(UNCONFINED, unconfined)
         if args.mode == "check":
