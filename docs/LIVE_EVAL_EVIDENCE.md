@@ -273,7 +273,17 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   writable by others and not set-id. A run killed by a signal ends the
   wrapper by the same signal, so `fw.test` reports it as it would without the
   account. Elsewhere (the owner's machine, CI's test job) there is no wrapper
-  and nothing changes. The compile and link steps of `fw.build` and `fw.test`
+  and nothing changes. In the live evaluation's jobs (`replay`, `live-eval`,
+  `rejudge`) the workflow names the wrapper (`NIRMAAN_SEAT_EXEC`), and there
+  `fw.test` never falls back (gate SC2 of
+  `council/records/2026-11-19-seat-c-live-refusal.md`): a wrapper that is not
+  there, not root's, or writable by another account refuses every `fw.test`
+  run before anything is compiled, so each run of each of up to 20 trials
+  uses it, not only the credential test's run at the start of the job. The
+  trials step also reads that job's credential test record (`FW_REACH`) and
+  exits 6 on a missing record, one of another run or job, one not written in
+  gate mode, or one with a probe not denied (gate SC4); with a record that
+  counts it still exits 6, for the refusal below. The compile and link steps of `fw.build` and `fw.test`
   still run the compiler as the runner over the seat's C; they run none of it.
   Other backends build or run host code over seat files, and none of them runs
   seat-written host code: `regmap.verify` builds a test the harness generates

@@ -95,6 +95,8 @@ jobs:
       HARNESS: ${{ inputs.harness }}
       EXPECTED: ${{ inputs.expected_harness }}
       PYTHONDONTWRITEBYTECODE: "1"
+      # Gate SC2: fw.test runs the program it builds only through this wrapper in this job, never as the runner.
+      NIRMAAN_SEAT_EXEC: /opt/nirmaan-seat/bin/nirmaan-seat-exec
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -189,6 +191,8 @@ jobs:
       HARNESS: ${{ inputs.harness }}
       EXPECTED: ${{ inputs.expected_harness }}
       PYTHONDONTWRITEBYTECODE: "1"
+      # Gate SC2: fw.test runs the program it builds only through this wrapper in this job, never as the runner.
+      NIRMAAN_SEAT_EXEC: /opt/nirmaan-seat/bin/nirmaan-seat-exec
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -240,6 +244,7 @@ jobs:
         id: trials
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          FW_REACH: ${{ runner.temp }}/fw-reach/fw-reach.json
         run: python scripts/live_eval_ci.py trials --out "$RUNNER_TEMP/results"
       - name: Check the checkout did not change
         id: after
@@ -278,6 +283,8 @@ jobs:
       TREE_BEFORE: ${{ needs.replay.outputs.tree_before || needs.live-eval.outputs.tree_before }}
       TREE_AFTER: ${{ needs.replay.outputs.tree_after || needs.live-eval.outputs.tree_after }}
       PYTHONDONTWRITEBYTECODE: "1"
+      # Gate SC2: fw.test runs the program it builds only through this wrapper in this job, never as the runner.
+      NIRMAAN_SEAT_EXEC: /opt/nirmaan-seat/bin/nirmaan-seat-exec
     steps:
       - name: Refuse records from a changed checkout
         run: |
