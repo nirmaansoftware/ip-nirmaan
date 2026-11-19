@@ -1,0 +1,29 @@
+{
+  "cases": {
+    "debug/root-cause-uart-tx": {
+      "high": 1.0,
+      "low": 0.20654931437723745,
+      "n": 1,
+      "passed": 1,
+      "rate": 1.0
+    }
+  },
+  "format": "nirmaan.eval-summary",
+  "seats": {
+    "root-cause": {
+      "high": 1.0,
+      "low": 0.20654931437723745,
+      "n": 1,
+      "passed": 1,
+      "rate": 1.0
+    }
+  },
+  "totals": {
+    "cost_usd": null,
+    "duration_s": 183.73,
+    "input_tokens": 4,
+    "model_calls": 2,
+    "output_tokens": 19737,
+    "trials": 1
+  }
+}

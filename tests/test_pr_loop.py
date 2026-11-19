@@ -1600,6 +1600,7 @@ def test_the_real_test_check_is_split_into_the_local_three_shards_on_cis_weights
     # profile and weights are the same, so the split differs only in its count.
     assert '--shard-profile test' in ci, "the same weights as CI's test job"
     assert "test" in json.loads((ROOT / "scripts" / "shard_weights.json").read_text())
+    assert check["env"]["NIRMAAN_VERILATOR_JOBS"] == "2", "each Verilator build in the check starts at most 2 jobs"
 
 
 def test_shard_commands_split_the_whole_suite_or_a_selection_of_several_files():
