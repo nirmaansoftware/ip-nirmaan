@@ -18,8 +18,8 @@ as seat code would, to:
   the eval cases name, all in the checkout, a canary file this script writes into the checkout and into the
   runner's temporary folder (readable by every account by its mode, so only the account's own denial stops it),
   and a listing of the checkout, its ``.git``, the runner's home and its temporary folder;
-- reach the network: a TCP connection out (IPv4 and IPv6), a TCP connection on the loopback address, and a UDP
-  packet to the local name server.
+- reach the network: a TCP connection out (IPv4 and IPv6), a TCP connection on the loopback address (IPv4 and IPv6),
+  and a UDP packet to the local name server.
 
 and one control, that it can write its own run directory. The module runs through ``simulator.run``'s cocotb
 backend (``eda.execute``), so through the ``vvp`` the trials use. The test passes only when cocotb's verdict is
@@ -60,8 +60,9 @@ PROBES = ("reach_identity", "reach_no_sudo", "reach_no_write", "reach_no_credent
 #: Where the network probe tries to go: (kind, address, port). Each is denied only on EPERM or EACCES, or, for TCP,
 #: EHOSTUNREACH, the "prohibited" answer the seat account's rule gives at once (``scripts/live_eval_seat.py``; on the
 #: loopback address nothing else gives it), and for IPv6 ENETUNREACH (no route at all). A timeout proves nothing.
+#: IPv6 loopback (``::1``) has a route on every runner, so it is the target that shows the ``ip6tables`` rule itself.
 NETWORK = (("tcp", "1.1.1.1", 443), ("tcp6", "2606:4700:4700::1111", 443), ("tcp", "127.0.0.1", 9),
-           ("udp", "127.0.0.53", 53))
+           ("tcp6", "::1", 9), ("udp", "127.0.0.53", 53))
 #: The programs gates run (eda.py backends) and the harness's own entry point.
 TOOLS = ("nirmaan", "iverilog", "vvp", "verilator", "yosys", "sby", "yices-smt2", "make", "cc", "python", "python3",
          "git", "node", "npm")
