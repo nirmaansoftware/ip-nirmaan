@@ -325,13 +325,24 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   `SEAT_C_TOOLS` in `scripts/live_eval_ci.py`. `check
   --require-expected` and `trials` refuse a case that runs seat C (one whose
   seat is `firmware`, whose held-out checks use `fw.build` or `fw.test`, or a
-  whole flow with a `firmware` stage) with exit 6 before any trial. Since
-  M90 seat C executes as the seat account and is compiled as the runner; that
-  does not lift this refusal. The council record `council/records/2026-11-19-seat-c-live-refusal.md` keeps it, and sets
-  gates SC1 to SC7 for a lift of the single-seat case in a pull request of its
-  own; the register block flow also waits for gates WF15 to WF19 of the G3
-  council record. A replay of such a case still runs: its code is the
-  reference answer.
+  whole flow with a `firmware` stage) with exit 6 before any trial, with one
+  exception. Since M90 seat C executes as the seat account and is compiled
+  as the runner; that alone did not lift this refusal. The council record
+  `council/records/2026-11-19-seat-c-live-refusal.md` set gates SC1 to SC7
+  for a lift of the single-seat case, and gate SC7 lifts it, in a pull
+  request of its own, for `firmware/axi4-lite-driver` only (`SEAT_C_LIVE`):
+  its `trials` step starts only on that job's own credential test record
+  (written with `--require-denied`, of that run, attempt, job and commit,
+  every probe denied, the wrapper found), and `check --require-expected`,
+  which runs before the credential test, leaves that record to `trials`.
+  Every other case that runs seat C stays refused; the register block flow
+  waits for gates WF15 to WF19 of the G3 council record and gate SC9. A
+  replay of such a case still runs: its code is the reference answer. A pass
+  rate, level or count for `firmware/axi4-lite-driver` from live trials is
+  stated only beside the case, its two held-out checks, the absence of a
+  mutant and the broken-driver control of gate SC5 (below), and as nothing
+  more than host co-simulation on Verilator against the reference RTL
+  (decision 5).
 - **The compile residual, and the compile screen** (M91, gate SC1 of
   `council/records/2026-11-19-seat-c-live-refusal.md`, fact 9 and decision 4).
   Seat C executes as the seat account, but `fw.build` and `fw.test` compile
@@ -351,7 +362,8 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   test's own compile so that a diagnostic quotes its lines (inference); the
   program `fw.test` builds holds the held-out test it is linked with; and the
   M53 redaction replaces only the exact value of a credential-named variable
-  (fact). The live refusal above stays until gate SC7.
+  (fact). Gate SC7 lifts the live refusal above for the single-seat case
+  only.
 - **The credential test for seat C** (`scripts/live_eval_fw_reach.py`, G3
   record, decision 4 and second addendum, decision 2, item 1) runs in the
   `replay`, `live-eval` and `rejudge` jobs of a whole-flow or firmware case,

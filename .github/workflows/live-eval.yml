@@ -32,8 +32,9 @@ name: Live evaluation
 # credential test for seat C under fw.test (scripts/live_eval_fw_reach.py) as a gate (--require-denied) and uploads
 # its result: since M90 fw.test runs the program it builds, which holds seat C, as nirmaan-seat (through
 # nirmaan-seat-exec), and the job stops unless every probe is denied. A firmware/ case runs the same test. A live
-# trial of a case that runs seat C stays refused (exit 6); lifting that is a change of its own. No schedule can start
-# one (gate WF13): this workflow has none.
+# trial of a case that runs seat C stays refused (exit 6), except firmware/axi4-lite-driver (gate SC7 of
+# council/records/2026-11-19-seat-c-live-refusal.md), whose trials step starts only on this job's own credential test
+# record (FW_REACH). No schedule can start one (gate WF13): this workflow has none.
 on:
   workflow_dispatch:
     inputs:
