@@ -11,6 +11,8 @@ owner's machine. The workflow calls this script in two ways:
   own record. It stops at once on exit 3 (a trial with no model answer, as on a plan or usage limit, RR5) or a
   limit line in the output, on any exit but 0 or 1, and when a record is not what was asked for. A stopped or
   failed trial is kept as it is and never run again; no later trial starts.
+- ``confined`` (decision #36): exit 6 unless the case named by CASE runs no seat C or this job's credential test
+  record (``FW_REACH``) shows it confined; the replay and re-judge steps run it before they run seat code.
 - ``tree``: the checkout's tree hash (gate WF17): the commit, and every file git tracks or would add, plus every
   file under ``src/``, ``scripts/`` and ``evals/`` ignored or not, by path, type, mode and content. The workflow
   takes it before and after the trials and fails on any change; the counting re-judge refuses records from a job
@@ -155,6 +157,34 @@ def _head() -> str | None:
         return None
 
 
+def seat_c_use(case_id: str) -> str | None:
+    """What of this case runs seat-written C (its tools and seats), or None when nothing does.
+
+    A whole flow seats every stage it lists, so a firmware stage anywhere in it runs seat C at its own
+    before-review checks, whichever stage is judged."""
+    case = next(c for c in _cases() if c.id == case_id)
+    tools = sorted({h.tool for h in case.held_out if h.tool in SEAT_C_TOOLS})
+    seats = sorted({case.seat, *(case.exercised if case.flow == "whole" else ())} & set(SEAT_C_SEATS))
+    what = [*tools, *(f"the {s} stage" if case.flow == "whole" else f"the {s} seat" for s in seats)]
+    return ", ".join(what) or None
+
+
+def confined_problem(case_id: str, env: Mapping[str, str] | None = None) -> str | None:
+    """Why this job may not run this case's seat code, or None (``confined``, decision #36 of 2026-11-19).
+
+    Every job that runs seat C (the replay of a reference answer, the counting re-judge) runs it only after the
+    credential test of that same job showed it confined (``fw_reach_problem``), as ``trials`` does for
+    ``SEAT_C_LIVE``. A case that runs no seat C needs nothing more than the cocotb reach test."""
+    what = seat_c_use(case_id)
+    if what is None:
+        return None
+    problem = fw_reach_problem(os.environ if env is None else env, _head())
+    if problem is None:
+        return None
+    return (f"case {case_id} runs seat-written C ({what}); this job runs it only after its own credential test shows "
+            f"seat C confined under fw.test (gate WF17, M90): {problem}. Nothing ran")
+
+
 def seat_c_problem(case_id: str, env: Mapping[str, str] | None = None, defer: bool = False) -> str | None:
     """Why a live trial of this case, which runs seat C, is refused, or None.
 
@@ -162,10 +192,8 @@ def seat_c_problem(case_id: str, env: Mapping[str, str] | None = None, defer: bo
     before-review checks, whichever stage is judged. A case in ``SEAT_C_LIVE`` is refused only without a credential
     test record of this job that shows every probe denied (``fw_reach_problem``); ``defer`` (``check``, which runs
     before the credential test) leaves that to ``trials``."""
-    case = next(c for c in _cases() if c.id == case_id)
-    tools = sorted({h.tool for h in case.held_out if h.tool in SEAT_C_TOOLS})
-    seats = sorted({case.seat, *(case.exercised if case.flow == "whole" else ())} & set(SEAT_C_SEATS))
-    if (seats or tools) and case_id in SEAT_C_LIVE:
+    what = seat_c_use(case_id)
+    if what and case_id in SEAT_C_LIVE:
         if defer:
             return None
         problem = fw_reach_problem(os.environ if env is None else env, _head())
@@ -173,8 +201,7 @@ def seat_c_problem(case_id: str, env: Mapping[str, str] | None = None, defer: bo
             return None
         return (f"case {case_id} runs seat-written C; a live trial of it needs this job's credential test to show "
                 f"seat C confined under fw.test (gate WF17, M90): {problem}. No trial ran")
-    if seats or tools:
-        what = ", ".join([*tools, *(f"the {s} stage" if case.flow == "whole" else f"the {s} seat" for s in seats)])
+    if what:
         return (f"case {case_id} runs seat-written C ({what}); live trials of it stay refused (gate WF17: fw.test runs "
                 "it as the seat account since M90, but the register block flow waits for gates WF15 to WF19 and the "
                 "dated plan addition). No trial ran")
@@ -310,6 +337,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     one.add_argument("--require-expected", action="store_true")
     many = sub.add_parser("trials", help="run the trials one at a time")
     many.add_argument("--out", type=Path, required=True)
+    sub.add_parser("confined", help="exit 6 unless this job's credential test shows the case's seat C confined")
     tree = sub.add_parser("tree", help="print the checkout's tree hash")
     tree.add_argument("--write", type=Path, help="also write the manifest the hash is taken over")
     args = parser.parse_args(argv)
@@ -318,6 +346,22 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.write:
             args.write.write_text("\n".join(lines) + "\n", encoding="utf-8")
         print(tree_digest(lines), flush=True)
+        return 0
+    if args.mode == "confined":  # decision #36: the replay and re-judge steps, before they run seat code
+        case = os.environ.get("CASE", "").strip()
+        if not case:
+            print("name the case (CASE) whose seat code this job runs", file=sys.stderr, flush=True)
+            return BAD_INPUT
+        try:
+            problem = confined_problem(case)
+        except StopIteration:
+            print(f"unknown case {case!r}", file=sys.stderr, flush=True)
+            return BAD_INPUT
+        if problem:
+            print(f"::error::{problem}", file=sys.stderr, flush=True)
+            return UNCONFINED
+        print(f"case {case}: " + ("seat C confined by this job's credential test" if seat_c_use(case)
+                                  else "runs no seat C"), flush=True)
         return 0
     try:
         opts = options(dict(os.environ))

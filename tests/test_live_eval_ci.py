@@ -329,6 +329,32 @@ def test_the_firmware_case_runs_live_only_on_this_jobs_credential_test_showing_e
     assert "not this checkout's" in ci.fw_reach_problem(record, None)
 
 
+def test_a_job_runs_a_cases_seat_c_only_on_its_own_credential_test_record(tmp_path, monkeypatch, capsys):
+    """Decision #36: the replay and the re-judge refuse seat C, fail closed, exactly as trials does."""
+    monkeypatch.setattr(ci, "_head", lambda: "c0ffee")
+    for case in ("firmware/axi4-lite-driver", REGS_FLOW_CASE):
+        assert ci.seat_c_use(case)
+        assert ci.confined_problem(case, _fw_record(tmp_path)) is None
+        for env in ({}, _fw_record(tmp_path, every_probe_denied=False), _fw_record(tmp_path, require_denied=False),
+                    {**_fw_record(tmp_path), "GITHUB_JOB": "replay"}):
+            problem = ci.confined_problem(case, env)
+            assert problem and "WF17" in problem and "Nothing ran" in problem, (case, env)
+    for case in ("dv/cocotb-crc", TIMER_FLOW):  # no seat C: the cocotb reach test is enough
+        assert ci.seat_c_use(case) is None and ci.confined_problem(case, {}) is None
+    for key in [*JOB_ENV, ci.FW_REACH_ENV, "CASE"]:
+        monkeypatch.delenv(key, raising=False)
+    assert ci.main(["confined"]) == ci.BAD_INPUT
+    monkeypatch.setenv("CASE", "no/such-case")
+    assert ci.main(["confined"]) == ci.BAD_INPUT
+    monkeypatch.setenv("CASE", "firmware/axi4-lite-driver")
+    assert ci.main(["confined"]) == ci.UNCONFINED and "Nothing ran" in capsys.readouterr().err
+    for key, value in _fw_record(tmp_path).items():
+        monkeypatch.setenv(key, value)
+    assert ci.main(["confined"]) == 0 and "confined by this job's credential test" in capsys.readouterr().out
+    monkeypatch.setenv("CASE", TIMER_FLOW)
+    assert ci.main(["confined"]) == 0 and "runs no seat C" in capsys.readouterr().out
+
+
 def test_the_register_block_flow_stays_refused_with_a_passing_credential_test(tmp_path, monkeypatch):
     monkeypatch.setattr(ci, "_head", lambda: "c0ffee")
     problem = ci.seat_c_problem(REGS_FLOW_CASE, _fw_record(tmp_path))
@@ -613,3 +639,13 @@ def test_a_whole_flow_dispatch_with_no_expected_fingerprint_is_refused_before_an
     assert ci.main(["check", "--require-expected"]) == 0
     monkeypatch.setenv("EXPECTED", harness_sha256(cli="2.1.325"))
     assert ci.main(["check", "--require-expected"]) == ci.MISMATCH
+
+
+def test_every_case_that_runs_seat_c_gets_the_credential_test_in_every_job():
+    """Decision #36: the workflow runs the credential test for flow/ and firmware/ cases; a case that runs seat C under
+    any other name would be stopped by ``confined`` in every job (fail closed), so none may exist."""
+    workflow = (REPO / ".github" / "workflows" / "live-eval.yml").read_text(encoding="utf-8")
+    condition = "if: startsWith(inputs.case, 'flow/') || startsWith(inputs.case, 'firmware/')"
+    assert workflow.count(condition + "\n        run: python scripts/live_eval_fw_reach.py") == 3  # replay, trials, rejudge
+    seat_c = [c.id for c in ci._cases() if ci.seat_c_use(c.id)]
+    assert seat_c and all(case.startswith(("flow/", "firmware/")) for case in seat_c), seat_c

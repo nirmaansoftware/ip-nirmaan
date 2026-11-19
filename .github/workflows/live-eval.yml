@@ -17,7 +17,9 @@ name: Live evaluation
 # through the real cocotb path, and stops before any trial unless every probe is denied. The trial
 # job hashes its checkout before and after the trials and fails on a change. The counting re-judge
 # runs in the `rejudge` job, which ran no seat code before it: a fresh checkout of the same commit,
-# the records only from the uploaded artifact, refused when the trial job's two hashes differ.
+# the records only from the uploaded artifact, refused when the trial job's two hashes differ. Every job that runs
+# seat C (replay, trials, re-judge) runs the credential test below first and starts nothing without its record
+# (scripts/live_eval_ci.py confined; decision #36).
 #
 # The token is CLAUDE_CODE_OAUTH_TOKEN, a secret of the `live-eval` environment, which only
 # `main` may deploy to; there is no repository secret. Only the gate step and the trials step
@@ -130,7 +132,11 @@ jobs:
         run: echo "tree=$(python scripts/live_eval_ci.py tree --write "$RUNNER_TEMP/tree-before.txt")" >> "$GITHUB_OUTPUT"
       - name: Replay the reference answer
         id: trials
-        run: nirmaan eval run "$CASE" --replay --out "$RUNNER_TEMP/replay"
+        env:
+          FW_REACH: ${{ runner.temp }}/fw-reach/fw-reach.json
+        run: |
+          python scripts/live_eval_ci.py confined
+          nirmaan eval run "$CASE" --replay --out "$RUNNER_TEMP/replay"
       - name: Check the checkout did not change
         id: after
         if: always() && steps.before.outcome == 'success'
@@ -269,6 +275,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     env:
+      CASE: ${{ inputs.case }}
       COMMIT: ${{ needs.replay.outputs.commit || needs.live-eval.outputs.commit }}
       TREE_BEFORE: ${{ needs.replay.outputs.tree_before || needs.live-eval.outputs.tree_before }}
       TREE_AFTER: ${{ needs.replay.outputs.tree_after || needs.live-eval.outputs.tree_after }}
@@ -308,12 +315,27 @@ jobs:
           path: ${{ runner.temp }}/records
       - name: Test what seat code can reach
         run: python scripts/live_eval_reach.py --records "$RUNNER_TEMP/records"
+      # Decision #36 (gate WF17 covers every job that runs seat code): re-judging a firmware or whole-flow record runs
+      # its seat C again, so this job runs the credential test too, as a gate, before it re-judges anything.
+      - name: Test what seat C can reach under fw.test
+        if: startsWith(inputs.case, 'flow/') || startsWith(inputs.case, 'firmware/')
+        run: python scripts/live_eval_fw_reach.py --records "$RUNNER_TEMP/records" --out "$RUNNER_TEMP/fw-reach/fw-reach.json" --require-denied
+      - name: Upload the seat C reach record
+        if: always() && (startsWith(inputs.case, 'flow/') || startsWith(inputs.case, 'firmware/'))
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: live-eval-fw-reach-rejudge-${{ github.run_id }}
+          path: ${{ runner.temp }}/fw-reach
+          if-no-files-found: ignore
       - name: Hash the checkout before the re-judge
         id: before
         run: echo "tree=$(python scripts/live_eval_ci.py tree --write "$RUNNER_TEMP/tree-before.txt")" >> "$GITHUB_OUTPUT"
       - name: Re-judge the records
         id: rejudge
+        env:
+          FW_REACH: ${{ runner.temp }}/fw-reach/fw-reach.json
         run: |
+          python scripts/live_eval_ci.py confined
           shopt -s nullglob
           records=("$RUNNER_TEMP"/records/*/)
           if [ "${#records[@]}" -eq 0 ]; then

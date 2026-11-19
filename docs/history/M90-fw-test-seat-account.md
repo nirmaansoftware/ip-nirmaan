@@ -42,6 +42,12 @@ step's `FW_REACH`): this run, attempt, job and commit, written with
 `--require-denied`, every probe denied, the control written, the wrapper
 found. The workflow runs the credential test for `firmware/` cases too.
 
+**Every job that runs seat C (decision #36 of 2026-11-19).** The `rejudge`
+job runs the credential test as a gate too, and the replay and re-judge steps
+first run `scripts/live_eval_ci.py confined`: exit 6 for a case that runs seat
+C unless that job's own record shows it confined, so a skipped or failed
+credential test never lets seat C run.
+
 **No fingerprint change.** The files changed are outside `harness.CODE`,
 `LOOP_CODE` and `FLOW_CODE`, and no tool definition changes. With Claude Code
 2.1.325 the default fingerprint stays

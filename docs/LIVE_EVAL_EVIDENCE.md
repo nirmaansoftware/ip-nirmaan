@@ -303,15 +303,20 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   reference answer.
 - **The credential test for seat C** (`scripts/live_eval_fw_reach.py`, G3
   record, decision 4 and second addendum, decision 2, item 1) runs in the
-  `replay` and `live-eval` jobs of a whole-flow case, after the reach test and
-  before the checkout is hashed. It runs a C driver test through `fw.test`
+  `replay`, `live-eval` and `rejudge` jobs of a whole-flow or firmware case,
+  after the reach test and before the checkout is hashed. It runs a C driver test through `fw.test`
   under a parent holding two canaries in its real environment and records
   whether that C can run as the runner or in another group, run `sudo -n`,
   write the checkout, the package, the records folder or any other target of
   the reach test above, read any process's environment or a runner-only file,
   or signal the harness. Since M90 the workflow runs it with
   `--require-denied`: the job stops unless every probe is denied and
-  `fw.test` found its wrapper. Before M90 it only recorded; that result
+  `fw.test` found its wrapper. Every step that runs seat code of a case that
+  runs seat C (the replay, the trials, the re-judge) first runs
+  `scripts/live_eval_ci.py confined`, which stops it with exit 6 unless that
+  job's own record shows seat C confined (decision #36 of 2026-11-19), so a
+  skipped or failed credential test never lets seat C run. Before M90 it only
+  recorded; that result
   (run 44401041085, as the runner) was every probe not denied, the parent's
   environment with the credential-named canary in it readable. Its record is
   `evals/flow/credential_test_record.json`.
@@ -333,11 +338,13 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   after the trials with the same result as before and ran this run's commit.
   It then checks out that commit afresh, installs the tools, makes the seat
   account, downloads the records (the artifact is the only way they reach it),
-  runs the reach test with the records folder as its target, hashes the
-  checkout, runs `nirmaan eval rejudge <record> --write` on every record, and
-  hashes the checkout again. Re-judging replays the recorded answers through
-  the real gates, so seat code runs again there, as the seat account. Any
-  difference, a changed checkout or a failed reach test fails the job.
+  runs the reach test with the records folder as its target, and for a
+  whole-flow or firmware case the credential test for seat C (since M90,
+  decision #36), hashes the checkout, runs `nirmaan eval rejudge <record>
+  --write` on every record after `live_eval_ci.py confined`, and hashes the
+  checkout again. Re-judging replays the recorded answers through the real
+  gates, so seat code runs again there, as the seat account. Any difference,
+  a changed checkout or a failed reach or credential test fails the job.
   **A reading of WF17, for security and the Founder Proxy to confirm.** The
   council asks that "the re-judge that counts runs in a job that ran no seat
   code". Re-judging is replaying the recorded answers through the real gates,
