@@ -456,12 +456,18 @@ def test_the_probe_compiles_as_fw_test_compiles_a_driver_test(tmp_path):
     """Compiled only, never run here: it runs sudo and reads other processes, so it runs in CI's live-eval jobs."""
     from nirmaan.integrations import firmware
 
-    for n, config in enumerate((CONFIG, {**CONFIG, "append_to": []})):
+    reads = {"read_files": ["/repo/evals/firmware/axi4_lite/held_out_test.c", "/repo/.nirmaan-read-canary-n"],
+             "list_dirs": ["/repo", "/home/runner"], "network": [list(n) for n in fw._reach().NETWORK]}
+    for n, config in enumerate((CONFIG, {**CONFIG, "append_to": []}, {**CONFIG, **reads})):
         source = tmp_path / f"fw_reach_probe_{n}.c"
         source.write_text(fw.probe_source(config))
         proc = subprocess.run(["cc", "-std=c11", "-Wall", "-Wextra", "-Werror", "-pedantic", f"-I{firmware.HARNESS}",
                                "-c", str(source), "-o", str(tmp_path / f"probe_{n}.o")], capture_output=True, text=True)
         assert proc.returncode == 0, proc.stderr
+    text = fw.probe_source({**CONFIG, **reads})  # gate SC6: every read target and every network target is tried
+    assert all(f'"{path}", ' in text for path in reads["read_files"] + reads["list_dirs"])
+    assert text.count("all &= one_target(") == len(reads["network"]) == 4
+    assert 'one_target(1, "2606:4700:4700::1111", 443)' in text and 'one_target(2, "127.0.0.53", 53)' in text
 
 
 def _log(denied=(), missing=(), done=True, control="ok"):
@@ -574,7 +580,10 @@ def test_the_recorded_credential_test_is_whole_and_the_register_block_flow_waits
     shows any probe not denied, a live trial of the register block flow is refused (exit 6)."""
     record = json.loads(CREDENTIAL_RECORD.read_text())
     assert record["format"] == fw.FORMAT and record["tool"] == "fw.test" and record["done"] and record["control_ok"]
-    assert not record["missing"] and set(record["probes"]) == set(fw.PROBES)
+    # A record that shows reach may predate probes added since (the READ and network probes, gate SC6); a record
+    # that shows every probe denied must hold them all. Gate SC3 replaces this record with one from main.
+    assert not record["missing"] and (set(record["probes"]) == set(fw.PROBES) or (
+        not record["every_probe_denied"] and set(record["probes"]) < set(fw.PROBES)))
     assert record["run"]["id"] and record["run"]["job_id"] and record["head"]
     assert record["every_probe_denied"] == all(p["denied"] for p in record["probes"].values())
     if not record["every_probe_denied"]:
@@ -682,3 +691,29 @@ def test_every_job_names_the_seat_wrapper_and_the_trials_step_its_record():
     assert workflow.count(f"      {firmware.SEAT_EXEC_ENV}: {seat.EXEC}\n") == 3  # replay, live-eval, rejudge
     trials = workflow.split("- name: Run the trials one at a time")[1].split("- name:")[0]
     assert "FW_REACH: ${{ runner.temp }}/fw-reach/fw-reach.json" in trials
+
+
+def test_the_broken_driver_control_needs_the_reference_to_pass_each_fixture_to_fail_and_the_wrapper():
+    """Gate SC5: the record proves something only when the reference passes every check, each broken fixture is
+    failed by a run that ran, and (in the replay job) every fw.test run went through the seat account's wrapper."""
+    spec = importlib.util.spec_from_file_location("live_eval_fw_broken", REPO / "scripts" / "live_eval_fw_broken.py")
+    broken = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(broken)
+
+    def run(tool="fw.test", ran=True, ok=False, wrapped=True):
+        return {"check": "c", "tool": tool, "ran": ran, "succeeded": ok, "summary": "", "through_wrapper": wrapped}
+
+    good = {"reference": [run("fw.build", ok=True), run(ok=True)],
+            **{n: [run("fw.build", ok=True), run()] for n in broken.BROKEN}}
+    assert broken.problems(good, require_seat=True) == []
+    assert set(broken.BROKEN) == {"wrong-map", "swallowed-error", "all-strobes", "sticky-response"}
+    assert all((broken.FW / f).is_file() for swap in broken.BROKEN.values() for f in swap.values())
+    bad = {**good, "reference": [run(ok=False)]}
+    assert "reference driver does not pass" in broken.problems(bad, require_seat=False)[0]
+    bad = {**good, "all-strobes": [run(ran=False)]}  # a refusal is not a failure of the judge
+    assert broken.problems(bad, require_seat=False) == ["all-strobes: no held-out check failed it by a run that ran"]
+    bad = {**good, "wrong-map": [run(wrapped=False)]}
+    assert broken.problems(bad, require_seat=True) == ["an fw.test run did not go through the seat account's wrapper"]
+    assert broken.problems(bad, require_seat=False) == []
+    workflow = (REPO / ".github" / "workflows" / "live-eval.yml").read_text(encoding="utf-8")
+    assert "python scripts/live_eval_fw_broken.py --out \"$RUNNER_TEMP/fw-reach/fw-broken.json\" --require-seat" in workflow
