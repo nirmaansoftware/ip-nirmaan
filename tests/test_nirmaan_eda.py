@@ -301,3 +301,30 @@ def test_a_new_backend_needs_no_core_changes(bridge, tmp_path, monkeypatch):
         assert ev.substantiated and unsatisfied_requirements(bridge.state, bridge.task(lint)) == []
     finally:
         unregister_backend("lint.run", "fakelint")
+
+
+# --- The Verilator jobs cap (NIRMAAN_VERILATOR_JOBS) --------------------------------------------------------------
+
+
+@pytest.mark.parametrize("value,jobs", [(None, "0"), ("", "0"), ("0", "0"), (" 2 ", "2"), ("02", "2"), ("16", "16"),
+                                        ("-1", "0"), ("two", "0"), ("1.5", "0")])
+def test_the_verilator_jobs_cap_is_read_where_a_build_is_made_and_unset_is_one_job_per_core(monkeypatch, tmp_path,
+                                                                                            value, jobs):
+    """Unset (and anything but a whole number above 0) keeps today's ``-j 0``; every Verilator build reads it."""
+    from nirmaan.integrations import eda, firmware, firmware_riscv
+
+    if value is None:
+        monkeypatch.delenv(eda.VERILATOR_JOBS_ENV, raising=False)
+    else:
+        monkeypatch.setenv(eda.VERILATOR_JOBS_ENV, value)
+    assert eda.verilator_jobs() == jobs
+    for module in (eda, firmware_riscv):  # no build keeps its own -j
+        assert module.verilator_jobs is eda.verilator_jobs and '"-j", "0"' not in Path(module.__file__).read_text()
+    # fw.test's build is pinned word for word by gate WF14's guard, so it keeps -j 0 whatever the setting says.
+    assert '"--build", "-j", "0"' in Path(firmware.__file__).read_text()
+    job = eda.Job("simulator.run", {}, tmp_path, (str(tmp_path / "top.v"),), "top")
+    for build in (eda._verilator_sim, eda._verilator_coverage):
+        monkeypatch.setattr(eda, "_expect", lambda job: None)
+        monkeypatch.setattr(eda, "coverage_design", lambda job: {}, raising=False)
+        argv = build(job)[0]
+        assert argv[0] == "verilator" and argv[argv.index("-j") + 1] == jobs, build.__name__

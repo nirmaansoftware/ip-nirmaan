@@ -33,7 +33,7 @@ from collections.abc import MutableMapping
 from dataclasses import dataclass
 from pathlib import Path
 
-from nirmaan.integrations.eda import NONCE_ARG, Backend, Job, RunRecord, new_nonce, register_backend
+from nirmaan.integrations.eda import NONCE_ARG, Backend, Job, RunRecord, new_nonce, register_backend, verilator_jobs
 from nirmaan.integrations.eda_parsers import Diagnostic, EdaResult
 from nirmaan.integrations.firmware import (
     HARNESS,
@@ -321,7 +321,7 @@ def _soc_steps(job: Job) -> list[list[str]]:
     defines = [f"+define+NIRMAAN_CORE={core.module}", f"+define+NIRMAAN_BRIDGE={bus.module}",
                f"+define+NIRMAAN_DUT={top}", *(["+define+NIRMAAN_DUT_IRQ"] if IRQ_PORT in ports else []),
                *(["+define+NIRMAAN_CORE_BUS_ERR"] if core.bus_error else [])]
-    steps.append(["verilator", "--cc", "--exe", "--build", "-j", "0", "-Wno-fatal", "--prefix", MODEL,
+    steps.append(["verilator", "--cc", "--exe", "--build", "-j", verilator_jobs(), "-Wno-fatal", "--prefix", MODEL,
                   "--top-module", "nirmaan_soc", "-Mdir", str(model), *defines,
                   str(soc / "nirmaan_soc.v"), _local(bus.verilog, soc, job.workdir),
                   *(_local(v, soc, job.workdir) for v in core.verilog), *rtl, str(soc / "soc_main.cpp")])
