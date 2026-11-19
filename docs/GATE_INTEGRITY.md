@@ -305,8 +305,24 @@ anyway is redacted from logs and from the uploaded record.
   user. Not done here; the runtime is outside this milestone's scope. Since
   M89 (gate WF17), the live evaluation runs `vvp`, and so every
   cocotb test module, as another account, and a reach test in each job shows
-  the token unreadable; seat C under `fw.test` still runs as the runner, so its
-  live trials are refused (`docs/LIVE_EVAL_EVIDENCE.md`, section 6).
+  the token unreadable. Since M90 the program `fw.test` builds from seat C
+  executes as that account too, and a credential test in C gates each
+  whole-flow and firmware job; seat C is still compiled as the runner, and
+  live trials of a case that runs seat C are still refused
+  (`docs/LIVE_EVAL_EVIDENCE.md`, section 6; `council/records/2026-11-19-seat-c-live-refusal.md`).
+* **The compile residual** (`council/records/2026-11-19-seat-c-live-refusal.md`, fact 9 and decision 4). `fw.build`
+  and `fw.test` compile seat C as the runner. The routes fact 9 found (an
+  include of the committed reference driver by an absolute or `..` path, a
+  top-level asm line that makes the assembler copy a file, a `#line` line)
+  are refused before anything compiles since the compile screen (M91, section
+  3; recorded must-refuse fixtures in `docs/COMPILE_SCREEN.md`). What stays
+  is listed there: the screen's own preprocessor opens what the seat names
+  before the list is checked, a seat header can make a diagnostic quote the
+  held-out test's lines (inference), and the program `fw.test` builds holds
+  the held-out test it is linked with. Fact: the M53 redaction replaces only
+  an exact credential value. Decision 4, item 5 (the compile as the seat
+  account, or security's reason for the screen) is still open for the
+  register block.
 * **A per-run `TMPDIR`**, once the ABC hang it caused in the
   OpenROAD-flow-scripts image is understood.
 * **Leaked run directories.** A run with no `workdir` keeps its directory (its

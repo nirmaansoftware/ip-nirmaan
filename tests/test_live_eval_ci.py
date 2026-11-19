@@ -285,9 +285,85 @@ def test_main_refuses_seat_c_before_any_trial_but_a_replay_check_does_not(monkey
     assert ci.main(["check"]) == 0
 
 
+# --- M90, gate WF17: a job runs a case's seat C only on its own credential test record ----------------------------
+
+JOB_ENV = {"GITHUB_RUN_ID": "77", "GITHUB_RUN_ATTEMPT": "1", "GITHUB_JOB": "live-eval"}
+
+
+def _fw_record(tmp_path, **over):
+    record = {"format": "nirmaan.fw-reach/1", "tool": "fw.test", "head": "c0ffee",
+              "run": {"id": "77", "attempt": "1", "job": "live-eval", "ref": "refs/heads/main"},
+              "require_denied": True, "every_probe_denied": True, "done": True, "control_ok": True, "missing": [],
+              "seat_exec": "/opt/nirmaan-seat/bin/nirmaan-seat-exec", **over}
+    path = tmp_path / f"fw-reach-{len(list(tmp_path.glob('fw-reach-*.json')))}.json"  # one file per record
+    path.write_text(json.dumps(record))
+    return {**JOB_ENV, ci.FW_REACH_ENV: str(path)}
+
+
+def test_a_credential_test_record_counts_only_for_its_own_job_commit_and_gate_run(tmp_path, monkeypatch):
+    assert ci.fw_reach_problem(_fw_record(tmp_path), "c0ffee") is None
+    bad = [({}, "not set"), ({ci.FW_REACH_ENV: str(tmp_path / "none.json"), **JOB_ENV}, "cannot be read")]
+    for over, why in [({"run": {"id": "76", "attempt": "1", "job": "live-eval"}}, "not this job's"),
+                      ({"run": {"id": "77", "attempt": "2", "job": "live-eval"}}, "not this job's"),
+                      ({"run": {"id": "77", "attempt": "1", "job": "replay"}}, "not this job's"),
+                      ({"head": "beef"}, "not this checkout's"), ({"format": "x"}, "not one of"),
+                      ({"require_denied": False}, "without --require-denied"),
+                      ({"require_denied": None}, "without --require-denied"),
+                      ({"every_probe_denied": False}, "every probe denied"), ({"done": False}, "every probe denied"),
+                      ({"control_ok": False}, "every probe denied"), ({"missing": ["fw_reach_no_sudo"]}, "every probe"),
+                      ({"seat_exec": None}, "seat wrapper")]:
+        bad.append((_fw_record(tmp_path, **over), why))
+    for env, why in bad:
+        problem = ci.fw_reach_problem(env, "c0ffee")
+        assert problem and why in problem, (env, problem)
+    record = _fw_record(tmp_path)
+    for name in JOB_ENV:  # outside a job nothing names the job, so no record is this job's
+        assert "not this job's" in ci.fw_reach_problem({k: v for k, v in record.items() if k != name}, "c0ffee")
+    assert "not this checkout's" in ci.fw_reach_problem(record, None)
+
+
+def test_a_job_runs_a_cases_seat_c_only_on_its_own_credential_test_record(tmp_path, monkeypatch, capsys):
+    """Gate WF17 covers every job that runs seat code: the replay and the re-judge run seat C only on their own job's
+    credential test record, and fail closed without it."""
+    monkeypatch.setattr(ci, "_head", lambda: "c0ffee")
+    for case in ("firmware/axi4-lite-driver", REGS_FLOW_CASE):
+        assert ci.seat_c_use(case)
+        assert ci.confined_problem(case, _fw_record(tmp_path)) is None
+        for env in ({}, _fw_record(tmp_path, every_probe_denied=False), _fw_record(tmp_path, require_denied=False),
+                    {**_fw_record(tmp_path), "GITHUB_JOB": "replay"}):
+            problem = ci.confined_problem(case, env)
+            assert problem and "WF17" in problem and "Nothing ran" in problem, (case, env)
+    for case in ("dv/cocotb-crc", TIMER_FLOW):  # no seat C: the cocotb reach test is enough
+        assert ci.seat_c_use(case) is None and ci.confined_problem(case, {}) is None
+    for key in [*JOB_ENV, ci.FW_REACH_ENV, "CASE"]:
+        monkeypatch.delenv(key, raising=False)
+    assert ci.main(["confined"]) == ci.BAD_INPUT
+    monkeypatch.setenv("CASE", "no/such-case")
+    assert ci.main(["confined"]) == ci.BAD_INPUT
+    monkeypatch.setenv("CASE", "firmware/axi4-lite-driver")
+    assert ci.main(["confined"]) == ci.UNCONFINED and "Nothing ran" in capsys.readouterr().err
+    for key, value in _fw_record(tmp_path).items():
+        monkeypatch.setenv(key, value)
+    assert ci.main(["confined"]) == 0 and "executes as the seat account" in capsys.readouterr().out
+    monkeypatch.setenv("CASE", TIMER_FLOW)
+    assert ci.main(["confined"]) == 0 and "runs no seat C" in capsys.readouterr().out
+
+
+def test_a_passing_credential_test_lifts_no_live_refusal(tmp_path, monkeypatch):
+    """M90 runs seat C as the seat account; it does not lift exit 6 (council record 2026-11-19, seat C and the live
+    refusal). Live trials of both seat-C cases stay refused."""
+    monkeypatch.setattr(ci, "_head", lambda: "c0ffee")
+    for key, value in _fw_record(tmp_path).items():
+        monkeypatch.setenv(key, value)
+    for case in ("firmware/axi4-lite-driver", REGS_FLOW_CASE):
+        problem = ci.seat_c_problem(case)
+        assert problem and "WF17" in problem and "No trial ran" in problem, case
+
+
 # --- G3 step 5: whole-flow cases on the same path (council record 2026-11-17, decision 4) ----------------------
 
 TIMER_FLOW, REGS_FLOW = "flow/axil-timer", "flow/axi4-lite-regs-driver"
+REGS_FLOW_CASE = REGS_FLOW
 
 
 def test_a_whole_flow_case_is_known_when_named_one_trial_per_dispatch_on_the_default_harness():
@@ -356,14 +432,18 @@ def _fw_reach():
 
 fw = _fw_reach()
 CONFIG = {"canaries": ["0a1b", "2c3d"], "create_in": ["/tmp/a", "/tmp/b c"], "runner_uid": 1001,
-          "runner": "runner", "harness_pid": 4242, "secret_file": "/tmp/s/credential", "nonce": "beef"}
+          "runner": "runner", "harness_pid": 4242, "secret_file": "/tmp/s/credential", "nonce": "beef",
+          "append_to": ["/usr/bin/cc", "/opt/nirmaan-seat/bin/nirmaan-seat-exec"], "seat_gid": 998}
 
 
 def test_the_probe_names_every_target_and_refuses_a_name_it_cannot_write_as_a_literal():
     text = fw.probe_source(CONFIG)
     assert "__" not in text.split("#include \"nirmaan_hal.h\"", 1)[1].split("#define COUNT", 1)[0]
-    for value in ('"0a1b", "2c3d"', '"/tmp/a", "/tmp/b c"', "1001L", "4242L", '"/tmp/s/credential"', '"beef"'):
+    for value in ('"0a1b", "2c3d"', '"/tmp/a", "/tmp/b c"', "1001L", "4242L", '"/tmp/s/credential"', '"beef"',
+                  '{"/usr/bin/cc", "/opt/nirmaan-seat/bin/nirmaan-seat-exec", NULL}', "SEAT_GID = 998L"):
         assert value in text, value
+    bare = fw.probe_source({k: v for k, v in CONFIG.items() if k not in ("append_to", "seat_gid")})
+    assert "APPEND_TO[] = {NULL}" in bare and "SEAT_GID = -1L" in bare  # no seat account: groups never read denied
     for name in fw.PROBES:
         assert f'nirmaan_test_result("{name}", ' in text, name
     assert fw.c_string('a"b\\c') == '"a\\"b\\\\c"'
@@ -376,11 +456,12 @@ def test_the_probe_compiles_as_fw_test_compiles_a_driver_test(tmp_path):
     """Compiled only, never run here: it runs sudo and reads other processes, so it runs in CI's live-eval jobs."""
     from nirmaan.integrations import firmware
 
-    source = tmp_path / "fw_reach_probe.c"
-    source.write_text(fw.probe_source(CONFIG))
-    proc = subprocess.run(["cc", "-std=c11", "-Wall", "-Wextra", "-Werror", "-pedantic", f"-I{firmware.HARNESS}",
-                           "-c", str(source), "-o", str(tmp_path / "probe.o")], capture_output=True, text=True)
-    assert proc.returncode == 0, proc.stderr
+    for n, config in enumerate((CONFIG, {**CONFIG, "append_to": []})):
+        source = tmp_path / f"fw_reach_probe_{n}.c"
+        source.write_text(fw.probe_source(config))
+        proc = subprocess.run(["cc", "-std=c11", "-Wall", "-Wextra", "-Werror", "-pedantic", f"-I{firmware.HARNESS}",
+                               "-c", str(source), "-o", str(tmp_path / f"probe_{n}.o")], capture_output=True, text=True)
+        assert proc.returncode == 0, proc.stderr
 
 
 def _log(denied=(), missing=(), done=True, control="ok"):
@@ -412,15 +493,19 @@ def test_a_probe_is_denied_only_when_every_line_of_it_is_and_a_missing_probe_nev
                                                 (dict(denied=fw.PROBES, done=False), False, 1),
                                                 (dict(denied=fw.PROBES, control="FAILED"), True, 1),
                                                 (dict(denied=fw.PROBES, control=None), True, 1),
-                                                (dict(control="FAILED"), False, 1)])
+                                                (dict(control="FAILED"), False, 1),
+                                                (dict(denied=fw.PROBES, seat_exec=None), True, 1),
+                                                (dict(denied=fw.PROBES, seat_exec=None), False, 0)])
 def test_the_record_mode_records_and_the_gate_mode_needs_every_probe_denied(tmp_path, monkeypatch, capsys, found,
                                                                           require, code):
     out = tmp_path / "fw-reach.json"
+    found = dict(found)
+    wrapper = found.pop("seat_exec", "/opt/nirmaan-seat/bin/nirmaan-seat-exec")
 
     def fake(argv, env):
         assert env[fw.CANARY_SECRET] and env[fw.CANARY_PLAIN] and env[fw.INNER] == "1"  # in the harness's real env
         out.write_text(json.dumps({"format": fw.FORMAT, "account": {"user": "runner", "uid": 1001},
-                                   "summary": "s", **fw.parse(_log(**found))}))
+                                   "seat_exec": wrapper, "summary": "s", **fw.parse(_log(**found))}))
         return subprocess.CompletedProcess(argv, 0)
 
     monkeypatch.setattr(fw.subprocess, "run", fake)
@@ -428,15 +513,18 @@ def test_the_record_mode_records_and_the_gate_mode_needs_every_probe_denied(tmp_
     assert fw.run(tmp_path, out, require, {"GITHUB_RUN_ID": "7", "GITHUB_JOB": "replay"}) == code
     record = json.loads(out.read_text())
     assert record["head"] == "abc" and record["run"]["id"] == "7" and record["run"]["job"] == "replay"
+    assert record["require_denied"] is require  # what live_eval_ci.py's lift reads
     printed = capsys.readouterr().out
     control_ok = found.get("control", "ok") == "ok"
     assert ("NOT confined" in printed) == (not found.get("denied") and not found.get("missing") and control_ok)
+    assert ("found no nirmaan-seat wrapper" in printed) == (require and wrapper is None)
     assert CONFIG["canaries"][0] not in printed
 
 
 def test_a_target_it_cannot_name_or_find_fails_the_test_and_a_crash_never_reads_as_denied(tmp_path, monkeypatch,
                                                                                         capsys):
-    assert str(tmp_path) in fw.targets(tmp_path)
+    create, append = fw.targets(tmp_path)
+    assert str(tmp_path) in create and append == []
     for over in ({"package_file": ""}, {"purelib": ""}):
         with pytest.raises(fw.Unresolved):
             fw.targets(tmp_path, **over)
@@ -449,6 +537,33 @@ def test_a_target_it_cannot_name_or_find_fails_the_test_and_a_crash_never_reads_
     for require in (False, True):
         assert fw.run(tmp_path, out, require, {}) == 1
         assert not out.exists() and "nothing is recorded as denied" in capsys.readouterr().out
+
+
+def test_in_actions_the_credential_test_tries_every_target_of_the_reach_test(tmp_path, monkeypatch):
+    """M90: seat C is tried against the same folders and files as cocotb's seat code, and the same failures stop it."""
+    assert callable(fw._reach().targets)  # the real reach test's list
+    seen = []
+
+    class Reach:
+        @staticmethod
+        def targets(records, env):
+            seen.append((records, env["GITHUB_ACTIONS"]))
+            return [str(tmp_path), "/usr/local/bin"], ["/usr/bin/cc", "/opt/nirmaan-seat/bin/nirmaan-seat-exec"]
+
+    monkeypatch.setattr(fw, "_reach", lambda: Reach)
+    create, append = fw.targets(tmp_path, env={"GITHUB_ACTIONS": "true"})
+    assert seen == [(tmp_path, "true")] and create.count(str(tmp_path)) == 1 and "/usr/local/bin" in create
+    assert append == ["/usr/bin/cc", "/opt/nirmaan-seat/bin/nirmaan-seat-exec"]
+    assert fw.targets(tmp_path, env={})[1] == [] and len(seen) == 1
+
+    class Fails:
+        @staticmethod
+        def targets(records, env):
+            raise SystemExit("reach test: cannot determine vvp on PATH")
+
+    monkeypatch.setattr(fw, "_reach", lambda: Fails)
+    with pytest.raises(SystemExit, match="cannot determine"):
+        fw.targets(tmp_path, env={"GITHUB_ACTIONS": "true"})
 
 
 CREDENTIAL_RECORD = REPO / "evals" / "flow" / "credential_test_record.json"
@@ -464,6 +579,11 @@ def test_the_recorded_credential_test_is_whole_and_the_register_block_flow_waits
     assert record["every_probe_denied"] == all(p["denied"] for p in record["probes"].values())
     if not record["every_probe_denied"]:
         assert ci.seat_c_problem(REGS_FLOW)
+    else:  # M90: denied because fw.test ran the program as the seat account, through its wrapper, in a gate run
+        assert record["seat_exec"] == "/opt/nirmaan-seat/bin/nirmaan-seat-exec" and record["seat_account"]["uid"] != \
+            record["account"]["uid"]
+        assert record["run_step"][0][0] == record["seat_exec"] and record["append_targets"]
+        assert ci.seat_c_problem(REGS_FLOW)  # still refused live: lifting that is a change of its own
 
 
 # --- G3 third addendum (2026-11-19), gate WF21: no attempts option, and no whole-flow dispatch without its fingerprint
@@ -504,3 +624,14 @@ def test_a_whole_flow_dispatch_with_no_expected_fingerprint_is_refused_before_an
     assert ci.main(["check", "--require-expected"]) == 0
     monkeypatch.setenv("EXPECTED", harness_sha256(cli="2.1.325"))
     assert ci.main(["check", "--require-expected"]) == ci.MISMATCH
+
+
+def test_every_case_that_runs_seat_c_gets_the_credential_test_in_every_job():
+    """The workflow runs the credential test for flow/ and firmware/ cases; a case that runs seat C under
+    any other name would be stopped by ``confined`` in every job (fail closed), so none may exist."""
+    workflow = (REPO / ".github" / "workflows" / "live-eval.yml").read_text(encoding="utf-8")
+    condition = "if: startsWith(inputs.case, 'flow/') || startsWith(inputs.case, 'firmware/')"
+    runs = condition + "\n        run: python scripts/live_eval_fw_reach.py"
+    assert workflow.count(runs) == 3  # replay, trials, rejudge
+    seat_c = [c.id for c in ci._cases() if ci.seat_c_use(c.id)]
+    assert seat_c and all(case.startswith(("flow/", "firmware/")) for case in seat_c), seat_c

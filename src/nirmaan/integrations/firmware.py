@@ -45,8 +45,26 @@ STRICT_FLAGS = ("-std=c11", "-Wall", "-Wextra", "-Werror", "-pedantic")
 #: The class name Verilator gives the model, so the harness names no design.
 MODEL = "Vdut"
 
+#: M90, gate WF17 (docs/LIVE_EVAL_EVIDENCE.md, section 6): where a program of this name is on ``PATH`` (the live
+#: evaluation's jobs install it, ``scripts/live_eval_seat.py``), ``fw.test`` runs the program it built, which holds
+#: the seat's C, through it as the seat account, in the folder ``SEAT_DIR`` of the run's directory. Elsewhere the
+#: program runs as the caller, as before.
+SEAT_EXEC = "nirmaan-seat-exec"
+SEAT_DIR = "seat"
+
 _C_SUFFIXES = (".c",)
 _HEADER_SUFFIXES = (".h",)
+
+
+def _killed(status: int) -> bool:
+    """Whether ``status`` is a signal's: ``-N``. ``-1`` is left out: it is also what a step that could not start
+    reports (``eda._run_step``), and what a parser is given when no step ran."""
+    return status < -1
+
+
+def _ended(status: int) -> str:
+    """How a step ended, for a summary: ``exit status N``, or ``killed by signal N``."""
+    return f"killed by signal {-status}" if _killed(status) else f"exit status {status}"
 
 
 def _plural(n: int, word: str) -> str:
@@ -123,7 +141,7 @@ def parse_c_build(log: str, returncodes: tuple[int, ...]) -> EdaResult:
         summary = (f"build failed: {_plural(len(errors), 'error')}, {_plural(len(warnings), 'warning')}"
                    f"{_first(errors or warnings)}")
         if not diags:
-            summary += f" (exit status {status})"
+            summary += f" ({_ended(status)})"
     return EdaResult(passed, summary, tuple(diags),
                      {"errors": len(errors), "warnings": len(warnings), "compiled": runs,
                       "exit_statuses": list(returncodes)})
@@ -241,10 +259,15 @@ def parse_fw_test(log: str, returncodes: tuple[int, ...], what: str = "co-simula
             passed = False
             harness.extend(Diagnostic("error", m, "REQUIRE") for m in missing)
             summary = f"{what} failed: {'; '.join(missing)} ({_plural(passed_checks, 'check')} passed)"
+    elif not ran and _killed(status) and not build and _ran_the_program(log) and all(c == 0 for c in returncodes[:-1]):
+        # Every step before the program's run exited 0, and the program was killed.
+        # Ends as a failed build's summary does (": 0 errors (exit status S)"), so a pattern on that tail matches both.
+        summary = (f"{what} was killed by signal {-status} before it reported anything; the build was clean: "
+                   f"0 errors (exit status {status})")
     elif not ran:
         summary = f"build failed before {what}: {_plural(len(build), 'error')}{_first(build)}"
         if not build:
-            summary += f" (exit status {status})"
+            summary += f" ({_ended(status)})"
     elif failed_checks:
         first = next(c for c in checks if not c["passed"])
         summary = (f"{what} failed: {failed_checks} of {_plural(len(checks), 'check')} failed; "
@@ -253,12 +276,20 @@ def parse_fw_test(log: str, returncodes: tuple[int, ...], what: str = "co-simula
         summary = f"{what} failed: {harness[0].message}"
     elif not finished:
         summary = f"{what} did not finish: the harness printed no summary"
+        if _killed(status):
+            summary += f" ({_ended(status)})"
     else:
-        summary = f"{what} failed (exit status {status})"
+        summary = f"{what} failed ({_ended(status)})"
     return EdaResult(passed, summary, tuple(build + harness),
                      {"checks": checks, "passed": passed_checks, "failed": failed_checks, "cycles": cycles,
                       "bus_transfers": transfers, "irq_taken": irqs, "bus_error_traps": len(traps),
                       "traps": traps, "exit_statuses": list(returncodes)})
+
+
+def _ran_the_program(log: str) -> bool:
+    """Whether the last step the log echoes is the built program's run: the one step given the run's nonce (M53)."""
+    echoed = [line for line in log.splitlines() if line.startswith("$ ")]
+    return bool(echoed) and NONCE_ARG in echoed[-1]
 
 
 # --- The backends ----------------------------------------------------------------------------
@@ -536,8 +567,22 @@ def _build_check(job: Job) -> str | None:
     return map_problem(job) or compile_problem(job, "cc")
 
 
+def seat_run(job: Job, argv: list[str]) -> list[str]:
+    """``argv``, the built program and its arguments, run as the seat account where ``SEAT_EXEC`` is installed (M90).
+
+    The seat's folder is new and holds nothing the harness reads afterwards: the run's directory keeps what the
+    harness wrote (the requirements, the log), and the seat account may write only its own folder."""
+    seat = shutil.which(SEAT_EXEC)
+    if seat is None:
+        return argv
+    here = job.workdir / SEAT_DIR
+    here.mkdir(exist_ok=True)
+    return [seat, str(here), *argv]
+
+
 def _cosim_steps(job: Job) -> list[list[str]]:
-    """Compile the driver and its tests, build the model with the harness, and run it.
+    """Compile the driver and its tests, build the model with the harness, and run it (as the seat account where
+    ``SEAT_EXEC`` is installed: ``seat_run``).
 
     Verilator's ``--build`` drives make, which cannot handle a space in a path,
     so the harness and the RTL are copied, byte for byte, into the working
@@ -559,7 +604,7 @@ def _cosim_steps(job: Job) -> list[list[str]]:
     steps.append(["verilator", "--cc", "--exe", "--build", "-j", "0", "-Wno-fatal", "--prefix", MODEL,
                   "-Mdir", str(model), *job.top_args("--top-module"), *rtl, str(harness / manager.name),
                   *objects, "-CFLAGS", f"-I{harness}", *irq])
-    steps.append([str(model / MODEL), NONCE_ARG + new_nonce()])  # M53: the harness tags its lines with it
+    steps.append(seat_run(job, [str(model / MODEL), NONCE_ARG + new_nonce()]))  # M53: the harness tags its lines
     return steps
 
 

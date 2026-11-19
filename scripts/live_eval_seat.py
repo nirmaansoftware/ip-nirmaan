@@ -8,6 +8,12 @@ no password, no sudo rule, no group but its own, ``no_new_privs`` set (so no set
 it more), and an environment holding only cocotb's own settings. It may write only the run's own directory; every
 other grant is taken back when the run ends. The harness code is unchanged: the wrapper is first on ``PATH``.
 
+``fw.test`` runs the co-simulation it builds (the seat's C linked with the harness, M90) by path, not through
+``PATH``, so it has a wrapper of its own: where ``nirmaan-seat-exec`` is on ``PATH``, ``fw.test`` runs the built
+program through it, in a folder of its own inside the run's directory (``nirmaan.integrations.firmware``). That runs
+as the same account, with ``no_new_privs`` and an empty environment; the program must be one the runner built in the
+same run directory.
+
 Modes, each run by the workflow or by the wrapper:
 
 - ``install`` (as root, from ``.github/actions/live-eval-seat``): make the account, copy this file to
@@ -16,12 +22,18 @@ Modes, each run by the workflow or by the wrapper:
   rest, then ``sudo`` to ``run``.
 - ``run`` (as root, through sudo): stop any seat process left over, give the seat account the run's directory, run
   ``EXE`` as the seat account, then ``cleanup``.
+- ``exec DIR EXE ARGS`` (as the runner, from ``nirmaan-seat-exec``): pass nothing of the environment, then ``sudo``
+  to ``run-built``.
+- ``run-built`` (as root, through sudo): as ``run``, with ``DIR`` as the seat's folder, for a program the runner
+  built in the same run directory (``built_problem``), with an empty environment. A run ended by a signal ends this
+  process by the same signal, so the harness sees the signal as it would without the account.
 - ``cleanup`` (as root): stop every seat process, give every file the seat account made in a run directory back to
   the runner (a link or any other non-regular file it made there is removed first, so nothing the harness reads
   afterwards leads elsewhere), take back every grant, and remove what it left in the shared temporary folders.
 
-``fw.build`` and ``fw.test`` run the seat's C by path, not through ``PATH``, so this does not reach them; a live
-trial of a case that runs seat C is refused (``scripts/live_eval_ci.py``) until it does.
+``fw.build`` compiles the seat's C and ``fw.test`` compiles and links it; both run the compiler as the runner. Seat C
+runs only in ``fw.test``'s last step, as the seat account where ``nirmaan-seat-exec`` is installed. A live trial of a
+case that runs seat C is still refused (``scripts/live_eval_ci.py``): lifting that is a change of its own.
 """
 
 from __future__ import annotations
@@ -32,6 +44,7 @@ import json
 import os
 import pwd
 import re
+import resource
 import shutil
 import signal
 import stat
@@ -50,6 +63,9 @@ GRANTS = STATE / "grants.json"
 LOCK = STATE / "lock"
 #: The programs that run seat code, wrapped by name. cocotb runs a test module inside ``vvp``.
 WRAPPED = ("vvp",)
+#: The wrapper ``fw.test`` runs its built co-simulation through (``nirmaan.integrations.firmware.SEAT_EXEC``).
+EXEC_NAME = "nirmaan-seat-exec"
+EXEC = BIN / EXEC_NAME
 #: Where a run's directory must be: one the harness made in the temporary folder (``eda.run_directory``).
 RUN_ROOT = Path("/tmp")
 RUN_PREFIX = "nirmaan-"
@@ -90,6 +106,17 @@ def wrapper_text(exe: str, script: str = str(INSTALLED)) -> str:
             f"exec /usr/bin/python3 -I {script} wrap {exe} -- \"$@\"\n")
 
 
+def exec_argv(where: str, exe: str, args: Sequence[str], script: str = str(INSTALLED)) -> list[str]:
+    """The sudo command that runs a built program ``exe`` as the seat account in ``where``, with no environment."""
+    return ["/usr/bin/sudo", "-n", "/usr/bin/python3", "-I", script, "run-built", "--cwd", where, "--exe", exe, "--",
+            *args]
+
+
+def exec_wrapper_text(script: str = str(INSTALLED)) -> str:
+    return (f"#!/bin/sh\n# Runs DIR EXE ARGS: a program fw.test built, as {SEAT} (scripts/live_eval_seat.py; "
+            f"docs/LIVE_EVAL_EVIDENCE.md, section 6).\nexec /usr/bin/python3 -I {script} exec -- \"$@\"\n")
+
+
 # --- As root ------------------------------------------------------------------------------------------------------
 
 
@@ -110,6 +137,57 @@ def run_dir_problem(cwd: Path, owner: int, root: Path = RUN_ROOT) -> str | None:
         if info.st_uid != owner:
             return f"{here} does not belong to the runner (uid {info.st_uid}, not {owner})"
     return None
+
+
+def built_problem(exe: Path, cwd: Path, owner: int, root: Path = RUN_ROOT) -> str | None:
+    """Why ``exe`` is not a program the runner built in the run directory that holds ``cwd``, or None.
+
+    Both are already resolved. The program must be inside the same ``root/nirmaan-*`` directory as ``cwd``, every
+    folder from there down to it the runner's own and not a link, and itself a regular file of the runner's that no
+    other account may write, with no set-id bit, that the seat account may run."""
+    top = root / cwd.relative_to(root).parts[0]
+    try:
+        rel = exe.relative_to(top)
+    except ValueError:
+        return f"{exe} is not inside the run directory {top}"
+    if not rel.parts:
+        return f"{exe} is the run directory, not a program in it"
+    here = top
+    for part in rel.parts:
+        here = here / part
+        info = os.lstat(here)
+        if stat.S_ISLNK(info.st_mode):
+            return f"{here} is a link"
+        if info.st_uid != owner:
+            return f"{here} does not belong to the runner (uid {info.st_uid}, not {owner})"
+        if here != exe and not stat.S_ISDIR(info.st_mode):
+            return f"{here} is not a directory"
+    info = os.lstat(exe)
+    if not stat.S_ISREG(info.st_mode):
+        return f"{exe} is not a regular file"
+    if info.st_mode & (stat.S_IWOTH | stat.S_ISUID | stat.S_ISGID):
+        return f"{exe} is writable by other accounts or set-id (mode {stat.S_IMODE(info.st_mode):o})"
+    if not info.st_mode & stat.S_IXOTH:
+        return f"{exe} cannot be run by other accounts (mode {stat.S_IMODE(info.st_mode):o})"
+    return None
+
+
+def passed_on(code: int) -> int:
+    """The exit status for a run that ended with ``code``: a run ended by a signal ends this process by the same
+    signal (no core is written), so the caller sees what it would have seen without the account. Only if that
+    fails, ``128 + N``."""
+    if code >= 0:
+        return code
+    signum = -code
+    try:
+        resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
+        signal.signal(signum, signal.SIG_DFL)
+    except (OSError, ValueError):  # SIGKILL keeps its default; it still ends this process below
+        pass
+    sys.stdout.flush()
+    sys.stderr.flush()
+    os.kill(os.getpid(), signum)
+    return 128 + signum
 
 
 def grants_for(cwd: Path, root: Path = RUN_ROOT) -> list[tuple[str, str]]:
@@ -226,16 +304,20 @@ def cleanup() -> None:
     _sweep(seat.pw_uid)
 
 
-def run(cwd: str, exe: str, env: Sequence[str], args: Sequence[str]) -> int:
+def run(cwd: str, exe: str, env: Sequence[str], args: Sequence[str], built: bool = False) -> int:
+    """Run ``exe`` as the seat account in ``cwd``; its exit status, negative for a signal (``built``) or ``128 + N``.
+
+    ``built``: ``exe`` is a program the runner built in the same run directory (``built_problem``), run with no
+    environment of the caller's; otherwise one of the wrapped programs, with cocotb's settings."""
     owner = (int(os.environ["SUDO_UID"]), int(os.environ["SUDO_GID"]))
     seat = _seat()
     if seat.pw_uid in owner or owner[0] == 0:
         raise Refused(f"{SEAT}: the caller must be the runner, not uid {owner[0]}")
-    bad = [pair.split("=", 1)[0] for pair in env if not KEEP_ENV.match(pair.split("=", 1)[0])
+    bad = [pair.split("=", 1)[0] for pair in env if built or not KEEP_ENV.match(pair.split("=", 1)[0])
            or SECRET.search(pair.split("=", 1)[0])]
     if bad:
         raise Refused(f"{SEAT}: refusing to pass {', '.join(bad)}")
-    if exe not in installed_exes():
+    if not built and exe not in installed_exes():
         raise Refused(f"{SEAT}: {exe} is not a program this account runs")
     STATE.mkdir(mode=0o700, exist_ok=True)
     stop_seat(seat.pw_uid)  # a run left behind by a stopped step, so it frees the lock
@@ -246,6 +328,11 @@ def run(cwd: str, exe: str, env: Sequence[str], args: Sequence[str]) -> int:
         problem = run_dir_problem(where, owner[0])
         if problem:
             raise Refused(f"{SEAT}: {problem}; {exe} runs only in a run directory (nothing ran)")
+        if built:
+            exe = os.path.realpath(exe)
+            problem = built_problem(Path(exe), where, owner[0])
+            if problem:
+                raise Refused(f"{SEAT}: {problem}; only a program the runner built in this run runs (nothing ran)")
         grants = grants_for(where)
         _save_grants({"owner": list(owner), "paths": grants})  # recorded first, so a crash leaves them to cleanup
         for path, mode in grants:
@@ -268,7 +355,7 @@ def run(cwd: str, exe: str, env: Sequence[str], args: Sequence[str]) -> int:
             time.sleep(0.05)
         cleanup()
     code = proc.returncode
-    return 128 - code if code < 0 else code
+    return code if built or code >= 0 else 128 - code
 
 
 def installed_exes() -> list[str]:
@@ -342,9 +429,10 @@ def install(source: Path, trees: Sequence[str] = (), folders: Sequence[str] = ()
             raise Refused(f"{name} is not installed")
         exes.append(str(Path(real).resolve()))
         (BIN / name).write_text(wrapper_text(exes[-1]), encoding="utf-8")
+    EXEC.write_text(exec_wrapper_text(), encoding="utf-8")
     shutil.copyfile(source, INSTALLED)
     (HOME / "exes.json").write_text(json.dumps(exes), encoding="utf-8")
-    for path in (HOME, BIN, *(BIN / n for n in WRAPPED)):
+    for path in (HOME, BIN, *(BIN / n for n in WRAPPED), EXEC):
         os.chown(path, 0, 0)
         os.chmod(path, 0o755)
     for path in (INSTALLED, HOME / "exes.json"):
@@ -354,7 +442,8 @@ def install(source: Path, trees: Sequence[str] = (), folders: Sequence[str] = ()
     changed = harden(trees, folders)
     print(f"{SEAT}: took write access from other accounts on {len(changed)} paths in {', '.join(trees)} and the "
           f"folders on PATH")
-    print(f"{SEAT}: uid {seat.pw_uid}, groups {groups}; {', '.join(f'{BIN / n} runs {e}' for n, e in zip(WRAPPED, exes))}")
+    print(f"{SEAT}: uid {seat.pw_uid}, groups {groups}; {', '.join(f'{BIN / n} runs {e}' for n, e in zip(WRAPPED, exes))}; "
+          f"{EXEC} runs what fw.test builds")
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -366,17 +455,28 @@ def main(argv: Sequence[str] | None = None) -> int:
     wrap = sub.add_parser("wrap")
     wrap.add_argument("exe")
     wrap.add_argument("args", nargs=argparse.REMAINDER)
+    built = sub.add_parser("exec")
+    built.add_argument("args", nargs=argparse.REMAINDER)
     one = sub.add_parser("run")
     one.add_argument("--cwd", required=True)
     one.add_argument("--exe", required=True)
     one.add_argument("--env", action="append", default=[])
     one.add_argument("args", nargs=argparse.REMAINDER)
+    run_built = sub.add_parser("run-built")
+    run_built.add_argument("--cwd", required=True)
+    run_built.add_argument("--exe", required=True)
+    run_built.add_argument("args", nargs=argparse.REMAINDER)
     sub.add_parser("cleanup")
     args = parser.parse_args(argv)
     rest = args.args[1:] if getattr(args, "args", [])[:1] == ["--"] else getattr(args, "args", [])
     try:
         if args.mode == "wrap":
             command = wrap_argv(args.exe, rest, os.getcwd(), os.environ)
+            os.execv(command[0], command)
+        if args.mode == "exec":
+            if len(rest) < 2:
+                raise Refused(f"{EXEC_NAME}: give the seat's folder and the program to run (nothing ran)")
+            command = exec_argv(rest[0], rest[1], rest[2:])
             os.execv(command[0], command)
         if os.geteuid() != 0:
             raise Refused(f"{args.mode} runs as root")
@@ -387,6 +487,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.mode == "cleanup":
             cleanup()
             return 0
+        if args.mode == "run-built":
+            return passed_on(run(args.cwd, args.exe, [], rest, built=True))
         return run(args.cwd, args.exe, args.env, rest)
     except Refused as refused:
         print(refused, file=sys.stderr, flush=True)
