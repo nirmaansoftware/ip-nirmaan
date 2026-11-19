@@ -1494,3 +1494,12 @@ is required. The plan and its addition are documents. If the build lane
 wants the pinned digests of decision 2, item 4 checked by the dispatch
 script, that check goes in `scripts/live_eval_ci.py`, outside
 `harness.CODE`, and merges before the timer's slot 1.
+
+## Note (2026-11-19): read with the seat C record
+
+`council/records/2026-11-19-seat-c-live-refusal.md` rules on the live
+refusal of cases that run seat C. For this record it confirms a reading of
+gate WF17 (its decision 3), adds conditions before the first register block
+trial and one line to gate WF18 (its decision 2 and gate SC9), and requires
+the compile of seat C to be closed before any such trial (its decision 4).
+It changes nothing else here.
