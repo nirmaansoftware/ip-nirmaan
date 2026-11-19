@@ -278,6 +278,61 @@ def test_the_driver_passes_against_the_real_rtl(block, tmp_path):
     assert "verilator --cc --exe --build" in log and run.params["rtl"] == (str(RTL),)
 
 
+def _fake_seat_exec(folder: Path) -> Path:
+    """A stand-in for the live evaluation's ``nirmaan-seat-exec`` (scripts/live_eval_seat.py): it records how it was
+    called and runs the program in the seat's folder, as the caller (the account itself exists only in Actions)."""
+    folder.mkdir()
+    script = folder / "nirmaan-seat-exec"
+    script.write_text('#!/bin/sh\nprintf "%s\\n" "$@" > "$1/called-with"\nd="$1"; shift\n'
+                      'cd "$d" && pwd -P > ran-in && exec "$@"\n', encoding="utf-8")
+    script.chmod(0o755)
+    return script
+
+
+def test_without_the_seat_wrapper_the_built_program_runs_as_before(tmp_path, monkeypatch):
+    """M90: off the live evaluation's jobs nothing changes: the last step is the program and its nonce."""
+    from nirmaan.integrations import firmware
+    from nirmaan.integrations.eda import Job
+
+    monkeypatch.setattr(firmware.shutil, "which", lambda name, *a, **k: None)
+    job = Job("fw.test", {}, tmp_path, (), None)
+    assert firmware.seat_run(job, ["/run/cosim/Vdut", "+nirmaan_nonce=ab"]) == ["/run/cosim/Vdut", "+nirmaan_nonce=ab"]
+    assert not (tmp_path / firmware.SEAT_DIR).exists()
+
+
+def test_with_the_seat_wrapper_the_built_program_runs_through_it_in_a_folder_of_its_own(tmp_path, monkeypatch):
+    from nirmaan.integrations import firmware
+    from nirmaan.integrations.eda import Job
+
+    monkeypatch.setattr(firmware.shutil, "which",
+                        lambda name, *a, **k: "/opt/nirmaan-seat/bin/nirmaan-seat-exec" if name == firmware.SEAT_EXEC
+                        else None)
+    job = Job("fw.test", {}, tmp_path, (), None)
+    argv = firmware.seat_run(job, ["/run/cosim/Vdut", "+nirmaan_nonce=ab"])
+    assert argv == ["/opt/nirmaan-seat/bin/nirmaan-seat-exec", str(tmp_path / "seat"), "/run/cosim/Vdut",
+                    "+nirmaan_nonce=ab"]
+    assert (tmp_path / "seat").is_dir() and not any((tmp_path / "seat").iterdir())
+
+
+@needs(*COSIM)
+def test_the_driver_passes_through_the_seat_wrapper_with_the_same_checks(block, tmp_path, monkeypatch):
+    """M90: the wrapper changes only who runs the built program and where; the run, its checks and its nonce are
+    the same, and the requirements the harness reads afterwards stay outside the seat's folder."""
+    wrapper = _fake_seat_exec(tmp_path / "bin")
+    monkeypatch.setenv("PATH", f"{wrapper.parent}:{__import__('os').environ['PATH']}")
+    work = tmp_path / "run"
+    run, outcome = invoke(block, "fw.test", {"sources": joined(*DRIVER, TESTS), "rtl": str(RTL)}, work)
+    assert run.succeeded, run.summary
+    last = outcome.data["commands"][-1]
+    seat = Path(last[1])
+    assert last[0] == str(wrapper) and seat.name == "seat" and last[2].endswith("/cosim/Vdut")
+    assert last[3].startswith("+nirmaan_nonce=")
+    assert (seat / "ran-in").read_text().strip() == str(seat.resolve())
+    assert (seat / "called-with").read_text().split() == last[1:]
+    assert len(outcome.data["result"]["metrics"]["checks"]) == 6
+    assert not list(seat.glob("*.json")) and list(seat.parent.glob("*.json"))
+
+
 @needs(*COSIM)
 def test_a_wrong_driver_is_a_recorded_failed_run(block, tmp_path):
     run, outcome = invoke(block, "fw.test", {"sources": joined(*wrong_driver(tmp_path)), "rtl": str(RTL)},

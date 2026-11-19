@@ -259,8 +259,22 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   test, the control, writes the run's own directory. Each target must exist
   first, so a refusal proves something. The job fails before any trial unless
   cocotb's verdict is a pass with every probe test in its results.
-- **Seat C waits.** `fw.build` and `fw.test` run the seat's C by path, not
-  through `PATH`, so the account does not reach them.
+- **Seat C runs as the account too (M90).** `fw.test` runs the program it
+  builds (the seat's C linked with the harness and the Verilated model) by
+  path, not through `PATH`, so it has a wrapper of its own:
+  `/opt/nirmaan-seat/bin/nirmaan-seat-exec`, root's, made by the same action.
+  Where it is on `PATH`, `fw.test`'s last step runs the program through it
+  (`nirmaan.integrations.firmware.SEAT_EXEC`), in a new folder `seat` inside
+  the run's directory: as `nirmaan-seat`, with `no_new_privs`, an empty
+  environment, write access to that folder only (the run's directory, which
+  holds the requirements file and the log the harness reads, is not
+  writable), and the same cleanup. The program must be a regular file the
+  runner built in the same run directory, reached through no link, not
+  writable by others and not set-id. A run killed by a signal ends the
+  wrapper by the same signal, so `fw.test` reports it as it would without the
+  account. Elsewhere (the owner's machine, CI's test job) there is no wrapper
+  and nothing changes. The compile and link steps of `fw.build` and `fw.test`
+  still run the compiler as the runner over the seat's C; they run none of it.
   Other backends build or run host code over seat files, and none of them runs
   seat-written host code: `regmap.verify` builds a test the harness generates
   from the seat's register map (`nirmaan.regmap.c_test`, after `validate`),
@@ -274,23 +288,26 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   `docs/GATE_INPUTS.md`, section 2). Those runs stay with the runner account,
   as before; if a case ever hands one of them seat-written host code, it joins
   `SEAT_C_TOOLS` in `scripts/live_eval_ci.py`. `check
-  --require-expected` and `trials` refuse a case that runs seat C (one whose
-  seat is `firmware`, whose held-out checks use `fw.build` or `fw.test`, or a
-  whole flow with a `firmware` stage) with exit 6 before any trial. A replay
-  of such a case still runs: its code is the reference answer.
+  --require-expected` and `trials` still refuse a case that runs seat C (one
+  whose seat is `firmware`, whose held-out checks use `fw.build` or `fw.test`,
+  or a whole flow with a `firmware` stage) with exit 6 before any trial;
+  lifting that is a change of its own (for the register block flow, after
+  gates WF15 to WF19 of the G3 council record). A replay of such a case still
+  runs: its code is the reference answer.
 - **The credential test for seat C** (`scripts/live_eval_fw_reach.py`, G3
   record, decision 4 and second addendum, decision 2, item 1) runs in the
   `replay` and `live-eval` jobs of a whole-flow case, after the reach test and
   before the checkout is hashed. It runs a C driver test through `fw.test`
   under a parent holding two canaries in its real environment and records
-  whether that C can run as the runner, run `sudo -n`, write the checkout, the
-  package or the records folder, read any process's environment or a
-  runner-only file, or signal the harness. Today it records, and does not
-  gate, since `fw.test` runs seat C as the runner; with `--require-denied` it
-  becomes the gate when that changes. Its recorded result
-  (`evals/flow/credential_test_record.json`, run 44401041085): every probe
-  not denied, the parent's environment with the credential-named canary in
-  it readable.
+  whether that C can run as the runner or in another group, run `sudo -n`,
+  write the checkout, the package, the records folder or any other target of
+  the reach test above, read any process's environment or a runner-only file,
+  or signal the harness. Since M90 the workflow runs it with
+  `--require-denied`: the job stops unless every probe is denied and
+  `fw.test` found its wrapper. Before M90 it only recorded; that result
+  (run 44401041085, as the runner) was every probe not denied, the parent's
+  environment with the credential-named canary in it readable. Its record is
+  `evals/flow/credential_test_record.json`.
 - **Whole-flow cases** (`docs/WHOLE_FLOW.md`, "The CI path") run in these
   jobs when named: one trial per dispatch, on the default harness, in the
   whole-flow fingerprint, each record checked for `flow: whole`; a `flow/`

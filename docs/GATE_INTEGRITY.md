@@ -287,8 +287,10 @@ anyway is redacted from logs and from the uploaded record.
   user. Not done here; the runtime is outside this milestone's scope. Since
   M89 (gate WF17), the live evaluation runs `vvp`, and so every
   cocotb test module, as another account, and a reach test in each job shows
-  the token unreadable; seat C under `fw.test` still runs as the runner, so its
-  live trials are refused (`docs/LIVE_EVAL_EVIDENCE.md`, section 6).
+  the token unreadable. Since M90 the program `fw.test` builds from seat C
+  runs as that account too, and a credential test in C gates each whole-flow
+  job; live trials of a case that runs seat C are still refused
+  (`docs/LIVE_EVAL_EVIDENCE.md`, section 6).
 * **A per-run `TMPDIR`**, once the ABC hang it caused in the
   OpenROAD-flow-scripts image is understood.
 * **Leaked run directories.** A run with no `workdir` keeps its directory (its

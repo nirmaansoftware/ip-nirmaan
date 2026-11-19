@@ -17,19 +17,21 @@ owner's machine. The workflow calls this script in two ways:
   whose two hashes differ.
 
 A live trial (``check --require-expected`` and ``trials``) of a case that runs seat-written C (``fw.build``,
-``fw.test``, the firmware seat, or a whole flow with a firmware stage) is refused before anything runs: that C runs
-by path, not as the seat account (``scripts/live_eval_seat.py``), so the reach test cannot cover it yet.
+``fw.test``, the firmware seat, or a whole flow with a firmware stage) is refused before anything runs. Since M90
+``fw.test`` runs the program it builds as the seat account in these jobs (``scripts/live_eval_seat.py``) and the
+credential test (``scripts/live_eval_fw_reach.py --require-denied``) gates it; the refusal stays until a change of
+its own lifts it (for the register block flow, after gates WF15 to WF19 of the G3 council record).
 
 A whole-flow case (``flow/...``, G3 council record 2026-11-17, decision 4) runs only when named, one trial per
 dispatch (each dispatch is one slot of the committed batch plan), on the default harness, in the whole-flow
 fingerprint (``harness_sha256(flow="whole")``); every record must carry ``flow: whole``. The register block flow
-(``flow/axi4-lite-regs-driver``) has a firmware stage, so it stays refused until ``fw.test`` runs seat C as the
-seat account; the timer flow (``flow/axil-timer``) links no seat C and runs.
+(``flow/axi4-lite-regs-driver``) has a firmware stage, so it stays refused (above); the timer flow
+(``flow/axil-timer``) links no seat C and runs.
 
 The options come from the environment (CASE, TRIALS, KNOWLEDGE, PURPOSE, HARNESS, EXPECTED), as the workflow
 sets them, so no input is expanded inside a shell command. Nothing here prints a credential. Exit codes: 0 every
 trial ran (passed or failed), 2 bad input, 3 stopped on a limit, 4 fingerprint or record mismatch, 5 stopped on
-another exit, 6 a case whose seat code this job cannot run as the seat account. See docs/LIVE_EVAL_EVIDENCE.md, section 6.
+another exit, 6 a case that runs seat C (refused, above). See docs/LIVE_EVAL_EVIDENCE.md, section 6.
 """
 
 from __future__ import annotations
@@ -51,7 +53,7 @@ CLI_PACKAGE = "@anthropic-ai/claude-code"
 LIMIT = re.compile(r"hit your .*limit|usage limit|spend(ing)? limit", re.IGNORECASE)
 MAX_TRIALS = 20
 BAD_INPUT, STOPPED_LIMIT, MISMATCH, STOPPED_OTHER, UNCONFINED = 2, 3, 4, 5, 6
-#: Tools that build or run seat-written C by path, outside the seat account (gate WF17), and the seat that uses them.
+#: Tools that build or run seat-written C, and the seat that uses them: a live trial of a case with either is refused.
 #: regmap.verify, fw.soc_test and Verilator's --binary run no seat-written host code (docs/LIVE_EVAL_EVIDENCE.md, 6).
 SEAT_C_TOOLS, SEAT_C_SEATS = ("fw.build", "fw.test"), ("firmware",)
 #: Folders hashed whole, ignored files included: the judge's code, the scripts the workflow runs, the cases.
@@ -113,7 +115,7 @@ def _cases() -> list:
 
 
 def seat_c_problem(case_id: str) -> str | None:
-    """Why a live trial of this case would run seat code outside the seat account, or None.
+    """Why a live trial of this case, which runs seat C, is refused, or None.
 
     A whole flow seats every stage it lists, so a firmware stage anywhere in it runs seat C at its own
     before-review checks, whichever stage is judged."""
@@ -122,8 +124,9 @@ def seat_c_problem(case_id: str) -> str | None:
     seats = sorted({case.seat, *(case.exercised if case.flow == "whole" else ())} & set(SEAT_C_SEATS))
     if seats or tools:
         what = ", ".join([*tools, *(f"the {s} stage" if case.flow == "whole" else f"the {s} seat" for s in seats)])
-        return (f"case {case_id} runs seat-written C ({what}), which fw.build and fw.test run by path, not as the "
-                "seat account; live trials of it wait for that (gate WF17). No trial ran")
+        return (f"case {case_id} runs seat-written C ({what}); live trials of it stay refused (gate WF17: fw.test runs "
+                "it as the seat account since M90, and only a change of its own lifts this; for the register block "
+                "flow, after gates WF15 to WF19). No trial ran")
     return None
 
 

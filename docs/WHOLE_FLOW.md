@@ -535,30 +535,32 @@ checkout. No new workflow and no new action.
   checkout is hashed. It compiles a driver test in C for this run and runs it
   through `fw.test`'s co-simulation backend on the reference register block,
   under a parent process that holds two canaries in its real environment
-  (one under `CLAUDE_CODE_OAUTH_TOKEN`). Its tests try to run as the runner,
-  run `sudo -n`, create a file in the checkout, the installed package and the
-  records folder, find a canary in any `/proc/<pid>/environ`, read its
-  parent's environment at all, read a runner-only file and signal the
-  harness; a control writes its own run directory. The result is uploaded as
-  `live-eval-fw-reach-<job>-<run id>`. It is recorded, not a gate:
-  `fw.test` runs seat C by path, as the runner. `--require-denied` makes it
-  a gate.
-- **The recorded result** (`evals/flow/credential_test_record.json`, run
-  44401041085, job `replay`, head feda503): every probe not denied. The C ran
-  as the runner (uid 1001), `sudo -n true` exited 0, it created a file in the
-  checkout, `src/nirmaan`, `scripts`, `evals`, `site-packages` and the records
-  folder, it read its parent's `/proc/<pid>/environ` holding both canaries
-  (the credential-named one included), its own environment held the plain
-  one, and it read the runner-only file and could signal the harness. So the
-  register block flow waits, as below.
+  (one under `CLAUDE_CODE_OAUTH_TOKEN`). Its tests try to run as the runner
+  or in another group, run `sudo -n`, create a file in the checkout, the
+  installed package and the records folder, and in Actions open for writing
+  every other target of the cocotb reach test, find a canary in any
+  `/proc/<pid>/environ`, read its parent's environment at all, read a
+  runner-only file and signal the harness; a control writes its own run
+  directory. The result is uploaded as `live-eval-fw-reach-<job>-<run id>`.
+  Since M90 `fw.test` runs the program it builds as `nirmaan-seat`
+  (`docs/LIVE_EVAL_EVIDENCE.md`, section 6) and the step runs with
+  `--require-denied`: a gate.
+- **The result before M90** (run 44401041085, job `replay`, head feda503):
+  every probe not denied. The C ran as the runner (uid 1001), `sudo -n true`
+  exited 0, it created a file in the checkout, `src/nirmaan`, `scripts`,
+  `evals`, `site-packages` and the records folder, it read its parent's
+  `/proc/<pid>/environ` holding both canaries (the credential-named one
+  included), its own environment held the plain one, and it read the
+  runner-only file and could signal the harness.
+- **The recorded result** (`evals/flow/credential_test_record.json`):
+  RECORD_PENDING
 - **The register block flow stays refused.** Its firmware stage and its
   held-out checks run seat C, so `check --require-expected` and `trials`
   refuse it with exit 6 before any trial, as M89 refuses the single-seat
-  firmware case. It runs live only once `fw.test` builds and runs seat C as
-  the seat account (a harness change, after wave 2's first live batch is
-  read), the credential test then shows every probe denied and is switched to
-  a gate, and gates WF15 to WF19 are met. A replay of it still runs: its code
-  is the reference answer.
+  firmware case. Since M90 `fw.test` runs the program it builds as the seat
+  account and the credential test is a gate; the refusal stays until gates
+  WF15 to WF19 are met and a change of its own lifts it. A replay of it still
+  runs: its code is the reference answer.
 - **The timer flow** links no seat C (its checks and stages run HDL, and its
   testbenches run in `vvp` as the seat account), so it runs live now.
 
