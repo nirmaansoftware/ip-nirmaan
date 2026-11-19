@@ -242,7 +242,10 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   [run 44555981466](https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44555981466)
   shows every probe denied: 130 files not read, 4 folders not listed, both
   read canaries denied, TCP refused (errno 113) and UDP refused (errno 1), and
-  IPv6 with no route (errno 101). The hosted runner's tool cache (the Python the package is installed
+  IPv6 with no route (errno 101). Since a TCP probe of `::1` was added, which
+  has a route, the IPv6 rule itself is shown: the replay job of
+  [run 44563164453](https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44563164453)
+  records it refused (errno 13), with every other probe denied as before. The hosted runner's tool cache (the Python the package is installed
   in, with its `site-packages` and console scripts) and its global
   `node_modules` (npm) are writable by every account on the hosted runner.
   Two replays of this change, before the action took that away, recorded it
@@ -274,7 +277,8 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   canary file the test writes, readable by every account by its mode, into
   the checkout and into the runner's temporary folder, and a listing of the
   checkout, its `.git`, the runner's home and its temporary folder); and to
-  reach the network (TCP out over IPv4 and IPv6, TCP on the loopback address,
+  reach the network (TCP out over IPv4 and IPv6, TCP on the loopback address
+  over IPv4 and IPv6,
   and a UDP packet to the local name server). A canary value in the run's log
   or results fails it too. A last
   test, the control, writes the run's own directory. Each target must exist
