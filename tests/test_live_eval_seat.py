@@ -476,7 +476,7 @@ def test_a_refused_or_timed_out_connection_is_not_a_denial(monkeypatch, capsys):
 
     outcomes = {("1.1.1.1", 443): OSError(errno.EPERM, "x"), ("2606:4700:4700::1111", 443):
                 OSError(errno.ENETUNREACH, "x"), ("127.0.0.1", 9): ConnectionRefusedError(errno.ECONNREFUSED, "x"),
-                ("127.0.0.53", 53): None}
+                ("::1", 9): OSError(errno.EACCES, "x"), ("127.0.0.53", 53): None}
 
     class Fake:
         def __init__(self, *args):
