@@ -1,0 +1,29 @@
+{
+  "cases": {
+    "dv/prove-deep-counter": {
+      "high": 1.0,
+      "low": 0.20654931437723745,
+      "n": 1,
+      "passed": 1,
+      "rate": 1.0
+    }
+  },
+  "format": "nirmaan.eval-summary",
+  "seats": {
+    "assertions-formal": {
+      "high": 1.0,
+      "low": 0.20654931437723745,
+      "n": 1,
+      "passed": 1,
+      "rate": 1.0
+    }
+  },
+  "totals": {
+    "cost_usd": null,
+    "duration_s": 265.712,
+    "input_tokens": 2,
+    "model_calls": 1,
+    "output_tokens": 11991,
+    "trials": 1
+  }
+}
