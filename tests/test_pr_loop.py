@@ -789,7 +789,7 @@ def test_a_fault_that_passes_clears_the_count(repo):
     assert r.tick() == ["retry"]
     expire_backoff(r)
     assert r.tick() == ["auto-merge"]
-    assert r.st()["transient"] is None and r.github.posts and not r.labeled() and not stalled(r)
+    assert not r.st().get("transient") and r.github.posts and not r.labeled() and not stalled(r)
 
 
 def test_any_other_error_still_stops_with_needs_founder(repo):
@@ -1337,6 +1337,60 @@ def test_a_conflict_only_in_the_generated_levels_file_is_resolved_by_the_loop_as
     r.github.mergeable = True
     assert r.tick(loop=GENERATED) == ["auto-merge"]
     assert r.github.merges[0][-1] == new
+
+
+REJECTED = "To origin\n ! [remote rejected] abc1234 -> feature (failed)\nerror: failed to push some refs to 'origin'\n"
+
+
+def fail_pushes(monkeypatch, stderr, times):
+    """The loop's push of the branch update fails `times` times with `stderr`, then goes through."""
+    real, seen = pr_loop._git, {"pushes": 0, "fetches": 0}
+
+    def git(cwd, *args, **kw):
+        if args and args[0] == "fetch":
+            seen["fetches"] += 1
+        if args and args[0] == "push":
+            seen["pushes"] += 1
+            if seen["pushes"] <= times:
+                raise subprocess.CalledProcessError(1, ["git", *args], "", stderr)
+        return real(cwd, *args, **kw)
+    monkeypatch.setattr(pr_loop, "_git", git)
+    return seen
+
+
+def test_a_reasonless_push_rejection_of_the_branch_update_is_fetched_and_pushed_once_more(repo, monkeypatch):
+    r = levels_repo(repo, {"records/z.txt": "z\n"}, {"records/a.txt": "a\n"})
+    r.github.mergeable = False
+    seen = fail_pushes(monkeypatch, REJECTED, 1)
+    assert r.tick(loop=GENERATED) == ["updated"]
+    assert seen["pushes"] == 2 and seen["fetches"] >= 1
+    assert is_merge_of(r, r.origin_head(), r.first_head)
+    assert not r.labeled() and not r.st().get("transient")
+
+
+def test_a_reasonless_push_rejection_twice_backs_off_and_stops_only_after_the_retry_limit(repo, monkeypatch):
+    r = levels_repo(repo, {"records/z.txt": "z\n"}, {"records/a.txt": "a\n"})
+    r.github.mergeable = False
+    fail_pushes(monkeypatch, REJECTED, 10**6)
+    assert r.tick(loop=GENERATED) == ["retry"]
+    assert not r.labeled() and r.st()["stopped"] is None and r.st()["transient"]["count"] == 1
+    assert r.tick(loop=GENERATED) == ["backoff"]
+    for n in range(2, GENERATED["transient_retries"] + 1):
+        expire_backoff(r)
+        assert r.tick(loop=GENERATED) == ["retry"] and r.st()["transient"]["count"] == n
+    expire_backoff(r)
+    assert r.tick(loop=GENERATED) == ["stopped"]
+    assert "the push failed" in r.comments()[-1] and "still failing after" in r.comments()[-1]
+    assert r.origin_head() == r.first_head
+
+
+def test_a_push_error_with_a_reason_still_stops_the_branch_update_at_once(repo, monkeypatch):
+    r = levels_repo(repo, {"records/z.txt": "z\n"}, {"records/a.txt": "a\n"})
+    r.github.mergeable = False
+    seen = fail_pushes(monkeypatch, "remote: error: GH006: Protected branch update failed\n ! [remote rejected] abc -> feature (protected branch hook declined)\n", 10**6)
+    assert r.tick(loop=GENERATED) == ["stopped"]
+    assert seen["pushes"] == 1 and r.labeled() and not r.st().get("transient")
+    assert "the push failed" in r.comments()[-1]
 
 
 def test_a_merge_call_refused_for_a_conflict_only_in_the_generated_file_is_a_branch_update_not_a_stop(repo):
