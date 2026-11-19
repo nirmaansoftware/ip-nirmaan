@@ -636,13 +636,13 @@ module axil_timer_tb_lane #(
         check("R backpressure 40 cycles SLVERR", {30'd0, resp}, {30'd0, SLVERR});
         check("R backpressure 40 cycles SLVERR data", data, 32'd0);
 
-        // The coverage matrix (G3, decision #37): the tasks after this block.
+        // The coverage matrix (G3, one round that closes classes): the tasks below.
         matrix;
 
         done = 1'b1;
     end
 
-    // --- The coverage matrix (G3, decision #37) ----------------------------------------------
+    // --- The coverage matrix (G3, one round that closes classes) -----------------------------
     // Each class is closed in both lanes, not sampled:
     // * writes: ordering (AW and W together, AW first, W first) x every address class (each
     //   register, every unaligned offset, and at ADDR_WIDTH 8 offsets from 0x10 up, aligned and

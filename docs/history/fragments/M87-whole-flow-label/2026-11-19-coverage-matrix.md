@@ -1,4 +1,5 @@
-**The coverage matrix (decision #37).** Another independent check failed both
+**The coverage matrix.** Another independent check (the timer document's
+fourth, the register block's third) failed both
 flow documents again (timer 7 findings, register block 5), each a single point
 in a class the copies sampled: held write addresses, `SLVERR` with partial or
 no strobes, periodic `LOAD` 1 and 2 and the 32-bit reload, a periodic restart

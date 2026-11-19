@@ -426,7 +426,7 @@ module axi4_lite_regs_tb;
         end
         b2b = 1'b0;
 
-        // The coverage matrix (G3, decision #37): the tasks after this block.
+        // The coverage matrix (G3, one round that closes classes): the tasks below.
         matrix;
 
         if (errors == 0)
@@ -438,7 +438,7 @@ module axi4_lite_regs_tb;
         $finish;
     end
 
-    // --- The coverage matrix (G3, decision #37) ----------------------------------------------
+    // --- The coverage matrix (G3, one round that closes classes) -----------------------------
     // Each class is closed, not sampled:
     // * writes: ordering (AW and W together, AW first, W first) x every address (the four
     //   registers and all twelve unaligned offsets; the testbench instantiates ADDR_WIDTH 4 only)

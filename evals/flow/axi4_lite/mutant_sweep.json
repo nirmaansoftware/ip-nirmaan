@@ -4,7 +4,7 @@
   "case": "flow/axi4-lite-regs-driver",
   "testbench": {
     "path": "evals/flow/axi4_lite/axi4_lite_regs_tb.v",
-    "sha256": "048830896d45686196f89894484ac122f379886403090a720c95ec1ccbe65645",
+    "sha256": "01c3bc87141fbe3c9e621e6e543a7aec882ba244b760454c1676aff495ebb994",
     "top": "axi4_lite_regs_tb"
   },
   "builder": "tests/flow_mutants.py::regs_mutants",
