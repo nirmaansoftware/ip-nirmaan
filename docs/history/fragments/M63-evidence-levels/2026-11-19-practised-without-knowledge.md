@@ -6,8 +6,5 @@ Practised group counts, else Knowledge when ..."). `systemverilog`, named by
 as the W2-L1 records landed, and the levels test, which equated "at Knowledge or
 above" with "has a committed check record", failed. The test now reads
 Knowledge from the knowledge entry (`counts`) and checks that every skill whose
-level is Knowledge is among them. No level rule changes. The same pull request
-regenerates `capability/levels.json`, which two record pull requests merged at
-the same time had left stale on `main` (each was generated before the other
-merged, and their edits did not conflict as text). The harness code and the
+level is Knowledge is among them. No level rule changes. The harness code and the
 fingerprints are unchanged.
