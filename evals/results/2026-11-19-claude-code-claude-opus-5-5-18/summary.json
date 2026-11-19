@@ -1,0 +1,29 @@
+{
+  "cases": {
+    "dv/coverage-irq-ctrl": {
+      "high": 0.7934506856227626,
+      "low": 0.0,
+      "n": 1,
+      "passed": 0,
+      "rate": 0.0
+    }
+  },
+  "format": "nirmaan.eval-summary",
+  "seats": {
+    "coverage": {
+      "high": 0.7934506856227626,
+      "low": 0.0,
+      "n": 1,
+      "passed": 0,
+      "rate": 0.0
+    }
+  },
+  "totals": {
+    "cost_usd": null,
+    "duration_s": 173.371,
+    "input_tokens": 2,
+    "model_calls": 1,
+    "output_tokens": 17278,
+    "trials": 1
+  }
+}
