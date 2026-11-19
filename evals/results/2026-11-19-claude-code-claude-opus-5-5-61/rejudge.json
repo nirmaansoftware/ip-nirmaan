@@ -1,0 +1,13 @@
+{
+  "format": "nirmaan.eval-rejudge",
+  "record": "2026-11-19-claude-code-claude-opus-5-5-61",
+  "nirmaan_version": "1.25.0",
+  "trials": [
+    {
+      "case": "dv/scoreboard-mac",
+      "trial": 1,
+      "same": true,
+      "differences": []
+    }
+  ]
+}
