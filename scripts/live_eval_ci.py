@@ -11,25 +11,32 @@ owner's machine. The workflow calls this script in two ways:
   own record. It stops at once on exit 3 (a trial with no model answer, as on a plan or usage limit, RR5) or a
   limit line in the output, on any exit but 0 or 1, and when a record is not what was asked for. A stopped or
   failed trial is kept as it is and never run again; no later trial starts.
+- ``confined`` (gate WF17: every job that runs seat code; ``council/records/2026-11-19-seat-c-live-refusal.md``,
+  decision 3): exit 6 unless the case named by CASE runs no seat C or this job's credential test record
+  (``FW_REACH``) shows every probe denied; the replay and re-judge steps run it before they run seat code.
 - ``tree``: the checkout's tree hash (gate WF17): the commit, and every file git tracks or would add, plus every
   file under ``src/``, ``scripts/`` and ``evals/`` ignored or not, by path, type, mode and content. The workflow
   takes it before and after the trials and fails on any change; the counting re-judge refuses records from a job
   whose two hashes differ.
 
 A live trial (``check --require-expected`` and ``trials``) of a case that runs seat-written C (``fw.build``,
-``fw.test``, the firmware seat, or a whole flow with a firmware stage) is refused before anything runs: that C runs
-by path, not as the seat account (``scripts/live_eval_seat.py``), so the reach test cannot cover it yet.
+``fw.test``, the firmware seat, or a whole flow with a firmware stage) is refused before anything runs. Since M90
+``fw.test`` runs the program it builds as the seat account in these jobs (``scripts/live_eval_seat.py``), and the
+credential test (``scripts/live_eval_fw_reach.py --require-denied``) gates every job that runs seat C; seat C is still
+compiled as the runner. The refusal stays (``council/records/2026-11-19-seat-c-live-refusal.md``): lifting it for the
+single-seat case is a pull request of its own after gates SC1 to SC7, and the register block flow also waits for
+gates WF15 to WF19 of the G3 council record.
 
 A whole-flow case (``flow/...``, G3 council record 2026-11-17, decision 4) runs only when named, one trial per
 dispatch (each dispatch is one slot of the committed batch plan), on the default harness, in the whole-flow
 fingerprint (``harness_sha256(flow="whole")``); every record must carry ``flow: whole``. The register block flow
-(``flow/axi4-lite-regs-driver``) has a firmware stage, so it stays refused until ``fw.test`` runs seat C as the
-seat account; the timer flow (``flow/axil-timer``) links no seat C and runs.
+(``flow/axi4-lite-regs-driver``) has a firmware stage, so it stays refused (above); the timer flow
+(``flow/axil-timer``) links no seat C and runs.
 
 The options come from the environment (CASE, TRIALS, KNOWLEDGE, PURPOSE, HARNESS, EXPECTED), as the workflow
 sets them, so no input is expanded inside a shell command. Nothing here prints a credential. Exit codes: 0 every
 trial ran (passed or failed), 2 bad input, 3 stopped on a limit, 4 fingerprint or record mismatch, 5 stopped on
-another exit, 6 a case whose seat code this job cannot run as the seat account. See docs/LIVE_EVAL_EVIDENCE.md, section 6.
+another exit, 6 a case that runs seat C refused (above, and ``confined``). See docs/LIVE_EVAL_EVIDENCE.md, section 6.
 """
 
 from __future__ import annotations
@@ -41,7 +48,7 @@ import os
 import re
 import subprocess
 import sys
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -51,9 +58,11 @@ CLI_PACKAGE = "@anthropic-ai/claude-code"
 LIMIT = re.compile(r"hit your .*limit|usage limit|spend(ing)? limit", re.IGNORECASE)
 MAX_TRIALS = 20
 BAD_INPUT, STOPPED_LIMIT, MISMATCH, STOPPED_OTHER, UNCONFINED = 2, 3, 4, 5, 6
-#: Tools that build or run seat-written C by path, outside the seat account (gate WF17), and the seat that uses them.
+#: Tools that build or run seat-written C, and the seat that uses them: a live trial of a case with either is refused.
 #: regmap.verify, fw.soc_test and Verilator's --binary run no seat-written host code (docs/LIVE_EVAL_EVIDENCE.md, 6).
 SEAT_C_TOOLS, SEAT_C_SEATS = ("fw.build", "fw.test"), ("firmware",)
+#: Where a step that runs seat code finds its job's credential test record (``live_eval_fw_reach.py --out``).
+FW_REACH_ENV = "FW_REACH"
 #: Folders hashed whole, ignored files included: the judge's code, the scripts the workflow runs, the cases.
 TREE_WHOLE = ("src", "scripts", "evals")
 NIRMAAN = ("nirmaan",)
@@ -112,18 +121,79 @@ def _cases() -> list:
     return load_cases(ROOT / "evals", flow=None)
 
 
-def seat_c_problem(case_id: str) -> str | None:
-    """Why a live trial of this case would run seat code outside the seat account, or None.
+def fw_reach_problem(env: Mapping[str, str], head: str | None) -> str | None:
+    """Why the credential test record named by ``FW_REACH`` does not show, for this job, every probe denied for seat
+    C under ``fw.test`` (it executes as the seat account), or None. Every field is required; a record that says
+    nothing proves nothing."""
+    where = env.get(FW_REACH_ENV, "").strip()
+    if not where:
+        return f"no credential test record ({FW_REACH_ENV} is not set)"
+    try:
+        record = json.loads(Path(where).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        return f"the credential test record {where} cannot be read ({type(exc).__name__})"
+    run = record.get("run") or {}
+    want = {"id": env.get("GITHUB_RUN_ID"), "attempt": env.get("GITHUB_RUN_ATTEMPT"), "job": env.get("GITHUB_JOB")}
+    if not all(want.values()) or any(run.get(k) != v for k, v in want.items()):
+        return f"the credential test record is not this job's (run {run}, this job {want})"
+    if not head or record.get("head") != head:
+        return f"the credential test record is of commit {record.get('head')}, not this checkout's {head}"
+    if record.get("format") != "nirmaan.fw-reach/1" or record.get("tool") != "fw.test":
+        return "the credential test record is not one of scripts/live_eval_fw_reach.py's"
+    if record.get("require_denied") is not True:
+        return "the credential test ran without --require-denied"
+    if not (record.get("every_probe_denied") is True and record.get("done") is True and record.get("control_ok") is True
+            and record.get("missing") == [] and record.get("seat_exec")):
+        return "the credential test record does not show every probe denied with the seat wrapper in use"
+    return None
+
+
+def _head() -> str | None:
+    try:
+        return subprocess.run(["git", "-C", str(ROOT), "rev-parse", "HEAD"], check=True, capture_output=True,
+                              text=True).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        return None
+
+
+def seat_c_use(case_id: str) -> str | None:
+    """What of this case runs seat-written C (its tools and seats), or None when nothing does.
 
     A whole flow seats every stage it lists, so a firmware stage anywhere in it runs seat C at its own
     before-review checks, whichever stage is judged."""
     case = next(c for c in _cases() if c.id == case_id)
     tools = sorted({h.tool for h in case.held_out if h.tool in SEAT_C_TOOLS})
     seats = sorted({case.seat, *(case.exercised if case.flow == "whole" else ())} & set(SEAT_C_SEATS))
-    if seats or tools:
-        what = ", ".join([*tools, *(f"the {s} stage" if case.flow == "whole" else f"the {s} seat" for s in seats)])
-        return (f"case {case_id} runs seat-written C ({what}), which fw.build and fw.test run by path, not as the "
-                "seat account; live trials of it wait for that (gate WF17). No trial ran")
+    what = [*tools, *(f"the {s} stage" if case.flow == "whole" else f"the {s} seat" for s in seats)]
+    return ", ".join(what) or None
+
+
+def confined_problem(case_id: str, env: Mapping[str, str] | None = None) -> str | None:
+    """Why this job may not run this case's seat code, or None (``confined``).
+
+    Gate WF17 (G3 council record 2026-11-17, second addendum, decision 2, item 1) covers every job that runs seat
+    code, so every job that runs seat C (the replay of a reference answer, the counting re-judge) runs it only after
+    the credential test of that same job showed every probe denied (``fw_reach_problem``); the council ratified this
+    for the re-judge (council record 2026-11-19, seat C and the live refusal, decision 3). A case that runs no seat C
+    needs nothing more than the cocotb reach test."""
+    what = seat_c_use(case_id)
+    if what is None:
+        return None
+    problem = fw_reach_problem(os.environ if env is None else env, _head())
+    if problem is None:
+        return None
+    return (f"case {case_id} runs seat-written C ({what}); this job runs it only after its own credential test shows "
+            f"every probe denied for seat C under fw.test (gate WF17, M90): {problem}. Nothing ran")
+
+
+def seat_c_problem(case_id: str) -> str | None:
+    """Why a live trial of this case, which runs seat C, is refused, or None (``seat_c_use``)."""
+    what = seat_c_use(case_id)
+    if what:
+        return (f"case {case_id} runs seat-written C ({what}); live trials of it stay refused (gate WF17: seat C "
+                "executes as the seat account since M90 and is compiled as the runner; council record 2026-11-19 "
+                "keeps this refusal until gates SC1 to SC7, and for the register block flow gates WF15 to WF19). "
+                "No trial ran")
     return None
 
 
@@ -256,6 +326,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     one.add_argument("--require-expected", action="store_true")
     many = sub.add_parser("trials", help="run the trials one at a time")
     many.add_argument("--out", type=Path, required=True)
+    sub.add_parser("confined", help="exit 6 unless this job's credential test denied every probe for the case's seat C")
     tree = sub.add_parser("tree", help="print the checkout's tree hash")
     tree.add_argument("--write", type=Path, help="also write the manifest the hash is taken over")
     args = parser.parse_args(argv)
@@ -264,6 +335,23 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.write:
             args.write.write_text("\n".join(lines) + "\n", encoding="utf-8")
         print(tree_digest(lines), flush=True)
+        return 0
+    if args.mode == "confined":  # gate WF17: the replay and re-judge steps, before they run seat code
+        case = os.environ.get("CASE", "").strip()
+        if not case:
+            print("name the case (CASE) whose seat code this job runs", file=sys.stderr, flush=True)
+            return BAD_INPUT
+        try:
+            problem = confined_problem(case)
+        except StopIteration:
+            print(f"unknown case {case!r}", file=sys.stderr, flush=True)
+            return BAD_INPUT
+        if problem:
+            print(f"::error::{problem}", file=sys.stderr, flush=True)
+            return UNCONFINED
+        print(f"case {case}: " + ("seat C executes as the seat account; this job's credential test denied every probe"
+                                  if seat_c_use(case)
+                                  else "runs no seat C"), flush=True)
         return 0
     try:
         opts = options(dict(os.environ))

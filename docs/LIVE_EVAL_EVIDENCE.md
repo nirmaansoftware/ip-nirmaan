@@ -259,8 +259,22 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   test, the control, writes the run's own directory. Each target must exist
   first, so a refusal proves something. The job fails before any trial unless
   cocotb's verdict is a pass with every probe test in its results.
-- **Seat C waits.** `fw.build` and `fw.test` run the seat's C by path, not
-  through `PATH`, so the account does not reach them.
+- **Seat C runs as the account too (M90).** `fw.test` runs the program it
+  builds (the seat's C linked with the harness and the Verilated model) by
+  path, not through `PATH`, so it has a wrapper of its own:
+  `/opt/nirmaan-seat/bin/nirmaan-seat-exec`, root's, made by the same action.
+  Where it is on `PATH`, `fw.test`'s last step runs the program through it
+  (`nirmaan.integrations.firmware.SEAT_EXEC`), in a new folder `seat` inside
+  the run's directory: as `nirmaan-seat`, with `no_new_privs`, an empty
+  environment, write access to that folder only (the run's directory, which
+  holds the requirements file and the log the harness reads, is not
+  writable), and the same cleanup. The program must be a regular file the
+  runner built in the same run directory, reached through no link, not
+  writable by others and not set-id. A run killed by a signal ends the
+  wrapper by the same signal, so `fw.test` reports it as it would without the
+  account. Elsewhere (the owner's machine, CI's test job) there is no wrapper
+  and nothing changes. The compile and link steps of `fw.build` and `fw.test`
+  still run the compiler as the runner over the seat's C; they run none of it.
   Other backends build or run host code over seat files, and none of them runs
   seat-written host code: `regmap.verify` builds a test the harness generates
   from the seat's register map (`nirmaan.regmap.c_test`, after `validate`),
@@ -276,21 +290,52 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   `SEAT_C_TOOLS` in `scripts/live_eval_ci.py`. `check
   --require-expected` and `trials` refuse a case that runs seat C (one whose
   seat is `firmware`, whose held-out checks use `fw.build` or `fw.test`, or a
-  whole flow with a `firmware` stage) with exit 6 before any trial. A replay
-  of such a case still runs: its code is the reference answer.
+  whole flow with a `firmware` stage) with exit 6 before any trial. Since
+  M90 seat C executes as the seat account and is compiled as the runner; that
+  does not lift this refusal. The council record `council/records/2026-11-19-seat-c-live-refusal.md` keeps it, and sets
+  gates SC1 to SC7 for a lift of the single-seat case in a pull request of its
+  own; the register block flow also waits for gates WF15 to WF19 of the G3
+  council record. A replay of such a case still runs: its code is the
+  reference answer.
+- **The compile residual** (`council/records/2026-11-19-seat-c-live-refusal.md`, fact 9 and decision 4, open until
+  gate SC1 is met). Seat C executes as the seat account, but `fw.build` and
+  `fw.test` compile it as the runner, and nothing screens what it includes.
+  Fact (compiled locally with the strict flags and `fw.test`'s include
+  order, not in CI): seat files that include the committed reference driver,
+  its header and its map by an absolute path or by a path with `..` compile
+  clean, and the held-out test compiles against them; a top-level asm line
+  that makes the assembler copy a file into the object also compiles clean.
+  Inference: such a driver passes both held-out checks of the single-seat
+  case without a driver being written, and including the held-out test
+  shows its text in diagnostics that a retry returns to the seat. Inference:
+  the assembler route copies any file the runner can read into the program.
+  Fact: the M53 redaction replaces only the exact value of a credential-named
+  variable. Inference: a `#line` line in seat text makes the object screen's
+  asm rule skip the lines after it. Assumption: the seat account can read
+  the checkout (only writes are probed). A re-judge compiles stored seat C
+  the way the trial did, so it cannot detect an included reference answer.
+  No live trial of a case that runs seat C runs before this is closed.
 - **The credential test for seat C** (`scripts/live_eval_fw_reach.py`, G3
   record, decision 4 and second addendum, decision 2, item 1) runs in the
-  `replay` and `live-eval` jobs of a whole-flow case, after the reach test and
-  before the checkout is hashed. It runs a C driver test through `fw.test`
+  `replay`, `live-eval` and `rejudge` jobs of a whole-flow or firmware case,
+  after the reach test and before the checkout is hashed. It runs a C driver test through `fw.test`
   under a parent holding two canaries in its real environment and records
-  whether that C can run as the runner, run `sudo -n`, write the checkout, the
-  package or the records folder, read any process's environment or a
-  runner-only file, or signal the harness. Today it records, and does not
-  gate, since `fw.test` runs seat C as the runner; with `--require-denied` it
-  becomes the gate when that changes. Its recorded result
-  (`evals/flow/credential_test_record.json`, run 44401041085): every probe
-  not denied, the parent's environment with the credential-named canary in
-  it readable.
+  whether that C can run as the runner or in another group, run `sudo -n`,
+  write the checkout, the package, the records folder or any other target of
+  the reach test above, read any process's environment or a runner-only file,
+  or signal the harness. Since M90 the workflow runs it with
+  `--require-denied`: the job stops unless every probe is denied and
+  `fw.test` found its wrapper. Gate WF17 covers every job that runs seat
+  code, so every step that runs seat code of a case that runs seat C (the
+  replay, the re-judge) first runs `scripts/live_eval_ci.py confined`, which
+  stops it with exit 6 unless that job's own record (written with
+  `--require-denied`, of that run, attempt, job and commit) shows every
+  probe denied, so seat C never executes after a skipped or failed credential
+  test. Before M90 it only
+  recorded; that result
+  (run 44401041085, as the runner) was every probe not denied, the parent's
+  environment with the credential-named canary in it readable. Its record is
+  `evals/flow/credential_test_record.json`.
 - **Whole-flow cases** (`docs/WHOLE_FLOW.md`, "The CI path") run in these
   jobs when named: one trial per dispatch, on the default harness, in the
   whole-flow fingerprint, each record checked for `flow: whole`; a `flow/`
@@ -309,22 +354,22 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   after the trials with the same result as before and ran this run's commit.
   It then checks out that commit afresh, installs the tools, makes the seat
   account, downloads the records (the artifact is the only way they reach it),
-  runs the reach test with the records folder as its target, hashes the
-  checkout, runs `nirmaan eval rejudge <record> --write` on every record, and
-  hashes the checkout again. Re-judging replays the recorded answers through
-  the real gates, so seat code runs again there, as the seat account. Any
-  difference, a changed checkout or a failed reach test fails the job.
-  **A reading of WF17, for security and the Founder Proxy to confirm.** The
-  council asks that "the re-judge that counts runs in a job that ran no seat
-  code". Re-judging is replaying the recorded answers through the real gates,
-  and a gate of a cocotb case runs the seat's test module, so no re-judge of
-  such a case can run no seat code at all. This change reads the gate as: the
-  job ran no seat code before the re-judge (nothing a seat wrote could have
-  changed its checkout, tools or records first), and the seat code the
-  re-judge itself runs does so as the seat account, after a reach test in that
-  job showed every probe denied, between two tree hashes of its checkout. That
-  reading is this change's, not the council's; if security or the Proxy reads
-  the gate otherwise, the `rejudge` job is where it changes. The
+  runs the reach test with the records folder as its target, and for a
+  whole-flow or firmware case the credential test for seat C (since M90),
+  hashes the checkout, runs `nirmaan eval rejudge <record>
+  --write` on every record after `live_eval_ci.py confined`, and hashes the
+  checkout again. Re-judging replays the recorded answers through the real
+  gates, so seat code runs again there, as the seat account. Any difference,
+  a changed checkout or a failed reach or credential test fails the job.
+  **The council's reading of WF17** (`council/records/2026-11-19-seat-c-live-refusal.md`, decision 3). The G3 record
+  asks that "the re-judge that counts runs in a job that ran no seat code".
+  Re-judging replays the recorded answers through the real gates, so the
+  council reads the gate as: the job ran no seat code before the re-judge;
+  the seat code the re-judge itself runs executes as the seat account, after
+  that job's own reach and credential tests showed every probe denied,
+  between two hashes of its checkout; seat C is compiled as the runner. Until
+  gate SC1 is met, a re-judge compiles stored seat C the way the trial did,
+  so it cannot detect an included reference answer. The
   re-judged records, each with its `rejudge.json`, are uploaded as
   `live-eval-rejudged-<run id>`; that is the re-judge a record is committed
   with.

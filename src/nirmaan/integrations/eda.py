@@ -92,8 +92,9 @@ METRICS_CAP = 2**20
 #: M88: set to anything but empty or 0 and no temporary run directory or eval sandbox is removed (debugging).
 KEEP_ENV = "NIRMAAN_KEEP_RUN_DIRS"
 #: The most build jobs a Verilator build starts (``-j N``), read where its command is made. Unset, empty, 0 or not a
-#: whole number: ``-j 0``, one job per core, as before. The review loop's checks set it, so a machine running several
-#: test shards and reviews at once does not run out of memory (decision #32 of 2026-11-19). ``fw.test``'s
+#: whole number: ``-j 0``, one job per core, as before. The review loop's test check sets it, because it runs up to
+#: three test shards at once beside reviews, and with ``-j 0`` every Verilator build in every shard starts one job per
+#: core (docs/TEST_CI_HARDENING.md, section 9). ``fw.test``'s
 #: co-simulation build keeps ``-j 0``: gate WF14's guard pins its options word for word
 #: (``tests/test_nirmaan_firmware_reach.py``), and a change there is the council's return condition.
 VERILATOR_JOBS_ENV = "NIRMAAN_VERILATOR_JOBS"
