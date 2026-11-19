@@ -204,6 +204,24 @@ Its code is in no harness fingerprint (as the scorers are not): an edit to it
 changes what the whole-flow judge refuses without a fingerprint change, so
 every refusal names the screen in its summary and the record keeps it.
 
+**The compile screen (M91, gate SC1): what C may pull in.** Council record
+`council/records/2026-11-19-seat-c-live-refusal.md`, decision 4. Seat C is
+compiled and assembled as the runner, so an include of the reference driver
+by an absolute or `..` path, or an `.incbin` of any file the runner can read,
+compiled clean (fact 9). Since M91 every backend that compiles the C a job
+names (`fw.build`, `fw.test`, `fw.cross_build`, `fw.soc_test`), and the object
+screen above, first runs `nirmaan.integrations.compile_screen`: it refuses a
+directive outside a short list (so `#line` and line markers), an absolute or
+`..` include, a file the compiler pulls in from outside the run's folders and
+its own include folders, and an asm statement or a file-reading assembler
+directive in the compiler's assembly. A refusal is a failed run with nothing
+compiled. **This gate changed without a fingerprint change:** the screen is
+in the shared tools' backends, which no fingerprint digests, so a record's
+fingerprint does not say whether it ran; a refusal names the screen in its
+summary. Every committed fixture, reference answer and held-out test passes
+it and keeps its result (`tests/test_compile_screen.py`). Design, the recorded
+must-refuse fixtures and what it does not do: `docs/COMPILE_SCREEN.md`.
+
 ---
 
 ## 4. The runner (F16, F3, F22, F9, and the parallel-build flake)
@@ -292,18 +310,19 @@ anyway is redacted from logs and from the uploaded record.
   whole-flow and firmware job; seat C is still compiled as the runner, and
   live trials of a case that runs seat C are still refused
   (`docs/LIVE_EVAL_EVIDENCE.md`, section 6; `council/records/2026-11-19-seat-c-live-refusal.md`).
-* **The compile residual** (`council/records/2026-11-19-seat-c-live-refusal.md`, fact 9 and decision 4, open until gate
-  SC1). `fw.build` and `fw.test` compile seat C as the runner and screen no
-  include. Fact (compiled locally, not in CI): an include of the committed
-  reference driver by an absolute path or a `..` path, and a top-level asm
-  line that makes the assembler copy a file, compile clean under the strict
-  flags. Inference: such a driver passes the single-seat case's held-out
-  checks without a driver being written, and the assembler route carries any
-  file the runner can read into the program. Fact: the M53 redaction replaces
-  only an exact credential value. Inference: a `#line` line hides later lines
-  from the object screen's asm rule. Assumption: the seat account can read
-  the checkout. Closed by a screen or a seat-account compile, with recorded
-  must-refuse fixtures, before any live trial of a case that compiles seat C.
+* **The compile residual** (`council/records/2026-11-19-seat-c-live-refusal.md`, fact 9 and decision 4). `fw.build`
+  and `fw.test` compile seat C as the runner. The routes fact 9 found (an
+  include of the committed reference driver by an absolute or `..` path, a
+  top-level asm line that makes the assembler copy a file, a `#line` line)
+  are refused before anything compiles since the compile screen (M91, section
+  3; recorded must-refuse fixtures in `docs/COMPILE_SCREEN.md`). What stays
+  is listed there: the screen's own preprocessor opens what the seat names
+  before the list is checked, a seat header can make a diagnostic quote the
+  held-out test's lines (inference), and the program `fw.test` builds holds
+  the held-out test it is linked with. Fact: the M53 redaction replaces only
+  an exact credential value. Decision 4, item 5 (the compile as the seat
+  account, or security's reason for the screen) is still open for the
+  register block.
 * **A per-run `TMPDIR`**, once the ABC hang it caused in the
   OpenROAD-flow-scripts image is understood.
 * **Leaked run directories.** A run with no `workdir` keeps its directory (its
