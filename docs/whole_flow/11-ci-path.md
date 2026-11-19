@@ -37,8 +37,8 @@ checkout. No new workflow and no new action.
   Since M90 `fw.test` runs the program it builds as `nirmaan-seat`
   (`docs/LIVE_EVAL_EVIDENCE.md`, section 6) and the step runs with
   `--require-denied`: a gate.
-- **The recorded result** (`evals/flow/credential_test_record.json`, run
-  44401041085, job `replay`, head feda503, before M90):
+- **The first recorded result** (run 44401041085, job `replay`, head
+  feda503, before M90; replaced on `main` by gate SC3, below):
   every probe not denied. The C ran as the runner (uid 1001), `sudo -n true`
   exited 0, it created a file in the checkout, `src/nirmaan`, `scripts`,
   `evals`, `site-packages` and the records folder, it read its parent's
@@ -46,9 +46,14 @@ checkout. No new workflow and no new action.
   included), its own environment held the plain one, and it read the
   runner-only file and could signal the harness.
 - **Since M90** every job that runs seat C runs the test with
-  `--require-denied`, so each job shows its own result. A new committed
-  record, from a replay on `main` after M90 merges, follows in a pull request
-  of its own, so the record and the code it grades never change together.
+  `--require-denied`, so each job shows its own result. The committed record
+  (`evals/flow/credential_test_record.json`, gate SC3 of
+  `council/records/2026-11-19-seat-c-live-refusal.md`) is from run
+  44585417262, a replay of `firmware/axi4-lite-driver` on `main` at 0c4f45b:
+  the `replay` and `rejudge` jobs, each in gate mode with all 9 probes denied.
+  It reached `main` in a pull request of its own, which changed no code it
+  grades. No run on `main` yet shows the re-judge gate on the register block
+  flow (decision 2, addition 3).
 - **The register block flow stays refused.** Its firmware stage and its
   held-out checks run seat C, so `check --require-expected` and `trials`
   refuse it with exit 6 before any trial. Since M90 the program `fw.test`
