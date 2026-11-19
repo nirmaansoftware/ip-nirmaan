@@ -32,21 +32,19 @@ it with `--require-denied`, which also fails when `fw.test` found no wrapper.
 
 **What stays.** The compile and link steps of `fw.build` and `fw.test` run
 the compiler as the runner over the seat's C (they run none of it); that
-residual is open for the security seat. The register block flow is still
-refused live (exit 6) until gates WF15 to WF19 and the dated plan addition.
+residual is open for the security seat. A live trial of a case that runs
+seat C is still refused (exit 6); lifting that is a change of its own (for
+the register block flow, after gates WF15 to WF19 and the dated plan
+addition). The committed credential record is still the one from before
+M90; a new one, from a replay on `main`, follows in its own pull request.
 
-**The single-seat firmware case runs live (decision #35 of 2026-11-19).**
-`scripts/live_eval_ci.py` lets `firmware/axi4-lite-driver` (`SEAT_C_LIVE`)
-start trials only on the credential test record of the same job (the trials
-step's `FW_REACH`): this run, attempt, job and commit, written with
-`--require-denied`, every probe denied, the control written, the wrapper
-found. The workflow runs the credential test for `firmware/` cases too.
-
-**Every job that runs seat C (decision #36 of 2026-11-19).** The `rejudge`
-job runs the credential test as a gate too, and the replay and re-judge steps
-first run `scripts/live_eval_ci.py confined`: exit 6 for a case that runs seat
-C unless that job's own record shows it confined, so a skipped or failed
-credential test never lets seat C run.
+**Every job that runs seat C (gate WF17).** The workflow runs the
+credential test for `firmware/` cases as well as whole-flow ones, the
+`rejudge` job runs it as a gate too, and the replay and re-judge steps first
+run `scripts/live_eval_ci.py confined`: exit 6 for a case that runs seat C
+unless that job's own record (`--require-denied`, of that run, attempt, job
+and commit) shows it confined, so a skipped or failed credential test never
+lets seat C run.
 
 **No fingerprint change.** The files changed are outside `harness.CODE`,
 `LOOP_CODE` and `FLOW_CODE`, and no tool definition changes. With Claude Code

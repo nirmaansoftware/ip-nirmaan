@@ -33,8 +33,7 @@ Modes, each run by the workflow or by the wrapper:
 
 ``fw.build`` compiles the seat's C and ``fw.test`` compiles and links it; both run the compiler as the runner. Seat C
 runs only in ``fw.test``'s last step, as the seat account where ``nirmaan-seat-exec`` is installed. A live trial of a
-case that runs seat C is refused (``scripts/live_eval_ci.py``), except the single-seat firmware case on a credential
-test record of the same job.
+case that runs seat C is still refused (``scripts/live_eval_ci.py``): lifting that is a change of its own.
 """
 
 from __future__ import annotations

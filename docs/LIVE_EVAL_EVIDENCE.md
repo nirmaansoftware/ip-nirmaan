@@ -290,16 +290,10 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   `SEAT_C_TOOLS` in `scripts/live_eval_ci.py`. `check
   --require-expected` and `trials` refuse a case that runs seat C (one whose
   seat is `firmware`, whose held-out checks use `fw.build` or `fw.test`, or a
-  whole flow with a `firmware` stage) with exit 6 before any trial, with one
-  exception (decision #35 of 2026-11-19): the single-seat
-  `firmware/axi4-lite-driver` (`SEAT_C_LIVE`) runs live, but `trials` starts
-  only on the credential test record of the same job (the trials step's
-  `FW_REACH`): this run, attempt, job and commit, written with
-  `--require-denied`, every probe denied, the control written, the wrapper
-  found. Otherwise it stops with exit 6. `check` leaves that to `trials`,
-  since the credential test runs after it. The register block flow stays
-  refused: the G3 council record still requires gates WF15 to WF19 and the
-  dated plan addition. A replay of such a case still runs: its code is the
+  whole flow with a `firmware` stage) with exit 6 before any trial. M90
+  confines seat C; it does not lift this refusal, which is a change of its
+  own (for the register block flow, after gates WF15 to WF19 of the G3
+  council record). A replay of such a case still runs: its code is the
   reference answer.
 - **The credential test for seat C** (`scripts/live_eval_fw_reach.py`, G3
   record, decision 4 and second addendum, decision 2, item 1) runs in the
@@ -311,11 +305,12 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   the reach test above, read any process's environment or a runner-only file,
   or signal the harness. Since M90 the workflow runs it with
   `--require-denied`: the job stops unless every probe is denied and
-  `fw.test` found its wrapper. Every step that runs seat code of a case that
-  runs seat C (the replay, the trials, the re-judge) first runs
-  `scripts/live_eval_ci.py confined`, which stops it with exit 6 unless that
-  job's own record shows seat C confined (decision #36 of 2026-11-19), so a
-  skipped or failed credential test never lets seat C run. Before M90 it only
+  `fw.test` found its wrapper. Gate WF17 covers every job that runs seat
+  code, so every step that runs seat code of a case that runs seat C (the
+  replay, the re-judge) first runs `scripts/live_eval_ci.py confined`, which
+  stops it with exit 6 unless that job's own record (written with
+  `--require-denied`, of that run, attempt, job and commit) shows seat C
+  confined, so a skipped or failed credential test never lets seat C run. Before M90 it only
   recorded; that result
   (run 44401041085, as the runner) was every probe not denied, the parent's
   environment with the credential-named canary in it readable. Its record is
@@ -339,8 +334,8 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   It then checks out that commit afresh, installs the tools, makes the seat
   account, downloads the records (the artifact is the only way they reach it),
   runs the reach test with the records folder as its target, and for a
-  whole-flow or firmware case the credential test for seat C (since M90,
-  decision #36), hashes the checkout, runs `nirmaan eval rejudge <record>
+  whole-flow or firmware case the credential test for seat C (since M90),
+  hashes the checkout, runs `nirmaan eval rejudge <record>
   --write` on every record after `live_eval_ci.py confined`, and hashes the
   checkout again. Re-judging replays the recorded answers through the real
   gates, so seat code runs again there, as the seat account. Any difference,

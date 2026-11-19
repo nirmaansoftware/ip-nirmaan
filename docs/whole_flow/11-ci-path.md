@@ -37,31 +37,25 @@ checkout. No new workflow and no new action.
   Since M90 `fw.test` runs the program it builds as `nirmaan-seat`
   (`docs/LIVE_EVAL_EVIDENCE.md`, section 6) and the step runs with
   `--require-denied`: a gate.
-- **The result before M90** (run 44401041085, job `replay`, head feda503):
+- **The recorded result** (`evals/flow/credential_test_record.json`, run
+  44401041085, job `replay`, head feda503, before M90):
   every probe not denied. The C ran as the runner (uid 1001), `sudo -n true`
   exited 0, it created a file in the checkout, `src/nirmaan`, `scripts`,
   `evals`, `site-packages` and the records folder, it read its parent's
   `/proc/<pid>/environ` holding both canaries (the credential-named one
   included), its own environment held the plain one, and it read the
   runner-only file and could signal the harness.
-- **The recorded result** (`evals/flow/credential_test_record.json`, run
-  44436318890, job `replay`, head 91bbb2b, `--require-denied`, for
-  `flow/axi4-lite-regs-driver`): every probe denied. `fw.test` ran the
-  program it built through `/opt/nirmaan-seat/bin/nirmaan-seat-exec`; the C
-  ran as `nirmaan-seat` (uid 999, its own group only), `sudo -n` exited 1,
-  each of 26 folders and 26 files refused a write with `EACCES`, its own
-  environment held no canary, the parent's and the harness's
-  `/proc/<pid>/environ`, the runner-only file and a signal to the harness
-  were refused, and the control wrote only the seat's folder. The same job's
-  replay of the register block flow passed.
+- **Since M90** every job that runs seat C runs the test with
+  `--require-denied`, so each job shows its own result. A new committed
+  record, from a replay on `main` after M90 merges, follows in a pull request
+  of its own, so the record and the code it grades never change together.
 - **The register block flow stays refused.** Its firmware stage and its
   held-out checks run seat C, so `check --require-expected` and `trials`
   refuse it with exit 6 before any trial. Since M90 `fw.test` runs the
-  program it builds as the seat account and the credential test is a gate,
-  and the single-seat firmware case runs live on that test's record from the
-  same job (`docs/LIVE_EVAL_EVIDENCE.md`, section 6); the register block flow
-  stays refused until gates WF15 to WF19 and the dated plan addition are met
-  and a change of its own lifts it. A replay of it still runs: its code is
+  program it builds as the seat account and the credential test is a gate
+  (`docs/LIVE_EVAL_EVIDENCE.md`, section 6); the refusal stays until gates
+  WF15 to WF19 and the dated plan addition are met and a change of its own
+  lifts it. A replay of it still runs: its code is
   the reference answer.
 - **The timer flow** links no seat C (its checks and stages run HDL, and its
   testbenches run in `vvp` as the seat account), so it runs live now.

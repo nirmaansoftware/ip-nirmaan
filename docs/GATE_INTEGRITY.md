@@ -289,8 +289,7 @@ anyway is redacted from logs and from the uploaded record.
   cocotb test module, as another account, and a reach test in each job shows
   the token unreadable. Since M90 the program `fw.test` builds from seat C
   runs as that account too, and a credential test in C gates each whole-flow
-  and firmware job; of the cases that run seat C only the single-seat firmware
-  case runs live, on that test's record from the same job
+  and firmware job; live trials of a case that runs seat C are still refused
   (`docs/LIVE_EVAL_EVIDENCE.md`, section 6).
 * **A per-run `TMPDIR`**, once the ABC hang it caused in the
   OpenROAD-flow-scripts image is understood.
