@@ -144,7 +144,10 @@ def test_on_main_every_practised_or_proven_level_has_committed_records_and_the_f
             assert all(Path(r).name in committed for g in counting for r in g["records"]), skill
     # Knowledge comes only from committed check records, and every committed record counts, except a
     # record whose document was corrected after its check: that one is stale until it is re-checked.
-    at_knowledge = {s for s, v in levels["skills"].items() if v["level"] in ("knowledge", "practised", "proven")}
+    # A skill with no counted knowledge can still be Practised from its own records (a Practised group
+    # counts on its own, docs/CAPABILITY_LEVELS.md), so Knowledge is read from the knowledge entry.
+    at_knowledge = {s for s, v in levels["skills"].items() if (v.get("knowledge") or {}).get("counts")}
+    assert {s for s, v in levels["skills"].items() if v["level"] == "knowledge"} <= at_knowledge
     stale = {s for s, v in levels["skills"].items()
              if "stale: the document changed after its check" in (v.get("knowledge") or {}).get("problems", [])}
     assert at_knowledge == {p.stem for p in (ROOT / CHECKS).glob("*.json")} - stale
