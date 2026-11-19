@@ -25,8 +25,10 @@ module never imports VeriTriage.
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
+import stat
 from collections.abc import MutableMapping
 from pathlib import Path
 
@@ -51,6 +53,11 @@ MODEL = "Vdut"
 #: program runs as the caller, as before.
 SEAT_EXEC = "nirmaan-seat-exec"
 SEAT_DIR = "seat"
+#: Gate SC2 (council record ``council/records/2026-11-19-seat-c-live-refusal.md``, decision 1, item 2): where this
+#: names the wrapper (the live evaluation's jobs set it, ``.github/workflows/live-eval.yml``), ``fw.test`` runs the
+#: program it builds only through that file, never as the caller. A wrapper that is missing, not root's, or writable
+#: by another account refuses the run before anything is compiled, in every trial, not only in the job's first run.
+SEAT_EXEC_ENV = "NIRMAAN_SEAT_EXEC"
 
 _C_SUFFIXES = (".c",)
 _HEADER_SUFFIXES = (".h",)
@@ -538,7 +545,23 @@ def cosim_bus(job: Job) -> tuple[str, str | None]:
 
 
 def _cosim_check(job: Job) -> str | None:
-    return map_problem(job) or cosim_bus(job)[1] or require_problem(job)
+    return seat_exec_problem() or map_problem(job) or cosim_bus(job)[1] or require_problem(job)
+
+
+def seat_exec_problem() -> str | None:
+    """Why ``fw.test`` may not run the program it builds in this job (gate SC2), or None."""
+    want = os.environ.get(SEAT_EXEC_ENV, "").strip()
+    if not want:
+        return None
+    why = (f"this job names the seat account's wrapper ({SEAT_EXEC_ENV}={want}), and fw.test runs the program it "
+           "builds only through it, never as the caller (gate SC2); nothing ran")
+    try:
+        info = os.lstat(want)
+    except OSError:
+        return f"the wrapper is not there: {why}"
+    if not stat.S_ISREG(info.st_mode) or info.st_uid != 0 or info.st_mode & (stat.S_IWGRP | stat.S_IWOTH):
+        return f"the wrapper is not a regular file only root may write: {why}"
+    return None
 
 
 def seat_run(job: Job, argv: list[str]) -> list[str]:
@@ -546,9 +569,16 @@ def seat_run(job: Job, argv: list[str]) -> list[str]:
 
     The seat's folder is new and holds nothing the harness reads afterwards: the run's directory keeps what the
     harness wrote (the requirements, the log), and the seat account may write only its own folder."""
-    seat = shutil.which(SEAT_EXEC)
-    if seat is None:
-        return argv
+    want = os.environ.get(SEAT_EXEC_ENV, "").strip()
+    if want:  # gate SC2: the job names the wrapper; without it nothing runs, never the caller's run
+        problem = seat_exec_problem()
+        if problem:
+            raise RuntimeError(problem)
+        seat = want
+    else:
+        seat = shutil.which(SEAT_EXEC)
+        if seat is None:
+            return argv
     here = job.workdir / SEAT_DIR
     here.mkdir(exist_ok=True)
     return [seat, str(here), *argv]

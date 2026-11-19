@@ -229,7 +229,23 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   killed, what it made in the run's directory goes back to the runner (a link,
   pipe or other non-regular file it made there is removed first), every grant
   is taken back, and what it left in `/tmp`, `/var/tmp` and `/dev/shm` is
-  removed. The hosted runner's tool cache (the Python the package is installed
+  removed. The account has no read access to the runner's home, the checkout
+  and the runner's temporary folder (an ACL entry with no permission, whatever
+  their modes allow), and no network: its TCP connections are refused at once
+  with an ICMP "prohibited" answer and its other packets are dropped
+  (`owner` rules first in `OUTPUT`, IPv4 and IPv6). The reach test of
+  [run 44553476118](https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44553476118),
+  before either, recorded every read denied (by the home folder's own mode)
+  and the network open: `REACH NOT DENIED` on TCP to 1.1.1.1 port 443
+  (connected), TCP to 127.0.0.1 port 9 (refused by the closed port, so
+  reached) and UDP to 127.0.0.53 port 53 (sent). The replay job of
+  [run 44555981466](https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44555981466)
+  shows every probe denied: 130 files not read, 4 folders not listed, both
+  read canaries denied, TCP refused (errno 113) and UDP refused (errno 1), and
+  IPv6 with no route (errno 101). Since a TCP probe of `::1` was added, which
+  has a route, the IPv6 rule itself is shown: the replay job of
+  [run 44563164453](https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44563164453)
+  records it refused (errno 13), with every other probe denied as before. The hosted runner's tool cache (the Python the package is installed
   in, with its `site-packages` and console scripts) and its global
   `node_modules` (npm) are writable by every account on the hosted runner.
   Two replays of this change, before the action took that away, recorded it
@@ -255,7 +271,16 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   `GITHUB_STEP_SUMMARY`); to find either of two canary values the test puts in
   the harness's environment (one under a credential's name, one under a plain
   name) in its own environment or in any process's `/proc/<pid>/environ`, or
-  to read a file only the runner may read; and to signal the harness. A last
+  to read a file only the runner may read; to signal the harness; to read
+  what the judge keeps from the seat (READ probes: every reference answer,
+  held-out case file and mutant the eval cases name, all in the checkout, a
+  canary file the test writes, readable by every account by its mode, into
+  the checkout and into the runner's temporary folder, and a listing of the
+  checkout, its `.git`, the runner's home and its temporary folder); and to
+  reach the network (TCP out over IPv4 and IPv6, TCP on the loopback address
+  over IPv4 and IPv6,
+  and a UDP packet to the local name server). A canary value in the run's log
+  or results fails it too. A last
   test, the control, writes the run's own directory. Each target must exist
   first, so a refusal proves something. The job fails before any trial unless
   cocotb's verdict is a pass with every probe test in its results.
@@ -273,7 +298,17 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   writable by others and not set-id. A run killed by a signal ends the
   wrapper by the same signal, so `fw.test` reports it as it would without the
   account. Elsewhere (the owner's machine, CI's test job) there is no wrapper
-  and nothing changes. The compile and link steps of `fw.build` and `fw.test`
+  and nothing changes. In the live evaluation's jobs (`replay`, `live-eval`,
+  `rejudge`) the workflow names the wrapper (`NIRMAAN_SEAT_EXEC`), and there
+  `fw.test` never falls back (gate SC2 of
+  `council/records/2026-11-19-seat-c-live-refusal.md`): a wrapper that is not
+  there, not root's, or writable by another account refuses every `fw.test`
+  run before anything is compiled, so each run of each of up to 20 trials
+  uses it, not only the credential test's run at the start of the job. The
+  trials step also reads that job's credential test record (`FW_REACH`) and
+  exits 6 on a missing record, one of another run or job, one not written in
+  gate mode, or one with a probe not denied (gate SC4); with a record that
+  counts it still exits 6, for the refusal below. The compile and link steps of `fw.build` and `fw.test`
   still run the compiler as the runner over the seat's C; they run none of it.
   Other backends build or run host code over seat files, and none of them runs
   seat-written host code: `regmap.verify` builds a test the harness generates
