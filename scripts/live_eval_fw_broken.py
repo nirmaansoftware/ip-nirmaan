@@ -66,13 +66,13 @@ def run_checks(seat: list[str], seat_exec: str | None) -> list[dict]:
         params = {k: ",".join(v) if isinstance(v, list) else v for k, v in params.items()}
         backend, why = select_backend(str(check.tool), params)
         if backend is None:
-            results.append({"check": check.name, "tool": check.tool, "ran": False, "succeeded": False,
-                            "summary": f"no backend: {why}", "run_step": []})
+            results.append({"check": check.name, "tool": str(check.tool), "ran": False, "succeeded": False,
+                            "summary": f"no backend: {why}", "run_step": [], "through_wrapper": False})
             continue
         with temporary_runs():
             outcome = execute(backend, params)
         step = ((outcome.data or {}).get("commands") or [[]])[-1]
-        results.append({"check": check.name, "tool": check.tool, "ran": bool(outcome.references),
+        results.append({"check": check.name, "tool": str(check.tool), "ran": bool(outcome.references),
                         "succeeded": outcome.succeeded, "summary": outcome.summary, "run_step": step[:1],
                         "through_wrapper": bool(seat_exec) and step[:1] == [seat_exec]})
     return results

@@ -577,7 +577,7 @@ def inner(records: Path, out: Path) -> int:
     result = {"format": FORMAT, "tool": "fw.test", "backend": backend.name, "rtl": str(RTL.relative_to(ROOT)),
               "account": {"user": runner.pw_name, "uid": os.getuid()},
               "seat_account": {"user": seat.pw_name, "uid": seat.pw_uid, "gid": seat.pw_gid} if seat else None,
-              "seat_exec": shutil.which(firmware.SEAT_EXEC), "run_step": (outcome.data or {}).get("commands", [[]])[-1:],
+              "seat_exec": os.environ.get(firmware.SEAT_EXEC_ENV, "").strip() or shutil.which(firmware.SEAT_EXEC), "run_step": (outcome.data or {}).get("commands", [[]])[-1:],
               "summary": outcome.summary, "targets": config["create_in"], "append_targets": append,
               "read_targets": read_files, "list_targets": list_dirs, "network_targets": config["network"], **found}
     out.parent.mkdir(parents=True, exist_ok=True)
