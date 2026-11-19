@@ -456,12 +456,19 @@ def test_the_probe_compiles_as_fw_test_compiles_a_driver_test(tmp_path):
     """Compiled only, never run here: it runs sudo and reads other processes, so it runs in CI's live-eval jobs."""
     from nirmaan.integrations import firmware
 
-    for n, config in enumerate((CONFIG, {**CONFIG, "append_to": []})):
+    reads = {"read_files": ["/repo/evals/firmware/axi4_lite/held_out_test.c", "/repo/.nirmaan-read-canary-n"],
+             "list_dirs": ["/repo", "/home/runner"], "network": [list(n) for n in fw._reach().NETWORK]}
+    for n, config in enumerate((CONFIG, {**CONFIG, "append_to": []}, {**CONFIG, **reads})):
         source = tmp_path / f"fw_reach_probe_{n}.c"
         source.write_text(fw.probe_source(config))
         proc = subprocess.run(["cc", "-std=c11", "-Wall", "-Wextra", "-Werror", "-pedantic", f"-I{firmware.HARNESS}",
                                "-c", str(source), "-o", str(tmp_path / f"probe_{n}.o")], capture_output=True, text=True)
         assert proc.returncode == 0, proc.stderr
+    text = fw.probe_source({**CONFIG, **reads})  # gate SC6: every read target and every network target is tried
+    assert all(f'"{path}", ' in text for path in reads["read_files"] + reads["list_dirs"])
+    assert text.count("all &= one_target(") == len(reads["network"]) == 5
+    assert 'one_target(1, "2606:4700:4700::1111", 443)' in text and 'one_target(2, "127.0.0.53", 53)' in text
+    assert 'one_target(1, "::1", 9)' in text and 'one_target(0, "127.0.0.1", 9)' in text
 
 
 def _log(denied=(), missing=(), done=True, control="ok"):
@@ -574,7 +581,12 @@ def test_the_recorded_credential_test_is_whole_and_the_register_block_flow_waits
     shows any probe not denied, a live trial of the register block flow is refused (exit 6)."""
     record = json.loads(CREDENTIAL_RECORD.read_text())
     assert record["format"] == fw.FORMAT and record["tool"] == "fw.test" and record["done"] and record["control_ok"]
-    assert not record["missing"] and set(record["probes"]) == set(fw.PROBES)
+    # The record holds every probe. The one exception, named exactly: the record of run 44401041085, taken before the
+    # READ and network probes existed (gate SC6), lacks those two and no other, and shows reach. Gate SC3 replaces it
+    # with a record from main, which must hold them all.
+    older = set(fw.PROBES) - {"fw_reach_no_read", "fw_reach_no_network"}
+    assert not record["missing"] and (set(record["probes"]) == set(fw.PROBES) or (
+        record["run"]["id"] == "44401041085" and not record["every_probe_denied"] and set(record["probes"]) == older))
     assert record["run"]["id"] and record["run"]["job_id"] and record["head"]
     assert record["every_probe_denied"] == all(p["denied"] for p in record["probes"].values())
     if not record["every_probe_denied"]:
