@@ -376,8 +376,16 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   test. Before M90 it only
   recorded; that result
   (run 44401041085, as the runner) was every probe not denied, the parent's
-  environment with the credential-named canary in it readable. Its record is
-  `evals/flow/credential_test_record.json`.
+  environment with the credential-named canary in it readable. The committed
+  record, `evals/flow/credential_test_record.json`, is now (gate SC3 of
+  `council/records/2026-11-19-seat-c-live-refusal.md`) the one of
+  [run 44585417262](https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/44585417262),
+  a replay of `firmware/axi4-lite-driver` dispatched on `main` at 0c4f45b,
+  after ip#371 and the later changes to the same confinement files: in the
+  `replay` job and in the `rejudge` job, each in gate mode, all 9 probes
+  denied, through the wrapper, the control written. It shows the program
+  executes as the seat account and is denied each listed target, and
+  nothing more.
 - **The judge fails a wrong driver as the seat account** (gate SC5). The
   `replay` job of `firmware/axi4-lite-driver` runs
   `scripts/live_eval_fw_broken.py --require-seat`: the four committed broken
