@@ -229,9 +229,10 @@ def _screen(flags: Sequence[str], files: Sequence[str], roots: list[Path], scree
             return (f"{REFUSED}: {name}: the preprocessor could not list the files it pulls in (exit "
                     f"{listed.returncode}){own}; nothing was compiled")
         for dep in make_dependencies(listed.stdout):
-            if not os.path.isabs(dep) or not os.path.exists(dep):
+            found = Path(workdir) / dep  # a relative name is the compiler's, from the folder it ran in
+            if not found.exists():
                 continue  # a header not found (-MG): the build reports it, and reads nothing for it
-            real = Path(dep).resolve()
+            real = found.resolve()
             if not _inside(real, roots):
                 return (f"{REFUSED}: {name} pulls in {dep}, outside the run's source folders, the harness and the "
                         "compiler's own include folders; nothing was compiled")
