@@ -4,7 +4,7 @@
   "case": "flow/axi4-lite-regs-driver",
   "testbench": {
     "path": "evals/flow/axi4_lite/axi4_lite_regs_tb.v",
-    "sha256": "c98117b52b12a01dd90670f3ea1dbaaaeba5b847f424e61d3c5b3585f93e0523",
+    "sha256": "048830896d45686196f89894484ac122f379886403090a720c95ec1ccbe65645",
     "top": "axi4_lite_regs_tb"
   },
   "builder": "tests/flow_mutants.py::regs_mutants",
@@ -13,20 +13,20 @@
     "path": "tests/fixtures/rtl/axi4_lite/axi4_lite_regs.v",
     "sha256": "92ff38c7100446da8115c8bd0129f09d9a2dbc78be10de80686b4e303fe68b88",
     "result": "passes",
-    "checks": 847
+    "checks": 8357
   },
   "conforming": [
     {
       "path": "tests/fixtures/rtl/axi4_lite/variants/axi4_lite_regs_lat2.v",
       "sha256": "436cd5a4adfd9391d7a8e85b848f7f50f54733a10f79d3c508f78026ab3d6001",
       "result": "passes",
-      "checks": 847
+      "checks": 8357
     },
     {
       "path": "tests/fixtures/rtl/axi4_lite/variants/axi4_lite_regs_awready_low_in_reset.v",
       "sha256": "a7e836949ec5121ca90a08558e943610423e08d08b711ed0620af5e398ee6d26",
       "result": "passes",
-      "checks": 847
+      "checks": 8357
     }
   ],
   "mutants": [
@@ -35,7 +35,7 @@
       "mutant": "MAP_reg0_bit29_stuck",
       "sha256": "504283498a9b1b0c39099a54af13ec010e175c6710e40d4a8e055de8f68e45e3",
       "result": "fails",
-      "errors": 3,
+      "errors": 87,
       "first_failure": "read data: got 0x80a0a0a0, expected 0xa0a0a0a0"
     },
     {
@@ -43,7 +43,7 @@
       "mutant": "MAP_reg1_bit6_stuck1",
       "sha256": "fa389689ae57c43ab448d4713f3921178b54f727d035dc21a2068ea74fc84c31",
       "result": "fails",
-      "errors": 11,
+      "errors": 86,
       "first_failure": "read data: got 0x22222262, expected 0x22222222"
     },
     {
@@ -51,7 +51,7 @@
       "mutant": "MAP_reg2_16bit",
       "sha256": "d9bb432f75f4c7eeb1db9767a757e79b2dc031581ed4aae7c9dad206f2e995f1",
       "result": "fails",
-      "errors": 14,
+      "errors": 173,
       "first_failure": "read data: got 0x00003333, expected 0x33333333"
     },
     {
@@ -75,7 +75,7 @@
       "mutant": "PORTS_reset_active_high",
       "sha256": "fc13e0c41b07930455bbc8e6808db075849fb3b7aea2d3e0601d4bde3100b021",
       "result": "fails",
-      "errors": 261,
+      "errors": 2511,
       "first_failure": "BVALID after first reset edge: got 0x0000000X, expected 0x00000000"
     },
     {
@@ -99,8 +99,16 @@
       "mutant": "ORDER_awaddr_not_held",
       "sha256": "6c151d84f6ac5eb3c0612296dd5c992947a39eb4f713c106b53249a5e5503d28",
       "result": "fails",
-      "errors": 9,
+      "errors": 437,
       "first_failure": "write response OKAY: got 0x0000000X, expected 0x00000000"
+    },
+    {
+      "tag": "AXIL-ORDER",
+      "mutant": "ORDER_held_addr_align",
+      "sha256": "79c70a54808c874e22b8ca80d102f87bf0289a602ce2139ce5318bd93c6a6de3",
+      "result": "fails",
+      "errors": 288,
+      "first_failure": "matrix: unmapped write SLVERR: got 0x00000000, expected 0x00000002"
     },
     {
       "tag": "AXIL-ORDER",
@@ -115,15 +123,23 @@
       "mutant": "ORDER_wdata_not_held",
       "sha256": "61fe66a07929600d3751fe4b12f71c11cdafe0607b9202ac66aaa244de8a2454",
       "result": "fails",
-      "errors": 5,
+      "errors": 112,
       "first_failure": "read data: got 0xxxxxxxxx, expected 0xb1b1b1b1"
+    },
+    {
+      "tag": "AXIL-ORDER",
+      "mutant": "ORDER_wstrb_not_held",
+      "sha256": "b39ca83062efa348f6d95a40bf8a09a157d9b47b757a2db4e287a28d5ec76dd1",
+      "result": "fails",
+      "errors": 112,
+      "first_failure": "read data: got 0x22222222, expected 0xb1b1b1b1"
     },
     {
       "tag": "AXIL-WSTRB",
       "mutant": "WSTRB_b0_alone_ignored",
       "sha256": "d713fabfdfcce8f7225a7943480d8c405e3ad49f3014a369cd461ae42ab69759",
       "result": "fails",
-      "errors": 6,
+      "errors": 30,
       "first_failure": "read data: got 0xffffffff, expected 0xffffff00"
     },
     {
@@ -131,7 +147,7 @@
       "mutant": "WSTRB_b1_alone_ignored",
       "sha256": "94e1e6dd72a845b55cba57bdd8148fded728cb6ab48a8ff46fe7c2e6ad5ce7aa",
       "result": "fails",
-      "errors": 5,
+      "errors": 17,
       "first_failure": "read data: got 0xffffff00, expected 0xffff0000"
     },
     {
@@ -139,15 +155,23 @@
       "mutant": "WSTRB_b3_needs_b0",
       "sha256": "d6b4b42b2f92e4c8c5da835969a2103e663d03f13386a3030146caf93321d063",
       "result": "fails",
-      "errors": 5,
+      "errors": 53,
       "first_failure": "wstrb 1000 then 0000: got 0xff22ff44, expected 0xaa22ff44"
+    },
+    {
+      "tag": "AXIL-WSTRB",
+      "mutant": "WSTRB_wfirst_strb0110",
+      "sha256": "a234ed3717ef3cc0c284c3a1b7741386a118fec53d47658e2565dca6b5766612",
+      "result": "fails",
+      "errors": 1,
+      "first_failure": "matrix: read back, by strobe: got 0xa81e3496, expected 0xa8563496"
     },
     {
       "tag": "AXIL-WSTRB",
       "mutant": "WSTRB_zero_writes_all",
       "sha256": "ce57928b6bed4833c3704bbd552fec40c08439cfeaeaeacf49af6b819b1f3498",
       "result": "fails",
-      "errors": 2,
+      "errors": 98,
       "first_failure": "wstrb 1000 then 0000: got 0x00000000, expected 0xaa22ff44"
     },
     {
@@ -155,7 +179,7 @@
       "mutant": "SLVERR_okay_at_d",
       "sha256": "ffb288bbcedde734b0ab0dc47c55d25388fc6bca65b2b0aa8114e11f088c8148",
       "result": "fails",
-      "errors": 1,
+      "errors": 49,
       "first_failure": "unmapped write SLVERR, all addrs: got 0x00000000, expected 0x00000002"
     },
     {
@@ -163,7 +187,7 @@
       "mutant": "SLVERR_rd_ignore_a0",
       "sha256": "74b3707faa12f6199c92e13d380f8dfdcd84d5bfc0cfd5e605e36cf7e4c9fc5b",
       "result": "fails",
-      "errors": 8,
+      "errors": 36,
       "first_failure": "unmapped read SLVERR, all addrs: got 0x00000000, expected 0x00000002"
     },
     {
@@ -171,15 +195,39 @@
       "mutant": "SLVERR_rd_ignore_a1",
       "sha256": "a403087f019301810e7cc933c45b6286d06cf1ee1575665a6d7b35d3b74810f8",
       "result": "fails",
-      "errors": 10,
+      "errors": 90,
       "first_failure": "unmapped read SLVERR: got 0x00000000, expected 0x00000002"
+    },
+    {
+      "tag": "AXIL-SLVERR",
+      "mutant": "SLVERR_rd_wait_data",
+      "sha256": "9ee29d2351a0a3871de796b690116a0c87d9cf4a63fd2bfd39268a5a3abfef15",
+      "result": "fails",
+      "errors": 5,
+      "first_failure": "RDATA stable while RVALID waits: got 0xc48c9f50, expected 0x00000000"
+    },
+    {
+      "tag": "AXIL-SLVERR",
+      "mutant": "SLVERR_strb0_okay",
+      "sha256": "084253ddb43c48fb773506d8e853499a81f34a850ef3b332f153902657644584",
+      "result": "fails",
+      "errors": 36,
+      "first_failure": "matrix: unmapped write SLVERR: got 0x00000000, expected 0x00000002"
+    },
+    {
+      "tag": "AXIL-SLVERR",
+      "mutant": "SLVERR_strb_partial_okay",
+      "sha256": "2ea35164ef8e3e7f7c562c0bbcd71bf9aeb0423ac133741d780c6f2ac4ad81cc",
+      "result": "fails",
+      "errors": 540,
+      "first_failure": "matrix: unmapped write SLVERR: got 0x00000000, expected 0x00000002"
     },
     {
       "tag": "AXIL-SLVERR",
       "mutant": "SLVERR_unm_rdata",
       "sha256": "e5856590b55ae406b4ad884195681ab6841790a4126369e531cebfe2c4deef0e",
       "result": "fails",
-      "errors": 1,
+      "errors": 4,
       "first_failure": "unmapped read data, all addrs: got 0x76543210, expected 0x00000000"
     },
     {
@@ -187,15 +235,23 @@
       "mutant": "SLVERR_unm_write_changes",
       "sha256": "bd8fac6e33dde4153c5403fba6547b29187a1f1ed733a69011bc2b4434ac3121",
       "result": "fails",
-      "errors": 1,
+      "errors": 47,
       "first_failure": "read data: got 0xffffffff, expected 0x89abcdef"
+    },
+    {
+      "tag": "AXIL-SLVERR",
+      "mutant": "SLVERR_wfirst_unm_writes",
+      "sha256": "1b12f0f83967fe5c291030bcd5fb0725b80cf3f354d2dffa4ed7ee10d6ff4b7e",
+      "result": "fails",
+      "errors": 30,
+      "first_failure": "read data: got 0xad940d90, expected 0x526b0d90"
     },
     {
       "tag": "AXIL-SLVERR",
       "mutant": "SLVERR_wr_ignore_a0",
       "sha256": "ec7b9ec5f0ae5dab2eeb5b39f5a8b3da8f1985875e723a02771e9c8feac8ba4e",
       "result": "fails",
-      "errors": 12,
+      "errors": 447,
       "first_failure": "unmapped write SLVERR: got 0x00000000, expected 0x00000002"
     },
     {
@@ -203,7 +259,7 @@
       "mutant": "SLVERR_wr_ignore_a1",
       "sha256": "76b9032f73de5aeb58773f62c79b3658c114b6caa43f7f7a8a973e4cc7e35149",
       "result": "fails",
-      "errors": 12,
+      "errors": 384,
       "first_failure": "unmapped write SLVERR: got 0x00000000, expected 0x00000002"
     },
     {
@@ -211,15 +267,47 @@
       "mutant": "LATENCY_3_after_aw_first",
       "sha256": "0cb08da13ad8aa90df9002927b4cfb1bd8b8d060e76b80ce1f3bdd40038338e4",
       "result": "fails",
-      "errors": 5,
+      "errors": 277,
       "first_failure": "write latency within bound: got 0x00000000, expected 0x00000001"
+    },
+    {
+      "tag": "AXIL-LATENCY",
+      "mutant": "LATENCY_b_read_pending",
+      "sha256": "e063368142fb70eb472b0cef36567f0959deb6ad21eb2e818b414987a6721a01",
+      "result": "fails",
+      "errors": 30,
+      "first_failure": "write latency within bound: got 0x00000000, expected 0x00000001"
+    },
+    {
+      "tag": "AXIL-LATENCY",
+      "mutant": "LATENCY_r_write_pending",
+      "sha256": "784971690caedc859420dce9c6f33815df2f4849208210b4fcff25011fcc75ce",
+      "result": "fails",
+      "errors": 10,
+      "first_failure": "read latency within bound: got 0x00000000, expected 0x00000001"
+    },
+    {
+      "tag": "AXIL-B2B",
+      "mutant": "B2B_after_slverr_r",
+      "sha256": "744e9668e4f16057564119751c31ee2330b74bd5b08be513095e94ff70f19a55",
+      "result": "fails",
+      "errors": 8,
+      "first_failure": "next-cycle read accepted: got 0x00000000, expected 0x00000001"
+    },
+    {
+      "tag": "AXIL-B2B",
+      "mutant": "B2B_after_slverr_w",
+      "sha256": "67b26f2df5b98518dbc2db858622c0211652ae7057e6a89a76d1fa999bb34d66",
+      "result": "fails",
+      "errors": 8,
+      "first_failure": "next-cycle write accepted: got 0x00000000, expected 0x00000001"
     },
     {
       "tag": "AXIL-B2B",
       "mutant": "B2B_gap_after_wait",
       "sha256": "ac07f21186d8c6b3d166428f12b4280c94a669bfc7487007cb3d784a64899838",
       "result": "fails",
-      "errors": 7,
+      "errors": 15,
       "first_failure": "next-cycle write accepted: got 0x00000000, expected 0x00000001"
     },
     {
@@ -227,7 +315,7 @@
       "mutant": "B2B_read_gap_after_wait",
       "sha256": "5b1365990de06288af2691806697c1a2176f3ac7c74d412216dbfc575ed53564",
       "result": "fails",
-      "errors": 3,
+      "errors": 11,
       "first_failure": "next-cycle read accepted: got 0x00000000, expected 0x00000001"
     },
     {
@@ -235,7 +323,7 @@
       "mutant": "RESET_keeps_aw",
       "sha256": "34c5df336098045d3073bba9b58ba3548a0d780d2f2f71e208c3eb16ea7358c7",
       "result": "fails",
-      "errors": 206,
+      "errors": 2456,
       "first_failure": "write 0x0: no response within 50 cycles"
     },
     {
@@ -251,7 +339,7 @@
       "mutant": "RESET_keeps_w",
       "sha256": "c779ae905bf7d87948fe706dbd26c0af9a635dbc90f5223d7c49d0c4065439c7",
       "result": "fails",
-      "errors": 206,
+      "errors": 2456,
       "first_failure": "write 0x0: no response within 50 cycles"
     },
     {
