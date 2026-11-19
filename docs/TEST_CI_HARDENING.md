@@ -224,3 +224,25 @@ so no two tests share a process they did not share before):
   `pytest --collect-only --shard` run splits two files exactly and rejects a
   bad `--shard`; the workflow's shard counts, profiles, artifact names and
   aggregate jobs agree.
+
+## 8. CI wall time (2026-11-19)
+
+Measured over the last 30 pull request CI runs, the wall time is set by the three
+`test (shard K/3)` jobs (median 14 to 19 minutes, worst 37), not by the other jobs
+(`no-tools` 4 minutes, `physical-design` shards 6 minutes, the aggregate jobs 10
+seconds). Two things made them slow, and neither tests less:
+
+- **apt download.** The Ubuntu mirror is sometimes throttled to about 70 kB/s, so
+  the same 84 MB install took up to 25 minutes (median 4). The downloaded `.deb`
+  files are now cached by ISO week (`apt-eda-noble-<week>`), copied into apt's
+  archive before `apt-get install`, and apt still resolves versions from a fresh
+  index. The tool set and versions are unchanged.
+- **Shard balance.** `scripts/shard_weights.json` listed 60 files (575 s) for a suite
+  that takes about 1630 s, so the unlisted files counted 0.5 s each and the shards
+  ran 745, 481 and 402 s of tests. The weights are regenerated from three recent
+  JUnit reports; the split is now 544, 542 and 543 s. Same shard count and names.
+
+Not changed, and why: the physical-design jobs cannot start only on relevant paths,
+because `test-union` reads their reports to prove every test ran, and a required
+check that does not report blocks the merge; they run in parallel with the test
+shards, so they are not on the critical path.
