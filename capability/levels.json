@@ -1698,6 +1698,34 @@
       "reason": "run without knowledge documents (knowledge: off in the run manifest and the trial): never counts toward a level",
       "record": "evals/results/2026-11-14-claude-code-claude-opus-5-5-without-knowledge-9",
       "trial": 3
+    },
+    {
+      "case": "rtl/apb-gpio",
+      "passed": true,
+      "reason": "run without knowledge documents (knowledge: off in the run manifest and the trial): never counts toward a level",
+      "record": "evals/results/2026-11-18-claude-code-claude-opus-5-5-without-knowledge",
+      "trial": 1
+    },
+    {
+      "case": "dv/directed-irq-ctrl",
+      "passed": true,
+      "reason": "run without knowledge documents (knowledge: off in the run manifest and the trial): never counts toward a level",
+      "record": "evals/results/2026-11-18-claude-code-claude-opus-5-5-without-knowledge-2",
+      "trial": 1
+    },
+    {
+      "case": "rtl/rr-arbiter",
+      "passed": true,
+      "reason": "run without knowledge documents (knowledge: off in the run manifest and the trial): never counts toward a level",
+      "record": "evals/results/2026-11-18-claude-code-claude-opus-5-5-without-knowledge-3",
+      "trial": 1
+    },
+    {
+      "case": "dv/equiv-gray",
+      "passed": true,
+      "reason": "run without knowledge documents (knowledge: off in the run manifest and the trial): never counts toward a level",
+      "record": "evals/results/2026-11-19-claude-code-claude-opus-5-5-without-knowledge-2",
+      "trial": 1
     }
   ]
 }
