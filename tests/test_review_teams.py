@@ -393,6 +393,32 @@ def test_the_gate_input_guard_is_gate_semantics(teams_map, files):
     assert "gate-semantics" not in _classify(teams_map, records, diff, status="M")["founder"]
 
 
+@pytest.mark.parametrize("path", [
+    "src/nirmaan/evals/scorers.py", "src/nirmaan/evals/object_screen.py",
+    "src/nirmaan/evals/cases.py", "src/nirmaan/models/evaluation.py",
+    "evals/flow/controls.json", "evals/flow/controls_record.json",
+    "evals/flow/object_screen_record.json", "evals/flow/axil_timer.json",
+    "evals/flow/axil_timer/axil_timer_tb.v", "evals/flow/axi4_lite/held_out_test.c",
+    "evals/rtl/sync_fifo.json", "evals/dv/cocotb_crc.json",
+    "evals/firmware/axi4_lite_driver.json", "evals/firmware/axi4_lite/held_out_test.c",
+    "evals/spec/axi4_lite_interface.json", "evals/spec/axi4_lite/interface_checks.json",
+])
+def test_the_eval_judging_code_is_gate_semantics(teams_map, files, path):
+    """What a scorer, an object screen, a case check or a control refuses or
+    passes is gate semantics. ip#351 and ip#352 changed it, said so in their
+    text, and merged without the Founder Proxy, because the loop classifies
+    founder class from paths only and none of these were listed."""
+    assert path in files, f"{path} is not tracked"
+    diff = f"diff --git a/{path} b/{path}\n--- a/{path}\n+++ b/{path}\n@@ -1,1 +1,1 @@\n-# old\n+# new\n"
+    assert "gate-semantics" in _classify(teams_map, path, diff, status="M")["founder"], path
+
+
+def test_eval_result_records_stay_out_of_gate_semantics(teams_map, files):
+    path = next(p for p in files if p.startswith("evals/results/") and p.endswith(".json"))
+    diff = f"diff --git a/{path} b/{path}\n--- a/{path}\n+++ b/{path}\n@@ -1,1 +1,1 @@\n-# old\n+# new\n"
+    assert "gate-semantics" not in _classify(teams_map, path, diff, status="M")["founder"], path
+
+
 def _harness_files() -> list[str]:
     """The harness settings, the level computation, the tool catalog and every
     harness.CODE file, from the repository root. Read from harness.CODE, so a
