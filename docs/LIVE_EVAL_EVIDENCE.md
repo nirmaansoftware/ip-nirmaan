@@ -332,24 +332,26 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   own; the register block flow also waits for gates WF15 to WF19 of the G3
   council record. A replay of such a case still runs: its code is the
   reference answer.
-- **The compile residual** (`council/records/2026-11-19-seat-c-live-refusal.md`, fact 9 and decision 4, open until
-  gate SC1 is met). Seat C executes as the seat account, but `fw.build` and
-  `fw.test` compile it as the runner, and nothing screens what it includes.
-  Fact (compiled locally with the strict flags and `fw.test`'s include
-  order, not in CI): seat files that include the committed reference driver,
-  its header and its map by an absolute path or by a path with `..` compile
-  clean, and the held-out test compiles against them; a top-level asm line
-  that makes the assembler copy a file into the object also compiles clean.
-  Inference: such a driver passes both held-out checks of the single-seat
-  case without a driver being written, and including the held-out test
-  shows its text in diagnostics that a retry returns to the seat. Inference:
-  the assembler route copies any file the runner can read into the program.
-  Fact: the M53 redaction replaces only the exact value of a credential-named
-  variable. Inference: a `#line` line in seat text makes the object screen's
-  asm rule skip the lines after it. Assumption: the seat account can read
-  the checkout (only writes are probed). A re-judge compiles stored seat C
-  the way the trial did, so it cannot detect an included reference answer.
-  No live trial of a case that runs seat C runs before this is closed.
+- **The compile residual, and the compile screen** (M91, gate SC1 of
+  `council/records/2026-11-19-seat-c-live-refusal.md`, fact 9 and decision 4).
+  Seat C executes as the seat account, but `fw.build` and `fw.test` compile
+  and assemble it as the runner. The record found (compiled locally, not in
+  CI) that seat files including the committed reference driver by an
+  absolute or `..` path compile clean, and so does a top-level asm line that
+  makes the assembler copy a file into the object. Since M91, before anything
+  of a job is compiled, every backend that compiles its C refuses `#line` and
+  line markers, an include written with an absolute or `..` path, a file the
+  compiler pulls in from outside the run's folders and its own include
+  folders, and an asm statement or a file-reading assembler directive in the
+  compiler's assembly; each route is recorded refused in CI
+  (`docs/COMPILE_SCREEN.md`). The re-judge goes through the same backends, so
+  it refuses such stored seat C too. What stays, as that document lists: the
+  screen's own preprocessor opens what the seat names before the list is
+  checked (only file names come back); a seat header can break the held-out
+  test's own compile so that a diagnostic quotes its lines (inference); the
+  program `fw.test` builds holds the held-out test it is linked with; and the
+  M53 redaction replaces only the exact value of a credential-named variable
+  (fact). The live refusal above stays until gate SC7.
 - **The credential test for seat C** (`scripts/live_eval_fw_reach.py`, G3
   record, decision 4 and second addendum, decision 2, item 1) runs in the
   `replay`, `live-eval` and `rejudge` jobs of a whole-flow or firmware case,
@@ -402,9 +404,11 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   council reads the gate as: the job ran no seat code before the re-judge;
   the seat code the re-judge itself runs executes as the seat account, after
   that job's own reach and credential tests showed every probe denied,
-  between two hashes of its checkout; seat C is compiled as the runner. Until
-  gate SC1 is met, a re-judge compiles stored seat C the way the trial did,
-  so it cannot detect an included reference answer. The
+  between two hashes of its checkout; seat C is compiled as the runner. A
+  re-judge compiles stored seat C the way the trial did; since gate SC1 (the
+  compile screen, M91) both refuse an include of a file outside the run's
+  folders before anything is compiled, so an included reference answer is
+  refused, not repeated. The
   re-judged records, each with its `rejudge.json`, are uploaded as
   `live-eval-rejudged-<run id>`; that is the re-judge a record is committed
   with.

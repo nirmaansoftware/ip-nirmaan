@@ -45,6 +45,7 @@ from nirmaan.integrations.firmware import (
     _parse_build,
     _plural,
     build_steps,
+    compile_problem,
     copy_rtl,
     design_ports,
     map_problem,
@@ -236,13 +237,19 @@ def _core(job: Job) -> Core | None:
     return CORES.get(job.params.get("core") or next(iter(CORES)))
 
 
+def _image_problem(job: Job) -> str | None:
+    """The compile screen (M91, gate SC1) over the job's C, compiled for the core with the runtime."""
+    prefix = toolchain() or RISCV_GCC[0].removesuffix("gcc")
+    return compile_problem(job, prefix + "gcc", TARGET_FLAGS, sources=tuple(str(SOC / r) for r in RUNTIME))
+
+
 def _core_check(job: Job) -> str | None:
     problem = map_problem(job)  # M41: a map given must be usable
     if problem:
         return problem
-    if _core(job):
-        return None
-    return f"unknown core {job.params['core']!r}; known cores: {', '.join(CORES)}"
+    if not _core(job):
+        return f"unknown core {job.params['core']!r}; known cores: {', '.join(CORES)}"
+    return _image_problem(job)
 
 
 def _image_steps(job: Job, soc: Path, out: Path, runtime: Path, march: str) -> list[list[str]]:
@@ -337,6 +344,11 @@ def _parse_soc(run: RunRecord) -> EdaResult:
     return parse_soc_test(run.log, run.returncodes, read_requirements(run.workdir))
 
 
+def _riscv_build_check(job: Job) -> str | None:
+    prefix = toolchain() or RISCV_GCC[0].removesuffix("gcc")
+    return map_problem(job) or compile_problem(job, prefix + "gcc", TARGET_FLAGS)
+
+
 def _riscv_build_steps(job: Job) -> list[list[str]]:
     """``fw.build`` with RISC-V GCC: the strict compile, for the ISA the SoC runs (M53: one GCC definition)."""
     prefix = toolchain() or RISCV_GCC[0].removesuffix("gcc")
@@ -344,7 +356,7 @@ def _riscv_build_steps(job: Job) -> list[list[str]]:
 
 
 register_backend(Backend("riscv-gcc", "fw.build", (), _riscv_build_steps, _parse_build, files=("map",),
-                         environment=_needs_toolchain, check=map_problem))
+                         environment=_needs_toolchain, check=_riscv_build_check))
 register_backend(Backend("rv32-gcc", "fw.cross_build", (), _cross_build_steps, _parse_cross,
                          environment=_needs_toolchain, check=_core_check))
 register_backend(Backend("picorv32-verilator", "fw.soc_test", ("verilator", "make"), _soc_steps, _parse_soc,
