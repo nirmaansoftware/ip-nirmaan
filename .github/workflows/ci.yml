@@ -43,9 +43,26 @@ jobs:
       # M27: the driver cross-compiled for RV32I and run on PicoRV32 against the
       # RTL. Ubuntu's multilib GCC includes rv32i/ilp32; the SoC runtime carries
       # its own small libc, so no picolibc. See docs/RISCV_FIRMWARE.md.
+      # The Ubuntu mirror is sometimes throttled to about 70 kB/s, which made this step take
+      # up to 25 minutes (median 4 minutes; the same 84 MB). The downloaded packages are
+      # cached by ISO week, so the same package set is downloaded about once a week
+      # (apt still resolves versions from a fresh index, so a newer package is simply
+      # downloaded as before).
+      - name: Week of the package cache
+        id: week
+        run: echo "week=$(date -u +%G-W%V)" >> "$GITHUB_OUTPUT"
+      - name: Cache the downloaded apt packages
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/apt-debs
+          key: apt-eda-noble-${{ steps.week.outputs.week }}
+          restore-keys: apt-eda-noble-
       - name: Install open-source EDA tools and the RISC-V cross compiler
         run: |
-          sudo apt-get update && sudo apt-get install -y verilator iverilog yosys gcc-riscv64-unknown-elf
+          mkdir -p ~/apt-debs
+          sudo cp -n ~/apt-debs/*.deb /var/cache/apt/archives/ 2>/dev/null || true
+          sudo apt-get update && sudo apt-get install -y -o Acquire::Retries=3 verilator iverilog yosys gcc-riscv64-unknown-elf
+          cp -n /var/cache/apt/archives/*.deb ~/apt-debs/
           riscv64-unknown-elf-gcc --version | head -1
           riscv64-unknown-elf-gcc -print-multi-lib | grep rv32i/ilp32
       # M26: formal in CI. apt has no `sby`, so SymbiYosys and Yices come from the
