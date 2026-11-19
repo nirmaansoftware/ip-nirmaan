@@ -1,0 +1,378 @@
+{
+  "answers": [
+    {
+      "cache_read_tokens": 620,
+      "cache_write_tokens": 14924,
+      "error": null,
+      "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+      "input_tokens": 2,
+      "mode": "work",
+      "model": "claude-opus-5-5",
+      "output_tokens": 25458,
+      "packet_sha256": "7e61631bf1193bb81b444335090f15813c6cdcca3c20ca4e2685ebb7a672e3ec",
+      "prompt_sha256": "51bf44e48a4cd6f4556ea51611267d6a27273fddb7e1a0ca15250c7d2e650263",
+      "provider": "claude-code",
+      "text": "```json\n{\"uncertainty\": 0.25, \"outcome\": \"Delivered skid_buffer.v (RTL) and skid_buffer_tb.v (self-checking testbench). The design follows the approved microarchitecture: an output register and a skid register, s_ready driven by the inverse of skid_valid, and the next-state table implemented row for row. No tool has run on these files. Lint, simulation and synthesis results come only from the platform's runs.\", \"artifacts\": [{\"kind\": \"rtl_source\", \"title\": \"skid_buffer RTL\", \"summary\": \"Two-register skid buffer that implements the interface in [artifact:prj-fed4b510c5.interface-spec.a1] and the next-state table of [artifact:prj-fed4b510c5.microarchitecture.a1]. Ports clk, rst_n (active-low, synchronous), s_valid/s_ready/s_data, m_valid/m_ready/m_data, with parameter WIDTH defaulting to 8. s_ready is the inverse of the skid_valid flop, and m_valid and m_data are flops, so no input has a combinational path to any output. The block serves [requirement:req-49d207f970].\"}, {\"kind\": \"testbench\", \"title\": \"skid_buffer self-checking testbench\", \"summary\": \"Self-checking testbench with two lanes, WIDTH 8 and WIDTH 1, that share the same handshakes. It follows the verification plan in [artifact:prj-fed4b510c5.microarchitecture.a1] and the list in section 6 of [artifact:prj-fed4b510c5.interface-spec.a1]. Every cycle it checks m_valid, s_ready and m_data against a two-entry queue model, checks the hold rule, and toggles m_ready and s_valid inside the cycle to confirm the outputs do not move. Directed cases cover reset values, one-cycle latency, 64 beats at full throughput, a stall with one beat held and with two, a one-cycle stall and a multi-cycle stall in a stream, and reset with beats held. It then runs 4000 cycles of random traffic with occasional resets and ends with a drain. Each failure is reported with $error, and passing checks are counted.\"}], \"files\": [{\"path\": \"skid_buffer.v\", \"kind\": \"rtl_source\", \"title\": \"skid_buffer RTL\", \"summary\": \"Synthesizable Verilog-2001 skid buffer implementing the next-state table in [artifact:prj-fed4b510c5.microarchitecture.a1]. Next state is computed in an always @* block with defaults on every variable, so it infers no latch. The register block resets only m_valid and skid_valid, as the state table specifies. Design-intent assertions sit under ifdef FORMAL.\", \"entry\": \"skid_buffer\"}, {\"path\": \"skid_buffer_tb.v\", \"kind\": \"testbench\", \"title\": \"skid_buffer testbench\", \"summary\": \"Self-checking testbench with lanes at WIDTH 8 and 1, against the requirements of [artifact:prj-fed4b510c5.interface-spec.a1] section 6. It reads nirmaan_nonce with $value$plusargs and prints the NIRMAAN-SIM verdict once, just before $finish.\", \"entry\": \"skid_buffer_tb\"}], \"tool_runs\": [], \"claims\": [\"The RTL is written to be Verilator -Wall lint clean at WIDTH 8 and 1, with no waivers. This is unverified until lint.run reports.\", \"The RTL is written to synthesize in Yosys with no latches. This is unverified until synth.run reports.\", \"The testbench is written to pass under Icarus Verilog and under Verilator (with --binary/--timing). This is unverified until simulator.run reports.\", \"The assertions under ifdef FORMAL in skid_buffer.v have never been run by any tool.\"], \"escalation\": null, \"notes\": \"Traceability: this work serves [requirement:req-49d207f970] and implements [artifact:prj-fed4b510c5.microarchitecture.a1] against [artifact:prj-fed4b510c5.interface-spec.a1].\\n\\nRecorded decision: m_data and skid_data have no reset. The microarchitecture state table specifies 'Reset: none' for them, and the interface spec leaves data undefined while m_valid is low. This differs from the general guidance to reset every flop, and the approved spec governs. The testbench compares data only while m_valid is high.\\n\\nOpen gap: no formal_spec (.sby) is submitted, because the task's expected outputs are rtl_source and testbench only. The interface spec's formal proof requirement is therefore not addressed here: a queue model at WIDTH 8 and 1, with covers for stall, full, drain and throughput. The microarchitecture's skid_buffer.sby and skid_buffer_w1.sby also remain to be produced, and the gate accepts only one .sby per task. A follow-up task should own that work.\\n\\nTestbench timing: inputs change 1 ns after each rising edge. Outputs are checked 3 ns after that. A 1 ns glitch of m_ready and s_valid follows, and the handshake is sampled just before the next edge.\\n\\nPortability: random stimulus uses an in-testbench xorshift generator so that both simulators see the same sequence. The testbench relies on the platform compiling it with SystemVerilog system tasks ($error) available and, under Verilator, with timing support.\"}\n```\n=== FILE: skid_buffer.v ===\n// skid_buffer: two-register valid/ready slice (register slice).\n// Implements interface_spec.md and microarchitecture.md (approved).\n// Every output is a flop or the inverse of one: s_ready = !skid_valid,\n// m_valid and m_data are registers. Inputs reach only next-state logic.\n`default_nettype none\n\nmodule skid_buffer #(\n    parameter integer WIDTH = 8\n) (\n    input  wire             clk,\n    input  wire             rst_n,\n    input  wire             s_valid,\n    output wire             s_ready,\n    input  wire [WIDTH-1:0] s_data,\n    output reg              m_valid,\n    input  wire             m_ready,\n    output reg  [WIDTH-1:0] m_data\n);\n\n    reg             skid_valid;\n    reg [WIDTH-1:0] skid_data;\n\n    reg             m_valid_d;\n    reg [WIDTH-1:0] m_data_d;\n    reg             skid_valid_d;\n    reg [WIDTH-1:0] skid_data_d;\n\n    // The output register may load on this edge.\n    wire m_free = !m_valid || m_ready;\n    // An upstream beat is accepted on this edge.\n    wire s_fire = s_valid && s_ready;\n\n    assign s_ready = !skid_valid;\n\n    // Next state, microarchitecture section 3.\n    always @* begin\n        m_valid_d    = m_valid;\n        m_data_d     = m_data;\n        skid_valid_d = skid_valid;\n        skid_data_d  = skid_data;\n        if (m_free) begin\n            if (skid_valid) begin\n                // The skid beat (the older of what remains) moves out.\n                m_valid_d    = 1'b1;\n                m_data_d     = skid_data;\n                skid_valid_d = 1'b0;\n            end else begin\n                // Skid empty: s_ready is high, so s_fire equals s_valid.\n                m_valid_d    = s_valid;\n                m_data_d     = s_data;\n            end\n        end else if (s_fire) begin\n            // Output stalled with one beat: catch the new beat.\n            skid_valid_d = 1'b1;\n            skid_data_d  = s_data;\n        end\n    end\n\n    // Control registers: synchronous active-low reset.\n    always @(posedge clk) begin\n        if (!rst_n) begin\n            m_valid    <= 1'b0;\n            skid_valid <= 1'b0;\n        end else begin\n            m_valid    <= m_valid_d;\n            skid_valid <= skid_valid_d;\n        end\n    end\n\n    // Data registers: no reset (microarchitecture section 2).\n    always @(posedge clk) begin\n        m_data    <= m_data_d;\n        skid_data <= skid_data_d;\n    end\n\n`ifdef FORMAL\n    // Design-intent assertions (not a proof setup; no .sby is submitted).\n    reg f_past_valid;\n    initial f_past_valid = 1'b0;\n    always @(posedge clk) f_past_valid <= 1'b1;\n\n    always @(*) begin\n        if (!f_past_valid) assume(!rst_n);\n    end\n\n    // The skid register is only full while the output register is full.\n    always @(*) begin\n        if (f_past_valid) assert(!skid_valid || m_valid);\n    end\n\n    always @(posedge clk) begin\n        if (f_past_valid) begin\n            if (!$past(rst_n)) begin\n                assert(!m_valid);\n                assert(!skid_valid);\n            end else if ($past(m_valid) && !$past(m_ready)) begin\n                // A stalled beat holds.\n                assert(m_valid);\n                assert(m_data == $past(m_data));\n            end\n        end\n    end\n\n    always @(posedge clk) begin\n        if (f_past_valid && rst_n) cover(skid_valid && m_ready);\n    end\n`endif\n\nendmodule\n\n`default_nettype wire\n=== END FILE ===\n=== FILE: skid_buffer_tb.v ===\n// Self-checking testbench for skid_buffer, lanes at WIDTH 8 and WIDTH 1.\n// Checks every cycle against a queue model of up to two beats.\n`timescale 1ns/1ps\n`default_nettype none\n\n`define CHECK(c, m) begin if (c) passed = passed + 1; else begin failed = failed + 1; $error(m); end end\n\nmodule skid_buffer_tb;\n\n    reg        clk;\n    reg        rst_n;\n    reg        s_valid;\n    reg  [7:0] s_data;\n    reg        m_ready;\n\n    wire       s_ready8;\n    wire       m_valid8;\n    wire [7:0] m_data8;\n    wire       s_ready1;\n    wire       m_valid1;\n    wire [0:0] m_data1;\n\n    skid_buffer #(.WIDTH(8)) dut8 (\n        .clk     (clk),\n        .rst_n   (rst_n),\n        .s_valid (s_valid),\n        .s_ready (s_ready8),\n        .s_data  (s_data),\n        .m_valid (m_valid8),\n        .m_ready (m_ready),\n        .m_data  (m_data8)\n    );\n\n    skid_buffer #(.WIDTH(1)) dut1 (\n        .clk     (clk),\n        .rst_n   (rst_n),\n        .s_valid (s_valid),\n        .s_ready (s_ready1),\n        .s_data  (s_data[0:0]),\n        .m_valid (m_valid1),\n        .m_ready (m_ready),\n        .m_data  (m_data1)\n    );\n\n    integer        passed;\n    integer        failed;\n    reg [8*64-1:0] nonce;\n\n    // Queue model.\n    reg [7:0] q0;\n    reg [7:0] q1;\n    integer   cnt;\n    reg       model_known;\n    reg       prev_stall;\n    reg [7:0] prev_data8;\n    reg       prev_data1;\n\n    // Values sampled just before each edge.\n    reg       pre_s_ready;\n    reg       pre_m_valid;\n    reg [7:0] pre_m_data8;\n    reg       pre_m_data1;\n    reg       fire_s;\n    reg       fire_m;\n\n    // Snapshot for the in-cycle stability check.\n    reg       g_s_ready8;\n    reg       g_m_valid8;\n    reg [7:0] g_m_data8;\n    reg       g_s_ready1;\n    reg       g_m_valid1;\n    reg       g_m_data1;\n\n    integer    n_s_fire;\n    integer    n_m_fire;\n    integer    n_full;\n    integer    n_stall;\n    integer    i;\n    integer    k;\n    integer    base_s;\n    integer    base_m;\n    reg [31:0] rs;\n    reg        rv;\n    reg        rr;\n    reg        rn;\n\n    initial clk = 1'b0;\n    always #5 clk = ~clk;\n\n    task rnd;\n        begin\n            rs = rs ^ (rs << 13);\n            rs = rs ^ (rs >> 17);\n            rs = rs ^ (rs << 5);\n        end\n    endtask\n\n    task check_outputs;\n        begin\n            if (model_known) begin\n                `CHECK(m_valid8 === (cnt > 0), \"W8: m_valid does not match the beats held\")\n                `CHECK(s_ready8 === (cnt < 2), \"W8: s_ready does not match the beats held\")\n                `CHECK(m_valid1 === (cnt > 0), \"W1: m_valid does not match the beats held\")\n                `CHECK(s_ready1 === (cnt < 2), \"W1: s_ready does not match the beats held\")\n                if (cnt > 0) begin\n                    `CHECK(m_data8 === q0, \"W8: m_data is not the oldest beat held\")\n                    `CHECK(m_data1 === q0[0:0], \"W1: m_data is not the oldest beat held\")\n                end\n                if (prev_stall) begin\n                    `CHECK(m_valid8 === 1'b1 && m_data8 === prev_data8, \"W8: stalled beat did not hold\")\n                    `CHECK(m_valid1 === 1'b1 && m_data1 === prev_data1, \"W1: stalled beat did not hold\")\n                end\n            end\n        end\n    endtask\n\n    // One clock cycle: apply inputs, check, glitch-check, sample, edge, model.\n    task cycle;\n        input       sv;\n        input [7:0] sd;\n        input       mr;\n        input       rnn;\n        begin\n            s_valid = sv;\n            s_data  = sd;\n            m_ready = mr;\n            rst_n   = rnn;\n            #2;\n            check_outputs;\n            g_s_ready8 = s_ready8;\n            g_m_valid8 = m_valid8;\n            g_m_data8  = m_data8;\n            g_s_ready1 = s_ready1;\n            g_m_valid1 = m_valid1;\n            g_m_data1  = m_data1;\n            s_valid = !sv;\n            m_ready = !mr;\n            #1;\n            if (model_known) begin\n                `CHECK(s_ready8 === g_s_ready8, \"W8: s_ready moved with m_ready or s_valid inside a cycle\")\n                `CHECK(m_valid8 === g_m_valid8, \"W8: m_valid moved with an input inside a cycle\")\n                `CHECK(m_data8 === g_m_data8, \"W8: m_data moved with an input inside a cycle\")\n                `CHECK(s_ready1 === g_s_ready1, \"W1: s_ready moved with m_ready or s_valid inside a cycle\")\n                `CHECK(m_valid1 === g_m_valid1, \"W1: m_valid moved with an input inside a cycle\")\n                `CHECK(m_data1 === g_m_data1, \"W1: m_data moved with an input inside a cycle\")\n            end\n            s_valid = sv;\n            m_ready = mr;\n            #1;\n            pre_s_ready = s_ready8;\n            pre_m_valid = m_valid8;\n            pre_m_data8 = m_data8;\n            pre_m_data1 = m_data1;\n            fire_s = sv && s_ready8;\n            fire_m = m_valid8 && mr;\n            @(posedge clk);\n            if (!rnn) begin\n                cnt         = 0;\n                model_known = 1'b1;\n                prev_stall  = 1'b0;\n            end else if (model_known) begin\n                prev_stall = pre_m_valid && !mr;\n                prev_data8 = pre_m_data8;\n                prev_data1 = pre_m_data1;\n                if (fire_m) begin\n                    n_m_fire = n_m_fire + 1;\n                    if (cnt > 0) begin\n                        q0  = q1;\n                        cnt = cnt - 1;\n                    end\n                end\n                if (fire_s) begin\n                    n_s_fire = n_s_fire + 1;\n                    `CHECK(cnt < 2, \"a beat was accepted while two were held\")\n                    if (cnt == 0) q0 = sd;\n                    else if (cnt == 1) q1 = sd;\n                    if (cnt < 2) cnt = cnt + 1;\n                end\n            end\n            #1;\n        end\n    endtask\n\n    initial begin\n        passed      = 0;\n        failed      = 0;\n        nonce       = {(8*64){1'b0}};\n        if ($value$plusargs(\"nirmaan_nonce=%s\", nonce) == 0) nonce = {(8*64){1'b0}};\n        q0          = 8'h00;\n        q1          = 8'h00;\n        cnt         = 0;\n        model_known = 1'b0;\n        prev_stall  = 1'b0;\n        prev_data8  = 8'h00;\n        prev_data1  = 1'b0;\n        n_s_fire    = 0;\n        n_m_fire    = 0;\n        n_full      = 0;\n        n_stall     = 0;\n        rs          = 32'h1234_5678;\n        s_valid     = 1'b0;\n        s_data      = 8'h00;\n        m_ready     = 1'b0;\n        rst_n       = 1'b0;\n\n        // 1. Reset values.\n        cycle(1'b0, 8'h00, 1'b0, 1'b0);\n        cycle(1'b1, 8'hFF, 1'b0, 1'b0);\n        cycle(1'b0, 8'h00, 1'b1, 1'b1);\n        `CHECK(pre_m_valid === 1'b0, \"m_valid not low after reset\")\n        `CHECK(pre_s_ready === 1'b1, \"s_ready not high after reset\")\n\n        // 2. One-cycle latency.\n        cycle(1'b1, 8'hA5, 1'b1, 1'b1);\n        `CHECK(pre_m_valid === 1'b0, \"beat offered in the cycle it was accepted\")\n        `CHECK(fire_s === 1'b1, \"empty slice did not accept a beat\")\n        cycle(1'b0, 8'h00, 1'b1, 1'b1);\n        `CHECK(pre_m_valid === 1'b1 && pre_m_data8 === 8'hA5, \"beat not offered one cycle after acceptance\")\n        cycle(1'b0, 8'h00, 1'b1, 1'b1);\n        `CHECK(pre_m_valid === 1'b0, \"slice did not return to idle\")\n\n        // 3. Long stream at full throughput.\n        base_s = n_s_fire;\n        base_m = n_m_fire;\n        for (i = 0; i < 64; i = i + 1) begin\n            cycle(1'b1, i[7:0], 1'b1, 1'b1);\n            `CHECK(pre_s_ready === 1'b1, \"s_ready dropped at full throughput\")\n            if (i > 0) `CHECK(pre_m_valid === 1'b1, \"output bubble at full throughput\")\n        end\n        `CHECK(n_s_fire - base_s == 64, \"not one beat in per cycle at full throughput\")\n        `CHECK(n_m_fire - base_m == 63, \"not one beat out per cycle at full throughput\")\n        cycle(1'b0, 8'h00, 1'b1, 1'b1);\n        cycle(1'b0, 8'h00, 1'b1, 1'b1);\n        `CHECK(cnt == 0, \"stream did not drain\")\n\n        // 4. Stall with one beat held, then two.\n        cycle(1'b1, 8'h11, 1'b1, 1'b1);\n        cycle(1'b1, 8'h22, 1'b0, 1'b1);\n        `CHECK(pre_m_valid === 1'b1 && pre_s_ready === 1'b1, \"second beat refused with one beat held\")\n        `CHECK(fire_s === 1'b1, \"second beat not accepted during stall\")\n        cycle(1'b1, 8'h33, 1'b0, 1'b1);\n        `CHECK(pre_s_ready === 1'b0, \"third beat offered s_ready with two held\")\n        `CHECK(fire_s === 1'b0, \"third beat accepted with two held\")\n        for (k = 0; k < 4; k = k + 1) begin\n            cycle(1'b1, 8'hE0 + k[7:0], 1'b0, 1'b1);\n            `CHECK(pre_s_ready === 1'b0, \"s_ready rose while full and stalled\")\n            `CHECK(pre_m_data8 === 8'h11, \"stalled beat changed\")\n        end\n        cycle(1'b1, 8'h33, 1'b1, 1'b1);\n        `CHECK(pre_s_ready === 1'b0 && pre_m_data8 === 8'h11, \"wrong state on the first ready after a full stall\")\n        cycle(1'b1, 8'h33, 1'b1, 1'b1);\n        `CHECK(pre_s_ready === 1'b1 && pre_m_data8 === 8'h22, \"skid beat not second out or ready not risen\")\n        `CHECK(fire_s === 1'b1, \"beat not accepted after ready rose\")\n        cycle(1'b0, 8'h00, 1'b1, 1'b1);\n        `CHECK(pre_m_valid === 1'b1 && pre_m_data8 === 8'h33, \"third beat not out in order\")\n        cycle(1'b0, 8'h00, 1'b1, 1'b1);\n        `CHECK(pre_m_valid === 1'b0, \"slice not idle after stall drain\")\n\n        // 5. Stream with a one-cycle and a multi-cycle stall.\n        for (i = 0; i < 24; i = i + 1) begin\n            rr = !(i == 5 || (i >= 12 && i < 17));\n            cycle(1'b1, 8'h80 + i[7:0], rr, 1'b1);\n        end\n        cycle(1'b0, 8'h00, 1'b1, 1'b1);\n        cycle(1'b0, 8'h00, 1'b1, 1'b1);\n        cycle(1'b0, 8'h00, 1'b1, 1'b1);\n        `CHECK(cnt == 0, \"stalled stream did not drain\")\n\n        // 6. Reset with beats held.\n        cycle(1'b1, 8'h44, 1'b0, 1'b1);\n        cycle(1'b1, 8'h55, 1'b0, 1'b1);\n        `CHECK(cnt == 2, \"two beats not held before reset\")\n        cycle(1'b1, 8'h66, 1'b0, 1'b0);\n        cycle(1'b1, 8'h77, 1'b1, 1'b1);\n        `CHECK(pre_m_valid === 1'b0 && pre_s_ready === 1'b1, \"reset did not drop held beats\")\n        cycle(1'b0, 8'h00, 1'b1, 1'b1);\n        `CHECK(pre_m_valid === 1'b1 && pre_m_data8 === 8'h77, \"first beat after reset wrong\")\n        cycle(1'b0, 8'h00, 1'b1, 1'b1);\n\n        // 7. Random traffic against the model, with rare resets.\n        for (i = 0; i < 4000; i = i + 1) begin\n            rnd;\n            rv = (rs[1:0] != 2'b00);\n            case ((i / 500) % 4)\n                0:       rr = (rs[3:2] != 2'b00);\n                1:       rr = rs[2];\n                2:       rr = (rs[3:2] == 2'b00);\n                default: begin rr = 1'b1; rv = 1'b1; end\n            endcase\n            rn = (rs[31:22] != 10'd0);\n            if (cnt == 2) n_full = n_full + 1;\n            if (cnt > 0 && !rr) n_stall = n_stall + 1;\n            cycle(rv, rs[15:8], rr, rn);\n        end\n        `CHECK(n_full > 0, \"random traffic never filled the slice\")\n        `CHECK(n_stall > 0, \"random traffic never stalled the output\")\n\n        // Drain.\n        for (k = 0; k < 4; k = k + 1) begin\n            cycle(1'b0, 8'h00, 1'b1, 1'b1);\n        end\n        `CHECK(cnt == 0, \"random traffic did not drain\")\n        `CHECK(pre_m_valid === 1'b0, \"m_valid still high after drain\")\n        `CHECK(pre_s_ready === 1'b1, \"s_ready low after drain\")\n\n        $display(\"NIRMAAN-SIM %0s %0d passed, %0d failed\", nonce, passed, failed);\n        $finish;\n    end\n\nendmodule\n\n`default_nettype wire\n=== END FILE ==="
+    }
+  ],
+  "format": "nirmaan.eval-trial",
+  "harness_variant": "default",
+  "judge_runs": [
+    {
+      "check": "The reference testbench passes on the seat's RTL",
+      "params": {
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-zv49qhdk/seat/prj-fed4b510c5_rtl-implementation/1/skid_buffer.v",
+          "tests/fixtures/rtl/skid_buffer/skid_buffer_tb.v"
+        ],
+        "top": "skid_buffer_tb"
+      },
+      "run": "run-0004",
+      "succeeded": true,
+      "summary": "icarus: simulation passed: 10473 checks passed, $finish reached at time 11340000, 0 errors",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The seat's testbench fails each skid buffer mutant",
+      "params": {
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-zv49qhdk/judge/check-2/must-fail-bdvh06fn/clean/skid_buffer_tb.v",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-zv49qhdk/judge/check-2/must-fail-bdvh06fn/clean/skid_buffer.v"
+        ],
+        "top": "skid_buffer_tb"
+      },
+      "run": "run-0005",
+      "succeeded": true,
+      "summary": "icarus: simulation passed: 54283 checks passed, $finish reached at time 41196000, 0 errors",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The seat's testbench fails each skid buffer mutant",
+      "params": {
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-zv49qhdk/judge/check-2/must-fail-bdvh06fn/mutant-1-1/skid_buffer_tb.v",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-zv49qhdk/judge/check-2/must-fail-bdvh06fn/mutant-1-1/skid_buffer.v"
+        ],
+        "top": "skid_buffer_tb"
+      },
+      "run": "run-0006",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: 15244 errors, the testbench reports 15244 of 55595 checks failed; first: /private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-zv49qhdk/judge/check-2/must-fail-bdvh06fn/mutant-1-1/skid_buffer_tb.v:102: W8: s_ready does not match the beats held",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The seat's testbench fails each skid buffer mutant",
+      "params": {
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-zv49qhdk/judge/check-2/must-fail-bdvh06fn/mutant-1-2/skid_buffer_tb.v",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-zv49qhdk/judge/check-2/must-fail-bdvh06fn/mutant-1-2/skid_buffer.v"
+        ],
+        "top": "skid_buffer_tb"
+      },
+      "run": "run-0007",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: 10034 errors, the testbench reports 10034 of 53726 checks failed; first: /private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-zv49qhdk/judge/check-2/must-fail-bdvh06fn/mutant-1-2/skid_buffer_tb.v:140: W8: s_ready moved with m_ready or s_valid inside a cycle",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The seat's testbench fails each skid buffer mutant",
+      "params": {
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-zv49qhdk/judge/check-2/must-fail-bdvh06fn/mutant-1-3/skid_buffer_tb.v",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-zv49qhdk/judge/check-2/must-fail-bdvh06fn/mutant-1-3/skid_buffer.v"
+        ],
+        "top": "skid_buffer_tb"
+      },
+      "run": "run-0008",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: 16099 errors, the testbench reports 16099 of 44644 checks failed; first: /private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-zv49qhdk/judge/check-2/must-fail-bdvh06fn/mutant-1-3/skid_buffer_tb.v:102: W8: s_ready does not match the beats held",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The seat's testbench fails each skid buffer mutant",
+      "params": {
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-zv49qhdk/judge/check-2/must-fail-bdvh06fn/mutant-1-4/skid_buffer_tb.v",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-zv49qhdk/judge/check-2/must-fail-bdvh06fn/mutant-1-4/skid_buffer.v"
+        ],
+        "top": "skid_buffer_tb"
+      },
+      "run": "run-0009",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: 2648 errors, the testbench reports 2648 of 54283 checks failed; first: /private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-zv49qhdk/judge/check-2/must-fail-bdvh06fn/mutant-1-4/skid_buffer_tb.v:106: W8: m_data is not the oldest beat held",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The case's WIDTH 8 proof reaches every cover and fails each mutant",
+      "params": {
+        "sby": "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-zv49qhdk/judge/check-3/must-fail-di6c9cxb/clean/skid_buffer.sby",
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-zv49qhdk/judge/check-3/must-fail-di6c9cxb/clean/skid_buffer.v"
+        ]
+      },
+      "run": "run-0010",
+      "succeeded": true,
+      "summary": "symbiyosys: formal passed: every property proven",
+      "tool": "formal.run"
+    },
+    {
+      "check": "The case's WIDTH 8 proof reaches every cover and fails each mutant",
+      "params": {
+        "sby": "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-zv49qhdk/judge/check-3/must-fail-di6c9cxb/cover/skid_buffer.sby",
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-zv49qhdk/judge/check-3/must-fail-di6c9cxb/cover/skid_buffer.v"
+        ]
+      },
+      "run": "run-0011",
+      "succeeded": true,
+      "summary": "symbiyosys-cover: not vacuous: every cover reached (5 of 5); every assertion antecedent reached (7 of 7)",
+      "tool": "formal.cover"
+    },
+    {
+      "check": "The case's WIDTH 8 proof reaches every cover and fails each mutant",
+      "params": {
+        "sby": "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-zv49qhdk/judge/check-3/must-fail-di6c9cxb/mutant-1-1/skid_buffer.sby",
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-zv49qhdk/judge/check-3/must-fail-di6c9cxb/mutant-1-1/skid_buffer.v"
+        ]
+      },
+      "run": "run-0012",
+      "succeeded": false,
+      "summary": "symbiyosys: formal fail: 2 errors; first: skid_buffer.v:114: [ASSERT] assertion skid_buffer._witness_.check_assert_skid_buffer_v_114_54 failed at step 4",
+      "tool": "formal.run"
+    },
+    {
+      "check": "The case's WIDTH 8 proof reaches every cover and fails each mutant",
+      "params": {
+        "sby": "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-zv49qhdk/judge/check-3/must-fail-di6c9cxb/mutant-1-2/skid_buffer.sby",
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-zv49qhdk/judge/check-3/must-fail-di6c9cxb/mutant-1-2/skid_buffer.v"
+        ]
+      },
+      "run": "run-0013",
+      "succeeded": false,
+      "summary": "symbiyosys: formal fail: 1 error; first: skid_buffer.v:119: [ASSERT] assertion skid_buffer._witness_.check_assert_skid_buffer_v_119_55 failed at step 3",
+      "tool": "formal.run"
+    },
+    {
+      "check": "The case's WIDTH 8 proof reaches every cover and fails each mutant",
+      "params": {
+        "sby": "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-zv49qhdk/judge/check-3/must-fail-di6c9cxb/mutant-1-3/skid_buffer.sby",
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-zv49qhdk/judge/check-3/must-fail-di6c9cxb/mutant-1-3/skid_buffer.v"
+        ]
+      },
+      "run": "run-0014",
+      "succeeded": false,
+      "summary": "symbiyosys: formal fail: 1 error; first: skid_buffer.v:117: [ASSERT] assertion skid_buffer._witness_.check_assert_skid_buffer_v_117_54 failed at step 5",
+      "tool": "formal.run"
+    },
+    {
+      "check": "The case's WIDTH 8 proof reaches every cover and fails each mutant",
+      "params": {
+        "sby": "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-zv49qhdk/judge/check-3/must-fail-di6c9cxb/mutant-1-4/skid_buffer.sby",
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-zv49qhdk/judge/check-3/must-fail-di6c9cxb/mutant-1-4/skid_buffer.v"
+        ]
+      },
+      "run": "run-0015",
+      "succeeded": false,
+      "summary": "symbiyosys: formal fail: 2 errors; first: skid_buffer.v:121: [ASSERT] assertion skid_buffer._witness_.check_assert_skid_buffer_v_121_58 failed at step 4",
+      "tool": "formal.run"
+    },
+    {
+      "check": "The case's WIDTH 1 proof reaches every cover and fails each mutant",
+      "params": {
+        "sby": "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-zv49qhdk/judge/check-4/must-fail-2imq6tuu/clean/skid_buffer_w1.sby",
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-zv49qhdk/judge/check-4/must-fail-2imq6tuu/clean/skid_buffer.v"
+        ]
+      },
+      "run": "run-0016",
+      "succeeded": true,
+      "summary": "symbiyosys: formal passed: every property proven",
+      "tool": "formal.run"
+    },
+    {
+      "check": "The case's WIDTH 1 proof reaches every cover and fails each mutant",
+      "params": {
+        "sby": "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-zv49qhdk/judge/check-4/must-fail-2imq6tuu/cover/skid_buffer_w1.sby",
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-zv49qhdk/judge/check-4/must-fail-2imq6tuu/cover/skid_buffer.v"
+        ]
+      },
+      "run": "run-0017",
+      "succeeded": true,
+      "summary": "symbiyosys-cover: not vacuous: every cover reached (5 of 5); every assertion antecedent reached (7 of 7)",
+      "tool": "formal.cover"
+    },
+    {
+      "check": "The case's WIDTH 1 proof reaches every cover and fails each mutant",
+      "params": {
+        "sby": "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-zv49qhdk/judge/check-4/must-fail-2imq6tuu/mutant-1-1/skid_buffer_w1.sby",
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-zv49qhdk/judge/check-4/must-fail-2imq6tuu/mutant-1-1/skid_buffer.v"
+        ]
+      },
+      "run": "run-0018",
+      "succeeded": false,
+      "summary": "symbiyosys: formal fail: 2 errors; first: skid_buffer.v:114: [ASSERT] assertion skid_buffer._witness_.check_assert_skid_buffer_v_114_152 failed at step 4",
+      "tool": "formal.run"
+    },
+    {
+      "check": "The case's WIDTH 1 proof reaches every cover and fails each mutant",
+      "params": {
+        "sby": "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-zv49qhdk/judge/check-4/must-fail-2imq6tuu/mutant-1-2/skid_buffer_w1.sby",
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-zv49qhdk/judge/check-4/must-fail-2imq6tuu/mutant-1-2/skid_buffer.v"
+        ]
+      },
+      "run": "run-0019",
+      "succeeded": false,
+      "summary": "symbiyosys: formal fail: 1 error; first: skid_buffer.v:119: [ASSERT] assertion skid_buffer._witness_.check_assert_skid_buffer_v_119_154 failed at step 3",
+      "tool": "formal.run"
+    },
+    {
+      "check": "The case's WIDTH 1 proof reaches every cover and fails each mutant",
+      "params": {
+        "sby": "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-zv49qhdk/judge/check-4/must-fail-2imq6tuu/mutant-1-3/skid_buffer_w1.sby",
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-zv49qhdk/judge/check-4/must-fail-2imq6tuu/mutant-1-3/skid_buffer.v"
+        ]
+      },
+      "run": "run-0020",
+      "succeeded": false,
+      "summary": "symbiyosys: formal fail: 1 error; first: skid_buffer.v:117: [ASSERT] assertion skid_buffer._witness_.check_assert_skid_buffer_v_117_152 failed at step 5",
+      "tool": "formal.run"
+    },
+    {
+      "check": "The case's WIDTH 1 proof reaches every cover and fails each mutant",
+      "params": {
+        "sby": "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-zv49qhdk/judge/check-4/must-fail-2imq6tuu/mutant-1-4/skid_buffer_w1.sby",
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-zv49qhdk/judge/check-4/must-fail-2imq6tuu/mutant-1-4/skid_buffer.v"
+        ]
+      },
+      "run": "run-0021",
+      "succeeded": false,
+      "summary": "symbiyosys: formal fail: 2 errors; first: skid_buffer.v:121: [ASSERT] assertion skid_buffer._witness_.check_assert_skid_buffer_v_121_157 failed at step 4",
+      "tool": "formal.run"
+    }
+  ],
+  "knowledge": "on",
+  "model": "claude-opus-5-5",
+  "purpose": "evidence",
+  "record": "2026-11-18-claude-code-claude-opus-5-5-23",
+  "result": {
+    "attempts": 1,
+    "attestations": [],
+    "audit_ok": true,
+    "case": "rtl/skid-buffer",
+    "case_digest": "sha256:e3101b7d1fc7acce728995852ad92bf9d85cddb7d6136ae79771cc0530754761",
+    "cli": "2.1.325",
+    "cost_usd": null,
+    "detail": "Traceability: this work serves [requirement:req-49d207f970] and implements [artifact:prj-fed4b510c5.microarchitecture.a1] against [artifact:prj-fed4b510c5.interface-spec.a1].\n\nRecorded decision: m_data and skid_data have no reset. The microarchitecture state table specifies 'Reset: none' for them, and the interface spec leaves data undefined while m_valid is low. This differs from the general guidance to reset every flop, and the approved spec governs. The testbench compares data only while m_valid is high.\n\nOpen gap: no formal_spec (.sby) is submitted, because the task's expected outputs are rtl_source and testbench only. The interface spec's formal proof requirement is therefore not addressed here: a queue model at WIDTH 8 and 1, with covers for stall, full, drain and throughput. The microarchitecture's skid_buffer.sby and skid_buffer_w1.sby also remain to be produced, and the gate accepts only one .sby per task. A follow-up task should own that work.\n\nTestbench timing: inputs change 1 ns after each rising edge. Outputs are checked 3 ns after that. A 1 ns glitch of m_ready and s_valid follows, and the handshake is sampled just before the next edge.\n\nPortability: random stimulus uses an in-testbench xorshift generator so that both simulators see the same sequence. The testbench relies on the platform compiling it with SystemVerilog system tasks ($error) available and, under Verilator, with timing support.",
+    "duration_s": 221.247,
+    "gate_runs": [
+      {
+        "run": "run-0001",
+        "succeeded": true,
+        "summary": "verilator-lint: lint clean: 0 errors, 0 warnings",
+        "tool": "lint.run"
+      },
+      {
+        "run": "run-0002",
+        "succeeded": true,
+        "summary": "icarus: simulation passed: 54283 checks passed, $finish reached at time 41196000, 0 errors",
+        "tool": "simulator.run"
+      },
+      {
+        "run": "run-0003",
+        "succeeded": true,
+        "summary": "yosys: synthesis passed: 33 cells, 18 flip-flops, 0 latches, 0 warnings",
+        "tool": "synth.run"
+      }
+    ],
+    "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+    "input_tokens": 2,
+    "model_calls": 1,
+    "output_tokens": 25458,
+    "passed": true,
+    "replay": false,
+    "runtime": "claude-code",
+    "sandbox": "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-zv49qhdk",
+    "scores": [
+      {
+        "failed_runs": [],
+        "name": "The reference testbench passes on the seat's RTL",
+        "runs": [
+          "run-0004"
+        ],
+        "scorer": "held-out-run",
+        "status": "passed",
+        "summary": "simulator.run run-0004: icarus: simulation passed: 10473 checks passed, $finish reached at time 11340000, 0 errors"
+      },
+      {
+        "failed_runs": [
+          "run-0006",
+          "run-0007",
+          "run-0008",
+          "run-0009"
+        ],
+        "name": "The seat's testbench fails each skid buffer mutant",
+        "runs": [
+          "run-0005"
+        ],
+        "scorer": "must-fail",
+        "status": "passed",
+        "summary": "simulator.run run-0005 passed on the clean inputs; 4 of 4 mutants failed it"
+      },
+      {
+        "failed_runs": [
+          "run-0012",
+          "run-0013",
+          "run-0014",
+          "run-0015"
+        ],
+        "name": "The case's WIDTH 8 proof reaches every cover and fails each mutant",
+        "runs": [
+          "run-0010",
+          "run-0011"
+        ],
+        "scorer": "must-fail",
+        "status": "passed",
+        "summary": "formal.run run-0010 passed on the clean inputs with every cover reached; 4 of 4 mutants failed it"
+      },
+      {
+        "failed_runs": [
+          "run-0018",
+          "run-0019",
+          "run-0020",
+          "run-0021"
+        ],
+        "name": "The case's WIDTH 1 proof reaches every cover and fails each mutant",
+        "runs": [
+          "run-0016",
+          "run-0017"
+        ],
+        "scorer": "must-fail",
+        "status": "passed",
+        "summary": "formal.run run-0016 passed on the clean inputs with every cover reached; 4 of 4 mutants failed it"
+      }
+    ],
+    "seat": "prj-fed4b510c5:rtl-implementation",
+    "seat_status": "in_review",
+    "started_at": "2026-11-18T21:36:22.361467Z",
+    "submitted": true,
+    "tool_calls": [],
+    "version": "1.25.0"
+  },
+  "skills": {
+    "buffering_flow_control": "sha256:9ce453d40894146149cbc0b239b46c96be234eb3e1d8657fede9b2e728bfb5e2",
+    "pipeline_design": "sha256:7a9c0840844c1929aaeae397d090a070a7662d7ba2020a395a377e59b0061882",
+    "rtl_design": "sha256:012eb9b7155ed6eb7761adca880b338f10c8f978b15dfd92f5adbb3253307a52"
+  },
+  "stage": "rtl-implementation",
+  "trial": 1,
+  "version": 1
+}
