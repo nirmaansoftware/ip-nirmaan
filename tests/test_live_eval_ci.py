@@ -682,3 +682,29 @@ def test_every_job_names_the_seat_wrapper_and_the_trials_step_its_record():
     assert workflow.count(f"      {firmware.SEAT_EXEC_ENV}: {seat.EXEC}\n") == 3  # replay, live-eval, rejudge
     trials = workflow.split("- name: Run the trials one at a time")[1].split("- name:")[0]
     assert "FW_REACH: ${{ runner.temp }}/fw-reach/fw-reach.json" in trials
+
+
+def test_the_broken_driver_control_needs_the_reference_to_pass_each_fixture_to_fail_and_the_wrapper():
+    """Gate SC5: the record proves something only when the reference passes every check, each broken fixture is
+    failed by a run that ran, and (in the replay job) every fw.test run went through the seat account's wrapper."""
+    spec = importlib.util.spec_from_file_location("live_eval_fw_broken", REPO / "scripts" / "live_eval_fw_broken.py")
+    broken = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(broken)
+
+    def run(tool="fw.test", ran=True, ok=False, wrapped=True):
+        return {"check": "c", "tool": tool, "ran": ran, "succeeded": ok, "summary": "", "through_wrapper": wrapped}
+
+    good = {"reference": [run("fw.build", ok=True), run(ok=True)],
+            **{n: [run("fw.build", ok=True), run()] for n in broken.BROKEN}}
+    assert broken.problems(good, require_seat=True) == []
+    assert set(broken.BROKEN) == {"wrong-map", "swallowed-error", "all-strobes", "sticky-response"}
+    assert all((broken.FW / f).is_file() for swap in broken.BROKEN.values() for f in swap.values())
+    bad = {**good, "reference": [run(ok=False)]}
+    assert "reference driver does not pass" in broken.problems(bad, require_seat=False)[0]
+    bad = {**good, "all-strobes": [run(ran=False)]}  # a refusal is not a failure of the judge
+    assert broken.problems(bad, require_seat=False) == ["all-strobes: no held-out check failed it by a run that ran"]
+    bad = {**good, "wrong-map": [run(wrapped=False)]}
+    assert broken.problems(bad, require_seat=True) == ["an fw.test run did not go through the seat account's wrapper"]
+    assert broken.problems(bad, require_seat=False) == []
+    workflow = (REPO / ".github" / "workflows" / "live-eval.yml").read_text(encoding="utf-8")
+    assert "python scripts/live_eval_fw_broken.py --out \"$RUNNER_TEMP/fw-reach/fw-broken.json\" --require-seat" in workflow

@@ -346,6 +346,14 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   (run 44401041085, as the runner) was every probe not denied, the parent's
   environment with the credential-named canary in it readable. Its record is
   `evals/flow/credential_test_record.json`.
+- **The judge fails a wrong driver as the seat account** (gate SC5). The
+  `replay` job of `firmware/axi4-lite-driver` runs
+  `scripts/live_eval_fw_broken.py --require-seat`: the four committed broken
+  fixtures (the wrong map header, and the swallowed-error, all-strobes and
+  sticky-response drivers) and the reference driver, each through every
+  held-out check of the case, every `fw.test` run through the wrapper. The job
+  fails unless the reference passes every check and each fixture fails one by
+  a run that ran. The result is uploaded with the credential test's record.
 - **Whole-flow cases** (`docs/WHOLE_FLOW.md`, "The CI path") run in these
   jobs when named: one trial per dispatch, on the default harness, in the
   whole-flow fingerprint, each record checked for `flow: whole`; a `flow/`
