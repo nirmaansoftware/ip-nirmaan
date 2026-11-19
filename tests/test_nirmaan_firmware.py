@@ -231,6 +231,8 @@ def test_a_clean_build_whose_program_is_killed_is_reported_as_killed_by_its_sign
     crashed = parse_fw_test("$ cc -c drv.c -o drv.o\n", (-11,))
     assert crashed.summary == "build failed before co-simulation: 0 errors (killed by signal 11)"
     assert parse_fw_test("$ cc -c drv.c -o drv.o\n", (1,)).summary.endswith("(exit status 1)")
+    # An earlier step that did not exit 0 means the build was not clean, whatever the last echo says.
+    assert parse_fw_test(steps, (0, 1, -11)).summary == "build failed before co-simulation: 0 errors (killed by signal 11)"
     # -1 is also a step that could not start: never read as a signal.
     assert parse_fw_test(steps, (0, 0, -1)).summary == "build failed before co-simulation: 0 errors (exit status -1)"
     # Killed after it reported something: the signal is named beside what is missing.

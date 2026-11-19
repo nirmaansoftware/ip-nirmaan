@@ -252,8 +252,8 @@ def parse_fw_test(log: str, returncodes: tuple[int, ...], what: str = "co-simula
             passed = False
             harness.extend(Diagnostic("error", m, "REQUIRE") for m in missing)
             summary = f"{what} failed: {'; '.join(missing)} ({_plural(passed_checks, 'check')} passed)"
-    elif not ran and _killed(status) and not build and _ran_the_program(log):
-        # Every build step exited 0 (a run stops at the first that does not), and the program was killed.
+    elif not ran and _killed(status) and not build and _ran_the_program(log) and all(c == 0 for c in returncodes[:-1]):
+        # Every step before the program's run exited 0, and the program was killed.
         summary = f"{what} was killed by signal {-status} before it reported anything; the build was clean"
     elif not ran:
         summary = f"build failed before {what}: {_plural(len(build), 'error')}{_first(build)}"
