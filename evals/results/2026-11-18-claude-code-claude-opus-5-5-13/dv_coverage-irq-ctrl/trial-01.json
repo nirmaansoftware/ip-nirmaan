@@ -1,0 +1,152 @@
+{
+  "answers": [
+    {
+      "cache_read_tokens": 620,
+      "cache_write_tokens": 7977,
+      "error": null,
+      "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+      "input_tokens": 2,
+      "mode": "work",
+      "model": "claude-opus-5-5",
+      "output_tokens": 17650,
+      "packet_sha256": "baa67104f225122a65109331e0f55ddd486faa27b3472f24f05f43d886676a18",
+      "prompt_sha256": "3bf86b60de2d063837776ee9fa35dc7b98c6deda5199dde787045071518ea6a8",
+      "provider": "claude-code",
+      "text": "{\"uncertainty\": 0.35, \"outcome\": \"Wrote a self-checking SystemVerilog testbench, irq_ctrl_cov_tb.sv, that extends the approved idle testbench to drive every design path in irq_ctrl.v. Also wrote a coverage report that lists the code points I expect to be unreachable. No coverage number is reported: the line and toggle results must come from the platform's coverage.read run over this testbench.\", \"artifacts\": [{\"kind\": \"coverage_report\", \"title\": \"irq_ctrl coverage closure plan and unreachable-point justification (N=8)\", \"summary\": \"Requirement: [requirement:req-1e26d9c190]. Design under test: [artifact:prj-63d6b8e26c.design-under-test.a1], whose review is recorded in [evidence:prj-63d6b8e26c.design-under-test.e1]. Starting point: [artifact:prj-63d6b8e26c.testbench.a1]. Its passing run is [run:run-0001], recorded as [evidence:prj-63d6b8e26c.testbench.e1]. That testbench never raises a source, so detect, claim, acknowledge, edge mode and priority are never exercised. The new testbench adds stimulus for each gap: (1) reset that overrides a write and a high source; (2) all-ones and all-zeros writes on every register, which toggle wdata[31:0] and test that bits at or above N are ignored; (3) level mode, each source alone, with PENDING, irq, irq_id and CLAIM checked, then acknowledged; (4) all sources at once, where the lowest index wins; (5) a detection that beats both a W1C clear and an acknowledge on the same edge; (6) partial W1C; (7) out-of-range acknowledge ids 31 and 8 (ack_hit false), and an acknowledge with upper wdata bits set; (8) the claim sequence through ids 4, 5, 6 and 7; (9) enable gating with pending held; (10) edge mode: rising edge, held level, clear while held, falling edge, acknowledge while held; (11) mixed MODE=0x0F, where level sources re-detect and edge sources clear; (12) reset from a non-zero state. Points I expect to be unreachable for N=8, each justified from the RTL text: rdata[30:8] (no case arm assigns them, so they stay at the default 0); irq_id[4:3] (the highest id is N-1=7); unused_wdata (it is &{1'b0, wdata}, so always 0). Toggle points on these signals should be listed as unreachable, not covered. The loop variable i is an integer, and the knowledge document says Verilator does not toggle-count integers. Edges at time zero may be counted. The testbench cannot zero coverage before reset is released, because pragmas and $c are refused in non-design files. Measured percentages and any remaining uncovered points are pending the platform's coverage.read run, and the line/toggle bounds are not stated in my inputs.\"}], \"files\": [{\"path\": \"irq_ctrl_cov_tb.sv\", \"kind\": \"testbench\", \"title\": \"irq_ctrl_cov_tb: self-checking coverage testbench for irq_ctrl (N=8)\", \"summary\": \"Extends [artifact:prj-63d6b8e26c.testbench.a1] to exercise every path of [artifact:prj-63d6b8e26c.design-under-test.a1]: level and edge detection, mixed modes, W1C, acknowledge (in range and out of range), detection beating a clear on the same edge, fixed priority, enable gating, and reset from a non-zero state. It checks every result. It prints the NIRMAAN-SIM verdict line with the plusarg nonce, as the approved testbench does. It uses no include, pragma, $fopen, $system, $c or DPI. Serves [requirement:req-1e26d9c190].\", \"entry\": \"irq_ctrl_cov_tb\"}], \"tool_runs\": [], \"claims\": [\"I have not run the testbench. Whether it passes on the approved RTL, and what line and toggle coverage it reaches, is unknown until the platform runs coverage.read.\", \"rdata[30:8], irq_id[4:3] and unused_wdata are expected to be unreachable for N=8, based on reading the RTL source. No tool has confirmed this.\", \"The expected values in the testbench come from my reading of irq_ctrl.v. If any of them is wrong, the run will report a failed check.\"], \"escalation\": null, \"notes\": \"Top module for coverage.read is irq_ctrl_cov_tb. The design file is irq_ctrl.v. The testbench uses timing controls (#, @) in the same style as the approved idle testbench, so the platform's Verilator build has to support timing as it does for that file. The sections I was given do not state numeric coverage bounds. If the bounds count the justified-unreachable toggle points (rdata[30:8], irq_id[4:3], unused_wdata), toggle coverage cannot reach 100 percent for N=8, and the bound owner must accept those exclusions. The independent review evidence must be recorded by a different seat after the platform's run.\"}\n\n=== FILE: irq_ctrl_cov_tb.sv ===\n// Coverage testbench for irq_ctrl.v (N = 8). Extends irq_ctrl_idle_tb.sv:\n// besides reset values and register read-back, it raises every source in level\n// and edge mode, checks pending, irq, irq_id and CLAIM, clears by W1C and by\n// acknowledge, checks that a detection wins over a clear at the same edge, that\n// out-of-range acknowledges do nothing, that disabled sources do not interrupt,\n// and that reset clears a non-zero state. Every check is self-checking; the\n// verdict line is the same NIRMAAN-SIM line as the approved testbench.\n//\n// Expected unreachable points for N = 8 (see coverage report): rdata[30:8],\n// irq_id[4:3], unused_wdata.\n`timescale 1ns / 1ps\nmodule irq_ctrl_cov_tb;\n    localparam int N = 8;\n    localparam logic [1:0] A_ENABLE = 2'd0, A_MODE = 2'd1, A_PENDING = 2'd2, A_CLAIM = 2'd3;\n\n    logic        clk = 1'b0;\n    logic        rst_n = 1'b0;\n    logic [7:0]  src = 8'd0;\n    logic        we = 1'b0;\n    logic [1:0]  addr = 2'd0;\n    logic [31:0] wdata = 32'd0;\n    logic [31:0] rdata;\n    logic        irq;\n    logic [4:0]  irq_id;\n    int checks = 0, errors = 0;\n    logic [8*64-1:0] nonce;\n\n    irq_ctrl #(.N(N)) dut (.clk(clk), .rst_n(rst_n), .src(src), .we(we), .addr(addr), .wdata(wdata),\n                           .rdata(rdata), .irq(irq), .irq_id(irq_id));\n\n    always #5 clk = ~clk;\n\n    task automatic check(input logic ok, input string what);\n        checks++;\n        if (ok !== 1'b1) begin\n            errors++;\n            $display(\"FAIL at %0t: %0s\", $time, what);\n        end\n    endtask\n\n    task automatic tick();\n        @(posedge clk);\n        #1;\n    endtask\n\n    task automatic wr(input logic [1:0] a, input logic [31:0] d);\n        we = 1'b1;\n        addr = a;\n        wdata = d;\n        tick();\n        we = 1'b0;\n        wdata = 32'd0;\n    endtask\n\n    task automatic expect_reg(input logic [1:0] a, input logic [31:0] expected, input string what);\n        addr = a;\n        #1;\n        check(rdata === expected, what);\n    endtask\n\n    task automatic expect_irq(input logic exp_irq, input logic [4:0] exp_id, input string what);\n        #1;\n        check((irq === exp_irq) && (irq_id === exp_id), what);\n    endtask\n\n    initial begin\n        // ---- 1. Reset wins over a write and a high source ----\n        @(posedge clk);\n        #1;\n        src = 8'hFF;\n        we = 1'b1;\n        addr = A_ENABLE;\n        wdata = 32'hFFFF_FFFF;\n        repeat (2) @(posedge clk);\n        #1;\n        src = 8'h00;\n        we = 1'b0;\n        wdata = 32'd0;\n        rst_n = 1'b1;\n        tick();\n        expect_reg(A_ENABLE,  32'd0, \"ENABLE is 0 after reset; write during reset ignored\");\n        expect_reg(A_MODE,    32'd0, \"MODE is 0 after reset\");\n        expect_reg(A_PENDING, 32'd0, \"PENDING is 0 after reset; source during reset ignored\");\n        expect_reg(A_CLAIM,   32'd0, \"CLAIM reads 0 after reset\");\n        expect_irq(1'b0, 5'd0, \"no irq after reset\");\n\n        // ---- 2. Register access, every wdata bit ----\n        wr(A_ENABLE, 32'hFFFF_FFFF);\n        expect_reg(A_ENABLE, 32'h0000_00FF, \"ENABLE keeps bits below N and ignores the rest\");\n        wr(A_MODE, 32'hFFFF_FFFF);\n        expect_reg(A_MODE, 32'h0000_00FF, \"MODE keeps bits below N and ignores the rest\");\n        expect_reg(A_PENDING, 32'd0, \"no source, nothing pending\");\n        expect_irq(1'b0, 5'd0, \"no source, no irq\");\n        wr(A_ENABLE, 32'h0000_00A5);\n        expect_reg(A_ENABLE, 32'h0000_00A5, \"ENABLE read-back A5\");\n        wr(A_MODE, 32'h0000_005A);\n        expect_reg(A_MODE, 32'h0000_005A, \"MODE read-back 5A\");\n        wr(A_PENDING, 32'hFFFF_FFFF);\n        expect_reg(A_PENDING, 32'd0, \"W1C on empty PENDING keeps it 0\");\n        wr(A_CLAIM, 32'hFFFF_FFFF);\n        expect_reg(A_ENABLE, 32'h0000_00A5, \"CLAIM write leaves ENABLE\");\n        expect_reg(A_MODE, 32'h0000_005A, \"CLAIM write leaves MODE\");\n        wr(A_ENABLE, 32'd0);\n        wr(A_MODE, 32'd0);\n        expect_reg(A_ENABLE, 32'd0, \"ENABLE cleared\");\n        expect_reg(A_MODE, 32'd0, \"MODE cleared\");\n\n        // ---- 3. Level mode, each source alone, then acknowledged ----\n        wr(A_ENABLE, 32'h0000_00FF);\n        for (int k = 0; k < N; k++) begin\n            src = 8'h01 << k;\n            tick();\n            expect_reg(A_PENDING, 32'h1 << k, \"level source sets its own pending bit\");\n            expect_irq(1'b1, k[4:0], \"irq_id names the single active source\");\n            expect_reg(A_CLAIM, {1'b1, 26'd0, k[4:0]}, \"CLAIM reads irq and id\");\n            src = 8'h00;\n            wr(A_CLAIM, {27'd0, k[4:0]});\n            expect_reg(A_PENDING, 32'd0, \"acknowledge clears the named source\");\n            expect_irq(1'b0, 5'd0, \"no irq after acknowledge\");\n        end\n\n        // ---- 4. Priority, detection beats clear, W1C, out-of-range acknowledge ----\n        src = 8'hFF;\n        tick();\n        expect_reg(A_PENDING, 32'h0000_00FF, \"all level sources pending\");\n        expect_irq(1'b1, 5'd0, \"lowest-numbered active source wins\");\n        wr(A_PENDING, 32'h0000_00FF);\n        expect_reg(A_PENDING, 32'h0000_00FF, \"detection wins over W1C at the same edge\");\n        wr(A_CLAIM, 32'd0);\n        expect_reg(A_PENDING, 32'h0000_00FF, \"detection wins over acknowledge at the same edge\");\n        src = 8'h00;\n        wr(A_PENDING, 32'h0000_000F);\n        expect_reg(A_PENDING, 32'h0000_00F0, \"W1C clears only the bits written as 1\");\n        expect_irq(1'b1, 5'd4, \"next priority is source 4\");\n        wr(A_CLAIM, 32'h0000_001F);\n        expect_reg(A_PENDING, 32'h0000_00F0, \"acknowledge id 31 (>= N) clears nothing\");\n        wr(A_CLAIM, 32'h0000_0008);\n        expect_reg(A_PENDING, 32'h0000_00F0, \"acknowledge id 8 (= N) clears nothing\");\n        wr(A_CLAIM, 32'hFFFF_FFE4);\n        expect_reg(A_PENDING, 32'h0000_00E0, \"acknowledge uses wdata[4:0] only (id 4)\");\n        expect_irq(1'b1, 5'd5, \"next priority is source 5\");\n        wr(A_CLAIM, 32'h0000_0005);\n        expect_reg(A_PENDING, 32'h0000_00C0, \"acknowledge 5\");\n        expect_irq(1'b1, 5'd6, \"next priority is source 6\");\n        wr(A_CLAIM, 32'h0000_0006);\n        expect_reg(A_PENDING, 32'h0000_0080, \"acknowledge 6\");\n        expect_irq(1'b1, 5'd7, \"next priority is source 7\");\n        expect_reg(A_CLAIM, {1'b1, 26'd0, 5'd7}, \"CLAIM reads irq with id 7\");\n        wr(A_CLAIM, 32'h0000_0007);\n        expect_reg(A_PENDING, 32'd0, \"acknowledge 7 empties PENDING\");\n        expect_reg(A_CLAIM, 32'd0, \"CLAIM reads 0 when nothing active\");\n        expect_irq(1'b0, 5'd0, \"no irq when nothing pending\");\n\n        // ---- 5. Enable gating ----\n        src = 8'h81;\n        tick();\n        src = 8'h00;\n        expect_reg(A_PENDING, 32'h0000_0081, \"sources 0 and 7 pending\");\n        expect_irq(1'b1, 5'd0, \"source 0 wins\");\n        wr(A_ENABLE, 32'h0000_0080);\n        expect_irq(1'b1, 5'd7, \"disabled source 0 skipped, source 7 claimed\");\n        wr(A_ENABLE, 32'd0);\n        expect_irq(1'b0, 5'd0, \"pending but disabled: no irq\");\n        expect_reg(A_CLAIM, 32'd0, \"CLAIM reads 0 when all disabled\");\n        expect_reg(A_PENDING, 32'h0000_0081, \"disabling keeps pending bits\");\n        wr(A_ENABLE, 32'h0000_00FF);\n        expect_irq(1'b1, 5'd0, \"re-enabling restores irq\");\n        wr(A_PENDING, 32'h0000_0081);\n        expect_reg(A_PENDING, 32'd0, \"W1C clears both\");\n        expect_irq(1'b0, 5'd0, \"no irq after W1C\");\n\n        // ---- 6. Edge mode ----\n        wr(A_MODE, 32'h0000_00FF);\n        src = 8'h3C;\n        tick();\n        expect_reg(A_PENDING, 32'h0000_003C, \"rising edges set pending\");\n        expect_irq(1'b1, 5'd2, \"lowest rising source is 2\");\n        tick();\n        expect_reg(A_PENDING, 32'h0000_003C, \"held high: pending held, no new detection\");\n        wr(A_PENDING, 32'h0000_003C);\n        expect_reg(A_PENDING, 32'd0, \"edge mode: clear sticks while source held high\");\n        expect_irq(1'b0, 5'd0, \"no irq after clear in edge mode\");\n        src = 8'h00;\n        tick();\n        expect_reg(A_PENDING, 32'd0, \"falling edge is not detected\");\n        src = 8'h02;\n        tick();\n        expect_reg(A_PENDING, 32'h0000_0002, \"rising edge on source 1\");\n        expect_irq(1'b1, 5'd1, \"source 1 claimed\");\n        wr(A_CLAIM, 32'h0000_0001);\n        expect_reg(A_PENDING, 32'd0, \"edge mode: acknowledge sticks while source held\");\n        src = 8'h00;\n        tick();\n        src = 8'hC3;\n        tick();\n        expect_reg(A_PENDING, 32'h0000_00C3, \"rising edges on 0, 1, 6, 7\");\n\n        // ---- 7. Mixed mode: sources 0-3 edge, 4-7 level ----\n        wr(A_MODE, 32'h0000_000F);\n        expect_reg(A_MODE, 32'h0000_000F, \"MODE mixed\");\n        expect_reg(A_PENDING, 32'h0000_00C3, \"mode change alone does not detect\");\n        wr(A_PENDING, 32'h0000_00FF);\n        expect_reg(A_PENDING, 32'h0000_00C0, \"level sources re-detect, edge sources clear\");\n        expect_irq(1'b1, 5'd6, \"source 6 claimed\");\n        src = 8'h00;\n        wr(A_PENDING, 32'h0000_00FF);\n        expect_reg(A_PENDING, 32'd0, \"all cleared once sources are low\");\n\n        // ---- 8. Reset from a non-zero state ----\n        src = 8'hFF;\n        tick();\n        expect_reg(A_PENDING, 32'h0000_00FF, \"all pending before reset\");\n        rst_n = 1'b0;\n        tick();\n        expect_reg(A_ENABLE,  32'd0, \"reset clears ENABLE\");\n        expect_reg(A_MODE,    32'd0, \"reset clears MODE\");\n        expect_reg(A_PENDING, 32'd0, \"reset clears PENDING\");\n        expect_irq(1'b0, 5'd0, \"no irq in reset\");\n        src = 8'h00;\n        rst_n = 1'b1;\n        tick();\n        expect_reg(A_PENDING, 32'd0, \"PENDING stays 0 after reset release\");\n\n        if (!$value$plusargs(\"nirmaan_nonce=%s\", nonce)) nonce = \"none\";\n        $display(\"NIRMAAN-SIM %0s %0d passed, %0d failed\", nonce, (checks > errors ? checks - errors : 0), errors);\n        $finish;\n    end\nendmodule\n=== END FILE ==="
+    }
+  ],
+  "format": "nirmaan.eval-trial",
+  "harness_variant": "default",
+  "judge_runs": [
+    {
+      "check": "The seat's testbench passes the approved RTL, meets the coverage bounds on it and fails each interrupt controller mutant",
+      "params": {
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-0mg622cr/judge/check-1/must-fail-t_d7fioy/clean/irq_ctrl_cov_tb.sv",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-0mg622cr/judge/check-1/must-fail-t_d7fioy/clean/irq_ctrl.v"
+        ],
+        "top": "irq_ctrl_cov_tb"
+      },
+      "run": "run-0003",
+      "succeeded": true,
+      "summary": "verilator-coverage: coverage read over irq_ctrl.v: line 100.00% (8/8), toggle 82.55% (246/298), branch 100.00% (12/12); simulation passed: 104 checks passed, $finish reached, 0 errors",
+      "tool": "coverage.read"
+    },
+    {
+      "check": "The seat's testbench passes the approved RTL, meets the coverage bounds on it and fails each interrupt controller mutant",
+      "params": {
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-0mg622cr/judge/check-1/must-fail-t_d7fioy/cover/irq_ctrl_cov_tb.sv",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-0mg622cr/judge/check-1/must-fail-t_d7fioy/cover/irq_ctrl.v"
+        ],
+        "top": "irq_ctrl_cov_tb"
+      },
+      "run": "run-0004",
+      "succeeded": true,
+      "summary": "verilator-coverage: coverage read over irq_ctrl.v: line 100.00% (8/8), toggle 82.55% (246/298), branch 100.00% (12/12); simulation passed: 104 checks passed, $finish reached, 0 errors",
+      "tool": "coverage.read"
+    },
+    {
+      "check": "The seat's testbench passes the approved RTL, meets the coverage bounds on it and fails each interrupt controller mutant",
+      "params": {
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-0mg622cr/judge/check-1/must-fail-t_d7fioy/mutant-1-1/irq_ctrl_cov_tb.sv",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-0mg622cr/judge/check-1/must-fail-t_d7fioy/mutant-1-1/irq_ctrl.v"
+        ],
+        "top": "irq_ctrl_cov_tb"
+      },
+      "run": "run-0005",
+      "succeeded": false,
+      "summary": "verilator-coverage: coverage not read: simulation failed: the testbench reports 8 of 104 checks failed",
+      "tool": "coverage.read"
+    },
+    {
+      "check": "The seat's testbench passes the approved RTL, meets the coverage bounds on it and fails each interrupt controller mutant",
+      "params": {
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-0mg622cr/judge/check-1/must-fail-t_d7fioy/mutant-1-2/irq_ctrl_cov_tb.sv",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-0mg622cr/judge/check-1/must-fail-t_d7fioy/mutant-1-2/irq_ctrl.v"
+        ],
+        "top": "irq_ctrl_cov_tb"
+      },
+      "run": "run-0006",
+      "succeeded": false,
+      "summary": "verilator-coverage: coverage not read: simulation failed: the testbench reports 58 of 104 checks failed",
+      "tool": "coverage.read"
+    },
+    {
+      "check": "The seat's testbench passes the approved RTL, meets the coverage bounds on it and fails each interrupt controller mutant",
+      "params": {
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-0mg622cr/judge/check-1/must-fail-t_d7fioy/mutant-1-3/irq_ctrl_cov_tb.sv",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-0mg622cr/judge/check-1/must-fail-t_d7fioy/mutant-1-3/irq_ctrl.v"
+        ],
+        "top": "irq_ctrl_cov_tb"
+      },
+      "run": "run-0007",
+      "succeeded": false,
+      "summary": "verilator-coverage: coverage not read: simulation failed: the testbench reports 3 of 104 checks failed",
+      "tool": "coverage.read"
+    }
+  ],
+  "knowledge": "on",
+  "model": "claude-opus-5-5",
+  "purpose": "evidence",
+  "record": "2026-11-18-claude-code-claude-opus-5-5-13",
+  "result": {
+    "attempts": 1,
+    "attestations": [],
+    "audit_ok": true,
+    "case": "dv/coverage-irq-ctrl",
+    "case_digest": "sha256:c828a43209fa717fd4de48b3cadd48ff275faefa3afed2b7523d96e6013f5696",
+    "cli": "2.1.325",
+    "cost_usd": null,
+    "detail": "Top module for coverage.read is irq_ctrl_cov_tb. The design file is irq_ctrl.v. The testbench uses timing controls (#, @) in the same style as the approved idle testbench, so the platform's Verilator build has to support timing as it does for that file. The sections I was given do not state numeric coverage bounds. If the bounds count the justified-unreachable toggle points (rdata[30:8], irq_id[4:3], unused_wdata), toggle coverage cannot reach 100 percent for N=8, and the bound owner must accept those exclusions. The independent review evidence must be recorded by a different seat after the platform's run.",
+    "duration_s": 171.201,
+    "gate_runs": [
+      {
+        "run": "run-0002",
+        "succeeded": true,
+        "summary": "verilator-coverage: coverage read over irq_ctrl.v: line 100.00% (8/8), toggle 82.55% (246/298), branch 100.00% (12/12); simulation passed: 104 checks passed, $finish reached, 0 errors",
+        "tool": "coverage.read"
+      }
+    ],
+    "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+    "input_tokens": 2,
+    "model_calls": 1,
+    "output_tokens": 17650,
+    "passed": true,
+    "replay": false,
+    "runtime": "claude-code",
+    "sandbox": "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-0mg622cr",
+    "scores": [
+      {
+        "failed_runs": [
+          "run-0005",
+          "run-0006",
+          "run-0007"
+        ],
+        "name": "The seat's testbench passes the approved RTL, meets the coverage bounds on it and fails each interrupt controller mutant",
+        "runs": [
+          "run-0003",
+          "run-0004"
+        ],
+        "scorer": "must-fail",
+        "status": "passed",
+        "summary": "coverage.read run-0003 passed on the clean inputs with every cover reached; 3 of 3 mutants failed it"
+      }
+    ],
+    "seat": "prj-63d6b8e26c:coverage",
+    "seat_status": "in_review",
+    "started_at": "2026-11-18T20:27:24.322748Z",
+    "submitted": true,
+    "tool_calls": [],
+    "version": "1.25.0"
+  },
+  "skills": {
+    "code_coverage": "sha256:b5a1c9b8bb5f208c1e3ffcae7e9a5da4f26811e68a36954bf58fc612c481ea9b"
+  },
+  "stage": "coverage",
+  "trial": 1,
+  "version": 1
+}
