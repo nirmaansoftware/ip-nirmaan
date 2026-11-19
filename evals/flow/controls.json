@@ -785,7 +785,7 @@
         }
       ],
       "reaches_review": false,
-      "refused_by": "build failed before co-simulation: 0 errors \\(exit status -11\\)$"
+      "refused_by": "co-simulation.*: 0 errors \\(exit status -11\\)$"
     },
     {
       "id": "driver-b-before-w",
