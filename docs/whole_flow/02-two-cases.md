@@ -37,7 +37,22 @@ accepting edge (`TMR-READ-VALUE`), `COUNT` while a count runs
 (`TMR-COUNT-READ`), a `CTRL` write on a count end (`TMR-CTRL-WINS`), what a
 synchronous reset does to a pending response or a held half write
 (`TMR-RESET-EDGE`), and the testbench checking every requirement
-(`TMR-TB-ALL`; the must-fail check holds it only to the four mutants). A test
+(`TMR-TB-ALL`; the must-fail check holds it only to the four mutants). A fifth
+independent check found mutants that still pass, and each such clause is split
+out of its rule into its own tag, not judged: for the timer, a response edge
+with `READY` already high (`TMR-RESPONSE-EDGE-READY-HIGH`), a request
+accepted while a response waits (`TMR-READY-HELD-REQUEST`), `RDATA` held still
+for `CTRL`, `LOAD` and `STATUS` (`TMR-RESPONSE-RDATA-STABLE`; `TMR-RESPONSE`
+keeps it for `COUNT`), transfers that must leave a running count alone
+(`TMR-RUNNING-UNDISTURBED`), the `MODE` of a restarted count
+(`TMR-RESTART-MODE`), a periodic end with `EXPIRED` already set
+(`TMR-PERIODIC-EXPIRED-SET`), the 32-bit width of the count above bit 20
+(`TMR-COUNT-32BIT`), and a `LOAD` write on a periodic end edge, on which the
+document gives no rule (`TMR-LOAD-END-EDGE`), and the `LOAD` values at which a one-shot count or a period is timed (`TMR-ONESHOT-VALUES`, `TMR-PERIODIC-VALUES`: the list is in `citations.json`); for the register block, the
+latency bound with `READY` already high (`AXIL-LATENCY-READY-HIGH`) and the
+registers and held halves cleared from the first reset edge
+(`AXIL-RESET-REGS`). `TMR-IRQ` stays judged, for 100000 cycles
+(`judged_scope` in the timer's `citations.json`). A test
 checks both ways: each cited tag or heading exists, and each tag is cited or
 listed.
 
