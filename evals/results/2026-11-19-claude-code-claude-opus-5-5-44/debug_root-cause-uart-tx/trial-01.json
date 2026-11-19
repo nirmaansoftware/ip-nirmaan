@@ -1,0 +1,197 @@
+{
+  "answers": [
+    {
+      "cache_read_tokens": 620,
+      "cache_write_tokens": 8141,
+      "error": null,
+      "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+      "input_tokens": 2,
+      "mode": "work",
+      "model": "claude-opus-5-5",
+      "output_tokens": 8031,
+      "packet_sha256": "10976a09cb6eb124c3a23dfec6a0be214b9c53a28d053fdf0b0b4eddca3a7442",
+      "prompt_sha256": "35a0b0a82fc89d730840d71069bbaa1c9348439b4e4d6e3a753f9c91591370a7",
+      "provider": "claude-code",
+      "text": "{\"uncertainty\": 0.2, \"outcome\": \"rtl_bug\", \"artifacts\": [{\"kind\": \"root_cause_analysis\", \"title\": \"Root cause of the uart_tx regression failure: hold register reloaded by a start pulse while busy\", \"summary\": \"Requirement [requirement:req-d10c4df532]: investigate and reproduce the failing uart_tx test. Evidence: VeriTriage gave unknown_failure at 30% confidence with a top hypothesis of 'Likely RTL bug' ([evidence:prj-a0b3e1ca75.triage.e1], [run:run-0001]). Icarus reproduced the failure deterministically: 1 of 4 checks failed and $finish was reached at time 546000 ([evidence:prj-a0b3e1ca75.triage.e2], [run:run-0002]). The design under investigation is [artifact:prj-a0b3e1ca75.design-under-investigation.a1], reviewed per [evidence:prj-a0b3e1ca75.design-under-investigation.e1]. Defect: in the non-reset branch the statement `if (start) hold <= data;` sits before and outside the `case (state)`, so it runs in every state, not only IDLE. Causality: the DATA state drives `tx <= hold[bit_idx + 3'd1]` at each bit boundary. A start pulse during a frame therefore replaces `hold` with the new byte, and every data bit after the pulse comes from the new byte. The fault is created at the cycle the stray start is sampled. It becomes visible only at later bit boundaries, so a scoreboard flags the received byte, not the write that corrupted it. Incorrectness: the file's own header contract says 'A start pulse while a frame is in flight is ignored.' Here the pulse is ignored for state sequencing but not for data, which breaks that contract. A fix limited to IDLE (the existing `hold <= data` inside the IDLE branch) would cover every mid-frame timing, not only the failing one. Ranked hypotheses and what would refute each: (1) RTL bug, most likely; it is refuted if the repro below passes on this RTL, or if it also fails on the clean reference RTL. (2) Testbench bug (wrong expectation in the regression test); weakened because the new repro derives its expected bits from the header contract, not from RTL output, and it would be confirmed if the repro failed on clean RTL. (3) Infrastructure; unlikely because the failure reproduced with a clean $finish and a specific 1-of-4 check count, not a crash, timeout or build error ([run:run-0002]); a clean rebuild that made the failure disappear would refute this rejection. (4) Spec ambiguity; rejected because the header states the behaviour explicitly, though one could argue 'ignored' only constrains framing; a spec owner ruling that data reload is allowed would refute this rejection. Limit: the regression log and the upstream triage testbench content are not in my inputs, so I cannot show that the single failed check in [run:run-0002] is this mechanism rather than another one.\"}], \"files\": [{\"path\": \"uart_tx_reload_repro_tb.v\", \"kind\": \"testbench\", \"title\": \"Minimal self-checking repro: start pulse during a frame must not alter the frame's data bits\", \"summary\": \"Repro for [requirement:req-d10c4df532] against [artifact:prj-a0b3e1ca75.design-under-investigation.a1]. It runs four checks, with expected values taken from the 8N1 header contract rather than from RTL output: idle after reset; a clean 0xA5 frame; a 0xA5 frame with a 0x3C start pulse injected during data bit 2, whose bits must still decode as 0xA5; and no second frame after the ignored pulse. On the RTL under investigation, check 3 should fail (bits 3 onward come from 0x3C). On RTL whose hold register only loads in IDLE, all four should pass. It prints exactly one NIRMAAN-SIM verdict line, and a watchdog guards against hangs.\", \"entry\": \"uart_tx_reload_repro_tb\"}], \"tool_runs\": [\"run:run-0001\", \"run:run-0002\"], \"claims\": [\"The clean reference uart_tx presumably differs only by loading hold in IDLE; I have not seen the clean RTL.\", \"I do not know the exact plusarg name the platform uses to pass the nonce; the testbench tries NIRMAAN_NONCE, nirmaan_nonce, NONCE and nonce. If none matches, the verdict line will carry 'unset' and the gate will not accept it.\", \"I have not seen the content of triage_report.md, uart_tx_triage_repro.v or regression_fail.log, so I cannot tie the specific failed check in run-0002 to this mechanism.\"], \"escalation\": null, \"notes\": \"Expected failing check on the mutant: with 0xA5 sent and the 0x3C reload landing in data bit 2, the decoded byte should be 0x3D (bits 0-2 from 0xA5, bits 3-7 from 0x3C) instead of 0xA5. Inputs are driven and tx is sampled on falling clock edges, mid-bit, to avoid races with the DUT's posedge updates. The testbench does not reference DUT internals. Nothing here has been simulated by me; the platform's simulator.run with expect=fail is the check.\"}\n\n=== FILE: uart_tx_reload_repro_tb.v ===\n// Minimal reproduction: a start pulse while a frame is in flight must be\n// ignored (uart_tx header contract), so it must not change the data bits of\n// the frame already being sent. Expected values come from the 8N1 contract:\n// start bit 0, eight data bits LSB first, stop bit 1, CLKS_PER_BIT cycles each.\n`timescale 1ns / 1ps\nmodule uart_tx_reload_repro_tb;\n    localparam integer CPB = 4;\n    localparam integer T   = 10;\n\n    reg        clk   = 1'b0;\n    reg        rst   = 1'b1;\n    reg        start = 1'b0;\n    reg  [7:0] data  = 8'h00;\n    wire       tx;\n    wire       busy;\n\n    integer passed = 0;\n    integer failed = 0;\n    reg [8*128-1:0] nonce;\n\n    reg [7:0] rx_byte;\n    reg       rx_start_ok;\n    reg       rx_stop_ok;\n    reg       quiet_ok;\n    integer   n;\n\n    uart_tx #(.CLKS_PER_BIT(CPB)) dut (\n        .clk  (clk),\n        .rst  (rst),\n        .start(start),\n        .data (data),\n        .tx   (tx),\n        .busy (busy)\n    );\n\n    always #(T/2) clk = ~clk;\n\n    task check;\n        input            cond;\n        input [8*48-1:0] name;\n        begin\n            if (cond) begin\n                passed = passed + 1;\n                $display(\"check PASS: %0s\", name);\n            end else begin\n                failed = failed + 1;\n                $display(\"check FAIL: %0s\", name);\n            end\n        end\n    endtask\n\n    // Wait for a start bit, then sample each bit at its middle. tx changes on\n    // rising edges; the samples land on falling edges.\n    task receive;\n        integer k;\n        begin\n            @(negedge tx);\n            #(CPB*T/2 + T/2);\n            rx_start_ok = (tx === 1'b0);\n            for (k = 0; k < 8; k = k + 1) begin\n                #(CPB*T);\n                rx_byte[k] = tx;\n            end\n            #(CPB*T);\n            rx_stop_ok = (tx === 1'b1);\n        end\n    endtask\n\n    task pulse;\n        input [7:0] d;\n        begin\n            @(negedge clk);\n            start = 1'b1;\n            data  = d;\n            @(negedge clk);\n            start = 1'b0;\n            data  = 8'h00;\n        end\n    endtask\n\n    initial begin\n        nonce = \"unset\";\n        if (!$value$plusargs(\"NIRMAAN_NONCE=%s\", nonce))\n            if (!$value$plusargs(\"nirmaan_nonce=%s\", nonce))\n                if (!$value$plusargs(\"NONCE=%s\", nonce))\n                    if (!$value$plusargs(\"nonce=%s\", nonce))\n                        nonce = \"unset\";\n\n        repeat (4) @(negedge clk);\n        rst = 1'b0;\n        repeat (2) @(negedge clk);\n        check((tx === 1'b1) && (busy === 1'b0), \"idle line high and not busy after reset\");\n\n        // Baseline frame, no interference.\n        fork\n            receive;\n            pulse(8'hA5);\n        join\n        check(rx_start_ok && rx_stop_ok && (rx_byte === 8'hA5), \"clean frame 0xA5 sent LSB first\");\n        wait (busy === 1'b0);\n        repeat (2) @(negedge clk);\n\n        // Frame 0xA5 with a start pulse (data 0x3C) during data bit 2.\n        fork\n            receive;\n            begin\n                pulse(8'hA5);\n                repeat (13) @(negedge clk);\n                pulse(8'h3C);\n            end\n        join\n        $display(\"mid-frame start: received 0x%02h, expected 0xA5\", rx_byte);\n        check(rx_start_ok && rx_stop_ok && (rx_byte === 8'hA5), \"start while busy leaves frame data 0xA5 intact\");\n\n        // The ignored pulse must not launch a second frame.\n        wait (busy === 1'b0);\n        quiet_ok = 1'b1;\n        for (n = 0; n < CPB*12; n = n + 1) begin\n            @(negedge clk);\n            if ((tx !== 1'b1) || (busy !== 1'b0))\n                quiet_ok = 1'b0;\n        end\n        check(quiet_ok, \"ignored start launches no second frame\");\n\n        $display(\"NIRMAAN-SIM %0s %0d passed, %0d failed\", nonce, passed, failed);\n        $finish;\n    end\n\n    initial begin\n        #200000;\n        $display(\"check FAIL: watchdog timeout\");\n        $display(\"NIRMAAN-SIM %0s %0d passed, %0d failed\", nonce, passed, failed + 1);\n        $finish;\n    end\nendmodule\n=== END FILE ==="
+    },
+    {
+      "cache_read_tokens": 620,
+      "cache_write_tokens": 10066,
+      "error": null,
+      "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+      "input_tokens": 2,
+      "mode": "work",
+      "model": "claude-opus-5-5",
+      "output_tokens": 6654,
+      "packet_sha256": "ff2254cf4a13f69fc0ea6c4da2c2693075f9ab16f40b897f4758babf824ee836",
+      "prompt_sha256": "781bad1225455557cc67d335319951ff4ec4c85c8800d90e53ca8e5e9de0c6ab",
+      "provider": "claude-code",
+      "text": "```json\n{\"uncertainty\": 0.2, \"outcome\": \"rtl_bug\", \"artifacts\": [{\"kind\": \"root_cause_analysis\", \"title\": \"uart_tx regression failure: a start pulse while busy reloads the data being sent\", \"summary\": \"Requirement [requirement:req-d10c4df532] asks for the failing uart_tx test to be investigated and reproduced. Triage [evidence:prj-a0b3e1ca75.triage.e2] reports the failure reproducing under icarus with 1 of 4 checks failed and $finish reached, so the failure is deterministic. VeriTriage [evidence:prj-a0b3e1ca75.triage.e1] gives only weak support for its top hypothesis, Likely RTL bug: unknown_failure, 30% confidence, one evidence node. I treat that hypothesis as one candidate to test, not as a conclusion. DEFECT: in the RTL under investigation [artifact:prj-a0b3e1ca75.design-under-investigation.a1], the statement `if (start) hold <= data;` sits outside the state case. It executes in every state, not only IDLE. INCORRECTNESS: the module header states the contract 'A start pulse while a frame is in flight is ignored.' A pulse during START, DATA or STOP still overwrites the hold register, so the pulse is not ignored. CAUSALITY: data bits are driven from hold on each bit boundary (`tx <= hold[bit_idx + 3'd1]`). Every bit after the overwrite therefore comes from the new byte. In the repro, frame 0xA5 receives a pulse with 0x3C during data bit 2, at the posedge at 655 ns. Bits 0-2 come from 0xA5 and bits 3-7 from 0x3C, so the line carries 0x3D instead of 0xA5. The fault is created at the write to hold, cycles before the failing check samples the line. RANKED ALTERNATIVES AND WHY THEY ARE REJECTED: (1) rtl_bug, accepted. The code path that violates the header clause is identified by reading the source [artifact:prj-a0b3e1ca75.design-under-investigation.a1]. (2) testbench_bug, rejected for the repro. Its expected value 0xA5 comes from the 8N1 contract and the header clause, not from RTL output. Its baseline frame and idle checks are expected to pass on this RTL. What would refute this: the same testbench failing on RTL that loads hold only in IDLE. (3) infrastructure, rejected because triage [evidence:prj-a0b3e1ca75.triage.e2] reports a deterministic failure with $finish reached and a counted failed check, not a build or tool error. What would refute this: a clean rebuild with no other change that passes. (4) spec_ambiguity, rejected because the header clause fixes the behaviour explicitly. What would refute this: a governing specification that allows a mid-frame start to update the payload. PROPOSED FIX, not applied here: delete the unconditional `if (start) hold <= data;`. The IDLE branch already loads hold when a frame starts. Then add an assertion that hold is stable while busy.\"}], \"files\": [{\"path\": \"uart_tx_reload_repro_tb.v\", \"kind\": \"testbench\", \"title\": \"Minimal self-checking repro: a start pulse during a frame must not alter the frame's data bits\", \"summary\": \"This testbench checks the header contract of [artifact:prj-a0b3e1ca75.design-under-investigation.a1], that a start pulse during a frame is ignored. It sends a clean 0xA5 frame, then a 0xA5 frame with a 0x3C start pulse during data bit 2. It samples each bit at its middle and expects 0xA5, a value derived from the 8N1 contract. It then checks that the ignored pulse launches no second frame. It prints one NIRMAAN-SIM verdict line. On the RTL under investigation it is expected to report 3 passed, 1 failed (0x3D received), matching the 1-of-4 failure pattern in [evidence:prj-a0b3e1ca75.triage.e2]. On RTL that loads hold only in IDLE it is expected to pass.\", \"entry\": \"uart_tx_reload_repro_tb\"}], \"tool_runs\": [], \"claims\": [\"Hand analysis of the timing in the RTL under investigation predicts that the mid-frame-start frame arrives as 0x3D instead of 0xA5. No simulation was run by me.\", \"The repro is expected to pass on RTL whose hold register loads only in IDLE. This has not been run.\", \"The nonce plusarg name is not given in my inputs. The testbench tries NIRMAAN_NONCE, nirmaan_nonce, NONCE and nonce in that order.\"], \"escalation\": null, \"notes\": \"Attempt 1 was refused for listing tool runs that were never recorded. This attempt lists no tool runs and does not claim any tool execution. The reproduction run with expect=fail is left to the platform, over uart_tx_reload_repro_tb.v plus the approved RTL. Independent review is still required. The design-under-investigation review [evidence:prj-a0b3e1ca75.design-under-investigation.e1] covers the RTL fixture, not this analysis. Remaining uncertainty: I cannot see the regression testbench behind the original failure. If its failing check is something other than mid-frame reload, this diagnosis covers the repro but may not explain that check.\"}\n```\n=== FILE: uart_tx_reload_repro_tb.v ===\n// Minimal reproduction: a start pulse while a frame is in flight must be\n// ignored (uart_tx header contract), so it must not change the data bits of\n// the frame already being sent. Expected values come from the 8N1 contract:\n// start bit 0, eight data bits LSB first, stop bit 1, CLKS_PER_BIT cycles each.\n`timescale 1ns / 1ps\nmodule uart_tx_reload_repro_tb;\n    localparam integer CPB = 4;\n    localparam integer T   = 10;\n\n    reg        clk   = 1'b0;\n    reg        rst   = 1'b1;\n    reg        start = 1'b0;\n    reg  [7:0] data  = 8'h00;\n    wire       tx;\n    wire       busy;\n\n    integer passed = 0;\n    integer failed = 0;\n    reg [8*128-1:0] nonce;\n\n    reg [7:0] rx_byte;\n    reg       rx_start_ok;\n    reg       rx_stop_ok;\n    reg       quiet_ok;\n    integer   n;\n\n    uart_tx #(.CLKS_PER_BIT(CPB)) dut (\n        .clk  (clk),\n        .rst  (rst),\n        .start(start),\n        .data (data),\n        .tx   (tx),\n        .busy (busy)\n    );\n\n    always #(T/2) clk = ~clk;\n\n    task check;\n        input            cond;\n        input [8*48-1:0] name;\n        begin\n            if (cond) begin\n                passed = passed + 1;\n                $display(\"check PASS: %0s\", name);\n            end else begin\n                failed = failed + 1;\n                $display(\"check FAIL: %0s\", name);\n            end\n        end\n    endtask\n\n    // Wait for a start bit, then sample each bit at its middle. tx changes on\n    // rising edges; the samples land on falling edges.\n    task receive;\n        integer k;\n        begin\n            @(negedge tx);\n            #(CPB*T/2 + T/2);\n            rx_start_ok = (tx === 1'b0);\n            for (k = 0; k < 8; k = k + 1) begin\n                #(CPB*T);\n                rx_byte[k] = tx;\n            end\n            #(CPB*T);\n            rx_stop_ok = (tx === 1'b1);\n        end\n    endtask\n\n    task pulse;\n        input [7:0] d;\n        begin\n            @(negedge clk);\n            start = 1'b1;\n            data  = d;\n            @(negedge clk);\n            start = 1'b0;\n            data  = 8'h00;\n        end\n    endtask\n\n    initial begin\n        nonce = \"unset\";\n        if (!$value$plusargs(\"NIRMAAN_NONCE=%s\", nonce))\n            if (!$value$plusargs(\"nirmaan_nonce=%s\", nonce))\n                if (!$value$plusargs(\"NONCE=%s\", nonce))\n                    if (!$value$plusargs(\"nonce=%s\", nonce))\n                        nonce = \"unset\";\n\n        repeat (4) @(negedge clk);\n        rst = 1'b0;\n        repeat (2) @(negedge clk);\n        check((tx === 1'b1) && (busy === 1'b0), \"idle line high and not busy after reset\");\n\n        // Baseline frame, no interference.\n        fork\n            receive;\n            pulse(8'hA5);\n        join\n        check(rx_start_ok && rx_stop_ok && (rx_byte === 8'hA5), \"clean frame 0xA5 sent LSB first\");\n        wait (busy === 1'b0);\n        repeat (2) @(negedge clk);\n\n        // Frame 0xA5 with a start pulse (data 0x3C) during data bit 2.\n        fork\n            receive;\n            begin\n                pulse(8'hA5);\n                repeat (13) @(negedge clk);\n                pulse(8'h3C);\n            end\n        join\n        $display(\"mid-frame start: received 0x%02h, expected 0xA5\", rx_byte);\n        check(rx_start_ok && rx_stop_ok && (rx_byte === 8'hA5), \"start while busy leaves frame data 0xA5 intact\");\n\n        // The ignored pulse must not launch a second frame.\n        wait (busy === 1'b0);\n        quiet_ok = 1'b1;\n        for (n = 0; n < CPB*12; n = n + 1) begin\n            @(negedge clk);\n            if ((tx !== 1'b1) || (busy !== 1'b0))\n                quiet_ok = 1'b0;\n        end\n        check(quiet_ok, \"ignored start launches no second frame\");\n\n        $display(\"NIRMAAN-SIM %0s %0d passed, %0d failed\", nonce, passed, failed);\n        $finish;\n    end\n\n    initial begin\n        #200000;\n        $display(\"check FAIL: watchdog timeout\");\n        $display(\"NIRMAAN-SIM %0s %0d passed, %0d failed\", nonce, passed, failed + 1);\n        $finish;\n    end\nendmodule\n=== END FILE ==="
+    }
+  ],
+  "format": "nirmaan.eval-trial",
+  "harness_variant": "default",
+  "judge_runs": [
+    {
+      "check": "The seat's repro passes the fixed uart_tx and fails the RTL under investigation and its shift-register variant",
+      "params": {
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-37z1apcv/judge/check-1/must-fail-w_uar27r/clean/uart_tx_reload_repro_tb.v",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-37z1apcv/judge/check-1/must-fail-w_uar27r/clean/uart_tx.v"
+        ],
+        "top": "uart_tx_reload_repro_tb"
+      },
+      "run": "run-0005",
+      "succeeded": true,
+      "summary": "icarus: simulation passed: 4 checks passed, $finish reached at time 1380000, 0 errors",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The seat's repro passes the fixed uart_tx and fails the RTL under investigation and its shift-register variant",
+      "params": {
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-37z1apcv/judge/check-1/must-fail-w_uar27r/mutant-1-1/uart_tx_reload_repro_tb.v",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-37z1apcv/judge/check-1/must-fail-w_uar27r/mutant-1-1/uart_tx.v"
+        ],
+        "top": "uart_tx_reload_repro_tb"
+      },
+      "run": "run-0006",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: the testbench reports 1 of 4 checks failed",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The seat's repro passes the fixed uart_tx and fails the RTL under investigation and its shift-register variant",
+      "params": {
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-37z1apcv/judge/check-1/must-fail-w_uar27r/mutant-1-2/uart_tx_reload_repro_tb.v",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-37z1apcv/judge/check-1/must-fail-w_uar27r/mutant-1-2/uart_tx.v"
+        ],
+        "top": "uart_tx_reload_repro_tb"
+      },
+      "run": "run-0007",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: the testbench reports 1 of 4 checks failed",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The same repro passes a second, independent fixed implementation and fails both defective ones",
+      "params": {
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-37z1apcv/judge/check-2/must-fail-6qw5tjdv/clean/uart_tx_reload_repro_tb.v",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-37z1apcv/judge/check-2/must-fail-6qw5tjdv/clean/uart_tx.v"
+        ],
+        "top": "uart_tx_reload_repro_tb"
+      },
+      "run": "run-0008",
+      "succeeded": true,
+      "summary": "icarus: simulation passed: 4 checks passed, $finish reached at time 1380000, 0 errors",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The same repro passes a second, independent fixed implementation and fails both defective ones",
+      "params": {
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-37z1apcv/judge/check-2/must-fail-6qw5tjdv/mutant-1-1/uart_tx_reload_repro_tb.v",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-37z1apcv/judge/check-2/must-fail-6qw5tjdv/mutant-1-1/uart_tx.v"
+        ],
+        "top": "uart_tx_reload_repro_tb"
+      },
+      "run": "run-0009",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: the testbench reports 1 of 4 checks failed",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The same repro passes a second, independent fixed implementation and fails both defective ones",
+      "params": {
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-37z1apcv/judge/check-2/must-fail-6qw5tjdv/mutant-1-2/uart_tx_reload_repro_tb.v",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-37z1apcv/judge/check-2/must-fail-6qw5tjdv/mutant-1-2/uart_tx.v"
+        ],
+        "top": "uart_tx_reload_repro_tb"
+      },
+      "run": "run-0010",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: the testbench reports 1 of 4 checks failed",
+      "tool": "simulator.run"
+    }
+  ],
+  "knowledge": "on",
+  "model": "claude-opus-5-5",
+  "purpose": "evidence",
+  "record": "2026-11-19-claude-code-claude-opus-5-5-44",
+  "result": {
+    "attempts": 2,
+    "attestations": [],
+    "audit_ok": true,
+    "case": "debug/root-cause-uart-tx",
+    "case_digest": "sha256:9be6d4f3a142bf825f6b7a8938d836e9acec0f3ad6b69bf4cc519d4f81a9f06c",
+    "cli": "2.1.325",
+    "cost_usd": null,
+    "detail": "Attempt 1 was refused for listing tool runs that were never recorded. This attempt lists no tool runs and does not claim any tool execution. The reproduction run with expect=fail is left to the platform, over uart_tx_reload_repro_tb.v plus the approved RTL. Independent review is still required. The design-under-investigation review [evidence:prj-a0b3e1ca75.design-under-investigation.e1] covers the RTL fixture, not this analysis. Remaining uncertainty: I cannot see the regression testbench behind the original failure. If its failing check is something other than mid-frame reload, this diagnosis covers the repro but may not explain that check.; submitted on attempt 2, after prj-a0b3e1ca75:root-cause#t1",
+    "duration_s": 134.843,
+    "gate_runs": [
+      {
+        "run": "run-0003",
+        "succeeded": true,
+        "summary": "icarus: failure reproduced: the testbench reports 1 of 4 checks failed, $finish reached at time 1380000",
+        "tool": "simulator.run"
+      },
+      {
+        "run": "run-0004",
+        "succeeded": true,
+        "summary": "icarus: failure reproduced: the testbench reports 1 of 4 checks failed, $finish reached at time 1380000",
+        "tool": "simulator.run"
+      }
+    ],
+    "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+    "input_tokens": 4,
+    "model_calls": 2,
+    "output_tokens": 14685,
+    "passed": true,
+    "replay": false,
+    "runtime": "claude-code",
+    "sandbox": "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-37z1apcv",
+    "scores": [
+      {
+        "failed_runs": [
+          "run-0006",
+          "run-0007"
+        ],
+        "name": "The seat's repro passes the fixed uart_tx and fails the RTL under investigation and its shift-register variant",
+        "runs": [
+          "run-0005"
+        ],
+        "scorer": "must-fail",
+        "status": "passed",
+        "summary": "simulator.run run-0005 passed on the clean inputs; 2 of 2 mutants failed it"
+      },
+      {
+        "failed_runs": [
+          "run-0009",
+          "run-0010"
+        ],
+        "name": "The same repro passes a second, independent fixed implementation and fails both defective ones",
+        "runs": [
+          "run-0008"
+        ],
+        "scorer": "must-fail",
+        "status": "passed",
+        "summary": "simulator.run run-0008 passed on the clean inputs; 2 of 2 mutants failed it"
+      }
+    ],
+    "seat": "prj-a0b3e1ca75:root-cause",
+    "seat_status": "in_review",
+    "started_at": "2026-11-19T04:09:22.498677Z",
+    "submitted": true,
+    "tool_calls": [],
+    "version": "1.25.0"
+  },
+  "skills": {
+    "root_cause_analysis": "sha256:b65cd62f88597fc7ec2fcdd85730104dc5f6719b70e3513d59014af36060431f"
+  },
+  "stage": "root-cause",
+  "trial": 1,
+  "version": 1
+}

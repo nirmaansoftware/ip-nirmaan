@@ -1,0 +1,175 @@
+{
+  "answers": [
+    {
+      "cache_read_tokens": 12972,
+      "cache_write_tokens": 709,
+      "error": null,
+      "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+      "input_tokens": 2,
+      "mode": "work",
+      "model": "claude-opus-5-5",
+      "output_tokens": 10434,
+      "packet_sha256": "c7ceb0014a584d9eba5bacdab1f1acb6e498ef6b5d52e95aa0fc7ceb74acdfb9",
+      "prompt_sha256": "3df64bd8550102291aa3c5910c29d3497ec578282ade177e3be454709baec45e",
+      "provider": "claude-code",
+      "text": "{\"uncertainty\": 0.3, \"outcome\": \"Submitted one formal_spec job file and one assertions file for the approved credit_counter RTL. The assertions are written from the interface specification, cover every requirement tag, and carry covers for each scenario. No proof or cover run has happened yet; the platform runs formal.run and formal.cover over these files.\", \"artifacts\": [{\"kind\": \"assertions\", \"title\": \"Interface-level assertion set for credit_counter\", \"summary\": \"The assertions are immediate assertions inside clocked and combinational always blocks, in the subset the open Yosys front end reads. Each one states a rule of [artifact:prj-4986bc98bc.interface-spec.a1] as a property of the ports of the approved RTL [artifact:prj-4986bc98bc.design-under-test.a1]. Every rule has its own assertion: CC-RESET, CC-TAKE, CC-GIVE, CC-BOTH (no credit change and no refusal, at zero and at MAX too), CC-IDLE, CC-RANGE, CC-UNDERFLOW, CC-OVERFLOW, CC-ERR-STICKY, an 'err rises only on a refusal' rule, and CC-STATUS. Each $past is guarded by a first-cycle flag. Covers reach the empty state, full regained from below, an underflow refusal, an overflow refusal, both inputs high at zero and at MAX, and err cleared by reset. The property module is instantiated for MAX=1, MAX=3 (not a power of two) and MAX=4 (the default), which serves [requirement:req-207be3dd7c].\"}], \"files\": [{\"path\": \"credit_counter_formal.sby\", \"kind\": \"formal_spec\", \"title\": \"SymbiYosys single-task prove setup for credit_counter\", \"summary\": \"This is a single-task setup with no [tasks] section: mode prove, depth 16, engine smtbmc. It reads the approved RTL credit_counter.v [artifact:prj-4986bc98bc.design-under-test.a1] and the property file, and lists both under [files]. The top is credit_counter_formal. Depth 16 is above the longest covered scenario for MAX=4, which is about 7 steps from reset to an underflow refusal. This serves [requirement:req-207be3dd7c].\", \"entry\": \"credit_counter_formal\"}, {\"path\": \"credit_counter_props.sv\", \"kind\": \"assertions\", \"title\": \"credit_counter properties and formal top\", \"summary\": \"The file contains the property module credit_counter_props, parameterised by MAX, which instantiates the DUT and asserts each rule of [artifact:prj-4986bc98bc.interface-spec.a1]. It also contains the top credit_counter_formal, which instantiates the property module for MAX=1, 3 and 4, each with its own free take and give inputs. There is one environment assumption: rst_n is low in the first cycle. The specification defines the state only through reset, so no other input is constrained.\", \"entry\": \"credit_counter_formal\"}], \"tool_runs\": [], \"claims\": [\"I expect the properties to pass k-induction at depth 16, because the range assertion credits <= MAX is itself the inductive invariant. This expectation has not been checked by any run.\", \"I expect every cover and every derived assertion guard to be reachable within depth 16 for MAX in {1, 3, 4}. No cover run has happened.\", \"The approved RTL appears to implement CC-BOTH correctly: take_only and give_only exclude the case where both inputs are high. This comes from reading the RTL; no tool has checked it.\"], \"escalation\": null, \"notes\": \"Limitations:\\n\\n1. CC-PARAM (MAX from 1 to 255) is checked only at MAX = 1, 3 and 4. Large values such as MAX=255 would need cover depths above 255 steps to reach empty and underflow from reset. That would make the single-task cover run impractical, so the 8-bit upper boundary is not proven here. A reviewer may want a separate job for MAX=255, either bmc at a large depth or an unbounded engine.\\n\\n2. The one assumption, reset in the first cycle, is an environment constraint. The formal.cover run is what shows it does not exclude the refusal, full and empty scenarios.\\n\\n3. All assertions are procedural if-guarded immediate assertions with no sequence operators. This keeps the antecedent derivation in formal.cover able to place a cover for each guard.\\n\\n4. No file is named credit_counter.v. The approved RTL is referred to by that name only.\"}\n\n=== FILE: credit_counter_formal.sby ===\n[options]\nmode prove\ndepth 16\n\n[engines]\nsmtbmc\n\n[script]\nread -formal credit_counter.v\nread -formal credit_counter_props.sv\nprep -top credit_counter_formal\n\n[files]\ncredit_counter.v\ncredit_counter_props.sv\n=== END FILE ===\n\n=== FILE: credit_counter_props.sv ===\n// Formal properties for credit_counter, written from interface_spec.md.\n// Each assertion states one interface rule, tagged with its [req:...] id.\n// Immediate assertions only (open Yosys front end); $past guarded by past_valid.\nmodule credit_counter_props #(\n    parameter integer MAX = 4\n) (\n    input wire clk,\n    input wire rst_n,\n    input wire take,\n    input wire give\n);\n    wire [7:0] credits;\n    wire       avail;\n    wire       full;\n    wire       err;\n\n    credit_counter #(.MAX(MAX)) dut (\n        .clk(clk),\n        .rst_n(rst_n),\n        .take(take),\n        .give(give),\n        .credits(credits),\n        .avail(avail),\n        .full(full),\n        .err(err)\n    );\n\n    localparam [7:0] LIMIT = MAX;\n\n    // A refusal as the specification defines it (3.3), from interface signals.\n    wire refuse = (take && !give && (credits == 8'd0)) ||\n                  (give && !take && (credits == LIMIT));\n\n    reg past_valid = 1'b0;\n    always @(posedge clk)\n        past_valid <= 1'b1;\n\n    // Environment: reset is applied in the first cycle. The specification\n    // defines the counter's state only through reset (3.1); nothing else\n    // about the inputs is constrained.\n    always @(*)\n        if (!past_valid)\n            assume(!rst_n);\n\n    // [req:CC-RANGE] credits never above MAX and never wrapped below zero.\n    always @(*)\n        if (past_valid)\n            assert(credits <= LIMIT);\n\n    // [req:CC-STATUS] avail and full follow credits combinationally.\n    always @(*)\n        assert(avail == (credits != 8'd0));\n    always @(*)\n        assert(full == (credits == LIMIT));\n\n    // [req:CC-RESET]\n    always @(posedge clk)\n        if (past_valid && !$past(rst_n))\n            assert(credits == LIMIT);\n    always @(posedge clk)\n        if (past_valid && !$past(rst_n))\n            assert(!err);\n\n    // [req:CC-TAKE]\n    always @(posedge clk)\n        if (past_valid && $past(rst_n) && $past(take) && !$past(give) &&\n            ($past(credits) != 8'd0))\n            assert(credits == $past(credits) - 8'd1);\n\n    // [req:CC-GIVE]\n    always @(posedge clk)\n        if (past_valid && $past(rst_n) && $past(give) && !$past(take) &&\n            ($past(credits) < LIMIT))\n            assert(credits == $past(credits) + 8'd1);\n\n    // [req:CC-BOTH] no change, at zero and at MAX too, and nothing refused.\n    always @(posedge clk)\n        if (past_valid && $past(rst_n) && $past(take) && $past(give))\n            assert(credits == $past(credits));\n    always @(posedge clk)\n        if (past_valid && $past(rst_n) && $past(take) && $past(give))\n            assert(err == $past(err));\n\n    // [req:CC-IDLE]\n    always @(posedge clk)\n        if (past_valid && $past(rst_n) && !$past(take) && !$past(give))\n            assert(credits == $past(credits));\n\n    // [req:CC-UNDERFLOW]\n    always @(posedge clk)\n        if (past_valid && $past(rst_n) && $past(take) && !$past(give) &&\n            ($past(credits) == 8'd0))\n            assert(credits == 8'd0);\n    always @(posedge clk)\n        if (past_valid && $past(rst_n) && $past(take) && !$past(give) &&\n            ($past(credits) == 8'd0))\n            assert(err);\n\n    // [req:CC-OVERFLOW]\n    always @(posedge clk)\n        if (past_valid && $past(rst_n) && $past(give) && !$past(take) &&\n            ($past(credits) == LIMIT))\n            assert(credits == LIMIT);\n    always @(posedge clk)\n        if (past_valid && $past(rst_n) && $past(give) && !$past(take) &&\n            ($past(credits) == LIMIT))\n            assert(err);\n\n    // [req:CC-ERR-STICKY] once set, err stays set until reset.\n    always @(posedge clk)\n        if (past_valid && $past(rst_n) && $past(err))\n            assert(err);\n\n    // err is set only by a refusal (2: \"high once a take or a give has been refused\").\n    always @(posedge clk)\n        if (past_valid && $past(rst_n) && !$past(err) && !$past(refuse))\n            assert(!err);\n\n    // Covers: scenarios the proof must still allow.\n    always @(posedge clk)\n        if (past_valid) begin\n            // empty reached\n            cover(credits == 8'd0);\n            // full regained from below\n            cover($past(rst_n) && ($past(credits) < LIMIT) && (credits == LIMIT));\n            // underflow refusal\n            cover($past(rst_n) && $past(take) && !$past(give) &&\n                  ($past(credits) == 8'd0) && err);\n            // overflow refusal\n            cover($past(rst_n) && $past(give) && !$past(take) &&\n                  ($past(credits) == LIMIT) && err);\n            // both at zero\n            cover($past(rst_n) && $past(take) && $past(give) &&\n                  ($past(credits) == 8'd0));\n            // both at MAX\n            cover($past(rst_n) && $past(take) && $past(give) &&\n                  ($past(credits) == LIMIT));\n            // err cleared by reset\n            cover($past(err) && !$past(rst_n) && !err);\n        end\nendmodule\n\n// Formal top: the properties at MAX = 1, 3 (not a power of two) and 4 (default).\nmodule credit_counter_formal (\n    input wire clk,\n    input wire rst_n,\n    input wire take_a,\n    input wire give_a,\n    input wire take_b,\n    input wire give_b,\n    input wire take_c,\n    input wire give_c\n);\n    credit_counter_props #(.MAX(1)) p_max1 (\n        .clk(clk), .rst_n(rst_n), .take(take_a), .give(give_a)\n    );\n    credit_counter_props #(.MAX(3)) p_max3 (\n        .clk(clk), .rst_n(rst_n), .take(take_b), .give(give_b)\n    );\n    credit_counter_props #(.MAX(4)) p_max4 (\n        .clk(clk), .rst_n(rst_n), .take(take_c), .give(give_c)\n    );\nendmodule\n=== END FILE ==="
+    }
+  ],
+  "format": "nirmaan.eval-trial",
+  "harness_variant": "default",
+  "judge_runs": [
+    {
+      "check": "The seat's proof passes the approved RTL with every cover reached and fails each credit counter mutant",
+      "params": {
+        "sby": "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-oxfhdoel/judge/check-1/must-fail-6ckni4fa/clean/credit_counter_formal.sby",
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-oxfhdoel/judge/check-1/must-fail-6ckni4fa/clean/credit_counter_props.sv",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-oxfhdoel/judge/check-1/must-fail-6ckni4fa/clean/credit_counter.v"
+        ]
+      },
+      "run": "run-0003",
+      "succeeded": true,
+      "summary": "symbiyosys: formal passed: every property proven",
+      "tool": "formal.run"
+    },
+    {
+      "check": "The seat's proof passes the approved RTL with every cover reached and fails each credit counter mutant",
+      "params": {
+        "sby": "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-oxfhdoel/judge/check-1/must-fail-6ckni4fa/cover/credit_counter_formal.sby",
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-oxfhdoel/judge/check-1/must-fail-6ckni4fa/cover/credit_counter_props.sv",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-oxfhdoel/judge/check-1/must-fail-6ckni4fa/cover/credit_counter.v"
+        ]
+      },
+      "run": "run-0004",
+      "succeeded": true,
+      "summary": "symbiyosys-cover: not vacuous: every cover reached (21 of 21); every assertion antecedent reached (48 of 48)",
+      "tool": "formal.cover"
+    },
+    {
+      "check": "The seat's proof passes the approved RTL with every cover reached and fails each credit counter mutant",
+      "params": {
+        "sby": "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-oxfhdoel/judge/check-1/must-fail-6ckni4fa/mutant-1-1/credit_counter_formal.sby",
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-oxfhdoel/judge/check-1/must-fail-6ckni4fa/mutant-1-1/credit_counter_props.sv",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-oxfhdoel/judge/check-1/must-fail-6ckni4fa/mutant-1-1/credit_counter.v"
+        ]
+      },
+      "run": "run-0005",
+      "succeeded": false,
+      "summary": "symbiyosys: formal fail: 1 error; first: credit_counter_props.sv:79: [ASSERT] assertion credit_counter_formal.p_max1._witness_.check_assert_credit_counter_props_sv_79_719 failed at step 3",
+      "tool": "formal.run"
+    },
+    {
+      "check": "The seat's proof passes the approved RTL with every cover reached and fails each credit counter mutant",
+      "params": {
+        "sby": "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-oxfhdoel/judge/check-1/must-fail-6ckni4fa/mutant-1-2/credit_counter_formal.sby",
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-oxfhdoel/judge/check-1/must-fail-6ckni4fa/mutant-1-2/credit_counter_props.sv",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-oxfhdoel/judge/check-1/must-fail-6ckni4fa/mutant-1-2/credit_counter.v"
+        ]
+      },
+      "run": "run-0006",
+      "succeeded": false,
+      "summary": "symbiyosys: formal fail: 1 error; first: credit_counter_props.sv:48: [ASSERT] assertion credit_counter_formal.p_max1._witness_.check_assert_credit_counter_props_sv_48_659 failed at step 3",
+      "tool": "formal.run"
+    },
+    {
+      "check": "The seat's proof passes the approved RTL with every cover reached and fails each credit counter mutant",
+      "params": {
+        "sby": "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-oxfhdoel/judge/check-1/must-fail-6ckni4fa/mutant-1-3/credit_counter_formal.sby",
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-oxfhdoel/judge/check-1/must-fail-6ckni4fa/mutant-1-3/credit_counter_props.sv",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-oxfhdoel/judge/check-1/must-fail-6ckni4fa/mutant-1-3/credit_counter.v"
+        ]
+      },
+      "run": "run-0007",
+      "succeeded": false,
+      "summary": "symbiyosys: formal fail: 1 error; first: credit_counter_props.sv:112: [ASSERT] assertion credit_counter_formal.p_max3._witness_.check_assert_credit_counter_props_sv_112_509 failed at step 4",
+      "tool": "formal.run"
+    },
+    {
+      "check": "The seat's proof passes the approved RTL with every cover reached and fails each credit counter mutant",
+      "params": {
+        "sby": "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-oxfhdoel/judge/check-1/must-fail-6ckni4fa/mutant-1-4/credit_counter_formal.sby",
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-oxfhdoel/judge/check-1/must-fail-6ckni4fa/mutant-1-4/credit_counter_props.sv",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-oxfhdoel/judge/check-1/must-fail-6ckni4fa/mutant-1-4/credit_counter.v"
+        ]
+      },
+      "run": "run-0008",
+      "succeeded": false,
+      "summary": "symbiyosys: formal fail: 1 error; first: credit_counter_props.sv:54: [ASSERT] assertion credit_counter_formal.p_max4._witness_.check_assert_credit_counter_props_sv_54_88 failed",
+      "tool": "formal.run"
+    }
+  ],
+  "knowledge": "on",
+  "model": "claude-opus-5-5",
+  "purpose": "evidence",
+  "record": "2026-11-19-claude-code-claude-opus-5-5-40",
+  "result": {
+    "attempts": 1,
+    "attestations": [],
+    "audit_ok": true,
+    "case": "dv/formal-credit-counter",
+    "case_digest": "sha256:d9066555f451e3045e2de46abf0aa2f757a4d0f8a5cf42ee6e02b86cc2ac32e4",
+    "cli": "2.1.325",
+    "cost_usd": null,
+    "detail": "Limitations:\n\n1. CC-PARAM (MAX from 1 to 255) is checked only at MAX = 1, 3 and 4. Large values such as MAX=255 would need cover depths above 255 steps to reach empty and underflow from reset. That would make the single-task cover run impractical, so the 8-bit upper boundary is not proven here. A reviewer may want a separate job for MAX=255, either bmc at a large depth or an unbounded engine.\n\n2. The one assumption, reset in the first cycle, is an environment constraint. The formal.cover run is what shows it does not exclude the refusal, full and empty scenarios.\n\n3. All assertions are procedural if-guarded immediate assertions with no sequence operators. This keeps the antecedent derivation in formal.cover able to place a cover for each guard.\n\n4. No file is named credit_counter.v. The approved RTL is referred to by that name only.",
+    "duration_s": 105.412,
+    "gate_runs": [
+      {
+        "run": "run-0001",
+        "succeeded": true,
+        "summary": "symbiyosys: formal passed: every property proven",
+        "tool": "formal.run"
+      },
+      {
+        "run": "run-0002",
+        "succeeded": true,
+        "summary": "symbiyosys-cover: not vacuous: every cover reached (21 of 21); every assertion antecedent reached (48 of 48)",
+        "tool": "formal.cover"
+      }
+    ],
+    "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+    "input_tokens": 2,
+    "model_calls": 1,
+    "output_tokens": 10434,
+    "passed": true,
+    "replay": false,
+    "runtime": "claude-code",
+    "sandbox": "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-oxfhdoel",
+    "scores": [
+      {
+        "failed_runs": [
+          "run-0005",
+          "run-0006",
+          "run-0007",
+          "run-0008"
+        ],
+        "name": "The seat's proof passes the approved RTL with every cover reached and fails each credit counter mutant",
+        "runs": [
+          "run-0003",
+          "run-0004"
+        ],
+        "scorer": "must-fail",
+        "status": "passed",
+        "summary": "formal.run run-0003 passed on the clean inputs with every cover reached; 4 of 4 mutants failed it"
+      }
+    ],
+    "seat": "prj-4986bc98bc:assertions-formal",
+    "seat_status": "in_review",
+    "started_at": "2026-11-19T04:01:57.508317Z",
+    "submitted": true,
+    "tool_calls": [],
+    "version": "1.25.0"
+  },
+  "skills": {
+    "assertion_coverage": "sha256:9a2e389eba23a86d1f98c45a933969b8cb2fd8dd38ff53d820dd31c0473d916f",
+    "formal_verification": "sha256:496f8d92db14cfe796776c8c485fa2191df0c12e29c5a10bac2a86d7ac034dc7",
+    "sva": "sha256:dd2c6a58cb270577169dd2af6f053c57a72ac38aaecfd5449d234887c78606ee"
+  },
+  "stage": "assertions-formal",
+  "trial": 1,
+  "version": 1
+}
