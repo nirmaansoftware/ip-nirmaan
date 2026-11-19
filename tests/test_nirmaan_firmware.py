@@ -219,6 +219,28 @@ def test_the_fw_test_parser_fails_what_did_not_really_pass():
     assert result.errors[0].file == "x.v"
 
 
+def test_a_clean_build_whose_program_is_killed_is_reported_as_killed_by_its_signal():
+    """A run whose built program dies on a signal before it prints a record is not a failed build."""
+    steps = f"$ cc -c drv.c -o drv.o\n$ verilator --cc --exe --build x.v drv.o\n$ cosim/Vdut +nirmaan_nonce={NONCE}\n"
+    result = parse_fw_test(steps, (0, 0, -11))
+    assert not result.passed
+    assert result.summary == "co-simulation was killed by signal 11 before it reported anything; the build was clean"
+    soc = parse_fw_test(steps, (0, 0, -6), what="SoC run")
+    assert soc.summary == "SoC run was killed by signal 6 before it reported anything; the build was clean"
+    # A build step killed by a signal is still a failed build, now with the signal named.
+    crashed = parse_fw_test("$ cc -c drv.c -o drv.o\n", (-11,))
+    assert crashed.summary == "build failed before co-simulation: 0 errors (killed by signal 11)"
+    assert parse_fw_test("$ cc -c drv.c -o drv.o\n", (1,)).summary.endswith("(exit status 1)")
+    # -1 is also a step that could not start: never read as a signal.
+    assert parse_fw_test(steps, (0, 0, -1)).summary == "build failed before co-simulation: 0 errors (exit status -1)"
+    # Killed after it reported something: the signal is named beside what is missing.
+    partial = steps + f"FWTEST:{NONCE} BUS read 0x0 -> 0x00000000 OKAY\nFWTEST:{NONCE} PASS reset_values\n"
+    assert parse_fw_test(partial, (0, 0, -11)).summary == ("co-simulation did not finish: the harness printed no "
+                                                          "summary (killed by signal 11)")
+    assert parse_fw_test(partial, (0, 0, 1)).summary == "co-simulation did not finish: the harness printed no summary"
+    assert parse_c_build("$ cc -c drv.c\n", (-9,)).summary.endswith("(killed by signal 9)")
+
+
 # --- Refusals: a missing tool is never a simulated run ---------------------------------------
 
 

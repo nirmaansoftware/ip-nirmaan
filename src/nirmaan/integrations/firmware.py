@@ -49,6 +49,17 @@ _C_SUFFIXES = (".c",)
 _HEADER_SUFFIXES = (".h",)
 
 
+def _killed(status: int) -> bool:
+    """Whether ``status`` is a signal's: ``-N``. ``-1`` is left out: it is also what a step that could not start
+    reports (``eda._run_step``), and what a parser is given when no step ran."""
+    return status < -1
+
+
+def _ended(status: int) -> str:
+    """How a step ended, for a summary: ``exit status N``, or ``killed by signal N``."""
+    return f"killed by signal {-status}" if _killed(status) else f"exit status {status}"
+
+
 def _plural(n: int, word: str) -> str:
     return f"{n} {word}{'' if n == 1 else 's'}"
 
@@ -123,7 +134,7 @@ def parse_c_build(log: str, returncodes: tuple[int, ...]) -> EdaResult:
         summary = (f"build failed: {_plural(len(errors), 'error')}, {_plural(len(warnings), 'warning')}"
                    f"{_first(errors or warnings)}")
         if not diags:
-            summary += f" (exit status {status})"
+            summary += f" ({_ended(status)})"
     return EdaResult(passed, summary, tuple(diags),
                      {"errors": len(errors), "warnings": len(warnings), "compiled": runs,
                       "exit_statuses": list(returncodes)})
@@ -241,10 +252,13 @@ def parse_fw_test(log: str, returncodes: tuple[int, ...], what: str = "co-simula
             passed = False
             harness.extend(Diagnostic("error", m, "REQUIRE") for m in missing)
             summary = f"{what} failed: {'; '.join(missing)} ({_plural(passed_checks, 'check')} passed)"
+    elif not ran and _killed(status) and not build and _ran_the_program(log):
+        # Every build step exited 0 (a run stops at the first that does not), and the program was killed.
+        summary = f"{what} was killed by signal {-status} before it reported anything; the build was clean"
     elif not ran:
         summary = f"build failed before {what}: {_plural(len(build), 'error')}{_first(build)}"
         if not build:
-            summary += f" (exit status {status})"
+            summary += f" ({_ended(status)})"
     elif failed_checks:
         first = next(c for c in checks if not c["passed"])
         summary = (f"{what} failed: {failed_checks} of {_plural(len(checks), 'check')} failed; "
@@ -253,12 +267,20 @@ def parse_fw_test(log: str, returncodes: tuple[int, ...], what: str = "co-simula
         summary = f"{what} failed: {harness[0].message}"
     elif not finished:
         summary = f"{what} did not finish: the harness printed no summary"
+        if _killed(status):
+            summary += f" ({_ended(status)})"
     else:
-        summary = f"{what} failed (exit status {status})"
+        summary = f"{what} failed ({_ended(status)})"
     return EdaResult(passed, summary, tuple(build + harness),
                      {"checks": checks, "passed": passed_checks, "failed": failed_checks, "cycles": cycles,
                       "bus_transfers": transfers, "irq_taken": irqs, "bus_error_traps": len(traps),
                       "traps": traps, "exit_statuses": list(returncodes)})
+
+
+def _ran_the_program(log: str) -> bool:
+    """Whether the last step the log echoes is the built program's run: the one step given the run's nonce (M53)."""
+    echoed = [line for line in log.splitlines() if line.startswith("$ ")]
+    return bool(echoed) and NONCE_ARG in echoed[-1]
 
 
 # --- The backends ----------------------------------------------------------------------------
