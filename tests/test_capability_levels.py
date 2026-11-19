@@ -146,7 +146,7 @@ def test_on_main_every_practised_or_proven_level_has_committed_records_and_the_f
     # record whose document was corrected after its check: that one is stale until it is re-checked.
     at_knowledge = {s for s, v in levels["skills"].items() if v["level"] in ("knowledge", "practised", "proven")}
     stale = {s for s, v in levels["skills"].items()
-             if "stale: the document changed after its check" in v.get("knowledge", {}).get("problems", [])}
+             if "stale: the document changed after its check" in (v.get("knowledge") or {}).get("problems", [])}
     assert at_knowledge == {p.stem for p in (ROOT / CHECKS).glob("*.json")} - stale
     assert (ROOT / LEVELS).read_text(encoding="utf-8") == render(levels)
 
