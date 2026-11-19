@@ -214,6 +214,183 @@ def test_has_work_follows_the_loops_skip_rules(tmp_path):
     assert loop_cloud.has_work([], state) is False
 
 
+
+class ReadyGitHub:
+    """Reads only: each pull request's mergeable fields and its required CI conclusion."""
+
+    def __init__(self, pulls: dict, ci: dict):
+        self.pulls, self.ci = pulls, ci
+
+    def get_pull(self, n):
+        return {"head_sha": f"h{n}", "mergeable": True, "mergeable_state": "clean", **self.pulls.get(n, {})}
+
+    def list_check_runs(self, sha):
+        c = self.ci.get(sha, "success")
+        return [{"id": i, "name": name, "status": "in_progress" if c == "pending" else "completed",
+                 "conclusion": None if c == "pending" else c, "started_at": "2026-11-19T00:00:00Z"}
+                for i, name in enumerate(pr_review.CONFIG["required_ci"])]
+
+
+def test_ready_now_names_only_steps_a_pass_would_take_now(tmp_path):
+    state = tmp_path / "state"
+    (state / "loop").mkdir(parents=True)
+    now = "2026-11-19T12:00:00+00:00"
+    pulls = [_pull(n) for n in range(1, 10)] + [_pull(10, labels=["needs-founder"]), _pull(11, draft=True)]
+    pr_loop._save_state(state, REPO, {"pr": 2, "done": {"head": "h2", "outcome": "auto-merge"}})
+    pr_loop._save_state(state, REPO, {"pr": 3, "done": {"head": "h3", "outcome": "auto-merge"}})
+    pr_loop._save_state(state, REPO, {"pr": 5, "stopped": {"head": "h5", "labeled": False, "visible": True}})
+    pr_loop._save_state(state, REPO, {"pr": 6, "transient": {"head": "h6", "count": 1, "next_at": "2026-11-19T12:04:00+00:00"}})
+    pr_loop._save_state(state, REPO, {"pr": 7, "author_fix": {"head": "h7"}})
+    pr_loop._save_state(state, REPO, {"pr": 8, "last_fix_head": "h8"})
+    pr_loop._save_state(state, REPO, {"pr": 10, "stopped": {"head": "h10", "labeled": True, "visible": False}})
+    github = ReadyGitHub({3: {"mergeable_state": "behind"}, 9: {"mergeable": False, "mergeable_state": "dirty"}},
+                         {"h4": "pending", "h8": "failure", "h1": "success"})
+    ready = loop_cloud.ready_now(pulls, state, github, now=now)
+    assert ready == [(1, "h1", "CI green: a review is due"), (3, "h3", "behind main"),
+                     (8, "h8", "CI failed after a fix round"), (9, "h9", "a merge conflict to handle"),
+                     (10, "h10", "a stop to post")], ready
+    # Not ready: 2 finished on this head, 4 CI running, 5 stopped on this head, 6 in backoff, 7 waits for the author.
+    assert loop_cloud.ready_now(pulls, state, github, now="2026-11-19T12:05:00+00:00")[1] == (3, "h3", "behind main")
+    assert (6, "h6", "CI green: a review is due") in loop_cloud.ready_now(pulls, state, github, now="2026-11-19T12:05:00+00:00")
+    # A failed CI with no fix round on this head is the author's: no step.
+    pr_loop._save_state(state, REPO, {"pr": 8, "last_fix_head": None})
+    assert all(r[0] != 8 for r in loop_cloud.ready_now(pulls, state, github, now=now))
+    # A rate-limit pause in force: nothing is ready.
+    pr_loop.pause_path(state).write_text(json.dumps({"until": "2026-11-19T12:30:00+00:00"}))
+    assert loop_cloud.ready_now(pulls, state, github, now=now) == []
+
+
+def test_next_chain_is_bounded_and_needs_progress():
+    ready = [(1, "h1", "CI green: a review is due")]
+    first = loop_cloud.next_chain("", ready)
+    assert first == f"1:{loop_cloud.ready_digest(ready)}"
+    assert loop_cloud.next_chain("0", []) is None, "nothing ready: the dispatcher's tick"
+    assert loop_cloud.next_chain(first, ready) is None, "the same ready set again: the last pass made no progress on it"
+    other = [(2, "h2", "behind main")]
+    assert loop_cloud.next_chain(first, other) == f"2:{loop_cloud.ready_digest(other)}"
+    assert loop_cloud.next_chain(f"{loop_cloud.CHAIN_MAX}:{'0' * 12}", other) is None, "at most CHAIN_MAX in a row"
+    for bad in ("x", "1:zz", "-1", "1;rm", "1:" + "a" * 13, "1234"):
+        assert loop_cloud.next_chain(bad, other) is None, bad
+
+
+def test_run_chained_runs_the_next_pass_at_once_while_a_step_is_ready_and_stops_safely():
+    lines, codes = [], []
+    ready_sets = iter([[(1, "h1", "CI green: a review is due")], [(2, "h2", "behind main")], []])
+
+    def once():
+        codes.append(0)
+        return 0
+    assert loop_cloud.run_chained(once, lambda: next(ready_sets), out=lines.append) == 0
+    assert len(codes) == 3 and lines[-1] == "loop-cloud: no chained pass"
+    # The same ready set twice: the pass before made no progress, so no further pass.
+    same = [(1, "h1", "CI green: a review is due")]
+    codes.clear()
+    assert loop_cloud.run_chained(once, lambda: same, out=lines.append) == 0
+    assert len(codes) == 2
+    # Never more than chain_max chained passes after the first.
+    k = iter(range(100))
+    codes.clear()
+    assert loop_cloud.run_chained(once, lambda: [(next(k), "h", "behind main")], out=lines.append, chain_max=3) == 0
+    assert len(codes) == 4
+    # The time budget: no pass starts after it is spent.
+    t = iter([0.0, 2000.0])
+    codes.clear()
+    assert loop_cloud.run_chained(once, lambda: same, clock=lambda: next(t), out=lines.append) == 0
+    assert len(codes) == 1 and "time budget" in lines[-1]
+    # A read error ends the chain without failing the job.
+    def down():
+        raise OSError("network down")
+    codes.clear()
+    assert loop_cloud.run_chained(once, down, out=lines.append) == 0 and len(codes) == 1 and "no chained pass" in lines[-1]
+    # The first pass's exit code is the job's; a chained pass refused because the loop
+    # scripts changed on main (exit 4) ends the chain quietly; any other failure fails.
+    assert loop_cloud.run_chained(lambda: 4, lambda: same, out=lines.append) == 4
+    results = iter([0, 4])
+    assert loop_cloud.run_chained(lambda: next(results), lambda: [(9, "h9", "behind main")], out=lines.append) == 0
+    results = iter([0, 1])
+    assert loop_cloud.run_chained(lambda: next(results), lambda: [(9, "h9", "behind main")], out=lines.append) == 1
+
+
+def test_the_run_subcommand_chains_and_shadow_runs_one_pass(monkeypatch):
+    seen = []
+    monkeypatch.setattr(loop_cloud, "SECRETS_FD_ENV", "NIRMAAN_TEST_NO_FD")
+    monkeypatch.setenv("NIRMAAN_TEST_NO_FD", "x")
+    monkeypatch.setattr(loop_cloud, "take_secrets", lambda: None)
+    monkeypatch.setattr(pr_loop, "main", lambda argv: seen.append(argv) or 0)
+    monkeypatch.setattr(loop_cloud, "_ready_from_github", lambda: [])
+    assert loop_cloud.main(["run"]) == 0 and seen == [["--once"]]
+    assert loop_cloud.main(["run", "--shadow", "7"]) == 0 and seen[-1] == ["--once", "--no-post", "--pr", "7"]
+
+
+def _simulate(chained: bool, phase: float, opens=(0.0, 3.0, 6.0, 30.0), ci=12.0, review=8.0, setup=3.0, tick=4.0,
+              strict: bool = True) -> list[float]:
+    """Open-to-merge minutes for pull requests opened at `opens`, on a model of the
+    cloud loop: the dispatcher starts a run every `tick` minutes when none runs or
+    waits; a run with open pull requests installs for `setup` minutes, then one
+    pass steps them in order: a branch behind main is updated (CI runs again), a
+    head whose CI finished is reviewed for `review` minutes and auto-merged (GitHub
+    merges at once; with `strict`, every other open pull request is then behind
+    main; the pass ends either way, as Loop._tick halts after an auto-merge), CI
+    still running is skipped. With `chained`, the end of a run
+    starts the next one at once when next_chain says so (the real function)."""
+    prs = [{"n": i + 1, "open": t, "ci_done": t + ci, "head": 0, "behind": False, "merged": None} for i, t in enumerate(opens)]
+    t, chain, queued, nxt_tick, job = 0.0, "", None, phase, 0.0
+    while any(p["merged"] is None for p in prs) and t < 1000:
+        if queued is not None:  # the same job: no new setup
+            now, chain, queued = t, queued, None
+        else:
+            while nxt_tick < t:  # a tick while a run is going sees it busy and skips
+                nxt_tick += tick
+            job, chain, nxt_tick = nxt_tick + 0.2, "", nxt_tick + tick
+            if not [p for p in prs if p["open"] <= job and p["merged"] is None]:
+                t = job + 0.2  # has-work: nothing to step, the run ends
+                continue
+            now = job + setup
+        for p in [p for p in prs if p["open"] <= now and p["merged"] is None]:
+            if p["behind"]:
+                p.update(behind=False, head=p["head"] + 1, ci_done=now + ci)
+            elif now >= p["ci_done"]:
+                now += review
+                p["merged"] = now
+                for q in prs if strict else []:
+                    if q is not p and q["merged"] is None and q["open"] <= now:
+                        q["behind"] = True
+                break
+        t = now
+        ready = [(p["n"], f"h{p['n']}.{p['head']}", "behind main" if p["behind"] else "CI green")
+                 for p in prs if p["open"] <= t and p["merged"] is None and (p["behind"] or t >= p["ci_done"])]
+        if chained and t - (job + setup) < loop_cloud.CHAIN_BUDGET_S / 60:
+            queued = loop_cloud.next_chain(chain, ready)
+    return [p["merged"] - p["open"] for p in prs]
+
+
+def test_a_simulated_timeline_merges_sooner_with_chained_passes():
+    """Chained passes never make a pull request merge later. With the Mac's
+    dispatcher (a tick every 4 minutes) they save a few minutes a pull request
+    (no wait for the tick and no second setup); with no dispatcher tick for an
+    hour (the Mac asleep, GitHub's schedule late) they keep the queue moving and
+    cut open-to-merge by about half. A pass that ends after the chain budget is
+    never chained. Means and medians over 16 dispatcher phases each."""
+    mean = lambda xs: sum(xs) / len(xs)  # noqa: E731
+    median = lambda xs: sorted(xs)[len(xs) // 2]  # noqa: E731
+    for tick, strict, opens, review in [(4, False, (0.0, 3.0, 6.0, 30.0), 8.0), (4, False, (0.0, 1.0, 2.0, 3.0, 4.0), 12.0),
+                                        (4, True, (0.0, 3.0, 6.0, 30.0), 8.0), (60, False, (0.0, 3.0, 6.0, 30.0), 8.0),
+                                        (60, True, (0.0, 1.0, 2.0, 3.0, 4.0), 12.0), (4, False, (0.0, 1.0, 2.0, 3.0, 4.0), 25.0)]:
+        phases = [k * tick / 16 for k in range(16)]
+        runs = [(_simulate(False, ph, opens, review=review, tick=tick, strict=strict),
+                 _simulate(True, ph, opens, review=review, tick=tick, strict=strict)) for ph in phases]
+        assert all(a <= b for before, after in runs for a, b in zip(after, before)), "never later"
+        before, after = [m for b, _ in runs for m in b], [m for _, a in runs for m in a]
+        print(f"tick {tick} strict {strict} opens {opens} review {review}: open-to-merge mean "
+              f"{mean(before):.1f} -> {mean(after):.1f}, median {median(before):.1f} -> {median(after):.1f} minutes")
+        if review >= loop_cloud.CHAIN_BUDGET_S / 60:
+            assert after == before, "a pass that ends after the budget is never chained"
+        elif not strict or tick == 60:
+            assert mean(after) < mean(before)
+        if tick == 60:
+            assert mean(after) < 0.7 * mean(before)
+
+
 FAKE_CLAUDE = """#!/usr/bin/env python3
 import json, os, sys
 fd = os.environ.get("CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR")
