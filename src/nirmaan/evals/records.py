@@ -198,22 +198,23 @@ def _free(out: Path, name: str) -> Path:
 
 
 def no_model_answer(trial: EvalTrial) -> bool:
-    """A live trial whose model calls all failed with no answer (RR5): a plan or usage limit, a model out of reach.
+    """A live trial whose last model call failed with no answer (RR5): a plan or usage limit, a model out of reach.
 
-    Judged by the trial's structure, never by the wording of a message: at least one call is recorded, and every
-    recorded answer has no text and an error. A model that answers, however wrongly, is not this.
+    Judged by the trial's structure, never by the wording of a message: at least one call is recorded, and the
+    last recorded answer has no text and an error. Under attempts-3 a limit can land on attempt 2 or 3 after an
+    answered attempt 1 (W2-L1, slot 57), so the last answer decides, as :func:`flow_stopped` does for a whole
+    flow (council record 2026-11-15-pilot-topup-reruns, decision 4: the runner stops at the first trial that
+    returns no model answer). A model that answers, however wrongly, on its last call is not this.
     """
-    return (not trial.result.replay and bool(trial.answers)
-            and all(not a.text and a.error for a in trial.answers))
+    return (not trial.result.replay and bool(trial.answers) and not trial.answers[-1].text
+            and bool(trial.answers[-1].error))
 
 
 def flow_stopped(trial: EvalTrial) -> bool:
     """A live whole-flow trial whose last model call returned no answer (G3, decision 3; WF8): a limit met at a
-    later stage leaves the earlier stages' answers with text, so :func:`no_model_answer` would not fire. Judged by
-    the trial's structure: the last recorded answer has no text and an error. Single-seat runs keep
-    :func:`no_model_answer`."""
-    return not trial.result.replay and bool(trial.answers) and not trial.answers[-1].text \
-        and bool(trial.answers[-1].error)
+    later stage leaves the earlier stages' answers with text. Judged by the trial's structure: the last recorded
+    answer has no text and an error, the same structure :func:`no_model_answer` reads for single-seat runs."""
+    return no_model_answer(trial)
 
 
 class RunStopped(RuntimeError):

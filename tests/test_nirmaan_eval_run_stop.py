@@ -159,3 +159,54 @@ def test_a_no_answer_on_attempt_one_stops_an_attempts_3_run_before_attempts_two_
     last = record.trials[-1]
     assert no_model_answer(last) and not last.result.passed and len(last.answers) == 1 and last.result.attempts == 1
     assert f"run stopped: {SPEC_CASE} trial {k} got no model answer" in ran.output
+
+
+def test_a_limit_on_attempt_two_after_an_answered_attempt_one_stops_the_run(fixed_clock, tmp_path, monkeypatch):
+    """RR5 under attempts-3: attempt 1 answers (wrongly, so the seat tries again) and attempt 2 meets the plan's
+    limit. The last answer decides, so the run stops there with exit 3 and no later trial starts (W2-L1, slot 57:
+    its record has an answered attempt 1 and a limit on attempt 2)."""
+    bindir = tmp_path / "bin"
+    bindir.mkdir()
+    # Attempt 1: the reference spec with no citation, which the seat's rules refuse, so it tries again.
+    spec = (AXI / "interface_spec.md").read_text()
+    calls = bindir / "calls"
+    script = bindir / "claude"
+    script.write_text(f"""#!{sys.executable}
+import json, sys
+from pathlib import Path
+if "--version" in sys.argv:
+    print("2.1.325 (Claude Code)")
+    sys.exit(0)
+sys.stdin.read()
+calls = Path({str(calls)!r})
+n = int(calls.read_text()) + 1 if calls.exists() else 1
+calls.write_text(str(n))
+if n >= 2:
+    json.dump({{"type": "result", "subtype": "success", "is_error": True, "result": {LIMIT!r},
+               "usage": {{"input_tokens": 0, "output_tokens": 0}}}}, sys.stdout)
+    sys.exit(0)
+meta = [{{"path": "interface_spec.md", "kind": "interface_spec", "title": "interface_spec.md", "summary": "spec"}}]
+head = json.dumps({{"uncertainty": 0.1, "artifacts": [], "tool_runs": [], "claims": [], "files": meta,
+                   "escalation": None, "notes": "fake claude"}})
+text = head + "\\n=== FILE: interface_spec.md ===\\n" + {spec!r} + "=== END FILE ===\\n"
+json.dump({{"type": "result", "subtype": "success", "is_error": False, "result": text,
+           "usage": {{"input_tokens": 12, "output_tokens": 345}}, "modelUsage": {{"claude-opus-5-5": {{}}}}}},
+          sys.stdout)
+""")
+    script.chmod(script.stat().st_mode | stat.S_IEXEC)
+    monkeypatch.setenv("NIRMAAN_CLAUDE_CODE", str(script))
+    monkeypatch.delenv("NIRMAAN_CLAUDE_CODE_MODEL", raising=False)
+    out = tmp_path / "results"
+    ran = CliRunner().invoke(app, ["eval", "run", "--runtime", "claude-code", "--trials", "3", "--seats", "spec",
+                                   "--harness", "attempts-3", "--cases", str(EVALS), "--repo", str(REPO),
+                                   "--out", str(out)])
+    assert ran.exit_code == STOPPED_EXIT == 3, ran.output
+    assert int(calls.read_text()) == 2  # attempt 1 answered, attempt 2 met the limit, nothing after
+    [path] = list(out.iterdir())
+    record = load_record(path)
+    assert [t.trial for t in record.trials] == [1]
+    last = record.trials[0]
+    assert len(last.answers) == 2 and last.answers[0].text and not last.answers[0].error
+    assert not last.answers[1].text and last.answers[1].error
+    assert no_model_answer(last) and not last.result.passed
+    assert f"run stopped: {SPEC_CASE} trial 1 got no model answer" in ran.output
