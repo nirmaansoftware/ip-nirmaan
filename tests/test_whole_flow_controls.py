@@ -266,6 +266,28 @@ def test_the_strict_fixtures_follow_every_route_to_a_cycle_count():
         assert soc.get("reaches_review") is False and soc["refused_by"], soc["id"]
 
 
+def test_the_soc_address_control_is_refused_by_a_crash_on_signal_11_and_nothing_else():
+    """driver-strict-soc-address expects the co-simulation killed by signal 11 before any record, after a clean build
+    (its ``what``). Its ``refused_by`` accepts that run's summary, in fw.test's old words and in the words that name the
+    signal, and rejects a build error, another exit status, another signal and a run that reported a check."""
+    pattern = next(c for c in CONTROLS if c["id"] == "driver-strict-soc-address")["refused_by"]
+    nonce = "5eed5eed5eed5eed"
+    steps = f"$ cc -c d.c -o d.o\n$ verilator --cc --exe --build x.v d.o\n$ cosim/Vdut +nirmaan_nonce={nonce}\n"
+
+    def refused(log: str, codes: tuple[int, ...]) -> bool:
+        return bool(re.search(pattern, "verilator-cosim: " + parse_fw_test(log, codes).summary))
+
+    assert refused(steps, (0, 0, -11))  # the crash this control is about, whatever words fw.test uses for it
+    for record in json.loads(RECORD.read_text(encoding="utf-8"))["controls"]:
+        if record["id"] == "driver-strict-soc-address":  # the committed run's words
+            assert all(re.search(pattern, g["summary"]) for g in record["gates"] if not g["succeeded"])
+    assert not refused("$ cc -c d.c -o d.o\nd.c:3:1: error: expected ';' before '}' token\n", (1,))  # a build error
+    assert not refused(steps, (0, 0, 1))  # another exit status
+    assert not refused(steps, (0, 0, -6))  # another signal
+    assert not refused(steps + f"FWTEST:{nonce} BUS read 0x0 -> 0x00000000 OKAY\nFWTEST:{nonce} PASS reset_values\n",
+                       (0, 0, -11))  # it reported before it died
+
+
 def test_the_record_names_a_ci_run_and_every_control_once():
     assert RECORD.is_file(), "the controls' recorded CI run is missing (evals/flow/controls_record.json)"
     data = json.loads(RECORD.read_text(encoding="utf-8"))
