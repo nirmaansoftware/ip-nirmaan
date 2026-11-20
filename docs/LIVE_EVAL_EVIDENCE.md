@@ -110,13 +110,15 @@ averages across cases into a single headline number; per seat is the coarsest
 summary.
 
 **A run stops at a trial with no model answer (RR5).** A live `eval run`
-stops right after the first trial whose model calls all failed with no
-answer: at least one call is recorded, and every recorded answer has no text
-and an error. A plan or usage limit looks like this (on 2026-11-15 nine trials
-failed in two seconds each, "You've hit your 5-hour limit", because the run
-went on), and so does a model that cannot be reached. The rule reads the
+stops right after the first trial whose last model call failed with no
+answer: at least one call is recorded, and the last recorded answer has no
+text and an error. A plan or usage limit looks like this (on 2026-11-15 nine
+trials failed in two seconds each, "You've hit your 5-hour limit", because the
+run went on), and so does a model that cannot be reached. Under attempts-3 the
+limit can land on attempt 2 or 3 after an answered attempt 1, so the last
+answer decides, as it does for a whole flow. The rule reads the
 trial's structure, never the wording of the error. A model that answers,
-however wrongly, never stops a run. The stopped trial is written like any
+however wrongly, on its last call never stops a run. The stopped trial is written like any
 other and counts as failed (decision 11 of the pilot retrospective); no later
 trial starts; the record gets its summary and finished manifest, whose
 `trials` stays the planned count. The CLI prints `run stopped: <case> trial
