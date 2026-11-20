@@ -1736,6 +1736,27 @@
       "trial": 1
     },
     {
+      "case": "rtl/sync-fifo",
+      "passed": true,
+      "reason": "run without knowledge documents (knowledge: off in the run manifest and the trial): never counts toward a level",
+      "record": "evals/results/2026-11-19-claude-code-claude-opus-5-5-without-knowledge-10",
+      "trial": 1
+    },
+    {
+      "case": "dv/plan-irq-ctrl",
+      "passed": false,
+      "reason": "run without knowledge documents (knowledge: off in the run manifest and the trial): never counts toward a level",
+      "record": "evals/results/2026-11-19-claude-code-claude-opus-5-5-without-knowledge-11",
+      "trial": 1
+    },
+    {
+      "case": "debug/triage-three-bugs",
+      "passed": false,
+      "reason": "run without knowledge documents (knowledge: off in the run manifest and the trial): never counts toward a level",
+      "record": "evals/results/2026-11-19-claude-code-claude-opus-5-5-without-knowledge-12",
+      "trial": 1
+    },
+    {
       "case": "dv/equiv-gray",
       "passed": true,
       "reason": "run without knowledge documents (knowledge: off in the run manifest and the trial): never counts toward a level",
