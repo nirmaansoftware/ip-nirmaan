@@ -274,18 +274,28 @@ def _opt(tmp_path: Path) -> Path:
     return opt
 
 
+def _usable_path() -> str:
+    """The real PATH minus folders this account cannot reach.
+
+    The cloud review loop runs its local check as another account, and the runner's own PATH still lists
+    $RUNNER_TEMP/cad-bin, which that account cannot traverse; reach.targets stats every PATH folder and would
+    raise PermissionError. These tests are about the targets, not about that account, so keep the readable folders.
+    """
+    return os.pathsep.join(d for d in os.environ["PATH"].split(os.pathsep) if d and os.access(d, os.X_OK))
+
+
 def test_every_write_target_exists_or_the_reach_test_stops(tmp_path, monkeypatch):
     monkeypatch.setattr(reach, "WRAPPER", tmp_path / "opt" / "bin" / "vvp")
     monkeypatch.setattr(reach, "TOOLS", ("python3",))
     with pytest.raises(SystemExit, match="cannot determine|do not exist"):
-        reach.targets(tmp_path / "records", {"PATH": os.environ["PATH"]})
+        reach.targets(tmp_path / "records", {"PATH": _usable_path()})
     _opt(tmp_path)
     (tmp_path / "cocotb").mkdir()
     (tmp_path / "cocotb" / "__init__.py").write_text("")
     real = reach.importlib.util.find_spec
     monkeypatch.setattr(reach.importlib.util, "find_spec", lambda name: SimpleNamespace(
         origin=str(tmp_path / "cocotb" / "__init__.py")) if name == "cocotb" else real(name))
-    env = {"GITHUB_OUTPUT": str(tmp_path / "out"), "RUNNER_TEMP": str(tmp_path), "PATH": os.environ["PATH"]}
+    env = {"GITHUB_OUTPUT": str(tmp_path / "out"), "RUNNER_TEMP": str(tmp_path), "PATH": _usable_path()}
     create, append = reach.targets(tmp_path / "records", env)
     assert str(REPO) in create and str(REPO / "src" / "nirmaan") in create and str(tmp_path / "records") in create
     assert str(tmp_path) in create and str(tmp_path / "out") in append
@@ -303,7 +313,7 @@ def test_a_target_the_reach_test_cannot_determine_fails_it_never_shrinks_it(tmp_
     monkeypatch.setattr(reach, "WRAPPER", tmp_path / "opt" / "bin" / "vvp")
     monkeypatch.setattr(reach, "TOOLS", ("python3",))
     opt = _opt(tmp_path)
-    env = {"PATH": os.environ["PATH"]}
+    env = {"PATH": _usable_path()}
     if what == "package":
         monkeypatch.setattr(nirmaan, "__file__", None)
     elif what == "cocotb":
