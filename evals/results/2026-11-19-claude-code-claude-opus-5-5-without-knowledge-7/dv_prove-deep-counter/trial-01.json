@@ -1,0 +1,173 @@
+{
+  "answers": [
+    {
+      "cache_read_tokens": 620,
+      "cache_write_tokens": 5281,
+      "error": null,
+      "harness": "sha256:9aa7a333cd961a23aa919616fac6428f9f29fed1ba44b2fa3f5c6ee49e745d39",
+      "input_tokens": 2,
+      "mode": "work",
+      "model": "claude-opus-5-5",
+      "output_tokens": 11520,
+      "packet_sha256": "12d8f4808f65bab461b95249f3d8329cd6214a486927ee7de4176a87a4b0e5e1",
+      "prompt_sha256": "0d039e7d75ab726e0f14717f51fea0b48057494810e5192997d8e6cca15c9c53",
+      "provider": "claude-code",
+      "text": "```json\n{\"uncertainty\": 0.3, \"outcome\": \"Submitted one assertions file and one single-task SymbiYosys job file for an unbounded k-induction proof of deep_counter.v. The platform's formal.run and formal.cover have not run yet, so the proof and its non-vacuity are still open.\", \"artifacts\": [{\"kind\": \"assertions\", \"title\": \"deep_counter property set and proof plan\", \"summary\": \"The assertions in deep_counter_props.sv check the approved RTL [artifact:prj-784d6227b5.design-under-test.a1] against every behavioural requirement in the approved interface spec [artifact:prj-784d6227b5.interface-spec.a1]: DC-RESET, DC-CLEAR, DC-COUNT, DC-HOLD, DC-RANGE and DC-CARRY. The goal is an unbounded proof, as [requirement:req-8ed9eb1797] asks. The DC-RANGE assertion count <= LIMIT doubles as the induction strengthening invariant. The only input constraint is reset low in the first cycle. Every assertion has a cover on its antecedent, including the wrap, the carry and count[6], which a bounded check of a few dozen cycles never reaches. The job checks three DUT instances, at LIMIT 1, 99 and 127.\"}], \"files\": [{\"path\": \"deep_counter_props.sv\", \"kind\": \"assertions\", \"title\": \"Formal properties and covers for deep_counter\", \"summary\": \"Formal wrapper deep_counter_fv instantiates the approved deep_counter.v [artifact:prj-784d6227b5.design-under-test.a1] through the checker deep_counter_props, at LIMIT 1, 99 (default) and 127. Each instance has its own free inputs. The immediate assertions encode the reset, clear, count/wrap, hold, range and carry rules of [artifact:prj-784d6227b5.interface-spec.a1]. Each rule has a cover on its antecedent so that a vacuous pass would show up. The single assumption is reset low in the first cycle.\", \"entry\": \"deep_counter_fv\"}, {\"path\": \"deep_counter.sby\", \"kind\": \"formal_spec\", \"title\": \"SymbiYosys job: unbounded prove of deep_counter\", \"summary\": \"Single-task SymbiYosys job (no [tasks] section) in mode prove with the smtbmc engine (basecase plus k-induction), aimed at [requirement:req-8ed9eb1797]. It reads the approved deep_counter.v [artifact:prj-784d6227b5.design-under-test.a1] and deep_counter_props.sv, with top deep_counter_fv. Depth 140 is the induction window, and in cover mode it is also enough for the LIMIT=127 wrap cover, which needs about 130 steps after reset.\", \"entry\": \"deep_counter_fv\"}], \"tool_runs\": [], \"claims\": [\"I expect the property set to be 1-inductive once DC-RANGE (count <= LIMIT) is in place. From count <= LIMIT, the next count is 0 or count+1 <= LIMIT, and a first-cycle reset forces count to 0. formal.run has not confirmed this.\", \"I expect every cover to be reachable within depth 140, given the first-cycle reset and about 130 enabled cycles for the LIMIT=127 wrap. formal.cover has not confirmed this.\", \"DC-PARAM (every LIMIT from 1 to 127) is only sampled at LIMIT 1, 99 and 127. It is not proven for every parameter value.\", \"I relied on the substantiated review records [evidence:prj-784d6227b5.interface-spec.e1] and [evidence:prj-784d6227b5.design-under-test.e1] for the approval status of the inputs.\"], \"escalation\": null, \"notes\": \"Design choices:\\n- Assertions are immediate asserts inside always blocks, with $past, read through yosys read -formal. I avoided concurrent SVA and bind so the proof needs no Verific.\\n- The sole constraint is assume(!rst_n) while f_past_valid is 0, in the first cycle only. en, clr and later rst_n stay free, so the proof is not over-constrained.\\n- DC-CARRY is checked combinationally on every cycle, with no reset gating.\\n- The transition assertions apply from the second step onward. Step 0 count is unconstrained.\\n- Covers that look at the past count also require a genuine prior cycle, $past(rst_n) or $past(f_past_valid), so an arbitrary initial count cannot satisfy them trivially.\\n- The count[6] cover is generated only where LIMIT >= 64, so no cover is unreachable by construction.\\n\\nRisks:\\n- Yosys parsing details, such as the truncating localparam [6:0] F_LAST = LIMIT, or init support for reg f_past_valid = 0.\\n- Runtime of a depth-140 induction. I expect it to be fine for about 3x8 flip-flops plus the $past registers.\\n\\nIf formal.run reports an induction failure, the first thing to check is whether the DC-RANGE invariant was parsed as intended.\\n\\nThe approved deep_counter.v is referenced by name and not rewritten.\"}\n```\n=== FILE: deep_counter_props.sv ===\n// Formal properties for deep_counter (interface_spec.md, sections 1-4).\n// Checker deep_counter_props binds one DUT instance by instantiation; the top\n// deep_counter_fv checks the boundary and default parameter values.\n`default_nettype none\n\nmodule deep_counter_props #(\n    parameter integer LIMIT = 99\n) (\n    input wire clk,\n    input wire rst_n,\n    input wire en,\n    input wire clr\n);\n    localparam [6:0] F_LAST = LIMIT;\n\n    wire [6:0] count;\n    wire       carry;\n\n    deep_counter #(\n        .LIMIT(LIMIT)\n    ) dut (\n        .clk  (clk),\n        .rst_n(rst_n),\n        .en   (en),\n        .clr  (clr),\n        .count(count),\n        .carry(carry)\n    );\n\n    // f_past_valid is 0 only in the first cycle.\n    reg f_past_valid = 1'b0;\n    always @(posedge clk)\n        f_past_valid <= 1'b1;\n\n    // Only constraint: the run starts with reset asserted.\n    always @(*)\n        if (!f_past_valid)\n            assume(!rst_n);\n\n    // [req:DC-CARRY] combinational, every cycle.\n    always @(*)\n        assert(carry == (en && !clr && (count == F_LAST)));\n\n    // [req:DC-RANGE] count never above LIMIT after reset (induction invariant).\n    always @(*)\n        if (f_past_valid)\n            assert(count <= F_LAST);\n\n    always @(posedge clk) begin\n        if (f_past_valid) begin\n            // [req:DC-RESET]\n            if (!$past(rst_n))\n                assert(count == 7'd0);\n            // [req:DC-CLEAR] clear wins over enable\n            if ($past(rst_n) && $past(clr))\n                assert(count == 7'd0);\n            // [req:DC-COUNT] increment below LIMIT, wrap to 0 at LIMIT\n            if ($past(rst_n) && !$past(clr) && $past(en))\n                assert(count == (($past(count) == F_LAST) ? 7'd0 : ($past(count) + 7'd1)));\n            // [req:DC-HOLD]\n            if ($past(rst_n) && !$past(clr) && !$past(en))\n                assert(count == $past(count));\n        end\n    end\n\n    // Non-vacuity covers: each assertion antecedent is exercised.\n    always @(posedge clk) begin\n        if (f_past_valid) begin\n            // reset of a non-zero count, after the initial reset\n            cover($past(f_past_valid) && !$past(rst_n) && ($past(count) != 7'd0));\n            // clear of a non-zero count while enable is high\n            cover($past(rst_n) && $past(clr) && $past(en) && ($past(count) != 7'd0));\n            // increment below LIMIT\n            cover($past(rst_n) && !$past(clr) && $past(en) && ($past(count) != F_LAST));\n            // wrap from LIMIT to 0\n            cover($past(rst_n) && !$past(clr) && $past(en) && ($past(count) == F_LAST) && (count == 7'd0));\n            // hold of a non-zero count\n            cover($past(rst_n) && !$past(clr) && !$past(en) && ($past(count) != 7'd0));\n            // count reaches LIMIT\n            cover(count == F_LAST);\n            // carry out asserted\n            cover(carry);\n        end\n    end\n\n    // Top bit of count exercised where LIMIT can reach it.\n    generate\n        if (LIMIT >= 64) begin : g_top_bit\n            always @(posedge clk)\n                if (f_past_valid)\n                    cover(count[6]);\n        end\n    endgenerate\nendmodule\n\nmodule deep_counter_fv (\n    input wire clk,\n    input wire rst_n_min,\n    input wire en_min,\n    input wire clr_min,\n    input wire rst_n_def,\n    input wire en_def,\n    input wire clr_def,\n    input wire rst_n_max,\n    input wire en_max,\n    input wire clr_max\n);\n    deep_counter_props #(.LIMIT(1)) u_min (\n        .clk(clk), .rst_n(rst_n_min), .en(en_min), .clr(clr_min)\n    );\n\n    deep_counter_props #(.LIMIT(99)) u_def (\n        .clk(clk), .rst_n(rst_n_def), .en(en_def), .clr(clr_def)\n    );\n\n    deep_counter_props #(.LIMIT(127)) u_max (\n        .clk(clk), .rst_n(rst_n_max), .en(en_max), .clr(clr_max)\n    );\nendmodule\n\n`default_nettype wire\n=== END FILE ===\n=== FILE: deep_counter.sby ===\n[options]\nmode prove\ndepth 140\n\n[engines]\nsmtbmc\n\n[script]\nread -formal deep_counter.v\nread -formal deep_counter_props.sv\nprep -top deep_counter_fv\n\n[files]\ndeep_counter.v\ndeep_counter_props.sv\n=== END FILE ==="
+    }
+  ],
+  "format": "nirmaan.eval-trial",
+  "harness_variant": "default",
+  "judge_runs": [
+    {
+      "check": "The seat's proof passes the approved RTL with every cover reached and fails each deep counter mutant",
+      "params": {
+        "sby": "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-_fa19v26/judge/check-1/must-fail-7fao8xpx/clean/deep_counter.sby",
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-_fa19v26/judge/check-1/must-fail-7fao8xpx/clean/deep_counter_props.sv",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-_fa19v26/judge/check-1/must-fail-7fao8xpx/clean/deep_counter.v"
+        ]
+      },
+      "run": "run-0003",
+      "succeeded": true,
+      "summary": "symbiyosys: formal passed: every property proven",
+      "tool": "formal.run"
+    },
+    {
+      "check": "The seat's proof passes the approved RTL with every cover reached and fails each deep counter mutant",
+      "params": {
+        "sby": "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-_fa19v26/judge/check-1/must-fail-7fao8xpx/cover/deep_counter.sby",
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-_fa19v26/judge/check-1/must-fail-7fao8xpx/cover/deep_counter_props.sv",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-_fa19v26/judge/check-1/must-fail-7fao8xpx/cover/deep_counter.v"
+        ]
+      },
+      "run": "run-0004",
+      "succeeded": true,
+      "summary": "symbiyosys-cover: not vacuous: every cover reached (23 of 23); every assertion antecedent reached (18 of 18)",
+      "tool": "formal.cover"
+    },
+    {
+      "check": "The seat's proof passes the approved RTL with every cover reached and fails each deep counter mutant",
+      "params": {
+        "sby": "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-_fa19v26/judge/check-1/must-fail-7fao8xpx/mutant-1-1/deep_counter.sby",
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-_fa19v26/judge/check-1/must-fail-7fao8xpx/mutant-1-1/deep_counter_props.sv",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-_fa19v26/judge/check-1/must-fail-7fao8xpx/mutant-1-1/deep_counter.v"
+        ]
+      },
+      "run": "run-0005",
+      "succeeded": false,
+      "summary": "symbiyosys: formal fail: 1 error; first: deep_counter_props.sv:59: [ASSERT] assertion deep_counter_fv.u_max._witness_.check_assert_deep_counter_props_sv_59_69 failed at step 66",
+      "tool": "formal.run"
+    },
+    {
+      "check": "The seat's proof passes the approved RTL with every cover reached and fails each deep counter mutant",
+      "params": {
+        "sby": "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-_fa19v26/judge/check-1/must-fail-7fao8xpx/mutant-1-2/deep_counter.sby",
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-_fa19v26/judge/check-1/must-fail-7fao8xpx/mutant-1-2/deep_counter_props.sv",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-_fa19v26/judge/check-1/must-fail-7fao8xpx/mutant-1-2/deep_counter.v"
+        ]
+      },
+      "run": "run-0006",
+      "succeeded": false,
+      "summary": "symbiyosys: formal fail: 1 error; first: deep_counter_props.sv:42: [ASSERT] assertion deep_counter_fv.u_min._witness_.check_assert_deep_counter_props_sv_42_310 failed",
+      "tool": "formal.run"
+    },
+    {
+      "check": "The seat's proof passes the approved RTL with every cover reached and fails each deep counter mutant",
+      "params": {
+        "sby": "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-_fa19v26/judge/check-1/must-fail-7fao8xpx/mutant-1-3/deep_counter.sby",
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-_fa19v26/judge/check-1/must-fail-7fao8xpx/mutant-1-3/deep_counter_props.sv",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-_fa19v26/judge/check-1/must-fail-7fao8xpx/mutant-1-3/deep_counter.v"
+        ]
+      },
+      "run": "run-0007",
+      "succeeded": false,
+      "summary": "symbiyosys: formal fail: 1 error; first: deep_counter_props.sv:59: [ASSERT] assertion deep_counter_fv.u_min._witness_.check_assert_deep_counter_props_sv_59_341 failed at step 4",
+      "tool": "formal.run"
+    },
+    {
+      "check": "The seat's proof passes the approved RTL with every cover reached and fails each deep counter mutant",
+      "params": {
+        "sby": "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-_fa19v26/judge/check-1/must-fail-7fao8xpx/mutant-1-4/deep_counter.sby",
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-_fa19v26/judge/check-1/must-fail-7fao8xpx/mutant-1-4/deep_counter_props.sv",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-_fa19v26/judge/check-1/must-fail-7fao8xpx/mutant-1-4/deep_counter.v"
+        ]
+      },
+      "run": "run-0008",
+      "succeeded": false,
+      "summary": "symbiyosys: formal fail: 1 error; first: deep_counter_props.sv:59: [ASSERT] assertion deep_counter_fv.u_min._witness_.check_assert_deep_counter_props_sv_59_341 failed at step 4",
+      "tool": "formal.run"
+    }
+  ],
+  "knowledge": "off",
+  "model": "claude-opus-5-5",
+  "purpose": "evidence",
+  "record": "2026-11-19-claude-code-claude-opus-5-5-without-knowledge-7",
+  "result": {
+    "attempts": 1,
+    "attestations": [],
+    "audit_ok": true,
+    "case": "dv/prove-deep-counter",
+    "case_digest": "sha256:cb3f87d661625f2c0cde082f9ab164f98fe0646abf8ec1ecb5a8da36bd8abae7",
+    "cli": "2.1.325",
+    "cost_usd": null,
+    "detail": "Design choices:\n- Assertions are immediate asserts inside always blocks, with $past, read through yosys read -formal. I avoided concurrent SVA and bind so the proof needs no Verific.\n- The sole constraint is assume(!rst_n) while f_past_valid is 0, in the first cycle only. en, clr and later rst_n stay free, so the proof is not over-constrained.\n- DC-CARRY is checked combinationally on every cycle, with no reset gating.\n- The transition assertions apply from the second step onward. Step 0 count is unconstrained.\n- Covers that look at the past count also require a genuine prior cycle, $past(rst_n) or $past(f_past_valid), so an arbitrary initial count cannot satisfy them trivially.\n- The count[6] cover is generated only where LIMIT >= 64, so no cover is unreachable by construction.\n\nRisks:\n- Yosys parsing details, such as the truncating localparam [6:0] F_LAST = LIMIT, or init support for reg f_past_valid = 0.\n- Runtime of a depth-140 induction. I expect it to be fine for about 3x8 flip-flops plus the $past registers.\n\nIf formal.run reports an induction failure, the first thing to check is whether the DC-RANGE invariant was parsed as intended.\n\nThe approved deep_counter.v is referenced by name and not rewritten.",
+    "duration_s": 170.745,
+    "gate_runs": [
+      {
+        "run": "run-0001",
+        "succeeded": true,
+        "summary": "symbiyosys: formal passed: every property proven",
+        "tool": "formal.run"
+      },
+      {
+        "run": "run-0002",
+        "succeeded": true,
+        "summary": "symbiyosys-cover: not vacuous: every cover reached (23 of 23); every assertion antecedent reached (18 of 18)",
+        "tool": "formal.cover"
+      }
+    ],
+    "harness": "sha256:9aa7a333cd961a23aa919616fac6428f9f29fed1ba44b2fa3f5c6ee49e745d39",
+    "input_tokens": 2,
+    "model_calls": 1,
+    "output_tokens": 11520,
+    "passed": true,
+    "replay": false,
+    "runtime": "claude-code",
+    "sandbox": "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-_fa19v26",
+    "scores": [
+      {
+        "failed_runs": [
+          "run-0005",
+          "run-0006",
+          "run-0007",
+          "run-0008"
+        ],
+        "name": "The seat's proof passes the approved RTL with every cover reached and fails each deep counter mutant",
+        "runs": [
+          "run-0003",
+          "run-0004"
+        ],
+        "scorer": "must-fail",
+        "status": "passed",
+        "summary": "formal.run run-0003 passed on the clean inputs with every cover reached; 4 of 4 mutants failed it"
+      }
+    ],
+    "seat": "prj-784d6227b5:assertions-formal",
+    "seat_status": "in_review",
+    "started_at": "2026-11-19T04:49:13.135071Z",
+    "submitted": true,
+    "tool_calls": [],
+    "version": "1.25.0"
+  },
+  "skills": {
+    "model_checking": "sha256:e46ca799b81314dd342c4063a78796b56f27f2948ef540e7e292fabf6a54ed1c"
+  },
+  "stage": "assertions-formal",
+  "trial": 1,
+  "version": 1
+}
