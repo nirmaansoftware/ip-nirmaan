@@ -255,10 +255,10 @@
           "counts": true,
           "digest": "sha256:53dff4b10deec145e18247fd490870321613e50b35a8da2f0e0a044b95b58e31",
           "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
-          "lower": 0.6457,
+          "lower": 0.6756,
           "model": "claude-opus-5-5",
-          "n": 7,
-          "passed": 7,
+          "n": 8,
+          "passed": 8,
           "reasons": [],
           "records": [
             "evals/results/2026-11-18-claude-code-claude-opus-5-5-3",
@@ -267,7 +267,8 @@
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-11",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-25",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-39",
-            "evals/results/2026-11-19-claude-code-claude-opus-5-5-53"
+            "evals/results/2026-11-19-claude-code-claude-opus-5-5-53",
+            "evals/results/2026-11-19-claude-code-claude-opus-5-5-84"
           ],
           "unjudged": 0
         },
@@ -635,10 +636,10 @@
           "counts": true,
           "digest": "sha256:6bf35095b83cbd9b641919c5b59bacdf5fc87ce7c569c2ad7df593ecddff70d6",
           "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
-          "lower": 0.8569,
+          "lower": 0.862,
           "model": "claude-opus-5-5",
-          "n": 23,
-          "passed": 23,
+          "n": 24,
+          "passed": 24,
           "reasons": [],
           "records": [
             "evals/results/2026-11-18-claude-code-claude-opus-5-5-11",
@@ -663,7 +664,8 @@
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-56",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-61",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-70",
-            "evals/results/2026-11-19-claude-code-claude-opus-5-5-75"
+            "evals/results/2026-11-19-claude-code-claude-opus-5-5-75",
+            "evals/results/2026-11-19-claude-code-claude-opus-5-5-83"
           ],
           "unjudged": 0
         }
@@ -1163,10 +1165,10 @@
           "counts": true,
           "digest": "sha256:012eb9b7155ed6eb7761adca880b338f10c8f978b15dfd92f5adbb3253307a52",
           "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
-          "lower": 0.8768,
+          "lower": 0.8788,
           "model": "claude-opus-5-5",
-          "n": 55,
-          "passed": 53,
+          "n": 56,
+          "passed": 54,
           "reasons": [],
           "records": [
             "evals/results/2026-11-18-claude-code-claude-opus-5-5",
@@ -1223,6 +1225,7 @@
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-78",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-79",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-82",
+            "evals/results/2026-11-19-claude-code-claude-opus-5-5-84",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-9"
           ],
           "unjudged": 0
@@ -1389,10 +1392,10 @@
           "counts": true,
           "digest": "sha256:b6d97df51f05b4963ddc316fcfe265dc04208251a4f331971e5a6583ba6c1f96",
           "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
-          "lower": 0.6457,
+          "lower": 0.6756,
           "model": "claude-opus-5-5",
-          "n": 7,
-          "passed": 7,
+          "n": 8,
+          "passed": 8,
           "reasons": [],
           "records": [
             "evals/results/2026-11-18-claude-code-claude-opus-5-5-2",
@@ -1401,7 +1404,8 @@
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-10",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-24",
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-38",
-            "evals/results/2026-11-19-claude-code-claude-opus-5-5-52"
+            "evals/results/2026-11-19-claude-code-claude-opus-5-5-52",
+            "evals/results/2026-11-19-claude-code-claude-opus-5-5-83"
           ],
           "unjudged": 0
         }
@@ -1743,10 +1747,59 @@
       "trial": 1
     },
     {
+      "case": "rtl/sync-fifo",
+      "passed": true,
+      "reason": "run without knowledge documents (knowledge: off in the run manifest and the trial): never counts toward a level",
+      "record": "evals/results/2026-11-19-claude-code-claude-opus-5-5-without-knowledge-10",
+      "trial": 1
+    },
+    {
+      "case": "dv/plan-irq-ctrl",
+      "passed": false,
+      "reason": "run without knowledge documents (knowledge: off in the run manifest and the trial): never counts toward a level",
+      "record": "evals/results/2026-11-19-claude-code-claude-opus-5-5-without-knowledge-11",
+      "trial": 1
+    },
+    {
+      "case": "debug/triage-three-bugs",
+      "passed": false,
+      "reason": "run without knowledge documents (knowledge: off in the run manifest and the trial): never counts toward a level",
+      "record": "evals/results/2026-11-19-claude-code-claude-opus-5-5-without-knowledge-12",
+      "trial": 1
+    },
+    {
       "case": "dv/equiv-gray",
       "passed": true,
       "reason": "run without knowledge documents (knowledge: off in the run manifest and the trial): never counts toward a level",
       "record": "evals/results/2026-11-19-claude-code-claude-opus-5-5-without-knowledge-2",
+      "trial": 1
+    },
+    {
+      "case": "rtl/axi4-lite-regs",
+      "passed": true,
+      "reason": "run without knowledge documents (knowledge: off in the run manifest and the trial): never counts toward a level",
+      "record": "evals/results/2026-11-19-claude-code-claude-opus-5-5-without-knowledge-5",
+      "trial": 1
+    },
+    {
+      "case": "dv/scoreboard-mac",
+      "passed": true,
+      "reason": "run without knowledge documents (knowledge: off in the run manifest and the trial): never counts toward a level",
+      "record": "evals/results/2026-11-19-claude-code-claude-opus-5-5-without-knowledge-6",
+      "trial": 1
+    },
+    {
+      "case": "dv/coverage-irq-ctrl",
+      "passed": true,
+      "reason": "run without knowledge documents (knowledge: off in the run manifest and the trial): never counts toward a level",
+      "record": "evals/results/2026-11-19-claude-code-claude-opus-5-5-without-knowledge-8",
+      "trial": 1
+    },
+    {
+      "case": "rtl/axil-timer",
+      "passed": true,
+      "reason": "run without knowledge documents (knowledge: off in the run manifest and the trial): never counts toward a level",
+      "record": "evals/results/2026-11-19-claude-code-claude-opus-5-5-without-knowledge-9",
       "trial": 1
     }
   ]

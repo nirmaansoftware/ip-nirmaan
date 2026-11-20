@@ -1,0 +1,152 @@
+{
+  "answers": [
+    {
+      "cache_read_tokens": 620,
+      "cache_write_tokens": 5693,
+      "error": null,
+      "harness": "sha256:9aa7a333cd961a23aa919616fac6428f9f29fed1ba44b2fa3f5c6ee49e745d39",
+      "input_tokens": 2,
+      "mode": "work",
+      "model": "claude-opus-5-5",
+      "output_tokens": 37957,
+      "packet_sha256": "84734cb51fdcc16c5a0c80faf3553c812d302e1c73ebb4525b16b6359774972d",
+      "prompt_sha256": "ca73947219661049f0829dd670e349a3d929c7195183aad21f56037c5532e5f8",
+      "provider": "claude-code",
+      "text": "```json\n{\"uncertainty\": 0.35, \"outcome\": \"Delivered a new SystemVerilog coverage testbench, irq_ctrl_cov_tb.sv, with top module irq_ctrl_cov_tb, and a coverage report that plans closure and justifies unreachable items. Neither has been simulated or measured. The platform's coverage.read run over the approved irq_ctrl.v must still decide pass/fail and coverage numbers, and independent review must follow.\", \"artifacts\": [{\"kind\": \"coverage_report\", \"title\": \"irq_ctrl code-coverage closure plan and unreachable-item justification\", \"summary\": \"This report covers the approved RTL [artifact:prj-63d6b8e26c.design-under-test.a1] (reviewed per [evidence:prj-63d6b8e26c.design-under-test.e1]) for requirement [requirement:req-1e26d9c190]. It contains no measured numbers. Those come only from the platform's coverage.read run over irq_ctrl_cov_tb.sv, which has not happened yet.\\n\\nBaseline: the approved testbench [artifact:prj-63d6b8e26c.testbench.a1] passed 5 checks per [run:run-0001] / [evidence:prj-63d6b8e26c.testbench.e1]. By its own header comment it never raises a source, so detection, pending, acknowledge, priority and the CLAIM read path go unexercised.\\n\\nClosure plan, line and branch, both instances of the RTL:\\n- Reset branch, with writes and all sources active during reset, both at start and mid-run.\\n- ENABLE and MODE write branches.\\n- PENDING write-one-to-clear (W1C) path.\\n- CLAIM acknowledge, both in range and out of range (N=8: ids 8 to 31 and 9/31 with pending held).\\n- All four rdata case arms, with the default arm returning {irq,0,irq_id}.\\n- The priority loop with every id 0 to 31 active, both alone and as lowest of many.\\n- Enable masking of the priority.\\n\\nClosure plan, toggle:\\n- dut_b (N=32) walks every bit of src, src_q, detect, w1c, ack, active, pending, enable and mode, both 0->1 and 1->0.\\n- All 32 bits of wdata and rdata, and all 5 bits of irq_id, toggle.\\n- irq and ack_hit toggle.\\n- addr covers all four values; we and rst_n toggle.\\n\\nClosure plan, functional behaviour checked by a cycle-accurate reference model before and after every edge, plus directed reads:\\n- Level mode re-asserting pending while the source is high.\\n- Edge mode latching a one-cycle pulse.\\n- Detection winning over a same-edge W1C or acknowledge, in both modes.\\n- Write data above bit 4 ignored on acknowledge.\\n- Bits at N and above read as zero for N=8.\\n- Mixed per-source modes.\\n- A mode change while sources are held high.\\n\\nUnreachable by construction (justification, so they are not counted as dead code covered):\\n1. unused_wdata = &{1'b0, wdata} is constant 0 in both instances. It exists only to mark ignored wdata bits.\\n2. In dut_a (N=8), rdata[30:8] is constant 0. ENABLE, MODE and PENDING fill only rdata[7:0], and the CLAIM word drives only bit 31 and bits 4:0.\\n3. In dut_a, irq_id[4:3] is constant 0, because the highest id is 7.\\n4. In dut_b (N=32), the out-of-range acknowledge condition ({27'd0,wdata[4:0]} < N being false) cannot occur, because every 5-bit id is below 32. dut_a exercises that condition instead.\\n\\nThe loop variable i is an implementation detail of the priority encoder. Its toggle points, if a tool counts them, are not a design requirement.\"}], \"files\": [{\"path\": \"irq_ctrl_cov_tb.sv\", \"kind\": \"testbench\", \"title\": \"irq_ctrl_cov_tb.sv: coverage-closing self-checking testbench for irq_ctrl.v\", \"summary\": \"Extends the approved idle testbench [artifact:prj-63d6b8e26c.testbench.a1] to verify the approved RTL [artifact:prj-63d6b8e26c.design-under-test.a1] for [requirement:req-1e26d9c190].\\n\\nStructure:\\n- Two instances of the RTL share one stimulus stream: dut_a with N=8 (the configuration of the approved testbench) and dut_b with N=32 (so every register, rdata and irq_id bit can toggle).\\n- A cycle-accurate reference model checks rdata, irq and irq_id of both instances 1 ns before and 1 ns after every rising edge.\\n- Directed register reads with fixed expected values are added at key points.\\n- Stimulus runs in phases: reset, register patterns, level walk, detection-wins-over-clear, priority/acknowledge/out-of-range acknowledge, enable masking, edge walk, pulses, mixed modes, mode change and mid-run reset.\\n\\nIt keeps the approved testbench's NIRMAAN-SIM result line and nonce plusarg. It has not been run. Its pass/fail and coverage are for the platform's coverage.read run to establish.\", \"entry\": \"irq_ctrl_cov_tb\"}], \"tool_runs\": [], \"claims\": [\"Expected, not measured: with dut_b at N=32, every line and branch of irq_ctrl.v is reachable and should be hit, except those listed as unreachable in the coverage report.\", \"Expected, not measured: the only toggle points that should stay unhit are unused_wdata (both instances), plus rdata[30:8] and irq_id[4:3] in the N=8 instance.\", \"Expected, not measured: the testbench completes in well under 10 us of simulated time and prints one NIRMAAN-SIM line with 0 failed on the approved RTL.\", \"The reference model was written from the RTL header and code in [artifact:prj-63d6b8e26c.design-under-test.a1]. Any disagreement it reports would need triage against the interface spec, which was not available here.\"], \"escalation\": null, \"notes\": \"Decisions for the reviewer:\\n1. I added a second DUT instance at N=32. The RTL allows N from 2 to 32. At N=8 alone, about 26 toggle points (rdata[30:8], irq_id[4:3], unused_wdata) are structurally unreachable, which would cap toggle coverage. N=32 makes them reachable, while the N=8 instance keeps the out-of-range acknowledge branch and the upper-bit masking covered. If the project's interface spec fixes N=8 only, or if coverage.read reports per instance in a way that penalises this, the reviewer may want dut_b removed. I did not escalate because both are legal configurations of the approved RTL.\\n2. I avoided initializers on the model registers and used no int bit-selects, to stay friendly to both Icarus and Verilator. The clk and input initializers mirror the approved testbench.\\n3. tool_runs is empty because run-0001 is the upstream idle testbench's run, not a run of this file. It is cited in the report only as the baseline.\\n4. The task is not complete until the platform's coverage.read run passes and an independent review_record is recorded.\"}\n```\n=== FILE: irq_ctrl_cov_tb.sv ===\n`timescale 1ns / 1ps\n// Coverage testbench for irq_ctrl.v (task prj-63d6b8e26c:coverage).\n// Extends the approved idle testbench (irq_ctrl_idle_tb.sv). One stimulus stream drives two\n// instances of the approved RTL:\n//   dut_a  N = 8   the configuration of the approved testbench (src[7:0])\n//   dut_b  N = 32  every bit of rdata, irq_id and the per-source registers is reachable\n// A cycle-accurate reference model predicts rdata, irq and irq_id of both instances; they are\n// compared 1 ns before and 1 ns after every rising edge, and directed reads compare register\n// values against fixed expectations.\n// Not reachable by design (justified in the coverage report): unused_wdata is constant 0; in\n// dut_a rdata[30:8] and irq_id[4:3] are constant 0; in dut_b an out-of-range acknowledge\n// (wdata[4:0] >= N) cannot occur.\nmodule irq_ctrl_cov_tb;\n    localparam logic [31:0] MASK_A = 32'h0000_00FF;  // dut_a, N = 8\n    localparam logic [31:0] MASK_B = 32'hFFFF_FFFF;  // dut_b, N = 32\n    localparam logic [1:0]  A_ENABLE = 2'd0, A_MODE = 2'd1, A_PENDING = 2'd2, A_CLAIM = 2'd3;\n\n    logic        clk = 1'b0;\n    logic        rst_n = 1'b0;\n    logic [31:0] src = '0;\n    logic        we = 1'b0;\n    logic [1:0]  addr = 2'd0;\n    logic [31:0] wdata = 32'd0;\n    logic [31:0] rdata_a, rdata_b;\n    logic        irq_a, irq_b;\n    logic [4:0]  irq_id_a, irq_id_b;\n    int checks = 0, errors = 0;\n    logic [8*64-1:0] nonce;\n\n    // Reference model state (reset at the first rising edge, before any comparison).\n    logic [31:0] en_a, md_a, pd_a, sq_a;\n    logic [31:0] en_b, md_b, pd_b, sq_b;\n\n    irq_ctrl #(.N(8)) dut_a (.clk(clk), .rst_n(rst_n), .src(src[7:0]), .we(we), .addr(addr),\n                             .wdata(wdata), .rdata(rdata_a), .irq(irq_a), .irq_id(irq_id_a));\n    irq_ctrl #(.N(32)) dut_b (.clk(clk), .rst_n(rst_n), .src(src), .we(we), .addr(addr),\n                              .wdata(wdata), .rdata(rdata_b), .irq(irq_b), .irq_id(irq_id_b));\n\n    always #5 clk = ~clk;\n\n    // ---------------------------------------------------------------- reference model\n    function automatic logic [31:0] next_pending(input logic [31:0] msk, input logic [5:0] n,\n                                                 input logic [31:0] p, input logic [31:0] mo,\n                                                 input logic [31:0] sq, input logic [31:0] s,\n                                                 input logic w, input logic [1:0] a,\n                                                 input logic [31:0] d);\n        logic [31:0] sm, det, clr;\n        sm  = s & msk;\n        det = ((mo & sm & ~sq) | (~mo & sm)) & msk;\n        clr = 32'd0;\n        if (w && a == 2'd2) clr = d & msk;\n        if (w && a == 2'd3 && {1'b0, d[4:0]} < n) clr = clr | (32'd1 << d[4:0]);\n        return (det | (p & ~clr)) & msk;\n    endfunction\n\n    function automatic logic [4:0] lowest(input logic [31:0] act);\n        logic [4:0] r;\n        logic [5:0] k;\n        logic       found;\n        r = 5'd0;\n        found = 1'b0;\n        for (k = 6'd0; k < 6'd32; k = k + 6'd1) begin\n            if (!found && act[k[4:0]]) begin\n                r = k[4:0];\n                found = 1'b1;\n            end\n        end\n        return r;\n    endfunction\n\n    function automatic logic [31:0] exp_rdata(input logic [1:0] a, input logic [31:0] e,\n                                              input logic [31:0] mo, input logic [31:0] p);\n        logic [31:0] act, r;\n        act = e & p;\n        case (a)\n            2'd0:    r = e;\n            2'd1:    r = mo;\n            2'd2:    r = p;\n            default: r = {(|act), 26'd0, lowest(act)};\n        endcase\n        return r;\n    endfunction\n\n    always @(posedge clk) begin\n        if (!rst_n) begin\n            en_a <= 32'd0; md_a <= 32'd0; pd_a <= 32'd0; sq_a <= 32'd0;\n            en_b <= 32'd0; md_b <= 32'd0; pd_b <= 32'd0; sq_b <= 32'd0;\n        end else begin\n            pd_a <= next_pending(MASK_A, 6'd8,  pd_a, md_a, sq_a, src, we, addr, wdata);\n            pd_b <= next_pending(MASK_B, 6'd32, pd_b, md_b, sq_b, src, we, addr, wdata);\n            sq_a <= src & MASK_A;\n            sq_b <= src & MASK_B;\n            if (we && addr == A_ENABLE) begin\n                en_a <= wdata & MASK_A;\n                en_b <= wdata & MASK_B;\n            end\n            if (we && addr == A_MODE) begin\n                md_a <= wdata & MASK_A;\n                md_b <= wdata & MASK_B;\n            end\n        end\n    end\n\n    // ---------------------------------------------------------------- checkers\n    task automatic check_one(input int tag, input int n, input logic [31:0] got_rd,\n                             input logic got_irq, input logic [4:0] got_id,\n                             input logic [31:0] e, input logic [31:0] mo, input logic [31:0] p);\n        logic [31:0] act, exp_rd;\n        act = e & p;\n        exp_rd = exp_rdata(addr, e, mo, p);\n        checks++;\n        if (got_rd !== exp_rd || got_irq !== (|act) || got_id !== lowest(act)) begin\n            errors++;\n            if (errors <= 20)\n                $display(\"MISMATCH N=%0d tag=%0d t=%0t addr=%0d rdata=%h/%h irq=%b/%b irq_id=%0d/%0d\",\n                         n, tag, $time, addr, got_rd, exp_rd, got_irq, (|act), got_id, lowest(act));\n        end\n    endtask\n\n    task automatic check_all(input int tag);\n        check_one(tag, 8,  rdata_a, irq_a, irq_id_a, en_a, md_a, pd_a);\n        check_one(tag, 32, rdata_b, irq_b, irq_id_b, en_b, md_b, pd_b);\n    endtask\n\n    // One clock cycle: called at a falling edge, drives the inputs, checks before and after the\n    // rising edge, returns at the next falling edge.\n    task automatic step(input logic [31:0] s, input logic w, input logic [1:0] a,\n                        input logic [31:0] d, input int tag);\n        src = s; we = w; addr = a; wdata = d;\n        #1;\n        check_all(tag);\n        @(posedge clk);\n        #1;\n        check_all(tag);\n        @(negedge clk);\n    endtask\n\n    // Directed read with fixed expectations for both instances. Called at a falling edge; holds\n    // src, drops we and returns at the next falling edge (that edge leaves the state unchanged).\n    task automatic expect_rd(input logic [1:0] a, input logic [31:0] exp_a, input logic [31:0] exp_b);\n        we = 1'b0;\n        addr = a;\n        #1;\n        checks++;\n        if (rdata_a !== exp_a) begin\n            errors++;\n            if (errors <= 20)\n                $display(\"DIRECTED N=8 t=%0t addr=%0d rdata=%h expected=%h\", $time, a, rdata_a, exp_a);\n        end\n        checks++;\n        if (rdata_b !== exp_b) begin\n            errors++;\n            if (errors <= 20)\n                $display(\"DIRECTED N=32 t=%0t addr=%0d rdata=%h expected=%h\", $time, a, rdata_b, exp_b);\n        end\n        check_all(100);\n        @(negedge clk);\n    endtask\n\n    // Register write followed by a directed read back (ENABLE and MODE).\n    task automatic wr_rb(input logic [1:0] a, input logic [31:0] d);\n        step(src, 1'b1, a, d, 1);\n        expect_rd(a, d & MASK_A, d & MASK_B);\n    endtask\n\n    // ---------------------------------------------------------------- stimulus\n    initial begin : stimulus\n        logic [31:0] s, ea, eb, pa, pb;\n\n        // Phase 0: reset wins over writes and active sources.\n        @(negedge clk);\n        step(32'hFFFF_FFFF, 1'b1, A_ENABLE,  32'hFFFF_FFFF, 0);\n        step(32'hFFFF_FFFF, 1'b1, A_MODE,    32'hFFFF_FFFF, 0);\n        step(32'h0000_0000, 1'b0, A_PENDING, 32'd0,         0);\n        rst_n = 1'b1;\n        expect_rd(A_ENABLE,  32'd0, 32'd0);\n        expect_rd(A_MODE,    32'd0, 32'd0);\n        expect_rd(A_PENDING, 32'd0, 32'd0);\n        expect_rd(A_CLAIM,   32'd0, 32'd0);\n\n        // Phase 1: ENABLE and MODE patterns (bits N and up read as zero for N = 8).\n        wr_rb(A_ENABLE, 32'hFFFF_FFFF);\n        wr_rb(A_ENABLE, 32'h0000_0000);\n        wr_rb(A_ENABLE, 32'hAAAA_AAAA);\n        wr_rb(A_ENABLE, 32'h5555_5555);\n        wr_rb(A_MODE,   32'hFFFF_FFFF);\n        wr_rb(A_MODE,   32'h0000_0000);\n        wr_rb(A_MODE,   32'hAAAA_AAAA);\n        wr_rb(A_MODE,   32'h5555_5555);\n        expect_rd(A_ENABLE, 32'h0000_0055, 32'h5555_5555);\n        step(32'd0, 1'b1, A_PENDING, 32'hFFFF_FFFF, 1);\n        step(32'd0, 1'b1, A_CLAIM,   32'd0,         1);\n        expect_rd(A_PENDING, 32'd0, 32'd0);\n\n        // Phase 2: level mode, every source alone: detect, claim, hold, W1C.\n        wr_rb(A_MODE,   32'h0000_0000);\n        wr_rb(A_ENABLE, 32'hFFFF_FFFF);\n        for (int k = 0; k < 32; k++) begin\n            s  = 32'd1 << k;\n            ea = (k < 8) ? (32'h8000_0000 | k) : 32'd0;\n            eb = 32'h8000_0000 | k;\n            step(s, 1'b0, A_CLAIM, 32'd0, 2);\n            expect_rd(A_CLAIM, ea, eb);\n            step(32'd0, 1'b0, A_PENDING, 32'd0, 2);\n            expect_rd(A_PENDING, s & MASK_A, s);\n            step(32'd0, 1'b1, A_PENDING, s, 2);\n            expect_rd(A_PENDING, 32'd0, 32'd0);\n        end\n\n        // Phase 3: level mode, a detection wins over a W1C at the same edge.\n        s = 32'h0010_0010;\n        step(s, 1'b0, A_PENDING, 32'd0, 3);\n        expect_rd(A_PENDING, 32'h0000_0010, 32'h0010_0010);\n        step(s, 1'b1, A_PENDING, s, 3);\n        expect_rd(A_PENDING, 32'h0000_0010, 32'h0010_0010);\n        step(32'd0, 1'b1, A_PENDING, s, 3);\n        expect_rd(A_PENDING, 32'd0, 32'd0);\n\n        // Phase 4: fixed priority and acknowledge of every id, upper wdata bits set.\n        step(32'hFFFF_FFFF, 1'b0, A_CLAIM, 32'd0, 4);\n        step(32'd0,         1'b0, A_CLAIM, 32'd0, 4);\n        expect_rd(A_CLAIM, 32'h8000_0000, 32'h8000_0000);\n        for (int k = 0; k < 32; k++) begin\n            step(32'd0, 1'b1, A_CLAIM, 32'hFFFF_FFE0 | k, 4);\n            pb = (k == 31) ? 32'd0 : (32'hFFFF_FFFF << (k + 1));\n            pa = (32'h0000_00FF << (k + 1)) & MASK_A;\n            ea = (k < 7)  ? (32'h8000_0000 | (k + 1)) : 32'd0;\n            eb = (k < 31) ? (32'h8000_0000 | (k + 1)) : 32'd0;\n            expect_rd(A_PENDING, pa, pb);\n            expect_rd(A_CLAIM, ea, eb);\n        end\n        // Out-of-range acknowledge for N = 8 is ignored; N = 32 clears the bit.\n        step(32'hFFFF_FFFF, 1'b0, A_PENDING, 32'd0, 4);\n        step(32'd0,         1'b0, A_PENDING, 32'd0, 4);\n        expect_rd(A_PENDING, 32'h0000_00FF, 32'hFFFF_FFFF);\n        step(32'd0, 1'b1, A_CLAIM, 32'd9, 4);\n        expect_rd(A_PENDING, 32'h0000_00FF, 32'hFFFF_FDFF);\n        step(32'd0, 1'b1, A_CLAIM, 32'd31, 4);\n        expect_rd(A_PENDING, 32'h0000_00FF, 32'h7FFF_FDFF);\n        step(32'd0, 1'b1, A_CLAIM, 32'h0000_0025, 4);  // wdata[4:0] = 5\n        expect_rd(A_PENDING, 32'h0000_00DF, 32'h7FFF_FDDF);\n        // Enable masking of the priority.\n        step(32'd0, 1'b1, A_ENABLE, 32'hF0F0_F0F0, 4);\n        expect_rd(A_CLAIM, 32'h8000_0004, 32'h8000_0004);\n        step(32'd0, 1'b1, A_ENABLE, 32'hFFFF_0000, 4);\n        expect_rd(A_CLAIM, 32'd0, 32'h8000_0010);\n        step(32'd0, 1'b1, A_ENABLE, 32'hC000_0000, 4);\n        expect_rd(A_CLAIM, 32'd0, 32'h8000_001E);\n        step(32'd0, 1'b1, A_ENABLE, 32'h0000_0000, 4);\n        expect_rd(A_CLAIM, 32'd0, 32'd0);\n        expect_rd(A_PENDING, 32'h0000_00DF, 32'h7FFF_FDDF);\n        step(32'd0, 1'b1, A_PENDING, 32'hFFFF_FFFF, 4);\n        expect_rd(A_PENDING, 32'd0, 32'd0);\n        step(32'd0, 1'b1, A_ENABLE, 32'hFFFF_FFFF, 4);\n\n        // Phase 5: rising-edge mode.\n        wr_rb(A_MODE, 32'hFFFF_FFFF);\n        for (int k = 0; k < 32; k++) begin\n            s = 32'd1 << k;\n            step(s, 1'b0, A_PENDING, 32'd0, 5);\n            expect_rd(A_PENDING, s & MASK_A, s);\n            step(s, 1'b1, A_PENDING, s, 5);           // held high: no new edge, cleared\n            expect_rd(A_PENDING, 32'd0, 32'd0);\n            step(32'd0, 1'b0, A_PENDING, 32'd0, 5);\n        end\n        // An edge wins over a W1C at the same edge.\n        step(32'h0000_0004, 1'b1, A_PENDING, 32'h0000_0004, 5);\n        expect_rd(A_PENDING, 32'h0000_0004, 32'h0000_0004);\n        step(32'h0000_0004, 1'b1, A_PENDING, 32'h0000_0004, 5);\n        expect_rd(A_PENDING, 32'd0, 32'd0);\n        step(32'd0, 1'b0, A_PENDING, 32'd0, 5);\n        // An edge wins over an acknowledge at the same edge.\n        step(32'h0000_0008, 1'b1, A_CLAIM, 32'd3, 5);\n        expect_rd(A_PENDING, 32'h0000_0008, 32'h0000_0008);\n        expect_rd(A_CLAIM, 32'h8000_0003, 32'h8000_0003);\n        step(32'h0000_0008, 1'b1, A_CLAIM, 32'd3, 5);\n        expect_rd(A_PENDING, 32'd0, 32'd0);\n        step(32'd0, 1'b0, A_PENDING, 32'd0, 5);\n        // A one-cycle pulse stays latched.\n        step(32'h0001_0001, 1'b0, A_PENDING, 32'd0, 5);\n        step(32'd0,         1'b0, A_PENDING, 32'd0, 5);\n        expect_rd(A_PENDING, 32'h0000_0001, 32'h0001_0001);\n        step(32'd0, 1'b1, A_PENDING, 32'hFFFF_FFFF, 5);\n        expect_rd(A_PENDING, 32'd0, 32'd0);\n        // All sources rise together.\n        step(32'hFFFF_FFFF, 1'b0, A_CLAIM, 32'd0, 5);\n        expect_rd(A_CLAIM, 32'h8000_0000, 32'h8000_0000);\n        step(32'hFFFF_FFFF, 1'b1, A_PENDING, 32'hFFFF_FFFF, 5);\n        expect_rd(A_PENDING, 32'd0, 32'd0);\n        step(32'd0, 1'b0, A_PENDING, 32'd0, 5);\n\n        // Phase 6: mixed modes, then a mode change with the sources held high.\n        wr_rb(A_MODE, 32'h5555_5555);\n        step(32'hFFFF_FFFF, 1'b0, A_PENDING, 32'd0, 6);\n        expect_rd(A_PENDING, 32'h0000_00FF, 32'hFFFF_FFFF);\n        step(32'hFFFF_FFFF, 1'b1, A_PENDING, 32'hFFFF_FFFF, 6);\n        expect_rd(A_PENDING, 32'h0000_00AA, 32'hAAAA_AAAA);\n        expect_rd(A_CLAIM, 32'h8000_0001, 32'h8000_0001);\n        step(32'hFFFF_FFFF, 1'b1, A_MODE, 32'h0000_0000, 6);\n        step(32'hFFFF_FFFF, 1'b0, A_PENDING, 32'd0, 6);\n        expect_rd(A_PENDING, 32'h0000_00FF, 32'hFFFF_FFFF);\n        step(32'd0, 1'b1, A_PENDING, 32'hFFFF_FFFF, 6);\n        expect_rd(A_PENDING, 32'd0, 32'd0);\n\n        // Phase 7: reset in the middle of activity.\n        wr_rb(A_MODE, 32'h0F0F_0F0F);\n        step(32'hFFFF_FFFF, 1'b0, A_CLAIM, 32'd0, 7);\n        expect_rd(A_CLAIM, 32'h8000_0000, 32'h8000_0000);\n        rst_n = 1'b0;\n        step(32'hFFFF_FFFF, 1'b1, A_ENABLE, 32'hFFFF_FFFF, 7);\n        expect_rd(A_ENABLE,  32'd0, 32'd0);\n        expect_rd(A_MODE,    32'd0, 32'd0);\n        expect_rd(A_PENDING, 32'd0, 32'd0);\n        expect_rd(A_CLAIM,   32'd0, 32'd0);\n        rst_n = 1'b1;\n        step(32'hFFFF_FFFF, 1'b0, A_PENDING, 32'd0, 7);\n        expect_rd(A_PENDING, 32'h0000_00FF, 32'hFFFF_FFFF);\n        expect_rd(A_CLAIM, 32'd0, 32'd0);\n        step(32'd0, 1'b1, A_PENDING, 32'hFFFF_FFFF, 7);\n        expect_rd(A_PENDING, 32'd0, 32'd0);\n        step(32'd0, 1'b0, A_CLAIM, 32'd0, 8);\n\n        if (!$value$plusargs(\"nirmaan_nonce=%s\", nonce)) nonce = \"none\";\n        $display(\"NIRMAAN-SIM %0s %0d passed, %0d failed\", nonce, (checks > errors ? checks - errors : 0), errors);\n        $finish;\n    end\nendmodule\n=== END FILE ==="
+    }
+  ],
+  "format": "nirmaan.eval-trial",
+  "harness_variant": "default",
+  "judge_runs": [
+    {
+      "check": "The seat's testbench passes the approved RTL, meets the coverage bounds on it and fails each interrupt controller mutant",
+      "params": {
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-nihe9669/judge/check-1/must-fail-yxskf3k4/clean/irq_ctrl_cov_tb.sv",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-nihe9669/judge/check-1/must-fail-yxskf3k4/clean/irq_ctrl.v"
+        ],
+        "top": "irq_ctrl_cov_tb"
+      },
+      "run": "run-0003",
+      "succeeded": true,
+      "summary": "verilator-coverage: coverage read over irq_ctrl.v: line 100.00% (16/16), toggle 94.74% (974/1028), branch 100.00% (24/24); simulation passed: 2236 checks passed, $finish reached, 0 errors",
+      "tool": "coverage.read"
+    },
+    {
+      "check": "The seat's testbench passes the approved RTL, meets the coverage bounds on it and fails each interrupt controller mutant",
+      "params": {
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-nihe9669/judge/check-1/must-fail-yxskf3k4/cover/irq_ctrl_cov_tb.sv",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-nihe9669/judge/check-1/must-fail-yxskf3k4/cover/irq_ctrl.v"
+        ],
+        "top": "irq_ctrl_cov_tb"
+      },
+      "run": "run-0004",
+      "succeeded": true,
+      "summary": "verilator-coverage: coverage read over irq_ctrl.v: line 100.00% (16/16), toggle 94.74% (974/1028), branch 100.00% (24/24); simulation passed: 2236 checks passed, $finish reached, 0 errors",
+      "tool": "coverage.read"
+    },
+    {
+      "check": "The seat's testbench passes the approved RTL, meets the coverage bounds on it and fails each interrupt controller mutant",
+      "params": {
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-nihe9669/judge/check-1/must-fail-yxskf3k4/mutant-1-1/irq_ctrl_cov_tb.sv",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-nihe9669/judge/check-1/must-fail-yxskf3k4/mutant-1-1/irq_ctrl.v"
+        ],
+        "top": "irq_ctrl_cov_tb"
+      },
+      "run": "run-0005",
+      "succeeded": false,
+      "summary": "verilator-coverage: coverage not read: simulation failed: the testbench reports 285 of 2236 checks failed",
+      "tool": "coverage.read"
+    },
+    {
+      "check": "The seat's testbench passes the approved RTL, meets the coverage bounds on it and fails each interrupt controller mutant",
+      "params": {
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-nihe9669/judge/check-1/must-fail-yxskf3k4/mutant-1-2/irq_ctrl_cov_tb.sv",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-nihe9669/judge/check-1/must-fail-yxskf3k4/mutant-1-2/irq_ctrl.v"
+        ],
+        "top": "irq_ctrl_cov_tb"
+      },
+      "run": "run-0006",
+      "succeeded": false,
+      "summary": "verilator-coverage: coverage not read: simulation failed: the testbench reports 422 of 2236 checks failed",
+      "tool": "coverage.read"
+    },
+    {
+      "check": "The seat's testbench passes the approved RTL, meets the coverage bounds on it and fails each interrupt controller mutant",
+      "params": {
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-nihe9669/judge/check-1/must-fail-yxskf3k4/mutant-1-3/irq_ctrl_cov_tb.sv",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-nihe9669/judge/check-1/must-fail-yxskf3k4/mutant-1-3/irq_ctrl.v"
+        ],
+        "top": "irq_ctrl_cov_tb"
+      },
+      "run": "run-0007",
+      "succeeded": false,
+      "summary": "verilator-coverage: coverage not read: simulation failed: the testbench reports 44 of 2236 checks failed",
+      "tool": "coverage.read"
+    }
+  ],
+  "knowledge": "off",
+  "model": "claude-opus-5-5",
+  "purpose": "evidence",
+  "record": "2026-11-19-claude-code-claude-opus-5-5-without-knowledge-8",
+  "result": {
+    "attempts": 1,
+    "attestations": [],
+    "audit_ok": true,
+    "case": "dv/coverage-irq-ctrl",
+    "case_digest": "sha256:c828a43209fa717fd4de48b3cadd48ff275faefa3afed2b7523d96e6013f5696",
+    "cli": "2.1.325",
+    "cost_usd": null,
+    "detail": "Decisions for the reviewer:\n1. I added a second DUT instance at N=32. The RTL allows N from 2 to 32. At N=8 alone, about 26 toggle points (rdata[30:8], irq_id[4:3], unused_wdata) are structurally unreachable, which would cap toggle coverage. N=32 makes them reachable, while the N=8 instance keeps the out-of-range acknowledge branch and the upper-bit masking covered. If the project's interface spec fixes N=8 only, or if coverage.read reports per instance in a way that penalises this, the reviewer may want dut_b removed. I did not escalate because both are legal configurations of the approved RTL.\n2. I avoided initializers on the model registers and used no int bit-selects, to stay friendly to both Icarus and Verilator. The clk and input initializers mirror the approved testbench.\n3. tool_runs is empty because run-0001 is the upstream idle testbench's run, not a run of this file. It is cited in the report only as the baseline.\n4. The task is not complete until the platform's coverage.read run passes and an independent review_record is recorded.",
+    "duration_s": 410.47,
+    "gate_runs": [
+      {
+        "run": "run-0002",
+        "succeeded": true,
+        "summary": "verilator-coverage: coverage read over irq_ctrl.v: line 100.00% (16/16), toggle 94.74% (974/1028), branch 100.00% (24/24); simulation passed: 2236 checks passed, $finish reached, 0 errors",
+        "tool": "coverage.read"
+      }
+    ],
+    "harness": "sha256:9aa7a333cd961a23aa919616fac6428f9f29fed1ba44b2fa3f5c6ee49e745d39",
+    "input_tokens": 2,
+    "model_calls": 1,
+    "output_tokens": 37957,
+    "passed": true,
+    "replay": false,
+    "runtime": "claude-code",
+    "sandbox": "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-nihe9669",
+    "scores": [
+      {
+        "failed_runs": [
+          "run-0005",
+          "run-0006",
+          "run-0007"
+        ],
+        "name": "The seat's testbench passes the approved RTL, meets the coverage bounds on it and fails each interrupt controller mutant",
+        "runs": [
+          "run-0003",
+          "run-0004"
+        ],
+        "scorer": "must-fail",
+        "status": "passed",
+        "summary": "coverage.read run-0003 passed on the clean inputs with every cover reached; 3 of 3 mutants failed it"
+      }
+    ],
+    "seat": "prj-63d6b8e26c:coverage",
+    "seat_status": "in_review",
+    "started_at": "2026-11-19T04:52:04.873935Z",
+    "submitted": true,
+    "tool_calls": [],
+    "version": "1.25.0"
+  },
+  "skills": {
+    "code_coverage": "sha256:625dbe16718c0bdbc6e60b3ea2085fb9ee130b2ff9d3b135fc88ef9c389df872"
+  },
+  "stage": "coverage",
+  "trial": 1,
+  "version": 1
+}
