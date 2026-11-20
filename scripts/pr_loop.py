@@ -154,6 +154,11 @@ def transient_error(exc) -> bool:
     return False
 
 
+# git's push rejection with no reason given: GitHub failed the ref update itself, and the same
+# commit pushed minutes later is accepted. A rejection that names a reason (a hook, a rule) is not this.
+PUSH_REJECTED_NO_REASON = re.compile(r"\[remote rejected\][^\n]*\(failed\)\s*$", re.M)
+
+
 def _rate_limited(k: dict) -> bool:
     """A key deferred by the plan's limit: by its call outcome, or by the text
     of its failed call (wordings the classifier missed)."""
@@ -1392,12 +1397,19 @@ class Loop:
             return {"outcome": "head-moved"}
         try:
             # A plain push: the merge has the head as its first parent, and GitHub refuses it if the branch moved.
-            _git(wt, "push", "--quiet", "--no-verify", "origin", f"{new}:refs/heads/{pull['head_ref']}")
+            try:
+                _git(wt, "push", "--quiet", "--no-verify", "origin", f"{new}:refs/heads/{pull['head_ref']}")
+            except subprocess.CalledProcessError as first:
+                if not PUSH_REJECTED_NO_REASON.search(first.stderr or ""):
+                    raise
+                # A reasonless rejection is a passing fault: fetch again and push the same commit once more.
+                _git(wt, "fetch", "--quiet", "--no-tags", "origin", pull["head_ref"])
+                _git(wt, "push", "--quiet", "--no-verify", "origin", f"{new}:refs/heads/{pull['head_ref']}")
         except subprocess.CalledProcessError as exc:
             if o["github"].get_pull(n)["head_sha"] != head:
                 self._log(ctx, "head-moved")
                 return {"outcome": "head-moved"}
-            if transient_error(exc):
+            if transient_error(exc) or PUSH_REJECTED_NO_REASON.search(exc.stderr or ""):
                 return self._retry(ctx, head, f"updating the branch with main: the push failed ({(exc.stderr or str(exc)).strip()[:300]})")
             return self._stop(ctx, head, f"updating the branch with main: the push failed ({(exc.stderr or str(exc)).strip()[:300]})")
         if st["last_fix_head"] == head:

@@ -1,0 +1,364 @@
+{
+  "answers": [
+    {
+      "cache_read_tokens": 620,
+      "cache_write_tokens": 17192,
+      "error": null,
+      "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+      "input_tokens": 2,
+      "mode": "work",
+      "model": "claude-opus-5-5",
+      "output_tokens": 56183,
+      "packet_sha256": "af38ef71ad75f2ae1c399e1d4d70ede8c19b66ea302baf0f22ac677f29c46d88",
+      "prompt_sha256": "62def785f90a58b38d6b08bf80079cc06350a200a39a175f31946556831322df",
+      "provider": "claude-code",
+      "text": "```json\n{\"uncertainty\": 0.3, \"outcome\": \"Delivered rtl_source axil_timer.v (top axil_timer) and testbench axil_timer_tb.v (top axil_timer_tb), implemented from the approved interface and microarchitecture specs. No formal_spec is submitted. Lint, simulation and synthesis have not run yet; the platform runs them.\", \"artifacts\": [{\"kind\": \"decision_record\", \"title\": \"Formal proof deferred: no formal_spec in this submission\", \"summary\": \"Interface spec section 8 [artifact:prj-97dea43f5b.interface-spec.a1] and the verification plan in [artifact:prj-97dea43f5b.microarchitecture.a1] call for a SymbiYosys proof (axil_timer.sby, axil_timer_aw8.sby). This task's expected outputs are rtl_source and testbench only, so no formal_spec is submitted and the formal.run and formal.cover requirements do not apply. The RTL holds a small set of design-intent assertions under ifdef FORMAL; no tool reads them yet. The proof stays open for a follow-up task. This decision is recorded here and needs review.\"}, {\"kind\": \"traceability\", \"title\": \"Trace from requirement to RTL\", \"summary\": \"The RTL serves [requirement:req-2b2b91a584]. Its ports, register map, timer rules, responses and reset follow [artifact:prj-97dea43f5b.interface-spec.a1] sections 2 to 7. Its structure follows [artifact:prj-97dea43f5b.microarchitecture.a1] sections 1 to 4: aw_held and w_held, do_write, arready = !rvalid, count_end = en && count <= 1, the four-step priority order, is_mapped, and the synchronous active-low reset. The upstream specs carry independent reviews [evidence:prj-97dea43f5b.interface-spec.e1] [evidence:prj-97dea43f5b.microarchitecture.e1].\"}], \"files\": [{\"path\": \"axil_timer.v\", \"kind\": \"rtl_source\", \"title\": \"AXI4-Lite timer peripheral RTL\", \"summary\": \"Verilog-2001 single-clock RTL for [requirement:req-2b2b91a584] per [artifact:prj-97dea43f5b.interface-spec.a1] and [artifact:prj-97dea43f5b.microarchitecture.a1]. AW and W are independent, with holding flags. There is one outstanding transaction per direction, and all READY signals are driven by flops. Responses are SLVERR for unmapped addresses (unaligned, or offset 0x10 and up) and for writes to COUNT. Writes to CTRL need wstrb[0]. LOAD takes a byte-strobed merge. STATUS is write-1-to-clear, and a count end beats a clear. The timer has one-shot and periodic modes, and a LOAD of 0 counts as 1. irq = expired && ie. Every flop has a synchronous active-low reset. Combinational blocks set defaults first, so they infer no latches. Assertions sit under ifdef FORMAL.\", \"entry\": \"axil_timer\"}, {\"path\": \"axil_timer_tb.v\", \"kind\": \"testbench\", \"title\": \"Self-checking testbench, lanes at ADDR_WIDTH 8 and 4\", \"summary\": \"Directed self-checking testbench for the section 8 list in [artifact:prj-97dea43f5b.interface-spec.a1] and the timing method in [artifact:prj-97dea43f5b.microarchitecture.a1]. It drives instances at ADDR_WIDTH 8 and 4 from one bus and checks the two in lockstep. It covers: reset values; LOAD with partial and empty strobes; AW first, W first and both together; B and R backpressure; a read and a write on the same cycle; COUNT being read only; the SLVERR and unaligned policies; offsets 0x10 and up at width 8; a CTRL write without wstrb[0]; one-shot counts timed to the edge at LOAD 5, 1 and 0, with EN clearing itself and no second interrupt; the IE rules on a pending expiry; a periodic count of 20 over four periods, with a clear on the edge a count ends; a stop that freezes COUNT; restarts, including CTRL writes on the end edge; and reset during a count with responses pending. Failures use $error. It counts passing checks and prints the NIRMAAN-SIM verdict once, before $finish.\", \"entry\": \"axil_timer_tb\"}], \"tool_runs\": [], \"claims\": [\"The testbench is written to pass against axil_timer.v under Icarus (-g2012) and Verilator (--binary --timing). It has not run; only simulator.run can show it.\", \"axil_timer.v is written to be clean under Verilator --lint-only -Wall and to synthesize in Yosys without latches. lint.run and synth.run have not run.\", \"The ifdef FORMAL assertions in axil_timer.v are unchecked. No formal tool has read them.\"], \"escalation\": null, \"notes\": \"Choices made where the specs leave room. (1) The held address and data registers are reset as well, although microarchitecture section 4 says they need no reset; this follows the rtl_design guidance that every flop gets a reset. (2) do_write also requires !bvalid. That case cannot be reached, and the extra term guards against a second response. (3) The testbench reads internal signals only through ports, apart from the irq monitor; it does not use hierarchical references into the RTL. (4) The testbench uses # delays and so needs Verilator --timing. (5) No timescale is used in any file, which avoids Verilator TIMESCALEMOD. (6) The formal proof called for by spec section 8 is deferred, as recorded in the decision artifact. An independent review_record is still needed for this task.\"}\n```\n=== FILE: axil_timer.v ===\n// axil_timer: 32-bit down-counting timer with one-shot and periodic modes and\n// a level interrupt, behind an AXI4-Lite subordinate port.\n// Implements interface_spec.md per microarchitecture.md.\n`default_nettype none\n\nmodule axil_timer #(\n    parameter ADDR_WIDTH = 4\n) (\n    input  wire                  aclk,\n    input  wire                  aresetn,\n    input  wire [ADDR_WIDTH-1:0] s_axil_awaddr,\n    input  wire                  s_axil_awvalid,\n    output wire                  s_axil_awready,\n    input  wire [31:0]           s_axil_wdata,\n    input  wire [3:0]            s_axil_wstrb,\n    input  wire                  s_axil_wvalid,\n    output wire                  s_axil_wready,\n    output wire [1:0]            s_axil_bresp,\n    output wire                  s_axil_bvalid,\n    input  wire                  s_axil_bready,\n    input  wire [ADDR_WIDTH-1:0] s_axil_araddr,\n    input  wire                  s_axil_arvalid,\n    output wire                  s_axil_arready,\n    output wire [31:0]           s_axil_rdata,\n    output wire [1:0]            s_axil_rresp,\n    output wire                  s_axil_rvalid,\n    input  wire                  s_axil_rready,\n    output wire                  irq\n);\n\n    localparam [1:0] RESP_OKAY   = 2'b00;\n    localparam [1:0] RESP_SLVERR = 2'b10;\n    localparam [1:0] IDX_CTRL    = 2'd0;\n    localparam [1:0] IDX_LOAD    = 2'd1;\n    localparam [1:0] IDX_COUNT   = 2'd2;\n    localparam [1:0] IDX_STATUS  = 2'd3;\n    localparam [ADDR_WIDTH-1:0] ADDR_ZERO = {ADDR_WIDTH{1'b0}};\n\n    // ------------------------------------------------------------------\n    // Channel state\n    // ------------------------------------------------------------------\n    reg                  aw_held;\n    reg [ADDR_WIDTH-1:0] aw_addr_q;\n    reg                  w_held;\n    reg [31:0]           w_data_q;\n    reg [3:0]            w_strb_q;\n    reg                  bvalid_q;\n    reg [1:0]            bresp_q;\n    reg                  rvalid_q;\n    reg [31:0]           rdata_q;\n    reg [1:0]            rresp_q;\n\n    // ------------------------------------------------------------------\n    // Timer state\n    // ------------------------------------------------------------------\n    reg        en_q;\n    reg        ie_q;\n    reg        mode_q;\n    reg        expired_q;\n    reg [31:0] load_q;\n    reg [31:0] count_q;\n\n    // READY signals depend on flops only (no input-to-output path).\n    wire awready_w = ~aw_held & ~bvalid_q;\n    wire wready_w  = ~w_held  & ~bvalid_q;\n    wire arready_w = ~rvalid_q;\n\n    wire aw_hs = s_axil_awvalid & awready_w;\n    wire w_hs  = s_axil_wvalid  & wready_w;\n    wire ar_hs = s_axil_arvalid & arready_w;\n\n    // Both halves present (held or arriving): the write takes effect.\n    wire do_write = (aw_held | aw_hs) & (w_held | w_hs) & ~bvalid_q;\n\n    wire [ADDR_WIDTH-1:0] wr_addr = aw_held ? aw_addr_q : s_axil_awaddr;\n    wire [31:0]           wr_data = w_held  ? w_data_q  : s_axil_wdata;\n    wire [3:0]            wr_strb = w_held  ? w_strb_q  : s_axil_wstrb;\n\n    // Address decode: word aligned and below 0x10.\n    wire       wr_mapped = (wr_addr[1:0] == 2'b00) && ((wr_addr >> 4) == ADDR_ZERO);\n    wire [1:0] wr_idx    = wr_addr[3:2];\n    wire       wr_ok     = wr_mapped && (wr_idx != IDX_COUNT);\n    wire       wr_ctrl   = do_write && wr_mapped && (wr_idx == IDX_CTRL) && wr_strb[0];\n    wire       wr_load   = do_write && wr_mapped && (wr_idx == IDX_LOAD);\n    wire       wr_clear  = do_write && wr_mapped && (wr_idx == IDX_STATUS) &&\n                           wr_strb[0] && wr_data[0];\n\n    wire       rd_mapped = (s_axil_araddr[1:0] == 2'b00) &&\n                           ((s_axil_araddr >> 4) == ADDR_ZERO);\n    wire [1:0] rd_idx    = s_axil_araddr[3:2];\n\n    // Last cycle of a count: a COUNT of 1 or 0 while enabled.\n    wire count_end = en_q && (count_q <= 32'd1);\n\n    // ------------------------------------------------------------------\n    // Read data mux (register values before the accepting edge)\n    // ------------------------------------------------------------------\n    reg [31:0] rd_data;\n    reg [1:0]  rd_resp;\n\n    always @* begin\n        rd_data = 32'd0;\n        rd_resp = RESP_SLVERR;\n        if (rd_mapped) begin\n            rd_resp = RESP_OKAY;\n            case (rd_idx)\n                IDX_CTRL:   rd_data = {29'd0, mode_q, ie_q, en_q};\n                IDX_LOAD:   rd_data = load_q;\n                IDX_COUNT:  rd_data = count_q;\n                IDX_STATUS: rd_data = {31'd0, expired_q};\n                default:    rd_data = 32'd0;\n            endcase\n        end\n    end\n\n    // ------------------------------------------------------------------\n    // Timer next state; priorities fall out of last-assignment-wins\n    // ------------------------------------------------------------------\n    reg        en_d;\n    reg        ie_d;\n    reg        mode_d;\n    reg        expired_d;\n    reg [31:0] load_d;\n    reg [31:0] count_d;\n\n    always @* begin\n        en_d      = en_q;\n        ie_d      = ie_q;\n        mode_d    = mode_q;\n        expired_d = expired_q;\n        load_d    = load_q;\n        count_d   = count_q;\n\n        // 1. The count step.\n        if (en_q) begin\n            if (count_end) begin\n                if (mode_q) begin\n                    count_d = load_q;\n                end else begin\n                    count_d = 32'd0;\n                    en_d    = 1'b0;\n                end\n            end else begin\n                count_d = count_q - 32'd1;\n            end\n        end\n\n        // 2. EXPIRED: clear, then set (a count end beats a clear).\n        if (wr_clear) begin\n            expired_d = 1'b0;\n        end\n        if (count_end) begin\n            expired_d = 1'b1;\n        end\n\n        // 3. CTRL write wins over the count step for EN and COUNT.\n        if (wr_ctrl) begin\n            ie_d   = wr_data[1];\n            mode_d = wr_data[2];\n            if (wr_data[0]) begin\n                en_d    = 1'b1;\n                count_d = load_q;\n            end else begin\n                en_d = 1'b0;\n            end\n        end\n\n        // 4. LOAD write merges strobed bytes.\n        if (wr_load) begin\n            if (wr_strb[0]) load_d[7:0]   = wr_data[7:0];\n            if (wr_strb[1]) load_d[15:8]  = wr_data[15:8];\n            if (wr_strb[2]) load_d[23:16] = wr_data[23:16];\n            if (wr_strb[3]) load_d[31:24] = wr_data[31:24];\n        end\n    end\n\n    always @(posedge aclk) begin\n        if (!aresetn) begin\n            en_q      <= 1'b0;\n            ie_q      <= 1'b0;\n            mode_q    <= 1'b0;\n            expired_q <= 1'b0;\n            load_q    <= 32'd0;\n            count_q   <= 32'd0;\n        end else begin\n            en_q      <= en_d;\n            ie_q      <= ie_d;\n            mode_q    <= mode_d;\n            expired_q <= expired_d;\n            load_q    <= load_d;\n            count_q   <= count_d;\n        end\n    end\n\n    // ------------------------------------------------------------------\n    // Write channels\n    // ------------------------------------------------------------------\n    always @(posedge aclk) begin\n        if (!aresetn) begin\n            aw_held   <= 1'b0;\n            aw_addr_q <= ADDR_ZERO;\n            w_held    <= 1'b0;\n            w_data_q  <= 32'd0;\n            w_strb_q  <= 4'd0;\n            bvalid_q  <= 1'b0;\n            bresp_q   <= RESP_OKAY;\n        end else begin\n            if (do_write) begin\n                aw_held  <= 1'b0;\n                w_held   <= 1'b0;\n                bvalid_q <= 1'b1;\n                bresp_q  <= wr_ok ? RESP_OKAY : RESP_SLVERR;\n            end else begin\n                if (aw_hs) begin\n                    aw_held   <= 1'b1;\n                    aw_addr_q <= s_axil_awaddr;\n                end\n                if (w_hs) begin\n                    w_held   <= 1'b1;\n                    w_data_q <= s_axil_wdata;\n                    w_strb_q <= s_axil_wstrb;\n                end\n                if (bvalid_q && s_axil_bready) begin\n                    bvalid_q <= 1'b0;\n                end\n            end\n        end\n    end\n\n    // ------------------------------------------------------------------\n    // Read channels\n    // ------------------------------------------------------------------\n    always @(posedge aclk) begin\n        if (!aresetn) begin\n            rvalid_q <= 1'b0;\n            rdata_q  <= 32'd0;\n            rresp_q  <= RESP_OKAY;\n        end else begin\n            if (ar_hs) begin\n                rvalid_q <= 1'b1;\n                rdata_q  <= rd_data;\n                rresp_q  <= rd_resp;\n            end else if (rvalid_q && s_axil_rready) begin\n                rvalid_q <= 1'b0;\n            end\n        end\n    end\n\n    assign s_axil_awready = awready_w;\n    assign s_axil_wready  = wready_w;\n    assign s_axil_bvalid  = bvalid_q;\n    assign s_axil_bresp   = bresp_q;\n    assign s_axil_arready = arready_w;\n    assign s_axil_rvalid  = rvalid_q;\n    assign s_axil_rdata   = rdata_q;\n    assign s_axil_rresp   = rresp_q;\n    assign irq            = expired_q & ie_q;\n\n`ifdef FORMAL\n    // Design-intent assertions (not yet run by any tool).\n    reg f_past_valid;\n    initial f_past_valid = 1'b0;\n    always @(posedge aclk) f_past_valid <= 1'b1;\n\n    always @(*) begin\n        if (!f_past_valid) assume(!aresetn);\n    end\n\n    always @(posedge aclk) begin\n        if (f_past_valid && $past(!aresetn)) begin\n            assert(!bvalid_q);\n            assert(!rvalid_q);\n            assert(!en_q);\n            assert(!expired_q);\n            assert(!aw_held);\n            assert(!w_held);\n        end\n    end\n\n    always @(*) begin\n        if (bvalid_q) assert(!aw_held && !w_held);\n        assert(bresp_q == RESP_OKAY || bresp_q == RESP_SLVERR);\n        assert(rresp_q == RESP_OKAY || rresp_q == RESP_SLVERR);\n        assert(irq == (expired_q && ie_q));\n    end\n`endif\n\nendmodule\n\n`default_nettype wire\n=== END FILE ===\n=== FILE: axil_timer_tb.v ===\n// axil_timer_tb: self-checking directed testbench for axil_timer.\n// Two lanes share one bus: dut8 (ADDR_WIDTH 8) and dut4 (ADDR_WIDTH 4).\n// Inputs change 1 time unit after a rising edge; outputs are sampled there\n// or at the falling edge.\nmodule axil_timer_tb;\n\n    localparam [1:0] OKAY   = 2'b00;\n    localparam [1:0] SLVERR = 2'b10;\n\n    reg aclk = 1'b0;\n    always #5 aclk = ~aclk;\n\n    reg        aresetn = 1'b0;\n    reg [7:0]  awaddr  = 8'h00;\n    reg        awvalid = 1'b0;\n    reg [31:0] wdata   = 32'h0000_0000;\n    reg [3:0]  wstrb   = 4'h0;\n    reg        wvalid  = 1'b0;\n    reg        bready  = 1'b0;\n    reg [7:0]  araddr  = 8'h00;\n    reg        arvalid = 1'b0;\n    reg        rready  = 1'b0;\n\n    wire        awready8, wready8, bvalid8, arready8, rvalid8, irq8;\n    wire [1:0]  bresp8, rresp8;\n    wire [31:0] rdata8;\n    wire        awready4, wready4, bvalid4, arready4, rvalid4, irq4;\n    wire [1:0]  bresp4, rresp4;\n    wire [31:0] rdata4;\n\n    axil_timer #(.ADDR_WIDTH(8)) dut8 (\n        .aclk(aclk), .aresetn(aresetn),\n        .s_axil_awaddr(awaddr), .s_axil_awvalid(awvalid), .s_axil_awready(awready8),\n        .s_axil_wdata(wdata), .s_axil_wstrb(wstrb), .s_axil_wvalid(wvalid), .s_axil_wready(wready8),\n        .s_axil_bresp(bresp8), .s_axil_bvalid(bvalid8), .s_axil_bready(bready),\n        .s_axil_araddr(araddr), .s_axil_arvalid(arvalid), .s_axil_arready(arready8),\n        .s_axil_rdata(rdata8), .s_axil_rresp(rresp8), .s_axil_rvalid(rvalid8), .s_axil_rready(rready),\n        .irq(irq8)\n    );\n\n    axil_timer #(.ADDR_WIDTH(4)) dut4 (\n        .aclk(aclk), .aresetn(aresetn),\n        .s_axil_awaddr(awaddr[3:0]), .s_axil_awvalid(awvalid), .s_axil_awready(awready4),\n        .s_axil_wdata(wdata), .s_axil_wstrb(wstrb), .s_axil_wvalid(wvalid), .s_axil_wready(wready4),\n        .s_axil_bresp(bresp4), .s_axil_bvalid(bvalid4), .s_axil_bready(bready),\n        .s_axil_araddr(araddr[3:0]), .s_axil_arvalid(arvalid), .s_axil_arready(arready4),\n        .s_axil_rdata(rdata4), .s_axil_rresp(rresp4), .s_axil_rvalid(rvalid4), .s_axil_rready(rready),\n        .irq(irq4)\n    );\n\n    // ------------------------------------------------------------------\n    // Bookkeeping\n    // ------------------------------------------------------------------\n    integer cycle = 0;                 // index of the last rising edge\n    always @(posedge aclk) cycle <= cycle + 1;\n\n    integer passed = 0;\n    integer failed = 0;\n    integer phase  = 0;\n    integer rc     = 0;\n    reg     done   = 1'b0;\n    reg [8*64-1:0] nonce = {(8*64){1'b0}};\n\n    // Monitors (written only here)\n    reg     mon_en        = 1'b0;\n    reg     lockstep_irq  = 1'b1;\n    reg     irq_last      = 1'b0;\n    integer irq_rise_edge = -1;\n    integer irq_rises     = 0;\n    integer lock_errs     = 0;\n\n    always @(negedge aclk) begin\n        if (mon_en) begin\n            if (irq8 === 1'b1 && irq_last !== 1'b1) begin\n                irq_rise_edge = cycle;\n                irq_rises = irq_rises + 1;\n            end\n            if ((awready8 !== awready4) || (wready8 !== wready4) ||\n                (bvalid8 !== bvalid4) || (arready8 !== arready4) ||\n                (rvalid8 !== rvalid4) || (lockstep_irq && (irq8 !== irq4))) begin\n                lock_errs = lock_errs + 1;\n                $error(\"cycle %0d: ADDR_WIDTH 8 and 4 lanes disagree on handshake or irq\", cycle);\n            end\n        end\n        irq_last = irq8;\n    end\n\n    // Results of the last transfer\n    reg [1:0]  b8, b4, rr8, rr4;\n    reg [31:0] r8, r4;\n    integer    wr_edge = 0;\n    integer    ar_edge = 0;\n\n    // ------------------------------------------------------------------\n    // Check helpers\n    // ------------------------------------------------------------------\n    task chk1(input integer id, input got, input exp);\n        begin\n            if (got === exp) passed = passed + 1;\n            else begin\n                failed = failed + 1;\n                $error(\"phase %0d check %0d: got %b, expected %b\", phase, id, got, exp);\n            end\n        end\n    endtask\n\n    task chk2(input integer id, input [1:0] got, input [1:0] exp);\n        begin\n            if (got === exp) passed = passed + 1;\n            else begin\n                failed = failed + 1;\n                $error(\"phase %0d check %0d: got %b, expected %b\", phase, id, got, exp);\n            end\n        end\n    endtask\n\n    task chk32(input integer id, input [31:0] got, input [31:0] exp);\n        begin\n            if (got === exp) passed = passed + 1;\n            else begin\n                failed = failed + 1;\n                $error(\"phase %0d check %0d: got %h, expected %h\", phase, id, got, exp);\n            end\n        end\n    endtask\n\n    task chkint(input integer id, input integer got, input integer exp);\n        begin\n            if (got == exp) passed = passed + 1;\n            else begin\n                failed = failed + 1;\n                $error(\"phase %0d check %0d: got %0d, expected %0d\", phase, id, got, exp);\n            end\n        end\n    endtask\n\n    task tick;\n        begin\n            @(posedge aclk);\n            #1;\n        end\n    endtask\n\n    task wait_edge(input integer e);\n        begin\n            while (cycle < e) tick;\n        end\n    endtask\n\n    // ------------------------------------------------------------------\n    // Bus tasks. order: 0 AW and W together, 1 AW first, 2 W first.\n    // ------------------------------------------------------------------\n    task axi_write(input [7:0] addr, input [31:0] data, input [3:0] strb,\n                   input integer order, input integer bdelay);\n        reg aw_left;\n        reg w_left;\n        reg aw_go;\n        reg w_go;\n        integer k;\n        begin\n            awaddr  = addr;\n            wdata   = data;\n            wstrb   = strb;\n            aw_left = 1'b1;\n            w_left  = 1'b1;\n            awvalid = (order != 2) ? 1'b1 : 1'b0;\n            wvalid  = (order != 1) ? 1'b1 : 1'b0;\n            while (aw_left || w_left) begin\n                @(negedge aclk);\n                aw_go = awvalid & awready8;\n                w_go  = wvalid & wready8;\n                @(posedge aclk);\n                #1;\n                if (aw_go) begin aw_left = 1'b0; awvalid = 1'b0; end\n                if (w_go)  begin w_left  = 1'b0; wvalid  = 1'b0; end\n                if (order == 1 && !aw_left && w_left) wvalid  = 1'b1;\n                if (order == 2 && !w_left && aw_left) awvalid = 1'b1;\n            end\n            wr_edge = cycle;\n            chk1(1, bvalid8, 1'b1);\n            chk1(2, bvalid4, 1'b1);\n            chk1(3, awready8, 1'b0);\n            chk1(4, wready8, 1'b0);\n            b8 = bresp8;\n            b4 = bresp4;\n            for (k = 0; k < bdelay; k = k + 1) begin\n                tick;\n                chk1(5, bvalid8, 1'b1);\n                chk2(6, bresp8, b8);\n                chk1(7, bvalid4, 1'b1);\n                chk2(8, bresp4, b4);\n                chk1(9, awready8, 1'b0);\n            end\n            bready = 1'b1;\n            tick;\n            bready = 1'b0;\n            chk1(10, bvalid8, 1'b0);\n            chk1(11, bvalid4, 1'b0);\n        end\n    endtask\n\n    task axi_read(input [7:0] addr, input integer rdelay);\n        reg ar_go;\n        integer k;\n        begin\n            araddr  = addr;\n            arvalid = 1'b1;\n            ar_go   = 1'b0;\n            while (!ar_go) begin\n                @(negedge aclk);\n                ar_go = arready8;\n                @(posedge aclk);\n                #1;\n            end\n            arvalid = 1'b0;\n            ar_edge = cycle;\n            chk1(20, rvalid8, 1'b1);\n            chk1(21, rvalid4, 1'b1);\n            chk1(22, arready8, 1'b0);\n            r8  = rdata8;\n            rr8 = rresp8;\n            r4  = rdata4;\n            rr4 = rresp4;\n            for (k = 0; k < rdelay; k = k + 1) begin\n                tick;\n                chk1(23, rvalid8, 1'b1);\n                chk32(24, rdata8, r8);\n                chk2(25, rresp8, rr8);\n                chk32(26, rdata4, r4);\n                chk2(27, rresp4, rr4);\n                chk1(28, arready8, 1'b0);\n            end\n            rready = 1'b1;\n            tick;\n            rready = 1'b0;\n            chk1(29, rvalid8, 1'b0);\n            chk1(30, rvalid4, 1'b0);\n        end\n    endtask\n\n    task write_chk(input integer id, input [7:0] addr, input [31:0] data, input [3:0] strb,\n                   input integer order, input integer bdelay, input [1:0] resp);\n        begin\n            axi_write(addr, data, strb, order, bdelay);\n            chk2(id, b8, resp);\n            chk2(id, b4, resp);\n        end\n    endtask\n\n    task write_chk2(input integer id, input [7:0] addr, input [31:0] data, input [3:0] strb,\n                    input [1:0] resp8, input [1:0] resp4);\n        begin\n            axi_write(addr, data, strb, 0, 0);\n            chk2(id, b8, resp8);\n            chk2(id, b4, resp4);\n        end\n    endtask\n\n    task read_chk(input integer id, input [7:0] addr, input [31:0] exp, input [1:0] resp,\n                  input integer rdelay);\n        begin\n            axi_read(addr, rdelay);\n            chk32(id, r8, exp);\n            chk2(id, rr8, resp);\n            chk32(id, r4, exp);\n            chk2(id, rr4, resp);\n        end\n    endtask\n\n    task read_chk2(input integer id, input [7:0] addr, input [31:0] exp8, input [1:0] resp8,\n                   input [31:0] exp4, input [1:0] resp4);\n        begin\n            axi_read(addr, 0);\n            chk32(id, r8, exp8);\n            chk2(id, rr8, resp8);\n            chk32(id, r4, exp4);\n            chk2(id, rr4, resp4);\n        end\n    endtask\n\n    // ------------------------------------------------------------------\n    // Watchdog\n    // ------------------------------------------------------------------\n    initial begin : watchdog\n        #200000;\n        if (!done) begin\n            $error(\"timeout: the test did not finish\");\n            $display(\"NIRMAAN-SIM %0s %0d passed, %0d failed\", nonce, passed, failed + 1);\n            $finish;\n        end\n    end\n\n    // ------------------------------------------------------------------\n    // Directed sequence\n    // ------------------------------------------------------------------\n    integer e0, r0, s0, rb, frozen;\n\n    initial begin : main\n        rc = $value$plusargs(\"nirmaan_nonce=%s\", nonce);\n\n        // Reset\n        aresetn = 1'b0;\n        repeat (3) tick;\n        aresetn = 1'b1;\n        tick;\n        mon_en = 1'b1;\n\n        // ---------------- Phase 1: reset values ----------------\n        phase = 1;\n        chk1(1, awready8, 1'b1);\n        chk1(2, wready8, 1'b1);\n        chk1(3, arready8, 1'b1);\n        chk1(4, bvalid8, 1'b0);\n        chk1(5, rvalid8, 1'b0);\n        chk1(6, irq8, 1'b0);\n        chk1(7, irq4, 1'b0);\n        read_chk(10, 8'h00, 32'h0000_0000, OKAY, 0);\n        read_chk(11, 8'h04, 32'h0000_0000, OKAY, 0);\n        read_chk(12, 8'h08, 32'h0000_0000, OKAY, 0);\n        read_chk(13, 8'h0C, 32'h0000_0000, OKAY, 0);\n\n        // ---------------- Phase 2: strobes, orders, backpressure ----------------\n        phase = 2;\n        write_chk(1, 8'h04, 32'hFFFF_FFFF, 4'hF, 0, 0, OKAY);\n        read_chk(2, 8'h04, 32'hFFFF_FFFF, OKAY, 0);\n        write_chk(3, 8'h04, 32'h1234_5678, 4'h5, 1, 3, OKAY);\n        read_chk(4, 8'h04, 32'hFF34_FF78, OKAY, 4);\n        write_chk(5, 8'h04, 32'hA5A5_A5A5, 4'hA, 2, 2, OKAY);\n        read_chk(6, 8'h04, 32'hA534_A578, OKAY, 0);\n        write_chk(7, 8'h04, 32'h0000_0000, 4'h0, 0, 1, OKAY);\n        read_chk(8, 8'h04, 32'hA534_A578, OKAY, 0);\n        // A write and a read accepted on the same edge: the read sees the\n        // value before that edge.\n        awaddr  = 8'h04;\n        wdata   = 32'h1111_1111;\n        wstrb   = 4'hF;\n        awvalid = 1'b1;\n        wvalid  = 1'b1;\n        araddr  = 8'h04;\n        arvalid = 1'b1;\n        @(negedge aclk);\n        chk1(9, awready8, 1'b1);\n        chk1(10, wready8, 1'b1);\n        chk1(11, arready8, 1'b1);\n        @(posedge aclk);\n        #1;\n        awvalid = 1'b0;\n        wvalid  = 1'b0;\n        arvalid = 1'b0;\n        chk1(12, bvalid8, 1'b1);\n        chk1(13, rvalid8, 1'b1);\n        chk2(14, bresp8, OKAY);\n        chk2(15, bresp4, OKAY);\n        chk32(16, rdata8, 32'hA534_A578);\n        chk32(17, rdata4, 32'hA534_A578);\n        bready = 1'b1;\n        rready = 1'b1;\n        tick;\n        bready = 1'b0;\n        rready = 1'b0;\n        chk1(18, bvalid8, 1'b0);\n        chk1(19, rvalid8, 1'b0);\n        read_chk(20, 8'h04, 32'h1111_1111, OKAY, 0);\n\n        // ---------------- Phase 3: SLVERR policy, CTRL without wstrb[0] ----------------\n        phase = 3;\n        write_chk(1, 8'h08, 32'h0000_0055, 4'hF, 0, 0, SLVERR);\n        read_chk(2, 8'h08, 32'h0000_0000, OKAY, 0);\n        write_chk(3, 8'h06, 32'h0000_0000, 4'hF, 0, 0, SLVERR);\n        read_chk(4, 8'h04, 32'h1111_1111, OKAY, 0);\n        read_chk(5, 8'h06, 32'h0000_0000, SLVERR, 0);\n        read_chk(6, 8'h01, 32'h0000_0000, SLVERR, 0);\n        write_chk(7, 8'h01, 32'h0000_0007, 4'hF, 1, 0, SLVERR);\n        read_chk(8, 8'h00, 32'h0000_0000, OKAY, 0);\n        write_chk(9, 8'h00, 32'h0000_0007, 4'hE, 0, 0, OKAY);\n        read_chk(10, 8'h00, 32'h0000_0000, OKAY, 0);\n        repeat (5) tick;\n        read_chk(11, 8'h08, 32'h0000_0000, OKAY, 0);\n        chkint(12, irq_rises, 0);\n        write_chk(13, 8'h0C, 32'h0000_0001, 4'hF, 0, 0, OKAY);\n        read_chk(14, 8'h0C, 32'h0000_0000, OKAY, 0);\n\n        // ---------------- Phase 4: one-shot timing ----------------\n        phase = 4;\n        write_chk(1, 8'h04, 32'd5, 4'hF, 0, 0, OKAY);\n        rb = irq_rises;\n        write_chk(2, 8'h00, 32'h0000_0003, 4'h1, 0, 0, OKAY);\n        e0 = wr_edge;\n        wait_edge(e0 + 6);\n        chkint(3, irq_rise_edge, e0 + 5);\n        chkint(4, irq_rises, rb + 1);\n        chk1(5, irq8, 1'b1);\n        read_chk(6, 8'h00, 32'h0000_0002, OKAY, 0);\n        read_chk(7, 8'h08, 32'h0000_0000, OKAY, 0);\n        read_chk(8, 8'h0C, 32'h0000_0001, OKAY, 0);\n        repeat (12) tick;\n        chkint(9, irq_rises, rb + 1);\n        chk1(10, irq8, 1'b1);\n        write_chk(11, 8'h0C, 32'h0000_0000, 4'hF, 0, 0, OKAY);\n        read_chk(12, 8'h0C, 32'h0000_0001, OKAY, 0);\n        write_chk(13, 8'h0C, 32'h0000_0001, 4'hE, 0, 0, OKAY);\n        read_chk(14, 8'h0C, 32'h0000_0001, OKAY, 0);\n        chk1(15, irq8, 1'b1);\n        write_chk(16, 8'h0C, 32'h0000_0001, 4'h1, 0, 0, OKAY);\n        chk1(17, irq8, 1'b0);\n        read_chk(18, 8'h0C, 32'h0000_0000, OKAY, 0);\n        // LOAD of 1\n        write_chk(19, 8'h04, 32'd1, 4'hF, 0, 0, OKAY);\n        rb = irq_rises;\n        write_chk(20, 8'h00, 32'h0000_0003, 4'h1, 0, 0, OKAY);\n        e0 = wr_edge;\n        wait_edge(e0 + 2);\n        chkint(21, irq_rise_edge, e0 + 1);\n        chkint(22, irq_rises, rb + 1);\n        read_chk(23, 8'h00, 32'h0000_0002, OKAY, 0);\n        write_chk(24, 8'h0C, 32'h0000_0001, 4'h1, 0, 0, OKAY);\n        chk1(25, irq8, 1'b0);\n        // LOAD of 0 counts as 1\n        write_chk(26, 8'h04, 32'd0, 4'hF, 0, 0, OKAY);\n        rb = irq_rises;\n        write_chk(27, 8'h00, 32'h0000_0003, 4'h1, 0, 0, OKAY);\n        e0 = wr_edge;\n        wait_edge(e0 + 2);\n        chkint(28, irq_rise_edge, e0 + 1);\n        chkint(29, irq_rises, rb + 1);\n        read_chk(30, 8'h00, 32'h0000_0002, OKAY, 0);\n        read_chk(31, 8'h08, 32'h0000_0000, OKAY, 0);\n        repeat (6) tick;\n        chkint(32, irq_rises, rb + 1);\n        write_chk(33, 8'h0C, 32'h0000_0001, 4'h1, 0, 0, OKAY);\n        chk1(34, irq8, 1'b0);\n\n        // ---------------- Phase 5: interrupt enable on a pending expiry ----------------\n        phase = 5;\n        write_chk(1, 8'h04, 32'd3, 4'hF, 0, 0, OKAY);\n        rb = irq_rises;\n        write_chk(2, 8'h00, 32'h0000_0001, 4'h1, 0, 0, OKAY);\n        e0 = wr_edge;\n        wait_edge(e0 + 6);\n        chk1(3, irq8, 1'b0);\n        chkint(4, irq_rises, rb);\n        read_chk(5, 8'h0C, 32'h0000_0001, OKAY, 0);\n        read_chk(6, 8'h00, 32'h0000_0000, OKAY, 0);\n        write_chk(7, 8'h00, 32'h0000_0002, 4'h1, 0, 0, OKAY);\n        chk1(8, irq8, 1'b1);\n        chkint(9, irq_rise_edge, wr_edge);\n        chkint(10, irq_rises, rb + 1);\n        write_chk(11, 8'h00, 32'h0000_0000, 4'h1, 0, 0, OKAY);\n        chk1(12, irq8, 1'b0);\n        read_chk(13, 8'h0C, 32'h0000_0001, OKAY, 0);\n        write_chk(14, 8'h00, 32'h0000_0002, 4'h1, 0, 0, OKAY);\n        chk1(15, irq8, 1'b1);\n        write_chk(16, 8'h0C, 32'h0000_0001, 4'h1, 0, 0, OKAY);\n        chk1(17, irq8, 1'b0);\n\n        // ---------------- Phase 6: periodic timing, clear on the end edge, stop ----------------\n        phase = 6;\n        write_chk(1, 8'h04, 32'd20, 4'hF, 0, 0, OKAY);\n        rb = irq_rises;\n        write_chk(2, 8'h00, 32'h0000_0007, 4'h1, 0, 0, OKAY);\n        e0 = wr_edge;\n        wait_edge(e0 + 21);\n        chkint(3, irq_rise_edge, e0 + 20);\n        chkint(4, irq_rises, rb + 1);\n        axi_read(8'h08, 0);\n        chk32(5, r8, 20 - ((ar_edge - 1 - e0) % 20));\n        chk32(6, r4, 20 - ((ar_edge - 1 - e0) % 20));\n        read_chk(7, 8'h00, 32'h0000_0007, OKAY, 0);\n        // Acknowledge the pending expiry on the very edge the next count ends.\n        wait_edge(e0 + 39);\n        write_chk(8, 8'h0C, 32'h0000_0001, 4'h1, 0, 0, OKAY);\n        chkint(9, wr_edge, e0 + 40);\n        chk1(10, irq8, 1'b1);\n        chkint(11, irq_rises, rb + 1);\n        read_chk(12, 8'h0C, 32'h0000_0001, OKAY, 0);\n        write_chk(13, 8'h0C, 32'h0000_0001, 4'h1, 0, 0, OKAY);\n        chk1(14, irq8, 1'b0);\n        wait_edge(e0 + 61);\n        chkint(15, irq_rise_edge, e0 + 60);\n        chkint(16, irq_rises, rb + 2);\n        write_chk(17, 8'h0C, 32'h0000_0001, 4'h1, 0, 0, OKAY);\n        chk1(18, irq8, 1'b0);\n        axi_read(8'h08, 2);\n        chk32(19, r8, 20 - ((ar_edge - 1 - e0) % 20));\n        chk32(20, r4, 20 - ((ar_edge - 1 - e0) % 20));\n        wait_edge(e0 + 81);\n        chkint(21, irq_rise_edge, e0 + 80);\n        chkint(22, irq_rises, rb + 3);\n        write_chk(23, 8'h0C, 32'h0000_0001, 4'h1, 0, 0, OKAY);\n        chk1(24, irq8, 1'b0);\n        // Stop: COUNT freezes at the value the stopping edge gives it.\n        write_chk(25, 8'h00, 32'h0000_0006, 4'h1, 0, 0, OKAY);\n        s0 = wr_edge;\n        frozen = 20 - ((s0 - e0) % 20);\n        repeat (45) tick;\n        chkint(26, irq_rises, rb + 3);\n        chk1(27, irq8, 1'b0);\n        read_chk(28, 8'h08, frozen, OKAY, 0);\n        read_chk(29, 8'h00, 32'h0000_0006, OKAY, 0);\n        read_chk(30, 8'h0C, 32'h0000_0000, OKAY, 0);\n\n        // ---------------- Phase 7: restarts and CTRL writes on the end edge ----------------\n        phase = 7;\n        // 7a: restart while counting\n        write_chk(1, 8'h04, 32'd10, 4'hF, 0, 0, OKAY);\n        rb = irq_rises;\n        write_chk(2, 8'h00, 32'h0000_0003, 4'h1, 0, 0, OKAY);\n        e0 = wr_edge;\n        wait_edge(e0 + 3);\n        write_chk(3, 8'h00, 32'h0000_0003, 4'h1, 0, 0, OKAY);\n        r0 = wr_edge;\n        chkint(4, r0, e0 + 4);\n        axi_read(8'h08, 0);\n        chk32(5, r8, 10 - (ar_edge - 1 - r0));\n        wait_edge(r0 + 11);\n        chkint(6, irq_rise_edge, r0 + 10);\n        chkint(7, irq_rises, rb + 1);\n        read_chk(8, 8'h00, 32'h0000_0002, OKAY, 0);\n        write_chk(9, 8'h0C, 32'h0000_0001, 4'h1, 0, 0, OKAY);\n        chk1(10, irq8, 1'b0);\n        // 7b: one-shot, EN 1 written on the end edge restarts from LOAD\n        write_chk(11, 8'h04, 32'd12, 4'hF, 0, 0, OKAY);\n        rb = irq_rises;\n        write_chk(12, 8'h00, 32'h0000_0003, 4'h1, 0, 0, OKAY);\n        e0 = wr_edge;\n        wait_edge(e0 + 11);\n        write_chk(13, 8'h00, 32'h0000_0003, 4'h1, 0, 0, OKAY);\n        r0 = wr_edge;\n        chkint(14, r0, e0 + 12);\n        chkint(15, irq_rise_edge, e0 + 12);\n        chkint(16, irq_rises, rb + 1);\n        read_chk(17, 8'h00, 32'h0000_0003, OKAY, 0);\n        axi_read(8'h08, 0);\n        chk32(18, r8, 12 - (ar_edge - 1 - r0));\n        write_chk(19, 8'h0C, 32'h0000_0001, 4'h1, 0, 0, OKAY);\n        chk1(20, irq8, 1'b0);\n        wait_edge(r0 + 13);\n        chkint(21, irq_rise_edge, r0 + 12);\n        chkint(22, irq_rises, rb + 2);\n        read_chk(23, 8'h00, 32'h0000_0002, OKAY, 0);\n        read_chk(24, 8'h08, 32'h0000_0000, OKAY, 0);\n        write_chk(25, 8'h0C, 32'h0000_0001, 4'h1, 0, 0, OKAY);\n        chk1(26, irq8, 1'b0);\n        // 7c: periodic, EN 0 written on the end edge: COUNT takes LOAD, stops\n        write_chk(27, 8'h04, 32'd8, 4'hF, 0, 0, OKAY);\n        rb = irq_rises;\n        write_chk(28, 8'h00, 32'h0000_0007, 4'h1, 0, 0, OKAY);\n        e0 = wr_edge;\n        wait_edge(e0 + 7);\n        write_chk(29, 8'h00, 32'h0000_0006, 4'h1, 0, 0, OKAY);\n        chkint(30, wr_edge, e0 + 8);\n        chkint(31, irq_rise_edge, e0 + 8);\n        read_chk(32, 8'h00, 32'h0000_0006, OKAY, 0);\n        read_chk(33, 8'h08, 32'd8, OKAY, 0);\n        read_chk(34, 8'h0C, 32'h0000_0001, OKAY, 0);\n        repeat (20) tick;\n        chkint(35, irq_rises, rb + 1);\n        write_chk(36, 8'h0C, 32'h0000_0001, 4'h1, 0, 0, OKAY);\n        chk1(37, irq8, 1'b0);\n\n        // ---------------- Phase 8: reset during a count with responses pending ----------------\n        phase = 8;\n        write_chk(1, 8'h04, 32'd50, 4'hF, 0, 0, OKAY);\n        rb = irq_rises;\n        write_chk(2, 8'h00, 32'h0000_0003, 4'h1, 0, 0, OKAY);\n        repeat (3) tick;\n        awaddr  = 8'h04;\n        wdata   = 32'h0000_1234;\n        wstrb   = 4'hF;\n        awvalid = 1'b1;\n        wvalid  = 1'b1;\n        araddr  = 8'h00;\n        arvalid = 1'b1;\n        tick;\n        awvalid = 1'b0;\n        wvalid  = 1'b0;\n        arvalid = 1'b0;\n        chk1(3, bvalid8, 1'b1);\n        chk1(4, rvalid8, 1'b1);\n        chk32(5, rdata8, 32'h0000_0003);\n        tick;\n        chk1(6, bvalid8, 1'b1);\n        chk1(7, rvalid8, 1'b1);\n        aresetn = 1'b0;\n        tick;\n        chk1(8, bvalid8, 1'b0);\n        chk1(9, rvalid8, 1'b0);\n        chk1(10, bvalid4, 1'b0);\n        chk1(11, rvalid4, 1'b0);\n        chk1(12, irq8, 1'b0);\n        chk1(13, awready8, 1'b1);\n        chk1(14, arready8, 1'b1);\n        tick;\n        aresetn = 1'b1;\n        tick;\n        read_chk(15, 8'h00, 32'h0000_0000, OKAY, 0);\n        read_chk(16, 8'h04, 32'h0000_0000, OKAY, 0);\n        read_chk(17, 8'h08, 32'h0000_0000, OKAY, 0);\n        read_chk(18, 8'h0C, 32'h0000_0000, OKAY, 0);\n        repeat (60) tick;\n        chkint(19, irq_rises, rb);\n        chk1(20, irq8, 1'b0);\n\n        // ---------------- Phase 9: offsets from 0x10 up at ADDR_WIDTH 8 ----------------\n        // dut4 sees only addr[3:0], so these accesses alias its registers;\n        // dut8 must answer SLVERR and change nothing.\n        phase = 9;\n        lockstep_irq = 1'b0;\n        write_chk(1, 8'h04, 32'h0000_0042, 4'hF, 0, 0, OKAY);\n        write_chk2(2, 8'h14, 32'hDEAD_BEEF, 4'hF, SLVERR, OKAY);\n        read_chk2(3, 8'h04, 32'h0000_0042, OKAY, 32'hDEAD_BEEF, OKAY);\n        read_chk2(4, 8'h14, 32'h0000_0000, SLVERR, 32'hDEAD_BEEF, OKAY);\n        write_chk2(5, 8'h18, 32'h0000_0005, 4'hF, SLVERR, SLVERR);\n        write_chk2(6, 8'h1C, 32'h0000_0001, 4'hF, SLVERR, OKAY);\n        write_chk2(7, 8'h80, 32'h0000_0002, 4'hF, SLVERR, OKAY);\n        read_chk2(8, 8'h00, 32'h0000_0000, OKAY, 32'h0000_0002, OKAY);\n        read_chk2(9, 8'h10, 32'h0000_0000, SLVERR, 32'h0000_0002, OKAY);\n        read_chk2(10, 8'hF0, 32'h0000_0000, SLVERR, 32'h0000_0002, OKAY);\n        read_chk2(11, 8'hFC, 32'h0000_0000, SLVERR, 32'h0000_0000, OKAY);\n        read_chk2(12, 8'h18, 32'h0000_0000, SLVERR, 32'h0000_0000, OKAY);\n        read_chk2(13, 8'h08, 32'h0000_0000, OKAY, 32'h0000_0000, OKAY);\n        read_chk2(14, 8'h0C, 32'h0000_0000, OKAY, 32'h0000_0000, OKAY);\n        read_chk2(15, 8'h43, 32'h0000_0000, SLVERR, 32'h0000_0000, SLVERR);\n        chk1(16, irq8, 1'b0);\n        chk1(17, irq4, 1'b0);\n\n        // ---------------- Verdict ----------------\n        phase = 10;\n        chkint(1, lock_errs, 0);\n        done = 1'b1;\n        $display(\"NIRMAAN-SIM %0s %0d passed, %0d failed\", nonce, passed, failed);\n        $finish;\n    end\n\nendmodule\n=== END FILE ==="
+    }
+  ],
+  "format": "nirmaan.eval-trial",
+  "harness_variant": "default",
+  "judge_runs": [
+    {
+      "check": "The reference testbench passes on the seat's RTL",
+      "params": {
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-cwtcpop6/seat/prj-97dea43f5b_rtl-implementation/1/axil_timer.v",
+          "tests/fixtures/rtl/axil_timer/axil_timer_tb.v"
+        ],
+        "top": "axil_timer_tb"
+      },
+      "run": "run-0004",
+      "succeeded": true,
+      "summary": "icarus: simulation passed: 937 checks passed, $finish reached at time 4991000, 0 errors",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The seat's testbench fails each timer mutant",
+      "params": {
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-cwtcpop6/judge/check-2/must-fail-2kbqpdaw/clean/axil_timer_tb.v",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-cwtcpop6/judge/check-2/must-fail-2kbqpdaw/clean/axil_timer.v"
+        ],
+        "top": "axil_timer_tb"
+      },
+      "run": "run-0005",
+      "succeeded": true,
+      "summary": "icarus: simulation passed: 1098 checks passed, $finish reached at time 5086000000000000, 0 errors",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The seat's testbench fails each timer mutant",
+      "params": {
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-cwtcpop6/judge/check-2/must-fail-2kbqpdaw/mutant-1-1/axil_timer_tb.v",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-cwtcpop6/judge/check-2/must-fail-2kbqpdaw/mutant-1-1/axil_timer.v"
+        ],
+        "top": "axil_timer_tb"
+      },
+      "run": "run-0006",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: 23 errors, the testbench reports 23 of 1098 checks failed; first: /private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-cwtcpop6/judge/check-2/must-fail-2kbqpdaw/mutant-1-1/axil_timer_tb.v:122: phase 4 check 6: got 00000003, expected 00000002",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The seat's testbench fails each timer mutant",
+      "params": {
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-cwtcpop6/judge/check-2/must-fail-2kbqpdaw/mutant-1-2/axil_timer_tb.v",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-cwtcpop6/judge/check-2/must-fail-2kbqpdaw/mutant-1-2/axil_timer.v"
+        ],
+        "top": "axil_timer_tb"
+      },
+      "run": "run-0007",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: 18 errors, the testbench reports 18 of 1098 checks failed; first: /private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-cwtcpop6/judge/check-2/must-fail-2kbqpdaw/mutant-1-2/axil_timer_tb.v:122: phase 6 check 5: got 00000014, expected 00000013",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The seat's testbench fails each timer mutant",
+      "params": {
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-cwtcpop6/judge/check-2/must-fail-2kbqpdaw/mutant-1-3/axil_timer_tb.v",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-cwtcpop6/judge/check-2/must-fail-2kbqpdaw/mutant-1-3/axil_timer.v"
+        ],
+        "top": "axil_timer_tb"
+      },
+      "run": "run-0008",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: 15 errors, the testbench reports 15 of 1098 checks failed; first: /private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-cwtcpop6/judge/check-2/must-fail-2kbqpdaw/mutant-1-3/axil_timer_tb.v:132: phase 6 check 26: got 9, expected 8",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The seat's testbench fails each timer mutant",
+      "params": {
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-cwtcpop6/judge/check-2/must-fail-2kbqpdaw/mutant-1-4/axil_timer_tb.v",
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-cwtcpop6/judge/check-2/must-fail-2kbqpdaw/mutant-1-4/axil_timer.v"
+        ],
+        "top": "axil_timer_tb"
+      },
+      "run": "run-0009",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: 13 errors, the testbench reports 13 of 1098 checks failed; first: /private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-cwtcpop6/judge/check-2/must-fail-2kbqpdaw/mutant-1-4/axil_timer_tb.v:112: phase 9 check 2: got 00, expected 10",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The case's ADDR_WIDTH 8 proof reaches every cover and fails each mutant",
+      "params": {
+        "sby": "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-cwtcpop6/judge/check-3/must-fail-wpztnx6j/clean/axil_timer_aw8.sby",
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-cwtcpop6/judge/check-3/must-fail-wpztnx6j/clean/axil_timer.v"
+        ]
+      },
+      "run": "run-0010",
+      "succeeded": true,
+      "summary": "symbiyosys: formal passed: every property proven",
+      "tool": "formal.run"
+    },
+    {
+      "check": "The case's ADDR_WIDTH 8 proof reaches every cover and fails each mutant",
+      "params": {
+        "sby": "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-cwtcpop6/judge/check-3/must-fail-wpztnx6j/cover/axil_timer_aw8.sby",
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-cwtcpop6/judge/check-3/must-fail-wpztnx6j/cover/axil_timer.v"
+        ]
+      },
+      "run": "run-0011",
+      "succeeded": true,
+      "summary": "symbiyosys-cover: not vacuous: every cover reached (9 of 9); every assertion antecedent reached (18 of 18)",
+      "tool": "formal.cover"
+    },
+    {
+      "check": "The case's ADDR_WIDTH 8 proof reaches every cover and fails each mutant",
+      "params": {
+        "sby": "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-cwtcpop6/judge/check-3/must-fail-wpztnx6j/mutant-1-1/axil_timer_aw8.sby",
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-cwtcpop6/judge/check-3/must-fail-wpztnx6j/mutant-1-1/axil_timer.v"
+        ]
+      },
+      "run": "run-0012",
+      "succeeded": false,
+      "summary": "symbiyosys: formal fail: 1 error; first: axil_timer.v:325: [ASSERT] assertion axil_timer._witness_.check_assert_axil_timer_v_325_570 failed at step 4",
+      "tool": "formal.run"
+    },
+    {
+      "check": "The case's ADDR_WIDTH 8 proof reaches every cover and fails each mutant",
+      "params": {
+        "sby": "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-cwtcpop6/judge/check-3/must-fail-wpztnx6j/mutant-1-2/axil_timer_aw8.sby",
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-cwtcpop6/judge/check-3/must-fail-wpztnx6j/mutant-1-2/axil_timer.v"
+        ]
+      },
+      "run": "run-0013",
+      "succeeded": false,
+      "summary": "symbiyosys: formal fail: 1 error; first: axil_timer.v:331: [ASSERT] assertion axil_timer._witness_.check_assert_axil_timer_v_331_580 failed at step 4",
+      "tool": "formal.run"
+    },
+    {
+      "check": "The case's ADDR_WIDTH 8 proof reaches every cover and fails each mutant",
+      "params": {
+        "sby": "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-cwtcpop6/judge/check-3/must-fail-wpztnx6j/mutant-1-3/axil_timer_aw8.sby",
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-cwtcpop6/judge/check-3/must-fail-wpztnx6j/mutant-1-3/axil_timer.v"
+        ]
+      },
+      "run": "run-0014",
+      "succeeded": false,
+      "summary": "symbiyosys: formal fail: 1 error; first: axil_timer.v:328: [ASSERT] assertion axil_timer._witness_.check_assert_axil_timer_v_328_570 failed at step 5",
+      "tool": "formal.run"
+    },
+    {
+      "check": "The case's ADDR_WIDTH 8 proof reaches every cover and fails each mutant",
+      "params": {
+        "sby": "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-cwtcpop6/judge/check-3/must-fail-wpztnx6j/mutant-1-4/axil_timer_aw8.sby",
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-cwtcpop6/judge/check-3/must-fail-wpztnx6j/mutant-1-4/axil_timer.v"
+        ]
+      },
+      "run": "run-0015",
+      "succeeded": false,
+      "summary": "symbiyosys: formal fail: 1 error; first: axil_timer.v:332: [ASSERT] assertion axil_timer._witness_.check_assert_axil_timer_v_332_569 failed at step 3",
+      "tool": "formal.run"
+    },
+    {
+      "check": "The case's ADDR_WIDTH 4 proof reaches every cover and fails each mutant wrong at ADDR_WIDTH 4",
+      "params": {
+        "sby": "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-cwtcpop6/judge/check-4/must-fail-34533x24/clean/axil_timer.sby",
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-cwtcpop6/judge/check-4/must-fail-34533x24/clean/axil_timer.v"
+        ]
+      },
+      "run": "run-0016",
+      "succeeded": true,
+      "summary": "symbiyosys: formal passed: every property proven",
+      "tool": "formal.run"
+    },
+    {
+      "check": "The case's ADDR_WIDTH 4 proof reaches every cover and fails each mutant wrong at ADDR_WIDTH 4",
+      "params": {
+        "sby": "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-cwtcpop6/judge/check-4/must-fail-34533x24/cover/axil_timer.sby",
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-cwtcpop6/judge/check-4/must-fail-34533x24/cover/axil_timer.v"
+        ]
+      },
+      "run": "run-0017",
+      "succeeded": true,
+      "summary": "symbiyosys-cover: not vacuous: every cover reached (9 of 9); every assertion antecedent reached (18 of 18)",
+      "tool": "formal.cover"
+    },
+    {
+      "check": "The case's ADDR_WIDTH 4 proof reaches every cover and fails each mutant wrong at ADDR_WIDTH 4",
+      "params": {
+        "sby": "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-cwtcpop6/judge/check-4/must-fail-34533x24/mutant-1-1/axil_timer.sby",
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-cwtcpop6/judge/check-4/must-fail-34533x24/mutant-1-1/axil_timer.v"
+        ]
+      },
+      "run": "run-0018",
+      "succeeded": false,
+      "summary": "symbiyosys: formal fail: 1 error; first: axil_timer.v:325: [ASSERT] assertion axil_timer._witness_.check_assert_axil_timer_v_325_254 failed at step 4",
+      "tool": "formal.run"
+    },
+    {
+      "check": "The case's ADDR_WIDTH 4 proof reaches every cover and fails each mutant wrong at ADDR_WIDTH 4",
+      "params": {
+        "sby": "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-cwtcpop6/judge/check-4/must-fail-34533x24/mutant-1-2/axil_timer.sby",
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-cwtcpop6/judge/check-4/must-fail-34533x24/mutant-1-2/axil_timer.v"
+        ]
+      },
+      "run": "run-0019",
+      "succeeded": false,
+      "summary": "symbiyosys: formal fail: 1 error; first: axil_timer.v:331: [ASSERT] assertion axil_timer._witness_.check_assert_axil_timer_v_331_263 failed at step 4",
+      "tool": "formal.run"
+    },
+    {
+      "check": "The case's ADDR_WIDTH 4 proof reaches every cover and fails each mutant wrong at ADDR_WIDTH 4",
+      "params": {
+        "sby": "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-cwtcpop6/judge/check-4/must-fail-34533x24/mutant-1-3/axil_timer.sby",
+        "sources": [
+          "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-cwtcpop6/judge/check-4/must-fail-34533x24/mutant-1-3/axil_timer.v"
+        ]
+      },
+      "run": "run-0020",
+      "succeeded": false,
+      "summary": "symbiyosys: formal fail: 1 error; first: axil_timer.v:328: [ASSERT] assertion axil_timer._witness_.check_assert_axil_timer_v_328_254 failed at step 5",
+      "tool": "formal.run"
+    }
+  ],
+  "knowledge": "on",
+  "model": "claude-opus-5-5",
+  "purpose": "evidence",
+  "record": "2026-11-19-claude-code-claude-opus-5-5-78",
+  "result": {
+    "attempts": 1,
+    "attestations": [],
+    "audit_ok": true,
+    "case": "rtl/axil-timer",
+    "case_digest": "sha256:277f853308b03d739b3bb1ced6af1376ac9fe0252360110a0d2660931fd78090",
+    "cli": "2.1.325",
+    "cost_usd": null,
+    "detail": "Choices made where the specs leave room. (1) The held address and data registers are reset as well, although microarchitecture section 4 says they need no reset; this follows the rtl_design guidance that every flop gets a reset. (2) do_write also requires !bvalid. That case cannot be reached, and the extra term guards against a second response. (3) The testbench reads internal signals only through ports, apart from the irq monitor; it does not use hierarchical references into the RTL. (4) The testbench uses # delays and so needs Verilator --timing. (5) No timescale is used in any file, which avoids Verilator TIMESCALEMOD. (6) The formal proof called for by spec section 8 is deferred, as recorded in the decision artifact. An independent review_record is still needed for this task.",
+    "duration_s": 488.854,
+    "gate_runs": [
+      {
+        "run": "run-0001",
+        "succeeded": true,
+        "summary": "verilator-lint: lint clean: 0 errors, 0 warnings",
+        "tool": "lint.run"
+      },
+      {
+        "run": "run-0002",
+        "succeeded": true,
+        "summary": "icarus: simulation passed: 1098 checks passed, $finish reached at time 5086, 0 errors",
+        "tool": "simulator.run"
+      },
+      {
+        "run": "run-0003",
+        "succeeded": true,
+        "summary": "yosys: synthesis passed: 753 cells, 146 flip-flops, 0 latches, 0 warnings",
+        "tool": "synth.run"
+      }
+    ],
+    "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+    "input_tokens": 2,
+    "model_calls": 1,
+    "output_tokens": 56183,
+    "passed": true,
+    "replay": false,
+    "runtime": "claude-code",
+    "sandbox": "/private/var/folders/0l/6yk3ndld1bx8xmzrf1j7n0xr0000gp/T/nirmaan-eval-cwtcpop6",
+    "scores": [
+      {
+        "failed_runs": [],
+        "name": "The reference testbench passes on the seat's RTL",
+        "runs": [
+          "run-0004"
+        ],
+        "scorer": "held-out-run",
+        "status": "passed",
+        "summary": "simulator.run run-0004: icarus: simulation passed: 937 checks passed, $finish reached at time 4991000, 0 errors"
+      },
+      {
+        "failed_runs": [
+          "run-0006",
+          "run-0007",
+          "run-0008",
+          "run-0009"
+        ],
+        "name": "The seat's testbench fails each timer mutant",
+        "runs": [
+          "run-0005"
+        ],
+        "scorer": "must-fail",
+        "status": "passed",
+        "summary": "simulator.run run-0005 passed on the clean inputs; 4 of 4 mutants failed it"
+      },
+      {
+        "failed_runs": [
+          "run-0012",
+          "run-0013",
+          "run-0014",
+          "run-0015"
+        ],
+        "name": "The case's ADDR_WIDTH 8 proof reaches every cover and fails each mutant",
+        "runs": [
+          "run-0010",
+          "run-0011"
+        ],
+        "scorer": "must-fail",
+        "status": "passed",
+        "summary": "formal.run run-0010 passed on the clean inputs with every cover reached; 4 of 4 mutants failed it"
+      },
+      {
+        "failed_runs": [
+          "run-0018",
+          "run-0019",
+          "run-0020"
+        ],
+        "name": "The case's ADDR_WIDTH 4 proof reaches every cover and fails each mutant wrong at ADDR_WIDTH 4",
+        "runs": [
+          "run-0016",
+          "run-0017"
+        ],
+        "scorer": "must-fail",
+        "status": "passed",
+        "summary": "formal.run run-0016 passed on the clean inputs with every cover reached; 3 of 3 mutants failed it"
+      }
+    ],
+    "seat": "prj-97dea43f5b:rtl-implementation",
+    "seat_status": "in_review",
+    "started_at": "2026-11-19T06:52:47.854724Z",
+    "submitted": true,
+    "tool_calls": [],
+    "version": "1.25.0"
+  },
+  "skills": {
+    "axi": "sha256:171d24465d795d0e8777da54e74430e2764fcdc089654579b42412934258c9cf",
+    "fsm_design": "sha256:c4aaa4ba8ed4f24373d4a09fffba720d73e81491cb15a0fc1084c3227c47d9b8",
+    "rtl_design": "sha256:012eb9b7155ed6eb7761adca880b338f10c8f978b15dfd92f5adbb3253307a52"
+  },
+  "stage": "rtl-implementation",
+  "trial": 1,
+  "version": 1
+}
