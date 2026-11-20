@@ -115,8 +115,8 @@ answer: at least one call is recorded, and the last recorded answer has no
 text and an error. A plan or usage limit looks like this (on 2026-11-15 nine
 trials failed in two seconds each, "You've hit your 5-hour limit", because the
 run went on), and so does a model that cannot be reached. Under attempts-3 the
-limit can land on attempt 2 or 3 after an answered attempt 1 (W2-L1, slot 57),
-so the last answer decides, as it does for a whole flow. The rule reads the
+limit can land on attempt 2 or 3 after an answered attempt 1, so the last
+answer decides, as it does for a whole flow. The rule reads the
 trial's structure, never the wording of the error. A model that answers,
 however wrongly, on its last call never stops a run. The stopped trial is written like any
 other and counts as failed (decision 11 of the pilot retrospective); no later

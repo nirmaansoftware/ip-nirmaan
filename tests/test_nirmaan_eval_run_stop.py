@@ -163,8 +163,7 @@ def test_a_no_answer_on_attempt_one_stops_an_attempts_3_run_before_attempts_two_
 
 def test_a_limit_on_attempt_two_after_an_answered_attempt_one_stops_the_run(fixed_clock, tmp_path, monkeypatch):
     """RR5 under attempts-3: attempt 1 answers (wrongly, so the seat tries again) and attempt 2 meets the plan's
-    limit. The last answer decides, so the run stops there with exit 3 and no later trial starts (W2-L1, slot 57:
-    its record has an answered attempt 1 and a limit on attempt 2)."""
+    limit. The last answer decides, so the run stops there with exit 3 and no later trial starts."""
     bindir = tmp_path / "bin"
     bindir.mkdir()
     # Attempt 1: the reference spec with no citation, which the seat's rules refuse, so it tries again.

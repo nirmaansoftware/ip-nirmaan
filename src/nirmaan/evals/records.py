@@ -202,7 +202,7 @@ def no_model_answer(trial: EvalTrial) -> bool:
 
     Judged by the trial's structure, never by the wording of a message: at least one call is recorded, and the
     last recorded answer has no text and an error. Under attempts-3 a limit can land on attempt 2 or 3 after an
-    answered attempt 1 (W2-L1, slot 57), so the last answer decides, as :func:`flow_stopped` does for a whole
+    answered attempt 1, so the last answer decides, as :func:`flow_stopped` does for a whole
     flow (council record 2026-11-15-pilot-topup-reruns, decision 4: the runner stops at the first trial that
     returns no model answer). A model that answers, however wrongly, on its last call is not this.
     """
