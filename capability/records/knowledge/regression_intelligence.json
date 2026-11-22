@@ -24,11 +24,11 @@
   "gate_claims": [
     {
       "claim": "the card's one tool is veritriage.investigate",
-      "evidence": "src/nirmaan/company/skills.py:522"
+      "evidence": "src/nirmaan/company/skills.py:530"
     },
     {
       "claim": "the card's procedure is to check whether a failure was seen before and what fixed it, and its failure is re-debugging known failures",
-      "evidence": "src/nirmaan/company/skills.py:525"
+      "evidence": "src/nirmaan/company/skills.py:533"
     },
     {
       "claim": "veritriage.investigate takes paths (required) and an optional workspace",
