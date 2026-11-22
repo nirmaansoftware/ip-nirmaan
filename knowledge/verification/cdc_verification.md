@@ -29,7 +29,7 @@ sources are vendor or single-author papers; their claims are the authors'.
   tests/test_nirmaan_eda.py::test_the_open_source_tools_are_available_and_the_rest_stay_contracts).
 - The card names the packs cdc and reset-clocking and asks that waivers be
   reviewed and that no violation go unexplained (gate:
-  src/nirmaan/company/skills.py:543-548).
+  src/nirmaan/company/skills.py:545-550).
 - So any statement from this skill about crossings is reasoning over source
   files and papers. It cannot say "the crossing check passed" (inference).
 
@@ -51,7 +51,7 @@ sources are vendor or single-author papers; their claims are the authors'.
 
 ## Failure modes to look for in the RTL
 
-Each is a case [GIN] reports from real designs, with its fix.
+Each is a case [GIN] reports, with its fix; the author met them while teaching, working with design teams and reviewing papers.
 
 - No synchroniser at all. The designer judged the failure rate too low, or
   the receiver clock much faster. Simulation can hide it by assuming clock
@@ -79,8 +79,10 @@ Each is a case [GIN] reports from real designs, with its fix.
   Recheck the whole list after the last design change [GIN].
 - A pulse synchroniser that fails when the pulse lasts two cycles or two
   pulses come one cycle apart [GIN].
-- A fast-to-slow shortcut that relies on one clock being faster; it fails when
-  frequencies change [GIN].
+- A slow-to-fast shortcut: when the sender is slower than the receiver, a
+  one-cycle request is sampled by at least two receiver edges, so the
+  handshake is simplified. It fails when clock frequencies change and the
+  assumption of who is faster no longer holds [GIN].
 - A "metastability blocker" circuit that only moves the risk to a latch [GIN].
 - One two-flop synchroniser on each bit of a bus. Bits can resolve
   differently, and the paper's example puts a 32 bit bus at a failure every
@@ -128,8 +130,9 @@ Each is a case [GIN] reports from real designs, with its fix.
 
 - Blanket waivers (the card's own failure): a waiver with no reason is a
   crossing nobody has looked at (inference).
-- Reading a clean report of one tool as proof for the whole flow; the report
-  speaks of the stage it ran on [LIT].
+- Reading a clean report of one tool as proof for the whole flow: a report
+  speaks of the stage it ran on (inference). [LIT] says RTL verification is
+  necessary and not enough and recommends netlist CDC analysis.
 - Treating a quiet simulation as evidence: it cannot show metastability [LIT].
 
 ## Not sourced here
