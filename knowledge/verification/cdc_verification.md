@@ -6,9 +6,7 @@ review_by: 2027-05-22
 sources:
   - open | Ginosar, Fourteen Ways to Fool Your Synchronizer, ASYNC 2003 (author copy, IEEE copyright, no open licence stated) [GIN] | https://webee.technion.ac.il/~ran/papers/Sync_Errors_Feb03.pdf
   - open | Litterick, Full Flow Clock Domain Crossing: From Source to Si, DVCon proceedings (no licence stated) [LIT] | https://dvcon-proceedings.org/wp-content/uploads/full-flow-clock-domain-crossing-from-source-to-si.pdf
-  - open | AMD UG906 Vivado Design Analysis (2025.2), Understanding the Clock Domain Crossings Report Rules (public AMD documentation, no reuse statement) [UG906] | https://docs.amd.com/r/2025.2-English/ug906-vivado-design-analysis/Understanding-the-Clock-Domain-Crossings-Report-Rules
-  - open | AMD UG949 Vivado Design Methodology, Clock Domain Crossing and Report CDC pages (public AMD documentation, no reuse statement) [UG949] | https://docs.amd.com/r/en-US/ug949-vivado-design-methodology/Clock-Domain-Crossing
-licence_check: original writing that summarises and cites; no text, table, figure or code copied from any source; the AMD rule identifiers are named only as labels of a tool's own rule set
+licence_check: original writing that summarises and cites; no text, table, figure or code copied from any source
 export_screen: clear
 writer: RX-K2 session (wave 2 close, 2026-11-22)
 checker: pending, a different session reads the sources and writes the check record
@@ -98,28 +96,6 @@ Each is a case [GIN] reports from real designs, with its fix.
   synchronisers, including convergent paths, but gives no checklist for
   them. The checking method here is unsourced.
 
-## A structural check set
-
-[UG906] lists the rules of one tool, with severities that the tool does not
-let a user change. By category it covers: an unsynchronised single-bit or
-multi-bit crossing (critical); a synchroniser missing the attribute that tells
-the tools to keep its flops together (warning); an asynchronous clear or
-preset crossing without synchronisation (critical); logic in front of a
-synchroniser; fan-out of the signal before the synchroniser; data from several
-clocks into one synchroniser (all critical); crossings controlled by a clock
-enable or a multiplexer (warning); and a possible read and write collision on
-a distributed memory (warning). By default only the highest-precedence
-violation per endpoint is shown; an option shows all checks [UG906]. The
-identifiers, the version (2025.2) and the severities are AMD's, for its FPGA
-flow. As a list of what a structural pass should flag, it matches the cases
-above (inference).
-
-[UG949] adds that the report is structural, that it gives no timing slack
-because slack means nothing between asynchronous clocks, and that constraints
-must keep default timing analysis off those paths. A crossing circuit is
-needed between two asynchronous clocks, and also where a designer relaxes
-timing between two synchronous clocks with a false path [UG949].
-
 ## Method
 
 - Structural pass: identify clock domains, find every crossing, and flag
@@ -132,8 +108,7 @@ timing between two synchronous clocks with a false path [UG949].
   clock edges. For a handshake: every request gets an acknowledge, a full
   request and acknowledge sequence, and data stable until the acknowledge is
   seen [LIT].
-- Waive only with a reason. [UG949] says safe violations can be waived and
-  defers the mechanism to [UG906]; who approves a waiver is unsourced.
+- Waive only with a reason; who approves a waiver is unsourced.
 - Repeat after every design change and before closing [GIN].
 
 ## Beyond RTL
