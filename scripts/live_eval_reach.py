@@ -48,6 +48,21 @@ process stands for the parent that holds the token. For each tool:
   path, so these probes reach the tool with the screen bypassed inside this process only, and say so in their
   output.
 
+``eqy`` runs as the same account (gate W2C3 of ``council/records/2026-11-23-wave-2-close-meeting-1.md``) and is probed
+the same way through ``equivalence.run``: the gold design of an eqy setup includes the target. The harness copies the
+setup and the files it reads into the run's directory, and eqy's Yosys reads the copies there as the seat account, so
+its control shows the tool ran and passed, not a read through the grant.
+
+``coverage.read`` builds seat HDL into a Verilator model and runs it, both as the same account (gate W2C4): the build
+through the wrapped ``verilator``, the model through ``nirmaan-seat-model``, in a run directory inside a folder of the
+kind an eval's sandbox is (``/tmp/nirmaan-*``), so the account is given passage through that folder. A control passes
+the gate; each target above, and a canary placed beside the run's directory in that folder (readable by every account
+by its mode), is probed twice: included by the design, so the build must fail with Verilator's own message that it
+could not open it; and opened by the testbench with ``$fopen`` while the model runs, so the model must print that it
+could not open it. The probes bypass the screen and the coverage run's own check of its sources, inside this process
+only, and say so. The two ``verilator_coverage`` steps after the model stay the runner's: they read only the data file
+the backend names in the run's directory.
+
 And for the held-out checks' compile (decision 3, item 2): through ``simulator.run``, a seat file with a judge file
 staged for the run as the held-out checks stage theirs (``nirmaan.evals.scorers``): the account reads that judge file,
 and a canary placed beside it (readable by every account by its mode) is denied. Every result is written to
@@ -77,6 +92,8 @@ SEAT = "nirmaan-seat"
 WRAPPER = Path("/opt/nirmaan-seat/bin/vvp")
 #: The wrapper fw.test runs its built program through, beside ``WRAPPER`` (M90; scripts/live_eval_seat.py).
 EXEC_NAME = "nirmaan-seat-exec"
+#: The wrapper coverage.read runs the model it built through, beside ``WRAPPER`` (gate W2C4; scripts/live_eval_seat.py).
+MODEL_NAME = "nirmaan-seat-model"
 #: Credential-named and plain-named canaries; neither may reach seat code.
 CANARY_SECRET, CANARY_PLAIN = "CLAUDE_CODE_OAUTH_TOKEN", "NIRMAAN_REACH_CANARY"
 #: The probe tests, by name; each must be in cocotb's results and pass.
@@ -89,11 +106,11 @@ PROBES = ("reach_identity", "reach_no_sudo", "reach_no_write", "reach_no_credent
 NETWORK = (("tcp", "1.1.1.1", 443), ("tcp6", "2606:4700:4700::1111", 443), ("tcp", "127.0.0.1", 9),
            ("tcp6", "::1", 9), ("udp", "127.0.0.53", 53))
 #: The programs gates run (eda.py backends) and the harness's own entry point.
-TOOLS = ("nirmaan", "iverilog", "vvp", "verilator", "yosys", "sby", "yices-smt2", "make", "cc", "python", "python3",
-         "git", "node", "npm")
+TOOLS = ("nirmaan", "iverilog", "vvp", "verilator", "verilator_coverage", "yosys", "sby", "eqy", "yices-smt2", "make",
+         "cc", "python", "python3", "git", "node", "npm")
 DESIGN = "module reach_probe(input wire clk);\nendmodule\n"
 #: The programs that run as the seat account, each wrapped first on ``PATH`` (``scripts/live_eval_seat.py``).
-WRAPPED = ("vvp", "iverilog", "verilator", "yosys", "sby")
+WRAPPED = ("vvp", "iverilog", "verilator", "yosys", "sby", "eqy")
 #: Gate ET3: each tool, the gate and backend it is probed through, and what it prints when it cannot open an include
 #: (``{}`` is the target's path). Verilator says "File not found" for a file it may not read, and "Cannot find include
 #: file" for one it cannot see (quoted in some versions, not in Ubuntu 24.04's 5.020).
@@ -101,7 +118,8 @@ TOOL_GATES = (("iverilog", "simulator.run", "icarus", ("Include file {} not foun
               ("verilator", "lint.run", "verilator-lint",
                ("Cannot find include file: '{}'", "Cannot find include file: {}", "File not found: {}")),
               ("yosys", "synth.run", "yosys", ("Can't open include file `{}'",)),
-              ("sby", "formal.run", "symbiyosys", ("Can't open include file `{}'",)))
+              ("sby", "formal.run", "symbiyosys", ("Can't open include file `{}'",)),
+              ("eqy", "equivalence.run", "eqy", ("Can't open include file `{}'",)))
 #: A seat file for each tool: (file name, top, text before the include, text after it).
 TOOL_FILES = {
     "iverilog": ("reach_tool_sim.v", "reach_tool_sim", "module reach_tool_sim;\n",
@@ -114,7 +132,33 @@ TOOL_FILES = {
     "sby": ("reach_tool_formal.sv", "reach_tool_formal", "module reach_tool_formal(input wire clk);\n",
             "reg r = 1'b0;\nalways @(posedge clk) r <= !r;\nalways @(posedge clk) if (r) assert (r);\n"
             "always @(posedge clk) cover (r);\nendmodule\n"),
+    "eqy": ("reach_tool_gold.v", "reach_tool_eqy", "module reach_tool_eqy(input wire a, output wire y);\n",
+            "assign y = a;\nendmodule\n"),
 }
+#: The eqy probe's gate design and setup: the gold side reads the file that includes the target.
+EQY_GATE = "module reach_tool_eqy(input wire a, output wire y);\nassign y = a & a;\nendmodule\n"
+EQY_SETUP = ("[gold]\nread_verilog -sv reach_tool_gold.v\nprep -top reach_tool_eqy\n\n[gate]\n"
+             "read_verilog -sv reach_tool_gate.v\nprep -top reach_tool_eqy\n\n[strategy sat]\nuse sat\ndepth 5\n")
+#: Gate W2C4: the coverage run's probe files. The design (which a probe of the build makes include a target) and the
+#: testbench (which a probe of the model makes open a target with ``$fopen`` while it runs, printing what it got).
+COVERAGE_TOP = "reach_cov_tb"
+COVERAGE_DESIGN = ("module reach_cov_design(input wire clk, output reg q);\n", "initial q = 1'b0;\n"
+                   "always @(posedge clk) q <= !q;\nendmodule\n")
+COVERAGE_TB = ("module reach_cov_tb;\nreg clk = 1'b0;\nwire q;\nreach_cov_design dut(.clk(clk), .q(q));\n"
+               "reg [8*64-1:0] nonce;\ninteger fd;\nreg [8*256-1:0] line;\ninitial begin\n",
+               "repeat (4) begin #1 clk = 1'b1; #1 clk = 1'b0; end\n$display(\"REACH COVERAGE control __NONCE__\");\n"
+               "if ($value$plusargs(\"nirmaan_nonce=%s\", nonce)) $display(\"NIRMAAN-SIM %0s 1 passed, 0 failed\", "
+               "nonce);\n$finish;\nend\nendmodule\n")
+#: What the model prints for a target it could not open, and for one it opened (``{}`` is the target's path).
+COVERAGE_DENIED, COVERAGE_OPENED = "REACH COVERAGE could not open {}", "REACH COVERAGE opened {}"
+
+
+def coverage_open(target: str) -> str:
+    """The testbench lines that open ``target`` while the model runs and print whether it could."""
+    denied, opened = COVERAGE_DENIED.format(target), COVERAGE_OPENED.format(target)
+    return (f'fd = $fopen("{target}", "r");\nif (fd == 0) $display("{denied}");\n'
+            f'else begin line = 0; void\'($fgets(line, fd)); $display("{opened}: %0s", line); $fclose(fd); end\n')
+
 SBY_SETUP = ("[options]\nmode prove\n\n[engines]\nsmtbmc yices\n\n[script]\nread -formal reach_tool_formal.sv\n"
              "prep -top reach_tool_formal\n\n[files]\nreach_tool_formal.sv\n")
 
@@ -290,7 +334,8 @@ def targets(records: Path, env: Mapping[str, str]) -> tuple[list[str], list[str]
               Path(_need(sys.executable, "the Python")).resolve().parent, WRAPPER.parent, records]
     append = [ROOT / "pyproject.toml", ROOT / "scripts" / "live_eval_ci.py", ROOT / ".github" / "workflows" /
               "live-eval.yml", package / "__init__.py", package / "integrations" / "cocotb_runner.py",
-              Path(sys.executable).resolve(), WRAPPER, WRAPPER.parent / EXEC_NAME, WRAPPER.parent.parent / "seat.py"]
+              Path(sys.executable).resolve(), WRAPPER, WRAPPER.parent / EXEC_NAME, WRAPPER.parent / MODEL_NAME,
+              WRAPPER.parent.parent / "seat.py"]
     installed = sorted(purelib.glob("__editable__*nirmaan*")) + sorted(purelib.glob("*nirmaan*.pth"))
     in_actions = env.get("GITHUB_ACTIONS") == "true"
     append += _need(installed, f"the installed package's files in {purelib}") if in_actions else installed
@@ -399,7 +444,7 @@ def results_problem(xml_text: str | None) -> str | None:
 
 def precheck() -> str | None:
     """Why seat code here would not run as the seat account at all, or None."""
-    for name in WRAPPED:
+    for name in (*WRAPPED, MODEL_NAME):
         found = shutil.which(name)
         if found is None or Path(found) != WRAPPER.parent / name:
             return f"{name} on PATH is {found}, not the seat account's {WRAPPER.parent / name}"
@@ -508,15 +553,24 @@ def _opened(texts: Sequence[str], messages: Sequence[str], target: str) -> bool:
     return not any(m.format(target) in t for m in messages for t in texts)
 
 
+def _printed(texts: Sequence[str], line: str, start: bool = False) -> bool:
+    """Whether a run printed ``line`` as a line of its own (``start``: a line that begins with it), so a tool that echoes
+    the source text it read, in a warning, never counts."""
+    return any(got == line or (start and got.startswith(line)) for t in texts for got in t.splitlines())
+
+
 def tools_child(out: Path) -> int:
     """The tool probes, run in the process ``tool_reach`` starts (its environment holds the canaries)."""
+    import dataclasses
+
     from nirmaan.evals.scorers import _stage
     from nirmaan.integrations import eda
+    from nirmaan.integrations import equivalence  # noqa: F401  (registers the eqy backend)
     from nirmaan.integrations.eda import execute, select_backend, temporary_runs
 
     canaries = [_need(os.environ.get(CANARY_SECRET), CANARY_SECRET), _need(os.environ.get(CANARY_PLAIN), CANARY_PLAIN)]
     nonce = secrets.token_hex(8)
-    file_canaries = [secrets.token_hex(16) for _ in range(3)]
+    file_canaries = [secrets.token_hex(16) for _ in range(4)]
     secret_values = [*canaries, *file_canaries]
     box = Path(tempfile.mkdtemp(prefix="nirmaan-reach-tools-")).resolve()
     other = Path(tempfile.mkdtemp(prefix="nirmaan-reach-runner-")).resolve()
@@ -533,6 +587,10 @@ def tools_child(out: Path) -> int:
             print(f"REACH tool {tool}: the screen is bypassed for this probe only, so the include reaches the tool",
                   flush=True)
             eda.check_inputs = eda.sby_problem = lambda *_a, **_k: None
+            if gate in ("equivalence.run", "coverage.read"):  # their own check of the sources would refuse it too
+                print(f"REACH tool {tool}: {gate}'s own check of its sources is bypassed for this probe only",
+                      flush=True)
+                backend = dataclasses.replace(backend, check=None)
         try:
             outcome = execute(backend, {"backend": name, "timeout": "300", **params})
         finally:
@@ -573,12 +631,17 @@ def tools_child(out: Path) -> int:
                     if tool == "sby":
                         params = {"sources": str(source), "sby": str(_write(here / "reach_tool_formal.sby", SBY_SETUP,
                                                                               0o600))}
+                    if tool == "eqy":
+                        gate_file = _write(here / "reach_tool_gate.v", EQY_GATE, 0o600)
+                        params = {"sources": f"{source},{gate_file}",
+                                  "eqy": str(_write(here / "reach_tool.eqy", EQY_SETUP, 0o600))}
                     outcome, texts = run(tool, gate, name, params, bypass=target is not None)
                     if target is None:
                         printed = any(f"REACH TOOL control {nonce}" in t for t in texts[1:])  # the log, the record
                         ok = outcome.succeeded and (tool != "iverilog" or printed)
-                        note(tool, gate, "control (seat files of mode 0600 read and passed)", None, ok,
-                             outcome.summary[:200], texts)
+                        what = ("control (the setup and both designs, copied into the run's directory by the harness, "
+                                "passed)" if tool == "eqy" else "control (seat files of mode 0600 read and passed)")
+                        note(tool, gate, what, None, ok, outcome.summary[:200], texts)
                         if tool == "sby":  # the cover run of the same setup, through formal.cover
                             cover, ctexts = run(tool, "formal.cover", "symbiyosys-cover", params, bypass=False)
                             note(tool, "formal.cover", "control (seat files of mode 0600 read and passed)", None,
@@ -586,6 +649,35 @@ def tools_child(out: Path) -> int:
                         continue
                     denied = not outcome.succeeded and not _opened(texts, messages, target)
                     note(tool, gate, what, target, denied, outcome.summary[:200], texts)
+            # Gate W2C4: coverage.read's build of seat HDL and the model it built, as the seat account, each in a run
+            # directory inside a folder of the sandbox's kind, beside a canary every account may read by its mode.
+            folder = box / "coverage"
+            beside = _write(folder / f"beside-{nonce}", f'initial $display("CANARY {file_canaries[3]}");\n', 0o644)
+            cov_targets = [*targets, ("canary beside the run's directory in its folder", str(beside))]
+            verilator_messages = next(m for t, _, _, m in TOOL_GATES if t == "verilator")
+            probes = [("control", "control", None), *(("build", w, t) for w, t in cov_targets),
+                      *(("model", w, t) for w, t in cov_targets)]
+            for n, (step, what, target) in enumerate(probes):
+                here = folder / str(n)
+                include = f'`include "{target}"\n' if step == "build" else ""
+                design = _write(here / "reach_cov_design.v", COVERAGE_DESIGN[0] + include + COVERAGE_DESIGN[1], 0o600)
+                opens = coverage_open(target) if step == "model" and target else ""
+                bench = _write(here / "reach_cov_tb.v",
+                               COVERAGE_TB[0] + opens + COVERAGE_TB[1].replace("__NONCE__", nonce), 0o600)
+                params = {"sources": f"{design},{bench}", "top": COVERAGE_TOP, "workdir": str(here / "run")}
+                outcome, texts = run("verilator", "coverage.read", "verilator-coverage", params, bypass=target is not None)
+                ran = _printed(texts[1:2], f"REACH COVERAGE control {nonce}")  # the model ran to its end
+                if step == "control":
+                    note("verilator", "coverage.read", "control (seat files of mode 0600 built, the model run and its "
+                         "coverage read)", None, outcome.succeeded and ran, outcome.summary[:200], texts)
+                elif step == "build":
+                    denied = not outcome.succeeded and not _opened(texts, verilator_messages, target)
+                    note("verilator", "coverage.read", f"build: {what}", target, denied, outcome.summary[:200], texts)
+                else:
+                    opened = _printed(texts[1:2], COVERAGE_OPENED.format(target), start=True)
+                    said = _printed(texts[1:2], COVERAGE_DENIED.format(target))
+                    note(MODEL_NAME, "coverage.read", f"model: {what}", target, ran and said and not opened,
+                         outcome.summary[:200], texts)
             # Decision 3, item 2: the held-out checks' compile reads the run's own judge file and nothing beside it.
             judge_src = _write(box / "judge-source" / "reach_judge.v",
                                f'module reach_judge;\ninitial $display("REACH JUDGE {nonce}");\nendmodule\n', 0o644)

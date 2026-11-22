@@ -10,9 +10,11 @@ other grant is taken back when the run ends. The harness code is unchanged: the 
 
 The tools that read seat-written Verilog run the same way (gates ET2 to ET4 of
 ``council/records/2026-11-22-eda-tools-seat-account.md``): ``iverilog``, ``yosys``, ``sby`` (and with it the Yosys and
-the solver it starts), and ``verilator`` when it lints (``--lint-only``). A Verilator model build (the simulator
-build, the co-simulation builds of ``fw.test`` and ``regmap.verify``) stays with the runner by that rule
-(``as_runner``; decision 6 of the record; gate ET9 waits on those builds). Such a tool reads its inputs where the
+the solver it starts), ``eqy`` (and the Yosys, SBY and solvers it starts; gate W2C3 of
+``council/records/2026-11-23-wave-2-close-meeting-1.md``), and ``verilator`` when it lints (``--lint-only``) or builds
+the coverage run's model (``--coverage-line``, which only ``coverage.read`` passes; gate W2C4). Every other Verilator
+model build (the simulator build, the co-simulation builds of ``fw.test`` and ``regmap.verify``) stays with the runner
+by that rule (``as_runner``; decision 6 of the ET record; gate ET9 waits on those builds). Such a tool reads its inputs where the
 harness keeps them, in the eval sandbox beside files the account may not read, so each run gets a view of its own:
 the program runs in a mount namespace of its own in which every ``/tmp/nirmaan-*`` folder holding one of the run's
 input files is replaced by an empty folder that holds only those input files, each at its own path and read only, and
@@ -26,6 +28,12 @@ files and nothing of the checkout is in the view.
 program through it, in a folder of its own inside the run's directory (``nirmaan.integrations.firmware``). That runs
 as the same account, with ``no_new_privs`` and an empty environment; the program must be one the runner built in the
 same run directory.
+
+``coverage.read`` runs the model it built from seat HDL by path too, so it has a wrapper of its own (gate W2C4):
+where the job names the wrappers, the harness starts that program as ``nirmaan-seat-model RUN_DIR PROGRAM ARGS``
+(``nirmaan.integrations.eda.seat_model``). That runs as the same account, with ``no_new_privs`` and an empty
+environment, in a view of its own that holds the run's own directory and nothing else of the run folders; the program
+must be one the runner built in that run directory.
 
 The account may not read what the judge keeps from it: ``install`` gives it an ACL entry with no permission on
 each folder named by ``--deny-read`` (the workflow names the runner's home, the checkout and the runner's
@@ -48,6 +56,10 @@ Modes, each run by the workflow or by the wrapper:
   of its own (``enter``), then ``cleanup``.
 - ``enter`` (as root, from ``run``): make the run's own mount namespace and its view, then run the command it is
   given (``setpriv``, which drops to the seat account) in the run's folder.
+- ``model RUN_DIR EXE ARGS`` (as the runner, from ``nirmaan-seat-model``): pass nothing of the environment, then
+  ``sudo`` to ``run-model``.
+- ``run-model`` (as root, through sudo): as ``run-built``, in a view of the run's own directory (``enter``), the
+  program inside it.
 - ``exec DIR EXE ARGS`` (as the runner, from ``nirmaan-seat-exec``): pass nothing of the environment, then ``sudo``
   to ``run-built``.
 - ``run-built`` (as root, through sudo): as ``run``, with ``DIR`` as the seat's folder, for a program the runner
@@ -89,8 +101,9 @@ STATE = Path("/run/nirmaan-seat")
 GRANTS = STATE / "grants.json"
 LOCK = STATE / "lock"
 #: The programs that run seat code, wrapped by name. cocotb runs a test module inside ``vvp``; the others read
-#: seat-written Verilog (gate ET2 of council/records/2026-11-22-eda-tools-seat-account.md).
-WRAPPED = ("vvp", "iverilog", "verilator", "yosys", "sby")
+#: seat-written Verilog (gate ET2 of council/records/2026-11-22-eda-tools-seat-account.md; ``eqy``, gate W2C3 of
+#: council/records/2026-11-23-wave-2-close-meeting-1.md).
+WRAPPED = ("vvp", "iverilog", "verilator", "yosys", "sby", "eqy")
 #: Where ``install`` looks for each wrapped program: the system's folders, then the OSS CAD Suite the live evaluation's
 #: tool action unpacks, root's, outside the runner's temporary folder, which the seat account may not read.
 TOOL_PATH = os.defpath + ":/usr/local/bin:/opt/oss-cad-suite/bin"
@@ -100,6 +113,11 @@ INPUTS_ENV = "NIRMAAN_SEAT_INPUTS"
 #: The wrapper ``fw.test`` runs its built co-simulation through (``nirmaan.integrations.firmware.SEAT_EXEC``).
 EXEC_NAME = "nirmaan-seat-exec"
 EXEC = BIN / EXEC_NAME
+#: The wrapper ``coverage.read`` runs the model it built through (``nirmaan.integrations.eda.SEAT_MODEL``; gate W2C4).
+MODEL_NAME = "nirmaan-seat-model"
+MODEL = BIN / MODEL_NAME
+#: The Verilator runs that are the seat account's: a lint, and the coverage run's model build (gate W2C4).
+VERILATOR_SEAT_FLAGS = frozenset({"--lint-only", "--coverage-line"})
 #: Where a run's directory must be: one the harness made in the temporary folder (``eda.run_directory``).
 RUN_ROOT = Path("/tmp")
 RUN_PREFIX = "nirmaan-"
@@ -128,9 +146,11 @@ def kept_env(env: Mapping[str, str]) -> list[str]:
 
 
 def as_runner(exe: str, args: Sequence[str]) -> bool:
-    """Whether this command stays with the runner: a Verilator run that is not a lint, so a model build (decision 6
-    of council/records/2026-11-22-eda-tools-seat-account.md). Every other wrapped command runs as the seat account."""
-    return Path(exe).name == "verilator" and "--lint-only" not in args
+    """Whether this command stays with the runner: a Verilator run that is neither a lint nor the coverage run's model
+    build (``--coverage-line``, gate W2C4), so one of the other model builds (decision 6 of
+    council/records/2026-11-22-eda-tools-seat-account.md; gate ET9). Every other wrapped command runs as the seat
+    account."""
+    return Path(exe).name == "verilator" and not VERILATOR_SEAT_FLAGS & set(args)
 
 
 def run_inputs(env: Mapping[str, str]) -> tuple[str | None, list[str]]:
@@ -167,6 +187,19 @@ def exec_argv(where: str, exe: str, args: Sequence[str], script: str = str(INSTA
     """The sudo command that runs a built program ``exe`` as the seat account in ``where``, with no environment."""
     return ["/usr/bin/sudo", "-n", "/usr/bin/python3", "-I", script, "run-built", "--cwd", where, "--exe", exe, "--",
             *args]
+
+
+def model_argv(run_dir: str, exe: str, args: Sequence[str], script: str = str(INSTALLED)) -> list[str]:
+    """The sudo command that runs a model the run built, ``exe``, as the seat account in the run's directory ``run_dir``,
+    with no environment and a view of that directory only (gate W2C4)."""
+    return ["/usr/bin/sudo", "-n", "/usr/bin/python3", "-I", script, "run-model", "--cwd", run_dir, "--run-dir", run_dir,
+            "--exe", exe, "--", *args]
+
+
+def model_wrapper_text(script: str = str(INSTALLED)) -> str:
+    return (f"#!/bin/sh\n# Runs RUN_DIR EXE ARGS: a model coverage.read built from seat HDL, as {SEAT} "
+            f"(scripts/live_eval_seat.py; docs/LIVE_EVAL_EVIDENCE.md, section 6).\n"
+            f"exec /usr/bin/python3 -I {script} model -- \"$@\"\n")
 
 
 def exec_wrapper_text(script: str = str(INSTALLED)) -> str:
@@ -467,12 +500,14 @@ def cleanup() -> None:
 
 
 def run(cwd: str, exe: str, env: Sequence[str], args: Sequence[str], built: bool = False, run_dir: str | None = None,
-        inputs: Sequence[str] = ()) -> int:
+        inputs: Sequence[str] = (), view: bool = False) -> int:
     """Run ``exe`` as the seat account in ``cwd``; its exit status, negative for a signal (``built``) or ``128 + N``.
 
     ``built``: ``exe`` is a program the runner built in the same run directory (``built_problem``), run with no
     environment of the caller's; otherwise one of the wrapped programs, with cocotb's settings, in a view of its own
-    (``view_plan``): ``run_dir`` (``cwd`` when not given) and the ``inputs``, nothing else of the run folders."""
+    (``view_plan``): ``run_dir`` (``cwd`` when not given) and the ``inputs``, nothing else of the run folders.
+    ``view`` (a built model, gate W2C4): the built program too runs in a view of its own, of ``run_dir``, and must be
+    inside ``run_dir``."""
     owner = (int(os.environ["SUDO_UID"]), int(os.environ["SUDO_GID"]))
     seat = _seat()
     if seat.pw_uid in owner or owner[0] == 0:
@@ -489,20 +524,23 @@ def run(cwd: str, exe: str, env: Sequence[str], args: Sequence[str], built: bool
         fcntl.flock(lock, fcntl.LOCK_EX)
         cleanup()
         start = Path(os.path.realpath(cwd))
-        where = Path(os.path.realpath(run_dir)) if run_dir and not built else start
+        viewed = view or not built
+        where = Path(os.path.realpath(run_dir)) if run_dir and viewed else start
         problem = run_dir_problem(where, owner[0])
         if problem:
             raise Refused(f"{SEAT}: {problem}; {exe} runs only in a run directory (nothing ran)")
         if built:
             exe = os.path.realpath(exe)
             problem = built_problem(Path(exe), where, owner[0])
+            if not problem and view and not Path(exe).is_relative_to(where):
+                problem = f"{exe} is not inside the run's directory {where}"
             if problem:
                 raise Refused(f"{SEAT}: {problem}; only a program the runner built in this run runs (nothing ran)")
         bad = [why for why in (input_problem(p, owner[0]) for p in inputs) if why]
         if bad:
             raise Refused(f"{SEAT}: {'; '.join(bad)}; a tool reads only files the runner made for this run (nothing "
                           f"ran)")
-        plan = None if built else view_plan(where, start, inputs)
+        plan = view_plan(where, start, inputs) if viewed else None
         grants = grants_for(where) + [(p, "r--") for p in dict.fromkeys(inputs)
                                       if not os.lstat(p).st_mode & stat.S_IROTH]
         _save_grants({"owner": list(owner), "paths": grants})  # recorded first, so a crash leaves them to cleanup
@@ -648,9 +686,10 @@ def install(source: Path, trees: Sequence[str] = (), folders: Sequence[str] = ()
         exes.append(str(Path(real).resolve()))
         (BIN / name).write_text(wrapper_text(exes[-1]), encoding="utf-8")
     EXEC.write_text(exec_wrapper_text(), encoding="utf-8")
+    MODEL.write_text(model_wrapper_text(), encoding="utf-8")
     shutil.copyfile(source, INSTALLED)
     (HOME / "exes.json").write_text(json.dumps(exes), encoding="utf-8")
-    for path in (HOME, BIN, *(BIN / n for n in WRAPPED), EXEC):
+    for path in (HOME, BIN, *(BIN / n for n in WRAPPED), EXEC, MODEL):
         os.chown(path, 0, 0)
         os.chmod(path, 0o755)
     for path in (INSTALLED, HOME / "exes.json"):
@@ -663,7 +702,7 @@ def install(source: Path, trees: Sequence[str] = (), folders: Sequence[str] = ()
     deny(seat.pw_uid, unreadable)
     print(f"{SEAT}: no read access to {', '.join(unreadable) or 'no folder'}; every packet it sends is stopped")
     print(f"{SEAT}: uid {seat.pw_uid}, groups {groups}; {', '.join(f'{BIN / n} runs {e}' for n, e in zip(WRAPPED, exes))}; "
-          f"{EXEC} runs what fw.test builds")
+          f"{EXEC} runs what fw.test builds; {MODEL} runs the model coverage.read builds")
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -678,6 +717,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     wrap.add_argument("args", nargs=argparse.REMAINDER)
     built = sub.add_parser("exec")
     built.add_argument("args", nargs=argparse.REMAINDER)
+    model = sub.add_parser("model")
+    model.add_argument("args", nargs=argparse.REMAINDER)
     one = sub.add_parser("run")
     one.add_argument("--cwd", required=True)
     one.add_argument("--exe", required=True)
@@ -692,6 +733,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     run_built.add_argument("--cwd", required=True)
     run_built.add_argument("--exe", required=True)
     run_built.add_argument("args", nargs=argparse.REMAINDER)
+    run_model = sub.add_parser("run-model")
+    run_model.add_argument("--cwd", required=True)
+    run_model.add_argument("--run-dir", required=True)
+    run_model.add_argument("--exe", required=True)
+    run_model.add_argument("args", nargs=argparse.REMAINDER)
     sub.add_parser("cleanup")
     args = parser.parse_args(argv)
     rest = args.args[1:] if getattr(args, "args", [])[:1] == ["--"] else getattr(args, "args", [])
@@ -706,6 +752,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                 raise Refused(f"{EXEC_NAME}: give the seat's folder and the program to run (nothing ran)")
             command = exec_argv(rest[0], rest[1], rest[2:])
             os.execv(command[0], command)
+        if args.mode == "model":
+            if len(rest) < 2:
+                raise Refused(f"{MODEL_NAME}: give the run's directory and the program to run (nothing ran)")
+            command = model_argv(rest[0], rest[1], rest[2:])
+            os.execv(command[0], command)
         if os.geteuid() != 0:
             raise Refused(f"{args.mode} runs as root")
         if args.mode == "install":
@@ -717,6 +768,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 0
         if args.mode == "run-built":
             return passed_on(run(args.cwd, args.exe, [], rest, built=True))
+        if args.mode == "run-model":
+            return passed_on(run(args.cwd, args.exe, [], rest, built=True, run_dir=args.run_dir, view=True))
         if args.mode == "enter":
             try:
                 return enter(json.loads(args.plan), rest)

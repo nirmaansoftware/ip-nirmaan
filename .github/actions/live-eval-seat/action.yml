@@ -3,8 +3,10 @@
 # runs the real one as that account, with no_new_privs, an environment holding only cocotb's settings, and write
 # access to the run's own directory only (scripts/live_eval_seat.py). Beside it, `nirmaan-seat-exec` runs the program
 # fw.test builds (seat C linked with the harness) as the same account, with no environment (M90). iverilog, yosys, sby
-# and verilator are wrapped the same way (gate ET2, council/records/2026-11-22-eda-tools-seat-account.md): each runs as
-# the account with a view of the run's own directory and input files only; a Verilator model build stays the runner's.
+# and verilator are wrapped the same way (gate ET2, council/records/2026-11-22-eda-tools-seat-account.md), and eqy
+# (gate W2C3, council/records/2026-11-23-wave-2-close-meeting-1.md): each runs as the account with a view of the run's
+# own directory and input files only. A Verilator model build stays the runner's, except coverage.read's, whose model
+# runs as the account through nirmaan-seat-model, with no environment, in a view of the run's directory (gate W2C4).
 # The hosted runner's
 # tool cache (the Python the package is installed in), its global node_modules (npm) and some folders on PATH are
 # writable by every account; it takes that away. The account gets no read access to the runner's home, the
@@ -15,7 +17,7 @@ description: Run seat code (cocotb's vvp, the program fw.test builds) as an unpr
 runs:
   using: composite
   steps:
-    - name: Make the seat account, its tool wrappers and its nirmaan-seat-exec
+    - name: Make the seat account, its tool wrappers, its nirmaan-seat-exec and its nirmaan-seat-model
       shell: bash
       run: |
         sudo /usr/bin/python3 -I scripts/live_eval_seat.py install \
