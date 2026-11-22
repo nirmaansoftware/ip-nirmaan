@@ -8,6 +8,10 @@ inputs:
   tools:
     description: Space-separated tool names to wrap (for example "sby yices-smt2").
     required: true
+  root:
+    description: Where the suite is unpacked, by root, owned by root (for example "/opt"); empty for the runner's temporary folder, as the runner.
+    required: false
+    default: ""
 runs:
   using: composite
   steps:
@@ -27,12 +31,19 @@ runs:
       shell: bash
       env:
         TOOLS: ${{ inputs.tools }}
+        ROOT: ${{ inputs.root }}
       run: |
         echo "6d04cf3e36c45d4eacbe2fa07f3860b9a86f503c2b725bdee4d02e54defbf80d  /tmp/oss-cad-suite.tgz" | sha256sum -c
-        tar -xzf /tmp/oss-cad-suite.tgz -C "$RUNNER_TEMP"
+        if [ -n "$ROOT" ]; then
+          sudo mkdir -p "$ROOT"
+          sudo tar --no-same-owner -xzf /tmp/oss-cad-suite.tgz -C "$ROOT"
+        else
+          ROOT="$RUNNER_TEMP"
+          tar -xzf /tmp/oss-cad-suite.tgz -C "$ROOT"
+        fi
         mkdir -p "$RUNNER_TEMP/cad-bin"
         for tool in $TOOLS; do
-          printf '#!/bin/sh\nexec "%s/oss-cad-suite/bin/%s" "$@"\n' "$RUNNER_TEMP" "$tool" > "$RUNNER_TEMP/cad-bin/$tool"
+          printf '#!/bin/sh\nexec "%s/oss-cad-suite/bin/%s" "$@"\n' "$ROOT" "$tool" > "$RUNNER_TEMP/cad-bin/$tool"
           chmod +x "$RUNNER_TEMP/cad-bin/$tool"
         done
         echo "$RUNNER_TEMP/cad-bin" >> "$GITHUB_PATH"

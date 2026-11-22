@@ -88,8 +88,7 @@ def held_out_run(ctx: ScoreContext) -> Score:
         if not files:
             return score(ScoreStatus.NOT_RUN, f"the seat submitted no {' or '.join(kinds)} file")
         values.setdefault(param, []).extend(str(a.location) for a in files)
-    for param, paths in check.case_files.items():
-        values.setdefault(param, []).extend(str(resolve(ctx.repo, p)) for p in paths)
+    cases = {param: [resolve(ctx.repo, p) for p in paths] for param, paths in check.case_files.items()}
     entries: dict[str, str] = {}
     for param, kinds in check.seat_entries.items():  # G3: a whole flow's check takes the RTL stage's declared top
         entry = _declared_entry(ctx, param, kinds)
@@ -97,13 +96,48 @@ def held_out_run(ctx: ScoreContext) -> Score:
             return score(ScoreStatus.NOT_RUN, f"no run of the seat's own declares {param} for its "
                                               f"{' or '.join(kinds)} file")
         entries[param] = entry
-    params = {**check.params, **entries, **values}  # lists: the broker holds them to the tool's contract (M28)
-    try:
-        run_id, outcome = ctx.tools.invoke(str(check.tool), **params)
-    except ToolAccessDenied as exc:
-        return score(ScoreStatus.NOT_RUN, f"{check.tool} not run: {exc}")
-    status = ScoreStatus.PASSED if outcome.succeeded else ScoreStatus.FAILED
-    return score(status, f"{check.tool} {run_id}: {outcome.summary}", (run_id,))
+
+    def judge(stage: Path | None) -> Score:
+        given = _stage_cases(stage, cases) if stage is not None else {k: [str(p) for p in v] for k, v in cases.items()}
+        for param, paths in given.items():
+            values.setdefault(param, []).extend(paths)
+        params = {**check.params, **entries, **values}  # lists: the broker holds them to the tool's contract (M28)
+        try:
+            run_id, outcome = ctx.tools.invoke(str(check.tool), **params)
+        except ToolAccessDenied as exc:
+            return score(ScoreStatus.NOT_RUN, f"{check.tool} not run: {exc}")
+        status = ScoreStatus.PASSED if outcome.succeeded else ScoreStatus.FAILED
+        return score(status, f"{check.tool} {run_id}: {outcome.summary}", (run_id,))
+
+    from nirmaan.integrations.eda import HELD_OUT_STAGED  # the tools are the gate backends' to name, not the judge's
+
+    if str(check.tool) not in HELD_OUT_STAGED or not cases:
+        return judge(None)
+    if ctx.work is not None:
+        ctx.work.mkdir(parents=True, exist_ok=True)
+        return judge(Path(tempfile.mkdtemp(prefix="held-out-", dir=ctx.work)))
+    with tempfile.TemporaryDirectory(prefix="nirmaan-held-out-") as stage:
+        return judge(Path(stage))
+
+
+def _stage_cases(where: Path, cases: dict[str, list[Path]]) -> dict[str, list[str]]:
+    """Copy each case file into ``where`` under its own name (in a numbered folder of its own when two share a name);
+    a case path that is not a file is passed as it is."""
+    names = [p.name for paths in cases.values() for p in paths if p.is_file()]
+    apart = len(set(names)) != len(names)
+    staged: dict[str, list[str]] = {}
+    n = 0
+    for param, paths in cases.items():
+        for path in paths:
+            if not path.is_file():
+                staged.setdefault(param, []).append(str(path))
+                continue
+            n += 1
+            target = (where / str(n) if apart else where) / path.name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(path, target)
+            staged.setdefault(param, []).append(str(target))
+    return staged
 
 
 # --- Negative controls (M58) -------------------------------------------------------------------
