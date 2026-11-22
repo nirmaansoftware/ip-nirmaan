@@ -19,6 +19,8 @@ from nirmaan.models import HeldOutCheck, ScoreStatus
 from nirmaan.models.workflow import Bound
 
 REPO = Path(__file__).resolve().parents[1]
+#: The coverage seat cases (RX-E2 added the second); every other case dumps as it did before the field existed.
+COVERAGE_CASES = ("dv/coverage-irq-ctrl", "dv/coverage-tick-timer")
 
 
 class FakeTools:
@@ -97,5 +99,5 @@ def test_only_the_coverage_case_dumps_cover_bounds():
     """Every other shipped case dumps as it did before the field existed, so its digest is unchanged."""
     for case in load_cases(REPO / "evals"):
         has = any("cover_bounds" in h.model_dump(mode="json") for h in case.held_out)
-        assert has == (case.id == "dv/coverage-irq-ctrl"), case.id
+        assert has == (case.id in COVERAGE_CASES), case.id
         assert case_digest(case, REPO)

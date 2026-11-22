@@ -384,3 +384,22 @@ security named: the first by a test of the flow's RTL stage with a seat `.sby` (
 amendment if the test shows the formal gates run), the second by the runner-account tools running as the seat account
 with a recorded reach test, or by a council ruling that names the screen as the control. Each is recorded by the pull
 request that settles it.
+
+## 15. Dated addition (2026-11-22): where the timer's records are committed
+
+Section 3 says the record names are the ones `record_run` writes. Every CI dispatch writes into a fresh folder, so
+two slots of one arm on one day get the same record name. To keep the names as written and still tell the slots
+apart, a slot's record is committed at `evals/results/g3-timer/slot-NN/<record name>/`, with `NN` the slot number in
+two digits (a failed slot's `causes.md` sits beside its `manifest.json`). The name is never changed; the path is
+the record's identity. The register block's folder is named in the dated addition that section 9 requires before its
+slot 21. This changes no count, slot, arm, harness, fingerprint or digest, and no record. What reads records by
+path:
+
+- `tests/test_whole_flow.py` asserts the structure of any committed whole-flow record (all trials whole-flow, each
+  with its stages and flow digest, and a place under a `g3-timer` slot folder) in place of the
+  absence it asserted before the first record.
+- `scripts/failure_curriculum.py` reads `causes.md` and trial files at any depth, and keys a failure by the
+  record's path under `evals/results` (a flat record keeps its bare name); an answer in a pull request names
+  that key.
+- `src/nirmaan/evals/levels.py` and `scripts/capability_levels.py` already find manifests at any depth and list
+  records by path; a test now covers two same-named records in two slot folders.

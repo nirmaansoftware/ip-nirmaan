@@ -494,12 +494,21 @@ SKILLS: list[Skill] = [
        fails=("Assertions that never evaluate.",), valid=("Every assertion evaluated non-vacuously.",)),
     sk("regression_management", "Regression management", "verification", "regression", provides=("dv.regression",),
        tools=("regression.run", "veritriage.investigate"),
+       docs=("verification/regression_management",),
        procedures=("Run regressions, track pass rates, triage failures through VeriTriage.",),
        fails=("Flaky tests ignored.",), valid=("Every failure is triaged or tracked.",)),
     sk("failure_triage", "Failure triage", "verification", "debug", provides=("debug.triage",),
        tools=("veritriage.investigate", "veritriage.explain_log", "simulator.run"), packs=("uvm", "sva"),
        docs=("verification/failure_triage",),
-       procedures=("Run VeriTriage over the failing artifacts.", "Classify with evidence, not intuition."),
+       procedures=("Run VeriTriage over the failing artifacts.", "Classify with evidence, not intuition.",
+                   # M71 granted simulator.run for the repro gate; the gate reads the M53 verdict
+                   # (docs/REPRO_GATES.md, docs/GATE_INTEGRITY.md), so the card names it, as rtl_design's does.
+                   "Write each repro as a self-checking testbench that counts its checks, and end it with its "
+                   "verdict, printed once just before $finish: read the run's nonce with "
+                   "$value$plusargs(\"nirmaan_nonce=%s\", nonce) into a reg [8*64-1:0], then "
+                   "$display(\"NIRMAAN-SIM %0s %0d passed, %0d failed\", nonce, passed, failed). The repro gate "
+                   "(simulator.run with expect=fail) counts a run only when it builds, reaches $finish, and prints "
+                   "that one verdict with the run's nonce and at least one failed check."),
        fails=("Classifying from the first error line only.",),
        valid=("Triage cites a VeriTriage session and its evidence nodes.",)),
     sk("log_analysis", "Log analysis", "verification", "debug", provides=("debug.triage",),
@@ -519,6 +528,7 @@ SKILLS: list[Skill] = [
        valid=("The conclusion names its evidence and the alternatives it rejects.",)),
     sk("regression_intelligence", "Regression intelligence", "verification", "debug", provides=("debug.triage",),
        tools=("veritriage.investigate",),
+       docs=("verification/regression_intelligence",),
        procedures=("Check whether a failure was seen before and what fixed it.",),
        fails=("Re-debugging known failures.",), valid=("Similar historical failures are checked.",)),
     sk("formal_verification", "Formal verification", "verification", "formal",
@@ -537,10 +547,12 @@ SKILLS: list[Skill] = [
        docs=("verification/equivalence_checking",), procedures=("Map and compare implementations.",),
        fails=("Unmapped points hidden.",), valid=("All compare points map.",)),
     sk("formal_coverage", "Formal coverage", "verification", "formal", provides=("formal.prove",),
-       packs=("formal",), procedures=("Measure proof core and reachability.",),
+       packs=("formal",), docs=("verification/formal_coverage",),
+       procedures=("Measure proof core and reachability.",),
        fails=("Unreachable covers ignored.",), valid=("Every unreachable cover is explained.",)),
     sk("cdc_verification", "CDC/RDC verification", "verification", "cdc",
        provides=("cdc.verify", "cdc.review"), packs=("cdc", "reset-clocking"), tools=("cdc.run",),
+       docs=("verification/cdc_verification",),
        procedures=("Run structural and functional CDC/RDC.", "Waive only with review."),
        fails=("Blanket waivers.", "Missed reconvergence."),
        valid=("Every violation is fixed or waived with an approved rationale.",)),

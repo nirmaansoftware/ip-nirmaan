@@ -1,0 +1,137 @@
+---
+id: verification/regression_intelligence
+skill: regression_intelligence
+as_of: 2026-11-22
+review_by: 2027-05-22
+sources:
+  - open | Poulos and Veneris (University of Toronto), Clustering-based Failure Triage for RTL Regression Debugging, ITC 2014 (author copy, IEEE copyright, no open licence stated) [POU] | https://www.eecg.utoronto.ca/~veneris/itc14.pdf
+  - open | El Mandouh, Maher, Ahmed, ElSharnoby and Wassal (Mentor Graphics, Cairo University), Guiding Functional Verification Regression Analysis Using Machine Learning and Big Data Methods, DVCon Europe 2018 (proceedings, no licence stated, vendor co-authored) [ELM] | https://dvcon-proceedings.org/wp-content/uploads/guiding-functional-verification-regression-analysis-using-machine-learning-and-big-data-methods.pdf
+  - open | Phogat and Hamilton (Arm), mL: Shrinking the Verification volume using Machine Learning, DVCon proceedings (no licence stated; the page shows no year) [PHO] | https://dvcon-proceedings.org/wp-content/uploads/1090-1.pdf
+licence_check: original writing that summarises and cites; no text, table, figure or code copied from any source; reported results are given as the authors' own
+export_screen: clear
+writer: RX-K2 session (wave 2 close, 2026-11-22)
+checker: pending, a different session reads the sources and writes the check record
+---
+Practising: the VeriTriage investigation tool this skill holds is available; this document is knowledge, not evidence.
+
+# Regression intelligence
+
+Using what earlier and parallel runs already show to decide which failures
+are new, which belong together and what is worth running or debugging. Tags
+in brackets name the sources above; a line marked "inference" is this
+document's own reasoning; a line marked "gate" names repository code that
+backs it. Every result figure below is the authors' own, from their own
+designs or projects, with no independent measurement found.
+
+## What the repository gives this skill
+
+- The card's one tool is veritriage.investigate. It takes `paths` (required)
+  and an optional `workspace` (gate: src/nirmaan/company/tools.py:112-115).
+  The card's procedure is to check whether a failure was seen before and what
+  fixed it, and it fails on re-debugging known failures (gate:
+  src/nirmaan/company/skills.py:521-525).
+- The tool refuses no paths, a missing path and a directory (gate:
+  src/nirmaan/integrations/veritriage.py:50-57; test:
+  tests/test_nirmaan_gate_integrity.py::test_veritriage_refuses_a_directory_cleanly).
+- The binding runs the investigation with `record_history=False` and
+  `learn=False` (gate: src/nirmaan/integrations/veritriage.py:59). In the
+  library the history record and the seen-before flag are attached only when
+  `record_history` is true and a workspace database exists (gate:
+  src/veritriage/workspace/services.py:211-219; test:
+  tests/test_workspace.py::test_investigate_can_record_history).
+- Together these mean the tool as the seat holds it does not itself say
+  whether a failure was seen before; the seat cannot set the flag, because
+  the tool lists only `paths` and `workspace` (inference from the three
+  lines above). The "seen before" step of the card therefore has to come from
+  the seat's own records of earlier runs and fixes, compared by hand.
+
+## What the papers describe
+
+Three approaches, at different points in a regression flow. None uses
+this repository's tool.
+
+### Triage by clustering failures [POU]
+
+- Triage after a regression has three tasks: a coarse first look at where each
+  failure may originate, binning failures that probably share a cause, and
+  sending each bin to the best-suited engineer. The authors report that
+  practice at the time was manual and ad hoc, so failures bounced between
+  engineers [POU].
+- Their engine needs a SAT-based debugger that returns, for each failure, a
+  set of suspect design components and the cycle each is excited. Suspects are
+  weighted up when the excitation is close to the failure and when the
+  suspect's inputs toggle rarely, since typical errors are easy to excite.
+- Each failure becomes a vector of suspect weights. Distance between vectors
+  says how related two failures are. Bins come from two passes: hierarchical
+  clustering with Ward's method, cut where the merge cost jumps 3 to 5
+  standard deviations above the mean, then K-means seeded from that cut.
+  Within a bin, suspects are ranked by average weight so the bin can go to the
+  owner of the top-ranked module.
+- Reported: on 20 regression runs of four OpenCores designs with injected
+  errors, 89 percent average clustering accuracy against 78 percent for the
+  earlier automated method and 58 percent for a script. The number of bins was
+  exactly right in 12 runs and one or two too few in 7, because very dense
+  clusters merge. Errors that cause few failures or are hard to excite were the
+  ones it ranked poorly [POU].
+
+### Learning good behaviour from passing runs [ELM]
+
+- Train clustering models on trace windows of passing tests: fixed windows of
+  100 cycles, with the count of 0-to-1 changes of selected signals as
+  features, and x-means to choose the number of clusters. A failing test whose
+  window fits no cluster is flagged. A nearest-neighbour step names the
+  suspect signals, and the report gives window, module and signals.
+- Signals are chosen by size of their cone of influence, dropping memories,
+  counters and equivalent signals. A MapReduce step spreads trace processing;
+  the authors report 2.7 times faster than sequential processing.
+- Reported on an Ethernet MAC core with 1,500 passing tests and injected
+  mutants: 81 percent exact, 13 percent partial (a superset of the signals),
+  6 percent missed, and 83 percent detected in the cycle of injection [ELM].
+  These are injected faults, not bugs found in a project (inference).
+
+### Choosing which tests to run [PHO]
+
+- A classifier trained on each test's knob values (about 1,000 knobs, one
+  million tests from two weeks of data) with pass or fail as the label ranks
+  newly generated tests by failure likelihood; the top k are simulated. Only
+  knobs fixed before simulation can be used.
+- Failures were about 5 percent of the data, so the authors use gradient
+  boosted trees and cross-validate with sequential splits grouped by date.
+- Old data goes stale as the RTL changes, so they retrain weekly on a sliding
+  window and keep running ordinary constrained-random regressions beside the
+  model, both to supply new training data and to probe areas it has not seen.
+- Measured as unique failure signatures per CPU hour, the authors report 1.35
+  times the baseline, 1.6 times on recovery rate, and 7.6 percent compute
+  saving over 15 months with the model's volume at 16 percent of the baseline
+  [PHO]. They assume one unique failure signature stands for one bug.
+
+## How to use these
+
+- A failure that matches an earlier one in signature, owner and cause is a
+  lead to test with the same seed and build, not a conclusion (inference).
+- Binning a regression: take each log through the tool, then group by evidence
+  and by shared failing modules; [POU] shows the idea but needs suspect sets
+  this tool does not produce (inference).
+- Cutting a regression by history is a project-scale activity needing months
+  of run records; [PHO] says the model needs its sibling random regression
+  to stay valid.
+- Record fixes with the signature so the next run can find them; the sources
+  describe signatures only in passing, so the format is unsourced.
+
+## Failure modes
+
+- Re-debugging a known failure because the history check was skipped (the
+  card's failure).
+- Treating a cluster or a model score as the cause [POU] [ELM].
+- Trusting a model trained before a big RTL change [PHO].
+- Dropping the random regression because the model looks good [PHO].
+- Counting two signatures as two bugs, or one as one, without a check
+  (inference from the [PHO] assumption).
+
+## Not sourced here
+
+- How to define a failure signature from a log.
+- Flaky-test detection and the triage queue (see regression_management).
+- Log clustering from UVM messages: a conference deck on it exists, but only
+  its opening slides were readable, so it is not cited.
+- How a known fix is matched to a new failure.

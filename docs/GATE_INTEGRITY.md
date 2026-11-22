@@ -159,7 +159,13 @@ test (an inference from the sources for the forged verdict, not run; what the
 address-arithmetic probe below really read is recorded). Council record
 `council/records/2026-11-17-g3-whole-flow-cases.md`, second addendum, decision
 2: running the driver and its tests in a process of their own is required
-before any second register block batch (gate WF18).
+before any second register block batch (gate WF18). Council record
+`council/records/2026-11-19-seat-c-live-refusal.md`, decision 2, adds a line
+to that gate: the nonce does not travel on a command line that the seat
+account can read, or a recorded probe shows it cannot read it. Today it does
+travel on one (the program's own, and the seat wrapper's, `sudo`'s and the
+root helper's in the live evaluation jobs), and no probe reads another
+process's command line (`docs/whole_flow/gates/WF18.md`).
 
 **The object screen (gate WF16): a tripwire, not confinement.** A check that
 names the scorer `screened-held-out-run` or `screened-must-fail`

@@ -10,6 +10,7 @@ is in no default case set and never runs as a single-seat case; and a whole-flow
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -78,13 +79,59 @@ def test_a_whole_flow_case_trial_and_manifest_carry_the_label():
     assert EvalTrial.model_validate_json(_trial("whole").model_dump_json()).flow == "whole"
 
 
-def test_every_committed_record_still_loads_and_none_is_whole_flow():
-    manifests = sorted((EVALS / "results").rglob("manifest.json"))
+#: Where a committed whole-flow record may live: one folder per timer slot, the record name as record_run wrote it.
+SLOT_RECORD = re.compile(r"g3-timer/slot-\d{2}/[^/]+")
+
+
+def _check_record_structure(root: Path, folder: Path) -> None:
+    """A committed record loads; a single-seat record is entirely single-seat (as before the label existed); a
+    whole-flow record is entirely whole-flow, sits in a timer slot folder and carries each trial's stages and
+    flow digest."""
+    record = load_record(folder)  # raises on a record that does not load
+    where = folder.relative_to(root).as_posix()
+    if not is_whole_flow(record):  # also raises when the record mixes the two kinds
+        assert all(t.flow == "seat" and t.stages == () and t.flow_digest is None for t in record.trials), where
+        return
+    assert SLOT_RECORD.fullmatch(where), f"{where}: a whole-flow record belongs in g3-timer/slot-NN/<record name>"
+    assert record.trials, where
+    for trial in record.trials:
+        assert trial.flow == "whole" and trial.stages and trial.flow_digest, f"{where} trial {trial.trial}"
+        assert all(isinstance(stage, EvalStage) for stage in trial.stages), where
+
+
+def test_every_committed_record_still_loads_and_a_whole_flow_one_has_its_structure():
+    root = EVALS / "results"
+    manifests = sorted(root.rglob("manifest.json"))
     assert manifests
     for path in manifests:
-        record = load_record(path.parent)
-        assert not is_whole_flow(record), path
-        assert all(t.flow == "seat" and t.stages == () and t.flow_digest is None for t in record.trials)
+        _check_record_structure(root, path.parent)
+
+
+def test_a_nested_slot_record_is_read_as_a_whole_flow_record_and_a_misplaced_or_unlabelled_one_fails(tmp_path):
+    stage = EvalStage(stage="requirements", task="t1", status="done")
+
+    def write(rel: str, manifest: EvalRunManifest, trial: EvalTrial) -> Path:
+        folder = tmp_path / rel
+        (folder / "flow_timer").mkdir(parents=True)
+        (folder / "manifest.json").write_text(manifest.model_dump_json(), encoding="utf-8")
+        (folder / "flow_timer" / "trial-01.json").write_text(trial.model_dump_json(), encoding="utf-8")
+        return folder
+
+    whole_trial = _trial("whole", stages=(stage,), flow_digest="sha256:f")
+    # Two slots of one arm on one day: the same record name under two slot folders, both fine.
+    for slot in ("slot-01", "slot-02"):
+        _check_record_structure(tmp_path, write(f"g3-timer/{slot}/2026-11-23-claude-code-m", _manifest("whole"),
+                                                whole_trial))
+    assert len(list(tmp_path.rglob("manifest.json"))) == 2
+    with pytest.raises(AssertionError, match="belongs in g3-timer"):  # a whole-flow record in the flat layout
+        _check_record_structure(tmp_path, write("2026-11-23-claude-code-m", _manifest("whole"), whole_trial))
+    with pytest.raises(AssertionError):  # a whole-flow trial that lost its stages or its digest
+        _check_record_structure(tmp_path, write("g3-timer/slot-03/m", _manifest("whole"), _trial("whole")))
+    with pytest.raises(AssertionError):  # the manifest says whole but the trial does not: both must say so
+        _check_record_structure(tmp_path, write("g3-timer/slot-04/m", _manifest("whole"), _trial()))
+    _check_record_structure(tmp_path, write("seat-run", _manifest(), _trial()))  # a single-seat record is as before
+    with pytest.raises(AssertionError):  # a single-seat record may not carry whole-flow detail
+        _check_record_structure(tmp_path, write("seat-run-2", _manifest(), _trial(flow_digest="sha256:f")))
 
 
 def test_either_label_is_enough_and_the_name_is_never_read():

@@ -267,3 +267,40 @@ def test_the_reference_setup_passes_the_refactor_and_fails_every_mutant_on_a_par
         summary = runs[run].summary
         assert runs[run].tool == "equivalence.run" and summary.startswith("eqy: "), summary
         assert "partitions not equivalent" in summary or "not equivalent" in summary, summary
+
+
+def _eqy_on_mutant(tmp_path, strategy):
+    """Run eqy directly: the approved counter against the wrong-flip-bit mutant, with this strategy block."""
+    import shutil
+    import subprocess
+
+    folder = tmp_path / "run"
+    folder.mkdir(parents=True)
+    shutil.copy(REPO / GRAY / "gray_counter.v", folder / "gray_counter.v")
+    shutil.copy(REPO / GRAY / "mutants" / "gray_counter_refactor_flip_wrong_bit.v", folder / "gate.v")
+    (folder / "s.eqy").write_text(
+        "[gold]\nread_verilog -sv gray_counter.v\nprep -top gray_counter\n\n"
+        "[gate]\nread_verilog -sv gate.v\nprep -top gray_counter\n\n" + strategy, encoding="utf-8")
+    done = subprocess.run(["eqy", "-f", "-d", "out", "s.eqy"], cwd=folder, capture_output=True, text=True,
+                          timeout=300, stdin=subprocess.DEVNULL)
+    return done.returncode, done.stdout + done.stderr
+
+
+@needs(*FORMAL_TOOLS, "eqy", "make")
+def test_a_sat_strategy_passes_the_wrong_flip_mutant_that_the_sby_strategy_fails(tmp_path):
+    """The evidence behind the equivalence_checking note: with the installed eqy and Yosys, ``use sat`` at depth 10
+    reports the register partition of the wrong-flip-bit mutant equivalent, and ``use sby`` with smtbmc (the
+    reference setup's strategy) reports it not equivalent. If an eqy or Yosys release fixes ``sat``, this test
+    fails and the note's sat paragraph is to be revisited."""
+    sat_code, sat_out = _eqy_on_mutant(tmp_path / "sat", "[strategy simple]\nuse sat\ndepth 10\n")
+    sby_code, sby_out = _eqy_on_mutant(tmp_path / "sby", "[strategy sby]\nuse sby\nengine smtbmc\ndepth 10\n")
+    assert sby_code != 0 and "DONE (FAIL" in sby_out, sby_out[-800:]
+    assert sat_code == 0 and "DONE (PASS" in sat_out, sat_out[-800:]
+
+
+@needs(*FORMAL_TOOLS, "eqy", "make")
+def test_a_sby_strategy_listed_after_sat_is_not_reached_when_sat_proves_the_partition(tmp_path):
+    """Slot 89 of the W2-L1 records wrote this shape and the mutant survived it."""
+    code, out = _eqy_on_mutant(tmp_path, "[strategy simple]\nuse sat\ndepth 10\n\n"
+                               "[strategy formal]\nuse sby\nengine smtbmc\ndepth 10\n")
+    assert code == 0 and "DONE (PASS" in out, out[-800:]
