@@ -768,6 +768,35 @@ def test_the_tools_as_the_seat_account_change_no_fingerprint():
     assert "NIRMAAN_SEAT" not in specs and "nirmaan-seat" not in specs  # no seat-account text reaches a seat
 
 
+TOOL_REACH_RECORD = REPO / "evals" / "flow" / "tool_reach_record.json"
+ET3_TOOLS = ("iverilog", "verilator", "yosys", "sby")
+
+
+def test_the_committed_tool_reach_record_is_from_main_with_every_probe_denied_in_the_replay_and_rejudge_jobs():
+    """Gate ET3 (decision 2, item 3): the committed record is a replay dispatched on main, holding the replay job's and
+    the rejudge job's tool reach records, of one run and one commit, each with every wrapped tool probed through its
+    gate as the seat account: every control passed and every probe denied."""
+    record = json.loads(TOOL_REACH_RECORD.read_text())
+    assert record["format"] == "nirmaan.tool-reach-record/1"
+    parts = {"replay": record["replay"], "rejudge": record["rejudge"]}
+    for job, part in parts.items():
+        assert part["format"] == "nirmaan.tool-reach" and part["job"] == job and part["seat"] == "nirmaan-seat"
+        assert part["seat_tools"] == "/opt/nirmaan-seat/bin" and part["every_denied"] is True, job
+        assert part["probes"] and all(p["denied"] for p in part["probes"]), job
+        # The tools gate ET3 names; a tool wrapped since (eqy, W2C3) has a record of its own, not this one.
+        for tool, gate, _backend, _messages in [t for t in reach.TOOL_GATES if t[0] in ET3_TOOLS]:
+            probes = [p for p in part["probes"] if p["tool"] == tool and p["gate"] == gate
+                      and not p["probe"].startswith("held-out compile")]
+            assert sum(p["target"] is None for p in probes) == 1, (job, tool)  # the control
+            targets = [p["probe"] for p in probes if p["target"]]
+            assert targets == ["checkout canary", "runner-only canary",
+                               "credential canary in the parent's environment"], (job, tool)
+        held = [p for p in part["probes"] if p["probe"].startswith("held-out compile")]
+        assert len(held) == 2 and sum(p["target"] is not None for p in held) == 1, job
+        assert any(p["gate"] == "formal.cover" for p in part["probes"]), job
+    assert parts["replay"]["run_id"] == parts["rejudge"]["run_id"] and parts["replay"]["commit"] == \
+        parts["rejudge"]["commit"]
+    assert parts["replay"]["commit"][:8] in record["about"] and parts["replay"]["run_id"] in record["about"]
 def test_the_eqy_probe_reads_its_target_from_the_gold_side_of_a_setup_the_gate_runs():
     """Gate W2C3 (council/records/2026-11-23-wave-2-close-meeting-1.md): eqy is probed through equivalence.run with a
     setup the gate accepts, whose gold side reads the file that includes the target and whose gate side reads another."""
