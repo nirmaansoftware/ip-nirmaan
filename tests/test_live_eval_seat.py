@@ -743,3 +743,16 @@ def test_the_tool_reach_probes_every_wrapped_tool_and_needs_each_wrapper_first_o
     assert reach._opened(["syntax error"], ("Include file {} not found",), "/x")
     assert not reach._opened(["a.v:2: Include file /x not found"], ("Include file {} not found",), "/x")
     assert reach._opened(["a.v:2: Include file /y not found"], ("Include file {} not found",), "/x")
+
+
+def test_the_tools_as_the_seat_account_change_no_fingerprint():
+    """Gate ET7 (council/records/2026-11-22-eda-tools-seat-account.md): the change touches no file a fingerprint
+    digests and no tool definition, so the default and whole-flow fingerprints are what they were."""
+    from nirmaan.company.tools import TOOLS
+    from nirmaan.runtime import harness
+
+    digested = {*harness.CODE, *harness.LOOP_CODE, *harness.FLOW_CODE}
+    for rel in ("nirmaan/integrations/eda.py", "nirmaan/evals/scorers.py"):
+        assert rel not in digested, rel
+    specs = json.dumps([spec.model_dump(mode="json") for spec in TOOLS])
+    assert "NIRMAAN_SEAT" not in specs and "nirmaan-seat" not in specs  # no seat-account text reaches a seat
