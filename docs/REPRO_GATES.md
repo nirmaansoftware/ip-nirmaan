@@ -107,6 +107,10 @@ verdict parameter's name is in `VERDICT_PARAMS`, next to `ToolRun`).
    `simulator.run` (tools are granted through skills, at the working band
    and above, so an intern still may not simulate). The gate runs it as the
    seat, and so do the must-fail judges of an evaluation.
+   The `failure_triage` card also states the verdict line the gate reads:
+   the plusarg `nirmaan_nonce` and the `NIRMAAN-SIM` format, as the
+   `rtl_design` card does (added after the W2-L1 read, where no triage seat
+   was told either; see `docs/history/fragments/M71-repro-gates/`).
 
 ## Who gets each task
 
