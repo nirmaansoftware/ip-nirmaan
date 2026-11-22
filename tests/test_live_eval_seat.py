@@ -277,6 +277,7 @@ def _opt(tmp_path: Path) -> Path:
     (opt / "bin").mkdir(parents=True)
     (opt / "bin" / "vvp").write_text("")
     (opt / "bin" / "nirmaan-seat-exec").write_text("")
+    (opt / "bin" / "nirmaan-seat-model").write_text("")
     (opt / "seat.py").write_text("")
     (opt / "exes.json").write_text(json.dumps([str(opt / "bin" / "vvp")]))
     (tmp_path / "records").mkdir()
@@ -311,7 +312,8 @@ def test_every_write_target_exists_or_the_reach_test_stops(tmp_path, monkeypatch
     assert str(REPO / ".github" / "workflows" / "live-eval.yml") in append
     assert str(tmp_path / "cocotb") in create and str(tmp_path / "opt" / "bin" / "vvp") in append
     assert str(tmp_path / "opt" / "bin" / "nirmaan-seat-exec") in append  # M90: fw.test's wrapper
-    assert reach.EXEC_NAME == seat.EXEC_NAME
+    assert str(tmp_path / "opt" / "bin" / "nirmaan-seat-model") in append  # gate W2C4: coverage.read's model wrapper
+    assert reach.EXEC_NAME == seat.EXEC_NAME and reach.MODEL_NAME == seat.MODEL_NAME
 
 
 @pytest.mark.parametrize("what", ["package", "cocotb", "tool", "wrapped", "path", "actions"])
@@ -538,16 +540,20 @@ def test_a_refused_or_timed_out_connection_is_not_a_denial(monkeypatch, capsys):
 
 def test_the_tools_that_read_seat_verilog_are_wrapped_and_the_harness_agrees():
     """Gate ET2 (council/records/2026-11-22-eda-tools-seat-account.md): iverilog, verilator (a lint), yosys and sby
-    are wrapped beside vvp, the harness names the same programs and the same settings, and the reach test probes
-    each one (vvp through cocotb)."""
+    are wrapped beside vvp, and eqy (gate W2C3 of council/records/2026-11-23-wave-2-close-meeting-1.md); the harness
+    names the same programs and the same settings, and the reach test probes each one (vvp through cocotb). eqy is
+    installed in the jobs from the same pinned suite as in CI's test job."""
     from nirmaan.integrations import eda
 
-    assert seat.WRAPPED == ("vvp", "iverilog", "verilator", "yosys", "sby") == eda.SEAT_TOOLS == reach.WRAPPED
+    assert seat.WRAPPED == ("vvp", "iverilog", "verilator", "yosys", "sby", "eqy") == eda.SEAT_TOOLS == reach.WRAPPED
+    assert seat.MODEL_NAME == eda.SEAT_MODEL == reach.MODEL_NAME
     assert (seat.RUN_DIR_ENV, seat.INPUTS_ENV) == (eda.SEAT_RUN_DIR_ENV, eda.SEAT_INPUTS_ENV)
     assert {tool for tool, *_ in reach.TOOL_GATES} == set(seat.WRAPPED) - {"vvp"}
     assert "/opt/oss-cad-suite/bin" in seat.TOOL_PATH.split(":")
     setup = (REPO / ".github" / "actions" / "live-eval-setup" / "action.yml").read_text(encoding="utf-8")
-    assert "tools: sby yices-smt2\n" in setup and "root: /opt\n" in setup  # not the runner's temporary folder
+    assert "tools: sby yices-smt2 eqy\n" in setup and "root: /opt\n" in setup  # not the runner's temporary folder
+    ci = (REPO / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    assert "tools: sby yices-smt2 eqy\n" in ci  # the test job's eqy, from the same pinned suite
     flow = (REPO / ".github" / "workflows" / "live-eval.yml").read_text(encoding="utf-8")
     assert flow.count("NIRMAAN_SEAT_TOOLS: /opt/nirmaan-seat/bin\n") == 3  # replay, live-eval, rejudge
     assert flow.count('--out "$RUNNER_TEMP/tool-reach/tool-reach.json"') == 3
@@ -560,6 +566,8 @@ def test_a_verilator_model_build_stays_with_the_runner_and_a_lint_does_not(monke
     assert seat.as_runner("/usr/bin/verilator", ["--cc", "--exe", "--build", "-Mdir", "obj", "a.v"])
     assert seat.as_runner("/usr/bin/verilator", ["--binary", "--top-module", "t", "a.v"])
     assert not seat.as_runner("/usr/bin/verilator", ["--lint-only", "-Wall", "a.v"])
+    # gate W2C4: coverage.read's model build is the seat account's
+    assert not seat.as_runner("/usr/bin/verilator", ["--cc", "--exe", "--build", "--coverage-line", "a.v"])
     for exe in ("/usr/bin/vvp", "/usr/bin/iverilog", "/usr/bin/yosys", "/opt/oss-cad-suite/bin/sby"):
         assert not seat.as_runner(exe, ["--cc"])
     execs = []
@@ -737,9 +745,10 @@ def test_the_tool_reach_probes_every_wrapped_tool_and_needs_each_wrapper_first_o
     monkeypatch.setattr(reach.shutil, "which", lambda name: f"/opt/nirmaan-seat/bin/{name}" if name != "yosys"
                         else "/usr/bin/yosys")
     assert "yosys on PATH is /usr/bin/yosys, not the seat account's /opt/nirmaan-seat/bin/yosys" in reach.precheck()
-    assert [t for t, *_ in reach.TOOL_GATES] == ["iverilog", "verilator", "yosys", "sby"]
+    assert [t for t, *_ in reach.TOOL_GATES] == ["iverilog", "verilator", "yosys", "sby", "eqy"]
     assert [(g, b) for _, g, b, _ in reach.TOOL_GATES] == [("simulator.run", "icarus"), ("lint.run", "verilator-lint"),
-                                                           ("synth.run", "yosys"), ("formal.run", "symbiyosys")]
+                                                           ("synth.run", "yosys"), ("formal.run", "symbiyosys"),
+                                                           ("equivalence.run", "eqy")]
     # a tool that read the target says nothing of not opening it, so the probe is not denied
     assert reach._opened(["syntax error"], ("Include file {} not found",), "/x")
     assert not reach._opened(["a.v:2: Include file /x not found"], ("Include file {} not found",), "/x")
@@ -757,3 +766,149 @@ def test_the_tools_as_the_seat_account_change_no_fingerprint():
         assert rel not in digested, rel
     specs = json.dumps([spec.model_dump(mode="json") for spec in TOOLS])
     assert "NIRMAAN_SEAT" not in specs and "nirmaan-seat" not in specs  # no seat-account text reaches a seat
+
+
+def test_the_eqy_probe_reads_its_target_from_the_gold_side_of_a_setup_the_gate_runs():
+    """Gate W2C3 (council/records/2026-11-23-wave-2-close-meeting-1.md): eqy is probed through equivalence.run with a
+    setup the gate accepts, whose gold side reads the file that includes the target and whose gate side reads another."""
+    from nirmaan.integrations.equivalence import COMPARED  # noqa: F401  (registers the backend)
+    from nirmaan.integrations.eda_guard import eqy_problem
+
+    name, top, head, tail = reach.TOOL_FILES["eqy"]
+    assert "read_verilog -sv reach_tool_gold.v" in reach.EQY_SETUP and name == "reach_tool_gold.v"
+    assert "read_verilog -sv reach_tool_gate.v" in reach.EQY_SETUP and f"module {top}(" in reach.EQY_GATE
+    assert head.startswith(f"module {top}(") and tail.endswith("endmodule\n")
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as d:
+        setup = Path(d) / "reach_tool.eqy"
+        setup.write_text(reach.EQY_SETUP)
+        assert eqy_problem(setup) is None  # the control runs the gate's own checks, none bypassed
+
+
+def test_the_coverage_probes_build_and_run_a_model_and_read_only_lines_it_printed():
+    """Gate W2C4: the coverage probes include a target in the design (the build) and open it with $fopen in the
+    testbench (the model); a line counts only as the model printed it, never as a tool echoed the source."""
+    lines = reach.coverage_open("/x/t")
+    assert '$fopen("/x/t", "r")' in lines and reach.COVERAGE_DENIED.format("/x/t") in lines
+    assert reach.COVERAGE_OPENED.format("/x/t") in lines
+    assert f"module {reach.COVERAGE_TOP};" in reach.COVERAGE_TB[0]
+    assert '$display("NIRMAAN-SIM %0s 1 passed, 0 failed", nonce)' in reach.COVERAGE_TB[1]
+    said = reach.COVERAGE_DENIED.format("/x/t")
+    echoed = f'   12 | if (fd == 0) $display("{said}");'
+    assert not reach._printed(["summary", echoed], said)  # a warning quoting the source is not the model's output
+    assert reach._printed(["summary", f"$ vvp\n{said}\n"], said)
+    assert reach._printed(["log", reach.COVERAGE_OPENED.format("/x/t") + ": CANARY"],
+                          reach.COVERAGE_OPENED.format("/x/t"), start=True)
+
+
+def test_coverage_builds_its_model_and_runs_it_as_the_seat_account_and_no_other_model_build_does(tmp_path,
+                                                                                                    monkeypatch):
+    """Gate W2C4: coverage.read's Verilator build is a seat-account run (``COVERAGE_BUILD``), and the model it built
+    starts through ``SEAT_MODEL`` where the job names the wrappers, never as the caller; the verilator_coverage steps
+    stay the caller's. Only that backend passes the flag, so the other model builds stay with the runner (gate ET9)."""
+    import shlex
+
+    from nirmaan.integrations import eda
+
+    (tmp_path / "d.v").write_text("module d(input wire clk); endmodule\n")
+    (tmp_path / "tb.v").write_text("module tb; d u(.clk(1'b0)); endmodule\n")
+    backend = next(b for b in eda.backends_for("coverage.read") if b.name == "verilator-coverage")
+
+    def steps(name: str) -> tuple[Path, list[list[str]]]:
+        work = tmp_path / name
+        work.mkdir()
+        job = eda.Job("coverage.read", {"sources": f"{tmp_path / 'd.v'},{tmp_path / 'tb.v'}", "top": "tb"}, work,
+                      (str(tmp_path / "d.v"), str(tmp_path / "tb.v")), "tb")
+        return work, backend.steps(job)
+
+    monkeypatch.delenv(eda.SEAT_TOOLS_ENV, raising=False)
+    work, plain = steps("elsewhere")
+    assert eda.COVERAGE_BUILD in plain[0] and plain[1][0] == str(work / "obj" / "Vtb")  # elsewhere: as before
+    monkeypatch.setenv(eda.SEAT_TOOLS_ENV, str(tmp_path / "bin"))
+    work, wrapped = steps("job")
+    assert wrapped[1][:3] == [eda.SEAT_MODEL, str(work), str(work / "obj" / "Vtb")]
+    assert [eda.seat_tool(a) for a in wrapped] == ["verilator", eda.SEAT_MODEL, None, None]
+    assert eda.seat_launch(wrapped[1])[0] == str(tmp_path / "bin" / eda.SEAT_MODEL)  # by the wrapper's path
+    assert eda.seat_launch(wrapped[2]) == wrapped[2]  # verilator_coverage: the caller's
+    problem = eda.seat_tools_problem([wrapped[1]])
+    assert problem and "the wrapper is not there" in problem and eda.SEAT_MODEL in problem
+    assert eda.run_nonce(f"$ {shlex.join(wrapped[1])}\n") == wrapped[1][-1].split("=", 1)[1]  # the parser's nonce
+    users = [p for p in (REPO / "src").rglob("*.py") if eda.COVERAGE_BUILD in p.read_text(encoding="utf-8")]
+    assert users == [REPO / "src" / "nirmaan" / "integrations" / "eda.py"]
+    assert (REPO / "src" / "nirmaan" / "integrations" / "eda.py").read_text(encoding="utf-8").count(
+        f'"{eda.COVERAGE_BUILD}"') == 1  # the constant, which only the coverage backend and the rule use
+
+
+def test_the_model_wrapper_runs_sudo_with_no_environment_and_the_run_directory(monkeypatch, capsys):
+    run = "/tmp/nirmaan-verilator-coverage-x"
+    argv = seat.model_argv(run, f"{run}/obj/Vtb", ["+nirmaan_nonce=ab"])
+    assert argv == ["/usr/bin/sudo", "-n", "/usr/bin/python3", "-I", "/opt/nirmaan-seat/seat.py", "run-model",
+                    "--cwd", run, "--run-dir", run, "--exe", f"{run}/obj/Vtb", "--", "+nirmaan_nonce=ab"]
+    text = seat.model_wrapper_text()
+    assert text.startswith("#!/bin/sh\n") and text.endswith(
+        'exec /usr/bin/python3 -I /opt/nirmaan-seat/seat.py model -- "$@"\n')
+    assert seat.MODEL == Path("/opt/nirmaan-seat/bin/nirmaan-seat-model")
+    monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "canary")
+    execs = []
+    monkeypatch.setattr(seat.os, "execv", lambda path, argv: execs.append(argv) or (_ for _ in ()).throw(SystemExit(0)))
+    with pytest.raises(SystemExit):
+        seat.main(["model", "--", run, f"{run}/obj/Vtb", "+nirmaan_nonce=ab"])
+    assert execs == [argv] and "canary" not in " ".join(execs[0]) and "--env" not in execs[0]
+    assert seat.main(["model", "--", run]) == 126
+    assert "nothing ran" in capsys.readouterr().err
+    calls = []
+    monkeypatch.setattr(seat, "run", lambda cwd, exe, env, rest, **kw: calls.append((cwd, exe, env, rest, kw)) or 0)
+    monkeypatch.setattr(seat.os, "geteuid", lambda: 0)
+    assert seat.main(argv[5:]) == 0
+    assert calls == [(run, f"{run}/obj/Vtb", [], ["+nirmaan_nonce=ab"], {"built": True, "run_dir": run, "view": True})]
+
+
+def test_a_built_model_runs_in_a_view_of_its_run_directory_and_only_from_inside_it(monkeypatch, tmp_path):
+    """Gate W2C4: run-model runs the built program as the seat account in a view of its own (``enter``) that holds the
+    run's directory and nothing else of its folder, with no environment; a program outside that directory never runs."""
+    root = tmp_path / "tmp"
+    box = root / "nirmaan-eval-x"
+    run_dir = box / "judge" / "run"
+    (run_dir / "obj").mkdir(parents=True)
+    (box / "judge" / "reference.v").write_text("x")
+    model = run_dir / "obj" / "Vtb"
+    model.write_text("x")
+    other = box / "judge" / "Vother"
+    other.write_text("x")
+    monkeypatch.setenv("SUDO_UID", str(os.getuid()))
+    monkeypatch.setenv("SUDO_GID", str(os.getgid()))
+    monkeypatch.setattr(seat, "_seat", lambda: type("P", (), {"pw_uid": 99999, "pw_gid": 99999})())
+    monkeypatch.setattr(seat, "STATE", tmp_path / "state")
+    monkeypatch.setattr(seat, "LOCK", tmp_path / "state" / "lock")
+    monkeypatch.setattr(seat, "GRANTS", tmp_path / "state" / "grants.json")
+    monkeypatch.setattr(seat, "stop_seat", lambda uid: None)
+    monkeypatch.setattr(seat, "cleanup", lambda: None)
+    monkeypatch.setattr(seat, "run_dir_problem", lambda where, owner: None)
+    monkeypatch.setattr(seat, "built_problem", lambda exe, where, owner: None)
+    real_view = seat.view_plan
+    monkeypatch.setattr(seat, "view_plan", lambda where, start, inputs: real_view(where, start, inputs, root))
+    monkeypatch.setattr(seat, "grants_for", lambda where: [(str(where), "rwx")])
+    monkeypatch.setattr(seat.subprocess, "run", lambda *a, **k: None)
+    started = []
+
+    class Done:
+        returncode = 0
+
+        def poll(self):
+            return 0
+
+    monkeypatch.setattr(seat.subprocess, "Popen", lambda argv, **k: started.append((argv, k)) or Done())
+    with pytest.raises(seat.Refused, match="is not inside the run's directory"):
+        seat.run(str(run_dir), str(other), [], [], built=True, run_dir=str(run_dir), view=True)
+    assert started == []  # nothing ran
+    assert seat.run(str(run_dir), str(model), [], ["+nirmaan_nonce=ab"], built=True, run_dir=str(run_dir),
+                    view=True) == 0
+    [(argv, kw)] = started
+    assert argv[:4] == ["/usr/bin/python3", "-I", "/opt/nirmaan-seat/seat.py", "enter"] and kw["cwd"] == "/"
+    plan = json.loads(argv[5])
+    assert plan["mask"] == [str(box)] and plan["files"] == [] and plan["run_dir"] == str(run_dir)  # the folder hidden
+    assert plan["cwd"] == str(run_dir)
+    command = argv[argv.index("--") + 1:]
+    assert command[0] == "/usr/bin/setpriv" and "--no-new-privs" in command
+    assert command[command.index("-i") + 1:] == [*seat.BASE_ENV, str(model), "+nirmaan_nonce=ab"]  # no environment
