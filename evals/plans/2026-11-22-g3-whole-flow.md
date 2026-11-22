@@ -404,6 +404,55 @@ path:
 - `src/nirmaan/evals/levels.py` and `scripts/capability_levels.py` already find manifests at any depth and list
   records by path; a test now covers two same-named records in two slot folders.
 
+## 16. Dated addition (2026-11-22): question 1 of section 14 settled by a test, and section 12 corrected
+
+Security's first question (section 14) is settled by `tests/test_whole_flow_reach.py`. The answer is yes: a timer
+seat that declares a `formal_spec` makes `formal.run` and `formal.cover` run SymbiYosys, with Yosys and the solver
+under it, over its own setup. This section records what the test shows and corrects the sentence of section 12 that
+the code does not bear out. It changes nothing in sections 1 to 11: no count, slot, arm, harness, fingerprint or digest.
+
+**What the test shows.** Both tests replay `flow/axil-timer` through `run_flow` on the default harness (three
+attempts per stage), with no model call. Each stage gives the case's reference answer, and at the RTL stage the
+answer also declares one more file, of kind `formal_spec`: the committed `tests/fixtures/rtl/axil_timer/axil_timer.sby`,
+which reads only the seat's own `axil_timer.v`.
+- `tests/test_whole_flow_reach.py:76`: the RTL stage's outputs are `rtl_source` and `testbench`, yet its prompt names
+  the input contracts of `formal.run` and `formal.cover` and says the formal requirement "applies only if you produce
+  a formal_spec file". Nothing refuses the extra kind: the stage reaches review on its first attempt with the `.sby`
+  recorded, and its gate runs are `lint.run`, `simulator.run`, `synth.run`, `formal.run` and `formal.cover`. Both
+  formal runs ran over the seat's own setup and RTL (their `sby` and `sources` are the seat's files), and each log is
+  SymbiYosys's own (`DONE (PASS`). So the RTL stage runs the formal gates whenever the seat writes a `formal_spec`
+  (`src/nirmaan/company/workflows.py:95-98`, `:635-640`), as security read.
+- `tests/test_whole_flow_reach.py:110`: when the first attempt's setup is a bounded check of four steps, both formal
+  runs fail, the attempt is refused, and the retry's prompt carries each failed formal run's summary and a log
+  excerpt with lines SymbiYosys wrote. So a formal run's log returns to the seat on a retry, as any gate's does.
+
+**Section 12, corrected.** Section 12 is read with these changes, for the timer flow:
+- *Where it can arise.* The RTL stage's gates are `lint.run`, `simulator.run` and `synth.run`, and also `formal.run`
+  and `formal.cover` on any attempt whose answer declares a file of kind `formal_spec`. The seat chooses that: the
+  stage's outputs do not list the kind, its prompt names both gates, and nothing refuses it. The sentence of section
+  12 that `formal.run` applies only when the stage's outputs include a `formal_spec` is withdrawn.
+- *What the logs hold.* Also SymbiYosys's log: its own lines on the job (the run's temporary folder, the commands it
+  started, the engine and the solver's status, the steps checked, and the assertions and covers by file and line of
+  the seat's own source). The excerpt is bounded as section 12 says.
+- *What the recorded reach tests show.* That paragraph does not cover the formal runs. They are not `vvp`, so in the
+  `live-eval` job they run today as the runner account, not as `nirmaan-seat` (`docs/LIVE_EVAL_EVIDENCE.md:219-230`,
+  `:320-326`), and no recorded probe runs through them. The only check before them is the input screen: the SBY
+  checks of `docs/GATE_INPUTS.md:78-89` and the Verilog check on the files the setup reads (`docs/GATE_INPUTS.md`,
+  section 2). This section makes no claim that the screen keeps a host file out of a formal log.
+- *What it can carry.* Nothing is claimed here for a formal run beyond what the test shows: the seat's own setup and
+  RTL go in, and SymbiYosys's summary and log excerpt come back on a retry. The formal runs are tools that read
+  seat-written files as the runner account, in the step whose parent process holds the plan credential, so they fall
+  under security's second question (section 14), which the council record of section 17 settles.
+
+**What it means for slot 1.** Question 1 is settled: the formal gates can run on the timer path. This section
+corrects only the formal sentence of section 12 and adds what the formal logs hold. With this test on `main`, decision
+5 of `council/records/2026-11-22-eda-tools-seat-account.md` applies in its first branch (section 17): `sby` is wrapped,
+so SymbiYosys, Yosys under it and the solver run as the seat account over the seat's `.sby` before slot 1, with their
+probes and fixtures (gates ET1 to ET3), and what section 12 says of the formal gates' logs is restated by the plan
+amendment of gate ET6. This section adds no condition before slot 1 and removes none; the WF23 condition of section
+13 is met only as section 17 says. Refusing a seat `formal_spec` in the timer flow would have been another way to
+close question 1; it is not taken, and the record's route is the seat account.
+
 ## 17. Dated addition (2026-11-22): the second question of section 14 is settled by a council record
 
 Section 14 says the second question (the runner-account tools over seat files, with the `eda_guard` screen as the
