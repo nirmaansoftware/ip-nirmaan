@@ -575,7 +575,8 @@ def tools_child(out: Path) -> int:
                                                                               0o600))}
                     outcome, texts = run(tool, gate, name, params, bypass=target is not None)
                     if target is None:
-                        ok = outcome.succeeded and (tool != "iverilog" or f"REACH TOOL control {nonce}" in texts[1])
+                        printed = any(f"REACH TOOL control {nonce}" in t for t in texts[1:])  # the log, the record
+                        ok = outcome.succeeded and (tool != "iverilog" or printed)
                         note(tool, gate, "control (seat files of mode 0600 read and passed)", None, ok,
                              outcome.summary[:200], texts)
                         if tool == "sby":  # the cover run of the same setup, through formal.cover
@@ -605,7 +606,7 @@ def tools_child(out: Path) -> int:
                     note("iverilog", "simulator.run", "held-out compile: a canary beside the staged judge file",
                          str(canary), denied, outcome.summary[:200], texts)
                 else:
-                    ok = outcome.succeeded and f"REACH JUDGE {nonce}" in texts[1]
+                    ok = outcome.succeeded and any(f"REACH JUDGE {nonce}" in t for t in texts[1:])
                     note("iverilog", "simulator.run", "held-out compile control (the staged judge file is read)",
                          None, ok, outcome.summary[:200], texts)
     finally:
