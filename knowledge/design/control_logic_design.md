@@ -45,6 +45,18 @@ marked "inference" is this document's own reasoning.
   (inference). Reset the copy to the pin's reset value, so leaving reset
   makes no false edge (inference).
 
+- Reset every register the bus can read, and the input sample registers
+  first among them. Software reads the input register through the bus, so
+  the flip-flop behind it is a registered path like any other. Left unreset,
+  it reads unknown (x) in a four-state simulation until its first load, so a
+  read straight after reset sees x (inference).
+- The same holds for a sample that loads only under an enable: reset it
+  whether or not the enable is high during reset, and reset the enable
+  itself (inference).
+- The specification's reset section lists what resets; when it names the
+  input samples, they are in the reset branch, with no exception for the
+  "input" side of the block (inference).
+
 ## Detect, status and mask
 
 - Per bit, enables for rising edge, falling edge, level high and level low;
@@ -79,6 +91,9 @@ marked "inference" is this document's own reasoning.
 - Edge logic on the raw pin, or a false edge at reset (inference from
   [CDC]).
 - One enable bit that cannot change without touching others [PIC].
+- An input sample register, or the copy used for edge detect, left out of
+  the reset branch, so a register reads x after reset while the design's own
+  testbench still passes (inference).
 
 ## How a result is checked
 
@@ -91,6 +106,12 @@ marked "inference" is this document's own reasoning.
     together with it;
   - enables hold without a write.
 - Cover the interrupt rising and a write clearing it [PIC].
+- Before finishing, list every register in the design and find its line in
+  the reset branch; every one a bus read can reach must be there
+  (inference). A testbench that compares a read-back value with `!=` or `==`
+  may not fail on x, because the comparison result is itself unknown; `!==`
+  and `===` count an unknown value as a mismatch (inference). A passing
+  self-written testbench therefore does not show that every register resets.
 - Simulation: each detect mode on several bits; one-cycle pulses; both
   edges; masked and unmasked with an event pending; a clear while the event
   is active; per-bit data and enable; the input read with the output
