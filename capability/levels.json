@@ -482,6 +482,18 @@
         }
       ]
     },
+    "cdc_verification": {
+      "knowledge": {
+        "check_record": null,
+        "counts": false,
+        "knowledge_document": "knowledge/verification/cdc_verification.md",
+        "problems": [
+          "no check record"
+        ]
+      },
+      "level": null,
+      "practised": []
+    },
     "code_coverage": {
       "knowledge": {
         "check_record": "capability/records/knowledge/code_coverage.json",
@@ -759,6 +771,18 @@
           "unjudged": 8
         }
       ]
+    },
+    "formal_coverage": {
+      "knowledge": {
+        "check_record": null,
+        "counts": false,
+        "knowledge_document": "knowledge/verification/formal_coverage.md",
+        "problems": [
+          "no check record"
+        ]
+      },
+      "level": null,
+      "practised": []
     },
     "formal_verification": {
       "knowledge": {
