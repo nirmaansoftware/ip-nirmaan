@@ -359,6 +359,50 @@ whose constraint keeps `init` away from `valid` lets the same mutant survive;
 and the reference over only 12 random cycles, with its own thinness check
 removed, lets a mutant survive. The scorer stops at the first survivor.
 
+A second formal case and a second equivalence case (RX-E1) add independent
+evidence on skills that rested on one case each, each on an approved block
+that no other case holds out (tests in `tests/test_dv_second_formal_equiv_evals.py`).
+
+- `dv/formal-rr-arbiter` judges `formal_verification`, `sva` and
+  `assertion_coverage` again, on a different kind of block: a round-robin
+  arbiter for three requesters (`tests/fixtures/dv/rr_arbiter/`) whose state is
+  a pointer register, `last`, that is also an output (8 tagged requirements: reset
+  pointer, idle, pick, only requesters, rotate, hold, yield, bounded wait). The
+  reference proof (`rr_arbiter_check.sv`, `rr_arbiter_check.sby`) ties the
+  grant and the pointer to a model written from the specification, states the
+  specification's own edge rules (the requester served yields; an idle edge
+  holds the pointer; no requester waits for a third grant of others), and
+  covers each of the three grants with all three requesting, an idle cycle, a
+  grant to requester 2 after requester 0 and a wait of two edges. It runs in
+  prove mode (k-induction), so every assertion is inductive.
+- `dv/equiv-updown` judges `equivalence_checking` again, on a 4-bit up/down
+  counter with a parallel load and wrap flags (`tests/fixtures/dv/updown_counter/`,
+  5 tagged requirements): the gold version steps with the adder, the approved
+  refactor toggles bits along a chain with no adder, under the same state
+  register `q`. Every one of the 16 counts is reachable, so the two versions
+  also agree on every state an induction step may start from. The control
+  runs `equivalence.run` over the seat's setup with each mutant below in place
+  of the refactor.
+
+| File | The one change | Judge that fails it |
+|---|---|---|
+| `rr_arbiter/mutants/rr_arbiter_fixed_priority.v` | the pointer is never updated: requester 0 always wins | seat proof (`formal.run`) |
+| `rr_arbiter/mutants/rr_arbiter_skip_rotation.v` | the pointer takes the index after the granted requester | seat proof |
+| `rr_arbiter/mutants/rr_arbiter_idle_resets_pointer.v` | an idle edge loads the reset pointer instead of holding | seat proof |
+| `rr_arbiter/mutants/rr_arbiter_reset_pointer.v` | reset loads 0, not 2 | seat proof |
+| `updown_counter/mutants/updown_counter_refactor_down_chain.v` | counting down toggles along the up chain | seat setup (`equivalence.run`) |
+| `updown_counter/mutants/updown_counter_refactor_load_after_count.v` | an enabled count wins over a load | seat setup |
+| `updown_counter/mutants/updown_counter_refactor_borrow_at_one.v` | `borrow` is high at count 1, not 0 | seat setup |
+
+The tests show the controls catch weak answers: one-cycle safety properties
+(one hot, only requesters, a grant when someone asks) pass their own gates and
+the approved RTL and the fixed-priority mutant survives them; the reference
+without the check that ties `last` to its model is not inductive, so the proof
+gate refuses it before review; a proof that assumes no requester ever asks
+reaches no cover and is refused; an equivalence setup that reads the original
+on both sides is refused. No live trial has been run on either case; they wait
+for a batch with its own plan.
+
 Wave 2's fourth eval pull request (W2-E4) adds the two debug cases, which judge
 the seats of a regression investigation that asks for a reproduction (M71,
 `docs/REPRO_GATES.md`). The request plans `regression-investigation` with the

@@ -74,7 +74,7 @@ its basecase and fails its induction step (sby reports UNKNOWN with the failed
 assertion) executed and wrote its log, so it counts as a mutant caught
 (`dv/prove-deep-counter`). An equivalence seat's control runs
 `equivalence.run` over the seat's eqy setup with a non-equivalent refactor in
-place of the approved one (`dv/equiv-gray`); a random-stimulus testbench's
+place of the approved one (`dv/equiv-gray`, `dv/equiv-updown`); a random-stimulus testbench's
 control is the ordinary `simulator.run` one (`dv/random-crc`), a coverage seat's runs
 `coverage.read` with `cover_bounds` (`dv/coverage-irq-ctrl`), a scoreboard
 testbench's is the ordinary one too (`dv/scoreboard-mac`), a seat's Python tests

@@ -151,7 +151,8 @@ a proof seat that ships its own `counter.v` and is refused.
   random-stimulus testbench `dv/random-crc` and the equivalence seat's
   `dv/equiv-gray`; W2-E4 added the two debug cases `debug/root-cause-uart-tx`
   and `debug/triage-three-bugs`; W2-E5 the coverage seat's `dv/coverage-irq-ctrl`; W2-E6 the two M83
-  refinements' cases, `dv/scoreboard-mac` and `dv/cocotb-crc`:
+  refinements' cases, `dv/scoreboard-mac` and `dv/cocotb-crc`; RX-E1 a second formal
+  case, `dv/formal-rr-arbiter`, and a second equivalence case, `dv/equiv-updown`:
   `docs/EVAL_SKILLS_MUST_FAIL.md`),
   and the department cut. The role ids
   in the tests are today's; a cut that renames them moves the tests with it.

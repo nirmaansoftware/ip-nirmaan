@@ -1,0 +1,71 @@
+{
+  "id": "dv/equiv-updown",
+  "request": "Verify the existing up/down counter RTL with an equivalence check of its refactor.",
+  "seat": "equivalence",
+  "skills": [
+    "equivalence_checking"
+  ],
+  "expected_behavior": "An eqy setup (.eqy) for the approved updown_counter RTL and its approved refactor, written from the approved interface specification: the gold script reads the original, the gate script reads the refactor, both prepared at the same top, and a strategy that proves every partition (the count and both wrap flags). It passes under the equivalence gate before review (the two approved versions are equivalent, with both versions named) and fails when the refactor is replaced by RTL that is not equivalent to the original.",
+  "constraints": [
+    "Work only from the approved interface specification and the two approved RTL versions, which sit beside the setup under their own names; never change or ship a file of the same name.",
+    "Give the gold and the gate side their own scripts, one reading each version, with the same top; use only Yosys commands that read and prepare a design.",
+    "Choose a strategy that proves partitions rather than only searching to a depth; every one of the 16 counts is reachable by a load, so a depth that shows only the first few counts proves little."
+  ],
+  "known_failure_modes": [
+    "A setup whose gold and gate scripts read the same file, which compares a design with itself; the equivalence runner refuses it.",
+    "A setup that reads only the original on both sides, or leaves the refactor out.",
+    "A setup that matches no signal, so nothing is proved.",
+    "A setup that cannot tell a refactor that counts down as it counts up, one where an enabled count wins over a load, or a borrow flag one count early from the approved refactor; the must-fail control fails it."
+  ],
+  "upstream": {
+    "interface-spec": [
+      {
+        "path": "tests/fixtures/dv/updown_counter/interface_spec.md",
+        "kind": "interface_spec"
+      }
+    ],
+    "design-under-test": [
+      {
+        "path": "tests/fixtures/dv/updown_counter/updown_counter.v",
+        "kind": "rtl_source",
+        "entry": "updown_counter"
+      },
+      {
+        "path": "tests/fixtures/dv/updown_counter/updown_counter_refactor.v",
+        "kind": "rtl_source",
+        "entry": "updown_counter"
+      }
+    ]
+  },
+  "reference": [
+    {
+      "path": "tests/fixtures/dv/updown_counter/updown_counter.eqy",
+      "kind": "equivalence_setup"
+    }
+  ],
+  "held_out": [
+    {
+      "name": "The seat's setup proves the approved refactor equivalent and fails each non-equivalent refactor",
+      "scorer": "must-fail",
+      "tool": "equivalence.run",
+      "seat_files": {
+        "eqy": [
+          "equivalence_setup"
+        ]
+      },
+      "case_files": {
+        "sources": [
+          "tests/fixtures/dv/updown_counter/updown_counter.v",
+          "tests/fixtures/dv/updown_counter/updown_counter_refactor.v"
+        ]
+      },
+      "mutants": {
+        "tests/fixtures/dv/updown_counter/updown_counter_refactor.v": [
+          "tests/fixtures/dv/updown_counter/mutants/updown_counter_refactor_down_chain.v",
+          "tests/fixtures/dv/updown_counter/mutants/updown_counter_refactor_load_after_count.v",
+          "tests/fixtures/dv/updown_counter/mutants/updown_counter_refactor_borrow_at_one.v"
+        ]
+      }
+    }
+  ]
+}
