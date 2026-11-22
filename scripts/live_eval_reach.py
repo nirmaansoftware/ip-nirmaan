@@ -29,6 +29,30 @@ stops before any trial.
 ``fw.test`` runs the program it builds from seat C through a wrapper of its own, ``nirmaan-seat-exec``, as the same
 account (M90). Its credential test (``scripts/live_eval_fw_reach.py``) tries the same targets from compiled C through
 ``fw.test``, and the workflow runs it as a gate (``--require-denied``) for a whole-flow case.
+
+The tools that read seat-written Verilog run as the same account (gates ET2 to ET4 of
+``council/records/2026-11-22-eda-tools-seat-account.md``), and a second part of this test probes each through the
+real backend, by ``PATH`` (``tool_reach``): Icarus through ``simulator.run``, Verilator through ``lint.run``, Yosys
+through ``synth.run``, SBY (with the Yosys and the solver it starts) through ``formal.run`` and ``formal.cover``. It
+runs in a process of its own whose real environment holds two canaries (one under a credential's name), so that
+process stands for the parent that holds the token. For each tool:
+
+- a control: seat files only the runner and the seat account may read (mode 0600, read by the seat account through
+  the grant its run gets) pass the gate, so the tool read them; with the runner-only canary below denied through the
+  same tool, its process is the seat account;
+- three probes, each a seat file that includes one target by absolute path: a canary file in the checkout (readable by
+  every account by its mode), a runner-only canary file (mode 0600, in a folder every account may enter), and the
+  parent's ``/proc/<pid>/environ``. Each target exists and the runner can read it first, so a denial proves something.
+  A probe is denied only when the run fails with the tool's own message that it could not open that target, and no
+  canary value is in the run's log, summary or result file. The screen (``eda_guard``) refuses an include by absolute
+  path, so these probes reach the tool with the screen bypassed inside this process only, and say so in their
+  output.
+
+And for the held-out checks' compile (decision 3, item 2): through ``simulator.run``, a seat file with a judge file
+staged for the run as the held-out checks stage theirs (``nirmaan.evals.scorers``): the account reads that judge file,
+and a canary placed beside it (readable by every account by its mode) is denied. Every result is written to
+``--out`` as the tool reach record; the job stops before any trial unless every probe is denied and every control
+passed.
 """
 
 from __future__ import annotations
@@ -40,6 +64,7 @@ import os
 import pwd
 import secrets
 import shutil
+import subprocess
 import sys
 import sysconfig
 import tempfile
@@ -67,6 +92,31 @@ NETWORK = (("tcp", "1.1.1.1", 443), ("tcp6", "2606:4700:4700::1111", 443), ("tcp
 TOOLS = ("nirmaan", "iverilog", "vvp", "verilator", "yosys", "sby", "yices-smt2", "make", "cc", "python", "python3",
          "git", "node", "npm")
 DESIGN = "module reach_probe(input wire clk);\nendmodule\n"
+#: The programs that run as the seat account, each wrapped first on ``PATH`` (``scripts/live_eval_seat.py``).
+WRAPPED = ("vvp", "iverilog", "verilator", "yosys", "sby")
+#: Gate ET3: each tool, the gate and backend it is probed through, and what it prints when it cannot open an include
+#: (``{}`` is the target's path). Verilator says "File not found" for a file it may not read, and "Cannot find include
+#: file" for one it cannot see (quoted in some versions, not in Ubuntu 24.04's 5.020).
+TOOL_GATES = (("iverilog", "simulator.run", "icarus", ("Include file {} not found",)),
+              ("verilator", "lint.run", "verilator-lint",
+               ("Cannot find include file: '{}'", "Cannot find include file: {}", "File not found: {}")),
+              ("yosys", "synth.run", "yosys", ("Can't open include file `{}'",)),
+              ("sby", "formal.run", "symbiyosys", ("Can't open include file `{}'",)))
+#: A seat file for each tool: (file name, top, text before the include, text after it).
+TOOL_FILES = {
+    "iverilog": ("reach_tool_sim.v", "reach_tool_sim", "module reach_tool_sim;\n",
+                 "reg [8*64-1:0] nonce;\ninitial begin\n$display(\"REACH TOOL control __NONCE__\");\n"
+                 "if ($value$plusargs(\"nirmaan_nonce=%s\", nonce)) $display(\"NIRMAAN-SIM %0s 1 passed, 0 failed\", "
+                 "nonce);\n$finish;\nend\nendmodule\n"),
+    "verilator": ("reach_tool_lint.v", "reach_tool_lint", "module reach_tool_lint;\n", "endmodule\n"),
+    "yosys": ("reach_tool_synth.v", "reach_tool_synth", "module reach_tool_synth(input wire a, output wire y);\n",
+              "assign y = a;\nendmodule\n"),
+    "sby": ("reach_tool_formal.sv", "reach_tool_formal", "module reach_tool_formal(input wire clk);\n",
+            "reg r = 1'b0;\nalways @(posedge clk) r <= !r;\nalways @(posedge clk) if (r) assert (r);\n"
+            "always @(posedge clk) cover (r);\nendmodule\n"),
+}
+SBY_SETUP = ("[options]\nmode prove\n\n[engines]\nsmtbmc yices\n\n[script]\nread -formal reach_tool_formal.sv\n"
+             "prep -top reach_tool_formal\n\n[files]\nreach_tool_formal.sv\n")
 
 PROBE = r'''"""Reach probe (scripts/live_eval_reach.py): seat code trying what it must not do. Every test passes only on denial."""
 import errno, json, os, pwd, subprocess
@@ -349,9 +399,10 @@ def results_problem(xml_text: str | None) -> str | None:
 
 def precheck() -> str | None:
     """Why seat code here would not run as the seat account at all, or None."""
-    vvp = shutil.which("vvp")
-    if vvp is None or Path(vvp) != WRAPPER:
-        return f"vvp on PATH is {vvp}, not the seat account's {WRAPPER}"
+    for name in WRAPPED:
+        found = shutil.which(name)
+        if found is None or Path(found) != WRAPPER.parent / name:
+            return f"{name} on PATH is {found}, not the seat account's {WRAPPER.parent / name}"
     try:
         pwd.getpwnam(SEAT)
     except KeyError:
@@ -378,10 +429,13 @@ def reach(records: Path) -> int:
     nonce, file_canary = secrets.token_hex(8), secrets.token_hex(16)
     read_files, list_dirs, canary_files = read_targets(os.environ, file_canary, nonce)
     os.environ[CANARY_SECRET], os.environ[CANARY_PLAIN] = canaries
-    work = None
+    work = secret = None
     try:  # the canaries leave the checkout and the environment whatever happens
-        work = Path(tempfile.mkdtemp(prefix="reach-probe-"))
-        secret_file = work / "credential"
+        # A run folder of the harness's kind (``/tmp/nirmaan-*``): the seat account's tools read their inputs only from
+        # one. The runner-only file is in a folder of its own, outside the run's view.
+        work = Path(tempfile.mkdtemp(prefix="nirmaan-reach-probe-"))
+        secret = Path(tempfile.mkdtemp(prefix="nirmaan-reach-secret-"))
+        secret_file = secret / "credential"
         secret_file.write_text(secrets.token_hex(16))
         secret_file.chmod(0o600)
         config = {"seat": SEAT, "runner": pwd.getpwuid(os.getuid()).pw_name, "runner_uid": os.getuid(),
@@ -400,8 +454,9 @@ def reach(records: Path) -> int:
             xml_text = read_output(Path(results)) if results else None
     finally:
         del os.environ[CANARY_SECRET], os.environ[CANARY_PLAIN]
-        if work is not None:
-            shutil.rmtree(work, ignore_errors=True)
+        for folder in (work, secret):
+            if folder is not None:
+                shutil.rmtree(folder, ignore_errors=True)
         remove_canaries(canary_files)
     for line in log.splitlines():
         if line.startswith("REACH ") or "TESTS=" in line:
@@ -419,11 +474,168 @@ def reach(records: Path) -> int:
     return 1
 
 
+# --- Gate ET3: the tools that read seat-written Verilog, as the seat account ---------------------------------------
+
+
+def tool_reach(out: Path | None) -> int:
+    """Run the tool probes (``tools_child``) in a process whose real environment holds two canaries; 0 only when every
+    probe is denied and every control passed."""
+    canaries = {CANARY_SECRET: secrets.token_hex(16), CANARY_PLAIN: secrets.token_hex(16)}
+    record = out or Path(tempfile.mkdtemp(prefix="nirmaan-reach-record-")) / "tool-reach.json"
+    record.parent.mkdir(parents=True, exist_ok=True)
+    proc = subprocess.run([sys.executable, str(Path(__file__).resolve()), "--tools-child", "--out", str(record)],
+                          env={**os.environ, **canaries})
+    if proc.returncode != 0 or not record.is_file():
+        print(f"::error::reach test: a tool probe was not denied, or a control failed (exit {proc.returncode}); no "
+              f"trial ran", flush=True)
+        return 1
+    data = json.loads(record.read_text(encoding="utf-8"))
+    if not data.get("every_denied") or any(v in record.read_text(encoding="utf-8") for v in canaries.values()):
+        print("::error::reach test: the tool reach record does not show every probe denied; no trial ran", flush=True)
+        return 1
+    return 0
+
+
+def _write(path: Path, text: str, mode: int) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+    path.chmod(mode)
+    return path
+
+
+def _opened(texts: Sequence[str], messages: Sequence[str], target: str) -> bool:
+    """Whether the tool said it could not open ``target``: one of its own messages, naming it, is in the log."""
+    return not any(m.format(target) in t for m in messages for t in texts)
+
+
+def tools_child(out: Path) -> int:
+    """The tool probes, run in the process ``tool_reach`` starts (its environment holds the canaries)."""
+    from nirmaan.evals.scorers import _stage
+    from nirmaan.integrations import eda
+    from nirmaan.integrations.eda import execute, select_backend, temporary_runs
+
+    canaries = [_need(os.environ.get(CANARY_SECRET), CANARY_SECRET), _need(os.environ.get(CANARY_PLAIN), CANARY_PLAIN)]
+    nonce = secrets.token_hex(8)
+    file_canaries = [secrets.token_hex(16) for _ in range(3)]
+    secret_values = [*canaries, *file_canaries]
+    box = Path(tempfile.mkdtemp(prefix="nirmaan-reach-tools-")).resolve()
+    other = Path(tempfile.mkdtemp(prefix="nirmaan-reach-runner-")).resolve()
+    other.chmod(0o755)  # every account may enter it, so only the file's own mode keeps the account out
+    in_checkout = ROOT / f".nirmaan-tool-canary-{nonce}"
+    results: list[dict] = []
+    real_check, real_sby = eda.check_inputs, eda.sby_problem
+
+    def run(tool: str, gate: str, name: str, params: dict, bypass: bool):
+        backend, why = select_backend(gate, {"backend": name})
+        if backend is None:
+            raise SystemExit(f"reach test: {gate} has no {name} backend here: {why}; no trial ran")
+        if bypass:
+            print(f"REACH tool {tool}: the screen is bypassed for this probe only, so the include reaches the tool",
+                  flush=True)
+            eda.check_inputs = eda.sby_problem = lambda *_a, **_k: None
+        try:
+            outcome = execute(backend, {"backend": name, "timeout": "300", **params})
+        finally:
+            eda.check_inputs, eda.sby_problem = real_check, real_sby
+        texts = [outcome.summary]
+        for ref in outcome.references:
+            texts.append(Path(ref).read_text(encoding="utf-8", errors="replace"))
+        return outcome, texts
+
+    def note(tool: str, gate: str, probe: str, target: str | None, ok: bool, detail: str, texts: Sequence[str]):
+        leaked = [n for n, v in enumerate(secret_values) if any(v in t for t in texts)]
+        ok = ok and not leaked
+        detail += f"; canary values in the log, summary or result: {len(leaked)}"
+        results.append({"tool": tool, "gate": gate, "probe": probe, "target": target, "denied": ok, "detail": detail})
+        print(f"REACH tool {'denied' if ok else 'NOT DENIED'}: {tool} ({gate}) {probe}"
+              f"{f' {target}' if target else ''}: {detail}", flush=True)
+
+    try:
+        _write(in_checkout, f'initial $display("CANARY {file_canaries[0]}");\n', 0o644)
+        runner_only = _write(other / f"runner-only-{nonce}", f'initial $display("CANARY {file_canaries[1]}");\n',
+                             0o600)
+        targets = [("checkout canary", str(in_checkout)), ("runner-only canary", str(runner_only)),
+                   ("credential canary in the parent's environment", f"/proc/{os.getpid()}/environ")]
+        for what, target in targets:  # each exists and the runner can read it, so a denial proves something
+            with open(target, "rb") as f:
+                data = f.read()
+            if what.startswith("credential") and canaries[0].encode() not in data:
+                raise SystemExit(f"reach test: the canary is not in {target}, so no probe of it proves anything")
+        with temporary_runs():
+            for tool, gate, name, messages in TOOL_GATES:
+                file, top, head, tail = TOOL_FILES[tool]
+                tail = tail.replace("__NONCE__", nonce)
+                for n, (what, target) in enumerate([("control", None), *targets]):
+                    here = box / tool / str(n)
+                    text = head + (f'`include "{target}"\n' if target else "") + tail
+                    source = _write(here / file, text, 0o600)  # the runner's and, by its grant, the seat account's
+                    params: dict = {"sources": str(source), "top": top}
+                    if tool == "sby":
+                        params = {"sources": str(source), "sby": str(_write(here / "reach_tool_formal.sby", SBY_SETUP,
+                                                                              0o600))}
+                    outcome, texts = run(tool, gate, name, params, bypass=target is not None)
+                    if target is None:
+                        printed = any(f"REACH TOOL control {nonce}" in t for t in texts[1:])  # the log, the record
+                        ok = outcome.succeeded and (tool != "iverilog" or printed)
+                        note(tool, gate, "control (seat files of mode 0600 read and passed)", None, ok,
+                             outcome.summary[:200], texts)
+                        if tool == "sby":  # the cover run of the same setup, through formal.cover
+                            cover, ctexts = run(tool, "formal.cover", "symbiyosys-cover", params, bypass=False)
+                            note(tool, "formal.cover", "control (seat files of mode 0600 read and passed)", None,
+                                 cover.succeeded, cover.summary[:200], ctexts)
+                        continue
+                    denied = not outcome.succeeded and not _opened(texts, messages, target)
+                    note(tool, gate, what, target, denied, outcome.summary[:200], texts)
+            # Decision 3, item 2: the held-out checks' compile reads the run's own judge file and nothing beside it.
+            judge_src = _write(box / "judge-source" / "reach_judge.v",
+                               f'module reach_judge;\ninitial $display("REACH JUDGE {nonce}");\nendmodule\n', 0o644)
+            for n, beside in enumerate((False, True)):
+                staged = _stage(box / "judge" / f"check-{n}", {"sources": [judge_src]}, None)["sources"][0]
+                canary = _write(Path(staged).parent / f"beside-{nonce}",
+                                f'initial $display("CANARY {file_canaries[2]}");\n', 0o644)
+                include = f'`include "{canary}"\n' if beside else ""
+                seat_tb = _write(box / "held-out" / str(n) / "reach_seat_tb.v",
+                                 f"module reach_seat_tb;\n{include}reach_judge j();\nreg [8*64-1:0] nonce;\n"
+                                 "initial begin #1\nif ($value$plusargs(\"nirmaan_nonce=%s\", nonce)) "
+                                 "$display(\"NIRMAAN-SIM %0s 1 passed, 0 failed\", nonce);\n$finish;\nend\n"
+                                 "endmodule\n", 0o644)
+                outcome, texts = run("iverilog", "simulator.run", "icarus",
+                                     {"sources": f"{seat_tb},{staged}", "top": "reach_seat_tb"}, bypass=beside)
+                if beside:
+                    denied = not outcome.succeeded and not _opened(texts, TOOL_GATES[0][3], str(canary))
+                    note("iverilog", "simulator.run", "held-out compile: a canary beside the staged judge file",
+                         str(canary), denied, outcome.summary[:200], texts)
+                else:
+                    ok = outcome.succeeded and any(f"REACH JUDGE {nonce}" in t for t in texts[1:])
+                    note("iverilog", "simulator.run", "held-out compile control (the staged judge file is read)",
+                         None, ok, outcome.summary[:200], texts)
+    finally:
+        eda.check_inputs, eda.sby_problem = real_check, real_sby
+        in_checkout.unlink(missing_ok=True)
+        shutil.rmtree(box, ignore_errors=True)
+        shutil.rmtree(other, ignore_errors=True)
+    every = bool(results) and all(r["denied"] for r in results)
+    record = {"format": "nirmaan.tool-reach", "seat": SEAT, "every_denied": every, "probes": results,
+              "commit": os.environ.get("GITHUB_SHA"), "run_id": os.environ.get("GITHUB_RUN_ID"),
+              "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"), "job": os.environ.get("GITHUB_JOB"),
+              "seat_tools": os.environ.get(eda.SEAT_TOOLS_ENV) or None}
+    out.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
+    denied = sum(r["denied"] for r in results)
+    print(f"reach test: tools as {SEAT}: {denied} of {len(results)} probes and controls as required", flush=True)
+    return 0 if every else 1
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Test what seat code can reach in this job, through cocotb.")
-    parser.add_argument("--records", type=Path, required=True, help="the records folder seat code must not write")
+    parser.add_argument("--records", type=Path, help="the records folder seat code must not write")
+    parser.add_argument("--out", type=Path, default=None, help="where the tool reach record is written")
+    parser.add_argument("--tools-child", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
-    return reach(args.records)
+    if args.tools_child:
+        return tools_child(args.out)
+    if args.records is None:
+        parser.error("--records is required")
+    return reach(args.records) or tool_reach(args.out)
 
 
 if __name__ == "__main__":

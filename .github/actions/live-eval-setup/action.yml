@@ -33,6 +33,9 @@ runs:
       uses: ./.github/actions/oss-cad-suite
       with:
         tools: sby yices-smt2
+        # Root's, outside the runner's temporary folder, which the seat account may not read: sby runs as that
+        # account in these jobs (gate ET2, council/records/2026-11-22-eda-tools-seat-account.md).
+        root: /opt
     - name: Install Claude Code
       shell: bash
       run: |

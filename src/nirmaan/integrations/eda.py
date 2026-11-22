@@ -40,6 +40,7 @@ import selectors
 import shlex
 import shutil
 import signal
+import stat
 import subprocess
 import sys
 import tempfile
@@ -104,6 +105,26 @@ VERILATOR_JOBS_ENV = "NIRMAAN_VERILATOR_JOBS"
 SECRET_ENV_RE = re.compile(r"TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL|API_?KEY|PRIVATE_KEY|^ANTHROPIC_", re.IGNORECASE)
 #: A value shorter than this is not redacted from what a run printed: it would match ordinary text.
 _REDACT_MIN = 16
+
+#: Gate ET2 (council/records/2026-11-22-eda-tools-seat-account.md): the programs that read seat-written Verilog or run
+#: seat code, which the live evaluation's jobs run as the seat account through root's wrappers of the same names
+#: (``scripts/live_eval_seat.py``). ``verilator`` is one of them only when it lints; a model build stays the caller's.
+SEAT_TOOLS = ("vvp", "iverilog", "verilator", "yosys", "sby")
+#: Gate ET2, no fallback (as gate SC2 for ``fw.test``): where this names a folder (the live evaluation's jobs set it,
+#: ``.github/workflows/live-eval.yml``), each of those programs runs only through the wrapper of its name in that folder,
+#: started by that path; a wrapper that is missing, not root's, or writable by another account refuses the run before
+#: any step.
+SEAT_TOOLS_ENV = "NIRMAAN_SEAT_TOOLS"
+#: What a run tells the wrappers, in each step's environment: its own directory and the files it was given (the
+#: sources, the setup and what its ``[files]`` name, the other files its parameters name). The seat account's view of
+#: the run holds those and nothing else of the run folders (``scripts/live_eval_seat.py``, ``view_plan``).
+SEAT_RUN_DIR_ENV = "NIRMAAN_SEAT_RUN_DIR"
+SEAT_INPUTS_ENV = "NIRMAAN_SEAT_INPUTS"
+#: Gate ET4 (the ET record, decision 3, item 1): the tools whose held-out run reads its case files from a copy staged
+#: for the run, as the must-fail check's runs do, never from the checkout (``nirmaan.evals.scorers.held_out_run``). In
+#: the live evaluation's jobs these tools run as the seat account, which may read the run's own inputs and nothing of
+#: the checkout. Each takes a plain list of files, so a copy under its own name reads the same.
+HELD_OUT_STAGED = ("simulator.run", "lint.run", "synth.run")
 
 #: How a run passes its nonce to the program that reports the verdict (M53): a simulator plusarg.
 NONCE_ARG = "+nirmaan_nonce="
@@ -288,11 +309,17 @@ def _execute(backend: Backend, params: Params, sources: tuple[str, ...], workdir
     printed = 0
     cwd = backend.cwd(job) if backend.cwd else workdir
     env = run_environment(workdir)
+    env[SEAT_RUN_DIR_ENV] = str(workdir)
+    env[SEAT_INPUTS_ENV] = json.dumps(seat_inputs(backend, job))
+    steps = backend.steps(job)
+    problem = seat_tools_problem(steps)
+    if problem:
+        return ToolOutcome(False, f"{backend.name}: {problem}")
     deadline = time.monotonic() + timeout  # M53: one deadline for the whole run, not one per step
-    for argv in backend.steps(job):
+    for argv in steps:
         commands.append(argv)
         chunks.append(f"$ {shlex.join(argv)}\n")
-        step = _run_step(argv, cwd, env, deadline, OUTPUT_CAP - printed, workdir)
+        step = _run_step(seat_launch(argv), cwd, env, deadline, OUTPUT_CAP - printed, workdir)
         chunks.append(step.output)
         printed += step.printed
         if step.stopped:
@@ -338,6 +365,78 @@ def _execute(backend: Backend, params: Params, sources: tuple[str, ...], workdir
     return ToolOutcome(result.passed, f"{backend.name}: {result.summary}",
                        references=(str(log_path), str(result_path)), data=record, outputs=outputs,
                        metrics=dict(result.metrics))
+
+
+def _program(argv: list[str]) -> int | None:
+    """Where the program a step starts is in ``argv``: its first word, or the first after ``env`` and its settings."""
+    if not argv:
+        return None
+    if Path(argv[0]).name != "env":
+        return 0
+    for n, word in enumerate(argv[1:], start=1):
+        if "=" not in word:
+            return n
+    return None
+
+
+def seat_tool(argv: list[str]) -> str | None:
+    """The name of the seat-account program this step starts (``SEAT_TOOLS``), or None: ``verilator`` only for a lint,
+    since a model build stays the caller's (decision 6 of the ET record; ``scripts/live_eval_seat.as_runner``)."""
+    n = _program(argv)
+    if n is None or argv[n] not in SEAT_TOOLS:
+        return None
+    if argv[n] == "verilator" and "--lint-only" not in argv[n + 1:]:
+        return None
+    return argv[n]
+
+
+def seat_tools_problem(steps: list[list[str]]) -> str | None:
+    """Why this run may not start where ``SEAT_TOOLS_ENV`` names the wrappers (gate ET2, no fallback), or None."""
+    want = os.environ.get(SEAT_TOOLS_ENV, "").strip()
+    if not want:
+        return None
+    for argv in steps:
+        name = seat_tool(argv)
+        if name is None:
+            continue
+        wrapper = Path(want) / name
+        why = (f"this job names the seat account's wrappers ({SEAT_TOOLS_ENV}={want}), and {name} runs only through "
+               f"{wrapper}, never as the caller (gate ET2); nothing ran")
+        try:
+            info = os.lstat(wrapper)
+        except OSError:
+            return f"the wrapper is not there: {why}"
+        if not stat.S_ISREG(info.st_mode) or info.st_uid != 0 or info.st_mode & (stat.S_IWGRP | stat.S_IWOTH):
+            return f"the wrapper is not a regular file only root may write: {why}"
+    return None
+
+
+def seat_launch(argv: list[str]) -> list[str]:
+    """``argv`` as it is started: where ``SEAT_TOOLS_ENV`` names the wrappers, a seat-account program by its wrapper's
+    path, so no other program of that name on ``PATH`` runs in its place. The log shows ``argv`` as the backend gave it."""
+    want = os.environ.get(SEAT_TOOLS_ENV, "").strip()
+    name = seat_tool(argv) if want else None
+    if name is None:
+        return argv
+    n = _program(argv)
+    return [*argv[:n], str(Path(want) / name), *argv[n + 1:]]  # type: ignore[index, operator]
+
+
+def seat_inputs(backend: Backend, job: Job) -> list[str]:
+    """The files this run reads that the harness named (``SEAT_INPUTS_ENV``): the sources, every other file a parameter
+    names (``rtl``, ``design``, the setup, the backend's own), and every file a setup's ``[files]`` names, each by its
+    resolved path, each a regular file that exists."""
+    named = [*job.sources]
+    for param in (*HDL_PARAMS, "sby", *backend.files):
+        named += [str(Path(v).resolve()) for v in list_values(job.params.get(param, "")) if v.strip()]
+    sby = text_value(job.params.get("sby")).strip()
+    if sby and Path(sby).is_file():
+        setup = Path(sby).resolve()
+        for section, line in _sby_sections(setup):
+            text = line.strip()
+            if section == "files" and text and not text.startswith("[") and not text.startswith("#"):
+                named.append(str((setup.parent / text.split()[-1]).resolve()))
+    return [p for p in dict.fromkeys(named) if Path(p).is_file()]
 
 
 #: The file a run claims an empty ``workdir`` with (M53), so a second run there gets a directory of its own.
