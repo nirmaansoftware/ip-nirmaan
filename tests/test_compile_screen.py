@@ -235,3 +235,116 @@ def test_the_screen_changes_no_fingerprint():
                 "nirmaan/integrations/firmware_riscv.py", "nirmaan/evals/object_screen.py"):
         assert rel not in digested, rel
     assert not any("compile screen" in json.dumps(spec.model_dump(mode="json")) for spec in TOOLS)
+
+
+# --- Gate SC9 (council record 2026-11-19, decision 2, items 1 and 2): the register block flow ------------------------
+#
+# Item 1: the compile reach is closed for every check that compiles seat C in that flow, the firmware stage's own
+# before-review checks included. Item 2: the object screen of gate WF16 is not called met until the #line route of
+# fact 9 is tested and, if open, closed. Security's conditions for staying with the screen
+# (docs/COMPILE_SCREEN.md, "Decision 4, item 5: the register block") add the two routes a seat header can carry into
+# the held-out test's own compile in checks 5 and 6.
+
+REGS_FLOW = "flow/axi4-lite-regs-driver"
+FLOW_HELD_OUT = REPO / "evals" / "flow" / "axi4_lite" / "held_out_test.c"
+#: Every tool that compiles seat-written C (the driver, the driver test).
+C_TOOLS = ("fw.build", "fw.test", "fw.cross_build", "fw.soc_test")
+#: The two routes a seat's driver header can carry into the held-out test's compile, and the words of the refusal.
+HEADER_ROUTES = {"seat_header_incbin.h": "asm statement", "seat_header_line.h": "#line"}
+
+
+def _register_block_tools() -> tuple[set[str], set[str]]:
+    """The tools of the flow's held-out checks, and of its firmware stage's before-review checks (the workflow it
+    plans, ``nirmaan.company.workflows``), as data, not as a list typed here."""
+    from nirmaan.company.workflows import WORKFLOWS
+    from nirmaan.evals import load_cases
+
+    [case] = [c for c in load_cases(REPO / "evals", flow="whole") if c.id == REGS_FLOW]
+    stage = {t for wf in WORKFLOWS for s in wf.stages if s.id == "firmware" for e in s.evidence
+             if e.before_review for t in e.tools}
+    return {h.tool for h in case.held_out}, stage
+
+
+def test_every_check_that_compiles_seat_c_in_the_register_block_flow_runs_the_screen(tmp_path):
+    """Decision 2, item 1: each backend of each tool the flow's held-out checks and its firmware stage's own checks
+    run, among the tools that compile seat C, refuses an include of the reference driver by an absolute path in its
+    check, before any step. Without a tool's compiler the screen refuses too (it cannot list the compiler's folders),
+    so the check fails closed; CI has every compiler."""
+    from nirmaan.integrations import firmware_riscv  # noqa: F401  (registers the RISC-V backends)
+    from nirmaan.integrations.eda import Job, backends_for
+
+    held_out, stage = _register_block_tools()
+    assert {"fw.build", "fw.test"} <= held_out and set(C_TOOLS) <= stage  # the flow's seat C, judged and staged
+    assert not (held_out | stage) - set(C_TOOLS) - {"simulator.run", "regmap.verify"}  # no other tool in the flow
+    seat = tmp_path / "seat" / "drv.c"
+    seat.parent.mkdir()
+    seat.write_text(f'#include "nirmaan_hal.h"\n#include "{REFERENCE}"\n', encoding="utf-8")
+    seen = []
+    for tool in C_TOOLS:
+        assert backends_for(tool), tool
+        for backend in backends_for(tool):
+            assert backend.check is not None, (tool, backend.name)
+            work = tmp_path / f"{tool}-{backend.name}"
+            work.mkdir()
+            job = Job(tool, {"sources": str(seat), "rtl": str(RTL)}, work, (str(seat),), "axi4_lite_regs")
+            problem = backend.check(job)
+            seen.append({"tool": tool, "backend": backend.name, "refused": bool(problem and REFUSED in problem)})
+            assert problem and REFUSED in problem, (tool, backend.name, problem)
+            assert not list(work.rglob("*.o")), (tool, backend.name)
+    _record("FLOW-TOOLS", checks=seen)
+
+
+def test_the_line_route_of_fact_9_is_refused_before_the_object_screen_compiles(tmp_path):
+    """Decision 2, item 2: a #line line followed by asm would make the asm look like another file's, which the
+    object screen's own asm rule skips. The compile screen the object screen runs first refuses the #line line,
+    so nothing is compiled and the asm rule is never asked."""
+    fixture = FIXTURES / "line_asm.c"
+    hits = object_screen.screen([fixture], {fixture}, tmp_path / "s")
+    _record("REFUSED", fixture="line_asm.c", tool="object screen", hits=[h.rule for h in hits],
+            summary=hits[0].detail if hits else "")
+    assert [h.rule for h in hits] == ["reach"] and REFUSED in hits[0].detail and "#line" in hits[0].detail
+    assert not list((tmp_path / "s").rglob("*.o"))
+
+
+def _seat_with_header(tmp_path: Path, header: str) -> list[Path]:
+    """A seat's driver for the register block flow: the reference driver and map, with ``header`` as its driver
+    header, and the flow's held-out test beside them, as checks 5 and 6 name them."""
+    seat = tmp_path / "seat"
+    seat.mkdir()
+    for name in ("axi4_lite_regs_drv.c", "axi4_lite_regs_map.h"):
+        (seat / name).write_bytes((FW / "axi4_lite" / name).read_bytes())
+    (seat / "axi4_lite_regs_drv.h").write_bytes((FIXTURES / header).read_bytes())
+    return [seat / "axi4_lite_regs_drv.c", seat / "axi4_lite_regs_drv.h", seat / "axi4_lite_regs_map.h",
+            FLOW_HELD_OUT]
+
+
+@needs("cc", "verilator", "make")
+@pytest.mark.parametrize("header", sorted(HEADER_ROUTES))
+def test_a_seat_header_route_into_the_held_out_tests_compile_is_refused(header, tmp_path):
+    """Security's condition for the screen: each route a seat header can carry into the held-out test's own compile
+    (checks 5 and 6 compile the held-out test with the seat's header) is refused by fw.test before it compiles or
+    runs anything, and by the object screen the screened scorers run first."""
+    sources = _seat_with_header(tmp_path, header)
+    backend, why = select_backend("fw.test", {})
+    assert backend is not None, why
+    outcome = execute(backend, {"sources": ",".join(map(str, sources)), "rtl": str(RTL), "top": "axi4_lite_regs",
+                                "workdir": str(tmp_path / "run")})
+    seat = set(sources[:3])
+    hits = object_screen.screen(sources, seat, tmp_path / "s")
+    # The held-out test's own compile alone (the header, the map and the test, no seat C file): refused there too.
+    alone = tuple(map(str, sources[1:]))
+    (tmp_path / "alone").mkdir()
+    held_out_only = compile_screen.screen(firmware.compile_flags("cc", (), alone, firmware.HARNESS), alone, alone,
+                                          (firmware.HARNESS,), tmp_path / "alone")
+    _record("REFUSED", fixture=header, tool="fw.test and object screen", succeeded=outcome.succeeded,
+            summary=outcome.summary.replace(str(REPO), "<checkout>"), hits=[h.rule for h in hits],
+            held_out_only=(held_out_only or "").replace(str(REPO), "<checkout>"))
+    assert held_out_only and REFUSED in held_out_only and HEADER_ROUTES[header] in held_out_only
+    assert not list((tmp_path / "alone").rglob("*.o"))
+    assert not outcome.succeeded and REFUSED in outcome.summary and HEADER_ROUTES[header] in outcome.summary
+    assert not outcome.references and not (tmp_path / "run" / "cosim").exists()
+    assert not list((tmp_path / "run").rglob("*.o"))
+    # The object screen leaves asm statements to its own rule (``statements=False``), so the asm route may stop
+    # there instead of in the compile screen it runs first; either is a refusal before anything is linked or run.
+    assert hits and hits[0].rule in ("reach", "asm"), hits
+    assert hits[0].rule == "asm" or REFUSED in hits[0].detail
