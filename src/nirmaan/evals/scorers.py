@@ -109,20 +109,15 @@ def held_out_run(ctx: ScoreContext) -> Score:
         status = ScoreStatus.PASSED if outcome.succeeded else ScoreStatus.FAILED
         return score(status, f"{check.tool} {run_id}: {outcome.summary}", (run_id,))
 
-    if str(check.tool) not in STAGED_TOOLS or not cases:
+    from nirmaan.integrations.eda import HELD_OUT_STAGED  # the tools are the gate backends' to name, not the judge's
+
+    if str(check.tool) not in HELD_OUT_STAGED or not cases:
         return judge(None)
     if ctx.work is not None:
         ctx.work.mkdir(parents=True, exist_ok=True)
         return judge(Path(tempfile.mkdtemp(prefix="held-out-", dir=ctx.work)))
     with tempfile.TemporaryDirectory(prefix="nirmaan-held-out-") as stage:
         return judge(Path(stage))
-
-
-#: Gate ET4 (council/records/2026-11-22-eda-tools-seat-account.md, decision 3, item 1): the tools whose held-out run
-#: reads its case files from a copy staged for the run, as the must-fail check's runs do, never from the checkout. In
-#: the live evaluation's jobs these tools run as the seat account, which may read the run's own inputs and nothing of
-#: the checkout. Each takes a plain list of files, so a copy under its own name reads the same.
-STAGED_TOOLS = ("simulator.run", "lint.run", "synth.run")
 
 
 def _stage_cases(where: Path, cases: dict[str, list[Path]]) -> dict[str, list[str]]:

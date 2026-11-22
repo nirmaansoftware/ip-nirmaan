@@ -720,7 +720,8 @@ def test_the_held_out_run_reads_its_case_files_from_copies_staged_for_the_run(tm
     assert staged[0] == str(seat_file) and Path(staged[1]).parent.parent == work and Path(staged[1]).name == "tb.v"
     assert Path(staged[1]).read_text() == "module tb; endmodule\n"
     assert given == [str(seat_file), str(repo / "evals" / "tb.v")]  # not a seat-account tool: as before
-    assert scorers.STAGED_TOOLS == ("simulator.run", "lint.run", "synth.run")
+    from nirmaan.integrations.eda import HELD_OUT_STAGED
+    assert HELD_OUT_STAGED == ("simulator.run", "lint.run", "synth.run")
     (tmp_path / "y").mkdir()
     (tmp_path / "y" / "tb.v").write_text("module other; endmodule\n")
     two = scorers._stage_cases(tmp_path / "two", {"sources": [repo / "evals" / "tb.v", tmp_path / "y" / "tb.v",

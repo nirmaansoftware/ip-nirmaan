@@ -344,7 +344,7 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   uses one. The held-out checks' compile (Icarus, over the seat's file and the
   judge's) runs the same way: the reference testbench of check 1 is staged
   for the run as check 2's reference RTL and mutants already are
-  (`nirmaan.evals.scorers`, `STAGED_TOOLS`), so the account reads that run's
+  (`nirmaan.evals.scorers`; `eda.HELD_OUT_STAGED`), so the account reads that run's
   own judge file and nothing beside it. In these jobs the workflow names the
   wrappers (`NIRMAAN_SEAT_TOOLS`), and there a seat tool never falls back
   (gate ET2, as gate SC2 for `fw.test`): a wrapper that is not there, not

@@ -120,6 +120,11 @@ SEAT_TOOLS_ENV = "NIRMAAN_SEAT_TOOLS"
 #: the run holds those and nothing else of the run folders (``scripts/live_eval_seat.py``, ``view_plan``).
 SEAT_RUN_DIR_ENV = "NIRMAAN_SEAT_RUN_DIR"
 SEAT_INPUTS_ENV = "NIRMAAN_SEAT_INPUTS"
+#: Gate ET4 (the ET record, decision 3, item 1): the tools whose held-out run reads its case files from a copy staged
+#: for the run, as the must-fail check's runs do, never from the checkout (``nirmaan.evals.scorers.held_out_run``). In
+#: the live evaluation's jobs these tools run as the seat account, which may read the run's own inputs and nothing of
+#: the checkout. Each takes a plain list of files, so a copy under its own name reads the same.
+HELD_OUT_STAGED = ("simulator.run", "lint.run", "synth.run")
 
 #: How a run passes its nonce to the program that reports the verdict (M53): a simulator plusarg.
 NONCE_ARG = "+nirmaan_nonce="
