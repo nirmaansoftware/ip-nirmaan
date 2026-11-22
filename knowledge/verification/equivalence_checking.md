@@ -58,6 +58,12 @@ own reasoning; a line marked "gate" names the repository code that backs it.
   partitions with memories. The `sby` strategy always uses SymbiYosys in prove
   mode, with a chosen engine and solver, and is the more general choice
   [EqyStrat]. `depth` is the unrolling the proof may use [EqyStrat].
+- The gate restricts what a `[strategy]` may say: `use` is `sat` or `sby`,
+  `depth` and `timeout` are plain numbers, `xprop` is `on` or `off`, and a
+  strategy's `option` lines are refused (gate:
+  src/nirmaan/integrations/eda_guard.py:371-376). An `engine` line takes only
+  `smtbmc`, `abc`, `btor`, `aiger` or `none`, each with a fixed set of solver
+  words (gate: eda_guard.py:277-293).
 - eqy interprets gold with Yosys's three-valued semantics and gate with
   two-valued semantics in which each unknown bit is an arbitrary value, and the
   miter treats an unknown gold output as equal to any gate value [EqyX].
@@ -65,34 +71,34 @@ own reasoning; a line marked "gate" names the repository code that backs it.
 ## What the equivalence gate demands
 
 - `equivalence.run` takes the setup in `eqy`, and optionally the RTL it must
-  read in `sources` (gate: src/nirmaan/company/tools.py:170-175).
+  read in `sources` (gate: src/nirmaan/company/tools.py:172-176).
 - A setup is refused, and nothing runs, when a script line reaches outside
   Yosys (a shell, `exec`, `tcl`, `python`, `script`, `plugin`), when a script
   writes a file (`write_*`, `tee`, `dump`), when `[gold]` or `[gate]` is
   missing, when the two scripts are the same so that a design is compared with
   itself, or when it reads a file by an absolute path, outside its own folder,
-  or one that is not there (gate: src/nirmaan/integrations/equivalence.py:77-101).
+  or one that is not there (gate: src/nirmaan/integrations/equivalence.py:82-105).
 - Given `sources`, the setup must read every one of them, compared by resolved
-  path (gate: equivalence.py:109-117).
+  path (gate: equivalence.py:128-133).
 - The run copies the setup and the files it reads into its own directory, so a
   write cannot change the submitted files, and it records the files each side
-  read (gate: equivalence.py:120-132).
+  read (gate: equivalence.py:136-147).
 - A run passes only when eqy exited 0, said `DONE (PASS)` and that the designs
   were proved equivalent, proved at least one partition, and failed none. A
   setup that proves no partition fails, and the summary says that nothing was
   proved; one whose
   partition was not proved fails and names the first partition (gate:
-  src/nirmaan/integrations/eda_parsers.py:461-514).
+  src/nirmaan/integrations/eda_parsers.py:472-525).
 - The result names the gold and the gate files, so a pass says which two
-  versions were compared (gate: eda_parsers.py:497-499).
+  versions were compared (gate: eda_parsers.py:507-516).
 
 ## A partition that holds state
 
 - For a partition that holds state, such as a register, prefer the `sby`
   strategy over `sat`: `sat` is described as quick but unable to prove some
   partitions, while `sby` is the more general choice [EqyStrat]. Choose the
-  engine and a `depth` from the design and the sources, not from a fixed
-  number in this document.
+  engine from the gate's allow list above and a `depth` from the design and
+  the sources, not from a fixed number in this document.
 - A `sat` pass is weaker evidence for a register partition than an `sby`
   pass (inference). The eqy pages in the sources do not state strategy order
   for a proved partition, so list the stronger strategy first, or only.
@@ -105,7 +111,7 @@ own reasoning; a line marked "gate" names the repository code that backs it.
 - Gold and gate running the same commands, or only the original: the gate
   refuses a setup whose `[gold]` and `[gate]` sections hold identical command
   lists, because it would compare a design with itself (gate:
-  src/nirmaan/integrations/equivalence.py:91-93); lines under `[script]` are
+  src/nirmaan/integrations/equivalence.py:97-99); lines under `[script]` are
   shared and are not part of that comparison. It does not refuse two sides that
   read the same file with different commands, which it accepts (inference from
   the same check, which compares scripts and not file names). Naming only the
@@ -118,8 +124,12 @@ own reasoning; a line marked "gate" names the repository code that backs it.
 - A depth too small for a design whose outputs agree for the first steps and
   differ later. The `sat` strategy proves equality only if the outputs agree
   for the initial depth steps and for every later step that follows depth
-  agreeing steps [EqyStrat]. That condition does not make a `sat` pass sound
-  for a partition that holds state: see "A partition that holds state".
+  agreeing steps [EqyStrat]. For a partition that holds state, a `sat` pass
+  can still be wrong (inference): with the installed eqy and Yosys, `use sat`
+  at depth 10 reports a register partition of a wrong design equivalent, and
+  `use sby` with `smtbmc` reports it not equivalent
+  (tests/test_dv_crc_gray_evals.py::test_a_sat_strategy_passes_the_wrong_flip_mutant_that_the_sby_strategy_fails).
+  See "A partition that holds state".
 - Missing recode or match rules after synthesis changed an FSM encoding or a
   name, which leaves partitions that cannot be proved [EqyConfig].
 - A bug in gold carried into gate, which equivalence cannot see.
@@ -127,7 +137,7 @@ own reasoning; a line marked "gate" names the repository code that backs it.
 ## How a result is checked
 
 - Read the gold and gate file names and the partition count in the summary
-  (gate: eda_parsers.py:497-503).
+  (gate: eda_parsers.py:507-516).
 - Reviewer: run the same setup against a gate version with one behaviour changed, such as
   one wrong bit, an off-by-one in a flag or a wrong reset value. A setup that
   still reports equivalence is not looking at that behaviour (inference).
