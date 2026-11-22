@@ -443,6 +443,34 @@ seat today, so these cases do not name it (a later skills batch adds it).
   RTL, and each of the three single-defect mutants must fail a repro of its
   own (a matching, so one repro that fails all three defects cannot stand for
   three buckets). The reference has three repros, each narrow to one defect.
+- `debug/root-cause-debounce` (RX-E3, a second root-cause case, outcome
+  `rtl_bug`, `root_cause_analysis`). Its block (`tests/fixtures/dv/debounce/`)
+  is an input debouncer whose RTL under investigation restarts its count only
+  on a rising edge of `noisy`, so with `clean` high a low pulse shorter than
+  `STABLE` still reaches `clean`. The failing log is the evidence: its first
+  `ERROR` is a symptom (`clean` fell when `noisy` came back high), and an
+  earlier line shows a high bounce filtered correctly, which refutes a counter
+  that is broken in general. The triage report and quick repro
+  (`debounce_triage_repro.v`, which probes the count register by name and so
+  cannot build on the second implementation) are upstream. Two `must-fail`
+  controls, on the counter implementation and on an independent
+  history-register implementation (`alt/debounce.v`), each pass the fixed RTL
+  and fail the two defective ones. A repro with only high pulses passes the RTL
+  under investigation and is refused at the gate; one that expects `clean` to
+  move during the pulse fails the clean run (tested).
+- `debug/triage-pwm-gen` (RX-E3, a second triage case, `failure_triage`). Its
+  block (`tests/fixtures/dv/pwm_gen/`) is a pulse-width modulator with a period
+  of eight clocks and three independent defects (a pulse one clock too long, a
+  period of seven, a `duty` that is not held for the period), shown by three
+  failing logs. The one control is `must-fail-each`, as for
+  `debug/triage-three-bugs`; each of the three single-defect mutants fails
+  exactly one of the three reference repros (tested). The seat is told the
+  plusarg and the verdict line by the `failure_triage` card, as in
+  `debug/triage-three-bugs`; a repro that waits for a rising edge the defective
+  output never makes would hang, so the reference repros never do.
+
+Neither new case names `log_analysis`: the root-cause stage plans only
+`root_cause_analysis` for its seat, so the packet does not carry it.
 
 | File | The one change | Judge that fails it |
 |---|---|---|
