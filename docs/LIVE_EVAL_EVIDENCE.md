@@ -307,7 +307,19 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   with the screen bypassed inside that process only, and say so in their
   output. Each job uploads the result as `live-eval-tool-reach-<job>-<run
   id>`, and stops before any trial unless every probe is denied and every
-  control passed.
+  control passed. The committed record, `evals/flow/tool_reach_record.json`
+  (gate ET3), is the one of
+  [run 45073595509](https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45073595509),
+  a replay of `flow/axil-timer` dispatched on `main` at c99ef1fe (the merge of
+  ip#444): in the `replay` job and in the `rejudge` job, all 19 as required
+  (each tool's control passed and its three probes denied, the held-out
+  compile's judge file read and the canary beside it denied, no canary value
+  in any run's log, summary or result file). The same run's replay passed the
+  RTL stage's lint, simulation and synthesis and both held-out checks with
+  the tools as the account (check 1 on its staged testbench; check 2 clean,
+  4 of 4 mutants failed), and its re-judge was the same. It shows those
+  probes denied through those tools as the account in that run, and nothing
+  more; the `live-eval` job has no recorded run of them before slot 1.
 - **The tools that read seat Verilog run as the account too** (gates ET2 to
   ET4 of `council/records/2026-11-22-eda-tools-seat-account.md`). The input
   screen (`eda_guard`) reads seat files with patterns of its own, and the

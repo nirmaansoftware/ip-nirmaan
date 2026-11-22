@@ -757,3 +757,32 @@ def test_the_tools_as_the_seat_account_change_no_fingerprint():
         assert rel not in digested, rel
     specs = json.dumps([spec.model_dump(mode="json") for spec in TOOLS])
     assert "NIRMAAN_SEAT" not in specs and "nirmaan-seat" not in specs  # no seat-account text reaches a seat
+
+
+TOOL_REACH_RECORD = REPO / "evals" / "flow" / "tool_reach_record.json"
+
+
+def test_the_committed_tool_reach_record_is_from_main_with_every_probe_denied_in_the_replay_and_rejudge_jobs():
+    """Gate ET3 (decision 2, item 3): the committed record is a replay dispatched on main, holding the replay job's and
+    the rejudge job's tool reach records, of one run and one commit, each with every wrapped tool probed through its
+    gate as the seat account: every control passed and every probe denied."""
+    record = json.loads(TOOL_REACH_RECORD.read_text())
+    assert record["format"] == "nirmaan.tool-reach-record/1"
+    parts = {"replay": record["replay"], "rejudge": record["rejudge"]}
+    for job, part in parts.items():
+        assert part["format"] == "nirmaan.tool-reach" and part["job"] == job and part["seat"] == "nirmaan-seat"
+        assert part["seat_tools"] == "/opt/nirmaan-seat/bin" and part["every_denied"] is True, job
+        assert part["probes"] and all(p["denied"] for p in part["probes"]), job
+        for tool, gate, _backend, _messages in reach.TOOL_GATES:
+            probes = [p for p in part["probes"] if p["tool"] == tool and p["gate"] == gate
+                      and not p["probe"].startswith("held-out compile")]
+            assert sum(p["target"] is None for p in probes) == 1, (job, tool)  # the control
+            targets = [p["probe"] for p in probes if p["target"]]
+            assert targets == ["checkout canary", "runner-only canary",
+                               "credential canary in the parent's environment"], (job, tool)
+        held = [p for p in part["probes"] if p["probe"].startswith("held-out compile")]
+        assert len(held) == 2 and sum(p["target"] is not None for p in held) == 1, job
+        assert any(p["gate"] == "formal.cover" for p in part["probes"]), job
+    assert parts["replay"]["run_id"] == parts["rejudge"]["run_id"] and parts["replay"]["commit"] == \
+        parts["rejudge"]["commit"]
+    assert parts["replay"]["commit"][:8] in record["about"] and parts["replay"]["run_id"] in record["about"]
