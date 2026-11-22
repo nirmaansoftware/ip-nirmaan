@@ -18,6 +18,7 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -130,7 +131,7 @@ def _level(org, repo: Path, skill: str = SKILL):
 def test_on_main_every_practised_or_proven_level_has_committed_records_and_the_file_says_so(org):
     levels = compute(org, ROOT)
     results = ROOT / "evals" / "results"
-    committed = {p.parent.name for p in results.glob("*/manifest.json")} if results.is_dir() else set()
+    committed = {p.parent.name for p in results.rglob("manifest.json")} if results.is_dir() else set()
     for name in ("practised", "proven"):
         at_level = {s for s, v in levels["skills"].items() if v["level"] == name}
         assert levels["totals"][name] == len(at_level)
@@ -400,8 +401,27 @@ def test_a_record_that_mixes_calibration_and_evidence_trials_is_refused_in_the_r
 # --- Whole-flow trials (M87, council record 2026-11-17) -------------------------------------------
 
 
-def test_main_lists_no_whole_flow_trial_and_the_key_is_always_present(org):
-    assert compute(org, ROOT)["whole_flow"] == []
+def test_main_lists_whole_flow_trials_only_from_timer_slot_records_and_the_key_is_always_present(org):
+    # Before the first slot's record is committed the list is empty; after, every listed record is a timer slot
+    # record, and no whole-flow trial credits a skill (the next tests).
+    groups = compute(org, ROOT)["whole_flow"]
+    assert all(re.fullmatch(r"evals/results/g3-timer/slot-\d{2}/[^/]+", t["record"])
+               for g in groups for t in g["trials"])
+
+
+def test_records_nested_in_slot_folders_that_share_a_name_are_listed_apart_by_path(org, tmp_path):
+    # Two slots of one arm on one day carry the same record name (plan section 3); the path tells them apart, and
+    # neither credits a skill.
+    _case(tmp_path)
+    for slot in ("slot-01", "slot-02"):
+        _record(org, tmp_path, [True] * 5, name=f"g3-timer/{slot}/same-name", flow="whole")
+    levels = compute(org, tmp_path)
+    [group] = levels["whole_flow"]
+    assert group["count"]["n"] == 10
+    assert sorted({t["record"] for t in group["trials"]}) == ["evals/results/g3-timer/slot-01/same-name",
+                                                              "evals/results/g3-timer/slot-02/same-name"]
+    assert levels["skills"].get(SKILL, {}).get("practised", []) == [] and levels["totals"]["practised"] == 0
+    assert levels["refused_records"] == []
 
 
 @pytest.mark.parametrize("manifest, trial, where", [("whole", "whole", "the run manifest and the trial"),

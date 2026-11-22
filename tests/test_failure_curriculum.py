@@ -83,3 +83,66 @@ def test_a_row_with_a_missing_cause_or_record_is_skipped_not_a_crash(tmp_path):
 def test_main_survives_a_missing_module_docstring(tmp_path, monkeypatch):
     monkeypatch.setattr(fc, "__doc__", None)
     assert fc.main(["--results", str(_batch(tmp_path))]) == 0
+
+
+# --- Nested slot records (evals/results/g3-timer/slot-NN/<name>) ------------------------------------------------
+
+
+def _nested(tmp_path, slots=(1, 2), name="2026-01-01-x-m"):
+    """Two slots of one arm on one day: both folders carry the SAME record name, one per slot folder."""
+    results = tmp_path / "results"
+    for n in slots:
+        rec = results / "g3-timer" / f"slot-{n:02d}" / name
+        (rec / "flow_timer").mkdir(parents=True)
+        (rec / "flow_timer" / "trial-01.json").write_text(json.dumps(
+            {"trial": 1, "purpose": "evidence", "result": {"passed": False, "replay": False}}))
+        (rec / "causes.md").write_text(
+            "| Trial | Outcome | Cause | Shows |\n|---|---|---|---|\n| 1 | not passed | model (not further established) | x |\n")
+    return results
+
+
+def test_nested_records_with_one_name_get_distinct_keys(tmp_path):
+    rows, problems = fc.labels(_nested(tmp_path))
+    assert problems == []
+    assert [f.id for f in rows] == ["g3-timer/slot-01/2026-01-01-x-m:trial-01",
+                                    "g3-timer/slot-02/2026-01-01-x-m:trial-01"]
+    assert [f.source for f in rows] == ["g3-timer/slot-01/2026-01-01-x-m/causes.md",
+                                        "g3-timer/slot-02/2026-01-01-x-m/causes.md"]
+
+
+def test_each_nested_failure_needs_its_own_answer(tmp_path):
+    results = _nested(tmp_path)
+    first = "g3-timer/slot-01/2026-01-01-x-m:trial-01"
+    code, out = _run(results, f"- {first}: no: the case itself is under-specified, fixed in the case")
+    assert code == 1 and "unanswered: 1 of 2" in out
+    both = f"- {first}: no: the case itself is under-specified, fixed in the case\n" + \
+           "- g3-timer/slot-02/2026-01-01-x-m:trial-01: no: the case itself is under-specified, fixed in the case"
+    assert _run(results, both)[0] == 0
+
+
+def test_a_nested_failed_trial_with_no_label_is_listed_by_its_key_and_scope_follows_the_key(tmp_path):
+    results = _nested(tmp_path, slots=(1,))
+    (results / "g3-timer" / "slot-01" / "2026-01-01-x-m" / "causes.md").unlink()
+    code, out = _run(results, None, strict=True)
+    assert code == 1 and "  g3-timer/slot-01/2026-01-01-x-m:trial-01" in out
+    scoped = io.StringIO()
+    assert fc.run(results, ROOT, ["2026-01-01-x-m"], None, False, True, scoped) == 0  # a bare name is no key
+    assert fc.run(results, ROOT, ["g3-timer/slot-01/2026-01-01-x-m"], None, False, True, io.StringIO()) == 1
+
+
+def test_flat_and_nested_records_read_together_and_the_flat_key_is_unchanged(tmp_path):
+    _nested(tmp_path, slots=(1,))
+    results = _batch(tmp_path)
+    rows, _ = fc.labels(results)
+    assert {f.id for f in rows if f.is_model} == {"2026-01-01-x-m:trial-02", "g3-timer/slot-01/2026-01-01-x-m:trial-01"}
+
+
+def test_a_sibling_row_is_placed_inside_its_own_slot_folder(tmp_path):
+    results = _nested(tmp_path, slots=(1,))
+    slot = results / "g3-timer" / "slot-01"
+    (slot / "2026-01-01-x-m-2" / "flow_timer").mkdir(parents=True)
+    (slot / "2026-01-01-x-m" / "causes.md").write_text(
+        "| Record | Trial | Outcome | Cause | Shows |\n|---|---|---|---|---|\n"
+        "| -2 | 1 | not passed | model (not further established) | x |\n")
+    rows, problems = fc.labels(results)
+    assert problems == [] and [f.id for f in rows] == ["g3-timer/slot-01/2026-01-01-x-m-2:trial-01"]
