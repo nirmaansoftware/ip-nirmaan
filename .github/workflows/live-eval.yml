@@ -15,9 +15,11 @@ name: Live evaluation
 # records, and no credential in its environment (.github/actions/live-eval-seat). Every job that
 # runs seat code first runs the reach test (scripts/live_eval_reach.py), which tries each of those
 # through the real cocotb path, and stops before any trial unless every probe is denied. The tools that read seat
-# Verilog (Icarus, a Verilator lint, Yosys, SBY) run as that account too, each with a view of the run's own inputs only
-# (gates ET2 to ET4 of council/records/2026-11-22-eda-tools-seat-account.md); the reach test probes each through its
-# gate and uploads that record (live-eval-tool-reach-<job>-<run id>). The trial
+# Verilog (Icarus, a Verilator lint, Yosys, SBY, eqy) run as that account too, each with a view of the run's own inputs
+# only (gates ET2 to ET4 of council/records/2026-11-22-eda-tools-seat-account.md; eqy by gate W2C3 of
+# council/records/2026-11-23-wave-2-close-meeting-1.md), and so do coverage.read's Verilator build and the model it
+# builds from seat HDL (gate W2C4); the reach test probes each through its gate and uploads that record
+# (live-eval-tool-reach-<job>-<run id>). The trial
 # job hashes its checkout before and after the trials and fails on a change. The counting re-judge
 # runs in the `rejudge` job, which ran no seat code before it: a fresh checkout of the same commit,
 # the records only from the uploaded artifact, refused when the trial job's two hashes differ. Every job that runs
@@ -102,7 +104,9 @@ jobs:
       # Gate SC2: fw.test runs the program it builds only through this wrapper in this job, never as the runner.
       NIRMAAN_SEAT_EXEC: /opt/nirmaan-seat/bin/nirmaan-seat-exec
       # Gate ET2: vvp, iverilog, yosys, sby and a Verilator lint run only through root's wrappers here, never as the
-      # runner (council/records/2026-11-22-eda-tools-seat-account.md; nirmaan.integrations.eda.SEAT_TOOLS_ENV).
+      # runner (council/records/2026-11-22-eda-tools-seat-account.md; nirmaan.integrations.eda.SEAT_TOOLS_ENV); so do
+      # eqy, coverage.read's Verilator build and the model it builds (gates W2C3 and W2C4 of
+      # council/records/2026-11-23-wave-2-close-meeting-1.md).
       NIRMAAN_SEAT_TOOLS: /opt/nirmaan-seat/bin
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -214,7 +218,9 @@ jobs:
       # Gate SC2: fw.test runs the program it builds only through this wrapper in this job, never as the runner.
       NIRMAAN_SEAT_EXEC: /opt/nirmaan-seat/bin/nirmaan-seat-exec
       # Gate ET2: vvp, iverilog, yosys, sby and a Verilator lint run only through root's wrappers here, never as the
-      # runner (council/records/2026-11-22-eda-tools-seat-account.md; nirmaan.integrations.eda.SEAT_TOOLS_ENV).
+      # runner (council/records/2026-11-22-eda-tools-seat-account.md; nirmaan.integrations.eda.SEAT_TOOLS_ENV); so do
+      # eqy, coverage.read's Verilator build and the model it builds (gates W2C3 and W2C4 of
+      # council/records/2026-11-23-wave-2-close-meeting-1.md).
       NIRMAAN_SEAT_TOOLS: /opt/nirmaan-seat/bin
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -317,7 +323,9 @@ jobs:
       # Gate SC2: fw.test runs the program it builds only through this wrapper in this job, never as the runner.
       NIRMAAN_SEAT_EXEC: /opt/nirmaan-seat/bin/nirmaan-seat-exec
       # Gate ET2: vvp, iverilog, yosys, sby and a Verilator lint run only through root's wrappers here, never as the
-      # runner (council/records/2026-11-22-eda-tools-seat-account.md; nirmaan.integrations.eda.SEAT_TOOLS_ENV).
+      # runner (council/records/2026-11-22-eda-tools-seat-account.md; nirmaan.integrations.eda.SEAT_TOOLS_ENV); so do
+      # eqy, coverage.read's Verilator build and the model it builds (gates W2C3 and W2C4 of
+      # council/records/2026-11-23-wave-2-close-meeting-1.md).
       NIRMAAN_SEAT_TOOLS: /opt/nirmaan-seat/bin
     steps:
       - name: Refuse records from a changed checkout

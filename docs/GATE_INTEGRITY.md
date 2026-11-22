@@ -347,7 +347,14 @@ anyway is redacted from logs and from the uploaded record.
   builds of `fw.test` and `regmap.verify`) stay with the runner by a stated
   rule until gate ET9. On every other machine the tools run as before as
   the caller; everywhere, a held-out run of `simulator.run`, `lint.run` or
-  `synth.run` reads copies of its case files staged for the run.
+  `synth.run` reads copies of its case files staged for the run. Since gates
+  W2C3 and W2C4 of `council/records/2026-11-23-wave-2-close-meeting-1.md`,
+  `eqy` (with the Yosys, SBY and solvers it starts) runs as that account
+  there too, and so do `coverage.read`'s Verilator build and the model it
+  builds from seat HDL (the model through `nirmaan-seat-model`, in a view of
+  the run's directory, with no environment); its two `verilator_coverage`
+  steps stay with the caller. Again no fingerprint changed; elsewhere every
+  step runs as before.
 * **The compile residual** (`council/records/2026-11-19-seat-c-live-refusal.md`, fact 9 and decision 4). `fw.build`
   and `fw.test` compile seat C as the runner. The routes fact 9 found (an
   include of the committed reference driver by an absolute or `..` path, a

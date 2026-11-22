@@ -108,8 +108,18 @@ _REDACT_MIN = 16
 
 #: Gate ET2 (council/records/2026-11-22-eda-tools-seat-account.md): the programs that read seat-written Verilog or run
 #: seat code, which the live evaluation's jobs run as the seat account through root's wrappers of the same names
-#: (``scripts/live_eval_seat.py``). ``verilator`` is one of them only when it lints; a model build stays the caller's.
-SEAT_TOOLS = ("vvp", "iverilog", "verilator", "yosys", "sby")
+#: (``scripts/live_eval_seat.py``). ``eqy`` (and the Yosys, SBY and solvers it starts) is one of them by gate W2C3 of
+#: council/records/2026-11-23-wave-2-close-meeting-1.md. ``verilator`` is one of them only when it lints or builds the
+#: coverage run's model (``COVERAGE_BUILD``, gate W2C4); every other model build stays the caller's (gate ET9).
+SEAT_TOOLS = ("vvp", "iverilog", "verilator", "yosys", "sby", "eqy")
+#: Gate W2C4: the flag only the coverage run's Verilator build passes (``_verilator_coverage``), by which that build
+#: runs as the seat account where a lint does and the other model builds (the simulator build, ``fw.test``'s and
+#: ``regmap.verify``'s co-simulation builds) do not.
+COVERAGE_BUILD = "--coverage-line"
+#: Gate W2C4: the wrapper, beside the seat tools' wrappers in ``SEAT_TOOLS_ENV``'s folder, that runs a program the run
+#: built from seat HDL (the coverage run's model) as the seat account, with no environment, in a view of the run's own
+#: directory only (``scripts/live_eval_seat.py``, mode ``model``). It is started as ``SEAT_MODEL RUN_DIR PROGRAM ARGS``.
+SEAT_MODEL = "nirmaan-seat-model"
 #: Gate ET2, no fallback (as gate SC2 for ``fw.test``): where this names a folder (the live evaluation's jobs set it,
 #: ``.github/workflows/live-eval.yml``), each of those programs runs only through the wrapper of its name in that folder,
 #: started by that path; a wrapper that is missing, not root's, or writable by another account refuses the run before
@@ -380,14 +390,25 @@ def _program(argv: list[str]) -> int | None:
 
 
 def seat_tool(argv: list[str]) -> str | None:
-    """The name of the seat-account program this step starts (``SEAT_TOOLS``), or None: ``verilator`` only for a lint,
-    since a model build stays the caller's (decision 6 of the ET record; ``scripts/live_eval_seat.as_runner``)."""
+    """The name of the seat-account program this step starts (``SEAT_TOOLS``, or ``SEAT_MODEL``), or None:
+    ``verilator`` only for a lint or the coverage run's build (``COVERAGE_BUILD``), since every other model build stays
+    the caller's (decision 6 of the ET record; ``scripts/live_eval_seat.as_runner``)."""
     n = _program(argv)
-    if n is None or argv[n] not in SEAT_TOOLS:
+    if n is None or argv[n] not in (*SEAT_TOOLS, SEAT_MODEL):
         return None
-    if argv[n] == "verilator" and "--lint-only" not in argv[n + 1:]:
+    if argv[n] == "verilator" and not {"--lint-only", COVERAGE_BUILD} & set(argv[n + 1:]):
         return None
     return argv[n]
+
+
+def seat_model(argv: list[str], workdir: Path) -> list[str]:
+    """``argv``, a program this run built from seat HDL and its arguments, as the run starts it (gate W2C4): where
+    ``SEAT_TOOLS_ENV`` names the wrappers, through ``SEAT_MODEL`` with the run's directory, so it runs as the seat
+    account (``seat_launch`` then starts the wrapper by its path, and ``seat_tools_problem`` asks for it); elsewhere as
+    before."""
+    if not os.environ.get(SEAT_TOOLS_ENV, "").strip():
+        return argv
+    return [SEAT_MODEL, str(workdir), *argv]
 
 
 def seat_tools_problem(steps: list[list[str]]) -> str | None:
@@ -947,15 +968,19 @@ int main(int argc, char** argv) {{
 
 def _verilator_coverage(job: Job) -> list[list[str]]:
     """Build the simulation with line and toggle coverage and the run's own main, run it, then have
-    ``verilator_coverage`` read the data the run wrote and write it back, as data and as an lcov report (M70)."""
+    ``verilator_coverage`` read the data the run wrote and write it back, as data and as an lcov report (M70).
+
+    In the live evaluation's jobs the build and the built program run as the seat account (gate W2C4): the build as a
+    wrapped ``verilator`` (``COVERAGE_BUILD``), the program through ``SEAT_MODEL`` (``seat_model``). The two
+    ``verilator_coverage`` steps stay the caller's: they read only the data file named here, in the run's directory."""
     (job.workdir / COVERAGE_DESIGN).write_text(json.dumps({"design": coverage_design(job)}) + "\n", encoding="utf-8")
     raw, data = job.workdir / COVERAGE_RAW, job.workdir / COVERAGE_DATA
     main = job.workdir / "coverage_main.cpp"
     main.write_text(COVERAGE_MAIN.format(top=job.top, data=json.dumps(str(raw))), encoding="utf-8")
-    return [["verilator", "--cc", "--exe", "--build", "--timing", "--coverage-line", "--coverage-toggle",
+    return [["verilator", "--cc", "--exe", "--build", "--timing", COVERAGE_BUILD, "--coverage-toggle",
              "-Wno-fatal", "-j", verilator_jobs(), "--top-module", str(job.top), "-Mdir", "obj", str(main),
              *job.sources],
-            [str(job.workdir / "obj" / f"V{job.top}"), NONCE_ARG + new_nonce()],
+            seat_model([str(job.workdir / "obj" / f"V{job.top}"), NONCE_ARG + new_nonce()], job.workdir),
             ["verilator_coverage", "--write", str(data), str(raw)],
             ["verilator_coverage", "--write-info", str(job.workdir / COVERAGE_INFO), str(data)]]
 
