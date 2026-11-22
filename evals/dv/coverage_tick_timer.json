@@ -1,0 +1,90 @@
+{
+  "id": "dv/coverage-tick-timer",
+  "request": "Verify the existing tick timer RTL with a SystemVerilog testbench and coverage.",
+  "seat": "coverage",
+  "skills": [
+    "code_coverage"
+  ],
+  "expected_behavior": "A self-checking SystemVerilog testbench for the approved tick_timer RTL, extending the approved testbench the seat is handed, whose line and toggle coverage of the approved RTL, read by coverage.read, meets the bounds (line at least 90 percent, toggle at least 75 percent), and a coverage report that states the figures the seat measured. The testbench passes on the approved RTL under the coverage gate before review, and its checks are real: it fails on RTL that breaks the specification in one mode only, so coverage is not bought with stimulus that checks nothing, and a path run in one mode is not taken as checked in the other.",
+  "constraints": [
+    "Work only from the approved interface specification, the approved RTL and the approved testbench; never change the RTL.",
+    "Write the testbench in SystemVerilog, self-checking, ending with the verdict line the simulation gate reads.",
+    "Reach every part of the block the bounds count: start, count, expire and reload in one-shot and in periodic mode, set and clear the flag, mask the interrupt with IE, stop, and write LOAD while the timer runs, at more than one value of W.",
+    "Check what the stimulus produces in each mode separately; the held-out controls also run the testbench against mutant RTL that is wrong in one mode only."
+  ],
+  "known_failure_modes": [
+    "A testbench that only resets and reads registers, as the approved one does: its checks pass and its toggle coverage is far below the bound.",
+    "A testbench that never lets the count reach zero, so no expiry, reload, flag or clear is run and line coverage stays under the bound.",
+    "A testbench that runs one mode only, so the other mode's expiry path is never run.",
+    "A testbench that runs both modes and every line but checks the interrupt mask in one of them only: coverage is met, and a mutant wrong in the other mode passes.",
+    "A testbench at one W only, so the bits above it never toggle and the toggle bound is missed."
+  ],
+  "upstream": {
+    "interface-spec": [
+      {
+        "path": "tests/fixtures/dv/tick_timer/interface_spec.md",
+        "kind": "interface_spec"
+      }
+    ],
+    "design-under-test": [
+      {
+        "path": "tests/fixtures/dv/tick_timer/tick_timer.v",
+        "kind": "rtl_source",
+        "entry": "tick_timer"
+      }
+    ],
+    "testbench": [
+      {
+        "path": "tests/fixtures/dv/tick_timer/coverage/tick_timer_idle_tb.sv",
+        "kind": "testbench",
+        "entry": "tick_timer_idle_tb"
+      }
+    ]
+  },
+  "reference": [
+    {
+      "path": "tests/fixtures/dv/tick_timer/tick_timer_tb.sv",
+      "kind": "testbench",
+      "entry": "tick_timer_tb"
+    },
+    {
+      "path": "tests/fixtures/dv/tick_timer/coverage/tick_timer_coverage_report.md",
+      "kind": "coverage_report"
+    }
+  ],
+  "held_out": [
+    {
+      "name": "The seat's testbench passes the approved RTL, meets the coverage bounds on it and fails each tick timer mutant, one of them wrong in periodic mode only",
+      "scorer": "must-fail",
+      "tool": "coverage.read",
+      "cover_tool": "coverage.read",
+      "cover_bounds": [
+        "line>=90",
+        "toggle>=75"
+      ],
+      "seat_files": {
+        "sources": [
+          "testbench"
+        ]
+      },
+      "seat_entries": {
+        "top": [
+          "testbench"
+        ]
+      },
+      "case_files": {
+        "sources": [
+          "tests/fixtures/dv/tick_timer/tick_timer.v"
+        ]
+      },
+      "mutants": {
+        "tests/fixtures/dv/tick_timer/tick_timer.v": [
+          "tests/fixtures/dv/tick_timer/mutants/tick_timer_oneshot_keeps_running.v",
+          "tests/fixtures/dv/tick_timer/mutants/tick_timer_load_late_applies.v",
+          "tests/fixtures/dv/tick_timer/mutants/tick_timer_clear_beats_set.v",
+          "tests/fixtures/dv/tick_timer/mutants/tick_timer_irq_ie_ignored_periodic.v"
+        ]
+      }
+    }
+  ]
+}

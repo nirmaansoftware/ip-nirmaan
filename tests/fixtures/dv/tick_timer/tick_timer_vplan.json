@@ -1,0 +1,221 @@
+{
+  "format": "nirmaan.vplan",
+  "version": 1,
+  "requirements": [
+    {
+      "id": "TMR-PARAM",
+      "text": "The block works for every `W` from 4 to 32, and bits `W` and up of the `LOAD` and `COUNT` registers read as zero; a write to `LOAD` ignores them.",
+      "source": "interface_spec.md",
+      "section": "1"
+    },
+    {
+      "id": "TMR-RESET",
+      "text": "While `rst_n` is low at a rising edge of `clk`, `CTRL`, `LOAD`, `COUNT` and `STATUS` clear to zero.",
+      "source": "interface_spec.md",
+      "section": "4.1"
+    },
+    {
+      "id": "TMR-REG-RW",
+      "text": "A write to `CTRL` stores `wdata` bits 2 to 0 in it, and a write to `LOAD` stores `wdata` bits `W-1` to 0 in it.",
+      "source": "interface_spec.md",
+      "section": "4.1"
+    },
+    {
+      "id": "TMR-READ",
+      "text": "A read never changes any register; `rdata` follows `addr` with no clock edge.",
+      "source": "interface_spec.md",
+      "section": "4.1"
+    },
+    {
+      "id": "TMR-START",
+      "text": "At a rising edge where a write to `CTRL` sets `EN` and `EN` was 0, the count loads the `LOAD` value.",
+      "source": "interface_spec.md",
+      "section": "4.2"
+    },
+    {
+      "id": "TMR-COUNT",
+      "text": "At a rising edge where `EN` is 1 and the count is not zero, and no write to `CTRL` takes place, the count falls by one.",
+      "source": "interface_spec.md",
+      "section": "4.2"
+    },
+    {
+      "id": "TMR-WRITE-WINS",
+      "text": "A write to `CTRL` takes the place of that edge's count step: at that edge the count does not fall and the timer does not expire, whatever the count was.",
+      "source": "interface_spec.md",
+      "section": "4.2"
+    },
+    {
+      "id": "TMR-STOP",
+      "text": "A write to `CTRL` that clears `EN` stops the timer and the count keeps its value.",
+      "source": "interface_spec.md",
+      "section": "4.2"
+    },
+    {
+      "id": "TMR-LOAD-LATE",
+      "text": "A write to `LOAD` does not change the count: the new value is used at the next start or periodic reload.",
+      "source": "interface_spec.md",
+      "section": "4.2"
+    },
+    {
+      "id": "TMR-EXPIRE",
+      "text": "At a rising edge where `EN` is 1 and the count is zero, and no write to `CTRL` takes place, the timer expires: `EXPIRED` is set.",
+      "source": "interface_spec.md",
+      "section": "4.3"
+    },
+    {
+      "id": "TMR-PERIODIC",
+      "text": "In periodic mode an expiry also loads the count with the `LOAD` value, and `EN` stays 1.",
+      "source": "interface_spec.md",
+      "section": "4.3"
+    },
+    {
+      "id": "TMR-ONESHOT",
+      "text": "In one-shot mode an expiry also clears `EN`, and the count stays zero until the next start.",
+      "source": "interface_spec.md",
+      "section": "4.3"
+    },
+    {
+      "id": "TMR-W1C",
+      "text": "A write to `STATUS` with bit 0 set clears `EXPIRED`, and with bit 0 clear changes nothing; it never sets the flag.",
+      "source": "interface_spec.md",
+      "section": "4.4"
+    },
+    {
+      "id": "TMR-SET-WINS",
+      "text": "A timer that expires at the same rising edge as a write that clears `EXPIRED` keeps `EXPIRED` set.",
+      "source": "interface_spec.md",
+      "section": "4.4"
+    },
+    {
+      "id": "TMR-IRQ",
+      "text": "`irq` is high exactly when `EXPIRED` and `IE` are both 1, in one-shot and periodic mode alike; it follows the registers with no clock edge.",
+      "source": "interface_spec.md",
+      "section": "4.4"
+    }
+  ],
+  "items": [
+    {
+      "id": "tb-reset",
+      "kind": "test",
+      "file": "tick_timer_tb.sv",
+      "name": "Reset values and reset from a busy state",
+      "proves": [
+        "TMR-RESET"
+      ],
+      "rationale": "Both lanes read every register after the first reset and again after a reset with the timer running, expired and its interrupt up."
+    },
+    {
+      "id": "tb-registers",
+      "kind": "test",
+      "file": "tick_timer_tb.sv",
+      "name": "CTRL and LOAD write and read back",
+      "proves": [
+        "TMR-REG-RW",
+        "TMR-PARAM"
+      ],
+      "rationale": "Patterns and all ones are written and read back at W 16 and W 5; bits a register does not store, and bits W and up of LOAD and COUNT, must read zero."
+    },
+    {
+      "id": "tb-reads",
+      "kind": "test",
+      "file": "tick_timer_tb.sv",
+      "name": "Reads change nothing",
+      "proves": [
+        "TMR-READ"
+      ],
+      "rationale": "Registers are read twice between edges and must not move; every read is sampled with no clock edge, and a COUNT write changes nothing."
+    },
+    {
+      "id": "tb-start",
+      "kind": "test",
+      "file": "tick_timer_tb.sv",
+      "name": "Start loads the count",
+      "proves": [
+        "TMR-START",
+        "TMR-STOP"
+      ],
+      "rationale": "A start loads the stored LOAD value; a stop holds the count over several edges, and a second start loads LOAD again."
+    },
+    {
+      "id": "tb-count",
+      "kind": "test",
+      "file": "tick_timer_tb.sv",
+      "name": "The count falls one per edge",
+      "proves": [
+        "TMR-COUNT",
+        "TMR-LOAD-LATE"
+      ],
+      "rationale": "The count is read after each edge down to zero; a LOAD write while the timer runs must leave the count falling by one."
+    },
+    {
+      "id": "tb-write-wins",
+      "kind": "test",
+      "file": "tick_timer_tb.sv",
+      "name": "A CTRL write takes an edge's place",
+      "proves": [
+        "TMR-WRITE-WINS"
+      ],
+      "rationale": "With the count at zero and the timer running, a CTRL write must set no flag at its edge; the expiry comes at the next one."
+    },
+    {
+      "id": "tb-expire",
+      "kind": "test",
+      "file": "tick_timer_tb.sv",
+      "name": "Expiry sets the flag",
+      "proves": [
+        "TMR-EXPIRE"
+      ],
+      "rationale": "The flag stays clear while the count runs and is set at the edge after the count reaches zero, in both modes."
+    },
+    {
+      "id": "tb-periodic",
+      "kind": "test",
+      "file": "tick_timer_tb.sv",
+      "name": "Periodic expiry reloads",
+      "proves": [
+        "TMR-PERIODIC"
+      ],
+      "rationale": "After an expiry in periodic mode EN still reads 1 and the count holds the LOAD value, including a LOAD written after the start."
+    },
+    {
+      "id": "tb-oneshot",
+      "kind": "test",
+      "file": "tick_timer_tb.sv",
+      "name": "One-shot expiry stops",
+      "proves": [
+        "TMR-ONESHOT"
+      ],
+      "rationale": "After an expiry in one-shot mode EN reads 0 and the count stays zero over several edges, and no second expiry follows a clear."
+    },
+    {
+      "id": "tb-w1c",
+      "kind": "test",
+      "file": "tick_timer_tb.sv",
+      "name": "Write-1-to-clear",
+      "proves": [
+        "TMR-W1C"
+      ],
+      "rationale": "A STATUS write of bit 0 clears the flag; a write with bit 0 clear, or of all ones to a clear flag, never sets or clears it."
+    },
+    {
+      "id": "tb-race",
+      "kind": "test",
+      "file": "tick_timer_tb.sv",
+      "name": "Expiry at the edge of a clear",
+      "proves": [
+        "TMR-SET-WINS"
+      ],
+      "rationale": "A periodic timer with a zero reload expires at every edge; a STATUS clear at one of them must leave the flag set."
+    },
+    {
+      "id": "tb-irq",
+      "kind": "test",
+      "file": "tick_timer_tb.sv",
+      "name": "Interrupt masked by IE in each mode",
+      "proves": [
+        "TMR-IRQ"
+      ],
+      "rationale": "irq is checked with IE clear and set, in one-shot and in periodic mode separately, each 1 ns after the edge that expires or clears, with no extra edge."
+    }
+  ]
+}

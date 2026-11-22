@@ -560,10 +560,12 @@ def test_the_shipped_cases_name_the_skills_they_judge(nirmaan_org):
     assert named == {
         "dv/cocotb-crc": ("directed_testing", "python_verification"),
         "dv/coverage-irq-ctrl": ("code_coverage",),
+        "dv/coverage-tick-timer": ("code_coverage",),
         "dv/directed-irq-ctrl": ("directed_testing", "systemverilog"),
         "dv/formal-credit-counter": ("formal_verification", "sva", "assertion_coverage"),
         "dv/formal-rr-arbiter": ("formal_verification", "sva", "assertion_coverage"),
         "dv/plan-irq-ctrl": ("verification_planning",),
+        "dv/plan-tick-timer": ("verification_planning",),
         "dv/prove-deep-counter": ("model_checking",),
         "dv/random-crc": ("directed_testing", "constrained_random"),
         "dv/equiv-gray": ("equivalence_checking",),
