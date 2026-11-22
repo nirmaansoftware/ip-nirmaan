@@ -44,26 +44,46 @@ own reasoning; a line marked "gate" names the repository code that backs it.
 - Both sides must be elaborated to the same top and in comparable form. The
   getting-started example reads each version, runs `prep -top` on both, and
   turns a register file into flip-flops with `memory_map` [EqyQuick].
-- eqy matches signals of the two designs by name and cuts the combined design
-  into partitions at the matched points; each partition is proved on its own
-  [EqyConfig] [EqyQuick]. A signal that matches nothing proves nothing about
-  that signal (inference).
-- `[collect]` sections group bits that belong together, such as a register file
-  or an immediate field, into one partition [EqyConfig] [EqyQuick]. `[match]`
-  sections give name rules where synthesis renamed a signal, and `[recode]`
-  sections give the state encodings when a tool recoded an FSM [EqyConfig].
+- eqy matches net names in the gold design to net names in the gate design,
+  and `[match]` sections give the rules for that [EqyConfig]. It partitions the
+  design, and a strategy proves partitions equal [EqyConfig] [EqyStrat]. The
+  getting-started run reports how many partitions failed (1 of 44 in its
+  example) and names the failing one [EqyQuick]. A signal that matches nothing
+  proves nothing about that signal (inference).
+- `[collect]` sections group bits from matched nets into small related circuits
+  that belong in the same partition, and the getting-started example groups a
+  register file and joins the bits of immediate fields [EqyConfig] [EqyQuick].
+  `[recode]` sections give the state encodings when a synthesis tool recoded an
+  FSM [EqyConfig].
+- The gate takes only the Yosys commands in its allow list in `[gold]`, `[gate]`
+  and `[script]`: `read`, `read_verilog`, `verilog_defaults`, `verilog_defines`,
+  `hierarchy`, `prep`, `proc`, `flatten`, `opt`, `opt_clean`, `opt_expr`,
+  `opt_merge`, `chparam`, `setparam`, `setattr`, `memory`, `memory_nordff`,
+  `memory_map`, `async2sync`, `dffunmap`, `clk2fflogic`, `chformal`, `rename`,
+  `check`, `wreduce` and `peepopt`. Any other command is refused, among them
+  `abc`, `sat`, `sim`, `select` and `show` (gate:
+  src/nirmaan/integrations/eda_guard.py:190-194, refused at 247-249; test:
+  tests/test_gate_inputs.py::test_the_yosys_allow_list_writes_nothing_and_runs_nothing).
+  So write the two scripts from these commands, even where the config page
+  shows others.
+- The gate takes only these sections: `[options]`, `[gold]`, `[gate]`,
+  `[script]`, `[match]`, `[collect]`, `[partition]`, `[recode]` and `[strategy]`
+  (gate: eda_guard.py:364, refused at 389-391). Under `[options]` it takes only
+  `splitnets` or `insbuf`, each `on` or `off`; any other option line is refused
+  (gate: eda_guard.py:367, refused at 396-397). The config page lists only
+  `splitnets` [EqyConfig].
 - A `[strategy]` section picks how partitions are proved. The `sat` strategy
   runs a k-induction proof with Yosys's own `sat` command; it is quick for
-  small partitions, cannot prove some partitions equal, and does not apply to
-  partitions with memories. The `sby` strategy always uses SymbiYosys in prove
-  mode, with a chosen engine and solver, and is the more general choice
-  [EqyStrat]. `depth` is the unrolling the proof may use [EqyStrat].
+  small and simple partitions, cannot prove some partitions equal, and does not
+  apply to partitions with memories. The `sby` strategy always uses SymbiYosys
+  in prove mode, with a chosen engine and solver, and the page calls it very
+  versatile and a good default choice [EqyStrat]. `depth` is the unrolling the proof may use [EqyStrat].
 - The gate restricts what a `[strategy]` may say: `use` is `sat` or `sby`,
   `depth` and `timeout` are plain numbers, `xprop` is `on` or `off`, and a
   strategy's `option` lines are refused (gate:
   src/nirmaan/integrations/eda_guard.py:371-376). An `engine` line takes only
   `smtbmc`, `abc`, `btor`, `aiger` or `none`, each with a fixed set of solver
-  words (gate: eda_guard.py:277-293).
+  words (gate: eda_guard.py:277-298).
 - eqy interprets gold with Yosys's three-valued semantics and gate with
   two-valued semantics in which each unknown bit is an arbitrary value, and the
   miter treats an unknown gold output as equal to any gate value [EqyX].
@@ -72,8 +92,9 @@ own reasoning; a line marked "gate" names the repository code that backs it.
 
 - `equivalence.run` takes the setup in `eqy`, and optionally the RTL it must
   read in `sources` (gate: src/nirmaan/company/tools.py:172-176).
-- A setup is refused, and nothing runs, when a script line reaches outside
-  Yosys (a shell, `exec`, `tcl`, `python`, `script`, `plugin`), when a script
+- A setup is refused, and nothing runs, when a script line uses a Yosys command
+  outside the allow list under "How a setup is written", among them one that
+  reaches outside Yosys (a shell, `exec`, `tcl`, `python`, `script`, `plugin`), when a script
   writes a file (`write_*`, `tee`, `dump`), when `[gold]` or `[gate]` is
   missing, when the two scripts are the same so that a design is compared with
   itself, or when it reads a file by an absolute path, outside its own folder,
@@ -96,12 +117,19 @@ own reasoning; a line marked "gate" names the repository code that backs it.
 
 - For a partition that holds state, such as a register, prefer the `sby`
   strategy over `sat`: `sat` is described as quick but unable to prove some
-  partitions, while `sby` is the more general choice [EqyStrat]. Choose the
+  partitions, while `sby` is called very versatile and a good default choice
+  [EqyStrat]. Choose the
   engine from the gate's allow list above and a `depth` from the design and
   the sources, not from a fixed number in this document.
 - A `sat` pass is weaker evidence for a register partition than an `sby`
-  pass (inference). The eqy pages in the sources do not state strategy order
-  for a proved partition, so list the stronger strategy first, or only.
+  pass (inference). The strategies page says that when a `timeout` is reached,
+  or a `dummy` strategy runs, "the next strategy" is tried [EqyStrat]; it does
+  not say how strategies are ordered. Reading the file's order as the order
+  (inference, which the test
+  tests/test_dv_crc_gray_evals.py::test_a_sby_strategy_listed_after_sat_is_not_reached_when_sat_proves_the_partition
+  confirms for `sat` first), list the stronger strategy first, or only. A
+  `timeout` on it would hand the partition to a weaker one listed after
+  (inference).
 - The seat cannot mutation-test its own setup: one setup is submitted per run
   (inference). The mutation check under "How a result is checked" is therefore the
   reviewer's, not a step the seat can take.
@@ -117,7 +145,7 @@ own reasoning; a line marked "gate" names the repository code that backs it.
   the same check, which compares scripts and not file names). Naming only the
   original leaves nothing to compare.
 - Comparing before elaborating to the same top, or with different parameters,
-  so the signal names do not line up.
+  so the signal names do not line up (inference).
 - A setup that proves a few matched points while the output cone is unmatched.
   The gate counts partitions, not outputs, so read which partitions were
   proved (inference).
@@ -131,7 +159,10 @@ own reasoning; a line marked "gate" names the repository code that backs it.
   (tests/test_dv_crc_gray_evals.py::test_a_sat_strategy_passes_the_wrong_flip_mutant_that_the_sby_strategy_fails).
   See "A partition that holds state".
 - Missing recode or match rules after synthesis changed an FSM encoding or a
-  name, which leaves partitions that cannot be proved [EqyConfig].
+  name. The config page says recode sections exist for tools that change
+  encodings, and that without a fallback line unlisted gold values can make a
+  partition fail [EqyConfig]. That a missing recode or match rule leaves
+  partitions that cannot be proved is this document's reasoning (inference).
 - A bug in gold carried into gate, which equivalence cannot see.
 
 ## How a result is checked
