@@ -242,7 +242,8 @@ section 7). **This gate changed without a fingerprint change:** `eda_guard`
 is in the shared tools' backends, which no fingerprint digests, so a record's
 fingerprint does not say whether it ran; a refusal names the form in its
 summary. Every committed fixture, reference answer and held-out test passes
-it, and no committed trial's re-judge changes.
+it. The history scan has not been re-run on this head, so whether a committed
+trial's re-judge changes is not recorded.
 
 ---
 

@@ -309,9 +309,9 @@ relative path, and Verilator opens it. Each rule has a unit test, an ordinary
 file using every allowed form passes, and so do escaped names of the forms
 Yosys writes, a scan netlist from `dft.scan_insert` made in the test, and a
 committed one (`tests/fixtures/screen_pass/rr_arbiter_scan.v`). Every
-committed Verilog and C file still passes, and
-the history scan of section 3 refuses the same seat files as without the
-repair: no committed trial's re-judge changes.
+committed Verilog and C file under `tests/fixtures` and `evals` still passes.
+The history scan of section 3 has not been re-run on this head, so nothing
+here says whether a committed trial's seat files would now be refused.
 
 What is claimed: the check refuses, before any step, the forms its recorded
 fixtures name. What is not: that its reading matches any tool's
