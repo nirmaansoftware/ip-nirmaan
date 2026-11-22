@@ -1,0 +1,14 @@
+[options]
+mode prove
+depth 12
+
+[engines]
+smtbmc
+
+[script]
+read -formal rr_arbiter.v rr_arbiter_check.sv
+prep -top rr_arbiter_check
+
+[files]
+rr_arbiter.v
+rr_arbiter_check.sv
