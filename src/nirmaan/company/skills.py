@@ -499,7 +499,15 @@ SKILLS: list[Skill] = [
     sk("failure_triage", "Failure triage", "verification", "debug", provides=("debug.triage",),
        tools=("veritriage.investigate", "veritriage.explain_log", "simulator.run"), packs=("uvm", "sva"),
        docs=("verification/failure_triage",),
-       procedures=("Run VeriTriage over the failing artifacts.", "Classify with evidence, not intuition."),
+       procedures=("Run VeriTriage over the failing artifacts.", "Classify with evidence, not intuition.",
+                   # M71 granted simulator.run for the repro gate; the gate reads the M53 verdict
+                   # (docs/REPRO_GATES.md, docs/GATE_INTEGRITY.md), so the card names it, as rtl_design's does.
+                   "Write each repro as a self-checking testbench that counts its checks, and end it with its "
+                   "verdict, printed once just before $finish: read the run's nonce with "
+                   "$value$plusargs(\"nirmaan_nonce=%s\", nonce) into a reg [8*64-1:0], then "
+                   "$display(\"NIRMAAN-SIM %0s %0d passed, %0d failed\", nonce, passed, failed). The repro gate "
+                   "(simulator.run with expect=fail) counts a run only when it builds, reaches $finish, and prints "
+                   "that one verdict with the run's nonce and at least one failed check."),
        fails=("Classifying from the first error line only.",),
        valid=("Triage cites a VeriTriage session and its evidence nodes.",)),
     sk("log_analysis", "Log analysis", "verification", "debug", provides=("debug.triage",),
