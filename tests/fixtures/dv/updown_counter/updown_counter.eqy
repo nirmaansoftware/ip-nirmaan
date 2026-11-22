@@ -1,0 +1,13 @@
+# RX-E1: the up/down counter (gold) against its refactor (gate).
+[gold]
+read_verilog -sv updown_counter.v
+prep -top updown_counter
+
+[gate]
+read_verilog -sv updown_counter_refactor.v
+prep -top updown_counter
+
+[strategy sby]
+use sby
+engine smtbmc
+depth 10
