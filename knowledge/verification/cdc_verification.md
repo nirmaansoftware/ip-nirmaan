@@ -51,7 +51,7 @@ sources are vendor or single-author papers; their claims are the authors'.
 
 ## Failure modes to look for in the RTL
 
-Each is a case [GIN] reports, with its fix; the author met them while teaching, working with design teams and reviewing papers.
+Each is a case [GIN] reports, with its fix; the author met them while teaching, working with design teams and reviewing papers, and one is a published example from an FPGA vendor.
 
 - No synchroniser at all. The designer judged the failure rate too low, or
   the receiver clock much faster. Simulation can hide it by assuming clock
