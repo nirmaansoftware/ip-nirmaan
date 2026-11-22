@@ -255,8 +255,11 @@ def test_an_active_unit_backed_by_a_tool_judged_case_passes():
 GROUPING = ("verification.methodology", "verification.dynamic", "verification.formal", "verification.debug")
 
 
-def _unbacked(mutate=None):
-    return unbacked_active_units(_build(mutate), load_cases(REPO / "evals"))
+def _unbacked(mutate=None, uncased=None):
+    """``uncased``: a skill to treat as named by no eval case, so a fixture that needs an unbacked skill does not
+    depend on which real skills happen to lack a case today."""
+    cases = [c for c in load_cases(REPO / "evals") if uncased not in c.skills]
+    return unbacked_active_units(_build(mutate), cases)
 
 
 def test_the_four_verification_departments_pass_as_grouping_units(nirmaan_org):
@@ -322,7 +325,7 @@ def test_n7_a_grouping_unit_over_an_unbacked_new_unit_fails():
         _add(d, "verification.fixture", UnitKind.DEPARTMENT, "verification")
         _add(d, "verification.fixture.team", UnitKind.TEAM, "verification.fixture", skills=("functional_coverage",))
 
-    assert _unbacked(mutate) == [
+    assert _unbacked(mutate, uncased="functional_coverage") == [
         "verification.fixture: ACTIVE child verification.fixture.team neither frozen nor backed",
         "verification.fixture.team: own skill, not backed",
     ]

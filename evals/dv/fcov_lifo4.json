@@ -1,0 +1,68 @@
+{
+  "id": "dv/fcov-lifo4",
+  "request": "Prepare the lifo4 stack block for verification signoff: close its functional coverage with a coverage model written from the approved requirement matrix.",
+  "seat": "coverage-closure",
+  "skills": [
+    "functional_coverage"
+  ],
+  "expected_behavior": "A functional coverage model of the lifo4 stack, one SystemVerilog module lifo4_fcov with the ports the approved requirement matrix gives, delivered as the coverage report. It plans one bin for every scenario the matrix names (the nine crosses of operation and occupancy, the five occupancies and a reset while the stack holds a word), reports how many it plans and how many are not yet hit, and states at its top each planned bin and each exclusion with its reason. The model is judged by the held-out stimulus: with every scenario driven, it reports no hole and plans at least fifteen bins; with the stimulus missing any one scenario, it reports a hole, so the stimulus run fails. A model that never reports a hole, or that has written a reachable bin out, does not tell the stimuli apart.",
+  "constraints": [
+    "Work only from the approved requirement matrix: plan each bin from a scenario it names, not from what the RTL happens to do.",
+    "Deliver one SystemVerilog file in the artifact kind coverage_report: a module lifo4_fcov whose ports are exactly the ones the matrix gives, sampling at the rising edge of clk the port values just before it.",
+    "Keep every bin in the model; an exclusion needs a written reason, and the matrix names no scenario the stack cannot reach.",
+    "Write the closure statement as comments at the top of the file: each planned bin and each exclusion."
+  ],
+  "known_failure_modes": [
+    "A model whose holes output is constant zero, or whose bins are true by construction: it passes every stimulus, including the ones that skip a scenario, so the control sees a surviving mutant.",
+    "A model that writes a reachable bin out of the plan (the refused push, the pop from an empty stack or the push and pop together at either end), which hides a hole behind an exclusion the matrix does not allow.",
+    "A model with a bin that can never be hit (an occupancy of 5, or a cross that needs a state the ports do not show): the clean run reports a hole and fails.",
+    "A model that samples after the edge instead of before it, so every cross sees the stack one cycle late and a bin is never hit.",
+    "A model that counts a bin hit during reset, or ignores the reset scenario, so the reset bin is hit by nothing or by everything.",
+    "A model that plans fewer than fifteen bins, or whose planned output does not match the bins it tracks."
+  ],
+  "upstream": {
+    "plan-audit": [
+      {
+        "path": "tests/fixtures/dv/lifo4/traceability_matrix.md",
+        "kind": "traceability_matrix"
+      }
+    ]
+  },
+  "reference": [
+    {
+      "path": "tests/fixtures/dv/lifo4/fcov/lifo4_fcov_model.sv",
+      "kind": "coverage_report"
+    }
+  ],
+  "held_out": [
+    {
+      "name": "The seat's coverage model reports no hole when the stimulus drives every scenario, and reports a hole for each stimulus that skips one",
+      "scorer": "must-fail",
+      "tool": "coverage.read",
+      "params": {
+        "top": "lifo4_fcov_tb"
+      },
+      "seat_files": {
+        "sources": [
+          "coverage_report"
+        ]
+      },
+      "case_files": {
+        "sources": [
+          "tests/fixtures/dv/lifo4/lifo4.v",
+          "tests/fixtures/dv/lifo4/fcov/lifo4_fcov_tb.sv"
+        ]
+      },
+      "mutants": {
+        "tests/fixtures/dv/lifo4/fcov/lifo4_fcov_tb.sv": [
+          "tests/fixtures/dv/lifo4/mutants/lifo4_fcov_tb_no_underflow.sv",
+          "tests/fixtures/dv/lifo4/mutants/lifo4_fcov_tb_no_both_empty.sv",
+          "tests/fixtures/dv/lifo4/mutants/lifo4_fcov_tb_no_overflow.sv",
+          "tests/fixtures/dv/lifo4/mutants/lifo4_fcov_tb_no_both_full.sv",
+          "tests/fixtures/dv/lifo4/mutants/lifo4_fcov_tb_no_both_mid.sv",
+          "tests/fixtures/dv/lifo4/mutants/lifo4_fcov_tb_no_reset_busy.sv"
+        ]
+      }
+    }
+  ]
+}
