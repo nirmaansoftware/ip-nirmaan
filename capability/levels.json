@@ -482,6 +482,18 @@
         }
       ]
     },
+    "cdc_verification": {
+      "knowledge": {
+        "check_record": null,
+        "counts": false,
+        "knowledge_document": "knowledge/verification/cdc_verification.md",
+        "problems": [
+          "no check record"
+        ]
+      },
+      "level": null,
+      "practised": []
+    },
     "code_coverage": {
       "knowledge": {
         "check_record": "capability/records/knowledge/code_coverage.json",
@@ -748,6 +760,7 @@
           "n": 8,
           "passed": 0,
           "reasons": [
+            "stale: the skill card or document changed after these trials",
             "Wilson lower bound 0.000, under 0.5"
           ],
           "records": [
@@ -763,6 +776,18 @@
           "unjudged": 8
         }
       ]
+    },
+    "formal_coverage": {
+      "knowledge": {
+        "check_record": null,
+        "counts": false,
+        "knowledge_document": "knowledge/verification/formal_coverage.md",
+        "problems": [
+          "no check record"
+        ]
+      },
+      "level": null,
+      "practised": []
     },
     "formal_verification": {
       "knowledge": {
