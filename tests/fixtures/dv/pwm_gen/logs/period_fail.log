@@ -1,0 +1,2 @@
+ERROR: pwm_gen_regress_tb.v:39: period: rising edges 7 clocks apart, expected 8
+pwm_gen_regress_tb.v:51: $finish called at 105000 (1ps)
