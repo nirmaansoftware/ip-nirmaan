@@ -1,0 +1,89 @@
+{
+  "id": "debug/triage-pwm-gen",
+  "request": "Triage the three failing pwm_gen tests in the nightly regression and write a repro for each failure.",
+  "seat": "triage",
+  "skills": [
+    "failure_triage"
+  ],
+  "expected_behavior": "A triage report that sorts the three failing logs into three buckets, and one reproducing testbench per bucket, each failing on the RTL under investigation under simulator.run with expect=fail. The block, pwm_gen (a pulse-width modulator with a period of eight clocks and a duty input), carries three independent defects: the output is high one clock longer than the duty, the period is seven clocks instead of eight, and the duty input is not held for the period, so a change in the middle of a period raises the output again. Each repro fails on its own defect and on nothing else, passes on the fixed RTL, and is judged on its own: one repro that fails all three defects cannot stand for three buckets.",
+  "constraints": [
+    "Work from the RTL under investigation and the failing logs; one bucket per distinct defect, not per log line.",
+    "Write one self-checking testbench per bucket, each reproducing on its own against the RTL under investigation, and each printing its one verdict line just before $finish: read the run's nonce from the plusarg the simulation gate passes and print it with the counts, in the form the gate reads.",
+    "Check the behaviour the specification states (pulse width, period, duty sampled once per period), not the buggy RTL's output, and keep each repro narrow so it does not also fail on another bucket's defect."
+  ],
+  "known_failure_modes": [
+    "Merging the three failures into one bucket, or splitting one by log line, so the number of repros does not match the number of defects.",
+    "A single repro that checks pulse width, period and the mid-period change together and so fails on all three defects; the must-fail-each check cannot match it to three seeded bugs and fails it.",
+    "A repro that passes on the RTL under investigation (for example a duty change made while the pulse is still high, or a duty that does not change); the repro gate refuses it before review.",
+    "A repro that fails the fixed RTL, because it expects the duty to take effect at once or counts the pulse from a different clock; the clean run of the control fails it.",
+    "A repro that fails on a build error or never finishes (for example one that waits for a rising edge that the defective output never makes), which the gate does not count as a reproduction."
+  ],
+  "upstream": {
+    "design-under-investigation": [
+      {
+        "path": "tests/fixtures/dv/pwm_gen/pwm_gen_buggy.v",
+        "kind": "rtl_source",
+        "entry": "pwm_gen"
+      }
+    ]
+  },
+  "reference": [
+    {
+      "path": "tests/fixtures/dv/pwm_gen/triage_report.md",
+      "kind": "triage_report"
+    },
+    {
+      "path": "tests/fixtures/dv/pwm_gen/pwm_gen_repro_pulse_width.v",
+      "kind": "testbench",
+      "entry": "pwm_gen_repro_pulse_width"
+    },
+    {
+      "path": "tests/fixtures/dv/pwm_gen/pwm_gen_repro_period.v",
+      "kind": "testbench",
+      "entry": "pwm_gen_repro_period"
+    },
+    {
+      "path": "tests/fixtures/dv/pwm_gen/pwm_gen_repro_duty_update.v",
+      "kind": "testbench",
+      "entry": "pwm_gen_repro_duty_update"
+    }
+  ],
+  "inputs": {
+    "triage": {
+      "paths": [
+        "tests/fixtures/dv/pwm_gen/logs/pulse_width_fail.log",
+        "tests/fixtures/dv/pwm_gen/logs/period_fail.log",
+        "tests/fixtures/dv/pwm_gen/logs/duty_update_fail.log"
+      ]
+    }
+  },
+  "held_out": [
+    {
+      "name": "Each repro passes the fixed pwm_gen, and each seeded defect fails a repro of its own",
+      "scorer": "must-fail-each",
+      "tool": "simulator.run",
+      "seat_files": {
+        "sources": [
+          "testbench"
+        ]
+      },
+      "seat_entries": {
+        "top": [
+          "testbench"
+        ]
+      },
+      "case_files": {
+        "sources": [
+          "tests/fixtures/dv/pwm_gen/pwm_gen.v"
+        ]
+      },
+      "mutants": {
+        "tests/fixtures/dv/pwm_gen/pwm_gen.v": [
+          "tests/fixtures/dv/pwm_gen/mutants/pwm_gen_wide_pulse.v",
+          "tests/fixtures/dv/pwm_gen/mutants/pwm_gen_short_period.v",
+          "tests/fixtures/dv/pwm_gen/mutants/pwm_gen_live_duty.v"
+        ]
+      }
+    }
+  ]
+}
