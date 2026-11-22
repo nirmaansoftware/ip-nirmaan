@@ -1,6 +1,6 @@
 # The tools a live evaluation runs with (.github/workflows/live-eval.yml), the same for a replay,
 # live trials and the re-judge: Python 3.12, the open-source EDA tools (and acl, which the seat
-# account's grants use), SymbiYosys and Yices from the pinned OSS CAD Suite, Claude Code from
+# account's grants use), SymbiYosys, Yices and eqy from the pinned OSS CAD Suite, Claude Code from
 # .github/live-eval (npm ci checks each package against the sha512 in its lockfile), and the
 # package with the cocotb extra. It takes no secret. With `whole_flow: "true"` (a `flow/` case, G3 council record
 # 2026-11-17, decision 4: both whole-flow cases run on one tool set) it also installs the RISC-V cross compiler
@@ -29,12 +29,14 @@ runs:
         sudo apt-get install -y gcc-riscv64-unknown-elf
         riscv64-unknown-elf-gcc --version | head -1
         riscv64-unknown-elf-gcc -print-multi-lib | grep rv32i/ilp32
-    - name: Install SymbiYosys and Yices (OSS CAD Suite 2026-09-28)
+    - name: Install SymbiYosys, Yices and eqy (OSS CAD Suite 2026-09-28)
       uses: ./.github/actions/oss-cad-suite
       with:
-        tools: sby yices-smt2
-        # Root's, outside the runner's temporary folder, which the seat account may not read: sby runs as that
-        # account in these jobs (gate ET2, council/records/2026-11-22-eda-tools-seat-account.md).
+        # eqy judges the equivalence cases, as in CI's test job (gate W2C3,
+        # council/records/2026-11-23-wave-2-close-meeting-1.md).
+        tools: sby yices-smt2 eqy
+        # Root's, outside the runner's temporary folder, which the seat account may not read: sby and eqy run as that
+        # account in these jobs (gate ET2, council/records/2026-11-22-eda-tools-seat-account.md; gate W2C3).
         root: /opt
     - name: Install Claude Code
       shell: bash

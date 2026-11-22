@@ -373,6 +373,38 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   every account may read outside the probed targets, a fault in a tool's own
   parser beyond what the account may reach, and the builds that stay with
   the runner.
+- **eqy, and the coverage run's model, run as the account too** (gates W2C3
+  and W2C4 of `council/records/2026-11-23-wave-2-close-meeting-1.md`). The
+  jobs install `eqy` from the same pinned OSS CAD Suite as CI's test job, and
+  the same action wraps it beside the others: `equivalence.run` copies the
+  setup and the files it reads into the run's directory, and eqy, with the
+  Yosys, SBY and solvers it starts, reads the copies there as `nirmaan-seat`.
+  `coverage.read` builds seat HDL into a Verilator model and runs it. The
+  build is the one Verilator model build that runs as the account (its
+  `--coverage-line` flag, which only that backend passes, is in the stated
+  rule beside `--lint-only`; every other model build stays with the runner
+  until gate ET9). The model it built is started by path, so it has a
+  wrapper of its own, `nirmaan-seat-model`, which the harness starts as
+  `nirmaan-seat-model RUN_DIR PROGRAM ARGS` where the job names the wrappers
+  (`nirmaan.integrations.eda.seat_model`; not falling back, as for the
+  others). It runs the program as the account, with `no_new_privs` and an
+  empty environment, in a view of its own that holds the run's own directory
+  and nothing else of its `/tmp/nirmaan-*` folder; the program must be one
+  the runner built inside that directory. The two `verilator_coverage` steps
+  after it stay with the runner: they read only the data file the backend
+  names in the run's directory, and a fault in that tool's parser is the
+  residual the meeting's decision 4 accepts. The reach test probes eqy
+  through `equivalence.run` like the other tools, and `coverage.read` with a
+  control and two probes per target: the design includes the target, so the
+  build must fail with Verilator's own message that it could not open it,
+  and the testbench opens the target with `$fopen` while the model runs, so
+  the model must print that it could not open it. Beside the three targets
+  above, these probes add a canary placed beside the run's directory in its
+  folder (readable by every account by its mode), with the run's directory
+  inside a folder of the sandbox's kind, so the account is given passage
+  through that folder and only the view keeps the canary from it. The probes
+  of eqy and `coverage.read` also bypass that gate's own check of its
+  sources, inside the probe's process only, and say so.
 - **Seat C runs as the account too (M90).** `fw.test` runs the program it
   builds (the seat's C linked with the harness and the Verilated model) by
   path, not through `PATH`, so it has a wrapper of its own:
