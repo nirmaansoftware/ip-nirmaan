@@ -677,6 +677,43 @@ Each skill is one the seat's role holds and one the held-out judge exercises.
 Adding the field changes every case digest; no run record is committed, so no
 recorded trial becomes incomparable.
 
+## 6. Named exceptions to "Practising skills have evals"
+
+A skill computes as practising when one of its tools is available
+(`skill_tier`, `docs/KNOWLEDGE_FILES.md`). The wave 2 (Verification) exit
+asks that every such skill of the Verification division has an eval case that
+names it (`EvalCase.skills`), except the skills below. The list is closed.
+`tests/test_practising_skills_have_cases.py` fails when a Verification skill
+that computes as practising has no case and is not in the first table, when a
+skill in the first table gains a case or stops computing as practising (the
+entry is then removed in the same change), and when this section and the test
+disagree. Adding a skill here is therefore a change to the test and to this
+page, in a pull request that Verification reviews; it is never a side effect of
+adding a skill.
+
+The three skills of the first table are recorded as "tool available, no eval case, not measured, at Knowledge". None is a Practising capability, and none
+is described as one. The second column says what an honest case would need
+before a case can name the skill.
+
+| Skill | Needs before a case can name it |
+|---|---|
+| log_analysis | a workflow stage or refinement that plans it for a seat that reads logs |
+| regression_management | a bound `regression.run` that a gate can judge |
+| regression_intelligence | a database for the triage binding, history on, a history seeded per trial, and a test that one trial's history cannot reach another's |
+
+The second and third change the default harness fingerprint, so they are built
+with a later wave's batch and return to the council before they merge.
+
+Three more skills are named exceptions of a different kind, and are labelled
+so wherever they are counted. They are not in the closed list above, because
+none of them is a practising skill without a case:
+
+| Skill | Exception |
+|---|---|
+| waveform_debug | knowledge only; no knowledge document, because no source was found that an agent may read in full |
+| systemverilog | practised by trials of `dv/directed-irq-ctrl`; no knowledge document, because the language standard is a source the founder would have to obtain |
+| security_verification | leaves the Verification wave for the Security wave |
+
 ## Laws and tests
 
 - The evaluation package still names no stage, tool, artifact kind, or role
