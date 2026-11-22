@@ -404,7 +404,7 @@ path:
 - `src/nirmaan/evals/levels.py` and `scripts/capability_levels.py` already find manifests at any depth and list
   records by path; a test now covers two same-named records in two slot folders.
 
-## 16. Dated addition (2026-11-22): the second question of section 14 is settled by a council record
+## 17. Dated addition (2026-11-22): the second question of section 14 is settled by a council record
 
 Section 14 says the second question (the runner-account tools over seat files, with the `eda_guard` screen as the
 only control) is settled by those tools running as the seat account with a recorded reach test, or by a council
@@ -436,7 +436,8 @@ read lists, for each passed trial, whether a seat HDL file holds an include, cha
 beyond the four groups. The measured run of section 10 is made after the last of these merges.
 
 **The first question of section 14** (a seat that declares a `formal_spec`) is settled separately, by a test, in a
-pull request of its own (ip#435, open when this was written). The record's decision 5 says what follows for SBY
+pull request of its own (ip#435, open when this was written; its dated addition takes the number 16, which is why
+this section is 17). The record's decision 5 says what follows for SBY
 under each result of that test: if the test on `main` shows that the formal gates run over a seat's setup on the timer
 path, `sby` is among the tools that run as the seat account before slot 1 (gates ET1 to ET3), and whatever section 12
 says of the formal gates' logs is restated by the plan amendment of gate ET6.
