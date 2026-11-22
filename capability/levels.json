@@ -775,14 +775,12 @@
     },
     "formal_coverage": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/formal_coverage.json",
+        "counts": true,
         "knowledge_document": "knowledge/verification/formal_coverage.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     },
     "formal_verification": {
@@ -1126,26 +1124,22 @@
     },
     "regression_intelligence": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/regression_intelligence.json",
+        "counts": true,
         "knowledge_document": "knowledge/verification/regression_intelligence.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     },
     "regression_management": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/regression_management.json",
+        "counts": true,
         "knowledge_document": "knowledge/verification/regression_management.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     },
     "reset_design": {
@@ -1553,7 +1547,7 @@
     }
   },
   "totals": {
-    "knowledge": 23,
+    "knowledge": 26,
     "practised": 17,
     "proven": 0
   },

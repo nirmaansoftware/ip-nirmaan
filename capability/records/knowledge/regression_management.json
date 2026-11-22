@@ -1,0 +1,66 @@
+{
+  "format": "nirmaan.knowledge-check",
+  "skill": "regression_management",
+  "knowledge_document": "knowledge/verification/regression_management.md",
+  "document_sha256": "sha256:cea5be2e00b2872082ec0f95a237f1896f3e4c8a92642341acd94929763f348c",
+  "writer": "RX-K2 session (wave 2 close, 2026-11-22)",
+  "checker": "RX-C session (lane RX-C, wave 2 close independent check, 2026-11-22)",
+  "sources_read": [
+    "[COCO] cocotb.regression source listing, development build 2.2.0.dev49: the whole listing, https://docs.cocotb.org/en/latest/_modules/cocotb/regression.html",
+    "[OTDV] lowRISC OpenTitan Design Verification Methodology (doc/ug/dv_methodology/index.md), read through the mirror of commit e7bc9e2f named in the document: the whole page, https://opensecura.googlesource.com/3p/lowrisc/opentitan/+/e7bc9e2fbbda697cb190ca166e331799ce1c1d01/doc/ug/dv_methodology/index.md",
+    "[POU] Poulos and Veneris, Clustering-based Failure Triage for RTL Regression Debugging, ITC 2014: the whole paper to its references, https://www.eecg.utoronto.ca/~veneris/itc14.pdf",
+    "[PHO] Phogat and Hamilton, mL: Shrinking the Verification volume using Machine Learning, DVCon proceedings: the whole paper to its references, https://dvcon-proceedings.org/wp-content/uploads/1090-1.pdf",
+    "Repository code at the lines cited in gate_claims; tests/test_knowledge_files.py and tests/test_knowledge_gate_claims.py run and passing"
+  ],
+  "result": "every claim tagged with a source was found in that source (COCO: seed is base seed plus the SHA-1 of the test's full name, generators re-seeded at start and state restored at the end, base seed in the results file for passed, expected-fail, failed and failed-to-start tests, a failed test writes the base seed to system-err, name filters, shuffle by COCOTB_RANDOM_TEST_ORDER, COCOTB_MAX_FAILURES default 0, COCOTB_RESULTS_FILE; OTDV: sanity, nightly with 100 arbitrarily chosen seeds, random seeds, LSF farm, merged coverage, dashboard mapping tests to planned tests, overnight and triage next morning, weekly fallback, 100 percent nightly pass rate as key to verification complete, designer sign-off of coverage exclusions with annotated reasons, Xprop mandatory for coverage closure regressions, GitHub issue tracker; POU and PHO as in regression_intelligence), every line marked inference is a fair reading, and every sentence about the repository matches the code at the lines cited in gate_claims",
+  "notes": [
+    "OTDV, one wording point: the document says the sanity regression 'runs daily from a scheduled job on the main branch'; the page says a daily cron job run locally on the up-to-date master branch. The branch name is the project's own and the document gives no gate or test that depends on it. Reported to the owner, no effect on the Knowledge reading.",
+    "OTDV: 'waivers signed off by the designer and carrying a stated reason' joins two exclusion rules of the page (designers must sign off exclusions in a PR review; every exclusion needs an annotation explaining the waiver). Both are on the page and both are about waivers, so the join is faithful.",
+    "COCO: the results file carries the base seed (random_seed property), not the per-test seed; the document says base seed throughout, correctly.",
+    "The document's pointer to the failure triage document names knowledge/verification/failure_triage.md, which exists on main.",
+    "No held-out case detail appears; no em or en dash."
+  ],
+  "gate_claims": [
+    {
+      "claim": "the card lists two tools; regression.run is CONTRACT_ONLY so nothing here can launch or monitor a regression",
+      "evidence": "src/nirmaan/company/tools.py:135"
+    },
+    {
+      "claim": "CONTRACT_ONLY means nothing here can run it and the broker refuses it",
+      "evidence": "src/nirmaan/company/tools.py:5"
+    },
+    {
+      "claim": "the card's tools are regression.run and veritriage.investigate",
+      "evidence": "src/nirmaan/company/skills.py:496"
+    },
+    {
+      "claim": "veritriage.investigate is AVAILABLE and takes log file paths",
+      "evidence": "src/nirmaan/company/tools.py:112"
+    },
+    {
+      "claim": "the binding refuses no paths, a missing path and a directory, and makes one investigation over all the files",
+      "evidence": "src/nirmaan/integrations/veritriage.py:50"
+    },
+    {
+      "claim": "a directory is refused with a reason, tested",
+      "evidence": "tests/test_nirmaan_gate_integrity.py::test_veritriage_refuses_a_directory_cleanly"
+    },
+    {
+      "claim": "the card asks that no flaky test be ignored and that every failure be triaged or tracked",
+      "evidence": "src/nirmaan/company/skills.py:499"
+    },
+    {
+      "claim": "a workflow stage asks for regression results with failures triaged and names regression.run as its tool",
+      "evidence": "src/nirmaan/company/workflows.py:256"
+    },
+    {
+      "claim": "Practising tier line: veritriage.investigate is AVAILABLE",
+      "evidence": "src/nirmaan/company/tools.py:112"
+    },
+    {
+      "claim": "the cocotb seed, results-file and environment-variable behaviour is read from the development listing and marked to be re-checked per version; no gate stands behind a cocotb sentence",
+      "evidence": "unverified"
+    }
+  ],
+  "checked_at": "2026-11-22"
+}
