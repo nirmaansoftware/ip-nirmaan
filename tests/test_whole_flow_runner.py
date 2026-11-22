@@ -215,7 +215,7 @@ def _trial(*answers) -> EvalTrial:
 
 def test_the_whole_flow_stop_rule_reads_the_last_answer():
     limit = _trial(("a", None), ("b", None), ("", "hit your limit"))
-    assert flow_stopped(limit) and not no_model_answer(limit)  # the single-seat rule would not fire
+    assert flow_stopped(limit) and no_model_answer(limit)  # the single-seat rule reads the last answer too
     assert not flow_stopped(_trial(("a", None), ("b", None), ("c", None)))
     assert not flow_stopped(_trial(("a", None), ("", None)))  # no text but no error: an answer, however empty
     assert not flow_stopped(_trial())
