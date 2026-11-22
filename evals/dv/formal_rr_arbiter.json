@@ -1,0 +1,77 @@
+{
+  "id": "dv/formal-rr-arbiter",
+  "request": "Formally verify the existing round-robin arbiter RTL.",
+  "seat": "assertions-formal",
+  "skills": [
+    "formal_verification",
+    "sva",
+    "assertion_coverage"
+  ],
+  "expected_behavior": "A property file and a single-task SymbiYosys setup for the approved rr_arbiter RTL (three requesters, one-hot grant, a pointer register `last` that rotates to the granted requester, holds on an idle edge and loads 2 at reset), written from the approved interface specification, that proves every property in prove mode and reaches every cover under the proof gates before review, and fails on RTL that breaks any requirement of that specification.",
+  "constraints": [
+    "Work only from the approved interface specification and the approved RTL; never change the RTL or ship a file of the same name.",
+    "Use the SVA subset open Yosys reads: immediate assertions, assumptions and covers in always blocks, with $past; no implication or sequence operators.",
+    "Prove the rotation, not only the grant: the requester served yields to any other requester, and the pointer is checked, since the outputs show it only at the next grant."
+  ],
+  "known_failure_modes": [
+    "A proof that checks only the safety of one cycle (at most one grant, only to a requester, a grant when someone asks), so a fixed-priority arbiter that never rotates passes.",
+    "A proof that never looks at `last` or at the cycle after a grant, so a pointer that skips a requester, or is wrongly reset, hides until a later grant.",
+    "A proof that does not hold the pointer on an idle edge, so an arbiter that forgets who was served last when no one asks passes.",
+    "Covers that never reach three requesters at once with each of the three grants, so a proof whose assumptions block them looks complete.",
+    "A proof that cannot tell a fixed priority, a skipped requester in the rotation, a pointer reset on an idle edge or a wrong reset pointer from the approved RTL; the must-fail control fails it."
+  ],
+  "upstream": {
+    "interface-spec": [
+      {
+        "path": "tests/fixtures/dv/rr_arbiter/interface_spec.md",
+        "kind": "interface_spec"
+      }
+    ],
+    "design-under-test": [
+      {
+        "path": "tests/fixtures/dv/rr_arbiter/rr_arbiter.v",
+        "kind": "rtl_source",
+        "entry": "rr_arbiter"
+      }
+    ]
+  },
+  "reference": [
+    {
+      "path": "tests/fixtures/dv/rr_arbiter/rr_arbiter_check.sv",
+      "kind": "assertions"
+    },
+    {
+      "path": "tests/fixtures/dv/rr_arbiter/rr_arbiter_check.sby",
+      "kind": "formal_spec"
+    }
+  ],
+  "held_out": [
+    {
+      "name": "The seat's proof passes the approved RTL with every cover reached and fails each round-robin arbiter mutant",
+      "scorer": "must-fail",
+      "tool": "formal.run",
+      "cover_tool": "formal.cover",
+      "seat_files": {
+        "sby": [
+          "formal_spec"
+        ],
+        "sources": [
+          "assertions"
+        ]
+      },
+      "case_files": {
+        "sources": [
+          "tests/fixtures/dv/rr_arbiter/rr_arbiter.v"
+        ]
+      },
+      "mutants": {
+        "tests/fixtures/dv/rr_arbiter/rr_arbiter.v": [
+          "tests/fixtures/dv/rr_arbiter/mutants/rr_arbiter_fixed_priority.v",
+          "tests/fixtures/dv/rr_arbiter/mutants/rr_arbiter_skip_rotation.v",
+          "tests/fixtures/dv/rr_arbiter/mutants/rr_arbiter_idle_resets_pointer.v",
+          "tests/fixtures/dv/rr_arbiter/mutants/rr_arbiter_reset_pointer.v"
+        ]
+      }
+    }
+  ]
+}
