@@ -684,11 +684,13 @@
     "equivalence_checking": {
       "knowledge": {
         "check_record": "capability/records/knowledge/equivalence_checking.json",
-        "counts": true,
+        "counts": false,
         "knowledge_document": "knowledge/verification/equivalence_checking.md",
-        "problems": []
+        "problems": [
+          "stale: the document changed after its check"
+        ]
       },
-      "level": "knowledge",
+      "level": null,
       "practised": [
         {
           "cases": [
@@ -703,6 +705,7 @@
           "n": 8,
           "passed": 5,
           "reasons": [
+            "stale: the skill card or document changed after these trials",
             "Wilson lower bound 0.306, under 0.5"
           ],
           "records": [
@@ -1501,7 +1504,7 @@
     }
   },
   "totals": {
-    "knowledge": 24,
+    "knowledge": 23,
     "practised": 17,
     "proven": 0
   },
