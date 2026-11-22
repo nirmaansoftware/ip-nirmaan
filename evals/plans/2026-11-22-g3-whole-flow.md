@@ -417,4 +417,7 @@ read lists, for each passed trial, whether a seat HDL file holds an include, cha
 beyond the four groups. The measured run of section 10 is made after the last of these merges.
 
 **The first question of section 14** (a seat that declares a `formal_spec`) is settled separately, by a test, in a
-pull request of its own. The record's decision 5 says what follows for SBY under each result of that test.
+pull request of its own (ip#435, open when this was written). The record's decision 5 says what follows for SBY
+under each result of that test: if the test on `main` shows that the formal gates run over a seat's setup on the timer
+path, `sby` is among the tools that run as the seat account before slot 1 (gates ET1 to ET3), and whatever section 12
+says of the formal gates' logs is restated by the plan amendment of gate ET6.

@@ -369,6 +369,18 @@ no document claims anything for SBY on the timer path. If the way they are
 stopped is a change to a file in `harness.CODE`, it returns to the council
 before it merges (ai-engineer).
 
+The result, as far as it is known. After round 1 the other lane opened
+ip#435 (open when this was written, so not yet on `main`). Its test,
+`tests/test_whole_flow_reach.py`, replays the timer flow with a seat `.sby`
+declared as a `formal_spec`, and its pull request reports that the RTL stage
+then runs `formal.run` and `formal.cover` over the seat's setup and that a
+failed formal run's log excerpt returns to the seat on a retry. If that test
+merges with that result, the first branch above applies and every "if" on
+the formal gates in decisions 2 and 4 and in gates ET1 to ET3 is met: `sby`
+is wrapped, so SBY, Yosys under it and the solver run as the seat account
+over the seat's `.sby`, with their probes and fixtures, before slot 1. The
+build lane reads the test on `main`, not this paragraph.
+
 Owners: security (the wrapping and its probes); eda-tooling (the fixtures);
 qa-evidence (that no document claims anything for SBY if it cannot run, with
 gate ET8).
