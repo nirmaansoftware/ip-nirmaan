@@ -61,7 +61,8 @@ refused `$system`, `$fopen`, `$c` and DPI in every source.
   anywhere else (a link to a file or a folder of the host) is refused by
   the name it is included as, "leads outside the sandbox", and is never
   read (ip#309's follow-up).
-  Strings and comments are skipped. Which file may end a simulation or read a
+  Strings and comments are skipped, in a file written in forms every tool
+  splits into code, comments and strings the same way (section 7). Which file may end a simulation or read a
   plusarg is still the M53 testbench rule's matter. `simulator.run` and
   `test.run` take Verilog sources only.
 - **Yosys scripts** (a `.sby`'s `[script]`, an `.eqy`'s `[gold]`, `[gate]` and
@@ -220,3 +221,87 @@ on the development machine `harness_sha256()` was
 and the `tools-in-loop` variant's
 `sha256:d1fb57c9524e68570a38b7ce4b6ae5eacc48b2b54dcf22a235de44dc2664d067`,
 the same with and without this change.
+
+## 7. Where the check and a tool read the text differently (ET1)
+
+Council record `council/records/2026-11-22-eda-tools-seat-account.md`
+(decision 4, gate ET1). The checks of section 2 read a file's comments and
+strings with a regular expression of their own (`eda_guard._TEXT_RE`), and
+skip them; Icarus, Verilator and Yosys read them by their own rules. Where
+the two readings differ, text the check skipped is code to the tool. The
+record's fact 9 names two classes, found on a local machine during the
+meeting, and building the repair found more files of the same two:
+
+- **A comment or a string to the check, code to a tool.** An escaped
+  identifier holding a comment or quote mark (`\/*`, `\//`, `\"`), which
+  every tool reads as a name and the check as the start of a comment or a
+  string; a quote in a branch of `` `ifdef `` that is not taken (Icarus skips
+  that text without reading its strings, the check pairs the quote with a
+  later one); a quote left open on its line (Yosys reads a string on across
+  the line break); a block comment opened on a directive's line (Icarus ends
+  it there: `` `define C /* `` is "Unterminated comment in define", and after
+  `` `undef X /* `` the next lines are code).
+- **A name the preprocessor assembles.** A bare `$` before a macro
+  (`` $`N(...) ``, or `` `D`E `` with `D` defined as `$`), and a macro call glued
+  to the name after it: `` `P($write)memh(...) `` is `$writememh` to Icarus and
+  Verilator, and the check saw only `$write`, which it allows.
+
+With the check bypassed, the tools acted on these files: an include of a
+file outside the run, a `$readmemh` of one, or a `$writememh` to one.
+
+The repair (`_lexical`) is an allow list of forms; a file outside it is
+refused, with the reason, before any step runs:
+
+- every string closes on its own line; a quote that does not is refused;
+- no backslash outside a string but one that continues a line (so no escaped
+  identifier);
+- a conditional directive (`` `ifdef ``, `` `ifndef ``, `` `elsif ``,
+  `` `else ``, `` `endif ``) stands alone on its line, a `//` comment aside, and
+  none is inside a comment or a string;
+- a block comment that spans lines does not open on a directive's line or on a
+  line a backslash continues, and a macro call's arguments hold no comment;
+- no `$` that does not start a name, no macro glued to the name before it, no
+  macro call glued to the name after it, and no macro quote (`` `" ``,
+  `` `\ ``);
+- a backtick name with a lower case letter is a directive of `DIRECTIVES`
+  (so no `` `line ``, `` `uselib `` or `` `pragma ``) or a macro the run's own
+  files define; every directive of IEEE 1800 and of the three tools is lower
+  case but `` `__FILE__ `` and `` `__LINE__ ``, so a name with no lower case
+  letter is a macro;
+- no control character but tab, line feed, and a carriage return before a
+  line feed.
+
+A C source (a firmware driver in `sources`) is checked too. A C character
+literal (`'\0'`) breaks the first two rules, so a file with a suffix Verilator
+compiles as C++ (`.c`, `.cc`, `.cpp`, `.cxx`), with no `$` or `DPI` in it and a
+backtick only around a word, is left to the compiler for those two: it holds
+nothing a Verilog tool acts on to read a file or run anything.
+
+Tests: `tests/test_gate_inputs.py`, ET1 section. The fixtures are in
+`tests/fixtures/screen_bypass/` as templates, each reaching a canary file
+outside the run's folder (or, for `glued_macro_call`, writing a marker
+there). Must-fail: every fixture is refused through `lint.run`,
+`simulator.run` (icarus and verilator-sim), `synth.run` and `dft.scan_sim`,
+and in a setup through `formal.run` and `formal.cover`, with the canary's
+content in no summary; a seat file that reaches the timer's reference RTL,
+its held-out testbench and a mutant through two of the fixtures' forms is
+refused through each of the four gates. Controls, with the check bypassed:
+for each fixture the tools that act on it (the canary's name or content in
+the run's output, a synthesized result that changes with the canary's
+content, or the marker written), and for each judge file a tool that
+compiles it in. Each rule has a unit test, and an ordinary file using every
+allowed form passes. Every committed Verilog and C file still passes, and
+the history scan of section 3 refuses the same seat files as without the
+repair: no committed trial's re-judge changes.
+
+What is claimed: the check refuses, before any step, the forms its recorded
+fixtures name. What is not: that its reading matches any tool's
+preprocessor, that no third class exists, or that it covers a fault in a
+tool's own parser; it screens input and confines nothing. The record makes
+the seat account, not this check, the control for the runner-account tools
+of the timer path (gates ET2 to ET4).
+
+No file in `harness.CODE`, `harness.LOOP_CODE` or `FLOW_CODE` changes, so the
+single-seat and whole-flow fingerprints are unchanged; the whole-flow plan's
+"Gate backends" group digest moves (`evals/plans/2026-11-22-g3-whole-flow.md`,
+section 6), for the plan amendment of gate ET6.

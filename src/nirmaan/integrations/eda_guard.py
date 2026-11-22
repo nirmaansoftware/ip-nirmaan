@@ -114,8 +114,9 @@ SAFE_SYSTEM = frozenset({
     # waveforms, into the run's own directory
     "$dumpvars", "$dumpon", "$dumpoff", "$dumpall", "$dumpflush", "$dumplimit",
 })
-#: Strings and comments, matched together, so a "//" inside a string cannot hide what follows it.
-_TEXT_RE = re.compile(r'"(?:\\.|[^"\\\n])*"|//[^\n]*|/\*.*?\*/', re.DOTALL)
+#: Strings and comments, matched together, so a "//" inside a string cannot hide what follows it. A string ends on
+#: its own line: Yosys reads a string on across a line break, so a quote left open is refused (``_lexical``).
+_TEXT_RE = re.compile(r'"(?:\\[^\n]|[^"\\\n])*"|//[^\n]*|/\*.*?\*/', re.DOTALL)
 _SYSTEM_RE = re.compile(r"(?<![\w$])\$[A-Za-z_][\w$]*")
 #: ``$dumpfile`` with a plain file name, which lands in the run's own directory.
 _DUMPFILE_RE = re.compile(r'\$dumpfile\s*\(\s*"[A-Za-z0-9_][A-Za-z0-9_.\-]*"\s*\)')
@@ -127,6 +128,95 @@ _SYSTEMC_RE = re.compile(r"`systemc_\w*")
 
 def _without_comments(text: str) -> str:
     return _TEXT_RE.sub(lambda m: m.group(0) if m.group(0).startswith('"') else " ", text)
+
+
+# ET1 (council/records/2026-11-22-eda-tools-seat-account.md): the checks above read a file's comments and strings
+# by ``_TEXT_RE``, and a tool reads them by its own rules. Where the two readings differ, text the check skips as a
+# comment or a string is code to the tool. So a file is checked only if it is written in forms every tool splits
+# into code, comments and strings the way ``_TEXT_RE`` does, and a name is checked only if no tool can build a
+# longer one around it. Each rule below is an allow list of forms; what it does not name is refused.
+
+#: The compiler directives a gated file may use. Every directive of IEEE 1800 and of Icarus, Verilator and Yosys is
+#: lower case but ``__FILE__`` and ``__LINE__``, so any other backtick name with a lower case letter must be a macro
+#: the run's own files define (``verilog_problem``): so no `` `line `` (which names another file as the source),
+#: `` `uselib `` or `` `pragma ``, and no directive a tool adds in a later release. A name with no lower case
+#: letter is a macro (an undefined one is the tool's error).
+DIRECTIVES = frozenset({
+    "define", "undef", "undefineall", "ifdef", "ifndef", "elsif", "else", "endif", "include", "timescale",
+    "default_nettype", "resetall", "celldefine", "endcelldefine", "unconnected_drive", "nounconnected_drive",
+    "begin_keywords", "end_keywords", "__FILE__", "__LINE__",
+})
+#: A conditional directive. Icarus skips the text of a branch it does not take without reading its strings or
+#: comments, so a quote or a comment mark there is nothing to Icarus and opens a string or a comment to the check.
+_CONDITIONAL_RE = re.compile(r"`(?:ifdef|ifndef|elsif|else|endif)\b")
+#: The one form a conditional directive may take: alone on its line, a trailing ``//`` comment aside.
+_CONDITIONAL_LINE_RE = re.compile(
+    r"^[ \t]*`(?:(?:ifdef|ifndef|elsif)[ \t]+[A-Za-z_][\w$]*|else|endif)[ \t]*(?://[^\n]*)?$")
+#: A backtick name: a directive or a macro.
+_MACRO_RE = re.compile(r"`([A-Za-z_][\w$]*)")
+_DEFINE_RE = re.compile(r"`define[ \t]+([A-Za-z_][\w$]*)")
+#: The suffixes Verilator compiles as C++ rather than reading as Verilog.
+C_SUFFIXES = (".c", ".cc", ".cpp", ".cxx")
+#: The control characters a gated file may hold: tab, line feed, and a carriage return before a line feed.
+_CONTROL_RE = re.compile(r"[\x00-\x08\x0b-\x0c\x0e-\x1f\x7f]|\r(?!\n)")
+
+
+def _blank(text: str) -> str:
+    """``text`` with every comment and string blanked to spaces, line breaks kept: what the checks read as code."""
+    return _TEXT_RE.sub(lambda m: re.sub(r"[^\n]", " ", m.group(0)), text)
+
+
+def _lexical(raw: str, text: str, suffix: str = "") -> set[str]:
+    """Where a tool could read code that the checks read as a comment or a string, or build a name they never see.
+
+    ``raw`` is the file as stored (its line ends unchanged), ``text`` as the checks read it, ``suffix`` its name's.
+    """
+    found: set[str] = set()
+    control = _CONTROL_RE.search(raw)
+    if control:
+        found.add(f"the control character {control.group(0)!r}")
+    code = _blank(text)
+    # A C character literal ('\0', '"') breaks both rules below. A file Verilator compiles as C++ by its suffix, with
+    # no $ or DPI anywhere in it and a backtick only around a word (`bytes` in a comment), holds nothing a Verilog
+    # tool acts on to read a file or run anything, however it splits the text; so the two are left to the compiler.
+    c_source = suffix in C_SUFFIXES and not re.search(r"[`$]|DPI", re.sub(r"`[A-Za-z_][\w$]*`", "", text))
+    if '"' in code and not c_source:
+        found.add("a quote that does not close a string on its own line")
+    if re.search(r"\\(?!\n)", code) and not c_source:  # \/* or \" is a name to every tool, and a comment or string mark here
+        found.add("a backslash outside a string (an escaped identifier)")
+    lines, coded = text.split("\n"), code.split("\n")
+    if any(_CONDITIONAL_RE.search(c) and not _CONDITIONAL_LINE_RE.match(t) for t, c in zip(lines, coded)):
+        found.add("a conditional directive that is not alone on its line")
+    if len(_CONDITIONAL_RE.findall(text)) != len(_CONDITIONAL_RE.findall(code)):
+        found.add("a conditional directive inside a comment or a string")
+    # Icarus reads a block comment opened on a directive's line (or a macro's continued line) as ending there, and
+    # what follows as code: `define C /* is "Unterminated comment in define", `undef X /* is not a comment at all.
+    for m in _TEXT_RE.finditer(text):
+        if m.group(0).startswith("/*") and "\n" in m.group(0):
+            row = text.count("\n", 0, m.start())
+            column = m.start() - (text.rfind("\n", 0, m.start()) + 1)
+            if coded[row][:column].lstrip().startswith("`") or (row and lines[row - 1].endswith("\\")):
+                found.add("a block comment opened on a directive's line and closed on a later one")
+    # A name the preprocessor assembles: a bare $ before a macro, a macro glued to the name before it, or a macro
+    # call glued to the name after it (`P($write)memh is $writememh to Icarus and Verilator).
+    if re.search(r"(?<![\w$])\$(?![A-Za-z_])", code):
+        found.add("a $ that does not start a name (a macro could supply the name)")
+    if re.search(r"[\w$]`", code):
+        found.add("a macro glued to the name before it")
+    if re.search(r"`[\"\\]", _without_comments(text)):
+        found.add("a macro quote (`\" or `\\)")
+    unquoted = _TEXT_RE.sub(lambda m: m.group(0) if m.group(0).startswith("/") else re.sub(r"[^\n]", " ", m.group(0)),
+                            text)
+    for m in re.finditer(r"`[A-Za-z_][\w$]*[ \t]*\(", code):
+        depth, i = 1, m.end()
+        while i < len(code) and depth:
+            depth += {"(": 1, ")": -1}.get(code[i], 0)
+            i += 1
+        if i < len(code) and re.match(r"[\w$`]", code[i]):
+            found.add("a macro call glued to the name after it")
+        if re.search(r"//|/\*", unquoted[m.end():i]):  # a preprocessor collects arguments its own way
+            found.add("a comment inside a macro call's arguments")
+    return found
 
 
 def verilog_uses(text: str) -> tuple[set[str], list[str]]:
@@ -162,12 +252,20 @@ def verilog_problem(files: Iterable[str | Path]) -> str | None:
     given = [Path(f).resolve() for f in files]
     folders = {path.parent for path in given}
     todo = list(given)
+    defined: set[str] = set()
+    macros: dict[Path, set[str]] = {}
     while todo:
         path = todo.pop(0)
         if path in seen or not path.is_file():  # an absent file is the run's own failure
             continue
         seen.add(path)
-        used, included = verilog_uses(path.read_text(encoding="utf-8", errors="replace"))
+        raw = path.read_bytes().decode("utf-8", errors="replace")
+        text = raw.replace("\r\n", "\n").replace("\r", "\n")
+        used, included = verilog_uses(text)
+        used |= _lexical(raw, text, path.suffix)
+        code = _blank(text)
+        defined |= set(_DEFINE_RE.findall(code))
+        macros[path] = {m for m in _MACRO_RE.findall(code) if m not in DIRECTIVES and m != m.upper()}
         for name in included:
             target = (path.parent / name).resolve()
             if any(target.is_relative_to(folder) for folder in folders):
@@ -177,6 +275,11 @@ def verilog_problem(files: Iterable[str | Path]) -> str | None:
                         f"file outside the run's own folders (docs/GATE_INPUTS.md, section 2) {REFUSED}")
         if used:
             found.append(f"{path.name} uses {', '.join(sorted(used))}")
+    for path, names in macros.items():
+        unknown = sorted(f"`{m}" for m in names - defined)
+        if unknown:
+            found.append(f"{path.name} uses {', '.join(unknown)}, a directive a gate does not run and no macro the run's "
+                         f"files define")
     if not found:
         return None
     return ("a gate runs no Verilog that could open a file or reach outside the simulation (docs/GATE_INPUTS.md), "

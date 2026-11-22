@@ -15,6 +15,7 @@ import shutil
 from pathlib import Path
 
 import pytest
+from laws import needs
 
 from nirmaan.integrations import dft, eda, eda_guard, firmware, regmap  # noqa: F401  (their backends)
 from nirmaan.integrations.eda import backends_for, execute
@@ -299,6 +300,168 @@ def test_ordinary_constraints_pass(tmp_path):
                                     "set_clock_groups -asynchronous -group {\n  clk_a\n} -group {clk_b}\n"
                                     "set_load 0.01 [all_outputs]; set_false_path -from [get_ports rst_n]\n")
     assert sdc_problem(sdc) is None
+
+
+# --- ET1: forms the check and a tool read differently ------------------------------------------------
+# council/records/2026-11-22-eda-tools-seat-account.md, decision 4: each file of fact 9 (and four of the same two
+# classes found while building the repair) is refused through every gate that reads Verilog, and a control per
+# fixture shows, with the check bypassed, a tool acting on it. Each fixture reaches only a canary file (or writes a
+# marker) in the test's own temporary directory, outside the run's folder; three judge files are reached too.
+
+BYPASS = FIXTURES / "screen_bypass"
+CANARY = "canary_et1_7f3a"
+#: The gates whose tools read seat Verilog on the timer path (record, fact 5), and dft.scan_sim, which reads a source
+#: of any name as Verilog.
+VERILOG_GATES = [("lint.run", "verilator-lint"), ("simulator.run", "icarus"), ("simulator.run", "verilator-sim"),
+                 ("synth.run", "yosys")]
+FORMAL_GATES = [("formal.run", "symbiyosys"), ("formal.cover", "symbiyosys-cover")]
+#: For each fixture, the backends whose tool acts on it with the check bypassed: it reads the canary (its name or
+#: content reaches the run's output), changes the synthesized result with the canary's content (yosys, readmem
+#: fixtures), or writes the marker (glued_macro_call). Found on Icarus 13, Verilator 5.052 and Yosys 0.69.
+LIVE = {
+    "define_comment": ["icarus"],
+    "dollar_macro": ["icarus", "verilator-sim", "yosys"],
+    "esc_block": ["verilator-lint", "verilator-sim", "yosys"],
+    "esc_line": ["verilator-lint", "verilator-sim", "yosys"],
+    "esc_quote": ["verilator-lint", "icarus", "verilator-sim", "yosys"],
+    "glued_macro_call": ["icarus", "verilator-sim"],
+    "ifdef_continued_quote_include": ["icarus"],
+    "ifdef_continued_quote_readmem": ["icarus"],
+    "ifdef_lone_quote_include": ["yosys"],
+    "ifdef_lone_quote_readmem": ["yosys"],
+    "ifdef_quote_include": ["icarus"],
+    "split_macro": ["icarus", "verilator-sim", "yosys"],
+    "undef_comment": ["icarus"],
+}
+JUDGE = ["tests/fixtures/rtl/axil_timer/axil_timer.v", "evals/flow/axil_timer/axil_timer_tb.v",
+         "tests/fixtures/rtl/axil_timer/mutants/axil_timer_stop_ignored.v"]
+TOOL = {"verilator-lint": ("verilator",), "icarus": ("iverilog", "vvp"), "verilator-sim": ("verilator", "make"),
+        "yosys": ("yosys",)}
+GATE_OF = {name: tool for tool, name in VERILOG_GATES}
+
+
+def bypass_file(tmp_path: Path, fixture: str, bit: str = CANARY, include: str | None = None) -> tuple[Path, Path]:
+    """The fixture as a seat's ``run/m.v``, its canaries in ``outside/``: the file and the marker it may write."""
+    (tmp_path / "run").mkdir(exist_ok=True)
+    outside = tmp_path / "outside"
+    outside.mkdir(exist_ok=True)
+    vh = write(outside / "CANARY_ET1.vh", f"{CANARY} ! ;\n")
+    hexfile = write(outside / "CANARY_ET1.hex", f"{bit}\n")
+    marker = outside / "MARKER"
+    text = (BYPASS / f"{fixture}.v.tpl").read_text(encoding="utf-8")
+    text = text.replace("{canary_vh}", include or str(vh)).replace("{canary_hex}", str(hexfile))
+    return write(tmp_path / "run" / "m.v", text.replace("{marker}", str(marker))), marker
+
+
+def printed(outcome) -> str:
+    return outcome.summary + "".join(Path(r).read_text(encoding="utf-8", errors="replace")
+                                     for r in outcome.references if Path(r).is_file())
+
+
+def test_every_bypass_fixture_has_a_control():
+    assert sorted(p.name.removesuffix(".v.tpl") for p in BYPASS.glob("*.v.tpl")) == sorted(LIVE)
+
+
+@pytest.mark.parametrize("tool,name", VERILOG_GATES + [("dft.scan_sim", "icarus-scan")])
+@pytest.mark.parametrize("fixture", sorted(LIVE))
+def test_a_form_the_check_and_a_tool_read_differently_is_refused(tmp_path, tool, name, fixture):
+    source, marker = bypass_file(tmp_path, fixture)
+    outcome = execute(backend(tool, name), {"sources": str(source), "top": "m", "workdir": str(tmp_path / "wd")})
+    refused(outcome, marker)
+    assert CANARY not in outcome.summary
+
+
+@pytest.mark.parametrize("tool,name", FORMAL_GATES)
+@pytest.mark.parametrize("fixture", sorted(LIVE))
+def test_a_form_the_check_and_a_tool_read_differently_is_refused_in_a_formal_setup(tmp_path, tool, name, fixture):
+    source, marker = bypass_file(tmp_path, fixture)
+    setup = write(source.parent / "f.sby", "[options]\nmode bmc\ndepth 1\n\n[engines]\nsmtbmc\n\n[script]\n"
+                                           "read -formal m.v\nprep -top m\n\n[files]\nm.v\n")
+    refused(execute(backend(tool, name), {"sby": str(setup), "workdir": str(tmp_path / "wd")}), marker)
+
+
+@pytest.mark.parametrize("fixture,name", [pytest.param(f, n, marks=needs(*TOOL[n]))
+                                          for f, names in sorted(LIVE.items()) for n in names])
+def test_control_without_the_check_a_tool_acts_on_the_form(tmp_path, monkeypatch, fixture, name):
+    """The fixtures are live: with the check bypassed, the tool reads the canary, or writes the marker."""
+    monkeypatch.setattr(eda, "check_inputs", lambda *a: None)
+    gate = backend(GATE_OF[name], name)
+    if fixture == "glued_macro_call":
+        source, marker = bypass_file(tmp_path, fixture)
+        execute(gate, {"sources": str(source), "top": "m", "workdir": str(tmp_path / "wd")})
+        assert marker.exists()
+    elif name == "yosys" and "{canary_hex}" in (BYPASS / f"{fixture}.v.tpl").read_text(encoding="utf-8"):
+        cells = []
+        for bit in ("1", "0"):  # y = a ^ r[0]: one cell when the canary holds 1, none when it holds 0
+            (tmp_path / bit).mkdir()
+            source, _ = bypass_file(tmp_path / bit, fixture, bit)
+            cells.append(execute(gate, {"sources": str(source), "top": "m"}).metrics.get("cells"))
+        assert cells == [1, 0]
+    else:
+        source, _ = bypass_file(tmp_path, fixture)
+        assert "CANARY_ET1" in printed(execute(gate, {"sources": str(source), "top": "m",
+                                                      "workdir": str(tmp_path / "wd")}))
+
+
+@pytest.mark.parametrize("judge", JUDGE)
+@pytest.mark.parametrize("tool,name", VERILOG_GATES)
+def test_a_seat_file_that_reaches_a_judge_file_is_refused(tmp_path, judge, tool, name):
+    """Decision 4, item 3: the reference RTL, the held-out testbench and a mutant, through every gate."""
+    for fixture in ("esc_block", "ifdef_quote_include"):
+        source, marker = bypass_file(tmp_path, fixture, include=str(ROOT / judge))
+        outcome = execute(backend(tool, name), {"sources": str(source), "top": "m"})
+        refused(outcome, marker)
+        assert Path(judge).name not in outcome.summary
+
+
+@pytest.mark.parametrize("judge", JUDGE)
+@pytest.mark.parametrize("fixture,name", [pytest.param(f, n, marks=needs(*TOOL[n])) for f, n in (
+    ("esc_block", "verilator-lint"), ("esc_block", "verilator-sim"), ("esc_block", "yosys"),
+    ("ifdef_quote_include", "icarus"))])
+def test_control_without_the_check_a_seat_file_reaches_a_judge_file(tmp_path, monkeypatch, judge, fixture, name):
+    monkeypatch.setattr(eda, "check_inputs", lambda *a: None)
+    source, _ = bypass_file(tmp_path, fixture, include=str(ROOT / judge))
+    outcome = execute(backend(GATE_OF[name], name), {"sources": str(source), "top": "m",
+                                                     "workdir": str(tmp_path / "wd")})
+    assert Path(judge).name in printed(outcome)
+
+
+@pytest.mark.parametrize("text,why", [
+    ('module m;\n  wire \\x ;\nendmodule\n', "a backslash outside a string"),
+    ('module m;\n  initial $display("a\\\nb");\nendmodule\n', "a quote that does not close"),
+    ("`ifdef A\n`define B 1\n`endif // ok\n`ifdef A `define C 2\n`endif\n", "not alone on its line"),
+    ('module m;\n  // `endif\nendmodule\n', "inside a comment or a string"),
+    ('module m;\n  initial $display("`else");\nendmodule\n', "inside a comment or a string"),
+    ("`define D $\n", "a $ that does not start a name"),
+    ("`define W $write\nmodule m; initial x`W; endmodule\n", "a macro glued to the name before it"),
+    ("`define S(x) `\"x`\"\n", "a macro quote"),
+    ("`define P(x) x\nmodule m; initial `P(1)z; endmodule\n", "a macro call glued to the name after it"),
+    ("`define P(x) x\nmodule m; initial `P(1 /* c */); endmodule\n", "a comment inside a macro call's arguments"),
+    ("`define C /*\nmodule m; endmodule\n// */\n", "a block comment opened on a directive's line"),
+    ("`define C a \\\n  b /*\nmodule m; endmodule\n// */\n", "a block comment opened on a directive's line"),
+    ('`line 1 "/etc/hosts" 0\nmodule m; endmodule\n', "`line, a directive a gate does not run"),
+    ("`uselib file=/etc/hosts\nmodule m; endmodule\n", "`uselib"),
+    ("module m;\x0c endmodule\n", "the control character"),
+    ("module m;\x00 endmodule\n", "the control character"),
+])
+def test_each_rule_of_the_repair_refuses_its_form(tmp_path, text, why):
+    path = tmp_path / "t.v"
+    path.write_bytes(text.encode("utf-8"))
+    problem = verilog_problem([path])
+    assert problem and why in problem, problem
+
+
+def test_ordinary_forms_still_pass(tmp_path):
+    text = ("`timescale 1ns/1ps\n`default_nettype none\n`define WIDTH 8\n`define CHECK(c, m) \\\n"
+            "  if (!(c)) begin $error(\"%0s\", m); end\n`ifdef FORMAL\n  `define F 1\n`elsif SIM // a note\n`else\n"
+            "`endif\nmodule m(input wire [`WIDTH-1:0] a, output wire y); /* a comment\n  across lines, with \" and "
+            "/* in it */\n  assign y = ^a; // \"quoted\" \\ `x\n  initial begin\n"
+            "    `CHECK(1, \"tab\\t quote\\\" slash\\\\\")\n    $display(\"%0d $readmemh //\", `WIDTH);\n"
+            "`ifdef NIRMAAN_NONCE\n    $display(`NIRMAAN_NONCE);\n`endif\n  end\nendmodule\n")
+    assert verilog_problem([write(tmp_path / "m.v", text)]) is None
+    crlf = tmp_path / "w.v"
+    crlf.write_bytes(text.replace("\n", "\r\n").encode("utf-8"))
+    assert verilog_problem([crlf]) is None
 
 
 # --- Must-pass: every committed gate input -------------------------------------------------------------
