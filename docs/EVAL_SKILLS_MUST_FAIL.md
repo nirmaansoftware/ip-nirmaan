@@ -578,6 +578,41 @@ gate. The scorer's bounds are the second look: they let a coverage case be
 judged the same way when the testbench reaches it by another route, and the
 tests run the scorer directly on each (`tests/test_dv_coverage_irq_ctrl.py`).
 
+### A second coverage case and a second planning case (RX-E2)
+
+Both cases verify one new block, `tick_timer` (`tests/fixtures/dv/tick_timer/`): a down-counting timer with a
+one-shot and a periodic mode, a reload value, a flag cleared by writing a one, and an interrupt enable. The block is
+held out by no other case.
+
+`dv/coverage-tick-timer` judges the coverage seat (`code_coverage`) the way `dv/coverage-irq-ctrl` does: the seat is
+handed a testbench that only resets the block (`coverage/tick_timer_idle_tb.sv`), must meet the coverage gate's
+bounds on the approved RTL, and must still fail every RTL mutant on a check. Its four mutants differ in kind: a
+one-shot timer that does not stop, a `LOAD` write that replaces the count in flight, a clear that beats an expiry,
+and the one that answers a surviving-mutant failure of the first coverage case. In that failure (record
+`2026-11-19-claude-code-claude-opus-5-5-18`, trial 01) the seat's testbench reached the coverage bounds and the
+mutant `irq_ctrl_level_mask_ignored` survived: a masked path that was run and never checked. The new mutant,
+`tick_timer_irq_ie_ignored_periodic`, is wrong in periodic mode only (the interrupt enable is ignored there), so a
+testbench that checks the masked interrupt in one-shot mode and runs periodic mode without checking it passes the
+bounds and survives. A test builds that testbench from the reference by removing every check of the masked
+periodic interrupt and shows exactly that. Three weak testbenches in `tests/fixtures/dv/tick_timer/coverage/` each
+pass their own checks on the approved RTL and miss the bounds:
+
+| File | What it never does |
+|---|---|
+| `tick_timer_idle_tb.sv` | start the timer (the testbench the seat is handed) |
+| `tick_timer_no_expiry_tb.sv` | let the count reach zero |
+| `tick_timer_oneshot_only_tb.sv` | run periodic mode, the interrupt or the clear |
+
+The case names `code_coverage` only. The coverage seat of block verification holds that skill alone, and the case
+judges line and toggle coverage, not a coverage model built from the plan, so `functional_coverage` is not
+credited. No coverage percentage is stated anywhere for the case; the tests assert the bounds with the real tool.
+
+`dv/plan-tick-timer` judges the dv-plan seat (`verification_planning`) on the same specification. Its control is
+wider than the first planning case's two mutants: six specification mutants, each of a different kind (a
+requirement added, one removed, one number changed, one requirement ID renamed, one ID tagged twice, and one
+requirement changed in one mode only), so a plan cannot pass by quoting most of the text or by matching a
+requirement count. `vplan.check` reports a distinct problem for each, and a test names it.
+
 ### A control for X after reset (G5)
 
 Two live trials of `rtl/apb-gpio` (one with knowledge documents, one without)

@@ -52,8 +52,11 @@ checkout. No new workflow and no new action.
   44585417262, a replay of `firmware/axi4-lite-driver` on `main` at 0c4f45b:
   the `replay` and `rejudge` jobs, each in gate mode with all 9 probes denied.
   It reached `main` in a pull request of its own, which changed no code it
-  grades. No run on `main` yet shows the re-judge gate on the register block
-  flow (decision 2, addition 3).
+  grades. The re-judge gate on the register block flow (decision 2, addition
+  3) is shown by a replay of that case on `main` at 45a22c8, run 45026197824:
+  the credential test in gate mode and the `confined` step in both the
+  `replay` and the `rejudge` job, and a re-judge with the same verdicts
+  (`evals/flow/flow_rejudge_gate_record.json`; `gates/WF17.md`).
 - **The register block flow stays refused.** Its firmware stage and its
   held-out checks run seat C, so `check --require-expected` and `trials`
   refuse it with exit 6 before any trial. Since M90 the program `fw.test`
