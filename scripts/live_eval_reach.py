@@ -96,9 +96,10 @@ DESIGN = "module reach_probe(input wire clk);\nendmodule\n"
 WRAPPED = ("vvp", "iverilog", "verilator", "yosys", "sby")
 #: Gate ET3: each tool, the gate and backend it is probed through, and what it prints when it cannot open an include
 #: (``{}`` is the target's path). Verilator says "File not found" for a file it may not read, and "Cannot find include
-#: file" for one it cannot see.
+#: file" for one it cannot see (quoted in some versions, not in Ubuntu 24.04's 5.020).
 TOOL_GATES = (("iverilog", "simulator.run", "icarus", ("Include file {} not found",)),
-              ("verilator", "lint.run", "verilator-lint", ("Cannot find include file: '{}'", "File not found: {}")),
+              ("verilator", "lint.run", "verilator-lint",
+               ("Cannot find include file: '{}'", "Cannot find include file: {}", "File not found: {}")),
               ("yosys", "synth.run", "yosys", ("Can't open include file `{}'",)),
               ("sby", "formal.run", "symbiyosys", ("Can't open include file `{}'",)))
 #: A seat file for each tool: (file name, top, text before the include, text after it).

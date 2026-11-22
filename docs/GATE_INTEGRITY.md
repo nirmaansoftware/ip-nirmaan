@@ -311,7 +311,20 @@ anyway is redacted from logs and from the uploaded record.
   live trials of a case that runs seat C are still refused, except
   `firmware/axi4-lite-driver`, which gate SC7 lifts on each job's own
   credential test record (`docs/LIVE_EVAL_EVIDENCE.md`, section 6;
-  `council/records/2026-11-19-seat-c-live-refusal.md`).
+  `council/records/2026-11-19-seat-c-live-refusal.md`). Since gates ET2 to
+  ET4 of `council/records/2026-11-22-eda-tools-seat-account.md`, the tools
+  that read seat-written Verilog (`iverilog`, `yosys`, `sby` with the Yosys
+  and solver it starts, and `verilator` when it lints) run as that account
+  in the live evaluation's jobs too, each with a view of the run's own
+  directory and input files only, and a reach test probes each through its
+  gate. The wrappers act for every case those jobs run, so single-seat
+  trials' gates run as the account from that change, and that changed how
+  gates run there with no fingerprint change: none of the changed files is
+  digested. Verilator's model builds (the simulator build, the co-simulation
+  builds of `fw.test` and `regmap.verify`) stay with the runner by a stated
+  rule until gate ET9. On every other machine the tools run as before as
+  the caller; everywhere, a held-out run of `simulator.run`, `lint.run` or
+  `synth.run` reads copies of its case files staged for the run.
 * **The compile residual** (`council/records/2026-11-19-seat-c-live-refusal.md`, fact 9 and decision 4). `fw.build`
   and `fw.test` compile seat C as the runner. The routes fact 9 found (an
   include of the committed reference driver by an absolute or `..` path, a

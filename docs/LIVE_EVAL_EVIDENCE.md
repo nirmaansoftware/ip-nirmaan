@@ -285,7 +285,82 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   or results fails it too. A last
   test, the control, writes the run's own directory. Each target must exist
   first, so a refusal proves something. The job fails before any trial unless
-  cocotb's verdict is a pass with every probe test in its results.
+  cocotb's verdict is a pass with every probe test in its results. Its
+  second part (gate ET3, `tool_reach`) probes the tools that read seat
+  Verilog, each through its real gate and its wrapper on `PATH`: Icarus
+  through `simulator.run`, Verilator through `lint.run`, Yosys through
+  `synth.run`, SBY through `formal.run` and `formal.cover`. It runs in a
+  process of its own whose real environment holds a credential-named and a
+  plain canary. For each tool a control passes on seat files only the runner
+  and the account may read (mode 0600, read through the run's grant), and
+  three probes, each a seat file that includes one target by absolute path,
+  must fail with the tool's own message that it could not open that target:
+  a canary file in the checkout (readable by every account by its mode), a
+  runner-only canary file (mode 0600, in a folder every account may enter),
+  and that process's `/proc/<pid>/environ`. A control that passes beside a
+  runner-only file denied through the same tool shows the tool's process is
+  the account. For the held-out compile, through `simulator.run`, the
+  account reads a judge file staged for the run as the held-out checks stage
+  theirs, and a canary beside it (readable by every account by its mode) is
+  denied. No canary value may be in a run's log, summary or result file. The
+  screen refuses an include by absolute path, so these probes reach the tool
+  with the screen bypassed inside that process only, and say so in their
+  output. Each job uploads the result as `live-eval-tool-reach-<job>-<run
+  id>`, and stops before any trial unless every probe is denied and every
+  control passed.
+- **The tools that read seat Verilog run as the account too** (gates ET2 to
+  ET4 of `council/records/2026-11-22-eda-tools-seat-account.md`). The input
+  screen (`eda_guard`) reads seat files with patterns of its own, and the
+  record found files it passes that a tool then acts on by opening a file
+  outside the run, so in these jobs the screen is not the control for those
+  tools. The same action wraps `iverilog`, `yosys`, `sby` and `verilator`
+  beside `vvp`, root's, first on `PATH`: each runs as `nirmaan-seat`, with
+  `no_new_privs`, an environment with no credential and only cocotb's
+  settings, write access to the run's own directory only, and the same
+  cleanup. `sby` starts its Yosys and its solver as the same account. A
+  Verilator run that is not a lint (`--lint-only`), so a model build (the
+  Verilator simulator build, the co-simulation builds of `fw.test` and
+  `regmap.verify`), stays with the runner by that stated rule
+  (`scripts/live_eval_seat.py`, `as_runner`; the record's decision 6; gate
+  ET9 waits on those builds). A tool reads its inputs where the harness keeps
+  them, beside files the account may not read (the reference answer and the
+  mutants the held-out checks stage, every other stage's files), so each run
+  gets a view of its own: the program runs in a mount namespace of its own in
+  which every `/tmp/nirmaan-*` folder that holds one of the run's input files
+  is replaced by an empty folder holding only those files, each read only at
+  its own path, and the run's own directory. The run names its directory and
+  its input files (the sources, the setup and every file its `[files]` names,
+  the other files its parameters name) in each step's environment
+  (`nirmaan.integrations.eda`, `seat_inputs`), and the root helper refuses an
+  input that is not a regular file of the runner's, with one name, inside a
+  `/tmp/nirmaan-*` folder the runner made, reached through no link; nothing
+  runs then. An input other accounts may not read by its mode gets a read
+  grant for that run only. A file beside an input that the seat wrote but
+  the gate was not given is not in the view either, so a seat file that
+  includes a sibling it did not pass to the gate fails there where it would
+  pass elsewhere. What the account was shown denied is only what the reach
+  test probes (below). A gate whose tool reads a harness file outside the run
+  folders (the DFT backends' testbenches) is refused in these jobs; no case
+  uses one. The held-out checks' compile (Icarus, over the seat's file and the
+  judge's) runs the same way: the reference testbench of check 1 is staged
+  for the run as check 2's reference RTL and mutants already are
+  (`nirmaan.evals.scorers`, `STAGED_TOOLS`), so the account reads that run's
+  own judge file and nothing beside it. In these jobs the workflow names the
+  wrappers (`NIRMAAN_SEAT_TOOLS`), and there a seat tool never falls back
+  (gate ET2, as gate SC2 for `fw.test`): a wrapper that is not there, not
+  root's, or writable by another account refuses the run before any step,
+  and each tool is started by its wrapper's path. The wrappers act through
+  `PATH` for every case these jobs run, so a single-seat trial's gates run as
+  the account too, with no fingerprint change (no file of `harness.CODE`,
+  `LOOP_CODE` or `FLOW_CODE` and no tool definition changed). The OSS CAD
+  Suite (SymbiYosys, Yices) is unpacked by root into `/opt` in these jobs, out
+  of the runner's temporary folder, which the account may not read. The reach
+  test probes each tool through its gate (`tool_reach`, below). The screen
+  stays in force as the first check on every machine and is claimed only for
+  what its recorded fixtures show refused. Not probed and not claimed: files
+  every account may read outside the probed targets, a fault in a tool's own
+  parser beyond what the account may reach, and the builds that stay with
+  the runner.
 - **Seat C runs as the account too (M90).** `fw.test` runs the program it
   builds (the seat's C linked with the harness and the Verilated model) by
   path, not through `PATH`, so it has a wrapper of its own:
