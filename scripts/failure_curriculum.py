@@ -9,10 +9,11 @@ commits the batch, by one of:
     no: <reason>       a written reason why neither (at least 20 characters)
 
 Each answer is one line, `- <failure id>: <answer>`, in the answers text (the PR body or a file). The failure id is
-`<record folder>:trial-NN`, as this script prints it.
+`<record key>:trial-NN`, as this script prints it. The key is the record folder's path under evals/results:
+its bare name, or `g3-timer/slot-NN/<name>` for a record nested under a slot folder.
 
     python scripts/failure_curriculum.py                          list every model failure and its answer
-    python scripts/failure_curriculum.py --records A B            only the batch of these record folders
+    python scripts/failure_curriculum.py --records A B            only the batch of these record keys
     python scripts/failure_curriculum.py --body-file body.md      answers from a file (`-` is stdin)
     python scripts/failure_curriculum.py --pr 123                 answers from that PR's body (gh)
 
@@ -34,14 +35,14 @@ ROOT = Path(__file__).resolve().parent.parent
 RESULTS = ROOT / "evals" / "results"
 
 MIN_REASON = 20
-ANSWER = re.compile(r"^\s*[-*]\s*`?(?P<id>[\w.+-]+:trial-\d+)`?\s*:\s*(?P<kind>note|must-fail|no)\s*:\s*(?P<text>.+?)\s*$",
+ANSWER = re.compile(r"^\s*[-*]\s*`?(?P<id>[\w./+-]+:trial-\d+)`?\s*:\s*(?P<kind>note|must-fail|no)\s*:\s*(?P<text>.+?)\s*$",
                     re.IGNORECASE)
 
 
 @dataclass(frozen=True)
 class Failure:
-    id: str  # "<record folder>:trial-NN"
-    record: str
+    id: str  # "<record key>:trial-NN"
+    record: str  # the record key: the folder's path under evals/results, so a nested slot record is unique
     trial: int
     cause: str  # the label text from causes.md, or "" when none
     source: str  # the causes.md it came from, or ""
@@ -55,27 +56,34 @@ def _cells(line: str) -> list[str]:
     return [c.strip() for c in line.strip().strip("|").split("|")]
 
 
+def _key(folder: Path, results: Path) -> str:
+    """A record's key: its path under `results`. A flat record is its bare folder name, as before; a record
+    nested under a slot folder (evals/results/g3-timer/slot-NN/<name>) is `g3-timer/slot-NN/<name>`, so two
+    slots of one arm on one day, which share a record name, never share a key."""
+    return folder.relative_to(results).as_posix()
+
+
 def _resolve(folder: Path, cell: str, results: Path) -> str | None:
-    """The record folder a row's Record cell names: empty or `this` is the folder itself; `-11` or
-    `-without-knowledge-11` is a sibling named by the same stem."""
+    """The record key a row's Record cell names: empty or `this` is the folder itself; `-11` or
+    `-without-knowledge-11` is a sibling (in the same folder) named by the same stem."""
     cell = cell.strip().strip("`")
     if cell in ("", "this"):
-        return folder.name
+        return _key(folder, results)
     name = folder.name
     stems = [name, re.sub(r"-\d+$", "", name), re.sub(r"-without-knowledge(?:-\d+)?$", "", name),
              re.sub(r"-limit(?:-\d+)?$", "", name)]
     for stem in stems:
         for guess in (stem + cell, re.sub(r"-\d+$", "", stem) + cell):
-            if (results / guess).is_dir():
-                return guess
+            if (folder.parent / guess).is_dir():
+                return _key(folder.parent / guess, results)
     return None
 
 
 def labels(results: Path) -> tuple[list[Failure], list[str]]:
-    """Every labelled row of every `causes.md` under `results`, plus the rows that could not be placed."""
+    """Every labelled row of every `causes.md` under `results` (at any depth), plus the rows that could not be placed."""
     found: list[Failure] = []
     problems: list[str] = []
-    for causes in sorted(results.glob("*/causes.md")):
+    for causes in sorted(results.rglob("causes.md")):
         header: list[str] = []
         for line in causes.read_text(encoding="utf-8").splitlines():
             if not line.startswith("|"):
@@ -106,12 +114,12 @@ def labels(results: Path) -> tuple[list[Failure], list[str]]:
 def failed_trials(results: Path) -> list[tuple[str, int]]:
     """Every failed live evidence trial in the committed records: not passed, not a replay, not an ablation or calibration."""
     out: list[tuple[str, int]] = []
-    for path in sorted(results.glob("*/*/trial-*.json")):
+    for path in sorted(results.rglob("trial-*.json")):
         trial = json.loads(path.read_text(encoding="utf-8"))
         result = trial.get("result", {})
         if result.get("passed") or result.get("replay") or trial.get("purpose", "evidence") != "evidence":
             continue
-        out.append((path.parent.parent.name, int(trial.get("trial", 0))))
+        out.append((_key(path.parent.parent, results), int(trial.get("trial", 0))))
     return out
 
 
@@ -165,7 +173,7 @@ def run(results: Path, root: Path, records: list[str] | None, answers_text: str 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=(__doc__ or "").split("\n")[0])
     ap.add_argument("--results", type=Path, default=RESULTS)
-    ap.add_argument("--records", nargs="*", help="record folder names of the batch (default: all)")
+    ap.add_argument("--records", nargs="*", help="record keys of the batch (default: all)")
     ap.add_argument("--body-file", help="answers text; `-` is stdin")
     ap.add_argument("--pr", type=int, help="read the answers from this PR's body with gh")
     ap.add_argument("--require", action="store_true", help="fail on an unanswered failure even with no answers given")

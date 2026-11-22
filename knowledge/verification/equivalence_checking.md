@@ -86,6 +86,20 @@ own reasoning; a line marked "gate" names the repository code that backs it.
 - The result names the gold and the gate files, so a pass says which two
   versions were compared (gate: eda_parsers.py:497-499).
 
+## A partition that holds state
+
+- For a partition that holds state, such as a register, prefer the `sby`
+  strategy over `sat`: `sat` is described as quick but unable to prove some
+  partitions, while `sby` is the more general choice [EqyStrat]. Choose the
+  engine and a `depth` from the design and the sources, not from a fixed
+  number in this document.
+- A `sat` pass is weaker evidence for a register partition than an `sby`
+  pass (inference). The eqy pages in the sources do not state strategy order
+  for a proved partition, so list the stronger strategy first, or only.
+- The seat cannot mutation-test its own setup: one setup is submitted per run
+  (inference). The mutation check under "How a result is checked" is therefore the
+  reviewer's, not a step the seat can take.
+
 ## Common failure modes
 
 - Gold and gate running the same commands, or only the original: the gate
@@ -104,7 +118,8 @@ own reasoning; a line marked "gate" names the repository code that backs it.
 - A depth too small for a design whose outputs agree for the first steps and
   differ later. The `sat` strategy proves equality only if the outputs agree
   for the initial depth steps and for every later step that follows depth
-  agreeing steps [EqyStrat].
+  agreeing steps [EqyStrat]. That condition does not make a `sat` pass sound
+  for a partition that holds state: see "A partition that holds state".
 - Missing recode or match rules after synthesis changed an FSM encoding or a
   name, which leaves partitions that cannot be proved [EqyConfig].
 - A bug in gold carried into gate, which equivalence cannot see.
@@ -113,7 +128,7 @@ own reasoning; a line marked "gate" names the repository code that backs it.
 
 - Read the gold and gate file names and the partition count in the summary
   (gate: eda_parsers.py:497-503).
-- Run the same setup against a gate version with one behaviour changed, such as
+- Reviewer: run the same setup against a gate version with one behaviour changed, such as
   one wrong bit, an off-by-one in a flag or a wrong reset value. A setup that
   still reports equivalence is not looking at that behaviour (inference).
 - On a failure, eqy writes a trace of the failing case; the getting-started
