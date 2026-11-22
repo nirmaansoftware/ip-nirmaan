@@ -399,7 +399,14 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   `replay` job and in the `rejudge` job, each in gate mode, all 9 probes
   denied, through the wrapper, the control written. It shows the program
   executes as the seat account and is denied each listed target, and
-  nothing more.
+  nothing more. The same gate on the register block flow (gate SC9, decision
+  2, addition 3): `evals/flow/flow_rejudge_gate_record.json`, a replay of
+  `flow/axi4-lite-regs-driver` on `main` at 45a22c8
+  ([run 45026197824](https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45026197824)):
+  in both jobs the credential test in gate mode, all 9 probes denied, then
+  that job's `confined` step passed, and the `rejudge` job re-judged the
+  replay's record with the same verdicts. A replay is the reference answer,
+  not a trial; the flow case stays refused live.
 - **The judge fails a wrong driver as the seat account** (gate SC5). The
   `replay` job of `firmware/axi4-lite-driver` runs
   `scripts/live_eval_fw_broken.py --require-seat`: the four committed broken
