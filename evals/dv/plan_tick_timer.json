@@ -1,0 +1,61 @@
+{
+  "id": "dv/plan-tick-timer",
+  "request": "Verify the existing tick timer RTL.",
+  "seat": "dv-plan",
+  "skills": [
+    "verification_planning"
+  ],
+  "expected_behavior": "A verification plan in the nirmaan.vplan format for the approved tick_timer interface specification: every requirement the specification tags, quoted exactly with its source and section, and items that say how each will be proven, checked by vplan.check against the approved specification before review.",
+  "constraints": [
+    "Work only from the approved interface specification.",
+    "Cover every tagged requirement exactly once, quoting its text, and invent none.",
+    "Plan items for the testbench and the proof that name plain file names."
+  ],
+  "known_failure_modes": [
+    "A requirement left out of the plan, such as the same-edge race, the late LOAD write or the parameter range.",
+    "A requirement paraphrased instead of quoted, or its ID or source changed, so it no longer traces to the specification.",
+    "A requirement the specification does not tag, added from general knowledge of timers, such as a restart or a prescaler.",
+    "A plan whose requirements would also match a specification with one requirement added, removed, renamed, tagged twice or changed in one mode only; the must-fail control fails it."
+  ],
+  "upstream": {
+    "interface-spec": [
+      {
+        "path": "tests/fixtures/dv/tick_timer/interface_spec.md",
+        "kind": "interface_spec"
+      }
+    ]
+  },
+  "reference": [
+    {
+      "path": "tests/fixtures/dv/tick_timer/tick_timer_vplan.json",
+      "kind": "verification_plan"
+    }
+  ],
+  "held_out": [
+    {
+      "name": "The seat's plan covers the approved specification exactly and fails each specification mutant",
+      "scorer": "must-fail",
+      "tool": "vplan.check",
+      "seat_files": {
+        "plan": [
+          "verification_plan"
+        ]
+      },
+      "case_files": {
+        "spec": [
+          "tests/fixtures/dv/tick_timer/interface_spec.md"
+        ]
+      },
+      "mutants": {
+        "tests/fixtures/dv/tick_timer/interface_spec.md": [
+          "tests/fixtures/dv/tick_timer/mutants/interface_spec_added_req.md",
+          "tests/fixtures/dv/tick_timer/mutants/interface_spec_removed_req.md",
+          "tests/fixtures/dv/tick_timer/mutants/interface_spec_range_changed.md",
+          "tests/fixtures/dv/tick_timer/mutants/interface_spec_id_renamed.md",
+          "tests/fixtures/dv/tick_timer/mutants/interface_spec_id_duplicated.md",
+          "tests/fixtures/dv/tick_timer/mutants/interface_spec_irq_mode_changed.md"
+        ]
+      }
+    }
+  ]
+}

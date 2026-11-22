@@ -384,3 +384,60 @@ security named: the first by a test of the flow's RTL stage with a seat `.sby` (
 amendment if the test shows the formal gates run), the second by the runner-account tools running as the seat account
 with a recorded reach test, or by a council ruling that names the screen as the control. Each is recorded by the pull
 request that settles it.
+
+## 15. Dated addition (2026-11-22): where the timer's records are committed
+
+Section 3 says the record names are the ones `record_run` writes. Every CI dispatch writes into a fresh folder, so
+two slots of one arm on one day get the same record name. To keep the names as written and still tell the slots
+apart, a slot's record is committed at `evals/results/g3-timer/slot-NN/<record name>/`, with `NN` the slot number in
+two digits (a failed slot's `causes.md` sits beside its `manifest.json`). The name is never changed; the path is
+the record's identity. The register block's folder is named in the dated addition that section 9 requires before its
+slot 21. This changes no count, slot, arm, harness, fingerprint or digest, and no record. What reads records by
+path:
+
+- `tests/test_whole_flow.py` asserts the structure of any committed whole-flow record (all trials whole-flow, each
+  with its stages and flow digest, and a place under a `g3-timer` slot folder) in place of the
+  absence it asserted before the first record.
+- `scripts/failure_curriculum.py` reads `causes.md` and trial files at any depth, and keys a failure by the
+  record's path under `evals/results` (a flat record keeps its bare name); an answer in a pull request names
+  that key.
+- `src/nirmaan/evals/levels.py` and `scripts/capability_levels.py` already find manifests at any depth and list
+  records by path; a test now covers two same-named records in two slot folders.
+
+## 17. Dated addition (2026-11-22): the second question of section 14 is settled by a council record
+
+Section 14 says the second question (the runner-account tools over seat files, with the `eda_guard` screen as the
+only control) is settled by those tools running as the seat account with a recorded reach test, or by a council
+ruling that names the screen as the control. The council met on it:
+`council/records/2026-11-22-eda-tools-seat-account.md`. This section records what that record rules for this plan. It
+changes nothing in sections 1 to 11: no count, slot, arm, harness, fingerprint or digest.
+
+**The way is the first one.** The council did not name the screen as the control. In the meeting, seats found on a
+local machine (not recorded evidence) that the screen passes seat Verilog which a tool then acts on by opening a
+file outside the run (the record's fact 9). The record rules that every tool step of the timer path that reads
+seat-written Verilog runs as the seat account in the live evaluation's jobs, with reach probes through each such
+tool, and that the screen is repaired with recorded must-refuse fixtures whatever the route.
+
+**What slot 1 now waits for.** The question is settled as to the way, not yet as to the condition. "WF23 (section
+12, with security's confirmation)" in section 13 is met for this question only when gates ET1 to ET8 of that record
+are met on `main`: the screen repair with its fixtures (ET1); the RTL stage's tools as the seat account with no
+fallback (ET2); the reach probes through each wrapped tool, recorded in a replay on `main` and run as a gate in the
+`live-eval` job (ET3); the held-out checks' compile as the seat account with that run's inputs only, or the record's
+named fallback (ET4); a replay showing the reference answer and the controls unchanged (ET5); a plan amendment (ET6);
+the fingerprints shown unchanged and every pin recomputed (ET7); and the texts (ET8). Slot 1 is not dispatched before
+then.
+
+**What the plan amendment of gate ET6 will change, before slot 1.** The build moves the "Seat account" and "Gate
+backends" digests of section 6; the amendment restates them with the pull request that moved each. It corrects
+section 12, whose sentence "so a testbench cannot print a host file into the log" is not supported as written (the
+record's fact 15) and is not relied on from today. It states that a screen refusal, or a tool denied as the seat
+account, is a failed run and a trial that ends on it is a failed trial, never removed or repeated; that the timer's
+read lists, for each passed trial, whether a seat HDL file holds an include, changing no count; and what is pinned
+beyond the four groups. The measured run of section 10 is made after the last of these merges.
+
+**The first question of section 14** (a seat that declares a `formal_spec`) is settled separately, by a test, in a
+pull request of its own (ip#435, open when this was written; its dated addition takes the number 16, which is why
+this section is 17). The record's decision 5 says what follows for SBY
+under each result of that test: if the test on `main` shows that the formal gates run over a seat's setup on the timer
+path, `sby` is among the tools that run as the seat account before slot 1 (gates ET1 to ET3), and whatever section 12
+says of the formal gates' logs is restated by the plan amendment of gate ET6.

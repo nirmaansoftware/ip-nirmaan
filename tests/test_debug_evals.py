@@ -30,9 +30,11 @@ import pytest
 from laws import needs
 from nirmaan_helpers import GATE_TOOLS
 
-from nirmaan.evals import ReplayLLM, load_cases, run_case, validate_case
+from nirmaan.evals import ReplayLLM, evaluate, load_cases, run_case, validate_case
 from nirmaan.evals.records import record_trial
 from nirmaan.evals.runner import replay_llm
+from nirmaan.integrations.eda import NONCE_ARG
+from nirmaan.integrations.eda_parsers import _VERDICT_RE
 from nirmaan.models import ScoreStatus
 from nirmaan.orchestrator import Orchestrator
 from nirmaan.runtime import ModelRuntime, assemble
@@ -199,6 +201,34 @@ def test_the_reference_triage_repros_each_reproduce_and_each_seeded_defect_fails
     assert len(repro) == 3 and all(g.succeeded for g in repro), repro
     [score] = trial.result.scores
     assert score.status is ScoreStatus.PASSED and "each of 3 mutants fails a file of its own" in score.summary
+
+
+#: The verdict a repro prints, as a testbench writes it: the gate reads it with ``_VERDICT_RE``.
+VERDICT_DISPLAY = '$display("NIRMAAN-SIM %0s %0d passed, %0d failed"'
+
+
+@needs(*GATE_TOOLS)
+@pytest.mark.parametrize("knowledge", (True, False), ids=("documents-on", "documents-off"))
+def test_the_triage_seat_is_told_the_plusarg_and_the_verdict_line_its_repro_gate_reads(knowledge, nirmaan_org,
+                                                                                       fixed_clock, tmp_path):
+    """The repro gate (simulator.run, expect=fail) counts a testbench only when it prints one verdict line with the
+    nonce the run passes as a plusarg (``NONCE_ARG``). In the W2-L1 batch nothing the triage seat received named
+    either, and the gate refused every repro of its eight trials before any judge ran. The failure_triage card now
+    names both, so the seat's prompt carries them with and without the knowledge documents, and the case's reference
+    answer, which follows them, reproduces through the gate.
+    """
+    case_id = "debug/triage-three-bugs"
+    case = _case(case_id)
+    llm = replay_llm(case, REPO)
+    result, _ = evaluate(nirmaan_org, case, ModelRuntime(llm, runtime_id="replay"), replay=True, repo=REPO,
+                         sandbox=tmp_path / "sandbox", clock=fixed_clock, knowledge=knowledge)
+    prompt = llm.calls[0].render()
+    assert f'$value$plusargs("{NONCE_ARG.lstrip("+")}%s"' in prompt, case_id
+    assert VERDICT_DISPLAY in prompt, case_id
+    assert _VERDICT_RE.match("NIRMAAN-SIM %0s %0d passed, %0d failed".replace("%0s", "n0nce").replace("%0d", "1"))
+    repro = [g for g in result.gate_runs if "failure reproduced" in g.summary]
+    assert repro and all(g.succeeded for g in repro), result.gate_runs
+    assert result.passed, result.detail
 
 
 # --- Weak answers the controls fail -----------------------------------------------------------------

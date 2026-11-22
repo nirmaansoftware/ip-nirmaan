@@ -1503,3 +1503,13 @@ gate WF17 (its decision 3), adds conditions before the first register block
 trial and one line to gate WF18 (its decision 2 and gate SC9), and requires
 the compile of seat C to be closed before any such trial (its decision 4).
 It changes nothing else here.
+
+## Note (2026-11-22): read with the EDA tools record
+
+`council/records/2026-11-22-eda-tools-seat-account.md` rules on the second
+reach question security raised on the timer path under the fourth addendum's
+open item (the plan's section 14): the tools that read seat-written Verilog
+run as the seat account before the timer's slot 1, and the input screen is
+repaired, under its gates ET1 to ET8; gate ET9 returns the register block
+flow's Verilator model builds to security before slot 21. It changes nothing
+else here.
