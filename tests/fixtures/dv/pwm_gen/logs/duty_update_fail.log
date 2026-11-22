@@ -1,0 +1,2 @@
+ERROR: pwm_gen_regress_tb.v:49: duty_update: duty changed 2 to 6 mid-period, pwm high for 2 clocks before the next period, expected 0
+pwm_gen_regress_tb.v:51: $finish called at 96000 (1ps)

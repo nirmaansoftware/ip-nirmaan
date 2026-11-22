@@ -1,0 +1,2 @@
+ERROR: pwm_gen_regress_tb.v:33: pulse_width: duty 3 gave a pulse of 4 clocks, expected 3
+pwm_gen_regress_tb.v:51: $finish called at 76000 (1ps)
