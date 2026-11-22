@@ -45,10 +45,10 @@ AXI = REPO / "tests" / "fixtures" / "rtl" / "axi4_lite"
 RTL_CASES = ["rtl/apb-gpio", "rtl/apb-gpio-reset", "rtl/apb-regs", "rtl/axi4-lite-regs", "rtl/axil-timer", "rtl/rr-arbiter",
              "rtl/skid-buffer", "rtl/sync-fifo"]
 #: M45: a spec seat case and a firmware seat case join the RTL cases; W2-E1, W2-E2 and W2-E3 add verification seat
-#: cases, W2-E4 two debug seat cases, W2-E5 a coverage seat case, RX-E1 a second formal and a second equivalence case.
+#: cases, W2-E4 two debug seat cases, W2-E5 a coverage seat case, RX-E1 a second formal and a second equivalence case, RX-E4 a functional coverage case.
 DEBUG_CASES = ["debug/root-cause-uart-tx", "debug/triage-three-bugs"]
 DV_CASES = ["dv/cocotb-crc", "dv/coverage-irq-ctrl", "dv/coverage-tick-timer", "dv/directed-irq-ctrl", "dv/equiv-gray",
-            "dv/equiv-updown", "dv/formal-credit-counter", "dv/formal-rr-arbiter", "dv/plan-irq-ctrl",
+            "dv/equiv-updown", "dv/fcov-lifo4", "dv/formal-credit-counter", "dv/formal-rr-arbiter", "dv/plan-irq-ctrl",
             "dv/plan-tick-timer", "dv/prove-deep-counter", "dv/random-crc", "dv/scoreboard-mac"]
 SHIPPED = [*DEBUG_CASES, *DV_CASES, "firmware/axi4-lite-driver", *RTL_CASES, "spec/axi4-lite-interface"]
 

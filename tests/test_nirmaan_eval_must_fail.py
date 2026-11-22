@@ -562,6 +562,7 @@ def test_the_shipped_cases_name_the_skills_they_judge(nirmaan_org):
         "dv/coverage-irq-ctrl": ("code_coverage",),
         "dv/coverage-tick-timer": ("code_coverage",),
         "dv/directed-irq-ctrl": ("directed_testing", "systemverilog"),
+        "dv/fcov-lifo4": ("functional_coverage",),
         "dv/formal-credit-counter": ("formal_verification", "sva", "assertion_coverage"),
         "dv/formal-rr-arbiter": ("formal_verification", "sva", "assertion_coverage"),
         "dv/plan-irq-ctrl": ("verification_planning",),

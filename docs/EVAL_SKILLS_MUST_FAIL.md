@@ -613,6 +613,38 @@ requirement added, one removed, one number changed, one requirement ID renamed, 
 requirement changed in one mode only), so a plan cannot pass by quoting most of the text or by matching a
 requirement count. `vplan.check` reports a distinct problem for each, and a test names it.
 
+### A functional coverage case (RX-E4)
+
+`dv/fcov-lifo4` gives `functional_coverage` its first case. The skill's stage is the coverage-closure stage of
+signoff-preparation (the same skill is planned by the `coverage` stage of new-ip), whose evidence is a `coverage.read`
+run. `coverage.read` measures line, toggle and branch coverage of design files; it does not read a testbench's
+covergroups. A functional claim therefore needs a checker (a self-checking test that tallies each scenario and fails
+when one never happens), and this case judges exactly that.
+
+The seat writes a functional coverage model of a four-entry stack, `lifo4` (`tests/fixtures/dv/lifo4/`, held out by no
+other case), from the approved requirement matrix, and delivers it as the stage's output, the coverage report: one
+SystemVerilog module, `lifo4_fcov`, with the ports the matrix gives, and a closure statement in comments. The matrix
+names fifteen scenarios: the nine crosses of operation (push alone, pop alone, both) and occupancy (empty, neither,
+full), the five occupancies, and a reset while the stack holds a word. The control is a `must-fail` check whose tool is
+`coverage.read`, whose case files are the block and a held-out stimulus, and whose six mutants are the stimulus with
+one scenario taken out (the refused pop, the refused push, both at either end of the stack, both in the middle, and the
+reset). The stimulus reads the model's `planned` and `holes` after its last cycle and fails the run when fewer than
+fifteen bins are planned or any hole is left. The clean run must pass, and each mutant run must fail, so a model with
+a bin true by construction, a bin written out of the plan, or a constant zero hole count survives the mutant that
+skips its scenario, and a model with a bin no stimulus can hit fails the clean run. The coverage percentages in the
+`coverage.read` summary are not bounded. `tests/test_dv_fcov_lifo4_evals.py` runs the reference answer and each of
+those models against the real tool.
+
+`regression_intelligence` and `regression_management` get no case here, for reasons that hold on this head. No stage
+plans either skill: the triage stage of regression-investigation plans `failure_triage` only when asked for a
+reproduction, and the regression stages plan none, so the two skills reach a seat only as skills its role holds
+(`src/nirmaan/company/workflows.py`, stages `triage`, `regression`, `verify-fix`, `regression-health`;
+`src/nirmaan/company/org_chart.py`, the debug and regression teams). The tools they hold cannot judge a seat's work:
+`regression.run` has no binding (contract only), and `veritriage.investigate` reads logs with `record_history=False`
+(`src/nirmaan/integrations/veritriage.py:59`), so nothing in a run records or looks up a past failure, which is what
+`regression_intelligence` is about. The triage seat's work is already judged by repro testbenches
+(`debug/triage-three-bugs`), which says nothing about history.
+
 ### A control for X after reset (G5)
 
 Two live trials of `rtl/apb-gpio` (one with knowledge documents, one without)
