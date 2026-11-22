@@ -384,3 +384,37 @@ security named: the first by a test of the flow's RTL stage with a seat `.sby` (
 amendment if the test shows the formal gates run), the second by the runner-account tools running as the seat account
 with a recorded reach test, or by a council ruling that names the screen as the control. Each is recorded by the pull
 request that settles it.
+
+## 15. Dated addition (2026-11-22): the second question of section 14 is settled by a council record
+
+Section 14 says the second question (the runner-account tools over seat files, with the `eda_guard` screen as the
+only control) is settled by those tools running as the seat account with a recorded reach test, or by a council
+ruling that names the screen as the control. The council met on it:
+`council/records/2026-11-22-eda-tools-seat-account.md`. This section records what that record rules for this plan. It
+changes nothing in sections 1 to 11: no count, slot, arm, harness, fingerprint or digest.
+
+**The way is the first one.** The council did not name the screen as the control. In the meeting, seats found on a
+local machine (not recorded evidence) that the screen passes seat Verilog which a tool then acts on by opening a
+file outside the run (the record's fact 9). The record rules that every tool step of the timer path that reads
+seat-written Verilog runs as the seat account in the live evaluation's jobs, with reach probes through each such
+tool, and that the screen is repaired with recorded must-refuse fixtures whatever the route.
+
+**What slot 1 now waits for.** The question is settled as to the way, not yet as to the condition. "WF23 (section
+12, with security's confirmation)" in section 13 is met for this question only when gates ET1 to ET8 of that record
+are met on `main`: the screen repair with its fixtures (ET1); the RTL stage's tools as the seat account with no
+fallback (ET2); the reach probes through each wrapped tool, recorded in a replay on `main` and run as a gate in the
+`live-eval` job (ET3); the held-out checks' compile as the seat account with that run's inputs only, or the record's
+named fallback (ET4); a replay showing the reference answer and the controls unchanged (ET5); a plan amendment (ET6);
+the fingerprints shown unchanged and every pin recomputed (ET7); and the texts (ET8). Slot 1 is not dispatched before
+then.
+
+**What the plan amendment of gate ET6 will change, before slot 1.** The build moves the "Seat account" and "Gate
+backends" digests of section 6; the amendment restates them with the pull request that moved each. It corrects
+section 12, whose sentence "so a testbench cannot print a host file into the log" is not supported as written (the
+record's fact 15) and is not relied on from today. It states that a screen refusal, or a tool denied as the seat
+account, is a failed run and a trial that ends on it is a failed trial, never removed or repeated; that the timer's
+read lists, for each passed trial, whether a seat HDL file holds an include, changing no count; and what is pinned
+beyond the four groups. The measured run of section 10 is made after the last of these merges.
+
+**The first question of section 14** (a seat that declares a `formal_spec`) is settled separately, by a test, in a
+pull request of its own. The record's decision 5 says what follows for SBY under each result of that test.
