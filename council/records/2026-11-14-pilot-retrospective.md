@@ -650,7 +650,8 @@ Notes on the table:
 - systemverilog is Practised by the level rule, has no knowledge document,
   and is not a W2-L1 target: dv/directed-irq-ctrl names it, and the levels
   test allows a skill to be Practised with no document (#408). It is in the
-  file's totals, but it is not a result of the batch.
+  file's totals, but it is not a result of the batch. It was not in the file
+  at 01adfe9; its records added it, so the file now lists 41 skills.
 - python_verification has no trial. Its one case, dv/cocotb-crc, has the seat
   write executable test code, so it runs only in CI, under its own 9-slot
   list, and those trials have not run. directed_testing is read on its 24
