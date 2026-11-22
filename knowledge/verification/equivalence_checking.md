@@ -86,6 +86,37 @@ own reasoning; a line marked "gate" names the repository code that backs it.
 - The result names the gold and the gate files, so a pass says which two
   versions were compared (gate: eda_parsers.py:497-499).
 
+## A partition that holds state
+
+- Write the setup for any partition that holds state (the Gray-code counter's
+  register is one) with `use sby`, `engine smtbmc` and a `depth` of 10 or more.
+  The case's reference setup does exactly this
+  (tests/fixtures/dv/gray_counter/gray_counter.eqy:10-13). The `sby` strategy
+  and its `engine` and `depth` commands are described in [EqyStrat].
+- A `sat` pass is not evidence for a register partition. With the installed
+  eqy and Yosys, `use sat` with `depth 10` reports the wrong-flip-bit mutant of
+  the Gray-code refactor equivalent, and `use sby` with `engine smtbmc` and
+  `depth 10` reports it not equivalent (gate: tests/test_dv_crc_gray_evals.py,
+  `test_a_sat_strategy_passes_the_wrong_flip_mutant_that_the_sby_strategy_fails`).
+  Three live seats wrote `use sat` at `depth 10` and the held-out check of
+  `dv/equiv-gray` found that mutant surviving each setup
+  (evals/dv/equiv_gray.json:46-48 and the records
+  evals/results/2026-11-18-claude-code-claude-opus-5-5-35/dv_equiv-gray/trial-01.json:75,
+  evals/results/2026-11-19-claude-code-claude-opus-5-5-29/dv_equiv-gray/trial-01.json:75 and
+  evals/results/2026-11-19-claude-code-claude-opus-5-5-71/dv_equiv-gray/trial-01.json:75).
+  The eqy pages in the sources give no reason for this and do not state it;
+  the repository test is the evidence. A bigger `depth` is not offered as a
+  remedy: the test fixes only `depth 10`.
+- List `sby` first, or only. The test above also shows a setup that names
+  `sat` and then `sby` still passes the mutant, because the `sby` strategy
+  is not reached when `sat` proves the partition. The eqy pages in the
+  sources do not state strategy order for a proved partition (inference from
+  that test and from the slot 89 record,
+  evals/results/2026-11-19-claude-code-claude-opus-5-5-29/dv_equiv-gray/trial-01.json:75).
+- The seat cannot mutation-test its own setup: one setup is submitted per run
+  (inference). The mutation check under "How a result is checked" is therefore the
+  reviewer's, not a step the seat can take.
+
 ## Common failure modes
 
 - Gold and gate running the same commands, or only the original: the gate
@@ -104,7 +135,8 @@ own reasoning; a line marked "gate" names the repository code that backs it.
 - A depth too small for a design whose outputs agree for the first steps and
   differ later. The `sat` strategy proves equality only if the outputs agree
   for the initial depth steps and for every later step that follows depth
-  agreeing steps [EqyStrat].
+  agreeing steps [EqyStrat]. That condition does not make a `sat` pass sound
+  for a partition that holds state: see "A partition that holds state".
 - Missing recode or match rules after synthesis changed an FSM encoding or a
   name, which leaves partitions that cannot be proved [EqyConfig].
 - A bug in gold carried into gate, which equivalence cannot see.
@@ -113,7 +145,7 @@ own reasoning; a line marked "gate" names the repository code that backs it.
 
 - Read the gold and gate file names and the partition count in the summary
   (gate: eda_parsers.py:497-503).
-- Run the same setup against a gate version with one behaviour changed, such as
+- Reviewer: run the same setup against a gate version with one behaviour changed, such as
   one wrong bit, an off-by-one in a flag or a wrong reset value. A setup that
   still reports equivalence is not looking at that behaviour (inference).
 - On a failure, eqy writes a trace of the failing case; the getting-started
