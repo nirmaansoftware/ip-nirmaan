@@ -1,0 +1,67 @@
+{
+  "format": "nirmaan.knowledge-check",
+  "skill": "regression_intelligence",
+  "knowledge_document": "knowledge/verification/regression_intelligence.md",
+  "document_sha256": "sha256:f0f7b4e1a69f16fd70a04704e25c8582ef1b8138783e04e00f88e7e1fcc19137",
+  "writer": "RX-K2 session (wave 2 close, 2026-11-22)",
+  "checker": "RX-C session (lane RX-C, wave 2 close independent check, 2026-11-22)",
+  "sources_read": [
+    "[POU] Poulos and Veneris, Clustering-based Failure Triage for RTL Regression Debugging, ITC 2014: the whole paper to its references, https://www.eecg.utoronto.ca/~veneris/itc14.pdf",
+    "[ELM] El Mandouh et al., Guiding Functional Verification Regression Analysis Using Machine Learning and Big Data Methods, DVCon Europe 2018: the whole paper to its references, https://dvcon-proceedings.org/wp-content/uploads/guiding-functional-verification-regression-analysis-using-machine-learning-and-big-data-methods.pdf",
+    "[PHO] Phogat and Hamilton, mL: Shrinking the Verification volume using Machine Learning, DVCon proceedings: the whole paper to its references, https://dvcon-proceedings.org/wp-content/uploads/1090-1.pdf",
+    "Repository code at the lines cited in gate_claims; tests/test_knowledge_files.py and tests/test_knowledge_gate_claims.py run and passing; scripts/check_dashes clean by grep"
+  ],
+  "result": "every claim tagged with a source was found in that source (POU: three triage tasks, suspect sets with excitation cycles, weights for temporal proximity and low toggling frequency, Ward's method cut at 3 to 5 sigma then K-means seeded from the cut, 20 runs of four OpenCores designs, 89, 78 and 58 percent, 12 runs exact and 7 with one or two clusters too few; ELM: 100 cycle windows, counts of transitions to 1, X-means, cone of influence signal selection dropping memories and counters, MapReduce 2.7x, 1,500 tests, 81, 13 and 6 percent, 83 percent same cycle; PHO: about 1000 knobs, 1 million tests from 2 weeks, 5:95 imbalance, gradient boosted trees, sequential cross validation grouped by date, weekly retraining, CRT kept for new retraining data and unexplored areas, 1.35x, 1.6x, 7.6 percent, 16 percent, one failure signature assumed to be one bug), every line marked inference is a fair reading, and every sentence about the repository matches the code at the lines cited in gate_claims",
+  "notes": [
+    "POU: the document's 'number of bins was exactly right in 12 runs and one or two too few in 7' is the paper's figure for the number of clusters predicted by the dendrogram cut after the first pass (Fig. 8); the paper adds one run with one cluster too many (12 + 7 + 1 = 20). The sentence is a fair summary.",
+    "POU: 'since typical errors are easy to excite' is on the page (typical RTL errors are relatively easy to excite, so low toggling frequency is promoted).",
+    "ELM: the 1,500 tests are the training set the paper builds from passing runs; the document's 'injected faults, not bugs found in a project' is correctly marked inference (mutation testing is the paper's bug injection).",
+    "PHO: the page shows measurements from June 2022 to September 2023 (15 months); the document says the page shows no year, which is about the publication, not the data, and is harmless.",
+    "Behaviour: the binding calls WorkspaceServices(session_root=...) with no db (veritriage.py:42-44 and services.py:118), so even with a workspace given the history branch at services.py:211 never runs; the document's three-line inference holds.",
+    "Not a defect: the document cites veritriage.py:50-57 and services.py:211-219; both ranges hold the stated code on main at 74050fa3.",
+    "No held-out case detail, reference setup or mutant name appears; no em or en dash."
+  ],
+  "gate_claims": [
+    {
+      "claim": "the card's one tool is veritriage.investigate",
+      "evidence": "src/nirmaan/company/skills.py:522"
+    },
+    {
+      "claim": "the card's procedure is to check whether a failure was seen before and what fixed it, and its failure is re-debugging known failures",
+      "evidence": "src/nirmaan/company/skills.py:525"
+    },
+    {
+      "claim": "veritriage.investigate takes paths (required) and an optional workspace",
+      "evidence": "src/nirmaan/company/tools.py:112"
+    },
+    {
+      "claim": "the tool refuses no paths, a missing path and a directory",
+      "evidence": "src/nirmaan/integrations/veritriage.py:50"
+    },
+    {
+      "claim": "a directory is refused with a reason, tested",
+      "evidence": "tests/test_nirmaan_gate_integrity.py::test_veritriage_refuses_a_directory_cleanly"
+    },
+    {
+      "claim": "the binding runs the investigation with record_history=False and learn=False",
+      "evidence": "src/nirmaan/integrations/veritriage.py:59"
+    },
+    {
+      "claim": "the history record and seen-before flag are attached only when record_history is true and a database exists",
+      "evidence": "src/veritriage/workspace/services.py:211"
+    },
+    {
+      "claim": "with record_history on, a repeat run reports seen_before, tested",
+      "evidence": "tests/test_workspace.py::test_investigate_can_record_history"
+    },
+    {
+      "claim": "the binding builds the services from the workspace's session root only, with no history database (so the seat cannot set the flag; the document marks this an inference)",
+      "evidence": "src/nirmaan/integrations/veritriage.py:42"
+    },
+    {
+      "claim": "Practising tier line: the one tool the skill holds is AVAILABLE",
+      "evidence": "src/nirmaan/company/tools.py:112"
+    }
+  ],
+  "checked_at": "2026-11-22"
+}
