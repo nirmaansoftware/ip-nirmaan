@@ -1099,6 +1099,30 @@
         }
       ]
     },
+    "regression_intelligence": {
+      "knowledge": {
+        "check_record": null,
+        "counts": false,
+        "knowledge_document": "knowledge/verification/regression_intelligence.md",
+        "problems": [
+          "no check record"
+        ]
+      },
+      "level": null,
+      "practised": []
+    },
+    "regression_management": {
+      "knowledge": {
+        "check_record": null,
+        "counts": false,
+        "knowledge_document": "knowledge/verification/regression_management.md",
+        "problems": [
+          "no check record"
+        ]
+      },
+      "level": null,
+      "practised": []
+    },
     "reset_design": {
       "knowledge": {
         "check_record": "capability/records/knowledge/reset_design.json",
