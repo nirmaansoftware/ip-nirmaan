@@ -88,31 +88,14 @@ own reasoning; a line marked "gate" names the repository code that backs it.
 
 ## A partition that holds state
 
-- Write the setup for any partition that holds state (the Gray-code counter's
-  register is one) with `use sby`, `engine smtbmc` and a `depth` of 10 or more.
-  The case's reference setup does exactly this
-  (tests/fixtures/dv/gray_counter/gray_counter.eqy:10-13). The `sby` strategy
-  and its `engine` and `depth` commands are described in [EqyStrat].
-- A `sat` pass is not evidence for a register partition. With the installed
-  eqy and Yosys, `use sat` with `depth 10` reports the wrong-flip-bit mutant of
-  the Gray-code refactor equivalent, and `use sby` with `engine smtbmc` and
-  `depth 10` reports it not equivalent (gate: tests/test_dv_crc_gray_evals.py,
-  `test_a_sat_strategy_passes_the_wrong_flip_mutant_that_the_sby_strategy_fails`).
-  Three live seats wrote `use sat` at `depth 10` and the held-out check of
-  `dv/equiv-gray` found that mutant surviving each setup
-  (evals/dv/equiv_gray.json:46-48 and the records
-  evals/results/2026-11-18-claude-code-claude-opus-5-5-35/dv_equiv-gray/trial-01.json:75,
-  evals/results/2026-11-19-claude-code-claude-opus-5-5-29/dv_equiv-gray/trial-01.json:75 and
-  evals/results/2026-11-19-claude-code-claude-opus-5-5-71/dv_equiv-gray/trial-01.json:75).
-  The eqy pages in the sources give no reason for this and do not state it;
-  the repository test is the evidence. A bigger `depth` is not offered as a
-  remedy: the test fixes only `depth 10`.
-- List `sby` first, or only. The test above also shows a setup that names
-  `sat` and then `sby` still passes the mutant, because the `sby` strategy
-  is not reached when `sat` proves the partition. The eqy pages in the
-  sources do not state strategy order for a proved partition (inference from
-  that test and from the slot 89 record,
-  evals/results/2026-11-19-claude-code-claude-opus-5-5-29/dv_equiv-gray/trial-01.json:75).
+- For a partition that holds state, such as a register, prefer the `sby`
+  strategy over `sat`: `sat` is described as quick but unable to prove some
+  partitions, while `sby` is the more general choice [EqyStrat]. Choose the
+  engine and a `depth` from the design and the sources, not from a fixed
+  number in this document.
+- A `sat` pass is weaker evidence for a register partition than an `sby`
+  pass (inference). The eqy pages in the sources do not state strategy order
+  for a proved partition, so list the stronger strategy first, or only.
 - The seat cannot mutation-test its own setup: one setup is submitted per run
   (inference). The mutation check under "How a result is checked" is therefore the
   reviewer's, not a step the seat can take.
