@@ -33,8 +33,8 @@ screen refuses by what the C pulls in, whoever compiles it, needs no change
 to the job's grants, and is the smaller change (eda-tooling's position).
 Decision 4, item 5 asks, before the first register block trial, for the
 compile as the seat account or security's recorded reason for staying with
-the screen. Security chose the screen; its reason is below ("Decision 4,
-item 5: the register block").
+the screen. This pull request proposes the screen; the proposed reason is
+below ("Decision 4, item 5: the register block"), pending a security record.
 
 ## What it refuses
 
@@ -115,10 +115,11 @@ changed without a fingerprint change (`docs/GATE_INTEGRITY.md`, section 3).
 The record (decision 4, item 5, and gate SC9) asks, before the first trial of
 `flow/axi4-lite-regs-driver`, that the compile of seat text run as the seat
 account, or that security record its reason for staying with the screen.
-Security's choice is **the screen**, with the compile left with the runner.
-It was given on 2026-11-22 by the security seat (`council/security.md`) as a
-read-only process of its own, against `main` at 45a22c8, without any draft
-of this text. Its reason, in its own order:
+This pull request proposes **the screen**, with the compile left with the
+runner. No security seat record backs this choice yet: the security seat
+(`council/security.md`) has not recorded a decision here, and gate SC9 stays
+open until it does. The reasons below are the author's proposal for that
+seat to confirm or reject:
 
 1. The account route cannot meet its own condition in checks 5 and 6 (fact).
    The flow's held-out test includes the seat's header
@@ -161,7 +162,7 @@ of this text. Its reason, in its own order:
    weighs that as a moderate added risk in code that runs as root, for
    little beyond reason 4.
 
-Security's conditions, each before the first register block trial:
+Proposed conditions, each before the first register block trial:
 
 1. A CI record, on the build the trials will use, shows every must-refuse
    fixture refused. Run 44557443798 (636b02d) no longer is that build:
