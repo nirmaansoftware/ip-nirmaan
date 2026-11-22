@@ -1,0 +1,50 @@
+{
+  "format": "nirmaan.knowledge-check",
+  "skill": "formal_coverage",
+  "knowledge_document": "knowledge/verification/formal_coverage.md",
+  "document_sha256": "sha256:8f88e8f02146f4526290b197f861b79d499ae2616f79d1006bbed0b7ebcb4cd1",
+  "writer": "RX-K2 session (wave 2 close, 2026-11-22)",
+  "checker": "RX-C session (lane RX-C, wave 2 close independent check, 2026-11-22)",
+  "sources_read": [
+    "[RAN] Ranjan, Weber and Hanna, On Verification Coverage Metrics in Formal Verification and Speeding Verification Closure with UCIS Coverage Interoperability Standard, DVCon: the whole paper to its references, https://dvcon-proceedings.org/wp-content/uploads/on-verification-coverage-metrics-in-formal-verification-and-speeding-verification-closure-with-ucis-coverage-interoperability-standard.pdf",
+    "[PAT] US patent 8,826,201 B1, Formal verification coverage metrics for circuit design properties: the whole page (background, FIG. 1A shift register example, proof core and minimally sufficient core, over-estimation by COI metrics), https://patents.google.com/patent/US8826201",
+    "[PCP] Devarajegowda et al., A Mutually-Exclusive Deployment of Formal and Simulation Techniques Using Proof-Core Analysis, DVCon Europe 2017: the whole paper to its references, https://dvcon-proceedings.org/wp-content/uploads/a-mutually-exclusive-deployment-of-formal-and-simulation-techniques-using-proof-core-analysis-paper.pdf",
+    "Repository code at the lines cited in gate_claims; tests/test_knowledge_files.py and tests/test_knowledge_gate_claims.py run and passing"
+  ],
+  "result": "every claim tagged with a source was found in that source (RAN: three completeness dependencies, cover items and coverage as share reachable, COI, proof core by unsat-core extraction, proof core coverage called the strongest metric with its two costs, baseline environment of clock, reset and tie-offs, dead code, disabling parameter or constraints as causes of unreachable items, the transaction-order over-constraint found from three assumptions, 4,655 of 38,633 items outside every COI and nearly 10,000 in the COI of five or fewer properties, fault injection by disconnecting a flop driver, Chockler and Koen not adopted for complexity and impracticality, bounded proof coverage with 865 of 1200 less 55 giving 76 percent, the four responses to bounded holes, the caveat on merging formal and simulation coverage; PAT: proof core versus COI, minimally sufficient core, the five-register shift register example where RG0 is in the COI and outside the proof core, COI-only metrics over-estimate; PCP: block split by method, vPlan assigning each checker, proof core data merged with simulation code coverage, formal-friendly and unfriendly block lists as reference only, reductions small and not tabulated), every line marked inference is a fair reading, and the repository sentences are true on main",
+  "notes": [
+    "Citation drift, for the document's owner to refresh at its next edit: the document cites src/nirmaan/company/skills.py:539-542 (lines 31 and 108). On main after ip#438 (542821e7) the formal_coverage card is at skills.py:549-552; when the document was merged (74050fa3) it was at 541-544, and the cited 539-542 held the end of the equivalence_checking card and only the first half of this one. The sentences are true; the range does not hold them. The gate_claims below cite the current lines. tools.py:148-153 (formal.cover) is exact.",
+    "RAN: 'merged numbers mean less than one environment's own' is a strengthened reading of the page's caveat that the context of coverage measurement differs between formal and simulation and 'should be kept in mind when combining the coverage numbers'. Fair, but it is the document's wording under a [RAN] tag; reported to the owner, no effect on the Knowledge reading.",
+    "RAN: the document says [RAN] calls proof-core coverage the strongest 'of the metrics it lists'; the page says strongest 'of all coverage metrics used in simulation and formal verification', so the document's wording is the narrower and safe one.",
+    "PCP: 'its test vehicle was small' is the authors' statement that their simulation was small and the reductions small; fair.",
+    "The document's own pointer, knowledge/verification/assertion_coverage.md, exists and describes formal.cover.",
+    "No held-out case detail appears; no em or en dash."
+  ],
+  "gate_claims": [
+    {
+      "claim": "the card lists no tool, only the pack formal; procedure is to measure proof core and reachability, and every unreachable cover must be explained",
+      "evidence": "src/nirmaan/company/skills.py:549"
+    },
+    {
+      "claim": "the card's failure is unreachable covers ignored and its validity test is every unreachable cover explained",
+      "evidence": "src/nirmaan/company/skills.py:552"
+    },
+    {
+      "claim": "Knowledge only tier line: the card holds no tool",
+      "evidence": "src/nirmaan/company/skills.py:549"
+    },
+    {
+      "claim": "formal.cover runs every cover in a proof setup, plus a cover derived for each assertion antecedent, each reached under its assumptions",
+      "evidence": "src/nirmaan/company/tools.py:148"
+    },
+    {
+      "claim": "formal.cover takes the proof's .sby job file, single-task, in cover mode",
+      "evidence": "src/nirmaan/company/tools.py:149"
+    },
+    {
+      "claim": "formal.cover does not compute a proof core or the fraction of a design a property set reaches (marked inference from the tool description)",
+      "evidence": "unverified"
+    }
+  ],
+  "checked_at": "2026-11-22"
+}
