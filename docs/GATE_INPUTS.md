@@ -253,8 +253,16 @@ The repair (`_lexical`) is an allow list of forms; a file outside it is
 refused, with the reason, before any step runs:
 
 - every string closes on its own line; a quote that does not is refused;
-- no backslash outside a string but one that continues a line (so no escaped
-  identifier);
+- an escaped identifier (IEEE 1364, section 3.7.1: a backslash and every
+  character up to white space) is read as one name, as the tools read it, so
+  the marks in it open no comment or string; it may not begin with `$` unless
+  it is a name of `SAFE_SYSTEM` (Icarus and Yosys run `\$readmemh` as the
+  system task), nor begin with `/` or hold `..` (Verilator opens the file an
+  undefined module is named, so `\../x` reads `../x` and `\/abs/x` reads
+  `/abs/x`), nor hold a comment or quote mark, a backtick or a second
+  backslash. The names Yosys writes into a netlist (`\q_reg[3]`, a source path
+  after a name's first character) pass: `dft.check` and `dft.scan_sim` read
+  such netlists. Any other backslash outside a string continues a line;
 - a conditional directive (`` `ifdef ``, `` `ifndef ``, `` `elsif ``,
   `` `else ``, `` `endif ``) stands alone on its line, a `//` comment aside, and
   none is inside a comment or a string;
@@ -271,8 +279,12 @@ refused, with the reason, before any step runs:
 - no control character but tab, line feed, and a carriage return before a
   line feed.
 
+A file that breaks one of these rules is refused for that alone: what the
+check reads in it, its includes among them, may not be what a tool reads, so
+the refusal names none of it and no include of it is followed.
+
 A C source (a firmware driver in `sources`) is checked too. A C character
-literal (`'\0'`) breaks the first two rules, so a file with a suffix Verilator
+literal (`'\0'`, `'"'`) breaks the first two rules, so a file with a suffix Verilator
 compiles as C++ (`.c`, `.cc`, `.cpp`, `.cxx`), with no `$` or `DPI` in it and a
 backtick only around a word, is left to the compiler for those two: it holds
 nothing a Verilog tool acts on to read a file or run anything.
@@ -289,8 +301,15 @@ refused through each of the four gates. Controls, with the check bypassed:
 for each fixture the tools that act on it (the canary's name or content in
 the run's output, a synthesized result that changes with the canary's
 content, or the marker written), and for each judge file a tool that
-compiles it in. Each rule has a unit test, and an ordinary file using every
-allowed form passes. Every committed Verilog and C file still passes, and
+compiles it in. `esc_dollar_task` (an escaped `\$readmemh`) was refused
+before this change too, by the `$` name; it stays a fixture so that reading
+escaped identifiers as names cannot let one through. `esc_abs_module` and
+`esc_dotdot_module` name an undefined module by the canary's absolute and
+relative path, and Verilator opens it. Each rule has a unit test, an ordinary
+file using every allowed form passes, and so do escaped names of the forms
+Yosys writes, a scan netlist from `dft.scan_insert` made in the test, and a
+committed one (`tests/fixtures/screen_pass/rr_arbiter_scan.v`). Every
+committed Verilog and C file still passes, and
 the history scan of section 3 refuses the same seat files as without the
 repair: no committed trial's re-judge changes.
 

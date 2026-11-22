@@ -11,7 +11,9 @@ Every payload only creates a marker file inside the test's own temporary directo
 from __future__ import annotations
 
 import json
+import re
 import shutil
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -321,7 +323,10 @@ FORMAL_GATES = [("formal.run", "symbiyosys"), ("formal.cover", "symbiyosys-cover
 LIVE = {
     "define_comment": ["icarus"],
     "dollar_macro": ["icarus", "verilator-sim", "yosys"],
+    "esc_abs_module": ["verilator-lint", "verilator-sim"],
     "esc_block": ["verilator-lint", "verilator-sim", "yosys"],
+    "esc_dollar_task": ["icarus", "yosys"],
+    "esc_dotdot_module": ["verilator-lint", "verilator-sim"],
     "esc_line": ["verilator-lint", "verilator-sim", "yosys"],
     "esc_quote": ["verilator-lint", "icarus", "verilator-sim", "yosys"],
     "glued_macro_call": ["icarus", "verilator-sim"],
@@ -390,6 +395,15 @@ def test_control_without_the_check_a_tool_acts_on_the_form(tmp_path, monkeypatch
         source, marker = bypass_file(tmp_path, fixture)
         execute(gate, {"sources": str(source), "top": "m", "workdir": str(tmp_path / "wd")})
         assert marker.exists()
+    elif fixture in ("esc_abs_module", "esc_dotdot_module"):
+        # Verilator opens the file an undefined module is named (its error is on the canary's first line). It looks
+        # up no name longer than 127 characters once each "/" or "." is spelled "__02f" or "__02e", so the absolute
+        # name is a canary in a short folder under /tmp.
+        with tempfile.TemporaryDirectory(dir="/tmp") as short:
+            include = str(write(Path(short) / "CANARY_ET1.vh", f"{CANARY} ! ;\n"))
+            source, _ = bypass_file(tmp_path, fixture, include=include)
+            output = printed(execute(gate, {"sources": str(source), "top": "m", "workdir": str(tmp_path / "wd")}))
+        assert re.search(r"CANARY_ET1\.vh:1\b", output), output
     elif name == "yosys" and "{canary_hex}" in (BYPASS / f"{fixture}.v.tpl").read_text(encoding="utf-8"):
         cells = []
         for bit in ("1", "0"):  # y = a ^ r[0]: one cell when the canary holds 1, none when it holds 0
@@ -412,6 +426,8 @@ def test_a_seat_file_that_reaches_a_judge_file_is_refused(tmp_path, judge, tool,
         outcome = execute(backend(tool, name), {"sources": str(source), "top": "m"})
         refused(outcome, marker)
         assert Path(judge).name not in outcome.summary
+        lines = [line.strip() for line in (ROOT / judge).read_text(encoding="utf-8").splitlines()]
+        assert not [line for line in lines if len(line) >= 30 and line in outcome.summary]  # names it, quotes none
 
 
 @pytest.mark.parametrize("judge", JUDGE)
@@ -427,7 +443,16 @@ def test_control_without_the_check_a_seat_file_reaches_a_judge_file(tmp_path, mo
 
 
 @pytest.mark.parametrize("text,why", [
-    ('module m;\n  wire \\x ;\nendmodule\n', "a backslash outside a string"),
+    ('module m;\n  initial \\$fopen ("x", "r");\nendmodule\n', "the escaped name \\$fopen"),
+    ('module m;\n  \\../judge/ref u();\nendmodule\n', "an escaped name holding '..'"),
+    ('module m;\n  \\/judge/ref u();\nendmodule\n', "an escaped name that is an absolute path"),
+    ('module m;\n  wire \\a\\b ;\nendmodule\n', "an escaped name holding '\\\\'"),
+    ('module m;\n  wire \\a" ; initial $readmemh("x", r); // "\nendmodule\n', "an escaped name holding '\"'"),
+    ('module m;\n  wire \\a// ;\nendmodule\n', "an escaped name holding '//'"),
+    ('module m;\n  wire \\a*/ ;\nendmodule\n', "an escaped name holding '*/'"),
+    ('module m;\n  wire \\a/*b ;\nendmodule\n', "an escaped name holding '/*'"),
+    ('module m;\n  wire \\a`M ;\nendmodule\n', "an escaped name holding '`'"),
+    ('module m;\n  wire a = 1 \\ ;\nendmodule\n', "a backslash that neither starts a name nor continues a line"),
     ('module m;\n  initial $display("a\\\nb");\nendmodule\n', "a quote that does not close"),
     ("`ifdef A\n`define B 1\n`endif // ok\n`ifdef A `define C 2\n`endif\n", "not alone on its line"),
     ('module m;\n  // `endif\nendmodule\n', "inside a comment or a string"),
@@ -449,6 +474,34 @@ def test_each_rule_of_the_repair_refuses_its_form(tmp_path, text, why):
     path.write_bytes(text.encode("utf-8"))
     problem = verilog_problem([path])
     assert problem and why in problem, problem
+
+
+def test_escaped_names_as_yosys_writes_them_still_pass(tmp_path):
+    """IEEE 1364, 3.7.1: an escaped identifier is a name; scan insertion's netlist is full of them (dft.check reads
+    it). The names below are of the forms Yosys wrote into one, a source path in a name included."""
+    text = ("module top(input wire clk, output wire q);\n  wire [3:0] \\is_mapped$func$/work/run/regs.v:88$8.addr ;\n"
+            "  reg \\s_axil_bresp_reg[1] ;\n  reg \\u_core.w_data_q_reg[0] ;\n  always @(posedge clk)\n"
+            "    \\s_axil_bresp_reg[1]  <= \\u_core.w_data_q_reg[0] ;\n  assign q = \\s_axil_bresp_reg[1] ;\n"
+            "  initial \\$display (\"ok\");\nendmodule\n")
+    assert verilog_problem([write(tmp_path / "scan.v", text)]) is None
+
+
+@needs("yosys")
+def test_a_real_scan_netlist_passes_and_holds_escaped_names(tmp_path):
+    source = ROOT / "tests" / "fixtures" / "rtl" / "axi4_lite" / "axi4_lite_regs.v"
+    outcome = execute(backend("dft.scan_insert", "yosys-scan"), {"sources": str(source), "top": "axi4_lite_regs",
+                                                                  "workdir": str(tmp_path / "insert")})
+    assert outcome.succeeded, outcome.summary
+    netlist = Path(outcome.outputs["scan_netlist"])
+    assert "\\" in netlist.read_text(encoding="utf-8")
+    assert verilog_problem([netlist]) is None
+
+
+def test_a_committed_scan_netlist_with_an_escaped_name_passes():
+    """screen_pass/rr_arbiter_scan.v is dft.scan_insert's netlist of rtl/rr_arbiter, as Yosys 0.69 wrote it."""
+    netlist = FIXTURES / "screen_pass" / "rr_arbiter_scan.v"
+    assert "\\ptr_reg[0] " in netlist.read_text(encoding="utf-8")
+    assert verilog_problem([netlist]) is None
 
 
 def test_ordinary_forms_still_pass(tmp_path):

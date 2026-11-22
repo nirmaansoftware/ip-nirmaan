@@ -114,9 +114,11 @@ SAFE_SYSTEM = frozenset({
     # waveforms, into the run's own directory
     "$dumpvars", "$dumpon", "$dumpoff", "$dumpall", "$dumpflush", "$dumplimit",
 })
-#: Strings and comments, matched together, so a "//" inside a string cannot hide what follows it. A string ends on
-#: its own line: Yosys reads a string on across a line break, so a quote left open is refused (``_lexical``).
-_TEXT_RE = re.compile(r'"(?:\\[^\n]|[^"\\\n])*"|//[^\n]*|/\*.*?\*/', re.DOTALL)
+#: Strings, comments and escaped identifiers, matched together, so a "//" inside a string cannot hide what follows it.
+#: A string ends on its own line: Yosys reads a string on across a line break, so a quote left open is refused
+#: (``_lexical``). An escaped identifier (IEEE 1364, 3.7.1) is a backslash and every character up to white space: a
+#: name, whatever marks it holds (``_escaped`` says which it may hold).
+_TEXT_RE = re.compile(r'"(?:\\[^\n]|[^"\\\n])*"|//[^\n]*|/\*.*?\*/|\\[^ \t\n]+', re.DOTALL)
 _SYSTEM_RE = re.compile(r"(?<![\w$])\$[A-Za-z_][\w$]*")
 #: ``$dumpfile`` with a plain file name, which lands in the run's own directory.
 _DUMPFILE_RE = re.compile(r'\$dumpfile\s*\(\s*"[A-Za-z0-9_][A-Za-z0-9_.\-]*"\s*\)')
@@ -166,6 +168,25 @@ def _blank(text: str) -> str:
     return _TEXT_RE.sub(lambda m: re.sub(r"[^\n]", " ", m.group(0)), text)
 
 
+def _escaped(name: str) -> str | None:
+    """Why an escaped identifier (``name`` without its backslash) cannot be passed, or None.
+
+    Icarus and Yosys run ``\\$readmemh`` as the system task, and Verilator reads an undefined module's file by its
+    name, so ``\\../x`` reads ``../x`` and ``\\/abs/x`` reads ``/abs/x``. A comment or quote mark, or a backtick, in a
+    name is where the check's reading and the tools' differed before ET1 (``\\/*``, ``\\"``); a second backslash
+    could continue a line in a macro's body, so the name would end elsewhere. A name Yosys writes into a netlist
+    (``\\q_reg[3]``, a source path after its first character) holds none of these.
+    """
+    if name.startswith("$") and name not in SAFE_SYSTEM:
+        return f"the escaped name \\{name[:40]} (a tool runs it as the system task)"
+    if name.startswith("/"):
+        return "an escaped name that is an absolute path (Verilator reads a module's file by its name)"
+    bad = next((mark for mark in ("/*", "*/", "//", '"', "`", "..", "\\") if mark in name), None)
+    if bad:
+        return f"an escaped name holding {bad!r} (a tool reads it otherwise)"
+    return None
+
+
 def _lexical(raw: str, text: str, suffix: str = "") -> set[str]:
     """Where a tool could read code that the checks read as a comment or a string, or build a name they never see.
 
@@ -182,8 +203,11 @@ def _lexical(raw: str, text: str, suffix: str = "") -> set[str]:
     c_source = suffix in C_SUFFIXES and not re.search(r"[`$]|DPI", re.sub(r"`[A-Za-z_][\w$]*`", "", text))
     if '"' in code and not c_source:
         found.add("a quote that does not close a string on its own line")
-    if re.search(r"\\(?!\n)", code) and not c_source:  # \/* or \" is a name to every tool, and a comment or string mark here
-        found.add("a backslash outside a string (an escaped identifier)")
+    if re.search(r"\\(?!\n)", code) and not c_source:
+        found.add("a backslash that neither starts a name nor continues a line")
+    if not c_source:
+        found |= {why for m in _TEXT_RE.finditer(text) if m.group(0).startswith("\\")
+                  for why in [_escaped(m.group(0)[1:])] if why}
     lines, coded = text.split("\n"), code.split("\n")
     if any(_CONDITIONAL_RE.search(c) and not _CONDITIONAL_LINE_RE.match(t) for t, c in zip(lines, coded)):
         found.add("a conditional directive that is not alone on its line")
@@ -262,7 +286,11 @@ def verilog_problem(files: Iterable[str | Path]) -> str | None:
         raw = path.read_bytes().decode("utf-8", errors="replace")
         text = raw.replace("\r\n", "\n").replace("\r", "\n")
         used, included = verilog_uses(text)
-        used |= _lexical(raw, text, path.suffix)
+        # A file the check reads otherwise than a tool is refused for that alone: what the check reads in it (its
+        # includes among them) may not be what a tool reads, so none of it is followed or named.
+        lexical = _lexical(raw, text, path.suffix)
+        if lexical:
+            used, included = lexical, []
         code = _blank(text)
         defined |= set(_DEFINE_RE.findall(code))
         macros[path] = {m for m in _MACRO_RE.findall(code) if m not in DIRECTIVES and m != m.upper()}
