@@ -5,7 +5,7 @@
   "skills": [
     "verification_planning"
   ],
-  "expected_behavior": "A verification plan in the nirmaan.vplan format for the approved tick_timer interface specification: every requirement the specification tags, quoted exactly with its source and section, and items that say how each will be proven, checked by vplan.check against the approved specification before review.",
+  "expected_behavior": "A verification plan in the nirmaan.vplan format for the approved tick_timer interface specification: every requirement the specification tags, each quoted exactly and named with its ID and its source specification, and items that say how each will be proven, checked by vplan.check against the approved specification before review.",
   "constraints": [
     "Work only from the approved interface specification.",
     "Cover every tagged requirement exactly once, quoting its text, and invent none.",
