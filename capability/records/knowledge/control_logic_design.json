@@ -2,22 +2,40 @@
   "format": "nirmaan.knowledge-check",
   "skill": "control_logic_design",
   "knowledge_document": "knowledge/design/control_logic_design.md",
-  "document_sha256": "sha256:27714b3524b715f5906a32817d74bfa4a5ec798490ecb47d27aa1206387ffc6e",
-  "writer": "IP-P3-K2 session (P3 pilot, item K2, 2026-11-03)",
-  "checker": "IP-P3-C2 session (P3 pilot, item C2)",
+  "document_sha256": "sha256:b672c01cd42f0a0787327285a7f6b08f487c577d79f9a047d58d1d12a003477b",
+  "writer": "IP-P3-K2 session (P3 pilot, item K2, 2026-11-03; reset notes added in ip#439 by the G5 notes)",
+  "checker": "RX-C2 session (lane RX-C2, wave 2 close independent check, 2026-11-23)",
   "sources_read": [
-    "[GPIO] lowRISC, OpenTitan GPIO Theory of Operation (Apache 2.0): the whole page, https://opentitan.org/book/hw/ip/gpio/doc/theory_of_operation.html",
-    "[CIP] lowRISC, OpenTitan Comportability Specification (Apache 2.0): the whole page, read closely in its Interrupt Handling section, https://opentitan.org/book/doc/contributing/hw/comportability/index.html",
-    "[PIC] Gisselquist, The ZipCPU's Interrupt Controller, ZipCPU blog, 2019: the whole article with its formal rules and covers, https://zipcpu.com/zipcpu/2019/04/02/icontrol.html",
-    "[CDC] Gisselquist, Some Simple Clock-Domain Crossing Solutions, ZipCPU blog, 2017: the whole article, https://zipcpu.com/blog/2017/10/20/cdc.html"
+    "[GPIO] lowRISC, OpenTitan GPIO Theory of Operation (Apache 2.0): the whole page, 87 lines of saved text, https://opentitan.org/book/hw/ip/gpio/doc/theory_of_operation.html",
+    "[CIP] lowRISC, OpenTitan Comportability Specification (Apache 2.0): the whole page, 547 lines of saved text, the Interrupt Handling section (lines 359 to 475) read closely, https://opentitan.org/book/doc/contributing/hw/comportability/index.html",
+    "[PIC] Gisselquist, The ZipCPU's Interrupt Controller, ZipCPU blog, 2019: the whole article, 1075 lines of saved text, the state, enable and output logic and the formal rules and covers read closely, the AutoFPGA tail read to the end, https://zipcpu.com/zipcpu/2019/04/02/icontrol.html",
+    "[CDC] Gisselquist, Some Simple Clock-Domain Crossing Solutions, ZipCPU blog, 2017: the whole article, 435 lines of saved text, https://zipcpu.com/blog/2017/10/20/cdc.html",
+    "Repository code and tests named in gate_claims (worktree at origin/main e3324df0); tests/test_knowledge_files.py, tests/test_knowledge_gate_claims.py, tests/test_capability_levels.py and tests/test_status_docs.py run and passing; a four-state Icarus Verilog run of the compare forms the document names (run by the checker, not committed)"
   ],
-  "result": "every claim tagged with a source was found in that source, and every line marked inference is a fair reading of the source it names or the document's own reasoning",
+  "checked_at": "2026-11-23",
+  "result": "pass. Every claim tagged with a source was found in that source (three wordings recorded in the notes), every line marked inference is a fair reading or the document's own reasoning, and the two additions of ip#439 (reset the input samples, and check the reset branch and the compare forms) are marked inference throughout and hold. The document names no tool or gate; its tier line is the only sentence the repository can confirm.",
   "notes": [
-    "The input filter is the [GPIO] optional 16-cycle noise filter per input, applied to both DATA_IN and interrupt detection; the page names it a noise filter and the delay it imposes, and the document's waits for a stable value is read as what such a filter does.",
-    "Status raw and unmasked, the output as status AND enable, W1C clearing, a clear while the event is active leaving the bit set, hardware never clearing it, the test register and the status-type interrupt cleared only by removing the cause or masking are all in the [CIP] Interrupt Handling section.",
-    "New events win over a clear because [PIC] writes the state as the incoming interrupts OR (old state AND NOT the written bits); its single output is the OR of state AND enable, gated by the master enable, and registered.",
-    "The properties are [PIC] rules 1 to 8 with its reset assertions; the covers are an outgoing interrupt and w_any falling on a write with the enables stable.",
-    "The rise detect (last copy low, new value high) is the event crossing in [CDC]; the two or three flip-flop synchroniser and the rule never to use the first flip-flop's output are its first method."
+    "ip#439 additions (document lines 48-58, 94-96, 109-114): all marked (inference) except the last sentence, 'A passing self-written testbench therefore does not show that every register resets', which follows from the sentence before it. The Verilog fact is true: in a four-state run an if on `r != 0` with r unknown takes the else branch, `r !== 0` takes the then branch, and `r == 0` takes the else branch (Icarus Verilog, run by the checker). No source page states it; the document says so by marking it inference.",
+    "[CIP], 'writing 0 changes nothing' (line 65): the page says the event is acknowledged by writing 1 to a write-1-to-clear field and does not say in words what a 0 does; [PIC] line 'ignore any write otherwise' does. The reading is fair; the tag is [CIP] alone.",
+    "[CIP] [PIC], 'An event lost when it lands on the cycle of a clear' (line 88), carries source tags and no inference mark. Neither page names this failure: [CIP] says a clear with the event still active returns the bit to true, and [PIC] writes the next status as new events OR (old AND NOT written bits) with the comment 'only if the interrupt source is also inactive'. The failure is the contrapositive of both. It should read as inference at the document's next edit; the sentence is true.",
+    "[GPIO] filter (lines 41-42): the page calls it an optional 16-cycle noise filter per input, applied to both DATA_IN and interrupt detection; 'waits for a stable value' is the document's description of what such a filter does.",
+    "[CDC] (lines 38-40): the two-flip-flop method, 'some even recommend three', and 'none of your code should reference the output of the flip-flops in the metastable region' are on the page. The page gives the method for a value from another clock domain and adds that it works when the value changes much more slowly than the new clock; the document applies it to a pin without that caveat, which is the document's extension (a pin is an asynchronous input).",
+    "[CIP] and [GPIO] on the output (line 69-70): the page says INTR_STATE is not qualified by INTR_ENABLE and that the output is the state after masking (ANDing) with INTR_ENABLE; all wired interrupts are active-high level-triggered. [PIC] properties are its rules 1 to 8 with the reset assertions; the covers are an outgoing interrupt and w_any falling on a write with the enables stable.",
+    "Held-out screen: the new text is general reset and four-state teaching and names no register, value, mutant or line of rtl/apb-gpio or rtl/apb-gpio-reset; the held-out check of rtl/apb-gpio-reset is a mutant and a testbench, neither of which the text reproduces. It does teach the failure two live trials of rtl/apb-gpio showed, which is the failure-to-curriculum rule's purpose (knowledge/README.md). Recorded for the council's reading of that rule; no finding.",
+    "Sources rule: all four sources are open pages read in full; no vendor EDA documentation, no paid or unauthorised source. No em or en dash."
   ],
-  "checked_at": "2026-11-13"
+  "gate_claims": [
+    {
+      "claim": "the document's first line states the tier Knowledge only: the computed tier is Practising only when a tool of the skill's own card is AVAILABLE",
+      "evidence": "src/nirmaan/org/knowledge_files.py:49"
+    },
+    {
+      "claim": "the control_logic_design card names no tool (its tools field is empty)",
+      "evidence": "src/nirmaan/company/skills.py:305"
+    },
+    {
+      "claim": "the document names no tool, gate, mode, option or file rule other than the tier line; the four-state compare sentence is Verilog language semantics, checked by the checker with Icarus Verilog and not committed",
+      "evidence": "unverified"
+    }
+  ]
 }
