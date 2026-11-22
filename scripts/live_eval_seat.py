@@ -8,6 +8,19 @@ no password, no sudo rule, no group but its own, ``no_new_privs`` set (so no set
 it more), and an environment holding only cocotb's own settings. It may write only the run's own directory; every
 other grant is taken back when the run ends. The harness code is unchanged: the wrapper is first on ``PATH``.
 
+The tools that read seat-written Verilog run the same way (gates ET2 to ET4 of
+``council/records/2026-11-22-eda-tools-seat-account.md``): ``iverilog``, ``yosys``, ``sby`` (and with it the Yosys and
+the solver it starts), and ``verilator`` when it lints (``--lint-only``). A Verilator model build (the simulator
+build, the co-simulation builds of ``fw.test`` and ``regmap.verify``) stays with the runner by that rule
+(``as_runner``; decision 6 of the record; gate ET9 waits on those builds). Such a tool reads its inputs where the
+harness keeps them, in the eval sandbox beside files the account may not read, so each run gets a view of its own:
+the program runs in a mount namespace of its own in which every ``/tmp/nirmaan-*`` folder holding one of the run's
+input files is replaced by an empty folder that holds only those input files, each at its own path and read only, and
+the run's own directory. The harness names both in the step's environment (``RUN_DIR_ENV``, ``INPUTS_ENV``, set by
+``nirmaan.integrations.eda``); the root helper refuses an input that is not a regular file of the runner's inside a
+``/tmp/nirmaan-*`` folder the runner made, reached through no link, so nothing else of the sandbox, no other run's
+files and nothing of the checkout is in the view.
+
 ``fw.test`` runs the co-simulation it builds (the seat's C linked with the harness, M90) by path, not through
 ``PATH``, so it has a wrapper of its own: where ``nirmaan-seat-exec`` is on ``PATH``, ``fw.test`` runs the built
 program through it, in a folder of its own inside the run's directory (``nirmaan.integrations.firmware``). That runs
@@ -28,8 +41,13 @@ Modes, each run by the workflow or by the wrapper:
   ``/opt/nirmaan-seat/seat.py`` (root's, so seat code cannot change it) and write the ``vvp`` wrapper beside it.
 - ``wrap EXE ARGS`` (as the runner, from the wrapper): keep cocotb's settings from the environment and drop the
   rest, then ``sudo`` to ``run``.
-- ``run`` (as root, through sudo): stop any seat process left over, give the seat account the run's directory, run
-  ``EXE`` as the seat account, then ``cleanup``.
+- ``wrap`` keeps a Verilator model build with the runner (``as_runner``): it runs the real program, as the caller,
+  with the caller's environment, as if the wrapper were not there.
+- ``run`` (as root, through sudo): stop any seat process left over, give the seat account the run's directory (and
+  read access to each input file other accounts may not read by its mode), run ``EXE`` as the seat account in a view
+  of its own (``enter``), then ``cleanup``.
+- ``enter`` (as root, from ``run``): make the run's own mount namespace and its view, then run the command it is
+  given (``setpriv``, which drops to the seat account) in the run's folder.
 - ``exec DIR EXE ARGS`` (as the runner, from ``nirmaan-seat-exec``): pass nothing of the environment, then ``sudo``
   to ``run-built``.
 - ``run-built`` (as root, through sudo): as ``run``, with ``DIR`` as the seat's folder, for a program the runner
@@ -47,6 +65,7 @@ case that runs seat C is still refused (``scripts/live_eval_ci.py``): lifting th
 from __future__ import annotations
 
 import argparse
+import ctypes
 import fcntl
 import json
 import os
@@ -69,8 +88,15 @@ BIN = HOME / "bin"
 STATE = Path("/run/nirmaan-seat")
 GRANTS = STATE / "grants.json"
 LOCK = STATE / "lock"
-#: The programs that run seat code, wrapped by name. cocotb runs a test module inside ``vvp``.
-WRAPPED = ("vvp",)
+#: The programs that run seat code, wrapped by name. cocotb runs a test module inside ``vvp``; the others read
+#: seat-written Verilog (gate ET2 of council/records/2026-11-22-eda-tools-seat-account.md).
+WRAPPED = ("vvp", "iverilog", "verilator", "yosys", "sby")
+#: Where ``install`` looks for each wrapped program: the system's folders, then the OSS CAD Suite the live evaluation's
+#: tool action unpacks, root's, outside the runner's temporary folder, which the seat account may not read.
+TOOL_PATH = os.defpath + ":/usr/local/bin:/opt/oss-cad-suite/bin"
+#: The step's environment names the run's own directory and its input files (``nirmaan.integrations.eda``).
+RUN_DIR_ENV = "NIRMAAN_SEAT_RUN_DIR"
+INPUTS_ENV = "NIRMAAN_SEAT_INPUTS"
 #: The wrapper ``fw.test`` runs its built co-simulation through (``nirmaan.integrations.firmware.SEAT_EXEC``).
 EXEC_NAME = "nirmaan-seat-exec"
 EXEC = BIN / EXEC_NAME
@@ -101,11 +127,34 @@ def kept_env(env: Mapping[str, str]) -> list[str]:
     return [f"{k}={v}" for k, v in sorted(env.items()) if KEEP_ENV.match(k) and not SECRET.search(k)]
 
 
+def as_runner(exe: str, args: Sequence[str]) -> bool:
+    """Whether this command stays with the runner: a Verilator run that is not a lint, so a model build (decision 6
+    of council/records/2026-11-22-eda-tools-seat-account.md). Every other wrapped command runs as the seat account."""
+    return Path(exe).name == "verilator" and "--lint-only" not in args
+
+
+def run_inputs(env: Mapping[str, str]) -> tuple[str | None, list[str]]:
+    """The run's own directory and its input files, as the harness names them in the step's environment."""
+    run_dir = env.get(RUN_DIR_ENV) or None
+    try:
+        inputs = json.loads(env.get(INPUTS_ENV) or "[]")
+    except ValueError:
+        raise Refused(f"{SEAT}: {INPUTS_ENV} is not a JSON list (nothing ran)") from None
+    if not isinstance(inputs, list) or not all(isinstance(i, str) for i in inputs):
+        raise Refused(f"{SEAT}: {INPUTS_ENV} is not a list of paths (nothing ran)")
+    return run_dir, inputs
+
+
 def wrap_argv(exe: str, args: Sequence[str], cwd: str, env: Mapping[str, str], script: str = str(INSTALLED)) -> list[str]:
     """The sudo command that runs ``exe`` as the seat account in ``cwd``. Nothing is given to a shell."""
     argv = ["/usr/bin/sudo", "-n", "/usr/bin/python3", "-I", script, "run", "--cwd", cwd, "--exe", exe]
     for pair in kept_env(env):
         argv += ["--env", pair]
+    run_dir, inputs = run_inputs(env)
+    if run_dir:
+        argv += ["--run-dir", run_dir]
+    for path in inputs:
+        argv += ["--input", path]
     return [*argv, "--", *args]
 
 
@@ -203,6 +252,111 @@ def grants_for(cwd: Path, root: Path = RUN_ROOT) -> list[tuple[str, str]]:
     rel = cwd.relative_to(root)
     above = [root.joinpath(*rel.parts[:n]) for n in range(1, len(rel.parts))]
     return [*((str(p), "--x") for p in above), (str(cwd), "rwx")]
+
+
+def input_problem(path: str, owner: int, root: Path = RUN_ROOT) -> str | None:
+    """Why ``path`` is not an input file the runner made for this run, or None: it must be written as an absolute,
+    normal path, inside a ``root/nirmaan-*`` folder, every folder from there down to it the runner's own and not a link,
+    and itself a regular file of the runner's with no other name (one link), reached through no link."""
+    if not os.path.isabs(path) or os.path.normpath(path) != path:
+        return f"{path} is not an absolute, normal path"
+    try:
+        rel = Path(path).relative_to(root)
+    except ValueError:
+        return f"{path} is not inside {root}"
+    if len(rel.parts) < 2 or not rel.parts[0].startswith(RUN_PREFIX):
+        return f"{path} is not inside a {root}/{RUN_PREFIX}* folder"
+    here = root
+    for part in rel.parts:
+        here = here / part
+        try:
+            info = os.lstat(here)
+        except FileNotFoundError:
+            return f"{here} does not exist"
+        if stat.S_ISLNK(info.st_mode):
+            return f"{here} is a link"
+        if info.st_uid != owner:
+            return f"{here} does not belong to the runner (uid {info.st_uid}, not {owner})"
+        if here != Path(path) and not stat.S_ISDIR(info.st_mode):
+            return f"{here} is not a directory"
+    if not stat.S_ISREG(info.st_mode):
+        return f"{path} is not a regular file"
+    if info.st_nlink != 1:
+        return f"{path} has {info.st_nlink} names"
+    return None
+
+
+def top_of(path: Path, root: Path = RUN_ROOT) -> Path:
+    """The ``root/nirmaan-*`` folder ``path`` is in."""
+    return root / path.relative_to(root).parts[0]
+
+
+def view_plan(run_dir: Path, cwd: Path, inputs: Sequence[str], root: Path = RUN_ROOT) -> dict:
+    """What the run sees (``enter``): each top folder that holds an input outside the run's own directory, or the run's
+    own directory itself, is replaced by an empty one holding only those inputs and that directory; and the folder the
+    run starts in. All are already checked (``run_dir_problem``, ``input_problem``). The folder must be the run's own
+    directory or one inside it, or a folder on the way to one of the inputs (``sby`` starts in its setup's folder)."""
+    outside = [Path(p) for p in dict.fromkeys(inputs) if not Path(p).is_relative_to(run_dir)]
+    mask = sorted({str(top_of(p, root)) for p in outside} | ({str(top_of(run_dir, root))}
+                                                               if top_of(run_dir, root) != run_dir else set()))
+    shown = [str(p) for p in outside]
+    rebind = str(run_dir) if top_of(run_dir, root) != run_dir else None
+    on_way = any(p.is_relative_to(cwd) and cwd.is_relative_to(top_of(p, root)) for p in outside)
+    if not (cwd.is_relative_to(run_dir) or on_way):
+        raise Refused(f"{SEAT}: {cwd} is neither the run's directory nor a folder of its inputs (nothing ran)")
+    return {"mask": mask, "files": shown, "run_dir": rebind, "cwd": str(cwd),
+            "ids": {p: list(_identity(p)) for p in [*shown, *([rebind] if rebind else [])]}}
+
+
+def _identity(path: str) -> tuple[int, int]:
+    info = os.lstat(path)
+    return info.st_dev, info.st_ino
+
+
+MS_RDONLY, MS_NOSUID, MS_NODEV, MS_REMOUNT, MS_BIND, MS_REC, MS_PRIVATE = 1, 2, 4, 32, 4096, 16384, 1 << 18
+
+
+def _mount(source: str | None, target: str, fstype: str | None, flags: int, data: str | None = None) -> None:
+    libc = ctypes.CDLL(None, use_errno=True)
+    libc.mount.argtypes = [ctypes.c_char_p] * 3 + [ctypes.c_ulong, ctypes.c_char_p]
+
+    def enc(text: str | None) -> bytes | None:
+        return text.encode() if text is not None else None
+
+    if libc.mount(enc(source), enc(target), enc(fstype), flags, enc(data)) != 0:
+        err = ctypes.get_errno()
+        raise OSError(err, f"mount {source} on {target}: {os.strerror(err)}")
+
+
+def enter(plan: dict, command: Sequence[str]) -> int:
+    """As root: give this process a mount namespace of its own holding the run's view (``view_plan``), go to the run's
+    folder and run ``command`` in it (``setpriv``, which drops to the seat account). Fails closed: a file that is not
+    the one checked, or a mount that fails, stops it before the command runs."""
+    os.unshare(os.CLONE_NEWNS)
+    _mount(None, "/", None, MS_REC | MS_PRIVATE)
+    held = {}
+    for path, (dev, ino) in plan["ids"].items():  # held open before the view hides them
+        fd = os.open(path, os.O_PATH | os.O_NOFOLLOW | os.O_CLOEXEC)
+        info = os.fstat(fd)
+        if (info.st_dev, info.st_ino) != (dev, ino):
+            raise Refused(f"{SEAT}: {path} changed after it was checked (nothing ran)")
+        held[path] = fd
+    os.umask(0o022)
+    for top in plan["mask"]:
+        _mount("nirmaan-seat", top, "tmpfs", MS_NOSUID | MS_NODEV, "mode=0755,size=1m")
+    for path in plan["files"]:
+        os.makedirs(os.path.dirname(path), mode=0o755, exist_ok=True)
+        os.close(os.open(path, os.O_CREAT | os.O_WRONLY | os.O_CLOEXEC, 0o644))
+        _mount(f"/proc/self/fd/{held[path]}", path, None, MS_BIND)
+        _mount(None, path, None, MS_REMOUNT | MS_BIND | MS_RDONLY | MS_NOSUID | MS_NODEV)
+    if plan["run_dir"]:
+        os.makedirs(plan["run_dir"], mode=0o755, exist_ok=True)
+        _mount(f"/proc/self/fd/{held[plan['run_dir']]}", plan["run_dir"], None, MS_BIND)
+    for fd in held.values():
+        os.close(fd)
+    os.chdir(plan["cwd"])
+    os.execv(command[0], list(command))
+    return 126  # not reached
 
 
 def _seat() -> pwd.struct_passwd:
@@ -312,11 +466,13 @@ def cleanup() -> None:
     _sweep(seat.pw_uid)
 
 
-def run(cwd: str, exe: str, env: Sequence[str], args: Sequence[str], built: bool = False) -> int:
+def run(cwd: str, exe: str, env: Sequence[str], args: Sequence[str], built: bool = False, run_dir: str | None = None,
+        inputs: Sequence[str] = ()) -> int:
     """Run ``exe`` as the seat account in ``cwd``; its exit status, negative for a signal (``built``) or ``128 + N``.
 
     ``built``: ``exe`` is a program the runner built in the same run directory (``built_problem``), run with no
-    environment of the caller's; otherwise one of the wrapped programs, with cocotb's settings."""
+    environment of the caller's; otherwise one of the wrapped programs, with cocotb's settings, in a view of its own
+    (``view_plan``): ``run_dir`` (``cwd`` when not given) and the ``inputs``, nothing else of the run folders."""
     owner = (int(os.environ["SUDO_UID"]), int(os.environ["SUDO_GID"]))
     seat = _seat()
     if seat.pw_uid in owner or owner[0] == 0:
@@ -332,7 +488,8 @@ def run(cwd: str, exe: str, env: Sequence[str], args: Sequence[str], built: bool
     with open(LOCK, "w") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
         cleanup()
-        where = Path(os.path.realpath(cwd))
+        start = Path(os.path.realpath(cwd))
+        where = Path(os.path.realpath(run_dir)) if run_dir and not built else start
         problem = run_dir_problem(where, owner[0])
         if problem:
             raise Refused(f"{SEAT}: {problem}; {exe} runs only in a run directory (nothing ran)")
@@ -341,15 +498,24 @@ def run(cwd: str, exe: str, env: Sequence[str], args: Sequence[str], built: bool
             problem = built_problem(Path(exe), where, owner[0])
             if problem:
                 raise Refused(f"{SEAT}: {problem}; only a program the runner built in this run runs (nothing ran)")
-        grants = grants_for(where)
+        bad = [why for why in (input_problem(p, owner[0]) for p in inputs) if why]
+        if bad:
+            raise Refused(f"{SEAT}: {'; '.join(bad)}; a tool reads only files the runner made for this run (nothing "
+                          f"ran)")
+        plan = None if built else view_plan(where, start, inputs)
+        grants = grants_for(where) + [(p, "r--") for p in dict.fromkeys(inputs)
+                                      if not os.lstat(p).st_mode & stat.S_IROTH]
         _save_grants({"owner": list(owner), "paths": grants})  # recorded first, so a crash leaves them to cleanup
         for path, mode in grants:
             subprocess.run(["setfacl", "-m", f"u:{SEAT}:{mode}", "--", path], check=True)
         parent = os.getppid()
         os.umask(0o022)
-        proc = subprocess.Popen(["/usr/bin/setpriv", f"--reuid={seat.pw_uid}", f"--regid={seat.pw_gid}",
-                                 "--clear-groups", "--no-new-privs", "--inh-caps=-all", "--",
-                                 "/usr/bin/env", "-i", *BASE_ENV, *env, exe, *args], cwd=where)
+        command = ["/usr/bin/setpriv", f"--reuid={seat.pw_uid}", f"--regid={seat.pw_gid}", "--clear-groups",
+                   "--no-new-privs", "--inh-caps=-all", "--", "/usr/bin/env", "-i", *BASE_ENV, *env, exe, *args]
+        if plan is None:
+            proc = subprocess.Popen(command, cwd=where)
+        else:
+            proc = subprocess.Popen(enter_argv(plan, command), cwd="/")
         stop = []
 
         def forward(signum, _frame):
@@ -364,6 +530,11 @@ def run(cwd: str, exe: str, env: Sequence[str], args: Sequence[str], built: bool
         cleanup()
     code = proc.returncode
     return code if built or code >= 0 else 128 - code
+
+
+def enter_argv(plan: dict, command: Sequence[str], script: str = str(INSTALLED)) -> list[str]:
+    """The root command that makes the run's view and runs ``command`` in it (``enter``)."""
+    return ["/usr/bin/python3", "-I", script, "enter", "--plan", json.dumps(plan), "--", *command]
 
 
 def installed_exes() -> list[str]:
@@ -471,7 +642,7 @@ def install(source: Path, trees: Sequence[str] = (), folders: Sequence[str] = ()
     exes = []
     BIN.mkdir(parents=True, exist_ok=True)
     for name in WRAPPED:
-        real = shutil.which(name, path=os.defpath + ":/usr/local/bin")
+        real = shutil.which(name, path=TOOL_PATH)
         if real is None:
             raise Refused(f"{name} is not installed")
         exes.append(str(Path(real).resolve()))
@@ -511,7 +682,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     one.add_argument("--cwd", required=True)
     one.add_argument("--exe", required=True)
     one.add_argument("--env", action="append", default=[])
+    one.add_argument("--run-dir", default=None)
+    one.add_argument("--input", action="append", default=[])
     one.add_argument("args", nargs=argparse.REMAINDER)
+    view = sub.add_parser("enter")
+    view.add_argument("--plan", required=True)
+    view.add_argument("args", nargs=argparse.REMAINDER)
     run_built = sub.add_parser("run-built")
     run_built.add_argument("--cwd", required=True)
     run_built.add_argument("--exe", required=True)
@@ -521,6 +697,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     rest = args.args[1:] if getattr(args, "args", [])[:1] == ["--"] else getattr(args, "args", [])
     try:
         if args.mode == "wrap":
+            if as_runner(args.exe, rest):  # a Verilator model build: the runner's, as without the wrapper
+                os.execv(args.exe, [args.exe, *rest])
             command = wrap_argv(args.exe, rest, os.getcwd(), os.environ)
             os.execv(command[0], command)
         if args.mode == "exec":
@@ -539,7 +717,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 0
         if args.mode == "run-built":
             return passed_on(run(args.cwd, args.exe, [], rest, built=True))
-        return run(args.cwd, args.exe, args.env, rest)
+        if args.mode == "enter":
+            try:
+                return enter(json.loads(args.plan), rest)
+            except OSError as exc:  # a mount, a folder or the command: nothing ran as the seat account
+                raise Refused(f"{SEAT}: the run's view could not be made: {exc} (nothing ran)") from None
+        return run(args.cwd, args.exe, args.env, rest, run_dir=args.run_dir, inputs=args.input)
     except Refused as refused:
         print(refused, file=sys.stderr, flush=True)
         return 126
