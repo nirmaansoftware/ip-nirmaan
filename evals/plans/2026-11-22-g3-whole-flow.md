@@ -340,3 +340,47 @@ and the measured run of section 10. Slot 1 is dispatched only when each is true 
 
 This plan is not a record and not a ruling. It is a document, committed once, and a change after slot 1 is made only
 by a council ruling.
+
+## 14. Dated addition (2026-11-22): security's position on the timer path
+
+The fourth addendum leaves open, for security (not seated): "to confirm, in the plan's pull request, that the timer
+path raises no reach question beyond gate WF23". This plan merged without that confirmation. The security seat then
+gave its position as a read-only process of its own (`council/security.md`; a seat never changes the repository),
+against `main` at d0ba269d, on that question alone. This section records what it said. It is the seat's position, not
+a council ruling, and it changes nothing in sections 1 to 11: no count, slot, arm, harness, fingerprint or digest.
+
+**Not confirmed.** Security found two reach questions on the timer path that section 12 does not cover, in its words:
+
+1. "Can a timer seat that declares a `formal_spec` make `formal.run` and `formal.cover` run SBY, Yosys and a solver
+   over its setup, which section 12 says does not happen? Settled by a test of the flow's RTL stage with a seat
+   `.sby`." Its facts: the RTL stage of the block design workflow runs `formal.run` and `formal.cover` whenever a
+   `formal_spec` was produced (`src/nirmaan/company/workflows.py:95-98`, `:635-640`); the seat names each file's
+   kind itself and nothing checks it against the stage's expected outputs (`src/nirmaan/runtime/model.py:435-460`);
+   earlier RTL seats wrote 15 `.sby` files in committed records (`docs/GATE_INPUTS.md:113`); SymbiYosys and Yices
+   are installed in the job (`docs/LIVE_EVAL_EVIDENCE.md:203-206`). So the sentence of section 12 that `formal.run`
+   applies only to a stage whose outputs include a `formal_spec` is, by security's reading, not what the code does.
+   Security put its confidence that this can happen in practice at medium: no test it read runs a seat-declared
+   `.sby` through this stage.
+2. "Is the `eda_guard` allow list enough to keep seat files from causing code to run in the runner-account tools
+   (Icarus compile, Verilator lint, Yosys, SBY), which run in the step whose parent process holds the plan
+   credential, with no recorded probe? Settled by running them as the seat account with a recorded reach test, or
+   by a council ruling that names the screen as the control." Its facts: only `vvp` runs as `nirmaan-seat`, and the
+   other tool runs stay with the runner account (`docs/LIVE_EVAL_EVIDENCE.md:219-230`, `:320-326`); the trials step
+   holds `CLAUDE_CODE_OAUTH_TOKEN` (`.github/workflows/live-eval.yml:249-254`), which any process of the runner
+   user can read in `/proc/<pid>/environ` (`docs/LIVE_EVAL_EVIDENCE.md:221-223`); a tool run's own environment drops
+   credential names (`src/nirmaan/integrations/eda.py:418-424`); `eda_guard` screens input before a run and does
+   not confine it (`src/nirmaan/integrations/eda_guard.py:12-17`); the recorded reach test probes the cocotb path
+   through `vvp` only.
+
+**Where security saw no question beyond gate WF23.** The seat model in a trial is given no tools and no MCP server
+(`src/nirmaan/runtime/harness.py:145-146`, `src/nirmaan/runtime/claude_code.py:143`); a retry carries back only the
+run's summary and the bounded log excerpt of section 12 (`src/nirmaan/runtime/context.py:255-262`,
+`src/nirmaan/runtime/files.py:94-114`); the `rejudge` job holds no secret and follows the council's reading of gate
+WF17 (`council/records/2026-11-19-seat-c-live-refusal.md`, decision 3). Who can read the artifacts: no view.
+
+**What it means for slot 1.** Section 13 lists "WF23 (section 12, with security's confirmation)" among the conditions
+before slot 1. That condition is not met. Slot 1 is not dispatched until each question above is settled in the way
+security named: the first by a test of the flow's RTL stage with a seat `.sby` (and section 12 corrected by a plan
+amendment if the test shows the formal gates run), the second by the runner-account tools running as the seat account
+with a recorded reach test, or by a council ruling that names the screen as the control. Each is recorded by the pull
+request that settles it.
