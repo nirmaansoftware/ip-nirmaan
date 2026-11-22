@@ -74,7 +74,7 @@ def test_the_case_bounds_are_the_coverage_gates_bounds():
 
 
 def test_no_other_shipped_case_has_cover_bounds():
-    assert [c.id for c in load_cases(EVALS) if any(h.cover_bounds for h in c.held_out)] == [CASE]
+    assert [c.id for c in load_cases(EVALS) if any(h.cover_bounds for h in c.held_out)] == [CASE, "dv/coverage-tick-timer"]  # RX-E2 added the second
 
 
 # --- Planning, packets and the files ------------------------------------------------------------------------

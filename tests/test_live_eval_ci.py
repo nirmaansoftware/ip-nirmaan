@@ -586,6 +586,27 @@ def test_in_actions_the_credential_test_tries_every_target_of_the_reach_test(tmp
 
 
 CREDENTIAL_RECORD = REPO / "evals" / "flow" / "credential_test_record.json"
+FLOW_REJUDGE_RECORD = REPO / "evals" / "flow" / "flow_rejudge_gate_record.json"
+
+
+def _a_gate_part_from_main(job: str, part: dict, tmp_path: Path) -> dict[str, str]:
+    """One job's credential test record: from main, of its own job, in gate mode with every probe denied, through
+    the seat wrapper as another account, and passing the check that job's own ``confined`` step ran. Returns the
+    environment that job's ``confined`` step had."""
+    assert part["format"] == fw.FORMAT and part["tool"] == "fw.test", job
+    assert part["run"]["job"] == job and part["run"]["ref"] == "refs/heads/main" and part["run"]["job_id"], job
+    assert part["require_denied"] is True and part["every_probe_denied"] is True and part["done"] is True, job
+    assert part["control_ok"] is True and part["missing"] == [] and set(part["probes"]) == set(fw.PROBES), job
+    assert all(p["denied"] and p["lines"] for p in part["probes"].values()), job
+    assert part["seat_exec"] == "/opt/nirmaan-seat/bin/nirmaan-seat-exec" and part["run_step"][0][0] == \
+        part["seat_exec"], job
+    assert part["seat_account"]["uid"] != part["account"]["uid"], job
+    own = tmp_path / f"{job}.json"  # each part passes the check its own job ran before running seat C
+    own.write_text(json.dumps(part))
+    env = {"GITHUB_RUN_ID": part["run"]["id"], "GITHUB_RUN_ATTEMPT": part["run"]["attempt"], "GITHUB_JOB": job,
+           ci.FW_REACH_ENV: str(own)}
+    assert ci.fw_reach_problem(env, part["head"]) is None, job
+    return env
 
 
 def test_the_recorded_credential_test_is_whole_and_the_register_block_flow_waits_while_it_shows_reach():
@@ -610,21 +631,8 @@ def test_the_committed_credential_record_is_from_main_in_gate_mode_for_the_repla
     from a replay dispatched on main, holds the replay job's and the rejudge job's results, each in gate mode with every
     probe denied, through the seat wrapper, of one run and one commit."""
     record = json.loads(CREDENTIAL_RECORD.read_text())
-    jobs = {"replay": record, "rejudge": record["rejudge"]}
-    for job, part in jobs.items():
-        assert part["format"] == fw.FORMAT and part["tool"] == "fw.test", job
-        assert part["run"]["job"] == job and part["run"]["ref"] == "refs/heads/main" and part["run"]["job_id"], job
-        assert part["require_denied"] is True and part["every_probe_denied"] is True and part["done"] is True, job
-        assert part["control_ok"] is True and part["missing"] == [] and set(part["probes"]) == set(fw.PROBES), job
-        assert all(p["denied"] and p["lines"] for p in part["probes"].values()), job
-        assert part["seat_exec"] == "/opt/nirmaan-seat/bin/nirmaan-seat-exec" and part["run_step"][0][0] == \
-            part["seat_exec"], job
-        assert part["seat_account"]["uid"] != part["account"]["uid"], job
-        own = tmp_path / f"{job}.json"  # each part passes the check its own job ran before running seat C
-        own.write_text(json.dumps(part))
-        env = {"GITHUB_RUN_ID": part["run"]["id"], "GITHUB_RUN_ATTEMPT": part["run"]["attempt"], "GITHUB_JOB": job,
-               ci.FW_REACH_ENV: str(own)}
-        assert ci.fw_reach_problem(env, part["head"]) is None, job
+    for job, part in {"replay": record, "rejudge": record["rejudge"]}.items():
+        _a_gate_part_from_main(job, part, tmp_path)
     assert record["run"]["id"] == record["rejudge"]["run"]["id"] and record["head"] == record["rejudge"]["head"]
     # At or after ip#371's merge: the program ran through the wrapper ip#371 added (checked above), on main; CI's
     # shallow checkout has no history to walk, so the commit itself is named in the record's ``about``.
@@ -632,6 +640,27 @@ def test_the_committed_credential_record_is_from_main_in_gate_mode_for_the_repla
     assert ci.seat_c_problem(REGS_FLOW)  # a record that counts lifts nothing for the flow case
     assert ci.seat_c_problem("firmware/axi4-lite-driver") is None  # gate SC7, on this job's own record only
 
+
+
+def test_the_register_block_flows_rejudge_gate_is_recorded_from_main(tmp_path, monkeypatch, capsys):
+    """Gate SC9 (council record 2026-11-19, seat C and the live refusal, decision 2, addition 3): a replay on main
+    shows the rejudge job's credential test and ``confined`` step on the register block flow. The committed record
+    holds the replay job's and the rejudge job's credential test results (each as gate SC3 asks of its record), the
+    line each job's ``confined`` step printed, which the step prints again here from that job's own part, and the
+    re-judge's verdict: the same as the replay's. It lifts nothing: the flow case stays refused live (exit 6)."""
+    record = json.loads(FLOW_REJUDGE_RECORD.read_text())
+    assert record["case"] == REGS_FLOW and ci.seat_c_use(REGS_FLOW)
+    for job, part in {"replay": record, "rejudge": record["rejudge"]}.items():
+        env = _a_gate_part_from_main(job, part, tmp_path)
+        monkeypatch.setattr(ci, "_head", lambda part=part: part["head"])
+        for key, value in {**env, "CASE": REGS_FLOW}.items():
+            monkeypatch.setenv(key, value)
+        assert ci.main(["confined"]) == 0, job
+        assert capsys.readouterr().out.strip() == record["confined"][job], job
+    assert record["run"]["id"] == record["rejudge"]["run"]["id"] and record["head"] == record["rejudge"]["head"]
+    assert record["head"][:7] in record["about"]
+    assert record["rejudge_result"]["trials"] == [{"case": REGS_FLOW, "trial": 1, "same": True, "differences": []}]
+    assert ci.seat_c_problem(REGS_FLOW)  # still refused live: lifting that is a change of its own
 
 # --- G3 third addendum (2026-11-19), gate WF21: no attempts option, and no whole-flow dispatch without its fingerprint
 
