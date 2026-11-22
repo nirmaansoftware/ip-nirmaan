@@ -29,7 +29,7 @@ sources are vendor or single-author papers; their claims are the authors'.
   tests/test_nirmaan_eda.py::test_the_open_source_tools_are_available_and_the_rest_stay_contracts).
 - The card names the packs cdc and reset-clocking and asks that waivers be
   reviewed and that no violation go unexplained (gate:
-  src/nirmaan/company/skills.py:545-550).
+  src/nirmaan/company/skills.py:553-558).
 - So any statement from this skill about crossings is reasoning over source
   files and papers. It cannot say "the crossing check passed" (inference).
 
