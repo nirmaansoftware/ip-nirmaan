@@ -559,3 +559,166 @@ are on `main`), and this record is the retrospective.
 
 5. This read and its outcome, and the ruling it rests on, to confirm or
    overrule.
+
+## Addendum (2026-11-22): the W2-L1 read
+
+This addendum records the one read of W2-L1, the first evidence batch on the
+default harness, which the pilot's outcome above and the wave 2 table call
+for. Its plan, with the counts fixed before trial 1 and all 153 slots, is
+`evals/plans/2026-11-18-w2-l1.md`. This addendum adds the read and its
+outcome. It changes no decision, code, record, count, level or gate above.
+
+### Who decided what
+
+- The rule is the batch plan's, fixed before trial 1: one read, after every
+  one of the 153 records has merged, with no top-up, extension, replacement
+  or second read. A trial stopped by a plan limit stays failed and is never
+  run again (`council/records/2026-11-15-pilot-topup-reruns.md`).
+- Nothing was chosen at the read: it ran once the last record part merged.
+- Owner of the read: verification-lead (the wave owner). qa-evidence checks
+  the claims below.
+
+### What was read
+
+Read once, on `main` at 45a22c8, the merge of the last of the 32 record parts
+(#373 to #424). `scripts/capability_levels.py --check` reports that
+`capability/levels.json` matches the records, and the levels generator
+refuses no record (`refused_records` is empty). All 153 records are on
+`main`, failed ones included; each holds one trial, and every trial is
+re-judged the same (`rejudge.json` in each record).
+
+| Arm | Trials | Passed | Counts toward a level |
+|---|---|---|---|
+| E, with knowledge documents | 136, 8 on each of the 17 cases | 119 | yes |
+| N, without knowledge documents | 17, 1 on each case | 13 | never |
+
+Every arm E trial ran on the default harness (attempts-3)
+`sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00`,
+model claude-opus-5-5, Claude Code 2.1.325, from `main` 01adfe9. Arm N ran on
+the same harness without documents,
+`sha256:9aa7a333cd961a23aa919616fac6428f9f29fed1ba44b2fa3f5c6ee49e745d39`.
+
+### The read
+
+Each row is the skill's counted group in `capability/levels.json` at 45a22c8.
+The interval is the 95 percent Wilson interval. The bar is at least 5 trials
+and a lower bound of at least 0.5 (`docs/CAPABILITY_LEVELS.md`). "No judge"
+counts trials the file marks unjudged: the work was refused before review,
+and such a trial is a failed trial of its group. A digest is the first 8 hex
+digits of the group's skill digest.
+
+| Skill | Cases | Passed of n | Wilson interval | No judge | Digest | Level |
+|---|---|---|---|---|---|---|
+| apb | rtl/apb-gpio, rtl/apb-regs | 14 of 16 | 0.640 to 0.965 | 0 | 5eb05f03 | Practised |
+| axi | rtl/axi4-lite-regs, rtl/axil-timer | 16 of 16 | 0.806 to 1.000 | 0 | 171d2446 | Practised |
+| fsm_design | rtl/axil-timer | 8 of 8 | 0.676 to 1.000 | 0 | c4aaa4ba | Practised |
+| control_logic_design | rtl/apb-gpio | 6 of 8 | 0.409 to 0.929 | 0 | 3979d44f | Knowledge |
+| directed_testing | dv/directed-irq-ctrl, dv/random-crc, dv/scoreboard-mac | 24 of 24 | 0.862 to 1.000 | 0 | 6bf35095 | Practised |
+| constrained_random | dv/random-crc | 8 of 8 | 0.676 to 1.000 | 0 | 7e497fa2 | Practised |
+| reference_modelling | dv/scoreboard-mac | 8 of 8 | 0.676 to 1.000 | 0 | 69565f35 | Practised |
+| code_coverage | dv/coverage-irq-ctrl | 7 of 8 | 0.529 to 0.978 | 0 | b5a1c9b8 | Practised |
+| equivalence_checking | dv/equiv-gray | 5 of 8 | 0.306 to 0.863 | 0 | 98c09011 | Knowledge |
+| formal_verification | dv/formal-credit-counter | 8 of 8 | 0.676 to 1.000 | 0 | 496f8d92 | Practised |
+| sva | dv/formal-credit-counter | 8 of 8 | 0.676 to 1.000 | 0 | dd2c6a58 | Practised |
+| assertion_coverage | dv/formal-credit-counter | 8 of 8 | 0.676 to 1.000 | 0 | 9a2e389e | Practised |
+| model_checking | dv/prove-deep-counter | 8 of 8 | 0.676 to 1.000 | 0 | ad51c9e6 | Practised |
+| verification_planning | dv/plan-irq-ctrl | 6 of 8 | 0.409 to 0.929 | 2 | 930e0e5f | Knowledge |
+| root_cause_analysis | debug/root-cause-uart-tx | 7 of 8 | 0.529 to 0.978 | 1 | b65cd62f | Practised |
+| failure_triage | debug/triage-three-bugs | 0 of 8 | 0.000 to 0.324 | 8 | 1a7f2700 | Knowledge |
+| python_verification | dv/cocotb-crc, CI only | no trial | | | | Knowledge |
+| rtl_design | the seven RTL cases | 54 of 56 | 0.879 to 0.990 | 0 | 012eb9b7 | Practised |
+| arbitration | rtl/rr-arbiter | 8 of 8 | 0.676 to 1.000 | 0 | 53dff4b1 | Practised |
+| buffering_flow_control | rtl/skid-buffer, rtl/sync-fifo | 16 of 16 | 0.806 to 1.000 | 0 | 9ce453d4 | Practised |
+| pipeline_design | rtl/skid-buffer | 8 of 8 | 0.676 to 1.000 | 0 | 7a9c0840 | Practised |
+| systemverilog | dv/directed-irq-ctrl | 8 of 8 | 0.676 to 1.000 | 0 | b6d97df5 | Practised, see below |
+
+Notes on the table:
+
+- The batch's 17 target skills are the first seventeen rows: the four pilot
+  skills with a case (apb, axi, fsm_design, control_logic_design) and the
+  thirteen wave 2 verification skills with a case. Twelve reach Practised:
+  apb, axi, fsm_design, directed_testing, constrained_random,
+  reference_modelling, code_coverage, formal_verification, sva,
+  assertion_coverage, model_checking and root_cause_analysis. Five stay at
+  Knowledge: control_logic_design, equivalence_checking,
+  verification_planning, failure_triage and python_verification.
+- rtl_design, arbitration, buffering_flow_control and pipeline_design are
+  not targets. Their pilot groups went stale when the harness changed, so
+  before this batch they were at Knowledge (`capability/levels.json` at
+  01adfe9 showed 40 Knowledge and none Practised). Their cases were in the batch,
+  and on the current harness all four are Practised again.
+- systemverilog is Practised by the level rule, has no knowledge document,
+  and is not a W2-L1 target: dv/directed-irq-ctrl names it, and the levels
+  test allows a skill to be Practised with no document (#408). It is in the
+  file's totals, but it is not a result of the batch.
+- python_verification has no trial. Its one case, dv/cocotb-crc, has the seat
+  write executable test code, so it runs only in CI, under its own 9-slot
+  list, and those trials have not run. directed_testing is read on its 24
+  trials of the three other cases only.
+- The older pilot groups of eight of these skills stay in the file, each
+  marked stale (the harness changed). They count toward nothing.
+- After the read, `capability/levels.json` shows 17 Practised, 24 Knowledge
+  and 0 Proven. Nothing is Proven.
+
+### Arm N, reported only
+
+Arm N never counts toward a level and is reported beside the read only.
+With documents, 119 of 136 trials passed (Wilson interval 0.809 to 0.920);
+without documents, 13 of 17 (0.527 to 0.904). At one trial per case the arm
+shows only a batch-wide difference: the intervals overlap, and no skill or
+case conclusion follows. Its four failed trials:
+
+- slot 57, dv/random-crc: stopped by a plan limit with no model answer (see
+  below);
+- slot 76, debug/root-cause-uart-tx: model;
+- slot 152, dv/plan-irq-ctrl: model;
+- slot 153, debug/triage-three-bugs: the same missing input as every arm E
+  trial of that case.
+
+### Caveats
+
+- Thirteen of the targets with trials rest on one case each: fsm_design,
+  control_logic_design, constrained_random, reference_modelling,
+  code_coverage, equivalence_checking, formal_verification, sva,
+  assertion_coverage, model_checking, verification_planning,
+  root_cause_analysis and failure_triage. A level on one case says how the
+  model did on that case.
+- Slot 57 (`evals/results/2026-11-19-claude-code-claude-opus-5-5-without-knowledge`)
+  is a plan-limit trial in arm N. It is committed as failed, was never run
+  again, and counts toward no level.
+- failure_triage scored 0 of 8 because of a missing input, not a measurement
+  of the model. Nothing the triage seat receives names the testbench's
+  verdict-line contract (the plusarg and the verdict format), so the repro
+  gate refused every testbench and no judge ran (`causes.md` in each of the
+  eight records). Fixing that changes the skill's card or document, so its
+  group goes stale and it needs a new batch.
+- The other nine failed arm E trials are labelled the model's in their
+  `causes.md` (root-cause-uart-tx 1, plan-irq-ctrl 2, equiv-gray 3,
+  coverage-irq-ctrl 1, apb-gpio 2).
+- code_coverage and root_cause_analysis are Practised at 7 of 8, the
+  smallest count that clears the bar; one more failure in either would have
+  left it at Knowledge.
+- Any level that `capability/levels.json` showed on `main` while only part of
+  the batch was merged is an interim figure and is not cited here.
+
+### Outcome
+
+Seventeen skills are Practised on the current harness: twelve of the batch's
+17 targets, the four RTL skills above, and systemverilog. This was the one
+read of W2-L1: there is no top-up, extension or second read. It does not
+reopen the pilot exit, which closed with its shortfall recorded in the
+addendum above.
+
+### What remains, as already planned
+
+- The nine CI trials of dv/cocotb-crc wait for the live-eval workflow to be
+  able to run them; until then python_verification stays at Knowledge.
+- rtl_microarchitecture, rtl_lint, synthesis_awareness, reset_design and the
+  fifteen wave 2 verification skills that no case names had no trial; each
+  needs an eval case before a trial can count.
+- A second case for the single-case skills, and the failure_triage input,
+  are left to a later plan; this read decides neither.
+
+### Open, for the founder
+
+6. This read and its outcome, to confirm or overrule.
