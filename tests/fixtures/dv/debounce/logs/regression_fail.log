@@ -1,0 +1,16 @@
+INFO: cycle 2: noisy -> 1
+INFO: cycle 4: high bounce of 3 cycles done, clean=0
+INFO: cycle 5: noisy -> 0
+INFO: cycle 17: noisy -> 1
+INFO: cycle 22: clean -> 1
+INFO: cycle 31: noisy -> 0
+INFO: cycle 32: low bounce of 2 cycles done, clean=1
+INFO: cycle 33: noisy -> 1
+INFO: cycle 33: clean -> 0
+ERROR: debounce_regress_tb.v:42: cycle 33: clean went 0 after noisy had differed for only 2 cycles, expected 4
+INFO: cycle 38: clean -> 1
+INFO: cycle 47: noisy -> 0
+INFO: cycle 49: clean -> 0
+ERROR: debounce_regress_tb.v:42: cycle 49: clean went 0 after noisy had differed for only 2 cycles, expected 4
+ERROR: debounce_regress_tb.v:62: clean changed 4 times, expected 2
+debounce_regress_tb.v:64: $finish called at 635000 (1ps)
