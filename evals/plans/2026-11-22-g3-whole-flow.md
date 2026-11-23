@@ -1308,7 +1308,7 @@ answer's replay passed; the controls step failed, because 13 bypass controls fai
 on the same commit and the same uploaded records, and passed.
 
 Its uploads are committed as uploaded, byte for byte, by a chain of three pull requests that the review reads whole:
-ip#477 (part A, the six files of the controls upload, an index and a test), ip#479 (part A2, `fixtures.xml`,
+ip#477 (part A, the six files of the controls upload, an index, a test and a history fragment), ip#479 (part A2, `fixtures.xml`,
 `fixtures.log` and the two tool reach records) and ip#480 (part B, `evals/flow/et5_controls_record_45159697183.json`
 and the test of decision E4, item 3, in `tests/test_live_eval_controls.py`). The record reads each bypass control by
 decision E2 of the third addendum. `evals/flow/et5_controls_record.json` (run 45119522138) and its test are
@@ -1330,7 +1330,7 @@ adopted (decision E1), from the bypass record of run 45135605510 (`main` at `a15
 two, the payload itself ran (`touch`) and its write was refused; in the other nine the tool tried to open, resolve or
 write its target and printed that it could not. For the two `verilator --lint-only` forms the tool's line says that the
 reference could not be resolved, which is an inference that the refusal was of an open (decision E1, item 3). The
-record of run 45119522138 (`evals/flow/et5_controls_record.json`) shows only the failed assertions of those 11, and
+record of run 45119522138 (`evals/flow/et5_controls_record.json`) shows the failed assertions of those 11 and their messages only, and
 nothing here says it shows more. Section 21.3's other
 statements stand, except that the doubt in section 21.4's third bullet about the five `yosys` controls was withdrawn by
 verification-lead (decision E1, item 2): they are refused reads. Run 45159697183's record reads its 13 by the same rule (section 23.5).
@@ -1351,7 +1351,7 @@ addition is what section 7 needs to dispatch, and it does not keep ET5 met). Sec
 `bbc49847` equal; the dispatch check of section 7 holds the dispatch commit to them.
 
 What the statement rests on, as the committed test holds it: controls 7 of 7 and all 100 sweep rows; 408 fixture tests,
-none skipped, with the linked setup and every must-refuse fixture passed; every listed probe of each job's tool reach record denied (32 entries in each committed record, `every_denied` true), on the run's
+none skipped, with the linked setup and every must-refuse fixture passed; every listed probe of each job's tool reach record denied (the test does not pin the count; there are 32 entries in each committed record, `every_denied` true), on the run's
 commit (the first part's probes rest on the step result, as above); for each failed control, the seat account's wrapper and the tool's own line for its cause, and no target
 content in any account control's record. Decision E2 is taken up whole: item 2 applies (a control that fails without such a line, or whose record shows the
 target's content or its marker written, is a difference that stops the measured run and returns to the council; the

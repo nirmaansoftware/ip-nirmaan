@@ -346,7 +346,7 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   and first failure. Of the 402 fixture tests, 390 passed and 12 failed,
   none skipped, so the `replay` job failed at that step. Every must-refuse
   fixture passed. The 12 are 11 bypass controls and one must-pass test. Run
-  45119522138's own record shows the failed assertions only. Run
+  45119522138's own record shows the failed assertions and their messages only. Run
   45135605510's bypass record (`docs/evidence/et5/run-45135605510`), for the
   same 11 controls by name, shows that in each the tool ran through the
   account's wrapper; in the two shell controls the payload itself (`touch`)
