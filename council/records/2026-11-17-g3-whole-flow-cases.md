@@ -1542,8 +1542,11 @@ Ruling, in short:
   the run gate ET10 reads. No second run is owed (decision F1).
 
 It changes no code, case, eval record, level, fingerprint or digest by
-itself. It loosens no gate. No trial ran and no workflow was dispatched for
-the meeting.
+itself. It makes one stated exception to a rule another record set:
+decision F1, item 5 narrows decision C of the EDA tools record's addendum,
+which gate ET13 holds, for the sentences named there and no others. It
+loosens no other gate. No trial ran and no workflow was dispatched for the
+meeting.
 
 ### Who decided what
 
@@ -1607,8 +1610,8 @@ The chair checked each line at bbcf06a9 unless a seat is named.
    ended with success, and the trial file the `rejudge` job uploaded
    equals the one the `live-eval` job uploaded, field by field. Its flow
    stopped before its last stage: three of its four stages were seated
-   and the last is recorded "not run". The stop is the one decision 3 describes, an intermediate stage
-   that did not complete. It is not the stop rule of gate WF8: that rule
+   and the last is recorded "not run". The stop is the one decision 3
+   describes, an intermediate stage that did not complete. It is not the stop rule of gate WF8: that rule
    (`flow_stopped`, `src/nirmaan/evals/records.py:213-217`) reads a last
    answer with no text and an error, and it is false for this record.
 5. The digests. The record's flow digest is
@@ -1679,11 +1682,20 @@ The chair checked each line at bbcf06a9 unless a seat is named.
    never counted.
 5. An exception to decision C of the EDA tools record's addendum, which
    forbids stating "anything of its trial's outcome, stages or attempts".
-   This addendum, the plan's dated addition and the pull requests that
-   carry them may state the two things of item 3, because the ruling
-   cannot be made or checked without them. Nothing else of the run's
-   stages is stated anywhere: not why the flow stopped, not what a stage
-   answered, no attempt count. Decision C stands in every other respect.
+   It has two parts, and neither reaches further.
+   - The plan's dated addition and the pull requests that carry it may
+     state the two things of item 3: that the flow stopped before its
+     last stage, and that its flow digest covers the stages it seated.
+   - This addendum alone also states, in its facts 4 and 5 and nowhere
+     else, how many of the run's stages were seated, that the stop is the
+     one decision 3 describes and not the stop rule of gate WF8, and the
+     record's flow digest beside the plan's. The ruling rests on these and
+     cannot be checked without them. No other text repeats them; a text
+     that needs them cites this addendum.
+   Nothing else of the run's stages is stated anywhere, here included:
+   not which stage, not why the flow stopped, not what a stage answered,
+   no attempt count. Decision C stands in every other respect, and
+   qa-evidence's read under gate ET13 is made against it as narrowed here.
 6. How the private script's row for the run is marked is its operator's,
    under this decision: the run stands, and it is not a job-level stop to
    be dispatched again.
