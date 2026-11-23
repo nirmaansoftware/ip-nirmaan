@@ -683,6 +683,17 @@ def test_a_setup_opens_an_approved_file_linked_beside_it_inside_the_view(tmp_pat
     assert set(plan["links"].values()) <= set(inputs) and str(s["approved"]) in plan["ids"]
     assert plan["mask"] == [str(s["root"] / "nirmaan-et5-fixtures-x")]  # the link's folder is hidden as before
     assert seat.view_plan(s["run"], s["setup"], inputs, s["root"], owner=me + 1)["links"] == {}  # not the runner's
+    # A link to a link is not one (its text is no input's path); a link inside the run's directory is not looked at
+    # (the directory is in the view as it is); a link beside the setup to an input inside the run's directory shows
+    # that input, which the account may already read, held open since the check like the others.
+    inside = s["run"] / "inside.v"
+    inside.write_text("module inside; endmodule\n")
+    (s["setup"] / "chain.v").symlink_to(s["setup"] / "m.v")
+    (s["setup"] / "in.v").symlink_to(inside)
+    (s["run"] / "m.v").symlink_to(s["approved"])
+    plan = seat.view_plan(s["run"], s["setup"], [*inputs, str(inside)], s["root"], owner=me)
+    assert plan["links"] == {str(s["setup"] / "in.v"): str(inside), str(s["setup"] / "m.v"): str(s["approved"])}
+    assert str(inside) in plan["ids"] and plan["files"] == inputs
     assert seat.view_plan(s["run"], s["setup"], inputs, s["root"])["links"] == {}  # no owner: no link is looked at
 
 
