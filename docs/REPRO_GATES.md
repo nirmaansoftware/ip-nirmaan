@@ -110,7 +110,9 @@ verdict parameter's name is in `VERDICT_PARAMS`, next to `ToolRun`).
    The `failure_triage` card also states the verdict line the gate reads:
    the plusarg `nirmaan_nonce` and the `NIRMAAN-SIM` format, as the
    `rtl_design` card does (added after the W2-L1 read, where no triage seat
-   was told either; see `docs/history/fragments/M71-repro-gates/`).
+   was told either; see `docs/history/fragments/M71-repro-gates/`). The
+   `root_cause_analysis` card states the same, for the same reason: the
+   root-cause seat's repro goes through the same gate.
 
 ## Who gets each task
 
