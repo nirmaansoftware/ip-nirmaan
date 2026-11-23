@@ -57,6 +57,7 @@ from typing import Any
 
 from nirmaan.company.evidence import MUST_FAIL_DOMAINS
 from nirmaan.evals.cases import EvalError, load_cases, skill_digest
+from nirmaan.evals.flow import NOT_RUN
 from nirmaan.evals.records import (MANIFEST, calibration_labels, flow_labels, is_whole_flow, knowledge_off,
                                    load_evidence, load_record, variant_labels, wilson)
 from nirmaan.evals.scorers import scorer_spec
@@ -199,36 +200,73 @@ def _rejudged(record_dir: Path) -> dict[tuple[str, int], bool]:
 
 
 def _whole_flow_groups(trials: list[tuple[Any, Any, str]]) -> list[dict[str, Any]]:
-    """M87: whole-flow trials by group (case digest, model, harness, CLI, flow digest; and purpose, so a
-    calibration trial is never pooled with evidence), each trial listed one by one. A group's count (``n``,
+    """M87: whole-flow trials by group, each trial listed one by one, within one set of case, case digest, model,
+    harness, CLI and purpose (so a calibration trial is never pooled with evidence). A group's count (``n``,
     ``passed``, ``unjudged`` and the 95 percent Wilson interval) is stated only from ``WHOLE_FLOW_MIN`` trials;
     whether the group's planned count is complete is the committed plan's, which this file does not hold. A trial
-    no judge ran on is a failed trial of its group."""
-    groups: dict[tuple, dict[str, Any]] = {}
+    no judge ran on is a failed trial of its group.
+
+    Placement (council record 2026-11-17, fifth addendum, decision F2): within a set, trials are placed in the order
+    of how many stages they seated, most first. A trial fits a group when its stage names and their order equal the
+    group's and every stage it seated records exactly the skills and skill digests the group holds for that stage; a
+    group holds the stage values of the first trial placed in it, and a trial that seated every stage fits only a
+    group whose flow digest is its own (so complete trials group by flow digest, as before). A trial that fits no
+    group starts one, a trial that fits one joins it, and a trial that fits more than one is listed as unplaced in
+    each group it fits, with those groups named by their first trial, and none of them is given a count. Each trial
+    keeps its own recorded flow digest and gains ``stopped_at``, the stage at which its flow stopped (empty for a
+    flow that reached its last stage); a group shows its first trial's flow digest and whether that digest covers
+    every stage."""
+    sets: dict[tuple, list[tuple[Any, Any, str]]] = defaultdict(list)
     for manifest, trial, where in trials:
-        judged = bool(trial.judge_runs)
-        off = knowledge_off(manifest, trial)
         purpose = trial.purpose if trial.purpose != "evidence" else manifest.purpose
-        key = (trial.result.case, trial.result.case_digest, trial.model, _harness(trial), trial.result.cli,
-               trial.flow_digest, purpose)
-        group = groups.setdefault(key, {"case": key[0], "case_digest": key[1], "model": key[2], "harness": key[3],
-                                        "cli": key[4], "flow_digest": key[5], "purpose": key[6], "trials": []})
-        named = " and ".join(flow_labels(manifest, trial))
-        group["trials"].append({"record": where, "case": trial.result.case, "trial": trial.trial,
-                                "passed": judged and trial.result.passed, "judged": judged,
-                                "knowledge": "off" if off else "on", "flow_digest": trial.flow_digest,
-                                "reason": f"{WHOLE_FLOW_REASON} (labelled in {named})"})
+        sets[(trial.result.case, trial.result.case_digest, trial.model, _harness(trial), trial.result.cli,
+              purpose)].append((manifest, trial, where))
     out = []
-    for key in sorted(groups, key=lambda k: tuple(str(x) for x in k)):
-        group = groups[key]
+    for key, members in sets.items():
+        groups: list[dict[str, Any]] = []
+        members.sort(key=lambda m: (-sum(s.status != NOT_RUN for s in m[1].stages), m[2], m[1].trial))
+        for manifest, trial, where in members:
+            names = [s.stage for s in trial.stages]
+            stopped = any(s.status == NOT_RUN for s in trial.stages)
+            seated = [(i, s) for i, s in enumerate(trial.stages) if s.status != NOT_RUN]
+            judged = bool(trial.judge_runs)
+            off = knowledge_off(manifest, trial)
+            named = " and ".join(flow_labels(manifest, trial))
+            entry = {"record": where, "case": trial.result.case, "trial": trial.trial,
+                     "passed": judged and trial.result.passed, "judged": judged,
+                     "knowledge": "off" if off else "on", "flow_digest": trial.flow_digest,
+                     "stopped_at": (seated[-1][1].stage if seated else names[0]) if stopped else "",
+                     "reason": f"{WHOLE_FLOW_REASON} (labelled in {named})"}
+            fits = [g for g in groups
+                    if g["_names"] == names and (stopped or g["flow_digest"] == trial.flow_digest)
+                    and all(g["_values"][i] == s.skills for i, s in seated)]
+            if not fits:
+                groups.append({"case": key[0], "case_digest": key[1], "model": key[2], "harness": key[3],
+                               "cli": key[4], "flow_digest": trial.flow_digest, "covers_every_stage": not stopped,
+                               "purpose": key[5], "first": {"record": where, "trial": trial.trial},
+                               "trials": [entry], "_names": names,
+                               "_values": [s.skills if s.status != NOT_RUN else None for s in trial.stages]})
+            elif len(fits) == 1:
+                fits[0]["trials"].append(entry)
+            else:  # decision F2: listed apart, the groups it fits named; none of them is given a count
+                for g in fits:
+                    g.setdefault("unplaced", []).append({**entry, "fits": [dict(f["first"]) for f in fits]})
+        out += groups
+    out.sort(key=lambda g: tuple(str(g[k]) for k in ("case", "case_digest", "model", "harness", "cli", "flow_digest",
+                                                     "purpose")) + (g["first"]["record"], g["first"]["trial"]))
+    for group in out:
+        del group["_names"], group["_values"]
         group["trials"].sort(key=lambda t: (t["record"], t["trial"]))
         n = len(group["trials"])
-        if n >= WHOLE_FLOW_MIN:
+        if "unplaced" in group:
+            group["unplaced"].sort(key=lambda t: (t["record"], t["trial"]))
+            group["no_count"] = ("a trial fits this group and another (listed as unplaced): no count is given, "
+                                 "and the question returns to the council (fifth addendum, decision F2)")
+        elif n >= WHOLE_FLOW_MIN:
             passed = sum(t["passed"] for t in group["trials"])
             low, high = wilson(passed, n) or (0.0, 0.0)
             group["count"] = {"n": n, "passed": passed, "unjudged": sum(not t["judged"] for t in group["trials"]),
                               "low": round(low, 4), "high": round(high, 4)}
-        out.append(group)
     return out
 
 
