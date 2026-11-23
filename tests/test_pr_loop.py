@@ -931,10 +931,11 @@ def test_a_pause_in_one_worker_starts_no_new_step(repo):
 
 # --- Three pull requests at once ---------------------------------------------------------
 #
-# Founder, in session, 2026-11-23: approved the review loop reviewing up to three pull requests at
-# once. The fake reviewers below run inside the real Loop.step (its skips, labels, stops and pauses)
-# on the real per pull request state store, model slots and pause file; only the review itself
-# (Loop._step) is a fake that takes a model slot for its one call, as the review script does.
+# The width of three: council record 2026-11-19-parallel-keys.md, addendum 2026-11-24, decision A1,
+# held by its gates LW1 to LW5. The fake reviewers below run inside the real Loop.step (its skips,
+# labels, stops and pauses) on the real per pull request state store, model slots and pause file;
+# only the review itself (Loop._step) is a fake that takes a model slot for its one call, as the
+# review script does.
 
 
 class FakeReviewers:
@@ -1013,8 +1014,9 @@ class FakeReviewers:
 
 
 def test_three_pull_requests_are_reviewed_at_once_never_more_each_pull_request_and_head_by_one_worker(repo):
-    assert LOOP["parallel_reviews"] == 3, "the founder's approval of 2026-11-23: up to three at once"
-    assert pr_review.CONFIG["model_cap"] >= LOOP["parallel_reviews"], "each worker can hold a model slot"
+    assert LOOP["parallel_reviews"] == 3, "the council record's width (2026-11-19 addendum, decision A1)"
+    assert pr_review.CONFIG["model_cap"] >= LOOP["parallel_reviews"], "each worker can hold a model slot (gate LW1)"
+    assert pr_review.CONFIG["model_cap"] <= 3, "more than three slots is the founder's to say (gate LW1)"
     r = repo()
     loop = r.loop()
     together = threading.Barrier(3, timeout=10)

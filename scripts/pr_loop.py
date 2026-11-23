@@ -187,9 +187,9 @@ LOOP = {
     "transient_backoff_minutes": 2,
     "stalled_label": "loop-stalled",
     # Pull requests stepped at once in one pass (each by one worker); 1 steps them
-    # one at a time. Founder, in session, 2026-11-23: approved the review loop
-    # reviewing up to three pull requests at once. pr_review CONFIG model_cap is
-    # at least this, so each worker can hold a model slot.
+    # one at a time. Three: council record 2026-11-19-parallel-keys.md, addendum
+    # 2026-11-24, decision A1; at most 3 (gate LW1). pr_review CONFIG model_cap
+    # is at least this, so each worker can hold a model slot.
     "parallel_reviews": 3,
     "needs_founder_label": "needs-founder",
     # A finding on a path the fixer may not change: the fixer does not run, the

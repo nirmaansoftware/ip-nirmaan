@@ -212,9 +212,10 @@ Built in rollout R5; in use on real pull requests since 2026-10-18. The
 a pull request it wrote, and the script refuses when a Claude Code session has
 the branch checked out. In order:
 
-1. **At most three model calls at once** across Nirmaan and IP Nirmaan: three
-   model slots in `~/.nirmaan/pr-review/` (`model_cap` 3 here), two of them
-   shared with Nirmaan's loop (its `model_cap` 2), held here only around each
+1. **At most three model calls at once** across Nirmaan and IP Nirmaan where
+   both loops share one state folder: three model slots in
+   `~/.nirmaan/pr-review/` (`model_cap` 3 here), two of them shared with
+   Nirmaan's loop (its `model_cap` 2), held here only around each
    model call (a reviewer's, or the loop's fixer's), never while checking out,
    reading CI, posting or running local checks. Slot 0 is `review.lock`, slot
    n `model-slot-<n>.lock`; this script tries `review.lock` first and Nirmaan's
@@ -555,9 +556,11 @@ does a limit whose retry failed some other way. A limit any worker hits
 pauses all of them: no new step starts in that pass, and a step already
 running makes no further model call.
 
-**Three pull requests at once, every pull request each pass.** Approval:
-founder, in session, 2026-11-23: approved the review loop reviewing up to
-three pull requests at once. A model slot is
+**Three pull requests at once, every pull request each pass.** The width of
+three, with three model slots, is decision A1 of the
+[council record 2026-11-19 (parallel keys), addendum 2026-11-24](../council/records/2026-11-19-parallel-keys.md#addendum-2026-11-24-the-review-loop-at-three-pull-requests-at-once);
+its gates LW1 to LW5 hold it, and more than three workers or slots is a new
+question for the founder. A model slot is
 held only around each model call (step 1 of "How reviewers run"); the local
 checks run without one, so other reviews go on meanwhile. One pass at a time
 runs for this repository: the pass holds its own lock

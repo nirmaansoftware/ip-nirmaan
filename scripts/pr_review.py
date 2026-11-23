@@ -119,9 +119,9 @@ CONFIG = {
     # Model slots shared with the Nirmaan loop (its model_cap) when both use one
     # state folder: at most this many model calls run at once across both
     # repositories. Slot 0 is the shared review.lock, slot n model-slot-<n>.lock.
-    # At least pr_loop LOOP parallel_reviews, so each worker can hold one
-    # (founder, in session, 2026-11-23: approved the review loop reviewing up to
-    # three pull requests at once).
+    # At least pr_loop LOOP parallel_reviews, so each worker can hold one, and at
+    # most 3 (council record 2026-11-19-parallel-keys.md, addendum 2026-11-24,
+    # decision A1 and gate LW1).
     "model_cap": 3,
     # The records-only fast lane (founder, in session, 2026-11-23: approved a records-only fast lane so
     # generated eval record PRs merge on green CI and schema tests without the two agent review keys).
