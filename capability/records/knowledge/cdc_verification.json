@@ -1,0 +1,51 @@
+{
+  "format": "nirmaan.knowledge-check",
+  "skill": "cdc_verification",
+  "knowledge_document": "knowledge/verification/cdc_verification.md",
+  "document_sha256": "sha256:d27e0ba3b2fba46dcd93da9a13c3c3b0da340ee093c6b24c9b4a6be51493dab5",
+  "writer": "RX-K2 session (wave 2 close, ip#432), fixed by the RX-KFIX3 and RX-KFIX4 sessions (ip#455, ip#457)",
+  "checker": "RX-C5 session (lane RX-C5, wave 2 close independent check, 2026-11-23)",
+  "sources_read": [
+    "[GIN] Ginosar, Fourteen Ways to Fool Your Synchronizer, ASYNC 2003, author copy: all eight pages to the references (sections 1 and 2, 3.1 to 3.14, the conclusions), https://webee.technion.ac.il/~ran/papers/Sync_Errors_Feb03.pdf",
+    "[LIT] Litterick, Full Flow Clock Domain Crossing: From Source to Si, DVCon proceedings: the whole paper to its references (sections I to VII, including the physical requirements of the 2FF, parallel and handshake synchronisers and the DFT overview), https://dvcon-proceedings.org/wp-content/uploads/full-flow-clock-domain-crossing-from-source-to-si.pdf",
+    "Repository code and tests at the lines cited in gate_claims, on main d53e8474 (after ip#457); the Cummings SNUG 2008 link was fetched and redirects to an HTML technical-library page, not a paper file"
+  ],
+  "result": "every claim tagged [GIN] or [LIT] was found in that source (both read to their references), every line marked inference is a fair reading of the source it names or the document's own reasoning, no joined claim remains (the reconvergence item separates the quoted effect, the marked inference and the no-checklist sentence), the ip#440 and ip#455 findings are fixed at this head, and every code citation holds at d53e8474",
+  "notes": [
+    "Earlier findings re-checked at this head: the slow-to-fast direction now matches Ginosar 3.10 (sender slower, receiver samples the request at least twice); the 'clean report' sentence is marked inference with the Litterick recommendation named separately; 'real designs' is replaced by the paper's own wording (teaching, design teams, reviewing papers, one FPGA vendor example); the metastability blocker item states both scenarios of section 3.11 (latch at half a cycle, flop more dangerous); the shared-flop item names the RECEIVE signal and the schematics caveat; the reconvergence item quotes Litterick III.A and marks the reading inference.",
+    "Wording note, not a failure: the beyond-RTL bullet lists 'clock-tree work' among the stages that can weaken a synchroniser. Litterick III.D names synthesis, place and route, physical synthesis, clock gating and DFT insertion; clock-tree skew is covered in V.A (the 2FF skew requirement) and VII (badly constrained clock-tree synthesis). True, from two places in the paper.",
+    "Wording note: 'its release must be synchronised to each clock' for global reset; Ginosar 3.6 puts one interface at each of the clock generators and synchronises the trailing edge. Same meaning.",
+    "Wording note: the 32 bit bus figure is Ginosar's risk of failure every 16 microseconds, computed from his two metastability events per millisecond per bit; the document states it as the paper's example, which is what it is.",
+    "Wording note: 'The usual fix is a chain of flops' tags [GIN] [LIT]; Ginosar gives the two-flop form and a request and acknowledge exchange, Litterick the 2FF, handshake and parallel forms. Fair as a summary.",
+    "The Cummings SNUG 2008 sentence in 'Not sourced here' (behind a registration form, not read) is true at this head: the sunburst-design.com URL redirects to the Paradigm Works technical-library search page, which links no paper file.",
+    "Seat-facing content: the document names no case, no held-out input and no reference answer; tests/test_knowledge_files.py passes. The card's one tool, cdc.run, is CONTRACT_ONLY, so no committed test exercises a CDC gate; every gate sentence in the document is the contract-only statement.",
+    "as_of 2026-11-22 predates the 2026-11-23 edits (ip#455, ip#457); the content it dates is true now. No em or en dash (scripts/check_dashes.py clean). The front matter checker field still reads 'pending'; this record names the checker."
+  ],
+  "gate_claims": [
+    {
+      "claim": "the card lists one tool, cdc.run, and it is CONTRACT_ONLY: the catalog says the broker refuses it, so no agent can claim a crossing analysis ran",
+      "evidence": "src/nirmaan/company/tools.py:6"
+    },
+    {
+      "claim": "cdc.run is registered with status CONTRACT_ONLY (CO) and takes no parameters",
+      "evidence": "src/nirmaan/company/tools.py:177"
+    },
+    {
+      "claim": "the open-source tools are AVAILABLE and cdc.run stays a contract",
+      "evidence": "tests/test_nirmaan_eda.py::test_the_open_source_tools_are_available_and_the_rest_stay_contracts"
+    },
+    {
+      "claim": "the card names the packs cdc and reset-clocking, lists cdc.run, and asks that waivers be reviewed and that every violation be fixed or waived with an approved rationale",
+      "evidence": "src/nirmaan/company/skills.py:553"
+    },
+    {
+      "claim": "the card's failure modes are blanket waivers and missed reconvergence",
+      "evidence": "src/nirmaan/company/skills.py:557"
+    },
+    {
+      "claim": "so any statement from this skill about crossings is reasoning over source files and papers (marked inference)",
+      "evidence": "src/nirmaan/company/tools.py:177"
+    }
+  ],
+  "checked_at": "2026-11-23"
+}
