@@ -386,7 +386,8 @@ def test_the_workflow_runs_only_on_dispatch_and_only_main_gets_the_token():
     assert "workflow_dispatch:" in triggers
     for never in ("schedule", "cron", "pull_request", "push"):
         assert never not in triggers, never
-    for name in ("case", "trials", "knowledge", "purpose", "harness", "expected_harness", "replay"):
+    for name in ("case", "trials", "knowledge", "purpose", "harness", "expected_harness", "replay", "controls",
+                 "parallel"):
         assert f"\n      {name}:\n" in triggers, name
     jobs = _workflow_jobs(text)
     assert set(jobs) == {"replay", "not-main", "live-eval", "rejudge"}
