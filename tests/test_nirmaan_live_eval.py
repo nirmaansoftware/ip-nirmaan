@@ -501,6 +501,34 @@ def test_whole_flow_cases_get_one_tool_set_and_the_seat_c_credential_test_in_eve
         assert f" {tool} " in setup.split("Check every tool a whole flow runs", 1)[1], tool
 
 
+def test_the_et5_controls_run_only_in_a_replay_as_the_seat_account_between_the_tree_hashes():
+    """Gate ET5: with ``controls``, the replay job runs scripts/live_eval_controls.py after the reference answer's
+    replay and before the checkout is hashed again, with the tools as the seat account (NIRMAAN_SEAT_TOOLS), refused
+    first without this job's credential test record, with no secret, and uploads its record of its own."""
+    text = WORKFLOW.read_text()
+    triggers = text.split("\non:", 1)[1].split("\npermissions:", 1)[0]
+    assert "\n      controls:\n" in triggers and "type: boolean\n        default: false\n" in triggers.split(
+        "\n      controls:\n", 1)[1]
+    jobs = _workflow_jobs(text)
+    order = _steps(jobs["replay"])
+    run, upload = "Run the controls, the mutant sweep and the gate fixtures as the seat account", \
+        "Upload the controls record"
+    assert order.index("Replay the reference answer") < order.index(run) < order.index(
+        "Check the checkout did not change") < order.index(upload)
+    steps = {s.splitlines()[0].replace("name: ", ""): s for s in jobs["replay"].split("\n      - ")[1:]}
+    assert "if: inputs.controls\n" in steps[run] and "secrets." not in steps[run]
+    assert "FW_REACH: ${{ runner.temp }}/fw-reach/fw-reach.json" in steps[run]
+    body = steps[run]
+    assert body.index("python scripts/live_eval_ci.py confined") < body.index(
+        'python scripts/live_eval_controls.py --out "$RUNNER_TEMP/controls"')
+    assert "NIRMAAN_SEAT_TOOLS: /opt/nirmaan-seat/bin" in jobs["replay"].split("\n    steps:")[0]
+    assert "if: always() && steps.controls.outcome != 'skipped'" in steps[upload]
+    assert "name: live-eval-controls-${{ github.run_id }}" in steps[upload]
+    assert "path: ${{ runner.temp }}/controls" in steps[upload]
+    for job in ("live-eval", "rejudge", "not-main"):  # never where trials run or records are re-judged
+        assert "live_eval_controls.py" not in jobs[job] and "inputs.controls" not in jobs[job], job
+
+
 @pytest.mark.parametrize("secret,enabled", [(None, "false"), ("", "false"), ("sk-ant-oat-fake", "true")])
 def test_the_gate_skips_cleanly_without_the_secret(tmp_path, secret, enabled):
     output = tmp_path / "github_output"
