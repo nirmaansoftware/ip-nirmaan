@@ -1403,8 +1403,8 @@ are the shake-out of decision T3, item 10, dispatched before it.
 
 ### 24.1 The values, restated (gate WF32)
 
-Recomputed on `main` at [[TBD: commit C]], with CLI 2.1.325. That commit holds the change of gate WF31 (ip#487, merge
-`c842c4d7`) and the workflow change of the seventh addendum (ip#[[TBD: N]], merge [[TBD: M]]). The commands are those of
+Recomputed on `main` at `97324c78`, with CLI 2.1.325. That commit holds the change of gate WF31 (ip#487, merge
+`c842c4d7`) and the workflow change of the seventh addendum (ip#470, merge `97324c78`). The commands are those of
 sections 6, 18.1 and 23.1: each fingerprint is `harness_sha256(flow="whole", knowledge=..., cli="2.1.325")` and each
 single-seat default `harness_sha256(knowledge=..., cli="2.1.325")`, with the knowledge flag of its arm; the case digest
 is `case_digest`; the flow digests are computed as section 24.2 says; each group's digest is `git ls-files -z -- <paths>
@@ -1425,15 +1425,17 @@ is `case_digest`; the flow digests are computed as section 24.2 says; each group
 | Gate backends | `src/nirmaan/integrations` | 60 | unchanged | `sha256:7c12db371fe1b51fc6a2888e08c6f64677dcfb47d48411af7a66cb7c40ca5443` |
 | Seat account | `scripts/live_eval_seat.py`, `.github/actions/live-eval-seat` | 2 | unchanged | `sha256:6530c15123fabd55cdaf7142af49ee7306eea1ef09d7675338c561e42099c93b` |
 | CI command | `scripts/live_eval_ci.py` | 1 | unchanged | `sha256:3f396770975a7fcff4fc746c031e8694f768b921e90376c290e4fc023acf3e88` |
-| Workflow, tool set and CLI pin | `.github/workflows/live-eval.yml`, `.github/actions/live-eval-setup`, `.github/actions/oss-cad-suite`, `.github/live-eval` | 5 | moved by ip#[[TBD: N]] ([[TBD: M]]) from `4daa3c45...` | [[TBD: workflow group digest]] |
+| Workflow, tool set and CLI pin | `.github/workflows/live-eval.yml`, `.github/actions/live-eval-setup`, `.github/actions/oss-cad-suite`, `.github/live-eval` | 5 | moved by ip#470 (`97324c78`) from `4daa3c45...` | `sha256:82e264d9903a5c5d9f580f8ad8219b46f00db8c0aba367097df6d8d951ec3595` |
 | Reach test | `scripts/live_eval_reach.py` | 1 | unchanged | `sha256:581a4cebb61899090a1741fdbea49e51b57decdebdf0cb11c58562f60b4b93c0` |
 | Held-out scorers | `src/nirmaan/evals/scorers.py` | 1 | unchanged | `sha256:5f4f7909a3207f3837d2af7ad60b85c0bae620e1d461afde57aea0d2a592ecb4` |
 | Stage gates | `src/nirmaan/company/workflows.py` | 1 | unchanged | `sha256:bcd15f8204e55f142f266afdd8e12a4947c7f6276382dd18f4c9893e616a9873` |
 
 From this addition on, every check of sections 4 and 7 is made against these two tables and the two tables of section
-24.2, which replace those of section 23.1. The two expected fingerprints that section 4 lists, and the
-`expected_harness` of each dispatch, are the two whole-flow fingerprints above. Sections 18.1, 21.1, 22.1 and 23.1 keep
-their values as the record of what moved.
+24.2, which replace those of section 23.1. Sections 18.1, 21.1, 22.1 and 23.1 keep their values as the record of what
+moved. Section 4's two expected fingerprints, and the `expected_harness` of each dispatch, read:
+
+  - with documents: `sha256:56c5fac7d788bb34f84b263db1a50b896aba5779387bfed63a0a07975e4dcd72`
+  - without documents: `sha256:7e8ba68dd60b395186441ba4c27392659189a603b59705fa2cc3d4dbf5c4a83c`
 
 What moved them, shown as gate ET7 is shown in sections 18.6, 21.1, 22.1 and 23.2:
 
@@ -1447,9 +1449,16 @@ What moved them, shown as gate ET7 is shown in sections 18.6, 21.1, 22.1 and 23.
   `tests/test_whole_flow_passthrough_note.py` were run for this addition, locally and with no log kept, on a checkout of
   `c842c4d7`, and passed; they are part of the suite that CI's push run
   [45240330295](https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45240330295) on `c842c4d7` passed.
-- ip#[[TBD: N]] (merge [[TBD: M]]): [[TBD: git diff --name-only of the workflow PR; no fingerprint file; tests]].
-- No other merge between `bbc49847` (the commit of section 23.1) and [[TBD: commit C]] changes a file of any group: `git
-  diff --name-only bbc49847 [[TBD: C]]` over the paths of the group table names `.github/workflows/live-eval.yml` only.
+- ip#470 (merge `97324c78`): `git diff --name-only f4449663 97324c78` (its merge's first parent, and the merge) names
+  `.github/workflows/live-eval.yml`, `docs/LIVE_EVAL_EVIDENCE.md`, a history fragment, `tests/test_live_eval_ci.py` and
+  `tests/test_nirmaan_live_eval.py`. The workflow file is in the group "Workflow, tool set and CLI pin", so that
+  group's digest moved; it is in no fingerprint (seventh addendum, fact TF6). No file under `src/`, so no file in
+  `harness.CODE`, `LOOP_CODE` or `FLOW_CODE` and no tool definition, and not the CLI pin. The four fingerprints
+  recomputed with CLI 2.1.325 on `97324c78` are those above. `tests/test_whole_flow_dispatch.py` (gate WF7),
+  `tests/test_live_eval_ci.py` and `tests/test_nirmaan_live_eval.py` were run for this addition, locally and with no
+  log kept, on a checkout of `97324c78`, and passed.
+- No other merge between `bbc49847` (the commit of section 23.1) and `97324c78` changes a file of any group: `git
+  diff --name-only bbc49847 97324c78` over the paths of the group table names `.github/workflows/live-eval.yml` only.
 
 Gate ET5. Decision E4, item 4 of `council/records/2026-11-22-eda-tools-seat-account.md` holds verification-lead's
 statement of section 23.5 only while the values of the plan's tables on the commit the measured run is dispatched from
@@ -1461,7 +1470,7 @@ own words (sixth addendum, decision P3, item 2). The replay record owed by that 
 
 For each arm of the timer: the stage names in order, each stage's skills and their digests, and the digest over the
 first n stages for every n, the last of which is the arm's flow digest of section 24.1 (fifth addendum, decision F3,
-item 1). Computed on `main` at [[TBD: commit C]] by the steps `run_flow` takes to assemble each stage's skills
+item 1). Computed on `main` at `97324c78` by the steps `run_flow` takes to assemble each stage's skills
 (`src/nirmaan/evals/flow.py:188-195`), without running a stage, and `flow_digest` (`flow.py:152-155`) over the first n
 stages. The command, run from that checkout with `PYTHONPATH=src`:
 
@@ -1583,7 +1592,7 @@ extends it; decision C).
 
 ### 24.4 What a later stage is sent, and the words of decision P4 (gate WF32)
 
-On [[TBD: commit C]], as a replay of the reference answer with no model shows them (sixth addendum, facts 1 to 4, with
+On `97324c78`, as a replay of the reference answer with no model shows them (sixth addendum, facts 1 to 4, with
 the new note; decision P6, item 1):
 
 - After a stage reaches review, the harness reviews it with an approve verdict and approves it, as the stage's reviewer
@@ -1682,14 +1691,48 @@ width after an event (decision T5, item 1).
 
 ### 24.7 The workflow: the concurrency block and both guards, word for word
 
-ip#[[TBD: N]] (merge [[TBD: M]]) is the workflow change of the seventh addendum, decision T3, items 1 to 5. On
-[[TBD: commit C]], `.github/workflows/live-eval.yml`:
+ip#470 (merge `97324c78`) is the workflow change of the seventh addendum, decision T3, items 1 to 5. On
+`97324c78`, `.github/workflows/live-eval.yml`:
 
-[[TBD: the concurrency block, with its lines, word for word]]
+The concurrency block (`.github/workflows/live-eval.yml:107-109`), which is the block of decision T3, item 1, word for
+word:
 
-[[TBD: the guard on `parallel`, with its lines, word for word, in the replay and live-eval jobs]]
+```
+concurrency:
+  group: ${{ inputs.parallel && inputs.case == 'flow/axil-timer' && (inputs.knowledge == 'off' && 'live-eval-timer-off' || 'live-eval-timer-on') || inputs.parallel && !startsWith(inputs.case, 'flow/') && !startsWith(inputs.case, 'firmware/') && format('live-eval-run-{0}', github.run_id) || 'live-eval' }}
+  cancel-in-progress: false
+```
 
-[[TBD: the guard on the case's form, with its lines, word for word]]
+The guard on `parallel` (decision T3, item 3), the first step of the `replay` job (`:138-142`) and of the `live-eval`
+job (`:284-288`), the same in both:
+
+```
+      - name: Refuse parallel for the register block, other whole-flow and firmware cases
+        if: ${{ inputs.parallel && (startsWith(inputs.case, 'firmware/') || (startsWith(inputs.case, 'flow/') && inputs.case != 'flow/axil-timer')) }}
+        run: |
+          echo "::error::Of the flow/ and firmware/ cases only flow/axil-timer is dispatched with parallel; dispatch this case without it. Nothing ran."
+          exit 1
+```
+
+The guard on the case's form (decision T3, item 4), the second step of each of those jobs (`:143-152` and `:289-298`,
+its comment line first), the same in both:
+
+```
+      # The case only from the job's environment, never as text in this script (seventh addendum, decision T3, item 4).
+      - name: Refuse a case not written in its exact form
+        env:
+          LC_ALL: C
+        run: |
+          form='^[a-z0-9][a-z0-9/_.-]*$'
+          if [[ ! "$CASE" =~ $form ]] || [[ "$CASE" == *..* ]]; then
+            echo "::error::The case must be written exactly as its ID: lower case, no space, no '..'. Nothing ran."
+            exit 1
+          fi
+```
+
+Both guards come before the checkout (`:153`, `:299`), and in the `live-eval` job before its first step that reads the
+secret (`:305-309`). The `rejudge` job runs only when one of those two jobs uploaded records (`:386-387`), and a
+guard that fails skips the trials step.
 
 With the input false, and for every `firmware/` case and every `flow/` case other than the timer whatever the input
 says, the group is `live-eval`. A timer dispatch with the input runs in `live-eval-timer-on` or `live-eval-timer-off` by
@@ -1706,8 +1749,7 @@ The register block is never dispatched with it.
 one arm together and never more than two timer runs, and that is a fact of the workflow file. The window and the order
 rest on the dispatcher (sections 24.6 and 24.8), which is outside this repository.
 
-**What two runs share** (fact TF5). Each job runs on a hosted runner of its own ([[TBD: live-eval.yml lines of
-runs-on]]) and every artifact name carries the run's id. Two runs share the one secret of the `live-eval` environment,
+**What two runs share** (fact TF5). Each job runs on a hosted runner of its own (`.github/workflows/live-eval.yml:114`, `:249`, `:259`, `:388`) and every artifact name carries the run's id. Two runs share the one secret of the `live-eval` environment,
 so the one plan (an inference), and one cache entry, the tool suite's archive, whose sha256 is checked on every use
 (`.github/actions/oss-cad-suite/action.yml:18-23`, `:36`). They share nothing else: no checkout, no seat account and no
 file.
@@ -1795,16 +1837,16 @@ two trials ran together and never two of one arm. It reads the times and states 
 
 The rows of section 19.5 for gates WF9 and WF17 cite lines of `.github/workflows/live-eval.yml` as they were on
 `02cfa87f`; on `0362c9ad` those lines held other text (seventh addendum, fact TF4). Both rows are stated again here, on
-[[TBD: commit C]] (decision T3, item 13). Gate WF9 is not reworded: it names no group.
+`97324c78` (decision T3, item 13). Gate WF9 is not reworded: it names no group.
 
-| Condition (section 13) | State | Evidence, on [[TBD: commit C]] |
+| Condition (section 13) | State | Evidence, on `97324c78` |
 |---|---|---|
-| WF9 for the timer | Met | [[TBD: the named job; the concurrency block and the two groups a timer dispatch resolves to; one trial per dispatch on the default harness; the expected fingerprint required and checked; the hashed checkout; the counting re-judge, each by line]] |
-| WF17 for the timer | Met, as the council reads it | [[TBD: council/records/2026-11-19-seat-c-live-refusal.md, decision 3; the reach test as a gate before the first trial, by line; seat code as nirmaan-seat]] |
+| WF9 for the timer | Met | the named job, `live-eval`, in the `live-eval` environment, on `main` only (`.github/workflows/live-eval.yml:257-260`); the concurrency block word for word (`:107-109`, section 24.7), under which a timer dispatch with `parallel` true resolves to `live-eval-timer-on` with `knowledge` on and `live-eval-timer-off` with `knowledge` off; one trial per dispatch on the default harness (`scripts/live_eval_ci.py:117-118`); the expected fingerprint required and checked before any trial, exit 4 on a difference (`scripts/live_eval_ci.py:254-257`; the step at `.github/workflows/live-eval.yml:321-322`); the checkout hashed before and after the trials (`:347-349`, `:359-373`); the counting re-judge on a fresh checkout of the same commit, refused on a changed checkout (`:385-494`). The credential test of WF9 is the register block's (gate WF17) |
+| WF17 for the timer | Met, as the council reads it | `council/records/2026-11-19-seat-c-live-refusal.md`, decision 3 (`docs/LIVE_EVAL_EVIDENCE.md:663`); the reach test as a gate before the first trial (`.github/workflows/live-eval.yml:323-326`, before the trials step at `:353-358`) and before the re-judge (`:436-437`); seat code as `nirmaan-seat` (M89, ip#342; ip#444, ip#451) |
 
 ### 24.11 The shake-out
 
-From `main`, on a commit whose `live-eval.yml` is the one of ip#[[TBD: N]], with no model and no token (decision T3,
+From `main`, on a commit whose `live-eval.yml` is the one of ip#470, with no model and no token (decision T3,
 item 10). Each run is named with its commit and the sha256 of `.github/workflows/live-eval.yml` on that commit.
 
 | Run | Dispatch | Commit | sha256 of `live-eval.yml` | As required |
