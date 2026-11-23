@@ -769,8 +769,35 @@ and moves no line of it. Not checked by it: the JUnit count of run 45085382759, 
 repository does not hold.
 
 Its must-haves were findings 1 to 3 reworded, the "before slot 1" wording made consistent with section 19.1 and the
-chair's word on decision 8's bullet, and this section. Gate ET8 is not confirmed by this section: qa-evidence has not
-read the texts as this pull request leaves them, and its must-have includes the chair's word.
+chair's word on decision 8's bullet, and this section.
+
+**A third read**, on the head `9729c149`. In its words: "Ten of my eleven earlier findings hold as reworded." It found
+four sentences that fail decision 8, and this pull request rewords each as it suggested:
+
+1. `docs/GATE_INPUTS.md`, section 7: an escaped identifier "is read as one name, as the tools read it". Now: "as that
+   section defines it" (IEEE 1364, section 3.7.1).
+2. `docs/GATE_INPUTS.md`, section 3: "M85 closes that". Now: M85 refuses the forms section 6 names, and is claimed
+   for those only.
+3. `docs/LIVE_EVAL_EVIDENCE.md`, section 6: the refusal of "a system task outside an allow list" as a thing its
+   fixtures name. Now: the constructs its recorded fixtures name, among them `$system`, `$fopen`, `$c`, DPI and a
+   `` `systemc_ `` block (`tests/test_gate_inputs.py:111-156`), and the forms of `docs/GATE_INPUTS.md`, section 7.
+4. `docs/GATE_INTEGRITY.md`, section 6: run 45073595509 cited for "the named tools" right after eqy and
+   `coverage.read`. Now it names the four tools that run probed, on `c99ef1fe`, and says eqy and `coverage.read`
+   have no recorded probe run there.
+
+On section 19.1 it found, as an inference, that no text on this head says the `live-eval` job has a recorded probe
+run, "so ET8 does not need the chair's word today", but that the measured run, a `live-eval` dispatch before slot 1,
+"breaks the 'none until slot 1' premise of the record's lines 260-262 whatever the chair rules. ET8 needs the chair's
+word before any text cites that run's reach records."
+
+Outside decision 8, under its seat's own rule, it raised one more question, in its words: "the ET5 result claims
+(`LIVE_EVAL_EVIDENCE.md:317-320`, plan `:627-630`, the fragment `:1`) have no committed record behind them. The only
+committed file that names the run is the reach record, and it holds no gate or mutant results. This bears on ET5
+(verification-lead), not ET8." Its must-haves: the four sentences reworded; "a committed record (or a withdrawn claim)
+for ET5"; and the chair's word before the measured run's reach records are cited.
+
+Gate ET8 is not confirmed by this section: qa-evidence has not read the texts as this pull request leaves them. Gate
+ET5's evidence is open by qa-evidence's question, for verification-lead.
 
 ### 19.5 The conditions of section 13, checked on `main` at `02cfa87f`
 
@@ -781,7 +808,7 @@ no condition; its last line is security's must-have, which section 19.1 leaves w
 |---|---|---|
 | The read of wave 2's first live batch | Met | `council/records/2026-11-14-pilot-retrospective.md:563`, the addendum of the W2-L1 read (ip#426) |
 | WF3 for the timer | Met | the fixed documents and citations (ip#323, ip#327, ip#335); every judged tag exercised (ip#339); the first check records (ip#369), and `evals/flow/requirements_check_pending.json:4` lists none pending; `tests/test_whole_flow_cases.py:116` holds every check and mutant to a statement |
-| WF4 for the timer | Met | `evals/flow/controls_record.json` (run 44415682628; ip#324, ip#325), which `tests/test_whole_flow_controls.py:291` holds every later CI run to, CI run 45094550416 on `02cfa87f` among them; ET5 shown again with the tools as the seat account by run 45073595509 (section 18.6) |
+| WF4 for the timer | Met | `evals/flow/controls_record.json` (run 44415682628; ip#324, ip#325), which `tests/test_whole_flow_controls.py:291` holds every later CI run to, CI run 45094550416 on `02cfa87f` among them |
 | WF8 for the timer | Met | `tests/test_whole_flow_runner.py:216` (ip#348); with WF22 below |
 | WF9 for the timer | Met | the named job and its concurrency group (`.github/workflows/live-eval.yml:81-82`, `:199`); one trial per dispatch on the default harness (`scripts/live_eval_ci.py:117-118`); the expected fingerprint required and checked, exit 4 on a difference (`:254-257`); the checkout hashed before and after the trials (`.github/workflows/live-eval.yml:274-298`); the counting re-judge on a fresh checkout (`:309-346`). The credential test of WF9 is the register block's (gate WF17) |
 | WF17 for the timer | Met, as the council reads it | `council/records/2026-11-19-seat-c-live-refusal.md`, decision 3 (`docs/LIVE_EVAL_EVIDENCE.md:562`); the reach test as a gate before the first trial (`.github/workflows/live-eval.yml:250-253`); seat code as `nirmaan-seat` (M89, ip#342; ip#444, ip#451) |
@@ -789,7 +816,7 @@ no condition; its last line is security's must-have, which section 19.1 leaves w
 | WF20 | Met | sections 4 to 6 and 10 |
 | WF21 | Met | `tests/test_live_eval_ci.py:667` and `:680`; `tests/test_whole_flow_attempts.py:39`; `docs/HARNESS.md:261` |
 | WF22 | Met | `tests/test_whole_flow_attempts.py:85` |
-| WF23 | Not met | security confirms section 12 as corrected, with must-haves (section 19.1); ET1 ip#445, ET2 to ET4 ip#444, ET3 record ip#452, ET5 run 45073595509, ET6 ip#454, ET7 section 18.6 and below; ET8 not confirmed (sections 19.2 and 19.4) |
+| WF23 | Not met | security confirms section 12 as corrected, with must-haves (section 19.1); ET1 ip#445, ET2 to ET4 ip#444, ET3 record ip#452, ET5 run 45073595509, with no committed record of its results (qa-evidence, section 19.4); ET6 ip#454, ET7 section 18.6 and below; ET8 not confirmed (sections 19.2 and 19.4) |
 | WF25 | Met | sections 7, 18.1 and 18.2. On `02cfa87f`, CLI 2.1.325, the four fingerprints are the values of section 18.1 (with documents `d90b3c18...`, without `8d6590f7...`; single-seat `0ef27db1...` and `9aa7a333...`) and the other values of section 18.1 are equal; equal again on `d53e8474` (the merge of ip#457, merged into this pull request) |
 | WF26 | Met | section 11 |
 | The measured run of section 10 | Remaining | not dispatched; the last run of `.github/workflows/live-eval.yml` is still replay run 45073595509 |
@@ -797,7 +824,8 @@ no condition; its last line is security's must-have, which section 19.1 leaves w
 
 ### 19.6 What slot 1 still waits for
 
-In order: gate ET8, confirmed by qa-evidence on the texts as they then stand; the chair's word on security's
+In order: a committed record of the ET5 results of run 45073595509, or the claims withdrawn (verification-lead;
+section 19.4); gate ET8, confirmed by qa-evidence on the texts as they then stand; the chair's word on security's
 must-haves 1 and 2 against decision 2, item 3 and decision 8 of the record (section 19.1); the measured run of section
 10, dispatched from `main` with every value of section 18.1 recomputed on its commit first (section 7), and whatever
 the chair rules for its tool reach records; then slot 1, with the values recomputed again on its own commit. If a

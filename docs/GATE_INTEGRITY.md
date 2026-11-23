@@ -362,9 +362,11 @@ anyway is redacted from logs and from the uploaded record.
   builds from seat HDL (the model through `nirmaan-seat-model`, in a view of
   the run's directory, with no environment); its two `verilator_coverage`
   steps stay with the caller. Again no fingerprint changed; elsewhere every
-  step runs as before. What may be said is what a named run shows: the
-  listed probes denied to the account through the named tools (replay run
-  45073595509, `evals/flow/tool_reach_record.json`). Seat files are not
+  step runs as before. What may be said is what a named run shows: replay
+  run 45073595509 (`evals/flow/tool_reach_record.json`, on `c99ef1fe`, before
+  the eqy and `coverage.read` change) shows the listed probes denied to the
+  account through Icarus, Verilator, Yosys and SBY only; eqy and
+  `coverage.read` have no recorded probe run there. Seat files are not
   claimed confined, and the residual is the one stated for the input check
   in section 3: screen classes nobody has found, parser faults in a tool,
   and files any account may read.

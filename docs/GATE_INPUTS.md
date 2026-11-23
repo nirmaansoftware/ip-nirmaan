@@ -142,8 +142,8 @@ case that runs seat C is refused until `fw.test` does too
 Reading was not covered by M84: an `.sby` `[files]` source could name an
 absolute path or one outside its folder, and a Yosys read command a file or
 include folder anywhere, so a seat's setup could copy a file of the host into
-its run, where Yosys printed part of it to the log and the summary. M85 closes
-that (section 6).
+its run, where Yosys printed part of it to the log and the summary. M85 refuses
+the forms section 6 names, and is claimed for those only.
 
 ## 5. The harness
 
@@ -254,7 +254,7 @@ refused, with the reason, before any step runs:
 
 - every string closes on its own line; a quote that does not is refused;
 - an escaped identifier (IEEE 1364, section 3.7.1: a backslash and every
-  character up to white space) is read as one name, as the tools read it, so
+  character up to white space) is read as one name, as that section defines it, so
   the marks in it open no comment or string; it may not begin with `$` unless
   it is a name of `SAFE_SYSTEM` (Icarus and Yosys run `\$readmemh` as the
   system task), nor begin with `/` or hold `..` (Verilator opens the file an
