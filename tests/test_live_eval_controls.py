@@ -601,12 +601,13 @@ def test_the_wf33_record_is_from_main_and_reads_every_bypass_control_by_decision
     assert (run["id"], run["commit"], run["branch"], run["event"]) == (
         WF33_RUN, WF33_COMMIT, "main", "workflow_dispatch")
     assert run["inputs"] == {"case": controls.CASE, "replay": True, "controls": True, "parallel": True}
+    assert "fact TF14" in run["inputs_source"]  # no record of the run holds ``parallel``: it is the dispatcher's
     assert {k: v["conclusion"] for k, v in run["jobs"].items()} == {
-        "replay": "failure", "rejudge": "success", "live-eval": "skipped"}
+        "replay": "failure", "rejudge": "success", "live-eval": "skipped", "not-main": "skipped"}
     assert all(run["id"] in j["url"] and j["url"].endswith(f"/job/{j['id']}") for j in run["jobs"].values())
     # One attempt: every job ran once. Each job's own steps, as GitHub reported them.
     assert run["attempt"] == 1 and {k: v["attempt"] for k, v in run["jobs"].items()} == {
-        "replay": 1, "rejudge": 1, "live-eval": 1}
+        "replay": 1, "rejudge": 1, "live-eval": 1, "not-main": 1}
     assert run["steps"]["replay"]["Replay the reference answer"] == "success"
     assert run["steps"]["rejudge"]["Re-judge the records"] == "success"
     assert {"Test what seat code can reach", "Check the checkout did not change"} <= set(run["steps"]["replay"]) & set(
@@ -617,6 +618,7 @@ def test_the_wf33_record_is_from_main_and_reads_every_bypass_control_by_decision
     cancelled = run["cancelled_dispatch"]
     assert (cancelled["id"], cancelled["conclusion"], cancelled["read"]) == ("45259738096", "cancelled", "nothing")
     assert cancelled["commit"] != run["commit"] and cancelled["url"].endswith(f"/actions/runs/{cancelled['id']}")
+    assert cancelled["created"] < cancelled["completed"] < "2026-11-23T21:07:16Z"  # ended before this run's dispatch
     assert "A replay is not a trial and is never counted." in record["about"]
     assert "Whether ET5 is met is verification-lead's statement, not this record's." in record["about"]
     folder = REPO / record["folder"]

@@ -1,6 +1,6 @@
 {
  "format": "nirmaan.et5-seat-controls-record/2",
- "about": "Gate WF33 of the sixth addendum to council/records/2026-11-17-g3-whole-flow-cases.md (decision P3, item 2), by the procedure of decision E4 of the third addendum to council/records/2026-11-22-eda-tools-seat-account.md: replay run 45266375996 of flow/axil-timer, dispatched alone on main at b1bc2267 (the merge of ip#491, the plan's dated addition of section 24, on a commit that holds ip#487, which moved both whole-flow fingerprints) with controls and parallel set, no model and no token. A replay is not a trial and is never counted. Its controls upload (live-eval-controls-45266375996) and the tool reach records of its replay and rejudge jobs are committed as uploaded, byte for byte, in the folder this record names, each file with its sha256 here. Each job ran once (attempt 1): in the replay job the reach test denied every probe, the reference answer's replay passed, and the controls step failed because 13 bypass controls failed as the seat account; the rejudge job passed, its reach test denying every probe. An earlier dispatch, run 45259738096 on 11b205e4, was made before ip#491 merged and was cancelled at once; nothing is read from it. The record reads each bypass control by decision E2: for each one that failed as the account, every tool run it made, the seat account's wrapper it started and the tool's own line naming the target it could not open, resolve or write; and the controls whose tool runs as the caller by decision 6, listed and claimed for nothing. The records of runs 45119522138 (et5_controls_record.json) and 45159697183 (et5_controls_record_45159697183.json) are unchanged. Whether ET5 is met is verification-lead's statement, not this record's.",
+ "about": "Gate WF33 of the sixth addendum to council/records/2026-11-17-g3-whole-flow-cases.md (decision P3, item 2), by the procedure of decision E4 of the third addendum to council/records/2026-11-22-eda-tools-seat-account.md: replay run 45266375996 of flow/axil-timer, dispatched alone on main at b1bc2267 (the merge of ip#491, the plan's dated addition of section 24, on a commit that holds ip#487, which moved both whole-flow fingerprints) with controls and parallel set, no model and no token. A replay is not a trial and is never counted. Its controls upload (live-eval-controls-45266375996) and the tool reach records of its replay and rejudge jobs are committed as uploaded, byte for byte, in the folder this record names, each file with its sha256 here. Each job ran once (attempt 1): in the replay job the reach test denied every probe, the reference answer's replay passed, and the controls step failed because 13 bypass controls failed as the seat account; the rejudge job passed, its reach test denying every probe. An earlier dispatch, run 45259738096 on 11b205e4, was made before ip#491 merged and was cancelled by its dispatcher; nothing is read from it. The record reads each bypass control by decision E2: for each one that failed as the account, every tool run it made, the seat account's wrapper it started and the tool's own line naming the target it could not open, resolve or write; and the controls whose tool runs as the caller by decision 6, listed and claimed for nothing. The records of runs 45119522138 (et5_controls_record.json) and 45159697183 (et5_controls_record_45159697183.json) are unchanged. Whether ET5 is met is verification-lead's statement, not this record's.",
  "run": {
   "id": "45266375996",
   "url": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45266375996",
@@ -15,6 +15,7 @@
    "controls": true,
    "parallel": true
   },
+  "inputs_source": "The inputs as the dispatcher gave them: case flow/axil-timer, with replay, controls and parallel true, and no model and no token. GitHub's run and job data carry no dispatch inputs, and no record of the run holds parallel (seventh addendum to council/records/2026-11-17-g3-whole-flow-cases.md, fact TF14): its step that refuses parallel for other cases is skipped for this case whatever the input. The case is in the job's environment as GitHub reported it.",
   "jobs": {
    "replay": {
     "id": "138014258248",
@@ -33,6 +34,12 @@
     "attempt": 1,
     "conclusion": "skipped",
     "url": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45266375996/job/138014261681"
+   },
+   "not-main": {
+    "id": "138014261716",
+    "attempt": 1,
+    "conclusion": "skipped",
+    "url": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45266375996/job/138014261716"
    }
   },
   "steps": {
@@ -53,8 +60,9 @@
    "url": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45259738096",
    "commit": "11b205e4540995529c0a9e1f7387afd74901d877",
    "created": "2026-11-23T20:28:31Z",
+   "completed": "2026-11-23T20:34:09Z",
    "conclusion": "cancelled",
-   "why": "dispatched before ip#491 merged; plan section 24.13 asks for a commit that holds that addition, so it was cancelled at once",
+   "why": "dispatched before ip#491 merged; plan section 24.13 asks for a commit that holds that addition, so its dispatcher cancelled it; it ended at 2026-11-23T20:34:09Z, before run 45266375996 was dispatched at 2026-11-23T21:07:16Z",
    "read": "nothing"
   }
  },
