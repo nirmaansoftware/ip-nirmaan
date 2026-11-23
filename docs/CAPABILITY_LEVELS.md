@@ -60,9 +60,12 @@ labelled `"flow": "whole"` in its run manifest and in the trial. Labelled whole
 in either, it is taken out first, before the labels above and the skill loop,
 credits no skill and never counts toward any level: it is listed under
 `whole_flow`, by group (case, case digest, model, harness, CLI, flow digest and
-purpose), each trial one by one. A group's whole-flow pass count (`n`,
-`passed`, `unjudged`, Wilson interval) is written only from 10 trials, and a
-trial no judge ran on is a failed trial of its group. The record's name is
+purpose), each trial one by one. A trial whose flow stopped before its last
+stage is placed by the stages it seated, in its arm's group, and keeps its own
+flow digest and the stage at which it stopped (council record 2026-11-17, fifth
+addendum, decision F2; `docs/whole_flow/01-label-and-list.md`). A group's
+whole-flow pass count (`n`, `passed`, `unjudged`, Wilson interval) is written
+only from 10 trials, and a trial no judge ran on is a failed trial of its group. The record's name is
 never read. A record that mixes whole-flow and single-seat trials is refused.
 
 Trials are grouped by skill, model, the skill digest recorded with the trial
