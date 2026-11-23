@@ -1451,14 +1451,14 @@ What moved them, shown as gate ET7 is shown in sections 18.6, 21.1, 22.1 and 23.
   [45240330295](https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45240330295) on `c842c4d7` passed.
 - ip#470 (merge `97324c78`): `git diff --name-only f4449663 97324c78` (its merge's first parent, and the merge) names
   `.github/workflows/live-eval.yml`, `docs/LIVE_EVAL_EVIDENCE.md`, a history fragment, `tests/test_live_eval_ci.py` and
-  `tests/test_nirmaan_live_eval.py`. The workflow file is in the group "Workflow, tool set and CLI pin", so that
-  group's digest moved; it is in no fingerprint (seventh addendum, fact TF6). No file under `src/`, so no file in
+  `tests/test_nirmaan_live_eval.py`. The workflow file is in the group "Workflow, tool set and CLI pin", so that group's
+  digest moved; it is in no fingerprint (seventh addendum, fact TF6). No file under `src/`, so no file in
   `harness.CODE`, `LOOP_CODE` or `FLOW_CODE` and no tool definition, and not the CLI pin. The four fingerprints
   recomputed with CLI 2.1.325 on `97324c78` are those above. `tests/test_whole_flow_dispatch.py` (gate WF7),
-  `tests/test_live_eval_ci.py` and `tests/test_nirmaan_live_eval.py` were run for this addition, locally and with no
-  log kept, on a checkout of `97324c78`, and passed.
-- No other merge between `bbc49847` (the commit of section 23.1) and `97324c78` changes a file of any group: `git
-  diff --name-only bbc49847 97324c78` over the paths of the group table names `.github/workflows/live-eval.yml` only.
+  `tests/test_live_eval_ci.py` and `tests/test_nirmaan_live_eval.py` were run for this addition, locally and with no log
+  kept, on a checkout of `97324c78`, and passed.
+- No other merge between `bbc49847` (the commit of section 23.1) and `97324c78` changes a file of any group: `git diff
+  --name-only bbc49847 97324c78` over the paths of the group table names `.github/workflows/live-eval.yml` only.
 
 Gate ET5. Decision E4, item 4 of `council/records/2026-11-22-eda-tools-seat-account.md` holds verification-lead's
 statement of section 23.5 only while the values of the plan's tables on the commit the measured run is dispatched from
@@ -1592,8 +1592,8 @@ extends it; decision C).
 
 ### 24.4 What a later stage is sent, and the words of decision P4 (gate WF32)
 
-On `97324c78`, as a replay of the reference answer with no model shows them (sixth addendum, facts 1 to 4, with
-the new note; decision P6, item 1):
+On `97324c78`, as a replay of the reference answer with no model shows them (sixth addendum, facts 1 to 4, with the new
+note; decision P6, item 1):
 
 - After a stage reaches review, the harness reviews it with an approve verdict and approves it, as the stage's reviewer
   role and approver role, under its own actor name `eval-flow-passthrough` (`src/nirmaan/evals/flow.py:48`, `:207-214`),
@@ -1691,8 +1691,8 @@ width after an event (decision T5, item 1).
 
 ### 24.7 The workflow: the concurrency block and both guards, word for word
 
-ip#470 (merge `97324c78`) is the workflow change of the seventh addendum, decision T3, items 1 to 5. On
-`97324c78`, `.github/workflows/live-eval.yml`:
+ip#470 (merge `97324c78`) is the workflow change of the seventh addendum, decision T3, items 1 to 5. On `97324c78`,
+`.github/workflows/live-eval.yml`:
 
 The concurrency block (`.github/workflows/live-eval.yml:107-109`), which is the block of decision T3, item 1, word for
 word:
@@ -1731,8 +1731,8 @@ its comment line first), the same in both:
 ```
 
 Both guards come before the checkout (`:153`, `:299`), and in the `live-eval` job before its first step that reads the
-secret (`:305-309`). The `rejudge` job runs only when one of those two jobs uploaded records (`:386-387`), and a
-guard that fails skips the trials step.
+secret (`:305-309`). The `rejudge` job runs only when one of those two jobs uploaded records (`:386-387`), and a guard
+that fails skips the trials step.
 
 With the input false, and for every `firmware/` case and every `flow/` case other than the timer whatever the input
 says, the group is `live-eval`. A timer dispatch with the input runs in `live-eval-timer-on` or `live-eval-timer-off` by
@@ -1749,10 +1749,11 @@ The register block is never dispatched with it.
 one arm together and never more than two timer runs, and that is a fact of the workflow file. The window and the order
 rest on the dispatcher (sections 24.6 and 24.8), which is outside this repository.
 
-**What two runs share** (fact TF5). Each job runs on a hosted runner of its own (`.github/workflows/live-eval.yml:114`, `:249`, `:259`, `:388`) and every artifact name carries the run's id. Two runs share the one secret of the `live-eval` environment,
-so the one plan (an inference), and one cache entry, the tool suite's archive, whose sha256 is checked on every use
-(`.github/actions/oss-cad-suite/action.yml:18-23`, `:36`). They share nothing else: no checkout, no seat account and no
-file.
+**What two runs share** (fact TF5). Each job runs on a hosted runner of its own (`.github/workflows/live-eval.yml:114`,
+`:249`, `:259`, `:388`) and every artifact name carries the run's id. Two runs share the one secret of the `live-eval`
+environment, so the one plan (an inference), and one cache entry, the tool suite's archive, whose sha256 is checked on
+every use (`.github/actions/oss-cad-suite/action.yml:18-23`, `:36`). They share nothing else: no checkout, no seat
+account and no file.
 
 ### 24.8 Section 8 with two in flight
 
@@ -1846,12 +1847,18 @@ The rows of section 19.5 for gates WF9 and WF17 cite lines of `.github/workflows
 
 ### 24.11 The shake-out
 
-From `main`, on a commit whose `live-eval.yml` is the one of ip#470, with no model and no token (decision T3,
-item 10). Each run is named with its commit and the sha256 of `.github/workflows/live-eval.yml` on that commit.
+From `main`, on a commit whose `live-eval.yml` is the one of ip#470, with no model and no token (decision T3, item 10).
+Each run is named with its commit and the sha256 of `.github/workflows/live-eval.yml` on that commit.
 
 | Run | Dispatch | Commit | sha256 of `live-eval.yml` | As required |
 |---|---|---|---|---|
-[[TBD: shake-out rows: two timer replays with parallel true, on and off, in flight together; register block replay with parallel true refused at the guard on parallel; firmware/ replay with parallel true refused there; a case not in the exact form refused at the guard on the case's form; two replays without the input, the second waiting for the first in live-eval]]
+| [45250349174](https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45250349174) | replay of `flow/axil-timer`, `knowledge=on`, `parallel=true` | `97324c78` | `sha256:09afd2c059826ae42ccc630080c04207ae33c66b8a4a01637a810cbf9422dd72` | yes: its `replay` and `rejudge` jobs passed, as a replay is judged today; in flight together with 45250355681 |
+| [45250355681](https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45250355681) | replay of `flow/axil-timer`, `knowledge=off`, `parallel=true` | `97324c78` | `sha256:09afd2c059826ae42ccc630080c04207ae33c66b8a4a01637a810cbf9422dd72` | yes: its `replay` and `rejudge` jobs passed, as a replay is judged today; in flight together with 45250349174 |
+| [45250422029](https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45250422029) | replay of `flow/axi4-lite-regs-driver`, `parallel=true` | `97324c78` | `sha256:09afd2c059826ae42ccc630080c04207ae33c66b8a4a01637a810cbf9422dd72` | yes: refused at the guard on `parallel` (the `replay` job's first step failed; no other job ran) |
+| [45250876960](https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45250876960) | replay of `firmware/axi4-lite-driver`, `parallel=true` | `97324c78` | `sha256:09afd2c059826ae42ccc630080c04207ae33c66b8a4a01637a810cbf9422dd72` | yes: refused at the guard on `parallel`, as above |
+| [45250933054](https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45250933054) | replay of `FLOW/axil-timer` (not the exact form), without the input | `97324c78` | `sha256:09afd2c059826ae42ccc630080c04207ae33c66b8a4a01637a810cbf9422dd72` | yes: refused at the guard on the case's form (the `replay` job's second step failed; no other job ran) |
+| [45251622577](https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45251622577) | replay of `flow/axil-timer`, `knowledge=on`, without the input | `97324c78` | `sha256:09afd2c059826ae42ccc630080c04207ae33c66b8a4a01637a810cbf9422dd72` | yes: its `replay` and `rejudge` jobs passed |
+| [45251747099](https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45251747099) | replay of `flow/axil-timer`, `knowledge=on`, without the input, dispatched while 45251622577 ran | `97324c78` | `sha256:09afd2c059826ae42ccc630080c04207ae33c66b8a4a01637a810cbf9422dd72` | yes: its jobs started only after 45251622577 had finished, then passed |
 
 These are replays and refused dispatches. They ran no trial and are no record of the forty, and nothing here reads a
 result from them beyond what the workflow did with each.
