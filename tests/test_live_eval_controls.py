@@ -211,3 +211,78 @@ def test_the_fixtures_run_loads_the_recorder_and_writes_a_bypass_controls_runs(t
     [run] = line["runs"]
     assert run["backend"] == "yosys" and run["succeeded"] is False and run["steps"] == []
     assert "top must be a plain module name" in run["summary"]
+
+
+# --- The committed record of the dispatched run (gate ET5) --------------------------------------------------------
+
+RECORD = REPO / "evals" / "flow" / "et5_controls_record.json"
+LINKED = "test_a_setup_over_an_approved_file_linked_beside_it_still_proves"
+
+
+def test_the_committed_et5_controls_record_is_from_main_and_shows_each_part_against_its_expectation():
+    """Replay run 45119522138 of flow/axil-timer on main at c0ba283c (the merge of ip#464), with controls set: the seven
+    timer controls gave the verdicts of controls_record.json, all 100 sweep rows gave the record's result, error count
+    and first failure, and of the 402 fixture tests 390 passed and 12 failed (11 bypass controls and the linked setup),
+    none skipped; every must-refuse fixture passed. The record says what each difference is and claims no verdict."""
+    record = json.loads(RECORD.read_text(encoding="utf-8"))
+    assert record["format"] == "nirmaan.et5-seat-controls-record/1"
+    run = record["run"]
+    assert run["id"] == "45119522138" and run["commit"].startswith("c0ba283c") and re.fullmatch(r"[0-9a-f]{40}",
+                                                                                                run["commit"])
+    assert (run["branch"], run["event"]) == ("main", "workflow_dispatch")
+    assert run["inputs"] == {"case": controls.CASE, "replay": True, "controls": True}
+    assert run["artifact"] == f"live-eval-controls-{run['id']}" and run["url"].endswith(f"/actions/runs/{run['id']}")
+    assert set(run["jobs"]) == {"replay", "rejudge"}
+    assert all(run["id"] in j["url"] and j["url"].endswith(f"/job/{j['id']}") for j in run["jobs"].values())
+    assert (run["jobs"]["replay"]["conclusion"], run["jobs"]["rejudge"]["conclusion"]) == ("failure", "success")
+    assert record["summary"]["commit"] == run["commit"] and record["summary"]["seat_tools"] == "/opt/nirmaan-seat/bin"
+    assert record["summary"]["required"] == controls.REQUIRED.split() and record["summary"]["ok"] is False
+    assert run["id"] in record["about"] and run["commit"][:8] in record["about"]
+    assert "Whether ET5 is met is verification-lead's statement, not this record's." in record["about"]
+
+    # The reference answer's replay, its re-judge and the reach test, in the same run.
+    replay = record["replay"]
+    assert (replay["passed"], replay["n"]) == (1, 1)
+    assert replay["rejudge"] == [{"case": controls.CASE, "trial": 1, "same": True, "differences": []}]
+    assert replay["tool_reach_every_denied"] == {"replay": True, "rejudge": True}
+    assert set(replay["tool_reach_commit"].values()) == {run["commit"]}
+
+    # Controls: each timer control, in the manifest's order, as the manifest expects and as the CI run recorded.
+    manifest = [c for c in json.loads((REPO / "evals" / "flow" / "controls.json").read_text())["controls"]
+                if c["case"] == controls.CASE]
+    recorded = {c["id"]: c for c in json.loads((REPO / "evals" / "flow" / "controls_record.json").read_text())[
+        "controls"]}
+    part = record["controls"]
+    assert part["exit"] == 0 and part["junit"] == {"tests": 7, "passed": 7, "failed": 0, "error": 0, "skipped": 0}
+    assert [c["id"] for c in part["controls"]] == [c["id"] for c in manifest]
+    for got, want in zip(part["controls"], manifest):
+        expected = [s["expect"] for s in want["checks"]]
+        assert got["expected"] == expected == got["verdicts"] == got["recorded"] == recorded[want["id"]]["verdicts"]
+        assert got["submitted"] is want.get("reaches_review", True)
+
+    # Sweep: the reference and every mutant, each as the sweep record has it.
+    sweep = json.loads(controls.SWEEP.read_text(encoding="utf-8"))
+    rows = record["sweep"]["rows"]
+    assert record["sweep"]["ok"] is True and record["sweep"]["record_simulator"] == sweep["simulator"]
+    assert [r["mutant"] for r in rows] == ["reference", *(m["mutant"] for m in sweep["mutants"])]
+    assert rows[0]["sha256"] == sweep["reference"]["sha256"] and rows[0]["result"] == "passes"
+    assert (rows[0]["checks_passed"], rows[0]["errors"]) == (sweep["reference"]["checks"], 0)
+    for row, want in zip(rows[1:], sweep["mutants"]):
+        assert (row["tag"], row["sha256"], row["result"]) == (want["tag"], want["sha256"], want["result"]), row
+        assert (row["errors"], row["first_failure"]) == (want["errors"], want["first_failure"]), row
+    assert all(r["same_result"] and r["same_errors"] and r["same_first_failure"] and r["same_sha256"] for r in rows)
+
+    # Fixtures: every test ran, none skipped; the failures are exactly the differences the record names.
+    part = record["fixtures"]
+    assert part["files"] == list(controls.FIXTURE_TESTS) and part["exit"] == 1
+    assert part["junit"] == {"tests": 402, "passed": 390, "failed": 12, "error": 0, "skipped": 0}
+    assert len(part["tests"]) == 402 and len({t["test"] for t in part["tests"]}) == 402
+    failed = [t["test"] for t in part["tests"] if t["outcome"] != "passed"]
+    assert failed == [d["test"] for d in part["differences"]]
+    names = [t.split("::")[-1] for t in failed]
+    assert [n for n in names if not n.startswith("test_control_without_the_check")] == [LINKED]
+    assert sum(n.startswith("test_control_without_the_check") for n in names) == 11
+    for diff in part["differences"]:
+        assert diff["what"].startswith("must-pass" if diff["test"].endswith(LINKED) else "bypass control"), diff
+    refusing = [t for t in part["tests"] if "_refused" in t["test"].split("::")[-1]]
+    assert refusing and all(t["outcome"] == "passed" for t in refusing)  # every must-refuse fixture still refused
