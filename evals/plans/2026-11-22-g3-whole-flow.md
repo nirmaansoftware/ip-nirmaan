@@ -790,7 +790,7 @@ no condition; its last line is security's must-have, which section 19.1 leaves w
 | WF21 | Met | `tests/test_live_eval_ci.py:667` and `:680`; `tests/test_whole_flow_attempts.py:39`; `docs/HARNESS.md:261` |
 | WF22 | Met | `tests/test_whole_flow_attempts.py:85` |
 | WF23 | Not met | security confirms section 12 as corrected, with must-haves (section 19.1); ET1 ip#445, ET2 to ET4 ip#444, ET3 record ip#452, ET5 run 45073595509, ET6 ip#454, ET7 section 18.6 and below; ET8 not confirmed (sections 19.2 and 19.4) |
-| WF25 | Met | sections 7, 18.1 and 18.2. On `02cfa87f`, CLI 2.1.325, the four fingerprints are the values of section 18.1 (with documents `d90b3c18...`, without `8d6590f7...`; single-seat `0ef27db1...` and `9aa7a333...`) and the other values of section 18.1 are equal |
+| WF25 | Met | sections 7, 18.1 and 18.2. On `02cfa87f`, CLI 2.1.325, the four fingerprints are the values of section 18.1 (with documents `d90b3c18...`, without `8d6590f7...`; single-seat `0ef27db1...` and `9aa7a333...`) and the other values of section 18.1 are equal; equal again on `d53e8474` (the merge of ip#457, merged into this pull request) |
 | WF26 | Met | section 11 |
 | The measured run of section 10 | Remaining | not dispatched; the last run of `.github/workflows/live-eval.yml` is still replay run 45073595509 |
 | Security's item 1 (section 19.1) | Open | for the chair, against decision 2, item 3 and decision 8 of the record |
