@@ -1456,7 +1456,9 @@ What moved them, shown as gate ET7 is shown in sections 18.6, 21.1, 22.1 and 23.
   `harness.CODE`, `LOOP_CODE` or `FLOW_CODE` and no tool definition, and not the CLI pin. The four fingerprints
   recomputed with CLI 2.1.325 on `97324c78` are those above. `tests/test_whole_flow_dispatch.py` (gate WF7),
   `tests/test_live_eval_ci.py` and `tests/test_nirmaan_live_eval.py` were run for this addition, locally and with no log
-  kept, on a checkout of `97324c78`, and passed.
+  kept, on a checkout of `97324c78`, and passed; they are part of the suite that CI's push run
+  [45250256747](https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45250256747) on `97324c78` passed. The replay
+  jobs of runs 45250349174 and 45250355681 (section 24.11), on `97324c78`, print the two whole-flow fingerprints above.
 - No other merge between `bbc49847` (the commit of section 23.1) and `97324c78` changes a file of any group: `git diff
   --name-only bbc49847 97324c78` over the paths of the group table names `.github/workflows/live-eval.yml` only.
 
@@ -1736,18 +1738,20 @@ that fails skips the trials step.
 
 With the input false, and for every `firmware/` case and every `flow/` case other than the timer whatever the input
 says, the group is `live-eval`. A timer dispatch with the input runs in `live-eval-timer-on` or `live-eval-timer-off` by
-its `knowledge` input, a replay of the timer included. The input appears in the concurrency group and in the guard on
-`parallel`, the first step of the `replay` and `live-eval` jobs, and nowhere else; the guard on the case's form does not
-read it.
+its `knowledge` input, a replay of the timer included. `inputs.parallel` appears in the concurrency group and in the
+guard on `parallel`, the first step of the `replay` and `live-eval` jobs, and nowhere else; the guard on the case's form
+does not read it.
 
 **Which dispatches may use the input** (decision T3, item 7). For the timer: its slots; the second measured run; the
 replay of gate ET5's record; and the shake-out of section 24.11. A timer replay with the input runs only before slot 1
 or after slot 20's record. For the re-measure batch: what its own addendum says. Nothing else without a council ruling.
 The register block is never dispatched with it.
 
-**What holds the width.** For the timer, GitHub holds the width through the two groups: it never runs two timer runs of
-one arm together and never more than two timer runs, and that is a fact of the workflow file. The window and the order
-rest on the dispatcher (sections 24.6 and 24.8), which is outside this repository.
+**What holds the width.** For timer dispatches made with the input, as every slot is (section 24.6), GitHub holds the
+width through the two groups: it never runs two such runs of one arm together and never more than two such runs, and
+that is a fact of the workflow file. A timer dispatch without the input runs in `live-eval`, outside both groups; that
+none is made during the batch rests on the dispatcher. The window and the order rest on the dispatcher (sections 24.6
+and 24.8), which is outside this repository.
 
 **What two runs share** (fact TF5). Each job runs on a hosted runner of its own (`.github/workflows/live-eval.yml:114`,
 `:249`, `:259`, `:388`) and every artifact name carries the run's id. Two runs share the one secret of the `live-eval`
@@ -1843,7 +1847,7 @@ The rows of section 19.5 for gates WF9 and WF17 cite lines of `.github/workflows
 | Condition (section 13) | State | Evidence, on `97324c78` |
 |---|---|---|
 | WF9 for the timer | Met | the named job, `live-eval`, in the `live-eval` environment, on `main` only (`.github/workflows/live-eval.yml:257-260`); the concurrency block word for word (`:107-109`, section 24.7), under which a timer dispatch with `parallel` true resolves to `live-eval-timer-on` with `knowledge` on and `live-eval-timer-off` with `knowledge` off; one trial per dispatch on the default harness (`scripts/live_eval_ci.py:117-118`); the expected fingerprint required and checked before any trial, exit 4 on a difference (`scripts/live_eval_ci.py:254-257`; the step at `.github/workflows/live-eval.yml:321-322`); the checkout hashed before and after the trials (`:347-349`, `:359-373`); the counting re-judge on a fresh checkout of the same commit, refused on a changed checkout (`:385-494`). The credential test of WF9 is the register block's (gate WF17) |
-| WF17 for the timer | Met, as the council reads it | `council/records/2026-11-19-seat-c-live-refusal.md`, decision 3 (`docs/LIVE_EVAL_EVIDENCE.md:663`); the reach test as a gate before the first trial (`.github/workflows/live-eval.yml:323-326`, before the trials step at `:353-358`) and before the re-judge (`:436-437`); seat code as `nirmaan-seat` (M89, ip#342; ip#444, ip#451) |
+| WF17 for the timer | Met, as the council reads it | `council/records/2026-11-19-seat-c-live-refusal.md`, decision 3 (`docs/LIVE_EVAL_EVIDENCE.md:663`); the reach test as a gate before the first trial (`.github/workflows/live-eval.yml:323-326`, before the trials step at `:353-358`) and before the re-judge (`:436-437`); seat code as `nirmaan-seat` (`.github/workflows/live-eval.yml:319-320`, and `:429-430` in `rejudge`; M89, ip#342; ip#444, ip#451) |
 
 ### 24.11 The shake-out
 
@@ -1860,8 +1864,10 @@ Each run is named with its commit and the sha256 of `.github/workflows/live-eval
 | [45251622577](https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45251622577) | replay of `flow/axil-timer`, `knowledge=on`, without the input | `97324c78` | `sha256:09afd2c059826ae42ccc630080c04207ae33c66b8a4a01637a810cbf9422dd72` | yes: its `replay` and `rejudge` jobs passed |
 | [45251747099](https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45251747099) | replay of `flow/axil-timer`, `knowledge=on`, without the input, dispatched while 45251622577 ran | `97324c78` | `sha256:09afd2c059826ae42ccc630080c04207ae33c66b8a4a01637a810cbf9422dd72` | yes: its jobs started only after 45251622577 had finished, then passed |
 
-These are replays and refused dispatches. They ran no trial and are no record of the forty, and nothing here reads a
-result from them beyond what the workflow did with each.
+The inputs are as dispatched; no run records its `parallel` input (fact TF14). What each row shows is its jobs'
+conclusions and, for 45251747099, that its jobs started only after 45251622577 had finished. These are replays and
+refused dispatches. They ran no trial and are no record of the forty, and nothing here reads a result from them beyond
+what the workflow did with each.
 
 ### 24.12 What the read adds, and what is never said
 
@@ -1896,9 +1902,9 @@ gates read them. Still before slot 1, in order:
 - the replay record of the sixth addendum's decision P3, item 2: a replay of `flow/axil-timer` with `controls` and `-f
   parallel=true`, alone, with no model and no token, on a commit that holds this addition, committed with its test, and
   verification-lead's statement of gate ET5 on that pull request's head;
-- the values of sections 24.1 and 24.2 on the second measured run's dispatch commit equal to those on the commit of the
-  replay record that ET5 is stated on; if any differs, ET5 is open again and the second run is not dispatched (decision
-  E4, item 4);
+- the values of sections 24.1 and 24.2 on the second measured run's dispatch commit equal to those on the commit the
+  replay run of that record was dispatched on; if any differs, ET5 is open again and the second run is not dispatched
+  (decision E4, item 4);
 - the second measured run (section 24.3), with every value of sections 24.1 and 24.2 recomputed on its commit first;
 - the chain of gate ET10 on the second run, on a commit that holds all of it, and the reach records of run 45196235508
   committed as section 24.3 says (gate WF33);
