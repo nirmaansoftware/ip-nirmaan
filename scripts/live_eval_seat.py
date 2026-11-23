@@ -20,7 +20,7 @@ the program runs in a mount namespace of its own in which every ``/tmp/nirmaan-*
 input files is replaced by an empty folder that holds only those input files, each at its own path and read only, and
 the run's own directory. A link of the runner's beside an input whose text is exactly another input's path (M68's
 ``beside``: an approved file linked beside the setup that names it) is in the view too, as that input's own file, read
-only (``beside_links``); so the account reads no file it was not given. The harness names both in the step's environment (``RUN_DIR_ENV``, ``INPUTS_ENV``, set by
+only (``beside_links``); so the account reads no file of those folders it was not given. The harness names both in the step's environment (``RUN_DIR_ENV``, ``INPUTS_ENV``, set by
 ``nirmaan.integrations.eda``); the root helper refuses an input that is not a regular file of the runner's inside a
 ``/tmp/nirmaan-*`` folder the runner made, reached through no link, so no file outside those folders (none of the
 checkout) is ever an input. What the account may read elsewhere, outside the folders its view replaces, depends on file
