@@ -6,8 +6,10 @@ runs the reach test before any trial; these tests pin what the scripts decide wi
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
+import re
 import os
 from pathlib import Path
 from types import SimpleNamespace
@@ -980,3 +982,180 @@ def test_a_built_model_runs_in_a_view_of_its_run_directory_and_only_from_inside_
     command = argv[argv.index("--") + 1:]
     assert command[0] == "/usr/bin/setpriv" and "--no-new-privs" in command
     assert command[command.index("-i") + 1:] == [*seat.BASE_ENV, str(model), "+nirmaan_nonce=ab"]  # no environment
+
+
+# --- Gate ET10: the measured run's reach records, as the index of decision R2 names them ------------------------
+
+MEASURED_INDEX = REPO / "evals" / "flow" / "tool_reach_measured_run.json"
+MEASURED_FORMAT = "nirmaan.tool-reach-measured-run/2"
+MEASURED_JOBS = ("live-eval", "rejudge")
+LOG_TIMESTAMP = re.compile(r"^\s*\d{4}-\d\d-\d\dT")
+
+
+def _measured_problems(index_path: Path) -> list[str]:
+    """What is wrong with the measured run's index and the files it names, or []. With no index there is nothing to
+    hold: the folder may exist (the chain's first pull request adds only seat C reach records) and gate ET10 is not
+    met until the index is there."""
+    if not index_path.is_file():
+        return []
+    root = index_path.parents[2]
+    index = json.loads(index_path.read_text(encoding="utf-8"))
+    out: list[str] = []
+    if index.get("format") != MEASURED_FORMAT:
+        return [f"format is {index.get('format')!r}"]
+    run, commit = str(index.get("run_id")), index.get("commit")
+    if not run.isdigit() or not commit or index.get("purpose") != "calibration" or not index.get("run_attempt"):
+        out.append("the index names no run, attempt or commit, or its purpose is not calibration")
+    if not (index.get("about") and run in index["about"] and str(commit)[:8] in index["about"]):
+        out.append("the about field does not name the run and the commit")
+    if not index.get("values_18_1"):
+        out.append("the values of the plan's section 18.1 are not stated")
+    if index.get("missing"):
+        out.append(f"an artifact is missing, which counts as a probe not denied: {index['missing']}")
+    if set(index.get("jobs") or {}) != set(MEASURED_JOBS):
+        return out + ["the index does not hold exactly the live-eval and rejudge jobs"]
+    named = set()
+    for job, body in index["jobs"].items():
+        if body.get("reach_step") != "success":
+            out.append(f"{job}: the reach step is {body.get('reach_step')!r}")
+        first = body.get("first_part") or {}
+        lines = first.get("lines") or []
+        if not lines or not str(first.get("closing") or "").startswith("reach test: every probe denied") or any(
+                str(line).startswith("REACH NOT DENIED") for line in lines):
+            out.append(f"{job}: the first part's lines are missing or do not show every probe denied")
+        if any(LOG_TIMESTAMP.match(str(line)) for line in [*lines, first.get("closing") or ""]):
+            out.append(f"{job}: a first-part line still carries a log timestamp")
+        for kind in ("tool_reach", "fw_reach"):
+            ref = body.get(kind) or {}
+            path, digest = ref.get("file"), ref.get("sha256")
+            if not path or not digest or not (root / path).is_file():
+                out.append(f"{job}: {kind} names no committed file")
+                continue
+            named.add(path)
+            raw = (root / path).read_bytes()
+            if digest != "sha256:" + hashlib.sha256(raw).hexdigest():
+                out.append(f"{job}: {path} differs from its digest")
+            try:
+                data = json.loads(raw.decode("utf-8"))
+            except ValueError:
+                out.append(f"{job}: {path} is not UTF-8 JSON")
+                continue
+            if not isinstance(data, dict) or "format" not in data:
+                out.append(f"{job}: {path} is not a JSON object with a format field")
+            elif kind == "tool_reach":
+                probes = data.get("probes") or []
+                if data.get("format") != "nirmaan.tool-reach" or data.get("seat") != "nirmaan-seat" or not probes or \
+                        data.get("every_denied") is not True or not all(p.get("denied") is True for p in probes):
+                    out.append(f"{job}: the tool reach record does not show every probe denied and every control passed")
+                if (str(data.get("run_id")), data.get("commit"), data.get("job")) != (run, commit, job) or \
+                        str(data.get("run_attempt")) != str(index.get("run_attempt")):
+                    out.append(f"{job}: the tool reach record names another run, attempt, commit or job")
+            else:
+                inner = data.get("run") or {}
+                if not (data.get("every_probe_denied") is True and data.get("control_ok") is True
+                        and data.get("done") is True):
+                    out.append(f"{job}: the seat C reach record does not show every probe denied with its control passed")
+                if (str(inner.get("id")), data.get("head"), inner.get("job")) != (run, commit, job):
+                    out.append(f"{job}: the seat C reach record names another run, commit or job")
+    folder = root / "evals" / "flow" / "tool_reach_measured_run"
+    held = {p.relative_to(root).as_posix() for p in folder.rglob("*") if p.is_file()} if folder.is_dir() else set()
+    if held != named:
+        out.append(f"the folder holds {sorted(held - named)} the index does not name and lacks {sorted(named - held)}")
+    return out
+
+
+def test_the_measured_runs_reach_index_holds_every_check_once_it_is_committed():
+    """Gate ET10 (decisions A1 and R2): with the index, both jobs, every probe denied and every control passed, one run,
+    attempt and commit, the purpose calibration, the first part's lines, the seat C reach records, every digest equal,
+    nothing else in the folder. Without the index it passes: the measured run is not dispatched yet."""
+    assert _measured_problems(MEASURED_INDEX) == []
+
+
+def _measured(tmp_path: Path, **change) -> Path:
+    """A synthetic measured-run index and folder, with the given fields of the index replaced."""
+    run, commit = "123456789", "d" * 40
+    folder = tmp_path / "evals" / "flow" / "tool_reach_measured_run"
+    jobs = {}
+    for job, kind in (("live-eval", "trials"), ("rejudge", "rejudge")):
+        tool = {"format": "nirmaan.tool-reach", "seat": "nirmaan-seat", "every_denied": True, "commit": commit,
+                "run_id": run, "run_attempt": "1", "job": job, "probes": [{"tool": "vvp", "denied": True}]}
+        fw = {"format": "nirmaan.fw-reach/1", "every_probe_denied": True, "control_ok": True, "done": True,
+              "head": commit, "run": {"id": run, "attempt": "1", "job": job}}
+        body = {"reach_step": "success", "first_part": {"closing": "reach test: every probe denied",
+                                                        "lines": ["REACH identity: denied"]}}
+        for name, key, data, fname in (("tool", "tool_reach", tool, "tool-reach.json"),
+                                       ("fw", "fw_reach", fw, "fw-reach.json")):
+            rel = f"live-eval-{name}-reach-{kind}-{run}/{fname}"
+            (folder / rel).parent.mkdir(parents=True, exist_ok=True)
+            raw = (json.dumps(data, indent=2) + "\n").encode()
+            (folder / rel).write_bytes(raw)
+            body[key] = {"file": f"evals/flow/tool_reach_measured_run/{rel}",
+                         "sha256": "sha256:" + hashlib.sha256(raw).hexdigest()}
+        jobs[job] = body
+    index = {"format": MEASURED_FORMAT, "about": f"In run {run}, dispatched on main at {commit[:8]}", "run_id": run,
+             "run_attempt": "1", "commit": commit, "purpose": "calibration", "values_18_1": {"x": "y"}, "missing": [],
+             "jobs": jobs, **change}
+    path = tmp_path / "evals" / "flow" / "tool_reach_measured_run.json"
+    path.write_text(json.dumps(index), encoding="utf-8")
+    return path
+
+
+def _edit_measured(path: Path, job: str, key: str, change) -> None:
+    index = json.loads(path.read_text(encoding="utf-8"))
+    target = path.parent / "tool_reach_measured_run" / index["jobs"][job][key]["file"].split("/", 3)[3]
+    data = json.loads(target.read_text(encoding="utf-8"))
+    change(data)
+    raw = (json.dumps(data, indent=2) + "\n").encode()
+    target.write_bytes(raw)
+    index["jobs"][job][key]["sha256"] = "sha256:" + hashlib.sha256(raw).hexdigest()
+    path.write_text(json.dumps(index), encoding="utf-8")
+
+
+def test_a_measured_run_index_with_every_check_met_passes_and_each_failure_is_named(tmp_path):
+    assert _measured_problems(tmp_path / "evals" / "flow" / "tool_reach_measured_run.json") == []  # no index yet
+    assert _measured_problems(_measured(tmp_path)) == []
+    cases = {  # what a problem must say: the break that causes it
+        "does not show every probe denied": lambda p: _edit_measured(
+            p, "rejudge", "tool_reach", lambda d: d["probes"].append({"tool": "vvp", "denied": False})),
+        "names another run, attempt, commit or job": lambda p: _edit_measured(
+            p, "live-eval", "tool_reach", lambda d: d.update(commit="e" * 40)),
+        "seat C reach record names another run": lambda p: _edit_measured(
+            p, "live-eval", "fw_reach", lambda d: d["run"].update(id="1")),
+        "tool reach record names another": lambda p: _edit_measured(
+            p, "rejudge", "tool_reach", lambda d: d.update(run_attempt="2")),
+        "seat C reach record does not show": lambda p: _edit_measured(
+            p, "rejudge", "fw_reach", lambda d: d.update(control_ok=False)),
+        "not a JSON object with a format field": lambda p: _edit_measured(
+            p, "rejudge", "fw_reach", lambda d: d.pop("format")),
+    }
+    for expected, break_it in cases.items():
+        path = _measured(tmp_path / expected.replace(" ", "_").replace(",", ""))
+        break_it(path)
+        assert any(expected in problem for problem in _measured_problems(path)), expected
+    for what, change, match in (
+            ("purpose", {"purpose": "evidence"}, "calibration"),
+            ("missing", {"missing": ["live-eval-fw-reach-rejudge-123456789"]}, "missing"),
+            ("values", {"values_18_1": {}}, "section 18.1"),
+            ("about", {"about": "no run here"}, "about field"),
+            ("format", {"format": "nirmaan.tool-reach-measured-run/1"}, "format")):
+        path = _measured(tmp_path / what, **change)
+        assert any(match in problem for problem in _measured_problems(path)), what
+    path = _measured(tmp_path / "jobs")
+    index = json.loads(path.read_text(encoding="utf-8"))
+    del index["jobs"]["rejudge"]
+    path.write_text(json.dumps(index), encoding="utf-8")
+    assert any("live-eval and rejudge" in problem for problem in _measured_problems(path))
+    path = _measured(tmp_path / "step")
+    index = json.loads(path.read_text(encoding="utf-8"))
+    index["jobs"]["rejudge"]["reach_step"] = "failure"
+    index["jobs"]["live-eval"]["first_part"]["lines"] = ["2026-11-23T01:02:03.456Z REACH identity: denied"]
+    path.write_text(json.dumps(index), encoding="utf-8")
+    problems = _measured_problems(path)
+    assert any("reach step" in p for p in problems) and any("log timestamp" in p for p in problems)
+    path = _measured(tmp_path / "extra")
+    (path.parent / "tool_reach_measured_run" / "extra.json").write_text('{"format": "x"}', encoding="utf-8")
+    assert any("the index does not name" in problem for problem in _measured_problems(path))
+    path = _measured(tmp_path / "digest")
+    first = next((path.parent / "tool_reach_measured_run").rglob("tool-reach.json"))
+    first.write_text(first.read_text(encoding="utf-8") + " ", encoding="utf-8")
+    assert any("differs from its digest" in problem for problem in _measured_problems(path))

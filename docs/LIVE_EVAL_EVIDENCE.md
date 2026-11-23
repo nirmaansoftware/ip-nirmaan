@@ -321,7 +321,12 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   of that (gate ET5) is `evals/flow/et5_replay_record.json`, which holds no
   run of the timer's controls or of the committed fixtures. It shows those
   probes denied through those tools as the account in that run, and nothing
-  more; the `live-eval` job has no recorded run of them yet.
+  more. The `live-eval` job's recorded run of them is the measured run's, committed as
+  `evals/flow/tool_reach_measured_run.json` and the folder beside it (gate ET10), and cited in the words of that
+  index's own `about` field: in that run, on that commit, with purpose `calibration`, in its `live-eval` and `rejudge`
+  jobs, the listed probes were denied to `nirmaan-seat` through the named tools. The write and network probes ran
+  through `vvp` only, and are cited to the committed log lines of the reach step's first part, not to the tool reach
+  record. It covers no other run, commit or slot, and it states nothing of that run's trial.
 - **The tools that read seat Verilog run as the account too** (gates ET2 to
   ET4 of `council/records/2026-11-22-eda-tools-seat-account.md`). The input
   screen (`eda_guard`) reads seat files with patterns of its own, and the
