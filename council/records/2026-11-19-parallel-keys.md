@@ -11,6 +11,10 @@ under a minute on a passing head, the fix round that parallel keys could save
 did not occur once in the sample, and a parallel pair would hold both model
 slots. The question is heard again on the conditions in decision 4.
 
+An addendum of 2026-11-24, at the end of this record, records the founder's
+later direction on the loop's width (three pull requests at once) and what
+follows from it for fact 5 and decision 4.
+
 Three seats gave round 1 positions independently, each as its own read-only
 process that saw no other position (qa-evidence, eda-tooling, security); the
 chair decided. The meeting was kept to the seats that own the question: the
@@ -233,3 +237,200 @@ not a gate today, because nothing is adopted.
 ## Open, for the founder
 
 1. This ruling, to confirm or overrule.
+
+## Addendum (2026-11-24): the review loop at three pull requests at once
+
+The founder, in session, 2026-11-23: approved the review loop reviewing up to
+three pull requests at once. The direction is the founder's. This addendum
+records the founder's words, says what they change in this record, and rules
+on decision 4.
+
+Ruling, in short:
+
+- **The width is three** (decision A1): up to three pull requests stepped at
+  once, with three model slots (`parallel_reviews` 3, `model_cap` 3). This
+  replaces fact 5's "The founder declined more slots for now", for one more
+  slot and no further.
+- **The order of the keys does not change** (decision A2). Decision 4's first
+  condition is heard here and is spent. Gate PK1 stands.
+- **Five conditions hold the width** (decision A3, gates LW1 to LW5).
+
+It changes no code, prompt, seat file, check or gate. The change itself is
+made by its own pull request (#488 when this was written, not merged), which
+this addendum does not review again and does not pass. A key is an agent
+review; nothing here is a person's approval of any code.
+
+### Who decided what
+
+- The founder decided that the review loop reviews up to three pull requests
+  at once.
+- The council decided everything else below, and the founder can overrule
+  any of it.
+- Not decided by anyone here: any spending. The direction is for the plan as
+  it is; a plan upgrade was a separate option the founder was shown and did
+  not take up in these words.
+
+Three seats gave round 1 positions, each as a read-only process of its own
+that saw no other position: security, eda-tooling and qa-evidence (the seats
+of this record's meeting); the chair decided. The seats read ip-nirmaan
+`main` at c842c4d7 and the diff of #488 at its head ed97f4cb. No seat ran
+the tests.
+
+### The founder's words
+
+From the transcript of the founder's session with the orchestrator on
+2026-11-23. The transcript is not in this repository. The chair's session
+read it and checked each quotation below against it; no seat read it. Times
+are UTC.
+
+1. 17:32:47, the orchestrator, in a list of ways to go faster, offered
+   letting the review loop work two or three pull requests at once. In its
+   words: who decides: "You"; the catch: "More plan usage at once; a
+   control-plane change." Its recommendation was that option together with
+   running the timer's slots two at a time. It added that the review loop
+   change "needs your approval on GitHub, the same way the fast lane did."
+2. 17:33:29, the founder: "why only 2 why not 5?" The answer given was about
+   the timer's slots.
+3. 17:34:36, the founder: "go with what you recommended , i just want to
+   make things faster!!!"
+4. 17:34:46, the orchestrator, naming the work it started: "lets the review
+   loop work up to 3 PRs at once." It said again that the change would need
+   the founder's approval on GitHub.
+
+What this is and is not:
+
+- The founder's own words are items 2 and 3. The recommendation they accept
+  said two or three; "up to 3" is the orchestrator's, ten seconds later.
+- The loop already stepped two at once (fact 5), so three is the only change
+  the accepted range held. The council reads item 3 as the founder's
+  direction for a width of three.
+- The founder gave the word in session. It is not a review on GitHub: #488
+  had no review by the founder when this was written. The orchestrator said
+  twice that one was needed. Under `council/README.md` ("What stays with the
+  founder") this change is none of the three things that always wait for the
+  founder, so whether #488 merges is for the keys and the Founder Proxy
+  (agent), which accepts a council record behind such wording
+  (`council/founder-proxy.md`, "Fails").
+- No time saving is recorded here. Nothing is measured at a width of three.
+
+### Facts checked
+
+AF1 to AF4 number this addendum's facts. Line numbers are those at c842c4d7.
+
+AF1. On `main`, `LOOP["parallel_reviews"]` is 2 (`scripts/pr_loop.py` line
+   189) and `CONFIG["model_cap"]` is 2 (`scripts/pr_review.py` line 121).
+AF2. The diff of #488 raises both to 3. It adds one lock per listed head, so
+   two pull requests at one commit are stepped one after the other, and it
+   writes each pull request's state file and the pause file whole (a
+   temporary file renamed into place). In `scripts/pr_review.py` it changes
+   only the header, `model_cap` and a comment: the review itself, with the
+   order of the keys and the proxy after them, is not touched. It adds no
+   service, account, key or plan.
+AF3. The pass is one run under one lock for the repository
+   (`scripts/pr_loop.py` lines 845 to 858), and the workers are threads
+   inside it, so the state has one writer as before. A slot is tried, never
+   waited for (`scripts/pr_review.py` lines 952 to 963). The pause is read
+   at the start of a pass and before every model call
+   (`scripts/pr_review.py` lines 1523 to 1527), so a limit in one worker
+   starts no new step and no further call in any worker. Calls already
+   running finish: up to two more after a limit at this width, where it was
+   one.
+AF4. `docs/REVIEW_CALIBRATION.md` records none of the four items of
+   decision 3.
+
+### Decisions
+
+#### A1. The width is three, and fact 5's "for now" ends for one slot
+
+The council records the founder's direction: the loop steps up to three pull
+requests at once. Three workers need three slots, since a slot is never
+waited for (fact AF3), and more plan usage at once was the catch the founder
+was shown. So the council reads the direction as also ending "The founder
+declined more slots for now" (fact 5): `model_cap` 3, and no more than 3. A
+fourth slot or a fourth worker is a new question for the founder.
+
+No seat disagreed. qa-evidence asked that the reading be marked as the
+council's and not the founder's words, and it is. Owner eda-tooling.
+
+#### A2. The order of the keys is unchanged; decision 4's first condition is spent
+
+Decision 4 hears the parallel-keys question again when `model_cap` is 3 or
+more, "so a parallel pair no longer takes every slot". The pull request that
+carries decision A1 meets the number when it merges. The council hears it
+here, once, and rules: the keys stay in sequence, and gate PK1 stands.
+
+Why:
+
+- The reason behind the condition is not met. The workers rose with the
+  slots, three and three, so a pull request running both keys at once would
+  still leave another worker "busy" (eda-tooling).
+- None of the evidence of decision 3 is recorded (fact AF4), and gate PK1
+  allows no change without it.
+- Of the reasons of decision 1, only "Slots" is weaker with a third slot.
+  "Speed" and "Fix rounds" rest on fact 7, which has not moved (qa-evidence).
+
+The first condition of decision 4 is spent: `model_cap` at 3 calls no further
+hearing by itself. The second and third conditions stand as written, and the
+third (the key 2 alone run) still brings security's option to a hearing on
+its merits.
+
+Owner eda-tooling.
+
+#### A3. What holds the width
+
+Each of these is true of the diff of #488 or of `main` today, as the seats
+read them, and a later change keeps it:
+
+1. `model_cap` is never less than `parallel_reviews`, and a slot is tried,
+   never waited for.
+2. One pass per repository under one lock, so one writer of the state.
+3. One worker per pull request and per listed head; a stop labels only its
+   own pull request.
+4. A limit in any worker pauses all: no new step, and no further model call,
+   in that pass or in a later one until the pause ends.
+5. Gate PK2, unchanged: both checks required, `review/executive` never
+   passing on a head where key 1 failed or was deferred, the proxy only
+   after both keys pass.
+
+Limits the seats stated:
+
+- "At most three model calls at once across both repositories" is true only
+  where the Nirmaan loop shares this loop's state folder. On two machines
+  each loop has its own slots (this one three, the Nirmaan loop two), and
+  neither sees the other's pause (eda-tooling).
+- A head pushed during a pass to the same commit as another pull request's
+  is not covered by the per-head lock, which is taken on the heads listed at
+  the start of the pass (security, an inference).
+
+### Positions not adopted
+
+- security: leave the rehearing of decision 4 owed, to be held later, and
+  not spent here. The chair chose eda-tooling's reading because a hearing
+  held before decision 3's evidence exists can change nothing under gate
+  PK1, and security's own route to a hearing, the key 2 alone run, is kept.
+- eda-tooling: record its five conditions as five gates of its own. The
+  chair kept the conditions and gave the two that are about the review as a
+  control to security.
+
+### Dissent
+
+- security: its dissent above stands unchanged (the keys should run blind
+  and at once). The width is across pull requests; key 2 still reads key 1's
+  passes.
+
+### Gates
+
+| Gate | Condition | Owner seat |
+|---|---|---|
+| LW1 | `parallel_reviews` and `model_cap` are at most 3, and `model_cap` is never less than `parallel_reviews`; more than 3 of either is the founder's to say | eda-tooling |
+| LW2 | One pass per repository under one lock; a pull request's state file has one writer and is written whole | eda-tooling |
+| LW3 | One worker per pull request and per listed head; a stop labels only its own pull request | security |
+| LW4 | A limit in any worker pauses every worker: no new step and no further model call until the pause ends | eda-tooling |
+| LW5 | No page, record or pull request says that the width of three shortens the review by a stated amount until it is measured; none says the founder approved a pull request's code or reviewed it on GitHub on the strength of this addendum | qa-evidence |
+
+Gates PK1 to PK3 stand as written.
+
+### Open, for the founder
+
+1. This addendum, to confirm or overrule. It rests on the founder's word in
+   session, read by the council as a width of three with three slots.
