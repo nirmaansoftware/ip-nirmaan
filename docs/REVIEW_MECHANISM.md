@@ -212,12 +212,12 @@ Built in rollout R5; in use on real pull requests since 2026-10-18. The
 a pull request it wrote, and the script refuses when a Claude Code session has
 the branch checked out. In order:
 
-1. **At most two model calls at once** across Nirmaan and IP Nirmaan: two
-   model slots in `~/.nirmaan/pr-review/`, shared with Nirmaan's loop
-   (`model_cap` 2 in both), held here only around each model call (a
-   reviewer's, or the loop's fixer's), never while checking out, reading CI,
-   posting or running local checks. Slot 0 is `review.lock`, slot 1
-   `model-slot-1.lock`; this script tries `review.lock` first and Nirmaan's
+1. **At most three model calls at once** across Nirmaan and IP Nirmaan: three
+   model slots in `~/.nirmaan/pr-review/` (`model_cap` 3 here), two of them
+   shared with Nirmaan's loop (its `model_cap` 2), held here only around each
+   model call (a reviewer's, or the loop's fixer's), never while checking out,
+   reading CI, posting or running local checks. Slot 0 is `review.lock`, slot
+   n `model-slot-<n>.lock`; this script tries `review.lock` first and Nirmaan's
    loop its other slot first. When every slot is held elsewhere at a call, the
    run ends ("busy", exit 3) and the next run reuses the verdicts already
    cached. Each slot is a folder with an owner file written whole (a
@@ -551,9 +551,13 @@ writes no pause. The pause is read again before every model call, so a
 review or fix round already running when the other worker (or the Nirmaan
 loop) starts a pause makes no further call: its step ends `paused` and its
 cached verdicts carry over. Any other deferral still stops the loop, and so
-does a limit whose retry failed some other way.
+does a limit whose retry failed some other way. A limit any worker hits
+pauses all of them: no new step starts in that pass, and a step already
+running makes no further model call.
 
-**Two pull requests at once, every pull request each pass.** A model slot is
+**Three pull requests at once, every pull request each pass.** Approval:
+founder, in session, 2026-11-23: approved the review loop reviewing up to
+three pull requests at once. A model slot is
 held only around each model call (step 1 of "How reviewers run"); the local
 checks run without one, so other reviews go on meanwhile. One pass at a time
 runs for this repository: the pass holds its own lock
@@ -561,13 +565,21 @@ runs for this repository: the pass holds its own lock
 that finds it held ends at once. Each pass takes one step on every open pull
 request, one the loop is fixing first, then by number, so a pull request
 waiting for CI, or one that just ran a review or a fix, never holds up the
-others. Up to `parallel_reviews` (2) steps run at once, in two workers of the
-one pass; each pull request is taken by one worker only, so no pull request is
-ever reviewed or fixed by two at once. The keys, the Founder Proxy and the
-fixer are the same in each. Every model call of either worker holds one of the
-two model slots shared with the Nirmaan loop, so at most two model calls run
-at once across both repositories; a worker that finds both held ends its step
-`busy` and its cached verdicts carry over. The check that the loop is `main`'s
+others. Up to `parallel_reviews` (3, `LOOP` in `scripts/pr_loop.py`) steps run
+at once, in that many workers of the one pass; each pull request is taken by
+one worker only, so no pull request, and no head, is ever reviewed or fixed by
+two at once. With `parallel_reviews` 1 the pass steps one pull request at a
+time. The keys, the Founder Proxy, the fixer and its rounds, the records fast
+lane, the merge path and every stop rule are the same in each, and a stop
+labels only its own pull request. Each pull request's state file is written
+by its own worker only, and every write of it, and of the pause file, is a
+whole file renamed into place, so no reader sees half of one. Every model call
+of a worker holds one of the `model_cap` (3, `CONFIG` in
+`scripts/pr_review.py`) model slots, one for each worker. On a machine where
+the Nirmaan loop shares the state folder, its two slots are two of the same
+three, so at most three model calls run at once across both repositories; a
+worker that finds every slot held ends its step `busy` and its cached
+verdicts carry over. The check that the loop is `main`'s
 copy runs once, before each pass, so no new step starts once `main` may have
 moved: after the pass's own auto-merge (GitHub may merge at once), after a
 rate-limit pause, and when `main`'s sha on origin, read before each step,
@@ -868,8 +880,9 @@ second writer for one folder; the run then stops and says so, and nothing is
 overwritten. `pull` refuses a folder with no `writer.json`, so an unseeded
 loop never starts from empty state and reviews everything again.
 
-**Differences from the Mac.** The two model slots are files in a state
-folder, so once the loops run on two machines each has its own two. Until
+**Differences from the Mac.** The model slots are files in a state
+folder, so once the loops run on two machines each has its own (this loop
+three, the Nirmaan loop two). Until
 the Nirmaan loop also reads and writes the state repository, it does not see
 this loop's pause, nor this loop the Nirmaan loop's: each pauses at its own
 first limited call. Call lines from before the switch stay in the Mac's

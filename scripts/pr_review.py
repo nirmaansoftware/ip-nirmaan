@@ -4,8 +4,9 @@ Council record 2026-10-17 (teams and the PR review mechanism), rollout R5. How
 it runs: docs/REVIEW_MECHANISM.md. The skill that calls it:
 .claude/skills/pr-review/SKILL.md. The same mechanism runs in Nirmaan
 (.github/scripts/pr-review/review.mjs); both share the model slots
-(CONFIG model_cap, 2), so at most that many model calls run at once across the
-two repositories.
+(CONFIG model_cap, 3) when they share a state folder, so at most that many
+model calls run at once across the two repositories (the Nirmaan loop's slots
+are two of the same three).
 
 In order, and fail closed at every step (pending or failure, never success):
 
@@ -115,10 +116,13 @@ CONFIG = {
     # as the per-team calls (docs/REVIEW_CALIBRATION.md); a change back is a
     # calibration rerun first (decision 6, rerun rule).
     "composite_key1": True,
-    # Model slots shared with the Nirmaan loop (its model_cap): at most this
-    # many model calls run at once across both repositories. Slot 0 is the
-    # shared review.lock, slot 1 model-slot-1.lock.
-    "model_cap": 2,
+    # Model slots shared with the Nirmaan loop (its model_cap) when both use one
+    # state folder: at most this many model calls run at once across both
+    # repositories. Slot 0 is the shared review.lock, slot n model-slot-<n>.lock.
+    # At least pr_loop LOOP parallel_reviews, so each worker can hold one
+    # (founder, in session, 2026-11-23: approved the review loop reviewing up to
+    # three pull requests at once).
+    "model_cap": 3,
     # The records-only fast lane (founder, in session, 2026-11-23: approved a records-only fast lane so
     # generated eval record PRs merge on green CI and schema tests without the two agent review keys).
     # A pull request that meets every condition of fast_lane() gets no key 1, key 2 or Founder Proxy: the
@@ -1207,7 +1211,7 @@ class GitHub:
 # --- The review ----------------------------------------------------------------------
 
 
-# The loop steps two pull requests at once in one process: the git commands
+# The loop steps several pull requests at once in one process: the git commands
 # that write shared refs or worktree records in the one clone run one at a time.
 _GIT_SERIAL = threading.Lock()
 
