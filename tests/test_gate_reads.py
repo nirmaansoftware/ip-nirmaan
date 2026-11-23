@@ -171,7 +171,8 @@ def test_the_cover_run_reads_and_copies_no_files_entry_outside_the_run(tmp_path,
     lines = read_text(Path(cover)).splitlines()
     assert f"leak.vh {(folder / 'leak.vh').resolve()}" in lines and str((folder / "secret.v").resolve()) in lines
     for path in run.rglob("*"):
-        assert SECRET not in read_text(path, encoding="utf-8", errors="replace"), path
+        if path.is_file():
+            assert SECRET not in read_text(path, encoding="utf-8", errors="replace"), path
 
 
 @SBY

@@ -375,9 +375,16 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   which every `/tmp/nirmaan-*` folder that holds one of the run's input files
   is replaced by an empty folder holding only those files, each read only at
   its own path, and the run's own directory. The run names its directory and
-  its input files (the sources, the setup and every file its `[files]` names,
-  the other files its parameters name) in each step's environment
-  (`nirmaan.integrations.eda`, `seat_inputs`), and the root helper refuses an
+  its input files (the sources, the setup and every file its `[files]` names
+  that is the run's own, the other files its parameters name) in each step's
+  environment (`nirmaan.integrations.eda`, `seat_inputs`). A `[files]` entry is
+  the run's own only when its file is inside the setup's folder or one of the
+  sources, whether or not the screen ran, and `formal.cover` reads and copies
+  as the caller only such files (gate ET17 of the record's third addendum;
+  `docs/GATE_INPUTS.md`, section 8): before that, with the screen bypassed, an
+  entry naming a runner-made file under `/tmp/nirmaan-*` was an input, and
+  replay run 45135605510 showed a bypass control's host file in its summary as
+  the account (the addendum's fact T7). The root helper refuses an
   input that is not a regular file of the runner's, with one name, inside a
   `/tmp/nirmaan-*` folder the runner made, reached through no link; nothing
   runs then. An input other accounts may not read by its mode gets a read
