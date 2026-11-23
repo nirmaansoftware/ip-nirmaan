@@ -1,0 +1,2476 @@
+[
+  {
+    "result": "failed",
+    "runs": [
+      {
+        "backend": "yosys",
+        "metrics": {
+          "cells": 0,
+          "cells_by_type": {},
+          "exit_status": 0,
+          "flip_flops": 0,
+          "latches": 0,
+          "wires": 2
+        },
+        "steps": [
+          {
+            "command": [
+              "/opt/nirmaan-seat/bin/yosys",
+              "-s",
+              "synth.ys"
+            ],
+            "error_lines": [
+              "touch: cannot touch '/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check0/MARKER': Permission denied"
+            ],
+            "exit": 0,
+            "last_lines": [
+              "3. Executing command \"touch /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check0/MARKER\".",
+              "touch: cannot touch '/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check0/MARKER': Permission denied",
+              "End of script. Logfile hash: 97d25c7681, CPU: user 0.05s system 0.01s, MEM: 16.04 MB peak",
+              "Yosys 0.33 (git sha1 2584903a060)",
+              "Time spent: 26% 3x read_verilog (0 sec), 21% 13x opt_expr (0 sec), ..."
+            ],
+            "stopped": null
+          }
+        ],
+        "succeeded": true,
+        "summary": "yosys: synthesis passed: 0 cells, 0 flip-flops, 0 latches, 0 warnings",
+        "tool": "synth.run"
+      }
+    ],
+    "test": "tests/test_gate_inputs.py::test_control_without_the_check_a_top_reaches_the_shell"
+  },
+  {
+    "result": "passed",
+    "runs": [
+      {
+        "backend": "verilator-sim",
+        "metrics": {
+          "checks": null,
+          "checks_failed": null,
+          "end_time": null,
+          "errors": 0,
+          "exit_statuses": [
+            0,
+            0
+          ],
+          "finished": true,
+          "warnings": 0
+        },
+        "steps": [
+          {
+            "command": [
+              "verilator",
+              "--binary",
+              "-Wno-fatal",
+              "-j",
+              "0",
+              "--top-module",
+              "tb",
+              "-Mdir",
+              "obj",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check1/tb.v"
+            ],
+            "error_lines": [],
+            "exit": 0,
+            "last_lines": [
+              "g++ -Os  -I.  -MMD -I/usr/share/verilator/include -I/usr/share/verilator/include/vltstd -DVM_COVERAGE=0 -DVM_SC=0 -DVM_TRACE=0 -DVM_TRACE_FST=0 -DVM_TRACE_VCD=0 -faligned-new -fcf-protection=none -Wno-bool-operation -Wno-overloaded-virtual -Wno-shadow -Wno-sign-compare -Wno-uninitialized -Wno-unused-but-set-parameter -Wno-unused-but-set-variable -Wno-unused-parameter -Wno-unused-variable     -DVL_...",
+              "Archive ar -rcs Vtb__ALL.a Vtb__ALL.o",
+              "g++     verilated.o verilated_threads.o Vtb__ALL.a    -pthread -lpthread -latomic   -o Vtb",
+              "rm Vtb__ALL.verilator_deplist.tmp",
+              "make: Leaving directory '/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/tmp/nirmaan-verilator-sim-45zhahef/obj'"
+            ],
+            "stopped": null
+          },
+          {
+            "command": [
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/tmp/nirmaan-verilator-sim-45zhahef/obj/Vtb",
+              "+nirmaan_nonce=4bdc045eed385190440ce32d0a85f9c1"
+            ],
+            "error_lines": [],
+            "exit": 0,
+            "last_lines": [
+              "- /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check1/tb.v:5: Verilog $finish"
+            ],
+            "stopped": null
+          }
+        ],
+        "succeeded": false,
+        "summary": "verilator-sim: simulation failed: the testbench printed no verdict (NIRMAAN-SIM <nonce> <n> passed, <m> failed)",
+        "tool": "simulator.run"
+      }
+    ],
+    "test": "tests/test_gate_inputs.py::test_control_without_the_check_a_testbench_reaches_the_shell"
+  },
+  {
+    "result": "failed",
+    "runs": [
+      {
+        "backend": "symbiyosys",
+        "metrics": {
+          "depth": 2,
+          "exit_status": 16,
+          "mode": "bmc",
+          "proven": 0,
+          "status": "ERROR",
+          "traces": []
+        },
+        "steps": [
+          {
+            "command": [
+              "/opt/nirmaan-seat/bin/sby",
+              "-f",
+              "-d",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/tmp/nirmaan-symbiyosys-y5ik7pg3/sby",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check2/f.sby"
+            ],
+            "error_lines": [
+              "SBY 21:35:43 [/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/tmp/nirmaan-symbiyosys-y5ik7pg3/sby] base: touch: cannot touch '/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check2/MARKER': Permission denied",
+              "SBY 21:35:43 [/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/tmp/nirmaan-symbiyosys-y5ik7pg3/sby] base: ERROR: Shell command returned error code 256.",
+              "SBY 21:35:43 [/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/tmp/nirmaan-symbiyosys-y5ik7pg3/sby] base: task failed. ERROR.",
+              "SBY 21:35:43 [/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/tmp/nirmaan-symbiyosys-y5ik7pg3/sby] DONE (ERROR, rc=16)"
+            ],
+            "exit": 16,
+            "last_lines": [
+              "SBY 21:35:43 [/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/tmp/nirmaan-symbiyosys-y5ik7pg3/sby] summary: Elapsed clock time [H:MM:SS (secs)]: 0:00:00 (0)",
+              "SBY 21:35:43 [/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/tmp/nirmaan-symbiyosys-y5ik7pg3/sby] summary: Elapsed process time [H:MM:SS (secs)]: 0:00:00 (0)",
+              "SBY 21:35:43 [/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/tmp/nirmaan-symbiyosys-y5ik7pg3/sby] summary: engine_0 (smtbmc) did not return a status",
+              "SBY 21:35:43 [/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/tmp/nirmaan-symbiyosys-y5ik7pg3/sby] summary: engine_0 did not produce any traces",
+              "SBY 21:35:43 [/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/tmp/nirmaan-symbiyosys-y5ik7pg3/sby] DONE (ERROR, rc=16)"
+            ],
+            "stopped": null
+          }
+        ],
+        "succeeded": false,
+        "summary": "symbiyosys: formal error: 1 error; first: Shell command returned error code 256.",
+        "tool": "formal.run"
+      }
+    ],
+    "test": "tests/test_gate_inputs.py::test_control_without_the_check_a_setup_reaches_the_shell"
+  },
+  {
+    "result": "passed",
+    "runs": [
+      {
+        "backend": "icarus",
+        "metrics": {
+          "checks": null,
+          "checks_failed": null,
+          "end_time": null,
+          "errors": 1,
+          "exit_statuses": [
+            0,
+            0
+          ],
+          "finished": false,
+          "warnings": 0
+        },
+        "steps": [
+          {
+            "command": [
+              "/opt/nirmaan-seat/bin/iverilog",
+              "-g2012",
+              "-o",
+              "sim.vvp",
+              "-s",
+              "m",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check3/run/m.v"
+            ],
+            "error_lines": [],
+            "exit": 0,
+            "last_lines": [
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check3/run/m.v:1: Unterminated comment in define"
+            ],
+            "stopped": null
+          },
+          {
+            "command": [
+              "/opt/nirmaan-seat/bin/vvp",
+              "-n",
+              "sim.vvp",
+              "+nirmaan_nonce=69b929241bbe6068f9c63941111ddb83"
+            ],
+            "error_lines": [
+              "ERROR: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check3/run/m.v:4: $readmemh: Unable to open /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check3/outside/CANARY_ET1.hex for reading."
+            ],
+            "exit": 0,
+            "last_lines": [
+              "ERROR: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check3/run/m.v:4: $readmemh: Unable to open /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check3/outside/CANARY_ET1.hex for reading."
+            ],
+            "stopped": null
+          }
+        ],
+        "succeeded": false,
+        "summary": "icarus: simulation failed: 1 error, $finish never reached, the testbench printed no verdict (NIRMAAN-SIM <nonce> <n> passed, <m> failed); first: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check3/run/m.v:4: $readmemh: Unable to open /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check3/outside/CANARY_ET1.hex for reading.",
+        "tool": "simulator.run"
+      }
+    ],
+    "test": "tests/test_gate_inputs.py::test_control_without_the_check_a_tool_acts_on_the_form[define_comment-icarus]"
+  },
+  {
+    "result": "passed",
+    "runs": [
+      {
+        "backend": "icarus",
+        "metrics": {
+          "checks": null,
+          "checks_failed": null,
+          "end_time": null,
+          "errors": 1,
+          "exit_statuses": [
+            0,
+            0
+          ],
+          "finished": false,
+          "warnings": 0
+        },
+        "steps": [
+          {
+            "command": [
+              "/opt/nirmaan-seat/bin/iverilog",
+              "-g2012",
+              "-o",
+              "sim.vvp",
+              "-s",
+              "m",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check4/run/m.v"
+            ],
+            "error_lines": [],
+            "exit": 0,
+            "last_lines": [],
+            "stopped": null
+          },
+          {
+            "command": [
+              "/opt/nirmaan-seat/bin/vvp",
+              "-n",
+              "sim.vvp",
+              "+nirmaan_nonce=0cc4a95c8b95b6f4b20a73dee62467bc"
+            ],
+            "error_lines": [
+              "ERROR: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check4/run/m.v:4: $readmemh: Unable to open /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check4/outside/CANARY_ET1.hex for reading."
+            ],
+            "exit": 0,
+            "last_lines": [
+              "ERROR: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check4/run/m.v:4: $readmemh: Unable to open /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check4/outside/CANARY_ET1.hex for reading."
+            ],
+            "stopped": null
+          }
+        ],
+        "succeeded": false,
+        "summary": "icarus: simulation failed: 1 error, $finish never reached, the testbench printed no verdict (NIRMAAN-SIM <nonce> <n> passed, <m> failed); first: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check4/run/m.v:4: $readmemh: Unable to open /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check4/outside/CANARY_ET1.hex for reading.",
+        "tool": "simulator.run"
+      }
+    ],
+    "test": "tests/test_gate_inputs.py::test_control_without_the_check_a_tool_acts_on_the_form[dollar_macro-icarus]"
+  },
+  {
+    "result": "passed",
+    "runs": [
+      {
+        "backend": "verilator-sim",
+        "metrics": {
+          "checks": null,
+          "checks_failed": null,
+          "end_time": null,
+          "errors": 1,
+          "exit_statuses": [
+            0,
+            -6
+          ],
+          "finished": false,
+          "warnings": 0
+        },
+        "steps": [
+          {
+            "command": [
+              "verilator",
+              "--binary",
+              "-Wno-fatal",
+              "-j",
+              "0",
+              "--top-module",
+              "m",
+              "-Mdir",
+              "obj",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check5/run/m.v"
+            ],
+            "error_lines": [],
+            "exit": 0,
+            "last_lines": [
+              "g++ -Os  -I.  -MMD -I/usr/share/verilator/include -I/usr/share/verilator/include/vltstd -DVM_COVERAGE=0 -DVM_SC=0 -DVM_TRACE=0 -DVM_TRACE_FST=0 -DVM_TRACE_VCD=0 -faligned-new -fcf-protection=none -Wno-bool-operation -Wno-overloaded-virtual -Wno-shadow -Wno-sign-compare -Wno-uninitialized -Wno-unused-but-set-parameter -Wno-unused-but-set-variable -Wno-unused-parameter -Wno-unused-variable     -DVL_...",
+              "Archive ar -rcs Vm__ALL.a Vm__ALL.o",
+              "g++     verilated.o verilated_threads.o Vm__ALL.a    -pthread -lpthread -latomic   -o Vm",
+              "rm Vm__ALL.verilator_deplist.tmp",
+              "make: Leaving directory '/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check5/wd/obj'"
+            ],
+            "stopped": null
+          },
+          {
+            "command": [
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check5/wd/obj/Vm",
+              "+nirmaan_nonce=a2732c29fafdff6fc3c272408a8bd899"
+            ],
+            "error_lines": [
+              "%Error: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check5/outside/CANARY_ET1.hex:0: $readmem file syntax error"
+            ],
+            "exit": -6,
+            "last_lines": [
+              "%Error: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check5/outside/CANARY_ET1.hex:0: $readmem file syntax error",
+              "Aborting..."
+            ],
+            "stopped": null
+          }
+        ],
+        "succeeded": false,
+        "summary": "verilator-sim: simulation failed: 1 error, exit status -6, $finish never reached, the testbench printed no verdict (NIRMAAN-SIM <nonce> <n> passed, <m> failed); first: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check5/outside/CANARY_ET1.hex: $readmem file syntax error",
+        "tool": "simulator.run"
+      }
+    ],
+    "test": "tests/test_gate_inputs.py::test_control_without_the_check_a_tool_acts_on_the_form[dollar_macro-verilator-sim]"
+  },
+  {
+    "result": "failed",
+    "runs": [
+      {
+        "backend": "yosys",
+        "metrics": {
+          "exit_status": 1
+        },
+        "steps": [
+          {
+            "command": [
+              "/opt/nirmaan-seat/bin/yosys",
+              "-s",
+              "synth.ys"
+            ],
+            "error_lines": [
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check6/1/run/m.v:4: ERROR: Can not open file `/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check6/1/outside/CANARY_ET1.hex` for \\$readmemh."
+            ],
+            "exit": 1,
+            "last_lines": [
+              " \\----------------------------------------------------------------------------/",
+              " Yosys 0.33 (git sha1 2584903a060)",
+              "-- Executing script file `synth.ys' --",
+              "1. Executing Verilog-2005 frontend: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check6/1/run/m.v",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check6/1/run/m.v:4: ERROR: Can not open file `/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check6/1/outside/CANARY_ET1.hex` for \\$readmemh."
+            ],
+            "stopped": null
+          }
+        ],
+        "succeeded": false,
+        "summary": "yosys: synthesis failed: 0 errors (exit status 1)",
+        "tool": "synth.run"
+      },
+      {
+        "backend": "yosys",
+        "metrics": {
+          "exit_status": 1
+        },
+        "steps": [
+          {
+            "command": [
+              "/opt/nirmaan-seat/bin/yosys",
+              "-s",
+              "synth.ys"
+            ],
+            "error_lines": [
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check6/0/run/m.v:4: ERROR: Can not open file `/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check6/0/outside/CANARY_ET1.hex` for \\$readmemh."
+            ],
+            "exit": 1,
+            "last_lines": [
+              " \\----------------------------------------------------------------------------/",
+              " Yosys 0.33 (git sha1 2584903a060)",
+              "-- Executing script file `synth.ys' --",
+              "1. Executing Verilog-2005 frontend: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check6/0/run/m.v",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check6/0/run/m.v:4: ERROR: Can not open file `/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check6/0/outside/CANARY_ET1.hex` for \\$readmemh."
+            ],
+            "stopped": null
+          }
+        ],
+        "succeeded": false,
+        "summary": "yosys: synthesis failed: 0 errors (exit status 1)",
+        "tool": "synth.run"
+      }
+    ],
+    "test": "tests/test_gate_inputs.py::test_control_without_the_check_a_tool_acts_on_the_form[dollar_macro-yosys]"
+  },
+  {
+    "result": "failed",
+    "runs": [
+      {
+        "backend": "verilator-lint",
+        "metrics": {
+          "errors": 1,
+          "exit_status": 1,
+          "warnings": 0
+        },
+        "steps": [
+          {
+            "command": [
+              "/opt/nirmaan-seat/bin/verilator",
+              "--lint-only",
+              "-Wall",
+              "--top-module",
+              "m",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check7/run/m.v"
+            ],
+            "error_lines": [
+              "%Error: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check7/run/m.v:3:35: Can't resolve module reference: '/tmp/tmp2r1cj289/CANARY_ET1.vh'",
+              "%Error: Exiting due to 1 error(s)"
+            ],
+            "exit": 1,
+            "last_lines": [
+              "%Error: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check7/run/m.v:3:35: Can't resolve module reference: '/tmp/tmp2r1cj289/CANARY_ET1.vh'",
+              "    3 |   \\/tmp/tmp2r1cj289/CANARY_ET1.vh u ();",
+              "      |                                   ^",
+              "%Error: Exiting due to 1 error(s)"
+            ],
+            "stopped": null
+          }
+        ],
+        "succeeded": false,
+        "summary": "verilator-lint: lint failed: 1 error, 0 warnings; first: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check7/run/m.v:3: Can't resolve module reference: '/tmp/tmp2r1cj289/CANARY_ET1.vh'",
+        "tool": "lint.run"
+      }
+    ],
+    "test": "tests/test_gate_inputs.py::test_control_without_the_check_a_tool_acts_on_the_form[esc_abs_module-verilator-lint]"
+  },
+  {
+    "result": "passed",
+    "runs": [
+      {
+        "backend": "verilator-sim",
+        "metrics": {
+          "checks": null,
+          "checks_failed": null,
+          "end_time": null,
+          "errors": 1,
+          "exit_statuses": [
+            1
+          ],
+          "finished": false,
+          "warnings": 0
+        },
+        "steps": [
+          {
+            "command": [
+              "verilator",
+              "--binary",
+              "-Wno-fatal",
+              "-j",
+              "0",
+              "--top-module",
+              "m",
+              "-Mdir",
+              "obj",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check8/run/m.v"
+            ],
+            "error_lines": [
+              "%Error: /tmp/tmpfbbo4msd/CANARY_ET1.vh:1:1: syntax error, unexpected IDENTIFIER",
+              "%Error: Exiting due to 1 error(s)"
+            ],
+            "exit": 1,
+            "last_lines": [
+              "%Error: /tmp/tmpfbbo4msd/CANARY_ET1.vh:1:1: syntax error, unexpected IDENTIFIER",
+              "    1 | canary_et1_7f3a ! ;",
+              "      | ^~~~~~~~~~~~~~~",
+              "        /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check8/run/m.v:5:1: ... note: In file included from 'm.v'",
+              "%Error: Exiting due to 1 error(s)"
+            ],
+            "stopped": null
+          }
+        ],
+        "succeeded": false,
+        "summary": "verilator-sim: simulation failed: 1 error, exit status 1, $finish never reached, the testbench printed no verdict (NIRMAAN-SIM <nonce> <n> passed, <m> failed); first: /tmp/tmpfbbo4msd/CANARY_ET1.vh:1: syntax error, unexpected IDENTIFIER",
+        "tool": "simulator.run"
+      }
+    ],
+    "test": "tests/test_gate_inputs.py::test_control_without_the_check_a_tool_acts_on_the_form[esc_abs_module-verilator-sim]"
+  },
+  {
+    "result": "passed",
+    "runs": [
+      {
+        "backend": "verilator-lint",
+        "metrics": {
+          "errors": 3,
+          "exit_status": 1,
+          "warnings": 1
+        },
+        "steps": [
+          {
+            "command": [
+              "/opt/nirmaan-seat/bin/verilator",
+              "--lint-only",
+              "-Wall",
+              "--top-module",
+              "m",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check9/run/m.v"
+            ],
+            "error_lines": [
+              "%Error: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check9/run/m.v:4:23: Cannot find include file: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check9/outside/CANARY_ET1.vh",
+              "%Error: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check9/run/m.v:4:23: This may be because there's no search path specified with -I<dir>.",
+              "%Error: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check9/run/m.v:5:3: syntax error, unexpected ';', expecting TYPE-IDENTIFIER",
+              "%Error: Exiting due to 3 error(s), 1 warning(s)"
+            ],
+            "exit": 1,
+            "last_lines": [
+              "             obj_dir//tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check9/outside/CANARY_ET1.vh.sv",
+              "%Error: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check9/run/m.v:5:3: syntax error, unexpected ';', expecting TYPE-IDENTIFIER",
+              "    5 |   ;",
+              "      |   ^",
+              "%Error: Exiting due to 3 error(s), 1 warning(s)"
+            ],
+            "stopped": null
+          }
+        ],
+        "succeeded": false,
+        "summary": "verilator-lint: lint failed: 3 errors, 1 warning; first: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check9/run/m.v:4: Cannot find include file: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check9/outside/CANARY_ET1.vh",
+        "tool": "lint.run"
+      }
+    ],
+    "test": "tests/test_gate_inputs.py::test_control_without_the_check_a_tool_acts_on_the_form[esc_block-verilator-lint]"
+  },
+  {
+    "result": "passed",
+    "runs": [
+      {
+        "backend": "verilator-sim",
+        "metrics": {
+          "checks": null,
+          "checks_failed": null,
+          "end_time": null,
+          "errors": 1,
+          "exit_statuses": [
+            1
+          ],
+          "finished": false,
+          "warnings": 0
+        },
+        "steps": [
+          {
+            "command": [
+              "verilator",
+              "--binary",
+              "-Wno-fatal",
+              "-j",
+              "0",
+              "--top-module",
+              "m",
+              "-Mdir",
+              "obj",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check10/run/m.v"
+            ],
+            "error_lines": [
+              "%Error: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check10/outside/CANARY_ET1.vh:1:17: syntax error, unexpected '!', expecting ',' or ';'",
+              "%Error: Exiting due to 1 error(s)"
+            ],
+            "exit": 1,
+            "last_lines": [
+              "%Error: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check10/outside/CANARY_ET1.vh:1:17: syntax error, unexpected '!', expecting ',' or ';'",
+              "    1 | canary_et1_7f3a ! ;",
+              "      |                 ^",
+              "        /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check10/run/m.v:5:1: ... note: In file included from 'm.v'",
+              "%Error: Exiting due to 1 error(s)"
+            ],
+            "stopped": null
+          }
+        ],
+        "succeeded": false,
+        "summary": "verilator-sim: simulation failed: 1 error, exit status 1, $finish never reached, the testbench printed no verdict (NIRMAAN-SIM <nonce> <n> passed, <m> failed); first: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check10/outside/CANARY_ET1.vh:1: syntax error, unexpected '!', expecting ',' or ';'",
+        "tool": "simulator.run"
+      }
+    ],
+    "test": "tests/test_gate_inputs.py::test_control_without_the_check_a_tool_acts_on_the_form[esc_block-verilator-sim]"
+  },
+  {
+    "result": "passed",
+    "runs": [
+      {
+        "backend": "yosys",
+        "metrics": {
+          "exit_status": 1
+        },
+        "steps": [
+          {
+            "command": [
+              "/opt/nirmaan-seat/bin/yosys",
+              "-s",
+              "synth.ys"
+            ],
+            "error_lines": [
+              "ERROR: Can't open include file `/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check11/outside/CANARY_ET1.vh'!"
+            ],
+            "exit": 1,
+            "last_lines": [
+              " \\----------------------------------------------------------------------------/",
+              " Yosys 0.33 (git sha1 2584903a060)",
+              "-- Executing script file `synth.ys' --",
+              "1. Executing Verilog-2005 frontend: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check11/run/m.v",
+              "ERROR: Can't open include file `/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check11/outside/CANARY_ET1.vh'!"
+            ],
+            "stopped": null
+          }
+        ],
+        "succeeded": false,
+        "summary": "yosys: synthesis failed: 1 error; first: Can't open include file `/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check11/outside/CANARY_ET1.vh'!",
+        "tool": "synth.run"
+      }
+    ],
+    "test": "tests/test_gate_inputs.py::test_control_without_the_check_a_tool_acts_on_the_form[esc_block-yosys]"
+  },
+  {
+    "result": "passed",
+    "runs": [
+      {
+        "backend": "icarus",
+        "metrics": {
+          "checks": null,
+          "checks_failed": null,
+          "end_time": null,
+          "errors": 1,
+          "exit_statuses": [
+            0,
+            0
+          ],
+          "finished": false,
+          "warnings": 0
+        },
+        "steps": [
+          {
+            "command": [
+              "/opt/nirmaan-seat/bin/iverilog",
+              "-g2012",
+              "-o",
+              "sim.vvp",
+              "-s",
+              "m",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check12/run/m.v"
+            ],
+            "error_lines": [],
+            "exit": 0,
+            "last_lines": [],
+            "stopped": null
+          },
+          {
+            "command": [
+              "/opt/nirmaan-seat/bin/vvp",
+              "-n",
+              "sim.vvp",
+              "+nirmaan_nonce=0394c43b1a8160ba489a4dbddda5c407"
+            ],
+            "error_lines": [
+              "ERROR: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check12/run/m.v:3: $readmemh: Unable to open /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check12/outside/CANARY_ET1.hex for reading."
+            ],
+            "exit": 0,
+            "last_lines": [
+              "ERROR: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check12/run/m.v:3: $readmemh: Unable to open /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check12/outside/CANARY_ET1.hex for reading."
+            ],
+            "stopped": null
+          }
+        ],
+        "succeeded": false,
+        "summary": "icarus: simulation failed: 1 error, $finish never reached, the testbench printed no verdict (NIRMAAN-SIM <nonce> <n> passed, <m> failed); first: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check12/run/m.v:3: $readmemh: Unable to open /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check12/outside/CANARY_ET1.hex for reading.",
+        "tool": "simulator.run"
+      }
+    ],
+    "test": "tests/test_gate_inputs.py::test_control_without_the_check_a_tool_acts_on_the_form[esc_dollar_task-icarus]"
+  },
+  {
+    "result": "failed",
+    "runs": [
+      {
+        "backend": "yosys",
+        "metrics": {
+          "exit_status": 1
+        },
+        "steps": [
+          {
+            "command": [
+              "/opt/nirmaan-seat/bin/yosys",
+              "-s",
+              "synth.ys"
+            ],
+            "error_lines": [
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check13/1/run/m.v:3: ERROR: Can not open file `/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check13/1/outside/CANARY_ET1.hex` for \\$readmemh."
+            ],
+            "exit": 1,
+            "last_lines": [
+              " \\----------------------------------------------------------------------------/",
+              " Yosys 0.33 (git sha1 2584903a060)",
+              "-- Executing script file `synth.ys' --",
+              "1. Executing Verilog-2005 frontend: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check13/1/run/m.v",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check13/1/run/m.v:3: ERROR: Can not open file `/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check13/1/outside/CANARY_ET1.hex` for \\$readmemh."
+            ],
+            "stopped": null
+          }
+        ],
+        "succeeded": false,
+        "summary": "yosys: synthesis failed: 0 errors (exit status 1)",
+        "tool": "synth.run"
+      },
+      {
+        "backend": "yosys",
+        "metrics": {
+          "exit_status": 1
+        },
+        "steps": [
+          {
+            "command": [
+              "/opt/nirmaan-seat/bin/yosys",
+              "-s",
+              "synth.ys"
+            ],
+            "error_lines": [
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check13/0/run/m.v:3: ERROR: Can not open file `/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check13/0/outside/CANARY_ET1.hex` for \\$readmemh."
+            ],
+            "exit": 1,
+            "last_lines": [
+              " \\----------------------------------------------------------------------------/",
+              " Yosys 0.33 (git sha1 2584903a060)",
+              "-- Executing script file `synth.ys' --",
+              "1. Executing Verilog-2005 frontend: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check13/0/run/m.v",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check13/0/run/m.v:3: ERROR: Can not open file `/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check13/0/outside/CANARY_ET1.hex` for \\$readmemh."
+            ],
+            "stopped": null
+          }
+        ],
+        "succeeded": false,
+        "summary": "yosys: synthesis failed: 0 errors (exit status 1)",
+        "tool": "synth.run"
+      }
+    ],
+    "test": "tests/test_gate_inputs.py::test_control_without_the_check_a_tool_acts_on_the_form[esc_dollar_task-yosys]"
+  },
+  {
+    "result": "failed",
+    "runs": [
+      {
+        "backend": "verilator-lint",
+        "metrics": {
+          "errors": 1,
+          "exit_status": 1,
+          "warnings": 0
+        },
+        "steps": [
+          {
+            "command": [
+              "/opt/nirmaan-seat/bin/verilator",
+              "--lint-only",
+              "-Wall",
+              "--top-module",
+              "m",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check14/run/m.v"
+            ],
+            "error_lines": [
+              "%Error: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check14/run/m.v:3:29: Can't resolve module reference: '../outside/CANARY_ET1.vh'",
+              "%Error: Exiting due to 1 error(s)"
+            ],
+            "exit": 1,
+            "last_lines": [
+              "%Error: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check14/run/m.v:3:29: Can't resolve module reference: '../outside/CANARY_ET1.vh'",
+              "    3 |   \\../outside/CANARY_ET1.vh u ();",
+              "      |                             ^",
+              "%Error: Exiting due to 1 error(s)"
+            ],
+            "stopped": null
+          }
+        ],
+        "succeeded": false,
+        "summary": "verilator-lint: lint failed: 1 error, 0 warnings; first: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check14/run/m.v:3: Can't resolve module reference: '../outside/CANARY_ET1.vh'",
+        "tool": "lint.run"
+      }
+    ],
+    "test": "tests/test_gate_inputs.py::test_control_without_the_check_a_tool_acts_on_the_form[esc_dotdot_module-verilator-lint]"
+  },
+  {
+    "result": "passed",
+    "runs": [
+      {
+        "backend": "verilator-sim",
+        "metrics": {
+          "checks": null,
+          "checks_failed": null,
+          "end_time": null,
+          "errors": 1,
+          "exit_statuses": [
+            1
+          ],
+          "finished": false,
+          "warnings": 0
+        },
+        "steps": [
+          {
+            "command": [
+              "verilator",
+              "--binary",
+              "-Wno-fatal",
+              "-j",
+              "0",
+              "--top-module",
+              "m",
+              "-Mdir",
+              "obj",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check15/run/m.v"
+            ],
+            "error_lines": [
+              "%Error: ../outside/CANARY_ET1.vh:1:1: syntax error, unexpected IDENTIFIER",
+              "%Error: Exiting due to 1 error(s)"
+            ],
+            "exit": 1,
+            "last_lines": [
+              "%Error: ../outside/CANARY_ET1.vh:1:1: syntax error, unexpected IDENTIFIER",
+              "    1 | canary_et1_7f3a ! ;",
+              "      | ^~~~~~~~~~~~~~~",
+              "        /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check15/run/m.v:5:1: ... note: In file included from 'm.v'",
+              "%Error: Exiting due to 1 error(s)"
+            ],
+            "stopped": null
+          }
+        ],
+        "succeeded": false,
+        "summary": "verilator-sim: simulation failed: 1 error, exit status 1, $finish never reached, the testbench printed no verdict (NIRMAAN-SIM <nonce> <n> passed, <m> failed); first: ../outside/CANARY_ET1.vh:1: syntax error, unexpected IDENTIFIER",
+        "tool": "simulator.run"
+      }
+    ],
+    "test": "tests/test_gate_inputs.py::test_control_without_the_check_a_tool_acts_on_the_form[esc_dotdot_module-verilator-sim]"
+  },
+  {
+    "result": "passed",
+    "runs": [
+      {
+        "backend": "verilator-lint",
+        "metrics": {
+          "errors": 3,
+          "exit_status": 1,
+          "warnings": 1
+        },
+        "steps": [
+          {
+            "command": [
+              "/opt/nirmaan-seat/bin/verilator",
+              "--lint-only",
+              "-Wall",
+              "--top-module",
+              "m",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check16/run/m.v"
+            ],
+            "error_lines": [
+              "%Error: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check16/run/m.v:3:34: Cannot find include file: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check16/outside/CANARY_ET1.vh",
+              "%Error: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check16/run/m.v:3:34: This may be because there's no search path specified with -I<dir>.",
+              "%Error: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check16/run/m.v:4:3: syntax error, unexpected ';', expecting TYPE-IDENTIFIER",
+              "%Error: Exiting due to 3 error(s), 1 warning(s)"
+            ],
+            "exit": 1,
+            "last_lines": [
+              "             obj_dir//tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check16/outside/CANARY_ET1.vh.sv",
+              "%Error: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check16/run/m.v:4:3: syntax error, unexpected ';', expecting TYPE-IDENTIFIER",
+              "    4 |   ;",
+              "      |   ^",
+              "%Error: Exiting due to 3 error(s), 1 warning(s)"
+            ],
+            "stopped": null
+          }
+        ],
+        "succeeded": false,
+        "summary": "verilator-lint: lint failed: 3 errors, 1 warning; first: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check16/run/m.v:3: Cannot find include file: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check16/outside/CANARY_ET1.vh",
+        "tool": "lint.run"
+      }
+    ],
+    "test": "tests/test_gate_inputs.py::test_control_without_the_check_a_tool_acts_on_the_form[esc_line-verilator-lint]"
+  },
+  {
+    "result": "passed",
+    "runs": [
+      {
+        "backend": "verilator-sim",
+        "metrics": {
+          "checks": null,
+          "checks_failed": null,
+          "end_time": null,
+          "errors": 1,
+          "exit_statuses": [
+            1
+          ],
+          "finished": false,
+          "warnings": 0
+        },
+        "steps": [
+          {
+            "command": [
+              "verilator",
+              "--binary",
+              "-Wno-fatal",
+              "-j",
+              "0",
+              "--top-module",
+              "m",
+              "-Mdir",
+              "obj",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check17/run/m.v"
+            ],
+            "error_lines": [
+              "%Error: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check17/outside/CANARY_ET1.vh:1:17: syntax error, unexpected '!', expecting ',' or ';'",
+              "%Error: Exiting due to 1 error(s)"
+            ],
+            "exit": 1,
+            "last_lines": [
+              "%Error: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check17/outside/CANARY_ET1.vh:1:17: syntax error, unexpected '!', expecting ',' or ';'",
+              "    1 | canary_et1_7f3a ! ;",
+              "      |                 ^",
+              "        /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check17/run/m.v:4:1: ... note: In file included from 'm.v'",
+              "%Error: Exiting due to 1 error(s)"
+            ],
+            "stopped": null
+          }
+        ],
+        "succeeded": false,
+        "summary": "verilator-sim: simulation failed: 1 error, exit status 1, $finish never reached, the testbench printed no verdict (NIRMAAN-SIM <nonce> <n> passed, <m> failed); first: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check17/outside/CANARY_ET1.vh:1: syntax error, unexpected '!', expecting ',' or ';'",
+        "tool": "simulator.run"
+      }
+    ],
+    "test": "tests/test_gate_inputs.py::test_control_without_the_check_a_tool_acts_on_the_form[esc_line-verilator-sim]"
+  },
+  {
+    "result": "passed",
+    "runs": [
+      {
+        "backend": "yosys",
+        "metrics": {
+          "exit_status": 1
+        },
+        "steps": [
+          {
+            "command": [
+              "/opt/nirmaan-seat/bin/yosys",
+              "-s",
+              "synth.ys"
+            ],
+            "error_lines": [
+              "ERROR: Can't open include file `/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check18/outside/CANARY_ET1.vh'!"
+            ],
+            "exit": 1,
+            "last_lines": [
+              " \\----------------------------------------------------------------------------/",
+              " Yosys 0.33 (git sha1 2584903a060)",
+              "-- Executing script file `synth.ys' --",
+              "1. Executing Verilog-2005 frontend: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check18/run/m.v",
+              "ERROR: Can't open include file `/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check18/outside/CANARY_ET1.vh'!"
+            ],
+            "stopped": null
+          }
+        ],
+        "succeeded": false,
+        "summary": "yosys: synthesis failed: 1 error; first: Can't open include file `/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check18/outside/CANARY_ET1.vh'!",
+        "tool": "synth.run"
+      }
+    ],
+    "test": "tests/test_gate_inputs.py::test_control_without_the_check_a_tool_acts_on_the_form[esc_line-yosys]"
+  },
+  {
+    "result": "passed",
+    "runs": [
+      {
+        "backend": "verilator-lint",
+        "metrics": {
+          "errors": 0,
+          "exit_status": 1,
+          "warnings": 1
+        },
+        "steps": [
+          {
+            "command": [
+              "/opt/nirmaan-seat/bin/verilator",
+              "--lint-only",
+              "-Wall",
+              "--top-module",
+              "m",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check19/run/m.v"
+            ],
+            "error_lines": [
+              "%Error: Exiting due to 1 warning(s)"
+            ],
+            "exit": 1,
+            "last_lines": [
+              "    3 |   wire \\\" ; initial $readmemh(\"/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check19/outside/CANARY_ET1.hex\", r);  ",
+              "      |        ^~",
+              "                       ... For warning description see https://verilator.org/warn/UNUSEDSIGNAL?v=5.020",
+              "                       ... Use \"/* verilator lint_off UNUSEDSIGNAL */\" and lint_on around source to disable this message.",
+              "%Error: Exiting due to 1 warning(s)"
+            ],
+            "stopped": null
+          }
+        ],
+        "succeeded": false,
+        "summary": "verilator-lint: lint failed: 0 errors, 1 warning; first: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check19/run/m.v:3: [UNUSEDSIGNAL] Signal is not driven, nor used: '\"'",
+        "tool": "lint.run"
+      }
+    ],
+    "test": "tests/test_gate_inputs.py::test_control_without_the_check_a_tool_acts_on_the_form[esc_quote-verilator-lint]"
+  },
+  {
+    "result": "passed",
+    "runs": [
+      {
+        "backend": "icarus",
+        "metrics": {
+          "checks": null,
+          "checks_failed": null,
+          "end_time": null,
+          "errors": 1,
+          "exit_statuses": [
+            0,
+            0
+          ],
+          "finished": false,
+          "warnings": 0
+        },
+        "steps": [
+          {
+            "command": [
+              "/opt/nirmaan-seat/bin/iverilog",
+              "-g2012",
+              "-o",
+              "sim.vvp",
+              "-s",
+              "m",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check20/run/m.v"
+            ],
+            "error_lines": [],
+            "exit": 0,
+            "last_lines": [],
+            "stopped": null
+          },
+          {
+            "command": [
+              "/opt/nirmaan-seat/bin/vvp",
+              "-n",
+              "sim.vvp",
+              "+nirmaan_nonce=b182c52d753cc7974ae5c02f31b1cccc"
+            ],
+            "error_lines": [
+              "ERROR: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check20/run/m.v:3: $readmemh: Unable to open /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check20/outside/CANARY_ET1.hex for reading."
+            ],
+            "exit": 0,
+            "last_lines": [
+              "ERROR: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check20/run/m.v:3: $readmemh: Unable to open /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check20/outside/CANARY_ET1.hex for reading."
+            ],
+            "stopped": null
+          }
+        ],
+        "succeeded": false,
+        "summary": "icarus: simulation failed: 1 error, $finish never reached, the testbench printed no verdict (NIRMAAN-SIM <nonce> <n> passed, <m> failed); first: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check20/run/m.v:3: $readmemh: Unable to open /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check20/outside/CANARY_ET1.hex for reading.",
+        "tool": "simulator.run"
+      }
+    ],
+    "test": "tests/test_gate_inputs.py::test_control_without_the_check_a_tool_acts_on_the_form[esc_quote-icarus]"
+  },
+  {
+    "result": "passed",
+    "runs": [
+      {
+        "backend": "verilator-sim",
+        "metrics": {
+          "checks": null,
+          "checks_failed": null,
+          "end_time": null,
+          "errors": 1,
+          "exit_statuses": [
+            0,
+            -6
+          ],
+          "finished": false,
+          "warnings": 0
+        },
+        "steps": [
+          {
+            "command": [
+              "verilator",
+              "--binary",
+              "-Wno-fatal",
+              "-j",
+              "0",
+              "--top-module",
+              "m",
+              "-Mdir",
+              "obj",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check21/run/m.v"
+            ],
+            "error_lines": [],
+            "exit": 0,
+            "last_lines": [
+              "g++ -Os  -I.  -MMD -I/usr/share/verilator/include -I/usr/share/verilator/include/vltstd -DVM_COVERAGE=0 -DVM_SC=0 -DVM_TRACE=0 -DVM_TRACE_FST=0 -DVM_TRACE_VCD=0 -faligned-new -fcf-protection=none -Wno-bool-operation -Wno-overloaded-virtual -Wno-shadow -Wno-sign-compare -Wno-uninitialized -Wno-unused-but-set-parameter -Wno-unused-but-set-variable -Wno-unused-parameter -Wno-unused-variable     -DVL_...",
+              "Archive ar -rcs Vm__ALL.a Vm__ALL.o",
+              "g++     verilated.o verilated_threads.o Vm__ALL.a    -pthread -lpthread -latomic   -o Vm",
+              "rm Vm__ALL.verilator_deplist.tmp",
+              "make: Leaving directory '/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check21/wd/obj'"
+            ],
+            "stopped": null
+          },
+          {
+            "command": [
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check21/wd/obj/Vm",
+              "+nirmaan_nonce=7898b4a19cc86dee941ed0634deff07f"
+            ],
+            "error_lines": [
+              "%Error: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check21/outside/CANARY_ET1.hex:0: $readmem file syntax error"
+            ],
+            "exit": -6,
+            "last_lines": [
+              "%Error: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check21/outside/CANARY_ET1.hex:0: $readmem file syntax error",
+              "Aborting..."
+            ],
+            "stopped": null
+          }
+        ],
+        "succeeded": false,
+        "summary": "verilator-sim: simulation failed: 1 error, exit status -6, $finish never reached, the testbench printed no verdict (NIRMAAN-SIM <nonce> <n> passed, <m> failed); first: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check21/outside/CANARY_ET1.hex: $readmem file syntax error",
+        "tool": "simulator.run"
+      }
+    ],
+    "test": "tests/test_gate_inputs.py::test_control_without_the_check_a_tool_acts_on_the_form[esc_quote-verilator-sim]"
+  },
+  {
+    "result": "failed",
+    "runs": [
+      {
+        "backend": "yosys",
+        "metrics": {
+          "exit_status": 1
+        },
+        "steps": [
+          {
+            "command": [
+              "/opt/nirmaan-seat/bin/yosys",
+              "-s",
+              "synth.ys"
+            ],
+            "error_lines": [
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check22/1/run/m.v:3: ERROR: Can not open file `/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check22/1/outside/CANARY_ET1.hex` for \\$readmemh."
+            ],
+            "exit": 1,
+            "last_lines": [
+              " \\----------------------------------------------------------------------------/",
+              " Yosys 0.33 (git sha1 2584903a060)",
+              "-- Executing script file `synth.ys' --",
+              "1. Executing Verilog-2005 frontend: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check22/1/run/m.v",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check22/1/run/m.v:3: ERROR: Can not open file `/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check22/1/outside/CANARY_ET1.hex` for \\$readmemh."
+            ],
+            "stopped": null
+          }
+        ],
+        "succeeded": false,
+        "summary": "yosys: synthesis failed: 0 errors (exit status 1)",
+        "tool": "synth.run"
+      },
+      {
+        "backend": "yosys",
+        "metrics": {
+          "exit_status": 1
+        },
+        "steps": [
+          {
+            "command": [
+              "/opt/nirmaan-seat/bin/yosys",
+              "-s",
+              "synth.ys"
+            ],
+            "error_lines": [
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check22/0/run/m.v:3: ERROR: Can not open file `/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check22/0/outside/CANARY_ET1.hex` for \\$readmemh."
+            ],
+            "exit": 1,
+            "last_lines": [
+              " \\----------------------------------------------------------------------------/",
+              " Yosys 0.33 (git sha1 2584903a060)",
+              "-- Executing script file `synth.ys' --",
+              "1. Executing Verilog-2005 frontend: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check22/0/run/m.v",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check22/0/run/m.v:3: ERROR: Can not open file `/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check22/0/outside/CANARY_ET1.hex` for \\$readmemh."
+            ],
+            "stopped": null
+          }
+        ],
+        "succeeded": false,
+        "summary": "yosys: synthesis failed: 0 errors (exit status 1)",
+        "tool": "synth.run"
+      }
+    ],
+    "test": "tests/test_gate_inputs.py::test_control_without_the_check_a_tool_acts_on_the_form[esc_quote-yosys]"
+  },
+  {
+    "result": "failed",
+    "runs": [
+      {
+        "backend": "icarus",
+        "metrics": {
+          "checks": null,
+          "checks_failed": null,
+          "end_time": null,
+          "errors": 1,
+          "exit_statuses": [
+            0,
+            0
+          ],
+          "finished": false,
+          "warnings": 0
+        },
+        "steps": [
+          {
+            "command": [
+              "/opt/nirmaan-seat/bin/iverilog",
+              "-g2012",
+              "-o",
+              "sim.vvp",
+              "-s",
+              "m",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check23/run/m.v"
+            ],
+            "error_lines": [],
+            "exit": 0,
+            "last_lines": [],
+            "stopped": null
+          },
+          {
+            "command": [
+              "/opt/nirmaan-seat/bin/vvp",
+              "-n",
+              "sim.vvp",
+              "+nirmaan_nonce=d9dfc777893858b0b15a9762959ae606"
+            ],
+            "error_lines": [
+              "ERROR: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check23/run/m.v:4: $writememh: Unable to open /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check23/outside/MARKER for writing."
+            ],
+            "exit": 0,
+            "last_lines": [
+              "ERROR: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check23/run/m.v:4: $writememh: Unable to open /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check23/outside/MARKER for writing."
+            ],
+            "stopped": null
+          }
+        ],
+        "succeeded": false,
+        "summary": "icarus: simulation failed: 1 error, $finish never reached, the testbench printed no verdict (NIRMAAN-SIM <nonce> <n> passed, <m> failed); first: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check23/run/m.v:4: $writememh: Unable to open /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check23/outside/MARKER for writing.",
+        "tool": "simulator.run"
+      }
+    ],
+    "test": "tests/test_gate_inputs.py::test_control_without_the_check_a_tool_acts_on_the_form[glued_macro_call-icarus]"
+  },
+  {
+    "result": "passed",
+    "runs": [
+      {
+        "backend": "verilator-sim",
+        "metrics": {
+          "checks": null,
+          "checks_failed": null,
+          "end_time": null,
+          "errors": 0,
+          "exit_statuses": [
+            0
+          ],
+          "finished": false,
+          "warnings": 0
+        },
+        "steps": [
+          {
+            "command": [
+              "verilator",
+              "--binary",
+              "-Wno-fatal",
+              "-j",
+              "0",
+              "--top-module",
+              "m",
+              "-Mdir",
+              "obj",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check24/run/m.v"
+            ],
+            "error_lines": [],
+            "exit": 0,
+            "last_lines": [
+              "g++ -Os  -I.  -MMD -I/usr/share/verilator/include -I/usr/share/verilator/include/vltstd -DVM_COVERAGE=0 -DVM_SC=0 -DVM_TRACE=0 -DVM_TRACE_FST=0 -DVM_TRACE_VCD=0 -faligned-new -fcf-protection=none -Wno-bool-operation -Wno-overloaded-virtual -Wno-shadow -Wno-sign-compare -Wno-uninitialized -Wno-unused-but-set-parameter -Wno-unused-but-set-variable -Wno-unused-parameter -Wno-unused-variable     -DVL_...",
+              "Archive ar -rcs Vm__ALL.a Vm__ALL.o",
+              "g++     verilated.o verilated_threads.o Vm__ALL.a    -pthread -lpthread -latomic   -o Vm",
+              "rm Vm__ALL.verilator_deplist.tmp",
+              "make: Leaving directory '/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check24/wd/obj'"
+            ],
+            "stopped": null
+          },
+          {
+            "command": [
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check24/wd/obj/Vm",
+              "+nirmaan_nonce=28ffbd8b78d4fbd50a603d658ccd3df9"
+            ],
+            "error_lines": [],
+            "exit": null,
+            "last_lines": [],
+            "stopped": "timeout"
+          }
+        ],
+        "succeeded": false,
+        "summary": "verilator-sim: timed out after 300s in /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check24/wd/obj/Vm",
+        "tool": "simulator.run"
+      }
+    ],
+    "test": "tests/test_gate_inputs.py::test_control_without_the_check_a_tool_acts_on_the_form[glued_macro_call-verilator-sim]"
+  },
+  {
+    "result": "passed",
+    "runs": [
+      {
+        "backend": "icarus",
+        "metrics": {
+          "checks": null,
+          "checks_failed": null,
+          "end_time": null,
+          "errors": 1,
+          "exit_statuses": [
+            2
+          ],
+          "finished": false,
+          "warnings": 0
+        },
+        "steps": [
+          {
+            "command": [
+              "/opt/nirmaan-seat/bin/iverilog",
+              "-g2012",
+              "-o",
+              "sim.vvp",
+              "-s",
+              "m",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check25/run/m.v"
+            ],
+            "error_lines": [
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check25/run/m.v:7: Include file /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check25/outside/CANARY_ET1.vh not found",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check25/run/m.v:6: syntax error"
+            ],
+            "exit": 2,
+            "last_lines": [
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check25/run/m.v:7: Include file /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check25/outside/CANARY_ET1.vh not found",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check25/run/m.v:6: syntax error",
+              "I give up."
+            ],
+            "stopped": null
+          }
+        ],
+        "succeeded": false,
+        "summary": "icarus: simulation failed: 1 error, exit status 2, $finish never reached, the testbench printed no verdict (NIRMAAN-SIM <nonce> <n> passed, <m> failed); first: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check25/run/m.v:6: syntax error",
+        "tool": "simulator.run"
+      }
+    ],
+    "test": "tests/test_gate_inputs.py::test_control_without_the_check_a_tool_acts_on_the_form[ifdef_continued_quote_include-icarus]"
+  },
+  {
+    "result": "passed",
+    "runs": [
+      {
+        "backend": "icarus",
+        "metrics": {
+          "checks": null,
+          "checks_failed": null,
+          "end_time": null,
+          "errors": 1,
+          "exit_statuses": [
+            0,
+            0
+          ],
+          "finished": false,
+          "warnings": 0
+        },
+        "steps": [
+          {
+            "command": [
+              "/opt/nirmaan-seat/bin/iverilog",
+              "-g2012",
+              "-o",
+              "sim.vvp",
+              "-s",
+              "m",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check26/run/m.v"
+            ],
+            "error_lines": [],
+            "exit": 0,
+            "last_lines": [],
+            "stopped": null
+          },
+          {
+            "command": [
+              "/opt/nirmaan-seat/bin/vvp",
+              "-n",
+              "sim.vvp",
+              "+nirmaan_nonce=be6f9925e2d4ca91fc078e29aced394e"
+            ],
+            "error_lines": [
+              "ERROR: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check26/run/m.v:6: $readmemh: Unable to open /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check26/outside/CANARY_ET1.hex for reading."
+            ],
+            "exit": 0,
+            "last_lines": [
+              "ERROR: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check26/run/m.v:6: $readmemh: Unable to open /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check26/outside/CANARY_ET1.hex for reading."
+            ],
+            "stopped": null
+          }
+        ],
+        "succeeded": false,
+        "summary": "icarus: simulation failed: 1 error, $finish never reached, the testbench printed no verdict (NIRMAAN-SIM <nonce> <n> passed, <m> failed); first: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check26/run/m.v:6: $readmemh: Unable to open /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check26/outside/CANARY_ET1.hex for reading.",
+        "tool": "simulator.run"
+      }
+    ],
+    "test": "tests/test_gate_inputs.py::test_control_without_the_check_a_tool_acts_on_the_form[ifdef_continued_quote_readmem-icarus]"
+  },
+  {
+    "result": "passed",
+    "runs": [
+      {
+        "backend": "yosys",
+        "metrics": {
+          "exit_status": 1
+        },
+        "steps": [
+          {
+            "command": [
+              "/opt/nirmaan-seat/bin/yosys",
+              "-s",
+              "synth.ys"
+            ],
+            "error_lines": [
+              "ERROR: Can't open include file `/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check27/outside/CANARY_ET1.vh'!"
+            ],
+            "exit": 1,
+            "last_lines": [
+              " \\----------------------------------------------------------------------------/",
+              " Yosys 0.33 (git sha1 2584903a060)",
+              "-- Executing script file `synth.ys' --",
+              "1. Executing Verilog-2005 frontend: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check27/run/m.v",
+              "ERROR: Can't open include file `/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check27/outside/CANARY_ET1.vh'!"
+            ],
+            "stopped": null
+          }
+        ],
+        "succeeded": false,
+        "summary": "yosys: synthesis failed: 1 error; first: Can't open include file `/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check27/outside/CANARY_ET1.vh'!",
+        "tool": "synth.run"
+      }
+    ],
+    "test": "tests/test_gate_inputs.py::test_control_without_the_check_a_tool_acts_on_the_form[ifdef_lone_quote_include-yosys]"
+  },
+  {
+    "result": "failed",
+    "runs": [
+      {
+        "backend": "yosys",
+        "metrics": {
+          "exit_status": 1
+        },
+        "steps": [
+          {
+            "command": [
+              "/opt/nirmaan-seat/bin/yosys",
+              "-s",
+              "synth.ys"
+            ],
+            "error_lines": [
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check28/1/run/m.v:7: ERROR: Can not open file `/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check28/1/outside/CANARY_ET1.hex` for \\$readmemh."
+            ],
+            "exit": 1,
+            "last_lines": [
+              " \\----------------------------------------------------------------------------/",
+              " Yosys 0.33 (git sha1 2584903a060)",
+              "-- Executing script file `synth.ys' --",
+              "1. Executing Verilog-2005 frontend: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check28/1/run/m.v",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check28/1/run/m.v:7: ERROR: Can not open file `/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check28/1/outside/CANARY_ET1.hex` for \\$readmemh."
+            ],
+            "stopped": null
+          }
+        ],
+        "succeeded": false,
+        "summary": "yosys: synthesis failed: 0 errors (exit status 1)",
+        "tool": "synth.run"
+      },
+      {
+        "backend": "yosys",
+        "metrics": {
+          "exit_status": 1
+        },
+        "steps": [
+          {
+            "command": [
+              "/opt/nirmaan-seat/bin/yosys",
+              "-s",
+              "synth.ys"
+            ],
+            "error_lines": [
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check28/0/run/m.v:7: ERROR: Can not open file `/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check28/0/outside/CANARY_ET1.hex` for \\$readmemh."
+            ],
+            "exit": 1,
+            "last_lines": [
+              " \\----------------------------------------------------------------------------/",
+              " Yosys 0.33 (git sha1 2584903a060)",
+              "-- Executing script file `synth.ys' --",
+              "1. Executing Verilog-2005 frontend: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check28/0/run/m.v",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check28/0/run/m.v:7: ERROR: Can not open file `/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check28/0/outside/CANARY_ET1.hex` for \\$readmemh."
+            ],
+            "stopped": null
+          }
+        ],
+        "succeeded": false,
+        "summary": "yosys: synthesis failed: 0 errors (exit status 1)",
+        "tool": "synth.run"
+      }
+    ],
+    "test": "tests/test_gate_inputs.py::test_control_without_the_check_a_tool_acts_on_the_form[ifdef_lone_quote_readmem-yosys]"
+  },
+  {
+    "result": "passed",
+    "runs": [
+      {
+        "backend": "icarus",
+        "metrics": {
+          "checks": null,
+          "checks_failed": null,
+          "end_time": null,
+          "errors": 1,
+          "exit_statuses": [
+            2
+          ],
+          "finished": false,
+          "warnings": 0
+        },
+        "steps": [
+          {
+            "command": [
+              "/opt/nirmaan-seat/bin/iverilog",
+              "-g2012",
+              "-o",
+              "sim.vvp",
+              "-s",
+              "m",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check29/run/m.v"
+            ],
+            "error_lines": [
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check29/run/m.v:5: Include file /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check29/outside/CANARY_ET1.vh not found",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check29/run/m.v:4: syntax error"
+            ],
+            "exit": 2,
+            "last_lines": [
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check29/run/m.v:5: Include file /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check29/outside/CANARY_ET1.vh not found",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check29/run/m.v:4: syntax error",
+              "I give up."
+            ],
+            "stopped": null
+          }
+        ],
+        "succeeded": false,
+        "summary": "icarus: simulation failed: 1 error, exit status 2, $finish never reached, the testbench printed no verdict (NIRMAAN-SIM <nonce> <n> passed, <m> failed); first: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check29/run/m.v:4: syntax error",
+        "tool": "simulator.run"
+      }
+    ],
+    "test": "tests/test_gate_inputs.py::test_control_without_the_check_a_tool_acts_on_the_form[ifdef_quote_include-icarus]"
+  },
+  {
+    "result": "passed",
+    "runs": [
+      {
+        "backend": "icarus",
+        "metrics": {
+          "checks": null,
+          "checks_failed": null,
+          "end_time": null,
+          "errors": 1,
+          "exit_statuses": [
+            0,
+            0
+          ],
+          "finished": false,
+          "warnings": 0
+        },
+        "steps": [
+          {
+            "command": [
+              "/opt/nirmaan-seat/bin/iverilog",
+              "-g2012",
+              "-o",
+              "sim.vvp",
+              "-s",
+              "m",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check30/run/m.v"
+            ],
+            "error_lines": [],
+            "exit": 0,
+            "last_lines": [],
+            "stopped": null
+          },
+          {
+            "command": [
+              "/opt/nirmaan-seat/bin/vvp",
+              "-n",
+              "sim.vvp",
+              "+nirmaan_nonce=9fce7d1f198aa375b3b15f6a799fc5d0"
+            ],
+            "error_lines": [
+              "ERROR: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check30/run/m.v:5: $readmemh: Unable to open /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check30/outside/CANARY_ET1.hex for reading."
+            ],
+            "exit": 0,
+            "last_lines": [
+              "ERROR: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check30/run/m.v:5: $readmemh: Unable to open /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check30/outside/CANARY_ET1.hex for reading."
+            ],
+            "stopped": null
+          }
+        ],
+        "succeeded": false,
+        "summary": "icarus: simulation failed: 1 error, $finish never reached, the testbench printed no verdict (NIRMAAN-SIM <nonce> <n> passed, <m> failed); first: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check30/run/m.v:5: $readmemh: Unable to open /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check30/outside/CANARY_ET1.hex for reading.",
+        "tool": "simulator.run"
+      }
+    ],
+    "test": "tests/test_gate_inputs.py::test_control_without_the_check_a_tool_acts_on_the_form[split_macro-icarus]"
+  },
+  {
+    "result": "passed",
+    "runs": [
+      {
+        "backend": "verilator-sim",
+        "metrics": {
+          "checks": null,
+          "checks_failed": null,
+          "end_time": null,
+          "errors": 1,
+          "exit_statuses": [
+            0,
+            -6
+          ],
+          "finished": false,
+          "warnings": 0
+        },
+        "steps": [
+          {
+            "command": [
+              "verilator",
+              "--binary",
+              "-Wno-fatal",
+              "-j",
+              "0",
+              "--top-module",
+              "m",
+              "-Mdir",
+              "obj",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check31/run/m.v"
+            ],
+            "error_lines": [],
+            "exit": 0,
+            "last_lines": [
+              "g++ -Os  -I.  -MMD -I/usr/share/verilator/include -I/usr/share/verilator/include/vltstd -DVM_COVERAGE=0 -DVM_SC=0 -DVM_TRACE=0 -DVM_TRACE_FST=0 -DVM_TRACE_VCD=0 -faligned-new -fcf-protection=none -Wno-bool-operation -Wno-overloaded-virtual -Wno-shadow -Wno-sign-compare -Wno-uninitialized -Wno-unused-but-set-parameter -Wno-unused-but-set-variable -Wno-unused-parameter -Wno-unused-variable     -DVL_...",
+              "Archive ar -rcs Vm__ALL.a Vm__ALL.o",
+              "g++     verilated.o verilated_threads.o Vm__ALL.a    -pthread -lpthread -latomic   -o Vm",
+              "rm Vm__ALL.verilator_deplist.tmp",
+              "make: Leaving directory '/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check31/wd/obj'"
+            ],
+            "stopped": null
+          },
+          {
+            "command": [
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check31/wd/obj/Vm",
+              "+nirmaan_nonce=3b30338b37514b3080d39738856f8b9d"
+            ],
+            "error_lines": [
+              "%Error: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check31/outside/CANARY_ET1.hex:0: $readmem file syntax error"
+            ],
+            "exit": -6,
+            "last_lines": [
+              "%Error: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check31/outside/CANARY_ET1.hex:0: $readmem file syntax error",
+              "Aborting..."
+            ],
+            "stopped": null
+          }
+        ],
+        "succeeded": false,
+        "summary": "verilator-sim: simulation failed: 1 error, exit status -6, $finish never reached, the testbench printed no verdict (NIRMAAN-SIM <nonce> <n> passed, <m> failed); first: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check31/outside/CANARY_ET1.hex: $readmem file syntax error",
+        "tool": "simulator.run"
+      }
+    ],
+    "test": "tests/test_gate_inputs.py::test_control_without_the_check_a_tool_acts_on_the_form[split_macro-verilator-sim]"
+  },
+  {
+    "result": "failed",
+    "runs": [
+      {
+        "backend": "yosys",
+        "metrics": {
+          "exit_status": 1
+        },
+        "steps": [
+          {
+            "command": [
+              "/opt/nirmaan-seat/bin/yosys",
+              "-s",
+              "synth.ys"
+            ],
+            "error_lines": [
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check32/1/run/m.v:5: ERROR: Can not open file `/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check32/1/outside/CANARY_ET1.hex` for \\$readmemh."
+            ],
+            "exit": 1,
+            "last_lines": [
+              " \\----------------------------------------------------------------------------/",
+              " Yosys 0.33 (git sha1 2584903a060)",
+              "-- Executing script file `synth.ys' --",
+              "1. Executing Verilog-2005 frontend: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check32/1/run/m.v",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check32/1/run/m.v:5: ERROR: Can not open file `/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check32/1/outside/CANARY_ET1.hex` for \\$readmemh."
+            ],
+            "stopped": null
+          }
+        ],
+        "succeeded": false,
+        "summary": "yosys: synthesis failed: 0 errors (exit status 1)",
+        "tool": "synth.run"
+      },
+      {
+        "backend": "yosys",
+        "metrics": {
+          "exit_status": 1
+        },
+        "steps": [
+          {
+            "command": [
+              "/opt/nirmaan-seat/bin/yosys",
+              "-s",
+              "synth.ys"
+            ],
+            "error_lines": [
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check32/0/run/m.v:5: ERROR: Can not open file `/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check32/0/outside/CANARY_ET1.hex` for \\$readmemh."
+            ],
+            "exit": 1,
+            "last_lines": [
+              " \\----------------------------------------------------------------------------/",
+              " Yosys 0.33 (git sha1 2584903a060)",
+              "-- Executing script file `synth.ys' --",
+              "1. Executing Verilog-2005 frontend: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check32/0/run/m.v",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check32/0/run/m.v:5: ERROR: Can not open file `/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check32/0/outside/CANARY_ET1.hex` for \\$readmemh."
+            ],
+            "stopped": null
+          }
+        ],
+        "succeeded": false,
+        "summary": "yosys: synthesis failed: 0 errors (exit status 1)",
+        "tool": "synth.run"
+      }
+    ],
+    "test": "tests/test_gate_inputs.py::test_control_without_the_check_a_tool_acts_on_the_form[split_macro-yosys]"
+  },
+  {
+    "result": "passed",
+    "runs": [
+      {
+        "backend": "icarus",
+        "metrics": {
+          "checks": null,
+          "checks_failed": null,
+          "end_time": null,
+          "errors": 1,
+          "exit_statuses": [
+            1
+          ],
+          "finished": false,
+          "warnings": 0
+        },
+        "steps": [
+          {
+            "command": [
+              "/opt/nirmaan-seat/bin/iverilog",
+              "-g2012",
+              "-o",
+              "sim.vvp",
+              "-s",
+              "m",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check33/run/m.v"
+            ],
+            "error_lines": [
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check33/run/m.v:3: Include file /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check33/outside/CANARY_ET1.vh not found",
+              "error: Unable to find the root module \"m\" in the Verilog source.",
+              "1 error(s) during elaboration."
+            ],
+            "exit": 1,
+            "last_lines": [
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check33/run/m.v:3: Include file /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check33/outside/CANARY_ET1.vh not found",
+              "error: Unable to find the root module \"m\" in the Verilog source.",
+              "     : Perhaps ``-s m'' is incorrect?",
+              "1 error(s) during elaboration."
+            ],
+            "stopped": null
+          }
+        ],
+        "succeeded": false,
+        "summary": "icarus: simulation failed: 1 error, exit status 1, $finish never reached, the testbench printed no verdict (NIRMAAN-SIM <nonce> <n> passed, <m> failed); first: Unable to find the root module \"m\" in the Verilog source.",
+        "tool": "simulator.run"
+      }
+    ],
+    "test": "tests/test_gate_inputs.py::test_control_without_the_check_a_tool_acts_on_the_form[undef_comment-icarus]"
+  },
+  {
+    "result": "passed",
+    "runs": [
+      {
+        "backend": "verilator-lint",
+        "metrics": {
+          "errors": 3,
+          "exit_status": 1,
+          "warnings": 1
+        },
+        "steps": [
+          {
+            "command": [
+              "/opt/nirmaan-seat/bin/verilator",
+              "--lint-only",
+              "-Wall",
+              "--top-module",
+              "m",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check34/run/m.v"
+            ],
+            "error_lines": [
+              "%Error: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check34/run/m.v:4:23: Cannot find include file: /tmp/nirmaan-et5-checkout-9mey_4dk/repo/tests/fixtures/rtl/axil_timer/axil_timer.v",
+              "%Error: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check34/run/m.v:4:23: This may be because there's no search path specified with -I<dir>.",
+              "%Error: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check34/run/m.v:5:3: syntax error, unexpected ';', expecting TYPE-IDENTIFIER",
+              "%Error: Exiting due to 3 error(s), 1 warning(s)"
+            ],
+            "exit": 1,
+            "last_lines": [
+              "             obj_dir//tmp/nirmaan-et5-checkout-9mey_4dk/repo/tests/fixtures/rtl/axil_timer/axil_timer.v.sv",
+              "%Error: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check34/run/m.v:5:3: syntax error, unexpected ';', expecting TYPE-IDENTIFIER",
+              "    5 |   ;",
+              "      |   ^",
+              "%Error: Exiting due to 3 error(s), 1 warning(s)"
+            ],
+            "stopped": null
+          }
+        ],
+        "succeeded": false,
+        "summary": "verilator-lint: lint failed: 3 errors, 1 warning; first: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check34/run/m.v:4: Cannot find include file: /tmp/nirmaan-et5-checkout-9mey_4dk/repo/tests/fixtures/rtl/axil_timer/axil_timer.v",
+        "tool": "lint.run"
+      }
+    ],
+    "test": "tests/test_gate_inputs.py::test_control_without_the_check_a_seat_file_reaches_a_judge_file[esc_block-verilator-lint-tests/fixtures/rtl/axil_timer/axil_timer.v]"
+  },
+  {
+    "result": "passed",
+    "runs": [
+      {
+        "backend": "verilator-lint",
+        "metrics": {
+          "errors": 3,
+          "exit_status": 1,
+          "warnings": 1
+        },
+        "steps": [
+          {
+            "command": [
+              "/opt/nirmaan-seat/bin/verilator",
+              "--lint-only",
+              "-Wall",
+              "--top-module",
+              "m",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check35/run/m.v"
+            ],
+            "error_lines": [
+              "%Error: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check35/run/m.v:4:23: Cannot find include file: /tmp/nirmaan-et5-checkout-9mey_4dk/repo/evals/flow/axil_timer/axil_timer_tb.v",
+              "%Error: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check35/run/m.v:4:23: This may be because there's no search path specified with -I<dir>.",
+              "%Error: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check35/run/m.v:5:3: syntax error, unexpected ';', expecting TYPE-IDENTIFIER",
+              "%Error: Exiting due to 3 error(s), 1 warning(s)"
+            ],
+            "exit": 1,
+            "last_lines": [
+              "             obj_dir//tmp/nirmaan-et5-checkout-9mey_4dk/repo/evals/flow/axil_timer/axil_timer_tb.v.sv",
+              "%Error: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check35/run/m.v:5:3: syntax error, unexpected ';', expecting TYPE-IDENTIFIER",
+              "    5 |   ;",
+              "      |   ^",
+              "%Error: Exiting due to 3 error(s), 1 warning(s)"
+            ],
+            "stopped": null
+          }
+        ],
+        "succeeded": false,
+        "summary": "verilator-lint: lint failed: 3 errors, 1 warning; first: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check35/run/m.v:4: Cannot find include file: /tmp/nirmaan-et5-checkout-9mey_4dk/repo/evals/flow/axil_timer/axil_timer_tb.v",
+        "tool": "lint.run"
+      }
+    ],
+    "test": "tests/test_gate_inputs.py::test_control_without_the_check_a_seat_file_reaches_a_judge_file[esc_block-verilator-lint-evals/flow/axil_timer/axil_timer_tb.v]"
+  },
+  {
+    "result": "passed",
+    "runs": [
+      {
+        "backend": "verilator-lint",
+        "metrics": {
+          "errors": 3,
+          "exit_status": 1,
+          "warnings": 1
+        },
+        "steps": [
+          {
+            "command": [
+              "/opt/nirmaan-seat/bin/verilator",
+              "--lint-only",
+              "-Wall",
+              "--top-module",
+              "m",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check36/run/m.v"
+            ],
+            "error_lines": [
+              "%Error: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check36/run/m.v:4:23: Cannot find include file: /tmp/nirmaan-et5-checkout-9mey_4dk/repo/tests/fixtures/rtl/axil_timer/mutants/axil_timer_stop_ignored.v",
+              "%Error: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check36/run/m.v:4:23: This may be because there's no search path specified with -I<dir>.",
+              "%Error: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check36/run/m.v:5:3: syntax error, unexpected ';', expecting TYPE-IDENTIFIER",
+              "%Error: Exiting due to 3 error(s), 1 warning(s)"
+            ],
+            "exit": 1,
+            "last_lines": [
+              "             obj_dir//tmp/nirmaan-et5-checkout-9mey_4dk/repo/tests/fixtures/rtl/axil_timer/mutants/axil_timer_stop_ignored.v.sv",
+              "%Error: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check36/run/m.v:5:3: syntax error, unexpected ';', expecting TYPE-IDENTIFIER",
+              "    5 |   ;",
+              "      |   ^",
+              "%Error: Exiting due to 3 error(s), 1 warning(s)"
+            ],
+            "stopped": null
+          }
+        ],
+        "succeeded": false,
+        "summary": "verilator-lint: lint failed: 3 errors, 1 warning; first: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check36/run/m.v:4: Cannot find include file: /tmp/nirmaan-et5-checkout-9mey_4dk/repo/tests/fixtures/rtl/axil_timer/mutants/axil_timer_stop_ignored.v",
+        "tool": "lint.run"
+      }
+    ],
+    "test": "tests/test_gate_inputs.py::test_control_without_the_check_a_seat_file_reaches_a_judge_file[esc_block-verilator-lint-tests/fixtures/rtl/axil_timer/mutants/axil_timer_stop_ignored.v]"
+  },
+  {
+    "result": "passed",
+    "runs": [
+      {
+        "backend": "verilator-sim",
+        "metrics": {
+          "checks": null,
+          "checks_failed": null,
+          "end_time": null,
+          "errors": 2,
+          "exit_statuses": [
+            1
+          ],
+          "finished": false,
+          "warnings": 0
+        },
+        "steps": [
+          {
+            "command": [
+              "verilator",
+              "--binary",
+              "-Wno-fatal",
+              "-j",
+              "0",
+              "--top-module",
+              "m",
+              "-Mdir",
+              "obj",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check37/run/m.v"
+            ],
+            "error_lines": [
+              "%Error: /tmp/nirmaan-et5-checkout-9mey_4dk/repo/tests/fixtures/rtl/axil_timer/axil_timer.v:27:1: syntax error, unexpected module, expecting TYPE-IDENTIFIER",
+              "%Error: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check37/run/m.v:7:1: syntax error, unexpected endmodule",
+              "%Error: Exiting due to 2 error(s)"
+            ],
+            "exit": 1,
+            "last_lines": [
+              "        /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check37/run/m.v:5:1: ... note: In file included from 'm.v'",
+              "%Error: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check37/run/m.v:7:1: syntax error, unexpected endmodule",
+              "    7 | endmodule",
+              "      | ^~~~~~~~~",
+              "%Error: Exiting due to 2 error(s)"
+            ],
+            "stopped": null
+          }
+        ],
+        "succeeded": false,
+        "summary": "verilator-sim: simulation failed: 2 errors, exit status 1, $finish never reached, the testbench printed no verdict (NIRMAAN-SIM <nonce> <n> passed, <m> failed); first: /tmp/nirmaan-et5-checkout-9mey_4dk/repo/tests/fixtures/rtl/axil_timer/axil_timer.v:27: syntax error, unexpected module, expecting TYPE-IDENTIFIER",
+        "tool": "simulator.run"
+      }
+    ],
+    "test": "tests/test_gate_inputs.py::test_control_without_the_check_a_seat_file_reaches_a_judge_file[esc_block-verilator-sim-tests/fixtures/rtl/axil_timer/axil_timer.v]"
+  },
+  {
+    "result": "passed",
+    "runs": [
+      {
+        "backend": "verilator-sim",
+        "metrics": {
+          "checks": null,
+          "checks_failed": null,
+          "end_time": null,
+          "errors": 2,
+          "exit_statuses": [
+            1
+          ],
+          "finished": false,
+          "warnings": 0
+        },
+        "steps": [
+          {
+            "command": [
+              "verilator",
+              "--binary",
+              "-Wno-fatal",
+              "-j",
+              "0",
+              "--top-module",
+              "m",
+              "-Mdir",
+              "obj",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check38/run/m.v"
+            ],
+            "error_lines": [
+              "%Error: /tmp/nirmaan-et5-checkout-9mey_4dk/repo/evals/flow/axil_timer/axil_timer_tb.v:32:1: syntax error, unexpected module, expecting TYPE-IDENTIFIER",
+              "%Error: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check38/run/m.v:7:1: syntax error, unexpected endmodule",
+              "%Error: Exiting due to 2 error(s)"
+            ],
+            "exit": 1,
+            "last_lines": [
+              "        /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check38/run/m.v:5:1: ... note: In file included from 'm.v'",
+              "%Error: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check38/run/m.v:7:1: syntax error, unexpected endmodule",
+              "    7 | endmodule",
+              "      | ^~~~~~~~~",
+              "%Error: Exiting due to 2 error(s)"
+            ],
+            "stopped": null
+          }
+        ],
+        "succeeded": false,
+        "summary": "verilator-sim: simulation failed: 2 errors, exit status 1, $finish never reached, the testbench printed no verdict (NIRMAAN-SIM <nonce> <n> passed, <m> failed); first: /tmp/nirmaan-et5-checkout-9mey_4dk/repo/evals/flow/axil_timer/axil_timer_tb.v:32: syntax error, unexpected module, expecting TYPE-IDENTIFIER",
+        "tool": "simulator.run"
+      }
+    ],
+    "test": "tests/test_gate_inputs.py::test_control_without_the_check_a_seat_file_reaches_a_judge_file[esc_block-verilator-sim-evals/flow/axil_timer/axil_timer_tb.v]"
+  },
+  {
+    "result": "passed",
+    "runs": [
+      {
+        "backend": "verilator-sim",
+        "metrics": {
+          "checks": null,
+          "checks_failed": null,
+          "end_time": null,
+          "errors": 2,
+          "exit_statuses": [
+            1
+          ],
+          "finished": false,
+          "warnings": 0
+        },
+        "steps": [
+          {
+            "command": [
+              "verilator",
+              "--binary",
+              "-Wno-fatal",
+              "-j",
+              "0",
+              "--top-module",
+              "m",
+              "-Mdir",
+              "obj",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check39/run/m.v"
+            ],
+            "error_lines": [
+              "%Error: /tmp/nirmaan-et5-checkout-9mey_4dk/repo/tests/fixtures/rtl/axil_timer/mutants/axil_timer_stop_ignored.v:32:1: syntax error, unexpected module, expecting TYPE-IDENTIFIER",
+              "%Error: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check39/run/m.v:7:1: syntax error, unexpected endmodule",
+              "%Error: Exiting due to 2 error(s)"
+            ],
+            "exit": 1,
+            "last_lines": [
+              "        /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check39/run/m.v:5:1: ... note: In file included from 'm.v'",
+              "%Error: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check39/run/m.v:7:1: syntax error, unexpected endmodule",
+              "    7 | endmodule",
+              "      | ^~~~~~~~~",
+              "%Error: Exiting due to 2 error(s)"
+            ],
+            "stopped": null
+          }
+        ],
+        "succeeded": false,
+        "summary": "verilator-sim: simulation failed: 2 errors, exit status 1, $finish never reached, the testbench printed no verdict (NIRMAAN-SIM <nonce> <n> passed, <m> failed); first: /tmp/nirmaan-et5-checkout-9mey_4dk/repo/tests/fixtures/rtl/axil_timer/mutants/axil_timer_stop_ignored.v:32: syntax error, unexpected module, expecting TYPE-IDENTIFIER",
+        "tool": "simulator.run"
+      }
+    ],
+    "test": "tests/test_gate_inputs.py::test_control_without_the_check_a_seat_file_reaches_a_judge_file[esc_block-verilator-sim-tests/fixtures/rtl/axil_timer/mutants/axil_timer_stop_ignored.v]"
+  },
+  {
+    "result": "passed",
+    "runs": [
+      {
+        "backend": "yosys",
+        "metrics": {
+          "exit_status": 1
+        },
+        "steps": [
+          {
+            "command": [
+              "/opt/nirmaan-seat/bin/yosys",
+              "-s",
+              "synth.ys"
+            ],
+            "error_lines": [
+              "ERROR: Can't open include file `/tmp/nirmaan-et5-checkout-9mey_4dk/repo/tests/fixtures/rtl/axil_timer/axil_timer.v'!"
+            ],
+            "exit": 1,
+            "last_lines": [
+              " \\----------------------------------------------------------------------------/",
+              " Yosys 0.33 (git sha1 2584903a060)",
+              "-- Executing script file `synth.ys' --",
+              "1. Executing Verilog-2005 frontend: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check40/run/m.v",
+              "ERROR: Can't open include file `/tmp/nirmaan-et5-checkout-9mey_4dk/repo/tests/fixtures/rtl/axil_timer/axil_timer.v'!"
+            ],
+            "stopped": null
+          }
+        ],
+        "succeeded": false,
+        "summary": "yosys: synthesis failed: 1 error; first: Can't open include file `/tmp/nirmaan-et5-checkout-9mey_4dk/repo/tests/fixtures/rtl/axil_timer/axil_timer.v'!",
+        "tool": "synth.run"
+      }
+    ],
+    "test": "tests/test_gate_inputs.py::test_control_without_the_check_a_seat_file_reaches_a_judge_file[esc_block-yosys-tests/fixtures/rtl/axil_timer/axil_timer.v]"
+  },
+  {
+    "result": "passed",
+    "runs": [
+      {
+        "backend": "yosys",
+        "metrics": {
+          "exit_status": 1
+        },
+        "steps": [
+          {
+            "command": [
+              "/opt/nirmaan-seat/bin/yosys",
+              "-s",
+              "synth.ys"
+            ],
+            "error_lines": [
+              "ERROR: Can't open include file `/tmp/nirmaan-et5-checkout-9mey_4dk/repo/evals/flow/axil_timer/axil_timer_tb.v'!"
+            ],
+            "exit": 1,
+            "last_lines": [
+              " \\----------------------------------------------------------------------------/",
+              " Yosys 0.33 (git sha1 2584903a060)",
+              "-- Executing script file `synth.ys' --",
+              "1. Executing Verilog-2005 frontend: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check41/run/m.v",
+              "ERROR: Can't open include file `/tmp/nirmaan-et5-checkout-9mey_4dk/repo/evals/flow/axil_timer/axil_timer_tb.v'!"
+            ],
+            "stopped": null
+          }
+        ],
+        "succeeded": false,
+        "summary": "yosys: synthesis failed: 1 error; first: Can't open include file `/tmp/nirmaan-et5-checkout-9mey_4dk/repo/evals/flow/axil_timer/axil_timer_tb.v'!",
+        "tool": "synth.run"
+      }
+    ],
+    "test": "tests/test_gate_inputs.py::test_control_without_the_check_a_seat_file_reaches_a_judge_file[esc_block-yosys-evals/flow/axil_timer/axil_timer_tb.v]"
+  },
+  {
+    "result": "passed",
+    "runs": [
+      {
+        "backend": "yosys",
+        "metrics": {
+          "exit_status": 1
+        },
+        "steps": [
+          {
+            "command": [
+              "/opt/nirmaan-seat/bin/yosys",
+              "-s",
+              "synth.ys"
+            ],
+            "error_lines": [
+              "ERROR: Can't open include file `/tmp/nirmaan-et5-checkout-9mey_4dk/repo/tests/fixtures/rtl/axil_timer/mutants/axil_timer_stop_ignored.v'!"
+            ],
+            "exit": 1,
+            "last_lines": [
+              " \\----------------------------------------------------------------------------/",
+              " Yosys 0.33 (git sha1 2584903a060)",
+              "-- Executing script file `synth.ys' --",
+              "1. Executing Verilog-2005 frontend: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check42/run/m.v",
+              "ERROR: Can't open include file `/tmp/nirmaan-et5-checkout-9mey_4dk/repo/tests/fixtures/rtl/axil_timer/mutants/axil_timer_stop_ignored.v'!"
+            ],
+            "stopped": null
+          }
+        ],
+        "succeeded": false,
+        "summary": "yosys: synthesis failed: 1 error; first: Can't open include file `/tmp/nirmaan-et5-checkout-9mey_4dk/repo/tests/fixtures/rtl/axil_timer/mutants/axil_timer_stop_ignored.v'!",
+        "tool": "synth.run"
+      }
+    ],
+    "test": "tests/test_gate_inputs.py::test_control_without_the_check_a_seat_file_reaches_a_judge_file[esc_block-yosys-tests/fixtures/rtl/axil_timer/mutants/axil_timer_stop_ignored.v]"
+  },
+  {
+    "result": "passed",
+    "runs": [
+      {
+        "backend": "icarus",
+        "metrics": {
+          "checks": null,
+          "checks_failed": null,
+          "end_time": null,
+          "errors": 1,
+          "exit_statuses": [
+            2
+          ],
+          "finished": false,
+          "warnings": 0
+        },
+        "steps": [
+          {
+            "command": [
+              "/opt/nirmaan-seat/bin/iverilog",
+              "-g2012",
+              "-o",
+              "sim.vvp",
+              "-s",
+              "m",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check43/run/m.v"
+            ],
+            "error_lines": [
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check43/run/m.v:5: Include file /tmp/nirmaan-et5-checkout-9mey_4dk/repo/tests/fixtures/rtl/axil_timer/axil_timer.v not found",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check43/run/m.v:4: syntax error"
+            ],
+            "exit": 2,
+            "last_lines": [
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check43/run/m.v:5: Include file /tmp/nirmaan-et5-checkout-9mey_4dk/repo/tests/fixtures/rtl/axil_timer/axil_timer.v not found",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check43/run/m.v:4: syntax error",
+              "I give up."
+            ],
+            "stopped": null
+          }
+        ],
+        "succeeded": false,
+        "summary": "icarus: simulation failed: 1 error, exit status 2, $finish never reached, the testbench printed no verdict (NIRMAAN-SIM <nonce> <n> passed, <m> failed); first: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check43/run/m.v:4: syntax error",
+        "tool": "simulator.run"
+      }
+    ],
+    "test": "tests/test_gate_inputs.py::test_control_without_the_check_a_seat_file_reaches_a_judge_file[ifdef_quote_include-icarus-tests/fixtures/rtl/axil_timer/axil_timer.v]"
+  },
+  {
+    "result": "passed",
+    "runs": [
+      {
+        "backend": "icarus",
+        "metrics": {
+          "checks": null,
+          "checks_failed": null,
+          "end_time": null,
+          "errors": 1,
+          "exit_statuses": [
+            2
+          ],
+          "finished": false,
+          "warnings": 0
+        },
+        "steps": [
+          {
+            "command": [
+              "/opt/nirmaan-seat/bin/iverilog",
+              "-g2012",
+              "-o",
+              "sim.vvp",
+              "-s",
+              "m",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check44/run/m.v"
+            ],
+            "error_lines": [
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check44/run/m.v:5: Include file /tmp/nirmaan-et5-checkout-9mey_4dk/repo/evals/flow/axil_timer/axil_timer_tb.v not found",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check44/run/m.v:4: syntax error"
+            ],
+            "exit": 2,
+            "last_lines": [
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check44/run/m.v:5: Include file /tmp/nirmaan-et5-checkout-9mey_4dk/repo/evals/flow/axil_timer/axil_timer_tb.v not found",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check44/run/m.v:4: syntax error",
+              "I give up."
+            ],
+            "stopped": null
+          }
+        ],
+        "succeeded": false,
+        "summary": "icarus: simulation failed: 1 error, exit status 2, $finish never reached, the testbench printed no verdict (NIRMAAN-SIM <nonce> <n> passed, <m> failed); first: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check44/run/m.v:4: syntax error",
+        "tool": "simulator.run"
+      }
+    ],
+    "test": "tests/test_gate_inputs.py::test_control_without_the_check_a_seat_file_reaches_a_judge_file[ifdef_quote_include-icarus-evals/flow/axil_timer/axil_timer_tb.v]"
+  },
+  {
+    "result": "passed",
+    "runs": [
+      {
+        "backend": "icarus",
+        "metrics": {
+          "checks": null,
+          "checks_failed": null,
+          "end_time": null,
+          "errors": 1,
+          "exit_statuses": [
+            2
+          ],
+          "finished": false,
+          "warnings": 0
+        },
+        "steps": [
+          {
+            "command": [
+              "/opt/nirmaan-seat/bin/iverilog",
+              "-g2012",
+              "-o",
+              "sim.vvp",
+              "-s",
+              "m",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check45/run/m.v"
+            ],
+            "error_lines": [
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check45/run/m.v:5: Include file /tmp/nirmaan-et5-checkout-9mey_4dk/repo/tests/fixtures/rtl/axil_timer/mutants/axil_timer_stop_ignored.v not found",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check45/run/m.v:4: syntax error"
+            ],
+            "exit": 2,
+            "last_lines": [
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check45/run/m.v:5: Include file /tmp/nirmaan-et5-checkout-9mey_4dk/repo/tests/fixtures/rtl/axil_timer/mutants/axil_timer_stop_ignored.v not found",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check45/run/m.v:4: syntax error",
+              "I give up."
+            ],
+            "stopped": null
+          }
+        ],
+        "succeeded": false,
+        "summary": "icarus: simulation failed: 1 error, exit status 2, $finish never reached, the testbench printed no verdict (NIRMAAN-SIM <nonce> <n> passed, <m> failed); first: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check45/run/m.v:4: syntax error",
+        "tool": "simulator.run"
+      }
+    ],
+    "test": "tests/test_gate_inputs.py::test_control_without_the_check_a_seat_file_reaches_a_judge_file[ifdef_quote_include-icarus-tests/fixtures/rtl/axil_timer/mutants/axil_timer_stop_ignored.v]"
+  },
+  {
+    "result": "failed",
+    "runs": [
+      {
+        "backend": "symbiyosys",
+        "metrics": {
+          "depth": 2,
+          "exit_status": 1,
+          "mode": "bmc",
+          "proven": 0,
+          "status": "UNKNOWN",
+          "traces": []
+        },
+        "steps": [
+          {
+            "command": [
+              "/opt/nirmaan-seat/bin/sby",
+              "-f",
+              "-d",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check46/run/sby",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check46/setup/f.sby"
+            ],
+            "error_lines": [
+              "FileNotFoundError: [Errno 2] No such file or directory: '/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check46/host/leak.vh'"
+            ],
+            "exit": 1,
+            "last_lines": [
+              "    copyfile(srcfile, dstfile)",
+              "  File \"/opt/oss-cad-suite/lib/python3.11/shutil.py\", line 256, in copyfile",
+              "    with open(src, 'rb') as fsrc:",
+              "         ^^^^^^^^^^^^^^^",
+              "FileNotFoundError: [Errno 2] No such file or directory: '/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check46/host/leak.vh'"
+            ],
+            "stopped": null
+          }
+        ],
+        "succeeded": false,
+        "summary": "symbiyosys: formal did not finish (exit status 1): FileNotFoundError: [Errno 2] No such file or directory: '/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check46/host/leak.vh'",
+        "tool": "formal.run"
+      }
+    ],
+    "test": "tests/test_gate_reads.py::test_control_without_the_check_the_host_file_reaches_the_summary[files-absolute]"
+  },
+  {
+    "result": "failed",
+    "runs": [
+      {
+        "backend": "symbiyosys",
+        "metrics": {
+          "depth": 2,
+          "exit_status": 16,
+          "mode": "bmc",
+          "proven": 0,
+          "status": "ERROR",
+          "traces": []
+        },
+        "steps": [
+          {
+            "command": [
+              "/opt/nirmaan-seat/bin/sby",
+              "-f",
+              "-d",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check47/run/sby",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check47/setup/f.sby"
+            ],
+            "error_lines": [
+              "SBY 21:41:02 [/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check47/run/sby] base: ERROR: Can't open include file `leak.vh'!",
+              "SBY 21:41:02 [/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check47/run/sby] base: task failed. ERROR.",
+              "SBY 21:41:02 [/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check47/run/sby] DONE (ERROR, rc=16)"
+            ],
+            "exit": 16,
+            "last_lines": [
+              "SBY 21:41:02 [/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check47/run/sby] summary: Elapsed clock time [H:MM:SS (secs)]: 0:00:00 (0)",
+              "SBY 21:41:02 [/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check47/run/sby] summary: Elapsed process time [H:MM:SS (secs)]: 0:00:00 (0)",
+              "SBY 21:41:02 [/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check47/run/sby] summary: engine_0 (smtbmc) did not return a status",
+              "SBY 21:41:02 [/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check47/run/sby] summary: engine_0 did not produce any traces",
+              "SBY 21:41:02 [/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check47/run/sby] DONE (ERROR, rc=16)"
+            ],
+            "stopped": null
+          }
+        ],
+        "succeeded": false,
+        "summary": "symbiyosys: formal error: 1 error; first: Can't open include file `leak.vh'!",
+        "tool": "formal.run"
+      }
+    ],
+    "test": "tests/test_gate_reads.py::test_control_without_the_check_the_host_file_reaches_the_summary[include-glued]"
+  },
+  {
+    "result": "failed",
+    "runs": [
+      {
+        "backend": "symbiyosys-cover",
+        "metrics": {
+          "covers_reached": 0,
+          "covers_unreached": 0,
+          "exit_status": 1,
+          "status": "UNKNOWN",
+          "traces": []
+        },
+        "steps": [
+          {
+            "command": [
+              "/opt/nirmaan-seat/bin/sby",
+              "-f",
+              "-d",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check48/run/sby_cover",
+              "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check48/run/f_cover.sby"
+            ],
+            "error_lines": [
+              "FileNotFoundError: [Errno 2] No such file or directory: '/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check48/host/leak.vh'"
+            ],
+            "exit": 1,
+            "last_lines": [
+              "    copyfile(srcfile, dstfile)",
+              "  File \"/opt/oss-cad-suite/lib/python3.11/shutil.py\", line 256, in copyfile",
+              "    with open(src, 'rb') as fsrc:",
+              "         ^^^^^^^^^^^^^^^",
+              "FileNotFoundError: [Errno 2] No such file or directory: '/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check48/host/leak.vh'"
+            ],
+            "stopped": null
+          }
+        ],
+        "succeeded": false,
+        "summary": "symbiyosys-cover: cover run did not finish (exit status 1): FileNotFoundError: [Errno 2] No such file or directory: '/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check48/host/leak.vh'",
+        "tool": "formal.cover"
+      }
+    ],
+    "test": "tests/test_gate_reads.py::test_control_without_the_check_the_host_file_reaches_the_cover_summary[files-absolute]"
+  }
+]

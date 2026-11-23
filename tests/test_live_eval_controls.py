@@ -545,3 +545,38 @@ def test_the_et18_record_is_from_main_and_reads_every_bypass_control_by_decision
     assert caller == named["as_the_caller"]
     failed = sorted(t for t, o in outcomes.items() if o == "failed")
     assert failed == sorted(named["failed_as_the_account"]) == sorted(summary["bypass"]["failed"])
+
+
+# --- Gate WF33: gate ET5 stated again on a new replay record (sixth addendum to the G3 record, decision P3, item 2) ---
+
+#: Replay run 45266375996 of flow/axil-timer, dispatched alone on main at b1bc2267 (the merge of ip#491, the plan's
+#: section 24, on a commit that holds ip#487) with controls and parallel set, no model and no token. A replay is not a
+#: trial and is never counted.
+WF33_RUN = "45266375996"
+WF33_COMMIT = "b1bc226738040ec8f439340cec07766af120709f"
+
+
+def test_run_45266375996s_uploads_are_committed_as_uploaded_part_by_part():
+    """Gate WF33 (decision P3, item 2, by the procedure of decision E4, items 1 and 2): the uploads of replay run
+    45266375996 on main at b1bc2267, which holds ip#487 and the plan's section 24 (ip#491). Every file in the folder is
+    one the index names, with the sha256 and size it names; the chain's parts arrive in order, each whole: part A (the
+    controls upload but its fixtures files) is here, and a later part's files are all here or none."""
+    folder = EVIDENCE / f"run-{WF33_RUN}"
+    index = json.loads((folder / "index.json").read_text(encoding="utf-8"))
+    assert index["format"] == "nirmaan.et5-controls-upload-index/1" and index["about"].startswith("Records only.")
+    assert "Nothing here is cited as showing gate ET5 met" in index["about"]
+    assert "A replay is not a trial and is never counted." in index["about"]
+    run = index["run"]
+    assert (run["id"], run["commit"], run["branch"], run["event"]) == (
+        WF33_RUN, WF33_COMMIT, "main", "workflow_dispatch")
+    assert run["inputs"] == {"case": controls.CASE, "replay": True, "controls": True, "parallel": True}
+    assert {k: (v["attempt"], v["conclusion"]) for k, v in run["jobs"].items()} == {
+        "replay": (1, "failure"), "rejudge": (1, "success")}
+    present = {p.relative_to(folder).as_posix() for p in folder.rglob("*") if p.is_file() and p.name != "index.json"}
+    assert present <= set(index["files"]), present - set(index["files"])
+    committed_files(folder, {n: index["files"][n] for n in present})
+    here = [part for part in index["parts"][:-1] if any(f["part"] == part for n, f in index["files"].items()
+                                                         if n in present)]
+    assert here == index["parts"][:len(here)] and here[:1] == ["A"], here  # in order, part A first
+    for part in here:
+        assert {n for n, f in index["files"].items() if f["part"] == part} <= present, part  # each part whole
