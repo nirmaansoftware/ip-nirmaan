@@ -387,6 +387,6 @@ whole-flow plan's "Gate backends" group digest moved from `eac184ec...` to
 `7c12db37...`, and "Seat account" from `1b7309f1...` to `6530c151...` (the
 docstring of `scripts/live_eval_seat.py` now says what the harness names for
 a setup).
-Where those tests ran and how the digests were computed is recorded in section
-23.2 of `evals/plans/2026-11-22-g3-whole-flow.md`, which also holds the full
+Where those tests ran and how the digests were computed is recorded in sections
+23.1 and 23.2 of `evals/plans/2026-11-22-g3-whole-flow.md`, which also holds the full
 values of both groups (section 23.1).

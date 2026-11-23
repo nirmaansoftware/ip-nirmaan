@@ -1240,11 +1240,12 @@ run, and is read for `formal.cover`, only when it is the run's own. It changes `
 which is in the group "Gate backends", and `scripts/live_eval_seat.py`, which is in the group "Seat account". Those
 two digests moved. No other file of any group changed, and no fingerprint file.
 
-Every value of section 22.1, recomputed with CLI 2.1.325, by the same commands as section 18.1, with
-`~/Nirmaan-internal/2026-10-18-capability-buildout/p3-ip/g3/digests.py`, on `main` at `bbc49847`. That commit holds
+Every value of section 22.1, recomputed with CLI 2.1.325, by the commands of sections 6 and 18.1 (each group's
+`git ls-files -z -- <paths> | LC_ALL=C sort -z | xargs -0 shasum -a 256 | shasum -a 256`, `harness_sha256` with
+`flow="whole"` and the CLI pin, `case_digest`, and the flow digest of a replay's first step), on `main` at `bbc49847`. That commit holds
 `f8dcc97e`; every merge after it adds records, their test, an index, history fragments and one paragraph of `docs/GATE_INPUTS.md`, and no file of any group
-(`git diff --name-only f8dcc97e bbc49847` names none of the paths of the group table). The same program on `f8dcc97e`
-itself gives the same values.
+(`git diff --name-only f8dcc97e bbc49847` names none of the paths of the group table). The same commands on `f8dcc97e`
+itself give the same values.
 
 | Item | Since section 22.1 | Value |
 |---|---|---|
@@ -1282,11 +1283,13 @@ Section 22.1 shows gate ET7 for ip#471 (merge `a15b8c1d`). Two merges came after
   `src/nirmaan/integrations/eda.py` and `tests/test_gate_reads.py`. It names no file in `harness.CODE`, `LOOP_CODE`
   or `FLOW_CODE`, no tool definition and not the CLI pin.
 
-These tests were run for this addition on a checkout of `f8dcc97e` (a worktree on that commit, with
-`PYTHONPATH=src`, the repository's own virtualenv) and passed: `tests/test_whole_flow_dispatch.py` (gate WF7),
+These tests were run for this addition, locally and with no log kept, on a checkout of `f8dcc97e`, and passed. They are
+part of the suite whose four test shards and union job passed in CI's push run
+[45159565079](https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45159565079) on `f8dcc97e` (this text does not name
+the shard that ran each): `tests/test_whole_flow_dispatch.py` (gate WF7),
 `tests/test_live_eval_seat.py::test_the_tools_as_the_seat_account_change_no_fingerprint` and
 `tests/test_gate_inputs.py::test_no_file_this_milestone_changes_is_harness_code`. The two moved digests and every other value of
-section 23.1 were computed by the same program on that checkout and on `bbc49847`, with equal results. The four fingerprints of section
+section 23.1 were computed by the same commands on that checkout and on `bbc49847`, with equal results. The four fingerprints of section
 23.1 (the two whole-flow fingerprints and the two single-seat defaults) are the values of section 18.1, unchanged on
 `f8dcc97e` and on `bbc49847`. Gate ET7's last part, every value recomputed on the dispatch commit, is for the dispatch:
 it is not shown here.
@@ -1295,7 +1298,8 @@ it is not shown here.
 
 Run [45159697183](https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45159697183) is a replay of
 `flow/axil-timer` with `controls` set, dispatched on `main` at `f8dcc97e` with no model and no token. Its `live-eval`
-job was skipped. In its `replay` job, as in its `rejudge` job, the reach test denied every probe. The reference
+job was skipped. In its `replay` job, as in its `rejudge` job, the 32 listed probes of each job's tool reach record were denied; the first part's probes are in the job log only and
+rest on the step result GitHub reported ("Test what seat code can reach: success"). The reference
 answer's replay passed; the controls step failed, because 13 bypass controls failed as the seat account. Its
 `rejudge` job of attempt 1 stopped in its tool install and was cancelled; that job alone was run again as attempt 2
 on the same commit and the same uploaded records, and passed.
@@ -1325,7 +1329,8 @@ write its target and printed that it could not. For the two `verilator --lint-on
 reference could not be resolved, which is an inference that the refusal was of an open (decision E1, item 3). The
 record of run 45119522138 (`evals/flow/et5_controls_record.json`) shows only the failed assertions of those 11, and
 nothing here says it shows more. Section 21.3's other
-statements stand. Run 45159697183's record reads its 13 by the same rule (section 23.5).
+statements stand, except that the doubt in section 21.4's third bullet about the five `yosys` controls was withdrawn by
+verification-lead (decision E1, item 2): they are refused reads. Run 45159697183's record reads its 13 by the same rule (section 23.5).
 
 ### 23.5 Gate ET5, stated on this record (verification-lead)
 
@@ -1343,16 +1348,18 @@ addition is what section 7 needs to dispatch, and it does not keep ET5 met). Sec
 `bbc49847` equal; the dispatch check of section 7 holds the dispatch commit to them.
 
 What the statement rests on, as the committed test holds it: controls 7 of 7 and all 100 sweep rows; 408 fixture tests,
-none skipped, with the linked setup and every must-refuse fixture passed; every probe denied in both jobs, on the run's
-commit; for each failed control, the seat account's wrapper and the tool's own line for its cause, and no target
-content in any account control's record. Decision E2, items 3 and 4, apply: the controls that ran as the caller are
+none skipped, with the linked setup and every must-refuse fixture passed; the 32 listed probes of each job's tool reach record denied, on the run's
+commit (the first part's probes rest on the step result, as above); for each failed control, the seat account's wrapper and the tool's own line for its cause, and no target
+content in any account control's record. Decision E2 is taken up whole: item 2 applies (a control that fails without such a line, or whose record shows the
+target's content or its marker written, is a difference that stops the measured run and returns to the council; the
+committed test fails on one), items 3 and 4 apply, and item 5 holds in CI's test job, where every bypass control must
+still pass as the caller. Items 3 and 4: the controls that ran as the caller are
 listed and claimed for nothing, and a control that passed as the account is not read as showing a live payload or a
 refusal. The reference answer's pass rests on the step result GitHub reported; no replay result file is committed.
 
 ### 23.6 The order, and gate ET20
 
-The order of the addendum is taken up: gate ET17 (ip#475) is on `main`; gate ET18 is this record and verification-
-lead's statement; this addition and the texts of decision E5, item 2 (`docs/LIVE_EVAL_EVIDENCE.md`, which cites the
+The order of the addendum is taken up: gate ET17 (ip#475) is on `main`; gate ET18 is this record and verification-lead's statement; this addition and the texts of decision E5, item 2 (`docs/LIVE_EVAL_EVIDENCE.md`, which cites the
 record, and a history fragment) are gate ET19; the measured run is dispatched after the last of them.
 
 `--verilate-jobs 1` (gate ET20, decision V1) changes `src/nirmaan/integrations`, so it moves "Gate backends". It must
@@ -1370,6 +1377,6 @@ the condition above. Still before slot 1:
 - the chain of gate ET10: the measured run's tool reach records and seat C reach records committed as uploaded, with
   the index, on a commit that holds all of it;
 - gate ET16's test of decision R3, item 5, on `main`, holding at every commit after it;
-- the values of section 23.1 on the dispatch commit equal to these; if any differs, ET5 is open again and a new replay record is owed first (decision E4, item 4).
+- the values of section 23.1 on the dispatch commit equal to these; if any differs, ET5 is open again (decision E4, item 4); a new replay record would be owed first, which is this plan's reading.
 
 The measured run's records and the texts that cite them follow decision C of the addendum of 2026-11-23 (gate ET13).

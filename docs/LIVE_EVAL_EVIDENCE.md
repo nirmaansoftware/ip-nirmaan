@@ -347,8 +347,9 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   none skipped, so the `replay` job failed at that step. Every must-refuse
   fixture passed. The 12 are 11 bypass controls and one must-pass test. In
   each bypass control, with the screen bypassed, the tool ran through the
-  account's wrapper and printed that it could not open, resolve or write its
-  target, in run 45135605510's bypass record (`docs/evidence/et5/run-45135605510`;
+  account's wrapper; in the two shell controls the payload itself (`touch`)
+  ran as the account and its write was refused, and in the others the tool
+  printed that it could not open, resolve or write its target, in run 45135605510's bypass record (`docs/evidence/et5/run-45135605510`;
   security's statement, decision E1 of the third addendum, which reads the two
   `verilator --lint-only` forms as an inference). Run 45119522138's own record shows
   the failed assertions only, and which layer refused is in neither. The must-pass test is a formal setup
@@ -362,8 +363,8 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   replay of `flow/axil-timer` with `controls` set, no model and no token,
   was dispatched on `main` at f8dcc97e (the merge of ip#475, which holds gate
   ET17), as [run 45159697183](https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45159697183).
-  Its replay passed the reference answer and its reach test denied every
-  probe in its `replay` job (attempt 1) and its `rejudge` job (attempt 2). As the account, all seven timer
+  Its replay of the reference answer passed, and the 32 listed probes of
+  each tool reach record were denied in its `replay` job (attempt 1) and its `rejudge` job (attempt 2). As the account, all seven timer
   controls and all 100 sweep rows gave the results of the committed records;
   the controls step failed because 13 bypass controls of gate ET1 failed. Of
   its 408 fixture tests none was skipped, and the linked setup and every
