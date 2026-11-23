@@ -1164,3 +1164,64 @@ Section 20.7 stands, with these changes. The record of 20.6 is the one of sectio
 chair's rulings, and the fix and fresh dispatch of item 2 unless the chair scopes it out. Then verification-lead's
 statement that ET5 is met. The measured run is dispatched with every value of section 21.1 recomputed on its commit
 first (section 7).
+
+## 22. Dated addition (2026-11-23): the value ip#471 moved
+
+Section 21.4, item 2, asks that the seat account be given the link's target, so that a setup over approved RTL opens
+the link M68 places beside it. ip#471 (head `d00f1d3a`, merge `a15b8c1d`) did that in `scripts/live_eval_seat.py`,
+which is in the group "Seat account", so that group's digest moved. This section restates every value of section 21.1
+with that one moved. It changes no count, slot, arm, harness, attempt, fingerprint, case or level. It states no
+verdict on ET5, and it does not record a run.
+
+### 22.1 The change, and the value it moved
+
+The harness names the file a `[files]` entry leads to as the run's input (`nirmaan.integrations.eda`,
+`seat_inputs`), never the link, and `sby` opens each `[files]` name in the setup's folder. ip#471 adds `beside_links`
+to `scripts/live_eval_seat.py`. In each folder that holds an input outside the run's directory, a link of the
+runner's whose text is exactly one input's path is placed in the account's view as that input's own file, read only.
+The bind is made from the input's descriptor, which is held open since the input's check. No other link is placed,
+and no new read grant is made. The same pull request has `scripts/live_eval_controls.py` record each bypass control's
+tool outcome (`bypass.json`). That file is in no group (section 21.1).
+
+Every value of section 21.1, recomputed with CLI 2.1.325 by the same commands as section 18.1, on `main` at
+`6750a127`. That is the commit this pull request was cut from, after `a15b8c1d`: the only merge between them, ip#466,
+changes no file of any group and no fingerprint file.
+
+| Item | Since section 21.1 | Value |
+|---|---|---|
+| Case, `flow/axil-timer`, case digest | unchanged | `sha256:ff8a4afc77caee105070d996f3e29142f2fe013c411752becdc46090b7553da3` |
+| Whole-flow fingerprint, with documents | unchanged | `sha256:d90b3c1840870ae9434b90188dbb3078473140d56b2dec9e295c515c1832adfc` |
+| Whole-flow fingerprint, without documents | unchanged | `sha256:8d6590f7a66ac771abf360790643763e8c43d3c267d94a5145f1e4c8bf3ae975` |
+| Flow digest, with documents | unchanged | `sha256:a1aea0d36022a54be56c8d5c31831ea8ac0994f2802bd8ee8f39f6a5246ec312` |
+| Flow digest, without documents | unchanged | `sha256:b8608edecf2013dddfaec85e947106316f9a561a8ec74c7e3d99a7f53f8323c0` |
+| Single-seat default, with documents (must stay) | unchanged | `sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00` |
+| Single-seat default, without documents (must stay) | unchanged | `sha256:9aa7a333cd961a23aa919616fac6428f9f29fed1ba44b2fa3f5c6ee49e745d39` |
+
+| Group | Paths | Files | Since section 21.1 | Digest |
+|---|---|---|---|---|
+| Gate backends | `src/nirmaan/integrations` | 60 | unchanged | `sha256:eac184ecc60ae35bdc88e6f66c2fa3aceaabe4c32f62066e951d7d5e84e835f9` |
+| Seat account | `scripts/live_eval_seat.py`, `.github/actions/live-eval-seat` | 2 | moved by ip#471 (`a15b8c1d`) from `4abec1ad...` | `sha256:1b7309f171f0e56d203b69d166f65e05eecf14cbccbc8403185a4490a11fb8a3` |
+| CI command | `scripts/live_eval_ci.py` | 1 | unchanged | `sha256:3f396770975a7fcff4fc746c031e8694f768b921e90376c290e4fc023acf3e88` |
+| Workflow, tool set and CLI pin | `.github/workflows/live-eval.yml`, `.github/actions/live-eval-setup`, `.github/actions/oss-cad-suite`, `.github/live-eval` | 5 | unchanged | `sha256:4daa3c45ea748b0bfa77aad94173aa05341b4dee3e42a6fb61b7c5e467726481` |
+| Reach test | `scripts/live_eval_reach.py` | 1 | unchanged | `sha256:581a4cebb61899090a1741fdbea49e51b57decdebdf0cb11c58562f60b4b93c0` |
+| Held-out scorers | `src/nirmaan/evals/scorers.py` | 1 | unchanged | `sha256:5f4f7909a3207f3837d2af7ad60b85c0bae620e1d461afde57aea0d2a592ecb4` |
+| Stage gates | `src/nirmaan/company/workflows.py` | 1 | unchanged | `sha256:bcd15f8204e55f142f266afdd8e12a4947c7f6276382dd18f4c9893e616a9873` |
+
+From this addition on, every check of sections 4 and 7 is made against these two tables, which replace those of
+section 21.1. Section 21.1 keeps its values as the record of what moved.
+
+Gate ET7 for ip#471: `git diff --name-only 656cd2a8 a15b8c1d` (its merge's first parent, and the merge) names
+`scripts/live_eval_seat.py`, `scripts/live_eval_controls.py`, `tests/test_live_eval_seat.py`,
+`tests/test_live_eval_controls.py`, `docs/LIVE_EVAL_EVIDENCE.md` and a history fragment. It names no file in
+`harness.CODE`, `LOOP_CODE` or `FLOW_CODE`, no tool definition (`src/nirmaan/company/tools.py`) and not the CLI pin
+(`.github/live-eval/package.json`). These tests pass on `a15b8c1d`: `tests/test_whole_flow_dispatch.py` (gate WF7),
+`tests/test_live_eval_seat.py::test_the_tools_as_the_seat_account_change_no_fingerprint` and
+`tests/test_gate_inputs.py::test_no_file_this_milestone_changes_is_harness_code`. The four fingerprints above are
+those of section 21.1.
+
+### 22.2 What this section does not say
+
+Run 45135605510 is the replay on `main` after the fix, a replay of `flow/axil-timer` with `controls` set. This section
+does not record it, quote its results or read them. Whether ET5 is met, and how the 11 bypass controls of section 21.3
+are read, is for verification-lead and the chair (section 21.4). Section 21.5 stands, with the values of section 22.1
+in place of those of section 21.1.
