@@ -1,0 +1,65 @@
+{
+ "format": "nirmaan.et5-controls-upload-index/1",
+ "about": "Records only. The controls upload of replay run 45135605510 of flow/axil-timer, dispatched on main at a15b8c1d (the merge of ip#471) with controls set, no model and no token: every file of artifact live-eval-controls-45135605510 as uploaded, byte for byte, each named here with its sha256. The third addendum to council/records/2026-11-22-eda-tools-seat-account.md read its facts T3 to T7 from this upload, and decision E4, item 6 has it committed so that security's statement of decision E1 and the finding of decision E3 rest on a committed file. It is cited as what showed the finding, and never as showing gate ET5 met: the record gate ET5 is stated on is a replay on main on a commit that holds gate ET17 (decision E4).",
+ "run": {
+  "id": "45135605510",
+  "url": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45135605510",
+  "attempt": 1,
+  "commit": "a15b8c1dfe531f3634120f40335901c8965d8611",
+  "branch": "main",
+  "event": "workflow_dispatch",
+  "workflow": ".github/workflows/live-eval.yml",
+  "inputs": {
+   "case": "flow/axil-timer",
+   "replay": true,
+   "controls": true
+  },
+  "artifact": "live-eval-controls-45135605510",
+  "jobs": {
+   "replay": {
+    "id": "137561030446",
+    "conclusion": "failure",
+    "url": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45135605510/job/137561030446"
+   },
+   "rejudge": {
+    "id": "137568408317",
+    "conclusion": "success",
+    "url": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45135605510/job/137568408317"
+   }
+  }
+ },
+ "files": {
+  "live-eval-controls-45135605510/bypass.json": {
+   "sha256": "4695dea550bb036761c0604e17d4cdf1f1c9d2b18f1e63846b986f7047047d94",
+   "bytes": 104918
+  },
+  "live-eval-controls-45135605510/controls.json": {
+   "sha256": "41c9222e7a50ee36ed64f7854544e1eacc5f587b4b831a6122d9362a01548bb2",
+   "bytes": 5815
+  },
+  "live-eval-controls-45135605510/controls.log": {
+   "sha256": "d1a15ccb9ae259bd01959f9673f83f260a8030ac47ad70cbb051b574de0d102d",
+   "bytes": 5041
+  },
+  "live-eval-controls-45135605510/controls.xml": {
+   "sha256": "e4306a486ee129290b048205fc199674e557493fa480d1ee2ed54ed078847e9c",
+   "bytes": 1245
+  },
+  "live-eval-controls-45135605510/fixtures.log": {
+   "sha256": "ff1ddd5c4bfa27a4ae242c1467c2aecc04ab9b304f60e4c295becd3a9485a379",
+   "bytes": 28426
+  },
+  "live-eval-controls-45135605510/fixtures.xml": {
+   "sha256": "661d0ee0521558f7d48f80e1a0e495a981fc1e4d143780a837f2a5be8c87940d",
+   "bytes": 94959
+  },
+  "live-eval-controls-45135605510/summary.json": {
+   "sha256": "a4501df2f2631da23b4cf924d2d18edefbb40044afd9a8f8183944e4e2b9e63a",
+   "bytes": 2677
+  },
+  "live-eval-controls-45135605510/sweep.json": {
+   "sha256": "bd61cd2f62e3335a00ea6015f14d8a520edb615a37d47cf9f3e3032853c04393",
+   "bytes": 47810
+  }
+ }
+}
