@@ -24,7 +24,7 @@
   "gate_claims": [
     {
       "claim": "the card lists one tool, cdc.run, and it is CONTRACT_ONLY: the catalog says the broker refuses it, so no agent can claim a crossing analysis ran",
-      "evidence": "src/nirmaan/company/tools.py:5"
+      "evidence": "src/nirmaan/company/tools.py:6"
     },
     {
       "claim": "cdc.run is registered with status CONTRACT_ONLY (CO) and takes no parameters",

@@ -231,6 +231,27 @@ def test_the_triage_seat_is_told_the_plusarg_and_the_verdict_line_its_repro_gate
     assert result.passed, result.detail
 
 
+@needs(*GATE_TOOLS)
+@pytest.mark.parametrize("knowledge", (True, False), ids=("documents-on", "documents-off"))
+def test_the_root_cause_seat_is_told_the_plusarg_and_the_verdict_line_its_repro_gate_reads(knowledge, nirmaan_org,
+                                                                                         fixed_clock, tmp_path):
+    """The root-cause seat writes a repro for the same gate as the triage seat, and in the W2-L1 batch nothing it
+    received named the plusarg or the verdict line either (the arm E trials read the upstream testbench in the
+    sandbox). The root_cause_analysis card now names both, so the prompt carries them with and without the
+    knowledge documents, and the case's reference answer reproduces through the gate.
+    """
+    case = _case("debug/root-cause-uart-tx")
+    llm = replay_llm(case, REPO)
+    result, _ = evaluate(nirmaan_org, case, ModelRuntime(llm, runtime_id="replay"), replay=True, repo=REPO,
+                         sandbox=tmp_path / "sandbox", clock=fixed_clock, knowledge=knowledge)
+    prompt = llm.calls[0].render()
+    assert f'$value$plusargs("{NONCE_ARG.lstrip("+")}%s"' in prompt
+    assert VERDICT_DISPLAY in prompt
+    [gate] = [g for g in result.gate_runs if g.tool == "simulator.run"]
+    assert gate.succeeded and "failure reproduced" in gate.summary, gate.summary
+    assert result.passed, result.detail
+
+
 # --- Weak answers the controls fail -----------------------------------------------------------------
 
 
