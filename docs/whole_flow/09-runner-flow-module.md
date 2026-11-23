@@ -10,9 +10,17 @@ stage's own before-review checks run for real.
   as text and its trials are seated at every stage.
 - **Pass-through.** Review and approval of every stage but the last are done
   by the harness as `eval-flow-passthrough`, never the fixture, with the note
-  "Whole-flow evaluation: not reviewed. Before-review checks passed: <runs>."
-  or "... This stage has no before-review check: submitted, not checked." The
-  words "reviewed in the repository" are never used.
+  "Whole-flow evaluation: not reviewed. No reviewer judged this stage: the
+  evaluation harness recorded this review and approval itself, by the
+  evaluation's rule, so that later stages receive it as input; 'approved'
+  here records that rule, not a judgement. Before-review checks passed:
+  <runs>." or, for a stage with no check, the same first two sentences and
+  then "This stage has no before-review check: submitted, not checked." These
+  are the words of the council record 2026-11-17, sixth addendum, decision P2,
+  item 3. A later stage's prompt shows each stage it builds on as approved,
+  with a review record that reads "Independent review by" the stage's reviewer
+  role and then this note, so the note says who made the record and by what
+  rule. The words "reviewed in the repository" are never used.
 - **A stage that does not reach review** stops the flow. Later stages are
   recorded "not run", every held-out check is not run, and the trial is a
   failed trial of its group. There is no fallback to a reference document.
