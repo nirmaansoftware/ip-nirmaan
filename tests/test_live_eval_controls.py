@@ -450,6 +450,12 @@ def test_the_et18_record_is_from_main_and_reads_every_bypass_control_by_decision
     assert {k: v["attempt"] for k, v in run["jobs"].items()} == {"replay": 1, "rejudge": 2, "live-eval": 1}
     assert run["steps"]["replay"]["Replay the reference answer"] == "success"
     assert run["steps"]["rejudge"]["Re-judge the records"] == "success"
+    # Attempt 1's rejudge job, cancelled in its tool install: no probe and no re-judge ran in it.
+    cancelled = run["cancelled"]
+    assert (cancelled["job"], cancelled["attempt"], cancelled["conclusion"], cancelled["stopped_in"]) == (
+        "rejudge", 1, "cancelled", "Install the tools")
+    assert {"Test what seat code can reach", "Re-judge the records"} <= set(cancelled["not_run"])
+    assert cancelled["id"] not in {j["id"] for j in run["jobs"].values()} and cancelled["url"].endswith(cancelled["id"])
     assert {s: c for job in run["steps"].values() for s, c in job.items() if c != "success"} == {
         "Run the controls, the mutant sweep and the gate fixtures as the seat account": "failure"}
     assert "Whether ET5 is met is verification-lead's statement, not this record's." in record["about"]
@@ -492,6 +498,8 @@ def test_the_et18_record_is_from_main_and_reads_every_bypass_control_by_decision
     assert sweep["ok"] is True and summary["sweep"]["ok"] is True
     assert [r["mutant"] for r in rows] == ["reference", *(m["mutant"] for m in sweep_record["mutants"])]
     assert len(rows) == 100
+    assert (rows[0]["sha256"], rows[0]["result"], rows[0]["checks_passed"], rows[0]["errors"]) == (
+        sweep_record["reference"]["sha256"], "passes", sweep_record["reference"]["checks"], 0)
     assert all(r["same_result"] and r["same_errors"] and r["same_first_failure"] and r["same_sha256"] for r in rows)
     for row, want in zip(rows[1:], sweep_record["mutants"]):
         assert (row["sha256"], row["result"], row["errors"], row["first_failure"]) == (
@@ -521,6 +529,7 @@ def test_the_et18_record_is_from_main_and_reads_every_bypass_control_by_decision
                 build, *model = [s["command"] for s in r["steps"]]
                 assert build[0] == "verilator" and eda.seat_tool(build) is None, test
                 assert all(not argv[0].startswith(WRAPPERS) and "/obj/" in argv[0] for argv in model), test
+            assert control["result"] == "passed", test  # item 5's liveness, as the caller here too
             caller.append(test)
             continue
         assert not any(word in json.dumps(control) for word in TARGET_CONTENT), test  # items 2 and 4

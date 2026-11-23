@@ -46,6 +46,24 @@
     "Re-judge the records": "success",
     "Check the checkout did not change": "success"
    }
+  },
+  "cancelled": {
+   "job": "rejudge",
+   "id": "137652457083",
+   "attempt": 1,
+   "conclusion": "cancelled",
+   "url": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45159697183/job/137652457083",
+   "steps_succeeded": [
+    "Set up job",
+    "Refuse records from a changed checkout",
+    "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+    "Check the fresh checkout is the trial job's commit"
+   ],
+   "stopped_in": "Install the tools",
+   "not_run": [
+    "Test what seat code can reach",
+    "Re-judge the records"
+   ]
   }
  },
  "folder": "docs/evidence/et5/run-45159697183",
