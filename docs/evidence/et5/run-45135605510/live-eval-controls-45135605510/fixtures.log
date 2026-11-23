@@ -1,0 +1,463 @@
+............F.................................................F......... [ 17%]
+........................................................................ [ 35%]
+.........................................................FF.....FF...... [ 53%]
+.FF....F...F............................................................ [ 71%]
+................................F....................................... [ 89%]
+..........................................                               [100%]
+=================================== FAILURES ===================================
+____________ test_control_without_the_check_a_top_reaches_the_shell ____________
+
+tmp_path = PosixPath('/tmp/nirmaan-et5-fixtures-3_h1_69e/pytest/test_control_without_the_check0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f44e9ea0260>
+
+    @pytest.mark.skipif(shutil.which("yosys") is None, reason="needs yosys")
+    def test_control_without_the_check_a_top_reaches_the_shell(tmp_path, monkeypatch):
+        """The payload above is live: with the check bypassed, Yosys runs it."""
+        marker = tmp_path / "MARKER"
+        src = write(tmp_path / "m.v", DESIGN)
+        monkeypatch.setattr(eda, "check_inputs", lambda *a: None)
+        execute(backend("synth.run", "yosys"), {"sources": str(src), "top": f"m; exec -- touch {marker}"})
+>       assert marker.exists()
+E       AssertionError: assert False
+E        +  where False = exists()
+E        +    where exists = PosixPath('/tmp/nirmaan-et5-fixtures-3_h1_69e/pytest/test_control_without_the_check0/MARKER').exists
+
+tests/test_gate_inputs.py:82: AssertionError
+___________ test_control_without_the_check_a_setup_reaches_the_shell ___________
+
+tmp_path = PosixPath('/tmp/nirmaan-et5-fixtures-3_h1_69e/pytest/test_control_without_the_check2')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f44e99df170>
+
+    @pytest.mark.skipif(shutil.which("sby") is None, reason="needs sby")
+    def test_control_without_the_check_a_setup_reaches_the_shell(tmp_path, monkeypatch):
+        marker = tmp_path / "MARKER"
+        setup = sby(tmp_path, **{k: v.format(marker=marker) for k, v in SBY_PAYLOADS["bang"].items()})
+        monkeypatch.setattr(eda, "sby_problem", lambda *a: None)
+        execute(backend("formal.run", "symbiyosys"), {"sby": str(setup)})
+>       assert marker.exists()
+E       AssertionError: assert False
+E        +  where False = exists()
+E        +    where exists = PosixPath('/tmp/nirmaan-et5-fixtures-3_h1_69e/pytest/test_control_without_the_check2/MARKER').exists
+
+tests/test_gate_inputs.py:256: AssertionError
+__ test_control_without_the_check_a_tool_acts_on_the_form[dollar_macro-yosys] __
+
+tmp_path = PosixPath('/tmp/nirmaan-et5-fixtures-3_h1_69e/pytest/test_control_without_the_check6')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f44e98a3b30>
+fixture = 'dollar_macro', name = 'yosys'
+
+    @pytest.mark.parametrize("fixture,name", [pytest.param(f, n, marks=needs(*TOOL[n]))
+                                              for f, names in sorted(LIVE.items()) for n in names])
+    def test_control_without_the_check_a_tool_acts_on_the_form(tmp_path, monkeypatch, fixture, name):
+        """The fixtures are live: with the check bypassed, the tool reads the canary, or writes the marker."""
+        monkeypatch.setattr(eda, "check_inputs", lambda *a: None)
+        gate = backend(GATE_OF[name], name)
+        if fixture == "glued_macro_call":
+            source, marker = bypass_file(tmp_path, fixture)
+            execute(gate, {"sources": str(source), "top": "m", "workdir": str(tmp_path / "wd")})
+            assert marker.exists()
+        elif fixture in ("esc_abs_module", "esc_dotdot_module"):
+            # Verilator opens the file an undefined module is named (its error is on the canary's first line). It looks
+            # up no name longer than 127 characters once each "/" or "." is spelled "__02f" or "__02e", so the absolute
+            # name is a canary in a short folder under /tmp.
+            with tempfile.TemporaryDirectory(dir="/tmp") as short:
+                include = str(write(Path(short) / "CANARY_ET1.vh", f"{CANARY} ! ;\n"))
+                source, _ = bypass_file(tmp_path, fixture, include=include)
+                output = printed(execute(gate, {"sources": str(source), "top": "m", "workdir": str(tmp_path / "wd")}))
+            assert re.search(r"CANARY_ET1\.vh:1\b", output), output
+        elif name == "yosys" and "{canary_hex}" in (BYPASS / f"{fixture}.v.tpl").read_text(encoding="utf-8"):
+            cells = []
+            for bit in ("1", "0"):  # y = a ^ r[0]: one cell when the canary holds 1, none when it holds 0
+                (tmp_path / bit).mkdir()
+                source, _ = bypass_file(tmp_path / bit, fixture, bit)
+                cells.append(execute(gate, {"sources": str(source), "top": "m"}).metrics.get("cells"))
+>           assert cells == [1, 0]
+E           assert [None, None] == [1, 0]
+E             
+E             At index 0 diff: None != 1
+E             
+E             Full diff: (-: missing in left side, +: extra in left side)
+E               [
+E             -     1,
+E             -     0,
+E             +     None,
+E             +     None,
+E               ]
+
+tests/test_gate_inputs.py:413: AssertionError
+_ test_control_without_the_check_a_tool_acts_on_the_form[esc_abs_module-verilator-lint] _
+
+tmp_path = PosixPath('/tmp/nirmaan-et5-fixtures-3_h1_69e/pytest/test_control_without_the_check7')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f44e98a3560>
+fixture = 'esc_abs_module', name = 'verilator-lint'
+
+    @pytest.mark.parametrize("fixture,name", [pytest.param(f, n, marks=needs(*TOOL[n]))
+                                              for f, names in sorted(LIVE.items()) for n in names])
+    def test_control_without_the_check_a_tool_acts_on_the_form(tmp_path, monkeypatch, fixture, name):
+        """The fixtures are live: with the check bypassed, the tool reads the canary, or writes the marker."""
+        monkeypatch.setattr(eda, "check_inputs", lambda *a: None)
+        gate = backend(GATE_OF[name], name)
+        if fixture == "glued_macro_call":
+            source, marker = bypass_file(tmp_path, fixture)
+            execute(gate, {"sources": str(source), "top": "m", "workdir": str(tmp_path / "wd")})
+            assert marker.exists()
+        elif fixture in ("esc_abs_module", "esc_dotdot_module"):
+            # Verilator opens the file an undefined module is named (its error is on the canary's first line). It looks
+            # up no name longer than 127 characters once each "/" or "." is spelled "__02f" or "__02e", so the absolute
+            # name is a canary in a short folder under /tmp.
+            with tempfile.TemporaryDirectory(dir="/tmp") as short:
+                include = str(write(Path(short) / "CANARY_ET1.vh", f"{CANARY} ! ;\n"))
+                source, _ = bypass_file(tmp_path, fixture, include=include)
+                output = printed(execute(gate, {"sources": str(source), "top": "m", "workdir": str(tmp_path / "wd")}))
+>           assert re.search(r"CANARY_ET1\.vh:1\b", output), output
+E           AssertionError: verilator-lint: lint failed: 1 error, 0 warnings; first: /tmp/nirmaan-et5-fixtures-3_h1_69e/pytest/test_control_without_the_check7/run/m.v:3: Can't resolve module reference: '/tmp/tmpkt9o57jz/CANARY_ET1.vh'$ verilator --lint-only -Wall --top-module m /tmp/nirmaan-et5-fixtures-3_h1_69e/pytest/test_control_without_the_check7/run/m.v
+E             %Error: /tmp/nirmaan-et5-fixtures-3_h1_69e/pytest/test_control_without_the_check7/run/m.v:3:35: Can't resolve module reference: '/tmp/tmpkt9o57jz/CANARY_ET1.vh'
+E                 3 |   \/tmp/tmpkt9o57jz/CANARY_ET1.vh u ();
+E                   |                                   ^
+E             %Error: Exiting due to 1 error(s)
+E             {
+E               "tool": "lint.run",
+E               "backend": "verilator-lint",
+E               "executables": {
+E                 "verilator": "/opt/nirmaan-seat/bin/verilator"
+E               },
+E               "commands": [
+E                 [
+E                   "verilator",
+E                   "--lint-only",
+E                   "-Wall",
+E                   "--top-module",
+E                   "m",
+E                   "/tmp/nirmaan-et5-fixtures-3_h1_69e/pytest/test_control_without_the_check7/run/m.v"
+E                 ]
+E               ],
+E               "exit_statuses": [
+E                 1
+E               ],
+E               "log": "/tmp/nirmaan-et5-fixtures-3_h1_69e/pytest/test_control_without_the_check7/wd/verilator-lint.log",
+E               "output_bytes": 287,
+E               "result": {
+E                 "passed": false,
+E                 "summary": "lint failed: 1 error, 0 warnings; first: /tmp/nirmaan-et5-fixtures-3_h1_69e/pytest/test_control_without_the_check7/run/m.v:3: Can't resolve module reference: '/tmp/tmpkt9o57jz/CANARY_ET1.vh'",
+E                 "metrics": {
+E                   "errors": 1,
+E                   "warnings": 0,
+E                   "exit_status": 1
+E                 },
+E                 "diagnostics": [
+E                   {
+E                     "severity": "error",
+E                     "message": "Can't resolve module reference: '/tmp/tmpkt9o57jz/CANARY_ET1.vh'",
+E                     "code": "",
+E                     "file": "/tmp/nirmaan-et5-fixtures-3_h1_69e/pytest/test_control_without_the_check7/run/m.v",
+E                     "line": 3,
+E                     "column": 35
+E                   }
+E                 ]
+E               }
+E             }
+E             
+E           assert None
+E            +  where None = <function search at 0x7f44ec7ead40>('CANARY_ET1\\.vh:1\\b', 'verilator-lint: lint failed: 1 error, 0 warnings; first: /tmp/nirmaan-et5-fixtures-3_h1_69e/pytest/test_control_witho...e/pytest/test_control_without_the_check7/run/m.v",\n        "line": 3,\n        "column": 35\n      }\n    ]\n  }\n}\n')
+E            +    where <function search at 0x7f44ec7ead40> = re.search
+
+tests/test_gate_inputs.py:406: AssertionError
+_ test_control_without_the_check_a_tool_acts_on_the_form[esc_dollar_task-yosys] _
+
+tmp_path = PosixPath('/tmp/nirmaan-et5-fixtures-3_h1_69e/pytest/test_control_without_the_check13')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f44e9859040>
+fixture = 'esc_dollar_task', name = 'yosys'
+
+    @pytest.mark.parametrize("fixture,name", [pytest.param(f, n, marks=needs(*TOOL[n]))
+                                              for f, names in sorted(LIVE.items()) for n in names])
+    def test_control_without_the_check_a_tool_acts_on_the_form(tmp_path, monkeypatch, fixture, name):
+        """The fixtures are live: with the check bypassed, the tool reads the canary, or writes the marker."""
+        monkeypatch.setattr(eda, "check_inputs", lambda *a: None)
+        gate = backend(GATE_OF[name], name)
+        if fixture == "glued_macro_call":
+            source, marker = bypass_file(tmp_path, fixture)
+            execute(gate, {"sources": str(source), "top": "m", "workdir": str(tmp_path / "wd")})
+            assert marker.exists()
+        elif fixture in ("esc_abs_module", "esc_dotdot_module"):
+            # Verilator opens the file an undefined module is named (its error is on the canary's first line). It looks
+            # up no name longer than 127 characters once each "/" or "." is spelled "__02f" or "__02e", so the absolute
+            # name is a canary in a short folder under /tmp.
+            with tempfile.TemporaryDirectory(dir="/tmp") as short:
+                include = str(write(Path(short) / "CANARY_ET1.vh", f"{CANARY} ! ;\n"))
+                source, _ = bypass_file(tmp_path, fixture, include=include)
+                output = printed(execute(gate, {"sources": str(source), "top": "m", "workdir": str(tmp_path / "wd")}))
+            assert re.search(r"CANARY_ET1\.vh:1\b", output), output
+        elif name == "yosys" and "{canary_hex}" in (BYPASS / f"{fixture}.v.tpl").read_text(encoding="utf-8"):
+            cells = []
+            for bit in ("1", "0"):  # y = a ^ r[0]: one cell when the canary holds 1, none when it holds 0
+                (tmp_path / bit).mkdir()
+                source, _ = bypass_file(tmp_path / bit, fixture, bit)
+                cells.append(execute(gate, {"sources": str(source), "top": "m"}).metrics.get("cells"))
+>           assert cells == [1, 0]
+E           assert [None, None] == [1, 0]
+E             
+E             At index 0 diff: None != 1
+E             
+E             Full diff: (-: missing in left side, +: extra in left side)
+E               [
+E             -     1,
+E             -     0,
+E             +     None,
+E             +     None,
+E               ]
+
+tests/test_gate_inputs.py:413: AssertionError
+_ test_control_without_the_check_a_tool_acts_on_the_form[esc_dotdot_module-verilator-lint] _
+
+tmp_path = PosixPath('/tmp/nirmaan-et5-fixtures-3_h1_69e/pytest/test_control_without_the_check14')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f44e9858230>
+fixture = 'esc_dotdot_module', name = 'verilator-lint'
+
+    @pytest.mark.parametrize("fixture,name", [pytest.param(f, n, marks=needs(*TOOL[n]))
+                                              for f, names in sorted(LIVE.items()) for n in names])
+    def test_control_without_the_check_a_tool_acts_on_the_form(tmp_path, monkeypatch, fixture, name):
+        """The fixtures are live: with the check bypassed, the tool reads the canary, or writes the marker."""
+        monkeypatch.setattr(eda, "check_inputs", lambda *a: None)
+        gate = backend(GATE_OF[name], name)
+        if fixture == "glued_macro_call":
+            source, marker = bypass_file(tmp_path, fixture)
+            execute(gate, {"sources": str(source), "top": "m", "workdir": str(tmp_path / "wd")})
+            assert marker.exists()
+        elif fixture in ("esc_abs_module", "esc_dotdot_module"):
+            # Verilator opens the file an undefined module is named (its error is on the canary's first line). It looks
+            # up no name longer than 127 characters once each "/" or "." is spelled "__02f" or "__02e", so the absolute
+            # name is a canary in a short folder under /tmp.
+            with tempfile.TemporaryDirectory(dir="/tmp") as short:
+                include = str(write(Path(short) / "CANARY_ET1.vh", f"{CANARY} ! ;\n"))
+                source, _ = bypass_file(tmp_path, fixture, include=include)
+                output = printed(execute(gate, {"sources": str(source), "top": "m", "workdir": str(tmp_path / "wd")}))
+>           assert re.search(r"CANARY_ET1\.vh:1\b", output), output
+E           AssertionError: verilator-lint: lint failed: 1 error, 0 warnings; first: /tmp/nirmaan-et5-fixtures-3_h1_69e/pytest/test_control_without_the_check14/run/m.v:3: Can't resolve module reference: '../outside/CANARY_ET1.vh'$ verilator --lint-only -Wall --top-module m /tmp/nirmaan-et5-fixtures-3_h1_69e/pytest/test_control_without_the_check14/run/m.v
+E             %Error: /tmp/nirmaan-et5-fixtures-3_h1_69e/pytest/test_control_without_the_check14/run/m.v:3:29: Can't resolve module reference: '../outside/CANARY_ET1.vh'
+E                 3 |   \../outside/CANARY_ET1.vh u ();
+E                   |                             ^
+E             %Error: Exiting due to 1 error(s)
+E             {
+E               "tool": "lint.run",
+E               "backend": "verilator-lint",
+E               "executables": {
+E                 "verilator": "/opt/nirmaan-seat/bin/verilator"
+E               },
+E               "commands": [
+E                 [
+E                   "verilator",
+E                   "--lint-only",
+E                   "-Wall",
+E                   "--top-module",
+E                   "m",
+E                   "/tmp/nirmaan-et5-fixtures-3_h1_69e/pytest/test_control_without_the_check14/run/m.v"
+E                 ]
+E               ],
+E               "exit_statuses": [
+E                 1
+E               ],
+E               "log": "/tmp/nirmaan-et5-fixtures-3_h1_69e/pytest/test_control_without_the_check14/wd/verilator-lint.log",
+E               "output_bytes": 270,
+E               "result": {
+E                 "passed": false,
+E                 "summary": "lint failed: 1 error, 0 warnings; first: /tmp/nirmaan-et5-fixtures-3_h1_69e/pytest/test_control_without_the_check14/run/m.v:3: Can't resolve module reference: '../outside/CANARY_ET1.vh'",
+E                 "metrics": {
+E                   "errors": 1,
+E                   "warnings": 0,
+E                   "exit_status": 1
+E                 },
+E                 "diagnostics": [
+E                   {
+E                     "severity": "error",
+E                     "message": "Can't resolve module reference: '../outside/CANARY_ET1.vh'",
+E                     "code": "",
+E                     "file": "/tmp/nirmaan-et5-fixtures-3_h1_69e/pytest/test_control_without_the_check14/run/m.v",
+E                     "line": 3,
+E                     "column": 29
+E                   }
+E                 ]
+E               }
+E             }
+E             
+E           assert None
+E            +  where None = <function search at 0x7f44ec7ead40>('CANARY_ET1\\.vh:1\\b', 'verilator-lint: lint failed: 1 error, 0 warnings; first: /tmp/nirmaan-et5-fixtures-3_h1_69e/pytest/test_control_witho.../pytest/test_control_without_the_check14/run/m.v",\n        "line": 3,\n        "column": 29\n      }\n    ]\n  }\n}\n')
+E            +    where <function search at 0x7f44ec7ead40> = re.search
+
+tests/test_gate_inputs.py:406: AssertionError
+___ test_control_without_the_check_a_tool_acts_on_the_form[esc_quote-yosys] ____
+
+tmp_path = PosixPath('/tmp/nirmaan-et5-fixtures-3_h1_69e/pytest/test_control_without_the_check22')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f44e985b5c0>
+fixture = 'esc_quote', name = 'yosys'
+
+    @pytest.mark.parametrize("fixture,name", [pytest.param(f, n, marks=needs(*TOOL[n]))
+                                              for f, names in sorted(LIVE.items()) for n in names])
+    def test_control_without_the_check_a_tool_acts_on_the_form(tmp_path, monkeypatch, fixture, name):
+        """The fixtures are live: with the check bypassed, the tool reads the canary, or writes the marker."""
+        monkeypatch.setattr(eda, "check_inputs", lambda *a: None)
+        gate = backend(GATE_OF[name], name)
+        if fixture == "glued_macro_call":
+            source, marker = bypass_file(tmp_path, fixture)
+            execute(gate, {"sources": str(source), "top": "m", "workdir": str(tmp_path / "wd")})
+            assert marker.exists()
+        elif fixture in ("esc_abs_module", "esc_dotdot_module"):
+            # Verilator opens the file an undefined module is named (its error is on the canary's first line). It looks
+            # up no name longer than 127 characters once each "/" or "." is spelled "__02f" or "__02e", so the absolute
+            # name is a canary in a short folder under /tmp.
+            with tempfile.TemporaryDirectory(dir="/tmp") as short:
+                include = str(write(Path(short) / "CANARY_ET1.vh", f"{CANARY} ! ;\n"))
+                source, _ = bypass_file(tmp_path, fixture, include=include)
+                output = printed(execute(gate, {"sources": str(source), "top": "m", "workdir": str(tmp_path / "wd")}))
+            assert re.search(r"CANARY_ET1\.vh:1\b", output), output
+        elif name == "yosys" and "{canary_hex}" in (BYPASS / f"{fixture}.v.tpl").read_text(encoding="utf-8"):
+            cells = []
+            for bit in ("1", "0"):  # y = a ^ r[0]: one cell when the canary holds 1, none when it holds 0
+                (tmp_path / bit).mkdir()
+                source, _ = bypass_file(tmp_path / bit, fixture, bit)
+                cells.append(execute(gate, {"sources": str(source), "top": "m"}).metrics.get("cells"))
+>           assert cells == [1, 0]
+E           assert [None, None] == [1, 0]
+E             
+E             At index 0 diff: None != 1
+E             
+E             Full diff: (-: missing in left side, +: extra in left side)
+E               [
+E             -     1,
+E             -     0,
+E             +     None,
+E             +     None,
+E               ]
+
+tests/test_gate_inputs.py:413: AssertionError
+_ test_control_without_the_check_a_tool_acts_on_the_form[glued_macro_call-icarus] _
+
+tmp_path = PosixPath('/tmp/nirmaan-et5-fixtures-3_h1_69e/pytest/test_control_without_the_check23')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f44e985a060>
+fixture = 'glued_macro_call', name = 'icarus'
+
+    @pytest.mark.parametrize("fixture,name", [pytest.param(f, n, marks=needs(*TOOL[n]))
+                                              for f, names in sorted(LIVE.items()) for n in names])
+    def test_control_without_the_check_a_tool_acts_on_the_form(tmp_path, monkeypatch, fixture, name):
+        """The fixtures are live: with the check bypassed, the tool reads the canary, or writes the marker."""
+        monkeypatch.setattr(eda, "check_inputs", lambda *a: None)
+        gate = backend(GATE_OF[name], name)
+        if fixture == "glued_macro_call":
+            source, marker = bypass_file(tmp_path, fixture)
+            execute(gate, {"sources": str(source), "top": "m", "workdir": str(tmp_path / "wd")})
+>           assert marker.exists()
+E           AssertionError: assert False
+E            +  where False = exists()
+E            +    where exists = PosixPath('/tmp/nirmaan-et5-fixtures-3_h1_69e/pytest/test_control_without_the_check23/outside/MARKER').exists
+
+tests/test_gate_inputs.py:397: AssertionError
+_ test_control_without_the_check_a_tool_acts_on_the_form[ifdef_lone_quote_readmem-yosys] _
+
+tmp_path = PosixPath('/tmp/nirmaan-et5-fixtures-3_h1_69e/pytest/test_control_without_the_check28')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f44e9858320>
+fixture = 'ifdef_lone_quote_readmem', name = 'yosys'
+
+    @pytest.mark.parametrize("fixture,name", [pytest.param(f, n, marks=needs(*TOOL[n]))
+                                              for f, names in sorted(LIVE.items()) for n in names])
+    def test_control_without_the_check_a_tool_acts_on_the_form(tmp_path, monkeypatch, fixture, name):
+        """The fixtures are live: with the check bypassed, the tool reads the canary, or writes the marker."""
+        monkeypatch.setattr(eda, "check_inputs", lambda *a: None)
+        gate = backend(GATE_OF[name], name)
+        if fixture == "glued_macro_call":
+            source, marker = bypass_file(tmp_path, fixture)
+            execute(gate, {"sources": str(source), "top": "m", "workdir": str(tmp_path / "wd")})
+            assert marker.exists()
+        elif fixture in ("esc_abs_module", "esc_dotdot_module"):
+            # Verilator opens the file an undefined module is named (its error is on the canary's first line). It looks
+            # up no name longer than 127 characters once each "/" or "." is spelled "__02f" or "__02e", so the absolute
+            # name is a canary in a short folder under /tmp.
+            with tempfile.TemporaryDirectory(dir="/tmp") as short:
+                include = str(write(Path(short) / "CANARY_ET1.vh", f"{CANARY} ! ;\n"))
+                source, _ = bypass_file(tmp_path, fixture, include=include)
+                output = printed(execute(gate, {"sources": str(source), "top": "m", "workdir": str(tmp_path / "wd")}))
+            assert re.search(r"CANARY_ET1\.vh:1\b", output), output
+        elif name == "yosys" and "{canary_hex}" in (BYPASS / f"{fixture}.v.tpl").read_text(encoding="utf-8"):
+            cells = []
+            for bit in ("1", "0"):  # y = a ^ r[0]: one cell when the canary holds 1, none when it holds 0
+                (tmp_path / bit).mkdir()
+                source, _ = bypass_file(tmp_path / bit, fixture, bit)
+                cells.append(execute(gate, {"sources": str(source), "top": "m"}).metrics.get("cells"))
+>           assert cells == [1, 0]
+E           assert [None, None] == [1, 0]
+E             
+E             At index 0 diff: None != 1
+E             
+E             Full diff: (-: missing in left side, +: extra in left side)
+E               [
+E             -     1,
+E             -     0,
+E             +     None,
+E             +     None,
+E               ]
+
+tests/test_gate_inputs.py:413: AssertionError
+__ test_control_without_the_check_a_tool_acts_on_the_form[split_macro-yosys] ___
+
+tmp_path = PosixPath('/tmp/nirmaan-et5-fixtures-3_h1_69e/pytest/test_control_without_the_check32')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f44e9905c70>
+fixture = 'split_macro', name = 'yosys'
+
+    @pytest.mark.parametrize("fixture,name", [pytest.param(f, n, marks=needs(*TOOL[n]))
+                                              for f, names in sorted(LIVE.items()) for n in names])
+    def test_control_without_the_check_a_tool_acts_on_the_form(tmp_path, monkeypatch, fixture, name):
+        """The fixtures are live: with the check bypassed, the tool reads the canary, or writes the marker."""
+        monkeypatch.setattr(eda, "check_inputs", lambda *a: None)
+        gate = backend(GATE_OF[name], name)
+        if fixture == "glued_macro_call":
+            source, marker = bypass_file(tmp_path, fixture)
+            execute(gate, {"sources": str(source), "top": "m", "workdir": str(tmp_path / "wd")})
+            assert marker.exists()
+        elif fixture in ("esc_abs_module", "esc_dotdot_module"):
+            # Verilator opens the file an undefined module is named (its error is on the canary's first line). It looks
+            # up no name longer than 127 characters once each "/" or "." is spelled "__02f" or "__02e", so the absolute
+            # name is a canary in a short folder under /tmp.
+            with tempfile.TemporaryDirectory(dir="/tmp") as short:
+                include = str(write(Path(short) / "CANARY_ET1.vh", f"{CANARY} ! ;\n"))
+                source, _ = bypass_file(tmp_path, fixture, include=include)
+                output = printed(execute(gate, {"sources": str(source), "top": "m", "workdir": str(tmp_path / "wd")}))
+            assert re.search(r"CANARY_ET1\.vh:1\b", output), output
+        elif name == "yosys" and "{canary_hex}" in (BYPASS / f"{fixture}.v.tpl").read_text(encoding="utf-8"):
+            cells = []
+            for bit in ("1", "0"):  # y = a ^ r[0]: one cell when the canary holds 1, none when it holds 0
+                (tmp_path / bit).mkdir()
+                source, _ = bypass_file(tmp_path / bit, fixture, bit)
+                cells.append(execute(gate, {"sources": str(source), "top": "m"}).metrics.get("cells"))
+>           assert cells == [1, 0]
+E           assert [None, None] == [1, 0]
+E             
+E             At index 0 diff: None != 1
+E             
+E             Full diff: (-: missing in left side, +: extra in left side)
+E               [
+E             -     1,
+E             -     0,
+E             +     None,
+E             +     None,
+E               ]
+
+tests/test_gate_inputs.py:413: AssertionError
+_ test_control_without_the_check_the_host_file_reaches_the_summary[include-glued] _
+
+tmp_path = PosixPath('/tmp/nirmaan-et5-fixtures-3_h1_69e/pytest/test_control_without_the_check47')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f44e9904e30>
+read = 'include-glued'
+
+    @SBY
+    @pytest.mark.parametrize("read", ["files-absolute", "include-glued"])
+    def test_control_without_the_check_the_host_file_reaches_the_summary(tmp_path, monkeypatch, read):
+        """The reads above are live: with the check bypassed, what the host file holds is in the run's summary."""
+        folder = host(tmp_path)
+        script, files, _ = READS[read]
+        sby = setup(tmp_path, script.format(host=folder), files.format(host=folder))
+        monkeypatch.setattr(eda, "sby_problem", lambda *a: None)
+        outcome = execute(backend("formal.run", "symbiyosys"), {"sby": str(sby), "workdir": str(tmp_path / "run")})
+>       assert SECRET in outcome.summary, outcome.summary
+E       AssertionError: symbiyosys: formal error: 1 error; first: Can't open include file `leak.vh'!
+E       assert 'NIRMAAN_MARKER_4b1d' in "symbiyosys: formal error: 1 error; first: Can't open include file `leak.vh'!"
+E        +  where "symbiyosys: formal error: 1 error; first: Can't open include file `leak.vh'!" = ToolOutcome(succeeded=False, summary="symbiyosys: formal error: 1 error; first: Can't open include file `leak.vh'!", r...symbiyosys.log'}, metrics={'status': 'ERROR', 'exit_status': 16, 'traces': [], 'mode': 'bmc', 'depth': 2, 'proven': 0}).summary
+
+tests/test_gate_reads.py:125: AssertionError
