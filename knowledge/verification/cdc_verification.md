@@ -45,9 +45,11 @@ sources are vendor or single-author papers; their claims are the authors'.
   the clock rate and the data rate of the crossing [GIN] [LIT]. A small loss
   of settling time therefore costs a great deal (inference from the two
   formulas).
-- The usual fix is a synchroniser: a chain of flops on the receiving clock,
-  with a request and acknowledge exchange when data of more than one bit
-  moves [GIN] [LIT].
+- The usual fix is a synchroniser: a chain of flops on the receiving clock
+  [GIN] [LIT]. For data of more than one bit, [GIN] recommends a request and
+  acknowledge exchange, and [LIT] describes a handshake synchroniser for
+  multi-bit data and, as another form, a parallel synchroniser that carries a
+  Gray coded bus with no handshake.
 
 ## Failure modes to look for in the RTL
 
@@ -83,7 +85,15 @@ Each is a case [GIN] reports, with its fix; the author met them while teaching, 
   one-cycle request is sampled by at least two receiver edges, so the
   handshake is simplified. It fails when clock frequencies change and the
   assumption of who is faster no longer holds [GIN].
-- A "metastability blocker" circuit that only moves the risk to a latch [GIN].
+- A "metastability blocker" circuit (an SR latch in front of the flop) that is
+  meant to remove metastability. [GIN] names two scenarios the designer missed.
+  When the input rises as the clock goes low, the latch can go metastable; the
+  risk has moved from the flop to the latch, which has half a clock cycle to
+  settle, and with a proper protocol (input held until acknowledged) the
+  synchronisation works. When the input rises as the clock rises, the latch
+  probably misses it and the flop itself may go metastable, which [GIN] calls
+  more dangerous, since it may cause damage in the circuit that follows the
+  flop [GIN].
 - One two-flop synchroniser on each bit of a bus. Bits can resolve
   differently, and the paper's example puts a 32 bit bus at a failure every
   16 microseconds [GIN]. A bus survives only when one bit changes at a time,
@@ -92,8 +102,12 @@ Each is a case [GIN] reports, with its fix; the author met them while teaching, 
 - A handshake where one signal is shared by both sides and not synchronised
   by the receiver [GIN].
 - More stages than two is not an error; it buys more settling time [GIN].
-- Missed reconvergence, which the card lists: signals that cross separately
-  and meet again behind their synchronisers can arrive in different cycles.
+- Missed reconvergence, which the card lists. [LIT] mentions "multiple timing
+  scenarios resulting from CDC jitter observed on convergent synchronization
+  paths" among the effects simulation has to deal with. Reading that to mean
+  that signals which cross separately and meet again behind their
+  synchronisers can arrive in different cycles is this document's own
+  (inference).
   [LIT] says the rest of the device must work in the presence of the
   synchronisers, including convergent paths, but gives no checklist for
   them. The checking method here is unsourced.
