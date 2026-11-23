@@ -228,7 +228,7 @@ summary. Every committed fixture, reference answer and held-out test passes
 it and keeps its result (`tests/test_compile_screen.py`). Design, the recorded
 must-refuse fixtures and what it does not do: `docs/COMPILE_SCREEN.md`.
 
-**The Verilog input check reads text as the tools do (ET1).** Council record
+**The Verilog input check refuses two more classes (ET1).** Council record
 `council/records/2026-11-22-eda-tools-seat-account.md`, decision 4. The
 input check of every gate (`eda_guard`, M84) skipped comments and strings by
 a pattern of its own, and seat Verilog could be written so that what it
@@ -236,9 +236,15 @@ skipped was code to Icarus, Verilator or Yosys: an escaped identifier holding
 a comment mark, a quote in an `` `ifdef `` branch not taken, a block comment
 opened on a directive's line, or a system task name a macro assembles. With
 the check bypassed, a tool then included or read a file outside the run, or
-wrote one. The check now passes only text in forms every tool splits the same
-way, and refuses names a macro could lengthen (`docs/GATE_INPUTS.md`,
-section 7). **This gate changed without a fingerprint change:** `eda_guard`
+wrote one. The check now refuses, before any step, the two classes of the
+record's fact 9 in the forms its recorded fixtures name, and names a macro
+could lengthen (`docs/GATE_INPUTS.md`, section 7; `tests/test_gate_inputs.py`).
+It screens input and confines nothing; it is not claimed to read text as a
+tool's preprocessor does, to stop reads or code in general, or to cover a
+fault in a tool's own parser. The residual, as that record and
+`council/records/2026-11-23-wave-2-close-meeting-1.md` state it: screen
+classes nobody has found, parser faults in a tool, and files any account may
+read. **This gate changed without a fingerprint change:** `eda_guard`
 is in the shared tools' backends, which no fingerprint digests, so a record's
 fingerprint does not say whether it ran; a refusal names the form in its
 summary. Every committed fixture, reference answer and held-out test passes
@@ -328,7 +334,9 @@ anyway is redacted from logs and from the uploaded record.
   user. Not done here; the runtime is outside this milestone's scope. Since
   M89 (gate WF17), the live evaluation runs `vvp`, and so every
   cocotb test module, as another account, and a reach test in each job shows
-  the token unreadable. Since M90 the program `fw.test` builds from seat C
+  its probes denied to that account, a credential-named canary in the
+  parent's environment among them (no claim is made about the token itself).
+  Since M90 the program `fw.test` builds from seat C
   executes as that account too, and a credential test in C gates each
   whole-flow and firmware job; seat C is still compiled as the runner, and
   live trials of a case that runs seat C are still refused, except
@@ -354,7 +362,14 @@ anyway is redacted from logs and from the uploaded record.
   builds from seat HDL (the model through `nirmaan-seat-model`, in a view of
   the run's directory, with no environment); its two `verilator_coverage`
   steps stay with the caller. Again no fingerprint changed; elsewhere every
-  step runs as before.
+  step runs as before. What may be said is what a named run shows: replay
+  run 45073595509 (`evals/flow/tool_reach_record.json`, on `c99ef1fe`, before
+  the eqy and `coverage.read` change) shows the listed probes denied to the
+  account through Icarus, Verilator, Yosys and SBY only; eqy and
+  `coverage.read` have no recorded probe run there. Seat files are not
+  claimed confined, and the residual is the one stated for the input check
+  in section 3: screen classes nobody has found, parser faults in a tool,
+  and files any account may read.
 * **The compile residual** (`council/records/2026-11-19-seat-c-live-refusal.md`, fact 9 and decision 4). `fw.build`
   and `fw.test` compile seat C as the runner. The routes fact 9 found (an
   include of the committed reference driver by an absolute or `..` path, a

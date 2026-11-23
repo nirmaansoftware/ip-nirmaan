@@ -321,7 +321,7 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   of that (gate ET5) is `evals/flow/et5_replay_record.json`, which holds no
   run of the timer's controls or of the committed fixtures. It shows those
   probes denied through those tools as the account in that run, and nothing
-  more; the `live-eval` job has no recorded run of them before slot 1.
+  more; the `live-eval` job has no recorded run of them yet.
 - **The tools that read seat Verilog run as the account too** (gates ET2 to
   ET4 of `council/records/2026-11-22-eda-tools-seat-account.md`). The input
   screen (`eda_guard`) reads seat files with patterns of its own, and the
@@ -359,7 +359,7 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   judge's) runs the same way: the reference testbench of check 1 is staged
   for the run as check 2's reference RTL and mutants already are
   (`nirmaan.evals.scorers`; `eda.HELD_OUT_STAGED`), so the account reads that run's
-  own judge file and nothing beside it. In these jobs the workflow names the
+  own judge file, and in run 45073595509 a canary beside it was denied. In these jobs the workflow names the
   wrappers (`NIRMAAN_SEAT_TOOLS`), and there a seat tool never falls back
   (gate ET2, as gate SC2 for `fw.test`): a wrapper that is not there, not
   root's, or writable by another account refuses the run before any step,
@@ -440,10 +440,10 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   cross-builds the seat's firmware for RV32I and runs it inside the simulated
   PicoRV32, freestanding, with no host call (G3 record, second addendum, fact
   8), and no case today uses it; the Verilator `--binary` simulator compiles
-  seat HDL, and every gate refuses, before it runs, HDL with a way out to
-  the host: a system task outside an allow list (so `$system`, `$fopen` and
-  `$c`), DPI, or a `` `systemc_ `` block (`eda_guard.verilog_uses`;
-  `docs/GATE_INPUTS.md`, section 2). Those runs stay with the runner account,
+  seat HDL, and every gate refuses, before it runs, the constructs its
+  recorded fixtures name, among them `$system`, `$fopen`, `$c`, DPI and a
+  `` `systemc_ `` block (`tests/test_gate_inputs.py:111-156`), and the forms of
+  `docs/GATE_INPUTS.md`, section 7. Those runs stay with the runner account,
   as before; if a case ever hands one of them seat-written host code, it joins
   `SEAT_C_TOOLS` in `scripts/live_eval_ci.py`. `check
   --require-expected` and `trials` refuse a case that runs seat C (one whose
