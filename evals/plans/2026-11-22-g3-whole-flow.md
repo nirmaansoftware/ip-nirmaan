@@ -627,7 +627,10 @@ ip#444 (ET2 to ET4, `c99ef1fe`), ip#451 (gates W2C3 and W2C4 of the wave 2 close
 `cec29b2f`), ip#452 (the ET3 record, `fdf01d68`) and ip#445 (ET1, `817cc0d6`). ET5 is shown by the same run
 45073595509: the timer's reference answer passed `lint.run`, `simulator.run` and `synth.run` with the tools as the
 seat account; check 1 passed on its staged testbench; check 2 passed clean with 4 of 4 mutants failing; the re-judge
-gave the same result.
+gave the same result. The record of that is `evals/flow/et5_replay_record.json`, copied from the run's uploads, with
+`tests/test_live_eval_seat.py::test_the_committed_et5_replay_record_is_from_main_names_the_timer_and_shows_exactly_what_et5_claims`.
+It holds no run of the timer's controls or of the committed fixtures, which the run's uploads do not hold; those are
+this repository's tests on the same commit.
 
 - No file in `harness.CODE`, `LOOP_CODE` or `FLOW_CODE` and no tool definition changed:
   `git diff --name-only 45a22c84 817cc0d6` over those files and `src/nirmaan/company/tools.py` is empty, and these
