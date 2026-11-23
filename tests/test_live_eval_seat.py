@@ -636,6 +636,80 @@ def test_the_view_holds_the_run_directory_and_the_inputs_and_nothing_else(tmp_pa
     assert json.loads(argv[5]) == plan and argv[6:8] == ["--", "/usr/bin/setpriv"]
 
 
+def _beside_setup(tmp_path: Path) -> dict:
+    """A sandbox as M68 leaves it for a proof (``model._place_beside``): an approved file, a setup that names it as
+    ``m.v`` in its ``[files]``, and the link the platform placed beside the setup under that name. Beside it, a link
+    to a file the run is not given, and a link to the approved file by a relative path."""
+    root = tmp_path.resolve() / "tmp"
+    box = root / "nirmaan-et5-fixtures-x" / "pytest" / "t0"
+    approved = box / "approved" / "m.v"
+    other = box / "host" / "secret.v"
+    setup = box / "setup"
+    for folder in (approved.parent, other.parent, setup):
+        folder.mkdir(parents=True)
+    approved.write_text("module m(input wire a, output wire b); assign b = a; endmodule\n")
+    other.write_text("module secret; endmodule\n")
+    sby = setup / "f.sby"
+    sby.write_text("[options]\nmode bmc\ndepth 2\n\n[engines]\nsmtbmc\n\n[script]\nread -formal m.v\nprep -top m\n\n"
+                   "[files]\nm.v\n")
+    (setup / "m.v").symlink_to(approved)
+    (setup / "out.v").symlink_to(other)
+    (setup / "rel.v").symlink_to("../approved/m.v")
+    run = root / "nirmaan-symbiyosys-y"
+    run.mkdir(parents=True)
+    return {"root": root, "approved": approved, "setup": setup, "sby": sby, "run": run}
+
+
+def test_a_setup_opens_an_approved_file_linked_beside_it_inside_the_view(tmp_path):
+    """M68's ``beside`` as the seat account (ET5 replay run 45119522138): sby starts in its setup's folder and opens each
+    ``[files]`` name there, so the link the platform placed beside the setup is in the view, holding the approved file it
+    names (an input the harness named), read only. A link to a file the run was not given, a link by any other text,
+    and a link of another account's stay out of the view; nothing is added that is not a named input."""
+    from nirmaan.integrations import eda
+
+    me = os.getuid()
+    s = _beside_setup(tmp_path)
+    backend = next(b for b in eda.backends_for("formal.run") if b.name == "symbiyosys")
+    job = eda.Job("formal.run", {"sby": str(s["sby"]), "sources": str(s["approved"])}, s["run"],
+                  (str(s["approved"]),), None)
+    inputs = eda.seat_inputs(backend, job)
+    assert inputs == [str(s["approved"]), str(s["sby"])]  # the link's target is named; the link is not
+    assert all(seat.input_problem(p, me, s["root"]) is None for p in inputs)
+    plan = seat.view_plan(s["run"], s["setup"], inputs, s["root"], owner=me)
+    in_view = set(plan["files"]) | set(plan["links"])
+    for name in ("m.v", "f.sby"):  # what sby opens, relative to the folder it starts in
+        assert str(s["setup"] / name) in in_view, name
+    assert plan["links"] == {str(s["setup"] / "m.v"): str(s["approved"])}  # the named input, under the link's name
+    assert set(plan["links"].values()) <= set(inputs) and str(s["approved"]) in plan["ids"]
+    assert plan["mask"] == [str(s["root"] / "nirmaan-et5-fixtures-x")]  # the link's folder is hidden as before
+    assert seat.view_plan(s["run"], s["setup"], inputs, s["root"], owner=me + 1)["links"] == {}  # not the runner's
+    assert seat.view_plan(s["run"], s["setup"], inputs, s["root"])["links"] == {}  # no owner: no link is looked at
+
+
+def test_the_view_shows_a_beside_link_as_the_named_input_read_only(monkeypatch, tmp_path):
+    """``enter`` places the link's path in the view as the input it names: the same file, held open since it was
+    checked, bound read only on an empty file in the hidden folder; nothing is followed through the link itself."""
+    s = _beside_setup(tmp_path)
+    inputs = [str(s["approved"]), str(s["sby"])]
+    plan = seat.view_plan(s["run"], s["setup"], inputs, s["root"], owner=os.getuid())
+    mounts, placed, ran = [], [], []
+    monkeypatch.setattr(seat.os, "O_PATH", getattr(os, "O_PATH", 0), raising=False)
+    monkeypatch.setattr(seat.os, "unshare", lambda flags: None, raising=False)
+    monkeypatch.setattr(seat.os, "CLONE_NEWNS", getattr(os, "CLONE_NEWNS", 0), raising=False)
+    monkeypatch.setattr(seat.os, "chdir", lambda path: None)
+    monkeypatch.setattr(seat.os, "execv", lambda exe, argv: ran.append(argv))
+    monkeypatch.setattr(seat, "_mount", lambda *a: mounts.append(a))
+    monkeypatch.setattr(seat, "_placeholder", lambda path: placed.append(path))
+    seat.enter(plan, ["/usr/bin/setpriv", "--", "/usr/bin/sby"])
+    link, approved = str(s["setup"] / "m.v"), str(s["approved"])
+    assert placed == [approved, str(s["sby"]), link]  # each an empty file in the hidden folder, then bound
+    bound = {target: source for source, target, _, flags, *_ in mounts if flags == seat.MS_BIND}
+    assert bound[link] == bound[approved]  # the approved file's own descriptor, held since it was checked
+    readonly = seat.MS_REMOUNT | seat.MS_BIND | seat.MS_RDONLY | seat.MS_NOSUID | seat.MS_NODEV
+    assert (None, link, None, readonly) in mounts
+    assert ran == [["/usr/bin/setpriv", "--", "/usr/bin/sby"]]
+
+
 def test_run_refuses_an_input_the_runner_did_not_make_for_the_run(monkeypatch, tmp_path):
     monkeypatch.setenv("SUDO_UID", str(os.getuid()))
     monkeypatch.setenv("SUDO_GID", str(os.getgid()))
@@ -955,7 +1029,7 @@ def test_a_built_model_runs_in_a_view_of_its_run_directory_and_only_from_inside_
     monkeypatch.setattr(seat, "run_dir_problem", lambda where, owner: None)
     monkeypatch.setattr(seat, "built_problem", lambda exe, where, owner: None)
     real_view = seat.view_plan
-    monkeypatch.setattr(seat, "view_plan", lambda where, start, inputs: real_view(where, start, inputs, root))
+    monkeypatch.setattr(seat, "view_plan", lambda where, start, inputs, **kw: real_view(where, start, inputs, root, **kw))
     monkeypatch.setattr(seat, "grants_for", lambda where: [(str(where), "rwx")])
     monkeypatch.setattr(seat.subprocess, "run", lambda *a, **k: None)
     started = []

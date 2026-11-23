@@ -20,7 +20,12 @@ secret. Three parts, each written to ``--out``:
 - ``fixtures``: gate ET1's must-refuse fixtures and bypass controls (``tests/test_gate_inputs.py``,
   ``tests/test_gate_reads.py``) and the tests of the committed ``*_fail.v`` testbenches (``FIXTURE_TESTS``), from a
   copy of the checkout in a ``/tmp/nirmaan-*`` folder only the runner may read: the account reads only input files
-  the runner made in such a folder, and these tests name committed files as inputs.
+  the runner made in such a folder, and these tests name committed files as inputs. Gate ET1's bypass controls
+  (``test_control_without_the_check_*``: with the screen bypassed, the tool is expected to reach a canary or write a
+  marker) are among them; for each, every tool run is written down as the tool gave it (``BypassOutcomes``,
+  ``bypass.json``, and a ``BYPASS-CONTROL`` line each): its command, exit status, the lines it printed that name what
+  it could not open or read, its last lines, and the run's own summary and metrics. That only records; no test's
+  outcome changes.
 
 Every pytest run requires the tools it uses (``NIRMAAN_REQUIRE_EDA``), so a missing tool fails, never skips. Each
 writes its JUnit file and its output. ``summary.json`` names the commit, the wrappers and each part's outcome.
@@ -72,6 +77,87 @@ WRAPPED = (["iverilog"], ["vvp"], ["yosys"], ["sby"], ["eqy"], ["verilator", "--
 RUN_ROOT, RUN_PREFIX = "/tmp", "nirmaan-"
 FLOW_CONTROL = re.compile(r"^FLOW-CONTROL (\{.*\})$", re.MULTILINE)
 BAD_INPUT = 2
+#: Gate ET1's bypass controls, by the start of their test names (``tests/test_gate_inputs.py``,
+#: ``tests/test_gate_reads.py``).
+BYPASS = "test_control_without_the_check_"
+#: A line a tool printed that says what it could not open, find or read (or another error), kept for a bypass control.
+ERROR_LINE = re.compile(r"no such file|can't open|cannot open|could not open|can't find|cannot find|not found|"
+                        r"permission denied|read-only file system|can't resolve|error", re.IGNORECASE)
+#: How much of a step's output a bypass control's record keeps: lines of each kind, and characters of each line.
+KEEP_LINES, KEEP_CHARS = 5, 400
+#: How ``pytest_part`` starts pytest with ``BypassOutcomes``: as ``python -m pytest`` does (the current folder first
+#: on ``sys.path``), with the plugin loaded from this file by its path, so nothing else is put on ``sys.path``.
+BOOT = ("import importlib.util, os, sys\n"
+        "sys.path[0] = os.getcwd()\n"
+        "spec = importlib.util.spec_from_file_location('nirmaan_et5_controls', sys.argv[1])\n"
+        "module = importlib.util.module_from_spec(spec)\n"
+        "spec.loader.exec_module(module)\n"
+        "import pytest\n"
+        "sys.exit(pytest.main(sys.argv[3:], plugins=[module.BypassOutcomes(sys.argv[2])]))\n")
+
+
+def _kept(line: str) -> str:
+    return line if len(line) <= KEEP_CHARS else line[:KEEP_CHARS] + "..."
+
+
+def step_record(argv: Sequence[str], step) -> dict:
+    """One tool step as it ran (``eda._run_step``): its command, exit status (None when stopped, and why), the lines it
+    printed that name what it could not open or read, and its last lines."""
+    lines = [line for line in step.output.splitlines() if line.strip()]
+    return {"command": list(argv), "exit": step.code, "stopped": step.stopped,
+            "error_lines": [_kept(line) for line in lines if ERROR_LINE.search(line)][:KEEP_LINES],
+            "last_lines": [_kept(line) for line in lines[-KEEP_LINES:]]}
+
+
+class BypassOutcomes:
+    """A pytest plugin: for each bypass control (``BYPASS``), every gate run it made through
+    ``nirmaan.integrations.eda`` (the backend, each step as ``step_record`` keeps it, the run's summary and metrics)
+    and the test's result, one JSON line per control in ``path``. It wraps ``eda._execute`` and ``eda._run_step``,
+    which ``eda.execute`` looks up when it runs, and passes every argument and result through unchanged."""
+
+    def __init__(self, path: str | Path) -> None:
+        self.path = Path(path)
+        self.test: str | None = None
+        self.result = "not run"
+        self.runs: list[dict] = []
+
+    def pytest_configure(self, config) -> None:
+        from nirmaan.integrations import eda
+
+        execute, run_step = eda._execute, eda._run_step
+
+        def recorded_execute(backend, *args, **kwargs):
+            if self.test is None:
+                return execute(backend, *args, **kwargs)
+            run = {"backend": backend.name, "tool": backend.tool, "steps": []}
+            self.runs.append(run)
+            outcome = execute(backend, *args, **kwargs)
+            run.update(succeeded=outcome.succeeded, summary=outcome.summary, metrics=outcome.metrics)
+            return outcome
+
+        def recorded_step(argv, *args, **kwargs):
+            step = run_step(argv, *args, **kwargs)
+            if self.test is not None and self.runs:
+                self.runs[-1]["steps"].append(step_record(argv, step))
+            return step
+
+        eda._execute, eda._run_step = recorded_execute, recorded_step
+
+    def pytest_runtest_logstart(self, nodeid: str, location) -> None:
+        self.test = nodeid if BYPASS in nodeid else None
+        self.result, self.runs = "not run", []
+
+    def pytest_runtest_logreport(self, report) -> None:
+        if self.test is not None and (report.when == "call" or report.outcome != "passed"):
+            self.result = report.outcome
+
+    def pytest_runtest_logfinish(self, nodeid: str, location) -> None:
+        if self.test is None:
+            return
+        line = {"test": self.test, "result": self.result, "runs": self.runs}
+        with self.path.open("a", encoding="utf-8") as out:
+            out.write(json.dumps(line, sort_keys=True, default=str) + "\n")
+        self.test = None
 
 
 def _eda():
@@ -187,11 +273,15 @@ def sweep(out: Path) -> bool:
     return ok
 
 
-def pytest_part(name: str, tests: Sequence[str], cwd: Path, out: Path, env: dict[str, str]) -> dict:
+def pytest_part(name: str, tests: Sequence[str], cwd: Path, out: Path, env: dict[str, str],
+                bypass: Path | None = None) -> dict:
     """One pytest run, its temporary folders in a ``/tmp/nirmaan-*`` folder of their own, its JUnit file and output
-    kept; the tools it uses required."""
+    kept; the tools it uses required. With ``bypass``, each bypass control's tool runs are written there
+    (``BypassOutcomes``)."""
     base = Path(tempfile.mkdtemp(prefix=f"{RUN_PREFIX}et5-{name}-", dir=RUN_ROOT)).resolve()
-    argv = [sys.executable, "-m", "pytest", "-q", "-rs", "-p", "no:cacheprovider", f"--basetemp={base / 'pytest'}",
+    start = [sys.executable, "-c", BOOT, str(Path(__file__).resolve()), str(bypass)] if bypass else \
+        [sys.executable, "-m", "pytest"]
+    argv = [*start, "-q", "-rs", "-p", "no:cacheprovider", f"--basetemp={base / 'pytest'}",
             f"--junitxml={out / f'{name}.xml'}", *tests]
     proc = subprocess.run(argv, cwd=cwd, env={**env, "NIRMAAN_REQUIRE_EDA": REQUIRED}, capture_output=True, text=True)
     output = proc.stdout + proc.stderr
@@ -200,6 +290,13 @@ def pytest_part(name: str, tests: Sequence[str], cwd: Path, out: Path, env: dict
     shutil.rmtree(base, ignore_errors=True)
     return {"tests": list(tests), "exit": proc.returncode, "junit": f"{name}.xml", "log": f"{name}.log",
             "output": output}
+
+
+def bypass_lines(path: Path) -> list[dict]:
+    """The bypass controls' records ``BypassOutcomes`` wrote, in the order they ran (none when it wrote none)."""
+    if not path.is_file():
+        return []
+    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
 
 
 def copy_checkout() -> Path:
@@ -233,15 +330,25 @@ def main(argv: Sequence[str] | None = None) -> int:
     (out / "controls.json").write_text(json.dumps(lines, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     swept = sweep(out)
     copy = copy_checkout()
-    fixtures = pytest_part("fixtures", FIXTURE_TESTS, copy, out, {**env, "PYTHONPATH": str(copy / "src")})
+    lines_file = out / "bypass.jsonl"
+    lines_file.unlink(missing_ok=True)
+    fixtures = pytest_part("fixtures", FIXTURE_TESTS, copy, out, {**env, "PYTHONPATH": str(copy / "src")},
+                           bypass=lines_file)
     fixtures.pop("output")
     shutil.rmtree(copy.parent, ignore_errors=True)
+    bypass = bypass_lines(lines_file)
+    (out / "bypass.json").write_text(json.dumps(bypass, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    lines_file.unlink(missing_ok=True)
+    for control in bypass:
+        print(f"BYPASS-CONTROL {json.dumps(control, sort_keys=True)}", flush=True)
 
     ok = controls["exit"] == 0 and fixtures["exit"] == 0 and swept
     summary = {"format": "nirmaan.et5-seat-controls", "case": CASE, "commit": commit,
                "seat_tools": os.environ[_eda().SEAT_TOOLS_ENV], "required": REQUIRED.split(),
                "controls": {**controls, "lines": "controls.json", "count": len(lines)},
-               "sweep": {"record": "sweep.json", "ok": swept}, "fixtures": fixtures, "ok": ok}
+               "sweep": {"record": "sweep.json", "ok": swept}, "fixtures": fixtures,
+               "bypass": {"record": "bypass.json", "count": len(bypass),
+                          "failed": [c["test"] for c in bypass if c["result"] != "passed"]}, "ok": ok}
     (out / "summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
     print(f"ET5 as the seat account: controls exit {controls['exit']} ({len(lines)} controls), sweep "
           f"{'as recorded' if swept else 'DIFFERS'}, fixtures exit {fixtures['exit']}")

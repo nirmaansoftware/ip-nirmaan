@@ -18,7 +18,9 @@ by that rule (``as_runner``; decision 6 of the ET record; gate ET9 waits on thos
 harness keeps them, in the eval sandbox beside files the account may not read, so each run gets a view of its own:
 the program runs in a mount namespace of its own in which every ``/tmp/nirmaan-*`` folder holding one of the run's
 input files is replaced by an empty folder that holds only those input files, each at its own path and read only, and
-the run's own directory. The harness names both in the step's environment (``RUN_DIR_ENV``, ``INPUTS_ENV``, set by
+the run's own directory. A link of the runner's beside an input whose text is exactly another input's path (M68's
+``beside``: an approved file linked beside the setup that names it) is in the view too, as that input's own file, read
+only (``beside_links``); so the account reads no file it was not given. The harness names both in the step's environment (``RUN_DIR_ENV``, ``INPUTS_ENV``, set by
 ``nirmaan.integrations.eda``); the root helper refuses an input that is not a regular file of the runner's inside a
 ``/tmp/nirmaan-*`` folder the runner made, reached through no link, so nothing else of the sandbox, no other run's
 files and nothing of the checkout is in the view.
@@ -324,9 +326,32 @@ def top_of(path: Path, root: Path = RUN_ROOT) -> Path:
     return root / path.relative_to(root).parts[0]
 
 
-def view_plan(run_dir: Path, cwd: Path, inputs: Sequence[str], root: Path = RUN_ROOT) -> dict:
+def beside_links(run_dir: Path, inputs: Sequence[str], owner: int) -> dict[str, str]:
+    """The links the view also holds, each with the input it names: in each folder that holds an input outside the
+    run's own directory, a link of the runner's whose text is exactly the path of one of the inputs. That is the link
+    M68's ``beside`` places (``nirmaan.runtime.model._place_beside``): an approved file, linked under its own name beside
+    a setup that names its files relative to itself (``sby`` opens a ``[files]`` name in the setup's folder). The
+    harness names the file the link leads to (``nirmaan.integrations.eda.seat_inputs``), never the link. In the view the
+    link's path holds that input's own file, so the account reads no file it was not given, under one more name. Every
+    other link, and a link of another account's, stays out of the view. The inputs are already checked
+    (``input_problem``), so each folder is one the runner made, reached through no link."""
+    named = set(inputs)
+    folders = dict.fromkeys(Path(p).parent for p in inputs if not Path(p).is_relative_to(run_dir))
+    links = {}
+    for folder in folders:
+        for entry in sorted(os.scandir(folder), key=lambda e: e.name):
+            if not entry.is_symlink() or entry.stat(follow_symlinks=False).st_uid != owner:
+                continue
+            target = os.readlink(entry.path)
+            if target in named:
+                links[entry.path] = target
+    return links
+
+
+def view_plan(run_dir: Path, cwd: Path, inputs: Sequence[str], root: Path = RUN_ROOT, owner: int | None = None) -> dict:
     """What the run sees (``enter``): each top folder that holds an input outside the run's own directory, or the run's
-    own directory itself, is replaced by an empty one holding only those inputs and that directory; and the folder the
+    own directory itself, is replaced by an empty one holding only those inputs, the links beside them that name one of
+    them (``beside_links``, looked for only when ``owner``, the runner, is given) and that directory; and the folder the
     run starts in. All are already checked (``run_dir_problem``, ``input_problem``). The folder must be the run's own
     directory or one inside it, or a folder on the way to one of the inputs (``sby`` starts in its setup's folder)."""
     outside = [Path(p) for p in dict.fromkeys(inputs) if not Path(p).is_relative_to(run_dir)]
@@ -337,8 +362,10 @@ def view_plan(run_dir: Path, cwd: Path, inputs: Sequence[str], root: Path = RUN_
     on_way = any(p.is_relative_to(cwd) and cwd.is_relative_to(top_of(p, root)) for p in outside)
     if not (cwd.is_relative_to(run_dir) or on_way):
         raise Refused(f"{SEAT}: {cwd} is neither the run's directory nor a folder of its inputs (nothing ran)")
-    return {"mask": mask, "files": shown, "run_dir": rebind, "cwd": str(cwd),
-            "ids": {p: list(_identity(p)) for p in [*shown, *([rebind] if rebind else [])]}}
+    links = beside_links(run_dir, inputs, owner) if owner is not None else {}
+    held = dict.fromkeys([*shown, *links.values(), *([rebind] if rebind else [])])
+    return {"mask": mask, "files": shown, "links": links, "run_dir": rebind, "cwd": str(cwd),
+            "ids": {p: list(_identity(p)) for p in held}}
 
 
 def _identity(path: str) -> tuple[int, int]:
@@ -361,10 +388,22 @@ def _mount(source: str | None, target: str, fstype: str | None, flags: int, data
         raise OSError(err, f"mount {source} on {target}: {os.strerror(err)}")
 
 
+def _placeholder(path: str) -> None:
+    """An empty file at ``path`` in the view's hidden folder (with the folders above it), for a file to be bound on."""
+    os.makedirs(os.path.dirname(path), mode=0o755, exist_ok=True)
+    os.close(os.open(path, os.O_CREAT | os.O_WRONLY | os.O_CLOEXEC, 0o644))
+
+
+def _bind_read_only(fd: int, path: str) -> None:
+    _mount(f"/proc/self/fd/{fd}", path, None, MS_BIND)
+    _mount(None, path, None, MS_REMOUNT | MS_BIND | MS_RDONLY | MS_NOSUID | MS_NODEV)
+
+
 def enter(plan: dict, command: Sequence[str]) -> int:
     """As root: give this process a mount namespace of its own holding the run's view (``view_plan``), go to the run's
     folder and run ``command`` in it (``setpriv``, which drops to the seat account). Fails closed: a file that is not
-    the one checked, or a mount that fails, stops it before the command runs."""
+    the one checked, or a mount that fails, stops it before the command runs. A link of ``beside_links`` is placed as
+    the input it names, bound from that input's descriptor held since the check; the link itself is never followed."""
     os.unshare(os.CLONE_NEWNS)
     _mount(None, "/", None, MS_REC | MS_PRIVATE)
     held = {}
@@ -378,10 +417,11 @@ def enter(plan: dict, command: Sequence[str]) -> int:
     for top in plan["mask"]:
         _mount("nirmaan-seat", top, "tmpfs", MS_NOSUID | MS_NODEV, "mode=0755,size=1m")
     for path in plan["files"]:
-        os.makedirs(os.path.dirname(path), mode=0o755, exist_ok=True)
-        os.close(os.open(path, os.O_CREAT | os.O_WRONLY | os.O_CLOEXEC, 0o644))
-        _mount(f"/proc/self/fd/{held[path]}", path, None, MS_BIND)
-        _mount(None, path, None, MS_REMOUNT | MS_BIND | MS_RDONLY | MS_NOSUID | MS_NODEV)
+        _placeholder(path)
+        _bind_read_only(held[path], path)
+    for path, target in plan["links"].items():
+        _placeholder(path)
+        _bind_read_only(held[target], path)
     if plan["run_dir"]:
         os.makedirs(plan["run_dir"], mode=0o755, exist_ok=True)
         _mount(f"/proc/self/fd/{held[plan['run_dir']]}", plan["run_dir"], None, MS_BIND)
@@ -540,7 +580,7 @@ def run(cwd: str, exe: str, env: Sequence[str], args: Sequence[str], built: bool
         if bad:
             raise Refused(f"{SEAT}: {'; '.join(bad)}; a tool reads only files the runner made for this run (nothing "
                           f"ran)")
-        plan = view_plan(where, start, inputs) if viewed else None
+        plan = view_plan(where, start, inputs, owner=owner[0]) if viewed else None
         grants = grants_for(where) + [(p, "r--") for p in dict.fromkeys(inputs)
                                       if not os.lstat(p).st_mode & stat.S_IROTH]
         _save_grants({"owner": list(owner), "paths": grants})  # recorded first, so a crash leaves them to cleanup

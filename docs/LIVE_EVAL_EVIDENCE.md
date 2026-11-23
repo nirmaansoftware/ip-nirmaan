@@ -366,7 +366,12 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   input that is not a regular file of the runner's, with one name, inside a
   `/tmp/nirmaan-*` folder the runner made, reached through no link; nothing
   runs then. An input other accounts may not read by its mode gets a read
-  grant for that run only. A file beside an input that the seat wrote but
+  grant for that run only. A link of the runner's beside an input whose text
+  is exactly another input's path is in the view as that input's own file,
+  read only (`beside_links`): that is the link M68's `beside` places, an
+  approved file under its own name beside the setup that names it relative to
+  itself, which the harness names by the file it leads to. No other link is
+  shown, so the account reads no file it was not given. A file beside an input that the seat wrote but
   the gate was not given is not in the view either, so a seat file that
   includes a sibling it did not pass to the gate fails there where it would
   pass elsewhere. What the account was shown denied is only what the reach

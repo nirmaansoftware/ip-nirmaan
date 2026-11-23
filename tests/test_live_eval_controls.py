@@ -139,3 +139,75 @@ def test_each_sweep_run_is_in_a_run_directory_of_its_own_named_to_the_wrappers(m
                for r in out["rows"])
     assert out["rows"][0]["mutant"] == "reference" and out["simulator"].startswith("Icarus Verilog")
     assert not any(p.exists() for p in seen) and eda.SEAT_RUN_DIR_ENV not in os.environ
+
+
+def test_each_bypass_control_records_what_its_tool_gave_and_changes_nothing(monkeypatch, tmp_path):
+    """For security to state why a bypass control differs as the seat account (ET5 replay run 45119522138): each tool
+    run of a bypass control is written with its command, exit status, the line naming what it could not open, its last
+    lines and the run's summary; the run's arguments and outcome pass through unchanged, and other tests are not
+    recorded."""
+    from types import SimpleNamespace
+
+    from nirmaan.runtime.tools import ToolOutcome
+
+    printed = "Reading m.v\nERROR: Can't open include file `/tmp/nirmaan-x/CANARY_ET1.vh'!\nEnd of script.\n"
+    outcome = ToolOutcome(False, "yosys: synthesis failed: 1 error", metrics={"exit_status": 1})
+    calls = []
+
+    def run_step(argv, *rest):
+        calls.append(("step", argv, rest))
+        return eda._Step(printed, 1, None, len(printed))
+
+    def execute(backend, params, sources, workdir):
+        calls.append(("run", backend, params, sources, workdir))
+        eda._run_step(["/opt/nirmaan-seat/bin/yosys", "-s", "synth.ys"], "cwd", {}, 0.0, 10, workdir)
+        return outcome
+
+    monkeypatch.setattr(eda, "_run_step", run_step)
+    monkeypatch.setattr(eda, "_execute", execute)
+    path = tmp_path / "bypass.jsonl"
+    plugin = controls.BypassOutcomes(path)
+    plugin.pytest_configure(None)
+    gate = SimpleNamespace(name="yosys", tool="synth.run")
+    for nodeid, result in (("tests/test_gate_inputs.py::test_control_without_the_check_a_tool_acts_on_the_form[x]",
+                            "failed"), ("tests/test_gate_inputs.py::test_a_plain_top_still_synthesizes", "passed")):
+        plugin.pytest_runtest_logstart(nodeid, None)
+        assert eda._execute(gate, {"top": "m"}, ("m.v",), tmp_path) is outcome  # passed through unchanged
+        plugin.pytest_runtest_logreport(SimpleNamespace(when="call", outcome=result))
+        plugin.pytest_runtest_logfinish(nodeid, None)
+    assert [c[0] for c in calls] == ["run", "step"] * 2 and calls[0][2:] == ({"top": "m"}, ("m.v",), tmp_path)
+    [line] = controls.bypass_lines(path)  # the other test is not recorded
+    assert line["test"].endswith("test_control_without_the_check_a_tool_acts_on_the_form[x]")
+    assert line["result"] == "failed"
+    [run] = line["runs"]
+    assert run["backend"] == "yosys" and run["succeeded"] is False and run["summary"] == outcome.summary
+    assert run["metrics"] == {"exit_status": 1}
+    [step] = run["steps"]
+    assert step["command"] == ["/opt/nirmaan-seat/bin/yosys", "-s", "synth.ys"] and step["exit"] == 1
+    assert step["error_lines"] == ["ERROR: Can't open include file `/tmp/nirmaan-x/CANARY_ET1.vh'!"]
+    assert step["last_lines"][-1] == "End of script."
+
+
+def test_the_fixtures_run_loads_the_recorder_and_writes_a_bypass_controls_runs(tmp_path):
+    """End to end, with no tool: ``pytest_part`` starts pytest with the recorder, and a bypass control's run that is
+    refused before any step is written with its summary and no step."""
+    tests = tmp_path / "suite"
+    tests.mkdir()
+    (tests / "test_probe.py").write_text(
+        "from nirmaan.integrations.eda import backends_for, execute\n\n\n"
+        "def test_control_without_the_check_probe(tmp_path):\n"
+        "    gate = next(b for b in backends_for('synth.run') if b.name == 'yosys')\n"
+        "    (tmp_path / 'm.v').write_text('module m; endmodule\\n')\n"
+        "    assert not execute(gate, {'sources': str(tmp_path / 'm.v'), 'top': 'm;x'}).succeeded\n\n\n"
+        "def test_another():\n"
+        "    pass\n", encoding="utf-8")
+    out = tmp_path / "out"
+    out.mkdir()
+    env = {**os.environ, "PYTHONPATH": str(REPO / "src")}
+    part = controls.pytest_part("probe", ["test_probe.py"], tests, out, env, bypass=out / "bypass.jsonl")
+    assert part["exit"] == 0, part["output"]
+    [line] = controls.bypass_lines(out / "bypass.jsonl")
+    assert line["test"] == "test_probe.py::test_control_without_the_check_probe" and line["result"] == "passed"
+    [run] = line["runs"]
+    assert run["backend"] == "yosys" and run["succeeded"] is False and run["steps"] == []
+    assert "top must be a plain module name" in run["summary"]
