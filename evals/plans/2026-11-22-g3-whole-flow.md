@@ -490,3 +490,166 @@ this section is 17). The record's decision 5 says what follows for SBY
 under each result of that test: if the test on `main` shows that the formal gates run over a seat's setup on the timer
 path, `sby` is among the tools that run as the seat account before slot 1 (gates ET1 to ET3), and whatever section 12
 says of the formal gates' logs is restated by the plan amendment of gate ET6.
+
+## 18. Dated addition (2026-11-23): the plan amendment of gate ET6
+
+This is the plan amendment that gate ET6 of `council/records/2026-11-22-eda-tools-seat-account.md` asks for
+(decision 7, item 2). It also shows gate ET7 for the pull requests named below and holds the plan's part of gate ET8
+(decision 8). `council/records/2026-11-23-wave-2-close-meeting-1.md` (decision 4, "The whole-flow batch", and
+decision 5, item 1) has it merge before any dispatch of the timer case. It changes no code, no case, no record and no
+level: no file in `harness.CODE`, `LOOP_CODE` or `FLOW_CODE`, no tool definition, no CLI pin, no card and no knowledge
+document is touched. It changes no count, slot, arm, harness, attempt, fingerprint, main count or derived count.
+Unlike sections 14 to 17 it does change what sections 6, 7 and 12 say, as the record asks; where those sections and
+this one differ, this one rules.
+
+### 18.1 The timer's values, restated (section 6)
+
+Recomputed on `main` at `817cc0d6` (the commit this pull request was last merged with; this file touches none of the
+files below), CLI 2.1.325: the fingerprints with `harness_sha256(flow="whole", ...)` and the single-seat ones with
+`harness_sha256(...)`, each with the knowledge flag of its arm; the case digest with `case_digest`; the flow digests
+as a replay computes them before any stage runs (the skills each seated stage is given, and their digests); the group
+digests with the command of section 6.
+
+| Item | Since section 6 | Value |
+|---|---|---|
+| Case, `flow/axil-timer`, case digest | unchanged | `sha256:ff8a4afc77caee105070d996f3e29142f2fe013c411752becdc46090b7553da3` |
+| Whole-flow fingerprint, with documents | unchanged | `sha256:d90b3c1840870ae9434b90188dbb3078473140d56b2dec9e295c515c1832adfc` |
+| Whole-flow fingerprint, without documents | unchanged | `sha256:8d6590f7a66ac771abf360790643763e8c43d3c267d94a5145f1e4c8bf3ae975` |
+| Flow digest, with documents | unchanged | `sha256:a1aea0d36022a54be56c8d5c31831ea8ac0994f2802bd8ee8f39f6a5246ec312` |
+| Flow digest, without documents | unchanged | `sha256:b8608edecf2013dddfaec85e947106316f9a561a8ec74c7e3d99a7f53f8323c0` |
+| Single-seat default, with documents (must stay) | unchanged | `sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00` |
+| Single-seat default, without documents (must stay) | unchanged | `sha256:9aa7a333cd961a23aa919616fac6428f9f29fed1ba44b2fa3f5c6ee49e745d39` |
+
+The gate code groups. The first four are section 6's; the last three are pinned from this amendment on (section
+18.2). "Moved by" names each merge that changed a value, with the value on that merge commit.
+
+| Group | Paths | Files | Moved by | Digest |
+|---|---|---|---|---|
+| Gate backends | `src/nirmaan/integrations` | 60 | ip#444 (`c99ef1fe`: `3a7ad495...`), ip#451 (`cec29b2f`: `72e5a814...`), ip#445 (`817cc0d6`: `eac184ec...`) | `sha256:eac184ecc60ae35bdc88e6f66c2fa3aceaabe4c32f62066e951d7d5e84e835f9` |
+| Seat account | `scripts/live_eval_seat.py`, `.github/actions/live-eval-seat` | 2 | ip#444 (`c99ef1fe`: `00f3b35b...`), ip#451 (`cec29b2f`: `4abec1ad...`) | `sha256:4abec1ad1bb4fe9e48afb333c619c1d07ccd2e5df80b62f3142dc8ad750fa446` |
+| CI command | `scripts/live_eval_ci.py` | 1 | none | `sha256:3f396770975a7fcff4fc746c031e8694f768b921e90376c290e4fc023acf3e88` |
+| Workflow, tool set and CLI pin | `.github/workflows/live-eval.yml`, `.github/actions/live-eval-setup`, `.github/actions/oss-cad-suite`, `.github/live-eval` | 5 | ip#444 (`c99ef1fe`: `12c0fe97...`), ip#451 (`cec29b2f`: `09083077...`) | `sha256:09083077e0237a7e2b1ed89152d3d5b8f31836a03c8b78500b471d802f8e64d7` |
+| Reach test | `scripts/live_eval_reach.py` | 1 | newly pinned | `sha256:581a4cebb61899090a1741fdbea49e51b57decdebdf0cb11c58562f60b4b93c0` |
+| Held-out scorers | `src/nirmaan/evals/scorers.py` | 1 | newly pinned | `sha256:5f4f7909a3207f3837d2af7ad60b85c0bae620e1d461afde57aea0d2a592ecb4` |
+| Stage gates | `src/nirmaan/company/workflows.py` | 1 | newly pinned | `sha256:bcd15f8204e55f142f266afdd8e12a4947c7f6276382dd18f4c9893e616a9873` |
+
+Section 6's values for the first four groups were `ed76c4f2...`, `668a329a...`, `3f396770...` and `486f4fce...`;
+section 6 keeps them as the record of what moved. Every check of sections 4 and 7 is made against this table: "the
+four groups of section 6" in section 7 reads "the seven groups of section 18.1", and "the digests of section 6" in
+sections 4 and 7 reads "the values of section 18.1".
+
+### 18.2 What is pinned beyond the four groups
+
+The record asks which of `scripts/live_eval_reach.py`, `src/nirmaan/evals/scorers.py` and
+`src/nirmaan/company/workflows.py` this plan pins (its fact 13: they are in no fingerprint and were in no group). It
+pins all three, each as a group of its own in section 18.1:
+
+- `src/nirmaan/company/workflows.py` sets the timer's stages and which gates the RTL stage runs, the formal gates
+  on a seat `formal_spec` included (section 16).
+- `src/nirmaan/evals/scorers.py` runs the two held-out checks, and since ip#444 stages check 1's files for the run
+  (`eda.HELD_OUT_STAGED`) so that the seat account compiles them; a change there changes the judge.
+- `scripts/live_eval_reach.py` holds the probes that the `live-eval` job runs as a gate before its first trial
+  (section 18.3); a change there changes what that gate shows.
+
+So each falls under the dispatch check of section 7 (a moved digest stops the dispatch until a plan amendment
+merges) and under its freeze from slot 1 until the timer's last trial is recorded. A change to one of them that a
+register block gate needs merges before the timer's slot 1 or after its last trial is recorded, as section 7 already
+says of `fw.test`.
+
+### 18.3 Section 12, corrected
+
+The record's fact 15 finds one sentence of section 12 not supported, and decision 5 has what section 12 says of the
+formal gates restated here. Section 12 is read with these changes, for the timer flow; its parts not named here stand,
+as section 16 corrects them.
+
+- *What stops the rest.* The sentence "so a testbench cannot print a host file into the log" is withdrawn. The input
+  screen (`eda_guard`) is the first check before any step, on every machine. Since ip#445 it refuses the two classes
+  of the record's fact 9, by the rules of `docs/GATE_INPUTS.md`, section 7, and it is claimed only for the forms its
+  recorded fixtures name (`tests/test_gate_inputs.py`, through `lint.run`, `simulator.run`, `synth.run`, `formal.run`
+  and `formal.cover`; CI's test job in run 45085382759, on ip#445's merged head `cde63b5b`, holds 289 cases of that
+  file in its JUnit files, none skipped). It screens input; it confines nothing. It is not claimed to read as a
+  tool's preprocessor reads, to stop reads or code in general, or to cover a fault in a tool's parser.
+- *What the recorded reach tests show.* In the `replay`, `live-eval` and `rejudge` jobs, the steps of the timer path
+  that read seat-written Verilog run as `nirmaan-seat`, each by a wrapper in `/opt/nirmaan-seat/bin` with no
+  fallback to the runner (ip#444): `verilator --lint-only` (`lint.run`), `iverilog` and `vvp` (`simulator.run`),
+  `yosys` (`synth.run`), and `sby` with the Yosys and the solver it starts (`formal.run`, `formal.cover`). The
+  account is given the run's own directory and that run's input files. The held-out checks' Icarus compile runs
+  the same way, with check 1's files staged for the run as check 2's are (the record's decision 3, item 1; its
+  fallback was not built). Replay run 45073595509, dispatched on `main` at `c99ef1fe`, records it
+  (`evals/flow/tool_reach_record.json`, ip#452). In its `replay` job and again in its `rejudge` job, 19 of 19 were
+  as required. Each of Icarus through `simulator.run`, Verilator through `lint.run`, Yosys through `synth.run` and
+  SBY through `formal.run` (with a `formal.cover` control) passed a control on seat files and denied three probes: a
+  canary in the checkout, a runner-only canary, and the parent's `/proc/<pid>/environ` holding a credential-named
+  canary. The held-out compile read its own staged judge file, and a canary beside that file was denied. In both job
+  records, no canary value was in the log, summary or result file of any of those probe runs. The `live-eval` job runs the same probes as a gate before its
+  first trial and stops the job unless every probe is denied; it has no recorded run before slot 1. The vvp reach
+  test and runs of section 12 stand as written.
+- *The formal gates.* The paragraph of section 16 that says the formal runs run as the runner account with no
+  recorded probe through them is withdrawn from ip#444 on: `sby` runs as `nirmaan-seat` in those jobs, and run
+  45073595509 probes it as above. What section 16 says the formal logs hold, and that they return on a retry, stands.
+- *What stays with the runner.* The `nirmaan` process (the screen, the harness, the scorers' reading of results),
+  and any Verilator run that is neither a lint nor `coverage.read`'s build, by the stated rule of ip#444 and ip#451
+  (`as_runner`, `eda.seat_tool`). No step of the record's facts 5 and 6, which list the timer path's tool steps, is
+  such a build.
+- *What it can carry.* The seat's own earlier output, the tools' messages about it, and the names of the run's own
+  files. From outside the run, nothing is claimed beyond this: in run 45073595509 the probed targets were denied to
+  those tools as that account.
+- *What is not claimed*, adding to section 12's list (the record's decision 8): that seat files are confined,
+  sandboxed or isolated; that the screen is enough; that the credential is safe, or that it was or could not be read;
+  anything about files every account may read, beyond the probed targets; the local runs of the record's fact 9 as
+  evidence (the fixtures of ip#445 replace them); and that the `live-eval` job has a recorded probe run before slot
+  1. The residual, as the record and the wave 2 close record state it: screen classes nobody has found, faults in a
+  tool's parser, and files any account may read.
+
+### 18.4 A refused or denied run is a failed run
+
+A run that the screen refuses, or that fails because a tool is denied as the seat account (the wrapper refuses an
+input or the run, or the tool cannot open a file the account is not given, such as an include of a file the gate was
+not given), is a failed run of that gate, decided in advance as the record's fact 12 says: nothing of it passes. At
+a stage it is handled as any failed run, within the stage's attempts (section 4). A trial that ends on it is a failed
+trial of its group: committed as failed, never removed, never repeated and never replaced (section 8). In a held-out
+check it fails the check wherever the check needs that run to pass, and a refused mutant run is never counted as
+caught (`src/nirmaan/evals/scorers.py`). This is not a job-level stop of section 8: the job-level stop is the reach
+test before any trial, which, when a probe is not denied, stops the job with no trial run.
+
+### 18.5 The include listing at the read
+
+The timer's read lists, for each passed trial of each of its two groups, whether any HDL file a seat wrote in that
+trial (a file of kind `rtl_source` or `testbench`, or named `*.v`, `*.sv`, `*.vh` or `*.svh`, in any stage's recorded
+answer, at any attempt) holds an `` `include `` directive, and where one does, the stage, the attempt, the file and
+the line. The listing is read from the committed records at the same single read. It changes no count, makes no
+group, split or second read, and a passed trial stays passed.
+
+### 18.6 Gate ET7, shown
+
+The merges since section 6 was computed at `45a22c84` that meet gates ET1 to ET5 or move a value of section 18.1:
+ip#444 (ET2 to ET4, `c99ef1fe`), ip#451 (gates W2C3 and W2C4 of the wave 2 close record, on the same account,
+`cec29b2f`), ip#452 (the ET3 record, `fdf01d68`) and ip#445 (ET1, `817cc0d6`). ET5 is shown by the same run
+45073595509: the timer's reference answer passed `lint.run`, `simulator.run` and `synth.run` with the tools as the
+seat account; check 1 passed on its staged testbench; check 2 passed clean with 4 of 4 mutants failing; the re-judge
+gave the same result.
+
+- No file in `harness.CODE`, `LOOP_CODE` or `FLOW_CODE` and no tool definition changed:
+  `git diff --name-only 45a22c84 817cc0d6` over those files and `src/nirmaan/company/tools.py` is empty, and these
+  tests pass on `817cc0d6`: `tests/test_whole_flow_dispatch.py` (gate WF7),
+  `tests/test_live_eval_seat.py::test_the_tools_as_the_seat_account_change_no_fingerprint` and
+  `tests/test_gate_inputs.py::test_no_file_this_milestone_changes_is_harness_code`.
+- The four fingerprints, recomputed with CLI 2.1.325 on each merge commit (`c99ef1fe`, `cec29b2f`, `fdf01d68` and
+  `817cc0d6`, which is also the commit of section 18.1), are the values of section 18.1, unchanged.
+- Every value of section 18.1 is recomputed again on the commit the measured run is dispatched from and on the commit
+  of each slot (section 7); a difference stops the dispatch until a plan amendment merges.
+- The measured run of section 10 is made after this amendment merges. No dispatch of the timer case with a model, no
+  measured run and no slot, has happened before it: in every run of `.github/workflows/live-eval.yml` since ip#354
+  made a whole-flow case dispatchable, the `live-eval` job was skipped (each was a replay, run 45073595509 the last
+  before this amendment).
+
+### 18.7 What slot 1 still waits for
+
+With this merge, gate ET6 is met and ET7 is shown for every merge named above. ET1 to ET5 rest on the pull requests
+and runs named in sections 18.3 and 18.6. For ET8, this section is the plan's part; the documents it names are
+`docs/GATE_INPUTS.md` from ip#445, `docs/GATE_INTEGRITY.md` from ip#444, ip#451 and ip#445, and
+`docs/LIVE_EVAL_EVIDENCE.md`, section 6, from ip#444 and ip#451, and that every text follows decision 8 is
+qa-evidence's to confirm. Gate
+ET9 is the register block's, before slot 21. This section adds no condition before slot 1 and removes none: section
+13 stands, with the measured run of section 10 after this merge. The re-measure batch of the wave 2 close record and
+the timer's twenty are never interleaved: one records its last trial before the other dispatches its first.
