@@ -212,10 +212,15 @@ Built in rollout R5; in use on real pull requests since 2026-10-18. The
 a pull request it wrote, and the script refuses when a Claude Code session has
 the branch checked out. In order:
 
-1. **At most three model calls at once** across Nirmaan and IP Nirmaan where
-   both loops share one state folder: three model slots in
-   `~/.nirmaan/pr-review/` (`model_cap` 3 here), two of them shared with
-   Nirmaan's loop (its `model_cap` 2), held here only around each
+1. **At most three model calls at once** in this loop, in the three model
+   slots it has in GitHub Actions (`model_cap` 3 here; the slots are files in
+   its own state folder, so Nirmaan's loop takes none of them). Across both
+   repositories on a shared Mac state folder (`~/.nirmaan/pr-review/`) the cap
+   stays 2, as Nirmaan's founder-approved record sets it (its
+   `docs/operations/pr-review-decisions.md`, line 193, and R5.5 in
+   `docs/operations/2026-10-18-review-loop-decisions.md`): if this loop ever
+   runs on that folder again, its `model_cap` must be 2 there, or a Nirmaan
+   decision record must raise the shared cap first. A slot is held here only around each
    model call (a reviewer's, or the loop's fixer's), never while checking out,
    reading CI, posting or running local checks. Slot 0 is `review.lock`, slot
    n `model-slot-<n>.lock`; this script tries `review.lock` first and Nirmaan's
@@ -578,9 +583,11 @@ labels only its own pull request. Each pull request's state file is written
 by its own worker only, and every write of it, and of the pause file, is a
 whole file renamed into place, so no reader sees half of one. Every model call
 of a worker holds one of the `model_cap` (3, `CONFIG` in
-`scripts/pr_review.py`) model slots, one for each worker. On a machine where
-the Nirmaan loop shares the state folder, its two slots are two of the same
-three, so at most three model calls run at once across both repositories; a
+`scripts/pr_review.py`) model slots, one for each worker. Three
+holds where this loop has its own slots (GitHub Actions, today's setup). On a
+machine where the Nirmaan loop shares the state folder the shared cap is 2 (the
+Nirmaan record named in step 1 of "How reviewers run"), so this loop's
+`model_cap` must be 2 there; a
 worker that finds every slot held ends its step `busy` and its cached
 verdicts carry over. The check that the loop is `main`'s
 copy runs once, before each pass, so no new step starts once `main` may have
@@ -885,7 +892,8 @@ loop never starts from empty state and reviews everything again.
 
 **Differences from the Mac.** The model slots are files in a state
 folder, so once the loops run on two machines each has its own (this loop
-three, the Nirmaan loop two). Until
+three, the Nirmaan loop two); only a shared state folder is capped at 2 across
+both. Until
 the Nirmaan loop also reads and writes the state repository, it does not see
 this loop's pause, nor this loop the Nirmaan loop's: each pauses at its own
 first limited call. Call lines from before the switch stay in the Mac's
