@@ -362,6 +362,19 @@ in the same pull request.
   `CODE` files), so no level moves. This change ends decision 4's quiet
   window (gate RT4): evidence trials run on the new default.
 
+- G3, the whole-flow pass-through note (council record 2026-11-17, sixth
+  addendum, decision P2, gate WF31): the two notes of `evals/flow.py` gain
+  one sentence between their first and last, "No reviewer judged this stage:
+  the evaluation harness recorded this review and approval itself, by the
+  evaluation's rule, so that later stages receive it as input; 'approved'
+  here records that rule, not a judgement." The pass-through now says who
+  made the record and by what rule; it gives a seat no instruction. Only
+  `FLOW_CODE` changed: both whole-flow fingerprints changed and neither
+  single-seat default (`tests/test_whole_flow_dispatch.py`). No `CODE` file,
+  tool definition, card, knowledge document or case changed.
+  `tests/test_whole_flow_passthrough_note.py` replays both whole-flow cases
+  with no model, in both arms, and checks the lines a later stage is sent.
+
 ## What is not the harness
 
 - The model: its own group key, recorded on the trial. The program the
