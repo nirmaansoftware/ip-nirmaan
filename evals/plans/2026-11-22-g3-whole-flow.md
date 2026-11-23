@@ -580,8 +580,8 @@ as section 16 corrects them.
   as required. Each of Icarus through `simulator.run`, Verilator through `lint.run`, Yosys through `synth.run` and
   SBY through `formal.run` (with a `formal.cover` control) passed a control on seat files and denied three probes: a
   canary in the checkout, a runner-only canary, and the parent's `/proc/<pid>/environ` holding a credential-named
-  canary. The held-out compile read its own staged judge file, and a canary beside that file was denied. No canary
-  value was in any run's log, summary or result file. The `live-eval` job runs the same probes as a gate before its
+  canary. The held-out compile read its own staged judge file, and a canary beside that file was denied. In both job
+  records, no canary value was in the log, summary or result file of any of those probe runs. The `live-eval` job runs the same probes as a gate before its
   first trial and stops the job unless every probe is denied; it has no recorded run before slot 1. The vvp reach
   test and runs of section 12 stand as written.
 - *The formal gates.* The paragraph of section 16 that says the formal runs run as the runner account with no
@@ -639,15 +639,17 @@ gave the same result.
 - Every value of section 18.1 is recomputed again on the commit the measured run is dispatched from and on the commit
   of each slot (section 7); a difference stops the dispatch until a plan amendment merges.
 - The measured run of section 10 is made after this amendment merges. No dispatch of the timer case with a model, no
-  measured run and no slot, has happened before it: every run of the workflow on the timer case so far is a replay,
-  whose `live-eval` job did not run.
+  measured run and no slot, has happened before it: in every run of `.github/workflows/live-eval.yml` since ip#354
+  made a whole-flow case dispatchable, the `live-eval` job was skipped (each was a replay, run 45073595509 the last
+  before this amendment).
 
 ### 18.7 What slot 1 still waits for
 
-With this merge, gate ET6 is met and ET7 is shown for every merge named above; ET1 to ET5 and ET8 are met by the pull
-requests named in sections 18.3 and 18.6 (for ET8, `docs/GATE_INPUTS.md` from ip#445, `docs/GATE_INTEGRITY.md` from
-ip#444, ip#451 and ip#445, and `docs/LIVE_EVAL_EVIDENCE.md`, section 6, from ip#444 and ip#451; this section is the
-plan's part). Gate
+With this merge, gate ET6 is met and ET7 is shown for every merge named above. ET1 to ET5 rest on the pull requests
+and runs named in sections 18.3 and 18.6. For ET8, this section is the plan's part; the documents it names are
+`docs/GATE_INPUTS.md` from ip#445, `docs/GATE_INTEGRITY.md` from ip#444, ip#451 and ip#445, and
+`docs/LIVE_EVAL_EVIDENCE.md`, section 6, from ip#444 and ip#451, and that every text follows decision 8 is
+qa-evidence's to confirm. Gate
 ET9 is the register block's, before slot 21. This section adds no condition before slot 1 and removes none: section
 13 stands, with the measured run of section 10 after this merge. The re-measure batch of the wave 2 close record and
 the timer's twenty are never interleaved: one records its last trial before the other dispatches its first.
