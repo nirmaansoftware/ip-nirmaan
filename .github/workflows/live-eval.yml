@@ -29,7 +29,10 @@ name: Live evaluation
 # The token is CLAUDE_CODE_OAUTH_TOKEN, a secret of the `live-eval` environment, which only
 # `main` may deploy to; there is no repository secret. Only the gate step and the trials step
 # get it. A replay (`replay: true`) runs the case's reference answer: no model, no token, no
-# environment, from any branch, to check the tools before trials are spent.
+# environment, from any branch, to check the tools before trials are spent. A replay of `flow/axil-timer` with
+# `controls: true` also runs, in the `replay` job with the tools as the seat account, the timer's controls, its whole
+# mutant sweep and the committed gate fixtures (gate ET5 of council/records/2026-11-22-eda-tools-seat-account.md;
+# scripts/live_eval_controls.py), and uploads their record (live-eval-controls-<run id>).
 #
 # Whole-flow cases (`flow/...`, G3 council record 2026-11-17, decision 4; gates WF9 and WF13) run in these same
 # jobs, one trial per dispatch on the default harness (scripts/live_eval_ci.py), with the RISC-V cross compiler
@@ -74,6 +77,10 @@ on:
         description: "Replay the reference answer instead: no model and no token"
         type: boolean
         default: false
+      controls:
+        description: "With a replay of flow/axil-timer: also run its controls, mutant sweep and gate fixtures as the seat account (gate ET5)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -86,7 +93,7 @@ jobs:
   replay:
     if: ${{ inputs.replay }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 150
     outputs:
       records: ${{ steps.upload.outcome == 'success' }}
       artifact: live-eval-replay-${{ github.run_id }}
@@ -162,6 +169,16 @@ jobs:
         run: |
           python scripts/live_eval_ci.py confined
           nirmaan eval run "$CASE" --replay --out "$RUNNER_TEMP/replay"
+      # Gate ET5: the timer's controls, its whole mutant sweep and the committed gate fixtures, with the tools as the
+      # seat account (scripts/live_eval_controls.py; it refuses any other case and a job without the wrappers).
+      - name: Run the controls, the mutant sweep and the gate fixtures as the seat account
+        id: controls
+        if: inputs.controls
+        env:
+          FW_REACH: ${{ runner.temp }}/fw-reach/fw-reach.json
+        run: |
+          python scripts/live_eval_ci.py confined
+          python scripts/live_eval_controls.py --out "$RUNNER_TEMP/controls"
       - name: Check the checkout did not change
         id: after
         if: always() && steps.before.outcome == 'success'
@@ -184,6 +201,13 @@ jobs:
         with:
           name: live-eval-replay-${{ github.run_id }}
           path: ${{ runner.temp }}/replay
+      - name: Upload the controls record
+        if: always() && steps.controls.outcome != 'skipped'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: live-eval-controls-${{ github.run_id }}
+          path: ${{ runner.temp }}/controls
+          if-no-files-found: ignore
 
   # Live trials from another branch: nothing would run, so the run fails and says why.
   not-main:
