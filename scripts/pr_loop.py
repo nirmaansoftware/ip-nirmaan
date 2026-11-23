@@ -29,7 +29,9 @@ per call, as a state machine that survives restarts:
     review  both keys, and the Founder Proxy (agent) for a founder-class pull
             request, through scripts/pr_review.py; then one comment naming the
             soft shape rules it breaks (never a stop);
-    merge   both keys (and the proxy) passed: `gh pr merge --auto --merge` with the gh login
+    merge   both keys (and the proxy) passed, or the review found the pull request
+            qualified for the records-only fast lane (pr_review CONFIG "fast_lane": no key
+            ran): `gh pr merge --auto --merge` with the gh login
             when the review App posts the checks and the repository's
             allow_auto_merge field (read with gh) is true; a "ready" comment in
             a dry run or when it is false; the field unreadable or any merge
@@ -204,7 +206,7 @@ LOOP = {
     "fixer_forbidden": [
         ".github/**", ".claude/**", "CLAUDE.md", "council/**",
         "scripts/check_*.py", "scripts/live_eval_gate.py", "scripts/pr_review.py", "scripts/review_map.py", "scripts/pr_loop.py",
-        "scripts/loop_cloud.py", "tests/test_pr_review.py", "tests/test_pr_loop.py", "tests/test_review_teams.py", "tests/test_loop_cloud.py", "tests/fixtures/pr_review/**", "tests/fixtures/pr_loop/**",
+        "scripts/loop_cloud.py", "tests/test_pr_review.py", "tests/test_pr_loop.py", "tests/test_review_teams.py", "tests/test_loop_cloud.py", "tests/test_fast_lane.py", "tests/fixtures/pr_review/**", "tests/fixtures/pr_loop/**",
         "docs/REVIEW_MECHANISM.md", "docs/pr-loop.plist", "pyproject.toml", ".gitignore", ".gitattributes",
     ],
     # Checks the loop runs on the fix commit, in the worktree (in GitHub Actions
@@ -802,6 +804,9 @@ def _worktree_changes(path: str) -> list[str]:
 
 def _passed_what(r: dict, capital: bool = False) -> str:
     """What passed, for the merge-path comments."""
+    if r.get("fast_lane"):
+        what = "the records fast lane qualified (no agent key ran)"
+        return what[0].upper() + what[1:] if capital else what
     proxy = r.get("proxy")
     what = ("both keys passed" if not proxy else
             "both keys passed, and the founder's own GitHub review approves the changes the Founder Proxy (agent) sent to the founder"
@@ -1190,6 +1195,13 @@ class Loop:
             return {"outcome": "skip", "reason": f"{r['ci_failed']}; the author fixes it"}
         if r.get("deferred"):
             return self._stop(ctx, head, f"review deferred: {r['deferred']}")
+        if r.get("fast_lane"):
+            # The records-only fast lane (pr_review CONFIG "fast_lane"): the review checked every condition on
+            # this head and the App posted both checks naming the lane; no key ran, so no fix round can follow.
+            if not pr_review.fast_lane_ok(r["fast_lane"]):
+                return self._stop(ctx, head, "the review returned a records fast lane result with a failed condition")
+            self._log(ctx, "fast-lane", conditions=",".join(c["condition"] for c in r["fast_lane"]))
+            return self._merge_path(ctx, r)
         # When the verdicts reached GitHub (deferred keys included).
         self._log(ctx, "verdict-posted", key1=",".join(f"{k['team']}:{k['status']}" for k in r.get("key1") or []),
                   key2=r["key2"]["status"] if r.get("key2") else "not run",
@@ -1435,6 +1447,11 @@ class Loop:
         if cfg["hold_label"] in now["labels"]:
             self._log(ctx, "held")
             return {"outcome": "skip", "reason": "hold label set during the review"}
+        if r.get("fast_lane") and (now["head_sha"] != head or self.lc["needs_founder_label"] in now["labels"]):
+            # The fast lane's conditions were read on this head without that label: either changed, the normal path.
+            self._log(ctx, "fast-lane-dropped")
+            return {"outcome": "skip", "reason": "the head or its labels changed after the records fast lane was checked"}
+        footer = "_Records fast lane: no agent review ran._" if r.get("fast_lane") else "_Agent review only._"
         # main moved during the review: this head cannot merge, so update it
         # rather than ask GitHub to merge it.
         if now.get("mergeable_state") == "behind" and o["post"] != "none":
@@ -1481,12 +1498,12 @@ class Loop:
             self._log(ctx, "auto-merge")
             self._say(n, f"<!-- {MARK} auto-merge head={head} -->\n### Automated loop: {_passed_what(r)} on `{sha7}`\n\n"
                          "Auto-merge is on for this pull request: GitHub merges it with a merge commit once every required "
-                         "check passes on this head.\n\n_Agent review only._")
+                         "check passes on this head.\n\n" + footer)
             st["done"] = {"head": head, "outcome": "auto-merge"}
         else:
             self._log(ctx, "ready", why=why)
             self._say(n, f"<!-- {MARK} ready head={head} -->\n### Automated loop: ready\n\n{_passed_what(r, True)} on `{sha7}`, "
-                         f"waiting for the founder's merge settings: {why}. The founder merges this pull request.\n\n_Agent review only._")
+                         f"waiting for the founder's merge settings: {why}. The founder merges this pull request.\n\n" + footer)
             st["done"] = {"head": head, "outcome": "ready"}
         _save_state(self.state_dir, cfg["repo"], st)
         return {"outcome": st["done"]["outcome"]}

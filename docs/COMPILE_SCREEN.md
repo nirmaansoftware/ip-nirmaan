@@ -158,8 +158,8 @@ seat to confirm or reject:
    system compiler is not. It would also need read grants on the seat's
    files, the harness (which lives in the checkout the account may not read)
    and the generated map header, and objects written by the seat account
-   handed back to the runner's link step and to the object screen. Security
-   The author's own assessment, pending a security seat record, is a
+   handed back to the runner's link step and to the object screen. The
+   author's own assessment, pending a security seat record, is a
    moderate added risk in code that runs as root, for little beyond reason 4.
 
 Proposed conditions, each before the first register block trial:

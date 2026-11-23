@@ -327,6 +327,71 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   jobs, the listed probes were denied to `nirmaan-seat` through the named tools. The write and network probes ran
   through `vvp` only, and are cited to the committed log lines of the reach step's first part, not to the tool reach
   record. It covers no other run, commit or slot, and it states nothing of that run's trial.
+- **Gate ET5's controls, sweep and fixtures as the account.** A replay of
+  `flow/axil-timer` dispatched with `controls: true` also runs
+  `scripts/live_eval_controls.py` in the `replay` job, after the reference
+  answer's replay and before the checkout is hashed again, with the tools as
+  the account. It runs the timer's seven controls
+  (`tests/test_whole_flow_controls.py`, held to
+  `evals/flow/controls_record.json`); every row of
+  `evals/flow/axil_timer/mutant_sweep.json`, rebuilt and run on the
+  testbench copy by `flow_mutants.simulate` and compared with the record's
+  result, error count and first failure; and gate ET1's fixtures with the
+  tests of the committed `*_fail.v` testbenches. The fixtures run from a copy
+  of the checkout in a `/tmp/nirmaan-*` folder only the runner may read,
+  since the account reads only input files the runner made in such a folder.
+  A missing tool fails its test. The job uploads the result as
+  `live-eval-controls-<run id>`. The committed record is
+  `evals/flow/et5_controls_record.json`, of
+  [run 45119522138](https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45119522138),
+  a replay of `flow/axil-timer` with `controls` set, dispatched on `main` at
+  c0ba283c (the merge of ip#464). As the account, all seven timer controls
+  gave the verdicts of `evals/flow/controls_record.json`, and all 100 sweep
+  rows (the reference and 99 mutants) gave the record's result, error count
+  and first failure. Of the 402 fixture tests, 390 passed and 12 failed,
+  none skipped, so the `replay` job failed at that step. Every must-refuse
+  fixture passed. The 12 are 11 bypass controls and one must-pass test. Run
+  45119522138's own record shows the failed assertions and their messages only. Run
+  45135605510's bypass record (`docs/evidence/et5/run-45135605510`), for the
+  same 11 controls by name, shows that in each the tool ran through the
+  account's wrapper; in the two shell controls the payload itself (`touch`)
+  ran and its write was refused, and in the others the tool printed that it
+  could not open, resolve or write its target (security's statement, decision
+  E1 of the third addendum, which reads the two `verilator --lint-only` forms
+  as an inference). Which layer refused is in neither record. The must-pass test is a formal setup
+  over an approved file linked beside it, which did not run as the account.
+  The record lists each with its message. The same run's replay passed, its
+  re-judge was the same, and its reach test denied every probe in both
+  jobs. Whether gate ET5 is met is verification-lead's statement, which the
+  record does not make. Verification-lead read the record and stated ET5 not
+  met (plan section 21.4).
+- **Gate ET5 stated on run 45159697183** (gate ET18 of the third addendum). A
+  replay of `flow/axil-timer` with `controls` set, no model and no token,
+  was dispatched on `main` at f8dcc97e (the merge of ip#475, which holds gate
+  ET17), as [run 45159697183](https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45159697183).
+  Its replay of the reference answer passed, and the listed probes of
+  each tool reach record were denied (32 entries in each, `every_denied`
+  true) in its `replay` job (attempt 1) and its `rejudge` job (attempt 2). As the account, all seven timer
+  controls and all 100 sweep rows gave the results of the committed records;
+  the controls step failed because 13 bypass controls of gate ET1 failed. Of
+  its 408 fixture tests none was skipped, and the linked setup and every
+  must-refuse fixture passed. The
+  committed record, `evals/flow/et5_controls_record_45159697183.json`, reads
+  each by decision E2 of the third addendum: the tool ran through the
+  account's wrapper and the tool's own line names the target it could not
+  open, resolve or write. The controls that ran as the caller are listed and
+  claimed for nothing. The run's uploads, and its tool reach records, are
+  committed as uploaded in `docs/evidence/et5/run-45159697183`, and
+  `tests/test_live_eval_controls.py` holds the record to them and checks that
+  no bypass entry run as the account holds a target's content. The record
+  does not say ET5 is met; verification-lead stated ET5 met on this run at
+  f8dcc97e on the condition that the pinned values on the commit the measured
+  run is dispatched from equal f8dcc97e's (plan section 23.5). This is a
+  replay, not a reach record of the measured run or of a slot, and it covers
+  no other run or commit. The reference answer's pass rests on the step result
+  GitHub reported; no replay result file is committed. If a pinned group
+  moves after the statement, ET5 is open again. `evals/flow/et5_controls_record.json`
+  (run 45119522138) and its test are unchanged.
 - **The tools that read seat Verilog run as the account too** (gates ET2 to
   ET4 of `council/records/2026-11-22-eda-tools-seat-account.md`). The input
   screen (`eda_guard`) reads seat files with patterns of its own, and the
@@ -348,13 +413,26 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   which every `/tmp/nirmaan-*` folder that holds one of the run's input files
   is replaced by an empty folder holding only those files, each read only at
   its own path, and the run's own directory. The run names its directory and
-  its input files (the sources, the setup and every file its `[files]` names,
-  the other files its parameters name) in each step's environment
-  (`nirmaan.integrations.eda`, `seat_inputs`), and the root helper refuses an
+  its input files (the sources, the setup and every file its `[files]` names
+  that is the run's own, the other files its parameters name) in each step's
+  environment (`nirmaan.integrations.eda`, `seat_inputs`). A `[files]` entry is
+  the run's own only when its file is inside the setup's folder or one of the
+  sources, whether or not the screen ran, and `formal.cover` reads and copies
+  as the caller only such files (gate ET17 of the record's third addendum;
+  `docs/GATE_INPUTS.md`, section 8): before that, with the screen bypassed, an
+  entry naming a runner-made file under `/tmp/nirmaan-*` was an input, and
+  replay run 45135605510 showed a bypass control's host file in its summary as
+  the account (the addendum's fact T7). The root helper refuses an
   input that is not a regular file of the runner's, with one name, inside a
   `/tmp/nirmaan-*` folder the runner made, reached through no link; nothing
   runs then. An input other accounts may not read by its mode gets a read
-  grant for that run only. A file beside an input that the seat wrote but
+  grant for that run only. Any link of the runner's in a folder that holds
+  an input outside the run's directory, whose text is exactly an input's
+  path, is in the view as that input's own file, read only (`beside_links`).
+  M68's `beside` places such a link: an approved file under its own name
+  beside the setup that names it relative to itself, which the harness names
+  by the file it leads to. No other link is shown, so the account reads no
+  file it was not given. A file beside an input that the seat wrote but
   the gate was not given is not in the view either, so a seat file that
   includes a sibling it did not pass to the gate fails there where it would
   pass elsewhere. What the account was shown denied is only what the reach
