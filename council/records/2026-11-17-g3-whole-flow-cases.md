@@ -1924,3 +1924,460 @@ This meeting wrote no code and no plan text.
 ### Open, for the founder
 
 Nothing.
+
+## Sixth addendum (2026-11-23): what a later stage is told of the pass-through
+
+This addendum takes up the item the fifth addendum left open for
+verification-lead, before the timer's slot 1 and before any proposal
+existed: whether what the whole-flow pass-through shows the seat of a later
+stage is a defect of the harness. It amends the note of decision 3,
+"Intermediate stages", amends decision F1 of the fifth addendum, and adds
+gates WF31 to WF35. It is a decision made on 2026-11-23.
+
+Ruling, in short:
+
+- **It is a defect of the harness, in how the pass-through is shown, not
+  in the note's truth.** A later stage's seat is shown the earlier stage's
+  output as `approved` beside a record that reads "Independent review by"
+  a named role and then "not reviewed", marked substantiated, and nothing
+  says the harness made that record by the evaluation's rule. The separate
+  actor that decision 3 asked for never reaches a seat (decision P1).
+- **The note's words change, in `flow.py` only, before slot 1.** The note
+  says of itself that no reviewer judged the stage and that the harness
+  recorded the review and approval by the evaluation's rule. It gives a
+  seat no instruction. No file in `harness.CODE`, no card, document, case
+  file, engine or constitution text changes (decision P2; gate WF31).
+- **Both whole-flow fingerprints move, and what rests on them is made
+  again.** A dated plan addition restates them; gate ET5 is open again by
+  its own words; a second measured run is owed on the new fingerprint, by
+  the answer of gate ET10's owner. Run 45196235508 is no longer the run of
+  the plan's section 10 for slot 1 (decision P3; gates WF32 and WF33).
+- **A trial that stops because a seat escalated at a stage with no check
+  is never labelled "model"** and feeds no curriculum change; its cause is
+  an inference and is worded as decision P4 says (gate WF34).
+
+It changes no code, case, eval record, plan text, level, fingerprint or
+digest by itself. It loosens no gate. No trial ran and no workflow was
+dispatched for the meeting.
+
+### Who decided what
+
+The council decided every item below. The orchestrator called the meeting
+because the fifth addendum says that a proposal that changes a file in
+`harness.CODE` or `FLOW_CODE`, a tool definition, a card or a document
+before slot 1 "returns to the council". It is not a founder decision, and
+the founder can overrule it. No seat found anything reserved for the
+founder in it: it adds no spending, contract, counsel, sending, public name
+or licence term. The pull request that changes `src/nirmaan/evals/flow.py`
+is in a founder class by path (`.github/review-teams.yml`) and goes to the
+Founder Proxy (agent) by the usual rule.
+
+Five seats gave round 1 positions independently, each as its own read-only
+process that saw no other answer to the brief: verification-lead (the plan,
+the counts, the read and the failure label), ai-engineer (the harness and
+the fingerprint), qa-evidence (the claims), eda-tooling (the runner, the
+record and CI) and design-architect (what a careful architect does with
+such an input). The chair decided. After round 1 the chair asked security,
+as the owner of gate ET10
+(`council/records/2026-11-22-eda-tools-seat-account.md`), for owner facts on
+that gate only; security gave no position on the agenda. The seats read
+ip-nirmaan `main` at 24278dce, whose `src/`, `evals/`, `knowledge/` and
+`tests/` equal those of bbcf06a9. The seats had no shell. The chair ran a
+replay of the timer's reference answer, with no model, on a read-only
+checkout and read the prompt each stage is sent; no design tool ran beyond
+that replay's own checks.
+
+The seats also read the uploaded record of the measured run
+(run 45196235508) and the prompts rebuilt from it. Under decision C of the
+EDA tools record's addendum, as the fifth addendum's decision F1, item 5
+narrows it, this addendum states nothing of that run's stages, answers or
+attempts, and nothing of why its flow stopped. What the seats found there
+is in the internal minutes. Every fact below is a fact of the code or of a
+replay with no model, and the ruling can be checked from them alone.
+
+A key is an agent review. Nothing here is a person's approval, a release,
+or a claim that a design is ready to be made in silicon.
+
+### Facts checked
+
+The chair checked each line at 24278dce unless a seat is named.
+
+1. The pass-through. After a stage reaches review, the harness reviews it
+   with an approve verdict and approves it, as the stage's reviewer role
+   and approver role, under the actor name `eval-flow-passthrough`, with
+   one of two notes (`src/nirmaan/evals/flow.py:48-49`, `198-208`):
+   "Whole-flow evaluation: not reviewed. Before-review checks passed:
+   {runs}." or "Whole-flow evaluation: not reviewed. This stage has no
+   before-review check: submitted, not checked." These are decision 3's
+   words.
+2. How the engine stores it. A review that approves becomes an evidence
+   record whose description is "Independent review by" the actor's role, a
+   colon, and the note, marked substantiated
+   (`src/nirmaan/work/engine.py:432-437`). The actor's name is stored in
+   another field of that record (`engine.py:436`), and the view a prompt is
+   built from does not carry that field
+   (`src/nirmaan/runtime/context.py:317-322`; qa-evidence). So the
+   separate actor of decision 3 is in the record and never in a prompt.
+3. What the next seat is sent. Each upstream output is rendered as
+   `Upstream artifact ... (<kind>, approved)`
+   (`src/nirmaan/runtime/prompt.py:259`) and listed for citation as
+   `(approved)` (`prompt.py:139-141`). The review is rendered as
+   `Evidence ... review_record, substantiated: Independent review by
+   <role>: Whole-flow evaluation: not reviewed. ...`
+   (`prompt.py:265-268`). The replay of the timer's reference answer shows
+   these lines in the prompt of the second, third and fourth stage, in both
+   arms; the fourth stage is sent two such records.
+4. What else the same prompt says. The constitution, with "P6 Independent
+   review: Critical work requires independent review; nobody approves their
+   own work." and "P7 Conflicts escalate: Conflicting outputs require
+   escalation before approval." (`prompt.py:87-90`,
+   `src/nirmaan/company/governance.py:123-126`). The system prompt: "Never
+   claim that a tool ran, or that anything was verified or approved" and
+   "If the evidence does not support a conclusion, escalate instead of
+   guessing." (`src/nirmaan/runtime/harness.py:92-106`). Nothing in a
+   stage's prompt says what "Whole-flow evaluation" is or who made the
+   approval.
+5. What an escalation does. A seat that escalates leaves its task in a
+   status that is not a reviewed one (`src/nirmaan/evals/runner.py:61`);
+   the flow stops (`flow.py:199`, `223-224`) and, by decision 3, the trial
+   is a failed trial of its group. The three specification stages have no
+   check, so by decision 1, "Failures", a cause placed there is an
+   inference.
+6. The single-seat comparison. There the upstream stages are fixed by the
+   fixture, whose review note gives its reason: "Evaluation fixture:
+   <files>, as reviewed in the repository, not here."
+   (`src/nirmaan/evals/runner.py:163-165`).
+7. What a change moves. `flow.py` is `FLOW_CODE`
+   (`src/nirmaan/runtime/harness.py:271`): an edit moves both whole-flow
+   fingerprints and neither single-seat default (the test of gate WF7,
+   `tests/test_whole_flow_dispatch.py`). The flow digests cover skills
+   only (`flow.py:146-149`) and do not move; `flow.py` is in none of the
+   seven groups of the plan's section 23.1. `prompt.py`, `context.py` and
+   `evals/runner.py` are `harness.CODE` (`harness.py:280-293`): an edit
+   moves the single-seat defaults, on which every single-seat group and
+   the re-measure batch rest. A card or a knowledge document moves its
+   skill's digest; a case file moves the case digest.
+8. Text outside every fingerprint. `src/nirmaan/work/engine.py` (the words
+   "Independent review by") and `src/nirmaan/company/governance.py` (the
+   constitution) are in neither list and in no pinned group, and their
+   text reaches every seat's prompt, single-seat included. An edit there
+   would change prompts with no fingerprint moving (ai-engineer,
+   qa-evidence, eda-tooling).
+9. What holds the note today. `tests/test_whole_flow_runner.py:85-86`
+   asks that every stage's note starts "Whole-flow evaluation: not
+   reviewed." and line 92 that a stage with no check carries
+   `NOTE_UNCHECKED`; `docs/whole_flow/09-runner-flow-module.md` quotes
+   both notes. No committed record under `evals/` quotes them.
+10. What rests on the whole-flow fingerprints. The plan's section 7: a
+    slot is dispatched only on the stated values, and "a difference stops
+    the dispatch until a plan amendment pull request is merged". Decision
+    E4, item 4 of the EDA tools record: verification-lead's statement of
+    gate ET5 "holds only while the values of the plan's tables on the
+    commit the measured run is dispatched from equal those on the run's
+    commit". Gate ET10: the measured run's reach records, with "the values
+    of the plan's section 18.1 on that commit equal to those on slot 1's
+    commit"; section 18.1 and the tables that replace it list both
+    whole-flow fingerprints. The fifth addendum's decision F1, item 2
+    ruled no second measured run owed because "no pinned value moved". The
+    freeze of `FLOW_CODE` (fourth addendum, decision 2, item 4) starts at
+    slot 1, and no slot has run.
+11. Security, as owner of gate ET10, on a change to the note's words
+    alone: the gate cannot be met on run 45196235508 as it is worded, and
+    a run on the new commit is owed, which is a second measured run unless
+    the gate is reworded; the reach of the tools as the seat account does
+    not depend on the note (the note is written by the harness's own actor
+    after a stage has run, and neither the reach test nor the seat account
+    script reads `flow.py`), so there is no reach reason for or against
+    the change; gates ET11, ET15, ET17, WF17 and WF23 do not depend on a
+    fingerprint value.
+
+### Decisions
+
+#### P1. It is a defect of the harness
+
+1. What a later stage's seat is shown contradicts itself, and the harness
+   wrote every part of the contradiction: the label `approved`, the words
+   "Independent review by" a role in which nobody reviewed anything, the
+   mark "substantiated", and "not reviewed" in the same line (facts 1 to
+   3). The note is true. The line it is set in is not, and decision 3's
+   own safeguard, the separate actor, is not shown (fact 2).
+2. The same prompt tells the seat that conflicting outputs are escalated
+   and that it escalates where the evidence does not support a conclusion
+   (fact 4). A seat that stops on this input follows the rules it is
+   given. Decision 3 chose the pass-through over a model reviewer because
+   "a second model seat adds variance that one verdict cannot separate";
+   as it is shown, the pass-through adds a cause of its own that a count
+   cannot separate from the seats' work either (verification-lead,
+   inference).
+3. This is so at every later stage of every trial, in both arms and in
+   both cases (fact 3). It is a fact of the code and does not rest on any
+   run. How often a seat would stop on it is not known and this addendum
+   states no rate.
+4. What is not the harness's: what an earlier seat writes in its own file
+   about the state of its own work. That is the seat's text. No ruling
+   here touches it.
+
+Four seats held this (verification-lead, ai-engineer, qa-evidence,
+design-architect). eda-tooling held that the note is true and that a
+seat's choice on it is behaviour to measure, "with one confound the
+harness itself adds", the line of fact 2. Owner of the finding:
+ai-engineer.
+
+#### P2. The note's words change, in `flow.py` only, before slot 1
+
+1. **Before slot 1.** After slot 1 the flow code is frozen, and a trial is
+   never run again. Twenty trials, then twenty more, would each put the
+   line of P1 to three or four seats, and a read could then claim only a
+   count "under the note as shown". The cost of the change now is what
+   decision P3 lists, and none of it is a counted trial.
+2. **Where.** The two note constants of `src/nirmaan/evals/flow.py`, and
+   that module's own description of them. Nothing else:
+   - not `prompt.py`, `context.py` or `evals/runner.py`: the single-seat
+     defaults must stay (fact 7);
+   - not `engine.py` or `governance.py`: a change to what seats are sent
+     with no fingerprint moving is a hidden harness change (fact 8);
+   - not a card, a knowledge document or the system prompt: each moves
+     digests the finding gives no reason to move, and tells every seat
+     something;
+   - not a case file: a customer's document does not speak for the
+     evaluation.
+3. **The words.** Each note keeps its first sentence and its last, and
+   gains one sentence between them:
+   - "Whole-flow evaluation: not reviewed. No reviewer judged this stage:
+     the evaluation harness recorded this review and approval itself, by
+     the evaluation's rule, so that later stages receive it as input;
+     'approved' here records that rule, not a judgement. Before-review
+     checks passed: {runs}."
+   - "Whole-flow evaluation: not reviewed. No reviewer judged this stage:
+     the evaluation harness recorded this review and approval itself, by
+     the evaluation's rule, so that later stages receive it as input;
+     'approved' here records that rule, not a judgement. This stage has no
+     before-review check: submitted, not checked."
+   The added sentence is qa-evidence's, taken as written. Every seat that
+   chose a change offered a sentence of this kind.
+4. **What the note does not say.** It gives a seat no instruction: not to
+   proceed, not that there is no conflict, not what to assume. It states
+   who made the record and by what rule, which is what a seat in an
+   organization would be told of a stage passed on without review.
+   Whether a seat then proceeds or escalates stays the seat's, and stays
+   measured.
+5. **Decision 3, amended.** "Intermediate stages" now reads, after "The
+   note says the stage's output was not reviewed": "says that no reviewer
+   judged it and that the harness recorded the review and approval by the
+   evaluation's rule (sixth addendum, decision P2)". The rest stands: a
+   true note, the separate actor, and the words "reviewed in the
+   repository" never used for a model's output.
+6. **What is left, and said.** The words "Independent review by" and the
+   mark "substantiated" still stand before the note, because they are the
+   engine's and the prompt's (fact 2), and those are not changed. The note
+   now answers them in the same line. An earlier seat's own words about
+   its own work are untouched (P1, item 4). A seat may still stop on what
+   it is shown; decision P4 says how such a trial is worded.
+
+Who disagreed. eda-tooling chose no change to code before slot 1: a dated
+plan addition that states what the seats are shown and a replay test of
+those lines, for the reasons that every other course moves a pinned value
+and reopens gates ET5 and ET10, that the changed note does not remove what
+an earlier seat writes in its own file, and that one run is not a rate.
+The chair did not take it: the line is the harness's own, it is put to
+every later stage of forty trials that cannot be run again, and what it
+costs to change is owed once, before any counted trial. eda-tooling's
+condition for the case that the note changes, that it does not tell a seat
+to proceed, is adopted (item 4). Recorded as dissent.
+
+On the words. ai-engineer asked for a last sentence, "The next stage works
+from it as it is."; design-architect for "Later stages proceed on it as an
+unreviewed input and state what they assume of it."; verification-lead for
+"The approval and this record are not a conflict between outputs; a
+conflict in the files' content is still yours to raise." None is taken:
+each tells a seat what to do or how to read its own rules, which
+qa-evidence and eda-tooling refused, and the count would then measure the
+instruction. ai-engineer's and design-architect's point, that a seat in an
+organization is told when work is passed on at risk, is met by the
+sentence adopted, which says so as a fact.
+
+Owners: eda-tooling (the change and its tests); ai-engineer (the
+fingerprints, gate WF7); qa-evidence reads the texts.
+
+#### P3. What is owed because both whole-flow fingerprints move
+
+1. **The plan.** A dated addition restates both whole-flow fingerprints,
+   recomputed on the merge commit of the change, with the pull request
+   that moved them, and shows the two single-seat defaults, both flow
+   digests, the case digest and the seven group digests unchanged (the
+   plan's section 7). It replaces the two fingerprint rows of section 23.1
+   for every later check. It also states, with `path:line`, the lines a
+   later stage is sent (facts 1 to 4, with the new note) and the words of
+   decision P4. Owner: verification-lead; ai-engineer recomputes.
+2. **Gate ET5.** By decision E4, item 4 of the EDA tools record,
+   verification-lead's statement no longer holds once a value of the
+   plan's tables moves. That record's procedure applies again as written:
+   a replay of `flow/axil-timer` with `controls`, with no model and no
+   token, on a commit that holds the change; its record committed beside
+   the earlier ones with its test; verification-lead's statement on that
+   pull request's head. This addendum does not reword gate ET5 or decision
+   E4.
+3. **A second measured run.** By the answer of gate ET10's owner
+   (fact 11), a measured run on the new fingerprint is owed: the run of
+   the plan's section 10, made as that section says, with documents, after
+   the change, the plan addition and the record of item 2 are on `main`,
+   and with every pinned value recomputed on its commit. Gate ET10 is not
+   reworded; it is read on the second run. Gates ET11, ET15, ET17, WF17
+   and WF23 are not affected.
+4. **Decision F1 of the fifth addendum, amended.** Items 1 and 2 ruled
+   that run 45196235508 is the measured run and that no second run is
+   owed, on the ground that no pinned value had moved. A pinned value now
+   moves, by this council's ruling, on a defect that is a fact of the code
+   (decision P1, item 3). From the merge
+   of the change, "the measured run" in the plan, in gate ET10 and in
+   decision F1, items 3 to 6 means the second run. Item 5's first
+   exception covers it in the same words and no others.
+5. **Run 45196235508.** It is a run that was made and it is not hidden.
+   Its reach records are committed as uploaded, as records only, in the
+   layout of decision R2 of the EDA tools record's second addendum, under
+   `tool_reach_measured_run_superseded_45196235508` (the index and the
+   folder), and are never read as the gate ET10 file (security; the
+   precedents are decision E4, item 6 and decision R2, item 5 of that
+   record). Its trial record is treated as decision F1, item 4 says. What
+   it measured of a record's size may still be used to pack records; no
+   figure from it is stated. The sentences decision F1, item 3 allows are
+   still the only ones said of it.
+6. **The second run's outcome changes nothing by itself.** This is ruled
+   before it runs. Whether its flow seats every stage or stops, it stands
+   as the measured run if its gates hold, slot 1 is not held for it, and
+   the note is not changed again on its account. It is one run, outside
+   the forty, never counted and never stated as a result. A further
+   proposal to change a fingerprint file returns to the council, and after
+   slot 1 only by a ruling that records that results were known.
+7. **Gates WF27 to WF29 of the fifth addendum** touch no fingerprint file
+   and state no fingerprint value. They stand. The plan addition of gate
+   WF28 and the one of item 1 may be one addition or two.
+
+All five seats and security agreed on what a moved fingerprint owes;
+eda-tooling's dissent is on moving it (P2). Owners: verification-lead (the
+plan, gate ET5's statement); eda-tooling (the replay record and the
+dispatch); security keeps gate ET10.
+
+#### P4. A trial that stops because a seat escalated
+
+1. Decision 1, "Failures", stands: a failed trial records the first stage
+   that did not complete, and at a stage with no check a cause is an
+   inference and is labelled so.
+2. A whole-flow trial whose flow stops because a seat escalated at a stage
+   with no check is never labelled "model". The failure-to-curriculum rule
+   does not apply to it: a document that taught seats to go on past an
+   approval nobody made would teach the opposite of the organization's
+   own rules (verification-lead). All five seats held this.
+3. The read's words for such a trial: "stopped at <stage>: the seat
+   escalated; cause not established (an inference where one is given)".
+   Where the escalation's own text names the state of its upstream inputs,
+   the read may add "on the status of its upstream inputs under the
+   pass-through", marked as an inference. It never says the trial shows a
+   gap in a skill, and no per-stage figure is stated (decision 1).
+4. This holds with the changed note as it would have held without it. The
+   trial is still a failed trial of its group, counted as the fifth
+   addendum's decision F2 says.
+
+Owner: verification-lead (the read); qa-evidence reads every statement.
+
+#### P5. Text that reaches a prompt outside every fingerprint
+
+1. Fact 8 is a gap in what the fingerprint covers. It is not closed before
+   slot 1: closing it changes `harness.CODE` or the fingerprint's own
+   make-up and restarts every group.
+2. Until it is closed, the freeze inside a batch (fourth addendum,
+   decision 2, item 4; the plan's section 7) also names
+   `src/nirmaan/work/engine.py` and `src/nirmaan/company/governance.py`:
+   nothing merges that changes either between a case's first slot and its
+   last planned trial. The plan addition of P3, item 1 says so. This adds
+   a condition and loosens none.
+3. ai-engineer lists every file whose text reaches a seat's prompt and is
+   in no fingerprint, and proposes how the fingerprint covers them, with
+   the next change that restarts every group for another reason, and not
+   inside a batch.
+
+Raised by ai-engineer, qa-evidence and eda-tooling; the freeze words are
+verification-lead's. Owner: ai-engineer.
+
+#### P6. What may and may not be said
+
+1. Any text may state facts 1 to 11 and this ruling, and that a replay of
+   the reference answer with no model shows the lines a later stage is
+   sent.
+2. No text, this one included, states which stage of run 45196235508
+   stopped, why its flow stopped, what a seat answered, whether a seat
+   escalated or went on, or any count of either. Decision C stands as the
+   fifth addendum narrowed it, for that run and for the second measured
+   run.
+3. The change of P2 is described as what it is: the pass-through now says
+   who made the record. It is never described as a fix shown to work. No
+   replay can show how a model reads the new words (ai-engineer), and one
+   run is not a rate.
+4. The timer's read says that the note's words were changed before slot 1
+   by this addendum, and what a later stage is sent.
+
+Owner: qa-evidence (gate WF34, and gates WF30 and ET13 as they stand).
+
+### Positions not adopted, and open
+
+- eda-tooling: no code change before slot 1. Not adopted (decision P2).
+  Recorded as dissent.
+- ai-engineer, design-architect, verification-lead: a further sentence in
+  the note that tells the next stage how to go on. Not adopted
+  (decision P2, "On the words").
+- verification-lead, ai-engineer and qa-evidence offered labels that name
+  the harness as the cause of such a stop ("harness (inference)", "harness
+  condition (inference)"). Not taken as the read's words: once the note is
+  changed, a stop of this kind has no established cause, and decision P4
+  says only that.
+- design-architect held that no item is in a founder class. The change to
+  `flow.py` is in one by path; the review's map decides, not this record.
+- Open, for ai-engineer: decision P5, item 3.
+- Not known: how often a seat stops on the note, before or after the
+  change. This addendum states no rate and rests on none.
+
+### Gates
+
+Gates WF31 to WF34 are met before the timer's slot 1.
+
+| Gate | Condition | Owner seat |
+|---|---|---|
+| WF31 | The two notes of `src/nirmaan/evals/flow.py` carry the words of decision P2, item 3; no other file in `harness.CODE` or `FLOW_CODE`, no engine or constitution text, no card, document, case file or tool definition changes; tests show the cases of the build specification below; the test of gate WF7 shows both single-seat defaults unchanged | eda-tooling |
+| WF32 | A dated plan addition restates both whole-flow fingerprints on the merge commit of gate WF31's change and shows every other pinned value unchanged, states what a later stage is sent, the words of decision P4 and the freeze words of decision P5, item 2 | verification-lead |
+| WF33 | Gate ET5 is stated again on a new replay record, and a second measured run is made on the new fingerprint, as decision P3, items 2 to 6 say; the reach records of run 45196235508 are committed as records only under the name of item 5; slot 1 is not dispatched before the chain of gate ET10 is complete on the second run | verification-lead |
+| WF34 | Every statement about a trial stopped by an escalation follows decision P4, and every statement about the note, the change and either measured run follows decision P6 | qa-evidence |
+| WF35 | The list and the proposal of decision P5, item 3, with the next change that restarts every group; nothing of it merges inside a batch | ai-engineer |
+
+### Build specification, for the build lane
+
+This meeting wrote no code and no plan text.
+
+1. `src/nirmaan/evals/flow.py`: `NOTE_CHECKED` and `NOTE_UNCHECKED` take
+   the two texts of decision P2, item 3, exactly; the module's opening
+   description says the same. No other line of logic changes.
+2. Tests:
+   - `tests/test_whole_flow_runner.py:85-86` and `:92` pass as written;
+   - a replay of each whole-flow case with no model, in both arms: for
+     every stage after the first, the rendered prompt holds, for each
+     stage it builds on, one line with "review_record, substantiated:
+     Independent review by", that stage's reviewer role and the whole note
+     of that stage; every stage's recorded note equals one of the two
+     texts; "reviewed in the repository" appears in none;
+   - the test of gate WF7 (`tests/test_whole_flow_dispatch.py`), with the
+     four fingerprints before and after in the pull request's text: the
+     two whole-flow ones moved, the two single-seat defaults equal.
+3. `docs/whole_flow/09-runner-flow-module.md` quotes the new notes.
+4. A committed record that quotes an earlier note is the record of its
+   run and is not rewritten. If a test compares a committed record's note
+   with a fresh replay's, the build lane stops and asks the chair.
+5. The plan's dated addition (gate WF32), documents only, after the
+   change merges.
+6. The replay record of decision P3, item 2, then the second measured run
+   and the chain of gate ET10 on it, then slot 1. The reach records of run
+   45196235508 may be committed at any point before slot 1.
+7. Nothing in `prompt.py`, `context.py`, `evals/runner.py`, `engine.py`,
+   `governance.py`, the record format, a case, a card or a document.
+
+### Open, for the founder
+
+Nothing.
