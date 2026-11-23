@@ -465,13 +465,13 @@ def seat_inputs(backend: Backend, job: Job) -> list[str]:
 def own_file(path: Path, sby: Path, given: Iterable[str]) -> bool:
     """Whether a file a setup's ``[files]`` names is the run's own (gate ET17 of
     ``council/records/2026-11-22-eda-tools-seat-account.md``, third addendum, decision E3): resolved, inside the
-    folder of the setup ``sby`` (itself resolved), or one of ``given``, the files the harness gave the run (its
+    folder of the setup ``sby`` (resolved too), or one of ``given``, the files the harness gave the run (its
     ``sources``; M68's approved file linked beside the setup is one). The rule of ``eda_guard.inside_problem``,
     applied again where a run's inputs are named (``seat_inputs``) and where ``formal.cover`` reads the setup's files
     (``_hdl_files``), so it holds whether or not the screen ran: a file that is not the run's own is no input of it,
     and is never read by the caller for it."""
     real = path.resolve()
-    return real.is_relative_to(sby.parent) or real in {Path(g).resolve() for g in given}
+    return real.is_relative_to(sby.resolve().parent) or real in {Path(g).resolve() for g in given}
 
 
 #: The file a run claims an empty ``workdir`` with (M53), so a second run there gets a directory of its own.
