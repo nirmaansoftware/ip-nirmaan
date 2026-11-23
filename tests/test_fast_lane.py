@@ -204,7 +204,7 @@ def test_an_unrelated_label_passes():
 
 
 def test_any_founder_class_from_the_review_map_fails():
-    assert failed(founder={"commercial": [f"content in {RECORD}"]}) == ["founder classes"]
+    assert failed(founder={"control-plane": [f"content in {RECORD}"]}) == ["founder classes"]
 
 
 def test_an_added_line_in_a_credential_format_fails():
@@ -311,7 +311,7 @@ def test_a_symlinked_record_takes_the_normal_path(repo):
     ("a modified record", {"change": "modified"}),
     ("another path", {"change": "other"}),
     ("not an evals/ branch", {"ref": "feature"}),
-    ("a founder class (a price in a record)", {"change": "price"}),
+    ("a founder class detected on a record's content", {"change": "founder"}),
     ("needs-founder", {"gh": {"labels": ["needs-founder"]}}),
     ("another author", {"gh": {"author": "nirmaansoftware"}}),
 ])
@@ -320,15 +320,25 @@ def test_a_pull_request_that_fails_a_condition_gets_the_normal_two_key_review(re
         _main_with_record_tests(work)
         tr.write(work, RECORD, '{"trial": 0}\n')
 
+    def main_with_a_content_founder_class(work):
+        # main's map with a founder class that a marker in any changed line raises.
+        _main_with_record_tests(work)
+        plane = "  - id: control-plane\n    title: Control plane\n    paths: [.github/**, CLAUDE.md]\n"
+        assert plane in tr.MAP
+        tr.write(work, ".github/review-teams.yml", tr.MAP.replace(
+            plane, plane + "    content:\n      - pattern: 'FOUNDER-CLASS-MARKER'\n        example: 'FOUNDER-CLASS-MARKER'\n"))
+
     extra = {"modified": None, "other": lambda w: tr.write(w, "src/app.py", "changed\n"),
-             "price": lambda w: tr.write(w, RECORD.replace("trial-01", "trial-02"), '{"note": "the price"}\n')}
+             "founder": lambda w: tr.write(w, RECORD.replace("trial-01", "trial-02"), '{"note": "FOUNDER-CLASS-MARKER"}\n')}
     which = kw.get("change")
-    r = repo(change=_records(extra.get(which)), gh=kw.get("gh"),
-             main_extra=main_and_record if which == "modified" else _main_with_record_tests)
+    main = {"modified": main_and_record, "founder": main_with_a_content_founder_class}.get(which, _main_with_record_tests)
+    r = repo(change=_records(extra.get(which)), gh=kw.get("gh"), main_extra=main)
     get_pull = r.github.get_pull
     r.github.get_pull = lambda n: {**get_pull(n), "head_ref": kw.get("ref", "evals/w2-records-01"), "draft": False}
     result = r.run()
     assert "fast_lane" not in result, why
+    if which == "founder":
+        assert list(result["classification"]["founder"]) == ["control-plane"]
     assert len(r.calls()) >= 2, f"{why}: key 1 and key 2 ran"
     assert not any("Records fast lane" in c["body"] for c in r.comments())
 
