@@ -736,7 +736,7 @@ job before slot 1, and this record's own decision 7, item 3 says so.
    timer, which links no seat C; that statement is the register block's
    (gates WF17 to WF19). (Amended 2026-11-23 by the second addendum,
    decision R2. It read: "are committed with them, as uploaded".)
-5. The index states the values of the plan's section 18.1, the seven group
+5. The file states the values of the plan's section 18.1, the seven group
    digests among them, as computed on the run's commit, and they equal the
    values on the commit slot 1 is dispatched from. If any differs, the
    measured run's records do not cover the code slot 1 would run: that is
@@ -1061,7 +1061,7 @@ Ruling, in short:
 It changes no code, case, eval record, level, fingerprint or digest. It
 loosens no gate: every record the addendum above asks for still reaches
 `main`, none held out, each tied to its run and commit, and two conditions
-are added (gates ET15 and ET16). Three sentences of the addendum above and
+are added (gates ET15 and ET16). Three passages of the addendum above and
 two rows of its gate table are reworded in place, each with a note. No trial
 ran and no workflow was dispatched for the meeting.
 
