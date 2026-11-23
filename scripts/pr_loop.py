@@ -12,12 +12,17 @@ per call, as a state machine that survives restarts:
 
     skip    already finished on this head (ready, auto-merge);
     update  GitHub reports the branch behind main (mergeable_state "behind";
-            this repository's ruleset has strict up-to-date branches off, so
-            it is not expected, but if GitHub reports it the loop handles it
-            as Nirmaan's does): merge main into
+            this repository's ruleset "main: two keys" requires branches to be
+            up to date, strict on since 2026-11-23, so every open pull request
+            is behind each time main moves): merge main into
             it with the gh login (update-branch, pinned to the head the loop
             saw) before any review, and again after the review when main moved
             during it; a failed update stops, a push in between drops the step.
+            The head the loop merged main into is kept (state "update_from"), so
+            the review can carry a passing verdict on it to the merged head
+            (pr_review carry_basis: GitHub's update-branch merge, the diff
+            byte-identical, main's changes touching no file of the pull request
+            and no review-control file; never a fail or needs-founder, never CI).
             The generated capability/levels.json (LOOP "generated") the only
             file in a merge conflict with main, or stale on the merge with main
             when CI failed: the loop merges main into the branch itself (a
@@ -27,8 +32,9 @@ per call, as a state machine that survives restarts:
     wait    the required CI is not finished on the head (no model call), or
             GitHub is still making the update's merge commit;
     review  both keys, and the Founder Proxy (agent) for a founder-class pull
-            request, through scripts/pr_review.py; then one comment naming the
-            soft shape rules it breaks (never a stop);
+            request, through scripts/pr_review.py (a passing verdict carried
+            across the loop's update, as above, makes no model call); then one
+            comment naming the soft shape rules it breaks (never a stop);
     merge   both keys (and the proxy) passed, or the review found the pull request
             qualified for the records-only fast lane (pr_review CONFIG "fast_lane": no key
             ran): `gh pr merge --auto --merge` with the gh login
@@ -1188,7 +1194,7 @@ class Loop:
         r = pr_review.run_review(o["repo_root"], n, o["github"], o["post"], o["claude_bin"], self.state_dir, o["models"],
                                  o["timeout_s"], o["backoff_s"], config=cfg, caller_branch=o.get("caller_branch"),
                                  in_claude_session=o.get("in_claude_session", False), sleep=o.get("sleep", time.sleep),
-                                 out=self.out, gate=self._paused_now)
+                                 out=self.out, gate=self._paused_now, loop_merged=list(st.get("update_from") or []))
         if r["exit"] == pr_review.EXIT_HEAD_MOVED:
             self._log(ctx, "head-moved")
             return {"outcome": "head-moved"}
@@ -1285,11 +1291,17 @@ class Loop:
             return self._stop(ctx, head, f"could not update the branch with main {_gh_failure(exc)}. A person resolves it "
                                          "(a merge conflict with main, or GitHub refused the update)")
         st["updated"] = {"from": head, "at": _now(), "at_s": time.time()}
+        # The heads the loop itself asked GitHub to merge main into: a passing
+        # verdict on one carries to the merge only through pr_review carry_basis.
+        hops = (cfg.get("carry") or {}).get("max_hops", 20)
+        st["update_from"] = ([h for h in st.get("update_from") or [] if h != head] + [head])[-hops:]
         _save_state(self.state_dir, cfg["repo"], st)
         self._log(ctx, "updated")
         self._say(n, f"<!-- {MARK} updated from={head} -->\n### Automated loop: branch updated\n\nThe branch was behind `main`, "
                      "and GitHub reported that as blocking the merge, so the loop asked GitHub to merge `main` into it "
-                     f"(update-branch, a merge commit, only while the head was still `{sha7}`). The new head is reviewed from scratch.")
+                     f"(update-branch, a merge commit, only while the head was still `{sha7}`). The required CI runs on the new head. "
+                     f"A passing verdict on `{sha7}` carries to it only when the pull request's diff is byte-identical and `main`'s "
+                     "changes touch none of its files and no review-control file; otherwise it is reviewed from scratch.")
         return {"outcome": "updated"}
 
     def _update_generated(self, ctx, pull, conflict: bool):

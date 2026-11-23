@@ -160,7 +160,8 @@ class FakeGitHub:
             return '{"message":"Updating pull request branch."}'
         tmpw = self.origin.parent / f"upd-{len(self.updates)}"
         sh(self.origin.parent, "clone", "-q", "-b", "feature", str(self.origin), str(tmpw))
-        sh(tmpw, "config", "user.email", "gh@example.com")
+        # GitHub's own identity on an update-branch merge commit (web-flow).
+        sh(tmpw, "config", "user.email", "noreply@github.com")
         sh(tmpw, "config", "user.name", "GitHub")
         sh(tmpw, "merge", "-q", "--no-ff", "--no-edit", "origin/main")
         sh(tmpw, "push", "-q", "origin", "feature")
@@ -1466,6 +1467,236 @@ def test_no_post_never_updates_a_branch(repo):
     r.advance_main()
     r.tick(post="none")
     assert r.github.updates == [] and r.origin_head() == r.first_head
+
+
+# --- Carrying passing verdicts across the loop's merge of main ----------------------
+#
+# main's ruleset requires branches to be up to date (strict, on since 2026-11-23), so every
+# move of main makes each open pull request "behind" and the loop merges main into it. A
+# passing verdict on the head before that merge carries to the merge only when every carry
+# condition of pr_review.carry_basis holds; anything else is reviewed from scratch.
+
+
+def _main_commit(r, rel, text):
+    """A commit on main in origin writing `rel`; the branch is then behind."""
+    w = r.work
+    sh(w, "checkout", "-q", "main")
+    sh(w, "pull", "-q", "origin", "main")
+    write(w, rel, text)
+    sh(w, "add", "-A")
+    sh(w, "commit", "-qm", f"main changes {rel}")
+    sh(w, "push", "-q", "origin", "main")
+    r.github.behind = True
+
+
+def _main_moves_after(r, calls, move=None):
+    """main moves once the review has made `calls` model calls, so the loop updates
+    the branch instead of merging it."""
+    moved = []
+
+    def when():
+        if not moved and len(r.calls()) >= calls:
+            moved.append(sh(r.origin, "rev-parse", "refs/heads/main"))
+            (move or r.advance_main)()
+        return False
+    r.github.behind_when = when
+    return moved
+
+
+def _carried(r):
+    return [l for l in r.log() if l.get("outcome") == "carried"]
+
+
+def _refused(r):
+    return [l for l in r.log() if l.get("outcome") == "carry-refused"]
+
+
+def _author_push(r, tmp_path, then):
+    w = tmp_path / "author"
+    sh(tmp_path, "clone", "-q", "-b", "feature", str(r.origin), str(w))
+    sh(w, "config", "user.email", "agent@example.com")
+    sh(w, "config", "user.name", "Agent")
+    then(w)
+    sh(w, "push", "-q", "origin", "feature")
+    shutil.rmtree(w)
+
+
+def test_passing_verdicts_carry_across_the_loops_merge_of_main_with_a_note_and_a_log_line(repo):
+    r = repo()
+    moved = _main_moves_after(r, 2)
+    assert r.tick() == ["updated"]
+    r.github.behind_when = None
+    reviewed_main, new = moved[0], r.origin_head()
+    assert r.tick() == ["auto-merge"]
+    assert len(r.calls()) == 2, "no new model call: both keys carried"
+    assert r.github.merges[0][-1] == new
+    assert [(l["key"], l["head"], l["from_head"], l["from_main"], l["verdict"]) for l in _carried(r)] == [
+        (1, new, r.first_head, reviewed_main, "pass"), (2, new, r.first_head, reviewed_main, "pass")]
+    on_new = [c for c in r.comments() if c.startswith("<!-- nirmaan-pr-review key=") and f"head={new}" in c.split("\n")[0]]
+    assert len(on_new) == 2
+    for c in on_new:
+        assert f"Verdict carried from head {r.first_head}" in c and f"main {reviewed_main}" in c
+        assert "update-branch merge" in c and "the required CI ran on this head" in c
+    checks = [(p["name"], p["state"]) for p in r.github.posts if p["type"] == "check"][-2:]
+    assert checks == [("review/team-lead", "success"), ("review/executive", "success")]
+    assert not _refused(r)
+
+
+def test_a_founder_class_pull_request_carries_both_keys_and_the_founder_proxy(repo):
+    r = repo(change=_change_github)
+    _main_moves_after(r, 3)
+    assert r.tick() == ["updated"]
+    r.github.behind_when = None
+    assert r.tick() == ["auto-merge"]
+    assert len(r.calls()) == 3, "the pull request's own control-plane file does not stop the carry"
+    assert [l["key"] for l in _carried(r)] == [1, 2, "proxy"]
+    assert "Verdict carried from head" in [c for c in r.comments() if "Founder Proxy (agent), acting" in c][-1]
+
+
+def test_carry_follows_several_loop_merges_while_ci_runs(repo):
+    r = repo()
+    _main_moves_after(r, 2)
+    assert r.tick() == ["updated"]
+    r.github.behind_when = None
+    once = r.origin_head()
+    r.github.ci = lambda sha: "pending" if sha == once else "success"
+    r.advance_main()
+    assert r.tick() == ["updated"], "main moved again before the merged head was reviewed"
+    twice = r.origin_head()
+    assert twice != once and r.tick() == ["auto-merge"]
+    assert len(r.calls()) == 2
+    assert {(l["head"], l["from_head"]) for l in _carried(r)} == {(twice, r.first_head)}
+
+
+def test_ci_is_never_carried_the_new_head_waits_for_its_own_required_ci(repo):
+    r = repo()
+    _main_moves_after(r, 2)
+    assert r.tick() == ["updated"]
+    r.github.behind_when = None
+    new = r.origin_head()
+    r.github.ci = lambda sha: "pending" if sha == new else "success"
+    assert r.tick() == ["wait"] and not _carried(r)
+    r.github.ci = lambda sha: "failure" if sha == new else "success"
+    assert r.tick() == ["skip"] and not _carried(r) and r.github.merges == []
+    r.github.ci = lambda sha: "success"
+    assert r.tick() == ["auto-merge"] and len(_carried(r)) == 2 and len(r.calls()) == 2
+
+
+def test_no_carry_when_the_author_merged_main_into_the_branch_themselves(repo, tmp_path):
+    r = repo(gh={"auto_merge_allowed": "false"})
+    assert r.tick() == ["ready"]
+    r.advance_main()
+    r.github.update_async = True
+    assert r.tick() == ["updated"] and r.origin_head() == r.first_head, "the loop asked; GitHub has not merged yet"
+    _author_push(r, tmp_path, lambda w: sh(w, "merge", "-q", "--no-ff", "--no-edit", "origin/main"))
+    r.github.behind = False
+    assert r.tick() == ["ready"]
+    assert len(r.calls()) == 4 and not _carried(r), "a merge commit the author made is reviewed from scratch"
+    assert {c for l in _refused(r) for c in l["conditions"]} == {"loop-merge"}
+
+
+def test_no_carry_when_the_author_pushed_a_commit_after_the_loops_merge(repo, tmp_path):
+    r = repo()
+    _main_moves_after(r, 2)
+    assert r.tick() == ["updated"]
+    r.github.behind_when = None
+    _author_push(r, tmp_path, lambda w: sh(w, "commit", "-q", "--allow-empty", "-m", "author"))
+    assert r.tick() == ["auto-merge"]
+    assert len(r.calls()) == 4 and not _carried(r)
+    assert {c for l in _refused(r) for c in l["conditions"]} == {"loop-merge"}
+
+
+def test_no_carry_when_the_pull_requests_diff_changed_on_the_merge(repo):
+    # main changed the pull request's file before the review (the branch was not yet
+    # reported behind), so the merge changes the diff even though main's later move does not
+    # touch that file.
+    r = repo(gh={"auto_merge_allowed": "false"})
+    _main_commit(r, "src/app.py", "one\ntwo\nthree\n\nfour\n")
+    r.github.behind = False
+    assert r.tick() == ["ready"]
+    r.advance_main()
+    assert r.tick() == ["updated"]
+    assert r.tick() == ["ready"]
+    assert len(r.calls()) == 4 and not _carried(r)
+    assert {c for l in _refused(r) for c in l["conditions"]} == {"same-diff"}
+
+
+def test_no_carry_when_main_touched_a_file_of_the_pull_request(repo):
+    r = repo()
+    _main_moves_after(r, 2, lambda: _main_commit(r, "src/app.py", "one\ntwo\nthree\n\nfour\n"))
+    assert r.tick() == ["updated"]
+    r.github.behind_when = None
+    assert r.tick() == ["auto-merge"]
+    assert len(r.calls()) == 4 and not _carried(r)
+    refused = _refused(r)
+    assert refused and all("main-delta" in l["conditions"] for l in refused)
+    assert "src/app.py" in refused[0]["detail"]
+
+
+@pytest.mark.parametrize("rel, text", [
+    ("council/README.md", "# Council\n"),
+    ("council/chair.md", "# chair\nSEAT-MARKER-chair\n\n## In a review (key 1)\nREVIEW-MARKER-chair\nmore\n"),
+    (".github/review-teams.yml", MAP + "# a comment\n"),
+    (".github/CODEOWNERS", "* @someone\n"),
+    (".github/workflows/ci.yml", "name: ci\n"),
+])
+def test_no_carry_when_main_touched_a_review_control_file(repo, rel, text):
+    r = repo()
+    _main_moves_after(r, 2, lambda: _main_commit(r, rel, text))
+    assert r.tick() == ["updated"]
+    r.github.behind_when = None
+    assert r.tick() == ["auto-merge"]
+    assert len(r.calls()) == 4 and not _carried(r)
+    refused = _refused(r)
+    assert refused and {c for l in refused for c in l["conditions"]} == {"main-delta"}
+    assert rel in refused[0]["detail"]
+
+
+def test_an_earlier_fail_verdict_never_carries(repo):
+    r = repo(gh={"auto_merge_allowed": "false"})
+    assert r.tick() == ["ready"]
+    cache = r.state / "verdicts" / CONFIG["repo"].replace("/", "_") / "pr-1"
+    k1 = next(cache.glob(f"{r.first_head}-*-k1-*.json"))
+    k1.write_text(json.dumps({**json.loads(k1.read_text()), "status": "fail"}))
+    r.advance_main()
+    assert r.tick() == ["updated"]
+    assert r.tick() == ["ready"]
+    assert len(r.calls()) == 3, "key 1 reviewed again; key 2's pass carried"
+    assert [l["key"] for l in _carried(r)] == [2]
+    assert [(l["key"], l["conditions"]) for l in _refused(r)] == [(1, ["pass"])]
+
+
+def test_an_earlier_needs_founder_verdict_never_carries_the_proxy_runs_again(repo):
+    r = repo(change=_change_github, reviews=[{"verdict": "pass"}, {"verdict": "pass"}, NEEDS])
+    assert r.tick() == ["stopped"] and len(r.calls()) == 3
+    r.advance_main()
+    r.github.labels = []
+    assert r.tick() == ["updated"]
+    assert r.tick() == ["stopped"]
+    assert len(r.calls()) == 4, "the Founder Proxy ran again on the merged head"
+    assert [l["key"] for l in _carried(r)] == [1, 2]
+    assert [(l["key"], l["conditions"]) for l in _refused(r)] == [("proxy", ["pass"])]
+
+
+def test_a_review_run_by_hand_never_carries(repo):
+    r = repo()
+    _main_moves_after(r, 2)
+    assert r.tick() == ["updated"]
+    r.github.behind_when = None
+    got = pr_review.run_review(str(r.work), 1, r.github, "none", str(r.bin), r.state, {"key1": "k1", "key2": "k2"}, 30, 0,
+                               config=CONFIG, sleep=lambda s: None, out=lambda s: None)
+    assert got["exit"] == pr_review.EXIT_OK and len(r.calls()) == 4 and not _carried(r)
+
+
+@pytest.mark.parametrize("path, control", [
+    ("council/README.md", True), ("council/security.md", True), ("council/records/2026-10-17-teams-and-pr-review.md", True),
+    (".github/review-teams.yml", True), (".github/workflows/ci.yml", True), (".github/CODEOWNERS", True), ("CODEOWNERS", True),
+    ("docs/CODEOWNERS", True), ("scripts/pr_review.py", True), ("scripts/pr_loop.py", True), ("scripts/review_map.py", True),
+    ("scripts/loop_cloud.py", True), ("CLAUDE.md", True), (".claude/agents/x.md", True), ("docs/REVIEW_MECHANISM.md", True),
+    ("src/app.py", False), ("scripts/pr_review_notes.py", False), ("councils/x.md", False), ("evals/results/x.json", False),
+])
+def test_the_review_control_files(path, control):
+    assert pr_review.carry_control(path, pr_review.CONFIG) is control
 
 
 # --- The generated levels file ------------------------------------------------------

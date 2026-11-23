@@ -148,6 +148,23 @@ CONFIG = {
             "tests/test_nirmaan_evals.py",  # no committed record is taken for a shipped case
         ],
     },
+    # Carrying a passing verdict across the loop's own merge of main (2026-11-24). main's ruleset
+    # requires branches to be up to date (strict, on since 2026-11-23), so each move of main makes
+    # every open pull request behind and the loop merges main into it; without this, both keys and
+    # the Founder Proxy ran again from scratch on content they had already judged. carry_basis()
+    # lists the conditions; any doubt is a fresh review. None turns carrying off.
+    "carry": {
+        # The committer GitHub writes on an update-branch merge commit (web-flow).
+        "merge_committer": "noreply@github.com",
+        # At most this many loop merges between the reviewed head and the new head.
+        "max_hops": 20,
+        # The review-control files: a change on main to any of them since the review means a
+        # fresh review. A path ending in "/" is a folder. The review map, the seat files, the
+        # base checklist and the seat folder from this CONFIG are added by carry_control().
+        "control": [".github/", "council/", ".claude/", "CLAUDE.md", "CODEOWNERS", "docs/CODEOWNERS",
+                    "scripts/pr_review.py", "scripts/pr_loop.py", "scripts/review_map.py", "scripts/loop_cloud.py",
+                    "docs/REVIEW_MECHANISM.md"],
+    },
 }
 
 # Environment variables the review App (tracker T21) provides.
@@ -716,6 +733,16 @@ def required_ci(required: list[str], runs: list[dict]) -> dict:
 
 MARK = "nirmaan-pr-review"
 REUSED_NOTE = "Verdict reused from an earlier run on the same head and main commits; no new model call."
+# The note on a verdict carried to a new head (carry_basis). Its own sentence, so a later carry
+# replaces it rather than adding another.
+CARRIED_PREFIX = "Verdict carried from head"
+
+
+def carried_note(from_head: str, from_main: str, reviewed_head: str) -> str:
+    first = "" if reviewed_head == from_head else f" (first reviewed by a model on head {reviewed_head})"
+    return (f"{CARRIED_PREFIX} {from_head}, reviewed against main {from_main}{first}: this head is the loop's "
+            "update-branch merge of main into it, the pull request's diff is byte-identical, and main's changes "
+            "since touch none of its files and no review-control file. No new model call; the required CI ran on this head.")
 
 
 def comment_marker(r: dict, ctx: dict) -> str:
@@ -740,7 +767,8 @@ def _cell(s, limit: int = 600) -> str:
 def key1_view(r: dict) -> dict:
     """Key 1's result as key 2 and the proxy receive it; a composite call also
     names the checklists it loaded."""
-    return {"team": r["team"], "lead": r["role"], "verdict": r.get("verdict"), **({"loaded": r["loaded"]} if r.get("loaded") else {})}
+    return {"team": r["team"], "lead": r["role"], "verdict": r.get("verdict"), **({"loaded": r["loaded"]} if r.get("loaded") else {}),
+            **({"carried_from": r["carried"]["from_head"]} if r.get("carried") else {})}
 
 
 def render_comment(r: dict, ctx: dict) -> str:
@@ -1226,6 +1254,104 @@ def _git(repo_root, *args) -> str:
     return run()
 
 
+# The diff the reviewers get, and the one a carried verdict must match byte for byte.
+DIFF_ARGS = ("diff", "--no-ext-diff", "--no-textconv", "--no-color", "-M")
+
+
+def carry_control(path: str, cfg: dict = CONFIG) -> bool:
+    """Whether `path` is a review-control file: one that decides who reviews or how
+    (CONFIG "carry" "control", plus the review map, the seat folder and the base
+    checklist this CONFIG names)."""
+    entries = list((cfg.get("carry") or {}).get("control") or [])
+    entries += [cfg["map_path"], cfg["base_checklist"]["file"], cfg["seat_spec"].split("{")[0]]
+    return any(path.startswith(e) if e.endswith("/") else path == e for e in entries if e)
+
+
+def carry_basis(repo_root, cfg: dict, reviewed_head: str, reviewed_main: str, head: str, main_sha: str, diff: str,
+                loop_merged) -> list[dict]:
+    """The conditions for carrying a passing verdict given on `reviewed_head` (against
+    `reviewed_main`) to `head` (against `main_sha`, whose diff the review computed as
+    `diff`), each {"condition", "ok", "detail"}; a verdict carries only when every one is
+    ok. `loop_merged` is the heads the loop itself asked GitHub to merge main into
+    (pr_loop state "update_from"). When loop-merge fails the other two are not checked.
+
+    loop-merge  every commit from `head` back to `reviewed_head` is a merge of main the
+                loop asked for: two parents, the first a head in `loop_merged` (the
+                last of them `reviewed_head`), the second on main, committed by GitHub
+                (update-branch, CONFIG "carry" "merge_committer"). An author's push, a
+                fix round's commit or the loop's own levels.json merge never carries.
+    same-diff   the pull request's net diff against its merge base with main, as the
+                reviewers got it (DIFF_ARGS), is byte-identical on both heads. The whole
+                diff text, not a patch-id: a patch-id ignores whitespace and line numbers,
+                and the reviewers' citations are lines of that text.
+    main-delta  `reviewed_main` is an ancestor of main, and the files main changed since
+                (to main and to each merged main commit) include no file of the pull
+                request (a path or a rename's old path) and no review-control file
+                (carry_control).
+
+    Whether the earlier verdict passed, and CI, are the caller's: only a pass is
+    carried, and the review reaches this only after the required CI is green on `head`."""
+    carry = cfg.get("carry") or {}
+    out = []
+
+    def cond(name, ok, detail):
+        out.append({"condition": name, "ok": bool(ok), "detail": detail})
+        return bool(ok)
+
+    def ancestor(a, b):
+        try:
+            _git(repo_root, "merge-base", "--is-ancestor", a, b)
+            return True
+        except subprocess.CalledProcessError:
+            return False
+
+    merged = set(loop_merged or [])
+    mains, h, why = [], head, None
+    while h != reviewed_head:
+        if len(mains) >= carry.get("max_hops", 20):
+            why = f"more than {carry.get('max_hops', 20)} merges between {reviewed_head[:7]} and {head[:7]}"
+            break
+        parents = _git(repo_root, "rev-list", "--parents", "-n", "1", h).split()[1:]
+        committer = _git(repo_root, "log", "-1", "--format=%ce", h).strip()
+        if len(parents) != 2:
+            why = f"{h[:7]} is not a merge commit ({len(parents)} parent{'' if len(parents) == 1 else 's'})"
+        elif parents[0] not in merged:
+            why = f"the first parent {parents[0][:7]} of {h[:7]} is not a head the loop merged main into"
+        elif committer != carry.get("merge_committer"):
+            why = f"{h[:7]} was committed by {committer[:80] or 'nobody'}, not by GitHub's update-branch"
+        elif not ancestor(parents[1], main_sha):
+            why = f"the second parent {parents[1][:7]} of {h[:7]} is not on main"
+        if why:
+            break
+        mains.append(parents[1])
+        h = parents[0]
+    if not cond("loop-merge", why is None and mains, why or
+                f"{len(mains)} update-branch merge{'' if len(mains) == 1 else 's'} of main onto {reviewed_head[:7]}"):
+        return out
+
+    old_base = _git(repo_root, "merge-base", reviewed_main, reviewed_head).strip()
+    old_diff = _git(repo_root, *DIFF_ARGS, old_base, reviewed_head)
+    cond("same-diff", old_diff == diff, "the diff is byte-identical" if old_diff == diff else
+         f"the diff of {head[:7]} differs from the reviewed diff of {reviewed_head[:7]}")
+
+    if not ancestor(reviewed_main, main_sha):
+        cond("main-delta", False, f"the reviewed main {reviewed_main[:7]} is not an ancestor of main {main_sha[:7]}")
+        return out
+    names = _git(repo_root, "diff", "--no-ext-diff", "--name-status", "-z", "-M", old_base, reviewed_head)
+    pr_files = {p for f in review_map.parse_name_status(names) for p in (f["path"], f["old"]) if p}
+    touched = set()
+    for target in dict.fromkeys([main_sha, *mains]):
+        touched |= {p for p in _git(repo_root, "diff", "--no-ext-diff", "--name-only", "-z", "--no-renames",
+                                    reviewed_main, target).split("\0") if p}
+    hit_pr = sorted(touched & pr_files)
+    hit_control = sorted(p for p in touched if carry_control(p, cfg))
+    detail = (f"main changed {len(touched)} file{'' if len(touched) == 1 else 's'} since {reviewed_main[:7]}"
+              + (f"; of the pull request's: {', '.join(hit_pr[:10])}" if hit_pr else "")
+              + (f"; review-control: {', '.join(hit_control[:10])}" if hit_control else ""))
+    cond("main-delta", not hit_pr and not hit_control, detail)
+    return out
+
+
 def defaults(env=None) -> dict:
     env = os.environ if env is None else env
     return {
@@ -1242,12 +1368,15 @@ def defaults(env=None) -> dict:
 def run_review(repo_root, pr: int, github, post: str, claude_bin: str, state_dir: Path, models: dict,
                timeout_s: float, backoff_s: float, config: dict = CONFIG, fresh: bool = False,
                caller_branch: str | None = None, in_claude_session: bool = False, sleep=time.sleep, out=print,
-               gate=None) -> dict:
+               gate=None, loop_merged=None) -> dict:
     """The whole review. `post` is "app", "dry-run" or "none". A model slot
     is held only around each model call: when none is free at a call, the run ends
     with EXIT_BUSY, and the next run reuses the verdicts already cached.
     `gate()` (the loop's rate-limit pause) is asked before each model call; a
-    reason back ends the run the same way, with "paused" set to it."""
+    reason back ends the run the same way, with "paused" set to it.
+    `loop_merged` (the loop only): the heads the loop asked GitHub to merge main
+    into, so a passing verdict on one of them may carry to this head
+    (carry_basis); None, as from the command line, never carries."""
     cfg = config
     state_dir = Path(state_dir)
     worktrees: list[str] = []
@@ -1255,7 +1384,7 @@ def run_review(repo_root, pr: int, github, post: str, claude_bin: str, state_dir
     posted: list[dict] = []
     try:
         return _review(repo_root, pr, github, post, claude_bin, state_dir, models, timeout_s, backoff_s, cfg, fresh,
-                       caller_branch, in_claude_session, sleep, out, worktrees, posted, roots, gate)
+                       caller_branch, in_claude_session, sleep, out, worktrees, posted, roots, gate, loop_merged)
     except HeadMoved as exc:
         out(f"pr-review: {exc}. Nothing more was posted; run again on the new head.")
         return {"exit": EXIT_HEAD_MOVED, "posted": posted}
@@ -1283,7 +1412,7 @@ def run_review(repo_root, pr: int, github, post: str, claude_bin: str, state_dir
 
 
 def _review(repo_root, pr, github, post, claude_bin, state_dir, models, timeout_s, backoff_s, cfg, fresh,
-            caller_branch, in_claude_session, sleep, out, worktrees, posted, roots, gate=None):
+            caller_branch, in_claude_session, sleep, out, worktrees, posted, roots, gate=None, loop_merged=None):
     pull = github.get_pull(pr)
 
     def refuse(why):
@@ -1398,7 +1527,7 @@ def _review(repo_root, pr, github, post, claude_bin, state_dir, models, timeout_
         check("key2", "pending", why)
         out(f"pr-review: {why}. No model was called.")
         return {"exit": EXIT_OK, "deferred": why, "posted": posted}
-    diff = _git(repo_root, "diff", "--no-ext-diff", "--no-textconv", "--no-color", "-M", base_sha, head)
+    diff = _git(repo_root, *DIFF_ARGS, base_sha, head)
     tracked_head = set(p for p in _git(repo_root, "ls-tree", "-r", "--name-only", "-z", head).split("\0") if p)
 
     def show(ref, path):
@@ -1530,6 +1659,54 @@ def _review(repo_root, pr, github, post, claude_bin, state_dir, models, timeout_
             raise Paused(why)
         return acquire_slot(state_dir, {"repo": cfg["repo"], "pr": pr, "key": key}, cfg.get("model_cap", 1))
 
+    bases: dict = {}
+
+    def carry(key, team, lead, model, cache):
+        """A passing verdict on a head the loop merged main into, carried to this
+        head when every condition of carry_basis holds (logged "carried", and
+        cached for this head); else None, and the key is reviewed from scratch.
+        Each earlier verdict looked at and not carried is logged "carry-refused"
+        with the conditions that failed."""
+        if fresh or not loop_merged or cfg.get("carry") is None or not cache_dir.is_dir():
+            return None
+        tail = f"-k{key}-{team or 'chair'}-{lead}.json"
+        merged = set(loop_merged)
+        found = []
+        for path in cache_dir.iterdir():
+            m = re.fullmatch(r"([0-9a-f]{40})-([0-9a-f]{40})" + re.escape(tail), path.name)
+            if m and m.group(1) != head and m.group(1) in merged:
+                found.append((path.stat().st_mtime, m.group(1), m.group(2), path))
+        for _, from_head, from_main, path in sorted(found, reverse=True):
+            entry = {"repo": cfg["repo"], "pr": pr, "head": head, "key": key, "team": team, "model": model, "attempt": 0,
+                     "from_head": from_head, "from_main": from_main}
+            try:
+                earlier = json.loads(path.read_text())
+            except (OSError, ValueError):
+                continue
+            if earlier.get("status") != "pass":
+                failed = [{"condition": "pass", "ok": False, "detail": f"the earlier verdict is {earlier.get('status')}, not pass"}]
+            else:
+                if (from_head, from_main) not in bases:
+                    try:
+                        bases[(from_head, from_main)] = carry_basis(repo_root, cfg, from_head, from_main, head, main_sha, diff, merged)
+                    except (subprocess.SubprocessError, OSError) as exc:
+                        bases[(from_head, from_main)] = [{"condition": "git", "ok": False, "detail": f"git failed: {redact(str(exc))[:200]}"}]
+                failed = [c for c in bases[(from_head, from_main)] if not c["ok"]]
+            if failed:
+                log_call(state_dir, {**entry, "outcome": "carry-refused", "verdict": earlier.get("status"),
+                                     "conditions": [c["condition"] for c in failed], "detail": "; ".join(c["detail"] for c in failed)[:500]})
+                continue
+            reviewed = (earlier.get("carried") or {}).get("reviewed_head") or from_head
+            notes = [n for n in earlier.get("notes", []) if n != REUSED_NOTE and not n.startswith(CARRIED_PREFIX)]
+            done = {**earlier, "notes": notes + [carried_note(from_head, from_main, reviewed)],
+                    "carried": {"from_head": from_head, "from_main": from_main, "reviewed_head": reviewed}}
+            cache_dir.mkdir(parents=True, exist_ok=True)
+            cache.write_text(json.dumps(done))
+            log_call(state_dir, {**entry, "outcome": "carried", "verdict": "pass", "reviewed_head": reviewed})
+            out(f"pr-review: key {key} carried from {from_head[:7]} (main {from_main[:7]}); no model call.")
+            return done
+        return None
+
     def review(key, team, lead, model, system, user, composite=None):
         # The Founder Proxy is key "proxy" here: same cache, retry, validation and log.
         # `composite` names the checklists a composite key-1 call loaded.
@@ -1541,6 +1718,9 @@ def _review(repo_root, pr, github, post, claude_bin, state_dir, models, timeout_
                                  "verdict": cached.get("status")})
             cached["notes"] = cached.get("notes", []) + [REUSED_NOTE]
             return cached
+        carried = carry(key, team, lead, model, cache)
+        if carried:
+            return carried
         args = claude_args(model, system, [main_dir],
                            schema=composite_schema(composite) if composite else PROXY_VERDICT_SCHEMA if proxy else None)
         result = entry = None
@@ -1750,7 +1930,8 @@ def _review(repo_root, pr, github, post, claude_bin, state_dir, models, timeout_
             system = proxy_system_prompt({**common, "nonce": nonce, "proxy_seat": cfg["proxy_seat"], "proxy_spec": proxy_spec})
             user = user_prompt({**common, "nonce": nonce, "key": "proxy",
                                 "key1_results": [key1_view(r) for r in key1],
-                                "key2_result": {"seat": cfg["key2_seat"], "verdict": k2.get("verdict")}})
+                                "key2_result": {"seat": cfg["key2_seat"], "verdict": k2.get("verdict"),
+                                                **({"carried_from": k2["carried"]["from_head"]} if k2.get("carried") else {})}})
             out(f"pr-review: Founder Proxy ({cfg['proxy_seat']})...")
             proxy = {**pbase, **review("proxy", None, cfg["proxy_seat"], models.get("proxy") or models["key2"], system, user)}
         except LookupError as exc:
