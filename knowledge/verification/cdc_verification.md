@@ -18,8 +18,8 @@ Knowledge only: no tool run backs this; the card's one tool, cdc.run, is contrac
 Finding and judging signals that cross between clocks that have no fixed
 timing relation, and the reset crossings that go with them. Tags in brackets
 name the sources above; a line marked "inference" is this document's own
-reasoning; a line marked "gate" names repository code that backs it. Several
-sources are vendor or single-author papers; their claims are the authors'.
+reasoning; a line marked "gate" names repository code that backs it. Both
+sources are single-author papers; their claims are the authors'.
 
 ## What the repository gives this skill
 
@@ -53,7 +53,7 @@ sources are vendor or single-author papers; their claims are the authors'.
 
 ## Failure modes to look for in the RTL
 
-Each is a case [GIN] reports, with its fix; the author met them while teaching, working with design teams and reviewing papers, and one is a published example from an FPGA vendor.
+Items are tagged for their source, and a fix appears only where an item states one. The [GIN] cases are ones the author met while teaching, working with design teams and reviewing papers, and one is a published example from an FPGA vendor.
 
 - No synchroniser at all. The designer judged the failure rate too low, or
   the receiver clock much faster. Simulation can hide it by assuming clock
@@ -99,18 +99,21 @@ Each is a case [GIN] reports, with its fix; the author met them while teaching, 
   16 microseconds [GIN]. A bus survives only when one bit changes at a time,
   as in Gray coded values; a binary bus can produce values that were never
   sent [LIT].
-- A handshake where one signal is shared by both sides and not synchronised
-  by the receiver [GIN].
+- A handshake built on two signalling flops, in a published FPGA vendor
+  example, where the RECEIVE signal is driven by the sender's clock and is
+  never synchronised by the receiver, at least not in the schematics shown
+  there [GIN].
 - More stages than two is not an error; it buys more settling time [GIN].
-- Missed reconvergence, which the card lists. [LIT] mentions "multiple timing
+- Missed reconvergence, which the card lists. [LIT] names "multiple timing
   scenarios resulting from CDC jitter observed on convergent synchronization
-  paths" among the effects simulation has to deal with. Reading that to mean
-  that signals which cross separately and meet again behind their
-  synchronisers can arrive in different cycles is this document's own
-  (inference).
-  [LIT] says the rest of the device must work in the presence of the
-  synchronisers, including convergent paths, but gives no checklist for
-  them. The checking method here is unsourced.
+  paths" among the observable effects of metastability in the real
+  application, not in simulation. Reading that to mean that signals which
+  cross separately and meet again behind their synchronisers can arrive in
+  different cycles is this document's own (inference).
+  Separately, [LIT] says the rest of the device must work with the
+  synchronisers, including convergent paths through multiple synchronisers in
+  the presence of CDC jitter, but gives no checklist for them. The checking
+  method here is unsourced.
 
 ## Method
 
