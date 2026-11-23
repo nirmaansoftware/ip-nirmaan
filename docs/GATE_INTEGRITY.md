@@ -228,6 +228,23 @@ summary. Every committed fixture, reference answer and held-out test passes
 it and keeps its result (`tests/test_compile_screen.py`). Design, the recorded
 must-refuse fixtures and what it does not do: `docs/COMPILE_SCREEN.md`.
 
+**The Verilog input check reads text as the tools do (ET1).** Council record
+`council/records/2026-11-22-eda-tools-seat-account.md`, decision 4. The
+input check of every gate (`eda_guard`, M84) skipped comments and strings by
+a pattern of its own, and seat Verilog could be written so that what it
+skipped was code to Icarus, Verilator or Yosys: an escaped identifier holding
+a comment mark, a quote in an `` `ifdef `` branch not taken, a block comment
+opened on a directive's line, or a system task name a macro assembles. With
+the check bypassed, a tool then included or read a file outside the run, or
+wrote one. The check now passes only text in forms every tool splits the same
+way, and refuses names a macro could lengthen (`docs/GATE_INPUTS.md`,
+section 7). **This gate changed without a fingerprint change:** `eda_guard`
+is in the shared tools' backends, which no fingerprint digests, so a record's
+fingerprint does not say whether it ran; a refusal names the form in its
+summary. Every committed fixture, reference answer and held-out test passes
+it. The history scan has not been re-run on this head, so whether a committed
+trial's re-judge changes is not recorded.
+
 ---
 
 ## 4. The runner (F16, F3, F22, F9, and the parallel-build flake)
