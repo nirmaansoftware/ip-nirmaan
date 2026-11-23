@@ -837,6 +837,204 @@ the chair rules for its tool reach records; then slot 1, with the values recompu
 probe of the measured run's `live-eval` job is not denied, that job stops before its trial, and no slot is dispatched
 until the cause is fixed and a run records every probe denied. Section 13 stands.
 
+## 20. Dated addition (2026-11-23): the reach records of the measured run and of each slot, the failed gates, and the words (gate ET14)
+
+This section takes up decisions A1 to A3 and C of the addendum of 2026-11-23 in
+`council/records/2026-11-22-eda-tools-seat-account.md`, and decisions R1 to R4 of its second addendum (the reach records
+and the review's size limit). Where this section quotes a ruling the record is the source; where the two differ, the
+record rules. It is the dated addition that gate ET14 asks for, before slot 1. It changes this file only: no count,
+slot, arm, harness, attempt, fingerprint, main count, derived count or digest of section 18.1, no file in
+`harness.CODE`, `LOOP_CODE` or `FLOW_CODE`, no tool definition, no CLI pin, no card, no knowledge document and no file
+of the seven groups is touched, so no pinned value moves. No trial ran and nothing was dispatched.
+
+### 20.1 Security's items 1 and 2 of section 19.1 are conditions
+
+Section 19.1 left security's must-haves 1 and 2 with the chair. The chair has ruled (decision A1): both are adopted.
+Section 13's list therefore also holds, before slot 1 and in addition to what it names:
+
+- **Gate ET10, before slot 1.** The tool reach records of the measured run's `live-eval` and `rejudge` jobs are
+  committed as each job uploaded them, with the first part's log lines and the seat C reach records of the same two
+  jobs, in the layout of 20.2. Each of the two tool reach records shows every probe denied and every control passed;
+  both name the same run and the same commit; and the values of section 18.1 on that commit equal those on the commit
+  slot 1 is dispatched from. A missing record counts as a probe not denied. The gate is met only on a commit that holds
+  the whole chain of 20.2, and no text says it is met of a commit in between. The measured run's records never stand in
+  for a slot's own gate: every slot still runs the reach test before its trial and before its re-judge.
+- **Gate ET11, for each slot.** The reach records of every run of the slot are committed as 20.2 says, in pull
+  requests of their own that merge before the slot's record.
+- **Gate ET15, from slot 1.** Nothing of the timer case is dispatched, a later slot or the same slot again, unless the
+  commit it is dispatched from holds the reach folder of every earlier run of every slot, each file equal by digest to
+  what the run uploaded.
+- **Gate ET16, before slot 1 is dispatched.** The test of 20.3 is on `main`, and it holds at every commit of `main`
+  after it.
+
+The two sentences of the record that said the `live-eval` job has no recorded probe run until slot 1 are reworded there
+(decision A2). Until the measured run's records merge, no text says the job has a recorded probe run. The write and
+network probes through each wrapped tool are not a condition before slot 1: through `sby` and `eqy` they are a
+condition before slot 21 (gate ET12), and until then every text says the write and network denials were probed through
+`vvp` only. Section 19.6's wait for the chair's word on items 1 and 2 ends with this ruling; its other waits stand
+(20.7).
+
+### 20.2 Where the reach records sit
+
+Every reach file is committed as its job uploaded it, byte for byte, as text a reviewer reads: never compressed,
+encoded, re-serialised, factored or cut (decision R1). Every file in a reach folder is a UTF-8 JSON object with a
+`format` field. An index names each file with the sha256 of its bytes; the digests tie the files to one another and
+show a later change; they do not prove what GitHub served (decision R1, item 3). No reach folder holds a
+`manifest.json`, a `causes.md` or a `trial-*.json`, so no record reader finds one and none is counted or listed as a
+trial.
+
+**The measured run (gate ET10).** In `evals/flow/tool_reach_measured_run/<artifact name>/<file>`, the four uploaded
+files, and beside the ET3 record `evals/flow/tool_reach_measured_run.json`, the index (format `nirmaan.tool-reach-measured-run/2`). It has an `about` in the words of 20.5, and names the
+run, its attempt, the commit and the purpose `calibration`; the values of section 18.1 on that commit; the artifacts the
+run did not upload, as `missing`; for each job the conclusion of its reach step (`reach_step`), the lines the first part
+printed (its `REACH` lines and its closing `reach test:` line,
+copied from the job's log with the timestamps cut, and said to be that); and the path and sha256 of each job's tool
+reach record (`tool_reach`) and seat C reach record (`fw_reach`). It embeds no record. The ET3 record is not changed. The tool reach record does
+not hold the first part's probes (they are the only probes of writes and of the network through `vvp`), so those are
+cited to the log lines. The pull requests of the chain merge in this order: the seat C reach records first, by
+themselves, as records only (one pull request each if the two do not fit one); then the index, the tool reach records, the test of `tests/test_live_eval_seat.py` and the
+texts of 20.5, or the texts in a pull request after them if these do not fit one. A measured run whose gate failed
+(20.4) is committed in the same shape and order under `tool_reach_measured_run_failed_<run id>`, and is never read as
+the gate ET10 file.
+
+**The measured run's own trial record** is not committed anywhere in the repository: not under `evals/results`, not
+under `evals/flow`. It is left as a workflow artifact of the run the index names, and no retention period is set for it
+(`.github/workflows/live-eval.yml:304-306` sets no `retention-days`; second addendum, fact S6, finds the same for the reach
+artifacts); the committed index names the run, so the run is on record. Verification-lead gave this position as a read-only process of its own
+(`council/verification-lead.md`), and the plan adopts it for three reasons. Section 10 keeps every time, usage and cost
+figure of that run out of every record, and a trial carries its start and duration. Under `evals/results` the levels
+would list it as a whole-flow trial with its outcome and the failure-to-curriculum reader would take its failures, and
+decision C forbids stating anything of its trial's outcome. And `tests/test_whole_flow.py` (the check of
+`SLOT_RECORD`) refuses a whole-flow record outside a slot folder, which the measured run is not. Section 8's "committed as
+failed, never held out" and section 3's "none held out" govern the trials of the forty; the measured run is none of them (section 10). Verification-lead's
+open point also asked that a calibration record in a slot folder be refused; the test of 20.3 is to hold that, by an
+assertion added to `_check_record_structure` in `tests/test_whole_flow.py`, which needs no change to any file of a pinned group.
+
+**A slot (gate ET11).** For each run of the slot, `evals/results/g3-timer/slot-NN/reach/<run id>/` holds the run's
+uploaded files, each at `<artifact name>/<file name>` (`live-eval-tool-reach-trials-<run id>`,
+`live-eval-tool-reach-rejudge-<run id>`, `live-eval-fw-reach-trials-<run id>`, `live-eval-fw-reach-rejudge-<run id>`),
+and `reach-index.json` (format `nirmaan.slot-reach-index/1`). The index names its `format`, the slot's number, the run,
+its attempt and its commit; each file in `files` with its `sha256` (written `sha256:<hex>`); each of the four artifacts
+the run did not upload, by name, in `missing` (a probe not denied); `recorded`, whether this run wrote the slot's
+record; `reach_held`, which the runner states from the records (true only if every probe was denied in both jobs, or in the
+`live-eval` job only for an unjudged record; the test reads the records, not this field); and, if the run wrote no record, `no_record_cause`, in words: the job whose reach gate failed, or the job-level
+stop and its exit code. The folder sits beside `<record name>/` of section 15 and never inside it, so the record stays the re-judged
+record as the job wrote it. Every run of a slot has its folder, none held out: the run that wrote the record, a run whose
+reach gate failed, and a run that stopped at job level for any other cause.
+
+The order on `main`, for one slot: the reach records of each run that wrote no record, then those of the run that wrote
+the record, then the record. Across slots: slot N's record is on `main` before the reach records of slot N+1 are. A
+pull request holds one run's reach records, or records, and never both; a pull request of reach records adds records
+only (section 7), changes no level, names the slot, the run, the commit and the files, states no outcome and no count
+(section 11), and does not say gate ET11 is met.
+
+A record, or a single uploaded file, that is over the review's size limit by itself stops the dispatch and returns to
+the council before anything is committed. It is never cut, split across pull requests, compressed or held out, and the
+limit itself is not the council's to raise.
+
+### 20.3 What the test holds (gate ET16)
+
+`tests/test_whole_flow.py` holds, at every commit of `main`, for every folder under `evals/results/g3-timer/`:
+
+- a reach folder holds only the files its index names, every digest equals the committed file, every file is a UTF-8
+  JSON object with a `format` field, none takes a record's file name, and every record in it names the index's run, its
+  job and its commit (a tool reach record by `run_id`, `job` and `commit`, a seat C reach record by `run.id`, `run.job`
+  and `head`);
+- each of the four artifacts is in the folder or listed as missing, and not both;
+- a slot folder with a record has exactly one run folder whose index says `recorded`, that run's commit is the record's
+  `head_sha`;
+- that run's tool reach records show every probe denied in the `live-eval` job, and in the `rejudge` job unless the
+  record has no `rejudge.json` (an unjudged record, which section 8 commits as it is);
+- every other run folder states its `no_record_cause`, so a run that shows every probe denied in both jobs with no
+  record and no stated cause fails, since that would be a trial held out;
+- the slot folders with a record run from 01 with none missing, and only the highest-numbered slot folder may hold
+  reach records and no record;
+- a whole-flow record in a slot folder has purpose `evidence` in its manifest and in every trial.
+
+It passes while no slot folder exists, and a synthetic fixture drives each check, one pass and one failure for each. It
+holds a file's content to its path: it does not read the file's outcome as a count. A record whose own run does not
+show the `live-eval` job's probes denied (a record exists although a reach record is missing or shows a probe not
+denied) is to be committed as it is and none held out (decision R3, item 7), but the test above would fail on it, so it cannot
+merge and the dispatch stops until security and verification-lead decide how such a trial counts. That is not decided
+here.
+
+### 20.4 A reach gate that fails
+
+Decided in advance (decision A3), for each place it can fail:
+
+1. **The measured run, in either job.** No slot is dispatched. If the `live-eval` job's gate fails, no trial ran and the
+   run measured nothing. Whatever reach records and log lines the run left are committed, none held out, as a failed
+   gate (the layout of 20.2), before any further dispatch of the timer case. The cause is fixed; if the fix moves a
+   pinned value, the plan amendment of section 7 merges first. Then a run records every probe denied in both jobs, and
+   gate ET10 is read on that run. Section 10's "one run" is read with this: one run that passed its gates. Which run
+   meets gate ET10 again after a pinned value has moved goes to security when it arises.
+2. **A slot, in the `live-eval` job.** Section 8 already rules it: a job-level stop, no trial ran, and the same slot is
+   dispatched again once the cause is fixed. In addition: the failing run's reach records are committed in the slot's
+   folder, beside those of the run that later records the slot (20.2), and no slot is dispatched until the cause is
+   known. A fix that changes anything the freeze of section 7 holds returns to the council before it merges, since
+   from slot 1 the plan changes only by a ruling. If slots then run on two values of a group, the read names which slot
+   ran on which.
+3. **A slot, in the `rejudge` job, after the trial's record exists.** Section 8 as written applies and no count changes:
+   the record is a trial and is committed as it is, and an unjudged trial counts as failed in its group. The slot is not
+   dispatched again. No further slot is dispatched until the cause is known, as in item 2.
+
+### 20.5 The words of decision C, and where they may appear
+
+A reach record of the `live-eval` job is cited in these words and no wider: in run N, dispatched on `main` at C with
+purpose `calibration`, in its `live-eval` and `rejudge` jobs, the listed probes were denied to `nirmaan-seat` through the
+named tools. For a slot: the same, with the slot in place of the purpose. The words may appear, once the records are
+committed, in: the committed index's own `about` field; a dated section of this plan; `docs/LIVE_EVAL_EVIDENCE.md`,
+section 6, and `docs/GATE_INTEGRITY.md`, section 6; and each pull request that commits them (every pull request of the
+chain of 20.2).
+
+Never said, in addition to decision 8 of the record: the measured run as a result, a trial or a pass, or anything of its trial's outcome, stages or attempts,
+or any time, usage or cost figure from it (section 10); that a run's reach record covers another run, another commit or
+a slot; that a tool reach record holds the first part's probes (those are cited to the committed log lines); that write
+or network denial was probed through any tool but `vvp` until gate ET12 is met; `eqy` or `coverage.read` as tools of the
+timer path, though a record lists their probes; and that a file is "as uploaded" unless the test checks it byte for byte.
+qa-evidence reads, as a process apart from the pull request's author, the head of each pull request that changes one of
+these texts and of each pull request of the chain, before it merges (gate ET13). Security checks that the tools and probes a text names match the record. A read is an agent's read, not a
+person's approval.
+
+### 20.6 Gate ET5 is not met as recorded (verification-lead)
+
+Gate ET5 reads (table of the record): "A replay of `flow/axil-timer` on `main` shows the reference answer passing every
+gate and both held-out checks with the tools as the seat account; the timer's mutant sweep and controls and every
+committed fixture give the results they gave". Verification-lead reads "as the seat account" as applying to each part. Verification-lead, the gate's owner, gave its position as a
+read-only process of its own (`council/verification-lead.md`) on `main` after ip#460, and a seat's position is not a
+council ruling. It is that ET5 is **not met as recorded**:
+
+- Run 45073595509, as `evals/flow/et5_replay_record.json` holds it, shows the reference answer's `lint.run`,
+  `simulator.run` and `synth.run`, check 1 on its staged testbench, check 2 clean with 4 of 4 mutants failing (by check
+  mismatches, not permission errors), and the re-judge the same. Those four mutants are check 2's. They are not the
+  timer's mutant sweep, which is `evals/flow/axil_timer/mutant_sweep.json`, and the record holds no run of it.
+- The record holds no run of the timer's controls (`evals/flow/controls.json`) or of the committed fixtures as the seat
+  account, and says so. Those run in CI's test job, which does not set the seat tools (`NIRMAAN_SEAT_TOOLS` is set in
+  `.github/workflows/live-eval.yml` only, not in `.github/workflows/ci.yml`), so that job cannot meet ET5: only
+  a run as the account rules out a control that fails for want of a file the account may not read.
+- Section 18.6's sentence "ET5 is shown by the same run" is withdrawn as to the controls, the sweep and the fixtures,
+  and read as the reference answer, check 1 and check 2's four mutants only. The rows of section 19.5 and the first wait
+  of section 19.6 stand read the same way.
+- Owed before slot 1, and so before the measured run: a replay-only dispatch on `main` with no model, whose `replay`
+  job runs as the account the timer's controls, its full mutant sweep and the committed gate fixtures; its results
+  compared with `evals/flow/controls_record.json` and the sweep's committed results, and committed as a record of its own
+  with a test (owner: eda-tooling; verification-lead then reads it and states ET5 met). A difference stops slot 1 and
+  returns to the council. If that dispatch needs a change to `.github/workflows/live-eval.yml` or to a file of the seven
+  groups, the change goes through gate ET7 and the plan amendment of section 7 before it merges, and it does not
+  move a pinned value without one. Nobody narrows ET5's wording but the chair.
+- Not a substitute: the measured run, whose `rejudge` job re-runs the trial's gates and not the controls, and which
+  ET7 places after the last merge.
+- The record owed here is `evals/flow/et5_controls_record.json`, from run 45119522138 (section 21). ET5 is not met on it
+  (section 21.4).
+
+### 20.7 What slot 1 still waits for
+
+In order, each as section 13 and 19.6 say, with what 20.1 and 20.6 add: the record of 20.6, and verification-lead's read of it
+stating whether ET5 is met; gate ET8 and gate ET13 confirmed by qa-evidence on the texts as they then stand; the test of gate ET16 on `main`; the measured run of section 10, dispatched
+from `main` with every value of section 18.1 recomputed on its commit first (section 7); the chain of gate ET10 merged on a commit that holds the whole of it, with the values of
+section 18.1 on the measured run's commit equal to those on the commit slot 1 is dispatched from; then slot 1, with
+the values recomputed again on its own commit. Section 13 stands.
+
 ## 21. Dated addition (2026-11-23): gate ET5's controls, sweep and fixtures as the seat account, and the value ip#464 moved
 
 Section 20.6 records verification-lead's position that gate ET5 is not met as recorded, and what is owed: a
@@ -954,6 +1152,10 @@ What it says must happen, and who owns it:
 
 Verification-lead expects to state ET5 met without a new run if the chair rules the 11 as the account's expected
 result and scopes the linked setup out of slot 1. That scoping is the chair's.
+
+ET5 is not met. A council ruling on the 11 bypass controls and on the scope of the linked setup is pending. The fix of the
+linked setup is in progress as its own change (lane SEAT-LINK-FIX), which this section does not wait on and does not
+record as done.
 
 ### 21.5 What slot 1 still waits for
 
