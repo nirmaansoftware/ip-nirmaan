@@ -375,3 +375,173 @@ def test_run_45135605510s_controls_upload_is_committed_as_uploaded_and_as_record
     [found] = finding["runs"]
     assert [s["command"][0] for s in found["steps"]] == [f"{WRAPPERS}sby"]
     assert "NIRMAAN_MARKER_4b1d" in found["summary"]
+
+
+def test_run_45159697183s_uploads_are_committed_as_uploaded_part_by_part():
+    """Gate ET18 (decision E4, items 1 and 2): the uploads of replay run 45159697183 on main at f8dcc97e, which holds
+    gate ET17 (ip#475). Every file in the folder is one the index names, with the sha256 and size it names; the chain's
+    parts arrive in order, each whole: part A (the controls upload but its fixtures files) is here, and a later part's
+    files are all here or none. ``test_the_et18_record_is_from_main_and_reads_every_bypass_control_by_decision_e2``
+    holds the complete chain with its record (part B)."""
+    folder = EVIDENCE / "run-45159697183"
+    index = json.loads((folder / "index.json").read_text(encoding="utf-8"))
+    assert index["format"] == "nirmaan.et5-controls-upload-index/1" and index["about"].startswith("Records only.")
+    assert "Nothing here is cited as showing gate ET5 met" in index["about"]
+    run = index["run"]
+    assert (run["id"], run["commit"], run["branch"]) == (
+        "45159697183", "f8dcc97e5c774679e1bd6989e55d5e6bf16be628", "main")
+    assert run["inputs"] == {"case": controls.CASE, "replay": True, "controls": True}
+    assert {k: (v["attempt"], v["conclusion"]) for k, v in run["jobs"].items()} == {
+        "replay": (1, "failure"), "rejudge": (2, "success")}
+    present = {p.relative_to(folder).as_posix() for p in folder.rglob("*") if p.is_file() and p.name != "index.json"}
+    assert present <= set(index["files"]), present - set(index["files"])
+    committed_files(folder, {n: index["files"][n] for n in present})
+    here = [part for part in index["parts"][:-1] if any(f["part"] == part for n, f in index["files"].items()
+                                                         if n in present)]
+    assert here == index["parts"][:len(here)] and here[:1] == ["A"], here  # in order, part A first
+    for part in here:
+        assert {n for n, f in index["files"].items() if f["part"] == part} <= present, part  # each part whole
+# --- Gate ET18: the record gate ET5 is stated on (third addendum to the ET record, decision E4) -------------------
+
+#: Replay run 45159697183 of flow/axil-timer, on main at f8dcc97e (the merge of ip#475), with controls set and no model.
+ET18_RUN = "45159697183"
+ET18_RECORD = REPO / "evals" / "flow" / f"et5_controls_record_{ET18_RUN}.json"
+#: Decision E2, item 1: for each failed bypass control, the program whose own line says it could not open, resolve or
+#: write the target, and that line, by the end of the control's name. One cause each; a failed control none of them
+#: names, or whose run lacks the line, is a difference (item 2).
+CAUSES = (
+    ("::test_control_without_the_check_a_top_reaches_the_shell", "yosys",
+     r"touch: cannot touch '[^']*/MARKER': Permission denied"),
+    ("::test_control_without_the_check_a_setup_reaches_the_shell", "sby",
+     r"touch: cannot touch '[^']*/MARKER': Permission denied"),
+    ("-yosys]", "yosys", r"ERROR: Can not open file `[^`]*/outside/CANARY_ET1\.hex` for \\\$readmemh"),
+    ("-verilator-lint]", "verilator", r"Can't resolve module reference: '[^']*CANARY_ET1\.vh'"),
+    ("[glued_macro_call-icarus]", "vvp", r"\$writememh: Unable to open \S*/outside/MARKER for writing"),
+    ("[include-glued]", "sby", r"Can't open include file `leak\.vh'"),
+    ("[files-absolute]", "sby",
+     r"(?:FileNotFoundError|PermissionError): \[Errno \d+\] [^:]*: '[^']*/host/leak\.vh'"),
+)
+
+
+def cause_of(test: str) -> tuple[str, re.Pattern]:
+    [(program, line)] = [(p, l) for end, p, l in CAUSES if test.endswith(end)]
+    return program, re.compile(line)
+
+
+def test_the_et18_record_is_from_main_and_reads_every_bypass_control_by_decision_e2():
+    """Gate ET18 (decision E4, item 3): replay run 45159697183 on main at f8dcc97e, which holds gate ET17 (the merge of ip#475), with
+    its controls upload and both jobs' tool reach records committed as uploaded. Controls 7 of 7 and the sweep 100 of
+    100 against the committed files; every fixture test ran, none skipped; the linked setup's test and every
+    must-refuse fixture passed; every probe denied in both jobs on the run's commit; the failed tests are exactly the
+    bypass controls the record names, and each gives the reading of decision E2, item 1: for every tool run, the seat
+    account's wrapper as the command and the tool's own line naming the target it could not open, resolve or write,
+    with none of a target's content in its record. The controls whose tool runs as the caller (decision 6) are listed
+    and claimed for nothing."""
+    record = json.loads(ET18_RECORD.read_text(encoding="utf-8"))
+    assert record["format"] == "nirmaan.et5-seat-controls-record/2"
+    run = record["run"]
+    assert (run["id"], run["branch"], run["event"]) == (ET18_RUN, "main", "workflow_dispatch")
+    assert run["commit"].startswith("f8dcc97e") and re.fullmatch(r"[0-9a-f]{40}", run["commit"])
+    assert run["inputs"] == {"case": controls.CASE, "replay": True, "controls": True}
+    assert {k: v["conclusion"] for k, v in run["jobs"].items()} == {"replay": "failure", "rejudge": "success", "live-eval": "skipped"}
+    assert all(run["id"] in j["url"] and j["url"].endswith(f"/job/{j['id']}") for j in run["jobs"].values())
+    # The rejudge job alone was run again (attempt 2) after attempt 1's stopped in its tool install; the replay job
+    # ran once. Each job's own steps, as GitHub reported them.
+    assert {k: v["attempt"] for k, v in run["jobs"].items()} == {"replay": 1, "rejudge": 2, "live-eval": 1}
+    assert run["steps"]["replay"]["Replay the reference answer"] == "success"
+    assert run["steps"]["rejudge"]["Re-judge the records"] == "success"
+    # Attempt 1's rejudge job, cancelled in its tool install: no probe and no re-judge ran in it.
+    cancelled = run["cancelled"]
+    assert (cancelled["job"], cancelled["attempt"], cancelled["conclusion"], cancelled["stopped_in"]) == (
+        "rejudge", 1, "cancelled", "Install the tools")
+    assert {"Test what seat code can reach", "Re-judge the records"} <= set(cancelled["not_run"])
+    assert cancelled["id"] not in {j["id"] for j in run["jobs"].values()} and cancelled["url"].endswith(cancelled["id"])
+    assert {s: c for job in run["steps"].values() for s, c in job.items() if c != "success"} == {
+        "Run the controls, the mutant sweep and the gate fixtures as the seat account": "failure"}
+    assert "Whether ET5 is met is verification-lead's statement, not this record's." in record["about"]
+    folder = REPO / record["folder"]
+    assert folder == EVIDENCE / f"run-{ET18_RUN}"
+    committed_files(folder, record["files"])  # the chain is complete: every file here, as the record names it
+    index = json.loads((folder / "index.json").read_text(encoding="utf-8"))
+    assert {n: {k: f[k] for k in ("sha256", "bytes")} for n, f in index["files"].items()} == record["files"]
+    upload = folder / f"live-eval-controls-{ET18_RUN}"
+
+    # The run's own summary, on the same commit, and the reach test in both jobs.
+    summary = json.loads((upload / "summary.json").read_text(encoding="utf-8"))
+    assert (summary["format"], summary["case"], summary["commit"]) == (
+        "nirmaan.et5-seat-controls", controls.CASE, run["commit"])
+    assert summary["seat_tools"] == WRAPPERS.rstrip("/") and summary["required"] == controls.REQUIRED.split()
+    for job in ("replay", "rejudge"):
+        reach = json.loads((folder / f"live-eval-tool-reach-{job}-{ET18_RUN}" / "tool-reach.json").read_text(
+            encoding="utf-8"))
+        assert (reach["format"], reach["commit"], reach["run_id"], reach["job"]) == (
+            "nirmaan.tool-reach", run["commit"], ET18_RUN, job)
+        assert reach["every_denied"] is True and reach["probes"] and all(p["denied"] for p in reach["probes"])
+
+    # Controls: each timer control, in the manifest's order, as the manifest expects and as the CI run recorded.
+    manifest = [c for c in json.loads((REPO / "evals" / "flow" / "controls.json").read_text())["controls"]
+                if c["case"] == controls.CASE]
+    recorded = {c["id"]: c for c in json.loads((REPO / "evals" / "flow" / "controls_record.json").read_text())[
+        "controls"]}
+    assert (summary["controls"]["exit"], summary["controls"]["count"]) == (0, 7)
+    assert junit_outcomes(upload / "controls.xml") and set(junit_outcomes(upload / "controls.xml").values()) == {
+        "passed"}
+    lines = json.loads((upload / "controls.json").read_text(encoding="utf-8"))
+    assert [c["id"] for c in lines] == [c["id"] for c in manifest]
+    for got, want in zip(lines, manifest):
+        assert got["verdicts"] == [s["expect"] for s in want["checks"]] == recorded[want["id"]]["verdicts"], got["id"]
+
+    # Sweep: the reference and every mutant, each as the sweep record has it.
+    sweep_record = json.loads(controls.SWEEP.read_text(encoding="utf-8"))
+    sweep = json.loads((upload / "sweep.json").read_text(encoding="utf-8"))
+    rows = sweep["rows"]
+    assert sweep["ok"] is True and summary["sweep"]["ok"] is True
+    assert [r["mutant"] for r in rows] == ["reference", *(m["mutant"] for m in sweep_record["mutants"])]
+    assert len(rows) == 100
+    assert (rows[0]["sha256"], rows[0]["result"], rows[0]["checks_passed"], rows[0]["errors"]) == (
+        sweep_record["reference"]["sha256"], "passes", sweep_record["reference"]["checks"], 0)
+    assert all(r["same_result"] and r["same_errors"] and r["same_first_failure"] and r["same_sha256"] for r in rows)
+    for row, want in zip(rows[1:], sweep_record["mutants"]):
+        assert (row["sha256"], row["result"], row["errors"], row["first_failure"]) == (
+            want["sha256"], want["result"], want["errors"], want["first_failure"]), row
+
+    # Fixtures: every test ran, none skipped; the linked setup and every must-refuse fixture passed.
+    outcomes = junit_outcomes(upload / "fixtures.xml")
+    assert len(outcomes) == 408 and set(outcomes.values()) <= {"passed", "failed"}
+    assert outcomes[f"tests/test_gate_reads.py::{LINKED}"] == "passed"
+    refusing = [t for t in outcomes if "_refused" in t.split("::")[1]]
+    assert refusing and all(outcomes[t] == "passed" for t in refusing)
+
+    # The bypass controls, read by decision E2.
+    bypass = json.loads((upload / "bypass.json").read_text(encoding="utf-8"))
+    assert len(bypass) == summary["bypass"]["count"] == sum(controls.BYPASS in t for t in outcomes)
+    named = record["bypass_controls"]
+    caller = []
+    for control in bypass:
+        test = control["test"]
+        assert control["result"] == outcomes[test], test
+        steps = [s for r in control["runs"] for s in r["steps"]]
+        assert steps, test
+        if not all(s["command"][0].startswith(WRAPPERS) for s in steps):  # item 3: the caller's by decision 6
+            # A Verilator simulator build (no wrapper by eda.seat_tool), and the model it built, run by path.
+            assert {r["backend"] for r in control["runs"]} == {"verilator-sim"}, test
+            for r in control["runs"]:
+                build, *model = [s["command"] for s in r["steps"]]
+                assert build[0] == "verilator" and eda.seat_tool(build) is None, test
+                assert all(not argv[0].startswith(WRAPPERS) and "/obj/" in argv[0] for argv in model), test
+            assert control["result"] == "passed", test  # item 5's liveness, as the caller here too
+            caller.append(test)
+            continue
+        assert not any(word in json.dumps(control) for word in TARGET_CONTENT), test  # items 2 and 4
+        if control["result"] == "passed":
+            continue
+        program, line = cause_of(test)  # item 1, for every tool run it made
+        assert len(named["failed_as_the_account"][test]) == len(control["runs"]), test
+        for run_record, said in zip(control["runs"], named["failed_as_the_account"][test]):
+            printed = [ln for s in run_record["steps"] if s["command"][0] == WRAPPERS + program
+                       for ln in s["error_lines"] + s["last_lines"]]
+            assert any(line.search(ln) for ln in printed), (test, printed)
+            assert said["line"] in printed and line.search(said["line"]), (test, said)
+    assert caller == named["as_the_caller"]
+    failed = sorted(t for t, o in outcomes.items() if o == "failed")
+    assert failed == sorted(named["failed_as_the_account"]) == sorted(summary["bypass"]["failed"])
