@@ -1242,7 +1242,7 @@ two digests moved. No other file of any group changed, and no fingerprint file.
 
 Every value of section 22.1, recomputed with CLI 2.1.325, by the same commands as section 18.1, with
 `~/Nirmaan-internal/2026-10-18-capability-buildout/p3-ip/g3/digests.py`, on `main` at `bbc49847`. That commit holds
-`f8dcc97e`; every merge after it adds records, their test, an index and history fragments, and no file of any group
+`f8dcc97e`; every merge after it adds records, their test, an index, history fragments and one paragraph of `docs/GATE_INPUTS.md`, and no file of any group
 (`git diff --name-only f8dcc97e bbc49847` names none of the paths of the group table). The same program on `f8dcc97e`
 itself gives the same values.
 
@@ -1308,8 +1308,8 @@ decision E2 of the third addendum. `evals/flow/et5_controls_record.json` (run 45
 unchanged, and run 45135605510's records are cited, as the addendum says, as what showed the finding and never as
 showing ET5 met.
 
-The reach test's part, in the words of decision C of the second addendum and no wider: in run 45159697183,
-dispatched on `main` at `f8dcc97e`, in its `replay` and `rejudge` jobs, the listed probes were denied to
+The reach test's part, in the words of decision C of the addendum of 2026-11-23 and no wider: in run 45159697183,
+dispatched on `main` at `f8dcc97e`, in its `replay` job (attempt 1) and its `rejudge` job (attempt 2), the listed probes were denied to
 `nirmaan-seat` through the named tools. It is not a reach record of the measured run or of a slot, and it covers no
 other run and no other commit.
 
@@ -1318,15 +1318,18 @@ other run and no other commit.
 Section 21.3 says that, run as the account, the tool in each of the 11 bypass controls "did not reach the payload's
 target outside the run's view". The committed records do not show which layer refused, and no text may say it
 (decision E1, item 4). The sentence is withdrawn. What the records show is what security stated and the council
-adopted (decision E1): in each of those controls the tool ran through the seat account's wrapper; in two, the payload
-itself ran (`touch`) and its write was refused; in the other nine the tool tried to open or write its target and
-printed that it could not. For the two `verilator --lint-only` forms the tool's line says that the reference could not
-be resolved, which is an inference that the refusal was of an open (decision E1, item 3). Section 21.3's other
+adopted (decision E1), from the bypass record of run 45135605510 (`main` at `a15b8c1d`, committed in
+`docs/evidence/et5/run-45135605510`): in each of those 11 controls the tool ran through the seat account's wrapper; in
+two, the payload itself ran (`touch`) and its write was refused; in the other nine the tool tried to open, resolve or
+write its target and printed that it could not. For the two `verilator --lint-only` forms the tool's line says that the
+reference could not be resolved, which is an inference that the refusal was of an open (decision E1, item 3). The
+record of run 45119522138 (`evals/flow/et5_controls_record.json`) shows only the failed assertions of those 11, and
+nothing here says it shows more. Section 21.3's other
 statements stand. Run 45159697183's record reads its 13 by the same rule (section 23.5).
 
 ### 23.5 Gate ET5, stated on this record (verification-lead)
 
-Verification-lead, the gate's owner, read the head of part B (`29aaacaa`, which merged unchanged as ip#480, `bbc49847`) as a read-only process of its own
+Verification-lead, the gate's owner, read the head of part B (`29aaacaa`; ip#480, merge `bbc49847`, merged head `fdd9409d`, which has the same tree) as a read-only process of its own
 (`council/verification-lead.md`). A seat's read is not a council ruling. Its statement, which ip#480's text quotes in full
 and whose last line is:
 
@@ -1335,8 +1338,8 @@ and whose last line is:
 > the measured run is dispatched from must equal f8dcc97e's.
 
 The statement holds on one condition, which is decision E4, item 4: the values of the tables of section 23.1 on the
-commit the measured run is dispatched from equal those on `f8dcc97e`, or are restated in a dated addition before the
-dispatch. If a pinned group moves after it, ET5 is open again. Section 23.1 shows the values on `f8dcc97e` and on
+commit the measured run is dispatched from equal those on `f8dcc97e`. If a pinned group moves after it, ET5 is open again (a restatement in a dated
+addition is what section 7 needs to dispatch, and it does not keep ET5 met). Section 23.1 shows the values on `f8dcc97e` and on
 `bbc49847` equal; the dispatch check of section 7 holds the dispatch commit to them.
 
 What the statement rests on, as the committed test holds it: controls 7 of 7 and all 100 sweep rows; 408 fixture tests,
@@ -1367,6 +1370,6 @@ the condition above. Still before slot 1:
 - the chain of gate ET10: the measured run's tool reach records and seat C reach records committed as uploaded, with
   the index, on a commit that holds all of it;
 - gate ET16's test of decision R3, item 5, on `main`, holding at every commit after it;
-- the values of section 23.1 on the dispatch commit equal to these, or restated first.
+- the values of section 23.1 on the dispatch commit equal to these; if any differs, ET5 is open again and a new replay record is owed first (decision E4, item 4).
 
-The measured run's records and the texts that cite them follow decision C of the second addendum (gate ET13).
+The measured run's records and the texts that cite them follow decision C of the addendum of 2026-11-23 (gate ET13).
