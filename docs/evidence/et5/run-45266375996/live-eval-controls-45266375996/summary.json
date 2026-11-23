@@ -1,0 +1,70 @@
+{
+  "format": "nirmaan.et5-seat-controls",
+  "case": "flow/axil-timer",
+  "commit": "b1bc226738040ec8f439340cec07766af120709f",
+  "seat_tools": "/opt/nirmaan-seat/bin",
+  "required": [
+    "verilator",
+    "iverilog",
+    "vvp",
+    "yosys",
+    "cc",
+    "make",
+    "sby",
+    "yices-smt2",
+    "eqy"
+  ],
+  "controls": {
+    "tests": [
+      "tests/test_whole_flow_controls.py",
+      "-k",
+      "test_the_control_gets_the_verdict_it_expects and timer-"
+    ],
+    "exit": 0,
+    "junit": "controls.xml",
+    "log": "controls.log",
+    "lines": "controls.json",
+    "count": 7
+  },
+  "sweep": {
+    "record": "sweep.json",
+    "ok": true
+  },
+  "fixtures": {
+    "tests": [
+      "tests/test_gate_inputs.py",
+      "tests/test_gate_reads.py",
+      "tests/test_apb_regs_fixture.py",
+      "tests/test_axi4_lite_fixture.py",
+      "tests/test_rr_arbiter_fixture.py",
+      "tests/test_sync_fifo_fixture.py",
+      "tests/test_nirmaan_eda.py::test_a_failing_simulation_log_feeds_veritriage",
+      "tests/test_nirmaan_gate_integrity.py::test_a_testbench_that_reports_failure_in_words_fails",
+      "tests/test_nirmaan_gates_everywhere.py::test_a_failing_self_check_blocks_review",
+      "tests/test_nirmaan_gates_rest.py::test_a_failing_simulation_blocks_review"
+    ],
+    "exit": 1,
+    "junit": "fixtures.xml",
+    "log": "fixtures.log"
+  },
+  "bypass": {
+    "record": "bypass.json",
+    "count": 49,
+    "failed": [
+      "tests/test_gate_inputs.py::test_control_without_the_check_a_top_reaches_the_shell",
+      "tests/test_gate_inputs.py::test_control_without_the_check_a_setup_reaches_the_shell",
+      "tests/test_gate_inputs.py::test_control_without_the_check_a_tool_acts_on_the_form[dollar_macro-yosys]",
+      "tests/test_gate_inputs.py::test_control_without_the_check_a_tool_acts_on_the_form[esc_abs_module-verilator-lint]",
+      "tests/test_gate_inputs.py::test_control_without_the_check_a_tool_acts_on_the_form[esc_dollar_task-yosys]",
+      "tests/test_gate_inputs.py::test_control_without_the_check_a_tool_acts_on_the_form[esc_dotdot_module-verilator-lint]",
+      "tests/test_gate_inputs.py::test_control_without_the_check_a_tool_acts_on_the_form[esc_quote-yosys]",
+      "tests/test_gate_inputs.py::test_control_without_the_check_a_tool_acts_on_the_form[glued_macro_call-icarus]",
+      "tests/test_gate_inputs.py::test_control_without_the_check_a_tool_acts_on_the_form[ifdef_lone_quote_readmem-yosys]",
+      "tests/test_gate_inputs.py::test_control_without_the_check_a_tool_acts_on_the_form[split_macro-yosys]",
+      "tests/test_gate_reads.py::test_control_without_the_check_the_host_file_reaches_the_summary[files-absolute]",
+      "tests/test_gate_reads.py::test_control_without_the_check_the_host_file_reaches_the_summary[include-glued]",
+      "tests/test_gate_reads.py::test_control_without_the_check_the_host_file_reaches_the_cover_summary[files-absolute]"
+    ]
+  },
+  "ok": false
+}
