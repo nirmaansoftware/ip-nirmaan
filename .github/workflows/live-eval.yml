@@ -11,12 +11,19 @@ name: Live evaluation
 # later by pull request; nothing here commits.
 #
 # Concurrency: every dispatch runs in the one group `live-eval` (one running and one pending run; a newer pending
-# run cancels the older one), except a dispatch with `parallel: true` of a case that is neither `flow/` nor
-# `firmware/`, which gets a group of its own (`live-eval-run-<run id>`): it is never queued behind another run and
-# no run can cancel it. GitHub then holds no width; whatever dispatches it does. The first step of the `replay` and
-# `live-eval` jobs fails the run when `parallel` is asked for a `flow/` or `firmware/` case, so the whole-flow timer
-# and seat C cases stay one at a time. Only the wave 2 re-measure batch's cases, in its slots and its replays, are
-# dispatched with it (addendum of council/records/2026-11-23-wave-2-close-meeting-1.md, decision P2).
+# run cancels the older one), except two kinds of dispatch with `parallel: true`. A dispatch of `flow/axil-timer`, the
+# whole-flow timer, runs in `live-eval-timer-on` or `live-eval-timer-off` by its `knowledge` input, a replay included:
+# GitHub then never runs two timer runs of one arm together, nor more than two timer runs; the window and the order
+# of its slots rest on whatever dispatches it. A dispatch of a case that is neither `flow/` nor `firmware/` gets a
+# group of its own (`live-eval-run-<run id>`): it is never queued behind another run and no run can cancel it, and the
+# width is held by whatever dispatches it. The register block (`flow/axi4-lite-regs-driver`), every other `flow/` case
+# and every `firmware/` case stay in `live-eval` whatever the input says: the first step of the `replay` and
+# `live-eval` jobs fails the run when `parallel` is asked for one of them, and the second step fails every dispatch
+# whose case is not written exactly as its ID (GitHub compares strings ignoring case and the trial command strips
+# the name, so a name in another case or with a space would otherwise reach another group). Which dispatches use the
+# input: the timer's slots, its second measured run, the replay of gate ET5's record and the shake-out (seventh
+# addendum to council/records/2026-11-17-g3-whole-flow-cases.md, decision T3), and the wave 2 re-measure batch's cases
+# in its slots and its replays (addendum of council/records/2026-11-23-wave-2-close-meeting-1.md, decision P2).
 #
 # Gates WF9 and WF17: seat code (a cocotb test module, which runs inside vvp) runs as the account
 # `nirmaan-seat`, which has no sudo, no write access to the checkout, the installed package or the
@@ -90,7 +97,7 @@ on:
         type: boolean
         default: false
       parallel:
-        description: "Run in a concurrency group of its own; refused for flow/ and firmware/ cases (addendum P2 of the 2026-11-23 wave 2 close record)"
+        description: "flow/axil-timer: run in its arm's group (live-eval-timer-on or -off); a single-seat case: in a group of its own; refused for every other flow/ and firmware/ case (G3 record, seventh addendum, T3)"
         type: boolean
         default: false
 
@@ -98,7 +105,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ${{ inputs.parallel && !startsWith(inputs.case, 'flow/') && !startsWith(inputs.case, 'firmware/') && format('live-eval-run-{0}', github.run_id) || 'live-eval' }}
+  group: ${{ inputs.parallel && inputs.case == 'flow/axil-timer' && (inputs.knowledge == 'off' && 'live-eval-timer-off' || 'live-eval-timer-on') || inputs.parallel && !startsWith(inputs.case, 'flow/') && !startsWith(inputs.case, 'firmware/') && format('live-eval-run-{0}', github.run_id) || 'live-eval' }}
   cancel-in-progress: false
 
 jobs:
@@ -128,11 +135,21 @@ jobs:
       # council/records/2026-11-23-wave-2-close-meeting-1.md).
       NIRMAAN_SEAT_TOOLS: /opt/nirmaan-seat/bin
     steps:
-      - name: Refuse parallel for whole-flow and firmware cases
-        if: ${{ inputs.parallel && (startsWith(inputs.case, 'flow/') || startsWith(inputs.case, 'firmware/')) }}
+      - name: Refuse parallel for the register block, other whole-flow and firmware cases
+        if: ${{ inputs.parallel && (startsWith(inputs.case, 'firmware/') || (startsWith(inputs.case, 'flow/') && inputs.case != 'flow/axil-timer')) }}
         run: |
-          echo "::error::A flow/ or firmware/ case runs only in the live-eval concurrency group; dispatch it without parallel. Nothing ran."
+          echo "::error::Of the flow/ and firmware/ cases only flow/axil-timer is dispatched with parallel; dispatch this case without it. Nothing ran."
           exit 1
+      # The case only from the job's environment, never as text in this script (seventh addendum, decision T3, item 4).
+      - name: Refuse a case not written in its exact form
+        env:
+          LC_ALL: C
+        run: |
+          form='^[a-z0-9][a-z0-9/_.-]*$'
+          if [[ ! "$CASE" =~ $form ]] || [[ "$CASE" == *..* ]]; then
+            echo "::error::The case must be written exactly as its ID: lower case, no space, no '..'. Nothing ran."
+            exit 1
+          fi
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
@@ -264,11 +281,21 @@ jobs:
       # council/records/2026-11-23-wave-2-close-meeting-1.md).
       NIRMAAN_SEAT_TOOLS: /opt/nirmaan-seat/bin
     steps:
-      - name: Refuse parallel for whole-flow and firmware cases
-        if: ${{ inputs.parallel && (startsWith(inputs.case, 'flow/') || startsWith(inputs.case, 'firmware/')) }}
+      - name: Refuse parallel for the register block, other whole-flow and firmware cases
+        if: ${{ inputs.parallel && (startsWith(inputs.case, 'firmware/') || (startsWith(inputs.case, 'flow/') && inputs.case != 'flow/axil-timer')) }}
         run: |
-          echo "::error::A flow/ or firmware/ case runs only in the live-eval concurrency group; dispatch it without parallel. Nothing ran."
+          echo "::error::Of the flow/ and firmware/ cases only flow/axil-timer is dispatched with parallel; dispatch this case without it. Nothing ran."
           exit 1
+      # The case only from the job's environment, never as text in this script (seventh addendum, decision T3, item 4).
+      - name: Refuse a case not written in its exact form
+        env:
+          LC_ALL: C
+        run: |
+          form='^[a-z0-9][a-z0-9/_.-]*$'
+          if [[ ! "$CASE" =~ $form ]] || [[ "$CASE" == *..* ]]; then
+            echo "::error::The case must be written exactly as its ID: lower case, no space, no '..'. Nothing ran."
+            exit 1
+          fi
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
