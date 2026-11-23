@@ -241,9 +241,9 @@ def test_the_screen_changes_no_fingerprint():
 #
 # Item 1: the compile reach is closed for every check that compiles seat C in that flow, the firmware stage's own
 # before-review checks included. Item 2: the object screen of gate WF16 is not called met until the #line route of
-# fact 9 is tested and, if open, closed. The author's proposed conditions for staying with the screen (pending a security record)
-# (docs/COMPILE_SCREEN.md, "Decision 4, item 5: the register block") add the two routes a seat header can carry into
-# the held-out test's own compile in checks 5 and 6.
+# fact 9 is tested and, if open, closed. The author's proposed conditions for staying with the screen, pending a
+# security record (docs/COMPILE_SCREEN.md, "Decision 4, item 5: the register block"), add the two routes a seat
+# header can carry into the held-out test's own compile in checks 5 and 6.
 
 REGS_FLOW = "flow/axi4-lite-regs-driver"
 FLOW_HELD_OUT = REPO / "evals" / "flow" / "axi4_lite" / "held_out_test.c"
@@ -321,9 +321,9 @@ def _seat_with_header(tmp_path: Path, header: str) -> list[Path]:
 @needs("cc", "verilator", "make")
 @pytest.mark.parametrize("header", sorted(HEADER_ROUTES))
 def test_a_seat_header_route_into_the_held_out_tests_compile_is_refused(header, tmp_path):
-    """The author's proposed condition for the screen (pending a security record): each route a seat header can carry into the held-out test's own compile
-    (checks 5 and 6 compile the held-out test with the seat's header) is refused by fw.test before it compiles or
-    runs anything, and by the object screen the screened scorers run first."""
+    """The author's proposed condition for the screen, pending a security record: each route a seat header can carry
+    into the held-out test's own compile (checks 5 and 6 compile the held-out test with the seat's header) is refused
+    by fw.test before it compiles or runs anything, and by the object screen the screened scorers run first."""
     sources = _seat_with_header(tmp_path, header)
     backend, why = select_backend("fw.test", {})
     assert backend is not None, why
