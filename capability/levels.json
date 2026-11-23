@@ -484,14 +484,12 @@
     },
     "cdc_verification": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/cdc_verification.json",
+        "counts": true,
         "knowledge_document": "knowledge/verification/cdc_verification.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     },
     "code_coverage": {
@@ -1548,7 +1546,7 @@
     }
   },
   "totals": {
-    "knowledge": 27,
+    "knowledge": 28,
     "practised": 17,
     "proven": 0
   },
