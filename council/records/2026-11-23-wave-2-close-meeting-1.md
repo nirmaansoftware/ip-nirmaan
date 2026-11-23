@@ -683,11 +683,22 @@ ai-engineer (item 3 and item 5).
    With the input false, and for every `flow/` and `firmware/` case
    whatever the input says, the group is `live-eval`, as today. Otherwise
    the run is alone in a group of its own: it is never queued behind another
-   run and no run can cancel it.
+   run and no run can cancel it. (Amended 2026-11-23 by the seventh addendum to
+   `council/records/2026-11-17-g3-whole-flow-cases.md`, decision T3,
+   item 1: the block gains a first clause that puts a dispatch of
+   `flow/axil-timer` with the input in one of two groups by its arm; every
+   other `flow/` case and every `firmware/` case stay in `live-eval`, and
+   the cases of this batch keep the group per run. The block above is left
+   as this addendum ruled it.)
 2. The `replay` job and the `live-eval` job each get a guard as their
    first step, which fails the job when `parallel` is true and the case is
    a `flow/` or `firmware/` case. In the `live-eval` job that is before any
-   step that reads the secret; the `replay` job reads none.
+   step that reads the secret; the `replay` job reads none. (Amended
+   2026-11-23 by the seventh addendum to
+   `council/records/2026-11-17-g3-whole-flow-cases.md`, decision T3,
+   items 3 and 4: the guard refuses a `firmware/` case and every `flow/`
+   case other than `flow/axil-timer`, and a second guard refuses any
+   dispatch whose case is not written in its exact form.)
 3. `inputs.parallel` appears in the concurrency group and in those two
    guard steps and nowhere else: not in `env:`, not in a `run:` line, so it
    cannot reach a trial or a record (eda-tooling).
@@ -697,7 +708,12 @@ ai-engineer (item 3 and item 5).
 5. Only this batch's 13 cases, in its slots and its replays of gate W2C5,
    are dispatched with `parallel` true. Any other use needs a council
    ruling. The whole-flow timer and the register block are never dispatched
-   with it.
+   with it. (Amended 2026-11-23 by the seventh addendum to
+   `council/records/2026-11-17-g3-whole-flow-cases.md`, decision T3,
+   item 7: the timer's slots, its second measured run, the replay of gate
+   ET5's record and a shake-out are dispatched with it. It read: "The
+   whole-flow timer and the register block are never dispatched with it."
+   The register block is still never dispatched with it.)
 6. It changes no file in `harness.CODE`, `LOOP_CODE` or `FLOW_CODE` and no
    tool definition, so no fingerprint moves (fact PF3). It moves the digest
    of the group "Workflow, tool set and CLI pin" in both plans.
@@ -801,7 +817,11 @@ apart costs no trial. They are dispatched with `parallel` true, after the
 workflow change and the plan amendment have merged, on the amended values,
 with three in flight at least once. Each is judged as the plan's section 11
 says today. All 13 pass before slot 1, and the plan's dated addition names
-each run.
+each run. (Noted 2026-11-23: by the seventh addendum to
+`council/records/2026-11-17-g3-whole-flow-cases.md`, decision T3, items 10
+and 11, the input is used first by the timer; these replays are its first
+use for this batch's cases, and they are still dispatched only after the
+timer's last planned trial is recorded.)
 
 Owner: eda-tooling.
 
@@ -814,11 +834,26 @@ lines its gate WF9 cites as met (fact PF4). Nothing of this batch can be
 dispatched before that point in any case (the plan's section 10; gate W2C9),
 so the order costs the batch nothing it could have used.
 
+(Amended 2026-11-23 by the seventh addendum to
+`council/records/2026-11-17-g3-whole-flow-cases.md`, decision T3, items 9
+and 11. The first sentence read: "After the timer case's last planned trial
+is recorded, and before the replays of gate W2C5." It now reads: the
+workflow change, extended as that addendum says, merges before the
+whole-flow plan's addition of its gate WF32 is computed and before the
+timer's second measured run; if it has not merged by then, only after the
+timer case's last planned trial is recorded, and never in between. The
+whole-flow plan restates the moved digest and gate WF9's evidence in that
+addition, before the timer's slot 1. Gate W2C9 is not changed: nothing of
+this batch, a replay included, is dispatched before the timer case's last
+planned trial is recorded.)
+
 The whole-flow plan still pins the old digest for the register block. Its
 dated addition before slot 21 restates the moved digest with the pull
 request that moved it, and restates the evidence of gate WF9 against the
 workflow as it then is: a whole-flow case is always in the group
-`live-eval`.
+`live-eval`. (Amended 2026-11-23 by the same addendum: the register block
+is always in the group `live-eval`; a timer dispatch with the input is in
+one of the timer's two groups.)
 
 From slot 1 of this batch the workflow file is frozen with the rest (gate
 W2C7).
@@ -890,7 +925,11 @@ wording).
 No seat dissented from: the opt-in default; keeping whole-flow and firmware
 cases in the one group; cancelling nothing on a stop; committing every
 trial and running none again; the replays as the first use; or merging the
-workflow change after the timer's last trial.
+workflow change after the timer's last trial. (Noted 2026-11-23: this is
+what the seats held at this meeting. The seventh addendum to
+`council/records/2026-11-17-g3-whole-flow-cases.md`, a later meeting on the
+founder's direction for the timer, amends the second and the last of these
+for the timer; see the notes in decisions P2 and P6.)
 
 ### Gates added
 
@@ -902,7 +941,7 @@ W2C9 for this batch is decision P3, item 5.
 |---|---|---|
 | W2C12 | The plan amendment of decision P7 merged: width three, the window, one at a time after the first limit, the rewritten sections, the moved digest; the committed test of the window against section 12 | verification-lead |
 | W2C13 | The workflow change of decision P2, with its tests and the corrected document, and no fingerprint moved | security |
-| W2C14 | That change merges only after the timer case's last planned trial is recorded; before the register block's slot 21 the whole-flow plan restates the digest and gate WF9's evidence | eda-tooling |
+| W2C14 | That change, extended as the seventh addendum to `council/records/2026-11-17-g3-whole-flow-cases.md` says, merges before the whole-flow plan's addition of gate WF32 is computed and before the timer's second measured run, or else only after the timer case's last planned trial is recorded, never in between; the whole-flow plan restates the digest and gate WF9's evidence before the timer's slot 1, and again for the register block before its slot 21. (Amended 2026-11-23 by that addendum, decision T3, item 9. It read: "That change merges only after the timer case's last planned trial is recorded; before the register block's slot 21 the whole-flow plan restates the digest and gate WF9's evidence".) | eda-tooling |
 | W2C15 | One slot, one run, bound from the dispatch response before the next dispatch; a run the dispatcher did not start stops dispatch; records in slot order | qa-evidence |
 | W2C16 | A stop closes dispatch and cancels no running trial; every trial already dispatched is committed; nothing is run again; width one after the first limit | ai-engineer |
 | W2C17 | The 13 replays of gate W2C5 dispatched with the input, three in flight at least once, all passing, each named in the plan's dated addition | eda-tooling |
@@ -939,3 +978,15 @@ Nothing here is built by this addendum. In order:
    the founder wants the width kept
    after a limit, or no parallel running, that is the founder's to say
    before trial 1.
+
+## Note (2026-11-23): read with the G3 record's seventh addendum
+
+The seventh addendum to `council/records/2026-11-17-g3-whole-flow-cases.md`
+rules on running the whole-flow timer's slots two at a time, by the
+founder's direction. For the addendum above it amends decision P2, items 1,
+2 and 5 (the timer, by name, may be dispatched with the input, in two
+groups by arm; a second guard on the case's form), decision P6 and gate
+W2C14 (the workflow change merges before the timer's second measured run),
+and notes decision P5. Each is noted in place. Gate W2C9 stands exactly as
+written, and so do the width, the window, the stops and every other gate of
+this batch.
