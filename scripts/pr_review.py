@@ -23,6 +23,11 @@ In order, and fail closed at every step (pending or failure, never success):
    The newest run of each job counts, and a run in progress means waiting.
    A job that finished without success posts "CI failed; review not run"
    (action_required, never green) on both checks.
+   The records-only fast lane (CONFIG "fast_lane", founder, in session,
+   2026-11-23): a pull request that only adds eval records and meets every
+   condition of fast_lane() on this head gets no key and no model call; one
+   comment lists each condition and both checks pass, naming the lane. Any
+   failed condition or error is the normal path below.
 6. Key 1: a fresh `claude -p` per owning team lead, with the lead's seat file
    and the base checklist from main. Key 2: the chair's seat file plus every
    owning lead's seat file, given key 1's results. Read, Grep and Glob only; no
@@ -114,6 +119,31 @@ CONFIG = {
     # many model calls run at once across both repositories. Slot 0 is the
     # shared review.lock, slot 1 model-slot-1.lock.
     "model_cap": 2,
+    # The records-only fast lane (founder, in session, 2026-11-23: approved a records-only fast lane so
+    # generated eval record PRs merge on green CI and schema tests without the two agent review keys).
+    # A pull request that meets every condition of fast_lane() gets no key 1, key 2 or Founder Proxy: the
+    # App posts both checks as passed, naming the lane, and the loop takes the merge path. Any doubt is the
+    # normal two-key path. None turns the lane off. docs/REVIEW_MECHANISM.md ("Records fast lane").
+    "fast_lane": {
+        "author": "patel-om",
+        "branch_prefix": "evals/",
+        # Every changed path is an added regular file (mode 100644) under this folder ...
+        "records": "evals/results/",
+        # ... except these, which may only be modified (the generated levels file).
+        "may_modify": ["capability/levels.json"],
+        "needs_founder_label": "needs-founder",
+        # The required CI job that runs the record tests: the whole suite, and scripts/shards.py checks that
+        # its shards ran every collected test exactly once. Each test file must be at the head; the lane's
+        # path rule means the pull request cannot change one.
+        "ci_job": "test",
+        "record_tests": [
+            "tests/test_capability_levels.py",  # levels.json against levels.py, and capability_levels.py --check
+            "tests/test_whole_flow.py",  # every committed record loads, with its structure
+            "tests/test_eval_purpose.py",  # every committed manifest's purpose label
+            "tests/test_failure_curriculum.py",  # the committed records' causes tables parse
+            "tests/test_nirmaan_evals.py",  # no committed record is taken for a shipped case
+        ],
+    },
 }
 
 # Environment variables the review App (tracker T21) provides.
@@ -774,6 +804,106 @@ def short(text: str) -> str:
     return text if len(text) <= 140 else text[:137] + "..."
 
 
+# --- The records-only fast lane (CONFIG "fast_lane") -------------------------------------
+
+FAST_LANE_MODE = "100644"
+
+
+def fast_lane(lane: dict | None, pull: dict, files: list[dict], modes: dict, tracked_head: set, ci_now: dict,
+              required: list[str], diff_bytes: int, max_diff_bytes: int, founder: dict, diff: str,
+              hold_label: str = "hold") -> list[dict]:
+    """The fast lane's conditions, each {"condition", "ok", "detail"}. The pull request qualifies only
+    when every entry is ok (fast_lane_ok); an error is a failed entry, so any doubt is the normal two-key
+    path. `modes` maps each changed path to its git mode at the head (absent: not at the head)."""
+    if not lane:
+        return [{"condition": "lane", "ok": False, "detail": "the fast lane is off"}]
+    try:
+        return _fast_lane(lane, pull, files, modes, tracked_head, ci_now, required, diff_bytes, max_diff_bytes,
+                          founder, diff, hold_label)
+    except Exception as exc:  # noqa: BLE001 - any doubt is the normal path
+        return [{"condition": "evaluated", "ok": False, "detail": f"could not be evaluated ({type(exc).__name__}: {exc})"}]
+
+
+def fast_lane_ok(conditions: list[dict]) -> bool:
+    return bool(conditions) and all(c["ok"] is True for c in conditions)
+
+
+def _fast_lane(lane, pull, files, modes, tracked_head, ci_now, required, diff_bytes, max_diff_bytes, founder, diff,
+               hold_label):
+    out = []
+
+    def cond(name, ok, detail):
+        out.append({"condition": name, "ok": bool(ok), "detail": detail})
+
+    author, prefix, records = lane["author"], lane["branch_prefix"], lane["records"]
+    cond("author", pull.get("author") == author, f"author {pull.get('author')}; the lane takes only {author}")
+    ref = pull.get("head_ref")
+    cond("branch", isinstance(ref, str) and ref.startswith(prefix) and len(ref) > len(prefix),
+         f"head branch {ref}; the lane takes only branches starting {prefix}")
+    cond("draft", pull.get("draft") is not True, "a draft" if pull.get("draft") is True else "not a draft")
+
+    def is_record(path):
+        parts = path.split("/")
+        return path.startswith(records) and len(path) > len(records) and "" not in parts and not {".", ".."} & set(parts)
+
+    added = [f for f in files if f["status"] == "A" and not f["old"] and is_record(f["path"])]
+    modified = [f for f in files if f["status"] == "M" and not f["old"] and f["path"] in lane["may_modify"]]
+    other = [f for f in files if f not in added and f not in modified]
+    shown = ", ".join(f"{f['status']} {f['path']}" + (f" (from {f['old']})" if f["old"] else "") for f in other[:5])
+    detail = f"{len(added)} added under {records}, {len(modified)} modified of {', '.join(lane['may_modify'])}"
+    if other:
+        detail += f"; not allowed: {shown}" + (f" and {len(other) - 5} more" if len(other) > 5 else "")
+    if not added:
+        detail += "; no record added"
+    cond("paths", added and not other, detail)
+    odd = [f["path"] for f in files if modes.get(f["path"]) != FAST_LANE_MODE]
+    cond("regular files", files and not odd, f"every changed path is a regular file ({FAST_LANE_MODE}) at the head"
+         if not odd else f"not a regular file at the head: {', '.join(odd[:5])}")
+    cond("size", 0 < diff_bytes <= max_diff_bytes, f"diff {diff_bytes} bytes; the review's limit is {max_diff_bytes}")
+    jobs = {j["name"]: j["conclusion"] for j in ci_now.get("jobs") or []}
+    job = lane["ci_job"]
+    green = ci_now.get("state") == "green" and all(jobs.get(n) == "success" for n in required)
+    cond("ci", green and job in required, f"required CI on the head: {', '.join(f'{n} {jobs.get(n)}' for n in required)}"
+         + ("" if job in required else f"; {job} is not a required job"))
+    absent = [t for t in lane["record_tests"] if t not in tracked_head]
+    cond("record tests", lane["record_tests"] and not absent,
+         f"in the required {job} job, at the head: {', '.join(lane['record_tests'])}"
+         + (f"; missing: {', '.join(absent)}" if absent else ""))
+    labels = pull.get("labels") or []
+    bad = [label for label in (lane["needs_founder_label"], hold_label) if label in labels]
+    cond("labels", not bad, f"labelled {', '.join(bad)}" if bad else f"not labelled {lane['needs_founder_label']} or {hold_label}")
+    cond("founder classes", not founder, "none detected by main's review map" if not founder
+         else f"detected by main's review map: {', '.join(founder)}")
+    added_text = "\n".join(line[1:] for line in diff.splitlines() if line.startswith("+") and not line.startswith("+++"))
+    secret = any(p.search(added_text) for p in SECRET_PATTERNS)
+    cond("credentials", not secret, "an added line is in a credential format" if secret else "no added line in a credential format")
+    return out
+
+
+def render_fast_lane(conditions: list[dict], ctx: dict) -> str:
+    """The comment for a pull request that took the records fast lane: each condition, checked."""
+    payload = {"main": ctx["main_sha"], "base": ctx["base_sha"], "conditions": conditions, "dry_run": bool(ctx.get("dry_run"))}
+    digest = hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()[:16]
+    rows = [f"| {c['condition']} | {'yes' if c['ok'] else 'no'} | {_cell(c['detail'], 900)} |" for c in conditions]
+    return "\n".join([
+        f"<!-- {MARK} key=fast-lane team=records head={ctx['head_sha']} digest={digest} -->",
+        "### Records fast lane: qualified",
+        "",
+        f"Head `{ctx['head_sha']}`, base `{ctx['base_sha']}`, main `{ctx['main_sha']}`.",
+        "",
+        "This pull request only adds generated eval records under `evals/results/` (and at most regenerates "
+        "`capability/levels.json`), so it took the records fast lane: no key 1, key 2 or Founder Proxy (agent) ran. "
+        "The founder approved the lane in session on 2026-11-23 (docs/REVIEW_MECHANISM.md, \"Records fast lane\"). "
+        "Every condition was checked on this head:",
+        "",
+        "| Condition | Met | Detail |",
+        "|---|---|---|",
+        *rows,
+        "",
+        "_No agent review ran on this head; this is not a sign-off or an approval by a person._",
+    ])
+
+
 # --- Lock and call log (shared with Nirmaan's script: same directory, same protocol) ---
 
 
@@ -1317,6 +1447,34 @@ def _review(repo_root, pr, github, post, claude_bin, state_dir, models, timeout_
         check("key2", "pending", why)
         out(f"pr-review: {why}. No model was called.")
         return {"exit": EXIT_OK, "deferred": why, "too_large": True, "posted": posted}
+
+    # The records-only fast lane (CONFIG "fast_lane"): every condition met on this head, or the normal path.
+    lane = cfg.get("fast_lane")
+    if lane and (pull.get("head_ref") or "").startswith(lane["branch_prefix"]):
+        try:
+            changed = sorted({f["path"] for f in files})
+            # Literal pathspecs: a changed path is text the pull request chooses, never a pattern.
+            listed = _git(repo_root, "--literal-pathspecs", "ls-tree", "-z", head, "--", *changed) if changed else ""
+            modes = {}
+            for entry in (e for e in listed.split("\0") if e):
+                meta, _, path = entry.partition("\t")
+                mode, kind = meta.split(" ")[:2]
+                modes[path] = mode if kind == "blob" else f"{mode} {kind}"
+        except (subprocess.SubprocessError, OSError, ValueError) as exc:
+            modes = {}
+            out(f"pr-review: records fast lane: could not read the file modes at the head ({exc})")
+        conditions = fast_lane(lane, pull, files, modes, tracked_head, ci_now, cfg["required_ci"], size, cfg["max_diff_bytes"],
+                               classification["founder"], diff, cfg["hold_label"])
+        if fast_lane_ok(conditions):
+            url = comment(render_fast_lane(conditions, ctx))
+            sha7 = head[:7]
+            check("key1", "success", f"records fast lane, head {sha7}: qualified; no agent review ran", url)
+            check("key2", "success", f"records fast lane, head {sha7}: qualified; no agent review or Founder Proxy ran", url)
+            out(f"pr-review: #{pr} took the records fast lane on {sha7}. No model was called.")
+            return {"exit": EXIT_OK, "fast_lane": conditions, "key1": [], "key2": None, "proxy": None, "posted": posted,
+                    "classification": classification}
+        out("pr-review: records fast lane not taken (" + "; ".join(f"{c['condition']}: {c['detail']}" for c in conditions if not c["ok"])
+            + "); the normal review runs.")
 
     deleted = {f["path"] for f in files if f["status"] == "D"} | {f["old"] for f in files if f["old"]}
     counts: dict[str, int] = {}
