@@ -37,6 +37,7 @@ CITE ONLY THESE ARTIFACTS, using the token exactly as written:
 - Skill Root-cause analysis (root_cause_analysis)
 - Root-cause analysis procedure: Rank competing hypotheses.
 - Root-cause analysis procedure: Name the evidence that would refute each.
+- Root-cause analysis procedure: Write the repro as a self-checking testbench that counts its checks, and end it with its verdict, printed once just before $finish: read the run's nonce with $value$plusargs("nirmaan_nonce=%s", nonce) into a reg [8*64-1:0], then $display("NIRMAAN-SIM %0s %0d passed, %0d failed", nonce, passed, failed). The repro gate (simulator.run with expect=fail) counts a run only when it builds, reaches $finish, and prints that one verdict with the run's nonce and at least one failed check.
 - Root-cause analysis failure mode: Single-hypothesis tunnel vision.
 - Root-cause analysis validation: The conclusion names its evidence and the alternatives it rejects.
 - Root-cause analysis knowledge: veritriage_pack:uvm
