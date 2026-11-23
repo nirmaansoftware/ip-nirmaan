@@ -371,7 +371,10 @@ in the same pull request.
   made the record and by what rule; it gives a seat no instruction. Only
   `FLOW_CODE` changed: both whole-flow fingerprints changed and neither
   single-seat default (`tests/test_whole_flow_dispatch.py`). No `CODE` file,
-  tool definition, card, knowledge document or case changed.
+  tool definition, card, knowledge document or case changed. A whole-flow
+  trial recorded before this change carries the old whole-flow harness, so it
+  is a group of its own and never pools with a later trial; no whole-flow
+  trial record is committed under `evals/results`, so no group goes stale.
   `tests/test_whole_flow_passthrough_note.py` replays both whole-flow cases
   with no model, in both arms, and checks the lines a later stage is sent.
 
