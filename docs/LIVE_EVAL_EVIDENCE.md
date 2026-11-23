@@ -322,6 +322,23 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   run of the timer's controls or of the committed fixtures. It shows those
   probes denied through those tools as the account in that run, and nothing
   more; the `live-eval` job has no recorded run of them yet.
+- **Gate ET5's controls, sweep and fixtures as the account.** A replay of
+  `flow/axil-timer` dispatched with `controls: true` also runs
+  `scripts/live_eval_controls.py` in the `replay` job, after the reference
+  answer's replay and before the checkout is hashed again, with the tools as
+  the account. It runs the timer's seven controls
+  (`tests/test_whole_flow_controls.py`, held to
+  `evals/flow/controls_record.json`); every row of
+  `evals/flow/axil_timer/mutant_sweep.json`, rebuilt and run on the
+  testbench copy by `flow_mutants.simulate` and compared with the record's
+  result, error count and first failure; and gate ET1's fixtures with the
+  tests of the committed `*_fail.v` testbenches. The fixtures run from a copy
+  of the checkout in a `/tmp/nirmaan-*` folder only the runner may read,
+  since the account reads only input files the runner made in such a folder.
+  A missing tool fails its test. The job uploads the result as
+  `live-eval-controls-<run id>`. Until a record of such a run is committed,
+  nothing here says the controls, the sweep or the fixtures were run as the
+  account.
 - **The tools that read seat Verilog run as the account too** (gates ET2 to
   ET4 of `council/records/2026-11-22-eda-tools-seat-account.md`). The input
   screen (`eda_guard`) reads seat files with patterns of its own, and the
