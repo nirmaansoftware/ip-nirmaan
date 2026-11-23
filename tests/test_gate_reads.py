@@ -175,6 +175,43 @@ def test_the_cover_run_reads_and_copies_no_files_entry_outside_the_run(tmp_path,
             assert SECRET not in read_text(path, encoding="utf-8", errors="replace"), path
 
 
+def test_a_files_entry_is_the_runs_own_only_inside_the_setups_folder_or_given(tmp_path):
+    """``eda.own_file``, the rule itself: resolved, inside the setup's folder (the setup reached through a link too),
+    or one of the files the run is given; anything else, by a parent name, a link out or another folder, is not."""
+    folder = host(tmp_path)
+    run_in = tmp_path / "setup"
+    (run_in / "sub").mkdir(parents=True)
+    sby = run_in / "f.sby"
+    sby.write_text("[files]\n", encoding="utf-8")
+    (run_in / "out.v").symlink_to(folder / "secret.v")
+    (tmp_path / "linked.sby").symlink_to(sby)
+    for name in ("m.v", "sub/n.v"):
+        assert eda.own_file(run_in / name, sby, ()), name
+        assert eda.own_file(run_in / name, tmp_path / "linked.sby", ()), name
+    for path in (run_in / ".." / "host" / "leak.vh", folder / "leak.vh", run_in / "out.v"):
+        assert not eda.own_file(path, sby, ()), path
+    assert eda.own_file(run_in / "out.v", sby, [str(folder / "secret.v")])
+    assert not eda.own_file(run_in / "out.v", sby, [str(folder / "leak.vh")])
+
+
+def test_the_cover_run_reads_and_copies_an_approved_file_linked_beside_the_setup(tmp_path, monkeypatch):
+    """Must-pass for gate ET17: the approved file linked beside the setup (M68) and given as ``sources`` is read and
+    copied for the cover run as before, so its assertions still get derived covers."""
+    approved = tmp_path / "approved" / "m.v"
+    approved.parent.mkdir()
+    approved.write_text("module m(input wire a, output wire b); assign b = a; endmodule\n", encoding="utf-8")
+    sby = setup(tmp_path, "read -formal m.v\nprep -top m", "m.v")
+    (sby.parent / "m.v").unlink()
+    (sby.parent / "m.v").symlink_to(approved)
+    run = tmp_path / "run"
+    run.mkdir()
+    job = eda.Job("formal.cover", {"sby": str(sby), "sources": str(approved)}, run, (str(approved.resolve()),), None)
+    assert eda._sby_cover_check(job) is None
+    [[*_, cover]] = eda._sby_cover(job)
+    assert [p.name for p in (run / "antecedents").iterdir()] == ["m.v"]
+    assert str(run / "antecedents" / "m.v") in Path(cover).read_text(encoding="utf-8")
+
+
 @SBY
 @pytest.mark.parametrize("read", ["files-absolute"])
 def test_control_without_the_check_the_host_file_reaches_the_cover_summary(tmp_path, monkeypatch, read):

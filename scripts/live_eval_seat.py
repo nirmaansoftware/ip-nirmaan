@@ -22,11 +22,13 @@ the run's own directory. A link of the runner's beside an input whose text is ex
 ``beside``: an approved file linked beside the setup that names it) is in the view too, as that input's own file, read
 only (``beside_links``); so the account reads no file it was not given. The harness names both in the step's environment (``RUN_DIR_ENV``, ``INPUTS_ENV``, set by
 ``nirmaan.integrations.eda``); the root helper refuses an input that is not a regular file of the runner's inside a
-``/tmp/nirmaan-*`` folder the runner made, reached through no link, so nothing of the checkout and nothing outside
-those folders is in the view. Which files of those folders are in it is the harness's naming: a file a setup's
-``[files]`` names is an input only when it is the run's own, inside the setup's folder or one of the run's sources
-(``eda.own_file``, gate ET17 of the ET record's third addendum), whether or not the screen ran, so a setup's
-``[files]`` brings into the view no file outside the setup's folder but the run's sources.
+``/tmp/nirmaan-*`` folder the runner made, reached through no link, so no file outside those folders (none of the
+checkout) is ever an input. What the account may read elsewhere, outside the folders its view replaces, depends on file
+modes and the ``--deny-read`` entries below, and is not claimed beyond the targets the reach test probes. Which files of
+those folders are inputs is the harness's naming: a file a setup's ``[files]`` names is an input only when it is the
+run's own, inside the setup's folder or one of the run's sources (``eda.own_file``, gate ET17 of the ET record's third
+addendum), whether or not the screen ran, so a setup's ``[files]`` makes no file outside the setup's folder an input
+but the run's sources.
 
 ``fw.test`` runs the co-simulation it builds (the seat's C linked with the harness, M90) by path, not through
 ``PATH``, so it has a wrapper of its own: where ``nirmaan-seat-exec`` is on ``PATH``, ``fw.test`` runs the built

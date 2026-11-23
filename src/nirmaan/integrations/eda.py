@@ -126,7 +126,8 @@ SEAT_MODEL = "nirmaan-seat-model"
 #: any step.
 SEAT_TOOLS_ENV = "NIRMAAN_SEAT_TOOLS"
 #: What a run tells the wrappers, in each step's environment: its own directory and the files it was given (the
-#: sources, the setup and what its ``[files]`` name, the other files its parameters name). The seat account's view of
+#: sources, the setup and what its ``[files]`` name of the run's own, ``own_file``, the other files its parameters
+#: name). The seat account's view of
 #: the run holds those and nothing else of the run folders (``scripts/live_eval_seat.py``, ``view_plan``).
 SEAT_RUN_DIR_ENV = "NIRMAAN_SEAT_RUN_DIR"
 SEAT_INPUTS_ENV = "NIRMAAN_SEAT_INPUTS"

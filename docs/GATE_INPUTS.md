@@ -355,7 +355,9 @@ linked beside the setup is one). With the check in force nothing changes:
 the check already refuses every entry that is not the run's own (section 6).
 
 Tests: `tests/test_gate_reads.py`, gate ET17 section, each with the check
-bypassed. `seat_inputs` names no entry by an absolute name, a parent name or a
+bypassed where it would refuse. The rule itself (`own_file`), for a setup
+reached through a link too; the approved file linked beside the setup and
+given as `sources` is still read and copied for the cover run; `seat_inputs` names no entry by an absolute name, a parent name or a
 link out, and still names the approved file linked beside the setup; the cover
 run reads and copies no such entry as the caller, and the cover setup names
 it unchanged; a bypass control through `formal.cover` beside the one through
