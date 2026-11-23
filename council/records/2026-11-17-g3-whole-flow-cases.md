@@ -1513,3 +1513,394 @@ run as the seat account before the timer's slot 1, and the input screen is
 repaired, under its gates ET1 to ET8; gate ET9 returns the register block
 flow's Verilator model builds to security before slot 21. It changes nothing
 else here.
+
+## Fifth addendum (2026-11-23): a trial whose flow stops before its last stage
+
+This addendum settles, before the timer's slot 1, which group a whole-flow
+trial belongs to when its flow stops before its last stage, what is checked
+on such a trial's record, and whether the measured run of the plan's
+section 10 stands. It amends "The group key" in decision 1 and adds gates
+WF27 to WF30. It is a decision made on 2026-11-23.
+
+Ruling, in short:
+
+- **Decision 3 rules.** A trial whose intermediate stage does not complete
+  "is a failed trial that stays in its group's count". The code that reads
+  the records does not do that today: it keys a group on the trial's own
+  flow digest, and a stopped trial's digest covers only the stages it
+  seated. The read's code is changed, before slot 1, so that a stopped
+  trial is counted in its arm's group (decision F2; gate WF27).
+- **The flow code, the records and the fingerprints do not change.** No
+  file in `harness.CODE` or `FLOW_CODE` is touched, a trial's recorded flow
+  digest is never rewritten, and no pinned value of the plan moves.
+- **The plan states each stage's values.** A dated addition gives, for each
+  arm, every stage's skills and skill digests and the digest over the first
+  n stages, and the check made on a slot's record is stated there, stage by
+  stage, no weaker than the comparison of the whole digest (decision F3;
+  gates WF28 and WF29).
+- **The measured run stands** as the run of the plan's section 10 and as
+  the run gate ET10 reads. No second run is owed (decision F1).
+
+It changes no code, case, eval record, level, fingerprint or digest by
+itself. It loosens no gate. No trial ran and no workflow was dispatched for
+the meeting.
+
+### Who decided what
+
+The council decided every item below. The orchestrator called the meeting
+because the plan (`evals/plans/2026-11-22-g3-whole-flow.md`, section 1)
+leaves a change to a fixed item to a council ruling, and the group rule is
+this record's. It is not a founder decision, and the founder can overrule
+it. No seat found anything reserved for the founder in it: it adds no
+spending, contract, counsel, sending, public name or licence term. The pull
+request that changes `src/nirmaan/evals/levels.py` is in a founder class by
+path (gate semantics, `.github/review-teams.yml`) and goes to the Founder
+Proxy (agent) by the usual rule.
+
+Four seats gave round 1 positions independently, each as its own read-only
+process that saw no other answer to the brief: verification-lead (the plan,
+the counts, the group rule and the read), ai-engineer (the harness and the
+fingerprint), qa-evidence (the claims) and eda-tooling (the runner, the
+record and CI). The chair decided. Security was not seated: no seat found a
+reach or gate question in the brief, and the chain of gate ET10
+(`council/records/2026-11-22-eda-tools-seat-account.md`) stays security's
+as written. The seats read ip-nirmaan `main` at bbcf06a9 and the trial
+record of run 45196235508 as the run's `live-eval` and `rejudge` jobs
+uploaded it. That record is not committed at the time of this meeting. The
+seats had no shell. The chair recomputed the digests below on bbcf06a9 with
+the repository's own functions on a read-only checkout; no design tool ran.
+
+A key is an agent review. Nothing here is a person's approval, a release,
+or a claim that a design is ready to be made in silicon.
+
+### Facts checked
+
+The chair checked each line at bbcf06a9 unless a seat is named.
+
+1. The words. Decision 1, "The group key": "Case digest, model, harness
+   fingerprint, CLI and flow digest. The flow digest is a hash over the
+   sorted list of (stage, skill, skill digest) for every skill each seated
+   stage was given, as it was given in that arm." Decision 3, "A failed
+   intermediate stage": "The flow stops. Later stages are recorded as not
+   run, the final checks as not run, and the trial is a failed trial that
+   stays in its group's count." For a trial that stops early the two
+   cannot both hold as the code reads them (qa-evidence, eda-tooling).
+2. The flow code follows decision 1 to the letter. `run_flow` adds a
+   stage's skills to the digest's input only when it seats that stage
+   (`src/nirmaan/evals/flow.py:187-189`); a stage after a stop is recorded
+   "not run" with no skills (`flow.py:178-181`); the trial's digest is over
+   what was given (`flow.py:255`, the function at `flow.py:146-149`). So a
+   stopped trial's flow digest covers the stages up to and including the
+   one that did not complete.
+3. The read's code keys on that digest. `_whole_flow_groups`
+   (`src/nirmaan/evals/levels.py:201-232`) groups by case, case digest,
+   model, harness fingerprint, CLI, the trial's `flow_digest` and purpose
+   (`levels.py:212-213`), and writes a count only from ten trials
+   (`WHOLE_FLOW_MIN`, `levels.py:82`). So a stopped trial forms a group of
+   its own, its arm's group stays under ten, and no count is written for
+   the arm. Membership would depend on how far a trial got, and the trials
+   left out would all be failed ones (verification-lead, inference).
+4. The measured run. Run 45196235508 was dispatched from `main` at
+   bbcf06a9 with purpose `calibration`, with documents. Its trial record
+   carries the plan's case digest, the plan's with-documents whole-flow
+   fingerprint (`sha256:d90b3c18...`) and the plan's CLI pin; both jobs
+   ended with success, and the trial file the `rejudge` job uploaded
+   equals the one the `live-eval` job uploaded, field by field. Its flow
+   stopped before its last stage: three of its four stages were seated
+   and the last is recorded "not run". The stop is the one decision 3 describes, an intermediate stage
+   that did not complete. It is not the stop rule of gate WF8: that rule
+   (`flow_stopped`, `src/nirmaan/evals/records.py:213-217`) reads a last
+   answer with no text and an error, and it is false for this record.
+5. The digests. The record's flow digest is
+   `sha256:4ff378d26fdeb8f6daab2aaebfbe8395e44ec663e0ad7f7d7eaf1a155b971315`.
+   The plan's with-documents flow digest (section 23.1) is
+   `sha256:a1aea0d36022a54be56c8d5c31831ea8ac0994f2802bd8ee8f39f6a5246ec312`.
+   Recomputed on bbcf06a9 with the steps `run_flow` takes to assemble each
+   stage's skills, without running a stage: the timer with documents gives
+   the plan's value over four stages and the record's value over the first
+   three, and each of the record's three seated stages records the same
+   skills and skill digests. No pinned value differs.
+6. A digest over the first stages does not name an arm or a case. In the
+   same recomputation the digests over the first one and the first two
+   stages are equal in the timer's two arms, and the digests over the first
+   three stages of the register block equal the timer's in each arm. The
+   harness fingerprint differs by arm and the case digest by case.
+7. What is in a fingerprint or a pinned group. `harness.CODE` is twelve
+   files (`src/nirmaan/runtime/harness.py:280-293`) and `FLOW_CODE` is
+   `nirmaan/evals/flow.py` (`harness.py:271`). `src/nirmaan/evals/levels.py`,
+   `src/nirmaan/evals/records.py` and `src/nirmaan/models/evaluation.py`
+   are in neither, and in none of the seven groups of the plan's section
+   23.1 (ai-engineer; the chair read the lists). A change to `flow.py`
+   moves both whole-flow fingerprints, on one of which the measured run
+   ran.
+8. What a record holds. Each seated stage records its skills and their
+   digests (`EvalStage.skills`, `src/nirmaan/models/evaluation.py:251-252`),
+   so a record can be checked stage by stage. The plan states the two
+   whole-flow digests and no per-stage value.
+9. The check that stopped. The script that dispatches the slots is outside
+   the repository. Its operator reports that it compares a record's flow
+   digest with the plan's whole-flow value and stopped on the measured
+   run's record for that reason. `scripts/live_eval_ci.py` holds no flow
+   digest check (eda-tooling). The plan's section 8 names "record mismatch"
+   among the job-level stops and says that a record that exists "is a trial
+   and is committed as it is".
+10. Tests today. `tests/test_capability_levels.py:502-506` shows two flow
+    digests as two groups. No test states the group of a stopped trial.
+11. The plan's words. Section 18.1 says the flow digests are computed "as a
+    replay computes them before any stage runs". The code assembles a
+    stage's skills when it seats the stage (fact 2), so those words fit
+    only a flow that runs to its last stage (qa-evidence).
+
+### Decisions
+
+#### F1. The measured run stands
+
+1. Run 45196235508 is the measured run of the plan's section 10 and the
+   run gate ET10 is read on. It ran on the commit, case digest, fingerprint
+   and CLI the plan states. Its reach records are the ones gate ET10 is
+   read on; that chain is committed and read as the EDA tools record
+   already rules, and this addendum does not state that gate met. Decision
+   A3 of that record reads "one run" as one run that passed its gates, and
+   no seat found a gate of this run that failed.
+2. No second measured run is owed. The difference between the record's
+   flow digest and the plan's is fully explained by fact 5 and no pinned
+   value moved, so it is not a mismatch between what ran and what the plan
+   states. A second run made because this one stopped early would be a run
+   chosen by its outcome (verification-lead).
+3. What the run measured is less than a flow that seats every stage. The
+   plan's dated addition (decision F3) says, in these words and no more,
+   that the measured run's flow stopped before its last stage, that its
+   flow digest covers the stages it seated, and that what it measured of a
+   record's size is therefore a lower bound; the plan's rule for a record
+   over the review's size limit (its section 20.2) stands.
+4. The record of the measured run is treated as the plan and the EDA tools
+   record already rule; this addendum changes nothing about where or
+   whether it is committed. It belongs to no group of the forty and is
+   never counted.
+5. An exception to decision C of the EDA tools record's addendum, which
+   forbids stating "anything of its trial's outcome, stages or attempts".
+   This addendum, the plan's dated addition and the pull requests that
+   carry them may state the two things of item 3, because the ruling
+   cannot be made or checked without them. Nothing else of the run's
+   stages is stated anywhere: not why the flow stopped, not what a stage
+   answered, no attempt count. Decision C stands in every other respect.
+6. How the private script's row for the run is marked is its operator's,
+   under this decision: the run stands, and it is not a job-level stop to
+   be dispatched again.
+
+All four seats held that the run stands. Owner: verification-lead (the plan's
+words); security keeps gate ET10; qa-evidence reads the texts (gate ET13).
+
+#### F2. A stopped trial is counted in its arm's group
+
+1. **The reading.** Where decision 1's group key and decision 3 differ for
+   a trial that stops early, decision 3 rules: the trial is a failed trial
+   of the group its flow belongs to. "The group key" in decision 1 now
+   ends: a trial whose flow stops before its last stage is placed by the
+   stages it seated (fifth addendum, decision F2), and its own flow digest
+   is listed with it.
+2. **Where the fix is.** In the code that reads the records,
+   `_whole_flow_groups` in `src/nirmaan/evals/levels.py`, and nowhere
+   else. `flow.py` is not changed: the record keeps saying what each
+   seated stage was given, and a stage that was not seated was given
+   nothing. A record's flow digest is never rewritten or added to.
+3. **The rule.** Within one set of case, case digest, model, harness
+   fingerprint, CLI and purpose:
+   - Trials are placed in the order of how many stages they seated, most
+     first.
+   - A trial fits a group when its stage names and their order equal the
+     group's and every stage the trial seated records exactly the skills
+     and skill digests the group holds for that stage. A group holds the
+     stage values of the first trial placed in it.
+   - A trial that fits no group starts one. A trial that fits one group
+     joins it. A trial that fits more than one is listed apart as
+     unplaced, with the groups it fits named; none of those groups is
+     given a count, and the question returns to the council.
+   For trials that seat every stage this is today's grouping by flow
+   digest, and a test shows it. A group in which no trial seated every
+   stage is still a group, and its count is written from ten trials like
+   any other.
+4. **Counting.** A stopped trial is a failed trial: no judge ran on it,
+   and the existing rule already counts a trial no judge ran on as failed.
+   The minimum of ten, the Wilson interval and the rule against pooling
+   are unchanged.
+5. **The listing.** Each trial keeps its recorded `flow_digest` and gains
+   the stage at which the flow stopped, empty for a flow that reached its
+   last stage. A group shows the flow digest of the first trial placed in
+   it and whether that digest covers every stage. Where no trial of a
+   group seated every stage, the read cites the plan's whole-flow digest
+   for the arm from the plan's addition (decision F3).
+6. **At the read.** The read lists each stopped trial with the stage at
+   which it stopped. As decision 1, "Failures", already rules, a cause is
+   stated as fact only where that stage's own gate refused, and no
+   per-stage figure is stated as a skill rate.
+7. **When it merges.** Before the timer's slot 1. The rule that reads a
+   batch is never changed between a run and its read (ruling of
+   2026-11-15), so this is not left for later. No whole-flow trial that
+   counts has run.
+
+Who disagreed, and how the chair chose. No seat chose to leave the list as
+it is and count by hand at the read: the generated list would then never
+write the arm's count, and the read would rest on a step no test holds.
+No seat chose to change `flow.py`: it would move both whole-flow
+fingerprints, leave the measured run on a superseded fingerprint, reopen
+what gates ET5 and ET10 state on the pinned values, and make a record claim
+skills for a stage that was never seated. On the rule itself the seats
+differed. ai-engineer proposed to group by the six other fields alone and
+to write a count only where every trial's seated stages agree: a trial can
+then never fit two groups. verification-lead and eda-tooling proposed to
+place a stopped trial by its seated stages among groups keyed as today.
+The chair took the second: complete trials stay keyed by flow digest, as
+decision 1 and the existing test have it, and two complete flows on
+different cards are never listed as one group. From ai-engineer's position
+the chair took that the rule must work when no trial of an arm seats every
+stage. For a trial that fits two groups, verification-lead asked that
+neither group be given a count and eda-tooling that it return to the
+council; the chair took both. Under the freeze of the fourth addendum
+(decision 2, item 4) this cannot arise inside a batch unless a card or a
+document changed, which the dispatch check stops.
+
+Owner: verification-lead (the rule and the list); ai-engineer confirms that
+the change moves no fingerprint and no pinned value; qa-evidence reads the
+tests.
+
+#### F3. The plan's per-stage values, and the check on a slot's record
+
+1. **The values.** A dated addition to the plan, merged before slot 1,
+   states for each arm of the timer: the stage names in order; each
+   stage's skills and their digests; and the digest over the first n
+   stages for every n, the last of which is the whole-flow digest of
+   section 23.1. They are computed on `main` by the steps `run_flow` takes
+   to assemble each stage's skills, and the addition names the command.
+   The check of the plan's section 7 before each dispatch covers them.
+2. **The words.** The same addition corrects section 18.1's sentence of
+   fact 11 and carries the words of decision F1, item 3.
+3. **The check on a slot's record.** Every comparison made today stays:
+   case, purpose, arm, flow label, harness variant, case digest,
+   fingerprint, CLI. In place of the one comparison of the flow digest
+   with the whole-flow value:
+   - the record's stage names and order equal the plan's;
+   - the seated stages come first and every later stage is "not run",
+     with no skills, attempts, model calls or gate runs; where a stage is
+     "not run", every stage before the last seated one is completed and
+     the last seated one is not;
+   - each seated stage's skills and digests equal the plan's for the arm,
+     exactly;
+   - the record's flow digest equals the digest recomputed from its own
+     seated stages by the definition (`flow.py:146-149`), and equals the
+     plan's digest over that number of stages.
+   For a flow that seats every stage this is the comparison made today
+   and more. For a stopped flow it checks every skill that was given; the
+   stages not seated were given nothing, and their values are pinned at
+   dispatch by section 7.
+4. **What a stop is.** A record that passes item 3 with a stage "not run"
+   is a failed trial of its slot. It is not a record mismatch and does not
+   stop the batch. The stop rule of gate WF8 and the other stops of the
+   plan's section 8 are unchanged, and a record that fails item 3 stops
+   the batch as today.
+5. **The script.** The dispatching script is outside the repository, so
+   the plan's addition states item 3 in words that a reader can check, and
+   the script's operator shows, before slot 1, that the script accepts the
+   measured run's record under item 3 and refuses a copy of it with a
+   stage's skill digest changed, with a stage's skills removed, with a
+   seated stage after a "not run" one, and with the flow digest changed.
+
+All four seats asked for the per-stage values and for this check; they
+differed only in wording. Owner: verification-lead (the plan's addition);
+eda-tooling (the script's check); qa-evidence reads the addition.
+
+#### F4. The other batches
+
+1. **The re-measure batch** (`evals/plans/2026-11-23-w2-remeasure.md`) is
+   single-seat. A single-seat trial has no stages and no flow digest, and
+   the change of decision F2 is inside `_whole_flow_groups`. No effect; a
+   test shows that the change leaves `capability/levels.json` as it is.
+2. **The register block.** Decisions F2 and F3 apply to slots 21 to 40 as
+   written. The plan addition the fourth addendum requires before slot 21
+   also states, for each arm, the five stages' values and the digest over
+   the first n stages. The first three stages' values equal the timer's
+   (fact 6); the case digest keeps the two cases apart, and a test shows
+   that a stopped trial of one case never joins a group of the other.
+
+#### F5. What may and may not be said
+
+May be said, at a case's read: that a trial's flow stopped before its last
+stage and at which stage; that it is a failed trial of its group; its own
+flow digest beside the group's.
+
+Never said, adding to decision 4 of the fourth addendum: a count from which
+stopped trials are left out, or a second count "of the flows that reached
+the last stage"; a stopped trial's digest as a group or an arm of its own;
+that a stage "fails" at some rate; a cause for a stop beyond what decision
+1, "Failures", allows; anything of the measured run beyond decision F1,
+item 3.
+
+Owner: qa-evidence.
+
+### Positions not adopted, and open
+
+- eda-tooling held that the measured run meets the plan's section 10 only
+  in part, because it gives a lower bound on a record's size, and that no
+  text should say anything of its stages. The chair ruled that it stands
+  and that the plan says the lower bound in so many words (decision F1,
+  items 3 and 5). Recorded as dissent on the wording.
+- ai-engineer's grouping by six fields alone: not taken, for the reason
+  given under decision F2.
+- A new field in the record that states the whole flow's digest, written
+  by code outside `flow.py`: named in the brief, chosen by no seat. It
+  would state in a record what the plan already pins.
+- Open, for verification-lead: qa-evidence raised, as an inference from the
+  measured run's record, a question about why its flow stopped. Under
+  decision F1, item 5 this record states nothing of it. It is in the
+  internal minutes. If it leads to a proposal that changes a file in
+  `harness.CODE` or `FLOW_CODE`, a tool definition, a card or a document
+  before slot 1, the pinned values move and the fourth addendum and the
+  EDA tools record say what is then owed; such a proposal returns to the
+  council.
+- Not checked from the repository: the dispatching script and its row for
+  the measured run are private (fact 9).
+
+### Gates
+
+Each is met before the timer's slot 1.
+
+| Gate | Condition | Owner seat |
+|---|---|---|
+| WF27 | `_whole_flow_groups` places a trial whose flow stopped early by the rule of decision F2, item 3, and lists it as item 5 says; tests show the cases of the build specification below; no file in `harness.CODE` or `FLOW_CODE` changes and no value of the plan's section 23.1 moves | verification-lead |
+| WF28 | The plan's dated addition states the timer's per-stage values and the digests over the first n stages for both arms, the check of decision F3, item 3, the corrected sentence of section 18.1 and the words of decision F1, item 3; a test shows the stated values give the stated digests | verification-lead |
+| WF29 | The dispatching script checks a slot's record as decision F3, items 3 and 4 say, shown as item 5 says, before slot 1 | eda-tooling |
+| WF30 | Every statement about a stopped trial follows decision F5, and every statement about the measured run follows decision F1, items 3 and 5 | qa-evidence |
+
+### Build specification, for the build lane
+
+This meeting wrote no code and no plan text.
+
+1. `src/nirmaan/evals/levels.py`, `_whole_flow_groups` only (gate WF27).
+   Tests, in `tests/test_capability_levels.py`, that fail on bbcf06a9 and
+   pass on the change:
+   - nine trials that seat every stage and one stopped at an intermediate
+     stage, same arm: one group, n of ten, the stopped trial failed and
+     listed with its own digest and its stopping stage;
+   - ten stopped trials whose seated stages agree: one group of ten with
+     a count;
+   - a stopped trial whose seated stage records a different skill digest
+     stays apart from the group;
+   - a trial stopped at the first or the second stage joins the group of
+     its own fingerprint and never the other arm's, although the digests
+     over those stages are equal;
+   - a stopped trial of another case, with equal values on the stages it
+     seated, never joins;
+   - a stopped trial that fits two groups is listed unplaced and neither
+     group has a count;
+   - two flow digests of complete trials are still two groups, and
+     `capability/levels.json` is unchanged by the change.
+2. The plan's dated addition (gate WF28), documents only, with a test that
+   reads the addition's table and rebuilds every stated digest with
+   `flow_digest`.
+3. The dispatching script's check (gate WF29), outside the repository.
+4. Nothing in `flow.py`, `records.py`, the record format, a case, a card,
+   a document or the workflow.
+
+### Open, for the founder
+
+Nothing.
