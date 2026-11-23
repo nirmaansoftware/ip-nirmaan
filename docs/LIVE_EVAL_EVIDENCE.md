@@ -214,8 +214,16 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   usage limit) or a limit line in the output, on any exit other than 0 or 1,
   and when a record's purpose, knowledge label, harness variant, fingerprint or
   CLI is not what was asked for. A stopped or failed trial stays as it is and
-  is never run again; no later trial of the dispatch starts. One dispatch runs
-  at a time (the `live-eval` concurrency group).
+  is never run again; no later trial of the dispatch starts. Dispatches run
+  one at a time in the `live-eval` concurrency group, except a dispatch with
+  the input `parallel` (default false) of a case that is neither `flow/` nor
+  `firmware/`: it runs in a group of its own, `live-eval-run-<run id>`, so it
+  is never queued behind another run and none can cancel it, and the width is
+  held by whatever dispatches it. The first step of the `replay` and
+  `live-eval` jobs fails the run when `parallel` is asked for a `flow/` or
+  `firmware/` case. Only the wave 2 re-measure batch's cases, in its slots and
+  its replays, are dispatched with it (decision P2 of the addendum to
+  `council/records/2026-11-23-wave-2-close-meeting-1.md`).
 - **Seat code runs as an account of its own** (gates WF9 and WF17 of the G3
   council record, `council/records/2026-11-17-g3-whole-flow-cases.md`). The
   runner user has passwordless sudo, owns the checkout, the installed package

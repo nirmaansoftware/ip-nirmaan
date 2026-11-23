@@ -10,6 +10,14 @@ name: Live evaluation
 # before trial 1 and on every record. Records are uploaded as a workflow artifact and committed
 # later by pull request; nothing here commits.
 #
+# Concurrency: every dispatch runs in the one group `live-eval` (one running and one pending run; a newer pending
+# run cancels the older one), except a dispatch with `parallel: true` of a case that is neither `flow/` nor
+# `firmware/`, which gets a group of its own (`live-eval-run-<run id>`): it is never queued behind another run and
+# no run can cancel it. GitHub then holds no width; whatever dispatches it does. The first step of the `replay` and
+# `live-eval` jobs fails the run when `parallel` is asked for a `flow/` or `firmware/` case, so the whole-flow timer
+# and seat C cases stay one at a time. Only the wave 2 re-measure batch's cases, in its slots and its replays, are
+# dispatched with it (addendum of council/records/2026-11-23-wave-2-close-meeting-1.md, decision P2).
+#
 # Gates WF9 and WF17: seat code (a cocotb test module, which runs inside vvp) runs as the account
 # `nirmaan-seat`, which has no sudo, no write access to the checkout, the installed package or the
 # records, and no credential in its environment (.github/actions/live-eval-seat). Every job that
@@ -81,12 +89,16 @@ on:
         description: "With a replay of flow/axil-timer: also run its controls, mutant sweep and gate fixtures as the seat account (gate ET5)"
         type: boolean
         default: false
+      parallel:
+        description: "Run in a concurrency group of its own; refused for flow/ and firmware/ cases (addendum P2 of the 2026-11-23 wave 2 close record)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 concurrency:
-  group: live-eval
+  group: ${{ inputs.parallel && !startsWith(inputs.case, 'flow/') && !startsWith(inputs.case, 'firmware/') && format('live-eval-run-{0}', github.run_id) || 'live-eval' }}
   cancel-in-progress: false
 
 jobs:
@@ -116,6 +128,11 @@ jobs:
       # council/records/2026-11-23-wave-2-close-meeting-1.md).
       NIRMAAN_SEAT_TOOLS: /opt/nirmaan-seat/bin
     steps:
+      - name: Refuse parallel for whole-flow and firmware cases
+        if: ${{ inputs.parallel && (startsWith(inputs.case, 'flow/') || startsWith(inputs.case, 'firmware/')) }}
+        run: |
+          echo "::error::A flow/ or firmware/ case runs only in the live-eval concurrency group; dispatch it without parallel. Nothing ran."
+          exit 1
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
@@ -247,6 +264,11 @@ jobs:
       # council/records/2026-11-23-wave-2-close-meeting-1.md).
       NIRMAAN_SEAT_TOOLS: /opt/nirmaan-seat/bin
     steps:
+      - name: Refuse parallel for whole-flow and firmware cases
+        if: ${{ inputs.parallel && (startsWith(inputs.case, 'flow/') || startsWith(inputs.case, 'firmware/')) }}
+        run: |
+          echo "::error::A flow/ or firmware/ case runs only in the live-eval concurrency group; dispatch it without parallel. Nothing ran."
+          exit 1
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
