@@ -167,8 +167,8 @@ def test_the_label_reader_and_the_list_are_outside_the_harness_code():
 # never inside it (council record 2026-11-22-eda-tools-seat-account.md, addenda, decisions A1, R1 and R3). The index
 # names its `format`, `slot` (the number), `run`, `attempt` and `commit`; `files` (each `path` and `sha256`, the digest
 # written `sha256:<hex>`); `missing` (the name of each of the four artifacts the run did not upload); `recorded` (whether
-# this run wrote the slot's record); `reach_held` (true only if every probe was denied in both jobs, or in `live-eval`
-# only for an unjudged record); and `no_record_cause`, the words that say why a run that wrote no record wrote none.
+# this run wrote the slot's record); `no_record_cause`, the words that say why a run that wrote no record wrote none;
+# and the runner's own `reach_held`, which this test does not read: it reads the records.
 
 SLOT_FOLDER = re.compile(r"slot-(\d{2})")
 REACH_ARTIFACT = re.compile(r"live-eval-(tool|fw)-reach-(trials|rejudge)-(\d+)")
@@ -230,7 +230,6 @@ def _check_run_folder(folder: Path, slot: str, root: Path) -> tuple[dict, dict[s
     assert missing <= set(ARTIFACTS) and not missing & seen and missing | seen == set(ARTIFACTS), (
         f"{where}: each of the four artifacts is in the folder or in missing, and not both")
     assert isinstance(index.get("recorded"), bool), f"{where}: recorded is not stated"
-    assert isinstance(index.get("reach_held"), bool), f"{where}: reach_held is not stated"
     if not index["recorded"]:
         assert isinstance(index.get("no_record_cause"), str) and index["no_record_cause"].strip(), (
             f"{where}: a run that wrote no record states why")
@@ -323,7 +322,7 @@ def _run(slot: Path, run: str, *, wrote: bool, jobs=("trials", "rejudge"), head:
         _put(folder, f"live-eval-fw-reach-{job}-{run}/fw-reach.json", fw)
     missing = [f"{a}-{run}" for a in ARTIFACTS if a.rsplit("-", 1)[1] not in jobs]
     index = {"format": INDEX_FORMAT, "slot": int(slot.name[-2:]), "run": run, "attempt": "1", "commit": head,
-             "files": [], "missing": missing, "recorded": wrote, "reach_held": True,
+             "files": [], "missing": missing, "recorded": wrote,
              "no_record_cause": None if wrote else cause}
     (folder / INDEX).write_text(json.dumps(index), encoding="utf-8")
     _reindex(folder)
@@ -359,9 +358,9 @@ def test_slots_whose_reach_folders_hold_every_check_pass(tmp_path):
     _check_slots_reach(tmp_path)
     # An unjudged record (no rejudge.json): a rejudge tool record that shows a probe not denied is not asked of it.
     unjudged = _slot(tmp_path, 3, rejudged=False)
-    _run(unjudged, "112", wrote=False, cause="a second dispatch of the slot")
-    _edit(unjudged / "reach" / "112", "live-eval-tool-reach-rejudge-112/tool-reach.json",
-          lambda d: d.update(every_denied=False))
+    _run(unjudged, "111", wrote=True)  # the recording run's rejudge job did upload its tool reach record ...
+    _edit(unjudged / "reach" / "111", "live-eval-tool-reach-rejudge-111/tool-reach.json",
+          lambda d: d.update(every_denied=False))  # ... and one probe of it was not denied
     _check_slots_reach(tmp_path)
     # The highest slot may hold reach records and no record yet, or only a run that wrote none.
     _slot(tmp_path, 4, record=False)
