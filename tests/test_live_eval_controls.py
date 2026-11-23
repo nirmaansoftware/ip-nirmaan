@@ -8,6 +8,7 @@ of its own under ``/tmp/nirmaan-*`` with the step's environment naming it.
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 import os
@@ -286,3 +287,86 @@ def test_the_committed_et5_controls_record_is_from_main_and_shows_each_part_agai
         assert diff["what"].startswith("must-pass" if diff["test"].endswith(LINKED) else "bypass control"), diff
     refusing = [t for t in part["tests"] if "_refused" in t["test"].split("::")[-1]]
     assert refusing and all(t["outcome"] == "passed" for t in refusing)  # every must-refuse fixture still refused
+
+
+# --- Uploads committed as uploaded (third addendum to the ET record, decision E4) ---------------------------------
+
+#: Where controls uploads are committed, each run in ``run-<id>/`` with its ``index.json`` and the artifact's files at
+#: ``<artifact name>/<file name>``. Not under ``evals/``: ``bypass.json`` and ``controls.json`` are JSON arrays as
+#: uploaded, and ``nirmaan.evals.cases.load_cases`` reads every ``*.json`` there that is not a ``format`` object as a
+#: case.
+EVIDENCE = REPO / "docs" / "evidence" / "et5"
+#: Every program a seat-account step starts is a wrapper here (``.github/actions/live-eval-seat``).
+WRAPPERS = "/opt/nirmaan-seat/bin/"
+#: What gate ET1's targets hold: the canary (``tests/test_gate_inputs.py``) and the host file's marker
+#: (``tests/test_gate_reads.py``). Neither may be in a control's record as the account.
+TARGET_CONTENT = ("canary_et1_7f3a", "NIRMAAN_MARKER_4b1d")
+
+
+def committed_upload(run: str) -> tuple[dict, Path]:
+    """A run's committed upload: its index, after checking that the folder holds exactly the files the index names,
+    each with the sha256 and size it names (decision R1, item 3)."""
+    folder = EVIDENCE / f"run-{run}"
+    index = json.loads((folder / "index.json").read_text(encoding="utf-8"))
+    found = sorted(p.relative_to(folder).as_posix() for p in folder.rglob("*") if p.is_file() and p.name != "index.json")
+    assert found == sorted(index["files"]), found
+    for name, want in index["files"].items():
+        data = (folder / name).read_bytes()
+        assert (hashlib.sha256(data).hexdigest(), len(data)) == (want["sha256"], want["bytes"]), name
+    return index, folder
+
+
+def junit_outcomes(path: Path) -> dict[str, str]:
+    """Each test of a JUnit file, as ``path::name``, with its outcome: passed, failed, error or skipped."""
+    import xml.etree.ElementTree as ET
+
+    out = {}
+    for case in ET.parse(path).getroot().iter("testcase"):
+        name = case.get("classname", "").replace(".", "/") + ".py::" + case.get("name", "")
+        kinds = [k for k in ("failure", "error", "skipped") if case.find(k) is not None]
+        out[name] = {"failure": "failed", "error": "error", "skipped": "skipped"}[kinds[0]] if kinds else "passed"
+    return out
+
+
+def test_run_45135605510s_controls_upload_is_committed_as_uploaded_and_as_records_only():
+    """Decision E4, item 6: the upload the addendum's facts T3 to T7 were read from, as uploaded, cited as what showed
+    the finding of decision E3 and never as showing gate ET5 met. It holds what fact T3 says: controls 7, the sweep as
+    recorded, 402 fixture tests with 391 passed and 11 failed, none skipped, the linked setup passing, and the 11
+    failures the bypass controls of fact T5; and what fact T7 found: the ``[files]`` control passed through the seat
+    account's ``sby`` with the host file's marker in its summary."""
+    index, folder = committed_upload("45135605510")
+    assert index["format"] == "nirmaan.et5-controls-upload-index/1"
+    assert index["about"].startswith("Records only.") and "never as showing gate ET5 met" in index["about"]
+    run = index["run"]
+    assert (run["id"], run["commit"], run["branch"], run["attempt"]) == (
+        "45135605510", "a15b8c1dfe531f3634120f40335901c8965d8611", "main", 1)
+    assert run["inputs"] == {"case": controls.CASE, "replay": True, "controls": True}
+    assert run["artifact"] == "live-eval-controls-45135605510"
+    assert {k: v["conclusion"] for k, v in run["jobs"].items()} == {"replay": "failure", "rejudge": "success"}
+    upload = folder / run["artifact"]
+    assert sorted(p.name for p in upload.iterdir()) == sorted(
+        ["bypass.json", "controls.json", "controls.log", "controls.xml", "fixtures.log", "fixtures.xml",
+         "summary.json", "sweep.json"])
+
+    summary = json.loads((upload / "summary.json").read_text(encoding="utf-8"))
+    assert (summary["format"], summary["case"], summary["commit"]) == (
+        "nirmaan.et5-seat-controls", controls.CASE, run["commit"])
+    assert (summary["controls"]["exit"], summary["controls"]["count"], summary["sweep"]["ok"]) == (0, 7, True)
+    assert (summary["fixtures"]["exit"], summary["ok"]) == (1, False)
+    assert json.loads((upload / "sweep.json").read_text(encoding="utf-8"))["ok"] is True
+
+    outcomes = junit_outcomes(upload / "fixtures.xml")
+    assert len(outcomes) == 402 and "skipped" not in outcomes.values() and "error" not in outcomes.values()
+    failed = sorted(t for t, o in outcomes.items() if o == "failed")
+    assert len(failed) == 11 and failed == sorted(summary["bypass"]["failed"])
+    assert all(t.split("::")[1].startswith(controls.BYPASS) for t in failed)
+    assert outcomes[f"tests/test_gate_reads.py::{LINKED}"] == "passed"
+
+    bypass = {c["test"]: c for c in json.loads((upload / "bypass.json").read_text(encoding="utf-8"))}
+    assert len(bypass) == summary["bypass"]["count"] == 48
+    finding = bypass["tests/test_gate_reads.py::test_control_without_the_check_the_host_file_reaches_the_summary"
+                     "[files-absolute]"]
+    assert finding["result"] == "passed"
+    [found] = finding["runs"]
+    assert [s["command"][0] for s in found["steps"]] == [f"{WRAPPERS}sby"]
+    assert "NIRMAAN_MARKER_4b1d" in found["summary"]
