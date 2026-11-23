@@ -1696,6 +1696,14 @@ The chair checked each line at bbcf06a9 unless a seat is named.
    not which stage, not why the flow stopped, not what a stage answered,
    no attempt count. Decision C stands in every other respect, and
    qa-evidence's read under gate ET13 is made against it as narrowed here.
+   (Corrected 2026-11-23 by the chair, after the meeting, on the review
+   of the pull request that carried this addendum. As first merged, the
+   item allowed "the two things of item 3" to this addendum too, while
+   facts 4 and 5 already stated the further facts named above. The
+   correction makes the item say what the addendum states; it adds no
+   statement about the run. No seat was asked again, and eda-tooling's
+   dissent below, that no text should say anything of the run's stages,
+   stands against the item as corrected.)
 6. How the private script's row for the run is marked is its operator's,
    under this decision: the run stands, and it is not a job-level stop to
    be dispatched again.
@@ -1845,7 +1853,7 @@ stopped trials are left out, or a second count "of the flows that reached
 the last stage"; a stopped trial's digest as a group or an arm of its own;
 that a stage "fails" at some rate; a cause for a stop beyond what decision
 1, "Failures", allows; anything of the measured run beyond decision F1,
-item 3.
+items 3 and 5.
 
 Owner: qa-evidence.
 
