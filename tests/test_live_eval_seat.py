@@ -797,6 +797,45 @@ def test_the_committed_tool_reach_record_is_from_main_with_every_probe_denied_in
     assert parts["replay"]["run_id"] == parts["rejudge"]["run_id"] and parts["replay"]["commit"] == \
         parts["rejudge"]["commit"]
     assert parts["replay"]["commit"][:8] in record["about"] and parts["replay"]["run_id"] in record["about"]
+ET5_RECORD = REPO / "evals" / "flow" / "et5_replay_record.json"
+
+
+def test_the_committed_et5_replay_record_is_from_main_names_the_timer_and_shows_exactly_what_et5_claims():
+    """Gate ET5: the committed record is the replay of flow/axil-timer dispatched on main at c99ef1fe, run
+    45073595509, of the same run and commit as the tool reach record: the RTL stage's lint, simulation and synthesis
+    passed as the seat account, check 1 passed, check 2 passed clean with 4 of 4 mutants failing, and the re-judge was
+    the same. It holds no controls or fixtures run, and says so."""
+    record = json.loads(ET5_RECORD.read_text())
+    reach_record = json.loads(TOOL_REACH_RECORD.read_text())
+    assert record["format"] == "nirmaan.replay-record/1"
+    run, manifest, trial = record["run"], record["manifest"], record["trial"]
+    assert run["id"] == "45073595509" == reach_record["replay"]["run_id"]
+    assert run["commit"].startswith("c99ef1fe") and run["commit"] == manifest["head_sha"] == \
+        reach_record["replay"]["commit"]
+    assert run["commit"][:8] in record["about"] and run["id"] in record["about"]
+    assert set(run["jobs"]) == {"replay", "rejudge"} and all(j["conclusion"] == "success" for j in run["jobs"].values())
+    assert all(run["id"] in j["url"] and j["id"] in j["url"] for j in run["jobs"].values())
+    assert manifest["cases"] == ["flow/axil-timer"] and manifest["replay"] is True and manifest["trials"] == 1
+    assert trial["case"] == "flow/axil-timer" and trial["passed"] is True and trial["replay"] is True
+    for runs in (trial["gate_runs"], trial["rtl_stage_gate_runs"]):
+        assert [(g["tool"], g["succeeded"]) for g in runs] == [("lint.run", True), ("simulator.run", True),
+                                                               ("synth.run", True)]
+    check1, check2 = trial["scores"]
+    assert check1["name"] == "The reference testbench passes on the flow's RTL" and check1["status"] == "passed"
+    assert check2["name"] == "The flow's testbench passes on the reference RTL and fails each timer mutant"
+    assert check2["status"] == "passed" and len(check2["failed_runs"]) == 4  # 4 of 4 mutants
+    by_run = {j["run"]: j for j in trial["judge_runs"]}
+    assert by_run[check1["runs"][0]]["succeeded"] is True  # check 1, on the staged testbench
+    assert by_run[check2["runs"][0]]["succeeded"] is True  # check 2 clean
+    assert [by_run[r]["succeeded"] for r in check2["failed_runs"]] == [False] * 4  # each mutant failed
+    assert record["rejudge"]["trials"] == [{"case": "flow/axil-timer", "trial": 1, "same": True, "differences": []}]
+    assert trial["sha256_replay"] == trial["sha256_rejudged"]
+    assert record["summary"]["cases"]["flow/axil-timer"]["passed"] == 1 == record["summary"]["cases"][
+        "flow/axil-timer"]["n"]
+    assert record["rejudged_summary"] == record["summary"]
+    assert "records no run of the timer's controls or of the committed fixtures" in record["about"]
+
+
 def test_the_eqy_probe_reads_its_target_from_the_gold_side_of_a_setup_the_gate_runs():
     """Gate W2C3 (council/records/2026-11-23-wave-2-close-meeting-1.md): eqy is probed through equivalence.run with a
     setup the gate accepts, whose gold side reads the file that includes the target and whose gate side reads another."""
