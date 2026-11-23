@@ -241,9 +241,10 @@ def test_seats_select_by_group_or_stage():
     assert [c.id for c in select_cases(cases, ["interface-spec"])] == [SPEC_CASE]
     assert [c.id for c in select_cases(cases, ["dv"])] == [
         "dv/cocotb-crc", "dv/coverage-irq-ctrl", "dv/coverage-tick-timer", "dv/directed-irq-ctrl", "dv/equiv-gray",
-        "dv/equiv-updown", "dv/formal-credit-counter", "dv/formal-rr-arbiter", "dv/plan-irq-ctrl", "dv/plan-tick-timer",
-        "dv/prove-deep-counter", "dv/random-crc", "dv/scoreboard-mac"]  # W2-E1, E2, E3, E5, E6, RX-E1, RX-E2
-    assert [c.id for c in select_cases(cases, ["debug"])] == ["debug/root-cause-uart-tx", "debug/triage-three-bugs"]  # W2-E4
+        "dv/equiv-updown", "dv/fcov-lifo4", "dv/formal-credit-counter", "dv/formal-rr-arbiter", "dv/plan-irq-ctrl",
+        "dv/plan-tick-timer", "dv/prove-deep-counter", "dv/random-crc", "dv/scoreboard-mac"]  # W2-E1, E2, E3, E5, E6, RX-E1, RX-E2, RX-E4
+    assert [c.id for c in select_cases(cases, ["debug"])] == [
+        "debug/root-cause-debounce", "debug/root-cause-uart-tx", "debug/triage-pwm-gen", "debug/triage-three-bugs"]  # W2-E4, RX-E3
     assert len(select_cases(cases, ["rtl", "spec", "firmware", "dv", "debug"])) == len(cases)
     assert select_cases(cases, []) == cases
 

@@ -443,6 +443,34 @@ seat today, so these cases do not name it (a later skills batch adds it).
   RTL, and each of the three single-defect mutants must fail a repro of its
   own (a matching, so one repro that fails all three defects cannot stand for
   three buckets). The reference has three repros, each narrow to one defect.
+- `debug/root-cause-debounce` (RX-E3, a second root-cause case, outcome
+  `rtl_bug`, `root_cause_analysis`). Its block (`tests/fixtures/dv/debounce/`)
+  is an input debouncer whose RTL under investigation restarts its count only
+  on a rising edge of `noisy`, so with `clean` high a low pulse shorter than
+  `STABLE` still reaches `clean`. The failing log is the evidence: its first
+  `ERROR` is a symptom (`clean` fell when `noisy` came back high), and an
+  earlier line shows a high bounce filtered correctly, which refutes a counter
+  that is broken in general. The triage report and quick repro
+  (`debounce_triage_repro.v`, which probes the count register by name and so
+  cannot build on the second implementation) are upstream. Two `must-fail`
+  controls, on the counter implementation and on an independent
+  history-register implementation (`alt/debounce.v`), each pass the fixed RTL
+  and fail the two defective ones. A repro with only high pulses passes the RTL
+  under investigation and is refused at the gate; one that expects `clean` to
+  move during the pulse fails the clean run (tested).
+- `debug/triage-pwm-gen` (RX-E3, a second triage case, `failure_triage`). Its
+  block (`tests/fixtures/dv/pwm_gen/`) is a pulse-width modulator with a period
+  of eight clocks and three independent defects (a pulse one clock too long, a
+  period of seven, a `duty` that is not held for the period), shown by three
+  failing logs. The one control is `must-fail-each`, as for
+  `debug/triage-three-bugs`; each of the three single-defect mutants fails
+  exactly one of the three reference repros (tested). The seat is told the
+  plusarg and the verdict line by the `failure_triage` card, as in
+  `debug/triage-three-bugs`; a repro that waits for a rising edge the defective
+  output never makes would hang, so the reference repros never do.
+
+Neither new case names `log_analysis`: the root-cause stage plans only
+`root_cause_analysis` for its seat, so the packet does not carry it.
 
 | File | The one change | Judge that fails it |
 |---|---|---|
@@ -613,6 +641,38 @@ requirement added, one removed, one number changed, one requirement ID renamed, 
 requirement changed in one mode only), so a plan cannot pass by quoting most of the text or by matching a
 requirement count. `vplan.check` reports a distinct problem for each, and a test names it.
 
+### A functional coverage case (RX-E4)
+
+`dv/fcov-lifo4` gives `functional_coverage` its first case. The skill's stage is the coverage-closure stage of
+signoff-preparation (the same skill is planned by the `coverage` stage of new-ip), whose evidence is a `coverage.read`
+run. `coverage.read` measures line, toggle and branch coverage of design files; it does not read a testbench's
+covergroups. A functional claim therefore needs a checker (a self-checking test that tallies each scenario and fails
+when one never happens), and this case judges exactly that.
+
+The seat writes a functional coverage model of a four-entry stack, `lifo4` (`tests/fixtures/dv/lifo4/`, held out by no
+other case), from the approved requirement matrix, and delivers it as the stage's output, the coverage report: one
+SystemVerilog module, `lifo4_fcov`, with the ports the matrix gives, and a closure statement in comments. The matrix
+names fifteen scenarios: the nine crosses of operation (push alone, pop alone, both) and occupancy (empty, neither,
+full), the five occupancies, and a reset while the stack holds a word. The control is a `must-fail` check whose tool is
+`coverage.read`, whose case files are the block and a held-out stimulus, and whose six mutants are the stimulus with
+one scenario taken out (the refused pop, the refused push, both at either end of the stack, both in the middle, and the
+reset). The stimulus reads the model's `planned` and `holes` after its last cycle and fails the run when fewer than
+fifteen bins are planned or any hole is left. The clean run must pass, and each mutant run must fail, so a model with
+a bin true by construction, a bin written out of the plan, or a constant zero hole count survives the mutant that
+skips its scenario, and a model with a bin no stimulus can hit fails the clean run. The coverage percentages in the
+`coverage.read` summary are not bounded. `tests/test_dv_fcov_lifo4_evals.py` runs the reference answer and each of
+those models against the real tool.
+
+`regression_intelligence` and `regression_management` get no case here, for reasons that hold on this head. No stage
+plans either skill: the triage stage of regression-investigation plans `failure_triage` only when asked for a
+reproduction, and the regression stages plan none, so the two skills reach a seat only as skills its role holds
+(`src/nirmaan/company/workflows.py`, stages `triage`, `regression`, `verify-fix`, `regression-health`;
+`src/nirmaan/company/org_chart.py`, the debug and regression teams). The tools they hold cannot judge a seat's work:
+`regression.run` has no binding (contract only), and `veritriage.investigate` reads logs with `record_history=False`
+(`src/nirmaan/integrations/veritriage.py:59`), so nothing in a run records or looks up a past failure, which is what
+`regression_intelligence` is about. The triage seat's work is already judged by repro testbenches
+(`debug/triage-three-bugs`), which says nothing about history.
+
 ### A control for X after reset (G5)
 
 Two live trials of `rtl/apb-gpio` (one with knowledge documents, one without)
@@ -648,6 +708,43 @@ cases grade (their RTL, testbenches, proofs and reference documents) changed:
 Each skill is one the seat's role holds and one the held-out judge exercises.
 Adding the field changes every case digest; no run record is committed, so no
 recorded trial becomes incomparable.
+
+## 6. Named exceptions to "Practising skills have evals"
+
+A skill computes as practising when one of its tools is available
+(`skill_tier`, `docs/KNOWLEDGE_FILES.md`). The wave 2 (Verification) exit
+asks that every such skill of the Verification division has an eval case that
+names it (`EvalCase.skills`), except the skills below. The list is closed.
+`tests/test_practising_skills_have_cases.py` fails when a Verification skill
+that computes as practising has no case and is not in the first table, when a
+skill in the first table gains a case or stops computing as practising (the
+entry is then removed in the same change), and when this section and the test
+disagree. Adding a skill here is therefore a change to the test and to this
+page, in a pull request that Verification reviews; it is never a side effect of
+adding a skill.
+
+The three skills of the first table are recorded as "tool available, no eval case, not measured, at Knowledge". None is a Practising capability, and none
+is described as one. The second column says what an honest case would need
+before a case can name the skill.
+
+| Skill | Needs before a case can name it |
+|---|---|
+| log_analysis | a workflow stage or refinement that plans it for a seat that reads logs |
+| regression_management | a bound `regression.run` that a gate can judge |
+| regression_intelligence | a database for the triage binding, history on, a history seeded per trial, and a test that one trial's history cannot reach another's |
+
+The second and third change the default harness fingerprint, so they are built
+with a later wave's batch and return to the council before they merge.
+
+Three more skills are named exceptions of a different kind, and are labelled
+so wherever they are counted. They are not in the closed list above, because
+none of them is a practising skill without a case:
+
+| Skill | Exception |
+|---|---|
+| waveform_debug | knowledge only; no knowledge document, because no source was found that an agent may read in full |
+| systemverilog | practised by trials of `dv/directed-irq-ctrl`; no knowledge document, because the language standard is a source the founder would have to obtain |
+| security_verification | leaves the Verification wave for the Security wave |
 
 ## Laws and tests
 

@@ -588,6 +588,7 @@
           "n": 8,
           "passed": 6,
           "reasons": [
+            "stale: the skill card or document changed after these trials",
             "Wilson lower bound 0.409, under 0.5"
           ],
           "records": [
@@ -615,6 +616,7 @@
           "n": 10,
           "passed": 4,
           "reasons": [
+            "stale: the skill card or document changed after these trials",
             "stale: the harness changed after these trials (docs/HARNESS.md)",
             "Wilson lower bound 0.168, under 0.5"
           ],
@@ -696,13 +698,11 @@
     "equivalence_checking": {
       "knowledge": {
         "check_record": "capability/records/knowledge/equivalence_checking.json",
-        "counts": false,
+        "counts": true,
         "knowledge_document": "knowledge/verification/equivalence_checking.md",
-        "problems": [
-          "stale: the document changed after its check"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": [
         {
           "cases": [
@@ -775,14 +775,12 @@
     },
     "formal_coverage": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/formal_coverage.json",
+        "counts": true,
         "knowledge_document": "knowledge/verification/formal_coverage.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     },
     "formal_verification": {
@@ -1126,26 +1124,22 @@
     },
     "regression_intelligence": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/regression_intelligence.json",
+        "counts": true,
         "knowledge_document": "knowledge/verification/regression_intelligence.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     },
     "regression_management": {
       "knowledge": {
-        "check_record": null,
-        "counts": false,
+        "check_record": "capability/records/knowledge/regression_management.json",
+        "counts": true,
         "knowledge_document": "knowledge/verification/regression_management.md",
-        "problems": [
-          "no check record"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": []
     },
     "reset_design": {
@@ -1165,23 +1159,21 @@
         "knowledge_document": "knowledge/verification/root_cause_analysis.md",
         "problems": []
       },
-      "level": "knowledge",
+      "level": "practised",
       "practised": [
         {
           "cases": [
             "debug/root-cause-uart-tx"
           ],
           "cli": "2.1.325",
-          "counts": false,
+          "counts": true,
           "digest": "sha256:b65cd62f88597fc7ec2fcdd85730104dc5f6719b70e3513d59014af36060431f",
           "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
           "lower": 0.5291,
           "model": "claude-opus-5-5",
           "n": 8,
           "passed": 7,
-          "reasons": [
-            "stale: the skill card or document changed after these trials"
-          ],
+          "reasons": [],
           "records": [
             "evals/results/2026-11-18-claude-code-claude-opus-5-5-22",
             "evals/results/2026-11-18-claude-code-claude-opus-5-5-36",
@@ -1517,6 +1509,7 @@
           "n": 8,
           "passed": 6,
           "reasons": [
+            "stale: the skill card or document changed after these trials",
             "Wilson lower bound 0.409, under 0.5"
           ],
           "records": [
@@ -1555,8 +1548,8 @@
     }
   },
   "totals": {
-    "knowledge": 24,
-    "practised": 16,
+    "knowledge": 27,
+    "practised": 17,
     "proven": 0
   },
   "variants": [],

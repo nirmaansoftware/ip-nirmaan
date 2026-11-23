@@ -82,11 +82,17 @@ are run with `params: {"backend": "cocotb"}` and `seat_files` naming the
 `cocotb` parameter (`dv/cocotb-crc`), and a run that
 is too short or whose constraints never reach a corner lets a mutant survive.
 
+A functional coverage model's control runs the seat's model with a held-out
+stimulus in place of a testbench: the stimulus is a case file, each mutant is
+the stimulus with one scenario taken out, and the model must report a hole for
+it (`dv/fcov-lifo4`).
+
 A debug seat's control judges its repro testbenches. A root-cause repro has
 `must-fail` checks like a testbench (`debug/root-cause-uart-tx`: it passes the
 fixed RTL and fails the RTL under investigation and a variant, on two
 independent implementations); a triage seat's repros are judged by
-`must-fail-each`, one repro per seeded bug (`debug/triage-three-bugs`). Both
+`must-fail-each`, one repro per seeded bug (`debug/triage-three-bugs`; the
+second pair is `debug/root-cause-debounce` and `debug/triage-pwm-gen`). Both
 cases give the failing logs through `inputs` and run against RTL the case
 hands over as `design-under-investigation`.
 

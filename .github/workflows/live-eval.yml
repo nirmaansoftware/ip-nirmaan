@@ -14,7 +14,12 @@ name: Live evaluation
 # `nirmaan-seat`, which has no sudo, no write access to the checkout, the installed package or the
 # records, and no credential in its environment (.github/actions/live-eval-seat). Every job that
 # runs seat code first runs the reach test (scripts/live_eval_reach.py), which tries each of those
-# through the real cocotb path, and stops before any trial unless every probe is denied. The trial
+# through the real cocotb path, and stops before any trial unless every probe is denied. The tools that read seat
+# Verilog (Icarus, a Verilator lint, Yosys, SBY, eqy) run as that account too, each with a view of the run's own inputs
+# only (gates ET2 to ET4 of council/records/2026-11-22-eda-tools-seat-account.md; eqy by gate W2C3 of
+# council/records/2026-11-23-wave-2-close-meeting-1.md), and so do coverage.read's Verilator build and the model it
+# builds from seat HDL (gate W2C4); the reach test probes each through its gate and uploads that record
+# (live-eval-tool-reach-<job>-<run id>). The trial
 # job hashes its checkout before and after the trials and fails on a change. The counting re-judge
 # runs in the `rejudge` job, which ran no seat code before it: a fresh checkout of the same commit,
 # the records only from the uploaded artifact, refused when the trial job's two hashes differ. Every job that runs
@@ -98,6 +103,11 @@ jobs:
       PYTHONDONTWRITEBYTECODE: "1"
       # Gate SC2: fw.test runs the program it builds only through this wrapper in this job, never as the runner.
       NIRMAAN_SEAT_EXEC: /opt/nirmaan-seat/bin/nirmaan-seat-exec
+      # Gate ET2: vvp, iverilog, yosys, sby and a Verilator lint run only through root's wrappers here, never as the
+      # runner (council/records/2026-11-22-eda-tools-seat-account.md; nirmaan.integrations.eda.SEAT_TOOLS_ENV); so do
+      # eqy, coverage.read's Verilator build and the model it builds (gates W2C3 and W2C4 of
+      # council/records/2026-11-23-wave-2-close-meeting-1.md).
+      NIRMAAN_SEAT_TOOLS: /opt/nirmaan-seat/bin
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -116,7 +126,15 @@ jobs:
       - name: Test what seat code can reach
         run: |
           mkdir -p "$RUNNER_TEMP/replay"
-          python scripts/live_eval_reach.py --records "$RUNNER_TEMP/replay"
+          python scripts/live_eval_reach.py --records "$RUNNER_TEMP/replay" --out "$RUNNER_TEMP/tool-reach/tool-reach.json"
+      # Gate ET3: what the tools that read seat Verilog reach as the seat account, probed through each gate above.
+      - name: Upload the tool reach record
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: live-eval-tool-reach-replay-${{ github.run_id }}
+          path: ${{ runner.temp }}/tool-reach
+          if-no-files-found: ignore
       # Decision 4 and the second addendum, decision 2, item 1: what compiled seat C can reach under fw.test in
       # this job, for every whole-flow and firmware case. A gate since M90: every probe denied, or the job stops.
       - name: Test what seat C can reach under fw.test
@@ -199,6 +217,11 @@ jobs:
       PYTHONDONTWRITEBYTECODE: "1"
       # Gate SC2: fw.test runs the program it builds only through this wrapper in this job, never as the runner.
       NIRMAAN_SEAT_EXEC: /opt/nirmaan-seat/bin/nirmaan-seat-exec
+      # Gate ET2: vvp, iverilog, yosys, sby and a Verilator lint run only through root's wrappers here, never as the
+      # runner (council/records/2026-11-22-eda-tools-seat-account.md; nirmaan.integrations.eda.SEAT_TOOLS_ENV); so do
+      # eqy, coverage.read's Verilator build and the model it builds (gates W2C3 and W2C4 of
+      # council/records/2026-11-23-wave-2-close-meeting-1.md).
+      NIRMAAN_SEAT_TOOLS: /opt/nirmaan-seat/bin
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -227,7 +250,15 @@ jobs:
       - name: Test what seat code can reach
         run: |
           mkdir -p "$RUNNER_TEMP/results"
-          python scripts/live_eval_reach.py --records "$RUNNER_TEMP/results"
+          python scripts/live_eval_reach.py --records "$RUNNER_TEMP/results" --out "$RUNNER_TEMP/tool-reach/tool-reach.json"
+      # Gate ET3: what the tools that read seat Verilog reach as the seat account, probed through each gate above.
+      - name: Upload the tool reach record
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: live-eval-tool-reach-trials-${{ github.run_id }}
+          path: ${{ runner.temp }}/tool-reach
+          if-no-files-found: ignore
       # Decision 4 and the second addendum, decision 2, item 1: what compiled seat C can reach under fw.test in
       # this job, for every whole-flow and firmware case. A gate since M90: every probe denied, or the job stops.
       - name: Test what seat C can reach under fw.test
@@ -291,6 +322,11 @@ jobs:
       PYTHONDONTWRITEBYTECODE: "1"
       # Gate SC2: fw.test runs the program it builds only through this wrapper in this job, never as the runner.
       NIRMAAN_SEAT_EXEC: /opt/nirmaan-seat/bin/nirmaan-seat-exec
+      # Gate ET2: vvp, iverilog, yosys, sby and a Verilator lint run only through root's wrappers here, never as the
+      # runner (council/records/2026-11-22-eda-tools-seat-account.md; nirmaan.integrations.eda.SEAT_TOOLS_ENV); so do
+      # eqy, coverage.read's Verilator build and the model it builds (gates W2C3 and W2C4 of
+      # council/records/2026-11-23-wave-2-close-meeting-1.md).
+      NIRMAAN_SEAT_TOOLS: /opt/nirmaan-seat/bin
     steps:
       - name: Refuse records from a changed checkout
         run: |
@@ -325,7 +361,15 @@ jobs:
           name: ${{ needs.replay.outputs.artifact || needs.live-eval.outputs.artifact }}
           path: ${{ runner.temp }}/records
       - name: Test what seat code can reach
-        run: python scripts/live_eval_reach.py --records "$RUNNER_TEMP/records"
+        run: python scripts/live_eval_reach.py --records "$RUNNER_TEMP/records" --out "$RUNNER_TEMP/tool-reach/tool-reach.json"
+      # Gate ET3: what the tools that read seat Verilog reach as the seat account, probed through each gate above.
+      - name: Upload the tool reach record
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: live-eval-tool-reach-rejudge-${{ github.run_id }}
+          path: ${{ runner.temp }}/tool-reach
+          if-no-files-found: ignore
       # Gate WF17 covers every job that runs seat code: re-judging a firmware or whole-flow record runs
       # its seat C again, so this job runs the credential test too, as a gate, before it re-judges anything.
       - name: Test what seat C can reach under fw.test

@@ -275,3 +275,53 @@ def test_a_setup_that_reads_the_original_on_both_sides_is_refused_before_review(
                           [("updown_counter.eqy", "equivalence_setup", eqy)])
     assert not result.submitted and not result.passed
     assert result.detail, "the refusal names its reason"
+
+
+def _eqy_on_updown(tmp_path, gate_file, strategy):
+    """Run eqy directly: the approved up/down counter against one refactor file, with this strategy block."""
+    import shutil
+    import subprocess
+
+    folder = tmp_path / "run"
+    folder.mkdir(parents=True)
+    shutil.copy(REPO / UPDOWN / "updown_counter.v", folder / "updown_counter.v")
+    shutil.copy(gate_file, folder / "gate.v")
+    (folder / "s.eqy").write_text(
+        "[gold]\nread_verilog -sv updown_counter.v\nprep -top updown_counter\n\n"
+        "[gate]\nread_verilog -sv gate.v\nprep -top updown_counter\n\n" + strategy, encoding="utf-8")
+    done = subprocess.run(["eqy", "-f", "-d", "out", "s.eqy"], cwd=folder, capture_output=True, text=True,
+                          timeout=300, stdin=subprocess.DEVNULL)
+    return done.returncode, done.stdout + done.stderr
+
+
+#: Strategy blocks a seat would plausibly write: the reference setup's depth and shallower ones. Depth is not
+#: what separates the two strategies on this block, so the test pins a short and the reference depth for each.
+SAT = "[strategy simple]\nuse sat\ndepth {depth}\n"
+SBY = "[strategy sby]\nuse sby\nengine smtbmc\ndepth {depth}\n"
+DEPTHS = (5, 10)
+
+
+@needs(*FORMAL_TOOLS, "eqy", "make")
+@pytest.mark.parametrize("depth", DEPTHS)
+@pytest.mark.parametrize("mutant", sorted(UPDOWN_MUTANTS))
+def test_a_sat_setup_fails_each_updown_mutant_as_the_sby_setup_does(tmp_path, mutant, depth):
+    """What a ``use sat`` setup does to the mutants of ``dv/equiv-updown`` (W2-C meeting 1, decision 3, item 4).
+
+    Unlike ``dv/equiv-gray`` (``tests/test_dv_crc_gray_evals.py``), where ``use sat`` lets the wrong-flip-bit
+    mutant survive, here ``use sat`` at depth 5 and at depth 10 reports each of the three mutants not equivalent,
+    exactly as ``use sby`` with smtbmc does. So on this case a seat that writes ``use sat`` is still judged on its
+    setup by the case's must-fail control and no mutant survives it. If an eqy or Yosys release changes this, the
+    test fails and the case's reading is to be revisited."""
+    gate = REPO / UPDOWN / "mutants" / mutant
+    sat_code, sat_out = _eqy_on_updown(tmp_path / "sat", gate, SAT.format(depth=depth))
+    sby_code, sby_out = _eqy_on_updown(tmp_path / "sby", gate, SBY.format(depth=depth))
+    assert sby_code != 0 and "DONE (FAIL" in sby_out, sby_out[-800:]
+    assert sat_code != 0 and "DONE (FAIL" in sat_out, sat_out[-800:]
+
+
+@needs(*FORMAL_TOOLS, "eqy", "make")
+@pytest.mark.parametrize("depth", DEPTHS)
+def test_a_sat_setup_proves_the_approved_refactor_equivalent(tmp_path, depth):
+    """The approved pair passes under ``use sat`` too, so the fail above is the mutants' and not the strategy's."""
+    code, out = _eqy_on_updown(tmp_path, REPO / UPDOWN / "updown_counter_refactor.v", SAT.format(depth=depth))
+    assert code == 0 and "DONE (PASS" in out, out[-800:]
