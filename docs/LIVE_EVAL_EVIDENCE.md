@@ -319,7 +319,7 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   the tools as the account (check 1 on its staged testbench; check 2 clean,
   4 of 4 mutants failed), and its re-judge was the same. It shows those
   probes denied through those tools as the account in that run, and nothing
-  more; the `live-eval` job has no recorded run of them before slot 1.
+  more; the `live-eval` job has no recorded run of them yet.
 - **The tools that read seat Verilog run as the account too** (gates ET2 to
   ET4 of `council/records/2026-11-22-eda-tools-seat-account.md`). The input
   screen (`eda_guard`) reads seat files with patterns of its own, and the
@@ -357,7 +357,7 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   judge's) runs the same way: the reference testbench of check 1 is staged
   for the run as check 2's reference RTL and mutants already are
   (`nirmaan.evals.scorers`; `eda.HELD_OUT_STAGED`), so the account reads that run's
-  own judge file and nothing beside it. In these jobs the workflow names the
+  own judge file, and in run 45073595509 a canary beside it was denied. In these jobs the workflow names the
   wrappers (`NIRMAAN_SEAT_TOOLS`), and there a seat tool never falls back
   (gate ET2, as gate SC2 for `fw.test`): a wrapper that is not there, not
   root's, or writable by another account refuses the run before any step,

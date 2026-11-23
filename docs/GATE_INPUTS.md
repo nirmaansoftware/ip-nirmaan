@@ -2,8 +2,8 @@
 
 A gate runs open-source tools over files a seat wrote. Seats are model output,
 so a gate must not run anything a file asks of the machine outside the run:
-the founder's Mac, or a CI runner. Before M84 several gates did. M84 refuses
-such input before any step runs, in one module,
+the founder's Mac, or a CI runner. Before M84 several gates did. M84 refuses,
+before any step runs, the forms its recorded fixtures name, in one module,
 `src/nirmaan/integrations/eda_guard.py`, called from `eda.execute` (every
 backend) and from the formal, equivalence and timing backends' own checks. A
 refused input is a recorded failed run whose summary says why and ends
@@ -126,7 +126,7 @@ on a later `main`.
 
 A cocotb test module (Python, M72) and a firmware driver (C, `fw.build`,
 `fw.test`) are code by design, and no check can make them safe. They run as
-the account that runs the gate, with the M53 isolation only: a new directory
+the account that runs the gate, with the M53 measures only: a new directory
 per run, no credential in the environment, and the deadline that stops every
 process. The PR review loop's check account (`NIRMAAN_LOOP_CHECK_USER`,
 `scripts/pr_loop.py`, `check_argv`) runs the repository's checks as another

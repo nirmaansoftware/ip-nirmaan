@@ -685,7 +685,7 @@ changed that code afterwards ... The gate covers the current code when a run is 
 not cover it." Its confidence: high on the code reading; medium on one inference, that the network and write denials,
 probed through `vvp` only, hold for the other wrapped tools because they run as the same account.
 
-Its must-haves, which this plan takes as written:
+Its must-haves, as it wrote them:
 
 1. Before slot 1, the tool reach records of the measured run's `live-eval` and `rejudge` jobs
    (`live-eval-tool-reach-trials-<run id>` and `live-eval-tool-reach-rejudge-<run id>`) are committed beside the ET3
@@ -693,8 +693,13 @@ Its must-haves, which this plan takes as written:
 2. Each slot's tool reach records are committed with its record, in the slot's folder of section 15.
 3. The residual stays as section 18.3 states it.
 
-So the measured run of section 10 is followed, before slot 1, by the pull request of item 1. That is a condition of
-section 13 from this addition on (section 19.5).
+Item 3 holds (section 18.3). Items 1 and 2 are not taken into this plan here. Decision 2, item 3 of
+`council/records/2026-11-22-eda-tools-seat-account.md` says "Nobody says the `live-eval` job has a recorded run before
+slot 1: it has none until slot 1 (qa-evidence)", and decision 8 lists, among what is never said, "that the
+`live-eval` job has a recorded probe run, before slot 1". Item 1 would commit such a record before slot 1. qa-evidence
+asks the chair to reconcile the two (section 19.4), and this plan does not decide between a seat's must-have and a
+council record. Security gave its confirmation with item 1 as a must-have before slot 1, so slot 1 waits for the
+chair's word on it (section 19.6).
 
 ### 19.2 qa-evidence: gate ET8 not met on `02cfa87f`, and what this pull request changes
 
@@ -733,18 +738,50 @@ credential, a reference answer, a held-out file or mutant, the records, or anyth
 is withdrawn. It reads instead: in those runs the probed targets, a credential-named canary among them, were denied
 to that account through `vvp`; nothing is claimed of the credential itself, or of a target not probed. In section
 18.3, "The vvp reach test and runs of section 12 stand as written" reads "stand as written, except the sentence that
-section 19.3 withdraws". Nothing else of sections 12, 16 or 18.3 changes.
+section 19.3 withdraws". In section 18.3, "it has no recorded run before slot 1" reads "it has no recorded run on
+this commit" (qa-evidence's wording, section 19.4), which is true whatever the chair rules on section 19.1. Nothing else
+of sections 12, 16 or 18.3 changes.
+
+### 19.4 qa-evidence: a second read, on the corrected texts
+
+qa-evidence read the head `b73ce365` of this pull request (sections 19.1 to 19.3 and 19.5 to 19.6, and the reworded
+documents) as a read-only process of its own. In its words: "Of the six findings from my first read, all are now
+addressed, but five sentences still fail." It found the classes, the fixtures, the account's scope and the residual
+stated in `docs/GATE_INPUTS.md`, `docs/GATE_INTEGRITY.md` and `docs/LIVE_EVAL_EVIDENCE.md`, and sections 18.3 and 19.3
+following decision 8. Its five findings, and what this pull request does:
+
+1. `docs/GATE_INPUTS.md`, opening paragraph: "M84 refuses such input before any step runs" said the screen refuses
+   all such input. Reworded as it suggested: M84 refuses, before any step runs, the forms its recorded fixtures name.
+2. `docs/GATE_INPUTS.md`, section 4: "with the M53 isolation only" used a word decision 8 bars. Reworded: "with the
+   M53 measures only".
+3. `docs/LIVE_EVAL_EVIDENCE.md`, section 6: "the account reads that run's own judge file and nothing beside it" went
+   beyond the one probed canary. Reworded: the account reads that run's own judge file, and in run 45073595509 a
+   canary beside it was denied.
+4. Section 18.3 and `docs/LIVE_EVAL_EVIDENCE.md`, section 6, said the `live-eval` job has no recorded probe run
+   "before slot 1", against section 19.1's item 1 as this head first took it. Reworded to "on this commit" (section
+   19.3) and "yet"; section 19.1 no longer takes items 1 and 2, and leaves the reconciling of decision 2, item 3 and
+   decision 8's bullet with section 19.1 to the chair, as qa-evidence asked.
+5. Section 19.5 cited a section 19.4 that did not exist on that head. This section is it.
+
+It also noted, as an inference, that section 14's citation `docs/GATE_INPUTS.md:113` points one line above the count
+it quotes. That citation was so on `02cfa87f`; this pull request keeps `docs/GATE_INPUTS.md` at the same line count
+and moves no line of it. Not checked by it: the JUnit count of run 45085382759, which the plan names and the
+repository does not hold.
+
+Its must-haves were findings 1 to 3 reworded, the "before slot 1" wording made consistent with section 19.1 and the
+chair's word on decision 8's bullet, and this section. Gate ET8 is not confirmed by this section: qa-evidence has not
+read the texts as this pull request leaves them, and its must-have includes the chair's word.
 
 ### 19.5 The conditions of section 13, checked on `main` at `02cfa87f`
 
-Each line is what the repository shows on `02cfa87f`, with this pull request's text changes on top; no condition is
-added by this table except item 1 of section 19.1.
+Each line is what the repository shows on `02cfa87f`, with this pull request's text changes on top. The table adds
+no condition; its last line is security's must-have, which section 19.1 leaves with the chair.
 
 | Condition (section 13) | State | Evidence |
 |---|---|---|
 | The read of wave 2's first live batch | Met | `council/records/2026-11-14-pilot-retrospective.md:563`, the addendum of the W2-L1 read (ip#426) |
 | WF3 for the timer | Met | the fixed documents and citations (ip#323, ip#327, ip#335); every judged tag exercised (ip#339); the first check records (ip#369), and `evals/flow/requirements_check_pending.json:4` lists none pending; `tests/test_whole_flow_cases.py:116` holds every check and mutant to a statement |
-| WF4 for the timer | Met | `evals/flow/controls_record.json` (run 44415682628; ip#324, ip#325), which `tests/test_whole_flow_controls.py:291` holds every later CI run to; ET5 shown again with the tools as the seat account by run 45073595509 (section 18.6) |
+| WF4 for the timer | Met | `evals/flow/controls_record.json` (run 44415682628; ip#324, ip#325), which `tests/test_whole_flow_controls.py:291` holds every later CI run to, CI run 45094550416 on `02cfa87f` among them; ET5 shown again with the tools as the seat account by run 45073595509 (section 18.6) |
 | WF8 for the timer | Met | `tests/test_whole_flow_runner.py:216` (ip#348); with WF22 below |
 | WF9 for the timer | Met | the named job and its concurrency group (`.github/workflows/live-eval.yml:81-82`, `:199`); one trial per dispatch on the default harness (`scripts/live_eval_ci.py:117-118`); the expected fingerprint required and checked, exit 4 on a difference (`:254-257`); the checkout hashed before and after the trials (`.github/workflows/live-eval.yml:274-298`); the counting re-judge on a fresh checkout (`:309-346`). The credential test of WF9 is the register block's (gate WF17) |
 | WF17 for the timer | Met, as the council reads it | `council/records/2026-11-19-seat-c-live-refusal.md`, decision 3 (`docs/LIVE_EVAL_EVIDENCE.md:562`); the reach test as a gate before the first trial (`.github/workflows/live-eval.yml:250-253`); seat code as `nirmaan-seat` (M89, ip#342; ip#444, ip#451) |
@@ -752,17 +789,17 @@ added by this table except item 1 of section 19.1.
 | WF20 | Met | sections 4 to 6 and 10 |
 | WF21 | Met | `tests/test_live_eval_ci.py:667` and `:680`; `tests/test_whole_flow_attempts.py:39`; `docs/HARNESS.md:261` |
 | WF22 | Met | `tests/test_whole_flow_attempts.py:85` |
-| WF23 | See section 19.4 | security confirms section 12 as corrected (section 19.1); ET1 ip#445, ET2 to ET4 ip#444, ET3 record ip#452, ET5 run 45073595509, ET6 ip#454, ET7 section 18.6 and below; ET8 section 19.4 |
+| WF23 | Not met | security confirms section 12 as corrected, with must-haves (section 19.1); ET1 ip#445, ET2 to ET4 ip#444, ET3 record ip#452, ET5 run 45073595509, ET6 ip#454, ET7 section 18.6 and below; ET8 not confirmed (sections 19.2 and 19.4) |
 | WF25 | Met | sections 7, 18.1 and 18.2. On `02cfa87f`, CLI 2.1.325, the four fingerprints are the values of section 18.1 (with documents `d90b3c18...`, without `8d6590f7...`; single-seat `0ef27db1...` and `9aa7a333...`) and the other values of section 18.1 are equal |
 | WF26 | Met | section 11 |
 | The measured run of section 10 | Remaining | not dispatched; the last run of `.github/workflows/live-eval.yml` is still replay run 45073595509 |
-| Security's item 1 (section 19.1) | Remaining | after the measured run |
+| Security's item 1 (section 19.1) | Open | for the chair, against decision 2, item 3 and decision 8 of the record |
 
 ### 19.6 What slot 1 still waits for
 
-The measured run of section 10, dispatched from `main` after this addition merges, with every value of section 18.1
-recomputed on its commit first (section 7); then the pull request of section 19.1, item 1, committing its
-`live-eval` and `rejudge` tool reach records beside the ET3 record; then slot 1, with the values recomputed again on
-its own commit. If a probe of the measured run's `live-eval` job is not denied, that job stops before its trial; if
-a probe of either job is not denied, no slot is dispatched until the cause is fixed and a run records every probe
-denied.
+In order: gate ET8, confirmed by qa-evidence on the texts as they then stand; the chair's word on security's
+must-haves 1 and 2 against decision 2, item 3 and decision 8 of the record (section 19.1); the measured run of section
+10, dispatched from `main` with every value of section 18.1 recomputed on its commit first (section 7), and whatever
+the chair rules for its tool reach records; then slot 1, with the values recomputed again on its own commit. If a
+probe of the measured run's `live-eval` job is not denied, that job stops before its trial, and no slot is dispatched
+until the cause is fixed and a run records every probe denied. Section 13 stands.
