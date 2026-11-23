@@ -1284,7 +1284,12 @@ only, merged before the slot's record pull request and never after it.
    `main` before any further trial (ai-engineer); and an artifact may not be
    kept (S6). security rates it "a bound I chose, not a control", with
    medium confidence; the chair adopts it because three seats arrived at it
-   alone and nobody opposed it.
+   alone and nobody opposed it. (Amended 2026-11-23 by the seventh addendum
+   to `council/records/2026-11-17-g3-whole-flow-cases.md`, decision T2, for
+   the timer's slots run two at a time: the bound is now the four clauses
+   of that decision's item 1, with its items 2 and 3, and the reasons above
+   are restated by its item 6. The first sentence of this item is left as
+   it read.)
 5. **The test (gate ET16)**, in `tests/test_whole_flow.py`, holds at every
    commit of `main`:
    - a reach folder holds only what item 1 names, every digest of its index
@@ -1391,7 +1396,7 @@ with a note. Added:
 
 | Gate | Condition | Owner seat |
 |---|---|---|
-| ET15 | From slot 1: nothing of the timer case is dispatched unless the commit it is dispatched from holds the reach folder of every earlier run of every slot, each file equal by digest to what the run uploaded (decision R3, item 4) | security |
+| ET15 | From slot 1: slot k of the timer case is dispatched, a first time or again after a stop, only under clauses (a) to (d) of decision T2, item 1 of the seventh addendum to `council/records/2026-11-17-g3-whole-flow-cases.md`, with its items 2 and 3: every finished earlier run's reach files downloaded and verified by digest; those not yet on `main` on a branch of the repository at a commit read back from GitHub; the reach folder of every run of every slot numbered k-3 or lower on the commit dispatched from; and, for a second dispatch of a stopped slot, that slot's own earlier runs there too. (Amended 2026-11-23 by that addendum. It read: "From slot 1: nothing of the timer case is dispatched unless the commit it is dispatched from holds the reach folder of every earlier run of every slot, each file equal by digest to what the run uploaded (decision R3, item 4)".) | security |
 | ET16 | Before slot 1 is dispatched: the test of decision R3, item 5 is on `main`, and it holds at every commit of `main` after it, the commit between a slot's reach records and its record included | verification-lead |
 
 Gate ET13 covers the head of every pull request of the gate ET10 chain, and
@@ -1923,3 +1928,15 @@ this order; item 4 after the timer's last trial.
 ### Open, for the founder
 
 1. This addendum, to confirm or overrule.
+
+## Note (2026-11-23): read with the G3 record's seventh addendum
+
+The seventh addendum to `council/records/2026-11-17-g3-whole-flow-cases.md`
+rules on running the timer's slots two at a time, by the founder's
+direction. For this record it rewords gate ET15 and the bound of decision
+R3, item 4 of the second addendum (its decision T2, in the words of
+security, the gate's owner), adds that a finished run whose reach records
+show a probe not denied closes dispatch at once, and restates the reasons
+of that item. Both are noted in place above. Decision R3, item 3 (the order
+on `main`), gates ET10, ET11, ET13 and ET16 and everything else here stand
+as written.
