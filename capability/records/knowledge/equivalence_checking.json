@@ -2,97 +2,178 @@
   "format": "nirmaan.knowledge-check",
   "skill": "equivalence_checking",
   "knowledge_document": "knowledge/verification/equivalence_checking.md",
-  "document_sha256": "sha256:4b7a2b136155cb05f84e8ad1c54ac39798cfcfcb768fee17230668275dc82417",
-  "writer": "IP-W2-K2B session (ip#271, fix after the W2-C2 findings)",
-  "checker": "IP-W2-C2B session (lane IP-W2-C2B, second check, not the writer)",
+  "document_sha256": "sha256:730bd36d1661e484ef625faf484f86b266c24ec65e9ef9a709054f38d5d0bffb",
+  "writer": "IP-W2-K2 session (wave 2 knowledge batch), rewritten by the RX-K2 session (ip#431) and fixed by the RX-KFIX and RX-KFIX2 sessions (ip#443, ip#453)",
+  "checker": "RX-C3 session (lane RX-C3, wave 2 close independent check, 2026-11-23)",
   "sources_read": [
-    "[EqyQuick] YosysHQ EQY documentation, Getting Started: the whole page, https://yosyshq.readthedocs.io/projects/eqy/en/latest/quickstart.html",
-    "[EqyConfig] YosysHQ EQY documentation, Reference for the .eqy file format: the whole page (options, gold and gate, recode, match, collect, partition, strategy sections and pattern syntax), https://yosyshq.readthedocs.io/projects/eqy/en/latest/config.html",
-    "[EqyStrat] YosysHQ EQY documentation, EQY Strategies: the whole page (sat, sby and dummy strategies), https://yosyshq.readthedocs.io/projects/eqy/en/latest/strategies.html",
+    "[EqyQuick] YosysHQ EQY documentation, Getting Started: the whole page to its footer (NERV refactor, gold and gate scripts, collect, strategy, the 1/44 failure output and trace, the pass output), https://yosyshq.readthedocs.io/projects/eqy/en/latest/quickstart.html",
+    "[EqyConfig] YosysHQ EQY documentation, Reference for the .eqy file format: the whole page (options with splitnets only, gold and gate, recode with the fallback line, match, collect, partition, strategy, pattern syntax), https://yosyshq.readthedocs.io/projects/eqy/en/latest/config.html",
+    "[EqyStrat] YosysHQ EQY documentation, EQY Strategies: the whole page (sat, sby, dummy), https://yosyshq.readthedocs.io/projects/eqy/en/latest/strategies.html",
     "[EqyX] YosysHQ EQY documentation, Equivalence and X-Propagation: the whole page, https://yosyshq.readthedocs.io/projects/eqy/en/latest/xprop.html",
-    "Repository code at the lines cited in gate_claims, run locally (setup_files on four small setups)"
+    "Repository code and tests at the lines cited in gate_claims, on main 817cc0d6 (after ip#445); the eqy setup shapes under 'strategy' were run through eda_guard.eqy_problem by the checker"
   ],
-  "result": "every claim tagged with a source was found in that source, every line marked inference is a fair reading of the source it names or the document's own reasoning, and every sentence about the platform's gates matches the gate code at the lines cited in gate_claims; the identical-script sentence was run and is correct",
+  "result": "every claim tagged with a source was found in that source (the four EQY pages were fetched fresh and read to their footers), every line marked inference is a fair reading of the source it names or the document's own reasoning, no joined claim remains (the match and collect text and the getting-started partition count are now separate sentences), and every sentence about the equivalence gate is true at the code and tests named in gate_claims; the document's own eda_guard line citations are stale at this head (see notes) while the sentences they back are true",
   "notes": [
-    "Recheck after ip#271 of the W2-C2 finding (ip#268). The document now says the gate refuses a setup whose [gold] and [gate] sections hold identical command lists, that [script] lines are shared and not part of that comparison, and that two sides reading the same file with different commands are accepted. All three hold at equivalence.py:87-93, which compares commands['gold'] with commands['gate'] before the shared script lines are added.",
-    "Run (PYTHONPATH=src, setup_files on four setups in a temporary folder): identical [gold] and [gate] scripts gave 'reads gold and gate with the same script, so it compares a design with itself (refused, nothing ran)'; gold and gate both reading d.v with an extra 'flatten' on the gate side gave sides {'gold': ['d.v'], 'gate': ['d.v']} and no problem; a setup with the scripts only under [script] and empty [gold] and [gate] gave the 'needs a [gold] and a [gate] section' refusal; the same read in both sections with the shared prep under [script] was refused as the same script.",
-    "The gate compares split command words, so whitespace and comment differences do not make two scripts different. The document does not claim otherwise.",
-    "parse_eqy: a pass needs eqy exit 0, DONE (PASS), 'Successfully proved designs equivalent', at least one proved partition and none failed; a PASS with no partition proved gets the summary 'no partition was proved'; the summary names the gate and gold files and 'n of total' partitions (eda_parsers.py:496-505). The EQY pages hold what the document tags: the sat and sby strategy text, safe-replacement refinement, three-valued gold and two-valued gate, and the shifter bug trace (six bits instead of five).",
-    "Tag reading: 'matches signals by name' is a fair reading of the [match] section text (rules for matching net names of gold to gate) rather than a sentence of the page; the document pairs it with [EqyQuick] and the partition text, and it is not a gate claim."
+    "Citation drift, for the document's owner to refresh at its next edit: ip#445 (ET1) added 131 lines to eda_guard.py ahead of every line the document cites, so each eda_guard citation is now 131 lines low: the Yosys allow list 190-194 is 321-325 and its refusal 247-249 is 378-380; EQY_SECTIONS 364 is 495 and its refusal 389-391 is 520-522; EQY_OPTIONS 367 is 498 and its refusal 396-397 is 527-528; EQY_STRATEGY 371-376 is 502-507 (its refusal is 534-537); the engine words and engine_problem 277-298 are 408-429. The document's other citations hold at this head: tools.py:172-176, equivalence.py:97-99 and 128-133 and 136-147, eda_parsers.py:472-525 and 507-516; equivalence.py:82-105 stops one line short of the last refusal (the file that is not there returns at line 106). The sentences are true; the ranges do not hold them. The gate_claims below cite the current lines. Naming the constants (YOSYS_SAFE, EQY_SECTIONS, EQY_OPTIONS, EQY_STRATEGY, SBY_ENGINES) beside the line would stop this drift.",
+    "Restricted [strategy] lines: the document lists what a strategy may say (use sat or sby, plain depth and timeout, xprop on or off, engine, and option lines refused). It does not say that every other strategy line is refused, among them apply and noapply, which the config page's own strategy example uses, and use dummy, which the strategies page documents. Run by the checker: eqy_problem refuses 'apply top*', 'noapply a', 'use dummy' and 'option x y' with 'a gate takes depth, timeout, use, xprop and engine, each with a plain value'. No committed test covers apply or dummy (the option refusal is covered by tests/test_gate_inputs.py::test_an_equivalence_setup_that_reaches_outside_yosys_is_refused). The sentence is true as written; the gap is a reader who takes the list as examples. For the owner.",
+    "Setup lines the document does not mention: a file the setup reads must also be Verilog the gates run (equivalence.py:121-129, verilog_problem and inside_problem, widened by ip#445). The refusal list in 'What the equivalence gate demands' does not claim to be complete, so no sentence is false.",
+    "EqyStrat wording: the document says depth is 'the unrolling the proof may use'; the page says 'the maximal depth to try' (sat) and 'the depth to use for engine configurations that require a depth bound' (sby). A gloss under a [EqyStrat] tag, fair.",
+    "Line 44, 'Both sides must be elaborated to the same top and in comparable form', carries no tag and no inference mark; the next sentence, the getting-started example, is tagged and true, and the failure-modes bullet repeats the point as (inference). The 'A depth too small ...' bullet's sat sentence is the page's; its lead sentence has no stated consequence. Wording points, not false claims.",
+    "'A bug in gold carried into gate, which equivalence cannot see' has no mark; it repeats the (inference) at the top of the document.",
+    "The tag [EqyStrat] on 'the next strategy' is exact for timeout ('the next strategy is tried') and for dummy ('falling through to the next strategy'); the page states no order, the document says so and marks the file-order reading (inference), which tests/test_dv_crc_gray_evals.py::test_a_sby_strategy_listed_after_sat_is_not_reached_when_sat_proves_the_partition confirms for sat first (run by the checker: passes with eqy, sby and yosys installed).",
+    "Seat-facing content: the document gives a seat the behaviour of a mutant the case dv/equiv-gray holds out, in the id of the test it cites (wrong_flip_mutant) and in 'use sat at depth 10 reports a register partition of a wrong design equivalent', and its reviewer line (one wrong bit, an off-by-one in a flag, a wrong reset value) names the same three classes as the case's three mutants. No line of a held-out input or reference answer appears (tests/test_knowledge_files.py passes, which is the README rule); the council record for the wave 2 close asks for this very sat test, so the teaching is intended. Recorded so the owner knows the document narrows what the case's sat-versus-sby control measures.",
+    "as_of 2026-11-15 is older than the 2026-11-22 and 2026-11-23 edits; the content it dates was true on that day and is true now. No em or en dash (scripts/check_dashes.py clean). Checker field in the front matter still reads 'pending'; the record names the checker.",
+    "Claims checked and held: the safe-replacement, 3-valued gold and 2-valued gate text (EqyX), the sat and sby descriptions and the memory limit (EqyStrat), the recode fallback sentence now reads as the page says and its consequence is marked inference, the 1/44 getting-started output and the six-bit versus five-bit shifter trace (EqyQuick), splitnets as the only option the config page lists, the YOSYS_SAFE list word for word (26 commands), the nine EQY_SECTIONS, tools.py:172-176 (eqy required, sources optional)."
   ],
   "gate_claims": [
+    {
+      "claim": "the card holds equivalence.run, which is AVAILABLE, so the first line says Practising",
+      "evidence": "src/nirmaan/company/skills.py:545"
+    },
+    {
+      "claim": "the gate takes only the Yosys commands in its allow list (26 named) in [gold], [gate] and [script]",
+      "evidence": "src/nirmaan/integrations/eda_guard.py:321"
+    },
+    {
+      "claim": "any Yosys command outside the allow list is refused",
+      "evidence": "src/nirmaan/integrations/eda_guard.py:378"
+    },
+    {
+      "claim": "abc, sat, sim, select and show are refused",
+      "evidence": "tests/test_gate_inputs.py::test_the_yosys_allow_list_writes_nothing_and_runs_nothing"
+    },
+    {
+      "claim": "the gate takes only the sections [options], [gold], [gate], [script], [match], [collect], [partition], [recode] and [strategy]",
+      "evidence": "src/nirmaan/integrations/eda_guard.py:495"
+    },
+    {
+      "claim": "any other section is refused",
+      "evidence": "src/nirmaan/integrations/eda_guard.py:520"
+    },
+    {
+      "claim": "under [options] only splitnets or insbuf, each on or off",
+      "evidence": "src/nirmaan/integrations/eda_guard.py:498"
+    },
+    {
+      "claim": "any other option line is refused",
+      "evidence": "src/nirmaan/integrations/eda_guard.py:527"
+    },
+    {
+      "claim": "a [strategy] takes use sat or sby, plain depth and timeout, xprop on or off",
+      "evidence": "src/nirmaan/integrations/eda_guard.py:502"
+    },
+    {
+      "claim": "any other strategy line is refused",
+      "evidence": "src/nirmaan/integrations/eda_guard.py:534"
+    },
+    {
+      "claim": "a strategy's option lines are refused",
+      "evidence": "tests/test_gate_inputs.py::test_an_equivalence_setup_that_reaches_outside_yosys_is_refused"
+    },
+    {
+      "claim": "an engine line takes only smtbmc, abc, btor, aiger or none, each with a fixed set of solver words",
+      "evidence": "src/nirmaan/integrations/eda_guard.py:408"
+    },
+    {
+      "claim": "an engine line outside those words is refused",
+      "evidence": "src/nirmaan/integrations/eda_guard.py:418"
+    },
     {
       "claim": "equivalence.run takes the setup in eqy and optionally the RTL it must read in sources",
       "evidence": "src/nirmaan/company/tools.py:172"
     },
     {
-      "claim": "a setup is refused, nothing runs, when a script line reaches outside Yosys (a shell, exec, tcl, python, script, plugin)",
-      "evidence": "src/nirmaan/integrations/equivalence.py:35"
+      "claim": "a script line that reaches outside Yosys (a shell, exec, tcl, python, script, plugin) is refused",
+      "evidence": "src/nirmaan/integrations/equivalence.py:82"
     },
     {
       "claim": "a script that writes a file (write_*, tee, dump) is refused",
-      "evidence": "src/nirmaan/integrations/equivalence.py:84"
+      "evidence": "src/nirmaan/integrations/equivalence.py:85"
+    },
+    {
+      "claim": "both outside-Yosys and write refusals are exercised",
+      "evidence": "tests/test_nirmaan_equivalence.py::test_a_script_that_reaches_outside_yosys_or_writes_a_file_is_refused"
     },
     {
       "claim": "a setup with no [gold] or no [gate] section is refused",
-      "evidence": "src/nirmaan/integrations/equivalence.py:89"
+      "evidence": "src/nirmaan/integrations/equivalence.py:95"
     },
     {
-      "claim": "the gate refuses a setup whose [gold] and [gate] sections hold identical command lists (checked by running setup_files)",
-      "evidence": "src/nirmaan/integrations/equivalence.py:91"
-    },
-    {
-      "claim": "[script] lines are shared by both sides and are not part of the identical-script comparison",
-      "evidence": "src/nirmaan/integrations/equivalence.py:91"
-    },
-    {
-      "claim": "two sides that read the same file with different commands are accepted (checked by running setup_files)",
-      "evidence": "src/nirmaan/integrations/equivalence.py:91"
-    },
-    {
-      "claim": "a read by an absolute path or outside the setup's own folder is refused",
+      "claim": "a setup whose [gold] and [gate] command lists are identical is refused; [script] lines are shared and not part of that comparison",
       "evidence": "src/nirmaan/integrations/equivalence.py:97"
     },
     {
+      "claim": "the identical-script refusal is exercised",
+      "evidence": "tests/test_nirmaan_equivalence.py::test_a_setup_that_reads_outside_its_folder_or_compares_a_design_with_itself_is_refused"
+    },
+    {
+      "claim": "two sides that read the same file with different commands are accepted (inference from the comparison of scripts, not file names)",
+      "evidence": "src/nirmaan/integrations/equivalence.py:97"
+    },
+    {
+      "claim": "a read by an absolute path or outside the setup's own folder is refused",
+      "evidence": "src/nirmaan/integrations/equivalence.py:103"
+    },
+    {
       "claim": "a read of a file that is not there is refused",
-      "evidence": "src/nirmaan/integrations/equivalence.py:99"
+      "evidence": "src/nirmaan/integrations/equivalence.py:105"
     },
     {
       "claim": "given sources, the setup must read every one of them, compared by resolved path",
-      "evidence": "src/nirmaan/integrations/equivalence.py:115"
+      "evidence": "src/nirmaan/integrations/equivalence.py:131"
     },
     {
-      "claim": "the run copies the setup and the files it reads into its own directory, and records the files each side read",
-      "evidence": "src/nirmaan/integrations/equivalence.py:125"
+      "claim": "a source the setup does not read fails the run",
+      "evidence": "tests/test_nirmaan_equivalence.py::test_a_given_source_the_setup_does_not_read_fails_the_run"
     },
     {
-      "claim": "a run passes only when eqy exited 0, said DONE (PASS), proved the designs equivalent, proved at least one partition and failed none",
-      "evidence": "src/nirmaan/integrations/eda_parsers.py:496"
+      "claim": "the run copies the setup and the files it reads into its own directory",
+      "evidence": "src/nirmaan/integrations/equivalence.py:136"
     },
     {
-      "claim": "a setup that proves no partition fails and the summary says that nothing was proved",
-      "evidence": "src/nirmaan/integrations/eda_parsers.py:504"
+      "claim": "the run records the files each side read",
+      "evidence": "src/nirmaan/integrations/equivalence.py:147"
     },
     {
-      "claim": "a partition not proved fails the run and the summary names the first partition",
-      "evidence": "src/nirmaan/integrations/eda_parsers.py:500"
+      "claim": "the copies leave the submitted files unchanged",
+      "evidence": "tests/test_nirmaan_equivalence.py::test_a_true_refactor_is_proved_equivalent_over_copies"
+    },
+    {
+      "claim": "a run passes only when eqy exited 0, said DONE (PASS) and that the designs were proved equivalent, proved at least one partition, and failed none",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:507"
+    },
+    {
+      "claim": "a setup that proves no partition fails, and the summary says nothing was proved",
+      "evidence": "tests/test_nirmaan_equivalence.py::test_a_pass_with_no_partition_proved_is_not_equivalence"
+    },
+    {
+      "claim": "a partition not proved fails and names the first partition",
+      "evidence": "tests/test_nirmaan_equivalence.py::test_eqy_fail_names_the_partition_and_why"
     },
     {
       "claim": "the result names the gold and the gate files and the partition count",
-      "evidence": "src/nirmaan/integrations/eda_parsers.py:497"
+      "evidence": "tests/test_nirmaan_equivalence.py::test_eqy_pass_names_the_compared_files_and_every_partition"
     },
     {
-      "claim": "the gate counts partitions, not outputs",
-      "evidence": "src/nirmaan/integrations/eda_parsers.py:495"
+      "claim": "the summary text naming gate and gold files",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:508"
     },
     {
-      "claim": "the tool is available, so the document opens with Practising",
-      "evidence": "src/nirmaan/org/knowledge_files.py:53"
+      "claim": "with the installed eqy and Yosys, use sat at depth 10 reports a register partition of a wrong design equivalent and use sby with smtbmc reports it not equivalent",
+      "evidence": "tests/test_dv_crc_gray_evals.py::test_a_sat_strategy_passes_the_wrong_flip_mutant_that_the_sby_strategy_fails"
     },
     {
-      "claim": "tests that pin the refusals (outside Yosys, writes, outside the folder, a design compared with itself) and the unread source",
-      "evidence": "tests/test_nirmaan_equivalence.py::test_a_setup_that_reads_outside_its_folder_or_compares_a_design_with_itself_is_refused"
+      "claim": "a sby strategy listed after a sat strategy that proves the partition is not reached (the file's order, marked inference)",
+      "evidence": "tests/test_dv_crc_gray_evals.py::test_a_sby_strategy_listed_after_sat_is_not_reached_when_sat_proves_the_partition"
+    },
+    {
+      "claim": "one setup is submitted per run, so the seat cannot mutation-test its own setup (marked inference)",
+      "evidence": "src/nirmaan/company/tools.py:174"
+    },
+    {
+      "claim": "the gate counts partitions, not outputs (marked inference)",
+      "evidence": "src/nirmaan/integrations/eda_parsers.py:506"
     }
   ],
-  "checked_at": "2026-11-15"
+  "checked_at": "2026-11-23"
 }

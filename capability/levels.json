@@ -698,13 +698,11 @@
     "equivalence_checking": {
       "knowledge": {
         "check_record": "capability/records/knowledge/equivalence_checking.json",
-        "counts": false,
+        "counts": true,
         "knowledge_document": "knowledge/verification/equivalence_checking.md",
-        "problems": [
-          "stale: the document changed after its check"
-        ]
+        "problems": []
       },
-      "level": null,
+      "level": "knowledge",
       "practised": [
         {
           "cases": [
@@ -1550,7 +1548,7 @@
     }
   },
   "totals": {
-    "knowledge": 26,
+    "knowledge": 27,
     "practised": 17,
     "proven": 0
   },
