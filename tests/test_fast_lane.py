@@ -15,8 +15,10 @@ from pathlib import Path
 
 import pytest
 
+# test_pr_review first: it puts its copy of scripts/pr_review.py in sys.modules, and pr_loop (loaded by
+# test_pr_loop) then imports that same copy, so every later test module sees one pr_review.
+import test_pr_review as tr  # noqa: I001
 import test_pr_loop as tl
-import test_pr_review as tr
 
 pr_review = tr.pr_review
 pr_loop = tl.pr_loop
