@@ -1241,9 +1241,9 @@ which is in the group "Gate backends", and `scripts/live_eval_seat.py`, which is
 two digests moved. No other file of any group changed, and no fingerprint file.
 
 Every value of section 22.1, recomputed with CLI 2.1.325, by the same commands as section 18.1, with
-`~/Nirmaan-internal/2026-10-18-capability-buildout/p3-ip/g3/digests.py`, on `main` at `<MAIN>`. That commit holds
+`~/Nirmaan-internal/2026-10-18-capability-buildout/p3-ip/g3/digests.py`, on `main` at `bbc49847`. That commit holds
 `f8dcc97e`; every merge after it adds records, their test, an index and history fragments, and no file of any group
-(`git diff --name-only f8dcc97e <MAIN>` names none of the paths of the group table). The same program on `f8dcc97e`
+(`git diff --name-only f8dcc97e bbc49847` names none of the paths of the group table). The same program on `f8dcc97e`
 itself gives the same values.
 
 | Item | Since section 22.1 | Value |
@@ -1282,11 +1282,13 @@ Section 22.1 shows gate ET7 for ip#471 (merge `a15b8c1d`). Two merges came after
   `src/nirmaan/integrations/eda.py` and `tests/test_gate_reads.py`. It names no file in `harness.CODE`, `LOOP_CODE`
   or `FLOW_CODE`, no tool definition and not the CLI pin.
 
-These tests pass on `f8dcc97e`: `tests/test_whole_flow_dispatch.py` (gate WF7),
+These tests were run for this addition on a checkout of `f8dcc97e` (a worktree on that commit, with
+`PYTHONPATH=src`, the repository's own virtualenv) and passed: `tests/test_whole_flow_dispatch.py` (gate WF7),
 `tests/test_live_eval_seat.py::test_the_tools_as_the_seat_account_change_no_fingerprint` and
-`tests/test_gate_inputs.py::test_no_file_this_milestone_changes_is_harness_code`. The four fingerprints of section
+`tests/test_gate_inputs.py::test_no_file_this_milestone_changes_is_harness_code`. The two moved digests and every other value of
+section 23.1 were computed by the same program on that checkout and on `bbc49847`, with equal results. The four fingerprints of section
 23.1 (the two whole-flow fingerprints and the two single-seat defaults) are the values of section 18.1, unchanged on
-`f8dcc97e` and on `<MAIN>`. Gate ET7's last part, every value recomputed on the dispatch commit, is for the dispatch:
+`f8dcc97e` and on `bbc49847`. Gate ET7's last part, every value recomputed on the dispatch commit, is for the dispatch:
 it is not shown here.
 
 ### 23.3 The record of run 45159697183 (gate ET18)
@@ -1299,8 +1301,8 @@ answer's replay passed; the controls step failed, because 13 bypass controls fai
 on the same commit and the same uploaded records, and passed.
 
 Its uploads are committed as uploaded, byte for byte, by a chain of three pull requests that the review reads whole:
-ip#477 (part A, the six files of the controls upload, an index and a test), ip#<A2> (part A2, `fixtures.xml`,
-`fixtures.log` and the two tool reach records) and ip#<B> (part B, `evals/flow/et5_controls_record_45159697183.json`
+ip#477 (part A, the six files of the controls upload, an index and a test), ip#479 (part A2, `fixtures.xml`,
+`fixtures.log` and the two tool reach records) and ip#480 (part B, `evals/flow/et5_controls_record_45159697183.json`
 and the test of decision E4, item 3, in `tests/test_live_eval_controls.py`). The record reads each bypass control by
 decision E2 of the third addendum. `evals/flow/et5_controls_record.json` (run 45119522138) and its test are
 unchanged, and run 45135605510's records are cited, as the addendum says, as what showed the finding and never as
@@ -1324,8 +1326,9 @@ statements stand. Run 45159697183's record reads its 13 by the same rule (sectio
 
 ### 23.5 Gate ET5, stated on this record (verification-lead)
 
-Verification-lead, the gate's owner, read the head of part B (`29aaacaa`) as a read-only process of its own
-(`council/verification-lead.md`). A seat's read is not a council ruling. Its statement:
+Verification-lead, the gate's owner, read the head of part B (`29aaacaa`, which merged unchanged as ip#480, `bbc49847`) as a read-only process of its own
+(`council/verification-lead.md`). A seat's read is not a council ruling. Its statement, which ip#480's text quotes in full
+and whose last line is:
 
 > ET5: met on run 45159697183 at f8dcc97e. Every failed control is a bypass control refused as the seat account,
 > shown by the tool's own line; no account control's record holds target content; and the pinned values on the commit
@@ -1334,7 +1337,7 @@ Verification-lead, the gate's owner, read the head of part B (`29aaacaa`) as a r
 The statement holds on one condition, which is decision E4, item 4: the values of the tables of section 23.1 on the
 commit the measured run is dispatched from equal those on `f8dcc97e`, or are restated in a dated addition before the
 dispatch. If a pinned group moves after it, ET5 is open again. Section 23.1 shows the values on `f8dcc97e` and on
-`<MAIN>` equal; the dispatch check of section 7 holds the dispatch commit to them.
+`bbc49847` equal; the dispatch check of section 7 holds the dispatch commit to them.
 
 What the statement rests on, as the committed test holds it: controls 7 of 7 and all 100 sweep rows; 408 fixture tests,
 none skipped, with the linked setup and every must-refuse fixture passed; every probe denied in both jobs, on the run's
