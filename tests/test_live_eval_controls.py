@@ -455,7 +455,9 @@ def test_the_et18_record_is_from_main_and_reads_every_bypass_control_by_decision
     assert "Whether ET5 is met is verification-lead's statement, not this record's." in record["about"]
     folder = REPO / record["folder"]
     assert folder == EVIDENCE / f"run-{ET18_RUN}"
-    committed_files(folder, record["files"])
+    committed_files(folder, record["files"])  # the chain is complete: every file here, as the record names it
+    index = json.loads((folder / "index.json").read_text(encoding="utf-8"))
+    assert {n: {k: f[k] for k in ("sha256", "bytes")} for n, f in index["files"].items()} == record["files"]
     upload = folder / f"live-eval-controls-{ET18_RUN}"
 
     # The run's own summary, on the same commit, and the reach test in both jobs.
