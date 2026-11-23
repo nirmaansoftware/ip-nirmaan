@@ -375,3 +375,29 @@ def test_run_45135605510s_controls_upload_is_committed_as_uploaded_and_as_record
     [found] = finding["runs"]
     assert [s["command"][0] for s in found["steps"]] == [f"{WRAPPERS}sby"]
     assert "NIRMAAN_MARKER_4b1d" in found["summary"]
+
+
+def test_run_45159697183s_uploads_are_committed_as_uploaded_part_by_part():
+    """Gate ET18 (decision E4, items 1 and 2): the uploads of replay run 45159697183 on main at f8dcc97e, which holds
+    gate ET17 (ip#475). Every file in the folder is one the index names, with the sha256 and size it names; the chain's
+    parts arrive in order, each whole: part A (the controls upload but its fixtures files) is here, and a later part's
+    files are all here or none. ``test_the_et18_record_is_from_main_and_reads_every_bypass_control_by_decision_e2``
+    holds the complete chain with its record (part B)."""
+    folder = EVIDENCE / "run-45159697183"
+    index = json.loads((folder / "index.json").read_text(encoding="utf-8"))
+    assert index["format"] == "nirmaan.et5-controls-upload-index/1" and index["about"].startswith("Records only.")
+    assert "Nothing here is cited as showing gate ET5 met" in index["about"]
+    run = index["run"]
+    assert (run["id"], run["commit"], run["branch"]) == (
+        "45159697183", "f8dcc97e5c774679e1bd6989e55d5e6bf16be628", "main")
+    assert run["inputs"] == {"case": controls.CASE, "replay": True, "controls": True}
+    assert {k: (v["attempt"], v["conclusion"]) for k, v in run["jobs"].items()} == {
+        "replay": (1, "failure"), "rejudge": (2, "success")}
+    present = {p.relative_to(folder).as_posix() for p in folder.rglob("*") if p.is_file() and p.name != "index.json"}
+    assert present <= set(index["files"]), present - set(index["files"])
+    committed_files(folder, {n: index["files"][n] for n in present})
+    here = [part for part in index["parts"][:-1] if any(f["part"] == part for n, f in index["files"].items()
+                                                         if n in present)]
+    assert here == index["parts"][:len(here)] and here[:1] == ["A"], here  # in order, part A first
+    for part in here:
+        assert {n for n, f in index["files"].items() if f["part"] == part} <= present, part  # each part whole
