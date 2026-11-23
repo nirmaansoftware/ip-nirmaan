@@ -373,8 +373,17 @@ covered beyond the probed targets; whether a seat could learn the path of a
 file in another `/tmp/nirmaan-*` folder was not tested and is not needed by
 this rule. Nothing here says a seat file is confined.
 
-No file in `harness.CODE`, `harness.LOOP_CODE` or `FLOW_CODE` and no tool
-definition changes (`test_no_file_gate_et17_changes_is_harness_code`), so the
-four fingerprints are unchanged; the whole-flow plan's "Gate backends" and
-"Seat account" group digests move (the docstring of
-`scripts/live_eval_seat.py` now says what the harness names for a setup).
+Gate ET7. The one code file the repair changes, `eda.py`, is in none of
+`harness.CODE`, `harness.LOOP_CODE` or `FLOW_CODE`
+(`test_no_file_gate_et17_changes_is_harness_code` checks that file against
+the three lists; it reads no other file and no tool definition), and ip#475
+changed no tool definition (`src/nirmaan/company/tools.py`) and no CLI pin.
+On its merge commit `f8dcc97e` the tests of gate WF7
+(`tests/test_whole_flow_dispatch.py`) pass, and the four fingerprints,
+recomputed with `harness_sha256(cli="2.1.325")`, equal those of `main`
+`c356ba48` before it: `0ef27db1...` and `9aa7a333...` (single seat, with and
+without documents), `d90b3c18...` and `8d6590f7...` (whole flow). The
+whole-flow plan's "Gate backends" group digest moved from `eac184ec...` to
+`7c12db37...`, and "Seat account" from `1b7309f1...` to `6530c151...` (the
+docstring of `scripts/live_eval_seat.py` now says what the harness names for
+a setup).
