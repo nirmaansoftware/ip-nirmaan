@@ -922,11 +922,43 @@ holds it to the run, to `evals/flow/controls.json` and `evals/flow/controls_reco
     in the setup's folder, which the account's view of the run does not hold.
 
 These 12 are differences from the results the fixtures gave in CI's test job. By section 20.6 a difference stops slot 1
-and returns to the council. Verification-lead reads this record and states whether ET5 is met. Nobody narrows ET5's
-wording but the chair.
+and returns to the council. Section 21.4 gives verification-lead's read. Nobody narrows ET5's wording but the chair.
 
-### 21.4 What slot 1 still waits for
+### 21.4 Verification-lead's read of the record
 
-Section 20.7 stands, with two changes. The record of 20.6 is the one of section 21.3. Verification-lead's read of it
-comes first, and so does the council's ruling on the 12 differences, if verification-lead does not state ET5 met. The
-measured run is dispatched with every value of section 21.1 recomputed on its commit first (section 7).
+Verification-lead, the gate's owner, read this record as a read-only process of its own (`council/verification-lead.md`)
+on the head of the pull request that commits it, and stated **ET5 not met**, as the gate is worded. A seat's read is
+not a council ruling. In short:
+
+- The controls, the sweep and the reference answer's replay match: all seven controls, all 100 sweep rows, the replay
+  passed, its re-judge the same, every probe denied in both jobs.
+- 12 of the 402 fixture tests did not give the results they gave, so "every committed fixture" is not met.
+- The 11 bypass controls are probably the account stopping the tool, but the record does not show it. The 5 through
+  `yosys` report no cell count at all, which does not tell a refused payload from a run that did not finish. The
+  record's label "bypass control" is the record's own.
+- The linked setup is a real change: as the account, `sby` cannot open the link that `src/nirmaan/runtime/model.py`
+  (`_place_beside`) places beside a setup. A correct proof, cover or equivalence setup over approved RTL would fail as
+  the account.
+- No timer trial result depends on any of the 12. The timer's RTL stage runs `lint.run`, `simulator.run` and
+  `synth.run`, so the gates that use the link do not run in it. The bypass controls act only with the screen removed
+  inside the test.
+
+What it says must happen, and who owns it:
+
+1. Security reads the run's fixtures output and states the cause of each of the 11. The chair then rules whether "does
+   not reach its target, as the account" is the result these controls should give as the account. Only the chair
+   narrows ET5's wording.
+2. Security, with eda-tooling, gives the account the link's target, which is already a named input of the run. Then a
+   fresh controls dispatch on `main`, with its record and test, if the chair does not scope this change out of slot
+   1. Verification-lead expects it is needed for any formal or block-verification flow, not for timer slot 1.
+
+Verification-lead expects to state ET5 met without a new run if the chair rules the 11 as the account's expected
+result and scopes the linked setup out of slot 1. That scoping is the chair's.
+
+### 21.5 What slot 1 still waits for
+
+Section 20.7 stands, with these changes. The record of 20.6 is the one of section 21.3, and ET5 is not met on it
+(section 21.4). Before the measured run come the steps of section 21.4: security's statement of the 11 causes, the
+chair's rulings, and the fix and fresh dispatch of item 2 unless the chair scopes it out. Then verification-lead's
+statement that ET5 is met. The measured run is dispatched with every value of section 21.1 recomputed on its commit
+first (section 7).

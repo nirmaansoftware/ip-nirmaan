@@ -352,7 +352,8 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   The record lists each with its message. The same run's replay passed, its
   re-judge was the same, and its reach test denied every probe in both
   jobs. Whether gate ET5 is met is verification-lead's statement, which the
-  record does not make.
+  record does not make. Verification-lead read the record and stated ET5 not
+  met (plan section 21.4).
 - **The tools that read seat Verilog run as the account too** (gates ET2 to
   ET4 of `council/records/2026-11-22-eda-tools-seat-account.md`). The input
   screen (`eda_guard`) reads seat files with patterns of its own, and the
