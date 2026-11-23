@@ -345,14 +345,15 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   rows (the reference and 99 mutants) gave the record's result, error count
   and first failure. Of the 402 fixture tests, 390 passed and 12 failed,
   none skipped, so the `replay` job failed at that step. Every must-refuse
-  fixture passed. The 12 are 11 bypass controls and one must-pass test. In
-  each bypass control, with the screen bypassed, the tool ran through the
+  fixture passed. The 12 are 11 bypass controls and one must-pass test. Run
+  45119522138's own record shows the failed assertions only. Run
+  45135605510's bypass record (`docs/evidence/et5/run-45135605510`), for the
+  same 11 controls by name, shows that in each the tool ran through the
   account's wrapper; in the two shell controls the payload itself (`touch`)
-  ran as the account and its write was refused, and in the others the tool
-  printed that it could not open, resolve or write its target, in run 45135605510's bypass record (`docs/evidence/et5/run-45135605510`;
-  security's statement, decision E1 of the third addendum, which reads the two
-  `verilator --lint-only` forms as an inference). Run 45119522138's own record shows
-  the failed assertions only, and which layer refused is in neither. The must-pass test is a formal setup
+  ran and its write was refused, and in the others the tool printed that it
+  could not open, resolve or write its target (security's statement, decision
+  E1 of the third addendum, which reads the two `verilator --lint-only` forms
+  as an inference). Which layer refused is in neither record. The must-pass test is a formal setup
   over an approved file linked beside it, which did not run as the account.
   The record lists each with its message. The same run's replay passed, its
   re-judge was the same, and its reach test denied every probe in both
@@ -363,8 +364,9 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   replay of `flow/axil-timer` with `controls` set, no model and no token,
   was dispatched on `main` at f8dcc97e (the merge of ip#475, which holds gate
   ET17), as [run 45159697183](https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45159697183).
-  Its replay of the reference answer passed, and the 32 listed probes of
-  each tool reach record were denied in its `replay` job (attempt 1) and its `rejudge` job (attempt 2). As the account, all seven timer
+  Its replay of the reference answer passed, and the listed probes of
+  each tool reach record were denied (32 entries in each, `every_denied`
+  true) in its `replay` job (attempt 1) and its `rejudge` job (attempt 2). As the account, all seven timer
   controls and all 100 sweep rows gave the results of the committed records;
   the controls step failed because 13 bypass controls of gate ET1 failed. Of
   its 408 fixture tests none was skipped, and the linked setup and every
@@ -372,11 +374,11 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   committed record, `evals/flow/et5_controls_record_45159697183.json`, reads
   each by decision E2 of the third addendum: the tool ran through the
   account's wrapper and the tool's own line names the target it could not
-  open, resolve or write, and no account control's record holds the target's
-  content. The controls that ran as the caller are listed and claimed for
-  nothing. The run's uploads, and its tool reach records, are committed as
-  uploaded in `docs/evidence/et5/run-45159697183`, and
-  `tests/test_live_eval_controls.py` holds the record to them. The record
+  open, resolve or write. The controls that ran as the caller are listed and
+  claimed for nothing. The run's uploads, and its tool reach records, are
+  committed as uploaded in `docs/evidence/et5/run-45159697183`, and
+  `tests/test_live_eval_controls.py` holds the record to them and checks that
+  no bypass entry run as the account holds a target's content. The record
   does not say ET5 is met; verification-lead stated ET5 met on this run at
   f8dcc97e on the condition that the pinned values on the commit the measured
   run is dispatched from equal f8dcc97e's (plan section 23.5). This is a

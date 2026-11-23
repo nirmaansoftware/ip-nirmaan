@@ -1243,7 +1243,7 @@ two digests moved. No other file of any group changed, and no fingerprint file.
 Every value of section 22.1, recomputed with CLI 2.1.325, by the commands of sections 6 and 18.1 (each group's
 `git ls-files -z -- <paths> | LC_ALL=C sort -z | xargs -0 shasum -a 256 | shasum -a 256`, `harness_sha256` with
 `flow="whole"` and the CLI pin, `case_digest`, and the flow digest of a replay's first step), on `main` at `bbc49847`. That commit holds
-`f8dcc97e`; the five merges after it (ip#476, ip#478, ip#477, ip#479, ip#480) add between them records, their test, an index, history
+`f8dcc97e`; the five merges after it (ip#476, ip#478, ip#477, ip#479, ip#480) add between them records, their test, two indexes, history
 fragments and one paragraph of `docs/GATE_INPUTS.md`, and no file of any group
 (`git diff --name-only f8dcc97e bbc49847` names none of the paths of the group table). The same commands on `f8dcc97e`
 itself give the same values.
@@ -1301,7 +1301,7 @@ it is not shown here.
 
 Run [45159697183](https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45159697183) is a replay of
 `flow/axil-timer` with `controls` set, dispatched on `main` at `f8dcc97e` with no model and no token. Its `live-eval`
-job was skipped. In its `replay` job, as in its `rejudge` job, the 32 listed probes of each job's tool reach record were denied; the first part's probes are in the job log only and
+job was skipped. In its `replay` job, as in its `rejudge` job, the listed probes of each job's tool reach record were denied (32 entries in each, `every_denied` true); the first part's probes are in the job log only and
 rest on the step result GitHub reported ("Test what seat code can reach: success"). The reference
 answer's replay passed; the controls step failed, because 13 bypass controls failed as the seat account. Its
 `rejudge` job of attempt 1 stopped in its tool install and was cancelled; that job alone was run again as attempt 2
@@ -1351,11 +1351,12 @@ addition is what section 7 needs to dispatch, and it does not keep ET5 met). Sec
 `bbc49847` equal; the dispatch check of section 7 holds the dispatch commit to them.
 
 What the statement rests on, as the committed test holds it: controls 7 of 7 and all 100 sweep rows; 408 fixture tests,
-none skipped, with the linked setup and every must-refuse fixture passed; every listed probe of each job's tool reach record denied (32 in each committed record), on the run's
+none skipped, with the linked setup and every must-refuse fixture passed; every listed probe of each job's tool reach record denied (32 entries in each committed record, `every_denied` true), on the run's
 commit (the first part's probes rest on the step result, as above); for each failed control, the seat account's wrapper and the tool's own line for its cause, and no target
 content in any account control's record. Decision E2 is taken up whole: item 2 applies (a control that fails without such a line, or whose record shows the
 target's content or its marker written, is a difference that stops the measured run and returns to the council; the
-committed test fails on one), items 3 and 4 apply, and item 5 is the rule of CI's test job, where every bypass control must
+committed test fails on a failed control without its line and on a record that holds a target's content, and each of
+the three marker controls in this record shows its refusal line, so none shows a marker written), items 3 and 4 apply, and item 5 is the rule of CI's test job, where every bypass control must
 still pass as the caller (CI's push run 45159565079 on `f8dcc97e` passed). Items 3 and 4: the controls that ran as the caller are
 listed and claimed for nothing, and a control that passed as the account is not read as showing a live payload or a
 refusal. The reference answer's pass rests on the step result GitHub reported; no replay result file is committed.
