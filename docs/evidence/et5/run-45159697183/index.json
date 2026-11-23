@@ -1,0 +1,88 @@
+{
+ "format": "nirmaan.et5-controls-upload-index/1",
+ "about": "Records only. The uploads of replay run 45159697183 of flow/axil-timer, dispatched on main at f8dcc97e (the merge of ip#475, which holds gate ET17) with controls set, no model and no token, for gate ET18 of the third addendum to council/records/2026-11-22-eda-tools-seat-account.md (decision E4): every file of artifact live-eval-controls-45159697183 and the tool reach records of the replay and rejudge jobs, each as uploaded, byte for byte, named here with its sha256. Together they pass the review's diff limit, so they are committed as a chain (decision R2's rule; nothing is cut): part A, the six files of the controls upload marked A; part A2, the four marked A2; then part B, the record evals/flow/et5_controls_record_45159697183.json with the test of decision E4, item 3. Until part B merges, a file named here may be absent, never different, and the chain is not complete. Nothing here is cited as showing gate ET5 met: whether ET5 is met is verification-lead's statement on the record of part B.",
+ "parts": [
+  "A",
+  "A2",
+  "B"
+ ],
+ "run": {
+  "id": "45159697183",
+  "url": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45159697183",
+  "commit": "f8dcc97e5c774679e1bd6989e55d5e6bf16be628",
+  "branch": "main",
+  "event": "workflow_dispatch",
+  "workflow": ".github/workflows/live-eval.yml",
+  "inputs": {
+   "case": "flow/axil-timer",
+   "replay": true,
+   "controls": true
+  },
+  "jobs": {
+   "replay": {
+    "id": "137641609891",
+    "attempt": 1,
+    "conclusion": "failure",
+    "url": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45159697183/job/137641609891"
+   },
+   "rejudge": {
+    "id": "137677455231",
+    "attempt": 2,
+    "conclusion": "success",
+    "url": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45159697183/job/137677455231"
+   }
+  }
+ },
+ "files": {
+  "live-eval-controls-45159697183/bypass.json": {
+   "sha256": "ff87ec9cdcce18cfa38bf30ce0a50a1563606c9167f909d0f50ea3476be12563",
+   "bytes": 106011,
+   "part": "A"
+  },
+  "live-eval-controls-45159697183/controls.json": {
+   "sha256": "18bb09e9d7e85003038c9b6fc710106e13f4740adfa7ba60ca6c05ee26da8d1f",
+   "bytes": 5815,
+   "part": "A"
+  },
+  "live-eval-controls-45159697183/controls.log": {
+   "sha256": "b611f18a6ae0046d87a56eb4896179ba20ccecc33d2cbb97e3a50acc9ffa2dfd",
+   "bytes": 5041,
+   "part": "A"
+  },
+  "live-eval-controls-45159697183/controls.xml": {
+   "sha256": "4a1c2d6ab16d7408f47d1f0fa3e9ecc147c35f90aa52900a6a4ef8405ac26ab0",
+   "bytes": 1245,
+   "part": "A"
+  },
+  "live-eval-controls-45159697183/summary.json": {
+   "sha256": "b07080b92a705fd3937525454b3375541eb4dacf88a91970de405bb8d6b3a3be",
+   "bytes": 2915,
+   "part": "A"
+  },
+  "live-eval-controls-45159697183/sweep.json": {
+   "sha256": "bd61cd2f62e3335a00ea6015f14d8a520edb615a37d47cf9f3e3032853c04393",
+   "bytes": 47810,
+   "part": "A"
+  },
+  "live-eval-controls-45159697183/fixtures.log": {
+   "sha256": "4033b10b73dcc0a3f762532a80ef1e8aef45adab3d6053341148cb997c056114",
+   "bytes": 32602,
+   "part": "A2"
+  },
+  "live-eval-controls-45159697183/fixtures.xml": {
+   "sha256": "5495c767c24cdc7f41c12a08e2b42b9d7c06dccde927511ce188c14278368c89",
+   "bytes": 100880,
+   "part": "A2"
+  },
+  "live-eval-tool-reach-replay-45159697183/tool-reach.json": {
+   "sha256": "f0c4beef90c08a1f997c1459f798143387722cc349ab01c5f28a52fc47824fec",
+   "bytes": 13705,
+   "part": "A2"
+  },
+  "live-eval-tool-reach-rejudge-45159697183/tool-reach.json": {
+   "sha256": "b5aaeea838cf4f1863f226a9d0c0b65cbeef52a2be21597375ccbe484fdbf813",
+   "bytes": 13706,
+   "part": "A2"
+  }
+ }
+}
