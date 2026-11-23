@@ -336,9 +336,23 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   of the checkout in a `/tmp/nirmaan-*` folder only the runner may read,
   since the account reads only input files the runner made in such a folder.
   A missing tool fails its test. The job uploads the result as
-  `live-eval-controls-<run id>`. Until a record of such a run is committed,
-  nothing here says the controls, the sweep or the fixtures were run as the
-  account.
+  `live-eval-controls-<run id>`. The committed record is
+  `evals/flow/et5_controls_record.json`, of
+  [run 45119522138](https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45119522138),
+  a replay of `flow/axil-timer` with `controls` set, dispatched on `main` at
+  c0ba283c (the merge of ip#464). As the account, all seven timer controls
+  gave the verdicts of `evals/flow/controls_record.json`, and all 100 sweep
+  rows (the reference and 99 mutants) gave the record's result, error count
+  and first failure. Of the 402 fixture tests, 390 passed and 12 failed,
+  none skipped, so the `replay` job failed at that step. Every must-refuse
+  fixture passed. The 12 are 11 bypass controls and one must-pass test. In
+  each bypass control, with the screen bypassed, the payload did not reach
+  its target outside the run's view. The must-pass test is a formal setup
+  over an approved file linked beside it, which did not run as the account.
+  The record lists each with its message. The same run's replay passed, its
+  re-judge was the same, and its reach test denied every probe in both
+  jobs. Whether gate ET5 is met is verification-lead's statement, which the
+  record does not make.
 - **The tools that read seat Verilog run as the account too** (gates ET2 to
   ET4 of `council/records/2026-11-22-eda-tools-seat-account.md`). The input
   screen (`eda_guard`) reads seat files with patterns of its own, and the

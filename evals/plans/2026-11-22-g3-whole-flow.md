@@ -631,6 +631,8 @@ gave the same result. The record of that is `evals/flow/et5_replay_record.json`,
 `tests/test_live_eval_seat.py::test_the_committed_et5_replay_record_is_from_main_names_the_timer_and_shows_exactly_what_et5_claims`.
 It holds no run of the timer's controls or of the committed fixtures, which the run's uploads do not hold; those are
 this repository's tests on the same commit.
+The timer's controls, its mutant sweep and the committed gate fixtures as the seat account are in run 45119522138 and
+its record `evals/flow/et5_controls_record.json` (section 21).
 
 - No file in `harness.CODE`, `LOOP_CODE` or `FLOW_CODE` and no tool definition changed:
   `git diff --name-only 45a22c84 817cc0d6` over those files and `src/nirmaan/company/tools.py` is empty, and these
@@ -834,3 +836,97 @@ must-haves 1 and 2 against decision 2, item 3 and decision 8 of the record (sect
 the chair rules for its tool reach records; then slot 1, with the values recomputed again on its own commit. If a
 probe of the measured run's `live-eval` job is not denied, that job stops before its trial, and no slot is dispatched
 until the cause is fixed and a run records every probe denied. Section 13 stands.
+
+## 21. Dated addition (2026-11-23): gate ET5's controls, sweep and fixtures as the seat account, and the value ip#464 moved
+
+Section 20.6 records verification-lead's position that gate ET5 is not met as recorded, and what is owed: a
+replay-only dispatch on `main` with no model, whose `replay` job runs the timer's controls, its full mutant sweep and
+the committed gate fixtures as the seat account, committed as a record of its own with a test. This section names the
+change that made that dispatch possible, the value it moved, the run and its record. It changes no count, slot, arm,
+harness, attempt, fingerprint, case or level, and it states no verdict on ET5: that is verification-lead's.
+
+### 21.1 The change, and the value it moved
+
+No input of `.github/workflows/live-eval.yml` ran the controls, the sweep or the fixtures: the `replay` job ran only
+the case's reference answer. ip#464 (merge `c0ba283c`) added the input `controls`. With it, a replay of
+`flow/axil-timer` also runs `scripts/live_eval_controls.py` in the `replay` job, after the reference answer's replay,
+between the job's two tree hashes, where `NIRMAAN_SEAT_TOOLS` names the account's wrappers. It raised that job's
+time limit to 150 minutes. The `live-eval`, `not-main` and `rejudge` jobs did not change. The workflow file is in the
+group "Workflow, tool set and CLI pin", so that group's digest moved. `scripts/live_eval_controls.py` is in no group:
+the `live-eval` job, where trials run, never runs it.
+
+Every value of section 18.1, recomputed on `main` at `c0ba283c` with CLI 2.1.325, by the same commands as section
+18.1:
+
+| Item | Since section 18.1 | Value |
+|---|---|---|
+| Case, `flow/axil-timer`, case digest | unchanged | `sha256:ff8a4afc77caee105070d996f3e29142f2fe013c411752becdc46090b7553da3` |
+| Whole-flow fingerprint, with documents | unchanged | `sha256:d90b3c1840870ae9434b90188dbb3078473140d56b2dec9e295c515c1832adfc` |
+| Whole-flow fingerprint, without documents | unchanged | `sha256:8d6590f7a66ac771abf360790643763e8c43d3c267d94a5145f1e4c8bf3ae975` |
+| Flow digest, with documents | unchanged | `sha256:a1aea0d36022a54be56c8d5c31831ea8ac0994f2802bd8ee8f39f6a5246ec312` |
+| Flow digest, without documents | unchanged | `sha256:b8608edecf2013dddfaec85e947106316f9a561a8ec74c7e3d99a7f53f8323c0` |
+| Single-seat default, with documents (must stay) | unchanged | `sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00` |
+| Single-seat default, without documents (must stay) | unchanged | `sha256:9aa7a333cd961a23aa919616fac6428f9f29fed1ba44b2fa3f5c6ee49e745d39` |
+
+| Group | Paths | Files | Since section 18.1 | Digest |
+|---|---|---|---|---|
+| Gate backends | `src/nirmaan/integrations` | 60 | unchanged | `sha256:eac184ecc60ae35bdc88e6f66c2fa3aceaabe4c32f62066e951d7d5e84e835f9` |
+| Seat account | `scripts/live_eval_seat.py`, `.github/actions/live-eval-seat` | 2 | unchanged | `sha256:4abec1ad1bb4fe9e48afb333c619c1d07ccd2e5df80b62f3142dc8ad750fa446` |
+| CI command | `scripts/live_eval_ci.py` | 1 | unchanged | `sha256:3f396770975a7fcff4fc746c031e8694f768b921e90376c290e4fc023acf3e88` |
+| Workflow, tool set and CLI pin | `.github/workflows/live-eval.yml`, `.github/actions/live-eval-setup`, `.github/actions/oss-cad-suite`, `.github/live-eval` | 5 | moved by ip#464 (`c0ba283c`) from `09083077...` | `sha256:4daa3c45ea748b0bfa77aad94173aa05341b4dee3e42a6fb61b7c5e467726481` |
+| Reach test | `scripts/live_eval_reach.py` | 1 | unchanged | `sha256:581a4cebb61899090a1741fdbea49e51b57decdebdf0cb11c58562f60b4b93c0` |
+| Held-out scorers | `src/nirmaan/evals/scorers.py` | 1 | unchanged | `sha256:5f4f7909a3207f3837d2af7ad60b85c0bae620e1d461afde57aea0d2a592ecb4` |
+| Stage gates | `src/nirmaan/company/workflows.py` | 1 | unchanged | `sha256:bcd15f8204e55f142f266afdd8e12a4947c7f6276382dd18f4c9893e616a9873` |
+
+From this addition on, every check of sections 4 and 7 is made against these two tables, which replace those of
+section 18.1. Section 18.1 keeps its values as the record of what moved.
+
+Gate ET7 for ip#464: `git diff --name-only de1e547b c0ba283c` (its merge's first parent, and the merge) names
+`.github/workflows/live-eval.yml`, `scripts/live_eval_controls.py`, two test files, `docs/LIVE_EVAL_EVIDENCE.md` and a
+history fragment, and no file in `harness.CODE`, `LOOP_CODE` or `FLOW_CODE` and no tool definition
+(`src/nirmaan/company/tools.py`). These tests pass on `c0ba283c`: `tests/test_whole_flow_dispatch.py` (gate WF7),
+`tests/test_live_eval_seat.py::test_the_tools_as_the_seat_account_change_no_fingerprint` and
+`tests/test_gate_inputs.py::test_no_file_this_milestone_changes_is_harness_code`. The four fingerprints above are
+those of section 18.1.
+
+### 21.2 The run
+
+Run 45119522138 is a replay of `flow/axil-timer` with `controls` set, dispatched on `main` at `c0ba283c` with no
+model and no token. No other run of `.github/workflows/live-eval.yml` was queued or running when it was dispatched.
+Its `live-eval` job was skipped, as in every replay. In its `replay` job the reach test denied every probe, the
+reference answer's replay passed, and then the step of section 21.1 ran. That step failed, for the fixtures below. Its
+`rejudge` job re-judged the replayed record, found it the same, and its reach test denied every probe.
+
+### 21.3 The record, against the expectations
+
+`evals/flow/et5_controls_record.json` is copied from the run's upload `live-eval-controls-45119522138`, with the
+run's job ids. `tests/test_live_eval_controls.py::test_the_committed_et5_controls_record_is_from_main_and_shows_each_part_against_its_expectation`
+holds it to the run, to `evals/flow/controls.json` and `evals/flow/controls_record.json`, and to
+`evals/flow/axil_timer/mutant_sweep.json`.
+
+- **Controls:** all seven timer controls gave, as the account, the verdicts the manifest expects and the controls
+  record holds. `timer-rtl-decode-alias` was refused before review by the seat's own lint gate, as its manifest entry
+  says.
+- **Mutant sweep:** the reference passed with 44959 checks. Each of the 99 mutants, rebuilt from the same text (its
+  sha256 equal to the record's), failed with the record's error count and first failure. That held on Icarus Verilog
+  12.0, where the record was written on 13.0.
+- **Gate fixtures:** 402 tests ran from the files of gate ET1 (`tests/test_gate_inputs.py`, `tests/test_gate_reads.py`)
+  and the tests of the six committed `*_fail.v` testbenches; none was skipped. 390 passed, every must-refuse fixture
+  among them. 12 failed, and the record names each with its message:
+  - 11 bypass controls (`test_control_without_the_check_*`). Each removes the input screen inside the test to show that
+    the tool acts on the payload. Run as the account, the tool did not reach the payload's target outside the run's
+    view, a canary file or a marker, so the control's assertion that it did failed.
+  - 1 must-pass test, `tests/test_gate_reads.py::test_a_setup_over_an_approved_file_linked_beside_it_still_proves`. A
+    formal setup over an approved file linked beside it (the link M68 places,
+    `src/nirmaan/runtime/model.py`, `_place_beside`) did not run as the account: `sby` could not open `m.v`, the link
+    in the setup's folder, which the account's view of the run does not hold.
+
+These 12 are differences from the results the fixtures gave in CI's test job. By section 20.6 a difference stops slot 1
+and returns to the council. Verification-lead reads this record and states whether ET5 is met. Nobody narrows ET5's
+wording but the chair.
+
+### 21.4 What slot 1 still waits for
+
+Section 20.7 stands, with two changes. The record of 20.6 is the one of section 21.3. Verification-lead's read of it
+comes first, and so does the council's ruling on the 12 differences, if verification-lead does not state ET5 met. The
+measured run is dispatched with every value of section 21.1 recomputed on its commit first (section 7).
