@@ -438,10 +438,10 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   cross-builds the seat's firmware for RV32I and runs it inside the simulated
   PicoRV32, freestanding, with no host call (G3 record, second addendum, fact
   8), and no case today uses it; the Verilator `--binary` simulator compiles
-  seat HDL, and every gate refuses, before it runs, HDL with a way out to
-  the host: a system task outside an allow list (so `$system`, `$fopen` and
-  `$c`), DPI, or a `` `systemc_ `` block (`eda_guard.verilog_uses`;
-  `docs/GATE_INPUTS.md`, section 2). Those runs stay with the runner account,
+  seat HDL, and every gate refuses, before it runs, the constructs its
+  recorded fixtures name: a system task outside an allow list (so `$system`,
+  `$fopen` and `$c`), DPI, or a `` `systemc_ `` block (`eda_guard.verilog_uses`;
+  `docs/GATE_INPUTS.md`, sections 2 and 7). Those runs stay with the runner account,
   as before; if a case ever hands one of them seat-written host code, it joins
   `SEAT_C_TOOLS` in `scripts/live_eval_ci.py`. `check
   --require-expected` and `trials` refuse a case that runs seat C (one whose

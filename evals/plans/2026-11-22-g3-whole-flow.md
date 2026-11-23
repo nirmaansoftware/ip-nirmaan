@@ -653,3 +653,116 @@ qa-evidence's to confirm. Gate
 ET9 is the register block's, before slot 21. This section adds no condition before slot 1 and removes none: section
 13 stands, with the measured run of section 10 after this merge. The re-measure batch of the wave 2 close record and
 the timer's twenty are never interleaved: one records its last trial before the other dispatches its first.
+
+## 19. Dated addition (2026-11-23): security's confirmation of gate WF23, gate ET8, and the conditions before slot 1
+
+Section 13 lists "WF23 (section 12, with security's confirmation)" among the conditions before slot 1, and section 17
+has that condition met only when gates ET1 to ET8 of `council/records/2026-11-22-eda-tools-seat-account.md` are
+met. Section 18.7 leaves ET8 to qa-evidence. Each seat gave its position as a read-only process of its own
+(`council/security.md`, `council/qa-evidence.md`; a seat never changes the repository), against `main` at
+`02cfa87f` (the merge of ip#454). This section records what each said; a seat's position is not a council ruling.
+This pull request changes this file, `docs/GATE_INPUTS.md`, `docs/GATE_INTEGRITY.md` and `docs/LIVE_EVAL_EVIDENCE.md`
+only. It changes no count, slot, arm, harness, attempt, fingerprint, main count, derived count or digest of section
+18.1: no file in `harness.CODE`, `LOOP_CODE` or `FLOW_CODE`, no tool definition, no CLI pin, no card, no knowledge
+document and no file of the seven groups is touched.
+
+### 19.1 Security: gate WF23 confirmed, no reach question beyond it
+
+In its words: "I confirm section 12, as corrected by sections 16 and 18.3", and "REACH QUESTION: none beyond WF23".
+Its facts, as it cited them: all three jobs set `NIRMAAN_SEAT_TOOLS` and a seat tool starts only through the
+account's wrapper or the run is refused (`.github/workflows/live-eval.yml`, `src/nirmaan/integrations/eda.py`); the
+wrapped tools and the one Verilator use that stays with the runner (`scripts/live_eval_seat.py`), which no timer gate
+is; 19 of 19 in both jobs of run 45073595509 (`evals/flow/tool_reach_record.json`); the `live-eval` job's reach step
+stops the job unless every probe is denied, and the trials step does not run after it fails
+(`scripts/live_eval_reach.py`, `.github/workflows/live-eval.yml`); a retry carries back only the summary and the
+bounded excerpt of section 12. On what stays with the runner (the `nirmaan` process and Claude Code, in the step
+that holds the token), it inferred that neither runs seat content as code, the CLI having no tools and no MCP server
+(`src/nirmaan/runtime/harness.py`). It found the `live-eval` job's want of a recorded probe run not a reach
+question, since that gate stops the job on the commit it runs from.
+
+It named one gap, in its words: "the committed record tested the seat-account code as it was at c99ef1fe. ip#451
+changed that code afterwards ... The gate covers the current code when a run is dispatched; the committed record does
+not cover it." Its confidence: high on the code reading; medium on one inference, that the network and write denials,
+probed through `vvp` only, hold for the other wrapped tools because they run as the same account.
+
+Its must-haves, which this plan takes as written:
+
+1. Before slot 1, the tool reach records of the measured run's `live-eval` and `rejudge` jobs
+   (`live-eval-tool-reach-trials-<run id>` and `live-eval-tool-reach-rejudge-<run id>`) are committed beside the ET3
+   record, with the run id and commit. If any probe was not denied, no slot is dispatched.
+2. Each slot's tool reach records are committed with its record, in the slot's folder of section 15.
+3. The residual stays as section 18.3 states it.
+
+So the measured run of section 10 is followed, before slot 1, by the pull request of item 1. That is a condition of
+section 13 from this addition on (section 19.5).
+
+### 19.2 qa-evidence: gate ET8 not met on `02cfa87f`, and what this pull request changes
+
+In its words: "ET8 is not met. The account texts follow decision 8. Six passages in the screen texts and in section
+12 do not." It found that the reach record, `docs/LIVE_EVAL_EVIDENCE.md` section 6 on the account, the classes and
+fixtures of `docs/GATE_INPUTS.md` section 7 and its residual, and the "What is not claimed" list of section 18.3
+follow decision 8. Its six findings, each with what this pull request does:
+
+1. Text that says the screen reads as a tool's preprocessor reads (`docs/GATE_INTEGRITY.md`, the heading and close
+   of the ET1 paragraph; `docs/GATE_INPUTS.md`, section 2, on strings and comments). Reworded to what the record
+   allows: the check refuses, before any step, the two classes of fact 9 in the forms its recorded fixtures name, and
+   is not claimed to read as a tool reads.
+2. "a reach test in each job shows the token unreadable" (`docs/GATE_INTEGRITY.md`, section 6). Reworded: the reach
+   test shows its probes denied to the account, a credential-named canary in the parent's environment among them,
+   with no claim about the token itself.
+3. `docs/GATE_INTEGRITY.md` did not state the residual. It now states it in the ET1 paragraph and at the account
+   paragraph of section 6, as the record and `council/records/2026-11-23-wave-2-close-meeting-1.md` state it: screen
+   classes nobody has found, parser faults in a tool, and files any account may read.
+4. Four sentences of `docs/GATE_INPUTS.md` that say the screen stops ways out or reads in general (the allow list
+   paragraph, the history scan's "no committed trial reached the host", the log paragraph's "they carry no other
+   file's content", and the C source paragraph). Each is reworded to what the fixtures and sections 2 and 7 show; the
+   history scan is said to predate section 7.
+5. "every gate refuses, before it runs, HDL with a way out to the host" (`docs/LIVE_EVAL_EVIDENCE.md`, section 6).
+   Reworded: every gate refuses, before it runs, the constructs its recorded fixtures name.
+6. Section 12's sentence "So the excerpt of a timer run's log cannot carry the plan credential, ..." stands by
+   section 18.3 ("The vvp reach test and runs of section 12 stand as written") and contradicts 18.3's own list of
+   what is not claimed. Withdrawn by section 19.3.
+
+The wording changes keep each document's line count where a line of it is cited elsewhere (`docs/GATE_INPUTS.md`
+and `docs/LIVE_EVAL_EVIDENCE.md`); `docs/GATE_INTEGRITY.md` gains lines only after the lines cited.
+
+### 19.3 Section 12, one more sentence withdrawn
+
+In *What the recorded reach tests show*, the sentence "So the excerpt of a timer run's log cannot carry the plan
+credential, a reference answer, a held-out file or mutant, the records, or anything else under the probed targets."
+is withdrawn. It reads instead: in those runs the probed targets, a credential-named canary among them, were denied
+to that account through `vvp`; nothing is claimed of the credential itself, or of a target not probed. In section
+18.3, "The vvp reach test and runs of section 12 stand as written" reads "stand as written, except the sentence that
+section 19.3 withdraws". Nothing else of sections 12, 16 or 18.3 changes.
+
+### 19.5 The conditions of section 13, checked on `main` at `02cfa87f`
+
+Each line is what the repository shows on `02cfa87f`, with this pull request's text changes on top; no condition is
+added by this table except item 1 of section 19.1.
+
+| Condition (section 13) | State | Evidence |
+|---|---|---|
+| The read of wave 2's first live batch | Met | `council/records/2026-11-14-pilot-retrospective.md:563`, the addendum of the W2-L1 read (ip#426) |
+| WF3 for the timer | Met | the fixed documents and citations (ip#323, ip#327, ip#335); every judged tag exercised (ip#339); the first check records (ip#369), and `evals/flow/requirements_check_pending.json:4` lists none pending; `tests/test_whole_flow_cases.py:116` holds every check and mutant to a statement |
+| WF4 for the timer | Met | `evals/flow/controls_record.json` (run 44415682628; ip#324, ip#325), which `tests/test_whole_flow_controls.py:291` holds every later CI run to; ET5 shown again with the tools as the seat account by run 45073595509 (section 18.6) |
+| WF8 for the timer | Met | `tests/test_whole_flow_runner.py:216` (ip#348); with WF22 below |
+| WF9 for the timer | Met | the named job and its concurrency group (`.github/workflows/live-eval.yml:81-82`, `:199`); one trial per dispatch on the default harness (`scripts/live_eval_ci.py:117-118`); the expected fingerprint required and checked, exit 4 on a difference (`:254-257`); the checkout hashed before and after the trials (`.github/workflows/live-eval.yml:274-298`); the counting re-judge on a fresh checkout (`:309-346`). The credential test of WF9 is the register block's (gate WF17) |
+| WF17 for the timer | Met, as the council reads it | `council/records/2026-11-19-seat-c-live-refusal.md`, decision 3 (`docs/LIVE_EVAL_EVIDENCE.md:562`); the reach test as a gate before the first trial (`.github/workflows/live-eval.yml:250-253`); seat code as `nirmaan-seat` (M89, ip#342; ip#444, ip#451) |
+| WF10 as amended, and WF24 | Met | sections 1 to 3, 6 and 9 (ip#427), restated by section 18.1 (ip#454) |
+| WF20 | Met | sections 4 to 6 and 10 |
+| WF21 | Met | `tests/test_live_eval_ci.py:667` and `:680`; `tests/test_whole_flow_attempts.py:39`; `docs/HARNESS.md:261` |
+| WF22 | Met | `tests/test_whole_flow_attempts.py:85` |
+| WF23 | See section 19.4 | security confirms section 12 as corrected (section 19.1); ET1 ip#445, ET2 to ET4 ip#444, ET3 record ip#452, ET5 run 45073595509, ET6 ip#454, ET7 section 18.6 and below; ET8 section 19.4 |
+| WF25 | Met | sections 7, 18.1 and 18.2. On `02cfa87f`, CLI 2.1.325, the four fingerprints are the values of section 18.1 (with documents `d90b3c18...`, without `8d6590f7...`; single-seat `0ef27db1...` and `9aa7a333...`) and the other values of section 18.1 are equal |
+| WF26 | Met | section 11 |
+| The measured run of section 10 | Remaining | not dispatched; the last run of `.github/workflows/live-eval.yml` is still replay run 45073595509 |
+| Security's item 1 (section 19.1) | Remaining | after the measured run |
+
+### 19.6 What slot 1 still waits for
+
+The measured run of section 10, dispatched from `main` after this addition merges, with every value of section 18.1
+recomputed on its commit first (section 7); then the pull request of section 19.1, item 1, committing its
+`live-eval` and `rejudge` tool reach records beside the ET3 record; then slot 1, with the values recomputed again on
+its own commit. If a probe of the measured run's `live-eval` job is not denied, that job stops before its trial; if
+a probe of either job is not denied, no slot is dispatched until the cause is fixed and a run records every probe
+denied.

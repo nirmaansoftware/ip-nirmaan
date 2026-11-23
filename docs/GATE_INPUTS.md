@@ -9,8 +9,8 @@ backend) and from the formal, equivalence and timing backends' own checks. A
 refused input is a recorded failed run whose summary says why and ends
 "(refused, nothing ran)"; no step runs and no log is written.
 
-Every check is an allow list: what it does not name is refused, so a tool
-release that adds a way out does not open one here.
+Every check is an allow list: what it does not name is refused. It is
+claimed only for the forms its recorded fixtures name (below, and section 7).
 
 Tests: `tests/test_gate_inputs.py`. Each must-fail test gives a real backend a
 file whose payload would create a marker file in the test's own temporary
@@ -61,8 +61,8 @@ refused `$system`, `$fopen`, `$c` and DPI in every source.
   anywhere else (a link to a file or a folder of the host) is refused by
   the name it is included as, "leads outside the sandbox", and is never
   read (ip#309's follow-up).
-  Strings and comments are skipped, in a file written in forms every tool
-  splits into code, comments and strings the same way (section 7). Which file may end a simulation or read a
+  Strings and comments are skipped, in a file that the rules of section 7
+  do not refuse (not claimed to read as a tool reads). Which file may end a simulation or read a
   plusarg is still the M53 testbench rule's matter. `simulator.run` and
   `test.run` take Verilog sources only.
 - **Yosys scripts** (a `.sby`'s `[script]`, an `.eqy`'s `[gold]`, `[gate]` and
@@ -118,8 +118,8 @@ The 7 refused are `.sby` setups that declare `[tasks]` (`sync_fifo.sby` in
 two trials of run `-4`, `apb_regs.sby` in two of run `-5`, `axi4_lite_regs.sby`
 in runs `-7`, `-8` and `without-knowledge-7`), which `formal.run` already
 refused for the `[tasks]` itself; that reason still comes first. Every `entry`
-is a plain module name, and no seat file used a construct of section 1. So no
-committed trial reached the host through a gate. Anyone can rerun the script
+is a plain module name, and no seat file used a construct of section 1. The
+scan predates section 7 and is not re-run for it. Anyone can rerun the script
 on a later `main`.
 
 ## 4. Code by design
@@ -187,7 +187,7 @@ run, an excerpt of its log (`runtime/files.py`, `excerpt`: the first 20
 notable lines, else the last 20, each cut at 240 characters). Those can name
 the run's own paths (its temporary directory, the tools' install paths), and
 show the content of files in the run: the seat's own and the approved files
-it was given. With the reads refused they carry no other file's content.
+it was given. Of other files' content, nothing is claimed beyond what sections 2 and 7 refuse.
 Redacting paths there would change `harness.CODE` and `harness.LOOP_CODE`, so
 M85 leaves it.
 
@@ -287,7 +287,7 @@ A C source (a firmware driver in `sources`) is checked too. A C character
 literal (`'\0'`, `'"'`) breaks the first two rules, so a file with a suffix Verilator
 compiles as C++ (`.c`, `.cc`, `.cpp`, `.cxx`), with no `$` or `DPI` in it and a
 backtick only around a word, is left to the compiler for those two: it holds
-nothing a Verilog tool acts on to read a file or run anything.
+none of the Verilog forms the other rules refuse.
 
 Tests: `tests/test_gate_inputs.py`, ET1 section. The fixtures are in
 `tests/fixtures/screen_bypass/` as templates, each reaching a canary file
