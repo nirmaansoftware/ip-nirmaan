@@ -1225,3 +1225,145 @@ Run 45135605510 is the replay on `main` after the fix, a replay of `flow/axil-ti
 does not record it, quote its results or read them. Whether ET5 is met, and how the 11 bypass controls of section 21.3
 are read, is for verification-lead and the chair (section 21.4). Section 21.5 stands, with the values of section 22.1
 in place of those of section 21.1.
+
+## 23. Dated addition (2026-11-23): gate ET19, the values ip#475 moved, and gate ET5 stated on run 45159697183
+
+The third addendum to `council/records/2026-11-22-eda-tools-seat-account.md` (decision E5, item 1; gate ET19) asks for
+this addition before the measured run: every value of section 22.1 recomputed on a commit that holds the repair of
+gate ET17, the groups the repair moved recorded, gate ET7 shown, and the record of the replay on that repair named.
+It changes no count, slot, arm, harness, attempt, fingerprint, case or level. It records no trial.
+
+### 23.1 The change, and the values it moved
+
+ip#475 (merge `f8dcc97e`) is the repair of gate ET17: a file a seat's setup names under `[files]` is an input of the
+run, and is read for `formal.cover`, only when it is the run's own. It changes `src/nirmaan/integrations/eda.py`,
+which is in the group "Gate backends", and `scripts/live_eval_seat.py`, which is in the group "Seat account". Those
+two digests moved. No other file of any group changed, and no fingerprint file.
+
+Every value of section 22.1, recomputed with CLI 2.1.325, by the same commands as section 18.1, with
+`~/Nirmaan-internal/2026-10-18-capability-buildout/p3-ip/g3/digests.py`, on `main` at `<MAIN>`. That commit holds
+`f8dcc97e`; every merge after it adds records, their test, an index and history fragments, and no file of any group
+(`git diff --name-only f8dcc97e <MAIN>` names none of the paths of the group table). The same program on `f8dcc97e`
+itself gives the same values.
+
+| Item | Since section 22.1 | Value |
+|---|---|---|
+| Case, `flow/axil-timer`, case digest | unchanged | `sha256:ff8a4afc77caee105070d996f3e29142f2fe013c411752becdc46090b7553da3` |
+| Whole-flow fingerprint, with documents | unchanged | `sha256:d90b3c1840870ae9434b90188dbb3078473140d56b2dec9e295c515c1832adfc` |
+| Whole-flow fingerprint, without documents | unchanged | `sha256:8d6590f7a66ac771abf360790643763e8c43d3c267d94a5145f1e4c8bf3ae975` |
+| Flow digest, with documents | unchanged | `sha256:a1aea0d36022a54be56c8d5c31831ea8ac0994f2802bd8ee8f39f6a5246ec312` |
+| Flow digest, without documents | unchanged | `sha256:b8608edecf2013dddfaec85e947106316f9a561a8ec74c7e3d99a7f53f8323c0` |
+| Single-seat default, with documents (must stay) | unchanged | `sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00` |
+| Single-seat default, without documents (must stay) | unchanged | `sha256:9aa7a333cd961a23aa919616fac6428f9f29fed1ba44b2fa3f5c6ee49e745d39` |
+
+| Group | Paths | Files | Since section 22.1 | Digest |
+|---|---|---|---|---|
+| Gate backends | `src/nirmaan/integrations` | 60 | moved by ip#475 (`f8dcc97e`) from `eac184ec...` | `sha256:7c12db371fe1b51fc6a2888e08c6f64677dcfb47d48411af7a66cb7c40ca5443` |
+| Seat account | `scripts/live_eval_seat.py`, `.github/actions/live-eval-seat` | 2 | moved by ip#475 (`f8dcc97e`) from `1b7309f1...` (which ip#471 set) | `sha256:6530c15123fabd55cdaf7142af49ee7306eea1ef09d7675338c561e42099c93b` |
+| CI command | `scripts/live_eval_ci.py` | 1 | unchanged | `sha256:3f396770975a7fcff4fc746c031e8694f768b921e90376c290e4fc023acf3e88` |
+| Workflow, tool set and CLI pin | `.github/workflows/live-eval.yml`, `.github/actions/live-eval-setup`, `.github/actions/oss-cad-suite`, `.github/live-eval` | 5 | unchanged | `sha256:4daa3c45ea748b0bfa77aad94173aa05341b4dee3e42a6fb61b7c5e467726481` |
+| Reach test | `scripts/live_eval_reach.py` | 1 | unchanged | `sha256:581a4cebb61899090a1741fdbea49e51b57decdebdf0cb11c58562f60b4b93c0` |
+| Held-out scorers | `src/nirmaan/evals/scorers.py` | 1 | unchanged | `sha256:5f4f7909a3207f3837d2af7ad60b85c0bae620e1d461afde57aea0d2a592ecb4` |
+| Stage gates | `src/nirmaan/company/workflows.py` | 1 | unchanged | `sha256:bcd15f8204e55f142f266afdd8e12a4947c7f6276382dd18f4c9893e616a9873` |
+
+From this addition on, every check of sections 4 and 7 is made against these two tables, which replace those of
+section 22.1. Sections 18.1, 21.1 and 22.1 keep their values as the record of what moved.
+
+### 23.2 Gate ET7, shown
+
+Section 22.1 shows gate ET7 for ip#471 (merge `a15b8c1d`). Two merges came after it that the gate names:
+
+- ip#466 (merge `6750a127`): `git diff --name-only a15b8c1d 6750a127` names `docs/REVIEW_MECHANISM.md`, a history
+  fragment, `scripts/pr_loop.py`, `scripts/pr_review.py` and `tests/test_fast_lane.py`. It names no file of any group
+  of section 23.1, no file in `harness.CODE`, `LOOP_CODE` or `FLOW_CODE`, no tool definition
+  (`src/nirmaan/company/tools.py`) and not the CLI pin (`.github/live-eval/package.json`).
+- ip#475 (merge `f8dcc97e`): `git diff --name-only 2bc0b569 f8dcc97e` (its merge's first parent, and the merge) names
+  `docs/GATE_INPUTS.md`, `docs/LIVE_EVAL_EVIDENCE.md`, a history fragment, `scripts/live_eval_seat.py`,
+  `src/nirmaan/integrations/eda.py` and `tests/test_gate_reads.py`. It names no file in `harness.CODE`, `LOOP_CODE`
+  or `FLOW_CODE`, no tool definition and not the CLI pin.
+
+These tests pass on `f8dcc97e`: `tests/test_whole_flow_dispatch.py` (gate WF7),
+`tests/test_live_eval_seat.py::test_the_tools_as_the_seat_account_change_no_fingerprint` and
+`tests/test_gate_inputs.py::test_no_file_this_milestone_changes_is_harness_code`. The four fingerprints of section
+23.1 (the two whole-flow fingerprints and the two single-seat defaults) are the values of section 18.1, unchanged on
+`f8dcc97e` and on `<MAIN>`. Gate ET7's last part, every value recomputed on the dispatch commit, is for the dispatch:
+it is not shown here.
+
+### 23.3 The record of run 45159697183 (gate ET18)
+
+Run [45159697183](https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45159697183) is a replay of
+`flow/axil-timer` with `controls` set, dispatched on `main` at `f8dcc97e` with no model and no token. Its `live-eval`
+job was skipped. In its `replay` job, as in its `rejudge` job, the reach test denied every probe. The reference
+answer's replay passed; the controls step failed, because 13 bypass controls failed as the seat account. Its
+`rejudge` job of attempt 1 stopped in its tool install and was cancelled; that job alone was run again as attempt 2
+on the same commit and the same uploaded records, and passed.
+
+Its uploads are committed as uploaded, byte for byte, by a chain of three pull requests that the review reads whole:
+ip#477 (part A, the six files of the controls upload, an index and a test), ip#<A2> (part A2, `fixtures.xml`,
+`fixtures.log` and the two tool reach records) and ip#<B> (part B, `evals/flow/et5_controls_record_45159697183.json`
+and the test of decision E4, item 3, in `tests/test_live_eval_controls.py`). The record reads each bypass control by
+decision E2 of the third addendum. `evals/flow/et5_controls_record.json` (run 45119522138) and its test are
+unchanged, and run 45135605510's records are cited, as the addendum says, as what showed the finding and never as
+showing ET5 met.
+
+The reach test's part, in the words of decision C of the second addendum and no wider: in run 45159697183,
+dispatched on `main` at `f8dcc97e`, in its `replay` and `rejudge` jobs, the listed probes were denied to
+`nirmaan-seat` through the named tools. It is not a reach record of the measured run or of a slot, and it covers no
+other run and no other commit.
+
+### 23.4 Section 21.3, one sentence withdrawn
+
+Section 21.3 says that, run as the account, the tool in each of the 11 bypass controls "did not reach the payload's
+target outside the run's view". The committed records do not show which layer refused, and no text may say it
+(decision E1, item 4). The sentence is withdrawn. What the records show is what security stated and the council
+adopted (decision E1): in each of those controls the tool ran through the seat account's wrapper; in two, the payload
+itself ran (`touch`) and its write was refused; in the other nine the tool tried to open or write its target and
+printed that it could not. For the two `verilator --lint-only` forms the tool's line says that the reference could not
+be resolved, which is an inference that the refusal was of an open (decision E1, item 3). Section 21.3's other
+statements stand. Run 45159697183's record reads its 13 by the same rule (section 23.5).
+
+### 23.5 Gate ET5, stated on this record (verification-lead)
+
+Verification-lead, the gate's owner, read the head of part B (`29aaacaa`) as a read-only process of its own
+(`council/verification-lead.md`). A seat's read is not a council ruling. Its statement:
+
+> ET5: met on run 45159697183 at f8dcc97e. Every failed control is a bypass control refused as the seat account,
+> shown by the tool's own line; no account control's record holds target content; and the pinned values on the commit
+> the measured run is dispatched from must equal f8dcc97e's.
+
+The statement holds on one condition, which is decision E4, item 4: the values of the tables of section 23.1 on the
+commit the measured run is dispatched from equal those on `f8dcc97e`, or are restated in a dated addition before the
+dispatch. If a pinned group moves after it, ET5 is open again. Section 23.1 shows the values on `f8dcc97e` and on
+`<MAIN>` equal; the dispatch check of section 7 holds the dispatch commit to them.
+
+What the statement rests on, as the committed test holds it: controls 7 of 7 and all 100 sweep rows; 408 fixture tests,
+none skipped, with the linked setup and every must-refuse fixture passed; every probe denied in both jobs, on the run's
+commit; for each failed control, the seat account's wrapper and the tool's own line for its cause, and no target
+content in any account control's record. Decision E2, items 3 and 4, apply: the controls that ran as the caller are
+listed and claimed for nothing, and a control that passed as the account is not read as showing a live payload or a
+refusal. The reference answer's pass rests on the step result GitHub reported; no replay result file is committed.
+
+### 23.6 The order, and gate ET20
+
+The order of the addendum is taken up: gate ET17 (ip#475) is on `main`; gate ET18 is this record and verification-
+lead's statement; this addition and the texts of decision E5, item 2 (`docs/LIVE_EVAL_EVIDENCE.md`, which cites the
+record, and a history fragment) are gate ET19; the measured run is dispatched after the last of them.
+
+`--verilate-jobs 1` (gate ET20, decision V1) changes `src/nirmaan/integrations`, so it moves "Gate backends". It must
+not merge before the timer's last trial is recorded (gate WF25), and the re-measure plan's addition restates the moved
+digest before that batch's trial 1. This addition does not wait for it and does not record it as done.
+
+### 23.7 What slot 1 still waits for
+
+Section 22.2's reading stands, with section 23.1's values in place of section 22.1's, and sections 21.5 and 20.7 stand
+with these changes: the record of gate ET5 is the one of section 23.3 and ET5 is stated met on it (section 23.5), on
+the condition above. Still before slot 1:
+
+- the measured run of section 10, dispatched only after this merge and with every value of section 23.1 recomputed on
+  its commit (section 7);
+- the chain of gate ET10: the measured run's tool reach records and seat C reach records committed as uploaded, with
+  the index, on a commit that holds all of it;
+- gate ET16's test of decision R3, item 5, on `main`, holding at every commit after it;
+- the values of section 23.1 on the dispatch commit equal to these, or restated first.
+
+The measured run's records and the texts that cite them follow decision C of the second addendum (gate ET13).

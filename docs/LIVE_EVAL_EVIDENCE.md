@@ -346,14 +346,37 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   and first failure. Of the 402 fixture tests, 390 passed and 12 failed,
   none skipped, so the `replay` job failed at that step. Every must-refuse
   fixture passed. The 12 are 11 bypass controls and one must-pass test. In
-  each bypass control, with the screen bypassed, the payload did not reach
-  its target outside the run's view. The must-pass test is a formal setup
+  each bypass control, with the screen bypassed, the tool ran through the
+  account's wrapper and printed that it could not open or write its target
+  (security's statement, decision E1 of the third addendum; which layer
+  refused is not in the record). The must-pass test is a formal setup
   over an approved file linked beside it, which did not run as the account.
   The record lists each with its message. The same run's replay passed, its
   re-judge was the same, and its reach test denied every probe in both
   jobs. Whether gate ET5 is met is verification-lead's statement, which the
   record does not make. Verification-lead read the record and stated ET5 not
   met (plan section 21.4).
+- **Gate ET5 stated on run 45159697183** (gate ET18 of the third addendum). A
+  replay of `flow/axil-timer` with `controls` set, no model and no token,
+  was dispatched on `main` at f8dcc97e (the merge of ip#475, which holds gate
+  ET17), as [run 45159697183](https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45159697183).
+  Its replay passed the reference answer and its reach test denied every
+  probe in its `replay` and `rejudge` jobs. As the account, all seven timer
+  controls and all 100 sweep rows gave the results of the committed records;
+  the controls step failed because 13 bypass controls of gate ET1 failed. The
+  committed record, `evals/flow/et5_controls_record_45159697183.json`, reads
+  each by decision E2 of the third addendum: the tool ran through the
+  account's wrapper and the tool's own line names the target it could not
+  open, resolve or write, and no account control's record holds the target's
+  content. The controls that ran as the caller are listed and claimed for
+  nothing. The run's uploads, and its tool reach records, are committed as
+  uploaded in `docs/evidence/et5/run-45159697183`, and
+  `tests/test_live_eval_controls.py` holds the record to them. The record
+  does not say ET5 is met; verification-lead stated ET5 met on this run at
+  f8dcc97e on the condition that the pinned values on the commit the measured
+  run is dispatched from equal f8dcc97e's (plan section 23.5). This is a
+  replay, not a reach record of the measured run or of a slot, and it covers
+  no other run or commit. The record of run 45119522138 above is unchanged.
 - **The tools that read seat Verilog run as the account too** (gates ET2 to
   ET4 of `council/records/2026-11-22-eda-tools-seat-account.md`). The input
   screen (`eda_guard`) reads seat files with patterns of its own, and the
