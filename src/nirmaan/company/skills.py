@@ -523,7 +523,16 @@ SKILLS: list[Skill] = [
        provides=("debug.root_cause", "debug.review"), includes=("debugging",), packs=("uvm", "sva"),
        tools=("veritriage.investigate", "simulator.run"),
        docs=("verification/root_cause_analysis",),
-       procedures=("Rank competing hypotheses.", "Name the evidence that would refute each."),
+       procedures=("Rank competing hypotheses.", "Name the evidence that would refute each.",
+                   # M71 granted simulator.run for the repro gate; the gate reads the M53 verdict
+                   # (docs/REPRO_GATES.md, docs/GATE_INTEGRITY.md), so the card names it, as the failure_triage
+                   # and rtl_design cards do.
+                   "Write the repro as a self-checking testbench that counts its checks, and end it with its "
+                   "verdict, printed once just before $finish: read the run's nonce with "
+                   "$value$plusargs(\"nirmaan_nonce=%s\", nonce) into a reg [8*64-1:0], then "
+                   "$display(\"NIRMAAN-SIM %0s %0d passed, %0d failed\", nonce, passed, failed). The repro gate "
+                   "(simulator.run with expect=fail) counts a run only when it builds, reaches $finish, and prints "
+                   "that one verdict with the run's nonce and at least one failed check."),
        fails=("Single-hypothesis tunnel vision.",),
        valid=("The conclusion names its evidence and the alternatives it rejects.",)),
     sk("regression_intelligence", "Regression intelligence", "verification", "debug", provides=("debug.triage",),
