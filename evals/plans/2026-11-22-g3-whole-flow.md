@@ -882,7 +882,7 @@ show a later change; they do not prove what GitHub served (decision R1, item 3).
 trial.
 
 **The measured run (gate ET10).** In `evals/flow/tool_reach_measured_run/<artifact name>/<file>`, the four uploaded
-files, and beside the ET3 record `evals/flow/tool_reach_measured_run.json`, the index (format `nirmaan.tool-reach-measured-run/2`). The index names the
+files, and beside the ET3 record `evals/flow/tool_reach_measured_run.json`, the index (format `nirmaan.tool-reach-measured-run/2`). It has an `about` in the words of 20.5, and names the
 run, its attempt, the commit and the purpose `calibration`; the values of section 18.1 on that commit; the artifacts the
 run did not upload, as `missing`; for each job the conclusion of its reach step (`reach_step`), the lines the first part
 printed (its `REACH` lines and its closing `reach test:` line,
@@ -896,16 +896,17 @@ texts of 20.5, or the texts in a pull request after them if these do not fit one
 the gate ET10 file.
 
 **The measured run's own trial record** is not committed anywhere in the repository: not under `evals/results`, not
-under `evals/flow`. It is left as a workflow artifact of the run the index names, and no retention period is set for it (second addendum,
-fact S6); the committed index names the run, so the run is on record. Verification-lead gave this position as a read-only process of its own
+under `evals/flow`. It is left as a workflow artifact of the run the index names, and no retention period is set for it
+(`.github/workflows/live-eval.yml:304-306` sets no `retention-days`; second addendum, fact S6, finds the same for the reach
+artifacts); the committed index names the run, so the run is on record. Verification-lead gave this position as a read-only process of its own
 (`council/verification-lead.md`), and the plan adopts it for three reasons. Section 10 keeps every time, usage and cost
 figure of that run out of every record, and a trial carries its start and duration. Under `evals/results` the levels
 would list it as a whole-flow trial with its outcome and the failure-to-curriculum reader would take its failures, and
 decision C forbids stating anything of its trial's outcome. And `tests/test_whole_flow.py` (the check of
-`SLOT_RECORD`) refuses a whole-flow record outside a slot folder, which the measured run is not. Section 8's "committed,
-none held out" governs the trials of the forty; the measured run is none of them (section 10). Verification-lead's
-open point also asked that a calibration record in a slot folder be refused; the test of 20.3 holds that, by an
-assertion in `_check_record_structure`, which needs no change to any file of a pinned group.
+`SLOT_RECORD`) refuses a whole-flow record outside a slot folder, which the measured run is not. Section 8's "committed as
+failed, never held out" and section 3's "none held out" govern the trials of the forty; the measured run is none of them (section 10). Verification-lead's
+open point also asked that a calibration record in a slot folder be refused; the test of 20.3 is to hold that, by an
+assertion added to `_check_record_structure` in `tests/test_whole_flow.py`, which needs no change to any file of a pinned group.
 
 **A slot (gate ET11).** For each run of the slot, `evals/results/g3-timer/slot-NN/reach/<run id>/` holds the run's
 uploaded files, each at `<artifact name>/<file name>` (`live-eval-tool-reach-trials-<run id>`,
@@ -914,7 +915,7 @@ and `reach-index.json` (format `nirmaan.slot-reach-index/1`). The index names it
 its attempt and its commit; each file in `files` with its `sha256` (written `sha256:<hex>`); each of the four artifacts
 the run did not upload, by name, in `missing` (a probe not denied); `recorded`, whether this run wrote the slot's
 record; `reach_held`, which the runner states from the records (true only if every probe was denied in both jobs, or in the
-`live-eval` job only for an unjudged record; the test reads the records themselves); and, if the run wrote no record, `no_record_cause`, in words: the job whose reach gate failed, or the job-level
+`live-eval` job only for an unjudged record; the test reads the records, not this field); and, if the run wrote no record, `no_record_cause`, in words: the job whose reach gate failed, or the job-level
 stop and its exit code. The folder sits beside `<record name>/` of section 15 and never inside it, so the record stays the re-judged
 record as the job wrote it. Every run of a slot has its folder, none held out: the run that wrote the record, a run whose
 reach gate failed, and a run that stopped at job level for any other cause.
