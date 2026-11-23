@@ -913,8 +913,8 @@ def test_dry_run_posts_never_green_dry_run_statuses(repo):
 def test_lock_is_shared_and_a_dead_holder_is_cleared(repo):
     r = repo()
     held = [pr_review.acquire_lock(r.state, {"repo": "nirmaansoftware/Nirmaan", "pr": 9}, name=name)[0]
-            for name in ("review.lock", "model-slot-1.lock")]
-    assert r.run()["exit"] == pr_review.EXIT_BUSY, "every model slot (cap 2) held elsewhere"
+            for name in ("review.lock", "model-slot-1.lock", "model-slot-2.lock")]
+    assert r.run()["exit"] == pr_review.EXIT_BUSY, "every model slot (cap 3) held elsewhere"
     assert r.calls() == []
     for release in held:
         release()
