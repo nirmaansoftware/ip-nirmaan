@@ -9,8 +9,10 @@ is in no default case set and never runs as a single-seat case; and a whole-flow
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
+import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -94,7 +96,11 @@ def _check_record_structure(root: Path, folder: Path) -> None:
         return
     assert SLOT_RECORD.fullmatch(where), f"{where}: a whole-flow record belongs in g3-timer/slot-NN/<record name>"
     assert record.trials, where
+    # The measured run (purpose calibration) is outside the forty and its record is committed nowhere, so a slot
+    # folder holds evidence records only (plan, dated addition of 2026-11-23).
+    assert record.manifest.purpose == "evidence", f"{where}: a slot folder holds no calibration record"
     for trial in record.trials:
+        assert trial.purpose == "evidence", f"{where} trial {trial.trial}: a slot folder holds no calibration record"
         assert trial.flow == "whole" and trial.stages and trial.flow_digest, f"{where} trial {trial.trial}"
         assert all(isinstance(stage, EvalStage) for stage in trial.stages), where
 
@@ -129,6 +135,13 @@ def test_a_nested_slot_record_is_read_as_a_whole_flow_record_and_a_misplaced_or_
         _check_record_structure(tmp_path, write("g3-timer/slot-03/m", _manifest("whole"), _trial("whole")))
     with pytest.raises(AssertionError):  # the manifest says whole but the trial does not: both must say so
         _check_record_structure(tmp_path, write("g3-timer/slot-04/m", _manifest("whole"), _trial()))
+    calibration = _trial("whole", stages=(stage,), flow_digest="sha256:f", purpose="calibration")
+    with pytest.raises(AssertionError, match="no calibration record"):  # the measured run is no slot
+        _check_record_structure(tmp_path, write("g3-timer/slot-05/m", _manifest("whole"), calibration))
+    with pytest.raises(AssertionError, match="no calibration record"):
+        _check_record_structure(tmp_path, write("g3-timer/slot-06/m",
+                                                _manifest("whole").model_copy(update={"purpose": "calibration"}),
+                                                whole_trial))
     _check_record_structure(tmp_path, write("seat-run", _manifest(), _trial()))  # a single-seat record is as before
     with pytest.raises(AssertionError):  # a single-seat record may not carry whole-flow detail
         _check_record_structure(tmp_path, write("seat-run-2", _manifest(), _trial(flow_digest="sha256:f")))
@@ -145,6 +158,296 @@ def test_the_label_reader_and_the_list_are_outside_the_harness_code():
     for rel in ("nirmaan/models/evaluation.py", "nirmaan/evals/records.py", "nirmaan/evals/levels.py",
                 "nirmaan/evals/cases.py"):
         assert rel not in harness.CODE
+
+
+# --- The reach folders of the timer's slots (gate ET16) ---------------------------------------------------------
+#
+# Each run of a slot has a folder `g3-timer/slot-NN/reach/<run id>/`: the files its jobs uploaded, byte for byte, each
+# at `<artifact name>/<file name>`, and `reach-index.json`. The folder sits beside the slot's `<record name>/` and
+# never inside it (council record 2026-11-22-eda-tools-seat-account.md, addenda, decisions A1, R1 and R3). The index
+# names its `format`, `slot` (the number), `run`, `attempt` and `commit`; `files` (each `path` and `sha256`, the digest
+# written `sha256:<hex>`); `missing` (the name of each of the four artifacts the run did not upload); `recorded` (whether
+# this run wrote the slot's record); `reach_held` (true only if every probe was denied in both jobs, or in `live-eval`
+# only for an unjudged record); and `no_record_cause`, the words that say why a run that wrote no record wrote none.
+
+SLOT_FOLDER = re.compile(r"slot-(\d{2})")
+REACH_ARTIFACT = re.compile(r"live-eval-(tool|fw)-reach-(trials|rejudge)-(\d+)")
+INDEX = "reach-index.json"
+INDEX_FORMAT = "nirmaan.slot-reach-index/1"
+JOB = {"trials": "live-eval", "rejudge": "rejudge"}
+REACH_FILE = {"tool": "tool-reach.json", "fw": "fw-reach.json"}
+ARTIFACTS = tuple(f"live-eval-{kind}-reach-{job}" for job in ("trials", "rejudge") for kind in ("tool", "fw"))
+SHA256 = "sha256:"
+
+
+def _json_object(path: Path, where: str) -> dict:
+    """A reach file is UTF-8 text that is a JSON object with a ``format`` field (what the case loader skips too)."""
+    try:
+        data = json.loads(path.read_bytes().decode("utf-8"))
+    except (OSError, ValueError) as error:
+        raise AssertionError(f"{where}: not UTF-8 JSON text ({error})") from error
+    assert isinstance(data, dict) and "format" in data, f"{where}: not a JSON object with a format field"
+    return data
+
+
+def _check_run_folder(folder: Path, slot: str, root: Path) -> tuple[dict, dict[str, dict]]:
+    """One run's folder: only what the index names, every digest equal, every record naming the run and commit.
+    Returns the index and the loaded files by path."""
+    where = folder.relative_to(root).as_posix()
+    assert folder.is_dir() and folder.name.isdigit(), f"{where}: a run folder is named by the run id"
+    for path in folder.rglob("*"):
+        assert path.name not in ("manifest.json", "causes.md") and not path.name.startswith("trial-"), (
+            f"{where}: {path.relative_to(folder).as_posix()} takes a record's file name")
+    index = _json_object(folder / INDEX, f"{where}/{INDEX}")
+    assert index.get("format") == INDEX_FORMAT, f"{where}: the index's format is not {INDEX_FORMAT}"
+    assert (f"slot-{index.get('slot')!s:0>2}", str(index.get("run"))) == (slot, folder.name), (
+        f"{where}: the index names another slot or run")
+    assert index.get("commit") and index.get("attempt"), f"{where}: the index names no commit or attempt"
+    listed = {f.get("path"): f.get("sha256") for f in index.get("files", ())}
+    actual = {p.relative_to(folder).as_posix() for p in folder.rglob("*") if p.is_file() and p.name != INDEX}
+    assert set(listed) == actual and len(listed) == len(index.get("files", ())), (
+        f"{where}: the index names {sorted(listed)}, the folder holds {sorted(actual)}")
+    loaded: dict[str, dict] = {}
+    seen = set()
+    for rel, digest in sorted(listed.items()):
+        artifact, _, name = rel.partition("/")
+        match = REACH_ARTIFACT.fullmatch(artifact)
+        assert match and match.group(3) == folder.name and "/" not in name and name == REACH_FILE[match.group(1)], (
+            f"{where}: {rel} is not an uploaded reach file of run {folder.name}")
+        assert SHA256 + hashlib.sha256((folder / rel).read_bytes()).hexdigest() == digest, f"{where}: {rel} differs from its digest"
+        data = loaded[rel] = _json_object(folder / rel, f"{where}/{rel}")
+        kind, job = match.group(1), match.group(2)
+        seen.add(artifact.rsplit("-", 1)[0])
+        if kind == "tool":
+            ids = (str(data.get("run_id")), data.get("job"), data.get("commit"))
+        else:
+            run = data.get("run") or {}
+            ids = (str(run.get("id")), run.get("job"), data.get("head"))
+        assert ids == (folder.name, JOB[job], index["commit"]), f"{where}: {rel} names {ids}, not this run, job and commit"
+    missing = {m.rsplit("-", 1)[0] for m in index.get("missing", ())}
+    assert all(m == f"{m.rsplit('-', 1)[0]}-{folder.name}" for m in index.get("missing", ())), (
+        f"{where}: a missing artifact is named with this run's id")
+    assert missing <= set(ARTIFACTS) and not missing & seen and missing | seen == set(ARTIFACTS), (
+        f"{where}: each of the four artifacts is in the folder or in missing, and not both")
+    assert isinstance(index.get("recorded"), bool), f"{where}: recorded is not stated"
+    assert isinstance(index.get("reach_held"), bool), f"{where}: reach_held is not stated"
+    if not index["recorded"]:
+        assert isinstance(index.get("no_record_cause"), str) and index["no_record_cause"].strip(), (
+            f"{where}: a run that wrote no record states why")
+    return index, loaded
+
+
+def _denied(index: dict, loaded: dict[str, dict], job: str) -> bool:
+    """Every probe of the run's tool reach record of this job denied; a missing record counts as not denied."""
+    data = loaded.get(f"live-eval-tool-reach-{job}-{index['run']}/tool-reach.json")
+    probes = (data or {}).get("probes")
+    return bool(probes) and data.get("every_denied") is True and all(
+        isinstance(p, dict) and p.get("denied") is True for p in probes)
+
+
+def _check_slot_reach(slot: Path, root: Path) -> bool:
+    """One slot folder; returns whether it holds a record."""
+    where = slot.relative_to(root).as_posix()
+    reach = slot / "reach"
+    assert reach.is_dir(), f"{where}: the slot's reach records are not committed (reach/ is missing)"
+    assert not [p for p in slot.iterdir() if p.is_file()], f"{where}: only folders sit in a slot folder"
+    records = sorted(p.parent for p in slot.rglob("manifest.json") if reach not in p.parents)
+    assert len(records) <= 1, f"{where}: a slot holds one record, found {len(records)}"
+    assert [p.name for p in slot.iterdir()] == sorted({"reach", *(r.name for r in records)}), (
+        f"{where}: a slot folder holds reach/ and its record, nothing else")
+    runs = {}
+    for folder in sorted(reach.iterdir()):
+        runs[folder.name] = _check_run_folder(folder, slot.name, root)
+    assert runs, f"{where}: reach/ holds no run"
+    wrote = [name for name, (index, _) in runs.items() if index["recorded"]]
+    if not records:  # a slot whose record is still to come: at most one run says it will write it
+        assert len(wrote) <= 1, f"{where}: more than one run says it wrote the slot's record"
+        return False
+    manifest = json.loads((records[0] / "manifest.json").read_text(encoding="utf-8"))
+    head = manifest.get("head_sha")
+    assert head, f"{where}: the record's manifest names no head_sha"
+    assert len(wrote) == 1, f"{where}: exactly one run folder says it wrote the record, found {len(wrote)}"
+    index, loaded = runs[wrote[0]]
+    assert index["commit"] == head, f"{where}: the recording run is on {index['commit']}, the record on {head}"
+    assert index["reach_held"] is True, f"{where}: the recording run's index does not say its reach held"
+    assert _denied(index, loaded, "trials"), f"{where}: a probe of run {wrote[0]}, job live-eval, was not denied"
+    if (records[0] / "rejudge.json").exists():
+        assert _denied(index, loaded, "rejudge"), f"{where}: a probe of run {wrote[0]}, job rejudge, was not denied"
+    return True
+
+
+def _check_slots_reach(root: Path) -> None:
+    folders = sorted(root.glob("g3-timer/*"))
+    numbered = {}
+    for slot in folders:
+        match = SLOT_FOLDER.fullmatch(slot.name)
+        assert slot.is_dir() and match, f"{slot.relative_to(root)}: not a slot folder"
+        numbered[int(match.group(1))] = _check_slot_reach(slot, root)
+    with_record = sorted(n for n, has in numbered.items() if has)
+    assert with_record == list(range(1, len(with_record) + 1)), "the slots with a record run from 01 with none missing"
+    without = sorted(n for n, has in numbered.items() if not has)
+    assert without in ([], [len(with_record) + 1]), (
+        "only the highest slot folder may hold reach records and no record")
+
+
+def test_every_committed_timer_slot_has_its_reach_folders_and_its_record_on_their_commit():
+    # With no slot folder yet this passes, and the fixture tests below show the checks bite once one exists.
+    _check_slots_reach(EVALS / "results")
+
+
+SHA = "a" * 40
+
+
+def _put(folder: Path, rel: str, data: dict) -> None:
+    path = folder / rel
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+
+def _reindex(folder: Path, **change) -> None:
+    """Rewrite a run folder's index from what the folder holds (the digests), with the given fields changed."""
+    index = json.loads((folder / INDEX).read_text(encoding="utf-8"))
+    files = sorted(p.relative_to(folder).as_posix() for p in folder.rglob("*") if p.is_file() and p.name != INDEX)
+    index["files"] = [{"path": rel, "sha256": SHA256 + hashlib.sha256((folder / rel).read_bytes()).hexdigest()} for rel in files]
+    index.update(change)
+    (folder / INDEX).write_text(json.dumps(index, indent=2) + "\n", encoding="utf-8")
+
+
+def _run(slot: Path, run: str, *, wrote: bool, jobs=("trials", "rejudge"), head: str = SHA, cause: str | None = None) -> Path:
+    """A synthetic run folder: the reach files the given jobs uploaded, and its index."""
+    folder = slot / "reach" / run
+    for job in jobs:
+        tool = {"format": "nirmaan.tool-reach", "every_denied": True, "commit": head, "run_id": run,
+                "run_attempt": "1", "job": JOB[job], "probes": [{"tool": "vvp", "denied": True}]}
+        fw = {"format": "nirmaan.fw-reach/1", "head": head, "run": {"id": run, "attempt": "1", "job": JOB[job]}}
+        _put(folder, f"live-eval-tool-reach-{job}-{run}/tool-reach.json", tool)
+        _put(folder, f"live-eval-fw-reach-{job}-{run}/fw-reach.json", fw)
+    missing = [f"{a}-{run}" for a in ARTIFACTS if a.rsplit("-", 1)[1] not in jobs]
+    index = {"format": INDEX_FORMAT, "slot": int(slot.name[-2:]), "run": run, "attempt": "1", "commit": head,
+             "files": [], "missing": missing, "recorded": wrote, "reach_held": True,
+             "no_record_cause": None if wrote else cause}
+    (folder / INDEX).write_text(json.dumps(index), encoding="utf-8")
+    _reindex(folder)
+    return folder
+
+
+def _slot(tmp_path: Path, n: int = 1, *, record: bool = True, rejudged: bool = True, head: str = SHA) -> Path:
+    """A synthetic slot folder with one recording run (111) and, if asked, its record."""
+    slot = tmp_path / "g3-timer" / f"slot-{n:02d}"
+    if record:
+        folder = slot / "2026-11-23-claude-code-m"
+        folder.mkdir(parents=True)
+        (folder / "manifest.json").write_text(json.dumps({"id": "r", "head_sha": head}), encoding="utf-8")
+        if rejudged:
+            (folder / "rejudge.json").write_text("{}", encoding="utf-8")
+    _run(slot, "111", wrote=True, jobs=("trials", "rejudge") if rejudged else ("trials",), head=head)
+    return slot
+
+
+def _edit(folder: Path, rel: str, change) -> None:
+    data = json.loads((folder / rel).read_text(encoding="utf-8"))
+    change(data)
+    (folder / rel).write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    _reindex(folder)
+
+
+def test_slots_whose_reach_folders_hold_every_check_pass(tmp_path):
+    _check_slots_reach(tmp_path)  # no g3-timer folder at all: an empty set passes
+    one = _slot(tmp_path, 1)
+    # A failed gate's run (no record, its cause stated) is kept beside the run that recorded the slot.
+    _run(one, "90", wrote=False, jobs=("trials",), cause="the live-eval job's reach gate failed")
+    _slot(tmp_path, 2, rejudged=False)  # an unjudged record: the rejudge job's probes are not asked for
+    _check_slots_reach(tmp_path)
+    # The highest slot may hold reach records and no record yet, or only a run that wrote none.
+    _slot(tmp_path, 3, record=False)
+    _check_slots_reach(tmp_path)
+    shutil.rmtree(tmp_path / "g3-timer" / "slot-03")
+    _run(tmp_path / "g3-timer" / "slot-03", "95", wrote=False, jobs=("trials",), cause="exit 4, a fingerprint mismatch")
+    _check_slots_reach(tmp_path)
+
+
+@pytest.mark.parametrize("what, match", [
+    ("no reach folder", "reach/ is missing"),
+    ("a probe not denied in live-eval", "job live-eval, was not denied"),
+    ("a probe not denied in rejudge", "job rejudge, was not denied"),
+    ("no probes", "was not denied"),
+    ("the live-eval tool record missing", "was not denied"),
+    ("the rejudge tool record missing", "each of the four artifacts"),
+    ("a digest that differs", "differs from its digest"),
+    ("a file the index does not name", "the index names"),
+    ("a record on another commit", "not this run, job and commit"),
+    ("a seat C record on another run", "not this run, job and commit"),
+    ("the recording run on another commit than the manifest", "the record on"),
+    ("a manifest with no head_sha", "names no head_sha"),
+    ("a reach file named manifest.json", "takes a record's file name"),
+    ("a reach file that is not UTF-8 JSON", "not UTF-8 JSON text"),
+    ("a reach file with no format field", "not a JSON object with a format field"),
+    ("a run that wrote no record and states no cause", "states why"),
+    ("the recording run's reach not held", "does not say its reach held"),
+    ("two runs that wrote the record", "exactly one run folder says it wrote"),
+    ("no run that wrote the record", "exactly one run folder says it wrote"),
+    ("an index of another run", "names another slot or run"),
+    ("a slot folder missing before a later one", "run from 01 with none missing"),
+    ("a slot without a record that is not the highest", "only the highest slot folder"),
+    ("a file in a slot folder", "only folders sit"),
+])
+def test_a_timer_slot_whose_reach_folders_fail_a_check_is_refused(tmp_path, what, match):
+    slot = _slot(tmp_path)
+    run = slot / "reach" / "111"
+    tool_live, tool_rej = "live-eval-tool-reach-trials-111/tool-reach.json", "live-eval-tool-reach-rejudge-111/tool-reach.json"
+    if what == "no reach folder":
+        shutil.rmtree(slot / "reach")
+    elif what == "a probe not denied in live-eval":
+        _edit(run, tool_live, lambda d: d["probes"].append({"tool": "vvp", "denied": False}))
+    elif what == "a probe not denied in rejudge":
+        _edit(run, tool_rej, lambda d: d.update(every_denied=False))
+    elif what == "no probes":
+        _edit(run, tool_live, lambda d: d.update(probes=[]))
+    elif what == "the live-eval tool record missing":
+        (run / tool_live).unlink()
+        shutil.rmtree(run / "live-eval-tool-reach-trials-111")
+        _reindex(run, missing=["live-eval-tool-reach-trials-111"])
+    elif what == "the rejudge tool record missing":
+        shutil.rmtree(run / "live-eval-tool-reach-rejudge-111")
+        _reindex(run)
+    elif what == "a digest that differs":
+        (run / tool_live).write_text((run / tool_live).read_text(encoding="utf-8") + "\n", encoding="utf-8")
+    elif what == "a file the index does not name":
+        (run / "extra.json").write_text('{"format": "x"}', encoding="utf-8")
+    elif what == "a record on another commit":
+        _edit(run, tool_rej, lambda d: d.update(commit="b" * 40))
+    elif what == "a seat C record on another run":
+        _edit(run, "live-eval-fw-reach-trials-111/fw-reach.json", lambda d: d["run"].update(id="999"))
+    elif what == "the recording run on another commit than the manifest":
+        (slot / "2026-11-23-claude-code-m" / "manifest.json").write_text(json.dumps({"head_sha": "c" * 40}), encoding="utf-8")
+    elif what == "a manifest with no head_sha":
+        (slot / "2026-11-23-claude-code-m" / "manifest.json").write_text("{}", encoding="utf-8")
+    elif what == "a reach file named manifest.json":
+        (run / "live-eval-tool-reach-trials-111" / "manifest.json").write_text("{}", encoding="utf-8")
+    elif what == "a reach file that is not UTF-8 JSON":
+        (run / tool_live).write_bytes(b"\xff\xfe\x00")
+        _reindex(run)
+    elif what == "a reach file with no format field":
+        _edit(run, tool_live, lambda d: d.pop("format"))
+    elif what == "a run that wrote no record and states no cause":
+        _run(slot, "90", wrote=False, jobs=("trials",), cause=None)
+    elif what == "the recording run's reach not held":
+        _reindex(run, reach_held=False)
+    elif what == "two runs that wrote the record":
+        _run(slot, "222", wrote=True)
+    elif what == "no run that wrote the record":
+        _reindex(run, recorded=False, no_record_cause="none")
+    elif what == "an index of another run":
+        _reindex(run, run="222")
+    elif what == "a slot folder missing before a later one":
+        _slot(tmp_path, 3)
+    elif what == "a slot without a record that is not the highest":
+        _slot(tmp_path, 2, record=False)
+        _slot(tmp_path, 3, record=False)
+    elif what == "a file in a slot folder":
+        (slot / "notes.txt").write_text("x", encoding="utf-8")
+    with pytest.raises(AssertionError, match=match):
+        _check_slots_reach(tmp_path)
 
 
 # --- Default case sets never hold a whole-flow case -----------------------------------------------------------
