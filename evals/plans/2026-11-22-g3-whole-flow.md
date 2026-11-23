@@ -504,7 +504,7 @@ this one differ, this one rules.
 
 ### 18.1 The timer's values, restated (section 6)
 
-Recomputed on `main` at `<HEAD>` (the commit this pull request was last merged with; this file touches none of the
+Recomputed on `main` at `817cc0d6` (the commit this pull request was last merged with; this file touches none of the
 files below), CLI 2.1.325: the fingerprints with `harness_sha256(flow="whole", ...)` and the single-seat ones with
 `harness_sha256(...)`, each with the knowledge flag of its arm; the case digest with `case_digest`; the flow digests
 as a replay computes them before any stage runs (the skills each seated stage is given, and their digests); the group
@@ -525,13 +525,13 @@ The gate code groups. The first four are section 6's; the last three are pinned 
 
 | Group | Paths | Files | Moved by | Digest |
 |---|---|---|---|---|
-| Gate backends | `src/nirmaan/integrations` | 60 | ip#444 (`c99ef1fe`: `3a7ad495...`), ip#451 (`cec29b2f`: `72e5a814...`), ip#445 (`<M445>`: `<GB8>...`) | `<GB>` |
+| Gate backends | `src/nirmaan/integrations` | 60 | ip#444 (`c99ef1fe`: `3a7ad495...`), ip#451 (`cec29b2f`: `72e5a814...`), ip#445 (`817cc0d6`: `eac184ec...`) | `sha256:eac184ecc60ae35bdc88e6f66c2fa3aceaabe4c32f62066e951d7d5e84e835f9` |
 | Seat account | `scripts/live_eval_seat.py`, `.github/actions/live-eval-seat` | 2 | ip#444 (`c99ef1fe`: `00f3b35b...`), ip#451 (`cec29b2f`: `4abec1ad...`) | `sha256:4abec1ad1bb4fe9e48afb333c619c1d07ccd2e5df80b62f3142dc8ad750fa446` |
 | CI command | `scripts/live_eval_ci.py` | 1 | none | `sha256:3f396770975a7fcff4fc746c031e8694f768b921e90376c290e4fc023acf3e88` |
 | Workflow, tool set and CLI pin | `.github/workflows/live-eval.yml`, `.github/actions/live-eval-setup`, `.github/actions/oss-cad-suite`, `.github/live-eval` | 5 | ip#444 (`c99ef1fe`: `12c0fe97...`), ip#451 (`cec29b2f`: `09083077...`) | `sha256:09083077e0237a7e2b1ed89152d3d5b8f31836a03c8b78500b471d802f8e64d7` |
-| Reach test | `scripts/live_eval_reach.py` | 1 | newly pinned | `<RT>` |
-| Held-out scorers | `src/nirmaan/evals/scorers.py` | 1 | newly pinned | `<SC>` |
-| Stage gates | `src/nirmaan/company/workflows.py` | 1 | newly pinned | `<WF>` |
+| Reach test | `scripts/live_eval_reach.py` | 1 | newly pinned | `sha256:581a4cebb61899090a1741fdbea49e51b57decdebdf0cb11c58562f60b4b93c0` |
+| Held-out scorers | `src/nirmaan/evals/scorers.py` | 1 | newly pinned | `sha256:5f4f7909a3207f3837d2af7ad60b85c0bae620e1d461afde57aea0d2a592ecb4` |
+| Stage gates | `src/nirmaan/company/workflows.py` | 1 | newly pinned | `sha256:bcd15f8204e55f142f266afdd8e12a4947c7f6276382dd18f4c9893e616a9873` |
 
 Section 6's values for the first four groups were `ed76c4f2...`, `668a329a...`, `3f396770...` and `486f4fce...`;
 section 6 keeps them as the record of what moved. Every check of sections 4 and 7 is made against this table: "the
@@ -566,8 +566,9 @@ as section 16 corrects them.
   screen (`eda_guard`) is the first check before any step, on every machine. Since ip#445 it refuses the two classes
   of the record's fact 9, by the rules of `docs/GATE_INPUTS.md`, section 7, and it is claimed only for the forms its
   recorded fixtures name (`tests/test_gate_inputs.py`, through `lint.run`, `simulator.run`, `synth.run`, `formal.run`
-  and `formal.cover`, in CI's test job: `<CI445>`). It screens input; it confines nothing. It is not claimed to read
-  as a tool's preprocessor reads, to stop reads or code in general, or to cover a fault in a tool's parser.
+  and `formal.cover`; CI's test job in run 45085382759, on ip#445's merged head `cde63b5b`, holds 289 cases of that
+  file in its JUnit files, none skipped). It screens input; it confines nothing. It is not claimed to read as a
+  tool's preprocessor reads, to stop reads or code in general, or to cover a fault in a tool's parser.
 - *What the recorded reach tests show.* In the `replay`, `live-eval` and `rejudge` jobs, the steps of the timer path
   that read seat-written Verilog run as `nirmaan-seat`, each by a wrapper in `/opt/nirmaan-seat/bin` with no
   fallback to the runner (ip#444): `verilator --lint-only` (`lint.run`), `iverilog` and `vvp` (`simulator.run`),
@@ -608,9 +609,8 @@ not given), is a failed run of that gate, decided in advance as the record's fac
 a stage it is handled as any failed run, within the stage's attempts (section 4). A trial that ends on it is a failed
 trial of its group: committed as failed, never removed, never repeated and never replaced (section 8). In a held-out
 check it fails the check wherever the check needs that run to pass, and a refused mutant run is never counted as
-caught (`src/nirmaan/evals/scorers.py`). This is not a job-level
-stop of section 8: the job-level stop is the reach test before any trial, which, when a probe is not denied, stops
-the job with no trial run.
+caught (`src/nirmaan/evals/scorers.py`). This is not a job-level stop of section 8: the job-level stop is the reach
+test before any trial, which, when a probe is not denied, stops the job with no trial run.
 
 ### 18.5 The include listing at the read
 
@@ -622,18 +622,20 @@ group, split or second read, and a passed trial stays passed.
 
 ### 18.6 Gate ET7, shown
 
-The pull requests of gates ET1 to ET5 merged since section 6 was computed at `45a22c84`: ip#444 (ET2 to ET4,
-`c99ef1fe`), ip#451 (gates W2C3 and W2C4 of the wave 2 close record, on the same account, `cec29b2f`), ip#452 (the
-ET3 record, `fdf01d68`) and ip#445 (ET1, `<M445>`). ET5 is shown by the same run 45073595509: the timer's
-reference answer passed `lint.run`, `simulator.run` and `synth.run` with the tools as the seat account; check 1
-passed on its staged testbench; check 2 passed clean with 4 of 4 mutants failing; the re-judge gave the same result.
+The merges since section 6 was computed at `45a22c84` that meet gates ET1 to ET5 or move a value of section 18.1:
+ip#444 (ET2 to ET4, `c99ef1fe`), ip#451 (gates W2C3 and W2C4 of the wave 2 close record, on the same account,
+`cec29b2f`), ip#452 (the ET3 record, `fdf01d68`) and ip#445 (ET1, `817cc0d6`). ET5 is shown by the same run
+45073595509: the timer's reference answer passed `lint.run`, `simulator.run` and `synth.run` with the tools as the
+seat account; check 1 passed on its staged testbench; check 2 passed clean with 4 of 4 mutants failing; the re-judge
+gave the same result.
 
 - No file in `harness.CODE`, `LOOP_CODE` or `FLOW_CODE` and no tool definition changed:
-  `git diff --name-only 45a22c84 <HEAD>` over those files and `src/nirmaan/company/tools.py` is empty, and the tests
-  `test_whole_flow_dispatch.py` (gate WF7), `test_live_eval_seat.py::test_the_tools_as_the_seat_account_change_no_fingerprint`
-  and `test_gate_inputs.py::test_no_file_this_milestone_changes_is_harness_code` hold.
-- The four fingerprints, recomputed on each merge commit (`c99ef1fe`, `cec29b2f`, `fdf01d68`, `<M445>`) and on
-  `<HEAD>` with CLI 2.1.325, are the values of section 18.1, unchanged.
+  `git diff --name-only 45a22c84 817cc0d6` over those files and `src/nirmaan/company/tools.py` is empty, and these
+  tests pass on `817cc0d6`: `tests/test_whole_flow_dispatch.py` (gate WF7),
+  `tests/test_live_eval_seat.py::test_the_tools_as_the_seat_account_change_no_fingerprint` and
+  `tests/test_gate_inputs.py::test_no_file_this_milestone_changes_is_harness_code`.
+- The four fingerprints, recomputed with CLI 2.1.325 on each merge commit (`c99ef1fe`, `cec29b2f`, `fdf01d68` and
+  `817cc0d6`, which is also the commit of section 18.1), are the values of section 18.1, unchanged.
 - Every value of section 18.1 is recomputed again on the commit the measured run is dispatched from and on the commit
   of each slot (section 7); a difference stops the dispatch until a plan amendment merges.
 - The measured run of section 10 is made after this amendment merges. No dispatch of the timer case with a model, no
@@ -643,8 +645,9 @@ passed on its staged testbench; check 2 passed clean with 4 of 4 mutants failing
 ### 18.7 What slot 1 still waits for
 
 With this merge, gate ET6 is met and ET7 is shown for every merge named above; ET1 to ET5 and ET8 are met by the pull
-requests named in sections 18.3 and 18.6 (for ET8, `docs/GATE_INPUTS.md` from ip#445, and `docs/GATE_INTEGRITY.md`
-and `docs/LIVE_EVAL_EVIDENCE.md`, section 6, from ip#444, ip#451 and ip#445; this section is the plan's part). Gate
+requests named in sections 18.3 and 18.6 (for ET8, `docs/GATE_INPUTS.md` from ip#445, `docs/GATE_INTEGRITY.md` from
+ip#444, ip#451 and ip#445, and `docs/LIVE_EVAL_EVIDENCE.md`, section 6, from ip#444 and ip#451; this section is the
+plan's part). Gate
 ET9 is the register block's, before slot 21. This section adds no condition before slot 1 and removes none: section
 13 stands, with the measured run of section 10 after this merge. The re-measure batch of the wave 2 close record and
 the timer's twenty are never interleaved: one records its last trial before the other dispatches its first.
