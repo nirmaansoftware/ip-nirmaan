@@ -63,6 +63,11 @@ nothing and is not a key; it catches plain bugs before the keys spend calls.
    that block as the PR's flag.
 5. **Merge.** Automatic once every required check passes.
 
+One exception: a pull request that only adds generated eval records and meets
+every condition of the [records fast lane](#records-fast-lane) stops after
+step 1. No key 1, key 2 or Founder Proxy runs; the review App posts both
+checks as passed, naming the lane, and the loop turns on auto-merge.
+
 ## Teams
 
 | Team | Key 1 | Owns (summary) |
@@ -122,6 +127,73 @@ posts says "Founder Proxy (agent), acting under the founder's delegation of
 - **No CODEOWNERS.** `.github/CODEOWNERS` was removed, and
   `tests/test_review_teams.py` fails if one is added back.
 
+## Records fast lane
+
+Approval: founder, in session, 2026-11-23: approved a records-only fast lane
+so generated eval record PRs merge on green CI and schema tests without the
+two agent review keys. The Founder Proxy's seat file counts a change that lets
+the loop merge without both keys and the proxy as weakening a review gate; the
+lane is such a change, so the pull request that adds it is founder class and
+waits for the founder's own decision on GitHub.
+
+**Conditions.** A pull request takes the lane only when every one holds on
+its head (`fast_lane` in `CONFIG` and `fast_lane()` in `scripts/pr_review.py`):
+
+1. **Author:** the agents' account (`patel-om`), not any other allowed author.
+2. **Branch:** the head branch starts with `evals/` (and is longer than it).
+3. **Not a draft.**
+4. **Paths:** every changed path is an added file under `evals/results/`
+   (status `A` in `git diff --name-status -M` of the merge base and the head),
+   and at least one is; the only other path allowed is `capability/levels.json`,
+   modified (status `M`). A modified, deleted, renamed, copied or type-changed
+   file under `evals/results/`, the levels file added or deleted, a path with
+   an empty, `.` or `..` part, and any other path fail.
+5. **Regular files:** every changed path is a regular file (mode `100644`) at
+   the head, read with `git --literal-pathspecs ls-tree`; a symlink, an
+   executable, a submodule or an unreadable mode fails.
+6. **Size:** the diff is not empty and not over the review's size limit
+   (200,000 bytes; over it the review stops before the lane, as for any pull
+   request).
+7. **CI:** every required check (`test`, `no-tools`, `physical-design`,
+   `test-union`, `dashes`) concluded `success` on the head, the newest run of
+   each counting, as in step 5 of "How reviewers run". The record tests run in
+   the required `test` job, which runs the whole suite in four shards;
+   `scripts/shards.py` there checks the shards ran every collected test exactly
+   once.
+8. **Record tests:** each of these files is at the head (the path rule means
+   the pull request cannot change one): `tests/test_capability_levels.py` (the
+   levels file against `levels.py`, and `capability_levels.py --check`),
+   `tests/test_whole_flow.py` (every committed record loads, with its
+   structure), `tests/test_eval_purpose.py` (every committed manifest's purpose
+   label), `tests/test_failure_curriculum.py` (the committed records' causes
+   tables parse) and `tests/test_nirmaan_evals.py` (no committed record is
+   taken for a shipped case).
+9. **Labels:** not labelled `needs-founder` or `hold`.
+10. **Founder classes:** `main`'s review map detects none on the diff (path or
+    content). If it detects one, the pull request is not in the lane.
+11. **Credentials:** no added line is in a credential format (the review
+    script's `SECRET_PATTERNS`).
+
+**What happens.** The review script checks the lane after the CI-first step
+and the size limit, and only on a head branch starting with `evals/`. On a
+qualifying head it calls no model: it posts one comment (the "Records fast
+lane: qualified" table, with each condition, whether it holds and why) and
+both checks, `review/team-lead` and `review/executive`, as passed, titled
+"records fast lane ... no agent review ran". A dry run posts its usual never
+green statuses instead. The loop then takes the merge path (step 4 of
+"Automated loop") with no fix round, after reading the pull request again: a
+head that moved, or a `needs-founder` label added meanwhile, drops the merge.
+Its auto-merge comment says the lane qualified and that no agent review ran.
+
+**Fail closed.** Any failed condition, an error while checking (an
+unreadable mode, a malformed CI read, a malformed setting) or CI not yet
+green means the normal two-key path; nothing about the lane is posted then,
+and every other pull request is reviewed exactly as before. `fast_lane` set
+to `None` turns the lane off. The conditions are tested one by one, each
+passing and each way it fails, in `tests/test_fast_lane.py`, with the review
+and the loop end to end; the fixer may not change that file, the scripts or
+this page.
+
 ## Reviewer isolation
 
 The reviewer runs as a fresh read-only process in a clean checkout of the head
@@ -172,7 +244,9 @@ the branch checked out. In order:
    No model is called in either case. A diff of `main...head` over 200,000
    bytes is not reviewed either: both checks stay pending with "review not
    run: ... split the pull request". The reviewers always get the whole diff,
-   never a cut one (the one shape rule that stops a review).
+   never a cut one (the one shape rule that stops a review). A pull request
+   that meets every condition of the [records fast lane](#records-fast-lane)
+   ends here: one comment, both checks passed naming the lane, no model call.
 6. **Key 1, then key 2.** Key 1 is one fresh `claude -p` process per owning
    team lead: the base checklist, the lead's seat file and the "In a review"
    sections of the team's members. Key 2 runs only when every key 1 passed:
@@ -295,7 +369,9 @@ Running since 2026-10-18 under launchd (`online.nirmaan.ip-pr-loop`).
 whole cycle without anyone starting the review by hand: wait for CI, run both
 keys, fix what a key found, review again, and take the merge path when both
 keys pass. It never replaces a key or the Founder Proxy, and never decides
-what the proxy sends to the founder: a `needs-founder` verdict stops it.
+what the proxy sends to the founder: a `needs-founder` verdict stops it. The
+one pull request it merges with no key is one the review found in the
+[records fast lane](#records-fast-lane).
 
 **Which pull requests.** Open, targeting `main`, from a branch in this
 repository, authored by the agents' account (`patel-om`). Drafts and pull
@@ -349,7 +425,7 @@ requests labelled `hold` or `needs-founder` are skipped.
    per key and for the Founder Proxy on a founder-class pull request, seat
    files from `main`, comments and checks posted). A proxy `needs-founder`
    stops the loop (below).
-4. **Both keys (and the proxy) pass.** When the review App posts the checks, the loop reads the
+4. **Both keys (and the proxy) pass, or the records fast lane qualified.** When the review App posts the checks, the loop reads the
    repository's "Allow auto-merge" setting with the gh login (the
    `allow_auto_merge` field of `gh api repos/<repo>`). When it is on, the loop
    runs `gh pr merge --auto --merge --match-head-commit <head>`, so GitHub
@@ -587,7 +663,8 @@ Proxy verdict is `needs-founder` without the founder's own GitHub review
 approving its head, never changes the review configuration, the council or workflows, never pushes
 over someone else's push, never runs on a fork or another author's pull
 request, never turns auto-merge on for the repository, and never treats a
-deferred review as a pass. A fix the loop pushed is agent work like any other:
+deferred review as a pass. It merges with no key only a pull request the
+review found in the records fast lane, every condition met on its head. A fix the loop pushed is agent work like any other:
 both keys review it again.
 
 ## Running the loop in GitHub Actions
