@@ -520,8 +520,10 @@ Ruling, in short:
   No slot is dispatched while a slot three or more places before it is
   unfinished, so one event can fail at most one counted trial of any group.
 - **After the first plan or usage limit the batch runs one at a time to its
-  end** (decision P1). That bounds what parallel running can cost the
-  evidence to two more failed trials than the plan as committed, once.
+  end** (decision P1). That bounds what a limit can cost the evidence
+  through parallel running to two more failed trials than the plan as
+  committed, once. Any other event that ends running trials can still end
+  up to three (decision P4, item 8).
 - **The workflow gets an opt-in input** (decision P2). With it, a dispatch
   of a case that is neither a whole-flow nor a firmware case gets a
   concurrency group of its own, so no run is queued behind another and
@@ -529,8 +531,9 @@ Ruling, in short:
   whole-flow timer stays one at a time.
 - **One slot, one run, bound before the next dispatch; records in slot
   order** (decision P3).
-- **A stop closes dispatch and cancels nothing** (decision P4). Trials
-  already running end as they end and are committed. Nothing is run again.
+- **A stop closes dispatch and cancels no running trial** (decision P4).
+  Trials already running end as they end and are committed. Nothing is run
+  again.
 - **The replays of gate W2C5 are the first use of the mechanism** (decision
   P5).
 - **The workflow change merges only after the timer case's last planned
@@ -539,10 +542,14 @@ Ruling, in short:
 
 It changes no code, case, eval record, level, fingerprint or digest: the
 changes it orders are made by their own pull requests. It changes no count,
-case, arm or slot of the batch, and not the one read. It loosens no gate and
-lifts no refusal: a failed trial stays a failed trial, nothing is run again,
-and conditions are added before trial 1. No trial ran and no workflow was
-dispatched for the meeting.
+case, arm or slot of the batch, and not the one read. It lifts no refusal
+and changes no gate's condition: a failed trial stays a failed trial,
+nothing is run again, and conditions are added before trial 1. One thing
+that kept a gate changes, by the founder's direction: the workflow's single
+group kept one trial at a time and kept the two batches apart (gate W2C9),
+and for this batch the dispatcher's rules keep the width and that gate
+instead (decision P2, item 9; decision P3). No trial ran and no workflow
+was dispatched for the meeting.
 
 ### Who decided what
 
@@ -677,9 +684,10 @@ ai-engineer (item 3 and item 5).
    whatever the input says, the group is `live-eval`, as today. Otherwise
    the run is alone in a group of its own: it is never queued behind another
    run and no run can cancel it.
-2. The `replay` job and the `live-eval` job each get a first step that fails
-   the job when `parallel` is true and the case is a `flow/` or `firmware/`
-   case. It runs before any step that reads the secret.
+2. The `replay` job and the `live-eval` job each get a guard as their
+   first step, which fails the job when `parallel` is true and the case is
+   a `flow/` or `firmware/` case. In the `live-eval` job that is before any
+   step that reads the secret; the `replay` job reads none.
 3. `inputs.parallel` appears in the concurrency group and in those two
    guard steps and nowhere else: not in `env:`, not in a `run:` line, so it
    cannot reach a trial or a record (eda-tooling).
@@ -695,8 +703,9 @@ ai-engineer (item 3 and item 5).
    of the group "Workflow, tool set and CLI pin" in both plans.
 7. Tests, written failing first, merged with the change: the exact
    concurrency block; the input's type and default; that a `flow/` and a
-   `firmware/` case resolve to `live-eval` whatever the input; the guard
-   step's place before the first step that reads the secret; that
+   `firmware/` case resolve to `live-eval` whatever the input; the guard as
+   the first step of both jobs, before the first step that reads the secret
+   in the `live-eval` job; that
    `inputs.parallel` appears only where item 3 says; and that the secret
    appears in exactly the steps it appears in today.
 8. `docs/LIVE_EVAL_EVIDENCE.md` ("One dispatch runs at a time") is corrected
@@ -773,6 +782,12 @@ security (items 4 and 5).
    this batch (fact PF5). The rule it supported stands: a failed trial is
    never replaced. Parallel running can only lower a pass count, so no
    level becomes easier to reach (qa-evidence).
+8. The rule of one at a time bounds limits only. An event of another kind
+   that ends running trials, such as an outage or a replaced secret, can
+   end up to three at once; each is a failed trial, committed and never run
+   again, and the read names the event and its slots. A stop that ends no
+   trial (a re-judge that did not hold, a changed tool set, a record
+   mismatch) fails nothing in flight.
 
 Owners: verification-lead (the rules); ai-engineer (item 5's width);
 eda-tooling (item 6).
@@ -847,8 +862,9 @@ The read (gate W2C11) adds: the width; that trials overlapped; for each
 slot its run and the slots whose runs overlapped it; every stop event with
 the slots then in flight and their labels; each group's failed trials by
 label; every slot dispatched after a later one; the point from which the
-batch ran one at a time; and that nothing was cancelled, held out or run
-again. Never said: that running trials at once had no effect on a result,
+batch ran one at a time; any run cancelled before its trial under decision
+P4, item 2; and that no running trial was cancelled and nothing was held
+out or run again. Never said: that running trials at once had no effect on a result,
 or that this batch and W2-L1 ran under the same dispatch conditions. W2-L1
 ran one trial at a time.
 
@@ -879,7 +895,8 @@ workflow change after the timer's last trial.
 ### Gates added
 
 Each is met on `main` before trial 1 of the batch unless it says otherwise.
-Gates W2C1 to W2C11 stand as written.
+The conditions of gates W2C1 to W2C11 stand as written; what keeps gate
+W2C9 for this batch is decision P3, item 5.
 
 | Gate | Condition | Owner seat |
 |---|---|---|
@@ -887,7 +904,7 @@ Gates W2C1 to W2C11 stand as written.
 | W2C13 | The workflow change of decision P2, with its tests and the corrected document, and no fingerprint moved | security |
 | W2C14 | That change merges only after the timer case's last planned trial is recorded; before the register block's slot 21 the whole-flow plan restates the digest and gate WF9's evidence | eda-tooling |
 | W2C15 | One slot, one run, bound from the dispatch response before the next dispatch; a run the dispatcher did not start stops dispatch; records in slot order | qa-evidence |
-| W2C16 | A stop closes dispatch and cancels nothing; every trial already dispatched is committed; nothing is run again; width one after the first limit | ai-engineer |
+| W2C16 | A stop closes dispatch and cancels no running trial; every trial already dispatched is committed; nothing is run again; width one after the first limit | ai-engineer |
 | W2C17 | The 13 replays of gate W2C5 dispatched with the input, three in flight at least once, all passing, each named in the plan's dated addition | eda-tooling |
 | W2C18 | At the read: what decision P7 asks the read to add, and nothing it forbids | qa-evidence |
 
@@ -918,6 +935,7 @@ Nothing here is built by this addendum. In order:
    would have lost one. Each is a failed trial of its group and is never run
    again, and for a single-case group of eight one failed trial is the
    whole margin for Practised (fact PF7). The council bounds this to one
-   such event (decision P1, item 3). If the founder wants the width kept
+   such event from a limit (decision P1, item 3; decision P4, item 8). If
+   the founder wants the width kept
    after a limit, or no parallel running, that is the founder's to say
    before trial 1.
