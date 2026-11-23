@@ -1159,21 +1159,23 @@
         "knowledge_document": "knowledge/verification/root_cause_analysis.md",
         "problems": []
       },
-      "level": "practised",
+      "level": "knowledge",
       "practised": [
         {
           "cases": [
             "debug/root-cause-uart-tx"
           ],
           "cli": "2.1.325",
-          "counts": true,
+          "counts": false,
           "digest": "sha256:b65cd62f88597fc7ec2fcdd85730104dc5f6719b70e3513d59014af36060431f",
           "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
           "lower": 0.5291,
           "model": "claude-opus-5-5",
           "n": 8,
           "passed": 7,
-          "reasons": [],
+          "reasons": [
+            "stale: the skill card or document changed after these trials"
+          ],
           "records": [
             "evals/results/2026-11-18-claude-code-claude-opus-5-5-22",
             "evals/results/2026-11-18-claude-code-claude-opus-5-5-36",
@@ -1548,8 +1550,8 @@
     }
   },
   "totals": {
-    "knowledge": 27,
-    "practised": 17,
+    "knowledge": 28,
+    "practised": 16,
     "proven": 0
   },
   "variants": [],
