@@ -303,16 +303,21 @@ WRAPPERS = "/opt/nirmaan-seat/bin/"
 TARGET_CONTENT = ("canary_et1_7f3a", "NIRMAAN_MARKER_4b1d")
 
 
-def committed_upload(run: str) -> tuple[dict, Path]:
-    """A run's committed upload: its index, after checking that the folder holds exactly the files the index names,
-    each with the sha256 and size it names (decision R1, item 3)."""
-    folder = EVIDENCE / f"run-{run}"
-    index = json.loads((folder / "index.json").read_text(encoding="utf-8"))
+def committed_files(folder: Path, files: dict) -> None:
+    """``folder`` holds exactly ``files`` (each ``name: {sha256, bytes}``, by its path in the folder), besides an
+    ``index.json``, each with the sha256 and size named (decision R1, item 3)."""
     found = sorted(p.relative_to(folder).as_posix() for p in folder.rglob("*") if p.is_file() and p.name != "index.json")
-    assert found == sorted(index["files"]), found
-    for name, want in index["files"].items():
+    assert found == sorted(files), found
+    for name, want in files.items():
         data = (folder / name).read_bytes()
         assert (hashlib.sha256(data).hexdigest(), len(data)) == (want["sha256"], want["bytes"]), name
+
+
+def committed_upload(run: str) -> tuple[dict, Path]:
+    """A run's committed upload and its ``index.json``, after ``committed_files``."""
+    folder = EVIDENCE / f"run-{run}"
+    index = json.loads((folder / "index.json").read_text(encoding="utf-8"))
+    committed_files(folder, index["files"])
     return index, folder
 
 
