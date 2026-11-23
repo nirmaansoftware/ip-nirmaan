@@ -1,0 +1,266 @@
+{
+ "format": "nirmaan.replay-record/1",
+ "about": "The replay of gate ET5 (council/records/2026-11-22-eda-tools-seat-account.md): run 45073595509, a replay of flow/axil-timer dispatched on main at c99ef1fe (the merge of ip#444), whose replay job ran the tools that read seat Verilog as the seat account nirmaan-seat and whose rejudge job re-judged the replay's records. Each field is copied from the run's uploads (live-eval-replay-45073595509 and live-eval-rejudged-45073595509): the manifest and summary (without their times and usage totals), the trial's case, passed, gate_runs, scores and judge_runs, the RTL stage's gate_runs, and the rejudge result. It shows that in that run the reference answer's RTL stage passed lint.run, simulator.run and synth.run, check 1 passed on its staged testbench, check 2 passed on the clean inputs and failed 4 of 4 mutants, and the rejudge found the trial the same; the replayed and the rejudged trial files are byte for byte the same (the sha256 below). It records no run of the timer's controls or of the committed fixtures: the run's uploads hold none, and those are the repository's own tests, not part of this record.",
+ "run": {
+  "id": "45073595509",
+  "attempt": "1",
+  "url": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45073595509",
+  "commit": "c99ef1fea171492ca7ee01c0bcd18d5e21fb3c21",
+  "jobs": {
+   "replay": {
+    "id": "137365812487",
+    "url": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45073595509/job/137365812487",
+    "conclusion": "success"
+   },
+   "rejudge": {
+    "id": "137367647509",
+    "url": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45073595509/job/137367647509",
+    "conclusion": "success"
+   }
+  },
+  "artifacts": [
+   "live-eval-replay-45073595509",
+   "live-eval-rejudged-45073595509"
+  ]
+ },
+ "manifest": {
+  "cases": [
+   "flow/axil-timer"
+  ],
+  "command": "nirmaan eval run flow/axil-timer --replay --out /home/runner/work/_temp/replay",
+  "flow": "whole",
+  "format": "nirmaan.eval-run",
+  "harness_variant": "default",
+  "head_sha": "c99ef1fea171492ca7ee01c0bcd18d5e21fb3c21",
+  "id": "2026-11-22-replay-replay-whole-flow",
+  "knowledge": "on",
+  "model": "replay",
+  "nirmaan_version": "1.25.0",
+  "purpose": "evidence",
+  "replay": true,
+  "runtime": "replay",
+  "seats": [
+   "rtl-implementation"
+  ],
+  "source": "",
+  "trials": 1,
+  "version": 1
+ },
+ "summary": {
+  "cases": {
+   "flow/axil-timer": {
+    "high": 1.0,
+    "low": 0.20654931437723745,
+    "n": 1,
+    "passed": 1,
+    "rate": 1.0
+   }
+  },
+  "format": "nirmaan.eval-summary",
+  "seats": {
+   "rtl-implementation": {
+    "high": 1.0,
+    "low": 0.20654931437723745,
+    "n": 1,
+    "passed": 1,
+    "rate": 1.0
+   }
+  }
+ },
+ "trial": {
+  "file": "flow_axil-timer/trial-01.json",
+  "sha256_replay": "ff925dd3e5d75641e9e6e45e3fe2b490be539cb2085e1111a6eb88c784c2d983",
+  "sha256_rejudged": "ff925dd3e5d75641e9e6e45e3fe2b490be539cb2085e1111a6eb88c784c2d983",
+  "case": "flow/axil-timer",
+  "passed": true,
+  "replay": true,
+  "seat_status": "in_review",
+  "gate_runs": [
+   {
+    "run": "run-0001",
+    "succeeded": true,
+    "summary": "verilator-lint: lint clean: 0 errors, 0 warnings",
+    "tool": "lint.run"
+   },
+   {
+    "run": "run-0002",
+    "succeeded": true,
+    "summary": "icarus: simulation passed: 937 checks passed, $finish reached at time 4991000, 0 errors",
+    "tool": "simulator.run"
+   },
+   {
+    "run": "run-0003",
+    "succeeded": true,
+    "summary": "yosys: synthesis passed: 766 cells, 146 flip-flops, 0 latches, 0 warnings",
+    "tool": "synth.run"
+   }
+  ],
+  "rtl_stage_gate_runs": [
+   {
+    "run": "run-0001",
+    "succeeded": true,
+    "summary": "verilator-lint: lint clean: 0 errors, 0 warnings",
+    "tool": "lint.run"
+   },
+   {
+    "run": "run-0002",
+    "succeeded": true,
+    "summary": "icarus: simulation passed: 937 checks passed, $finish reached at time 4991000, 0 errors",
+    "tool": "simulator.run"
+   },
+   {
+    "run": "run-0003",
+    "succeeded": true,
+    "summary": "yosys: synthesis passed: 766 cells, 146 flip-flops, 0 latches, 0 warnings",
+    "tool": "synth.run"
+   }
+  ],
+  "scores": [
+   {
+    "failed_runs": [],
+    "name": "The reference testbench passes on the flow's RTL",
+    "runs": [
+     "run-0004"
+    ],
+    "scorer": "held-out-run",
+    "status": "passed",
+    "summary": "simulator.run run-0004: icarus: simulation passed: 44959 checks passed, $finish reached at time 4614170000, 0 errors"
+   },
+   {
+    "failed_runs": [
+     "run-0006",
+     "run-0007",
+     "run-0008",
+     "run-0009"
+    ],
+    "name": "The flow's testbench passes on the reference RTL and fails each timer mutant",
+    "runs": [
+     "run-0005"
+    ],
+    "scorer": "must-fail",
+    "status": "passed",
+    "summary": "simulator.run run-0005 passed on the clean inputs; 4 of 4 mutants failed it"
+   }
+  ],
+  "judge_runs": [
+   {
+    "check": "The reference testbench passes on the flow's RTL",
+    "params": {
+     "sources": [
+      "/tmp/nirmaan-eval-rfdwjuwq/stages/prj-c3ba6dc38a_rtl-implementation/prj-c3ba6dc38a_rtl-implementation/1/axil_timer.v",
+      "/tmp/nirmaan-eval-rfdwjuwq/judge/check-1/held-out-xjd1432x/axil_timer_tb.v"
+     ],
+     "top": "axil_timer_tb"
+    },
+    "run": "run-0004",
+    "succeeded": true,
+    "summary": "icarus: simulation passed: 44959 checks passed, $finish reached at time 4614170000, 0 errors",
+    "tool": "simulator.run"
+   },
+   {
+    "check": "The flow's testbench passes on the reference RTL and fails each timer mutant",
+    "params": {
+     "sources": [
+      "/tmp/nirmaan-eval-rfdwjuwq/judge/check-2/must-fail-hz9u8071/clean/axil_timer_tb.v",
+      "/tmp/nirmaan-eval-rfdwjuwq/judge/check-2/must-fail-hz9u8071/clean/axil_timer.v"
+     ],
+     "top": "axil_timer_tb"
+    },
+    "run": "run-0005",
+    "succeeded": true,
+    "summary": "icarus: simulation passed: 937 checks passed, $finish reached at time 4991000, 0 errors",
+    "tool": "simulator.run"
+   },
+   {
+    "check": "The flow's testbench passes on the reference RTL and fails each timer mutant",
+    "params": {
+     "sources": [
+      "/tmp/nirmaan-eval-rfdwjuwq/judge/check-2/must-fail-hz9u8071/mutant-1-1/axil_timer_tb.v",
+      "/tmp/nirmaan-eval-rfdwjuwq/judge/check-2/must-fail-hz9u8071/mutant-1-1/axil_timer.v"
+     ],
+     "top": "axil_timer_tb"
+    },
+    "run": "run-0006",
+    "succeeded": false,
+    "summary": "icarus: simulation failed: 48 errors, the testbench reports 48 of 937 checks failed; first: /tmp/nirmaan-eval-rfdwjuwq/judge/check-2/must-fail-hz9u8071/mutant-1-1/axil_timer_tb.v:87: lane AW=4: one-shot EN clears itself: got 0x00000003, expected 0x00000002",
+    "tool": "simulator.run"
+   },
+   {
+    "check": "The flow's testbench passes on the reference RTL and fails each timer mutant",
+    "params": {
+     "sources": [
+      "/tmp/nirmaan-eval-rfdwjuwq/judge/check-2/must-fail-hz9u8071/mutant-1-2/axil_timer_tb.v",
+      "/tmp/nirmaan-eval-rfdwjuwq/judge/check-2/must-fail-hz9u8071/mutant-1-2/axil_timer.v"
+     ],
+     "top": "axil_timer_tb"
+    },
+    "run": "run-0007",
+    "succeeded": false,
+    "summary": "icarus: simulation failed: 6 errors, the testbench reports 6 of 937 checks failed; first: /tmp/nirmaan-eval-rfdwjuwq/judge/check-2/must-fail-hz9u8071/mutant-1-2/axil_timer_tb.v:87: lane AW=4: periodic period in cycles: got 0x00000008, expected 0x00000007",
+    "tool": "simulator.run"
+   },
+   {
+    "check": "The flow's testbench passes on the reference RTL and fails each timer mutant",
+    "params": {
+     "sources": [
+      "/tmp/nirmaan-eval-rfdwjuwq/judge/check-2/must-fail-hz9u8071/mutant-1-3/axil_timer_tb.v",
+      "/tmp/nirmaan-eval-rfdwjuwq/judge/check-2/must-fail-hz9u8071/mutant-1-3/axil_timer.v"
+     ],
+     "top": "axil_timer_tb"
+    },
+    "run": "run-0008",
+    "succeeded": false,
+    "summary": "icarus: simulation failed: 8 errors, the testbench reports 8 of 937 checks failed; first: /tmp/nirmaan-eval-rfdwjuwq/judge/check-2/must-fail-hz9u8071/mutant-1-3/axil_timer_tb.v:87: lane AW=4: stop freezes COUNT: got 0x00000003, expected 0x00000006",
+    "tool": "simulator.run"
+   },
+   {
+    "check": "The flow's testbench passes on the reference RTL and fails each timer mutant",
+    "params": {
+     "sources": [
+      "/tmp/nirmaan-eval-rfdwjuwq/judge/check-2/must-fail-hz9u8071/mutant-1-4/axil_timer_tb.v",
+      "/tmp/nirmaan-eval-rfdwjuwq/judge/check-2/must-fail-hz9u8071/mutant-1-4/axil_timer.v"
+     ],
+     "top": "axil_timer_tb"
+    },
+    "run": "run-0009",
+    "succeeded": false,
+    "summary": "icarus: simulation failed: 15 errors, the testbench reports 15 of 937 checks failed; first: /tmp/nirmaan-eval-rfdwjuwq/judge/check-2/must-fail-hz9u8071/mutant-1-4/axil_timer_tb.v:87: lane AW=8: write SLVERR: got 0x00000000, expected 0x00000002",
+    "tool": "simulator.run"
+   }
+  ]
+ },
+ "rejudge": {
+  "format": "nirmaan.eval-rejudge",
+  "record": "2026-11-22-replay-replay-whole-flow",
+  "nirmaan_version": "1.25.0",
+  "trials": [
+   {
+    "case": "flow/axil-timer",
+    "trial": 1,
+    "same": true,
+    "differences": []
+   }
+  ]
+ },
+ "rejudged_summary": {
+  "cases": {
+   "flow/axil-timer": {
+    "high": 1.0,
+    "low": 0.20654931437723745,
+    "n": 1,
+    "passed": 1,
+    "rate": 1.0
+   }
+  },
+  "format": "nirmaan.eval-summary",
+  "seats": {
+   "rtl-implementation": {
+    "high": 1.0,
+    "low": 0.20654931437723745,
+    "n": 1,
+    "passed": 1,
+    "rate": 1.0
+   }
+  }
+ }
+}
