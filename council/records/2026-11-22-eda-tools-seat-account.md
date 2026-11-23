@@ -274,6 +274,8 @@ Conditions, each a gate:
    reference answer passing every gate and both held-out checks with the
    tools run as the seat account; the timer's mutant sweep and controls give
    the results they gave; every committed fixture still passes (ET5).
+   (Read from 2026-11-23 with the third addendum, decision E2: how a bypass
+   control of gate ET1 is read as the seat account.)
 
 Who disagreed. eda-tooling and qa-evidence asked for exactly this at the RTL
 stage. Security asked for it everywhere (decision 3). ai-engineer and
@@ -510,7 +512,7 @@ Each is met on `main` before the timer's slot 1 unless it says otherwise.
 | ET2 | In the `replay`, `live-eval` and `rejudge` jobs the RTL stage's `verilator --lint-only`, `iverilog` and `yosys` steps (and `sby` if it can run) run as `nirmaan-seat`, granted the run's own directory and input files only, with no fallback to the runner, shown by tests | security |
 | ET3 | The reach test probes each wrapped tool through the real backend (decision 2, item 2); a replay on `main` on the merged head records every probe denied in the `replay` and `rejudge` jobs; the `live-eval` job runs them as a gate before any trial | security |
 | ET4 | The held-out checks' Icarus compile runs as the seat account with that run's inputs only, with the probe of decision 3, item 2; or the fallback of decision 3, item 3 is built, with the obstacle shown and security's reason recorded in the pull request | security |
-| ET5 | A replay of `flow/axil-timer` on `main` shows the reference answer passing every gate and both held-out checks with the tools as the seat account; the timer's mutant sweep and controls and every committed fixture give the results they gave | verification-lead |
+| ET5 | A replay of `flow/axil-timer` on `main` shows the reference answer passing every gate and both held-out checks with the tools as the seat account; the timer's mutant sweep and controls and every committed fixture give the results they gave, a bypass control of gate ET1 being read as decision E2 of the third addendum says; shown by one committed record of one run, on a commit whose pinned values equal those of the commit the measured run is dispatched from (decision E4). (Reworded 2026-11-23 by the third addendum; it read "A replay of `flow/axil-timer` on `main` shows the reference answer passing every gate and both held-out checks with the tools as the seat account; the timer's mutant sweep and controls and every committed fixture give the results they gave") | verification-lead |
 | ET6 | The plan amendment of decision 7, item 2 is merged: section 6 restated, section 12 corrected, the failed-run rule, the include listing at the read, and what is pinned | verification-lead |
 | ET7 | No file in `harness.CODE`, `LOOP_CODE` or `FLOW_CODE` and no tool definition changed by any of the above, shown by the test of gate WF7 and the four fingerprints recomputed on each merge commit; every pin recomputed on the dispatch commit; the measured run made after the last merge. Otherwise it returns to the council | ai-engineer |
 | ET8 | Every text follows decision 8; `docs/GATE_INPUTS.md`, `docs/GATE_INTEGRITY.md` and `docs/LIVE_EVAL_EVIDENCE.md` state the classes, the fixtures, the account's scope and the residual from the merge of ET1 and ET2 on | qa-evidence |
@@ -1426,3 +1428,498 @@ and 3 of the build specification above are read with these.
 2. Decision R4, item 6: whether the review's size rule should count or
    refuse binary files. Raised by all four seats; not decided by the
    council.
+
+## Third addendum (2026-11-23): gate ET5 and the bypass controls as the seat account; two words of a build option list under gate WF14
+
+This addendum settles two questions before the timer's measured run. The
+first: gate ET5 asks that "every committed fixture" give the result it gave
+with the tools as the seat account, and 11 of gate ET1's bypass controls do
+not (plan `evals/plans/2026-11-22-g3-whole-flow.md`, sections 20.6 and
+21.4). Verification-lead, the gate's owner, stated ET5 not met as worded and
+asked for security's statement of each cause and the chair's ruling; nobody
+narrows the gate's wording but the chair. The second: a build lane proposes
+to add `--verilate-jobs 1` to the Verilator model builds, one of which is
+the build whose option list gate WF14's guard pins
+(`council/records/2026-11-17-g3-whole-flow-cases.md`).
+
+Ruling, in short:
+
+- **The 11 are the account at work, and that is the result they should
+  give.** In each, the tool ran through the seat account's wrapper and
+  printed that it could not open or write its target. Gate ET5 is reworded
+  to say how a bypass control is read as the account (decision E2). The
+  words "every committed fixture" stay.
+- **Gate ET5 is not met yet.** The seats found, in the same data, one
+  bypass control that passed as the account with the host file's text in
+  its summary: a file that a seat's formal setup names under `[files]` is
+  handed to the account as an input, so for that form the screen is the
+  only control. The first ruling of this record is that the screen is not
+  the control. That is closed in code before the measured run (gate ET17).
+- **Gate ET5 is then stated on one committed record of one fresh replay**
+  on the commit that holds the repair, with each bypass control's tool
+  outcome committed as uploaded and a test that checks the cause and not
+  only the count (decisions E4 and E5; gate ET18). The record of run
+  45119522138 stays as it is.
+- **The two words are acceptable under gate WF14 on conditions** (decision
+  V1; gate ET20): evidence from CI in the pull request, the WF14 owner's
+  statement on the return condition, corrected texts, and a merge only
+  after the timer's last trial is recorded.
+
+It changes no code, case, eval record, level, fingerprint or digest. It
+loosens no gate: ET5 keeps every part and gains a rule of reading and a
+committed record, and three conditions are added before the measured run
+(gates ET17 to ET19). One row of the gate table above and one item of
+decision 2 carry a dated note. No trial ran and no workflow was dispatched
+for the meeting.
+
+### Who decided what
+
+The council decided every item below. The orchestrator called the meeting
+because plan section 21.4 leaves the first question to the chair and the
+second touches a guard a council record set. It is not a founder decision,
+and the founder can overrule it. No seat found anything reserved for the
+founder in it: it adds no spending, contract, counsel, sending, public name
+or licence term. The pull request that builds gate ET17 changes what the
+seat account may read, so it is in a founder class by content (gate
+semantics) and goes to the Founder Proxy (agent) by the usual rule.
+
+Six seats gave round 1 positions independently, each as its own read-only
+process that saw no other answer to the brief: security, verification-lead,
+eda-tooling, qa-evidence and ai-engineer on both questions, and
+firmware-engineer, the owner of gate WF14, on the second only. The chair
+then put one follow-up question to security, the owner of the account, on
+the facts of the `[files]` finding (step 4 of `council/README.md`), and
+decided. The seats read ip-nirmaan `main` at 6750a127, the uploads of
+replay run 45135605510 as GitHub served them, and the diff of the build
+lane's branch `fix/verilator-verilate-jobs` at 7e55d212. The seats had no
+shell; nothing was run. The chair rechecked the facts below against the
+files and the data.
+
+A key is an agent review. Nothing here is a person's approval, a release,
+or a claim that a design is ready to be made in silicon.
+
+### Facts checked
+
+T1 to T12 number this addendum's facts.
+
+- T1. `evals/flow/et5_controls_record.json` records replay run 45119522138
+  (`main` at c0ba283c): controls 7 of 7 and sweep 100 of 100 as recorded;
+  of 402 fixture tests 390 passed and 12 failed, 11 bypass controls and one
+  must-pass test, the setup over an approved file linked beside it (plan
+  section 21.3).
+- T2. ip#471 (merge a15b8c1d) changed `scripts/live_eval_seat.py` so that
+  such a setup opens the linked file inside the account's view, and added
+  to `scripts/live_eval_controls.py` a recorder that writes each bypass
+  control's tool runs (command, exit status, the lines naming what it could
+  not open, last lines, summary and metrics) to `bypass.json`.
+- T3. Replay run 45135605510 was dispatched on `main` at a15b8c1d with
+  `controls`, no model and no token (replay job 137561030446, conclusion
+  failure at the fixtures step; rejudge job 137568408317, success; the
+  `live-eval` job skipped). No committed file holds this run. Its uploads
+  show: 32 probes denied in each of the two jobs' tool reach records, on
+  that commit; the reference answer's replay passed and its re-judge was
+  the same; controls exit 0 with 7 controls; the sweep matched; 402 fixture
+  tests, 391 passed, 11 failed, none skipped; the linked setup's test
+  passed.
+- T4. `main` at 6750a127 differs from a15b8c1d by ip#466 only, which
+  changes the review loop's files and no file that run read.
+- T5. The 11 failed tests are the 11 bypass controls of T1, by name. In
+  `bypass.json` every step of theirs starts a wrapper in
+  `/opt/nirmaan-seat/bin/`, and the tool's own lines are:
+  - `a_top_reaches_the_shell` (Yosys, exit 0) and
+    `a_setup_reaches_the_shell` (SBY, exit 16): the payload's `touch` ran
+    and printed "cannot touch '.../MARKER': Permission denied";
+  - the five canary forms through Yosys (`dollar_macro`, `esc_dollar_task`,
+    `esc_quote`, `ifdef_lone_quote_readmem`, `split_macro`), two runs each:
+    "Can not open file ... CANARY_ET1.hex for $readmemh", exit 1;
+  - `esc_abs_module` and `esc_dotdot_module` through `verilator
+    --lint-only`: "Can't resolve module reference" naming the canary file;
+  - `glued_macro_call` through Icarus (`vvp`): "$writememh: Unable to open
+    .../outside/MARKER for writing";
+  - `the_host_file_reaches_the_summary[include-glued]` through SBY: "Can't
+    open include file `leak.vh'", exit 16.
+- T6. The record holds no user id and no error number. It shows which
+  program started and what it printed; it does not show which layer refused
+  (the run's view, a file mode or an access list). The reach records of T3
+  show the account's denials separately.
+- T7. Of the 37 bypass controls that passed in that run:
+  - 12 are through `verilator-sim`, whose command is `verilator` with no
+    wrapper: a Verilator model build stays the caller's by decision 6 above
+    and gate ET9 (`src/nirmaan/integrations/eda.py`, `seat_tool`). They
+    reached their targets as the runner.
+  - 24 ran through the account's wrappers and passed. Their assertion
+    looks only for the file's name in the output
+    (`tests/test_gate_inputs.py`,
+    `test_control_without_the_check_a_tool_acts_on_the_form`, last branch,
+    and `test_control_without_the_check_a_seat_file_reaches_a_judge_file`).
+    In 23 the tool's line says it could not open or find the file, and
+    that line names it; in one (`esc_quote` through the lint) a warning
+    quotes the seat's own source line, which holds the name.
+  - 1, `the_host_file_reaches_the_summary[files-absolute]`
+    (`tests/test_gate_reads.py`), ran SBY through the account's wrapper and
+    passed with the host file's marker in the run's summary.
+- T8. Why T7's last control reached. `eda.seat_inputs` names as an input of
+  the run every file a setup's `[files]` section names, by its resolved
+  path. The root helper (`scripts/live_eval_seat.py`, `input_problem`)
+  refuses an input that is not a regular file of the runner's, with one
+  name, reached through no link, inside a `/tmp/nirmaan-*` folder the
+  runner made; it grants any other. So with the screen bypassed, a `[files]`
+  entry makes readable to the account a runner-made file under
+  `/tmp/nirmaan-*` whose exact path the setup writes. Also, `formal.cover`
+  builds its steps by reading each such Verilog file as the caller and
+  writing a derived copy into the run's directory (`eda.py`, `_hdl_files`,
+  `_sby_cover`).
+- T9. With the screen in force, an absolute, parent, home or linked
+  `[files]` entry is refused before SBY starts
+  (`tests/test_gate_reads.py`,
+  `test_a_setup_that_reads_a_host_file_is_refused_and_its_content_reaches_no_output`);
+  those fixtures passed in run 45135605510. Security (follow-up): the flow's
+  sandbox is a `/tmp/nirmaan-flow-*` folder that holds the held-out checks'
+  copies; the plan credential, the relay token, the checkout and the
+  runner's home are outside `/tmp/nirmaan-*` and are refused by the helper.
+  Whether a seat could learn a path inside another folder was not tested
+  (security, assumption).
+- T10. The formal gates can run on the timer path: a timer seat that
+  declares a `formal_spec` makes `formal.run` and `formal.cover` run SBY
+  over its own setup (plan section 16; `tests/test_whole_flow_reach.py`).
+- T11. ip#471 moved the digest of the pinned group "Seat account". Plan
+  section 21.1 on `main` still gives the earlier value as unchanged, and no
+  committed file names the new one (ai-engineer, qa-evidence).
+- T12. For the second question. `tests/test_nirmaan_firmware_reach.py`
+  pins the literal options of the Verilator build in
+  `firmware._cosim_steps` (`VERILATOR_OPTIONS`) and fails with
+  `RETURN_CONDITION` when they differ. The branch at 7e55d212 adds
+  `--verilate-jobs 1` to four Verilator model builds
+  (`eda.py`, twice; `firmware.py`; `firmware_riscv.py`) and to
+  `VERILATOR_OPTIONS` in the same commit, with a test that the words are
+  present and a section of `docs/TEST_CI_HARDENING.md`. It touches no
+  harness file, header, manager, HAL member or `IRQ_OPTIONS`, and adds no
+  `--vpi`, `--public`, `--trace` or `--threads`. `src/nirmaan/integrations`
+  is the pinned group "Gate backends" of the plan (section 21.1) and of
+  `evals/plans/2026-11-23-w2-remeasure.md` (section 6). That the two words
+  change nothing Verilator emits was not shown: no seat could build.
+
+### Decisions
+
+#### E1. The cause of each of the 11 (security's statement)
+
+Security stated the cause of each from T5, and verification-lead,
+eda-tooling and qa-evidence read the same lines the same way:
+
+1. In all 11 the tool ran through the seat account's wrapper. In two the
+   payload itself ran (`touch`), and its write was refused. In the other
+   nine the tool tried to open or write its target and printed that it
+   could not.
+2. The five Yosys canary runs stopped at the open of the canary. This
+   answers verification-lead's doubt of plan section 21.4: they are refused
+   reads, not runs that did not finish. Verification-lead withdrew that
+   doubt in its position.
+3. For the two `verilator --lint-only` forms the tool's line says the
+   reference could not be resolved, not that an open was refused. The
+   reading rests on a contrast in the same run: the same forms through
+   `verilator-sim`, as the runner, print the canary's first line. It is an
+   inference, and is recorded as one (verification-lead, qa-evidence).
+4. Which layer refused is not in the data (T6). Every text says "could not
+   open or write", "was refused" or "did not reach", and never names the
+   layer from this record.
+
+The 37 that passed do not change the reading of the 11. They show three
+other things (T7), which decisions E2 and E3 take up.
+
+Owner: security.
+
+#### E2. How a bypass control is read as the seat account, and gate ET5 reworded
+
+All five seats on this question said that a refused target is the result
+these controls should give as the account: the account is the control this
+record chose, and a bypass control removes only the screen. They differed
+on the words. Security and eda-tooling named the 11; qa-evidence would not
+say "outside the run's view" or "does not reach" beyond what was observed;
+verification-lead gave a rule that checks the tool's line; ai-engineer tied
+the gate to a commit's pinned values. The chair takes verification-lead's
+rule, with qa-evidence's limits and ai-engineer's tie (decision E4).
+
+A bypass control of gate ET1 (`test_control_without_the_check_*`), run with
+the tools as the seat account, is read so:
+
+1. It gives its expected result when it fails and the run's committed
+   bypass record shows, for every tool run it made, a wrapper of the seat
+   account as the command and the tool's own line naming the canary, the
+   marker or the host file as a target it could not open, resolve, read or
+   write, and none of the target's content in the output.
+2. A control that fails without such a line, or whose record shows the
+   target's content in its output or its marker written, is a difference.
+   It stops the measured run and returns to the council.
+3. A control whose tool runs as the caller by a stated rule (today the
+   Verilator model builds, decision 6 and gate ET9) gives no result as the
+   account. It is listed as such and claimed for nothing.
+4. A control that passes as the account is not read as showing a live
+   payload as the account, and not as showing a refusal either. If its
+   record shows the target's content, item 2 applies whatever its outcome.
+5. In CI's test job, as the caller, every bypass control must still pass:
+   that is where it shows its fixture is live (gate ET1).
+
+Every other committed fixture gives the result it gave, as before. The row
+of gate ET5 in the table above is reworded with a note, and item 5 of
+decision 2 is read with this decision.
+
+Why this loosens nothing. The gate's purpose is that running the tools as
+the account changes no result a trial depends on and breaks no fixture.
+A control built to show a payload reaching its target cannot both pass and
+have the account stop the payload. The reading replaces "the same outcome"
+for those controls with a stricter thing to show: the tool's own line, per
+control, in a committed record, held by a test.
+
+By item 2, run 45135605510 holds a difference: the `[files]` control of T7.
+So ET5 is not met on that run. Decision E3 follows.
+
+Owners: verification-lead (the gate and its statement); security (the
+reading of each control).
+
+#### E3. A setup's `[files]` entries: closed in code before the measured run (gate ET17)
+
+Security found it and holds that it must be closed before the measured
+run. Verification-lead, eda-tooling and qa-evidence saw the same fact in
+round 1 and asked that it be stated: in security's position, in the gate's
+wording and in `docs/GATE_INPUTS.md`. None of them saw security's follow-up
+answer, and none argued for running the measured run with it open. The
+chair decides with security, for three reasons.
+
+First, decision 1 above: the screen is not named as the control, because a
+check of text by patterns was shown to differ from what a tool does. For a
+`[files]` entry under `/tmp/nirmaan-*` the screen is today the only control
+(T8), and the folders it could reach hold the held-out checks (T9).
+Second, T10: the formal gates run on the timer path whenever a seat
+declares a `formal_spec`, so this is the timer's own path from the measured
+run on, not a later flow's. Third, gate ET7 puts the measured run after the
+last merge and the freeze of gate WF25 holds from slot 1, so a repair after
+the measured run would mean a second measured run.
+
+1. Before the measured run, a file that a seat's setup names under
+   `[files]` becomes an input of the run, and is read by the caller for
+   `formal.cover`, only when it is the run's own: inside the setup's own
+   folder, or a file the harness itself gave the run. The rule is applied
+   where the inputs are named, independently of the screen, so it holds
+   with the screen bypassed.
+2. The setup over an approved file linked beside it (T2) still runs as the
+   account. The build lane and security settle how; a repair that breaks
+   that test is not the repair.
+3. Shown by: a unit test of each function changed; the `[files]` bypass
+   control refused as the account, by the reading of decision E2; a bypass
+   control through `formal.cover`; and every must-refuse fixture of T9
+   still refused.
+4. The sentence of `scripts/live_eval_seat.py` that says nothing else of
+   the sandbox is in the view is made true or corrected in the same pull
+   request, so the "Seat account" group moves at most once more.
+5. Gate ET7 applies: no file in `harness.CODE`, `LOOP_CODE` or `FLOW_CODE`
+   and no tool definition changes, shown by the test of gate WF7 and the
+   four fingerprints recomputed on the merge commit. If it cannot be built
+   so, it returns to the council before it merges.
+6. `docs/GATE_INPUTS.md` and `docs/LIVE_EVAL_EVIDENCE.md` state what the
+   account is given for a formal setup and what remains of the residual, by
+   decision 8 (gate ET8, qa-evidence).
+
+Not ruled: whether a seat could in fact learn a path it would need (T9).
+The repair does not wait on that question.
+
+Owners: security (the rule and its conditions); eda-tooling (the build).
+
+#### E4. The record gate ET5 is stated on (gate ET18)
+
+All five seats said a committed record is required before anyone states
+ET5 met: no committed file holds run 45135605510, and plan section 19.4
+already asked on what committed evidence an ET5 claim rests. They named
+that run because it was the newest. After decision E3 it is not the run
+ET5 can be stated on: the repair moves "Gate backends", and a statement
+about the tools as the account holds only for the code that ran
+(ai-engineer).
+
+1. After the repair of decision E3 merges, a replay of `flow/axil-timer`
+   with `controls` is dispatched on `main` on that merge commit or a later
+   one, with no model and no token.
+2. Its record is committed by eda-tooling as a new file beside
+   `evals/flow/et5_controls_record.json`, with the run's `bypass.json` as
+   uploaded, byte for byte, named with its sha256 (decision R1). If the two
+   do not fit one pull request that the review reads whole, they go as a
+   chain as decision R2 says; nothing is cut.
+3. A test in `tests/test_live_eval_controls.py` holds it: the run, its
+   commit on `main` and each job's conclusion; controls 7 of 7 and the
+   sweep 100 of 100 against the committed files; the fixture counts, none
+   skipped; the linked setup's test and every must-refuse fixture passed;
+   every probe denied in both jobs' reach records on the same commit; the
+   set of failed tests equal to a set of bypass controls the record names;
+   and, for each of those, the reading of decision E2, item 1, checked from
+   the committed bypass record. It lists the controls that ran as the
+   caller. A failed test outside that set, or a control that meets item 2
+   of decision E2, fails it.
+4. Verification-lead reads the head of that pull request and states whether
+   ET5 is met. The statement names the run and the commit, and holds only
+   while the values of the plan's tables on the commit the measured run is
+   dispatched from equal those on the run's commit (section 7 of the plan).
+   If a pinned group moves after it, ET5 is open again and says so.
+5. `evals/flow/et5_controls_record.json` (run 45119522138) and its test
+   stay unchanged, as the record of that run. It is not cited as showing
+   ET5 met. The precedent is decision A2: a record is not rewritten to hide
+   what a run showed.
+6. Run 45135605510. This addendum's facts T3 to T7 were read from its
+   uploads. Its controls upload is committed too, as uploaded, as records
+   only, so that security's statement of decision E1 and the finding of
+   decision E3 rest on a committed file. It is cited as what showed the
+   finding and never as showing ET5 met.
+7. If the replay of item 1 shows anything the reading of decision E2 does
+   not expect, nothing is dispatched and it returns to the council.
+
+Owners: eda-tooling (the records and the test); verification-lead (the
+read and the statement); qa-evidence (the texts, gates ET8 and ET13).
+
+#### E5. What else is on `main` before the measured run (gate ET19)
+
+1. A dated addition to the plan (verification-lead writes it; ai-engineer
+   checks the values): every value of section 21.1 recomputed on the commit
+   of decision E4, item 1; the "Seat account" group recorded as moved by
+   ip#471 (T11) and whatever the repair of decision E3 moves; gate ET7
+   shown for ip#471, for ip#466 and for the repair; the reading of
+   decision E2 and the order of this addendum taken up; and section 21.3's
+   sentence that the payload "did not reach its target outside the run's
+   view" reworded to what the committed records show.
+2. `docs/LIVE_EVAL_EVIDENCE.md` cites the record of decision E4 for ET5,
+   in the words of decision E1, item 4. History fragments are not edited;
+   a new one is added (qa-evidence reads the head).
+3. The measured run is dispatched only after the last of these merges
+   (gate ET7), with every value recomputed on its commit first.
+
+Not before the measured run, and recorded so that they are not lost:
+
+- The 24 controls of T7 whose assertion a refusal line satisfies are made
+  to assert the target's content. eda-tooling would do it now;
+  verification-lead would wait, since it changes the fixture set ET5
+  compares. The chair: before slot 21, with gates ET9 and ET12, and not
+  between the replay of decision E4 and the timer's last trial. Until then
+  item 4 of decision E2 says what such a pass means. Owner: eda-tooling.
+- eda-tooling reported that the Yosys summary reads "0 errors" for an
+  error line of the form the canary runs printed. It is a parser matter in
+  a pinned group and is eda-tooling's to schedule outside both freezes; it
+  is not decided here.
+- The re-measure plan pins values that ip#464 and ip#471 moved
+  (ai-engineer). Its own section 7 governs; its amendment is owed before
+  its trial 1, not before the timer's measured run.
+
+Owners: verification-lead, with ai-engineer (item 1); qa-evidence (item 2).
+
+#### V1. `--verilate-jobs 1` under gate WF14 (gate ET20)
+
+Every seat that answered found the two words acceptable if evidence is
+shown, and none found them acceptable on reading alone. Firmware-engineer,
+the gate's owner: acceptable on its conditions; the guard still pins the
+list exactly, since the list and the build change in one commit; the claim
+that nothing a driver test can reach changes is not shown by reading,
+because the guard pins option text and not the generated model or the
+simulator's version. qa-evidence: the claim is not shown.
+
+The chair rules that the two words are acceptable under gate WF14 when all
+of these hold:
+
+1. **Evidence in the pull request, from CI on its head, named by run and
+   job.** The guard file passes;
+   `test_a_driver_tests_c_reaches_the_simulators_clock` gives the counts it
+   is recorded with; the wait probe and the strict fixtures of gate WF15
+   give their recorded results (firmware-engineer). And, on the Verilator
+   that CI installs, for both registered buses, the co-simulation image's
+   external symbols are the same with and without the two words (security,
+   eda-tooling, qa-evidence): the guard's own comment gives symbols as its
+   concern, so the chair asks for them and not only for the behaviour.
+2. **The return condition is checked by its owner.** `RETURN_CONDITION`
+   says the list changes "only together with that check". The chair reads
+   that as: firmware-engineer reads the evidence of item 1 on the head and
+   states that what a driver test can reach under `fw.test` did not change.
+   The pull request's text says the guard's list changed and names the
+   condition. If any result of item 1 differs, the pull request returns to
+   firmware-engineer, the fixture driver test is owed again as the
+   condition says, and gate WF15's records are taken again on the new
+   build.
+3. **Texts.** `docs/TEST_CI_HARDENING.md` section 9 and the comment in
+   `eda.py` say what the co-simulation build now passes; the new section
+   and the new test name the same four builds (one says `regmap.verify`,
+   the other `fw.soc_test`); the count of CI failures cites its runs or is
+   dropped; "cannot happen" is given as an inference with an open source;
+   the two accounts of the upstream fix agree. No text says a record of
+   gate ET5 covers a build with these words (verification-lead). qa-evidence
+   reads the head.
+4. **Order.** It merges only after the timer's last trial is recorded
+   (gate WF25): it moves "Gate backends", and the timer gains nothing from
+   it, since no timer step is a Verilator model build and a lint passes no
+   `-j`. Before trial 1 of the re-measure batch, that plan's dated addition
+   restates the moved digest, with whatever its own rules ask to be run
+   again after a pinned group moves; ai-engineer names the coverage replays
+   and checks the six fingerprints unchanged on the merge commit.
+
+This reads with gate WF14 of the 2026-11-17 record and changes no word of
+it. It is recorded here because the meeting was one meeting.
+
+Owners: firmware-engineer (items 1 and 2); the build lane's seat,
+eda-tooling (the pull request and item 3); ai-engineer with
+verification-lead (item 4); qa-evidence (the texts).
+
+### Positions not adopted, and dissent
+
+- security and eda-tooling: name the 11 controls in the gate's words. Not
+  adopted as wording: the set is named by the committed record and held by
+  its test (decision E4, item 3), since the repair of decision E3 changes
+  the set. Adopted in substance.
+- qa-evidence: the reading should say that these 11 runs "printed that
+  they could not open or write" and should not say "does not reach".
+  Adopted for every text (decision E1, item 4); the reading of decision E2
+  is by the tool's line.
+- security, verification-lead, eda-tooling, qa-evidence and ai-engineer
+  each asked that ET5 be stated on a committed record of run 45135605510.
+  Not adopted as asked: after decision E3 the run ET5 is stated on is a
+  later one. That run's upload is still committed (decision E4, item 6).
+  No seat saw decision E3 when it answered; recorded so that each may
+  dissent on reading this.
+- verification-lead, eda-tooling and qa-evidence asked in round 1 that the
+  `[files]` finding be stated or recorded. Security: closed before the
+  measured run. The chair decided with security (decision E3). Recorded as
+  a difference; none of the three argued against closing it.
+- eda-tooling: make the 24 name-only controls assert content now.
+  Verification-lead: after the timer. The chair set the window of decision
+  E5. Recorded as dissent by eda-tooling.
+- firmware-engineer did not ask for the symbol comparison; three other
+  seats did. Adopted with firmware-engineer's own evidence (decision V1,
+  item 1).
+- No seat held that the 11 are anything other than the account refusing
+  the payload's target, and no seat proposed dropping "every committed
+  fixture" from the gate.
+
+### Gates changed and added
+
+Gate ET5 is reworded in the table above, with a note. Added:
+
+| Gate | Condition | Owner seat |
+|---|---|---|
+| ET17 | Before the measured run: a file a seat's setup names under `[files]` is an input of the run, and is read for `formal.cover`, only when it is the run's own, independently of the screen, with the tests and texts of decision E3 and gate ET7 shown on its merge commit | security |
+| ET18 | Before the measured run: the record of a fresh replay with `controls` on `main`, on a commit that holds gate ET17, is committed with its bypass record as uploaded and the test of decision E4, item 3; verification-lead states ET5 on the head of that pull request; the controls upload of run 45135605510 is committed as records only | eda-tooling |
+| ET19 | Before the measured run: the plan's dated addition and the texts of decision E5, items 1 and 2, are on `main`, and the measured run is dispatched after the last of them | verification-lead |
+| ET20 | Before `--verilate-jobs 1` merges: the evidence, the owner's statement and the texts of decision V1, items 1 to 3; and it merges only after the timer's last trial is recorded, with the re-measure plan's addition before that batch's trial 1 | firmware-engineer |
+
+### Build specification, for the build lane
+
+This meeting wrote no code. Items 1 to 3 come before the measured run, in
+this order; item 4 after the timer's last trial.
+
+1. **Gate ET17.** The repair of decision E3 in the code that names a run's
+   inputs and that reads a setup's files for `formal.cover`, with its
+   tests, the corrected sentence and the texts. Gate ET7 shown in the pull
+   request. A founder class by content.
+2. **Gate ET18.** The replay on the merge commit; then the records: that
+   run's record, its bypass record as uploaded, the test, and the controls
+   upload of run 45135605510 as records only. Each pull request is one the
+   review reads whole.
+3. **Gate ET19.** The plan's dated addition and the evidence text, after
+   verification-lead's statement, or in the same pull request as the
+   statement's record if it fits.
+4. **Gate ET20.** The build lane's pull request for `--verilate-jobs 1`,
+   as decision V1 says.
+
+### Open, for the founder
+
+1. This addendum, to confirm or overrule.
