@@ -212,12 +212,18 @@ Built in rollout R5; in use on real pull requests since 2026-10-18. The
 a pull request it wrote, and the script refuses when a Claude Code session has
 the branch checked out. In order:
 
-1. **At most two model calls at once** across Nirmaan and IP Nirmaan: two
-   model slots in `~/.nirmaan/pr-review/`, shared with Nirmaan's loop
-   (`model_cap` 2 in both), held here only around each model call (a
-   reviewer's, or the loop's fixer's), never while checking out, reading CI,
-   posting or running local checks. Slot 0 is `review.lock`, slot 1
-   `model-slot-1.lock`; this script tries `review.lock` first and Nirmaan's
+1. **At most three model calls at once** in this loop, in the three model
+   slots it has in GitHub Actions (`model_cap` 3 here; the slots are files in
+   its own state folder, so Nirmaan's loop takes none of them). Across both
+   repositories on a shared Mac state folder (`~/.nirmaan/pr-review/`) the cap
+   stays 2, as Nirmaan's founder-approved record sets it (its
+   `docs/operations/pr-review-decisions.md`, line 193, and R5.5 in
+   `docs/operations/2026-10-18-review-loop-decisions.md`): if this loop ever
+   runs on that folder again, its `model_cap` must be 2 there, or a Nirmaan
+   decision record must raise the shared cap first. A slot is held here only around each
+   model call (a reviewer's, or the loop's fixer's), never while checking out,
+   reading CI, posting or running local checks. Slot 0 is `review.lock`, slot
+   n `model-slot-<n>.lock`; this script tries `review.lock` first and Nirmaan's
    loop its other slot first. When every slot is held elsewhere at a call, the
    run ends ("busy", exit 3) and the next run reuses the verdicts already
    cached. Each slot is a folder with an owner file written whole (a
@@ -551,9 +557,15 @@ writes no pause. The pause is read again before every model call, so a
 review or fix round already running when the other worker (or the Nirmaan
 loop) starts a pause makes no further call: its step ends `paused` and its
 cached verdicts carry over. Any other deferral still stops the loop, and so
-does a limit whose retry failed some other way.
+does a limit whose retry failed some other way. A limit any worker hits
+pauses all of them: no new step starts in that pass, and a step already
+running makes no further model call.
 
-**Two pull requests at once, every pull request each pass.** A model slot is
+**Three pull requests at once, every pull request each pass.** The width of
+three, with three model slots, is decision A1 of the
+[council record 2026-11-19 (parallel keys), addendum 2026-11-24](../council/records/2026-11-19-parallel-keys.md#addendum-2026-11-24-the-review-loop-at-three-pull-requests-at-once);
+its gates LW1 to LW5 hold it, and more than three workers or slots is a new
+question for the founder. A model slot is
 held only around each model call (step 1 of "How reviewers run"); the local
 checks run without one, so other reviews go on meanwhile. One pass at a time
 runs for this repository: the pass holds its own lock
@@ -561,13 +573,23 @@ runs for this repository: the pass holds its own lock
 that finds it held ends at once. Each pass takes one step on every open pull
 request, one the loop is fixing first, then by number, so a pull request
 waiting for CI, or one that just ran a review or a fix, never holds up the
-others. Up to `parallel_reviews` (2) steps run at once, in two workers of the
-one pass; each pull request is taken by one worker only, so no pull request is
-ever reviewed or fixed by two at once. The keys, the Founder Proxy and the
-fixer are the same in each. Every model call of either worker holds one of the
-two model slots shared with the Nirmaan loop, so at most two model calls run
-at once across both repositories; a worker that finds both held ends its step
-`busy` and its cached verdicts carry over. The check that the loop is `main`'s
+others. Up to `parallel_reviews` (3, `LOOP` in `scripts/pr_loop.py`) steps run
+at once, in that many workers of the one pass; each pull request is taken by
+one worker only, so no pull request, and no head, is ever reviewed or fixed by
+two at once. With `parallel_reviews` 1 the pass steps one pull request at a
+time. The keys, the Founder Proxy, the fixer and its rounds, the records fast
+lane, the merge path and every stop rule are the same in each, and a stop
+labels only its own pull request. Each pull request's state file is written
+by its own worker only, and every write of it, and of the pause file, is a
+whole file renamed into place, so no reader sees half of one. Every model call
+of a worker holds one of the `model_cap` (3, `CONFIG` in
+`scripts/pr_review.py`) model slots, one for each worker. Three
+holds where this loop has its own slots (GitHub Actions, today's setup). On a
+machine where the Nirmaan loop shares the state folder the shared cap is 2 (the
+Nirmaan record named in step 1 of "How reviewers run"), so this loop's
+`model_cap` must be 2 there; a
+worker that finds every slot held ends its step `busy` and its cached
+verdicts carry over. The check that the loop is `main`'s
 copy runs once, before each pass, so no new step starts once `main` may have
 moved: after the pass's own auto-merge (GitHub may merge at once), after a
 rate-limit pause, and when `main`'s sha on origin, read before each step,
@@ -868,8 +890,10 @@ second writer for one folder; the run then stops and says so, and nothing is
 overwritten. `pull` refuses a folder with no `writer.json`, so an unseeded
 loop never starts from empty state and reviews everything again.
 
-**Differences from the Mac.** The two model slots are files in a state
-folder, so once the loops run on two machines each has its own two. Until
+**Differences from the Mac.** The model slots are files in a state
+folder, so once the loops run on two machines each has its own (this loop
+three, the Nirmaan loop two); only a shared state folder is capped at 2 across
+both. Until
 the Nirmaan loop also reads and writes the state repository, it does not see
 this loop's pause, nor this loop the Nirmaan loop's: each pauses at its own
 first limited call. Call lines from before the switch stay in the Mac's

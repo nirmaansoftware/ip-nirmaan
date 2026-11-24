@@ -37,6 +37,26 @@ refused as any other.
 CLI version and flow digest, and by purpose, so a calibration trial is never
 pooled with evidence. Arms are apart already: a run without knowledge is a
 different harness. Every trial is listed one by one with whether a judge ran.
+
+**A flow that stops early** (fifth addendum to the council record, decision
+F2). A stopped trial's flow digest covers only the stages it seated, so it is
+placed by those stages instead. Within one set of case, case digest, model,
+harness, CLI and purpose, trials are placed in the order of how many stages
+they seated, most first. A trial fits a group when its stage names and their
+order equal the group's and every stage it seated records exactly the skills
+and skill digests the group holds for that stage; a group holds the stage
+values of the first trial placed in it, and a trial that seated every stage
+fits only a group of its own flow digest, so complete trials group by flow
+digest as above. A trial that fits no group starts one, and one that fits one
+group joins it. One that fits more than one is listed under `unplaced` in each
+group it fits, with those groups named by their first trial (`fits`); none of
+them is given a count (`no_count` says why) and the question returns to the
+council. Each trial keeps its recorded `flow_digest` and gains `stopped_at`,
+the stage at which its flow stopped (empty for a flow that reached its last
+stage). A group shows its first trial's flow digest (`first`) and
+`covers_every_stage`. A stopped trial reached no judge, so it is a failed trial
+of its group. Only `_whole_flow_groups` changed: the flow code, the record
+format and the fingerprints did not.
 A group's "whole-flow pass count" (`count`: `n`, `passed`, `unjudged` and the
 95 percent Wilson interval) is written only from `WHOLE_FLOW_MIN` (10) trials;
 whether the planned count of the group is complete is the committed batch

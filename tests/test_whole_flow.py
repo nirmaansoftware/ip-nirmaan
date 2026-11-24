@@ -20,6 +20,7 @@ import pytest
 
 from nirmaan.company import build_organization
 from nirmaan.evals import EvalError, load_cases, record_run, validate_case
+from nirmaan.evals.flow import flow_digest
 from nirmaan.evals.records import flow_labels, is_whole_flow, load_record
 from nirmaan.models import EvalCase, EvalResult, EvalRunManifest, EvalStage, EvalTrial
 from nirmaan.runtime import harness
@@ -452,6 +453,242 @@ def test_a_timer_slot_whose_reach_folders_fail_a_check_is_refused(tmp_path, what
         (slot / "notes.txt").write_text("x", encoding="utf-8")
     with pytest.raises(AssertionError, match=match):
         _check_slots_reach(tmp_path)
+
+
+def test_a_slot_redispatched_after_a_stop_may_record_on_a_later_commit_than_the_next_slot(tmp_path):
+    # Seventh addendum, decision T2, item 7: at width two, slot 1's first run stops at job level with no trial while
+    # slot 2 runs and records on commit A; slot 1 is dispatched again from a later commit B and records there.
+    earlier, later = "a" * 40, "b" * 40
+    one = tmp_path / "g3-timer" / "slot-01"
+    record = one / "2026-11-23-claude-code-m"
+    record.mkdir(parents=True)
+    (record / "manifest.json").write_text(json.dumps({"id": "r", "head_sha": later}), encoding="utf-8")
+    (record / "rejudge.json").write_text("{}", encoding="utf-8")
+    _run(one, "90", wrote=False, jobs=("trials",), head=earlier, cause="exit 2, bad input")
+    _run(one, "113", wrote=True, head=later)
+    _slot(tmp_path, 2, head=earlier)  # run 111, dispatched between slot 1's two runs
+    _check_slots_reach(tmp_path)
+
+
+# --- The overlap of the timer's slots (seventh addendum, decision T5, item 2) ------------------------------------
+#
+# Two slots are in flight at most, always two adjacent slots, one of each arm (decision T1). The committed records show
+# it: among the timer's slot records, any two whose manifests' times overlap are records of adjacent slots. The check
+# reads the times and states none.
+
+
+def _manifest_times(folder: Path, where: str) -> tuple[datetime, datetime]:
+    manifest = json.loads((folder / "manifest.json").read_text(encoding="utf-8"))
+    try:
+        start, finish = (datetime.fromisoformat(manifest[key]) for key in ("started_at", "finished_at"))
+    except (KeyError, TypeError, ValueError) as error:
+        raise AssertionError(f"{where}: the manifest's started_at and finished_at do not read as times") from error
+    assert start <= finish, f"{where}: the manifest finishes before it starts"
+    return start, finish
+
+
+def _check_slot_overlap(root: Path) -> None:
+    timed = []
+    for slot in sorted(root.glob("g3-timer/slot-*")):
+        match = SLOT_FOLDER.fullmatch(slot.name)
+        if not (slot.is_dir() and match):
+            continue  # not a slot folder: the reach check refuses it
+        for path in sorted(slot.rglob("manifest.json")):
+            if slot / "reach" not in path.parents:
+                where = path.parent.relative_to(root).as_posix()
+                timed.append((int(match.group(1)), where, *_manifest_times(path.parent, where)))
+    for i, (n, where, start, finish) in enumerate(timed):
+        for m, other, start2, finish2 in timed[i + 1:]:
+            if start < finish2 and start2 < finish:
+                assert abs(n - m) == 1, f"{where} and {other} overlap in time and are not adjacent slots"
+
+
+def test_committed_timer_slot_records_overlap_only_with_an_adjacent_slot():
+    # With no slot record yet this passes; the fixture tests below show the check bites once records exist.
+    _check_slot_overlap(EVALS / "results")
+
+
+def _timed_slot(root: Path, n: int, start: int, finish: int, *, times: bool = True) -> None:
+    """A slot record whose manifest runs from `start` to `finish` hours after AT."""
+    folder = root / "g3-timer" / f"slot-{n:02d}" / "2026-11-23-claude-code-m"
+    folder.mkdir(parents=True)
+    hour = AT.timestamp()
+    manifest = {"id": "r", "head_sha": SHA}
+    if times:
+        manifest.update(started_at=datetime.fromtimestamp(hour + 3600 * start, timezone.utc).isoformat(),
+                        finished_at=datetime.fromtimestamp(hour + 3600 * finish, timezone.utc).isoformat())
+    (folder / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+
+
+def test_slot_records_that_overlap_only_with_an_adjacent_slot_pass(tmp_path):
+    _check_slot_overlap(tmp_path)  # no record at all
+    for n, start, finish in ((1, 0, 4), (2, 1, 6), (3, 5, 9), (4, 9, 12), (5, 12, 14)):
+        _timed_slot(tmp_path, n, start, finish)  # 1 with 2, 2 with 3; 3 ends as 4 starts; 4 ends as 5 starts
+    # A reach folder's files are no record and carry no times.
+    _put(tmp_path / "g3-timer" / "slot-01" / "reach" / "111", "live-eval-tool-reach-trials-111/tool-reach.json",
+         {"format": "nirmaan.tool-reach"})
+    _check_slot_overlap(tmp_path)
+
+
+@pytest.mark.parametrize("slots, match", [
+    (((1, 0, 4), (2, 5, 8), (3, 2, 6)), "slot-01/.* and .*slot-03/.* overlap"),  # two of one arm together
+    (((1, 0, 6), (2, 1, 6), (3, 2, 6)), "not adjacent slots"),  # three in flight at once
+    (((1, 0, 2), (2, 1, 3), (5, 2, 4)), "slot-02/.* and .*slot-05/.* overlap"),  # a slot outside the window
+])
+def test_slot_records_that_overlap_with_a_slot_that_is_not_adjacent_are_refused(tmp_path, slots, match):
+    for n, start, finish in slots:
+        _timed_slot(tmp_path, n, start, finish)
+    with pytest.raises(AssertionError, match=match):
+        _check_slot_overlap(tmp_path)
+
+
+def test_a_slot_record_whose_manifest_holds_no_times_is_refused(tmp_path):
+    _timed_slot(tmp_path, 1, 0, 1, times=False)
+    with pytest.raises(AssertionError, match="do not read as times"):
+        _check_slot_overlap(tmp_path)
+
+
+# --- The plan's per-stage values (gate WF28; fifth addendum, decision F3, item 1) ----------------------------------
+#
+# A dated addition to the plan states, for each arm of the timer, every stage's skills and skill digests and the digest
+# over the first n stages. A later dated addition may state a table again, which then replaces the earlier one for that
+# arm. The stated values must give the stated digests with `flow_digest`, and the digest over every stage must be the
+# arm's flow digest in the latest table of the plan that states it.
+
+PLAN = EVALS / "plans" / "2026-11-22-g3-whole-flow.md"
+_ARM = r"(with documents \(on\)|without documents \(off\))"
+_DIGEST = r"`(sha256:[0-9a-f]{64})`"
+STAGE_ROW = re.compile(rf"^\| `flow/axil-timer` \| {_ARM} \| (\d+) \| `([^`]+)` \| `([^`]+)` \| {_DIGEST} \|$")
+PREFIX_ROW = re.compile(rf"^\| `flow/axil-timer` \| {_ARM} \| (\d+) \| `([^`]+)` \| {_DIGEST} \|$")
+FLOW_ROW = re.compile(rf"^\| Flow digest, (with|without) documents \|.* {_DIGEST} \|$")
+ARMS = {"with documents (on)": "with", "without documents (off)": "without"}
+
+
+def _stage_tables(text: str) -> tuple[dict, dict, dict]:
+    """The latest stage table, digest table and flow digest of each arm; a restated table is in a dated addition."""
+    stages: dict[str, dict[int, tuple[str, dict[str, str]]]] = {}
+    prefixes: dict[str, dict[int, tuple[str, str]]] = {}
+    flows: dict[str, str] = {}
+    section, dated, seen = 0, False, {}
+    for line in text.splitlines():
+        if line.startswith("## "):
+            section, dated = section + 1, "Dated addition" in line
+            continue
+        if match := FLOW_ROW.match(line):
+            flows[match.group(1)] = match.group(2)
+            continue
+        match, kind = STAGE_ROW.match(line), "stages"
+        if not match:
+            match, kind = PREFIX_ROW.match(line), "prefixes"
+        if not match:
+            continue
+        arm, n = ARMS[match.group(1)], int(match.group(2))
+        table = stages if kind == "stages" else prefixes
+        if seen.get((kind, arm), section) != section:
+            assert dated, f"the {kind} table of the {arm}-documents arm is stated again outside a dated addition"
+            table.pop(arm, None)
+        seen[(kind, arm)] = section
+        rows = table.setdefault(arm, {})
+        if kind == "stages":
+            name, skills = rows.setdefault(n, (match.group(3), {}))
+            assert name == match.group(3), f"{arm}: stage {n} is named {name!r} and {match.group(3)!r}"
+            assert match.group(4) not in skills, f"{arm}: stage {n} states skill {match.group(4)!r} twice"
+            skills[match.group(4)] = match.group(5)
+        else:
+            assert n not in rows, f"{arm}: the digest over the first {n} stages is stated twice"
+            rows[n] = (match.group(3), match.group(4))
+    return stages, prefixes, flows
+
+
+def _check_stage_tables(text: str, exercised: dict) -> None:
+    stages, prefixes, flows = _stage_tables(text)
+    for arm in ARMS.values():
+        st, pr = stages.get(arm), prefixes.get(arm)
+        assert st and pr, f"the {arm}-documents arm has no stage table or no digest table"
+        count = list(range(1, len(st) + 1))
+        assert sorted(st) == count and sorted(pr) == count, f"{arm}: the stages and the digests are not both 1 to N"
+        assert [st[n][0] for n in count] == list(exercised), f"{arm}: the stages are not the case's, in order"
+        for n in count:
+            assert sorted(st[n][1]) == sorted(exercised[st[n][0]]), f"{arm}: stage {n}'s skills are not the case's"
+            assert pr[n][0] == st[n][0], f"{arm}: the digest over the first {n} stages names another stage"
+            given = {st[i][0]: st[i][1] for i in range(1, n + 1)}
+            assert flow_digest(given) == pr[n][1], f"{arm}: the stated values do not give the digest over {n} stages"
+        assert pr[count[-1]][1] == flows.get(arm), f"{arm}: the digest over every stage is not the arm's flow digest"
+
+
+def test_the_plan_states_each_stage_of_the_timer_and_its_digests_give_the_stated_flow_digests():
+    timer = {c.id: c for c in load_cases(EVALS, flow="whole")}["flow/axil-timer"]
+    _check_stage_tables(PLAN.read_text(encoding="utf-8"), {s: list(k) for s, k in timer.exercised.items()})
+
+
+def _tables(rows: dict, flows: dict, stages=None) -> str:
+    """A plan-like text with one dated addition holding both tables for both arms."""
+    lines = ["## 1. Values", *(f"| Flow digest, {arm} documents | `{d}` |" for arm, d in flows.items()),
+             "## 2. Dated addition (2026-11-24): stages", "| Case | Arm | n | Stage | Skill | Skill digest |"]
+    order = list(stages or EXERCISED)
+    for words, arm in ARMS.items():
+        for n, stage in enumerate(order, start=1):
+            lines += [f"| `flow/axil-timer` | {words} | {n} | `{stage}` | `{skill}` | `{rows[arm][stage][skill]}` |"
+                      for skill in sorted(rows[arm][stage])]
+    lines.append("| Case | Arm | n | Last stage | Digest over the first n stages |")
+    for words, arm in ARMS.items():
+        for n, stage in enumerate(order, start=1):
+            digest = flow_digest({s: rows[arm][s] for s in order[:n]})
+            lines.append(f"| `flow/axil-timer` | {words} | {n} | `{stage}` | `{digest}` |")
+    return "\n".join(lines) + "\n"
+
+
+def _synthetic():
+    rows = {arm: {stage: {skill: "sha256:" + hashlib.sha256(f"{arm}{skill}".encode()).hexdigest() for skill in skills}
+                  for stage, skills in EXERCISED.items()} for arm in ARMS.values()}
+    return rows, {arm: flow_digest(rows[arm]) for arm in ARMS.values()}
+
+
+def test_stage_tables_whose_digests_follow_from_their_values_pass():
+    rows, flows = _synthetic()
+    text = _tables(rows, flows)
+    _check_stage_tables(text, EXERCISED)
+    # A later dated addition may state the tables again; the latest rules.
+    later = {arm: {stage: {skill: "sha256:" + "0" * 64 for skill in skills} for stage, skills in EXERCISED.items()}
+             for arm in ARMS.values()}
+    again = _tables(later, {arm: flow_digest(later[arm]) for arm in ARMS.values()}).replace("## 1.", "## 3.").replace(
+        "## 2. Dated addition", "## 4. Dated addition")
+    _check_stage_tables(text + again, EXERCISED)
+
+
+@pytest.mark.parametrize("what, match", [
+    ("a skill digest changed", "do not give the digest"),
+    ("a digest over n stages changed", "do not give the digest"),
+    ("a flow digest that is not the last", "is not the arm's flow digest"),
+    ("a skill missing", "skills are not the case's"),
+    ("an arm missing", "no stage table"),
+    ("the tables stated again outside a dated addition", "outside a dated addition"),
+    ("a stage out of order", "not the case's, in order"),
+])
+def test_stage_tables_that_do_not_give_their_digests_are_refused(what, match):
+    rows, flows = _synthetic()
+    text = _tables(rows, flows)
+    lines = text.splitlines()
+    if what == "a skill digest changed":
+        old = rows["with"]["microarchitecture"]["rtl_microarchitecture"]
+        text = text.replace(f"| `{old}` |", f"| `sha256:{'1' * 64}` |", 1)
+    elif what == "a digest over n stages changed":
+        row = next(i for i, line in enumerate(lines) if PREFIX_ROW.match(line))
+        lines[row] = re.sub(r"sha256:[0-9a-f]{64}", "sha256:" + "2" * 64, lines[row])
+        text = "\n".join(lines) + "\n"
+    elif what == "a flow digest that is not the last":
+        text = text.replace(flows["without"], "sha256:" + "3" * 64, 1)
+    elif what == "a skill missing":
+        text = "\n".join(line for line in lines if "`fsm_design`" not in line or "with documents" not in line) + "\n"
+    elif what == "an arm missing":
+        text = "\n".join(line for line in lines if "without documents (off)" not in line) + "\n"
+    elif what == "the tables stated again outside a dated addition":
+        text = text + "## 3. Not dated\n" + "\n".join(lines[4:]) + "\n"
+    elif what == "a stage out of order":
+        text = _tables(rows, flows, stages=["interface-spec", "requirements", "microarchitecture",
+                                            "rtl-implementation"])
+    with pytest.raises(AssertionError, match=match):
+        _check_stage_tables(text, EXERCISED)
 
 
 # --- Default case sets never hold a whole-flow case -----------------------------------------------------------

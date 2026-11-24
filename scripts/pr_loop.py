@@ -66,9 +66,10 @@ per call, as a state machine that survives restarts:
             `needs-founder`, say why. A stop whose label or comment could not
             be posted (GitHub unreachable) is logged and posted on a later pass.
 
-Up to `parallel_reviews` (2) pull requests are stepped at once in a pass, each
+Up to `parallel_reviews` (3) pull requests are stepped at once in a pass, each
 by one worker; every model call holds one of the model slots shared with the
-Nirmaan loop (pr_review CONFIG model_cap).
+Nirmaan loop (pr_review CONFIG model_cap, 3, so each worker can hold one). With
+`parallel_reviews` 1 the pass steps one pull request at a time.
 
 Usage: python scripts/pr_loop.py (--once | --watch) [--pr N] [--interval-minutes 5] [--no-post]
 Exit: 0 done, 2 setup error, 4 refused (this copy differs from main).
@@ -185,8 +186,11 @@ LOOP = {
     "transient_retries": 4,
     "transient_backoff_minutes": 2,
     "stalled_label": "loop-stalled",
-    # Pull requests stepped at once in one pass (each by one worker).
-    "parallel_reviews": 2,
+    # Pull requests stepped at once in one pass (each by one worker); 1 steps them
+    # one at a time. Three: council record 2026-11-19-parallel-keys.md, addendum
+    # 2026-11-24, decision A1; at most 3 (gate LW1). pr_review CONFIG model_cap
+    # is at least this, so each worker can hold a model slot.
+    "parallel_reviews": 3,
     "needs_founder_label": "needs-founder",
     # A finding on a path the fixer may not change: the fixer does not run, the
     # pull request gets this label, and the author's next head clears it.
@@ -450,10 +454,21 @@ def load_state(state_dir, repo: str, pr: int) -> dict:
         return {"pr": pr, "rounds": 0, "seen": {}, "last_fix_head": None, "done": None, "stopped": None}
 
 
-def _save_state(state_dir, repo: str, st: dict):
-    path = _state_path(state_dir, repo, st["pr"])
+def _write_whole(path: Path, text: str):
+    """Writes `path` whole: a temporary file beside it, renamed over it, so a
+    reader (another worker, the state push) never sees half a file, and a run
+    killed mid-write leaves the old one."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(st, indent=2))
+    tmp = path.parent / f".{path.name}.{os.getpid()}.{threading.get_ident()}.{secrets.token_hex(4)}.tmp"
+    try:
+        tmp.write_text(text)
+        os.replace(tmp, path)
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
+def _save_state(state_dir, repo: str, st: dict):
+    _write_whole(_state_path(state_dir, repo, st["pr"]), json.dumps(st, indent=2))
 
 
 # The loop-wide rate-limit pause. The same file and format as the Nirmaan
@@ -833,7 +848,8 @@ class Loop:
     # one that just ran a review or a fix, never holds up the others. A pull
     # request the loop is fixing goes first, then by number. Up to
     # parallel_reviews steps run at once, each pull request taken by one worker
-    # only; every model call holds one of the model slots shared with the
+    # only, and two pull requests listed with one head sha are stepped one
+    # after the other (the review checks are posted on the head); every model call holds one of the model slots shared with the
     # Nirmaan loop (none free at a call makes that pull request "busy" and the
     # pass goes on). The check that this copy is main's runs once, before the
     # pass, so no new step starts once main may have moved: after this pass's
@@ -872,6 +888,8 @@ class Loop:
             return 0 if s["last_fix_head"] and not s["done"] and not s["stopped"] else 1
         pulls.sort(key=lambda p: (in_flight(p), p["number"]))
         queue, results, guard, halt = list(enumerate(pulls)), [], threading.Lock(), threading.Event()
+        # One lock per listed head: no two workers ever act on one head at once.
+        heads: dict = {}
 
         def worker():
             while True:
@@ -885,10 +903,14 @@ class Loop:
                                  "the rest wait for the next pass")
                         halt.set()
                         return
-                try:
-                    res = {"pr": p["number"], **self.step(p)}
-                except Exception as exc:  # noqa: BLE001 - step() stops on its own errors; this is a last guard
-                    res = {"pr": p["number"], "outcome": "error", "reason": str(exc)}
+                    head_lock = heads.setdefault(p.get("head_sha") or ("pr", p["number"]), threading.Lock())
+                with head_lock:
+                    if halt.is_set():
+                        return  # halted while another worker had this head: it waits for the next pass
+                    try:
+                        res = {"pr": p["number"], **self.step(p)}
+                    except Exception as exc:  # noqa: BLE001 - step() stops on its own errors; this is a last guard
+                        res = {"pr": p["number"], "outcome": "error", "reason": str(exc)}
                 with guard:
                     results.append((i, res))
                     if res["outcome"] in ("auto-merge", "paused"):
@@ -1116,9 +1138,7 @@ class Loop:
         reason = pr_review.redact(why)
         until = (datetime.now(timezone.utc) + timedelta(minutes=self.lc.get("rate_limit_pause_minutes", 30))).isoformat()
         if self.o["post"] != "none":  # a --no-post run leaves the real loop alone
-            path = pause_path(self.state_dir)
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(json.dumps({"until": until, "repo": self.cfg["repo"], "pr": n, "head": head, "reason": reason}))
+            _write_whole(pause_path(self.state_dir), json.dumps({"until": until, "repo": self.cfg["repo"], "pr": n, "head": head, "reason": reason}))
         self.out(f"pr-loop: #{n} paused until {until}: {reason}")
         self._log(ctx, "paused", reason=reason, until=until)
         return {"outcome": "paused", "reason": reason, "until": until}

@@ -214,8 +214,29 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   usage limit) or a limit line in the output, on any exit other than 0 or 1,
   and when a record's purpose, knowledge label, harness variant, fingerprint or
   CLI is not what was asked for. A stopped or failed trial stays as it is and
-  is never run again; no later trial of the dispatch starts. One dispatch runs
-  at a time (the `live-eval` concurrency group).
+  is never run again; no later trial of the dispatch starts. Dispatches run
+  one at a time in the `live-eval` concurrency group, except two kinds of
+  dispatch with the input `parallel` (default false). A dispatch of the
+  whole-flow timer, `flow/axil-timer`, runs in `live-eval-timer-on` or
+  `live-eval-timer-off` by its `knowledge` input, a replay included, so GitHub
+  never runs two timer runs of one arm together, nor more than two timer runs;
+  the window and the order of its slots rest on whatever dispatches it. A
+  dispatch of a case that is neither `flow/` nor `firmware/` runs in a group
+  of its own, `live-eval-run-<run id>`, so it is never queued behind another
+  run and none can cancel it, and the width is held by whatever dispatches it.
+  The register block, every other `flow/` case and every `firmware/` case stay
+  in `live-eval` whatever the input says. The first step of the `replay` and
+  `live-eval` jobs fails the run when `parallel` is asked for one of them; the
+  second step fails every dispatch whose case is not written exactly as its ID
+  (`^[a-z0-9][a-z0-9/_.-]*$`, no `..`), reading the case only from the job's
+  environment, because GitHub compares strings ignoring case and the trial
+  command strips the name. Both come before the checkout and before any step
+  that reads the secret. The input is used by the timer's slots, its second
+  measured run, the replay of gate ET5's record and the shake-out (decision T3
+  of the seventh addendum to
+  `council/records/2026-11-17-g3-whole-flow-cases.md`), and by the wave 2
+  re-measure batch's cases in its slots and its replays (decision P2 of the
+  addendum to `council/records/2026-11-23-wave-2-close-meeting-1.md`).
 - **Seat code runs as an account of its own** (gates WF9 and WF17 of the G3
   council record, `council/records/2026-11-17-g3-whole-flow-cases.md`). The
   runner user has passwordless sudo, owns the checkout, the installed package
@@ -734,6 +755,12 @@ input, so roughly $13 to $20. Results land in
   without its secret; its trials run one at a time and stop on a limit, an
   odd exit or a record that is not the trial asked for, and none runs again
   (`tests/test_live_eval_ci.py`);
+- the concurrency block word for word; the group it gives a timer dispatch
+  with `parallel` by arm, a single-seat case with and without it, and the
+  register block, every other `flow/` case and every `firmware/` case
+  (`live-eval` whatever the input); both guards before the checkout and the
+  secret, the second refusing the timer's name in another letter case or with
+  a space and passing every case ID (`tests/test_live_eval_ci.py`);
 - gate WF17: every trial job makes the seat account and runs the reach test
   before the trials, between two tree hashes; the counting re-judge is a job of
   its own, on a fresh checkout of the trial job's commit, from the artifact

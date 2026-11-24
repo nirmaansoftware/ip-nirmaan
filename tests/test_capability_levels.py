@@ -27,11 +27,13 @@ import pytest
 from nirmaan.company import build_organization
 from nirmaan.company.evidence import MUST_FAIL_DOMAINS
 from nirmaan.evals import skill_digest
+from nirmaan.evals.flow import NOT_RUN, flow_digest
 from nirmaan.evals.levels import (CHECKS, KNOWLEDGE_CHECK_FORMAT, LEVELS, REJUDGE, REJUDGE_FORMAT, compute,
                                   render)
 from nirmaan.evals.records import MANIFEST, trial_path
 from nirmaan.evals.scorers import register_scorer, unregister_scorer
-from nirmaan.models import EvalResult, EvalRunManifest, EvalTrial, JudgeRun, RecordedAnswer, Score, ScoreStatus
+from nirmaan.models import (EvalResult, EvalRunManifest, EvalStage, EvalTrial, JudgeRun, RecordedAnswer, Score,
+                            ScoreStatus)
 from nirmaan.runtime import harness
 from nirmaan.runtime.harness import harness_sha256
 
@@ -542,6 +544,147 @@ def test_whole_flow_trials_add_and_take_nothing_beside_a_record_that_counts(org,
     [group] = entry["practised"]
     assert entry["level"] == "practised" and group["n"] == 5 and group["records"] == ["evals/results/run1"]
     assert compute(org, tmp_path)["totals"]["practised"] == 1
+
+
+# --- A whole-flow trial whose flow stops early (council record 2026-11-17, fifth addendum, decision F2) --------
+
+STAGES = ("requirements", "interface-spec", "microarchitecture", "rtl-implementation")
+#: Each stage's skills and skill digests in an arm. The arms agree on the first two stages, as the timer's do.
+ON = ({"requirements_engineering": "sha256:r"}, {"interface_specification": "sha256:i"},
+      {"rtl_microarchitecture": "sha256:m-on"}, {"axi": "sha256:a-on", "rtl_design": "sha256:d-on"})
+OFF = (ON[0], ON[1], {"rtl_microarchitecture": "sha256:m-off"}, {"axi": "sha256:a-off", "rtl_design": "sha256:d-off"})
+#: Arm "on" with another microarchitecture card: a second flow on the same harness.
+CHANGED = (ON[0], ON[1], {"rtl_microarchitecture": "sha256:m-changed"}, ON[3])
+
+
+def _digest(values, seated: int) -> str:
+    """The flow digest ``run_flow`` records for a flow that seated the first ``seated`` stages."""
+    return flow_digest({STAGES[i]: values[i] for i in range(seated)})
+
+
+def _flow(org, repo: Path, name: str, seated: list[int], *, values=ON, knowledge: str = "on",
+          case_id: str = "rtl/fixture", case_digest: str = "sha256:x") -> Path:
+    """A whole-flow record whose trial n seated the first ``seated[n - 1]`` stages, as ``run_flow`` records it: the
+    stages after a stop are "not run" with no skills, and a stopped trial reached no judge."""
+    record = _record(org, repo, [True] * len(seated), name=name, case_id=case_id, flow="whole", knowledge=knowledge)
+    for number, count in enumerate(seated, start=1):
+        path = trial_path(record, case_id, number)
+        data = json.loads(path.read_text(encoding="utf-8"))
+        stopped = count < len(STAGES)
+        stages = [EvalStage(stage=stage, task=f"t{i}", status=NOT_RUN if i >= count else
+                            "blocked" if stopped and i == count - 1 else "completed",
+                            skills=values[i] if i < count else {}).model_dump(mode="json")
+                  for i, stage in enumerate(STAGES)]
+        data.update(stages=stages, flow_digest=_digest(values, count))
+        data["result"]["case_digest"] = case_digest
+        if stopped:
+            data["result"].update(passed=False, submitted=False, seat_status=NOT_RUN,
+                                  scores=[{**data["result"]["scores"][0], "status": "not_run"}])
+            data["judge_runs"] = []
+        path.write_text(json.dumps(data), encoding="utf-8")
+    return record
+
+
+def _by_first(groups) -> dict[str, dict]:
+    return {g["first"]["record"]: g for g in groups}
+
+
+def test_nine_complete_trials_and_one_stopped_at_an_intermediate_stage_are_one_group_of_ten(org, tmp_path):
+    _case(tmp_path)
+    _flow(org, tmp_path, "flow", [4] * 9 + [3])
+    [group] = compute(org, tmp_path)["whole_flow"]
+    assert group["count"] == {"n": 10, "passed": 9, "unjudged": 1, "low": 0.5958, "high": 0.9821}
+    assert group["flow_digest"] == _digest(ON, 4) and group["covers_every_stage"] is True
+    [stopped] = [t for t in group["trials"] if t["stopped_at"]]
+    assert (stopped["trial"], stopped["passed"], stopped["judged"]) == (10, False, False)
+    assert stopped["flow_digest"] == _digest(ON, 3) and stopped["stopped_at"] == "microarchitecture"
+    assert [t["stopped_at"] for t in group["trials"] if t is not stopped] == [""] * 9
+
+
+def test_ten_stopped_trials_whose_seated_stages_agree_are_one_counted_group(org, tmp_path):
+    _case(tmp_path)
+    _flow(org, tmp_path, "flow", [3] * 6 + [2] * 4)
+    [group] = compute(org, tmp_path)["whole_flow"]
+    assert group["count"] == {"n": 10, "passed": 0, "unjudged": 10, "low": 0.0, "high": 0.2775}
+    # The group shows its first trial's digest, one that does not cover every stage.
+    assert group["flow_digest"] == _digest(ON, 3) and group["covers_every_stage"] is False
+    assert sorted(t["stopped_at"] for t in group["trials"]) == ["interface-spec"] * 4 + ["microarchitecture"] * 6
+    assert {t["flow_digest"] for t in group["trials"]} == {_digest(ON, 3), _digest(ON, 2)}
+
+
+def test_a_stopped_trial_whose_seated_stage_records_another_skill_digest_stays_apart(org, tmp_path):
+    _case(tmp_path)
+    _flow(org, tmp_path, "flow", [4] * 10 + [3])  # the stopped eleventh agrees and joins
+    _flow(org, tmp_path, "other", [3], values=(ON[0], {"interface_specification": "sha256:i-changed"}, *ON[2:]))
+    groups = _by_first(compute(org, tmp_path)["whole_flow"])
+    assert sorted(groups) == ["evals/results/flow", "evals/results/other"]
+    assert groups["evals/results/flow"]["count"]["n"] == 11
+    apart = groups["evals/results/other"]
+    assert [t["record"] for t in apart["trials"]] == ["evals/results/other"] and "count" not in apart
+    assert apart["covers_every_stage"] is False and apart["trials"][0]["stopped_at"] == "microarchitecture"
+
+
+@pytest.mark.parametrize("stop", [1, 2])
+def test_a_trial_stopped_at_the_first_or_second_stage_joins_its_own_arms_group_and_never_the_other(org, tmp_path,
+                                                                                                    stop):
+    _case(tmp_path)
+    assert _digest(ON, stop) == _digest(OFF, stop)  # the digests over these stages do not name the arm
+    _flow(org, tmp_path, "on", [4] * 10)
+    _flow(org, tmp_path, "off", [4] * 10, values=OFF, knowledge="off")
+    _flow(org, tmp_path, "on-stop", [stop])
+    _flow(org, tmp_path, "off-stop", [stop], values=OFF, knowledge="off")
+    groups = _by_first(compute(org, tmp_path)["whole_flow"])
+    assert sorted(groups) == ["evals/results/off", "evals/results/on"]
+    for arm in ("on", "off"):
+        group = groups[f"evals/results/{arm}"]
+        assert group["count"]["n"] == 11 and {t["knowledge"] for t in group["trials"]} == {arm}
+        assert [t["record"] for t in group["trials"] if t["stopped_at"]] == [f"evals/results/{arm}-stop"]
+        assert group["flow_digest"] == _digest(ON if arm == "on" else OFF, 4)
+
+
+@pytest.mark.parametrize("case_id, case_digest", [("rtl/other", "sha256:x"), ("rtl/fixture", "sha256:y")])
+def test_a_stopped_trial_of_another_case_never_joins(org, tmp_path, case_id, case_digest):
+    _case(tmp_path)
+    _case(tmp_path, case_id="rtl/other")
+    _flow(org, tmp_path, "flow", [4] * 10 + [3])
+    _flow(org, tmp_path, "other", [3], case_id=case_id, case_digest=case_digest)  # equal values on its stages
+    groups = _by_first(compute(org, tmp_path)["whole_flow"])
+    assert sorted(groups) == ["evals/results/flow", "evals/results/other"]
+    assert groups["evals/results/flow"]["count"]["n"] == 11
+    other = groups["evals/results/other"]
+    assert (other["case"], other["case_digest"], len(other["trials"])) == (case_id, case_digest, 1)
+    assert "count" not in other
+
+
+def test_a_stopped_trial_that_fits_two_groups_is_unplaced_and_neither_group_has_a_count(org, tmp_path):
+    _case(tmp_path)
+    _flow(org, tmp_path, "a", [4] * 10)
+    _flow(org, tmp_path, "b", [4] * 10, values=CHANGED)  # same harness, another card at the third stage
+    _flow(org, tmp_path, "stop", [2])
+    groups = _by_first(compute(org, tmp_path)["whole_flow"])
+    assert sorted(groups) == ["evals/results/a", "evals/results/b"]
+    fits = [{"record": "evals/results/a", "trial": 1}, {"record": "evals/results/b", "trial": 1}]
+    for group in groups.values():
+        assert "count" not in group and "returns to the council" in group["no_count"]
+        assert len(group["trials"]) == 10 and all(t["record"] != "evals/results/stop" for t in group["trials"])
+        [unplaced] = group["unplaced"]
+        assert (unplaced["record"], unplaced["trial"], unplaced["stopped_at"]) == ("evals/results/stop", 1,
+                                                                                   "interface-spec")
+        assert unplaced["flow_digest"] == _digest(ON, 2) and unplaced["fits"] == fits
+
+
+def test_complete_flows_still_group_by_flow_digest_and_the_committed_levels_are_unchanged(org, tmp_path):
+    _case(tmp_path)
+    _flow(org, tmp_path, "a", [4] * 10)
+    _flow(org, tmp_path, "b", [4] * 10, values=CHANGED)
+    groups = compute(org, tmp_path)["whole_flow"]
+    assert sorted(g["flow_digest"] for g in groups) == sorted([_digest(ON, 4), _digest(CHANGED, 4)])
+    for group in groups:
+        assert group["count"]["n"] == 10 and group["covers_every_stage"] is True and "unplaced" not in group
+        assert {t["stopped_at"] for t in group["trials"]} == {""}
+        assert {t["flow_digest"] for t in group["trials"]} == {group["flow_digest"]}
+    # The single-seat levels and the committed file are what the records give, unchanged by the placement rule.
+    assert (ROOT / LEVELS).read_text(encoding="utf-8") == render(compute(org, ROOT))
 
 
 # --- Without knowledge (M67) -------------------------------------------------------------------
