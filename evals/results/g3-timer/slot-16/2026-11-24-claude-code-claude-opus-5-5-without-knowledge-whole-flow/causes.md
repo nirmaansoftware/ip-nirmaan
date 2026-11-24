@@ -1,0 +1,13 @@
+# Failed trial and its cause (flow/axil-timer, slot 16)
+
+Record `2026-11-24-claude-code-claude-opus-5-5-without-knowledge-whole-flow`, one trial, G3 timer case, slot 16 of 20, group B, without documents, purpose evidence, run 45428397475, manifest head_sha `3e97fbfe`, harness `sha256:7e8ba68dd60b395186441ba4c27392659189a603b59705fa2cc3d4dbf5c4a83c`, case digest `sha256:ff8a4afc77caee105070d996f3e29142f2fe013c411752becdc46090b7553da3`, flow digest `sha256:9d94c40502aa75d262248c4e74b51aecbe1f9a0ec8d661a1db9e1723f78f0506`, Claude Code 2.1.325, seat model claude-opus-5-5. Re-judged: the verdict reproduces (`rejudge.json`). Written after the read, from the committed record only (the stage records and the trial's detail); the record was committed without a `causes.md`.
+
+Cause words are those of the read of the timer case's twenty trials: the eighth addendum of `council/records/2026-11-17-g3-whole-flow-cases.md` (ip#545, read on `main` at `904bb511`), unchanged. A cause is stated as fact only where a gate's own record shows it; anything else is marked inference.
+
+| Record | Trial | Outcome | Cause | What the record shows |
+|---|---|---|---|---|
+| this | 1 | not passed, flow stopped | stopped at `microarchitecture`: the seat escalated; cause not established (an inference: on the status of its upstream inputs under the pass-through) | Stage `microarchitecture` has no check; its recorded status is `escalated`, with one attempt and one model call, and no answer of the trial records an error. No later stage ran and no judge ran (both held-out scores read "the work never reached review, so there is nothing to judge"), so the trial is a failed trial of its group. The seat's own words, in the trial's `detail`: "The interface_spec.md header says 'Status: draft. Awaiting independent review. Not approved.' Its approved state comes only from the harness rule recorded in [evidence:prj-ada3a9b9d9.interface-spec.e3]. The register map key names are unverified ([evidence:prj-ada3a9b9d9.interface-spec.e2]). The faithfulness of the interface spec to the requirements is unchecked ([evidence:prj-ada3a9b9d9.interface-spec.e1]). This output needs an independent review record before it can be approved. This seat cannot provide or claim that review." |
+
+Inference: the escalation's own note says the interface spec's header reads "Status: draft. Awaiting independent review. Not approved." and that "Its approved state comes only from the harness rule".
+
+Not labelled "model": the failure-to-curriculum rule does not apply, and the trial is not said to show a gap in any skill (decision P4). No count is stated from which it is left out and no figure for a stage.
