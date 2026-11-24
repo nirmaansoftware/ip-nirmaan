@@ -1600,6 +1600,17 @@
           "record": "evals/results/g3-timer/slot-05/2026-11-24-claude-code-claude-opus-5-5-whole-flow",
           "stopped_at": "",
           "trial": 1
+        },
+        {
+          "case": "flow/axil-timer",
+          "flow_digest": "sha256:4ff378d26fdeb8f6daab2aaebfbe8395e44ec663e0ad7f7d7eaf1a155b971315",
+          "judged": false,
+          "knowledge": "on",
+          "passed": false,
+          "reason": "whole-flow trial: credits no skill and never counts toward a level (labelled in the run manifest and the trial)",
+          "record": "evals/results/g3-timer/slot-07/2026-11-24-claude-code-claude-opus-5-5-whole-flow",
+          "stopped_at": "microarchitecture",
+          "trial": 1
         }
       ]
     },
