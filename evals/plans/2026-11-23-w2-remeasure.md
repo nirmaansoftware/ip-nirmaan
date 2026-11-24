@@ -10,6 +10,15 @@ changes no code, no case, no record and no level: no file in `harness.CODE`, no 
 and no knowledge document is touched, so every fingerprint and digest below is the one `main` already has. It was
 written on 2026-11-23, before trial 1.
 
+**Amendment before trial 1: trials in parallel.** The addendum of 2026-11-23 to the record ("running the batch's
+trials in parallel", decisions P1 to P7, gates W2C12 to W2C18), as the seventh addendum to
+`council/records/2026-11-17-g3-whole-flow-cases.md` (decision T3) amends its decisions P2, P6 and gate W2C14, lets the
+batch run up to three trials at once. This amendment states what its decision P7 asks, in sections 1, 3, 5, 6, 7, 8,
+9, 10 and 11. It changes no count, case, arm, slot or read. The values of section 6 it changes are the digests of
+three groups of gate code that pull requests moved after this plan was committed, each named with the pull request
+and the merge that moved it: "Workflow, tool set and CLI pin" (decision P7, item 3), "Seat account" and "Gate
+backends". No fingerprint, case digest or skill digest moved, and no trial has run.
+
 ## 1. What is fixed, and how it may change
 
 Fixed here, before slot 1:
@@ -18,6 +27,8 @@ Fixed here, before slot 1:
   104 and 13, 117 slots.
 - The slot order of section 3, listed whole in section 12.
 - The default harness, the seat model and the CLI of section 6, one trial per dispatch.
+- The width: at most three trials in flight at once, inside a window of three slots, and one after the first limit
+  (section 3).
 - Every group the batch's trials join, with the count and the passes W2-L1 recorded for it (section 4).
 - Where every trial runs, and which account runs each tool (section 5).
 - The values a dispatch is made on (section 6) and the freeze (section 7).
@@ -85,28 +96,97 @@ route (ip#451), so both equivalence cases and both coverage cases are in the pla
 skill apart and mixes the kinds. The base order is dv/equiv-gray, debug/triage-three-bugs, rtl/apb-gpio,
 dv/plan-irq-ctrl, dv/formal-rr-arbiter, debug/root-cause-uart-tx, dv/fcov-lifo4, dv/equiv-updown,
 dv/coverage-tick-timer, debug/triage-pwm-gen, dv/cocotb-crc, dv/plan-tick-timer, debug/root-cause-debounce. Each
-round starts three places later in that order than the one before, so that a stop does not land on one case. The
-13 arm N slots sit at the ends of the rounds, two after each of rounds 1 to 5 and one after each of rounds 6 to 8,
-their cases in the base order. Section 12 lists every slot.
+round starts three places later in that order than the one before. The 13 arm N slots sit at the ends of the rounds,
+two after each of rounds 1 to 5 and one after each of rounds 6 to 8, their cases in the base order. Section 12 lists
+every slot. In that order two arm E slots whose cases name a skill in common are never fewer than four slots apart
+(slots 12 and 16, 73 and 77, 86 and 90 are four apart), and two arm E slots of one case are never fewer than eleven
+apart. So any three consecutive slots, and any four, hold at most one arm E trial of any group; five do not. Slots
+28 and 29 are the one pair of adjacent slots of one case (`rtl/apb-gpio`, arm E and then arm N); arm N counts toward
+no level.
 
-**Dispatch.** One dispatch is one slot. The workflow is `.github/workflows/live-eval.yml`, job `live-eval`,
-dispatched from `main`, and the counting re-judge is its `rejudge` job on a fresh checkout of the same commit:
+**Dispatch.** One dispatch is one slot and one run. The workflow is `.github/workflows/live-eval.yml`, job
+`live-eval`, dispatched from `main` with the input `parallel`, and the counting re-judge is its `rejudge` job on a
+fresh checkout of the same commit:
 
 ```
 gh workflow run live-eval.yml -R nirmaansoftware/ip-nirmaan --ref main \
   -f case=<case> -f trials=1 -f knowledge=<on|off> -f purpose=evidence \
-  -f harness=default -f expected_harness=<the arm's fingerprint of section 6>
+  -f harness=default -f expected_harness=<the arm's fingerprint of section 6> -f parallel=true
 ```
 
 `scripts/live_eval_ci.py` stops the job before any trial on a CLI that is not the pinned one or a fingerprint that
-is not the expected one (exit 4), and after the trial on a record that is not the trial asked for. A slot is marked
-attempted before its dispatch. The next slot is dispatched only after the whole run, `live-eval` and `rejudge`, has
-finished, and never while another run of the workflow is queued or running: the `live-eval` concurrency group keeps
-one pending run, so a second dispatch would cancel a queued one.
+is not the expected one (exit 4), and after the trial on a record that is not the trial asked for. A slot is in
+flight from its dispatch until its whole run, `live-eval` and `rejudge`, has finished.
+
+**The input and the group** (the addendum, decision P2, as the seventh addendum's decision T3, items 1 to 4 and 7,
+amends it). The workflow's input `parallel` is a boolean whose default is false. ip#470 (merge `97324c78`) made the
+change; on `main` its concurrency block (`.github/workflows/live-eval.yml:107-109`) is, word for word:
+
+```
+concurrency:
+  group: ${{ inputs.parallel && inputs.case == 'flow/axil-timer' && (inputs.knowledge == 'off' && 'live-eval-timer-off' || 'live-eval-timer-on') || inputs.parallel && !startsWith(inputs.case, 'flow/') && !startsWith(inputs.case, 'firmware/') && format('live-eval-run-{0}', github.run_id) || 'live-eval' }}
+  cancel-in-progress: false
+```
+
+The block's first clause is the seventh addendum's (decision T3, item 1): a dispatch of `flow/axil-timer` with the
+input runs in `live-eval-timer-on` or `live-eval-timer-off` by its arm. It never applies to this batch, whose 13
+cases are all single-seat cases and none is a `flow/` or `firmware/` case. For them the second clause is the one of
+the addendum's decision P2, item 1, unchanged: a dispatch of one of this batch's cases with `parallel` true runs
+alone in the group `live-eval-run-<its run id>`, so it is never queued behind another run, no run can cancel it, and
+no two of the batch's runs, nor a batch run and a timer run, share a group. With the input false, the group is
+`live-eval`, which holds one running and one pending run, a newer pending run cancelling the older one. Two guards
+are the first two steps of the `replay` job and of the `live-eval` job: the first fails a run that asks for
+`parallel` on a `firmware/` case or on a `flow/` case other than `flow/axil-timer`; the second fails every dispatch
+whose case is not written exactly as its ID (lower case, no space, no `..`), so a case name cannot reach another
+group. Both pass for each of this batch's 13 case IDs, as section 12 writes them. Of this batch, only its 13 cases,
+in its 117 slots and in its 13 replays of gate W2C5 (section 11), are dispatched with `parallel` true. The other
+uses of the input are the seventh addendum's for the timer (its slots, its second measured run, the replay of gate
+ET5's record and a shake-out); any further use needs a council ruling, and the register block is never dispatched
+with it. With a group per run GitHub holds no width and no longer keeps the two batches apart: the width below and
+gate W2C9 (section 10) rest on whatever dispatches the batch, "the dispatcher" below.
+
+**The width** (the addendum, decision P1).
+
+| Item | Value |
+|---|---|
+| Width: trials of the batch in flight at once | `3` |
+
+- At most three slots of the batch are in flight at once. The number is fixed here, before trial 1, and is never
+  raised during the batch. It is in no fingerprint and no group key.
+- **The window.** A slot is dispatched only when every slot three or more places before it has finished, its
+  counting re-judge included. So the slots in flight always lie within three consecutive slot numbers, and by the
+  order above one event can fail at most one arm E trial of any group. `tests/test_w2_remeasure_plan.py` reads
+  section 12 and the width above and fails if any window of that many consecutive slots holds two arm E slots whose
+  cases name a skill in common.
+- **After a limit.** After the first trial of the batch that ends on a plan or usage limit, the width is one from
+  then until slot 117: one slot at a time, each dispatched only after the run before it has finished. This is a rule
+  of this plan, applied mechanically, never a choice made during the batch. With it, running trials at once can cost
+  the batch at most two failed trials more than the plan as first committed would have lost to that same limit,
+  once, each in a different group.
+- No rule rests on reading the plan's remaining allowance: no script can read it.
+
+**Which run is which slot** (the addendum, decision P3).
+
+- Slots are first dispatched in strictly increasing slot order, arm N where section 12 puts it. Nothing is
+  reordered by a result.
+- A slot is marked attempted before its own dispatch. The dispatch check of section 7 is made before every
+  dispatch, one check at a time, and the commit each run reports is checked as section 7 says.
+- One slot, one run. The run's id is taken from the response to the dispatch and written beside the slot before
+  the next dispatch is made. A run is never identified by the time it was created. If the id cannot be bound,
+  dispatch stops and a person binds it; the run is not cancelled.
+- The width is counted on the dispatcher's own bound runs. One dispatcher process runs at a time.
+- A run of the workflow that the dispatcher did not start, queued or running, stops new dispatches until it has
+  ended.
+- Two trials of one case may run at the same time; the window makes that possible only for slots 28 and 29, one of
+  which is arm N.
+- **What runs share.** Each job runs on a hosted runner of its own, and every artifact name carries its run's id, so
+  two runs share no checkout, no seat account and no file. They share the one secret of the `live-eval` environment,
+  so the one plan, and nothing else in the workflow couples them.
 
 **Records.** The counted result of a slot is the re-judged record (`live-eval-rejudged-<run id>`): the record as the
 trial job wrote it, with `rejudge.json`. Every record reaches `main` by pull request in slot order, none held out,
-failed ones included. Every dispatch writes into a fresh folder, so two slots of one arm on one day get the same
+failed ones included, whatever order the runs finish in: a slot's record waits for every earlier slot's. Every
+dispatch writes into a fresh folder, so two slots of one arm on one day get the same
 record name; a slot's record is therefore committed at `evals/results/w2-remeasure/slot-NNN/<record name>/`, with
 `NNN` the slot number in three digits and the name the one `record_run` wrote, unchanged. This is the form of the
 whole-flow plan (`evals/plans/2026-11-22-g3-whole-flow.md`, section 15): `src/nirmaan/evals/levels.py` finds every
@@ -197,9 +277,10 @@ image: their versions above are the ones installed in run
 [45073595509](https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45073595509), the replay on `main` that
 `evals/flow/tool_reach_record.json` records. Every run's log states what it installed. The replays of gate W2C5 are
 read against this table before slot 1, and a difference there means a plan amendment before trial 1. After slot 1,
-a run whose log shows another version of a tool in this table stops the batch: no further slot is dispatched, the
-trial that ran is a trial and stays, and the difference returns to the council before dispatch resumes. The read
-names any such difference.
+a run whose log shows another version of a tool in this table stops the batch: no further slot is dispatched, every
+trial already dispatched is a trial and stays, so up to three trials can have run on that tool set, and the
+difference returns to the council before dispatch resumes. The read names any such difference and each trial that
+ran on it.
 
 **Tools and accounts per case** (decision 4, "Where it runs", item 3). This is the table ip#451 stated when it met
 gates W2C3 and W2C4, restated here; each case's held-out checks and their tools were read again from the case files
@@ -232,7 +313,9 @@ found. That residual is the one the record states and accepts (decision 4, "Resi
 ## 6. The values a dispatch is made on
 
 Computed on `main` at `81bbaefd4a2dd8df50fce3a1fbe78065bfefefd2`, the commit this pull request was last merged
-with (this file touches none of the files below), Claude Code 2.1.325.
+with (this file touches none of the files below), Claude Code 2.1.325. The amendment before trial 1 recomputed every
+value on a later commit and restates the three group digests that moved, below the group table; the tables hold the
+values on that commit.
 
 | Item | Value |
 |---|---|
@@ -293,19 +376,67 @@ plan:
 
 | Group | Paths | Files | Digest |
 |---|---|---|---|
-| Gate backends | `src/nirmaan/integrations` | 60 | `sha256:eac184ecc60ae35bdc88e6f66c2fa3aceaabe4c32f62066e951d7d5e84e835f9` |
+| Gate backends | `src/nirmaan/integrations` | 60 | `sha256:17c4b3d7d52e73db75f486dff7507dd1eacf3c8cd97a75f287a108f9e003203f` |
 | Plan check | `src/nirmaan/vplan.py` | 1 | `sha256:9dfd92674fd08729156fb6b8cbedd3479d9a05bb69a6e890c07b77f62b4fb74a` |
 | Triage engine | `src/veritriage` | 253 | `sha256:fc207ed693832819bef89910091a06e265e62185d98e111fdf69f93a765ef098` |
 | Held-out scorers | `src/nirmaan/evals/scorers.py` | 1 | `sha256:5f4f7909a3207f3837d2af7ad60b85c0bae620e1d461afde57aea0d2a592ecb4` |
 | Stage gates | `src/nirmaan/company/workflows.py` | 1 | `sha256:bcd15f8204e55f142f266afdd8e12a4947c7f6276382dd18f4c9893e616a9873` |
-| Seat account | `scripts/live_eval_seat.py`, `.github/actions/live-eval-seat` | 2 | `sha256:4abec1ad1bb4fe9e48afb333c619c1d07ccd2e5df80b62f3142dc8ad750fa446` |
+| Seat account | `scripts/live_eval_seat.py`, `.github/actions/live-eval-seat` | 2 | `sha256:6530c15123fabd55cdaf7142af49ee7306eea1ef09d7675338c561e42099c93b` |
 | Reach test | `scripts/live_eval_reach.py` | 1 | `sha256:581a4cebb61899090a1741fdbea49e51b57decdebdf0cb11c58562f60b4b93c0` |
 | CI command | `scripts/live_eval_ci.py` | 1 | `sha256:3f396770975a7fcff4fc746c031e8694f768b921e90376c290e4fc023acf3e88` |
-| Workflow, tool set and CLI pin | `.github/workflows/live-eval.yml`, `.github/actions/live-eval-setup`, `.github/actions/oss-cad-suite`, `.github/live-eval` | 5 | `sha256:09083077e0237a7e2b1ed89152d3d5b8f31836a03c8b78500b471d802f8e64d7` |
+| Workflow, tool set and CLI pin | `.github/workflows/live-eval.yml`, `.github/actions/live-eval-setup`, `.github/actions/oss-cad-suite`, `.github/live-eval` | 5 | `sha256:82e264d9903a5c5d9f580f8ad8219b46f00db8c0aba367097df6d8d951ec3595` |
 
 "Gate backends" holds every tool backend the tables of section 5 name. "Plan check" is `vplan.check`, which the
 record asks this plan to pin by name. "Triage engine" is what `veritriage.investigate` runs. "Stage gates" is the
 file that says which tools a seat's stage runs before review.
+
+**The moved workflow digest** (the addendum, decision P7, item 3). This plan as first committed pinned "Workflow, tool
+set and CLI pin" at `sha256:09083077e0237a7e2b1ed89152d3d5b8f31836a03c8b78500b471d802f8e64d7`. Two pull requests
+moved it before trial 1, neither moving a fingerprint: ip#464 (merge `c0ba283c`, the replay input `controls`, gate
+ET5) to `sha256:4daa3c45ea748b0bfa77aad94173aa05341b4dee3e42a6fb61b7c5e467726481`, and ip#470 (merge `97324c78`, the
+input `parallel`, the group per run of decision P2 and the timer's two groups and second guard of the seventh
+addendum's decision T3) to `sha256:82e264d9903a5c5d9f580f8ad8219b46f00db8c0aba367097df6d8d951ec3595`, the value in the
+table above. Every value of this section was recomputed on `main` at `bceb3c2c5a9e9c3268aada1a7568c2f66a48d612` by the commands this
+section names; the three moved group digests are the only values that differ from those computed on `81bbaefd`.
+
+**The other moved digests.** Two more groups moved after this plan was committed, each by a pull request that the
+whole-flow plan (`evals/plans/2026-11-22-g3-whole-flow.md`) names with gate ET7 shown:
+
+- "Seat account" (`scripts/live_eval_seat.py`, `.github/actions/live-eval-seat`): from
+  `sha256:4abec1ad1bb4fe9e48afb333c619c1d07ccd2e5df80b62f3142dc8ad750fa446` to
+  `sha256:1b7309f171f0e56d203b69d166f65e05eecf14cbccbc8403185a4490a11fb8a3` by ip#471 (merge `a15b8c1d`: a setup over
+  approved RTL opens its beside link in the account's view), then to
+  `sha256:6530c15123fabd55cdaf7142af49ee7306eea1ef09d7675338c561e42099c93b`, the value in the table above, by ip#475
+  (merge `f8dcc97e`: gate ET17, a setup's `[files]` entry is an input of the run only when it is the run's own).
+- "Gate backends" (`src/nirmaan/integrations`): from
+  `sha256:eac184ecc60ae35bdc88e6f66c2fa3aceaabe4c32f62066e951d7d5e84e835f9` to
+  `sha256:7c12db371fe1b51fc6a2888e08c6f64677dcfb47d48411af7a66cb7c40ca5443` by ip#475 (merge `f8dcc97e`,
+  `src/nirmaan/integrations/eda.py`), then to `sha256:17c4b3d7d52e73db75f486dff7507dd1eacf3c8cd97a75f287a108f9e003203f`, the value in the table above, by ip#522 (merge `bceb3c2c`:
+  gate ET20, every Verilator model build passes `--verilate-jobs 1`).
+
+**Gate ET7, shown** (gate W2C2: no fingerprint moved). For each merge that moved a group digest above, `git diff
+--name-only <first parent> <merge>` names no file in `harness.CODE`, `LOOP_CODE` or `FLOW_CODE`, no tool definition
+(`src/nirmaan/company/tools.py`) and not the CLI pin (`.github/live-eval/package.json`):
+
+| Pull request (merge) | Files the merge changed | Where the whole-flow plan shows it |
+|---|---|---|
+| ip#464 (`c0ba283c`) | `.github/workflows/live-eval.yml`, `scripts/live_eval_controls.py`, two test files, `docs/LIVE_EVAL_EVIDENCE.md`, a history fragment | section 21.1 |
+| ip#471 (`a15b8c1d`) | `scripts/live_eval_seat.py`, `scripts/live_eval_controls.py`, `tests/test_live_eval_seat.py`, `tests/test_live_eval_controls.py`, `docs/LIVE_EVAL_EVIDENCE.md`, a history fragment | section 22.1 |
+| ip#475 (`f8dcc97e`) | `docs/GATE_INPUTS.md`, `docs/LIVE_EVAL_EVIDENCE.md`, a history fragment, `scripts/live_eval_seat.py`, `src/nirmaan/integrations/eda.py`, `tests/test_gate_reads.py` | section 23.2 |
+| ip#470 (`97324c78`) | `.github/workflows/live-eval.yml`, `docs/LIVE_EVAL_EVIDENCE.md`, a history fragment, `tests/test_live_eval_ci.py`, `tests/test_nirmaan_live_eval.py` | section 24.1 |
+| ip#522 (`bceb3c2c`) | `docs/TEST_CI_HARDENING.md`, a history fragment, `src/nirmaan/integrations/eda.py`, `src/nirmaan/integrations/firmware.py`, `src/nirmaan/integrations/firmware_riscv.py`, `tests/test_nirmaan_eda.py`, `tests/test_nirmaan_firmware_reach.py` | none (this plan; decision V1, item 4) |
+
+The two fingerprints of this section, recomputed on `bceb3c2c5a9e9c3268aada1a7568c2f66a48d612` with `harness_sha256(knowledge=..., cli="2.1.325")`,
+are W2-L1's, as this plan first stated them; so are the 13 case digests and the 14 skill digests.
+
+**Gate backends and gate ET20.** `--verilate-jobs 1` (gate ET20 of `council/records/2026-11-22-eda-tools-seat-account.md`,
+third addendum, decision V1; ip#522) changed `src/nirmaan/integrations`, so it moved "Gate backends" again, to
+`sha256:17c4b3d7d52e73db75f486dff7507dd1eacf3c8cd97a75f287a108f9e003203f`. It merged at `bceb3c2c5a9e9c3268aada1a7568c2f66a48d612`, after the whole-flow timer's last planned trial was recorded, with the evidence, the
+firmware-engineer's statement and the texts of decision V1, items 1 to 3, in its pull request. Decision V1, item 4 asks
+that this plan's addition restate the moved digest before this batch's trial 1, with whatever this plan's own rules
+ask to be run again after a pinned group moves. This plan's answer: ip#522 merged before this amendment, so the table
+above states its value and the replays of gate W2C5 (section 11), which must run on the values a dispatch is made on,
+run on it; nothing is owed again. The fingerprints of this section are unchanged on `bceb3c2c`.
 
 ## 7. The freeze and the dispatch check (gate W2C7)
 
@@ -314,14 +445,15 @@ batch case's files; the card or the document of a skill a batch case names, the 
 the batch's checks run (the groups of section 6); or the job's tool set (section 5). A change that would move a
 default fingerprint returns to the council in any case.
 
-**The dispatch check.** Before every slot the fingerprints, the seat model, the pins, the 13 case digests, the 14
+**The dispatch check.** Before every dispatch, one check at a time, the fingerprints, the seat model, the pins, the 13 case digests, the 14
 skill digests and the nine group digests are recomputed on `main` as it is, and this file is compared with the copy
 the values were read from. Any difference stops the dispatch: no trial runs on a value this committed plan does not
 name. The same check is made on the commit slot 1 is dispatched from, before trial 1. Before slot 1 a difference is
 settled by a plan amendment pull request. From slot 1 on a difference means the freeze was broken: dispatch stays
 stopped and the matter returns to the council, since an amendment alone would let later slots run on other values
 than the earlier ones and split a group inside the batch. The commit a run reports is compared with the commit just checked; if they differ, that commit is
-checked too, and a run on a commit that fails the check is cancelled before its trial.
+checked too, and a run on a commit that fails the check is cancelled before its trial. That is the one cancel this
+batch makes: on the dispatcher's own bound run, and only while its trial step has not started (section 8).
 
 **One commit.** Decision 4 says the batch runs "from one commit, with one tool set". The workflow runs live trials
 only from the head of `main`, and `main` moves when this plan merges and when each record pull request merges. This
@@ -344,18 +476,36 @@ what follows is the council's to rule. The failure-to-curriculum rule applies to
   failed, never removed, never held out and never run again (decision 4, "Stops and the read"; decision 11 of the
   pilot retrospective; `council/records/2026-11-15-pilot-topup-reruns.md`).
 - **No top-up, extension, replacement, early stop or second read.**
-- **Limit stop.** `live_eval_ci.py trials` stops at exit 3 or a limit line. The slot is recorded failed, and the next
-  slot is dispatched only after the limit has reset.
+- **Any stop closes dispatch** (the addendum, decision P4). A plan or usage limit, an interrupted trial, a job-level
+  stop, a record that is not the trial asked for, a re-judge that did not finish or did not hold, a changed tool
+  set, a run the dispatcher did not start, or a run whose id could not be bound closes dispatch at once: no further
+  slot is dispatched.
+- **Nothing in flight is cancelled**: cancelling a running trial makes a failed trial. The one cancel is the one of
+  section 7, before a run's trial step starts. Every trial already dispatched ends as it ends, is classified by
+  itself and is committed as it is. Nothing is run again and nothing is replaced.
+- **Limit stop.** `live_eval_ci.py trials` stops at exit 3 or a limit line. The slot is recorded failed. Dispatch
+  resumes only when the limit has reset and every trial that was in flight has been classified, and then at width
+  one to the end of the batch (section 3).
+- **Other events that end trials.** The width of one after a limit bounds limits only. An event of another kind
+  that ends running trials, such as an outage or a replaced secret, can end up to three at once; each is a failed
+  trial, committed and never run again, and the read names the event and its slots. A stop that ends no trial (a
+  re-judge that did not hold, a changed tool set, a record mismatch) fails nothing in flight.
 - **Job-level stops.** Exit 2 (bad input), exit 4 before the trial (a CLI or fingerprint that is not the expected
   one), a failed reach test, a missing secret or a failed tool install stop the job before the trials step, so no
-  trial ran. The cause is fixed and the same slot is dispatched again. If a record exists for a dispatch, it is a
-  trial and is committed as it is.
+  trial ran. The cause is fixed and the same slot is dispatched again, alone and before any later slot that has not
+  been dispatched. If a record exists for a dispatch, it is a trial and is committed as it is.
 - **The re-judge.** A trial whose counting re-judge did not finish or did not hold is committed as the trial job
   wrote it. The level rule then gives its group the reason "trials without a clean re-judge", and that group does
   not count, a pooled group included. A re-judge is not a trial and changes no recorded answer; whether such a record
   may be re-judged again in the job is not decided here and goes to the council before the read. Dispatch waits for
-  a person after any such slot.
+  a person after any such slot, once nothing is in flight.
 - **A changed tool set** stops the batch as section 5 says.
+- **After a stop that waits for a person**, dispatch waits for a person, once nothing is in flight.
+- **Decision 11's reason does not hold here; its rule does.** Decision 11 of the pilot retrospective kept an
+  interrupted trial a failed trial and refused a replacement because the runner's stop rule limited the loss to one
+  trial. With up to three trials in flight on one plan, one event can fail up to three, so that reason does not hold
+  for this batch. The rule it supported stands: a failed trial is never replaced. Running trials at once can only
+  lower a pass count, so no level becomes easier to reach.
 - **Labels.** Each failed trial gets its cause label in `causes.md` before its record merges. A label is not changed
   after the outcome is seen (decision 8, item 4).
 - **Counts are fixed here, never by outcome.**
@@ -380,12 +530,17 @@ addendum to the council record, and it is taken together with W2-L1's recorded f
   most a batch-wide difference, and no conclusion per skill or per case follows.
 - **Failures.** Every failed trial with its label, and the curriculum answers the record asks for (decision 8, item
   5: the eleven failures of W2-L1), each path existing on `main` by then.
+- **Trials in parallel** (gate W2C18). The width; that trials overlapped; for each slot its run and the slots whose
+  runs overlapped it; every stop event with the slots then in flight and their labels; each group's failed trials by
+  label; every slot dispatched after a later one; the slot from which the batch ran at width one; any run cancelled
+  before its trial under section 7; and that no running trial was cancelled and nothing was held out or run again.
 
 Never said, in this plan, a record pull request, the read or any other text: a figure of this batch before the
 read (a level or a count that `capability/levels.json` shows while only part of the batch is merged is an interim
 figure and is never cited); a pooled figure without the two figures it is made of; a level as anything but what the
 level rule computes; that the two batches ran on the same tools; that documents help, beyond the two arms' counts
-stated side by side; anything decision 8 of `council/records/2026-11-22-eda-tools-seat-account.md` forbids; any
+stated side by side; that running trials at once had no effect on a result; that this batch and W2-L1 ran under the
+same dispatch conditions (W2-L1 ran one trial at a time); anything decision 8 of `council/records/2026-11-22-eda-tools-seat-account.md` forbids; any
 time, usage or cost figure.
 
 ## 10. The start (gate W2C8) and the order against the whole-flow batch (gate W2C9)
@@ -401,7 +556,9 @@ limits and are never interleaved: one records its last trial before the other di
 left to the orchestrator session, and it is: the timer case's measured run and its twenty slots first, then this
 batch. So slot 1 here is dispatched only after the timer case's last planned trial is recorded, and from slot 1
 here until this batch's last trial is recorded no whole-flow dispatch is made, the register block's slots included.
-The two batches never share a run window: no slot is dispatched while any run of the workflow is queued or running.
+The two batches never share a run window: no slot is dispatched while any run of the workflow that is not this
+batch's own is queued or running. With a group per run GitHub no longer keeps the two batches apart; the dispatcher
+does (section 3).
 
 ## 11. Conditions before slot 1
 
@@ -411,7 +568,7 @@ stood when this plan was committed.
 | Gate | Condition | Where it stands |
 |---|---|---|
 | W2C1 | One committed plan | This file |
-| W2C2 | No trial on the owner's machine; every trial in the job as the seat account; ET1 to ET4 met, ET8's documents merged, ET7's statement shown | Section 5. ET1: ip#445. ET2 to ET4: ip#444, with ET3's recorded replay on `main` in ip#452 (run 45073595509). ET8's documents, `docs/GATE_INPUTS.md`, `docs/GATE_INTEGRITY.md` and `docs/LIVE_EVAL_EVIDENCE.md`: changed by ip#444, ip#445, ip#451 and ip#452; whether every text follows decision 8 of that record is qa-evidence's to confirm. ET7: the two fingerprints of section 6 are W2-L1's |
+| W2C2 | No trial on the owner's machine; every trial in the job as the seat account; ET1 to ET4 met, ET8's documents merged, ET7's statement shown | Section 5. ET1: ip#445. ET2 to ET4: ip#444, with ET3's recorded replay on `main` in ip#452 (run 45073595509). ET8's documents, `docs/GATE_INPUTS.md`, `docs/GATE_INTEGRITY.md` and `docs/LIVE_EVAL_EVIDENCE.md`: changed by ip#444, ip#445, ip#451 and ip#452; whether every text follows decision 8 of that record is qa-evidence's to confirm. ET7: the two fingerprints of section 6 are W2-L1's, and ET7 is shown in section 6 for ip#464, ip#471, ip#475 and ip#470, which moved group digests after this plan was committed |
 | W2C3 | `eqy` installed and run as the seat account with its probe | ip#451; both equivalence cases are in the plan. Its probes ran in replays on that pull request's branch; their first runs on `main` are the replays of gate W2C5 |
 | W2C4 | A build or run of a program from seat HDL outside the wrapped tools is made as the seat account with a probe; the table of tools and accounts | ip#451 (`coverage.read`), with the same note on its probes; the table of section 5 |
 | W2C5 | Every batch case's reference answer replayed in the job on the batch's commit: passes, and every mutant fails | Not yet met: below |
@@ -419,12 +576,24 @@ stood when this plan was committed.
 | W2C7 | The freeze; a dispatch only on the plan's values | Section 7 |
 | W2C8 | The start | Section 10; not yet met |
 | W2C9 | Never interleaved | Section 10 |
+| W2C12 | The plan amendment of the addendum's decision P7, with the committed test of the window against section 12 | The amendment (sections 1, 3, 5 to 11); `tests/test_w2_remeasure_plan.py` |
+| W2C13 | The workflow change of decision P2, with its tests and the corrected document, and no fingerprint moved | ip#470 (merge `97324c78`), as the seventh addendum's decision T3 extends it; no fingerprint moved (section 6) |
+| W2C14 | As the seventh addendum's decision T3, item 9 amends it: that change, extended, merges before the whole-flow plan's addition of gate WF32 is computed and before the timer's second measured run, or else only after the timer's last planned trial is recorded, never in between; the whole-flow plan restates the digest and gate WF9's evidence before the timer's slot 1, and again for the register block before its slot 21 | ip#470 merged at `97324c78`, before the whole-flow plan's section 24 computed its values on that commit and before the timer's second measured run; that section restates the digest and gate WF9's evidence for the timer. The restatement for the register block is that plan's, before its slot 21 |
+| W2C15 | One slot, one run, bound from the dispatch response before the next dispatch; a run the dispatcher did not start stops dispatch; records in slot order | Section 3 |
+| W2C16 | A stop closes dispatch and cancels no running trial; every trial already dispatched is committed; nothing is run again; width one after the first limit | Sections 3 and 8 |
+| W2C17 | The 13 replays of gate W2C5 dispatched with the input, three in flight at least once, all passing, each named in the dated addition | Not yet met: below |
 
-Gates W2C10 and W2C11 are not conditions of slot 1: W2C10 is due before meeting 2 (its closed list and test merged
-as ip#450), and W2C11 is the read (section 9).
+Gates W2C10, W2C11 and W2C18 are not conditions of slot 1: W2C10 is due before meeting 2 (its closed list and test
+merged as ip#450), and W2C11 and W2C18 are the read (section 9).
 
-**Gate W2C5, after this plan merges.** Each of the 13 cases is dispatched once as a replay (`replay=true`: the
-case's reference answer, no model, no token) from `main`, on a commit that passes the dispatch check of section 7.
+**Gate W2C5, after this plan merges** (with gate W2C17, the addendum's decision P5). Each of the 13 cases is
+dispatched once as a replay (`replay=true`: the case's reference answer, no model, no token) with `parallel=true`,
+from `main`, after the workflow change (ip#470), ip#522 (gate ET20, section 6) and this plan's amendment have
+merged, and only after the whole-flow timer's last planned trial is recorded (gate W2C9: nothing of this batch, a
+replay included, is dispatched before then), on a commit that passes the dispatch check of section 7. They are the
+first use of the input for this batch's cases (the timer used it first: the seventh addendum, decision T3, items 10
+and 11): they run under the width, the window and the run binding of section 3, with three in flight at least once,
+so a fault in the routing, in binding a run to its slot or in keeping each run's artifacts apart costs no trial.
 A replay passes when its `replay` job and its `rejudge` job succeed, the reference answer passes every tool before
 review and every held-out check, which for a must-fail check means the clean file passes and every mutant fails,
 the re-judge gives the same verdict, and both jobs' tool reach records show every probe denied. The versions each
@@ -432,8 +601,10 @@ replay's log shows are read against section 5. A replay is not a trial, counts t
 as a record. Slot 1 is not dispatched until all 13 have passed.
 
 **The dated addition before slot 1.** One pull request adds a dated section to this file that names, for gate W2C5,
-the 13 replay runs with their commits and results and the tool versions their logs show; for gate W2C8, which
-answer the batch starts on; and for gate W2C9, that the timer case's last planned trial is recorded. It changes no
+the 13 replay runs with their commits and results, the tool versions their logs show and which of them were in
+flight together (gate W2C17); for gate W2C8, which
+answer the batch starts on; and for gate W2C9, that the timer case's last planned trial is recorded and that no
+replay was dispatched before it. It changes no
 count, slot, arm, case or value. If a replay fails, the cause is fixed by a pull request of its own, and if that
 moves a value of section 6, by a plan amendment as well, before any trial.
 
