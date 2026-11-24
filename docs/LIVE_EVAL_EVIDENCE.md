@@ -415,7 +415,28 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   no other run or commit. The reference answer's pass rests on the step result
   GitHub reported; no replay result file is committed. If a pinned group
   moves after the statement, ET5 is open again. `evals/flow/et5_controls_record.json`
-  (run 45119522138) and its test are unchanged.
+  (run 45119522138) and its test are unchanged. Both whole-flow fingerprints
+  moved with ip#487 (plan section 24.1), so this statement no longer holds,
+  and the one below is the current evidence. It stays as the history of the
+  chain.
+- **Gate ET5 stated again on run 45266375996** (decision E4 of the third
+  addendum, as ip#497 records it). A replay of `flow/axil-timer` with
+  `controls` and `parallel` set, no model and no token, was dispatched alone
+  on `main` at b1bc2267 (the merge of ip#491, plan section 24, on a commit
+  that holds ip#487), as [run 45266375996](https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45266375996).
+  The committed record, `evals/flow/et5_controls_record_45266375996.json`,
+  and its uploads, committed as uploaded in
+  `docs/evidence/et5/run-45266375996` (ip#495 and ip#496), are read by the
+  same rules as run 45159697183's, and `tests/test_live_eval_controls.py`
+  holds the record to them. The record does not say ET5 is met;
+  verification-lead stated it in ip#497: "ET5: met on run 45266375996 at
+  b1bc2267. Every failed control is a bypass control refused as the seat
+  account, shown by the tool's own line; no account control's record holds
+  target content; and the pinned values on the commit the second measured run
+  is dispatched from must equal b1bc2267's (decision E4, item 4)." The
+  current evidence for ET5 is this run at b1bc2267. It is a replay, not a
+  reach record of a measured run or of a slot, and it covers no other run or
+  commit. If a pinned group moves after the statement, ET5 is open again.
 - **The tools that read seat Verilog run as the account too** (gates ET2 to
   ET4 of `council/records/2026-11-22-eda-tools-seat-account.md`). The input
   screen (`eda_guard`) reads seat files with patterns of its own, and the
