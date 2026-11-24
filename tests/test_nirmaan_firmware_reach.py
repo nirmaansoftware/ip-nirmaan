@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import ast
 import re
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -113,8 +114,8 @@ COSIM_BUSES = {"axi4-lite": "axil_manager.cpp", "apb": "apb_manager.cpp"}
 
 #: The literal options of the Verilator build in ``firmware._cosim_steps``. An option such as --vpi, --public or
 #: --trace would put more simulator symbols (a C time call, the design's signals) in the image.
-VERILATOR_OPTIONS = ["verilator", "--cc", "--exe", "--build", "-j", "0", "-Wno-fatal", "--prefix", "-Mdir",
-                     "-CFLAGS"]
+VERILATOR_OPTIONS = ["verilator", "--cc", "--exe", "--build", "-j", "0", "--verilate-jobs", "1", "-Wno-fatal",
+                     "--prefix", "-Mdir", "-CFLAGS"]
 IRQ_OPTIONS = ["-CFLAGS", "-DNIRMAAN_DUT_IRQ"]
 
 
@@ -315,3 +316,65 @@ def test_a_driver_tests_c_reaches_the_simulators_clock(capsys):
         timed[rtl.name] = (int(m[1]), int(m[2]))
     ref, lat2 = timed["axi4_lite_regs.v"], timed["axi4_lite_regs_lat2.v"]
     assert lat2[0] > ref[0] and lat2[1] > ref[1], timed
+
+
+#: Gate ET20 (council/records/2026-11-22-eda-tools-seat-account.md, third addendum, decision V1, item 1): a driver,
+#: its test and the RTL per registered bus, from the fixtures, to build each bus's co-simulation image.
+_FW = REPO / "tests" / "fixtures" / "fw"
+COSIM_FIXTURES = {
+    "axi4-lite": (RTL / "axi4_lite_regs.v",
+                  tuple(_FW / "axi4_lite" / n for n in ("axi4_lite_regs_map.h", "axi4_lite_regs_drv.h",
+                                                         "axi4_lite_regs_drv.c", "axi4_lite_regs_test.c"))),
+    "apb": (REPO / "tests" / "fixtures" / "rtl" / "apb_regs" / "apb_regs.v",
+            tuple(_FW / "apb_regs" / n for n in ("apb_regs_map.h", "apb_regs_drv.h", "apb_regs_drv.c",
+                                                  "apb_regs_test.c"))),
+}
+
+
+def _cosim_image(bus: str, workdir: Path, *, verilate_jobs: bool) -> Path:
+    """Build ``fw.test``'s co-simulation image for ``bus`` with every step of ``firmware._cosim_steps`` but the run,
+    with ``--verilate-jobs 1`` as the build passes it, or with those two words taken out."""
+    from nirmaan.integrations.eda import Job, run_environment
+
+    rtl, sources = COSIM_FIXTURES[bus]
+    workdir.mkdir(parents=True)
+    job = Job("fw.test", {"sources": ",".join(map(str, sources)), "rtl": str(rtl), "bus": bus}, workdir,
+              tuple(str(s) for s in sources), None)
+    steps = firmware._cosim_steps(job)[:-1]  # the last step runs the image; it is not needed here
+    [build] = [s for s in steps if s[0] == "verilator"]
+    at = build.index("--verilate-jobs")
+    assert build[at:at + 2] == ["--verilate-jobs", "1"], build
+    if not verilate_jobs:
+        del build[at:at + 2]
+    for argv in steps:
+        done = subprocess.run(argv, cwd=workdir, env=run_environment(workdir), capture_output=True, text=True,
+                              check=False)
+        assert done.returncode == 0, (argv[:6], done.stdout[-2000:], done.stderr[-2000:])
+    image = workdir / "cosim" / firmware.MODEL
+    assert image.is_file(), image
+    return image
+
+
+def _external_symbols(image: Path) -> set[tuple[str, str]]:
+    """The image's external symbols, defined and undefined, as (name, type): ``nm -g -P``, addresses left out."""
+    done = subprocess.run(["nm", "-g", "-P", str(image)], capture_output=True, text=True, check=True)
+    return {(f[0], f[1]) for f in (line.split() for line in done.stdout.splitlines()) if len(f) >= 2}
+
+
+@needs("cc", "verilator", "make", "nm")
+@pytest.mark.parametrize("bus", sorted(COSIM_BUSES))
+def test_the_cosim_images_external_symbols_are_the_same_with_and_without_verilate_jobs(bus, tmp_path, capsys):
+    """Gate ET20: on the Verilator this machine has (in CI, the one CI installs), for each registered bus, the
+    co-simulation image built with ``--verilate-jobs 1`` has the same external symbols as the image built without
+    those two words. The guard pins option text, not the image; the guard's own comment gives the image's simulator
+    symbols as its concern, so this compares them."""
+    assert set(COSIM_FIXTURES) == set(COSIM_BUSES)
+    version = subprocess.run(["verilator", "--version"], capture_output=True, text=True, check=False).stdout.strip()
+    with_words = _external_symbols(_cosim_image(bus, tmp_path / "with", verilate_jobs=True))
+    without = _external_symbols(_cosim_image(bus, tmp_path / "without", verilate_jobs=False))
+    undefined = sum(1 for _, kind in with_words if kind in "Uw")
+    with capsys.disabled():  # into the CI log, as the REACH-PROBE lines are
+        print(f"\nCOSIM-SYMBOLS {bus}: {version}; with --verilate-jobs 1: {len(with_words)} external symbols "
+              f"({undefined} undefined); without: {len(without)}; equal: {with_words == without}")
+    assert with_words == without, (f"{RETURN_CONDITION}\nadded {sorted(with_words - without)[:20]}; "
+                                   f"removed {sorted(without - with_words)[:20]}")

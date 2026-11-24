@@ -328,3 +328,28 @@ def test_the_verilator_jobs_cap_is_read_where_a_build_is_made_and_unset_is_one_j
         monkeypatch.setattr(eda, "coverage_design", lambda job: {}, raising=False)
         argv = build(job)[0]
         assert argv[0] == "verilator" and argv[argv.index("-j") + 1] == jobs, build.__name__
+
+
+def test_every_verilator_model_build_verilates_on_one_thread():
+    """Verilator 5.020 can abort as it exits after verilating on more than one thread ("attempted to destroy locked
+    Thread Pool", verilator/verilator#4931); ``-j`` alone would set that thread count. So every model build in the
+    integrations (``--build`` or ``--binary``, as written in its source) passes ``--verilate-jobs 1``. A lint starts no
+    build and is not one of them."""
+    import ast
+
+    from nirmaan.integrations import eda
+
+    builds = {}
+    for path in sorted(Path(eda.__file__).parent.glob("*.py")):
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            if isinstance(node, ast.List):
+                words = [e.value if isinstance(e, ast.Constant) else None for e in node.elts]
+                if words[:1] == ["verilator"] and {"--build", "--binary"} & set(words):
+                    builds[f"{path.name}:{node.lineno}"] = words
+    assert {name.split(":")[0] for name in builds} == {"eda.py", "firmware.py", "firmware_riscv.py"}, sorted(builds)
+    # simulator.run's Verilator backend, coverage.read, fw.test's co-simulation build (which regmap.verify runs too)
+    # and fw.soc_test, as docs/TEST_CI_HARDENING.md, section 10, names them
+    assert len(builds) == 4, sorted(builds)
+    for name, words in builds.items():
+        at = words.index("--verilate-jobs") if "--verilate-jobs" in words else -1
+        assert at > 0 and words[at + 1] == "1", name
