@@ -1,0 +1,25 @@
+{
+  "cases": [
+    "flow/axil-timer"
+  ],
+  "command": "nirmaan eval run flow/axil-timer --runtime claude-code --trials 1 --purpose evidence --out /home/runner/work/_temp/results",
+  "finished_at": "2026-11-24T16:59:01.694178Z",
+  "flow": "whole",
+  "format": "nirmaan.eval-run",
+  "harness_variant": "default",
+  "head_sha": "508e55ffaab0a91d6577bbe534f498aee2840e3f",
+  "id": "2026-11-24-claude-code-claude-opus-5-5-whole-flow",
+  "knowledge": "on",
+  "model": "claude-opus-5-5",
+  "nirmaan_version": "1.25.0",
+  "purpose": "evidence",
+  "replay": false,
+  "runtime": "claude-code",
+  "seats": [
+    "rtl-implementation"
+  ],
+  "source": "",
+  "started_at": "2026-11-24T16:46:47.216180Z",
+  "trials": 1,
+  "version": 1
+}

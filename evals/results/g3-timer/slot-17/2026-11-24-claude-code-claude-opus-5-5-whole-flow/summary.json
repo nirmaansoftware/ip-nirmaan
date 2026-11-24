@@ -1,0 +1,29 @@
+{
+  "cases": {
+    "flow/axil-timer": {
+      "high": 1.0,
+      "low": 0.20654931437723745,
+      "n": 1,
+      "passed": 1,
+      "rate": 1.0
+    }
+  },
+  "format": "nirmaan.eval-summary",
+  "seats": {
+    "rtl-implementation": {
+      "high": 1.0,
+      "low": 0.20654931437723745,
+      "n": 1,
+      "passed": 1,
+      "rate": 1.0
+    }
+  },
+  "totals": {
+    "cost_usd": null,
+    "duration_s": 734.388,
+    "input_tokens": 8,
+    "model_calls": 4,
+    "output_tokens": 88993,
+    "trials": 1
+  }
+}

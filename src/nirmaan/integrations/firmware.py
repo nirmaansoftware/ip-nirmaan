@@ -632,8 +632,8 @@ def _cosim_steps(job: Job) -> list[list[str]]:
     steps, objects = _compile("cc", (), (*job.sources, *added), harness, job.workdir / "cobj", headers=False,
                               include=include)
     model = job.workdir / "cosim"
-    steps.append(["verilator", "--cc", "--exe", "--build", "-j", "0", "-Wno-fatal", "--prefix", MODEL,
-                  "-Mdir", str(model), *job.top_args("--top-module"), *rtl, str(harness / manager.name),
+    steps.append(["verilator", "--cc", "--exe", "--build", "-j", "0", "--verilate-jobs", "1", "-Wno-fatal",
+                  "--prefix", MODEL, "-Mdir", str(model), *job.top_args("--top-module"), *rtl, str(harness / manager.name),
                   *objects, "-CFLAGS", f"-I{harness}", *irq])
     steps.append(seat_run(job, [str(model / MODEL), NONCE_ARG + new_nonce()]))  # M53: the harness tags its lines
     return steps

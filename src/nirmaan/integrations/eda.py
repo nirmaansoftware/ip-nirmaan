@@ -95,9 +95,10 @@ KEEP_ENV = "NIRMAAN_KEEP_RUN_DIRS"
 #: The most build jobs a Verilator build starts (``-j N``), read where its command is made. Unset, empty, 0 or not a
 #: whole number: ``-j 0``, one job per core, as before. The review loop's test check sets it, because it runs up to
 #: three test shards at once beside reviews, and with ``-j 0`` every Verilator build in every shard starts one job per
-#: core (docs/TEST_CI_HARDENING.md, section 9). ``fw.test``'s
-#: co-simulation build keeps ``-j 0``: gate WF14's guard pins its options word for word
-#: (``tests/test_nirmaan_firmware_reach.py``), and a change there is the council's return condition.
+#: core (docs/TEST_CI_HARDENING.md, section 9). ``fw.test``'s co-simulation build (``regmap.verify`` runs the same
+#: build) keeps ``-j 0`` and, like every model build, passes ``--verilate-jobs 1`` (section 10 there): gate WF14's
+#: guard pins its options word for word (``tests/test_nirmaan_firmware_reach.py``), and a change there is the council's
+#: return condition.
 VERILATOR_JOBS_ENV = "NIRMAAN_VERILATOR_JOBS"
 
 #: Environment variables no tool run sees (M53): code a seat wrote runs in these steps, and what it prints
@@ -826,15 +827,23 @@ def _icarus(job: Job) -> list[list[str]]:
 
 
 def verilator_jobs() -> str:
-    """``-j``'s value for a Verilator build: ``VERILATOR_JOBS_ENV`` when it is a whole number above 0, else ``0``."""
+    """``-j``'s value for a Verilator build: ``VERILATOR_JOBS_ENV`` when it is a whole number above 0, else ``0``.
+
+    ``-j`` sets the ``make`` jobs of the build and also Verilator's own verilation threads, unless
+    ``--verilate-jobs`` says otherwise. Every model build passes ``--verilate-jobs 1``: Verilator 5.020 (Ubuntu
+    24.04's, in CI and the live evaluation) can abort as it exits when it verilated on more than one thread
+    ("Internal Error: attempted to destroy locked Thread Pool", verilator/verilator#4931, closed upstream on 2024-03-01,
+    after 5.020's release; which release first carries the fix is not checked here). With one verilation thread it starts
+    no worker and leaves its locks off, so we infer from its source that the abort does not happen; no run shows
+    that (docs/TEST_CI_HARDENING.md, section 10). The ``make`` jobs stay as ``-j`` says."""
     value = os.environ.get(VERILATOR_JOBS_ENV, "").strip()
     return str(int(value)) if value.isdigit() and int(value) > 0 else "0"
 
 
 def _verilator_sim(job: Job) -> list[list[str]]:
     _expect(job)
-    return [["verilator", "--binary", "-Wno-fatal", "-j", verilator_jobs(), "--top-module", str(job.top),
-             "-Mdir", "obj", *job.sources],
+    return [["verilator", "--binary", "-Wno-fatal", "-j", verilator_jobs(), "--verilate-jobs", "1",
+             "--top-module", str(job.top), "-Mdir", "obj", *job.sources],
             [str(job.workdir / "obj" / f"V{job.top}"), NONCE_ARG + new_nonce()]]
 
 
@@ -993,8 +1002,8 @@ def _verilator_coverage(job: Job) -> list[list[str]]:
     main = job.workdir / "coverage_main.cpp"
     main.write_text(COVERAGE_MAIN.format(top=job.top, data=json.dumps(str(raw))), encoding="utf-8")
     return [["verilator", "--cc", "--exe", "--build", "--timing", COVERAGE_BUILD, "--coverage-toggle",
-             "-Wno-fatal", "-j", verilator_jobs(), "--top-module", str(job.top), "-Mdir", "obj", str(main),
-             *job.sources],
+             "-Wno-fatal", "-j", verilator_jobs(), "--verilate-jobs", "1", "--top-module", str(job.top),
+             "-Mdir", "obj", str(main), *job.sources],
             seat_model([str(job.workdir / "obj" / f"V{job.top}"), NONCE_ARG + new_nonce()], job.workdir),
             ["verilator_coverage", "--write", str(data), str(raw)],
             ["verilator_coverage", "--write-info", str(job.workdir / COVERAGE_INFO), str(data)]]
