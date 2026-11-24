@@ -366,7 +366,9 @@ anyway is redacted from logs and from the uploaded record.
   run 45073595509 (`evals/flow/tool_reach_record.json`, on `c99ef1fe`, before
   the eqy and `coverage.read` change) shows the listed probes denied to the
   account through Icarus, Verilator, Yosys and SBY only; eqy and
-  `coverage.read` have no recorded probe run there. Seat files are not
+  `coverage.read` have no recorded probe run there. The measured run's
+  reach records (`evals/flow/tool_reach_measured_run.json`) are cited in the words of that index's `about` field and no
+  wider; a slot's are cited in the same words with the slot in place of the purpose. Seat files are not
   claimed confined, and the residual is the one stated for the input check
   in section 3: screen classes nobody has found, parser faults in a tool,
   and files any account may read.
