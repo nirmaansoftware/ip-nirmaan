@@ -1,0 +1,268 @@
+{
+  "format": "nirmaan.tool-reach",
+  "seat": "nirmaan-seat",
+  "every_denied": true,
+  "probes": [
+    {
+      "tool": "iverilog",
+      "gate": "simulator.run",
+      "probe": "control (seat files of mode 0600 read and passed)",
+      "target": null,
+      "denied": true,
+      "detail": "icarus: simulation passed: 1 check passed, $finish reached at time 0, 0 errors; canary values in the log, summary or result: 0"
+    },
+    {
+      "tool": "iverilog",
+      "gate": "simulator.run",
+      "probe": "checkout canary",
+      "target": "/home/runner/work/ip-nirmaan/ip-nirmaan/.nirmaan-tool-canary-d567ba1d86e623c9",
+      "denied": true,
+      "detail": "icarus: simulation failed: 1 error, exit status 2, $finish never reached, the testbench printed no verdict (NIRMAAN-SIM <nonce> <n> passed, <m> failed); first: /tmp/nirmaan-reach-tools-7yf731rj/iveril; canary values in the log, summary or result: 0"
+    },
+    {
+      "tool": "iverilog",
+      "gate": "simulator.run",
+      "probe": "runner-only canary",
+      "target": "/tmp/nirmaan-reach-runner-fjstcxmx/runner-only-d567ba1d86e623c9",
+      "denied": true,
+      "detail": "icarus: simulation failed: 1 error, exit status 2, $finish never reached, the testbench printed no verdict (NIRMAAN-SIM <nonce> <n> passed, <m> failed); first: /tmp/nirmaan-reach-tools-7yf731rj/iveril; canary values in the log, summary or result: 0"
+    },
+    {
+      "tool": "iverilog",
+      "gate": "simulator.run",
+      "probe": "credential canary in the parent's environment",
+      "target": "/proc/3495/environ",
+      "denied": true,
+      "detail": "icarus: simulation failed: 1 error, exit status 2, $finish never reached, the testbench printed no verdict (NIRMAAN-SIM <nonce> <n> passed, <m> failed); first: /tmp/nirmaan-reach-tools-7yf731rj/iveril; canary values in the log, summary or result: 0"
+    },
+    {
+      "tool": "verilator",
+      "gate": "lint.run",
+      "probe": "control (seat files of mode 0600 read and passed)",
+      "target": null,
+      "denied": true,
+      "detail": "verilator-lint: lint clean: 0 errors, 0 warnings; canary values in the log, summary or result: 0"
+    },
+    {
+      "tool": "verilator",
+      "gate": "lint.run",
+      "probe": "checkout canary",
+      "target": "/home/runner/work/ip-nirmaan/ip-nirmaan/.nirmaan-tool-canary-d567ba1d86e623c9",
+      "denied": true,
+      "detail": "verilator-lint: lint failed: 2 errors, 1 warning; first: /tmp/nirmaan-reach-tools-7yf731rj/verilator/1/reach_tool_lint.v:2: Cannot find include file: /home/runner/work/ip-nirmaan/ip-nirmaan/.nirmaan-t; canary values in the log, summary or result: 0"
+    },
+    {
+      "tool": "verilator",
+      "gate": "lint.run",
+      "probe": "runner-only canary",
+      "target": "/tmp/nirmaan-reach-runner-fjstcxmx/runner-only-d567ba1d86e623c9",
+      "denied": true,
+      "detail": "verilator-lint: lint failed: 1 error, 1 warning; first: /tmp/nirmaan-reach-tools-7yf731rj/verilator/2/reach_tool_lint.v:2: File not found: /tmp/nirmaan-reach-runner-fjstcxmx/runner-only-d567ba1d86e623; canary values in the log, summary or result: 0"
+    },
+    {
+      "tool": "verilator",
+      "gate": "lint.run",
+      "probe": "credential canary in the parent's environment",
+      "target": "/proc/3495/environ",
+      "denied": true,
+      "detail": "verilator-lint: lint failed: 1 error, 1 warning; first: /tmp/nirmaan-reach-tools-7yf731rj/verilator/3/reach_tool_lint.v:2: File not found: /proc/3495/environ; canary values in the log, summary or result: 0"
+    },
+    {
+      "tool": "yosys",
+      "gate": "synth.run",
+      "probe": "control (seat files of mode 0600 read and passed)",
+      "target": null,
+      "denied": true,
+      "detail": "yosys: synthesis passed: 0 cells, 0 flip-flops, 0 latches, 0 warnings; canary values in the log, summary or result: 0"
+    },
+    {
+      "tool": "yosys",
+      "gate": "synth.run",
+      "probe": "checkout canary",
+      "target": "/home/runner/work/ip-nirmaan/ip-nirmaan/.nirmaan-tool-canary-d567ba1d86e623c9",
+      "denied": true,
+      "detail": "yosys: synthesis failed: 1 error; first: Can't open include file `/home/runner/work/ip-nirmaan/ip-nirmaan/.nirmaan-tool-canary-d567ba1d86e623c9'!; canary values in the log, summary or result: 0"
+    },
+    {
+      "tool": "yosys",
+      "gate": "synth.run",
+      "probe": "runner-only canary",
+      "target": "/tmp/nirmaan-reach-runner-fjstcxmx/runner-only-d567ba1d86e623c9",
+      "denied": true,
+      "detail": "yosys: synthesis failed: 1 error; first: Can't open include file `/tmp/nirmaan-reach-runner-fjstcxmx/runner-only-d567ba1d86e623c9'!; canary values in the log, summary or result: 0"
+    },
+    {
+      "tool": "yosys",
+      "gate": "synth.run",
+      "probe": "credential canary in the parent's environment",
+      "target": "/proc/3495/environ",
+      "denied": true,
+      "detail": "yosys: synthesis failed: 1 error; first: Can't open include file `/proc/3495/environ'!; canary values in the log, summary or result: 0"
+    },
+    {
+      "tool": "sby",
+      "gate": "formal.run",
+      "probe": "control (seat files of mode 0600 read and passed)",
+      "target": null,
+      "denied": true,
+      "detail": "symbiyosys: formal passed: every property proven; canary values in the log, summary or result: 0"
+    },
+    {
+      "tool": "sby",
+      "gate": "formal.cover",
+      "probe": "control (seat files of mode 0600 read and passed)",
+      "target": null,
+      "denied": true,
+      "detail": "symbiyosys-cover: not vacuous: every cover reached (1 of 1); every assertion antecedent reached (1 of 1); canary values in the log, summary or result: 0"
+    },
+    {
+      "tool": "sby",
+      "gate": "formal.run",
+      "probe": "checkout canary",
+      "target": "/home/runner/work/ip-nirmaan/ip-nirmaan/.nirmaan-tool-canary-d567ba1d86e623c9",
+      "denied": true,
+      "detail": "symbiyosys: formal error: 1 error; first: Can't open include file `/home/runner/work/ip-nirmaan/ip-nirmaan/.nirmaan-tool-canary-d567ba1d86e623c9'!; canary values in the log, summary or result: 0"
+    },
+    {
+      "tool": "sby",
+      "gate": "formal.run",
+      "probe": "runner-only canary",
+      "target": "/tmp/nirmaan-reach-runner-fjstcxmx/runner-only-d567ba1d86e623c9",
+      "denied": true,
+      "detail": "symbiyosys: formal error: 1 error; first: Can't open include file `/tmp/nirmaan-reach-runner-fjstcxmx/runner-only-d567ba1d86e623c9'!; canary values in the log, summary or result: 0"
+    },
+    {
+      "tool": "sby",
+      "gate": "formal.run",
+      "probe": "credential canary in the parent's environment",
+      "target": "/proc/3495/environ",
+      "denied": true,
+      "detail": "symbiyosys: formal error: 1 error; first: Can't open include file `/proc/3495/environ'!; canary values in the log, summary or result: 0"
+    },
+    {
+      "tool": "eqy",
+      "gate": "equivalence.run",
+      "probe": "control (the setup and both designs, copied into the run's directory by the harness, passed)",
+      "target": null,
+      "denied": true,
+      "detail": "eqy: equivalent: gate reach_tool_gate.v against gold reach_tool_gold.v: every partition proved (1 of 1); canary values in the log, summary or result: 0"
+    },
+    {
+      "tool": "eqy",
+      "gate": "equivalence.run",
+      "probe": "checkout canary",
+      "target": "/home/runner/work/ip-nirmaan/ip-nirmaan/.nirmaan-tool-canary-d567ba1d86e623c9",
+      "denied": true,
+      "detail": "eqy: equivalence check unknown: 2 errors; first: Can't open include file `/home/runner/work/ip-nirmaan/ip-nirmaan/.nirmaan-tool-canary-d567ba1d86e623c9'!; canary values in the log, summary or result: 0"
+    },
+    {
+      "tool": "eqy",
+      "gate": "equivalence.run",
+      "probe": "runner-only canary",
+      "target": "/tmp/nirmaan-reach-runner-fjstcxmx/runner-only-d567ba1d86e623c9",
+      "denied": true,
+      "detail": "eqy: equivalence check unknown: 2 errors; first: Can't open include file `/tmp/nirmaan-reach-runner-fjstcxmx/runner-only-d567ba1d86e623c9'!; canary values in the log, summary or result: 0"
+    },
+    {
+      "tool": "eqy",
+      "gate": "equivalence.run",
+      "probe": "credential canary in the parent's environment",
+      "target": "/proc/3495/environ",
+      "denied": true,
+      "detail": "eqy: equivalence check unknown: 2 errors; first: Can't open include file `/proc/3495/environ'!; canary values in the log, summary or result: 0"
+    },
+    {
+      "tool": "verilator",
+      "gate": "coverage.read",
+      "probe": "control (seat files of mode 0600 built, the model run and its coverage read)",
+      "target": null,
+      "denied": true,
+      "detail": "verilator-coverage: coverage read over reach_cov_design.v: line 100.00% (2/2), toggle 100.00% (2/2); simulation passed: 1 check passed, $finish reached, 0 errors; canary values in the log, summary or result: 0"
+    },
+    {
+      "tool": "verilator",
+      "gate": "coverage.read",
+      "probe": "build: checkout canary",
+      "target": "/home/runner/work/ip-nirmaan/ip-nirmaan/.nirmaan-tool-canary-d567ba1d86e623c9",
+      "denied": true,
+      "detail": "verilator-coverage: coverage not read: simulation failed: 2 errors, exit status 1, $finish never reached, the testbench printed no verdict (NIRMAAN-SIM <nonce> <n> passed, <m> failed); first: /tmp/nir; canary values in the log, summary or result: 0"
+    },
+    {
+      "tool": "verilator",
+      "gate": "coverage.read",
+      "probe": "build: runner-only canary",
+      "target": "/tmp/nirmaan-reach-runner-fjstcxmx/runner-only-d567ba1d86e623c9",
+      "denied": true,
+      "detail": "verilator-coverage: coverage not read: simulation failed: 1 error, exit status 1, $finish never reached, the testbench printed no verdict (NIRMAAN-SIM <nonce> <n> passed, <m> failed); first: /tmp/nirm; canary values in the log, summary or result: 0"
+    },
+    {
+      "tool": "verilator",
+      "gate": "coverage.read",
+      "probe": "build: credential canary in the parent's environment",
+      "target": "/proc/3495/environ",
+      "denied": true,
+      "detail": "verilator-coverage: coverage not read: simulation failed: 1 error, exit status 1, $finish never reached, the testbench printed no verdict (NIRMAAN-SIM <nonce> <n> passed, <m> failed); first: /tmp/nirm; canary values in the log, summary or result: 0"
+    },
+    {
+      "tool": "verilator",
+      "gate": "coverage.read",
+      "probe": "build: canary beside the run's directory in its folder",
+      "target": "/tmp/nirmaan-reach-tools-7yf731rj/coverage/beside-d567ba1d86e623c9",
+      "denied": true,
+      "detail": "verilator-coverage: coverage not read: simulation failed: 2 errors, exit status 1, $finish never reached, the testbench printed no verdict (NIRMAAN-SIM <nonce> <n> passed, <m> failed); first: /tmp/nir; canary values in the log, summary or result: 0"
+    },
+    {
+      "tool": "nirmaan-seat-model",
+      "gate": "coverage.read",
+      "probe": "model: checkout canary",
+      "target": "/home/runner/work/ip-nirmaan/ip-nirmaan/.nirmaan-tool-canary-d567ba1d86e623c9",
+      "denied": true,
+      "detail": "verilator-coverage: coverage read over reach_cov_design.v: line 100.00% (2/2), toggle 100.00% (2/2); simulation passed: 1 check passed, $finish reached, 0 errors; canary values in the log, summary or result: 0"
+    },
+    {
+      "tool": "nirmaan-seat-model",
+      "gate": "coverage.read",
+      "probe": "model: runner-only canary",
+      "target": "/tmp/nirmaan-reach-runner-fjstcxmx/runner-only-d567ba1d86e623c9",
+      "denied": true,
+      "detail": "verilator-coverage: coverage read over reach_cov_design.v: line 100.00% (2/2), toggle 100.00% (2/2); simulation passed: 1 check passed, $finish reached, 0 errors; canary values in the log, summary or result: 0"
+    },
+    {
+      "tool": "nirmaan-seat-model",
+      "gate": "coverage.read",
+      "probe": "model: credential canary in the parent's environment",
+      "target": "/proc/3495/environ",
+      "denied": true,
+      "detail": "verilator-coverage: coverage read over reach_cov_design.v: line 100.00% (2/2), toggle 100.00% (2/2); simulation passed: 1 check passed, $finish reached, 0 errors; canary values in the log, summary or result: 0"
+    },
+    {
+      "tool": "nirmaan-seat-model",
+      "gate": "coverage.read",
+      "probe": "model: canary beside the run's directory in its folder",
+      "target": "/tmp/nirmaan-reach-tools-7yf731rj/coverage/beside-d567ba1d86e623c9",
+      "denied": true,
+      "detail": "verilator-coverage: coverage read over reach_cov_design.v: line 100.00% (2/2), toggle 100.00% (2/2); simulation passed: 1 check passed, $finish reached, 0 errors; canary values in the log, summary or result: 0"
+    },
+    {
+      "tool": "iverilog",
+      "gate": "simulator.run",
+      "probe": "held-out compile control (the staged judge file is read)",
+      "target": null,
+      "denied": true,
+      "detail": "icarus: simulation passed: 1 check passed, $finish reached at time 1, 0 errors; canary values in the log, summary or result: 0"
+    },
+    {
+      "tool": "iverilog",
+      "gate": "simulator.run",
+      "probe": "held-out compile: a canary beside the staged judge file",
+      "target": "/tmp/nirmaan-reach-tools-7yf731rj/judge/check-1/beside-d567ba1d86e623c9",
+      "denied": true,
+      "detail": "icarus: simulation failed: 1 error, exit status 2, $finish never reached, the testbench printed no verdict (NIRMAAN-SIM <nonce> <n> passed, <m> failed); first: /tmp/nirmaan-reach-tools-7yf731rj/held-o; canary values in the log, summary or result: 0"
+    }
+  ],
+  "commit": "1e9c560b2869c6837d0a38d69308397737648d3b",
+  "run_id": "45318904373",
+  "run_attempt": "1",
+  "job": "rejudge",
+  "seat_tools": "/opt/nirmaan-seat/bin"
+}
