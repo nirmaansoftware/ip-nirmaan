@@ -1691,6 +1691,13 @@
       "case": "flow/axil-timer",
       "case_digest": "sha256:ff8a4afc77caee105070d996f3e29142f2fe013c411752becdc46090b7553da3",
       "cli": "2.1.325",
+      "count": {
+        "high": 0.6873,
+        "low": 0.1682,
+        "n": 10,
+        "passed": 4,
+        "unjudged": 5
+      },
       "covers_every_stage": true,
       "first": {
         "record": "evals/results/g3-timer/slot-02/2026-11-24-claude-code-claude-opus-5-5-without-knowledge-whole-flow",
@@ -1798,6 +1805,17 @@
           "reason": "whole-flow trial: credits no skill and never counts toward a level (labelled in the run manifest and the trial)",
           "record": "evals/results/g3-timer/slot-18/2026-11-24-claude-code-claude-opus-5-5-without-knowledge-whole-flow",
           "stopped_at": "",
+          "trial": 1
+        },
+        {
+          "case": "flow/axil-timer",
+          "flow_digest": "sha256:9d94c40502aa75d262248c4e74b51aecbe1f9a0ec8d661a1db9e1723f78f0506",
+          "judged": false,
+          "knowledge": "off",
+          "passed": false,
+          "reason": "whole-flow trial: credits no skill and never counts toward a level (labelled in the run manifest and the trial)",
+          "record": "evals/results/g3-timer/slot-20/2026-11-24-claude-code-claude-opus-5-5-without-knowledge-whole-flow",
+          "stopped_at": "microarchitecture",
           "trial": 1
         }
       ]
