@@ -1152,7 +1152,7 @@ def _measured_problems(index_path: Path) -> list[str]:
 def test_the_measured_runs_reach_index_holds_every_check_once_it_is_committed():
     """Gate ET10 (decisions A1 and R2): with the index, both jobs, every probe denied and every control passed, one run,
     attempt and commit, the purpose calibration, the first part's lines, the seat C reach records, every digest equal,
-    nothing else in the folder. Without the index it passes: the measured run is not dispatched yet."""
+    nothing else in the folder. Without the index it passes: nothing is committed to hold."""
     assert _measured_problems(MEASURED_INDEX) == []
 
 
