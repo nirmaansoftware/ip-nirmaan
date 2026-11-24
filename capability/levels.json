@@ -1553,7 +1553,62 @@
     "proven": 0
   },
   "variants": [],
-  "whole_flow": [],
+  "whole_flow": [
+    {
+      "case": "flow/axil-timer",
+      "case_digest": "sha256:ff8a4afc77caee105070d996f3e29142f2fe013c411752becdc46090b7553da3",
+      "cli": "2.1.325",
+      "covers_every_stage": true,
+      "first": {
+        "record": "evals/results/g3-timer/slot-01/2026-11-24-claude-code-claude-opus-5-5-whole-flow",
+        "trial": 1
+      },
+      "flow_digest": "sha256:a1aea0d36022a54be56c8d5c31831ea8ac0994f2802bd8ee8f39f6a5246ec312",
+      "harness": "sha256:56c5fac7d788bb34f84b263db1a50b896aba5779387bfed63a0a07975e4dcd72",
+      "model": "claude-opus-5-5",
+      "purpose": "evidence",
+      "trials": [
+        {
+          "case": "flow/axil-timer",
+          "flow_digest": "sha256:a1aea0d36022a54be56c8d5c31831ea8ac0994f2802bd8ee8f39f6a5246ec312",
+          "judged": true,
+          "knowledge": "on",
+          "passed": false,
+          "reason": "whole-flow trial: credits no skill and never counts toward a level (labelled in the run manifest and the trial)",
+          "record": "evals/results/g3-timer/slot-01/2026-11-24-claude-code-claude-opus-5-5-whole-flow",
+          "stopped_at": "",
+          "trial": 1
+        }
+      ]
+    },
+    {
+      "case": "flow/axil-timer",
+      "case_digest": "sha256:ff8a4afc77caee105070d996f3e29142f2fe013c411752becdc46090b7553da3",
+      "cli": "2.1.325",
+      "covers_every_stage": true,
+      "first": {
+        "record": "evals/results/g3-timer/slot-02/2026-11-24-claude-code-claude-opus-5-5-without-knowledge-whole-flow",
+        "trial": 1
+      },
+      "flow_digest": "sha256:b8608edecf2013dddfaec85e947106316f9a561a8ec74c7e3d99a7f53f8323c0",
+      "harness": "sha256:7e8ba68dd60b395186441ba4c27392659189a603b59705fa2cc3d4dbf5c4a83c",
+      "model": "claude-opus-5-5",
+      "purpose": "evidence",
+      "trials": [
+        {
+          "case": "flow/axil-timer",
+          "flow_digest": "sha256:b8608edecf2013dddfaec85e947106316f9a561a8ec74c7e3d99a7f53f8323c0",
+          "judged": true,
+          "knowledge": "off",
+          "passed": false,
+          "reason": "whole-flow trial: credits no skill and never counts toward a level (labelled in the run manifest and the trial)",
+          "record": "evals/results/g3-timer/slot-02/2026-11-24-claude-code-claude-opus-5-5-without-knowledge-whole-flow",
+          "stopped_at": "",
+          "trial": 1
+        }
+      ]
+    }
+  ],
   "without_knowledge": [
     {
       "case": "rtl/rr-arbiter",
