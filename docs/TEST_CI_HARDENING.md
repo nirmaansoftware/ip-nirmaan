@@ -281,3 +281,35 @@ it (`simulator.run`'s Verilator backend, coverage and `fw.soc_test`;
 `nirmaan.integrations.eda.verilator_jobs`) start at most two jobs each. Unset, as in CI's own test
 jobs and on a developer's machine, it is `-j 0` as before. `fw.test`'s co-simulation build keeps
 `-j 0`: gate WF14's guard pins its options word for word (`tests/test_nirmaan_firmware_reach.py`).
+Since section 10 every Verilator model build, `fw.test`'s co-simulation build included (the one `regmap.verify`
+uses too), also passes `--verilate-jobs 1`; the `make` jobs stay as this section says, and the co-simulation build
+still passes `-j 0`.
+
+## 10. Verilator verilates on one thread (2026-11-23)
+
+Verilator 5.020, the one Ubuntu 24.04 installs (CI's test jobs, and the live evaluation's jobs: `5.020-1` in
+`evals/plans/2026-11-23-w2-remeasure.md`, section 5, from run 45073595509), can abort as it exits
+with "Internal Error: attempted to destroy locked Thread Pool" when it verilated on more than one thread: a race in
+the teardown of its own thread pool (verilator/verilator#4931, closed upstream on 2024-03-01, after 5.020's release;
+which release first carries the fix is not checked here). `-j N` sets both the `make` jobs of a build and Verilator's
+verilation threads, so `-j 0` gave every build one verilation thread per core. The `verilator` script then exits 255
+and the build fails, though nothing in the design or the test is wrong. CI's test shards have hit it; the pull
+request that added this section names the runs it found.
+
+Every Verilator model build now passes `--verilate-jobs 1`. There are four, and `tests/test_nirmaan_eda.py` checks
+that each passes it: `simulator.run`'s Verilator backend and `coverage.read` (`eda.py`), `fw.test`'s co-simulation
+build (`firmware.py`; `regmap.verify` runs the same build) and `fw.soc_test` (`firmware_riscv.py`). The `make` jobs
+stay as `-j` says (`NIRMAAN_VERILATOR_JOBS`, section 9). A lint passes no `-j` and already verilated on one thread.
+
+That the abort no longer happens is an inference, not a measurement: from Verilator 5.020's source (open, the
+thread pool in `src/V3ThreadPool.cpp`), with one verilation thread it starts no worker thread and leaves its locks
+off, so the teardown race should not arise. No run can show that it is gone.
+
+`fw.test`'s build is the one whose option list gate WF14's guard pins (`tests/test_nirmaan_firmware_reach.py`), so
+the guard's list gained the same two words, and before it merged the guard's return condition is checked as gate ET20 of
+`council/records/2026-11-22-eda-tools-seat-account.md` (third addendum, decision V1) asks: the guard passes, the
+simulator-clock probe gives the counts it is recorded with, the wait probe and the strict fixtures of gate WF15 give
+their recorded results, and, on the Verilator CI installs, for both registered buses, the co-simulation image has
+the same external symbols with and without the two words (the guard file's
+`test_the_cosim_images_external_symbols_are_the_same_with_and_without_verilate_jobs`). The pull request names the
+CI run and job of each. No record of gate ET5 was made on a build with these words, and none covers one.

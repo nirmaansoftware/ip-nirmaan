@@ -328,8 +328,8 @@ def _soc_steps(job: Job) -> list[list[str]]:
     defines = [f"+define+NIRMAAN_CORE={core.module}", f"+define+NIRMAAN_BRIDGE={bus.module}",
                f"+define+NIRMAAN_DUT={top}", *(["+define+NIRMAAN_DUT_IRQ"] if IRQ_PORT in ports else []),
                *(["+define+NIRMAAN_CORE_BUS_ERR"] if core.bus_error else [])]
-    steps.append(["verilator", "--cc", "--exe", "--build", "-j", verilator_jobs(), "-Wno-fatal", "--prefix", MODEL,
-                  "--top-module", "nirmaan_soc", "-Mdir", str(model), *defines,
+    steps.append(["verilator", "--cc", "--exe", "--build", "-j", verilator_jobs(), "--verilate-jobs", "1",
+                  "-Wno-fatal", "--prefix", MODEL, "--top-module", "nirmaan_soc", "-Mdir", str(model), *defines,
                   str(soc / "nirmaan_soc.v"), _local(bus.verilog, soc, job.workdir),
                   *(_local(v, soc, job.workdir) for v in core.verilog), *rtl, str(soc / "soc_main.cpp")])
     steps.append([str(model / MODEL), f"+firmware={image}", NONCE_ARG + new_nonce()])  # M53: for the records
