@@ -110,3 +110,61 @@ def test_one_at_a_time_is_said_of_this_batch_only_after_a_limit():
     for paragraph in re.split(r"\n\s*\n|\n- ", text):
         if re.search(r"\bone (slot |trial |dispatch |run )?at a time\b", paragraph):
             assert "limit" in paragraph or "W2-L1 ran" in paragraph, paragraph
+
+
+GROUP_ROW = re.compile(r"^\| ([^|]+?) \| [^|]+ \| \d+ \| `(sha256:[0-9a-f]{64})` \|$", re.MULTILINE)
+
+
+def _groups(text: str) -> dict[str, str]:
+    return dict(GROUP_ROW.findall(_sections(text)["6"]))
+
+
+def test_the_amendment_states_each_moved_group_digest_with_the_pull_requests_that_moved_it():
+    """Decision P7, item 3, and gate W2C2 (ET7 shown): every group digest that moved after the plan was committed is
+    in section 6's table at its last value, and the amendment names each value it passed through, with the pull
+    request and merge that set it."""
+    text = PLAN.read_text(encoding="utf-8")
+    groups = _groups(text)
+    assert groups["Workflow, tool set and CLI pin"] == (
+        "sha256:82e264d9903a5c5d9f580f8ad8219b46f00db8c0aba367097df6d8d951ec3595")
+    assert groups["Seat account"] == "sha256:6530c15123fabd55cdaf7142af49ee7306eea1ef09d7675338c561e42099c93b"
+    other = " ".join(text.split("**The other moved digests.**", 1)[1].split("**Gate ET7, shown**", 1)[0].split())
+    seat = other.split('- "Seat account"', 1)[1].split('- "Gate backends"', 1)[0]
+    for value, pr in (("4abec1ad", None), ("1b7309f1", "ip#471 (merge `a15b8c1d`"), ("6530c151", "ip#475 (merge `f8dcc97e`")):
+        assert f"`sha256:{value}" in seat, value
+        assert pr is None or pr in seat, pr
+    backends = other.split('- "Gate backends"', 1)[1]
+    assert "`sha256:eac184ec" in backends and f"`{groups['Gate backends']}`" in backends and "ip#475" in backends
+    shown = text.split("**Gate ET7, shown**", 1)[1].split("\n\n**", 1)[0]
+    for pr in ("ip#464 (`c0ba283c`)", "ip#471 (`a15b8c1d`)", "ip#475 (`f8dcc97e`)", "ip#470 (`97324c78`)"):
+        assert f"| {pr} |" in shown, pr
+
+
+def test_the_concurrency_block_is_the_workflows_word_for_word():
+    """Decision P7, item 2: the block as it is on `main` (with the seventh addendum's first clause), word for word."""
+    text = PLAN.read_text(encoding="utf-8")
+    workflow = (REPO / ".github" / "workflows" / "live-eval.yml").read_text(encoding="utf-8")
+    block = re.search(r"^concurrency:\n  group: .*\n  cancel-in-progress: false$", workflow, re.MULTILINE)
+    assert block and f"```\n{block.group(0)}\n```" in _sections(text)["3"]
+
+
+def test_each_case_of_the_batch_runs_in_a_group_of_its_own_with_the_input():
+    """The seventh addendum's decision T3 left the group per run for single-seat cases: with `parallel` true, a case
+    that is neither `flow/` nor `firmware/` gets `live-eval-run-<run id>`, and both guards let each of the 13 IDs
+    through (no `flow/` or `firmware/` prefix; written in its exact form)."""
+    workflow = (REPO / ".github" / "workflows" / "live-eval.yml").read_text(encoding="utf-8")
+    assert ("inputs.parallel && !startsWith(inputs.case, 'flow/') && !startsWith(inputs.case, 'firmware/') && "
+            "format('live-eval-run-{0}', github.run_id)") in workflow
+    assert "form='^[a-z0-9][a-z0-9/_.-]*$'" in workflow
+    cases = {case for _, _, case in _slots(PLAN.read_text(encoding="utf-8"))}
+    assert len(cases) == 13
+    for case in cases:
+        assert not case.startswith(("flow/", "firmware/")), case
+        assert re.fullmatch(r"[a-z0-9][a-z0-9/_.-]*", case) and ".." not in case, case
+
+
+def test_no_placeholder_is_left_in_the_plan():
+    """The amendment is drafted before gate ET20's pull request (ip#522) merges; its merge commit and the value
+    recomputed on it are filled in before the amendment merges."""
+    text = PLAN.read_text(encoding="utf-8")
+    assert not re.findall(r"MERGE-COMMIT-OF-[A-Z0-9]+|GATE-BACKENDS-AFTER-[A-Z0-9]+", text)

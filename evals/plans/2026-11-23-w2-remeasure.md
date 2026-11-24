@@ -11,10 +11,13 @@ and no knowledge document is touched, so every fingerprint and digest below is t
 written on 2026-11-23, before trial 1.
 
 **Amendment before trial 1: trials in parallel.** The addendum of 2026-11-23 to the record ("running the batch's
-trials in parallel", decisions P1 to P7, gates W2C12 to W2C18) lets the batch run up to three trials at once. This
-amendment states what its decision P7 asks, in sections 1, 3, 5, 6, 7, 8, 9, 10 and 11. It changes no count, case,
-arm, slot or read, and no value other than the digest of the group "Workflow, tool set and CLI pin" (section 6). No
-fingerprint moved, and no trial has run.
+trials in parallel", decisions P1 to P7, gates W2C12 to W2C18), as the seventh addendum to
+`council/records/2026-11-17-g3-whole-flow-cases.md` (decision T3) amends its decisions P2, P6 and gate W2C14, lets the
+batch run up to three trials at once. This amendment states what its decision P7 asks, in sections 1, 3, 5, 6, 7, 8,
+9, 10 and 11. It changes no count, case, arm, slot or read. The values of section 6 it changes are the digests of
+three groups of gate code that pull requests moved after this plan was committed, each named with the pull request
+and the merge that moved it: "Workflow, tool set and CLI pin" (decision P7, item 3), "Seat account" and "Gate
+backends". No fingerprint, case digest or skill digest moved, and no trial has run.
 
 ## 1. What is fixed, and how it may change
 
@@ -115,24 +118,32 @@ gh workflow run live-eval.yml -R nirmaansoftware/ip-nirmaan --ref main \
 is not the expected one (exit 4), and after the trial on a record that is not the trial asked for. A slot is in
 flight from its dispatch until its whole run, `live-eval` and `rejudge`, has finished.
 
-**The input and the group** (the addendum, decision P2). The workflow's input `parallel` is a boolean whose default
-is false, and its concurrency block is, word for word:
+**The input and the group** (the addendum, decision P2, as the seventh addendum's decision T3, items 1 to 4 and 7,
+amends it). The workflow's input `parallel` is a boolean whose default is false. ip#470 (merge `97324c78`) made the
+change; on `main` its concurrency block (`.github/workflows/live-eval.yml:107-109`) is, word for word:
 
 ```
 concurrency:
-  group: ${{ inputs.parallel && !startsWith(inputs.case, 'flow/') && !startsWith(inputs.case, 'firmware/') && format('live-eval-run-{0}', github.run_id) || 'live-eval' }}
+  group: ${{ inputs.parallel && inputs.case == 'flow/axil-timer' && (inputs.knowledge == 'off' && 'live-eval-timer-off' || 'live-eval-timer-on') || inputs.parallel && !startsWith(inputs.case, 'flow/') && !startsWith(inputs.case, 'firmware/') && format('live-eval-run-{0}', github.run_id) || 'live-eval' }}
   cancel-in-progress: false
 ```
 
-With `parallel` true, a dispatch of a case that is neither a `flow/` nor a `firmware/` case runs alone in a group of
-its own: it is never queued behind another run and no run can cancel it. With the input false, and for every `flow/`
-and `firmware/` case whatever it says, the group is `live-eval`, which holds one running and one pending run, a
-newer pending run cancelling the older one; the first step of the `replay` job and of the `live-eval` job fails a
-run that asks for `parallel` on a `flow/` or `firmware/` case. Only this batch's 13 cases, in its 117 slots and in
-its 13 replays of gate W2C5 (section 11), are dispatched with `parallel` true. Any other use needs a council ruling,
-and the whole-flow timer and the register block are never dispatched with it. With a group per run GitHub holds no
-width and no longer keeps the two batches apart: the width below and gate W2C9 (section 10) rest on whatever
-dispatches the batch, "the dispatcher" below.
+The block's first clause is the seventh addendum's (decision T3, item 1): a dispatch of `flow/axil-timer` with the
+input runs in `live-eval-timer-on` or `live-eval-timer-off` by its arm. It never applies to this batch, whose 13
+cases are all single-seat cases and none is a `flow/` or `firmware/` case. For them the second clause is the one of
+the addendum's decision P2, item 1, unchanged: a dispatch of one of this batch's cases with `parallel` true runs
+alone in the group `live-eval-run-<its run id>`, so it is never queued behind another run, no run can cancel it, and
+no two of the batch's runs, nor a batch run and a timer run, share a group. With the input false, the group is
+`live-eval`, which holds one running and one pending run, a newer pending run cancelling the older one. Two guards
+are the first two steps of the `replay` job and of the `live-eval` job: the first fails a run that asks for
+`parallel` on a `firmware/` case or on a `flow/` case other than `flow/axil-timer`; the second fails every dispatch
+whose case is not written exactly as its ID (lower case, no space, no `..`), so a case name cannot reach another
+group. Both pass for each of this batch's 13 case IDs, as section 12 writes them. Of this batch, only its 13 cases,
+in its 117 slots and in its 13 replays of gate W2C5 (section 11), are dispatched with `parallel` true. The other
+uses of the input are the seventh addendum's for the timer (its slots, its second measured run, the replay of gate
+ET5's record and a shake-out); any further use needs a council ruling, and the register block is never dispatched
+with it. With a group per run GitHub holds no width and no longer keeps the two batches apart: the width below and
+gate W2C9 (section 10) rest on whatever dispatches the batch, "the dispatcher" below.
 
 **The width** (the addendum, decision P1).
 
@@ -302,7 +313,9 @@ found. That residual is the one the record states and accepts (decision 4, "Resi
 ## 6. The values a dispatch is made on
 
 Computed on `main` at `81bbaefd4a2dd8df50fce3a1fbe78065bfefefd2`, the commit this pull request was last merged
-with (this file touches none of the files below), Claude Code 2.1.325.
+with (this file touches none of the files below), Claude Code 2.1.325. The amendment before trial 1 recomputed every
+value on a later commit and restates the three group digests that moved, below the group table; the tables hold the
+values on that commit.
 
 | Item | Value |
 |---|---|
@@ -363,15 +376,15 @@ plan:
 
 | Group | Paths | Files | Digest |
 |---|---|---|---|
-| Gate backends | `src/nirmaan/integrations` | 60 | `sha256:eac184ecc60ae35bdc88e6f66c2fa3aceaabe4c32f62066e951d7d5e84e835f9` |
+| Gate backends | `src/nirmaan/integrations` | 60 | `sha256:7c12db371fe1b51fc6a2888e08c6f64677dcfb47d48411af7a66cb7c40ca5443` |
 | Plan check | `src/nirmaan/vplan.py` | 1 | `sha256:9dfd92674fd08729156fb6b8cbedd3479d9a05bb69a6e890c07b77f62b4fb74a` |
 | Triage engine | `src/veritriage` | 253 | `sha256:fc207ed693832819bef89910091a06e265e62185d98e111fdf69f93a765ef098` |
 | Held-out scorers | `src/nirmaan/evals/scorers.py` | 1 | `sha256:5f4f7909a3207f3837d2af7ad60b85c0bae620e1d461afde57aea0d2a592ecb4` |
 | Stage gates | `src/nirmaan/company/workflows.py` | 1 | `sha256:bcd15f8204e55f142f266afdd8e12a4947c7f6276382dd18f4c9893e616a9873` |
-| Seat account | `scripts/live_eval_seat.py`, `.github/actions/live-eval-seat` | 2 | `sha256:4abec1ad1bb4fe9e48afb333c619c1d07ccd2e5df80b62f3142dc8ad750fa446` |
+| Seat account | `scripts/live_eval_seat.py`, `.github/actions/live-eval-seat` | 2 | `sha256:6530c15123fabd55cdaf7142af49ee7306eea1ef09d7675338c561e42099c93b` |
 | Reach test | `scripts/live_eval_reach.py` | 1 | `sha256:581a4cebb61899090a1741fdbea49e51b57decdebdf0cb11c58562f60b4b93c0` |
 | CI command | `scripts/live_eval_ci.py` | 1 | `sha256:3f396770975a7fcff4fc746c031e8694f768b921e90376c290e4fc023acf3e88` |
-| Workflow, tool set and CLI pin | `.github/workflows/live-eval.yml`, `.github/actions/live-eval-setup`, `.github/actions/oss-cad-suite`, `.github/live-eval` | 5 | `sha256:211dbfc14a980c799f783c316e22ac506121b476a852a68394e99b464a10199a` |
+| Workflow, tool set and CLI pin | `.github/workflows/live-eval.yml`, `.github/actions/live-eval-setup`, `.github/actions/oss-cad-suite`, `.github/live-eval` | 5 | `sha256:82e264d9903a5c5d9f580f8ad8219b46f00db8c0aba367097df6d8d951ec3595` |
 
 "Gate backends" holds every tool backend the tables of section 5 name. "Plan check" is `vplan.check`, which the
 record asks this plan to pin by name. "Triage engine" is what `veritriage.investigate` runs. "Stage gates" is the
@@ -379,10 +392,52 @@ file that says which tools a seat's stage runs before review.
 
 **The moved workflow digest** (the addendum, decision P7, item 3). This plan as first committed pinned "Workflow, tool
 set and CLI pin" at `sha256:09083077e0237a7e2b1ed89152d3d5b8f31836a03c8b78500b471d802f8e64d7`. Two pull requests
-moved it before trial 1, neither moving a fingerprint: ip#464 (the replay input `controls`, gate ET5) to
-`sha256:4daa3c45ea748b0bfa77aad94173aa05341b4dee3e42a6fb61b7c5e467726481`, and ip#470 (the input `parallel` and the
-group per run, decision P2) to the value in the table above, computed on `main` at `MERGE-COMMIT-OF-IP470`. Every
-other value of this section is unchanged and is the one computed on `81bbaefd`.
+moved it before trial 1, neither moving a fingerprint: ip#464 (merge `c0ba283c`, the replay input `controls`, gate
+ET5) to `sha256:4daa3c45ea748b0bfa77aad94173aa05341b4dee3e42a6fb61b7c5e467726481`, and ip#470 (merge `97324c78`, the
+input `parallel`, the group per run of decision P2 and the timer's two groups and second guard of the seventh
+addendum's decision T3) to `sha256:82e264d9903a5c5d9f580f8ad8219b46f00db8c0aba367097df6d8d951ec3595`, the value in the
+table above. Every value of this section was recomputed on `main` at `47061e020635dd846f94ffa1b57bdc34abd24731` by the commands this
+section names; the three moved group digests are the only values that differ from those computed on `81bbaefd`.
+
+**The other moved digests.** Two more groups moved after this plan was committed, each by a pull request that the
+whole-flow plan (`evals/plans/2026-11-22-g3-whole-flow.md`) names with gate ET7 shown:
+
+- "Seat account" (`scripts/live_eval_seat.py`, `.github/actions/live-eval-seat`): from
+  `sha256:4abec1ad1bb4fe9e48afb333c619c1d07ccd2e5df80b62f3142dc8ad750fa446` to
+  `sha256:1b7309f171f0e56d203b69d166f65e05eecf14cbccbc8403185a4490a11fb8a3` by ip#471 (merge `a15b8c1d`: a setup over
+  approved RTL opens its beside link in the account's view), then to
+  `sha256:6530c15123fabd55cdaf7142af49ee7306eea1ef09d7675338c561e42099c93b`, the value in the table above, by ip#475
+  (merge `f8dcc97e`: gate ET17, a setup's `[files]` entry is an input of the run only when it is the run's own).
+- "Gate backends" (`src/nirmaan/integrations`): from
+  `sha256:eac184ecc60ae35bdc88e6f66c2fa3aceaabe4c32f62066e951d7d5e84e835f9` to
+  `sha256:7c12db371fe1b51fc6a2888e08c6f64677dcfb47d48411af7a66cb7c40ca5443`, the value in the table above, by ip#475
+  (merge `f8dcc97e`, `src/nirmaan/integrations/eda.py`).
+
+**Gate ET7, shown** (gate W2C2: no fingerprint moved). For each merge that moved a group digest above, `git diff
+--name-only <first parent> <merge>` names no file in `harness.CODE`, `LOOP_CODE` or `FLOW_CODE`, no tool definition
+(`src/nirmaan/company/tools.py`) and not the CLI pin (`.github/live-eval/package.json`):
+
+| Pull request (merge) | Files the merge changed | Where the whole-flow plan shows it |
+|---|---|---|
+| ip#464 (`c0ba283c`) | `.github/workflows/live-eval.yml`, `scripts/live_eval_controls.py`, two test files, `docs/LIVE_EVAL_EVIDENCE.md`, a history fragment | section 21.1 |
+| ip#471 (`a15b8c1d`) | `scripts/live_eval_seat.py`, `scripts/live_eval_controls.py`, `tests/test_live_eval_seat.py`, `tests/test_live_eval_controls.py`, `docs/LIVE_EVAL_EVIDENCE.md`, a history fragment | section 22.1 |
+| ip#475 (`f8dcc97e`) | `docs/GATE_INPUTS.md`, `docs/LIVE_EVAL_EVIDENCE.md`, a history fragment, `scripts/live_eval_seat.py`, `src/nirmaan/integrations/eda.py`, `tests/test_gate_reads.py` | section 23.2 |
+| ip#470 (`97324c78`) | `.github/workflows/live-eval.yml`, `docs/LIVE_EVAL_EVIDENCE.md`, a history fragment, `tests/test_live_eval_ci.py`, `tests/test_nirmaan_live_eval.py` | section 24.1 |
+
+The two fingerprints of this section, recomputed on `47061e020635dd846f94ffa1b57bdc34abd24731` with `harness_sha256(knowledge=..., cli="2.1.325")`,
+are W2-L1's, as this plan first stated them; so are the 13 case digests and the 14 skill digests.
+
+**Gate backends and gate ET20.** `--verilate-jobs 1` (gate ET20 of `council/records/2026-11-22-eda-tools-seat-account.md`,
+third addendum, decision V1; ip#522) changes `src/nirmaan/integrations`, so it moves "Gate backends" again, to
+`GATE-BACKENDS-AFTER-IP522` on its head. It merges only after the whole-flow timer's last planned trial is recorded.
+Decision V1, item 4 asks that this plan's addition restate the moved digest before this batch's trial 1, with
+whatever this plan's own rules ask to be run again after a pinned group moves. This plan's answer: ip#522 merges
+before this amendment does, so that the table above states its value and the replays of gate W2C5 (section 11),
+which must run on the values a dispatch is made on, run on it; nothing is then owed again. Its merge commit and the
+value recomputed on it go here: `MERGE-COMMIT-OF-IP522`. If ip#522 has not merged when this amendment is otherwise
+ready, it waits; if the council or its owner seats hold ip#522 back, this paragraph is replaced by one that says so
+and the table keeps the value above, and a later ip#522 then needs a new amendment and the replays again before
+trial 1.
 
 ## 7. The freeze and the dispatch check (gate W2C7)
 
@@ -514,7 +569,7 @@ stood when this plan was committed.
 | Gate | Condition | Where it stands |
 |---|---|---|
 | W2C1 | One committed plan | This file |
-| W2C2 | No trial on the owner's machine; every trial in the job as the seat account; ET1 to ET4 met, ET8's documents merged, ET7's statement shown | Section 5. ET1: ip#445. ET2 to ET4: ip#444, with ET3's recorded replay on `main` in ip#452 (run 45073595509). ET8's documents, `docs/GATE_INPUTS.md`, `docs/GATE_INTEGRITY.md` and `docs/LIVE_EVAL_EVIDENCE.md`: changed by ip#444, ip#445, ip#451 and ip#452; whether every text follows decision 8 of that record is qa-evidence's to confirm. ET7: the two fingerprints of section 6 are W2-L1's |
+| W2C2 | No trial on the owner's machine; every trial in the job as the seat account; ET1 to ET4 met, ET8's documents merged, ET7's statement shown | Section 5. ET1: ip#445. ET2 to ET4: ip#444, with ET3's recorded replay on `main` in ip#452 (run 45073595509). ET8's documents, `docs/GATE_INPUTS.md`, `docs/GATE_INTEGRITY.md` and `docs/LIVE_EVAL_EVIDENCE.md`: changed by ip#444, ip#445, ip#451 and ip#452; whether every text follows decision 8 of that record is qa-evidence's to confirm. ET7: the two fingerprints of section 6 are W2-L1's, and ET7 is shown in section 6 for ip#464, ip#471, ip#475 and ip#470, which moved group digests after this plan was committed |
 | W2C3 | `eqy` installed and run as the seat account with its probe | ip#451; both equivalence cases are in the plan. Its probes ran in replays on that pull request's branch; their first runs on `main` are the replays of gate W2C5 |
 | W2C4 | A build or run of a program from seat HDL outside the wrapped tools is made as the seat account with a probe; the table of tools and accounts | ip#451 (`coverage.read`), with the same note on its probes; the table of section 5 |
 | W2C5 | Every batch case's reference answer replayed in the job on the batch's commit: passes, and every mutant fails | Not yet met: below |
@@ -523,8 +578,8 @@ stood when this plan was committed.
 | W2C8 | The start | Section 10; not yet met |
 | W2C9 | Never interleaved | Section 10 |
 | W2C12 | The plan amendment of the addendum's decision P7, with the committed test of the window against section 12 | The amendment (sections 1, 3, 5 to 11); `tests/test_w2_remeasure_plan.py` |
-| W2C13 | The workflow change of decision P2, with its tests and the corrected document, and no fingerprint moved | ip#470 |
-| W2C14 | That change merged only after the timer case's last planned trial is recorded; the whole-flow plan's addition before the register block's slot 21 | ip#470 merged after the timer case's last planned trial was recorded; the whole-flow plan's addition is that plan's, before its slot 21 |
+| W2C13 | The workflow change of decision P2, with its tests and the corrected document, and no fingerprint moved | ip#470 (merge `97324c78`), as the seventh addendum's decision T3 extends it; no fingerprint moved (section 6) |
+| W2C14 | As the seventh addendum's decision T3, item 9 amends it: that change, extended, merges before the whole-flow plan's addition of gate WF32 is computed and before the timer's second measured run, or else only after the timer's last planned trial is recorded, never in between; the whole-flow plan restates the digest and gate WF9's evidence before the timer's slot 1, and again for the register block before its slot 21 | ip#470 merged at `97324c78`, before the whole-flow plan's section 24 computed its values on that commit and before the timer's second measured run; that section restates the digest and gate WF9's evidence for the timer. The restatement for the register block is that plan's, before its slot 21 |
 | W2C15 | One slot, one run, bound from the dispatch response before the next dispatch; a run the dispatcher did not start stops dispatch; records in slot order | Section 3 |
 | W2C16 | A stop closes dispatch and cancels no running trial; every trial already dispatched is committed; nothing is run again; width one after the first limit | Sections 3 and 8 |
 | W2C17 | The 13 replays of gate W2C5 dispatched with the input, three in flight at least once, all passing, each named in the dated addition | Not yet met: below |
@@ -534,10 +589,12 @@ merged as ip#450), and W2C11 and W2C18 are the read (section 9).
 
 **Gate W2C5, after this plan merges** (with gate W2C17, the addendum's decision P5). Each of the 13 cases is
 dispatched once as a replay (`replay=true`: the case's reference answer, no model, no token) with `parallel=true`,
-from `main`, after the workflow change (ip#470) and this plan's amendment have merged, on a commit that passes the
-dispatch check of section 7. The replays are the first use of the input: they run under the width, the window and
-the run binding of section 3, with three in flight at least once, so a fault in the routing, in binding a run to
-its slot or in keeping each run's artifacts apart costs no trial.
+from `main`, after the workflow change (ip#470), ip#522 (gate ET20, section 6) and this plan's amendment have
+merged, and only after the whole-flow timer's last planned trial is recorded (gate W2C9: nothing of this batch, a
+replay included, is dispatched before then), on a commit that passes the dispatch check of section 7. They are the
+first use of the input for this batch's cases (the timer used it first: the seventh addendum, decision T3, items 10
+and 11): they run under the width, the window and the run binding of section 3, with three in flight at least once,
+so a fault in the routing, in binding a run to its slot or in keeping each run's artifacts apart costs no trial.
 A replay passes when its `replay` job and its `rejudge` job succeed, the reference answer passes every tool before
 review and every held-out check, which for a must-fail check means the clean file passes and every mutant fails,
 the re-judge gives the same verdict, and both jobs' tool reach records show every probe denied. The versions each
@@ -547,8 +604,8 @@ as a record. Slot 1 is not dispatched until all 13 have passed.
 **The dated addition before slot 1.** One pull request adds a dated section to this file that names, for gate W2C5,
 the 13 replay runs with their commits and results, the tool versions their logs show and which of them were in
 flight together (gate W2C17); for gate W2C8, which
-answer the batch starts on; and for gate W2C9, that the timer case's last planned trial is recorded, and for gate W2C14, that ip#470 merged
-after it. It changes no
+answer the batch starts on; and for gate W2C9, that the timer case's last planned trial is recorded and that no
+replay was dispatched before it. It changes no
 count, slot, arm, case or value. If a replay fails, the cause is fixed by a pull request of its own, and if that
 moves a value of section 6, by a plan amendment as well, before any trial.
 
