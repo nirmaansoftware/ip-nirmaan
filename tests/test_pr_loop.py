@@ -1511,6 +1511,13 @@ def _refused(r):
     return [l for l in r.log() if l.get("outcome") == "carry-refused"]
 
 
+def _refused_key1(r):
+    """The conditions key 1 was refused on; key 2 is then refused at least on "upstream"."""
+    refused = _refused(r)
+    assert refused and all("upstream" in l["conditions"] for l in refused if l["key"] == 2)
+    return {c for l in refused if l["key"] == 1 for c in l["conditions"]}
+
+
 def _author_push(r, tmp_path, then):
     w = tmp_path / "author"
     sh(tmp_path, "clone", "-q", "-b", "feature", str(r.origin), str(w))
@@ -1592,7 +1599,7 @@ def test_no_carry_when_the_author_merged_main_into_the_branch_themselves(repo, t
     r.github.behind = False
     assert r.tick() == ["ready"]
     assert len(r.calls()) == 4 and not _carried(r), "a merge commit the author made is reviewed from scratch"
-    assert {c for l in _refused(r) for c in l["conditions"]} == {"loop-merge"}
+    assert _refused_key1(r) == {"loop-merge"}
 
 
 def test_no_carry_when_the_author_pushed_a_commit_after_the_loops_merge(repo, tmp_path):
@@ -1603,7 +1610,7 @@ def test_no_carry_when_the_author_pushed_a_commit_after_the_loops_merge(repo, tm
     _author_push(r, tmp_path, lambda w: sh(w, "commit", "-q", "--allow-empty", "-m", "author"))
     assert r.tick() == ["auto-merge"]
     assert len(r.calls()) == 4 and not _carried(r)
-    assert {c for l in _refused(r) for c in l["conditions"]} == {"loop-merge"}
+    assert _refused_key1(r) == {"loop-merge"}
 
 
 def test_no_carry_when_the_pull_requests_diff_changed_on_the_merge(repo):
@@ -1618,7 +1625,7 @@ def test_no_carry_when_the_pull_requests_diff_changed_on_the_merge(repo):
     assert r.tick() == ["updated"]
     assert r.tick() == ["ready"]
     assert len(r.calls()) == 4 and not _carried(r)
-    assert {c for l in _refused(r) for c in l["conditions"]} == {"same-diff"}
+    assert _refused_key1(r) == {"same-diff"}
 
 
 def test_no_carry_when_main_touched_a_file_of_the_pull_request(repo):
@@ -1648,7 +1655,7 @@ def test_no_carry_when_main_touched_a_review_control_file(repo, rel, text):
     assert r.tick() == ["auto-merge"]
     assert len(r.calls()) == 4 and not _carried(r)
     refused = _refused(r)
-    assert refused and {c for l in refused for c in l["conditions"]} == {"main-delta"}
+    assert _refused_key1(r) == {"main-delta"}
     assert rel in refused[0]["detail"]
 
 
@@ -1661,9 +1668,26 @@ def test_an_earlier_fail_verdict_never_carries(repo):
     r.advance_main()
     assert r.tick() == ["updated"]
     assert r.tick() == ["ready"]
-    assert len(r.calls()) == 3, "key 1 reviewed again; key 2's pass carried"
-    assert [l["key"] for l in _carried(r)] == [2]
-    assert [(l["key"], l["conditions"]) for l in _refused(r)] == [(1, ["pass"])]
+    assert len(r.calls()) == 4, "key 1 reviewed again, so key 2 is too: it never passes on key-1 results it did not judge"
+    assert not _carried(r)
+    assert [(l["key"], l["conditions"]) for l in _refused(r)] == [(1, ["pass"]), (2, ["upstream"])]
+
+
+def test_a_newer_verdict_that_is_not_a_pass_wins_over_an_older_pass_on_the_same_head(repo):
+    # A pass on the head against main M1, then a fail on the same head against M2 (a run
+    # by hand): the newest review of that head is the fail, so nothing carries.
+    r = repo(gh={"auto_merge_allowed": "false"})
+    assert r.tick() == ["ready"] and len(r.calls()) == 2
+    r.advance_main()
+    r.scenario([fail("bad")], [])
+    got = pr_review.run_review(str(r.work), 1, r.github, "none", str(r.bin), r.state, {"key1": "k1", "key2": "k2"}, 30, 0,
+                               config=CONFIG, sleep=lambda s: None, out=lambda s: None, fresh=True)
+    assert got["exit"] == pr_review.EXIT_OK and got["key1"][0]["status"] == "fail" and len(r.calls()) == 3
+    r.scenario([{"verdict": "pass"}], [])
+    assert r.tick() == ["updated"]
+    assert r.tick() == ["ready"]
+    assert len(r.calls()) == 5 and not _carried(r), "the older pass against M1 never carries over the newer fail"
+    assert [(l["key"], l["conditions"]) for l in _refused(r)] == [(1, ["pass"]), (2, ["pass", "upstream"])]
 
 
 def test_an_earlier_needs_founder_verdict_never_carries_the_proxy_runs_again(repo):

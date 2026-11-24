@@ -13,7 +13,7 @@ per call, as a state machine that survives restarts:
     skip    already finished on this head (ready, auto-merge);
     update  GitHub reports the branch behind main (mergeable_state "behind";
             this repository's ruleset "main: two keys" requires branches to be
-            up to date, strict on since 2026-11-23, so every open pull request
+            up to date (strict; read on 2026-11-24), so every open pull request
             is behind each time main moves): merge main into
             it with the gh login (update-branch, pinned to the head the loop
             saw) before any review, and again after the review when main moved

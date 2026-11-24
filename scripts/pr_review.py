@@ -149,7 +149,7 @@ CONFIG = {
         ],
     },
     # Carrying a passing verdict across the loop's own merge of main (2026-11-24). main's ruleset
-    # requires branches to be up to date (strict, on since 2026-11-23), so each move of main makes
+    # requires branches to be up to date (strict; read on 2026-11-24), so each move of main makes
     # every open pull request behind and the loop merges main into it; without this, both keys and
     # the Founder Proxy ran again from scratch on content they had already judged. carry_basis()
     # lists the conditions; any doubt is a fresh review. None turns carrying off.
@@ -1290,7 +1290,9 @@ def carry_basis(repo_root, cfg: dict, reviewed_head: str, reviewed_main: str, he
                 (carry_control).
 
     Whether the earlier verdict passed, and CI, are the caller's: only a pass is
-    carried, and the review reaches this only after the required CI is green on `head`."""
+    carried, from the newest review of the nearest reviewed head (never an older
+    one), key 2 only when every key-1 result carried and the proxy only when key 2
+    did, and the review reaches this only after the required CI is green on `head`."""
     carry = cfg.get("carry") or {}
     out = []
 
@@ -1659,57 +1661,92 @@ def _review(repo_root, pr, github, post, claude_bin, state_dir, models, timeout_
             raise Paused(why)
         return acquire_slot(state_dir, {"repo": cfg["repo"], "pr": pr, "key": key}, cfg.get("model_cap", 1))
 
-    bases: dict = {}
+    carry_state: dict = {}
 
-    def carry(key, team, lead, model, cache):
-        """A passing verdict on a head the loop merged main into, carried to this
-        head when every condition of carry_basis holds (logged "carried", and
-        cached for this head); else None, and the key is reviewed from scratch.
-        Each earlier verdict looked at and not carried is logged "carry-refused"
-        with the conditions that failed."""
+    def carry_source():
+        """The one earlier review a verdict may carry from, for every key of this
+        run: the nearest head down this head's first parents that has cached
+        verdicts, when the loop merged main into it, and its newest review basis
+        (the main of its newest cache file), with that pair's carry_basis. None when carrying is off or there is
+        no such head. Every key carries from this one source or not at all, so an
+        older pass never wins over a newer verdict on that head, and key 2 and the
+        proxy carry only with the results they judged."""
+        if "source" in carry_state:
+            return carry_state["source"]
+        carry_state["source"] = None
         if fresh or not loop_merged or cfg.get("carry") is None or not cache_dir.is_dir():
             return None
-        tail = f"-k{key}-{team or 'chair'}-{lead}.json"
-        merged = set(loop_merged)
-        found = []
+        files: dict = {}
         for path in cache_dir.iterdir():
-            m = re.fullmatch(r"([0-9a-f]{40})-([0-9a-f]{40})" + re.escape(tail), path.name)
-            if m and m.group(1) != head and m.group(1) in merged:
-                found.append((path.stat().st_mtime, m.group(1), m.group(2), path))
-        for _, from_head, from_main, path in sorted(found, reverse=True):
-            entry = {"repo": cfg["repo"], "pr": pr, "head": head, "key": key, "team": team, "model": model, "attempt": 0,
-                     "from_head": from_head, "from_main": from_main}
-            try:
-                earlier = json.loads(path.read_text())
-            except (OSError, ValueError):
-                continue
-            if earlier.get("status") != "pass":
-                failed = [{"condition": "pass", "ok": False, "detail": f"the earlier verdict is {earlier.get('status')}, not pass"}]
-            else:
-                if (from_head, from_main) not in bases:
-                    try:
-                        bases[(from_head, from_main)] = carry_basis(repo_root, cfg, from_head, from_main, head, main_sha, diff, merged)
-                    except (subprocess.SubprocessError, OSError) as exc:
-                        bases[(from_head, from_main)] = [{"condition": "git", "ok": False, "detail": f"git failed: {redact(str(exc))[:200]}"}]
-                failed = [c for c in bases[(from_head, from_main)] if not c["ok"]]
-            if failed:
-                log_call(state_dir, {**entry, "outcome": "carry-refused", "verdict": earlier.get("status"),
-                                     "conditions": [c["condition"] for c in failed], "detail": "; ".join(c["detail"] for c in failed)[:500]})
-                continue
-            reviewed = (earlier.get("carried") or {}).get("reviewed_head") or from_head
-            notes = [n for n in earlier.get("notes", []) if n != REUSED_NOTE and not n.startswith(CARRIED_PREFIX)]
-            done = {**earlier, "notes": notes + [carried_note(from_head, from_main, reviewed)],
-                    "carried": {"from_head": from_head, "from_main": from_main, "reviewed_head": reviewed}}
-            cache_dir.mkdir(parents=True, exist_ok=True)
-            cache.write_text(json.dumps(done))
-            log_call(state_dir, {**entry, "outcome": "carried", "verdict": "pass", "reviewed_head": reviewed})
-            out(f"pr-review: key {key} carried from {from_head[:7]} (main {from_main[:7]}); no model call.")
-            return done
-        return None
+            m = re.fullmatch(r"([0-9a-f]{40})-([0-9a-f]{40})-k.+\.json", path.name)
+            if m and m.group(1) != head:
+                files.setdefault(m.group(1), []).append((path.stat().st_mtime, m.group(2)))
+        merged = set(loop_merged)
+        try:
+            # First parents down from this head, to the nearest one that was reviewed;
+            # carry_basis then checks every commit on the way.
+            h, found = head, None
+            for _ in range((cfg["carry"] or {}).get("max_hops", 20) + 1):
+                parents = _git(repo_root, "rev-list", "--parents", "-n", "1", h).split()[1:]
+                if not parents:
+                    break
+                h = parents[0]
+                if h in files:
+                    found = h if h in merged else None
+                    break
+            if found is None:
+                return None
+            from_main = max(files[h])[1]
+            basis = carry_basis(repo_root, cfg, h, from_main, head, main_sha, diff, merged)
+        except (subprocess.SubprocessError, OSError) as exc:
+            out(f"pr-review: no verdict carried: git failed ({redact(str(exc))[:200]})")
+            return None
+        carry_state["source"] = {"from_head": h, "from_main": from_main, "basis": basis}
+        return carry_state["source"]
 
-    def review(key, team, lead, model, system, user, composite=None):
+    def carry(key, team, lead, model, cache, upstream=True):
+        """This key's verdict on the carry source, carried to this head when it is a
+        pass, every condition of carry_basis holds, and (key 2, the proxy) every
+        result it judged carried too (`upstream`): logged "carried" and cached for
+        this head. Otherwise None, and the key is reviewed from scratch; a verdict
+        looked at and not carried is logged "carry-refused" with what failed."""
+        source = carry_source()
+        if not source or not source.get("from_head"):
+            return None
+        from_head, from_main = source["from_head"], source["from_main"]
+        entry = {"repo": cfg["repo"], "pr": pr, "head": head, "key": key, "team": team, "model": model, "attempt": 0,
+                 "from_head": from_head, "from_main": from_main}
+        path = cache_dir / f"{from_head}-{from_main}-k{key}-{team or 'chair'}-{lead}.json"
+        try:
+            earlier = json.loads(path.read_text())
+        except (OSError, ValueError):
+            earlier = None
+        failed = []
+        if earlier is None:
+            failed.append({"condition": "pass", "ok": False, "detail": f"no verdict for this key on {from_head[:7]} against main {from_main[:7]}"})
+        elif earlier.get("status") != "pass":
+            failed.append({"condition": "pass", "ok": False, "detail": f"the earlier verdict is {earlier.get('status')}, not pass"})
+        if not upstream:
+            failed.append({"condition": "upstream", "ok": False, "detail": "a result this key judged was not carried from the same review"})
+        failed += [c for c in source["basis"] if not c["ok"]]
+        if failed:
+            log_call(state_dir, {**entry, "outcome": "carry-refused", "verdict": (earlier or {}).get("status"),
+                                 "conditions": [c["condition"] for c in failed], "detail": "; ".join(c["detail"] for c in failed)[:500]})
+            return None
+        reviewed = (earlier.get("carried") or {}).get("reviewed_head") or from_head
+        notes = [n for n in earlier.get("notes", []) if n != REUSED_NOTE and not n.startswith(CARRIED_PREFIX)]
+        done = {**earlier, "notes": notes + [carried_note(from_head, from_main, reviewed)],
+                "carried": {"from_head": from_head, "from_main": from_main, "reviewed_head": reviewed}}
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        cache.write_text(json.dumps(done))
+        log_call(state_dir, {**entry, "outcome": "carried", "verdict": "pass", "reviewed_head": reviewed})
+        out(f"pr-review: key {key} carried from {from_head[:7]} (main {from_main[:7]}); no model call.")
+        return done
+
+    def review(key, team, lead, model, system, user, composite=None, upstream=True):
         # The Founder Proxy is key "proxy" here: same cache, retry, validation and log.
-        # `composite` names the checklists a composite key-1 call loaded.
+        # `composite` names the checklists a composite key-1 call loaded. `upstream`:
+        # every result this key judges was carried (carry()).
         proxy = key == "proxy"
         cache = cache_dir / f"{head}-{main_sha}-k{key}-{team or 'chair'}-{lead}.json"
         if not fresh and cache.exists():
@@ -1718,7 +1755,7 @@ def _review(repo_root, pr, github, post, claude_bin, state_dir, models, timeout_
                                  "verdict": cached.get("status")})
             cached["notes"] = cached.get("notes", []) + [REUSED_NOTE]
             return cached
-        carried = carry(key, team, lead, model, cache)
+        carried = carry(key, team, lead, model, cache, upstream)
         if carried:
             return carried
         args = claude_args(model, system, [main_dir],
@@ -1898,7 +1935,8 @@ def _review(repo_root, pr, github, post, claude_bin, state_dir, models, timeout_
                                      "key1_loaded": key1[0]["loaded"] if plan else None})
         user = user_prompt({**common, "nonce": nonce, "key": 2, "key1_results": [key1_view(r) for r in key1]})
         out(f"pr-review: key 2 ({cfg['key2_seat']})...")
-        k2 = {**k2base, **review(2, None, cfg["key2_seat"], models["key2"], system, user)}
+        k2 = {**k2base, **review(2, None, cfg["key2_seat"], models["key2"], system, user,
+                                 upstream=bool(key1) and all(r.get("carried") for r in key1))}
     except LookupError as exc:
         k2 = {**k2base, "status": "deferred", "reason": f"seat file or checklist missing on main: {exc}"}
 
@@ -1933,7 +1971,8 @@ def _review(repo_root, pr, github, post, claude_bin, state_dir, models, timeout_
                                 "key2_result": {"seat": cfg["key2_seat"], "verdict": k2.get("verdict"),
                                                 **({"carried_from": k2["carried"]["from_head"]} if k2.get("carried") else {})}})
             out(f"pr-review: Founder Proxy ({cfg['proxy_seat']})...")
-            proxy = {**pbase, **review("proxy", None, cfg["proxy_seat"], models.get("proxy") or models["key2"], system, user)}
+            proxy = {**pbase, **review("proxy", None, cfg["proxy_seat"], models.get("proxy") or models["key2"], system, user,
+                                       upstream=bool(k2.get("carried")))}
         except LookupError as exc:
             proxy = {**pbase, "status": "deferred", "reason": f"seat file missing on main: {exc}"}
         proxy["notes"] = list(proxy.get("notes", []))
