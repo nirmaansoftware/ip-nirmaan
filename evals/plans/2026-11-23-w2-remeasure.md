@@ -376,7 +376,7 @@ plan:
 
 | Group | Paths | Files | Digest |
 |---|---|---|---|
-| Gate backends | `src/nirmaan/integrations` | 60 | `sha256:7c12db371fe1b51fc6a2888e08c6f64677dcfb47d48411af7a66cb7c40ca5443` |
+| Gate backends | `src/nirmaan/integrations` | 60 | `sha256:17c4b3d7d52e73db75f486dff7507dd1eacf3c8cd97a75f287a108f9e003203f` |
 | Plan check | `src/nirmaan/vplan.py` | 1 | `sha256:9dfd92674fd08729156fb6b8cbedd3479d9a05bb69a6e890c07b77f62b4fb74a` |
 | Triage engine | `src/veritriage` | 253 | `sha256:fc207ed693832819bef89910091a06e265e62185d98e111fdf69f93a765ef098` |
 | Held-out scorers | `src/nirmaan/evals/scorers.py` | 1 | `sha256:5f4f7909a3207f3837d2af7ad60b85c0bae620e1d461afde57aea0d2a592ecb4` |
@@ -396,7 +396,7 @@ moved it before trial 1, neither moving a fingerprint: ip#464 (merge `c0ba283c`,
 ET5) to `sha256:4daa3c45ea748b0bfa77aad94173aa05341b4dee3e42a6fb61b7c5e467726481`, and ip#470 (merge `97324c78`, the
 input `parallel`, the group per run of decision P2 and the timer's two groups and second guard of the seventh
 addendum's decision T3) to `sha256:82e264d9903a5c5d9f580f8ad8219b46f00db8c0aba367097df6d8d951ec3595`, the value in the
-table above. Every value of this section was recomputed on `main` at `47061e020635dd846f94ffa1b57bdc34abd24731` by the commands this
+table above. Every value of this section was recomputed on `main` at `bceb3c2c5a9e9c3268aada1a7568c2f66a48d612` by the commands this
 section names; the three moved group digests are the only values that differ from those computed on `81bbaefd`.
 
 **The other moved digests.** Two more groups moved after this plan was committed, each by a pull request that the
@@ -410,8 +410,9 @@ whole-flow plan (`evals/plans/2026-11-22-g3-whole-flow.md`) names with gate ET7 
   (merge `f8dcc97e`: gate ET17, a setup's `[files]` entry is an input of the run only when it is the run's own).
 - "Gate backends" (`src/nirmaan/integrations`): from
   `sha256:eac184ecc60ae35bdc88e6f66c2fa3aceaabe4c32f62066e951d7d5e84e835f9` to
-  `sha256:7c12db371fe1b51fc6a2888e08c6f64677dcfb47d48411af7a66cb7c40ca5443`, the value in the table above, by ip#475
-  (merge `f8dcc97e`, `src/nirmaan/integrations/eda.py`).
+  `sha256:7c12db371fe1b51fc6a2888e08c6f64677dcfb47d48411af7a66cb7c40ca5443` by ip#475 (merge `f8dcc97e`,
+  `src/nirmaan/integrations/eda.py`), then to `sha256:17c4b3d7d52e73db75f486dff7507dd1eacf3c8cd97a75f287a108f9e003203f`, the value in the table above, by ip#522 (merge `bceb3c2c`:
+  gate ET20, every Verilator model build passes `--verilate-jobs 1`).
 
 **Gate ET7, shown** (gate W2C2: no fingerprint moved). For each merge that moved a group digest above, `git diff
 --name-only <first parent> <merge>` names no file in `harness.CODE`, `LOOP_CODE` or `FLOW_CODE`, no tool definition
@@ -423,21 +424,19 @@ whole-flow plan (`evals/plans/2026-11-22-g3-whole-flow.md`) names with gate ET7 
 | ip#471 (`a15b8c1d`) | `scripts/live_eval_seat.py`, `scripts/live_eval_controls.py`, `tests/test_live_eval_seat.py`, `tests/test_live_eval_controls.py`, `docs/LIVE_EVAL_EVIDENCE.md`, a history fragment | section 22.1 |
 | ip#475 (`f8dcc97e`) | `docs/GATE_INPUTS.md`, `docs/LIVE_EVAL_EVIDENCE.md`, a history fragment, `scripts/live_eval_seat.py`, `src/nirmaan/integrations/eda.py`, `tests/test_gate_reads.py` | section 23.2 |
 | ip#470 (`97324c78`) | `.github/workflows/live-eval.yml`, `docs/LIVE_EVAL_EVIDENCE.md`, a history fragment, `tests/test_live_eval_ci.py`, `tests/test_nirmaan_live_eval.py` | section 24.1 |
+| ip#522 (`bceb3c2c`) | `docs/TEST_CI_HARDENING.md`, a history fragment, `src/nirmaan/integrations/eda.py`, `src/nirmaan/integrations/firmware.py`, `src/nirmaan/integrations/firmware_riscv.py`, `tests/test_nirmaan_eda.py`, `tests/test_nirmaan_firmware_reach.py` | none (this plan; decision V1, item 4) |
 
-The two fingerprints of this section, recomputed on `47061e020635dd846f94ffa1b57bdc34abd24731` with `harness_sha256(knowledge=..., cli="2.1.325")`,
+The two fingerprints of this section, recomputed on `bceb3c2c5a9e9c3268aada1a7568c2f66a48d612` with `harness_sha256(knowledge=..., cli="2.1.325")`,
 are W2-L1's, as this plan first stated them; so are the 13 case digests and the 14 skill digests.
 
 **Gate backends and gate ET20.** `--verilate-jobs 1` (gate ET20 of `council/records/2026-11-22-eda-tools-seat-account.md`,
-third addendum, decision V1; ip#522) changes `src/nirmaan/integrations`, so it moves "Gate backends" again, to
-`GATE-BACKENDS-AFTER-IP522` on its head. It merges only after the whole-flow timer's last planned trial is recorded.
-Decision V1, item 4 asks that this plan's addition restate the moved digest before this batch's trial 1, with
-whatever this plan's own rules ask to be run again after a pinned group moves. This plan's answer: ip#522 merges
-before this amendment does, so that the table above states its value and the replays of gate W2C5 (section 11),
-which must run on the values a dispatch is made on, run on it; nothing is then owed again. Its merge commit and the
-value recomputed on it go here: `MERGE-COMMIT-OF-IP522`. If ip#522 has not merged when this amendment is otherwise
-ready, it waits; if the council or its owner seats hold ip#522 back, this paragraph is replaced by one that says so
-and the table keeps the value above, and a later ip#522 then needs a new amendment and the replays again before
-trial 1.
+third addendum, decision V1; ip#522) changed `src/nirmaan/integrations`, so it moved "Gate backends" again, to
+`sha256:17c4b3d7d52e73db75f486dff7507dd1eacf3c8cd97a75f287a108f9e003203f`. It merged at `bceb3c2c5a9e9c3268aada1a7568c2f66a48d612`, after the whole-flow timer's last planned trial was recorded, with the evidence, the
+firmware-engineer's statement and the texts of decision V1, items 1 to 3, in its pull request. Decision V1, item 4 asks
+that this plan's addition restate the moved digest before this batch's trial 1, with whatever this plan's own rules
+ask to be run again after a pinned group moves. This plan's answer: ip#522 merged before this amendment, so the table
+above states its value and the replays of gate W2C5 (section 11), which must run on the values a dispatch is made on,
+run on it; nothing is owed again. The fingerprints of this section are unchanged on `bceb3c2c`.
 
 ## 7. The freeze and the dispatch check (gate W2C7)
 
