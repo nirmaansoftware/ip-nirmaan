@@ -7,7 +7,9 @@ collaborator or a workflow token does not count. The ruleset's "Require review
 from Code Owners" is still on, but since `.github/CODEOWNERS` was removed (the
 Founder Proxy, 2026-10-18) it has no effect; the founder can turn it off. A
 push dismisses an earlier approval.
-Branches need not be up to date with `main` (strict is off). Auto-merge is on.
+Branches must be up to date with `main`: strict is on (`strict_required_status_checks_policy`
+`true` in ruleset 25313563, read with `gh api repos/nirmaansoftware/ip-nirmaan/rulesets/25313563`
+on 2026-11-24; the ruleset was last updated 2026-11-22). Auto-merge is on.
 The first automatic merge was #106 (both keys passed, the loop turned on
 auto-merge, GitHub merged it with no human action); #105 and #107 merged
 through both keys after the founder's approval on GitHub.
@@ -385,22 +387,62 @@ requests labelled `hold` or `needs-founder` are skipped.
 
 **Each step, per pull request:**
 
-1. **Behind `main`.** The ruleset here has strict up-to-date branches off, so
-   GitHub is not expected to report a branch as behind. If it does
-   (`mergeable_state` `behind`), the loop handles it as Nirmaan's loop does.
-   It asks GitHub to merge `main` into the branch first, with the gh login:
+1. **Behind `main`.** The ruleset here requires branches to be up to date
+   (strict, see the top of this page), so every open pull request is behind
+   (`mergeable_state` `behind`) each time `main` moves. The loop handles it as
+   Nirmaan's loop does. It asks GitHub to merge `main` into the branch first, with the gh login:
    `PUT repos/<repo>/pulls/<n>/update-branch` with `expected_head_sha` set to
    the head it saw. This is the merge-commit update that
    `gh pr update-branch` makes, but GitHub refuses it if the head has moved.
    The loop does this before any review, also for a head that already
    finished (unless the review refused the pull request), and again after
-   both keys pass when `main` moved during the review. The new head is
-   reviewed from scratch. While GitHub
+   both keys pass when `main` moved during the review. The required CI runs
+   on the new head, and its review starts from scratch unless a passing
+   verdict carries (below). While GitHub
    is still making the merge commit (up to 10 minutes), the loop waits
    instead of asking again. If the update fails (a merge conflict with
    `main`, or GitHub refuses it), the loop stops with `needs-founder`. If
    someone pushed in between, the step is dropped without a label and the
    new head is reviewed. `--no-post` never updates a branch.
+
+   **Carrying a passing verdict across the update.** Without it, every move
+   of `main` restarted both keys and the Founder Proxy on content they had
+   already judged, so a founder-class pull request could wait through many
+   full reviews before one finished with `main` unchanged. The loop keeps the heads it asked
+   GitHub to merge `main` into (state `update_from`), and the review carries
+   a key's or the proxy's earlier verdict to the new head only when all of
+   these hold (`carry_basis` and `carry` in `scripts/pr_review.py`):
+   - **loop-merge**: every commit from the new head back to the reviewed head
+     is a merge the loop asked for: two parents, the first a head the loop
+     updated from, the second on `main`, committed by GitHub
+     (`noreply@github.com`, update-branch). An author's push, a fix round's
+     commit and the loop's own `levels.json` merge never carry.
+   - **same-diff**: the pull request's net diff against its merge base with
+     `main`, exactly as the reviewers get it, is byte-identical on both
+     heads. The whole diff text, not a patch-id: a patch-id ignores
+     whitespace and line numbers, and the reviewers' citations are lines of
+     that text.
+   - **main-delta**: the reviewed `main` is an ancestor of `main`, and the
+     files `main` changed since touch no file of the pull request and no
+     review-control file (`.github/`, `council/`, `.claude/`, `CLAUDE.md`,
+     `CODEOWNERS`, `scripts/pr_review.py`, `scripts/pr_loop.py`,
+     `scripts/review_map.py`, `scripts/loop_cloud.py`, this page; CONFIG
+     `carry`).
+   - **pass**: only a pass carries; a fail, `needs-founder` or deferral is
+     reviewed from scratch. Fix rounds are unchanged. Every key of a run
+     carries from one source: the nearest reviewed head below the new head,
+     and its newest review (the `main` of its newest cached verdict), so an
+     older pass never wins over a newer verdict.
+   - **upstream**: key 2 carries only when every key-1 result carried, and the
+     Founder Proxy only when key 2 did, so neither passes on results it never
+     judged.
+
+   CI is never carried: the review reaches a carry only once the required CI
+   is green on the new head. A carried verdict is posted on the new head with
+   a note naming the head and `main` it was reviewed on, and logged with
+   outcome `carried` (an earlier verdict looked at and not carried:
+   `carry-refused`, with the conditions that failed). `pr_review.py` run by
+   hand never carries.
 
    **The generated levels file.** `capability/levels.json` is generated
    (`scripts/capability_levels.py --write`) and many pull requests regenerate
