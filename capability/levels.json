@@ -1622,6 +1622,28 @@
           "record": "evals/results/g3-timer/slot-09/2026-11-24-claude-code-claude-opus-5-5-whole-flow",
           "stopped_at": "microarchitecture",
           "trial": 1
+        },
+        {
+          "case": "flow/axil-timer",
+          "flow_digest": "sha256:a1aea0d36022a54be56c8d5c31831ea8ac0994f2802bd8ee8f39f6a5246ec312",
+          "judged": true,
+          "knowledge": "on",
+          "passed": true,
+          "reason": "whole-flow trial: credits no skill and never counts toward a level (labelled in the run manifest and the trial)",
+          "record": "evals/results/g3-timer/slot-11/2026-11-24-claude-code-claude-opus-5-5-whole-flow",
+          "stopped_at": "",
+          "trial": 1
+        },
+        {
+          "case": "flow/axil-timer",
+          "flow_digest": "sha256:a89b7aa85c0b87e3450259992e3ca1e53cdcff53a6d5454053b310cbd4112a60",
+          "judged": false,
+          "knowledge": "on",
+          "passed": false,
+          "reason": "whole-flow trial: credits no skill and never counts toward a level (labelled in the run manifest and the trial)",
+          "record": "evals/results/g3-timer/slot-13/2026-11-24-claude-code-claude-opus-5-5-whole-flow",
+          "stopped_at": "interface-spec",
+          "trial": 1
         }
       ]
     },
@@ -1691,6 +1713,17 @@
           "passed": false,
           "reason": "whole-flow trial: credits no skill and never counts toward a level (labelled in the run manifest and the trial)",
           "record": "evals/results/g3-timer/slot-10/2026-11-24-claude-code-claude-opus-5-5-without-knowledge-whole-flow",
+          "stopped_at": "microarchitecture",
+          "trial": 1
+        },
+        {
+          "case": "flow/axil-timer",
+          "flow_digest": "sha256:9d94c40502aa75d262248c4e74b51aecbe1f9a0ec8d661a1db9e1723f78f0506",
+          "judged": false,
+          "knowledge": "off",
+          "passed": false,
+          "reason": "whole-flow trial: credits no skill and never counts toward a level (labelled in the run manifest and the trial)",
+          "record": "evals/results/g3-timer/slot-12/2026-11-24-claude-code-claude-opus-5-5-without-knowledge-whole-flow",
           "stopped_at": "microarchitecture",
           "trial": 1
         }
