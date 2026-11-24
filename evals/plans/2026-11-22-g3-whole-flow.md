@@ -1916,3 +1916,16 @@ gates read them. Still before slot 1, in order:
 
 From slot 1 to slot 20, gate ET15 as section 24.9 words it holds before every dispatch (gate WF39), and the rules of
 sections 24.6 and 24.8 hold (gate WF40). Section 13 stands.
+
+## 25. Dated addition (2026-11-24): section 18.3's last item of what is not claimed, in line with decision A2
+
+Decision C of the addendum of 2026-11-23 to `council/records/2026-11-22-eda-tools-seat-account.md` asks the pull request
+that commits the measured run's reach records to bring every sentence on `main` that says the `live-eval` job has no
+recorded run "before slot 1" in line with decision A2. That pull request is the one that adds this section, with the
+index `evals/flow/tool_reach_measured_run.json` (run 45295715357, commit `f3c8ae2a`).
+
+In section 18.3, *What is not claimed*, the item "that the `live-eval` job has a recorded probe run before slot 1" reads,
+in decision A2's words: "that the `live-eval` job has a recorded probe run, beyond a committed record that names the run
+and its commit; or that one run's reach record covers another run, another commit or a slot". Section 18.3's sentence
+"it has no recorded run on this commit", as section 19.3 reworded it, is true of the commit it was written on and is not
+changed. Nothing else of section 18.3 changes, and no value of any table of this plan changes.
