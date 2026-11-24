@@ -3372,7 +3372,8 @@ its own, not the dispatcher's; it shows the records, not the script.
 
 **Gate WF40** (owner: ai-engineer). Gate WF40 held from slot 1 to slot 20.
 The committed records and GitHub's run list show: each slot has one run and
-one record, whose manifest and reach index name that run and its commit;
+one record: its reach index names that run and its commit, and the record's
+manifest names the same commit;
 every run is a first attempt dispatched from `main`; none was cancelled; and
 the workflow has no other run between the dispatch of slot 1 and the end of
 slot 20's run. So every trial dispatched is committed, nothing was run
