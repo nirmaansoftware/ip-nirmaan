@@ -324,3 +324,69 @@ No file in `harness.CODE`, `harness.LOOP_CODE` or `FLOW_CODE` changes, so the
 single-seat and whole-flow fingerprints are unchanged; the whole-flow plan's
 "Gate backends" group digest moves (`evals/plans/2026-11-22-g3-whole-flow.md`,
 section 6), for the plan amendment of gate ET6.
+
+## 8. A setup's `[files]` as the seat account (ET17)
+
+Council record `council/records/2026-11-22-eda-tools-seat-account.md`, third
+addendum, decision E3 and gate ET17. In the live evaluation's jobs the seat
+account's view of a run holds the input files the harness names
+(`nirmaan.integrations.eda.seat_inputs`). Until this change that was every
+file a setup's `[files]` named, by its resolved path, so with the check of
+section 6 bypassed a `[files]` entry naming a file the runner made under a
+`/tmp/nirmaan-*` folder made it readable to the account: replay run
+45135605510 showed the bypass control
+`test_control_without_the_check_the_host_file_reaches_the_summary[files-absolute]`
+passing as the account, with the host file's marker in the summary (the
+addendum's facts T7 and T8). And `formal.cover` read each Verilog file of the
+setup as the caller and wrote a copy with derived covers into the run's
+directory, which the account reads.
+
+Now a `[files]` entry is the run's own only when its file, resolved, is
+inside the setup's folder or is one of the run's `sources` (`eda.own_file`;
+the rule of `eda_guard.inside_problem`, applied a second time where the
+inputs are named, so it holds whether or not the check ran). Only such a file
+is an input of the run, and only such a Verilog file is read and copied for
+`formal.cover` (`_hdl_files` with the run's sources); any other entry stays in
+the cover setup as the seat's setup names it, a file SBY itself must open.
+For a formal setup the account is given: the run's own directory, the setup,
+the sources, the other files its parameters name, and the files its `[files]`
+names inside its own folder or among those sources (M68's approved file
+linked beside the setup is one). With the check in force nothing changes:
+the check already refuses every entry that is not the run's own (section 6).
+
+Tests: `tests/test_gate_reads.py`, gate ET17 section, each with the check
+bypassed where it would refuse. The rule itself (`own_file`), for a setup
+reached through a link too; the approved file linked beside the setup and
+given as `sources` is still read and copied for the cover run; `seat_inputs` names no entry by an absolute name, a parent name or a
+link out, and still names the approved file linked beside the setup; the cover
+run reads and copies no such entry as the caller, and the cover setup names
+it unchanged; a bypass control through `formal.cover` beside the one through
+`formal.run`, which with the check bypassed, as the caller, finds the host
+file's content in the cover run's summary. Each must-refuse fixture of section
+6 is unchanged. What the two controls give as the seat account is for the ET5
+replay record of gate ET18, read by decision E2 of that addendum; nothing here
+claims it.
+
+What remains, by decision 8 of the record: a seat's own folder and the run's
+sources are in the view, as before; files every account may read are not
+covered beyond the probed targets; whether a seat could learn the path of a
+file in another `/tmp/nirmaan-*` folder was not tested and is not needed by
+this rule. Nothing here says a seat file is confined.
+
+Gate ET7. The one code file the repair changes, `eda.py`, is in none of
+`harness.CODE`, `harness.LOOP_CODE` or `FLOW_CODE`
+(`test_no_file_gate_et17_changes_is_harness_code` checks that file against
+the three lists; it reads no other file and no tool definition), and ip#475
+changed no tool definition (`src/nirmaan/company/tools.py`) and no CLI pin.
+On its merge commit `f8dcc97e` the tests of gate WF7
+(`tests/test_whole_flow_dispatch.py`) pass, and the four fingerprints,
+recomputed with `harness_sha256(cli="2.1.325")`, equal those of `main`
+`c356ba48` before it: `0ef27db1...` and `9aa7a333...` (single seat, with and
+without documents), `d90b3c18...` and `8d6590f7...` (whole flow). The
+whole-flow plan's "Gate backends" group digest moved from `eac184ec...` to
+`7c12db37...`, and "Seat account" from `1b7309f1...` to `6530c151...` (the
+docstring of `scripts/live_eval_seat.py` now says what the harness names for
+a setup).
+Where those tests ran and how the digests were computed is recorded in sections
+23.1 and 23.2 of `evals/plans/2026-11-22-g3-whole-flow.md`, which also holds the full
+values of both groups (section 23.1).

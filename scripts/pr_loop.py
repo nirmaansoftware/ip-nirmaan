@@ -12,12 +12,17 @@ per call, as a state machine that survives restarts:
 
     skip    already finished on this head (ready, auto-merge);
     update  GitHub reports the branch behind main (mergeable_state "behind";
-            this repository's ruleset has strict up-to-date branches off, so
-            it is not expected, but if GitHub reports it the loop handles it
-            as Nirmaan's does): merge main into
+            this repository's ruleset "main: two keys" requires branches to be
+            up to date (strict; read on 2026-11-24), so every open pull request
+            is behind each time main moves): merge main into
             it with the gh login (update-branch, pinned to the head the loop
             saw) before any review, and again after the review when main moved
             during it; a failed update stops, a push in between drops the step.
+            The head the loop merged main into is kept (state "update_from"), so
+            the review can carry a passing verdict on it to the merged head
+            (pr_review carry_basis: GitHub's update-branch merge, the diff
+            byte-identical, main's changes touching no file of the pull request
+            and no review-control file; never a fail or needs-founder, never CI).
             The generated capability/levels.json (LOOP "generated") the only
             file in a merge conflict with main, or stale on the merge with main
             when CI failed: the loop merges main into the branch itself (a
@@ -27,9 +32,12 @@ per call, as a state machine that survives restarts:
     wait    the required CI is not finished on the head (no model call), or
             GitHub is still making the update's merge commit;
     review  both keys, and the Founder Proxy (agent) for a founder-class pull
-            request, through scripts/pr_review.py; then one comment naming the
-            soft shape rules it breaks (never a stop);
-    merge   both keys (and the proxy) passed: `gh pr merge --auto --merge` with the gh login
+            request, through scripts/pr_review.py (a passing verdict carried
+            across the loop's update, as above, makes no model call); then one
+            comment naming the soft shape rules it breaks (never a stop);
+    merge   both keys (and the proxy) passed, or the review found the pull request
+            qualified for the records-only fast lane (pr_review CONFIG "fast_lane": no key
+            ran): `gh pr merge --auto --merge` with the gh login
             when the review App posts the checks and the repository's
             allow_auto_merge field (read with gh) is true; a "ready" comment in
             a dry run or when it is false; the field unreadable or any merge
@@ -64,9 +72,10 @@ per call, as a state machine that survives restarts:
             `needs-founder`, say why. A stop whose label or comment could not
             be posted (GitHub unreachable) is logged and posted on a later pass.
 
-Up to `parallel_reviews` (2) pull requests are stepped at once in a pass, each
+Up to `parallel_reviews` (3) pull requests are stepped at once in a pass, each
 by one worker; every model call holds one of the model slots shared with the
-Nirmaan loop (pr_review CONFIG model_cap).
+Nirmaan loop (pr_review CONFIG model_cap, 3, so each worker can hold one). With
+`parallel_reviews` 1 the pass steps one pull request at a time.
 
 Usage: python scripts/pr_loop.py (--once | --watch) [--pr N] [--interval-minutes 5] [--no-post]
 Exit: 0 done, 2 setup error, 4 refused (this copy differs from main).
@@ -183,8 +192,11 @@ LOOP = {
     "transient_retries": 4,
     "transient_backoff_minutes": 2,
     "stalled_label": "loop-stalled",
-    # Pull requests stepped at once in one pass (each by one worker).
-    "parallel_reviews": 2,
+    # Pull requests stepped at once in one pass (each by one worker); 1 steps them
+    # one at a time. Three: council record 2026-11-19-parallel-keys.md, addendum
+    # 2026-11-24, decision A1; at most 3 (gate LW1). pr_review CONFIG model_cap
+    # is at least this, so each worker can hold a model slot.
+    "parallel_reviews": 3,
     "needs_founder_label": "needs-founder",
     # A finding on a path the fixer may not change: the fixer does not run, the
     # pull request gets this label, and the author's next head clears it.
@@ -204,7 +216,7 @@ LOOP = {
     "fixer_forbidden": [
         ".github/**", ".claude/**", "CLAUDE.md", "council/**",
         "scripts/check_*.py", "scripts/live_eval_gate.py", "scripts/pr_review.py", "scripts/review_map.py", "scripts/pr_loop.py",
-        "scripts/loop_cloud.py", "tests/test_pr_review.py", "tests/test_pr_loop.py", "tests/test_review_teams.py", "tests/test_loop_cloud.py", "tests/fixtures/pr_review/**", "tests/fixtures/pr_loop/**",
+        "scripts/loop_cloud.py", "tests/test_pr_review.py", "tests/test_pr_loop.py", "tests/test_review_teams.py", "tests/test_loop_cloud.py", "tests/test_fast_lane.py", "tests/fixtures/pr_review/**", "tests/fixtures/pr_loop/**",
         "docs/REVIEW_MECHANISM.md", "docs/pr-loop.plist", "pyproject.toml", ".gitignore", ".gitattributes",
     ],
     # Checks the loop runs on the fix commit, in the worktree (in GitHub Actions
@@ -448,10 +460,21 @@ def load_state(state_dir, repo: str, pr: int) -> dict:
         return {"pr": pr, "rounds": 0, "seen": {}, "last_fix_head": None, "done": None, "stopped": None}
 
 
-def _save_state(state_dir, repo: str, st: dict):
-    path = _state_path(state_dir, repo, st["pr"])
+def _write_whole(path: Path, text: str):
+    """Writes `path` whole: a temporary file beside it, renamed over it, so a
+    reader (another worker, the state push) never sees half a file, and a run
+    killed mid-write leaves the old one."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(st, indent=2))
+    tmp = path.parent / f".{path.name}.{os.getpid()}.{threading.get_ident()}.{secrets.token_hex(4)}.tmp"
+    try:
+        tmp.write_text(text)
+        os.replace(tmp, path)
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
+def _save_state(state_dir, repo: str, st: dict):
+    _write_whole(_state_path(state_dir, repo, st["pr"]), json.dumps(st, indent=2))
 
 
 # The loop-wide rate-limit pause. The same file and format as the Nirmaan
@@ -802,6 +825,9 @@ def _worktree_changes(path: str) -> list[str]:
 
 def _passed_what(r: dict, capital: bool = False) -> str:
     """What passed, for the merge-path comments."""
+    if r.get("fast_lane"):
+        what = "the records fast lane qualified (no agent key ran)"
+        return what[0].upper() + what[1:] if capital else what
     proxy = r.get("proxy")
     what = ("both keys passed" if not proxy else
             "both keys passed, and the founder's own GitHub review approves the changes the Founder Proxy (agent) sent to the founder"
@@ -828,7 +854,8 @@ class Loop:
     # one that just ran a review or a fix, never holds up the others. A pull
     # request the loop is fixing goes first, then by number. Up to
     # parallel_reviews steps run at once, each pull request taken by one worker
-    # only; every model call holds one of the model slots shared with the
+    # only, and two pull requests listed with one head sha are stepped one
+    # after the other (the review checks are posted on the head); every model call holds one of the model slots shared with the
     # Nirmaan loop (none free at a call makes that pull request "busy" and the
     # pass goes on). The check that this copy is main's runs once, before the
     # pass, so no new step starts once main may have moved: after this pass's
@@ -867,6 +894,8 @@ class Loop:
             return 0 if s["last_fix_head"] and not s["done"] and not s["stopped"] else 1
         pulls.sort(key=lambda p: (in_flight(p), p["number"]))
         queue, results, guard, halt = list(enumerate(pulls)), [], threading.Lock(), threading.Event()
+        # One lock per listed head: no two workers ever act on one head at once.
+        heads: dict = {}
 
         def worker():
             while True:
@@ -880,10 +909,14 @@ class Loop:
                                  "the rest wait for the next pass")
                         halt.set()
                         return
-                try:
-                    res = {"pr": p["number"], **self.step(p)}
-                except Exception as exc:  # noqa: BLE001 - step() stops on its own errors; this is a last guard
-                    res = {"pr": p["number"], "outcome": "error", "reason": str(exc)}
+                    head_lock = heads.setdefault(p.get("head_sha") or ("pr", p["number"]), threading.Lock())
+                with head_lock:
+                    if halt.is_set():
+                        return  # halted while another worker had this head: it waits for the next pass
+                    try:
+                        res = {"pr": p["number"], **self.step(p)}
+                    except Exception as exc:  # noqa: BLE001 - step() stops on its own errors; this is a last guard
+                        res = {"pr": p["number"], "outcome": "error", "reason": str(exc)}
                 with guard:
                     results.append((i, res))
                     if res["outcome"] in ("auto-merge", "paused"):
@@ -1111,9 +1144,7 @@ class Loop:
         reason = pr_review.redact(why)
         until = (datetime.now(timezone.utc) + timedelta(minutes=self.lc.get("rate_limit_pause_minutes", 30))).isoformat()
         if self.o["post"] != "none":  # a --no-post run leaves the real loop alone
-            path = pause_path(self.state_dir)
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(json.dumps({"until": until, "repo": self.cfg["repo"], "pr": n, "head": head, "reason": reason}))
+            _write_whole(pause_path(self.state_dir), json.dumps({"until": until, "repo": self.cfg["repo"], "pr": n, "head": head, "reason": reason}))
         self.out(f"pr-loop: #{n} paused until {until}: {reason}")
         self._log(ctx, "paused", reason=reason, until=until)
         return {"outcome": "paused", "reason": reason, "until": until}
@@ -1163,7 +1194,7 @@ class Loop:
         r = pr_review.run_review(o["repo_root"], n, o["github"], o["post"], o["claude_bin"], self.state_dir, o["models"],
                                  o["timeout_s"], o["backoff_s"], config=cfg, caller_branch=o.get("caller_branch"),
                                  in_claude_session=o.get("in_claude_session", False), sleep=o.get("sleep", time.sleep),
-                                 out=self.out, gate=self._paused_now)
+                                 out=self.out, gate=self._paused_now, loop_merged=list(st.get("update_from") or []))
         if r["exit"] == pr_review.EXIT_HEAD_MOVED:
             self._log(ctx, "head-moved")
             return {"outcome": "head-moved"}
@@ -1190,6 +1221,13 @@ class Loop:
             return {"outcome": "skip", "reason": f"{r['ci_failed']}; the author fixes it"}
         if r.get("deferred"):
             return self._stop(ctx, head, f"review deferred: {r['deferred']}")
+        if r.get("fast_lane"):
+            # The records-only fast lane (pr_review CONFIG "fast_lane"): the review checked every condition on
+            # this head and the App posted both checks naming the lane; no key ran, so no fix round can follow.
+            if not pr_review.fast_lane_ok(r["fast_lane"]):
+                return self._stop(ctx, head, "the review returned a records fast lane result with a failed condition")
+            self._log(ctx, "fast-lane", conditions=",".join(c["condition"] for c in r["fast_lane"]))
+            return self._merge_path(ctx, r)
         # When the verdicts reached GitHub (deferred keys included).
         self._log(ctx, "verdict-posted", key1=",".join(f"{k['team']}:{k['status']}" for k in r.get("key1") or []),
                   key2=r["key2"]["status"] if r.get("key2") else "not run",
@@ -1253,11 +1291,17 @@ class Loop:
             return self._stop(ctx, head, f"could not update the branch with main {_gh_failure(exc)}. A person resolves it "
                                          "(a merge conflict with main, or GitHub refused the update)")
         st["updated"] = {"from": head, "at": _now(), "at_s": time.time()}
+        # The heads the loop itself asked GitHub to merge main into: a passing
+        # verdict on one carries to the merge only through pr_review carry_basis.
+        hops = (cfg.get("carry") or {}).get("max_hops", 20)
+        st["update_from"] = ([h for h in st.get("update_from") or [] if h != head] + [head])[-hops:]
         _save_state(self.state_dir, cfg["repo"], st)
         self._log(ctx, "updated")
         self._say(n, f"<!-- {MARK} updated from={head} -->\n### Automated loop: branch updated\n\nThe branch was behind `main`, "
                      "and GitHub reported that as blocking the merge, so the loop asked GitHub to merge `main` into it "
-                     f"(update-branch, a merge commit, only while the head was still `{sha7}`). The new head is reviewed from scratch.")
+                     f"(update-branch, a merge commit, only while the head was still `{sha7}`). The required CI runs on the new head. "
+                     f"A passing verdict on `{sha7}` carries to it only when the pull request's diff is byte-identical and `main`'s "
+                     "changes touch none of its files and no review-control file; otherwise it is reviewed from scratch.")
         return {"outcome": "updated"}
 
     def _update_generated(self, ctx, pull, conflict: bool):
@@ -1435,6 +1479,11 @@ class Loop:
         if cfg["hold_label"] in now["labels"]:
             self._log(ctx, "held")
             return {"outcome": "skip", "reason": "hold label set during the review"}
+        if r.get("fast_lane") and (now["head_sha"] != head or self.lc["needs_founder_label"] in now["labels"]):
+            # The fast lane's conditions were read on this head without that label: either changed, the normal path.
+            self._log(ctx, "fast-lane-dropped")
+            return {"outcome": "skip", "reason": "the head or its labels changed after the records fast lane was checked"}
+        footer = "_Records fast lane: no agent review ran._" if r.get("fast_lane") else "_Agent review only._"
         # main moved during the review: this head cannot merge, so update it
         # rather than ask GitHub to merge it.
         if now.get("mergeable_state") == "behind" and o["post"] != "none":
@@ -1481,12 +1530,12 @@ class Loop:
             self._log(ctx, "auto-merge")
             self._say(n, f"<!-- {MARK} auto-merge head={head} -->\n### Automated loop: {_passed_what(r)} on `{sha7}`\n\n"
                          "Auto-merge is on for this pull request: GitHub merges it with a merge commit once every required "
-                         "check passes on this head.\n\n_Agent review only._")
+                         "check passes on this head.\n\n" + footer)
             st["done"] = {"head": head, "outcome": "auto-merge"}
         else:
             self._log(ctx, "ready", why=why)
             self._say(n, f"<!-- {MARK} ready head={head} -->\n### Automated loop: ready\n\n{_passed_what(r, True)} on `{sha7}`, "
-                         f"waiting for the founder's merge settings: {why}. The founder merges this pull request.\n\n_Agent review only._")
+                         f"waiting for the founder's merge settings: {why}. The founder merges this pull request.\n\n" + footer)
             st["done"] = {"head": head, "outcome": "ready"}
         _save_state(self.state_dir, cfg["repo"], st)
         return {"outcome": st["done"]["outcome"]}

@@ -1,0 +1,283 @@
+{
+ "format": "nirmaan.et5-seat-controls-record/2",
+ "about": "Gate WF33 of the sixth addendum to council/records/2026-11-17-g3-whole-flow-cases.md (decision P3, item 2), by the procedure of decision E4 of the third addendum to council/records/2026-11-22-eda-tools-seat-account.md: replay run 45266375996 of flow/axil-timer, dispatched alone on main at b1bc2267 (the merge of ip#491, the plan's dated addition of section 24, on a commit that holds ip#487, which moved both whole-flow fingerprints) with controls and parallel set, no model and no token. A replay is not a trial and is never counted. Its controls upload (live-eval-controls-45266375996) and the tool reach records of its replay and rejudge jobs are committed as uploaded, byte for byte, in the folder this record names, each file with its sha256 here. Each job ran once (attempt 1): in the replay job the reach test denied every probe, the reference answer's replay passed, and the controls step failed because 13 bypass controls failed as the seat account; the rejudge job passed, its reach test denying every probe. An earlier dispatch, run 45259738096 on 11b205e4, was made before ip#491 merged and was cancelled by its dispatcher; nothing is read from it. The record reads each bypass control by decision E2: for each one that failed as the account, every tool run it made, the seat account's wrapper it started and the tool's own line naming the target it could not open, resolve or write; and the controls whose tool runs as the caller by decision 6, listed and claimed for nothing. The records of runs 45119522138 (et5_controls_record.json) and 45159697183 (et5_controls_record_45159697183.json) are unchanged. Whether ET5 is met is verification-lead's statement, not this record's.",
+ "run": {
+  "id": "45266375996",
+  "url": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45266375996",
+  "attempt": 1,
+  "commit": "b1bc226738040ec8f439340cec07766af120709f",
+  "branch": "main",
+  "event": "workflow_dispatch",
+  "workflow": ".github/workflows/live-eval.yml",
+  "inputs": {
+   "case": "flow/axil-timer",
+   "replay": true,
+   "controls": true,
+   "parallel": true
+  },
+  "inputs_source": "The inputs as the dispatcher gave them: case flow/axil-timer, with replay, controls and parallel true, and no model and no token. GitHub's run and job data carry no dispatch inputs, and no record of the run holds parallel (seventh addendum to council/records/2026-11-17-g3-whole-flow-cases.md, fact TF14): its step that refuses parallel for other cases is skipped for this case whatever the input. The case is in the job's environment as GitHub reported it.",
+  "jobs": {
+   "replay": {
+    "id": "138014258248",
+    "attempt": 1,
+    "conclusion": "failure",
+    "url": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45266375996/job/138014258248"
+   },
+   "rejudge": {
+    "id": "138035125760",
+    "attempt": 1,
+    "conclusion": "success",
+    "url": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45266375996/job/138035125760"
+   },
+   "live-eval": {
+    "id": "138014261681",
+    "attempt": 1,
+    "conclusion": "skipped",
+    "url": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45266375996/job/138014261681"
+   },
+   "not-main": {
+    "id": "138014261716",
+    "attempt": 1,
+    "conclusion": "skipped",
+    "url": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45266375996/job/138014261716"
+   }
+  },
+  "steps": {
+   "replay": {
+    "Test what seat code can reach": "success",
+    "Replay the reference answer": "success",
+    "Run the controls, the mutant sweep and the gate fixtures as the seat account": "failure",
+    "Check the checkout did not change": "success"
+   },
+   "rejudge": {
+    "Test what seat code can reach": "success",
+    "Re-judge the records": "success",
+    "Check the checkout did not change": "success"
+   }
+  },
+  "cancelled_dispatch": {
+   "id": "45259738096",
+   "url": "https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45259738096",
+   "commit": "11b205e4540995529c0a9e1f7387afd74901d877",
+   "created": "2026-11-23T20:28:31Z",
+   "completed": "2026-11-23T20:34:09Z",
+   "conclusion": "cancelled",
+   "why": "dispatched before ip#491 merged; plan section 24.13 asks for a commit that holds that addition, so its dispatcher cancelled it; it ended at 2026-11-23T20:34:09Z, before run 45266375996 was dispatched at 2026-11-23T21:07:16Z",
+   "read": "nothing"
+  }
+ },
+ "folder": "docs/evidence/et5/run-45266375996",
+ "files": {
+  "live-eval-controls-45266375996/bypass.json": {
+   "sha256": "91a10c991a574fc8ec78cf114d481e349d8041991b37c3422ad3b271627f07d6",
+   "bytes": 106011
+  },
+  "live-eval-controls-45266375996/controls.json": {
+   "sha256": "0e8e478ee2eafe874c7a6d7d2c0727f4661aa100dc69ea3045ec0107eae53ca9",
+   "bytes": 5815
+  },
+  "live-eval-controls-45266375996/controls.log": {
+   "sha256": "4aa7d973c0a0b62c4aaafa896b3a644aa449ff94d5479784a236f6709134bc79",
+   "bytes": 5041
+  },
+  "live-eval-controls-45266375996/controls.xml": {
+   "sha256": "02b23a99b40762cd026ba80848118575629af7a578b13d6d49a5a1587469dd25",
+   "bytes": 1246
+  },
+  "live-eval-controls-45266375996/fixtures.log": {
+   "sha256": "98e223580b90dd3c08c5455037ab1e36a2e4380d10f49399112b6458e023e3d6",
+   "bytes": 32602
+  },
+  "live-eval-controls-45266375996/fixtures.xml": {
+   "sha256": "193cdcac06314bd4ae85be243d704f9c492f292dbfd97f74e63c85cda6ca6c21",
+   "bytes": 100881
+  },
+  "live-eval-controls-45266375996/summary.json": {
+   "sha256": "c77cf8c3841505d4683da84e75186e7178ef0fc7e7ea76c8b753b878b3696b63",
+   "bytes": 2915
+  },
+  "live-eval-controls-45266375996/sweep.json": {
+   "sha256": "bd61cd2f62e3335a00ea6015f14d8a520edb615a37d47cf9f3e3032853c04393",
+   "bytes": 47810
+  },
+  "live-eval-tool-reach-rejudge-45266375996/tool-reach.json": {
+   "sha256": "4cb495fb3903125f32be1afdf2f70284ba1c839415065fa7a73f5beb92bdcd1e",
+   "bytes": 13706
+  },
+  "live-eval-tool-reach-replay-45266375996/tool-reach.json": {
+   "sha256": "049d9da2fd72a3d0d435c83d983b3a1c3292cd6fa1a20f2489134d47961926d7",
+   "bytes": 13705
+  }
+ },
+ "bypass_controls": {
+  "failed_as_the_account": {
+   "tests/test_gate_inputs.py::test_control_without_the_check_a_top_reaches_the_shell": [
+    {
+     "backend": "yosys",
+     "commands": [
+      "/opt/nirmaan-seat/bin/yosys"
+     ],
+     "line": "touch: cannot touch '/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check0/MARKER': Permission denied"
+    }
+   ],
+   "tests/test_gate_inputs.py::test_control_without_the_check_a_setup_reaches_the_shell": [
+    {
+     "backend": "symbiyosys",
+     "commands": [
+      "/opt/nirmaan-seat/bin/sby"
+     ],
+     "line": "SBY 21:35:43 [/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/tmp/nirmaan-symbiyosys-y5ik7pg3/sby] base: touch: cannot touch '/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check2/MARKER': Permission denied"
+    }
+   ],
+   "tests/test_gate_inputs.py::test_control_without_the_check_a_tool_acts_on_the_form[dollar_macro-yosys]": [
+    {
+     "backend": "yosys",
+     "commands": [
+      "/opt/nirmaan-seat/bin/yosys"
+     ],
+     "line": "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check6/1/run/m.v:4: ERROR: Can not open file `/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check6/1/outside/CANARY_ET1.hex` for \\$readmemh."
+    },
+    {
+     "backend": "yosys",
+     "commands": [
+      "/opt/nirmaan-seat/bin/yosys"
+     ],
+     "line": "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check6/0/run/m.v:4: ERROR: Can not open file `/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check6/0/outside/CANARY_ET1.hex` for \\$readmemh."
+    }
+   ],
+   "tests/test_gate_inputs.py::test_control_without_the_check_a_tool_acts_on_the_form[esc_abs_module-verilator-lint]": [
+    {
+     "backend": "verilator-lint",
+     "commands": [
+      "/opt/nirmaan-seat/bin/verilator"
+     ],
+     "line": "%Error: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check7/run/m.v:3:35: Can't resolve module reference: '/tmp/tmp2r1cj289/CANARY_ET1.vh'"
+    }
+   ],
+   "tests/test_gate_inputs.py::test_control_without_the_check_a_tool_acts_on_the_form[esc_dollar_task-yosys]": [
+    {
+     "backend": "yosys",
+     "commands": [
+      "/opt/nirmaan-seat/bin/yosys"
+     ],
+     "line": "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check13/1/run/m.v:3: ERROR: Can not open file `/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check13/1/outside/CANARY_ET1.hex` for \\$readmemh."
+    },
+    {
+     "backend": "yosys",
+     "commands": [
+      "/opt/nirmaan-seat/bin/yosys"
+     ],
+     "line": "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check13/0/run/m.v:3: ERROR: Can not open file `/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check13/0/outside/CANARY_ET1.hex` for \\$readmemh."
+    }
+   ],
+   "tests/test_gate_inputs.py::test_control_without_the_check_a_tool_acts_on_the_form[esc_dotdot_module-verilator-lint]": [
+    {
+     "backend": "verilator-lint",
+     "commands": [
+      "/opt/nirmaan-seat/bin/verilator"
+     ],
+     "line": "%Error: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check14/run/m.v:3:29: Can't resolve module reference: '../outside/CANARY_ET1.vh'"
+    }
+   ],
+   "tests/test_gate_inputs.py::test_control_without_the_check_a_tool_acts_on_the_form[esc_quote-yosys]": [
+    {
+     "backend": "yosys",
+     "commands": [
+      "/opt/nirmaan-seat/bin/yosys"
+     ],
+     "line": "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check22/1/run/m.v:3: ERROR: Can not open file `/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check22/1/outside/CANARY_ET1.hex` for \\$readmemh."
+    },
+    {
+     "backend": "yosys",
+     "commands": [
+      "/opt/nirmaan-seat/bin/yosys"
+     ],
+     "line": "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check22/0/run/m.v:3: ERROR: Can not open file `/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check22/0/outside/CANARY_ET1.hex` for \\$readmemh."
+    }
+   ],
+   "tests/test_gate_inputs.py::test_control_without_the_check_a_tool_acts_on_the_form[glued_macro_call-icarus]": [
+    {
+     "backend": "icarus",
+     "commands": [
+      "/opt/nirmaan-seat/bin/iverilog",
+      "/opt/nirmaan-seat/bin/vvp"
+     ],
+     "line": "ERROR: /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check23/run/m.v:4: $writememh: Unable to open /tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check23/outside/MARKER for writing."
+    }
+   ],
+   "tests/test_gate_inputs.py::test_control_without_the_check_a_tool_acts_on_the_form[ifdef_lone_quote_readmem-yosys]": [
+    {
+     "backend": "yosys",
+     "commands": [
+      "/opt/nirmaan-seat/bin/yosys"
+     ],
+     "line": "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check28/1/run/m.v:7: ERROR: Can not open file `/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check28/1/outside/CANARY_ET1.hex` for \\$readmemh."
+    },
+    {
+     "backend": "yosys",
+     "commands": [
+      "/opt/nirmaan-seat/bin/yosys"
+     ],
+     "line": "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check28/0/run/m.v:7: ERROR: Can not open file `/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check28/0/outside/CANARY_ET1.hex` for \\$readmemh."
+    }
+   ],
+   "tests/test_gate_inputs.py::test_control_without_the_check_a_tool_acts_on_the_form[split_macro-yosys]": [
+    {
+     "backend": "yosys",
+     "commands": [
+      "/opt/nirmaan-seat/bin/yosys"
+     ],
+     "line": "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check32/1/run/m.v:5: ERROR: Can not open file `/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check32/1/outside/CANARY_ET1.hex` for \\$readmemh."
+    },
+    {
+     "backend": "yosys",
+     "commands": [
+      "/opt/nirmaan-seat/bin/yosys"
+     ],
+     "line": "/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check32/0/run/m.v:5: ERROR: Can not open file `/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check32/0/outside/CANARY_ET1.hex` for \\$readmemh."
+    }
+   ],
+   "tests/test_gate_reads.py::test_control_without_the_check_the_host_file_reaches_the_summary[files-absolute]": [
+    {
+     "backend": "symbiyosys",
+     "commands": [
+      "/opt/nirmaan-seat/bin/sby"
+     ],
+     "line": "FileNotFoundError: [Errno 2] No such file or directory: '/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check46/host/leak.vh'"
+    }
+   ],
+   "tests/test_gate_reads.py::test_control_without_the_check_the_host_file_reaches_the_summary[include-glued]": [
+    {
+     "backend": "symbiyosys",
+     "commands": [
+      "/opt/nirmaan-seat/bin/sby"
+     ],
+     "line": "SBY 21:41:02 [/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check47/run/sby] base: ERROR: Can't open include file `leak.vh'!"
+    }
+   ],
+   "tests/test_gate_reads.py::test_control_without_the_check_the_host_file_reaches_the_cover_summary[files-absolute]": [
+    {
+     "backend": "symbiyosys-cover",
+     "commands": [
+      "/opt/nirmaan-seat/bin/sby"
+     ],
+     "line": "FileNotFoundError: [Errno 2] No such file or directory: '/tmp/nirmaan-et5-fixtures-thw8b5h3/pytest/test_control_without_the_check48/host/leak.vh'"
+    }
+   ]
+  },
+  "as_the_caller": [
+   "tests/test_gate_inputs.py::test_control_without_the_check_a_testbench_reaches_the_shell",
+   "tests/test_gate_inputs.py::test_control_without_the_check_a_tool_acts_on_the_form[dollar_macro-verilator-sim]",
+   "tests/test_gate_inputs.py::test_control_without_the_check_a_tool_acts_on_the_form[esc_abs_module-verilator-sim]",
+   "tests/test_gate_inputs.py::test_control_without_the_check_a_tool_acts_on_the_form[esc_block-verilator-sim]",
+   "tests/test_gate_inputs.py::test_control_without_the_check_a_tool_acts_on_the_form[esc_dotdot_module-verilator-sim]",
+   "tests/test_gate_inputs.py::test_control_without_the_check_a_tool_acts_on_the_form[esc_line-verilator-sim]",
+   "tests/test_gate_inputs.py::test_control_without_the_check_a_tool_acts_on_the_form[esc_quote-verilator-sim]",
+   "tests/test_gate_inputs.py::test_control_without_the_check_a_tool_acts_on_the_form[glued_macro_call-verilator-sim]",
+   "tests/test_gate_inputs.py::test_control_without_the_check_a_tool_acts_on_the_form[split_macro-verilator-sim]",
+   "tests/test_gate_inputs.py::test_control_without_the_check_a_seat_file_reaches_a_judge_file[esc_block-verilator-sim-tests/fixtures/rtl/axil_timer/axil_timer.v]",
+   "tests/test_gate_inputs.py::test_control_without_the_check_a_seat_file_reaches_a_judge_file[esc_block-verilator-sim-evals/flow/axil_timer/axil_timer_tb.v]",
+   "tests/test_gate_inputs.py::test_control_without_the_check_a_seat_file_reaches_a_judge_file[esc_block-verilator-sim-tests/fixtures/rtl/axil_timer/mutants/axil_timer_stop_ignored.v]"
+  ]
+ }
+}

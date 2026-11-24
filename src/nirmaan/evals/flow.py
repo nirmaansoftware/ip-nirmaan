@@ -3,8 +3,10 @@
 A whole-flow case (``flow: whole``) puts its request in, seats every work stage with the same seat runtime, in
 dependency order, and judges only the final block. Each stage runs through the unchanged ``run_task``, so its own
 before-review checks run for real. Review and approval are a pass-through by the harness under its own actor name,
-with a true note: the stage's output was not reviewed, and either the gate runs that passed are named or the stage
-had no check ("submitted, not checked"). A stage that does not reach review stops the flow: later stages are
+with a true note: the stage's output was not reviewed; no reviewer judged it, and the harness recorded the review
+and approval itself, by the evaluation's rule, so that later stages receive it as input ("approved" records that
+rule, not a judgement; sixth addendum, decision P2); and either the gate runs that passed are named or the stage had
+no check ("submitted, not checked"). A stage that does not reach review stops the flow: later stages are
 recorded as not run, every held-out check is not run, and the trial is failed. There is never a fallback to a
 reference document.
 
@@ -45,8 +47,12 @@ from nirmaan.work import PolicyViolationError, ProjectStore, TaskEngine, WorkErr
 #: The harness's own actor for the pass-through review and approval: never the fixture's.
 PASSTHROUGH = "eval-flow-passthrough"
 NOT_RUN = "not run"
-NOTE_CHECKED = "Whole-flow evaluation: not reviewed. Before-review checks passed: {runs}."
-NOTE_UNCHECKED = "Whole-flow evaluation: not reviewed. This stage has no before-review check: submitted, not checked."
+#: The notes of the council record 2026-11-17, sixth addendum, decision P2, item 3, word for word.
+_NOT_JUDGED = ("Whole-flow evaluation: not reviewed. No reviewer judged this stage: the evaluation harness recorded "
+               "this review and approval itself, by the evaluation's rule, so that later stages receive it as input; "
+               "'approved' here records that rule, not a judgement.")
+NOTE_CHECKED = _NOT_JUDGED + " Before-review checks passed: {runs}."
+NOTE_UNCHECKED = _NOT_JUDGED + " This stage has no before-review check: submitted, not checked."
 
 
 @dataclass(frozen=True)

@@ -7,7 +7,9 @@ collaborator or a workflow token does not count. The ruleset's "Require review
 from Code Owners" is still on, but since `.github/CODEOWNERS` was removed (the
 Founder Proxy, 2026-10-18) it has no effect; the founder can turn it off. A
 push dismisses an earlier approval.
-Branches need not be up to date with `main` (strict is off). Auto-merge is on.
+Branches must be up to date with `main`: strict is on (`strict_required_status_checks_policy`
+`true` in ruleset 25313563, read with `gh api repos/nirmaansoftware/ip-nirmaan/rulesets/25313563`
+on 2026-11-24; the ruleset was last updated 2026-11-22). Auto-merge is on.
 The first automatic merge was #106 (both keys passed, the loop turned on
 auto-merge, GitHub merged it with no human action); #105 and #107 merged
 through both keys after the founder's approval on GitHub.
@@ -62,6 +64,11 @@ nothing and is not a key; it catches plain bugs before the keys spend calls.
    removed, so the only markers left are the script's own. The keys treat
    that block as the PR's flag.
 5. **Merge.** Automatic once every required check passes.
+
+One exception: a pull request that only adds generated eval records and meets
+every condition of the [records fast lane](#records-fast-lane) stops after
+step 1. No key 1, key 2 or Founder Proxy runs; the review App posts both
+checks as passed, naming the lane, and the loop turns on auto-merge.
 
 ## Teams
 
@@ -122,6 +129,73 @@ posts says "Founder Proxy (agent), acting under the founder's delegation of
 - **No CODEOWNERS.** `.github/CODEOWNERS` was removed, and
   `tests/test_review_teams.py` fails if one is added back.
 
+## Records fast lane
+
+Approval: founder, in session, 2026-11-23: approved a records-only fast lane
+so generated eval record PRs merge on green CI and schema tests without the
+two agent review keys. The Founder Proxy's seat file counts a change that lets
+the loop merge without both keys and the proxy as weakening a review gate; the
+lane is such a change, so the pull request that adds it is founder class and
+waits for the founder's own decision on GitHub.
+
+**Conditions.** A pull request takes the lane only when every one holds on
+its head (`fast_lane` in `CONFIG` and `fast_lane()` in `scripts/pr_review.py`):
+
+1. **Author:** the agents' account (`patel-om`), not any other allowed author.
+2. **Branch:** the head branch starts with `evals/` (and is longer than it).
+3. **Not a draft.**
+4. **Paths:** every changed path is an added file under `evals/results/`
+   (status `A` in `git diff --name-status -M` of the merge base and the head),
+   and at least one is; the only other path allowed is `capability/levels.json`,
+   modified (status `M`). A modified, deleted, renamed, copied or type-changed
+   file under `evals/results/`, the levels file added or deleted, a path with
+   an empty, `.` or `..` part, and any other path fail.
+5. **Regular files:** every changed path is a regular file (mode `100644`) at
+   the head, read with `git --literal-pathspecs ls-tree`; a symlink, an
+   executable, a submodule or an unreadable mode fails.
+6. **Size:** the diff is not empty and not over the review's size limit
+   (200,000 bytes; over it the review stops before the lane, as for any pull
+   request).
+7. **CI:** every required check (`test`, `no-tools`, `physical-design`,
+   `test-union`, `dashes`) concluded `success` on the head, the newest run of
+   each counting, as in step 5 of "How reviewers run". The record tests run in
+   the required `test` job, which runs the whole suite in four shards;
+   `scripts/shards.py` there checks the shards ran every collected test exactly
+   once.
+8. **Record tests:** each of these files is at the head (the path rule means
+   the pull request cannot change one): `tests/test_capability_levels.py` (the
+   levels file against `levels.py`, and `capability_levels.py --check`),
+   `tests/test_whole_flow.py` (every committed record loads, with its
+   structure), `tests/test_eval_purpose.py` (every committed manifest's purpose
+   label), `tests/test_failure_curriculum.py` (the committed records' causes
+   tables parse) and `tests/test_nirmaan_evals.py` (no committed record is
+   taken for a shipped case).
+9. **Labels:** not labelled `needs-founder` or `hold`.
+10. **Founder classes:** `main`'s review map detects none on the diff (path or
+    content). If it detects one, the pull request is not in the lane.
+11. **Credentials:** no added line is in a credential format (the review
+    script's `SECRET_PATTERNS`).
+
+**What happens.** The review script checks the lane after the CI-first step
+and the size limit, and only on a head branch starting with `evals/`. On a
+qualifying head it calls no model: it posts one comment (the "Records fast
+lane: qualified" table, with each condition, whether it holds and why) and
+both checks, `review/team-lead` and `review/executive`, as passed, titled
+"records fast lane ... no agent review ran". A dry run posts its usual never
+green statuses instead. The loop then takes the merge path (step 4 of
+"Automated loop") with no fix round, after reading the pull request again: a
+head that moved, or a `needs-founder` label added meanwhile, drops the merge.
+Its auto-merge comment says the lane qualified and that no agent review ran.
+
+**Fail closed.** Any failed condition, an error while checking (an
+unreadable mode, a malformed CI read, a malformed setting) or CI not yet
+green means the normal two-key path; nothing about the lane is posted then,
+and every other pull request is reviewed exactly as before. `fast_lane` set
+to `None` turns the lane off. The conditions are tested one by one, each
+passing and each way it fails, in `tests/test_fast_lane.py`, with the review
+and the loop end to end; the fixer may not change that file, the scripts or
+this page.
+
 ## Reviewer isolation
 
 The reviewer runs as a fresh read-only process in a clean checkout of the head
@@ -140,12 +214,18 @@ Built in rollout R5; in use on real pull requests since 2026-10-18. The
 a pull request it wrote, and the script refuses when a Claude Code session has
 the branch checked out. In order:
 
-1. **At most two model calls at once** across Nirmaan and IP Nirmaan: two
-   model slots in `~/.nirmaan/pr-review/`, shared with Nirmaan's loop
-   (`model_cap` 2 in both), held here only around each model call (a
-   reviewer's, or the loop's fixer's), never while checking out, reading CI,
-   posting or running local checks. Slot 0 is `review.lock`, slot 1
-   `model-slot-1.lock`; this script tries `review.lock` first and Nirmaan's
+1. **At most three model calls at once** in this loop, in the three model
+   slots it has in GitHub Actions (`model_cap` 3 here; the slots are files in
+   its own state folder, so Nirmaan's loop takes none of them). Across both
+   repositories on a shared Mac state folder (`~/.nirmaan/pr-review/`) the cap
+   stays 2, as Nirmaan's founder-approved record sets it (its
+   `docs/operations/pr-review-decisions.md`, line 193, and R5.5 in
+   `docs/operations/2026-10-18-review-loop-decisions.md`): if this loop ever
+   runs on that folder again, its `model_cap` must be 2 there, or a Nirmaan
+   decision record must raise the shared cap first. A slot is held here only around each
+   model call (a reviewer's, or the loop's fixer's), never while checking out,
+   reading CI, posting or running local checks. Slot 0 is `review.lock`, slot
+   n `model-slot-<n>.lock`; this script tries `review.lock` first and Nirmaan's
    loop its other slot first. When every slot is held elsewhere at a call, the
    run ends ("busy", exit 3) and the next run reuses the verdicts already
    cached. Each slot is a folder with an owner file written whole (a
@@ -172,7 +252,9 @@ the branch checked out. In order:
    No model is called in either case. A diff of `main...head` over 200,000
    bytes is not reviewed either: both checks stay pending with "review not
    run: ... split the pull request". The reviewers always get the whole diff,
-   never a cut one (the one shape rule that stops a review).
+   never a cut one (the one shape rule that stops a review). A pull request
+   that meets every condition of the [records fast lane](#records-fast-lane)
+   ends here: one comment, both checks passed naming the lane, no model call.
 6. **Key 1, then key 2.** Key 1 is one fresh `claude -p` process per owning
    team lead: the base checklist, the lead's seat file and the "In a review"
    sections of the team's members. Key 2 runs only when every key 1 passed:
@@ -295,7 +377,9 @@ Running since 2026-10-18 under launchd (`online.nirmaan.ip-pr-loop`).
 whole cycle without anyone starting the review by hand: wait for CI, run both
 keys, fix what a key found, review again, and take the merge path when both
 keys pass. It never replaces a key or the Founder Proxy, and never decides
-what the proxy sends to the founder: a `needs-founder` verdict stops it.
+what the proxy sends to the founder: a `needs-founder` verdict stops it. The
+one pull request it merges with no key is one the review found in the
+[records fast lane](#records-fast-lane).
 
 **Which pull requests.** Open, targeting `main`, from a branch in this
 repository, authored by the agents' account (`patel-om`). Drafts and pull
@@ -303,22 +387,62 @@ requests labelled `hold` or `needs-founder` are skipped.
 
 **Each step, per pull request:**
 
-1. **Behind `main`.** The ruleset here has strict up-to-date branches off, so
-   GitHub is not expected to report a branch as behind. If it does
-   (`mergeable_state` `behind`), the loop handles it as Nirmaan's loop does.
-   It asks GitHub to merge `main` into the branch first, with the gh login:
+1. **Behind `main`.** The ruleset here requires branches to be up to date
+   (strict, see the top of this page), so every open pull request is behind
+   (`mergeable_state` `behind`) each time `main` moves. The loop handles it as
+   Nirmaan's loop does. It asks GitHub to merge `main` into the branch first, with the gh login:
    `PUT repos/<repo>/pulls/<n>/update-branch` with `expected_head_sha` set to
    the head it saw. This is the merge-commit update that
    `gh pr update-branch` makes, but GitHub refuses it if the head has moved.
    The loop does this before any review, also for a head that already
    finished (unless the review refused the pull request), and again after
-   both keys pass when `main` moved during the review. The new head is
-   reviewed from scratch. While GitHub
+   both keys pass when `main` moved during the review. The required CI runs
+   on the new head, and its review starts from scratch unless a passing
+   verdict carries (below). While GitHub
    is still making the merge commit (up to 10 minutes), the loop waits
    instead of asking again. If the update fails (a merge conflict with
    `main`, or GitHub refuses it), the loop stops with `needs-founder`. If
    someone pushed in between, the step is dropped without a label and the
    new head is reviewed. `--no-post` never updates a branch.
+
+   **Carrying a passing verdict across the update.** Without it, every move
+   of `main` restarted both keys and the Founder Proxy on content they had
+   already judged, so a founder-class pull request could wait through many
+   full reviews before one finished with `main` unchanged. The loop keeps the heads it asked
+   GitHub to merge `main` into (state `update_from`), and the review carries
+   a key's or the proxy's earlier verdict to the new head only when all of
+   these hold (`carry_basis` and `carry` in `scripts/pr_review.py`):
+   - **loop-merge**: every commit from the new head back to the reviewed head
+     is a merge the loop asked for: two parents, the first a head the loop
+     updated from, the second on `main`, committed by GitHub
+     (`noreply@github.com`, update-branch). An author's push, a fix round's
+     commit and the loop's own `levels.json` merge never carry.
+   - **same-diff**: the pull request's net diff against its merge base with
+     `main`, exactly as the reviewers get it, is byte-identical on both
+     heads. The whole diff text, not a patch-id: a patch-id ignores
+     whitespace and line numbers, and the reviewers' citations are lines of
+     that text.
+   - **main-delta**: the reviewed `main` is an ancestor of `main`, and the
+     files `main` changed since touch no file of the pull request and no
+     review-control file (`.github/`, `council/`, `.claude/`, `CLAUDE.md`,
+     `CODEOWNERS`, `scripts/pr_review.py`, `scripts/pr_loop.py`,
+     `scripts/review_map.py`, `scripts/loop_cloud.py`, this page; CONFIG
+     `carry`).
+   - **pass**: only a pass carries; a fail, `needs-founder` or deferral is
+     reviewed from scratch. Fix rounds are unchanged. Every key of a run
+     carries from one source: the nearest reviewed head below the new head,
+     and its newest review (the `main` of its newest cached verdict), so an
+     older pass never wins over a newer verdict.
+   - **upstream**: key 2 carries only when every key-1 result carried, and the
+     Founder Proxy only when key 2 did, so neither passes on results it never
+     judged.
+
+   CI is never carried: the review reaches a carry only once the required CI
+   is green on the new head. A carried verdict is posted on the new head with
+   a note naming the head and `main` it was reviewed on, and logged with
+   outcome `carried` (an earlier verdict looked at and not carried:
+   `carry-refused`, with the conditions that failed). `pr_review.py` run by
+   hand never carries.
 
    **The generated levels file.** `capability/levels.json` is generated
    (`scripts/capability_levels.py --write`) and many pull requests regenerate
@@ -349,7 +473,7 @@ requests labelled `hold` or `needs-founder` are skipped.
    per key and for the Founder Proxy on a founder-class pull request, seat
    files from `main`, comments and checks posted). A proxy `needs-founder`
    stops the loop (below).
-4. **Both keys (and the proxy) pass.** When the review App posts the checks, the loop reads the
+4. **Both keys (and the proxy) pass, or the records fast lane qualified.** When the review App posts the checks, the loop reads the
    repository's "Allow auto-merge" setting with the gh login (the
    `allow_auto_merge` field of `gh api repos/<repo>`). When it is on, the loop
    runs `gh pr merge --auto --merge --match-head-commit <head>`, so GitHub
@@ -475,9 +599,15 @@ writes no pause. The pause is read again before every model call, so a
 review or fix round already running when the other worker (or the Nirmaan
 loop) starts a pause makes no further call: its step ends `paused` and its
 cached verdicts carry over. Any other deferral still stops the loop, and so
-does a limit whose retry failed some other way.
+does a limit whose retry failed some other way. A limit any worker hits
+pauses all of them: no new step starts in that pass, and a step already
+running makes no further model call.
 
-**Two pull requests at once, every pull request each pass.** A model slot is
+**Three pull requests at once, every pull request each pass.** The width of
+three, with three model slots, is decision A1 of the
+[council record 2026-11-19 (parallel keys), addendum 2026-11-24](../council/records/2026-11-19-parallel-keys.md#addendum-2026-11-24-the-review-loop-at-three-pull-requests-at-once);
+its gates LW1 to LW5 hold it, and more than three workers or slots is a new
+question for the founder. A model slot is
 held only around each model call (step 1 of "How reviewers run"); the local
 checks run without one, so other reviews go on meanwhile. One pass at a time
 runs for this repository: the pass holds its own lock
@@ -485,13 +615,23 @@ runs for this repository: the pass holds its own lock
 that finds it held ends at once. Each pass takes one step on every open pull
 request, one the loop is fixing first, then by number, so a pull request
 waiting for CI, or one that just ran a review or a fix, never holds up the
-others. Up to `parallel_reviews` (2) steps run at once, in two workers of the
-one pass; each pull request is taken by one worker only, so no pull request is
-ever reviewed or fixed by two at once. The keys, the Founder Proxy and the
-fixer are the same in each. Every model call of either worker holds one of the
-two model slots shared with the Nirmaan loop, so at most two model calls run
-at once across both repositories; a worker that finds both held ends its step
-`busy` and its cached verdicts carry over. The check that the loop is `main`'s
+others. Up to `parallel_reviews` (3, `LOOP` in `scripts/pr_loop.py`) steps run
+at once, in that many workers of the one pass; each pull request is taken by
+one worker only, so no pull request, and no head, is ever reviewed or fixed by
+two at once. With `parallel_reviews` 1 the pass steps one pull request at a
+time. The keys, the Founder Proxy, the fixer and its rounds, the records fast
+lane, the merge path and every stop rule are the same in each, and a stop
+labels only its own pull request. Each pull request's state file is written
+by its own worker only, and every write of it, and of the pause file, is a
+whole file renamed into place, so no reader sees half of one. Every model call
+of a worker holds one of the `model_cap` (3, `CONFIG` in
+`scripts/pr_review.py`) model slots, one for each worker. Three
+holds where this loop has its own slots (GitHub Actions, today's setup). On a
+machine where the Nirmaan loop shares the state folder the shared cap is 2 (the
+Nirmaan record named in step 1 of "How reviewers run"), so this loop's
+`model_cap` must be 2 there; a
+worker that finds every slot held ends its step `busy` and its cached
+verdicts carry over. The check that the loop is `main`'s
 copy runs once, before each pass, so no new step starts once `main` may have
 moved: after the pass's own auto-merge (GitHub may merge at once), after a
 rate-limit pause, and when `main`'s sha on origin, read before each step,
@@ -587,7 +727,8 @@ Proxy verdict is `needs-founder` without the founder's own GitHub review
 approving its head, never changes the review configuration, the council or workflows, never pushes
 over someone else's push, never runs on a fork or another author's pull
 request, never turns auto-merge on for the repository, and never treats a
-deferred review as a pass. A fix the loop pushed is agent work like any other:
+deferred review as a pass. It merges with no key only a pull request the
+review found in the records fast lane, every condition met on its head. A fix the loop pushed is agent work like any other:
 both keys review it again.
 
 ## Running the loop in GitHub Actions
@@ -791,8 +932,10 @@ second writer for one folder; the run then stops and says so, and nothing is
 overwritten. `pull` refuses a folder with no `writer.json`, so an unseeded
 loop never starts from empty state and reviews everything again.
 
-**Differences from the Mac.** The two model slots are files in a state
-folder, so once the loops run on two machines each has its own two. Until
+**Differences from the Mac.** The model slots are files in a state
+folder, so once the loops run on two machines each has its own (this loop
+three, the Nirmaan loop two); only a shared state folder is capped at 2 across
+both. Until
 the Nirmaan loop also reads and writes the state repository, it does not see
 this loop's pause, nor this loop the Nirmaan loop's: each pauses at its own
 first limited call. Call lines from before the switch stay in the Mac's

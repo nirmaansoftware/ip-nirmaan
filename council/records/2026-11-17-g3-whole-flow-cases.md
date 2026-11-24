@@ -1513,3 +1513,1550 @@ run as the seat account before the timer's slot 1, and the input screen is
 repaired, under its gates ET1 to ET8; gate ET9 returns the register block
 flow's Verilator model builds to security before slot 21. It changes nothing
 else here.
+
+## Fifth addendum (2026-11-23): a trial whose flow stops before its last stage
+
+This addendum settles, before the timer's slot 1, which group a whole-flow
+trial belongs to when its flow stops before its last stage, what is checked
+on such a trial's record, and whether the measured run of the plan's
+section 10 stands. It amends "The group key" in decision 1 and adds gates
+WF27 to WF30. It is a decision made on 2026-11-23.
+
+Ruling, in short:
+
+- **Decision 3 rules.** A trial whose intermediate stage does not complete
+  "is a failed trial that stays in its group's count". The code that reads
+  the records does not do that today: it keys a group on the trial's own
+  flow digest, and a stopped trial's digest covers only the stages it
+  seated. The read's code is changed, before slot 1, so that a stopped
+  trial is counted in its arm's group (decision F2; gate WF27).
+- **The flow code, the records and the fingerprints do not change.** No
+  file in `harness.CODE` or `FLOW_CODE` is touched, a trial's recorded flow
+  digest is never rewritten, and no pinned value of the plan moves.
+- **The plan states each stage's values.** A dated addition gives, for each
+  arm, every stage's skills and skill digests and the digest over the first
+  n stages, and the check made on a slot's record is stated there, stage by
+  stage, no weaker than the comparison of the whole digest (decision F3;
+  gates WF28 and WF29).
+- **The measured run stands** as the run of the plan's section 10 and as
+  the run gate ET10 reads. No second run is owed (decision F1).
+
+It changes no code, case, eval record, level, fingerprint or digest by
+itself. It makes one stated exception to a rule another record set:
+decision F1, item 5 narrows decision C of the EDA tools record's addendum,
+which gate ET13 holds, for the sentences named there and no others. It
+loosens no other gate. No trial ran and no workflow was dispatched for the
+meeting.
+
+### Who decided what
+
+The council decided every item below. The orchestrator called the meeting
+because the plan (`evals/plans/2026-11-22-g3-whole-flow.md`, section 1)
+leaves a change to a fixed item to a council ruling, and the group rule is
+this record's. It is not a founder decision, and the founder can overrule
+it. No seat found anything reserved for the founder in it: it adds no
+spending, contract, counsel, sending, public name or licence term. The pull
+request that changes `src/nirmaan/evals/levels.py` is in a founder class by
+path (gate semantics, `.github/review-teams.yml`) and goes to the Founder
+Proxy (agent) by the usual rule.
+
+Four seats gave round 1 positions independently, each as its own read-only
+process that saw no other answer to the brief: verification-lead (the plan,
+the counts, the group rule and the read), ai-engineer (the harness and the
+fingerprint), qa-evidence (the claims) and eda-tooling (the runner, the
+record and CI). The chair decided. Security was not seated: no seat found a
+reach or gate question in the brief, and the chain of gate ET10
+(`council/records/2026-11-22-eda-tools-seat-account.md`) stays security's
+as written. The seats read ip-nirmaan `main` at bbcf06a9 and the trial
+record of run 45196235508 as the run's `live-eval` and `rejudge` jobs
+uploaded it. That record is not committed at the time of this meeting. The
+seats had no shell. The chair recomputed the digests below on bbcf06a9 with
+the repository's own functions on a read-only checkout; no design tool ran.
+
+A key is an agent review. Nothing here is a person's approval, a release,
+or a claim that a design is ready to be made in silicon.
+
+### Facts checked
+
+The chair checked each line at bbcf06a9 unless a seat is named.
+
+1. The words. Decision 1, "The group key": "Case digest, model, harness
+   fingerprint, CLI and flow digest. The flow digest is a hash over the
+   sorted list of (stage, skill, skill digest) for every skill each seated
+   stage was given, as it was given in that arm." Decision 3, "A failed
+   intermediate stage": "The flow stops. Later stages are recorded as not
+   run, the final checks as not run, and the trial is a failed trial that
+   stays in its group's count." For a trial that stops early the two
+   cannot both hold as the code reads them (qa-evidence, eda-tooling).
+2. The flow code follows decision 1 to the letter. `run_flow` adds a
+   stage's skills to the digest's input only when it seats that stage
+   (`src/nirmaan/evals/flow.py:187-189`); a stage after a stop is recorded
+   "not run" with no skills (`flow.py:178-181`); the trial's digest is over
+   what was given (`flow.py:255`, the function at `flow.py:146-149`). So a
+   stopped trial's flow digest covers the stages up to and including the
+   one that did not complete.
+3. The read's code keys on that digest. `_whole_flow_groups`
+   (`src/nirmaan/evals/levels.py:201-232`) groups by case, case digest,
+   model, harness fingerprint, CLI, the trial's `flow_digest` and purpose
+   (`levels.py:212-213`), and writes a count only from ten trials
+   (`WHOLE_FLOW_MIN`, `levels.py:82`). So a stopped trial forms a group of
+   its own, its arm's group stays under ten, and no count is written for
+   the arm. Membership would depend on how far a trial got, and the trials
+   left out would all be failed ones (verification-lead, inference).
+4. The measured run. Run 45196235508 was dispatched from `main` at
+   bbcf06a9 with purpose `calibration`, with documents. Its trial record
+   carries the plan's case digest, the plan's with-documents whole-flow
+   fingerprint (`sha256:d90b3c18...`) and the plan's CLI pin; both jobs
+   ended with success, and the trial file the `rejudge` job uploaded
+   equals the one the `live-eval` job uploaded, field by field. Its flow
+   stopped before its last stage: three of its four stages were seated
+   and the last is recorded "not run". The stop is the one decision 3
+   describes, an intermediate stage that did not complete. It is not the stop rule of gate WF8: that rule
+   (`flow_stopped`, `src/nirmaan/evals/records.py:213-217`) reads a last
+   answer with no text and an error, and it is false for this record.
+5. The digests. The record's flow digest is
+   `sha256:4ff378d26fdeb8f6daab2aaebfbe8395e44ec663e0ad7f7d7eaf1a155b971315`.
+   The plan's with-documents flow digest (section 23.1) is
+   `sha256:a1aea0d36022a54be56c8d5c31831ea8ac0994f2802bd8ee8f39f6a5246ec312`.
+   Recomputed on bbcf06a9 with the steps `run_flow` takes to assemble each
+   stage's skills, without running a stage: the timer with documents gives
+   the plan's value over four stages and the record's value over the first
+   three, and each of the record's three seated stages records the same
+   skills and skill digests. No pinned value differs.
+6. A digest over the first stages does not name an arm or a case. In the
+   same recomputation the digests over the first one and the first two
+   stages are equal in the timer's two arms, and the digests over the first
+   three stages of the register block equal the timer's in each arm. The
+   harness fingerprint differs by arm and the case digest by case.
+7. What is in a fingerprint or a pinned group. `harness.CODE` is twelve
+   files (`src/nirmaan/runtime/harness.py:280-293`) and `FLOW_CODE` is
+   `nirmaan/evals/flow.py` (`harness.py:271`). `src/nirmaan/evals/levels.py`,
+   `src/nirmaan/evals/records.py` and `src/nirmaan/models/evaluation.py`
+   are in neither, and in none of the seven groups of the plan's section
+   23.1 (ai-engineer; the chair read the lists). A change to `flow.py`
+   moves both whole-flow fingerprints, on one of which the measured run
+   ran.
+8. What a record holds. Each seated stage records its skills and their
+   digests (`EvalStage.skills`, `src/nirmaan/models/evaluation.py:251-252`),
+   so a record can be checked stage by stage. The plan states the two
+   whole-flow digests and no per-stage value.
+9. The check that stopped. The script that dispatches the slots is outside
+   the repository. Its operator reports that it compares a record's flow
+   digest with the plan's whole-flow value and stopped on the measured
+   run's record for that reason. `scripts/live_eval_ci.py` holds no flow
+   digest check (eda-tooling). The plan's section 8 names "record mismatch"
+   among the job-level stops and says that a record that exists "is a trial
+   and is committed as it is".
+10. Tests today. `tests/test_capability_levels.py:502-506` shows two flow
+    digests as two groups. No test states the group of a stopped trial.
+11. The plan's words. Section 18.1 says the flow digests are computed "as a
+    replay computes them before any stage runs". The code assembles a
+    stage's skills when it seats the stage (fact 2), so those words fit
+    only a flow that runs to its last stage (qa-evidence).
+
+### Decisions
+
+#### F1. The measured run stands
+
+1. Run 45196235508 is the measured run of the plan's section 10 and the
+   run gate ET10 is read on. It ran on the commit, case digest, fingerprint
+   and CLI the plan states. Its reach records are the ones gate ET10 is
+   read on; that chain is committed and read as the EDA tools record
+   already rules, and this addendum does not state that gate met. Decision
+   A3 of that record reads "one run" as one run that passed its gates, and
+   no seat found a gate of this run that failed.
+2. No second measured run is owed. The difference between the record's
+   flow digest and the plan's is fully explained by fact 5 and no pinned
+   value moved, so it is not a mismatch between what ran and what the plan
+   states. A second run made because this one stopped early would be a run
+   chosen by its outcome (verification-lead).
+3. What the run measured is less than a flow that seats every stage. The
+   plan's dated addition (decision F3) says, in these words and no more,
+   that the measured run's flow stopped before its last stage, that its
+   flow digest covers the stages it seated, and that what it measured of a
+   record's size is therefore a lower bound; the plan's rule for a record
+   over the review's size limit (its section 20.2) stands.
+4. The record of the measured run is treated as the plan and the EDA tools
+   record already rule; this addendum changes nothing about where or
+   whether it is committed. It belongs to no group of the forty and is
+   never counted.
+5. An exception to decision C of the EDA tools record's addendum, which
+   forbids stating "anything of its trial's outcome, stages or attempts".
+   It has two parts, and neither reaches further.
+   - The plan's dated addition and the pull requests that carry it may
+     state the two things of item 3: that the flow stopped before its
+     last stage, and that its flow digest covers the stages it seated.
+   - This addendum alone also states, in its facts 4 and 5 and nowhere
+     else, how many of the run's stages were seated, that the stop is the
+     one decision 3 describes and not the stop rule of gate WF8, and the
+     record's flow digest beside the plan's. The ruling rests on these and
+     cannot be checked without them. No other text repeats them; a text
+     that needs them cites this addendum.
+   Nothing else of the run's stages is stated anywhere, here included:
+   not which stage, not why the flow stopped, not what a stage answered,
+   no attempt count. Decision C stands in every other respect, and
+   qa-evidence's read under gate ET13 is made against it as narrowed here.
+   (Corrected 2026-11-23 by the chair, after the meeting, on the review
+   of the pull request that carried this addendum. As first merged, the
+   item allowed "the two things of item 3" to this addendum too, while
+   facts 4 and 5 already stated the further facts named above. The
+   correction makes the item say what the addendum states; it adds no
+   statement about the run. No seat was asked again, and eda-tooling's
+   dissent below, that no text should say anything of the run's stages,
+   stands against the item as corrected.)
+6. How the private script's row for the run is marked is its operator's,
+   under this decision: the run stands, and it is not a job-level stop to
+   be dispatched again.
+
+All four seats held that the run stands. Owner: verification-lead (the plan's
+words); security keeps gate ET10; qa-evidence reads the texts (gate ET13).
+
+#### F2. A stopped trial is counted in its arm's group
+
+1. **The reading.** Where decision 1's group key and decision 3 differ for
+   a trial that stops early, decision 3 rules: the trial is a failed trial
+   of the group its flow belongs to. "The group key" in decision 1 now
+   ends: a trial whose flow stops before its last stage is placed by the
+   stages it seated (fifth addendum, decision F2), and its own flow digest
+   is listed with it.
+2. **Where the fix is.** In the code that reads the records,
+   `_whole_flow_groups` in `src/nirmaan/evals/levels.py`, and nowhere
+   else. `flow.py` is not changed: the record keeps saying what each
+   seated stage was given, and a stage that was not seated was given
+   nothing. A record's flow digest is never rewritten or added to.
+3. **The rule.** Within one set of case, case digest, model, harness
+   fingerprint, CLI and purpose:
+   - Trials are placed in the order of how many stages they seated, most
+     first.
+   - A trial fits a group when its stage names and their order equal the
+     group's and every stage the trial seated records exactly the skills
+     and skill digests the group holds for that stage. A group holds the
+     stage values of the first trial placed in it.
+   - A trial that fits no group starts one. A trial that fits one group
+     joins it. A trial that fits more than one is listed apart as
+     unplaced, with the groups it fits named; none of those groups is
+     given a count, and the question returns to the council.
+   For trials that seat every stage this is today's grouping by flow
+   digest, and a test shows it. A group in which no trial seated every
+   stage is still a group, and its count is written from ten trials like
+   any other.
+4. **Counting.** A stopped trial is a failed trial: no judge ran on it,
+   and the existing rule already counts a trial no judge ran on as failed.
+   The minimum of ten, the Wilson interval and the rule against pooling
+   are unchanged.
+5. **The listing.** Each trial keeps its recorded `flow_digest` and gains
+   the stage at which the flow stopped, empty for a flow that reached its
+   last stage. A group shows the flow digest of the first trial placed in
+   it and whether that digest covers every stage. Where no trial of a
+   group seated every stage, the read cites the plan's whole-flow digest
+   for the arm from the plan's addition (decision F3).
+6. **At the read.** The read lists each stopped trial with the stage at
+   which it stopped. As decision 1, "Failures", already rules, a cause is
+   stated as fact only where that stage's own gate refused, and no
+   per-stage figure is stated as a skill rate.
+7. **When it merges.** Before the timer's slot 1. The rule that reads a
+   batch is never changed between a run and its read (ruling of
+   2026-11-15), so this is not left for later. No whole-flow trial that
+   counts has run.
+
+Who disagreed, and how the chair chose. No seat chose to leave the list as
+it is and count by hand at the read: the generated list would then never
+write the arm's count, and the read would rest on a step no test holds.
+No seat chose to change `flow.py`: it would move both whole-flow
+fingerprints, leave the measured run on a superseded fingerprint, reopen
+what gates ET5 and ET10 state on the pinned values, and make a record claim
+skills for a stage that was never seated. On the rule itself the seats
+differed. ai-engineer proposed to group by the six other fields alone and
+to write a count only where every trial's seated stages agree: a trial can
+then never fit two groups. verification-lead and eda-tooling proposed to
+place a stopped trial by its seated stages among groups keyed as today.
+The chair took the second: complete trials stay keyed by flow digest, as
+decision 1 and the existing test have it, and two complete flows on
+different cards are never listed as one group. From ai-engineer's position
+the chair took that the rule must work when no trial of an arm seats every
+stage. For a trial that fits two groups, verification-lead asked that
+neither group be given a count and eda-tooling that it return to the
+council; the chair took both. Under the freeze of the fourth addendum
+(decision 2, item 4) this cannot arise inside a batch unless a card or a
+document changed, which the dispatch check stops.
+
+Owner: verification-lead (the rule and the list); ai-engineer confirms that
+the change moves no fingerprint and no pinned value; qa-evidence reads the
+tests.
+
+#### F3. The plan's per-stage values, and the check on a slot's record
+
+1. **The values.** A dated addition to the plan, merged before slot 1,
+   states for each arm of the timer: the stage names in order; each
+   stage's skills and their digests; and the digest over the first n
+   stages for every n, the last of which is the whole-flow digest of
+   section 23.1. They are computed on `main` by the steps `run_flow` takes
+   to assemble each stage's skills, and the addition names the command.
+   The check of the plan's section 7 before each dispatch covers them.
+2. **The words.** The same addition corrects section 18.1's sentence of
+   fact 11 and carries the words of decision F1, item 3.
+3. **The check on a slot's record.** Every comparison made today stays:
+   case, purpose, arm, flow label, harness variant, case digest,
+   fingerprint, CLI. In place of the one comparison of the flow digest
+   with the whole-flow value:
+   - the record's stage names and order equal the plan's;
+   - the seated stages come first and every later stage is "not run",
+     with no skills, attempts, model calls or gate runs; where a stage is
+     "not run", every stage before the last seated one is completed and
+     the last seated one is not;
+   - each seated stage's skills and digests equal the plan's for the arm,
+     exactly;
+   - the record's flow digest equals the digest recomputed from its own
+     seated stages by the definition (`flow.py:146-149`), and equals the
+     plan's digest over that number of stages.
+   For a flow that seats every stage this is the comparison made today
+   and more. For a stopped flow it checks every skill that was given; the
+   stages not seated were given nothing, and their values are pinned at
+   dispatch by section 7.
+4. **What a stop is.** A record that passes item 3 with a stage "not run"
+   is a failed trial of its slot. It is not a record mismatch and does not
+   stop the batch. The stop rule of gate WF8 and the other stops of the
+   plan's section 8 are unchanged, and a record that fails item 3 stops
+   the batch as today.
+5. **The script.** The dispatching script is outside the repository, so
+   the plan's addition states item 3 in words that a reader can check, and
+   the script's operator shows, before slot 1, that the script accepts the
+   measured run's record under item 3 and refuses a copy of it with a
+   stage's skill digest changed, with a stage's skills removed, with a
+   seated stage after a "not run" one, and with the flow digest changed.
+
+All four seats asked for the per-stage values and for this check; they
+differed only in wording. Owner: verification-lead (the plan's addition);
+eda-tooling (the script's check); qa-evidence reads the addition.
+
+#### F4. The other batches
+
+1. **The re-measure batch** (`evals/plans/2026-11-23-w2-remeasure.md`) is
+   single-seat. A single-seat trial has no stages and no flow digest, and
+   the change of decision F2 is inside `_whole_flow_groups`. No effect; a
+   test shows that the change leaves `capability/levels.json` as it is.
+2. **The register block.** Decisions F2 and F3 apply to slots 21 to 40 as
+   written. The plan addition the fourth addendum requires before slot 21
+   also states, for each arm, the five stages' values and the digest over
+   the first n stages. The first three stages' values equal the timer's
+   (fact 6); the case digest keeps the two cases apart, and a test shows
+   that a stopped trial of one case never joins a group of the other.
+
+#### F5. What may and may not be said
+
+May be said, at a case's read: that a trial's flow stopped before its last
+stage and at which stage; that it is a failed trial of its group; its own
+flow digest beside the group's.
+
+Never said, adding to decision 4 of the fourth addendum: a count from which
+stopped trials are left out, or a second count "of the flows that reached
+the last stage"; a stopped trial's digest as a group or an arm of its own;
+that a stage "fails" at some rate; a cause for a stop beyond what decision
+1, "Failures", allows; anything of the measured run beyond decision F1,
+items 3 and 5.
+
+Owner: qa-evidence.
+
+### Positions not adopted, and open
+
+- eda-tooling held that the measured run meets the plan's section 10 only
+  in part, because it gives a lower bound on a record's size, and that no
+  text should say anything of its stages. The chair ruled that it stands
+  and that the plan says the lower bound in so many words (decision F1,
+  items 3 and 5). Recorded as dissent on the wording.
+- ai-engineer's grouping by six fields alone: not taken, for the reason
+  given under decision F2.
+- A new field in the record that states the whole flow's digest, written
+  by code outside `flow.py`: named in the brief, chosen by no seat. It
+  would state in a record what the plan already pins.
+- Open, for verification-lead: qa-evidence raised, as an inference from the
+  measured run's record, a question about why its flow stopped. Under
+  decision F1, item 5 this record states nothing of it. It is in the
+  internal minutes. If it leads to a proposal that changes a file in
+  `harness.CODE` or `FLOW_CODE`, a tool definition, a card or a document
+  before slot 1, the pinned values move and the fourth addendum and the
+  EDA tools record say what is then owed; such a proposal returns to the
+  council.
+- Not checked from the repository: the dispatching script and its row for
+  the measured run are private (fact 9).
+
+### Gates
+
+Each is met before the timer's slot 1.
+
+| Gate | Condition | Owner seat |
+|---|---|---|
+| WF27 | `_whole_flow_groups` places a trial whose flow stopped early by the rule of decision F2, item 3, and lists it as item 5 says; tests show the cases of the build specification below; no file in `harness.CODE` or `FLOW_CODE` changes and no value of the plan's section 23.1 moves | verification-lead |
+| WF28 | The plan's dated addition states the timer's per-stage values and the digests over the first n stages for both arms, the check of decision F3, item 3, the corrected sentence of section 18.1 and the words of decision F1, item 3; a test shows the stated values give the stated digests | verification-lead |
+| WF29 | The dispatching script checks a slot's record as decision F3, items 3 and 4 say, shown as item 5 says, before slot 1 | eda-tooling |
+| WF30 | Every statement about a stopped trial follows decision F5, and every statement about the measured run follows decision F1, items 3 and 5 | qa-evidence |
+
+### Build specification, for the build lane
+
+This meeting wrote no code and no plan text.
+
+1. `src/nirmaan/evals/levels.py`, `_whole_flow_groups` only (gate WF27).
+   Tests, in `tests/test_capability_levels.py`, that fail on bbcf06a9 and
+   pass on the change:
+   - nine trials that seat every stage and one stopped at an intermediate
+     stage, same arm: one group, n of ten, the stopped trial failed and
+     listed with its own digest and its stopping stage;
+   - ten stopped trials whose seated stages agree: one group of ten with
+     a count;
+   - a stopped trial whose seated stage records a different skill digest
+     stays apart from the group;
+   - a trial stopped at the first or the second stage joins the group of
+     its own fingerprint and never the other arm's, although the digests
+     over those stages are equal;
+   - a stopped trial of another case, with equal values on the stages it
+     seated, never joins;
+   - a stopped trial that fits two groups is listed unplaced and neither
+     group has a count;
+   - two flow digests of complete trials are still two groups, and
+     `capability/levels.json` is unchanged by the change.
+2. The plan's dated addition (gate WF28), documents only, with a test that
+   reads the addition's table and rebuilds every stated digest with
+   `flow_digest`.
+3. The dispatching script's check (gate WF29), outside the repository.
+4. Nothing in `flow.py`, `records.py`, the record format, a case, a card,
+   a document or the workflow.
+
+### Open, for the founder
+
+Nothing.
+
+## Sixth addendum (2026-11-23): what a later stage is told of the pass-through
+
+This addendum takes up the item the fifth addendum left open for
+verification-lead, before the timer's slot 1 and before any proposal
+existed: whether what the whole-flow pass-through shows the seat of a later
+stage is a defect of the harness. It amends the note of decision 3,
+"Intermediate stages", amends decision F1 of the fifth addendum, and adds
+gates WF31 to WF35. It is a decision made on 2026-11-23.
+
+Ruling, in short:
+
+- **It is a defect of the harness, in how the pass-through is shown, not
+  in the note's truth.** A later stage's seat is shown the earlier stage's
+  output as `approved` beside a record that reads "Independent review by"
+  a named role and then "not reviewed", marked substantiated, and nothing
+  says the harness made that record by the evaluation's rule. The separate
+  actor that decision 3 asked for never reaches a seat (decision P1).
+- **The note's words change, in `flow.py` only, before slot 1.** The note
+  says of itself that no reviewer judged the stage and that the harness
+  recorded the review and approval by the evaluation's rule. It gives a
+  seat no instruction. No file in `harness.CODE`, no card, document, case
+  file, engine or constitution text changes (decision P2; gate WF31).
+- **Both whole-flow fingerprints move, and what rests on them is made
+  again.** A dated plan addition restates them; gate ET5 is open again by
+  its own words; a second measured run is owed on the new fingerprint, by
+  the answer of gate ET10's owner. Run 45196235508 is no longer the run of
+  the plan's section 10 for slot 1 (decision P3; gates WF32 and WF33).
+- **A trial that stops because a seat escalated at a stage with no check
+  is never labelled "model"** and feeds no curriculum change; its cause is
+  an inference and is worded as decision P4 says (gate WF34).
+
+It changes no code, case, eval record, plan text, level, fingerprint or
+digest by itself. It loosens no gate. No trial ran and no workflow was
+dispatched for the meeting.
+
+### Who decided what
+
+The council decided every item below. The orchestrator called the meeting
+because the fifth addendum says that a proposal that changes a file in
+`harness.CODE` or `FLOW_CODE`, a tool definition, a card or a document
+before slot 1 "returns to the council". It is not a founder decision, and
+the founder can overrule it. No seat found anything reserved for the
+founder in it: it adds no spending, contract, counsel, sending, public name
+or licence term. The pull request that changes `src/nirmaan/evals/flow.py`
+is in a founder class by path (`.github/review-teams.yml`) and goes to the
+Founder Proxy (agent) by the usual rule.
+
+Five seats gave round 1 positions independently, each as its own read-only
+process that saw no other answer to the brief: verification-lead (the plan,
+the counts, the read and the failure label), ai-engineer (the harness and
+the fingerprint), qa-evidence (the claims), eda-tooling (the runner, the
+record and CI) and design-architect (what a careful architect does with
+such an input). The chair decided. After round 1 the chair asked security,
+as the owner of gate ET10
+(`council/records/2026-11-22-eda-tools-seat-account.md`), for owner facts on
+that gate only; security gave no position on the agenda. The seats read
+ip-nirmaan `main` at 24278dce, whose `src/`, `evals/`, `knowledge/` and
+`tests/` equal those of bbcf06a9. The seats had no shell. The chair ran a
+replay of the timer's reference answer, with no model, on a read-only
+checkout and read the prompt each stage is sent; no design tool ran beyond
+that replay's own checks.
+
+The seats also read the uploaded record of the measured run
+(run 45196235508) and the prompts rebuilt from it. Under decision C of the
+EDA tools record's addendum, as the fifth addendum's decision F1, item 5
+narrows it, this addendum states nothing of that run's stages, answers or
+attempts, and nothing of why its flow stopped. What the seats found there
+is in the internal minutes. Every fact below is a fact of the code or of a
+replay with no model, and the ruling can be checked from them alone.
+
+A key is an agent review. Nothing here is a person's approval, a release,
+or a claim that a design is ready to be made in silicon.
+
+### Facts checked
+
+The chair checked each line at 24278dce unless a seat is named.
+
+1. The pass-through. After a stage reaches review, the harness reviews it
+   with an approve verdict and approves it, as the stage's reviewer role
+   and approver role, under the actor name `eval-flow-passthrough`, with
+   one of two notes (`src/nirmaan/evals/flow.py:48-49`, `198-208`):
+   "Whole-flow evaluation: not reviewed. Before-review checks passed:
+   {runs}." or "Whole-flow evaluation: not reviewed. This stage has no
+   before-review check: submitted, not checked." These are decision 3's
+   words.
+2. How the engine stores it. A review that approves becomes an evidence
+   record whose description is "Independent review by" the actor's role, a
+   colon, and the note, marked substantiated
+   (`src/nirmaan/work/engine.py:432-437`). The actor's name is stored in
+   another field of that record (`engine.py:436`), and the view a prompt is
+   built from does not carry that field
+   (`src/nirmaan/runtime/context.py:317-322`; qa-evidence). So the
+   separate actor of decision 3 is in the record and never in a prompt.
+3. What the next seat is sent. Each upstream output is rendered as
+   `Upstream artifact ... (<kind>, approved)`
+   (`src/nirmaan/runtime/prompt.py:259`) and listed for citation as
+   `(approved)` (`prompt.py:139-141`). The review is rendered as
+   `Evidence ... review_record, substantiated: Independent review by
+   <role>: Whole-flow evaluation: not reviewed. ...`
+   (`prompt.py:265-268`). The replay of the timer's reference answer shows
+   these lines in the prompt of the second, third and fourth stage, in both
+   arms; the fourth stage is sent two such records.
+4. What else the same prompt says. The constitution, with "P6 Independent
+   review: Critical work requires independent review; nobody approves their
+   own work." and "P7 Conflicts escalate: Conflicting outputs require
+   escalation before approval." (`prompt.py:87-90`,
+   `src/nirmaan/company/governance.py:123-126`). The system prompt: "Never
+   claim that a tool ran, or that anything was verified or approved" and
+   "If the evidence does not support a conclusion, escalate instead of
+   guessing." (`src/nirmaan/runtime/harness.py:92-106`). Nothing in a
+   stage's prompt says what "Whole-flow evaluation" is or who made the
+   approval.
+5. What an escalation does. A seat that escalates leaves its task in a
+   status that is not a reviewed one (`src/nirmaan/evals/runner.py:61`);
+   the flow stops (`flow.py:199`, `223-224`) and, by decision 3, the trial
+   is a failed trial of its group. The three specification stages have no
+   check, so by decision 1, "Failures", a cause placed there is an
+   inference.
+6. The single-seat comparison. There the upstream stages are fixed by the
+   fixture, whose review note gives its reason: "Evaluation fixture:
+   <files>, as reviewed in the repository, not here."
+   (`src/nirmaan/evals/runner.py:163-165`).
+7. What a change moves. `flow.py` is `FLOW_CODE`
+   (`src/nirmaan/runtime/harness.py:271`): an edit moves both whole-flow
+   fingerprints and neither single-seat default (the test of gate WF7,
+   `tests/test_whole_flow_dispatch.py`). The flow digests cover skills
+   only (`flow.py:146-149`) and do not move; `flow.py` is in none of the
+   seven groups of the plan's section 23.1. `prompt.py`, `context.py` and
+   `evals/runner.py` are `harness.CODE` (`harness.py:280-293`): an edit
+   moves the single-seat defaults, on which every single-seat group and
+   the re-measure batch rest. A card or a knowledge document moves its
+   skill's digest; a case file moves the case digest.
+8. Text outside every fingerprint. `src/nirmaan/work/engine.py` (the words
+   "Independent review by") and `src/nirmaan/company/governance.py` (the
+   constitution) are in neither list and in no pinned group, and their
+   text reaches every seat's prompt, single-seat included. An edit there
+   would change prompts with no fingerprint moving (ai-engineer,
+   qa-evidence, eda-tooling).
+9. What holds the note today. `tests/test_whole_flow_runner.py:85-86`
+   asks that every stage's note starts "Whole-flow evaluation: not
+   reviewed." and line 92 that a stage with no check carries
+   `NOTE_UNCHECKED`; `docs/whole_flow/09-runner-flow-module.md` quotes
+   both notes. No committed record under `evals/` quotes them.
+10. What rests on the whole-flow fingerprints. The plan's section 7: a
+    slot is dispatched only on the stated values, and "a difference stops
+    the dispatch until a plan amendment pull request is merged". Decision
+    E4, item 4 of the EDA tools record: verification-lead's statement of
+    gate ET5 "holds only while the values of the plan's tables on the
+    commit the measured run is dispatched from equal those on the run's
+    commit". Gate ET10: the measured run's reach records, with "the values
+    of the plan's section 18.1 on that commit equal to those on slot 1's
+    commit"; section 18.1 and the tables that replace it list both
+    whole-flow fingerprints. The fifth addendum's decision F1, item 2
+    ruled no second measured run owed because "no pinned value moved". The
+    freeze of `FLOW_CODE` (fourth addendum, decision 2, item 4) starts at
+    slot 1, and no slot has run.
+11. Security, as owner of gate ET10, on a change to the note's words
+    alone: the gate cannot be met on run 45196235508 as it is worded, and
+    a run on the new commit is owed, which is a second measured run unless
+    the gate is reworded; the reach of the tools as the seat account does
+    not depend on the note (the note is written by the harness's own actor
+    after a stage has run, and neither the reach test nor the seat account
+    script reads `flow.py`), so there is no reach reason for or against
+    the change; gates ET11, ET15, ET17, WF17 and WF23 do not depend on a
+    fingerprint value.
+
+### Decisions
+
+#### P1. It is a defect of the harness
+
+1. What a later stage's seat is shown contradicts itself, and the harness
+   wrote every part of the contradiction: the label `approved`, the words
+   "Independent review by" a role in which nobody reviewed anything, the
+   mark "substantiated", and "not reviewed" in the same line (facts 1 to
+   3). The note is true. The line it is set in is not, and decision 3's
+   own safeguard, the separate actor, is not shown (fact 2).
+2. The same prompt tells the seat that conflicting outputs are escalated
+   and that it escalates where the evidence does not support a conclusion
+   (fact 4). A seat that stops on this input follows the rules it is
+   given. Decision 3 chose the pass-through over a model reviewer because
+   "a second model seat adds variance that one verdict cannot separate";
+   as it is shown, the pass-through adds a cause of its own that a count
+   cannot separate from the seats' work either (verification-lead,
+   inference).
+3. This is so at every later stage of every trial, in both arms and in
+   both cases (fact 3). It is a fact of the code and does not rest on any
+   run. How often a seat would stop on it is not known and this addendum
+   states no rate.
+4. What is not the harness's: what an earlier seat writes in its own file
+   about the state of its own work. That is the seat's text. No ruling
+   here touches it.
+
+Four seats held this (verification-lead, ai-engineer, qa-evidence,
+design-architect). eda-tooling held that the note is true and that a
+seat's choice on it is behaviour to measure, "with one confound the
+harness itself adds", the line of fact 2. Owner of the finding:
+ai-engineer.
+
+#### P2. The note's words change, in `flow.py` only, before slot 1
+
+1. **Before slot 1.** After slot 1 the flow code is frozen, and a trial is
+   never run again. Twenty trials, then twenty more, would each put the
+   line of P1 to three or four seats, and a read could then claim only a
+   count "under the note as shown". The cost of the change now is what
+   decision P3 lists, and none of it is a counted trial.
+2. **Where.** The two note constants of `src/nirmaan/evals/flow.py`, and
+   that module's own description of them. Nothing else:
+   - not `prompt.py`, `context.py` or `evals/runner.py`: the single-seat
+     defaults must stay (fact 7);
+   - not `engine.py` or `governance.py`: a change to what seats are sent
+     with no fingerprint moving is a hidden harness change (fact 8);
+   - not a card, a knowledge document or the system prompt: each moves
+     digests the finding gives no reason to move, and tells every seat
+     something;
+   - not a case file: a customer's document does not speak for the
+     evaluation.
+3. **The words.** Each note keeps its first sentence and its last, and
+   gains one sentence between them:
+   - "Whole-flow evaluation: not reviewed. No reviewer judged this stage:
+     the evaluation harness recorded this review and approval itself, by
+     the evaluation's rule, so that later stages receive it as input;
+     'approved' here records that rule, not a judgement. Before-review
+     checks passed: {runs}."
+   - "Whole-flow evaluation: not reviewed. No reviewer judged this stage:
+     the evaluation harness recorded this review and approval itself, by
+     the evaluation's rule, so that later stages receive it as input;
+     'approved' here records that rule, not a judgement. This stage has no
+     before-review check: submitted, not checked."
+   The added sentence is qa-evidence's, taken as written. Every seat that
+   chose a change offered a sentence of this kind.
+4. **What the note does not say.** It gives a seat no instruction: not to
+   proceed, not that there is no conflict, not what to assume. It states
+   who made the record and by what rule, which is what a seat in an
+   organization would be told of a stage passed on without review.
+   Whether a seat then proceeds or escalates stays the seat's, and stays
+   measured.
+5. **Decision 3, amended.** "Intermediate stages" now reads, after "The
+   note says the stage's output was not reviewed": "says that no reviewer
+   judged it and that the harness recorded the review and approval by the
+   evaluation's rule (sixth addendum, decision P2)". The rest stands: a
+   true note, the separate actor, and the words "reviewed in the
+   repository" never used for a model's output.
+6. **What is left, and said.** The words "Independent review by" and the
+   mark "substantiated" still stand before the note, because they are the
+   engine's and the prompt's (fact 2), and those are not changed. The note
+   now answers them in the same line. An earlier seat's own words about
+   its own work are untouched (P1, item 4). A seat may still stop on what
+   it is shown; decision P4 says how such a trial is worded.
+
+Who disagreed. eda-tooling chose no change to code before slot 1: a dated
+plan addition that states what the seats are shown and a replay test of
+those lines, for the reasons that every other course moves a pinned value
+and reopens gates ET5 and ET10, that the changed note does not remove what
+an earlier seat writes in its own file, and that one run is not a rate.
+The chair did not take it: the line is the harness's own, it is put to
+every later stage of forty trials that cannot be run again, and what it
+costs to change is owed once, before any counted trial. eda-tooling's
+condition for the case that the note changes, that it does not tell a seat
+to proceed, is adopted (item 4). Recorded as dissent.
+
+On the words. ai-engineer asked for a last sentence, "The next stage works
+from it as it is."; design-architect for "Later stages proceed on it as an
+unreviewed input and state what they assume of it."; verification-lead for
+"The approval and this record are not a conflict between outputs; a
+conflict in the files' content is still yours to raise." None is taken:
+each tells a seat what to do or how to read its own rules, which
+qa-evidence and eda-tooling refused, and the count would then measure the
+instruction. ai-engineer's and design-architect's point, that a seat in an
+organization is told when work is passed on at risk, is met by the
+sentence adopted, which says so as a fact.
+
+Owners: eda-tooling (the change and its tests); ai-engineer (the
+fingerprints, gate WF7); qa-evidence reads the texts.
+
+#### P3. What is owed because both whole-flow fingerprints move
+
+1. **The plan.** A dated addition restates both whole-flow fingerprints,
+   recomputed on the merge commit of the change, with the pull request
+   that moved them, and shows the two single-seat defaults, both flow
+   digests, the case digest and the seven group digests unchanged (the
+   plan's section 7). (Amended 2026-11-23 by the seventh addendum, decision
+   T3, item 9: the values are recomputed on a commit that holds this change
+   and the workflow change of that addendum; the digest of the group
+   "Workflow, tool set and CLI pin" is moved by that change and named with
+   its pull request, and the other six group digests are shown unchanged.)
+   It replaces the two fingerprint rows of section 23.1
+   for every later check. It also states, with `path:line`, the lines a
+   later stage is sent (facts 1 to 4, with the new note) and the words of
+   decision P4. Owner: verification-lead; ai-engineer recomputes.
+2. **Gate ET5.** By decision E4, item 4 of the EDA tools record,
+   verification-lead's statement no longer holds once a value of the
+   plan's tables moves. That record's procedure applies again as written:
+   a replay of `flow/axil-timer` with `controls`, with no model and no
+   token, on a commit that holds the change; its record committed beside
+   the earlier ones with its test; verification-lead's statement on that
+   pull request's head. This addendum does not reword gate ET5 or decision
+   E4.
+3. **A second measured run.** By the answer of gate ET10's owner
+   (fact 11), a measured run on the new fingerprint is owed: the run of
+   the plan's section 10, made as that section says, with documents, after
+   the change, the plan addition and the record of item 2 are on `main`,
+   and with every pinned value recomputed on its commit. Gate ET10 is not
+   reworded; it is read on the second run. Gates ET11, ET15, ET17, WF17
+   and WF23 are not affected.
+4. **Decision F1 of the fifth addendum, amended.** Items 1 and 2 ruled
+   that run 45196235508 is the measured run and that no second run is
+   owed, on the ground that no pinned value had moved. A pinned value now
+   moves, by this council's ruling, on a defect that is a fact of the code
+   (decision P1, item 3). From the merge
+   of the change, "the measured run" in the plan, in gate ET10 and in
+   decision F1, items 3 to 6 means the second run. Item 5's first
+   exception covers it in the same words and no others.
+5. **Run 45196235508.** It is a run that was made and it is not hidden.
+   Its reach records are committed as uploaded, as records only, in the
+   layout of decision R2 of the EDA tools record's second addendum, under
+   `tool_reach_measured_run_superseded_45196235508` (the index and the
+   folder), and are never read as the gate ET10 file (security; the
+   precedents are decision E4, item 6 and decision R2, item 5 of that
+   record). Its trial record is treated as decision F1, item 4 says. What
+   it measured of a record's size may still be used to pack records; no
+   figure from it is stated. The sentences decision F1, item 3 allows are
+   still the only ones said of it.
+6. **The second run's outcome changes nothing by itself.** This is ruled
+   before it runs. Whether its flow seats every stage or stops, it stands
+   as the measured run if its gates hold, slot 1 is not held for it, and
+   the note is not changed again on its account. It is one run, outside
+   the forty, never counted and never stated as a result. A further
+   proposal to change a fingerprint file returns to the council, and after
+   slot 1 only by a ruling that records that results were known.
+7. **Gates WF27 to WF29 of the fifth addendum** touch no fingerprint file
+   and state no fingerprint value. They stand. The plan addition of gate
+   WF28 and the one of item 1 may be one addition or two.
+
+All five seats and security agreed on what a moved fingerprint owes;
+eda-tooling's dissent is on moving it (P2). Owners: verification-lead (the
+plan, gate ET5's statement); eda-tooling (the replay record and the
+dispatch); security keeps gate ET10.
+
+#### P4. A trial that stops because a seat escalated
+
+1. Decision 1, "Failures", stands: a failed trial records the first stage
+   that did not complete, and at a stage with no check a cause is an
+   inference and is labelled so.
+2. A whole-flow trial whose flow stops because a seat escalated at a stage
+   with no check is never labelled "model". The failure-to-curriculum rule
+   does not apply to it: a document that taught seats to go on past an
+   approval nobody made would teach the opposite of the organization's
+   own rules (verification-lead). All five seats held this.
+3. The read's words for such a trial: "stopped at <stage>: the seat
+   escalated; cause not established (an inference where one is given)".
+   Where the escalation's own text names the state of its upstream inputs,
+   the read may add "on the status of its upstream inputs under the
+   pass-through", marked as an inference. It never says the trial shows a
+   gap in a skill, and no per-stage figure is stated (decision 1).
+4. This holds with the changed note as it would have held without it. The
+   trial is still a failed trial of its group, counted as the fifth
+   addendum's decision F2 says.
+
+Owner: verification-lead (the read); qa-evidence reads every statement.
+
+#### P5. Text that reaches a prompt outside every fingerprint
+
+1. Fact 8 is a gap in what the fingerprint covers. It is not closed before
+   slot 1: closing it changes `harness.CODE` or the fingerprint's own
+   make-up and restarts every group.
+2. Until it is closed, the freeze inside a batch (fourth addendum,
+   decision 2, item 4; the plan's section 7) also names
+   `src/nirmaan/work/engine.py` and `src/nirmaan/company/governance.py`:
+   nothing merges that changes either between a case's first slot and its
+   last planned trial. The plan addition of P3, item 1 says so. This adds
+   a condition and loosens none.
+3. ai-engineer lists every file whose text reaches a seat's prompt and is
+   in no fingerprint, and proposes how the fingerprint covers them, with
+   the next change that restarts every group for another reason, and not
+   inside a batch.
+
+Raised by ai-engineer, qa-evidence and eda-tooling; the freeze words are
+verification-lead's. Owner: ai-engineer.
+
+#### P6. What may and may not be said
+
+1. Any text may state facts 1 to 11 and this ruling, and that a replay of
+   the reference answer with no model shows the lines a later stage is
+   sent.
+2. No text, this one included, states which stage of run 45196235508
+   stopped, why its flow stopped, what a seat answered, whether a seat
+   escalated or went on, or any count of either. Decision C stands as the
+   fifth addendum narrowed it, for that run and for the second measured
+   run.
+3. The change of P2 is described as what it is: the pass-through now says
+   who made the record. It is never described as a fix shown to work. No
+   replay can show how a model reads the new words (ai-engineer), and one
+   run is not a rate.
+4. The timer's read says that the note's words were changed before slot 1
+   by this addendum, and what a later stage is sent.
+
+Owner: qa-evidence (gate WF34, and gates WF30 and ET13 as they stand).
+
+### Positions not adopted, and open
+
+- eda-tooling: no code change before slot 1. Not adopted (decision P2).
+  Recorded as dissent.
+- ai-engineer, design-architect, verification-lead: a further sentence in
+  the note that tells the next stage how to go on. Not adopted
+  (decision P2, "On the words").
+- verification-lead, ai-engineer and qa-evidence offered labels that name
+  the harness as the cause of such a stop ("harness (inference)", "harness
+  condition (inference)"). Not taken as the read's words: once the note is
+  changed, a stop of this kind has no established cause, and decision P4
+  says only that.
+- design-architect held that no item is in a founder class. The change to
+  `flow.py` is in one by path; the review's map decides, not this record.
+- Open, for ai-engineer: decision P5, item 3.
+- Not known: how often a seat stops on the note, before or after the
+  change. This addendum states no rate and rests on none.
+
+### Gates
+
+Gates WF31 to WF34 are met before the timer's slot 1.
+
+| Gate | Condition | Owner seat |
+|---|---|---|
+| WF31 | The two notes of `src/nirmaan/evals/flow.py` carry the words of decision P2, item 3; no other file in `harness.CODE` or `FLOW_CODE`, no engine or constitution text, no card, document, case file or tool definition changes; tests show the cases of the build specification below; the test of gate WF7 shows both single-seat defaults unchanged | eda-tooling |
+| WF32 | A dated plan addition restates both whole-flow fingerprints on the merge commit of gate WF31's change and shows every other pinned value unchanged, states what a later stage is sent, the words of decision P4 and the freeze words of decision P5, item 2. Amended 2026-11-23 by the seventh addendum, decision T3, item 9: on a commit that holds gate WF31's change and that addendum's workflow change, with the digest of the group "Workflow, tool set and CLI pin" moved by the latter and named with its pull request | verification-lead |
+| WF33 | Gate ET5 is stated again on a new replay record, and a second measured run is made on the new fingerprint, as decision P3, items 2 to 6 say; the reach records of run 45196235508 are committed as records only under the name of item 5; slot 1 is not dispatched before the chain of gate ET10 is complete on the second run | verification-lead |
+| WF34 | Every statement about a trial stopped by an escalation follows decision P4, and every statement about the note, the change and either measured run follows decision P6 | qa-evidence |
+| WF35 | The list and the proposal of decision P5, item 3, with the next change that restarts every group; nothing of it merges inside a batch | ai-engineer |
+
+### Build specification, for the build lane
+
+This meeting wrote no code and no plan text.
+
+1. `src/nirmaan/evals/flow.py`: `NOTE_CHECKED` and `NOTE_UNCHECKED` take
+   the two texts of decision P2, item 3, exactly; the module's opening
+   description says the same. No other line of logic changes.
+2. Tests:
+   - `tests/test_whole_flow_runner.py:85-86` and `:92` pass as written;
+   - a replay of each whole-flow case with no model, in both arms: for
+     every stage after the first, the rendered prompt holds, for each
+     stage it builds on, one line with "review_record, substantiated:
+     Independent review by", that stage's reviewer role and the whole note
+     of that stage; every stage's recorded note equals one of the two
+     texts; "reviewed in the repository" appears in none;
+   - the test of gate WF7 (`tests/test_whole_flow_dispatch.py`), with the
+     four fingerprints before and after in the pull request's text: the
+     two whole-flow ones moved, the two single-seat defaults equal.
+3. `docs/whole_flow/09-runner-flow-module.md` quotes the new notes.
+4. A committed record that quotes an earlier note is the record of its
+   run and is not rewritten. If a test compares a committed record's note
+   with a fresh replay's, the build lane stops and asks the chair.
+5. The plan's dated addition (gate WF32), documents only, after the
+   change merges.
+6. The replay record of decision P3, item 2, then the second measured run
+   and the chain of gate ET10 on it, then slot 1. The reach records of run
+   45196235508 may be committed at any point before slot 1.
+7. Nothing in `prompt.py`, `context.py`, `evals/runner.py`, `engine.py`,
+   `governance.py`, the record format, a case, a card or a document.
+
+### Open, for the founder
+
+Nothing.
+
+## Seventh addendum (2026-11-23): the timer's slots two at a time
+
+The committed plan (`evals/plans/2026-11-22-g3-whole-flow.md`) runs the
+timer's twenty slots one at a time. The founder, in session, 2026-11-23:
+approved running the G3 timer slots two at a time, with safeguards, to save
+time. The direction is the founder's. This addendum rules on how, and on
+what must be true before slot 1. It adds gates WF36 to WF41. It amends, each
+in its own record and each with a note in place: gate ET15 and decision R3,
+item 4 of `council/records/2026-11-22-eda-tools-seat-account.md` (second
+addendum); and decisions P2, P5 and P6 and gate W2C14 of the addendum to
+`council/records/2026-11-23-wave-2-close-meeting-1.md` ("the re-measure
+parallel addendum" below; its decisions are always named with that record,
+because the sixth addendum above has decisions P1 to P6 of its own). It
+also amends two phrases of the sixth addendum above (decision T3, item 9).
+It is a decision made on 2026-11-23.
+
+Ruling, in short:
+
+- **Width two, inside a window of two consecutive slots** (decision T1).
+  Odd slots run with documents and even slots without, so the two trials in
+  flight are always one of each arm, and one event can fail at most one
+  trial of each of the timer's two groups. The number is fixed in the plan
+  before slot 1 and never raised.
+- **One at a time, to slot 20, after the first trial that ends on a plan or
+  usage limit, is interrupted, or ends with no model answer** (decision T1).
+- **The workflow holds the width for the timer** (decision T3). With the
+  opt-in input `parallel`, a timer dispatch runs in one of two concurrency
+  groups, one for each arm, so GitHub itself never runs two trials of one
+  arm at once and never more than two timer runs. The register block, every
+  other `flow/` case and every `firmware/` case stay refused. A second guard
+  refuses any dispatch whose case is not written in its exact form.
+- **The workflow change merges now**, before the plan addition of gate WF32,
+  the replay record of gate ET5 and the second measured run, so that the
+  pinned values are restated once and every run before slot 1 uses the
+  workflow file the slots use (decision T3).
+- **Gate ET15 is reworded for width two** (decision T2), in the words of its
+  owner, security. A finished run's reach records are downloaded, verified
+  by digest and pushed to a branch of the repository before the next
+  dispatch; a finished run whose records show a probe not denied closes
+  dispatch at once; the reach folders of every slot three or more places
+  back are on `main`. The order on `main` and the test of gate ET16 do not
+  change.
+- **Gate W2C9 stays exactly as it is** (decision T3, item 11). The
+  re-measure batch dispatches nothing, its replays included, before the
+  timer's last planned trial is recorded.
+- **A stop closes dispatch and cancels no running trial; every trial
+  dispatched is committed; nothing is run again** (decision T4).
+
+It changes no code, case, eval record, plan text, level, fingerprint or
+digest by itself: the changes it orders are made by their own pull
+requests. It changes no count, case, arm or slot, and not the one read. A
+failed trial stays a failed trial and nothing is run again.
+
+It does change what two gates rest on, and it says so. Gate ET15 asked for
+every earlier run's reach folder on `main` before any dispatch; from this
+addendum it asks for that of slots three or more places back, and for a
+verified, pushed copy of the rest. That is a looser condition on where the
+records are at the time of a dispatch, made by the gate's owner for the
+founder's direction, with two conditions added that the gate did not have
+(decision T2, items 1 and 2). And the workflow's single group, which kept
+the timer one at a time, is replaced for the timer by two groups. No trial
+ran and no workflow was dispatched for the meeting.
+
+### Who decided what
+
+- The founder decided that the timer's slots run two at a time, with
+  safeguards. The council decided every item below, and the founder can
+  overrule any of it.
+- One cost of the direction is stated for the founder under "Open": what
+  one event can cost at width two (decision T1, item 3).
+- One preference of security needs a repository setting that only the
+  founder changes, and is listed under "Open". No ruling here rests on it.
+
+Five seats gave round 1 positions, each as a read-only process of its own
+that saw no other answer to the brief: security, ai-engineer,
+verification-lead, qa-evidence and eda-tooling; the chair decided. The
+seats read ip-nirmaan `main` at 0362c9ad, the draft pull request ip#470 and
+a copy of the private tooling that dispatches the batch. The seats had no
+shell; nothing was run. After round 1 the chair asked security, as the
+owner of gate ET15 and of the workflow's guard, four owner questions on
+points other seats had raised; security answered them without seeing any
+other position beyond what the questions quoted, and its answers are
+adopted where this addendum says so. The chair rechecked the facts below at
+0362c9ad.
+
+The pull requests that change `.github/workflows/live-eval.yml` and this
+record are in a founder class by path and go to the Founder Proxy (agent)
+by the usual rule. A key is an agent review. Nothing here is a person's
+approval, a release, or a claim that a design is ready to be made in
+silicon.
+
+### Facts checked
+
+TF1 to TF15 number this addendum's facts.
+
+- TF1. Slots 1 to 20 are all `flow/axil-timer`; odd slots run with
+  documents and even slots without
+  (`evals/plans/2026-11-22-g3-whole-flow.md:59-60`, `:218-239`). Whole-flow
+  trials group by case, case digest, model, harness fingerprint, CLI, flow
+  digest and purpose, and a count is written only from ten trials (the
+  plan, section 2); the two arms have different fingerprints. So the timer
+  has two groups of ten, with no level and no bar, and any two adjacent
+  slots are one trial of each group. Slots two apart are of the same arm.
+- TF2. No slot has been dispatched. By the sixth addendum above the
+  pass-through note changes before slot 1 (gate WF31), both whole-flow
+  fingerprints move and the plan restates them (gate WF32), and a new
+  replay record and a second measured run are owed before slot 1 (gate
+  WF33). None of the three was on `main` at 0362c9ad.
+- TF3. The timer is one at a time today in three places: the plan ("The
+  next slot is dispatched only after the whole run, `live-eval` and
+  `rejudge`, has finished", line 73; and lines 43-45); the workflow's one
+  concurrency group, `group: live-eval`, `cancel-in-progress: false`
+  (`.github/workflows/live-eval.yml:88-90`); and whatever dispatches the
+  batch, which refuses while any run of the workflow is queued or running.
+- TF4. Gate WF9 (line 497 above) names no concurrency group and does not
+  say "one at a time". The plan's evidence row for it (line 818) cites "the
+  named job and its concurrency group (`.github/workflows/live-eval.yml:81-82`,
+  `:199`)", as read at `02cfa87f` (the plan's line 807). At 0362c9ad those
+  lines are the `controls` input and the condition of the replay upload;
+  the group is at lines 88-90. The row for gate WF17 (line 819) cites
+  `:250-253`, which is now the checkout step. So both rows are owed again
+  whatever is decided here (qa-evidence, security, ai-engineer,
+  eda-tooling).
+- TF5. Each job runs on a hosted runner of its own
+  (`live-eval.yml:95`, `:225`, `:339`) and every artifact name carries the
+  run's id. Two runs share no checkout, no seat account and no file. They
+  share the one secret of the `live-eval` environment, so the one plan
+  (inference, as fact PF2 of the re-measure parallel addendum), and one
+  cache entry, the tool suite's archive, whose sha256 is checked on every
+  use (`.github/actions/oss-cad-suite/action.yml:18-23`, `:36`;
+  eda-tooling).
+- TF6. The workflow file is in no fingerprint (`harness.CODE`, `LOOP_CODE`
+  and `FLOW_CODE` name only files under `src/`,
+  `src/nirmaan/runtime/harness.py:257-293`). It is in the group "Workflow,
+  tool set and CLI pin", which the plan pins (line 1266). Gate ET10 asks
+  that the values on the measured run's commit "equal those on the commit
+  slot 1 is dispatched from" (the plan, lines 858-859). So a workflow edit
+  merged after the second measured run and before slot 1 would owe a third
+  measured run, and one merged after slot 1 is forbidden by the freeze
+  (fourth addendum, decision 2, item 4, which names the workflow).
+- TF7. The re-measure parallel addendum ruled, for the single-seat
+  re-measure batch: an opt-in input `parallel` whose group expression and
+  guard refuse every `flow/` and `firmware/` case (its decision P2, items
+  1, 2 and 5: "The whole-flow timer and the register block are never
+  dispatched with it"); that the workflow change "merges only after the
+  timer case's last planned trial is recorded" (its decision P6, gate
+  W2C14), because a merge before or during the timer's slots "would move a
+  digest the whole-flow plan pins and change the lines its gate WF9 cites
+  as met"; and gate W2C9, "The two batches are never interleaved". ip#470
+  is the draft that builds its decision P2.
+- TF8. The timer flow links no seat C and runs; the register block flow has
+  a firmware stage and stays refused (`scripts/live_eval_ci.py:34-37`). That
+  refusal is one "a change of its own lifts" (the plan, lines 39-41), so it
+  is not a lasting ground for keeping the register block out of anything.
+- TF9. A trial that is interrupted or ends on a plan or usage limit is a
+  failed trial of its group, committed, never run again (the plan, section
+  8). Decision 11 of `council/records/2026-11-14-pilot-retrospective.md`
+  rested that on "the runner's stop rule already limits the loss to one
+  trial" (its line 333). With two trials running on one plan, a limit that
+  ends one can end both (inference; no seat knows a way to read the plan's
+  remaining allowance from a script).
+- TF10. Gate ET15 has two texts. Decision R3, item 4 of the EDA tools
+  record's second addendum: "unless the commit it is dispatched from holds
+  the reach folder of every earlier run of every slot, with digests equal
+  to the files the dispatcher downloaded"; its gate row: "each file equal
+  by digest to what the run uploaded"; the plan quotes the row (lines
+  864-866). Neither says what a run still in flight owes. As written it
+  allows a width of one only (qa-evidence).
+- TF11. As written, gate ET15 would also deadlock at width two (inference;
+  verification-lead and ai-engineer, each alone). Slot N stops at job level
+  with no trial while slot N+1 runs and writes its record. Dispatching slot
+  N again would need slot N+1's reach folder on `main`; decision R3, item 3
+  keeps it off `main` until slot N's record is there.
+- TF12. GitHub compares strings with `==` ignoring case (GitHub's
+  documented behaviour; not run for the meeting), and the trial
+  command strips the case's name before it looks it up
+  (`scripts/live_eval_ci.py:101`). So a guard that tests the case's name
+  by prefix or by equality does not see the name the command will run: in
+  ip#470 as drafted, a timer case written with a leading space would get a
+  group of its own and pass the guard (inference from the two lines;
+  security). Nothing was dispatched to show it.
+- TF13. The test of gate ET16 fails a tree in which a slot has reach
+  records while a lower slot has reach records and no record
+  (`tests/test_whole_flow.py:284-288`). Branches need not be up to date
+  with `main` and auto-merge is on (`docs/REVIEW_MECHANISM.md:10`). So a
+  reach pull request opened before its turn would carry a failing check,
+  or could merge out of order on an old base (eda-tooling).
+- TF14. No committed record holds a run's `parallel` input or its
+  concurrency group. A record's manifest carries its commit and its start
+  and finish times (`src/nirmaan/evals/records.py:270-277`), and a slot's
+  reach index names its run (the plan, section 20.2) (qa-evidence).
+- TF15. Whatever dispatches the batch today falls back, when the dispatch
+  call returns no run, to the run created after the call, on the ground
+  that no other run was active. At width two that ground is gone (security,
+  ai-engineer, eda-tooling).
+
+### Decisions
+
+#### T1. Width two, a window of two slots, and one at a time after an event
+
+1. At most two trials of the timer are in flight at once. The number is
+   fixed in the plan addition before slot 1 and is never raised.
+2. The window. Slot k is first dispatched only when every slot numbered
+   k-2 or lower has finished: every job of its run concluded, the counting
+   re-judge included, and the run classified. So the slots in flight are
+   always two adjacent slots, one of each arm (fact TF1). The window is
+   counted by slot, not by run (verification-lead).
+3. What one event can cost. An event that ends every trial in flight ends
+   at most one trial of each group, where one at a time loses one trial of
+   one group. Each is a failed trial of its group, committed and never run
+   again. The council accepts this for the timer: the groups have no bar
+   and no level, and the loss falls on both arms alike. All five seats
+   accepted it. Width three would put two trials of one arm in one window
+   (fact TF1), so two is the most this plan's order allows (ai-engineer).
+4. After the first trial of the batch that ends on a plan or usage limit,
+   is interrupted, or ends with no model answer, the width is one from then
+   until slot 20. It is a rule of the plan, applied on the class of the
+   stop and never on a result, and it is never undone. It is ai-engineer's
+   rule; verification-lead asked that only a limit lower the width. The
+   chair took the wider rule because the groups are ten each and an outage
+   or a throttled answer is as shared between two running trials as a
+   limit is.
+5. After such an event, dispatch resumes only when every trial that was in
+   flight has been classified and, for a limit, the limit has reset.
+6. No rule rests on reading the plan's remaining allowance (fact TF9).
+7. The width is in no fingerprint and no group key.
+8. What the interleave does not give. Two trials that run together are not
+   independent: they share one plan and one secret, and an event that
+   reaches both cannot be told from the counts. Running two at a time may
+   add retried calls, which touches the derived count ("passed with every
+   stage on its first attempt") before the main count (verification-lead).
+   No text draws a paired figure from the overlap (decision T5).
+
+Why a rolling window and not aligned pairs: no seat chose pairs; the
+window gives the same bound and each dispatch keeps its own check.
+
+Owners: verification-lead (the number, the window); ai-engineer (items 4
+to 7).
+
+#### T2. Gate ET15 at width two
+
+Security is the gate's owner and gave these words; the chair asked it to
+settle the points of facts TF11 and TF13, and it did.
+
+1. **The gate, reworded.** From slot 1, slot k of the timer case is
+   dispatched, a first time or again after a stop, only if:
+   - (a) every run dispatched earlier that has finished has had every reach
+     artifact of every job downloaded, each file's sha256 equal to the
+     index the dispatcher wrote for that run. "Finished" means every job
+     concluded, the re-judge included, and the run classified. A run still
+     in flight owes nothing until it finishes;
+   - (b) for each such run whose reach folder is not yet on `main`, the
+     verified files are on a branch of the repository, at a commit whose
+     only change against its parent, a commit of `main`, adds exactly that
+     run's files in the layout of decision R3, item 1. The dispatcher reads
+     that commit back from GitHub, not from its own copy: the branch
+     resolves to it and every file's digest equals the index. It writes the
+     commit down before the next dispatch;
+   - (c) the commit dispatched from holds the reach folder of every run of
+     every slot numbered k-3 or lower, each file equal by digest to the
+     index;
+   - (d) for a second or later dispatch of a stopped slot k: (c) holds; the
+     commit dispatched from also holds the reach folder of every earlier
+     run of slot k itself; no lower slot is waiting to be dispatched again;
+     and no slot above k has its first dispatch before slot k's new run has
+     finished.
+2. **A probe not denied closes dispatch.** A finished run whose downloaded
+   reach records show a probe not denied, a reach gate that failed, or a
+   reach artifact missing closes dispatch at once, whether or not anything
+   of it is on `main`, and it stays closed until what decision A3 of the
+   EDA tools record's addendum asks for that run has been done. The trial
+   then in flight is not cancelled: its own reach test ran before its
+   trial and runs before its re-judge, and it is committed in its order.
+   This is new: the gate as written did not read the records' content
+   (ai-engineer, qa-evidence, eda-tooling and security each asked for it).
+3. **The branch.** The pull request of a run's reach records is opened only
+   when the order of decision R3, item 3 allows, and its head is the commit
+   of item 1 (b), or the files' digests are checked again before it
+   merges. The branch is never rewritten or deleted before its folder is on
+   `main`; if it changes, dispatch closes. Nothing in the repository
+   enforces that last sentence today: it is a rule for whatever dispatches,
+   and no text calls it a control (security).
+4. **Why (c) is three back.** Under the window every slot numbered k-2 or
+   lower has finished when slot k is dispatched, so (c) never waits on a
+   run in flight. verification-lead gave two back; security chose three
+   and would accept two, on the ground that (a) and (b) carry the gate and
+   the number only bounds how far `main` may trail. The chair took the
+   owner's number. Recorded under dissent.
+5. **No deadlock.** In the case of fact TF11, dispatching slot N again
+   needs nothing of slot N+1: (d) waits only on slot N-1's record and on
+   slot N's own earlier runs, and slot N+1's reach records wait on their
+   branch until slot N's record is on `main`.
+6. **The reasons of decision R3, item 4, restated.** "None held out" stays
+   a check: every finished run's files are verified and public before the
+   next dispatch. An artifact that is not kept is no loss: the files are on
+   a branch of the repository. "A denial that failed is on `main` before
+   any further trial" no longer holds as it was written. What holds is
+   this: a denial that failed closes dispatch before any further dispatch
+   (item 2), and at most the one trial then in flight ends after it,
+   behind its own reach gate. Every text that gives that reason gives it
+   in these words (qa-evidence).
+7. **What does not change.** The order on `main` (decision R3, item 3), one
+   pull request for one run's reach records or for records and never both,
+   and everything the test of gate ET16 holds. The test gains one passing
+   case: a slot whose recording run is on a later commit than the next
+   slot's, as a second dispatch after a stop produces (verification-lead).
+   Gates ET10, ET11, ET13 and ET16 are not reworded.
+
+Owners: security (the gate); verification-lead (item 7).
+
+#### T3. The workflow: two groups for the timer, two guards, merged now
+
+1. **The change is that of ip#470, extended, in one pull request.** The
+   input `parallel` stays a boolean whose default is false. The concurrency
+   block becomes:
+
+   ```
+   concurrency:
+     group: ${{ inputs.parallel && inputs.case == 'flow/axil-timer' && (inputs.knowledge == 'off' && 'live-eval-timer-off' || 'live-eval-timer-on') || inputs.parallel && !startsWith(inputs.case, 'flow/') && !startsWith(inputs.case, 'firmware/') && format('live-eval-run-{0}', github.run_id) || 'live-eval' }}
+     cancel-in-progress: false
+   ```
+
+   With the input false, and for every `firmware/` case and every `flow/`
+   case other than the timer whatever the input says, the group is
+   `live-eval`, as today. A timer dispatch with the input runs in
+   `live-eval-timer-on` or `live-eval-timer-off` by its `knowledge` input,
+   a replay of the timer included. The re-measure batch's single-seat
+   cases keep the group per run that the re-measure parallel addendum gave
+   them.
+2. **Why two groups by arm and not a group per run.** ai-engineer and
+   eda-tooling gave the timer a group per run, as ip#470 gives the
+   single-seat cases; then GitHub holds no width and it rests on the
+   dispatcher alone, which is private and which no public text may cite.
+   security made the two groups a must-have: GitHub then never runs two
+   timer trials of one arm together and never more than two timer runs,
+   and that is a fact of the workflow file anybody can read. It also meets
+   qa-evidence's condition that the width not rest on a private ledger.
+   The chair took security's form. In a group GitHub keeps one running and
+   one pending run, and a newer pending run cancels an older pending one.
+   Under the window of decision T1 no timer run is ever pending: a slot is
+   dispatched only when the last slot of its arm has finished. A pending
+   run can arise only from a dispatch outside the window, which is a fault
+   of the dispatcher; a pending run that is cancelled has run no trial,
+   and it is a job-level stop of its slot. For the re-measure batch
+   security refused any mechanism under which GitHub cancels a queued run,
+   and the council took a group per run there. Here security asked for
+   groups that can hold a pending run, on the ground that a width held
+   only by the dispatcher is a promise; the two rulings differ, and this
+   one is for the timer only. Recorded under dissent for ai-engineer and
+   eda-tooling.
+3. **The guard on `parallel`.** The first step of the `replay` job and of
+   the `live-eval` job fails the job when `parallel` is true and the case
+   is a `firmware/` case or a `flow/` case other than `flow/axil-timer`,
+   replays included. In the `live-eval` job it comes before the checkout
+   and before any step that reads the secret.
+4. **The guard on the case's form** (fact TF12). A step of its own, in both
+   of those jobs, before the checkout: it reads the case only from the
+   job's environment, never as text placed in a `run:` line, fails unless
+   the name matches `^[a-z0-9][a-z0-9/_.-]*$`, and refuses `..`. It does
+   not read `inputs.parallel` and applies to every dispatch. The `rejudge`
+   job runs only when one of those two jobs uploaded records, and a guard
+   that fails skips the trials step; a test holds that dependency. The
+   guard may also be the first step of `rejudge`.
+5. `inputs.parallel` appears in the concurrency group and in the two
+   steps of item 3 and nowhere else: not in `env:`, not in a `run:` line.
+   No new permission, no new use of the secret (it is read where it is
+   read today), no query of other runs from inside a job, and the
+   environment and its main-only rule are unchanged.
+6. **F-b is refused.** No seat chose to admit every `flow/` case and leave
+   the register block to the trial command's own refusal: that refusal is
+   one its own change lifts (fact TF8), and "never dispatched with it"
+   would then rest on nothing (security, qa-evidence, eda-tooling,
+   ai-engineer, verification-lead).
+7. **Which dispatches may use `parallel`.** For the timer: its slots; the
+   second measured run; the replay of gate ET5's record; and the shake-out
+   of item 10. A timer replay with the input runs only before slot 1 or
+   after slot 20's record. For the re-measure batch: what its own addendum
+   says. Nothing else without a council ruling. The register block is
+   never dispatched with it: before its slot 21 the question returns to
+   the council, and its slots run one at a time unless a ruling says
+   otherwise.
+8. **It moves no fingerprint** (fact TF6) and no tool definition. It moves
+   the digest of "Workflow, tool set and CLI pin" in both plans.
+9. **It merges now.** Before the plan addition of gate WF32 is computed,
+   before the replay record that states gate ET5 again, and before the
+   second measured run; the change of gate WF31 and this one merge in
+   either order. All five seats said so. Then the plan restates its values
+   once, on a commit that holds both, and the replay record, the second
+   measured run and every slot run on one workflow file (fact TF6). Two
+   phrases of the sixth addendum above are amended to allow it: in its
+   decision P3, item 1 and in gate WF32, "recomputed on the merge commit of
+   the change" reads "recomputed on a commit that holds the change of gate
+   WF31 and the workflow change of the seventh addendum", and "the seven
+   group digests unchanged" and "every other pinned value unchanged" read
+   with "except the digest of the group Workflow, tool set and CLI pin,
+   which the workflow change moves and the addition names with its pull
+   request". A further edit to the workflow file after the second measured
+   run owes a third (fact TF6); from slot 1 the file is frozen as before.
+10. **The shake-out, before the plan addition.** From `main`, on a commit
+    whose `live-eval.yml` is the merged one, with no model and no token:
+    two replays of the timer with `parallel` true, one with documents and
+    one without, in flight together, each judged as a replay is judged
+    today; a replay of the register block and a replay of a `firmware/`
+    case with `parallel` true, each refused at the guard of item 3; a
+    dispatch whose case is not in the exact form, refused at the guard of
+    item 4; and two replays without the input, the second of which waits
+    for the first in `live-eval`. The plan addition names each run, its
+    commit and the sha256 of the workflow file on it (security).
+    eda-tooling and ai-engineer asked for it: a workflow fault found after
+    the second measured run would owe a third, and a real dispatch is the
+    only proof of an expression that tests can only model. security first
+    refused `parallel` for any replay of a `flow/` case and withdrew that
+    on the chair's question: the `replay` job reads no secret, and in the
+    arm's group a replay can never overlap a trial of that arm.
+11. **Gate W2C9 stays exactly as it is.** ai-engineer, its owner, and every
+    other seat said so. With the workflow change on `main` early, the
+    re-measure batch's replays (its gate W2C5) could be dispatched earlier
+    in principle. They are not: nothing of that batch, a replay included,
+    is dispatched before the timer's last planned trial is recorded, and
+    the re-measure plan's section 10 is not changed. During the timer's
+    batch any run of the workflow that the dispatcher did not start, in
+    any group, closes dispatch until it has ended.
+12. **The second measured run and the replay of gate ET5's record are
+    dispatched with `parallel` true**, each alone. The plan's section 10
+    makes the measured run "by the same dispatch as a slot".
+13. **Gate WF9's evidence** is stated again in the plan addition, on the
+    commit it is computed on, by line: the named job; the concurrency
+    block word for word and the two groups a timer dispatch resolves to;
+    one trial per dispatch on the default harness; the expected
+    fingerprint; the hashed checkout; the counting re-judge. So is the
+    row of gate WF17 (fact TF4). "One at a time" is said only of the
+    trials inside one dispatch. Gate WF9 itself is not reworded: it names
+    no group (fact TF4).
+14. **Tests**, written failing first, in the workflow's pull request: the
+    exact concurrency block; the input's type and default; the group for
+    the timer with each `knowledge` value, with and without `replay`; that
+    the register block, any other `flow/` case and a `firmware/` case
+    resolve to `live-eval` whatever the input; a single-seat case with and
+    without the input; the timer's name in another letter case and with
+    surrounding space, refused by the guard of item 4; that every case id
+    under `evals/` matches that guard's form; both guards' places, before
+    the checkout and before the first step that reads the secret; where
+    `inputs.parallel` appears; the secret read exactly where it is read
+    today; and the dependency of `rejudge` on the two jobs (item 4). The
+    evaluator the tests use gains `==` and `!=`, ignoring case as GitHub
+    does. ip#470's tests that hold the timer in `live-eval` with the
+    input, and its comment that the timer stays one at a time, change.
+    `docs/LIVE_EVAL_EVIDENCE.md` is corrected in the same pull request.
+
+Owners: security (items 1 to 7); eda-tooling (items 8 to 10, 12, 14 and
+the build); ai-engineer (item 11 and the digest); qa-evidence (item 13).
+
+#### T4. Order, binding and stops with two in flight
+
+1. Slots are first dispatched in strictly increasing slot order. Nothing is
+   reordered by a result.
+2. A slot is marked attempted before its own dispatch. The check of the
+   plan's section 7 is made before every dispatch, one check at a time, on
+   `main` as it then is, and the commit each run reports is checked as
+   today.
+3. One slot, one run. The run's id is taken from the response to the
+   dispatch and written beside the slot before anything else is
+   dispatched. A run is never identified by the time it was created (fact
+   TF15). If the id cannot be bound, dispatch stops and a person binds it;
+   the run is not cancelled.
+4. The width is counted on the dispatcher's own bound runs, by one
+   dispatcher process. A run of the workflow that it did not start, queued
+   or running, in any group, closes dispatch until that run has ended.
+5. Any stop in any running trial closes dispatch at once: a plan or usage
+   limit, an interrupted trial, a trial with no model answer, a job-level
+   stop, a record that is not the trial asked for, a re-judge that did not
+   finish or did not hold, a reach gate that failed, a finding of decision
+   T2, item 2, a record or file over the review's size limit, a run that
+   was not the dispatcher's, a run whose id could not be bound.
+6. Nothing in flight is cancelled because of another run's outcome, and no
+   run whose trial step has started is ever cancelled: cancelling a
+   running trial makes a failed trial. The one cancel that remains is the
+   plan's own (section 7): a run whose commit fails the dispatch check is
+   cancelled on the dispatcher's own bound run, only while its trial step
+   has not started. If that step has started, the run is left to end, is
+   classified, and dispatch stays closed.
+7. Every trial already dispatched ends as it ends, is classified by
+   itself and is committed as it is. Nothing is run again and nothing is
+   replaced.
+8. A job-level stop that ran no trial is dispatched again as the plan
+   says, under decision T2, item 1 (d): before any slot above it is first
+   dispatched. The run that was beside it is not touched. The read names
+   every slot dispatched after a higher one.
+9. A stop that waits for a person today waits for a person as today, once
+   nothing is in flight.
+10. Records reach `main` in slot order, none held out, failed ones
+    included, whatever order the runs finish in (decision R3, item 3).
+11. Decision 11's reason, that a stop loses one trial, does not hold for
+    this batch (fact TF9). The rule it supported stands: a failed trial is
+    never replaced. Running two at a time can only lower a count.
+12. The rule of decision T1, item 4 bounds one event. An event of another
+    kind that ends running trials, such as a replaced secret, ends at most
+    two, one of each group; each is a failed trial, and the read names the
+    event and its slots.
+
+Owners: verification-lead (items 1, 2, 5 to 9); qa-evidence (items 3 and
+10); security (item 4); ai-engineer (items 11 and 12).
+
+#### T5. The plan addition, the read, and what may be said
+
+1. **One dated addition to the plan, merged before the replay record of
+   gate ET5, the second measured run and slot 1**, after the workflow
+   change, the change of gate WF31 and the shake-out. It may be the same
+   addition as gate WF32's and gate WF28's, if it lists each moved value
+   with the pull request that moved it. It changes no count, case, arm or
+   slot. It states:
+   - the width, the window and the rule of decision T1, item 4, and that
+     the number is never raised; it joins the list of what is fixed
+     (section 1);
+   - section 2, lines 43-45, and section 3, line 73, rewritten: the window
+     in place of "only after the whole run"; the dispatch command with
+     `-f parallel=true`; the two groups;
+   - section 7: the check before every dispatch, one at a time;
+   - section 8: an event can fail the two trials in flight, one of each
+     group; the rules of decision T4, items 5 to 9 and 12; the limit stop
+     as decision T1, items 4 and 5 give it; that decision 11's reason does
+     not hold here and its rule does;
+   - section 20: gate ET15 in the words of decision T2, item 1, with items
+     2, 3 and 6;
+   - the concurrency block and both guards word for word, which dispatches
+     may use the input, and that for the timer GitHub holds the width
+     through the two groups while the window and the order rest on the
+     dispatcher;
+   - the moved digest of "Workflow, tool set and CLI pin", the commit it
+     was computed on and the pull request that moved it;
+   - the rows of gates WF9 and WF17 again (decision T3, item 13);
+   - the runs of the shake-out;
+   - that runs share one secret and one plan, and the tool archive's cache
+     entry, and nothing else (fact TF5);
+   - what the read adds (item 3).
+   After it no text says "one at a time" of the timer's slots, except of
+   the width after an event and of the trials inside one dispatch.
+2. **A committed test of the overlap** (qa-evidence), in
+   `tests/test_whole_flow.py`, on `main` before slot 1 and holding at
+   every commit after: among the committed slot records of the timer, any
+   two whose manifests' times overlap are records of adjacent slots (fact
+   TF14). It passes while no slot record exists. It shows from the
+   committed records, and not from any private file, that no more than two
+   trials ran together and never two of one arm. It reads the times and
+   states none.
+3. **The read adds**: the width; that trials overlapped; for each slot its
+   run, its commit and the slot whose run overlapped it, if any; whether
+   it ran after the point from which the batch ran one at a time, and that
+   point; every stop event with the slots then in flight and their labels;
+   each group's failed trials by label; every slot dispatched after a
+   higher one; any run cancelled before its trial under decision T4, item
+   6; and that no running trial was cancelled and nothing was held out or
+   run again.
+4. **Never said**: that running two at a time had no effect on a result,
+   or that it had one; that the interleave makes the two arms comparable,
+   or any figure for a pair of overlapping trials; that the timer and any
+   batch that ran one at a time ran under the same dispatch conditions;
+   which concurrency group a given run used, as a fact of that run (no
+   record holds it, fact TF14): a text may say what the workflow file gives
+   for the inputs the plan fixes, and what the test of item 2 shows.
+5. Every statement about the measured runs follows decision P6 of the
+   sixth addendum above and decision C of the EDA tools record as they
+   stand. No time, usage or cost figure enters any text.
+
+Owners: verification-lead (the addition, the read); qa-evidence (the
+wording, items 2 and 4).
+
+### Positions not adopted, and dissent
+
+- ai-engineer and eda-tooling: a group per run for the timer, as for the
+  single-seat cases. Not adopted (decision T3, item 2). Recorded as
+  dissent. Their case named exactly, their refusal of F-b, and
+  eda-tooling's tests are adopted.
+- verification-lead: gate ET15's bound at two slots back. Not adopted: the
+  owner chose three and would accept two (decision T2, item 4). Recorded
+  as dissent.
+- verification-lead: only a limit lowers the width. Not adopted (decision
+  T1, item 4).
+- security, in round 1: `parallel` refused for every replay of a `flow/`
+  case; a reach pull request open before the next dispatch; a clause "at
+  most two finished runs are off `main`". Each was changed by security
+  itself on the chair's questions: the first withdrawn (decision T3, item
+  10); the second replaced by a pushed, verified commit (decision T2, item
+  1 (b), on eda-tooling's fact TF13); the third follows from (c), (d) and
+  the window and is left to the dispatcher to assert.
+- eda-tooling: the change of gate WF31 merges first, then the workflow
+  change. Not fixed: either order, both before the plan addition (decision
+  T3, item 9).
+- qa-evidence: either a committed record holds each run's `parallel`
+  input, or no text says which group a run used. The second is adopted
+  (decision T5, item 4); the record format is not changed.
+- qa-evidence asked that every amended ruling be noted in its own record
+  with the old text quoted. Adopted: the notes are in the two other
+  records, made by this pull request.
+
+No seat dissented from: width two with the rolling window; the timer named
+exactly; refusing the register block, every other `flow/` case and
+`firmware/`; merging the workflow change before the second measured run;
+keeping gate W2C9 as it is; cancelling nothing on a stop; committing every
+trial and running none again; or leaving the order on `main` and gate
+ET16's test as they are.
+
+### Gates
+
+Gates WF36 to WF38 are met before the timer's slot 1. Gates WF39 and WF40
+hold from slot 1 to slot 20, and gate WF41 at the read.
+
+| Gate | Condition | Owner seat |
+|---|---|---|
+| WF36 | The workflow change of decision T3, items 1 to 5, with the tests of item 14 and the corrected document, merged before the plan addition of gate WF32 is computed and before the second measured run; no fingerprint moved | security |
+| WF37 | The shake-out of decision T3, item 10, on the merged workflow file, every run named in the plan addition; the replay of gate ET5's record and the second measured run dispatched with `parallel` true, each alone | eda-tooling |
+| WF38 | The plan addition of decision T5, item 1, with the moved digest and the rows of gates WF9 and WF17 stated again; the committed test of decision T5, item 2 and the added case of decision T2, item 7 | verification-lead |
+| WF39 | Gate ET15 as decision T2 words it holds before every dispatch from slot 1: items 1 to 3; the order on `main` unchanged | security |
+| WF40 | One slot, one run, bound from the dispatch response; the window; a run the dispatcher did not start closes dispatch; a stop closes dispatch and cancels no running trial; every trial dispatched is committed; nothing is run again; width one after the first event of decision T1, item 4 | ai-engineer |
+| WF41 | At the read: what decision T5, item 3 asks the read to add, and nothing item 4 forbids | qa-evidence |
+
+Gate W2C9 of the wave 2 close record stands as written. Its gate W2C14 and
+the EDA tools record's gate ET15 are reworded in their own tables, each
+with a note.
+
+### Build specification, for the build lane
+
+Nothing here is built by this addendum. In order:
+
+1. The change of gate WF31 (sixth addendum) and, in either order, one pull
+   request, control plane: the workflow change of decision T3, items 1 to
+   5, the tests of item 14 and `docs/LIVE_EVAL_EVIDENCE.md`. It states that
+   no fingerprint moves and names the moved group digest. It is the change
+   of ip#470, extended; whether it is that pull request or one that
+   replaces it is its author's.
+2. The shake-out of decision T3, item 10, on `main`.
+3. One pull request, or more: the plan addition of decision T5, item 1,
+   which may be gate WF32's and gate WF28's, with every pinned value
+   recomputed on a commit that holds items 1 and 2's changes; the test of
+   decision T5, item 2 and the added case of decision T2, item 7 in
+   `tests/test_whole_flow.py`. No file of a pinned group changes.
+4. Whatever dispatches the batch (private tooling, not in this repository)
+   carries decisions T1, T2 and T4, with tests of its own before slot 1:
+   the window by slot; binding each run to its slot from the dispatch
+   response, with no fallback by time; the width counted on its own bound
+   runs; a run it did not start; each stop of decision T4, item 5 arriving
+   while another run is in flight; a limit with two in flight and the
+   width one after it, kept in its state and not in memory; no cancel of a
+   run whose trial step has started; gate ET15's four clauses, the read
+   back of the pushed commit, and a finished run that shows a probe not
+   denied; the second dispatch of a stopped slot beside a running one
+   (fact TF11); and the order of reach and record pull requests.
+5. The replay record that states gate ET5 again, then the second measured
+   run and the chain of gate ET10 on it (sixth addendum, gate WF33), each
+   dispatched with `parallel` true; then slot 1.
+6. The re-measure batch: its plan amendment (gate W2C12 of the wave 2
+   close record) restates the moved digest on the merged commit, as that
+   record's decision P7 says; nothing of it is dispatched before the
+   timer's last planned trial is recorded.
+7. Before the register block's slot 21: the dated addition the fourth
+   addendum asks for restates the values for that case, and the question
+   of its width returns to the council (decision T3, item 7).
+
+### Open, for the founder
+
+1. This addendum, to confirm or overrule.
+2. What the direction can cost, stated once: an event that ends both
+   running trials fails one trial in each of the timer's two groups, where
+   the plan as committed would have lost one trial in one group. Each is a
+   failed trial and is never run again. The council bounds this to one
+   such event from a limit, an interruption or a trial with no answer
+   (decision T1, item 4). If the founder wants the width kept after such
+   an event, or no running two at a time, that is the founder's to say
+   before slot 1.
+3. Security's preference, not a condition of any gate here: a repository
+   rule that blocks rewriting and deleting the branches that hold reach
+   records before they merge (decision T2, item 3). Repository rules are
+   the founder's to set.

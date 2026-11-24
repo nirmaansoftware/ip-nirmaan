@@ -125,6 +125,115 @@ def test_control_without_the_check_the_host_file_reaches_the_summary(tmp_path, m
     assert SECRET in outcome.summary, outcome.summary
 
 
+# --- Gate ET17: a [files] entry is the run's own, whatever the screen allowed ---------------------------------
+#
+# council/records/2026-11-22-eda-tools-seat-account.md, third addendum, decision E3: a file a setup's [files] names is
+# an input of the run (what the seat account's view holds), and is read by the caller for ``formal.cover``, only when
+# it is the run's own: inside the setup's folder, or a file the harness gave the run. Each test bypasses the screen.
+
+
+def test_a_files_entry_outside_the_run_is_no_input_of_it(tmp_path, monkeypatch):
+    """``eda.seat_inputs`` names an entry by an absolute name, a parent name or a link out of the folder as no input;
+    the setup's own file and the approved file linked beside it (M68), which the run is given, stay inputs."""
+    folder = host(tmp_path)
+    approved = tmp_path / "approved" / "a.v"
+    approved.parent.mkdir()
+    approved.write_text("module a; endmodule\n", encoding="utf-8")
+    sby = setup(tmp_path, "read -formal m.v\nprep -top m",
+                f"m.v\nleak.vh {folder}/leak.vh\nup.txt ../host/secret.txt\nout.v\na.v\n{folder}/secret.v")
+    (sby.parent / "out.v").symlink_to(folder / "secret.v")
+    (sby.parent / "a.v").symlink_to(approved)
+    monkeypatch.setattr(eda, "sby_problem", lambda *a: None)
+    job = eda.Job("formal.run", {"sby": str(sby), "sources": str(approved)}, tmp_path / "run",
+                  (str(approved.resolve()),), None)
+    inputs = eda.seat_inputs(backend("formal.run", "symbiyosys"), job)
+    assert inputs == [str(approved.resolve()), str(sby.resolve()), str((sby.parent / "m.v").resolve())], inputs
+    assert not any(Path(p).is_relative_to(folder.resolve()) for p in inputs)
+
+
+def test_the_cover_run_reads_and_copies_no_files_entry_outside_the_run(tmp_path, monkeypatch):
+    """``formal.cover`` reads each Verilog file of the setup as the caller and writes a copy with derived covers into
+    the run's directory (M29); an entry outside the run is neither read nor copied, and the cover setup names it as
+    the seat's setup does, a file SBY itself must open."""
+    folder = host(tmp_path)
+    sby = setup(tmp_path, "read -formal m.v\nprep -top m", f"m.v\nleak.vh {folder}/leak.vh\nout.v\n{folder}/secret.v")
+    (sby.parent / "out.v").symlink_to(folder / "secret.v")
+    monkeypatch.setattr(eda, "sby_problem", lambda *a: None)
+    reads, read_text = [], Path.read_text
+    monkeypatch.setattr(Path, "read_text", lambda self, *a, **k: reads.append(self.resolve()) or read_text(self, *a, **k))
+    run = tmp_path / "run"
+    run.mkdir()
+    job = eda.Job("formal.cover", {"sby": str(sby)}, run, (), None)
+    assert eda._sby_cover_check(job) is None
+    [[*_, cover]] = eda._sby_cover(job)
+    assert not [p for p in reads if p.is_relative_to(folder.resolve())], reads
+    assert sorted(p.name for p in (run / "antecedents").iterdir()) == ["m.v"]
+    lines = read_text(Path(cover)).splitlines()
+    assert f"leak.vh {(folder / 'leak.vh').resolve()}" in lines and str((folder / "secret.v").resolve()) in lines
+    for path in run.rglob("*"):
+        if path.is_file():
+            assert SECRET not in read_text(path, encoding="utf-8", errors="replace"), path
+
+
+def test_a_files_entry_is_the_runs_own_only_inside_the_setups_folder_or_given(tmp_path):
+    """``eda.own_file``, the rule itself: resolved, inside the setup's folder (the setup reached through a link too),
+    or one of the files the run is given; anything else, by a parent name, a link out or another folder, is not."""
+    folder = host(tmp_path)
+    run_in = tmp_path / "setup"
+    (run_in / "sub").mkdir(parents=True)
+    sby = run_in / "f.sby"
+    sby.write_text("[files]\n", encoding="utf-8")
+    (run_in / "out.v").symlink_to(folder / "secret.v")
+    (tmp_path / "linked.sby").symlink_to(sby)
+    for name in ("m.v", "sub/n.v"):
+        assert eda.own_file(run_in / name, sby, ()), name
+        assert eda.own_file(run_in / name, tmp_path / "linked.sby", ()), name
+    for path in (run_in / ".." / "host" / "leak.vh", folder / "leak.vh", run_in / "out.v"):
+        assert not eda.own_file(path, sby, ()), path
+    assert eda.own_file(run_in / "out.v", sby, [str(folder / "secret.v")])
+    assert not eda.own_file(run_in / "out.v", sby, [str(folder / "leak.vh")])
+
+
+def test_the_cover_run_reads_and_copies_an_approved_file_linked_beside_the_setup(tmp_path, monkeypatch):
+    """Must-pass for gate ET17: the approved file linked beside the setup (M68) and given as ``sources`` is read and
+    copied for the cover run as before, so its assertions still get derived covers."""
+    approved = tmp_path / "approved" / "m.v"
+    approved.parent.mkdir()
+    approved.write_text("module m(input wire a, output wire b); assign b = a; endmodule\n", encoding="utf-8")
+    sby = setup(tmp_path, "read -formal m.v\nprep -top m", "m.v")
+    (sby.parent / "m.v").unlink()
+    (sby.parent / "m.v").symlink_to(approved)
+    run = tmp_path / "run"
+    run.mkdir()
+    job = eda.Job("formal.cover", {"sby": str(sby), "sources": str(approved)}, run, (str(approved.resolve()),), None)
+    assert eda._sby_cover_check(job) is None
+    [[*_, cover]] = eda._sby_cover(job)
+    assert [p.name for p in (run / "antecedents").iterdir()] == ["m.v"]
+    assert str(run / "antecedents" / "m.v") in Path(cover).read_text(encoding="utf-8")
+
+
+@SBY
+@pytest.mark.parametrize("read", ["files-absolute"])
+def test_control_without_the_check_the_host_file_reaches_the_cover_summary(tmp_path, monkeypatch, read):
+    """The control above through ``formal.cover``: with the check bypassed, the read is live as the caller, and the
+    host file's content is in the cover run's summary. As the seat account the entry is no input of the run and is
+    not read for the cover (gate ET17), so SBY itself must open it, and the account's view does not hold it."""
+    folder = host(tmp_path)
+    script, files, _ = READS[read]
+    sby = setup(tmp_path, script.format(host=folder), files.format(host=folder))
+    monkeypatch.setattr(eda, "sby_problem", lambda *a: None)
+    outcome = execute(backend("formal.cover", "symbiyosys-cover"), {"sby": str(sby), "workdir": str(tmp_path / "run")})
+    assert SECRET in outcome.summary, outcome.summary
+
+
+def test_no_file_gate_et17_changes_is_harness_code():
+    """Gate ET7 for gate ET17: the repair is in the gate backends, none of them harness code, so no fingerprint moves."""
+    from nirmaan.runtime import harness
+
+    changed = {"nirmaan/integrations/eda.py"}
+    assert not changed & {*harness.CODE, *harness.LOOP_CODE, *harness.FLOW_CODE}
+
+
 def test_a_refusal_never_quotes_the_host_file(tmp_path):
     """Before M85 the Verilog check read a [files] source wherever it was, and named the ``$`` words it found."""
     folder = host(tmp_path)

@@ -214,8 +214,29 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   usage limit) or a limit line in the output, on any exit other than 0 or 1,
   and when a record's purpose, knowledge label, harness variant, fingerprint or
   CLI is not what was asked for. A stopped or failed trial stays as it is and
-  is never run again; no later trial of the dispatch starts. One dispatch runs
-  at a time (the `live-eval` concurrency group).
+  is never run again; no later trial of the dispatch starts. Dispatches run
+  one at a time in the `live-eval` concurrency group, except two kinds of
+  dispatch with the input `parallel` (default false). A dispatch of the
+  whole-flow timer, `flow/axil-timer`, runs in `live-eval-timer-on` or
+  `live-eval-timer-off` by its `knowledge` input, a replay included, so GitHub
+  never runs two timer runs of one arm together, nor more than two timer runs;
+  the window and the order of its slots rest on whatever dispatches it. A
+  dispatch of a case that is neither `flow/` nor `firmware/` runs in a group
+  of its own, `live-eval-run-<run id>`, so it is never queued behind another
+  run and none can cancel it, and the width is held by whatever dispatches it.
+  The register block, every other `flow/` case and every `firmware/` case stay
+  in `live-eval` whatever the input says. The first step of the `replay` and
+  `live-eval` jobs fails the run when `parallel` is asked for one of them; the
+  second step fails every dispatch whose case is not written exactly as its ID
+  (`^[a-z0-9][a-z0-9/_.-]*$`, no `..`), reading the case only from the job's
+  environment, because GitHub compares strings ignoring case and the trial
+  command strips the name. Both come before the checkout and before any step
+  that reads the secret. The input is used by the timer's slots, its second
+  measured run, the replay of gate ET5's record and the shake-out (decision T3
+  of the seventh addendum to
+  `council/records/2026-11-17-g3-whole-flow-cases.md`), and by the wave 2
+  re-measure batch's cases in its slots and its replays (decision P2 of the
+  addendum to `council/records/2026-11-23-wave-2-close-meeting-1.md`).
 - **Seat code runs as an account of its own** (gates WF9 and WF17 of the G3
   council record, `council/records/2026-11-17-g3-whole-flow-cases.md`). The
   runner user has passwordless sudo, owns the checkout, the installed package
@@ -321,7 +342,15 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   of that (gate ET5) is `evals/flow/et5_replay_record.json`, which holds no
   run of the timer's controls or of the committed fixtures. It shows those
   probes denied through those tools as the account in that run, and nothing
-  more; the `live-eval` job has no recorded run of them yet.
+  more. The measured run's reach records are committed as
+  `evals/flow/tool_reach_measured_run.json` and the folder beside it (gate ET10), and cited in the words of that
+  index's own `about` field: in that run, on that commit, with purpose `calibration`, in its `live-eval` and `rejudge`
+  jobs, the listed probes were denied to `nirmaan-seat` through the named tools. The write and network probes ran
+  through `vvp` only, and are cited to the committed log lines of the reach step's first part, not to the tool reach
+  record. It covers no other run, commit or slot, and it states nothing of that run's trial. The reach records of run
+  45196235508, which is no longer the measured run, are committed as records only under
+  `evals/flow/tool_reach_measured_run_superseded_45196235508.json` and the folder beside it, and are never read as the
+  gate ET10 file (sixth addendum to `council/records/2026-11-17-g3-whole-flow-cases.md`, decision P3, item 5).
 - **Gate ET5's controls, sweep and fixtures as the account.** A replay of
   `flow/axil-timer` dispatched with `controls: true` also runs
   `scripts/live_eval_controls.py` in the `replay` job, after the reference
@@ -336,9 +365,57 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   of the checkout in a `/tmp/nirmaan-*` folder only the runner may read,
   since the account reads only input files the runner made in such a folder.
   A missing tool fails its test. The job uploads the result as
-  `live-eval-controls-<run id>`. Until a record of such a run is committed,
-  nothing here says the controls, the sweep or the fixtures were run as the
-  account.
+  `live-eval-controls-<run id>`. The committed record is
+  `evals/flow/et5_controls_record.json`, of
+  [run 45119522138](https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45119522138),
+  a replay of `flow/axil-timer` with `controls` set, dispatched on `main` at
+  c0ba283c (the merge of ip#464). As the account, all seven timer controls
+  gave the verdicts of `evals/flow/controls_record.json`, and all 100 sweep
+  rows (the reference and 99 mutants) gave the record's result, error count
+  and first failure. Of the 402 fixture tests, 390 passed and 12 failed,
+  none skipped, so the `replay` job failed at that step. Every must-refuse
+  fixture passed. The 12 are 11 bypass controls and one must-pass test. Run
+  45119522138's own record shows the failed assertions and their messages only. Run
+  45135605510's bypass record (`docs/evidence/et5/run-45135605510`), for the
+  same 11 controls by name, shows that in each the tool ran through the
+  account's wrapper; in the two shell controls the payload itself (`touch`)
+  ran and its write was refused, and in the others the tool printed that it
+  could not open, resolve or write its target (security's statement, decision
+  E1 of the third addendum, which reads the two `verilator --lint-only` forms
+  as an inference). Which layer refused is in neither record. The must-pass test is a formal setup
+  over an approved file linked beside it, which did not run as the account.
+  The record lists each with its message. The same run's replay passed, its
+  re-judge was the same, and its reach test denied every probe in both
+  jobs. Whether gate ET5 is met is verification-lead's statement, which the
+  record does not make. Verification-lead read the record and stated ET5 not
+  met (plan section 21.4).
+- **Gate ET5 stated on run 45159697183** (gate ET18 of the third addendum). A
+  replay of `flow/axil-timer` with `controls` set, no model and no token,
+  was dispatched on `main` at f8dcc97e (the merge of ip#475, which holds gate
+  ET17), as [run 45159697183](https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45159697183).
+  Its replay of the reference answer passed, and the listed probes of
+  each tool reach record were denied (32 entries in each, `every_denied`
+  true) in its `replay` job (attempt 1) and its `rejudge` job (attempt 2). As the account, all seven timer
+  controls and all 100 sweep rows gave the results of the committed records;
+  the controls step failed because 13 bypass controls of gate ET1 failed. Of
+  its 408 fixture tests none was skipped, and the linked setup and every
+  must-refuse fixture passed. The
+  committed record, `evals/flow/et5_controls_record_45159697183.json`, reads
+  each by decision E2 of the third addendum: the tool ran through the
+  account's wrapper and the tool's own line names the target it could not
+  open, resolve or write. The controls that ran as the caller are listed and
+  claimed for nothing. The run's uploads, and its tool reach records, are
+  committed as uploaded in `docs/evidence/et5/run-45159697183`, and
+  `tests/test_live_eval_controls.py` holds the record to them and checks that
+  no bypass entry run as the account holds a target's content. The record
+  does not say ET5 is met; verification-lead stated ET5 met on this run at
+  f8dcc97e on the condition that the pinned values on the commit the measured
+  run is dispatched from equal f8dcc97e's (plan section 23.5). This is a
+  replay, not a reach record of the measured run or of a slot, and it covers
+  no other run or commit. The reference answer's pass rests on the step result
+  GitHub reported; no replay result file is committed. If a pinned group
+  moves after the statement, ET5 is open again. `evals/flow/et5_controls_record.json`
+  (run 45119522138) and its test are unchanged.
 - **The tools that read seat Verilog run as the account too** (gates ET2 to
   ET4 of `council/records/2026-11-22-eda-tools-seat-account.md`). The input
   screen (`eda_guard`) reads seat files with patterns of its own, and the
@@ -360,13 +437,26 @@ machine. One dispatch runs one case with these inputs: `case`, `trials` (1 to
   which every `/tmp/nirmaan-*` folder that holds one of the run's input files
   is replaced by an empty folder holding only those files, each read only at
   its own path, and the run's own directory. The run names its directory and
-  its input files (the sources, the setup and every file its `[files]` names,
-  the other files its parameters name) in each step's environment
-  (`nirmaan.integrations.eda`, `seat_inputs`), and the root helper refuses an
+  its input files (the sources, the setup and every file its `[files]` names
+  that is the run's own, the other files its parameters name) in each step's
+  environment (`nirmaan.integrations.eda`, `seat_inputs`). A `[files]` entry is
+  the run's own only when its file is inside the setup's folder or one of the
+  sources, whether or not the screen ran, and `formal.cover` reads and copies
+  as the caller only such files (gate ET17 of the record's third addendum;
+  `docs/GATE_INPUTS.md`, section 8): before that, with the screen bypassed, an
+  entry naming a runner-made file under `/tmp/nirmaan-*` was an input, and
+  replay run 45135605510 showed a bypass control's host file in its summary as
+  the account (the addendum's fact T7). The root helper refuses an
   input that is not a regular file of the runner's, with one name, inside a
   `/tmp/nirmaan-*` folder the runner made, reached through no link; nothing
   runs then. An input other accounts may not read by its mode gets a read
-  grant for that run only. A file beside an input that the seat wrote but
+  grant for that run only. Any link of the runner's in a folder that holds
+  an input outside the run's directory, whose text is exactly an input's
+  path, is in the view as that input's own file, read only (`beside_links`).
+  M68's `beside` places such a link: an approved file under its own name
+  beside the setup that names it relative to itself, which the harness names
+  by the file it leads to. No other link is shown, so the account reads no
+  file it was not given. A file beside an input that the seat wrote but
   the gate was not given is not in the view either, so a seat file that
   includes a sibling it did not pass to the gate fails there where it would
   pass elsewhere. What the account was shown denied is only what the reach
@@ -668,6 +758,12 @@ input, so roughly $13 to $20. Results land in
   without its secret; its trials run one at a time and stop on a limit, an
   odd exit or a record that is not the trial asked for, and none runs again
   (`tests/test_live_eval_ci.py`);
+- the concurrency block word for word; the group it gives a timer dispatch
+  with `parallel` by arm, a single-seat case with and without it, and the
+  register block, every other `flow/` case and every `firmware/` case
+  (`live-eval` whatever the input); both guards before the checkout and the
+  secret, the second refusing the timer's name in another letter case or with
+  a space and passing every case ID (`tests/test_live_eval_ci.py`);
 - gate WF17: every trial job makes the seat account and runs the reach test
   before the trials, between two tree hashes; the counting re-judge is a job of
   its own, on a fresh checkout of the trial job's commit, from the artifact

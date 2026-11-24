@@ -8,9 +8,11 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import re
 import stat
 import subprocess
 import sys
+import textwrap
 from pathlib import Path
 
 import pytest
@@ -803,3 +805,281 @@ def test_the_broken_driver_control_needs_the_reference_to_pass_each_fixture_to_f
     assert broken.problems(bad, require_seat=False) == []
     workflow = (REPO / ".github" / "workflows" / "live-eval.yml").read_text(encoding="utf-8")
     assert "python scripts/live_eval_fw_broken.py --out \"$RUNNER_TEMP/fw-reach/fw-broken.json\" --require-seat" in workflow
+
+
+# --- Parallel dispatches: the wave 2 re-measure batch's cases (addendum P2 of council/records/2026-11-23-wave-2-close-
+# meeting-1.md) and the whole-flow timer two at a time, one group per arm (seventh addendum to
+# council/records/2026-11-17-g3-whole-flow-cases.md, decision T3)
+
+WORKFLOW = REPO / ".github" / "workflows" / "live-eval.yml"
+TIMER, REGBLOCK = "flow/axil-timer", "flow/axi4-lite-regs-driver"
+GROUP = ("${{ inputs.parallel && inputs.case == 'flow/axil-timer' && (inputs.knowledge == 'off' && "
+         "'live-eval-timer-off' || 'live-eval-timer-on') || inputs.parallel && !startsWith(inputs.case, 'flow/') && "
+         "!startsWith(inputs.case, 'firmware/') && format('live-eval-run-{0}', github.run_id) || 'live-eval' }}")
+GUARD = "Refuse parallel for the register block, other whole-flow and firmware cases"
+FORM_GUARD = "Refuse a case not written in its exact form"
+RUN_ID = "45073595509"
+_EXPR_TOKEN = re.compile(r"\s*(?:('(?:[^']|'')*')|(&&|\|\||==|!=|!|\(|\)|,)|([A-Za-z_][\w.-]*))")
+
+
+def _evaluate(expression: str, context: dict) -> object:
+    """The part of GitHub's expression language the group and the guards use: `!`, then `==` and `!=` (strings
+    compared ignoring case, as GitHub does), then `&&`, then `||`, each `&&` and `||` giving one of its operands as
+    GitHub does; `startsWith` (ignoring case) and `format`; string literals; and names looked up in `context`.
+    Anything else fails the test."""
+    body = expression.strip()
+    assert body.startswith("${{") and body.endswith("}}"), body
+    text, tokens, at = body[3:-2].strip(), [], 0
+    while at < len(text):
+        match = _EXPR_TOKEN.match(text, at)
+        assert match and match.end() > at, text[at:]
+        tokens.append(match.group(1) or match.group(2) or match.group(3))
+        at = match.end()
+    tokens.append(None)
+    pos = 0
+
+    def take(want=None):
+        nonlocal pos
+        token = tokens[pos]
+        assert want is None or token == want, (want, token, text)
+        pos += 1
+        return token
+
+    def primary():
+        token = take()
+        if token == "(":
+            value = either()
+            take(")")
+            return value
+        if token == "!":
+            return not primary()
+        if token.startswith("'"):
+            return token[1:-1].replace("''", "'")
+        if tokens[pos] == "(":
+            take("(")
+            args = [either()]
+            while tokens[pos] == ",":
+                take(",")
+                args.append(either())
+            take(")")
+            if token == "startsWith":
+                return str(args[0]).lower().startswith(str(args[1]).lower())
+            if token == "format":
+                return re.sub(r"\{(\d+)\}", lambda m: str(args[1 + int(m.group(1))]), args[0])
+            raise AssertionError(f"function {token} is not in the subset")
+        assert token in context, token
+        return context[token]
+
+    def compared():
+        value = primary()
+        while tokens[pos] in ("==", "!="):
+            op, right = take(), primary()
+            if isinstance(value, str) and isinstance(right, str):
+                same = value.lower() == right.lower()
+            else:
+                assert type(value) is type(right), (value, right)  # the workflow compares strings with strings only
+                same = value == right
+            value = same if op == "==" else not same
+        return value
+
+    def both():
+        value = compared()
+        while tokens[pos] == "&&":
+            take()
+            right = compared()
+            value = right if value else value
+        return value
+
+    def either():
+        value = both()
+        while tokens[pos] == "||":
+            take()
+            right = both()
+            value = value if value else right
+        return value
+
+    value = either()
+    assert tokens[pos] is None, tokens[pos:]
+    return value
+
+
+def test_the_evaluator_compares_strings_ignoring_case_as_github_does():
+    assert _evaluate("${{ inputs.case == 'flow/axil-timer' }}", {"inputs.case": "FLOW/Axil-Timer"}) is True
+    assert _evaluate("${{ inputs.case != 'flow/axil-timer' }}", {"inputs.case": "FLOW/Axil-Timer"}) is False
+    assert _evaluate("${{ inputs.case == 'flow/axil-timer' }}", {"inputs.case": " flow/axil-timer"}) is False
+    assert _evaluate("${{ !(inputs.a == 'x') && 'y' || 'z' }}", {"inputs.a": "X"}) == "z"
+
+
+def _jobs_of(text: str) -> dict[str, str]:
+    block = text.split("\njobs:\n", 1)[1]
+    parts = re.split(r"^  ([\w-]+):\s*$", block, flags=re.MULTILINE)
+    return dict(zip(parts[1::2], parts[2::2]))
+
+
+def _job_steps(job: str) -> list[str]:
+    return ("\n" + job.split("\n    steps:\n", 1)[1]).split("\n      - ")[1:]
+
+
+def _step(job: str, name: str) -> str:
+    return next(step for step in _job_steps(job) if step.splitlines()[0] == f"name: {name}")
+
+
+def _group(case: str, parallel: bool, knowledge: str = "on", replay: bool = False) -> object:
+    """The group the workflow file itself gives (its one concurrency block), for these inputs."""
+    text = WORKFLOW.read_text(encoding="utf-8")
+    expression = re.search(r"^concurrency:\n  group: (.*)$", text, flags=re.MULTILINE).group(1)
+    return _evaluate(expression, {"inputs.parallel": parallel, "inputs.case": case, "inputs.knowledge": knowledge,
+                             "inputs.replay": replay, "github.run_id": RUN_ID})
+
+
+def _guard_condition(job: str) -> str:
+    guard = _job_steps(_jobs_of(WORKFLOW.read_text(encoding="utf-8"))[job])[0]
+    return re.search(r"^        if: (.*)$", guard, flags=re.MULTILINE).group(1)
+
+
+def _form_guard_refuses(case: str) -> bool:
+    """Run the form guard's own script, as the job's shell runs it, with the case in its environment only."""
+    step = _step(_jobs_of(WORKFLOW.read_text(encoding="utf-8"))["live-eval"], FORM_GUARD)
+    script = textwrap.dedent(step.split("\n        run: |\n", 1)[1])
+    env = {"PATH": "/usr/bin:/bin", "CASE": case, "LC_ALL": "C"}
+    done = subprocess.run(["bash", "--noprofile", "--norc", "-eo", "pipefail", "-c", script], env=env,
+                          capture_output=True, text=True)
+    assert done.returncode in (0, 1), done
+    return done.returncode == 1
+
+
+def test_the_parallel_input_is_a_boolean_that_defaults_to_false_after_controls():
+    triggers = WORKFLOW.read_text(encoding="utf-8").split("\non:", 1)[1].split("\npermissions:", 1)[0]
+    names = re.findall(r"^      (\w+):$", triggers, flags=re.MULTILINE)
+    assert names[names.index("controls") + 1] == "parallel" and names[-1] == "parallel", names
+    block = triggers.split("\n      parallel:\n", 1)[1]
+    assert re.findall(r"^        (type|default): (.*)$", block, flags=re.MULTILINE) == [("type", "boolean"),
+                                                                                       ("default", "false")]
+
+
+def test_the_concurrency_block_is_the_addendums_word_for_word():
+    text = WORKFLOW.read_text(encoding="utf-8")
+    block = re.escape(f"concurrency:\n  group: {GROUP}\n  cancel-in-progress: false\n")
+    assert len(re.findall(rf"^{block}", text, flags=re.MULTILINE)) == 1
+    assert text.count("concurrency:") == 1  # no job of its own sets another group
+
+
+@pytest.mark.parametrize("replay", [False, True])
+@pytest.mark.parametrize("knowledge", ["on", "off"])
+def test_a_timer_dispatch_with_the_input_runs_in_its_arms_group_a_replay_included(knowledge, replay):
+    assert _group(TIMER, True, knowledge, replay) == f"live-eval-timer-{knowledge}"
+    assert _group(TIMER, False, knowledge, replay) == "live-eval"
+
+
+@pytest.mark.parametrize("case", [REGBLOCK, "flow/x", "firmware/axi4-lite-driver", "firmware/x"])
+@pytest.mark.parametrize("parallel", [True, False])
+@pytest.mark.parametrize("knowledge", ["on", "off"])
+@pytest.mark.parametrize("replay", [False, True])
+def test_the_register_block_other_flow_and_firmware_cases_stay_in_the_one_group(case, parallel, knowledge, replay):
+    assert _group(case, parallel, knowledge, replay) == "live-eval"
+
+
+@pytest.mark.parametrize("case", ["dv/cocotb-crc", "rtl/apb-gpio", "spec/axi4-lite-interface"])
+@pytest.mark.parametrize("knowledge", ["on", "off"])
+def test_a_single_seat_case_gets_a_group_of_its_own_only_with_the_input(case, knowledge):
+    assert _group(case, True, knowledge) == f"live-eval-run-{RUN_ID}"
+    assert _group(case, False, knowledge) == "live-eval"
+
+
+@pytest.mark.parametrize("job", ["replay", "live-eval"])
+def test_the_parallel_guard_refuses_exactly_the_register_block_other_flow_and_firmware_cases(job):
+    condition = _guard_condition(job)
+    for case in (TIMER, REGBLOCK, "flow/x", "firmware/axi4-lite-driver", "firmware/x", "dv/cocotb-crc",
+                 "rtl/apb-gpio"):
+        for parallel in (True, False):
+            refused = bool(_evaluate(condition, {"inputs.parallel": parallel, "inputs.case": case}))
+            want = parallel and (case.startswith("firmware/") or (case.startswith("flow/") and case != TIMER))
+            assert refused == want, (case, parallel)
+
+
+@pytest.mark.parametrize("case", ["FLOW/AXIL-TIMER", "Flow/axil-timer", "flow/Axil-Timer", " flow/axil-timer",
+                                  "flow/axil-timer ", " flow/axil-timer ", "\tflow/axil-timer", "flow/axil-timer\n",
+                                  "flow/axil-timer\nflow/axil-timer", "flow/../flow/axil-timer", "flow/axil..timer",
+                                  "", "-x", "/flow/axil-timer", "flow/axil timer", "dv/cocotb-crc;id"])
+def test_the_form_guard_refuses_a_case_not_written_in_its_exact_form(case):
+    assert _form_guard_refuses(case)
+
+
+def test_the_timers_name_in_another_letter_case_or_with_space_passes_the_parallel_guard_so_the_form_guard_is_needed():
+    # Fact TF12: GitHub's == ignores case, and the trial command strips the name; neither of the first two lines
+    # alone stops these from running the timer outside its arm's group or in it under another spelling.
+    condition = _guard_condition("live-eval")
+    assert _group("FLOW/Axil-Timer", True) == "live-eval-timer-on"
+    assert _group(" flow/axil-timer", True) == f"live-eval-run-{RUN_ID}"
+    for case in ("FLOW/Axil-Timer", " flow/axil-timer"):
+        assert not _evaluate(condition, {"inputs.parallel": True, "inputs.case": case})
+        assert _form_guard_refuses(case)
+
+
+def test_every_case_id_under_evals_matches_the_form_guard():
+    from nirmaan.evals import load_cases
+
+    ids = [case.id for case in load_cases(REPO / "evals", flow=None)]
+    assert TIMER in ids and REGBLOCK in ids and "firmware/axi4-lite-driver" in ids
+    for case_id in ids:
+        assert not _form_guard_refuses(case_id), case_id
+
+
+@pytest.mark.parametrize("job", ["replay", "live-eval"])
+def test_both_guards_come_before_the_checkout_and_before_the_secret(job):
+    jobs = _jobs_of(WORKFLOW.read_text(encoding="utf-8"))
+    steps = _job_steps(jobs[job])
+    assert steps[0].splitlines()[0] == f"name: {GUARD}", steps[0]
+    assert steps[1].splitlines()[0] == f"name: {FORM_GUARD}", steps[1]
+    assert steps[2].startswith("uses: actions/checkout@"), steps[2]
+    for guard in steps[:2]:
+        assert "exit 1" in guard and "secrets." not in guard and "uses:" not in guard
+    form = steps[1]
+    assert "inputs." not in form and "${{" not in form and "\n        if:" not in form  # every dispatch, case from env
+    assert '"$CASE"' in form and "LC_ALL: C" in form
+    assert "\n      CASE: ${{ inputs.case }}\n" in jobs[job].split("\n    steps:\n", 1)[0]
+    with_secret = [i for i, step in enumerate(steps) if "secrets." in step]
+    if job == "replay":
+        assert with_secret == []  # the replay job reads no secret
+    else:
+        assert with_secret and with_secret[0] > 2
+        assert steps[with_secret[0]].splitlines()[0] == "name: Gate on the secret"
+
+
+def test_a_failed_guard_runs_no_trial_and_so_no_rejudge():
+    # A guard that fails skips the trials step, so no record is uploaded, so `rejudge` does not run (decision T3,
+    # item 4: the `rejudge` job runs only when one of the two jobs uploaded records).
+    jobs = _jobs_of(WORKFLOW.read_text(encoding="utf-8"))
+    for name, trials in (("replay", "Replay the reference answer"), ("live-eval", "Run the trials one at a time")):
+        job = jobs[name]
+        assert "\n      records: ${{ steps.upload.outcome == 'success' }}\n" in job
+        assert "\n        if:" not in _step(job, trials)
+        upload = next(step for step in _job_steps(job) if "\n        id: upload\n" in step)
+        assert "\n        if: always() && steps.trials.outcome != 'skipped'\n" in upload
+    rejudge = jobs["rejudge"]
+    assert "\n    needs: [replay, live-eval]\n" in rejudge
+    assert ("\n    if: ${{ always() && (needs.replay.outputs.records == 'true' || "
+            "needs.live-eval.outputs.records == 'true') }}\n") in rejudge
+
+
+def test_the_input_is_read_only_by_the_group_and_the_parallel_guards():
+    text = WORKFLOW.read_text(encoding="utf-8")
+    lines = [line for line in text.splitlines() if "inputs.parallel" in line]
+    assert len(lines) == 3, lines
+    assert lines[0] == f"  group: {GROUP}"
+    assert lines[1] == lines[2] and lines[1].startswith("        if: ${{ inputs.parallel")
+    jobs = _jobs_of(text)
+    for name, job in jobs.items():
+        for step in _job_steps(job)[1:] if name in ("replay", "live-eval") else _job_steps(job):
+            assert "inputs.parallel" not in step, (name, step.splitlines()[0])
+        assert "inputs.parallel" not in job.split("\n    steps:\n", 1)[0], name  # not in a job's env or condition
+    assert not any("inputs.parallel" in line for line in text.splitlines() if line.strip().startswith("run:"))
+
+
+def test_the_secret_is_read_where_it_was_and_nowhere_else():
+    text = WORKFLOW.read_text(encoding="utf-8")
+    assert text.count("secrets.CLAUDE_CODE_OAUTH_TOKEN") == 2
+    jobs = _jobs_of(text)
+    readers = [(name, step.splitlines()[0]) for name, job in jobs.items() for step in _job_steps(job)
+               if "secrets." in step]
+    assert readers == [("live-eval", "name: Gate on the secret"), ("live-eval", "name: Run the trials one at a time")]

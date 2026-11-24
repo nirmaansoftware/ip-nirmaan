@@ -39,6 +39,8 @@ LOOP = {**pr_loop.LOOP, "checks": [{"name": "dashes", "when": ["**"], "run": [
     ["{python}", "-c", "import os, sys; sys.exit(1 if os.path.exists('FAIL_CHECK') else 0)"]]}]}
 # One step at a time, for the tests of the order steps run in.
 SERIAL = {**LOOP, "parallel_reviews": 1}
+# Two workers, for the tests written when the loop stepped two at once.
+PAIR = {**LOOP, "parallel_reviews": 2}
 
 MAP = """version: 1
 teams:
@@ -158,7 +160,8 @@ class FakeGitHub:
             return '{"message":"Updating pull request branch."}'
         tmpw = self.origin.parent / f"upd-{len(self.updates)}"
         sh(self.origin.parent, "clone", "-q", "-b", "feature", str(self.origin), str(tmpw))
-        sh(tmpw, "config", "user.email", "gh@example.com")
+        # GitHub's own identity on an update-branch merge commit (web-flow).
+        sh(tmpw, "config", "user.email", "noreply@github.com")
         sh(tmpw, "config", "user.name", "GitHub")
         sh(tmpw, "merge", "-q", "--no-ff", "--no-edit", "origin/main")
         sh(tmpw, "push", "-q", "origin", "feature")
@@ -874,8 +877,7 @@ def test_transient_error_classification():
 
 def test_two_pull_requests_are_stepped_at_once_never_more_and_each_by_one_worker(repo):
     r = repo()
-    loop = r.loop()
-    assert LOOP["parallel_reviews"] == 2
+    loop = r.loop(loop=PAIR)
     pulls = [{"number": n} for n in (1, 2, 3, 4, 5)]
     loop.o["github"] = type("G", (), {"list_open_pulls": lambda self: pulls})()
     guard, active, peak, seen = threading.Lock(), set(), [0], []
@@ -902,7 +904,7 @@ def test_two_pull_requests_are_stepped_at_once_never_more_and_each_by_one_worker
 
 def test_a_pause_in_one_worker_starts_no_new_step(repo):
     r = repo()
-    loop = r.loop()
+    loop = r.loop(loop=PAIR)
     loop.o["github"] = type("G", (), {"list_open_pulls": lambda self: [{"number": n} for n in (1, 2, 3)]})()
     # Pull request 2 is taken while 1 is still in its step (which worker takes
     # which is the scheduler's choice), and 2's step ends only after the worker
@@ -926,6 +928,219 @@ def test_a_pause_in_one_worker_starts_no_new_step(repo):
     loop.step = step
     assert [x["outcome"] for x in loop.tick()] == ["paused", "wait"]
     assert sorted(seen) == [1, 2], "pull request 3 is not stepped"
+
+
+# --- Three pull requests at once ---------------------------------------------------------
+#
+# The width of three: council record 2026-11-19-parallel-keys.md, addendum 2026-11-24, decision A1,
+# held by its gates LW1 to LW5. The fake reviewers below run inside the real Loop.step (its skips,
+# labels, stops and pauses) on the real per pull request state store, model slots and pause file;
+# only the review itself (Loop._step) is a fake that takes a model slot for its one call, as the
+# review script does.
+
+
+class FakeReviewers:
+    """Open pull requests with their own heads, and a fake review for each: `verdicts` maps a pull
+    request to "pass" (the default), "stop" (a key fails and the loop stops) or "limit" (the plan's
+    limit). `in_call(n)` runs inside the model call, holding the slot; `before_call(n)` before the
+    pause gate; `after(n)` once the step's outcome is written."""
+
+    def __init__(self, loop, numbers, verdicts=None, in_call=None, heads=None, before_call=None, after=None):
+        self.loop, self.verdicts, self.in_call = loop, verdicts or {}, in_call or (lambda n: None)
+        self.before_call, self.after = before_call or (lambda n: None), after or (lambda n: None)
+        self.heads = heads or {n: f"{n:040x}" for n in numbers}
+        self.labels = {n: [] for n in numbers}
+        self.guard = threading.Lock()
+        self.on_pr, self.on_head, self.peak, self.calls, self.posts = set(), set(), [0], [], []
+        loop.o["github"] = self
+        loop._step = self.review
+
+    def _listed(self, n):
+        return {"number": n, "draft": False, "head_repo": CONFIG["repo"], "base_ref": "main", "author": "patel-om",
+                "labels": list(self.labels[n]), "head_sha": self.heads[n], "state": "open"}
+
+    def list_open_pulls(self):
+        return [self._listed(n) for n in self.heads]
+
+    def get_pull(self, n):
+        return self._listed(n)
+
+    def add_labels(self, n, labels):
+        with self.guard:
+            self.posts.append((n, "label", tuple(labels)))
+            self.labels[n] += labels
+
+    def create_comment(self, n, body):
+        with self.guard:
+            self.posts.append((n, "comment", body))
+        return f"https://github.example/pr/{n}"
+
+    def review(self, ctx, listed):
+        loop, n, head, st = self.loop, ctx["n"], ctx["head"], ctx["st"]
+        if (st.get("done") or {}).get("head") == head:
+            return {"outcome": "skip", "reason": "finished on this head"}
+        self.before_call(n)
+        why = loop._paused_now()
+        if why:
+            return {"outcome": "paused", "reason": why}
+        release, holder = pr_review.acquire_slot(loop.state_dir, {"repo": CONFIG["repo"], "pr": n, "key": "key1"}, loop.cfg["model_cap"])
+        if release is None:
+            return {"outcome": "busy", "reason": f"no model slot ({(holder or {}).get('pr')})"}
+        try:
+            with self.guard:
+                assert n not in self.on_pr, "one pull request is never reviewed by two workers"
+                assert head not in self.on_head, "one head is never reviewed by two workers"
+                self.on_pr.add(n)
+                self.on_head.add(head)
+                self.peak[0] = max(self.peak[0], len(self.on_pr))
+                self.calls.append(n)
+            self.in_call(n)
+            time.sleep(0.01)
+            with self.guard:
+                self.on_pr.discard(n)
+                self.on_head.discard(head)
+        finally:
+            release()
+        verdict = self.verdicts.get(n, "pass")
+        if verdict == "stop":
+            res = loop._stop(ctx, head, f"key 1 failed on #{n}")
+        elif verdict == "limit":
+            res = loop._pause(ctx, head, "You've hit your 5-hour limit")
+        else:
+            st["done"] = {"head": head, "outcome": "ready", "at": pr_loop._now()}
+            pr_loop._save_state(loop.state_dir, CONFIG["repo"], st)
+            res = {"outcome": "ready"}
+        self.after(n)
+        return res
+
+
+def test_three_pull_requests_are_reviewed_at_once_never_more_each_pull_request_and_head_by_one_worker(repo):
+    assert LOOP["parallel_reviews"] == 3, "the council record's width (2026-11-19 addendum, decision A1)"
+    assert pr_review.CONFIG["model_cap"] >= LOOP["parallel_reviews"], "each worker can hold a model slot (gate LW1)"
+    assert pr_review.CONFIG["model_cap"] <= 3, "more than three slots is the founder's to say (gate LW1)"
+    r = repo()
+    loop = r.loop()
+    together = threading.Barrier(3, timeout=10)
+    fake = FakeReviewers(loop, range(1, 8), in_call=lambda n: together.wait() if n <= 3 else None)
+    results = loop.tick()
+    assert fake.peak[0] == 3, "three at once, never more"
+    assert sorted(fake.calls) == list(range(1, 8)), "every pull request reviewed once"
+    assert [(x["pr"], x["outcome"]) for x in results] == [(n, "ready") for n in range(1, 8)], "results in the pass's order"
+    for n in range(1, 8):
+        st = pr_loop.load_state(r.state, CONFIG["repo"], n)
+        assert st["pr"] == n and st["done"]["head"] == fake.heads[n] and st["stopped"] is None, "each state holds its own pull request"
+    assert [x["outcome"] for x in loop.tick()] == ["skip"] * 7 and len(fake.calls) == 7, "nothing more on finished heads"
+    assert not list((r.state / "loop").glob(".*.tmp")), "no temporary state file is left"
+
+
+def test_two_pull_requests_with_one_head_are_never_reviewed_at_once(repo):
+    r = repo()
+    loop = r.loop()
+    heads = {1: "a" * 40, 2: "a" * 40, 3: "b" * 40, 4: "a" * 40}
+    fake = FakeReviewers(loop, heads, heads=heads, in_call=lambda n: time.sleep(0.05))
+    assert [x["outcome"] for x in loop.tick()] == ["ready"] * 4, "each pull request is still reviewed in the pass"
+    assert sorted(fake.calls) == [1, 2, 3, 4]
+
+
+def test_a_stop_on_one_pull_request_leaves_the_others_reviewed_and_unlabelled(repo):
+    r = repo()
+    loop = r.loop()
+    together = threading.Barrier(3, timeout=10)
+    fake = FakeReviewers(loop, range(1, 6), verdicts={2: "stop"}, in_call=lambda n: together.wait() if n <= 3 else None)
+    results = loop.tick()
+    assert [(x["pr"], x["outcome"]) for x in results] == [(1, "ready"), (2, "stopped"), (3, "ready"), (4, "ready"), (5, "ready")]
+    assert fake.labels == {1: [], 2: ["needs-founder"], 3: [], 4: [], 5: []}, "only the stopped pull request is labelled"
+    assert {n for n, kind, _ in fake.posts} == {2}, "and only it gets a comment"
+    st2 = pr_loop.load_state(r.state, CONFIG["repo"], 2)
+    assert st2["stopped"]["head"] == fake.heads[2] and st2["stopped"]["labeled"] and st2["done"] is None
+    for n in (1, 3, 4, 5):
+        st = pr_loop.load_state(r.state, CONFIG["repo"], n)
+        assert st["stopped"] is None and st["done"]["head"] == fake.heads[n]
+    again = loop.tick()
+    assert [x["outcome"] for x in again] == ["skip"] * 5 and "needs-founder" in again[1]["reason"]
+    assert len(fake.calls) == 5, "no model call on the second pass"
+
+
+def test_a_rate_limit_in_one_worker_pauses_all_three_and_every_later_pass(repo):
+    r = repo()
+    loop = r.loop()
+    in_steps, written, first_pass = threading.Barrier(3, timeout=10), threading.Event(), [True]
+
+    def before_call(n):
+        # Pull requests 1, 2 and 3 are in their steps together; 2 and 3 reach their model call only
+        # after 1 hit the limit and wrote the pause.
+        if first_pass[0] and n <= 3:
+            in_steps.wait()
+            if n != 1:
+                assert written.wait(10)
+
+    fake = FakeReviewers(loop, range(1, 7), verdicts={1: "limit"}, before_call=before_call,
+                         after=lambda n: written.set() if n == 1 else None)
+    results = loop.tick()
+    first_pass[0] = False
+    assert [(x["pr"], x["outcome"]) for x in results] == [(1, "paused"), (2, "paused"), (3, "paused")], "no new step after the limit"
+    assert fake.calls == [1], "pull requests 2 and 3 made no model call once the pause was written"
+    assert json.loads(pause_file(r).read_text())["pr"] == 1
+    assert all(not labels for labels in fake.labels.values()) and fake.posts == [], "a limit labels and posts nothing"
+    assert [x["outcome"] for x in loop.tick()] == ["paused"] * 6 and fake.calls == [1], "the next pass makes no call at all"
+    fake.verdicts.clear()
+    end_pause(r)
+    assert [x["outcome"] for x in loop.tick()] == ["ready"] * 6, "after the pause the same heads are reviewed"
+    assert sorted(fake.calls) == [1, 1, 2, 3, 4, 5, 6]
+
+
+def test_one_worker_gives_the_same_results_state_and_labels_as_three(repo, tmp_path):
+    r = repo()
+
+    def run(lc, state):
+        loop = r.loop(loop=lc, state_dir=state)
+        fake = FakeReviewers(loop, range(1, 7), verdicts={3: "stop", 5: "stop"})
+        passes = [[(x["pr"], x["outcome"]) for x in loop.tick()] for _ in range(2)]
+        states = []
+        for n in range(1, 7):
+            st = pr_loop.load_state(state, CONFIG["repo"], n)
+            states.append((st["pr"], st["rounds"], st["seen"], st["last_fix_head"], (st["done"] or {}).get("head"),
+                           {k: v for k, v in (st["stopped"] or {}).items() if k != "at"}))
+        return passes, states, sorted(fake.calls), fake.labels, sorted(fake.posts), fake.peak[0]
+    serial, three = run(SERIAL, tmp_path / "one"), run(LOOP, tmp_path / "three")
+    assert serial[:5] == three[:5], "the same results, state, model calls, labels and comments"
+    assert serial[5] == 1 and three[5] <= 3, "one worker reviews one pull request at a time"
+
+
+def test_concurrent_state_and_pause_writes_are_never_seen_half_written(tmp_path):
+    state, repo_name = tmp_path / "state", CONFIG["repo"]
+    big = {f"finding-{i:05d}": i for i in range(4000)}
+    for n in (1, 2, 3):
+        pr_loop._save_state(state, repo_name, {**pr_loop.load_state(state, repo_name, n), "seen": big, "rounds": 1})
+    pause = pr_loop.pause_path(state)
+    pr_loop._write_whole(pause, json.dumps({"until": "2999-01-01T00:00:00+00:00", "pr": 0, "reason": "x" * 50_000}))
+    stop, bad = threading.Event(), []
+
+    def writer(n):
+        for k in range(150):
+            pr_loop._save_state(state, repo_name, {"pr": n, "rounds": k, "seen": big, "last_fix_head": None, "done": None, "stopped": None})
+            pr_loop._write_whole(pause, json.dumps({"until": "2999-01-01T00:00:00+00:00", "pr": n, "reason": "x" * (50_000 + k)}))
+
+    def reader():
+        while not stop.is_set():
+            for n in (1, 2, 3):
+                st = pr_loop.load_state(state, repo_name, n)
+                if st["pr"] != n or st["seen"] != big:
+                    bad.append(("state", n))
+            if pr_loop.read_pause(state) is None:
+                bad.append(("pause",))
+    writers = [threading.Thread(target=writer, args=(n,)) for n in (1, 2, 3)]
+    readers = [threading.Thread(target=reader) for _ in range(2)]
+    for t in readers + writers:
+        t.start()
+    for t in writers:
+        t.join(60)
+    stop.set()
+    for t in readers:
+        t.join(60)
+    assert bad == [], "a reader saw a half-written state or pause file"
+    assert [pr_loop.load_state(state, repo_name, n)["rounds"] for n in (1, 2, 3)] == [149, 149, 149], "no update was lost"
+    assert not list((state / "loop").glob(".*.tmp"))
 
 
 def test_a_pause_written_mid_review_stops_the_next_model_call(repo, monkeypatch):
@@ -1082,12 +1297,13 @@ def test_a_merge_conflict_stops_and_removing_the_label_resumes(repo):
 def test_every_model_slot_held_elsewhere_makes_the_step_busy_and_one_free_slot_is_enough(repo):
     r = repo()
     held = [pr_review.acquire_lock(r.state, {"repo": "nirmaansoftware/Nirmaan", "pr": 9}, name=name)[0]
-            for name in ("review.lock", "model-slot-1.lock")]
-    assert r.tick() == ["busy"] and r.calls() == [], "both slots of the cap (2) taken: no model call"
+            for name in ("review.lock", "model-slot-1.lock", "model-slot-2.lock")]
+    assert r.tick() == ["busy"] and r.calls() == [], "every slot of the cap (3) taken: no model call"
     held[1]()
     assert r.tick() == ["auto-merge"], "the shared review.lock held (the Nirmaan loop reviewing): this loop takes slot 1"
     held[0]()
-    assert not any((r.state / n).exists() for n in ("review.lock", "model-slot-1.lock"))
+    held[2]()
+    assert not any((r.state / n).exists() for n in ("review.lock", "model-slot-1.lock", "model-slot-2.lock"))
 
 
 def test_a_model_slot_is_held_for_each_review_call_and_the_fixer_call_and_free_during_the_local_checks(repo, monkeypatch):
@@ -1121,9 +1337,9 @@ def test_a_lock_held_elsewhere_between_key1_and_key2_ends_the_step_and_the_next_
 
     def acquire(state_dir, owner, *a, **kw):
         if other.get("release") is None and "release" in other and kw.get("name", "review.lock") == "review.lock":
-            # Both model slots taken elsewhere (the Nirmaan loop and a hand run).
+            # Every model slot (cap 3) taken elsewhere (the Nirmaan loop and hand runs).
             held = [real_acquire(state_dir, {"repo": "nirmaansoftware/Nirmaan", "pr": 9}, name=name)[0]
-                    for name in ("review.lock", "model-slot-1.lock")]
+                    for name in ("review.lock", "model-slot-1.lock", "model-slot-2.lock")]
             other["release"] = lambda: [h() for h in held]
         return real_acquire(state_dir, owner, *a, **kw)
     monkeypatch.setattr(pr_review, "acquire_lock", acquire)
@@ -1251,6 +1467,260 @@ def test_no_post_never_updates_a_branch(repo):
     r.advance_main()
     r.tick(post="none")
     assert r.github.updates == [] and r.origin_head() == r.first_head
+
+
+# --- Carrying passing verdicts across the loop's merge of main ----------------------
+#
+# main's ruleset requires branches to be up to date (strict, on since 2026-11-23), so every
+# move of main makes each open pull request "behind" and the loop merges main into it. A
+# passing verdict on the head before that merge carries to the merge only when every carry
+# condition of pr_review.carry_basis holds; anything else is reviewed from scratch.
+
+
+def _main_commit(r, rel, text):
+    """A commit on main in origin writing `rel`; the branch is then behind."""
+    w = r.work
+    sh(w, "checkout", "-q", "main")
+    sh(w, "pull", "-q", "origin", "main")
+    write(w, rel, text)
+    sh(w, "add", "-A")
+    sh(w, "commit", "-qm", f"main changes {rel}")
+    sh(w, "push", "-q", "origin", "main")
+    r.github.behind = True
+
+
+def _main_moves_after(r, calls, move=None):
+    """main moves once the review has made `calls` model calls, so the loop updates
+    the branch instead of merging it."""
+    moved = []
+
+    def when():
+        if not moved and len(r.calls()) >= calls:
+            moved.append(sh(r.origin, "rev-parse", "refs/heads/main"))
+            (move or r.advance_main)()
+        return False
+    r.github.behind_when = when
+    return moved
+
+
+def _carried(r):
+    return [l for l in r.log() if l.get("outcome") == "carried"]
+
+
+def _refused(r):
+    return [l for l in r.log() if l.get("outcome") == "carry-refused"]
+
+
+def _refused_key1(r):
+    """The conditions key 1 was refused on; key 2 is then refused at least on "upstream"."""
+    refused = _refused(r)
+    assert refused and all("upstream" in l["conditions"] for l in refused if l["key"] == 2)
+    return {c for l in refused if l["key"] == 1 for c in l["conditions"]}
+
+
+def _author_push(r, tmp_path, then):
+    w = tmp_path / "author"
+    sh(tmp_path, "clone", "-q", "-b", "feature", str(r.origin), str(w))
+    sh(w, "config", "user.email", "agent@example.com")
+    sh(w, "config", "user.name", "Agent")
+    then(w)
+    sh(w, "push", "-q", "origin", "feature")
+    shutil.rmtree(w)
+
+
+def test_passing_verdicts_carry_across_the_loops_merge_of_main_with_a_note_and_a_log_line(repo):
+    r = repo()
+    moved = _main_moves_after(r, 2)
+    assert r.tick() == ["updated"]
+    r.github.behind_when = None
+    reviewed_main, new = moved[0], r.origin_head()
+    assert r.tick() == ["auto-merge"]
+    assert len(r.calls()) == 2, "no new model call: both keys carried"
+    assert r.github.merges[0][-1] == new
+    assert [(l["key"], l["head"], l["from_head"], l["from_main"], l["verdict"]) for l in _carried(r)] == [
+        (1, new, r.first_head, reviewed_main, "pass"), (2, new, r.first_head, reviewed_main, "pass")]
+    on_new = [c for c in r.comments() if c.startswith("<!-- nirmaan-pr-review key=") and f"head={new}" in c.split("\n")[0]]
+    assert len(on_new) == 2
+    for c in on_new:
+        assert f"Verdict carried from head {r.first_head}" in c and f"main {reviewed_main}" in c
+        assert "update-branch merge" in c and "the required CI ran on this head" in c
+    checks = [(p["name"], p["state"]) for p in r.github.posts if p["type"] == "check"][-2:]
+    assert checks == [("review/team-lead", "success"), ("review/executive", "success")]
+    assert not _refused(r)
+
+
+def test_a_founder_class_pull_request_carries_both_keys_and_the_founder_proxy(repo):
+    r = repo(change=_change_github)
+    _main_moves_after(r, 3)
+    assert r.tick() == ["updated"]
+    r.github.behind_when = None
+    assert r.tick() == ["auto-merge"]
+    assert len(r.calls()) == 3, "the pull request's own control-plane file does not stop the carry"
+    assert [l["key"] for l in _carried(r)] == [1, 2, "proxy"]
+    assert "Verdict carried from head" in [c for c in r.comments() if "Founder Proxy (agent), acting" in c][-1]
+
+
+def test_carry_follows_several_loop_merges_while_ci_runs(repo):
+    r = repo()
+    _main_moves_after(r, 2)
+    assert r.tick() == ["updated"]
+    r.github.behind_when = None
+    once = r.origin_head()
+    r.github.ci = lambda sha: "pending" if sha == once else "success"
+    r.advance_main()
+    assert r.tick() == ["updated"], "main moved again before the merged head was reviewed"
+    twice = r.origin_head()
+    assert twice != once and r.tick() == ["auto-merge"]
+    assert len(r.calls()) == 2
+    assert {(l["head"], l["from_head"]) for l in _carried(r)} == {(twice, r.first_head)}
+
+
+def test_ci_is_never_carried_the_new_head_waits_for_its_own_required_ci(repo):
+    r = repo()
+    _main_moves_after(r, 2)
+    assert r.tick() == ["updated"]
+    r.github.behind_when = None
+    new = r.origin_head()
+    r.github.ci = lambda sha: "pending" if sha == new else "success"
+    assert r.tick() == ["wait"] and not _carried(r)
+    r.github.ci = lambda sha: "failure" if sha == new else "success"
+    assert r.tick() == ["skip"] and not _carried(r) and r.github.merges == []
+    r.github.ci = lambda sha: "success"
+    assert r.tick() == ["auto-merge"] and len(_carried(r)) == 2 and len(r.calls()) == 2
+
+
+def test_no_carry_when_the_author_merged_main_into_the_branch_themselves(repo, tmp_path):
+    r = repo(gh={"auto_merge_allowed": "false"})
+    assert r.tick() == ["ready"]
+    r.advance_main()
+    r.github.update_async = True
+    assert r.tick() == ["updated"] and r.origin_head() == r.first_head, "the loop asked; GitHub has not merged yet"
+    _author_push(r, tmp_path, lambda w: sh(w, "merge", "-q", "--no-ff", "--no-edit", "origin/main"))
+    r.github.behind = False
+    assert r.tick() == ["ready"]
+    assert len(r.calls()) == 4 and not _carried(r), "a merge commit the author made is reviewed from scratch"
+    assert _refused_key1(r) == {"loop-merge"}
+
+
+def test_no_carry_when_the_author_pushed_a_commit_after_the_loops_merge(repo, tmp_path):
+    r = repo()
+    _main_moves_after(r, 2)
+    assert r.tick() == ["updated"]
+    r.github.behind_when = None
+    _author_push(r, tmp_path, lambda w: sh(w, "commit", "-q", "--allow-empty", "-m", "author"))
+    assert r.tick() == ["auto-merge"]
+    assert len(r.calls()) == 4 and not _carried(r)
+    assert _refused_key1(r) == {"loop-merge"}
+
+
+def test_no_carry_when_the_pull_requests_diff_changed_on_the_merge(repo):
+    # main changed the pull request's file before the review (the branch was not yet
+    # reported behind), so the merge changes the diff even though main's later move does not
+    # touch that file.
+    r = repo(gh={"auto_merge_allowed": "false"})
+    _main_commit(r, "src/app.py", "one\ntwo\nthree\n\nfour\n")
+    r.github.behind = False
+    assert r.tick() == ["ready"]
+    r.advance_main()
+    assert r.tick() == ["updated"]
+    assert r.tick() == ["ready"]
+    assert len(r.calls()) == 4 and not _carried(r)
+    assert _refused_key1(r) == {"same-diff"}
+
+
+def test_no_carry_when_main_touched_a_file_of_the_pull_request(repo):
+    r = repo()
+    _main_moves_after(r, 2, lambda: _main_commit(r, "src/app.py", "one\ntwo\nthree\n\nfour\n"))
+    assert r.tick() == ["updated"]
+    r.github.behind_when = None
+    assert r.tick() == ["auto-merge"]
+    assert len(r.calls()) == 4 and not _carried(r)
+    refused = _refused(r)
+    assert refused and all("main-delta" in l["conditions"] for l in refused)
+    assert "src/app.py" in refused[0]["detail"]
+
+
+@pytest.mark.parametrize("rel, text", [
+    ("council/README.md", "# Council\n"),
+    ("council/chair.md", "# chair\nSEAT-MARKER-chair\n\n## In a review (key 1)\nREVIEW-MARKER-chair\nmore\n"),
+    (".github/review-teams.yml", MAP + "# a comment\n"),
+    (".github/CODEOWNERS", "* @someone\n"),
+    (".github/workflows/ci.yml", "name: ci\n"),
+])
+def test_no_carry_when_main_touched_a_review_control_file(repo, rel, text):
+    r = repo()
+    _main_moves_after(r, 2, lambda: _main_commit(r, rel, text))
+    assert r.tick() == ["updated"]
+    r.github.behind_when = None
+    assert r.tick() == ["auto-merge"]
+    assert len(r.calls()) == 4 and not _carried(r)
+    refused = _refused(r)
+    assert _refused_key1(r) == {"main-delta"}
+    assert rel in refused[0]["detail"]
+
+
+def test_an_earlier_fail_verdict_never_carries(repo):
+    r = repo(gh={"auto_merge_allowed": "false"})
+    assert r.tick() == ["ready"]
+    cache = r.state / "verdicts" / CONFIG["repo"].replace("/", "_") / "pr-1"
+    k1 = next(cache.glob(f"{r.first_head}-*-k1-*.json"))
+    k1.write_text(json.dumps({**json.loads(k1.read_text()), "status": "fail"}))
+    r.advance_main()
+    assert r.tick() == ["updated"]
+    assert r.tick() == ["ready"]
+    assert len(r.calls()) == 4, "key 1 reviewed again, so key 2 is too: it never passes on key-1 results it did not judge"
+    assert not _carried(r)
+    assert [(l["key"], l["conditions"]) for l in _refused(r)] == [(1, ["pass"]), (2, ["upstream"])]
+
+
+def test_a_newer_verdict_that_is_not_a_pass_wins_over_an_older_pass_on_the_same_head(repo):
+    # A pass on the head against main M1, then a fail on the same head against M2 (a run
+    # by hand): the newest review of that head is the fail, so nothing carries.
+    r = repo(gh={"auto_merge_allowed": "false"})
+    assert r.tick() == ["ready"] and len(r.calls()) == 2
+    r.advance_main()
+    r.scenario([fail("bad")], [])
+    got = pr_review.run_review(str(r.work), 1, r.github, "none", str(r.bin), r.state, {"key1": "k1", "key2": "k2"}, 30, 0,
+                               config=CONFIG, sleep=lambda s: None, out=lambda s: None, fresh=True)
+    assert got["exit"] == pr_review.EXIT_OK and got["key1"][0]["status"] == "fail" and len(r.calls()) == 3
+    r.scenario([{"verdict": "pass"}], [])
+    assert r.tick() == ["updated"]
+    assert r.tick() == ["ready"]
+    assert len(r.calls()) == 5 and not _carried(r), "the older pass against M1 never carries over the newer fail"
+    assert [(l["key"], l["conditions"]) for l in _refused(r)] == [(1, ["pass"]), (2, ["pass", "upstream"])]
+
+
+def test_an_earlier_needs_founder_verdict_never_carries_the_proxy_runs_again(repo):
+    r = repo(change=_change_github, reviews=[{"verdict": "pass"}, {"verdict": "pass"}, NEEDS])
+    assert r.tick() == ["stopped"] and len(r.calls()) == 3
+    r.advance_main()
+    r.github.labels = []
+    assert r.tick() == ["updated"]
+    assert r.tick() == ["stopped"]
+    assert len(r.calls()) == 4, "the Founder Proxy ran again on the merged head"
+    assert [l["key"] for l in _carried(r)] == [1, 2]
+    assert [(l["key"], l["conditions"]) for l in _refused(r)] == [("proxy", ["pass"])]
+
+
+def test_a_review_run_by_hand_never_carries(repo):
+    r = repo()
+    _main_moves_after(r, 2)
+    assert r.tick() == ["updated"]
+    r.github.behind_when = None
+    got = pr_review.run_review(str(r.work), 1, r.github, "none", str(r.bin), r.state, {"key1": "k1", "key2": "k2"}, 30, 0,
+                               config=CONFIG, sleep=lambda s: None, out=lambda s: None)
+    assert got["exit"] == pr_review.EXIT_OK and len(r.calls()) == 4 and not _carried(r)
+
+
+@pytest.mark.parametrize("path, control", [
+    ("council/README.md", True), ("council/security.md", True), ("council/records/2026-10-17-teams-and-pr-review.md", True),
+    (".github/review-teams.yml", True), (".github/workflows/ci.yml", True), (".github/CODEOWNERS", True), ("CODEOWNERS", True),
+    ("docs/CODEOWNERS", True), ("scripts/pr_review.py", True), ("scripts/pr_loop.py", True), ("scripts/review_map.py", True),
+    ("scripts/loop_cloud.py", True), ("CLAUDE.md", True), (".claude/agents/x.md", True), ("docs/REVIEW_MECHANISM.md", True),
+    ("src/app.py", False), ("scripts/pr_review_notes.py", False), ("councils/x.md", False), ("evals/results/x.json", False),
+])
+def test_the_review_control_files(path, control):
+    assert pr_review.carry_control(path, pr_review.CONFIG) is control
 
 
 # --- The generated levels file ------------------------------------------------------

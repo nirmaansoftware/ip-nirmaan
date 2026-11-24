@@ -45,7 +45,7 @@ import subprocess
 import sys
 import tempfile
 import time
-from collections.abc import Iterator, MutableMapping
+from collections.abc import Iterable, Iterator, MutableMapping
 from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -126,7 +126,8 @@ SEAT_MODEL = "nirmaan-seat-model"
 #: any step.
 SEAT_TOOLS_ENV = "NIRMAAN_SEAT_TOOLS"
 #: What a run tells the wrappers, in each step's environment: its own directory and the files it was given (the
-#: sources, the setup and what its ``[files]`` name, the other files its parameters name). The seat account's view of
+#: sources, the setup and what its ``[files]`` name of the run's own, ``own_file``, the other files its parameters
+#: name). The seat account's view of
 #: the run holds those and nothing else of the run folders (``scripts/live_eval_seat.py``, ``view_plan``).
 SEAT_RUN_DIR_ENV = "NIRMAAN_SEAT_RUN_DIR"
 SEAT_INPUTS_ENV = "NIRMAAN_SEAT_INPUTS"
@@ -445,8 +446,8 @@ def seat_launch(argv: list[str]) -> list[str]:
 
 def seat_inputs(backend: Backend, job: Job) -> list[str]:
     """The files this run reads that the harness named (``SEAT_INPUTS_ENV``): the sources, every other file a parameter
-    names (``rtl``, ``design``, the setup, the backend's own), and every file a setup's ``[files]`` names, each by its
-    resolved path, each a regular file that exists."""
+    names (``rtl``, ``design``, the setup, the backend's own), and every file a setup's ``[files]`` names that is the
+    run's own (``own_file``, gate ET17), each by its resolved path, each a regular file that exists."""
     named = [*job.sources]
     for param in (*HDL_PARAMS, "sby", *backend.files):
         named += [str(Path(v).resolve()) for v in list_values(job.params.get(param, "")) if v.strip()]
@@ -456,8 +457,22 @@ def seat_inputs(backend: Backend, job: Job) -> list[str]:
         for section, line in _sby_sections(setup):
             text = line.strip()
             if section == "files" and text and not text.startswith("[") and not text.startswith("#"):
-                named.append(str((setup.parent / text.split()[-1]).resolve()))
+                path = setup.parent / text.split()[-1]
+                if own_file(path, setup, job.sources):
+                    named.append(str(path.resolve()))
     return [p for p in dict.fromkeys(named) if Path(p).is_file()]
+
+
+def own_file(path: Path, sby: Path, given: Iterable[str]) -> bool:
+    """Whether a file a setup's ``[files]`` names is the run's own (gate ET17 of
+    ``council/records/2026-11-22-eda-tools-seat-account.md``, third addendum, decision E3): resolved, inside the
+    folder of the setup ``sby`` (resolved too), or one of ``given``, the files the harness gave the run (its
+    ``sources``; M68's approved file linked beside the setup is one). The rule of ``eda_guard.inside_problem``,
+    applied again where a run's inputs are named (``seat_inputs``) and where ``formal.cover`` reads the setup's files
+    (``_hdl_files``), so it holds whether or not the screen ran: a file that is not the run's own is no input of it,
+    and is never read by the caller for it."""
+    real = path.resolve()
+    return real.is_relative_to(sby.resolve().parent) or real in {Path(g).resolve() for g in given}
 
 
 #: The file a run claims an empty ``workdir`` with (M53), so a second run there gets a directory of its own.
@@ -1067,22 +1082,23 @@ def _sby_sections(sby: Path) -> list[tuple[str | None, str]]:
     return out
 
 
-def _hdl_files(sby: Path) -> list[tuple[str, Path]]:
-    """The Verilog the setup reads: each [files] entry's name in the run, and the file itself."""
+def _hdl_files(sby: Path, given: Iterable[str] | None = None) -> list[tuple[str, Path]]:
+    """The Verilog the setup reads: each [files] entry's name in the run, and the file itself. With ``given`` (the run's
+    sources), only the entries that are the run's own (``own_file``, gate ET17): what ``formal.cover`` reads."""
     files = []
     for section, line in _sby_sections(sby):
         text = line.strip()
         if section == "files" and text and not text.startswith("[") and not text.startswith("#"):
             *dest, src = text.split()
             path = (sby.parent / src).resolve()
-            if path.suffix in HDL_SUFFIXES:
+            if path.suffix in HDL_SUFFIXES and (given is None or own_file(path, sby, given)):
                 files.append((dest[0] if dest else path.name, path))
     return files
 
 
-def _definitions(sby: Path) -> Definitions:
-    """The macros and named properties of every Verilog file the setup reads (M37): one may use another's."""
-    return definitions(path.read_text(encoding="utf-8", errors="replace") for _, path in _hdl_files(sby))
+def _definitions(sby: Path, given: Iterable[str]) -> Definitions:
+    """The macros and named properties of every Verilog file of its own the setup reads (M37): one may use another's."""
+    return definitions(path.read_text(encoding="utf-8", errors="replace") for _, path in _hdl_files(sby, given))
 
 
 def _sby_cover(job: Job) -> list[list[str]]:
@@ -1101,8 +1117,8 @@ def _sby_cover(job: Job) -> list[list[str]]:
     """
     sby = Path(job.params["sby"]).resolve()
     copies, sites = {}, []
-    defs = _definitions(sby)
-    for name, path in _hdl_files(sby):
+    defs = _definitions(sby, job.sources)
+    for name, path in _hdl_files(sby, job.sources):  # gate ET17: the run's own files only
         derivation = derive(path.read_text(encoding="utf-8", errors="replace"), name, defs)
         copy = job.workdir / "antecedents" / name
         copy.parent.mkdir(parents=True, exist_ok=True)
@@ -1144,8 +1160,8 @@ def _sby_cover_check(job: Job) -> str | None:
     unread = _sby_reads(job) or sby_problem(sby.resolve(), job.sources)  # M84, M85: as formal.run's
     if unread:
         return unread
-    defs = _definitions(sby.resolve())
-    underived = [s for name, path in _hdl_files(sby.resolve())
+    defs = _definitions(sby.resolve(), job.sources)
+    underived = [s for name, path in _hdl_files(sby.resolve(), job.sources)
                  for s in derive(path.read_text(encoding="utf-8", errors="replace"), name, defs).underived]
     if underived:
         listed = "; ".join(f"{s.where} ({s.reason})" for s in underived)

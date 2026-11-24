@@ -1,0 +1,29 @@
+{
+  "format": "nirmaan.slot-reach-index/1",
+  "slot": 3,
+  "run": "45318904373",
+  "attempt": "1",
+  "commit": "1e9c560b2869c6837d0a38d69308397737648d3b",
+  "files": [
+    {
+      "path": "live-eval-fw-reach-rejudge-45318904373/fw-reach.json",
+      "sha256": "sha256:0911bbcdf1575b0469684e415555b21bf4c4348f6a36f44db515bf069e9166db"
+    },
+    {
+      "path": "live-eval-fw-reach-trials-45318904373/fw-reach.json",
+      "sha256": "sha256:6c49a384654d5a017196c83fdfacdbed5c4d199be1e0537efe0067848bbbbf3b"
+    },
+    {
+      "path": "live-eval-tool-reach-rejudge-45318904373/tool-reach.json",
+      "sha256": "sha256:b5459cfdcb253c2cb878ef31a0130b6787924e9bd6a412a41688f21a4a5d8614"
+    },
+    {
+      "path": "live-eval-tool-reach-trials-45318904373/tool-reach.json",
+      "sha256": "sha256:60e47dd5aee29ce93e8ce4620a46be6183cea8f82a1e1aa67581ed6f7c3f160f"
+    }
+  ],
+  "missing": [],
+  "recorded": true,
+  "no_record_cause": null,
+  "reach_held": true
+}
