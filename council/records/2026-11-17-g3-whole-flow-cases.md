@@ -3060,3 +3060,431 @@ Nothing here is built by this addendum. In order:
    rule that blocks rewriting and deleting the branches that hold reach
    records before they merge (decision T2, item 3). Repository rules are
    the founder's to set.
+
+## Eighth addendum (2026-11-25): the read of the timer case's twenty trials
+
+This addendum records the one read of the timer case, `flow/axil-timer`,
+slots 1 to 20 of the committed plan
+(`evals/plans/2026-11-22-g3-whole-flow.md`). It is the read gate WF41 names.
+It adds the read and nothing else: it changes no decision, code, case,
+record, count, level or gate above. The register block case has not run.
+
+A key is an agent review. Nothing here is a person's approval, a release, or
+a claim that a design is ready to be made in silicon.
+
+### Who decided what
+
+- The rule was fixed before slot 1, by the plan and the addenda above: one
+  read per case, after the case's last planned trial is recorded, two groups
+  of ten, no split, no re-run, no top-up, no extension and no second read
+  (the plan's sections 2, 5, 8 and 11; fourth addendum, decision 1). What
+  the read adds and what it never says are the plan's section 24.12
+  (decision T5, items 3 to 5; fifth addendum, decision F5; sixth addendum,
+  decisions P4 and P6).
+- Nothing was chosen at the read. It was taken once, after the record of
+  slot 20 merged.
+- Owner of the read: verification-lead. qa-evidence reads every statement
+  (gates WF26, WF30 and WF41). eda-tooling, as owner of gate WF29, and
+  ai-engineer, as owner of gate WF40, ruled on how the showing of those two
+  gates is stated ("Gates WF29 and WF40" below). The seats' statements are
+  under "Seat statements".
+
+### What was read
+
+Read once, on `main` at `904bb511`, the merge of the record of slot 20
+(ip#543). The reach pull requests are the even numbers ip#502 to ip#520 and
+ip#524 to ip#542, and the record pull requests the odd numbers ip#503 to
+ip#521 and ip#525 to ip#543, one run or one slot each, in slot order, each
+record after the pull request of its run's reach records.
+
+- `scripts/capability_levels.py --check` reports that
+  `capability/levels.json` matches the records, and the levels generator
+  refuses no record (`refused_records` is empty).
+- The figures below are the two groups that `_whole_flow_groups`
+  (`src/nirmaan/evals/levels.py`) writes for `flow/axil-timer` under
+  `whole_flow` in that file, with each trial as that list holds it. Nothing
+  was counted by hand, and the code that reads the records did not change
+  between slot 1 and this read.
+- All twenty records are on `main` under `evals/results/g3-timer/slot-NN/`,
+  failed ones included, one trial in each, and every trial is re-judged the
+  same (`rejudge.json` in each record). Each slot holds one reach folder, of
+  one run, whose index names the slot, the run and the commit of the
+  record's manifest (`reach/<run>/reach-index.json`; the test of gate ET16
+  in `tests/test_whole_flow.py` holds at `904bb511`).
+- Every trial ran on the default harness with its attempts, one trial per
+  dispatch, model `claude-opus-5-5`, Claude Code 2.1.325, case digest
+  `sha256:ff8a4afc77caee105070d996f3e29142f2fe013c411752becdc46090b7553da3`,
+  purpose `evidence`.
+
+### The read
+
+The whole-flow pass count, per group, k of 10 with its 95 percent Wilson
+interval. It is not a level or a score, it has no bar, it credits no skill,
+and it is never pooled. The register block case has not run.
+
+| Group | Arm | Harness fingerprint | Flow digest | Whole-flow pass count | Wilson interval |
+|---|---|---|---|---|---|
+| A | with documents (odd slots) | `sha256:56c5fac7d788bb34f84b263db1a50b896aba5779387bfed63a0a07975e4dcd72` | `sha256:a1aea0d36022a54be56c8d5c31831ea8ac0994f2802bd8ee8f39f6a5246ec312` | 4 of 10 | 0.1682 to 0.6873 |
+| B | without documents (even slots) | `sha256:7e8ba68dd60b395186441ba4c27392659189a603b59705fa2cc3d4dbf5c4a83c` | `sha256:b8608edecf2013dddfaec85e947106316f9a561a8ec74c7e3d99a7f53f8323c0` | 4 of 10 | 0.1682 to 0.6873 |
+
+Each group's flow digest is the digest of the first trial placed in it, it
+covers every stage, and it equals the plan's flow digest for the arm
+(section 24.1). The two counts are stated side by side with their intervals,
+as the plan's section 11 allows, and nothing more is said of the arms. There
+is no figure for twenty and none for the case across its arms.
+
+**The derived count**, "passed with every stage on its first attempt", by
+the definition the plan's section 5 held word for word before slot 1: group
+A, 4 of 10; group B, 4 of 10. It is a description of trials on the default
+fingerprint, from the same records at this read. In every one of the twenty
+trials every stage that was seated records one attempt, so in each group
+the trials counted here are the trials that passed. It changes no main
+figure and is not a result on a one-attempt harness.
+
+**Each trial.** "Attempts" lists the recorded attempts of the four stages in
+order (`requirements`, `interface-spec`, `microarchitecture`,
+`rtl-implementation`); "not run" is a stage the flow did not seat. "Own
+flow digest" is the trial's recorded `flow_digest`, by its first 8 hex
+digits. "Run beside" is the slot whose run had jobs running together with
+this slot's run (see "Two at a time" below).
+
+| Slot | Group | Run | Commit | Run beside | Trial | Attempts | Own flow digest |
+|---|---|---|---|---|---|---|---|
+| 1 | A | 45315168823 | `1e9c560b` | slot 2 | failed, judged | 1, 1, 1, 1 | `a1aea0d3` |
+| 2 | B | 45315184979 | `1e9c560b` | slot 1 | failed, judged | 1, 1, 1, 1 | `b8608ede` |
+| 3 | A | 45318904373 | `1e9c560b` | slot 4 | passed | 1, 1, 1, 1 | `a1aea0d3` |
+| 4 | B | 45323667674 | `881a77d9` | slot 3 | failed, stopped | 1, 1, 1, not run | `9d94c405` |
+| 5 | A | 45330921164 | `29399c1a` | none | passed | 1, 1, 1, 1 | `a1aea0d3` |
+| 6 | B | 45337185043 | `3e615771` | none | passed | 1, 1, 1, 1 | `b8608ede` |
+| 7 | A | 45343158122 | `2f0dfc01` | none | failed, stopped | 1, 1, 1, not run | `4ff378d2` |
+| 8 | B | 45351486006 | `3eedbff3` | none | passed | 1, 1, 1, 1 | `b8608ede` |
+| 9 | A | 45367262139 | `90fabb76` | none | failed, stopped | 1, 1, 1, not run | `4ff378d2` |
+| 10 | B | 45375624519 | `9b31bd27` | none | failed, stopped | 1, 1, 1, not run | `9d94c405` |
+| 11 | A | 45382857575 | `1bcff2ae` | none | passed | 1, 1, 1, 1 | `a1aea0d3` |
+| 12 | B | 45390568718 | `9cdf3ad6` | none | failed, stopped | 1, 1, 1, not run | `9d94c405` |
+| 13 | A | 45397981621 | `47061e02` | none | failed, stopped | 1, 1, not run, not run | `a89b7aa8` |
+| 14 | B | 45408522143 | `8c969f2a` | none | passed | 1, 1, 1, 1 | `b8608ede` |
+| 15 | A | 45418598815 | `ec219a1f` | none | failed, judged | 1, 1, 1, 1 | `a1aea0d3` |
+| 16 | B | 45428397475 | `3e97fbfe` | none | failed, stopped | 1, 1, 1, not run | `9d94c405` |
+| 17 | A | 45440516870 | `508e55ff` | none | passed | 1, 1, 1, 1 | `a1aea0d3` |
+| 18 | B | 45448895134 | `68bf6c3e` | none | passed | 1, 1, 1, 1 | `b8608ede` |
+| 19 | A | 45458015129 | `6f102a46` | none | failed, stopped | 1, 1, 1, not run | `4ff378d2` |
+| 20 | B | 45467216245 | `e058183a` | none | failed, stopped | 1, 1, 1, not run | `9d94c405` |
+
+Each slot's commit is the `head_sha` of its record's manifest and the commit
+of its reach index. The commits differ because records and reach folders
+merged between dispatches; that the dispatch check of the plan's section 7
+ran before every dispatch is the account of the dispatcher's operator; what
+the repository shows is that from `1e9c560b` to `904bb511` nothing changed
+outside `evals/results/g3-timer/` and `capability/levels.json`, and that
+every record carries the case digest, the fingerprint, the CLI and the
+per-stage skill digests of its arm, for each stage it seated. No slot ran on
+a second value of any pinned group.
+
+### The failed trials, by label
+
+**Trials whose flow stopped before its last stage.** Each is a failed trial
+of its group: no judge ran on it, and it is counted as decision F2 says.
+Its own flow digest, in the table above, is the plan's digest over the
+stages it seated (section 24.2), beside the group's. In each, the stage
+named has no check, its recorded status is `escalated`, it records one
+attempt and one model call, and no answer of the trial records an error. In
+the words of decision P4:
+
+| Slot | Group | The read's words |
+|---|---|---|
+| 4 | B | stopped at `microarchitecture`: the seat escalated; cause not established |
+| 7 | A | stopped at `microarchitecture`: the seat escalated; cause not established (an inference: on the status of its upstream inputs under the pass-through) |
+| 9 | A | stopped at `microarchitecture`: the seat escalated; cause not established |
+| 10 | B | stopped at `microarchitecture`: the seat escalated; cause not established |
+| 12 | B | stopped at `microarchitecture`: the seat escalated; cause not established (an inference: on the status of its upstream inputs under the pass-through) |
+| 13 | A | stopped at `interface-spec`: the seat escalated; cause not established |
+| 16 | B | stopped at `microarchitecture`: the seat escalated; cause not established (an inference: on the status of its upstream inputs under the pass-through) |
+| 19 | A | stopped at `microarchitecture`: the seat escalated; cause not established |
+| 20 | B | stopped at `microarchitecture`: the seat escalated; cause not established |
+
+The inference is given only where the escalation's own recorded text (the
+stage's `note` in the trial record) names the review or approval status of
+its upstream inputs: slots 7, 12 and 16. Decision P4 leaves the inference
+optional, and the read gives it nowhere else.
+None of these trials is labelled "model", the failure-to-curriculum rule
+does not apply to them, and none is said to show a gap in a skill (decision
+P4). No count is stated from which they are left out, and no figure is
+stated for a stage.
+
+**Trials that reached the judge and failed.** In each, every stage was
+seated, the before-review checks of `rtl-implementation` passed, and the
+first held-out check, "The reference testbench passes on the flow's RTL",
+passed. The second held-out check, "The flow's testbench passes on the
+reference RTL and fails each timer mutant", failed, as the record's `scores`
+state:
+
+| Slot | Group | Label | What the record's `scores` state |
+|---|---|---|---|
+| 1 | A | model | the flow's testbench passed on the reference RTL (judge run `run-0005`), three mutants failed it (judge runs `run-0006` to `run-0008`) and one mutant survived it; the score's summary names the surviving mutant's run as `run-0009`, which the record's `judge_runs` does not list (run 45315168823) |
+| 2 | B | model | the flow's testbench passed on the reference RTL (judge run `run-0005`), three mutants failed it (judge runs `run-0006` to `run-0008`) and one mutant survived it; the score's summary names the surviving mutant's run as `run-0009`, which the record's `judge_runs` does not list (run 45315184979) |
+| 15 | A | model | the flow's testbench did not pass on the reference RTL (judge run `run-0005` of run 45418598815) |
+
+The label "model" is the label of the trial, given by verification-lead at
+this read from the record: every stage was seated, the stage's own checks
+passed, the judge ran and re-judges the same, and the fixed requirements
+document states what the flow's testbench must do. It names no stage and no
+skill; at which stage the rule was lost is not established. No `causes.md`
+is committed beside any failed slot's record at `904bb511`, so
+`scripts/failure_curriculum.py` lists every failed trial of the timer case
+as unlabelled.
+
+The failure-to-curriculum rule (retrospective, decision 7; the plan's
+section 9) applies to the trials of slots 1, 2 and 15. The answer is owed
+and is not given here. verification-lead gives it in a pull request of its
+own, which commits a `causes.md` beside each failed slot's record, with the
+labels and words of this read unchanged, and states for each of the trials
+of slots 1, 2 and 15 a knowledge note, a must-fail case or a written reason
+why not, naming the failing run. A change it makes to a card or a document
+merges only outside a batch's freeze, the re-measure batch's included, and
+one to a skill given to a register block stage is listed in the register
+block's dated addition, as section 9 says. This read changes no card and no
+document.
+
+**The include listing** (the plan's section 18.5). For each passed trial
+(group A: slots 3, 5, 11 and 17; group B: slots 6, 8, 14 and 18), no HDL
+file a seat wrote, in any stage's recorded answer at any attempt, holds an
+`` `include `` directive.
+
+### Two at a time
+
+- **The width.** Two, as the plan's section 24.6 fixes it. It was never
+  raised.
+- **That runs overlapped, and that no two trials' own times did.** Decision
+  T5, item 3 asks the read to say that trials overlapped. By the committed
+  records no two trials' own times overlap (next bullet). What overlapped
+  are runs: the runs of slots 1 and 2 had jobs running together, and so had
+  the runs of slots 3 and 4, two adjacent slots, one of each arm, each time.
+  From slot 5 to slot 20 no run had a job running while another slot's run
+  did. This is read from the job times GitHub holds for the run ids above.
+  They are not a committed record of this repository; a reader can check
+  them by run id. This read reads those times and states none.
+- **What the committed records show.** Among the committed slot records, no
+  two manifests' times (`started_at` to `finished_at`, the time of the trial
+  itself) overlap, so the committed test of decision T5, item 2
+  (`tests/test_whole_flow.py`) holds at `904bb511` with no overlapping pair
+  to check. The trials of slots 1 and 2, and of slots 3 and 4, ran inside
+  runs that had jobs running together. Nothing about any result is
+  concluded from this bullet or the one above.
+- **The point from which the batch ran at width one.** There is none. No
+  trial ended on a plan or usage limit, was interrupted, or ended with no
+  model answer (no answer in any of the twenty records carries an error),
+  so the rule of section 24.6 was never applied and no slot ran after such
+  a point. That one run ran at a time from slot 5 is not that
+  rule: clause (c) of gate ET15 (section 24.9) holds slot k until the reach
+  folders of slots k-3 and lower are on `main`.
+- **Order.** Slots were first dispatched in strictly increasing slot order.
+  No slot was dispatched after a higher one, and no slot was dispatched a
+  second time: the workflow's runs between the dispatch of slot 1 and the
+  end of slot 20's run are exactly the twenty runs above, each a first
+  attempt, each dispatched from `main`.
+- **Stop events.** No trial stopped the batch: there was no limit, no
+  interrupted trial, no trial with no model answer, no job-level stop, no
+  record that was not the trial asked for, no re-judge that did not finish
+  or did not hold, no reach gate that failed, no finding of section 24.9,
+  item 2, no record or file over the review's size limit, no run of the
+  workflow that the dispatcher did not start, and no run whose id could not
+  be bound. Dispatch was closed twice by the dispatcher's own check under
+  section 24.9, item 3, each time with no slot in flight:
+  1. After slot 4 had finished and before slot 5 was dispatched. The branch
+     the dispatcher had pushed for the reach records of slot 2's run no
+     longer resolved to the commit the dispatcher had written down. The
+     branch held one more commit, a merge of `main` made when that branch
+     was the head of the pull request ip#504 and the review loop updated
+     it. The reach files were equal by digest to the index, and they are
+     the files on `main`. The branch was added to, not rewritten: the
+     written commit stayed its ancestor. Security reads it as no security
+     event. Dispatch resumed after ip#504 merged. For slots 3 to 19 the pull
+     request of a run's reach records was opened from a branch of its own,
+     made at the pushed commit and never forced, so the branch the
+     dispatcher checks was not a pull request's head; the review loop
+     updated those pull request branches, and the files' digests were
+     checked again before each merge by the test of gate ET16. No dispatch
+     followed slot 20, so the dispatcher pushed no branch for it; its pull
+     request, ip#542, was opened from one commit that adds the run's five
+     files and was not updated.
+  2. After slot 18 had finished and before slot 19 was dispatched. The
+     dispatcher read back the branch it had just pushed for slot 18's run
+     before GitHub served it, and found no branch. The branch resolved to
+     the pushed commit when read again, and dispatch resumed. The dispatcher
+     was changed to read such a branch again for a bounded time; a branch at
+     any other commit still fails at once. Security reads it as no security
+     event.
+  The two closes are the account of the dispatcher's operator, from tooling
+  that is outside this repository; no committed record holds them; of the
+  first, GitHub shows the two commits of ip#504, the second a merge of
+  `main`. Section 24.9, item 3 is a rule for whatever dispatches, not a
+  control.
+- **Cancelled, held out, run again.** No run was cancelled before its trial
+  under the one cancel of section 24.8. No running trial was cancelled.
+  Nothing was held out and nothing was run again: twenty dispatches, twenty
+  runs, twenty records.
+
+### What a later stage is sent
+
+The words of the pass-through note were changed before slot 1 by the sixth
+addendum (ip#487): the note now says who made the record. A later stage is
+sent what the plan's section 24.4 states, as a replay of the reference
+answer with no model shows it: each upstream output rendered as approved,
+and the harness's own review of it rendered as a `review_record`,
+substantiated, "Independent review by" the reviewer's role, with the whole
+note, beside the constitution's P6 and P7 and the system prompt's words on
+claims and escalation. The change is not described as a fix shown to work,
+and this read states no rate of any kind for it.
+
+### Gates WF29 and WF40
+
+Both gates rest on the dispatcher, which is tooling outside this repository.
+What follows is each gate owner's ruling on what may be said of it here, in
+the owner's words.
+
+**Gate WF29** (owner: eda-tooling). The dispatching script is outside this
+repository. This paragraph is the account of its operator and the gate
+owner's own read of the script, its tests and its output; it is not a
+repository control and no committed record holds it. Before slot 1 the
+operator made the showing that the plan's section 24.2 and decision F3, item
+5 ask of the script, on the record of run 45295715357, the measured run of
+section 24.3, which is the run the gate's owner names. The copies were the
+four that item 5 names, and each was refused for the change made to it. The
+output is kept private because it prints stage names. Nothing more is said
+of that record, and nothing of its stages, attempts or outcome follows: the
+check of decision F3, item 3 passes a record whose flow seats every stage
+and a record whose flow stops alike.
+
+What the committed records show, and a reader can check on `main` at
+`904bb511`: each of the twenty slot records meets the four items of the
+check of section 24.2 against that section's two tables for its arm: the
+stage names and their order; the seated stages first and every later stage
+"not run" with no skills, attempts, model calls or gate runs, and in a
+stopped trial every stage before the last seated one completed and the last
+seated one not; each seated stage's skills and digests, exactly; and a flow
+digest equal to the one recomputed from its own seated stages and to the
+table's digest over that number of stages. The trials whose flow stopped
+(slots 4, 7, 9, 10, 12, 13, 16, 19 and 20) were each committed as a failed
+trial of its slot and none stopped the batch, as decision F3, item 4 says.
+The gate's owner recomputed this from the committed files with a script of
+its own, not the dispatcher's; it shows the records, not the script.
+
+**Gate WF40** (owner: ai-engineer). Gate WF40 held from slot 1 to slot 20.
+The committed records and GitHub's run list show: each slot has one run and
+one record, whose manifest and reach index name that run and its commit;
+every run is a first attempt dispatched from `main`; none was cancelled; and
+the workflow has no other run between the dispatch of slot 1 and the end of
+slot 20's run. So every trial dispatched is committed, nothing was run
+again, no run existed that the dispatcher did not start, and no running
+trial was cancelled. No trial ended on a limit, was interrupted, or ended
+with no model answer, so the width was never lowered. That each run was
+bound to its slot from the response to its dispatch, and that the window was
+held, is the account of the dispatcher's operator; the run list is
+consistent with it. The dispatcher is tooling outside this repository. Its
+operator reports that it carried a test of its own for each element of the
+seventh addendum's build specification, item 4, passing before slot 1; that
+it was changed at each of the two closes above, with no slot in flight, in
+nothing this gate names; and that after the second change its tests, with
+one added for it, passed again. The gate's owner read the dispatcher, its
+tests and its ledger and did not run them. This is the operator's account
+and not a control of this repository; no committed record holds it.
+
+### What is not said
+
+Under the plan's sections 11 and 24.12 and decisions T5, F5, P4 and P6, this
+read does not say, and no text may draw from it: that running two at a time
+had an effect on a result, or that it had none; that the interleave makes
+the two arms comparable, or any figure for a pair of trials whose runs
+overlapped; that the timer and any batch that ran with one trial in flight
+ran under the same dispatch conditions; which concurrency group a run used,
+as a fact of that run; a count from which stopped trials are left out; that
+a stage fails at some rate; that documents help, or do not, beyond the two
+counts side by side with their intervals; a combined figure; a level, a
+score or a bar; the timer case as independent verification; anything of
+either measured run; or any time, usage or cost figure. The twenty trials
+are "the timer case's twenty trials", and every statement of either count
+carries "the register block case has not run".
+
+### Seat statements
+
+Five seats read the draft of this addendum, each as a read-only process of
+its own that saw no other seat's answer: verification-lead, qa-evidence,
+eda-tooling, ai-engineer and security. Each checked the facts of its own
+item against the committed records at `904bb511`; eda-tooling, ai-engineer
+and security also read the private dispatcher, its tests and its ledger, and
+none ran it. The chair took every correction the seats asked for; where two
+seats worded the same sentence, the owner's wording stands. No seat
+dissented from the read.
+
+- **verification-lead** (owner of the read). States this read as the timer
+  case's read: 4 of 10 with documents and 4 of 10 without, each 0.1682 to
+  0.6873; the register block case has not run. It rebuilt the per-slot table
+  from the twenty records, confirmed the label "model" for slots 1, 2 and 15
+  and the inference for slots 7, 12 and 16 only, and owes the answer under
+  the failure-to-curriculum rule as written above. Its narrower reading of
+  decision P4's "state of its upstream inputs" (review or approval status)
+  is its own and is marked so. For a later pull request, outside a batch: a
+  surviving mutant's run is not carried into a record's `judge_runs`; the
+  verdict is still held by the re-judge.
+- **qa-evidence** (gates WF26, WF30 and WF41). Passed the read with nine
+  corrections, all taken: the include listing for passed trials only; no
+  count of failed or labelled trials across the two arms; the pull request
+  numbers; the overlap stated of runs and not of trials, from GitHub's job
+  times, named as not a committed record; the dispatch check as the
+  operator's account; the full list of stops that did not occur; and the two
+  closes kept, as the operator's account. It read the filled text of "Gates
+  WF29 and WF40" and of this section before the merge (the pull request
+  carries that read).
+- **eda-tooling** (gate WF29). Gate WF29 was met before slot 1, on the
+  record its owner names; the words above are the words it allows. Recorded
+  at its request: the gate rests on a private tool and on the owner's
+  private read, so it is a seat's statement and not a control, and
+  eda-tooling would rather the check lived in the repository for the
+  register block. Before slot 21 the dispatcher must refuse to dispatch the
+  register block without that case's per-stage values, and the showing of
+  decision F3, item 5 is owed again on them. Its dissents recorded in the
+  addenda above stand and are not reopened.
+- **ai-engineer** (gate WF40). Gate WF40 held, in the words above. The read
+  changes this record only, so no fingerprint and no pinned value moves; it
+  recomputed both whole-flow fingerprints at `904bb511` and they equal the
+  table above. Its recorded dissent, a group per run for the timer, stands
+  as recorded; this read gives no ground for or against it and is not cited
+  either way (decision T5, item 4).
+- **security** (gates WF36, WF39 and ET15). Gate ET15 as the plan's section
+  24.9 words it held before every dispatch as far as the records show: the
+  commit of each slot k holds the reach folder of every slot k-3 or lower,
+  equal by digest to its index; every reach record holds only denied probes;
+  no reach gate failed and no artifact is missing; and nothing under
+  `.github`, `scripts` or `src` changed on `main` between slot 1's commit
+  and `904bb511`. Clauses (a) and (b) at the moment of each dispatch rest on
+  the dispatcher's private ledger. Neither close is a security event. No
+  dissent. A note for the founder is under "Open".
+
+### Outcome
+
+The timer case is read: 4 of 10 with documents and 4 of 10 without, each
+with the interval 0.1682 to 0.6873, on the groups named above; the register
+block case has not run. This was the one read of the timer case. There is
+no top-up, extension, replacement or second read.
+
+### What remains, as already planned
+
+- The register block's twenty slots (21 to 40) wait for their own gates and
+  for the dated plan addition that states their values. Until that case is
+  read, every statement of a timer count carries "the register block case
+  has not run".
+- The trials labelled "model" are owed their answer under the
+  failure-to-curriculum rule (verification-lead), outside any batch's
+  freeze.
+
+### Open, for the founder
+
+1. This read and its outcome, to confirm or overrule.
+2. For information, from security, on item 3 of the seventh addendum's open
+   list (a repository rule for the branches that hold reach records before
+   they merge): a rule that blocks only rewriting and deleting would not
+   have stopped the first close above, since an update merge is neither. If
+   the founder sets a rule before slot 21, it would restrict updates to the
+   dispatcher's own branches and leave the pull request branches open to
+   the review loop. No gate rests on it.
