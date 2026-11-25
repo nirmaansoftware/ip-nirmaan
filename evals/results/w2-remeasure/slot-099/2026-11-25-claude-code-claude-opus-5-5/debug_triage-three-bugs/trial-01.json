@@ -1,0 +1,185 @@
+{
+  "answers": [
+    {
+      "cache_read_tokens": 7011,
+      "cache_write_tokens": 314,
+      "error": null,
+      "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+      "input_tokens": 2,
+      "mode": "work",
+      "model": "claude-opus-5-5",
+      "output_tokens": 6886,
+      "packet_sha256": "200a69a52456083b08db09d59a830c12b7579c164410563d8bfab5e2a07c60e7",
+      "prompt_sha256": "1917d7d8fc15df4adf919d08171250b58f7606c41933fd507ff5f1b989020137",
+      "provider": "claude-code",
+      "text": "```json\n{\"uncertainty\": 0.3, \"outcome\": \"Read the approved RTL and found three candidate root causes, one for each failing log. Each cause has its own self-checking repro, built to fail only on its own bug. VeriTriage run-0001 classified the three logs together as unknown_failure at 30% confidence, so these buckets come from reading the RTL and still have to be confirmed by the platform's repro runs.\", \"artifacts\": [{\"kind\": \"triage_report\", \"title\": \"uart_frame_tx nightly triage: three failures, three buckets\", \"summary\": \"Inputs: VeriTriage session [run:run-0001], one combined call over data_byte_fail.log, parity_bit_fail.log and frame_period_fail.log. It returned unknown_failure at 30% confidence with 3 evidence nodes; its top hypothesis was 'Likely RTL bug'. That confidence is too low to bucket on, so this report treats it as a lead only. RTL under investigation: [artifact:prj-c391b404ed.design-under-investigation.a1], whose fixture provenance is recorded in [evidence:prj-c391b404ed.design-under-investigation.e1]. The design header specifies one start bit, eight data bits LSB first, even parity, one stop bit, and CLKS_PER_BIT cycles per bit. Bucket B1 (data_byte), signature 'data bit order': START loads tx <= hold[7] and DATA sends hold[3'd7 - next_idx], so the data goes out MSB first instead of LSB first. The repro is tb_repro_data_byte.v; it checks only data bits 1..8 against data[0..7] at the centre of each bit. Bucket B2 (parity_bit), signature 'parity polarity': parity = ~^hold is odd parity, while even parity needs ^hold. The repro is tb_repro_parity_bit.v; it checks only the bit-9 sample against ^data. Bucket B3 (frame_period), signature 'stop bit length': STOP leaves at clk_cnt == CLKS_PER_BIT/2 - 1, so the stop bit lasts 2 cycles instead of 4. Busy therefore stays high 42 cycles instead of 11*CLKS_PER_BIT = 44. The repro is tb_repro_frame_period.v; it checks only how many cycles busy stays high. The three causes sit in disjoint parts of the RTL and no repro checks another bucket's behaviour. This serves [requirement:req-94eee275db].\"}], \"files\": [{\"path\": \"tb/tb_repro_data_byte.v\", \"kind\": \"testbench\", \"title\": \"Repro B1: data bits must be sent LSB first\", \"summary\": \"Self-checking repro for bucket B1 of [requirement:req-94eee275db]. It runs against [artifact:prj-c391b404ed.design-under-investigation.a1] and samples data bits 1..8 at mid-bit for four bytes, expecting LSB first. It does not depend on parity or stop length. It prints the NIRMAAN-SIM verdict once.\", \"entry\": \"tb_repro_data_byte\"}, {\"path\": \"tb/tb_repro_parity_bit.v\", \"kind\": \"testbench\", \"title\": \"Repro B2: parity bit must be even parity\", \"summary\": \"Self-checking repro for bucket B2 of [requirement:req-94eee275db]. It runs against [artifact:prj-c391b404ed.design-under-investigation.a1] and samples bit 9 at mid-bit, expecting ^data. Bit order and stop length do not affect this check. It prints the NIRMAAN-SIM verdict once.\", \"entry\": \"tb_repro_parity_bit\"}, {\"path\": \"tb/tb_repro_frame_period.v\", \"kind\": \"testbench\", \"title\": \"Repro B3: frame must last 11*CLKS_PER_BIT cycles\", \"summary\": \"Self-checking repro for bucket B3 of [requirement:req-94eee275db]. It runs against [artifact:prj-c391b404ed.design-under-investigation.a1] and counts busy-high cycles per frame, expecting 44 at CLKS_PER_BIT=4. It does not depend on data or parity values. It prints the NIRMAAN-SIM verdict once.\", \"entry\": \"tb_repro_frame_period\"}], \"tool_runs\": [\"run-0001\"], \"claims\": [\"Log-to-bucket mapping is inferred from the log file names: data_byte_fail.log to B1, parity_bit_fail.log to B2, frame_period_fail.log to B3. The log contents were not available to this seat.\", \"Expected busy-high count on a correct design is 44 cycles: 4 start + 32 data + 4 parity + 4 stop. On the buggy RTL it is 42 by hand analysis.\", \"Per-log VeriTriage runs and same-seed reruns to rule out flakiness have not been performed.\"], \"escalation\": null, \"notes\": \"VeriTriage was called once on the combined log set, which may hide classes that a single log would show. Running veritriage.investigate on each log separately would strengthen the evidence nodes behind each bucket. Each testbench declares its own top module as its entry.\"}\n```\n=== FILE: tb/tb_repro_data_byte.v ===\n`timescale 1ns / 1ps\nmodule tb_repro_data_byte;\n    reg clk = 1'b0;\n    reg rst = 1'b1;\n    reg start = 1'b0;\n    reg [7:0] data = 8'd0;\n    wire tx, busy;\n    integer passed = 0, failed = 0, i, guard;\n    reg [8*64-1:0] nonce;\n\n    uart_frame_tx #(.CLKS_PER_BIT(4)) dut (\n        .clk(clk), .rst(rst), .start(start), .data(data), .tx(tx), .busy(busy));\n\n    always #5 clk = ~clk;\n\n    task send_and_check(input [7:0] d);\n        begin\n            @(negedge clk); data = d; start = 1'b1;\n            @(posedge clk); #1 start = 1'b0;\n            repeat (2) @(posedge clk); #1;           // centre of start bit\n            for (i = 0; i < 8; i = i + 1) begin\n                repeat (4) @(posedge clk); #1;       // centre of data bit i\n                if (tx === d[i]) passed = passed + 1;\n                else begin\n                    failed = failed + 1;\n                    $display(\"CHECK data_bit_order FAIL byte=%h bit=%0d tx=%b exp=%b\", d, i, tx, d[i]);\n                end\n            end\n            guard = 0;\n            while (busy && guard < 200) begin @(posedge clk); #1; guard = guard + 1; end\n            repeat (3) @(posedge clk);\n        end\n    endtask\n\n    initial begin\n        if (!$value$plusargs(\"nirmaan_nonce=%s\", nonce)) nonce = \"none\";\n        repeat (4) @(posedge clk);\n        #1 rst = 1'b0;\n        repeat (2) @(posedge clk);\n        send_and_check(8'h01);\n        send_and_check(8'hA3);\n        send_and_check(8'h35);\n        send_and_check(8'hF0);\n        $display(\"NIRMAAN-SIM %0s %0d passed, %0d failed\", nonce, passed, failed);\n        $finish;\n    end\nendmodule\n=== END FILE ===\n=== FILE: tb/tb_repro_parity_bit.v ===\n`timescale 1ns / 1ps\nmodule tb_repro_parity_bit;\n    reg clk = 1'b0;\n    reg rst = 1'b1;\n    reg start = 1'b0;\n    reg [7:0] data = 8'd0;\n    wire tx, busy;\n    integer passed = 0, failed = 0, guard;\n    reg [8*64-1:0] nonce;\n\n    uart_frame_tx #(.CLKS_PER_BIT(4)) dut (\n        .clk(clk), .rst(rst), .start(start), .data(data), .tx(tx), .busy(busy));\n\n    always #5 clk = ~clk;\n\n    task send_and_check(input [7:0] d);\n        begin\n            @(negedge clk); data = d; start = 1'b1;\n            @(posedge clk); #1 start = 1'b0;\n            repeat (2) @(posedge clk); #1;           // centre of start bit\n            repeat (36) @(posedge clk); #1;          // centre of bit 9 (parity)\n            if (tx === (^d)) passed = passed + 1;\n            else begin\n                failed = failed + 1;\n                $display(\"CHECK parity_even FAIL byte=%h tx=%b exp=%b\", d, tx, ^d);\n            end\n            guard = 0;\n            while (busy && guard < 200) begin @(posedge clk); #1; guard = guard + 1; end\n            repeat (3) @(posedge clk);\n        end\n    endtask\n\n    initial begin\n        if (!$value$plusargs(\"nirmaan_nonce=%s\", nonce)) nonce = \"none\";\n        repeat (4) @(posedge clk);\n        #1 rst = 1'b0;\n        repeat (2) @(posedge clk);\n        send_and_check(8'h00);\n        send_and_check(8'h01);\n        send_and_check(8'hA3);\n        send_and_check(8'h7F);\n        $display(\"NIRMAAN-SIM %0s %0d passed, %0d failed\", nonce, passed, failed);\n        $finish;\n    end\nendmodule\n=== END FILE ===\n=== FILE: tb/tb_repro_frame_period.v ===\n`timescale 1ns / 1ps\nmodule tb_repro_frame_period;\n    localparam integer CPB = 4;\n    reg clk = 1'b0;\n    reg rst = 1'b1;\n    reg start = 1'b0;\n    reg [7:0] data = 8'd0;\n    wire tx, busy;\n    integer passed = 0, failed = 0, count;\n    reg [8*64-1:0] nonce;\n\n    uart_frame_tx #(.CLKS_PER_BIT(CPB)) dut (\n        .clk(clk), .rst(rst), .start(start), .data(data), .tx(tx), .busy(busy));\n\n    always #5 clk = ~clk;\n\n    task send_and_check(input [7:0] d);\n        begin\n            @(negedge clk); data = d; start = 1'b1;\n            @(posedge clk); #1 start = 1'b0;\n            count = 0;\n            while (busy && count < 200) begin @(posedge clk); #1; count = count + 1; end\n            if (count == 11 * CPB) passed = passed + 1;\n            else begin\n                failed = failed + 1;\n                $display(\"CHECK frame_period FAIL byte=%h busy_cycles=%0d exp=%0d\", d, count, 11 * CPB);\n            end\n            repeat (3) @(posedge clk);\n        end\n    endtask\n\n    initial begin\n        if (!$value$plusargs(\"nirmaan_nonce=%s\", nonce)) nonce = \"none\";\n        repeat (4) @(posedge clk);\n        #1 rst = 1'b0;\n        repeat (2) @(posedge clk);\n        send_and_check(8'h55);\n        send_and_check(8'hC3);\n        $display(\"NIRMAAN-SIM %0s %0d passed, %0d failed\", nonce, passed, failed);\n        $finish;\n    end\nendmodule\n=== END FILE ==="
+    }
+  ],
+  "format": "nirmaan.eval-trial",
+  "harness_variant": "default",
+  "judge_runs": [
+    {
+      "check": "Each repro passes the fixed uart_frame_tx, and each seeded defect fails a repro of its own",
+      "params": {
+        "sources": [
+          "/tmp/nirmaan-eval-l1b42piz/judge/check-1/must-fail-each-ub6iem05/file-1/clean/uart_frame_tx.v",
+          "/tmp/nirmaan-eval-l1b42piz/judge/check-1/must-fail-each-ub6iem05/file-1/clean/tb_repro_data_byte.v"
+        ],
+        "top": "tb_repro_data_byte"
+      },
+      "run": "run-0005",
+      "succeeded": true,
+      "summary": "icarus: simulation passed: 32 checks passed, $finish reached at time 1975000, 0 errors",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "Each repro passes the fixed uart_frame_tx, and each seeded defect fails a repro of its own",
+      "params": {
+        "sources": [
+          "/tmp/nirmaan-eval-l1b42piz/judge/check-1/must-fail-each-ub6iem05/file-2/clean/uart_frame_tx.v",
+          "/tmp/nirmaan-eval-l1b42piz/judge/check-1/must-fail-each-ub6iem05/file-2/clean/tb_repro_parity_bit.v"
+        ],
+        "top": "tb_repro_parity_bit"
+      },
+      "run": "run-0009",
+      "succeeded": true,
+      "summary": "icarus: simulation passed: 4 checks passed, $finish reached at time 1975000, 0 errors",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "Each repro passes the fixed uart_frame_tx, and each seeded defect fails a repro of its own",
+      "params": {
+        "sources": [
+          "/tmp/nirmaan-eval-l1b42piz/judge/check-1/must-fail-each-ub6iem05/file-3/clean/uart_frame_tx.v",
+          "/tmp/nirmaan-eval-l1b42piz/judge/check-1/must-fail-each-ub6iem05/file-3/clean/tb_repro_frame_period.v"
+        ],
+        "top": "tb_repro_frame_period"
+      },
+      "run": "run-0013",
+      "succeeded": true,
+      "summary": "icarus: simulation passed: 2 checks passed, $finish reached at time 1015000, 0 errors",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "Each repro passes the fixed uart_frame_tx, and each seeded defect fails a repro of its own",
+      "params": {
+        "sources": [
+          "/tmp/nirmaan-eval-l1b42piz/judge/check-1/must-fail-each-ub6iem05/file-1/mutant-1/uart_frame_tx.v",
+          "/tmp/nirmaan-eval-l1b42piz/judge/check-1/must-fail-each-ub6iem05/file-1/mutant-1/tb_repro_data_byte.v"
+        ],
+        "top": "tb_repro_data_byte"
+      },
+      "run": "run-0006",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: the testbench reports 18 of 32 checks failed",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "Each repro passes the fixed uart_frame_tx, and each seeded defect fails a repro of its own",
+      "params": {
+        "sources": [
+          "/tmp/nirmaan-eval-l1b42piz/judge/check-1/must-fail-each-ub6iem05/file-2/mutant-2/uart_frame_tx.v",
+          "/tmp/nirmaan-eval-l1b42piz/judge/check-1/must-fail-each-ub6iem05/file-2/mutant-2/tb_repro_parity_bit.v"
+        ],
+        "top": "tb_repro_parity_bit"
+      },
+      "run": "run-0011",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: the testbench reports 4 of 4 checks failed",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "Each repro passes the fixed uart_frame_tx, and each seeded defect fails a repro of its own",
+      "params": {
+        "sources": [
+          "/tmp/nirmaan-eval-l1b42piz/judge/check-1/must-fail-each-ub6iem05/file-3/mutant-3/uart_frame_tx.v",
+          "/tmp/nirmaan-eval-l1b42piz/judge/check-1/must-fail-each-ub6iem05/file-3/mutant-3/tb_repro_frame_period.v"
+        ],
+        "top": "tb_repro_frame_period"
+      },
+      "run": "run-0016",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: the testbench reports 2 of 2 checks failed",
+      "tool": "simulator.run"
+    }
+  ],
+  "knowledge": "on",
+  "model": "claude-opus-5-5",
+  "purpose": "evidence",
+  "record": "2026-11-25-claude-code-claude-opus-5-5",
+  "result": {
+    "attempts": 1,
+    "attestations": [],
+    "audit_ok": true,
+    "case": "debug/triage-three-bugs",
+    "case_digest": "sha256:7312c66195f8cdc8e7dee66f4984c56381a2c7c4d2bcbe49fc2b558750446941",
+    "cli": "2.1.325",
+    "cost_usd": null,
+    "detail": "VeriTriage was called once on the combined log set, which may hide classes that a single log would show. Running veritriage.investigate on each log separately would strengthen the evidence nodes behind each bucket. Each testbench declares its own top module as its entry.",
+    "duration_s": 65.829,
+    "gate_runs": [
+      {
+        "run": "run-0001",
+        "succeeded": true,
+        "summary": "VeriTriage classified data_byte_fail.log, parity_bit_fail.log, frame_period_fail.log as unknown_failure (30% confidence, 3 evidence nodes); top hypothesis: Likely RTL bug",
+        "tool": "veritriage.investigate"
+      },
+      {
+        "run": "run-0002",
+        "succeeded": true,
+        "summary": "icarus: failure reproduced: the testbench reports 18 of 32 checks failed, $finish reached at time 1895000",
+        "tool": "simulator.run"
+      },
+      {
+        "run": "run-0003",
+        "succeeded": true,
+        "summary": "icarus: failure reproduced: the testbench reports 4 of 4 checks failed, $finish reached at time 1895000",
+        "tool": "simulator.run"
+      },
+      {
+        "run": "run-0004",
+        "succeeded": true,
+        "summary": "icarus: failure reproduced: the testbench reports 2 of 2 checks failed, $finish reached at time 975000",
+        "tool": "simulator.run"
+      }
+    ],
+    "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+    "input_tokens": 2,
+    "model_calls": 1,
+    "output_tokens": 6886,
+    "passed": true,
+    "replay": false,
+    "runtime": "claude-code",
+    "sandbox": "/tmp/nirmaan-eval-l1b42piz",
+    "scores": [
+      {
+        "failed_runs": [
+          "run-0006",
+          "run-0011",
+          "run-0016"
+        ],
+        "name": "Each repro passes the fixed uart_frame_tx, and each seeded defect fails a repro of its own",
+        "runs": [
+          "run-0005",
+          "run-0009",
+          "run-0013"
+        ],
+        "scorer": "must-fail-each",
+        "status": "passed",
+        "summary": "each of 3 files passed simulator.run on the clean inputs; each of 3 mutants fails a file of its own"
+      }
+    ],
+    "seat": "prj-c391b404ed:triage",
+    "seat_status": "completed",
+    "started_at": "2026-11-25T05:37:00.805912Z",
+    "submitted": true,
+    "tool_calls": [],
+    "version": "1.25.0"
+  },
+  "skills": {
+    "failure_triage": "sha256:f94ee360df0608a5387e68952a4746f7b60c1a39ae395e3252bfd39f037d3317"
+  },
+  "stage": "triage",
+  "trial": 1,
+  "version": 1
+}
