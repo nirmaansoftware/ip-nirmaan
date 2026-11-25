@@ -1,0 +1,177 @@
+{
+  "answers": [
+    {
+      "cache_read_tokens": 7473,
+      "cache_write_tokens": 313,
+      "error": null,
+      "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+      "input_tokens": 2,
+      "mode": "work",
+      "model": "claude-opus-5-5",
+      "output_tokens": 4908,
+      "packet_sha256": "619aceb3c147917f3058fa429cfba066adcc85664ae8295c6ae6510c6953a624",
+      "prompt_sha256": "25397f3289a7ac2dc3fc01f8675c79d137b4c02af8a419a3d77a01dab5d71557",
+      "provider": "claude-code",
+      "text": "{\"uncertainty\": 0.15, \"outcome\": \"rtl_bug\", \"artifacts\": [{\"kind\": \"root_cause_analysis\", \"title\": \"Root cause: debounce only restarts its stability count on a rising edge of noisy\", \"summary\": \"Failure context: the regression failure was reproduced in icarus with 1 of 1 checks failed and $finish reached at 175000 [evidence:prj-a26914b30e.triage.e2] [run:run-0002]. VeriTriage gave only a weak lead, unknown_failure at 30% confidence with top hypothesis 'Likely RTL bug' [evidence:prj-a26914b30e.triage.e1] [run:run-0001], so I treat that as one candidate among four.\\n\\nDefect (incorrectness): The header of the approved RTL [artifact:prj-a26914b30e.design-under-investigation.a1] says 'A change on noisy, in either direction, restarts the count, so a pulse of STABLE edges or fewer, high or low, never reaches clean.' The code restarts the counter only on `if (noisy && !prev) cnt <= 0;`, which is a rising edge. A falling edge does not clear cnt. Once cnt has saturated at STABLE-1, it stays there.\\n\\nCausality, traced by reading the RTL with STABLE=4. This is a hand trace, not a run:\\n- Start state: clean=1, prev=1, cnt=3. noisy falls.\\n- Edge A: noisy=0 and prev=1, so cnt is not reset and stays at 3. Because noisy!=prev, clean is not updated. prev becomes 0.\\n- Edge B: noisy==prev and cnt==STABLE-1, so clean is set to 0.\\n- Result: a low glitch of only 2 edges, fewer than STABLE, reaches clean. The spec forbids this.\\n- A rising glitch is filtered correctly, because the rising edge does clear cnt.\\n\\nRanked hypotheses and the evidence that would refute each:\\n1. rtl_bug (accepted). It would be refuted if the RTL cleared cnt on any change of noisy. It does not.\\n2. testbench_bug (rejected). It would hold if the expected value were wrong. I derived the expectation again from the RTL's own stated behaviour (low pulses of STABLE edges or fewer never reach clean), not from the RTL's output. The new repro checks only that clause plus two long-hold sanity checks.\\n3. infrastructure (rejected for now). It would hold if the failure were nondeterministic or a build or tool artefact. The upstream run built, reached $finish and reported a counted check failure [run:run-0002]. The hand trace shows the RTL produces the fault deterministically.\\n4. spec_ambiguity (rejected). It would hold if the clause did not fix the behaviour. The clause explicitly says 'in either direction' and 'high or low', so falling-edge behaviour is specified. The exact latency for a long hold is less sharply worded, so the repro avoids depending on it: it allows 20 cycles.\\n\\nSuggested fix, not applied here: restart on any change, `if (noisy != prev) cnt <= 0;`.\\n\\nThe requirement served is to investigate and reproduce the failing debounce test [requirement:req-19189b08df].\"}], \"files\": [{\"path\": \"tb/debounce_rca_tb.v\", \"kind\": \"testbench\", \"title\": \"Self-checking repro: a short low glitch must not reach clean\", \"summary\": \"This is a self-checking testbench with 3 counted checks, written against the behaviour stated in the RTL header of [artifact:prj-a26914b30e.design-under-investigation.a1] with STABLE=4.\\n- Check 1: clean rises after noisy has been held high for 20 cycles.\\n- Check 2: clean stays high through a 2-edge low glitch and the 20 cycles after it.\\n- Check 3: clean falls after noisy has been held low for 20 cycles.\\n\\nStimulus is driven on the negedge of clk and clean is sampled on the negedge, which avoids races. Check 2 should fail on the rise-only-restart RTL, by hand trace, and pass on RTL that restarts the count on any change. It prints a single NIRMAAN-SIM verdict line with the run nonce just before $finish. It serves [requirement:req-19189b08df].\", \"entry\": \"debounce_rca_tb\"}], \"tool_runs\": [\"run-0001\", \"run-0002\"], \"claims\": [\"By hand trace of the RTL, not by simulation: with STABLE=4, a 2-edge low glitch on noisy, applied while clean=1 and cnt is saturated, drives clean to 0 on the second edge.\", \"Expected: tb/debounce_rca_tb.v reports 2 passed, 1 failed on the approved RTL under investigation, and 3 passed, 0 failed on RTL that resets cnt on any change of noisy. This has not been run.\"], \"escalation\": null, \"notes\": \"No separate specification document was provided. The behavioural contract used here is the header comment of the approved RTL.\\n\\nThe repro avoids exact-latency checks, because 'held its value for STABLE clock edges after a change' could be read as off by one. It checks only the unambiguous glitch-rejection clause.\\n\\nThe platform's simulator.run (expect=fail) over this testbench and independent review are still required. Neither is claimed here.\"}\n\n=== FILE: tb/debounce_rca_tb.v ===\n`timescale 1ns / 1ps\n// Repro for prj-a26914b30e:root-cause.\n// Spec (debounce header): a change on noisy, in either direction, restarts the\n// count, so a pulse of STABLE edges or fewer, high or low, never reaches clean.\nmodule debounce_rca_tb;\n    reg  clk   = 1'b0;\n    reg  rst   = 1'b1;\n    reg  noisy = 1'b0;\n    wire clean;\n\n    debounce #(.STABLE(4)) dut (\n        .clk  (clk),\n        .rst  (rst),\n        .noisy(noisy),\n        .clean(clean)\n    );\n\n    always #5 clk = ~clk;\n\n    integer passed = 0;\n    integer failed = 0;\n    integer i;\n    reg dropped;\n    reg [8*64-1:0] nonce;\n\n    initial begin\n        if (!$value$plusargs(\"nirmaan_nonce=%s\", nonce))\n            nonce = \"none\";\n\n        // Reset\n        noisy = 1'b0;\n        rst   = 1'b1;\n        repeat (3) @(negedge clk);\n        rst = 1'b0;\n        @(negedge clk);\n\n        // Check 1: a long high hold reaches clean.\n        noisy = 1'b1;\n        repeat (20) @(negedge clk);\n        if (clean === 1'b1) begin\n            passed = passed + 1;\n        end else begin\n            failed = failed + 1;\n            $display(\"CHECK1 FAIL: clean=%b after 20 cycles of noisy=1\", clean);\n        end\n\n        // Check 2: a 2-edge low glitch (fewer than STABLE) must not reach clean.\n        dropped = 1'b0;\n        noisy = 1'b0;\n        for (i = 0; i < 2; i = i + 1) begin\n            @(negedge clk);\n            if (clean !== 1'b1) dropped = 1'b1;\n        end\n        noisy = 1'b1;\n        for (i = 0; i < 20; i = i + 1) begin\n            @(negedge clk);\n            if (clean !== 1'b1) dropped = 1'b1;\n        end\n        if (!dropped) begin\n            passed = passed + 1;\n        end else begin\n            failed = failed + 1;\n            $display(\"CHECK2 FAIL: a 2-edge low glitch on noisy reached clean\");\n        end\n\n        // Check 3: a long low hold reaches clean.\n        noisy = 1'b0;\n        repeat (20) @(negedge clk);\n        if (clean === 1'b0) begin\n            passed = passed + 1;\n        end else begin\n            failed = failed + 1;\n            $display(\"CHECK3 FAIL: clean=%b after 20 cycles of noisy=0\", clean);\n        end\n\n        $display(\"NIRMAAN-SIM %0s %0d passed, %0d failed\", nonce, passed, failed);\n        $finish;\n    end\nendmodule\n=== END FILE ==="
+    }
+  ],
+  "format": "nirmaan.eval-trial",
+  "harness_variant": "default",
+  "judge_runs": [
+    {
+      "check": "The seat's repro passes the fixed debounce and fails the RTL under investigation and its history-register variant",
+      "params": {
+        "sources": [
+          "/tmp/nirmaan-eval-xtan9a6q/judge/check-1/must-fail-46tyj9_p/clean/debounce_rca_tb.v",
+          "/tmp/nirmaan-eval-xtan9a6q/judge/check-1/must-fail-46tyj9_p/clean/debounce.v"
+        ],
+        "top": "debounce_rca_tb"
+      },
+      "run": "run-0004",
+      "succeeded": true,
+      "summary": "icarus: simulation passed: 3 checks passed, $finish reached at time 660000, 0 errors",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The seat's repro passes the fixed debounce and fails the RTL under investigation and its history-register variant",
+      "params": {
+        "sources": [
+          "/tmp/nirmaan-eval-xtan9a6q/judge/check-1/must-fail-46tyj9_p/mutant-1-1/debounce_rca_tb.v",
+          "/tmp/nirmaan-eval-xtan9a6q/judge/check-1/must-fail-46tyj9_p/mutant-1-1/debounce.v"
+        ],
+        "top": "debounce_rca_tb"
+      },
+      "run": "run-0005",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: the testbench reports 1 of 3 checks failed",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The seat's repro passes the fixed debounce and fails the RTL under investigation and its history-register variant",
+      "params": {
+        "sources": [
+          "/tmp/nirmaan-eval-xtan9a6q/judge/check-1/must-fail-46tyj9_p/mutant-1-2/debounce_rca_tb.v",
+          "/tmp/nirmaan-eval-xtan9a6q/judge/check-1/must-fail-46tyj9_p/mutant-1-2/debounce.v"
+        ],
+        "top": "debounce_rca_tb"
+      },
+      "run": "run-0006",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: the testbench reports 1 of 3 checks failed",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The same repro passes a second, independent fixed implementation and fails both defective ones",
+      "params": {
+        "sources": [
+          "/tmp/nirmaan-eval-xtan9a6q/judge/check-2/must-fail-gy5xzik9/clean/debounce_rca_tb.v",
+          "/tmp/nirmaan-eval-xtan9a6q/judge/check-2/must-fail-gy5xzik9/clean/debounce.v"
+        ],
+        "top": "debounce_rca_tb"
+      },
+      "run": "run-0007",
+      "succeeded": true,
+      "summary": "icarus: simulation passed: 3 checks passed, $finish reached at time 660000, 0 errors",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The same repro passes a second, independent fixed implementation and fails both defective ones",
+      "params": {
+        "sources": [
+          "/tmp/nirmaan-eval-xtan9a6q/judge/check-2/must-fail-gy5xzik9/mutant-1-1/debounce_rca_tb.v",
+          "/tmp/nirmaan-eval-xtan9a6q/judge/check-2/must-fail-gy5xzik9/mutant-1-1/debounce.v"
+        ],
+        "top": "debounce_rca_tb"
+      },
+      "run": "run-0008",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: the testbench reports 1 of 3 checks failed",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The same repro passes a second, independent fixed implementation and fails both defective ones",
+      "params": {
+        "sources": [
+          "/tmp/nirmaan-eval-xtan9a6q/judge/check-2/must-fail-gy5xzik9/mutant-1-2/debounce_rca_tb.v",
+          "/tmp/nirmaan-eval-xtan9a6q/judge/check-2/must-fail-gy5xzik9/mutant-1-2/debounce.v"
+        ],
+        "top": "debounce_rca_tb"
+      },
+      "run": "run-0009",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: the testbench reports 1 of 3 checks failed",
+      "tool": "simulator.run"
+    }
+  ],
+  "knowledge": "on",
+  "model": "claude-opus-5-5",
+  "purpose": "evidence",
+  "record": "2026-11-25-claude-code-claude-opus-5-5",
+  "result": {
+    "attempts": 1,
+    "attestations": [],
+    "audit_ok": true,
+    "case": "debug/root-cause-debounce",
+    "case_digest": "sha256:5406d37bd5fd9afac83219fb4c0d70e9960300bbc2825cad507f52f9e09c2683",
+    "cli": "2.1.325",
+    "cost_usd": null,
+    "detail": "No separate specification document was provided. The behavioural contract used here is the header comment of the approved RTL.\n\nThe repro avoids exact-latency checks, because 'held its value for STABLE clock edges after a change' could be read as off by one. It checks only the unambiguous glitch-rejection clause.\n\nThe platform's simulator.run (expect=fail) over this testbench and independent review are still required. Neither is claimed here.; dropped runs not made for this task: run-0001, run-0002",
+    "duration_s": 47.803,
+    "gate_runs": [
+      {
+        "run": "run-0003",
+        "succeeded": true,
+        "summary": "icarus: failure reproduced: the testbench reports 1 of 3 checks failed, $finish reached at time 660000",
+        "tool": "simulator.run"
+      }
+    ],
+    "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+    "input_tokens": 2,
+    "model_calls": 1,
+    "output_tokens": 4908,
+    "passed": true,
+    "replay": false,
+    "runtime": "claude-code",
+    "sandbox": "/tmp/nirmaan-eval-xtan9a6q",
+    "scores": [
+      {
+        "failed_runs": [
+          "run-0005",
+          "run-0006"
+        ],
+        "name": "The seat's repro passes the fixed debounce and fails the RTL under investigation and its history-register variant",
+        "runs": [
+          "run-0004"
+        ],
+        "scorer": "must-fail",
+        "status": "passed",
+        "summary": "simulator.run run-0004 passed on the clean inputs; 2 of 2 mutants failed it"
+      },
+      {
+        "failed_runs": [
+          "run-0008",
+          "run-0009"
+        ],
+        "name": "The same repro passes a second, independent fixed implementation and fails both defective ones",
+        "runs": [
+          "run-0007"
+        ],
+        "scorer": "must-fail",
+        "status": "passed",
+        "summary": "simulator.run run-0007 passed on the clean inputs; 2 of 2 mutants failed it"
+      }
+    ],
+    "seat": "prj-a26914b30e:root-cause",
+    "seat_status": "in_review",
+    "started_at": "2026-11-25T01:49:23.864391Z",
+    "submitted": true,
+    "tool_calls": [],
+    "version": "1.25.0"
+  },
+  "skills": {
+    "root_cause_analysis": "sha256:f4d03c138a6b5294b9837be1fff05475a5b312326df7029c2da6250b8563bc34"
+  },
+  "stage": "root-cause",
+  "trial": 1,
+  "version": 1
+}
