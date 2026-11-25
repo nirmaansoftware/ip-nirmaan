@@ -18,3 +18,4 @@ changes, the gates with their owner seats, open questions, and dissent. Process:
 - [2026-11-19: seat C as the seat account, and the live refusal](2026-11-19-seat-c-live-refusal.md)
 - [2026-11-22: the runner-account tools on the timer path run as the seat account](2026-11-22-eda-tools-seat-account.md)
 - [2026-11-23: wave 2 (Verification) close, meeting 1: the rulings before the re-measure batch](2026-11-23-wave-2-close-meeting-1.md)
+- [2026-11-25: the remaining work re-ordered around one reference block and a prospect checkpoint](2026-11-25-sellable-ip-first.md)
