@@ -508,7 +508,9 @@ SKILLS: list[Skill] = [
                    "$value$plusargs(\"nirmaan_nonce=%s\", nonce) into a reg [8*64-1:0], then "
                    "$display(\"NIRMAAN-SIM %0s %0d passed, %0d failed\", nonce, passed, failed). The repro gate "
                    "(simulator.run with expect=fail) counts a run only when it builds, reaches $finish, and prints "
-                   "that one verdict with the run's nonce and at least one failed check."),
+                   "that one verdict with the run's nonce and at least one failed check.",
+                   "In tool_runs, list a run by its bare run id, the text after \"run:\" in its [run:<id>] "
+                   "citation token, not the token itself."),
        fails=("Classifying from the first error line only.",),
        valid=("Triage cites a VeriTriage session and its evidence nodes.",)),
     sk("log_analysis", "Log analysis", "verification", "debug", provides=("debug.triage",),
