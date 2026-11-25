@@ -160,3 +160,19 @@ def test_the_committed_w2_l1_answers_answer_every_model_failure_of_that_batch():
     assert len(fc.parse_answers(text)) == 13
     # The script must also fail on this batch when the answers are missing, or the test proves nothing.
     assert fc.run(results, ROOT, keys, "", True, True, io.StringIO()) == 1
+
+
+def test_the_committed_w2_remeasure_answers_answer_every_model_failure_of_that_batch():
+    """Wave 2 close, Part 2 (Carried): the sixteen answers of the re-measure batch, a committed file the script reads."""
+    results = ROOT / "evals" / "results"
+    keys = sorted(p.parent.relative_to(results).as_posix()
+                  for p in (results / "w2-remeasure").glob("slot-*/*/manifest.json"))
+    assert len(keys) == 117
+    text = (ROOT / "evals" / "plans" / "2026-11-25-w2-remeasure-curriculum-answers.md").read_text()
+    out = io.StringIO()
+    assert fc.run(results, ROOT, keys, text, True, True, out) == 0, out.getvalue()
+    assert "model-labelled failures in scope: 16" in out.getvalue()
+    assert "unanswered: 0 of 16" in out.getvalue()
+    assert len(fc.parse_answers(text)) == 16
+    # The script must also fail on this batch when the answers are missing, or the test proves nothing.
+    assert fc.run(results, ROOT, keys, "", True, True, io.StringIO()) == 1
