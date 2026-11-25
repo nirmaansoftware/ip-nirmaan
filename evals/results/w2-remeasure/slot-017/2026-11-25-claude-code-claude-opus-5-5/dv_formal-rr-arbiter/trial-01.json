@@ -1,0 +1,175 @@
+{
+  "answers": [
+    {
+      "cache_read_tokens": 12642,
+      "cache_write_tokens": 314,
+      "error": null,
+      "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+      "input_tokens": 2,
+      "mode": "work",
+      "model": "claude-opus-5-5",
+      "output_tokens": 11402,
+      "packet_sha256": "f32e3b2c5e7a6fb0971581ab5fda125fdbfb1aba3d87ca75ec353aa9124f0a3b",
+      "prompt_sha256": "3b853fbfa828523511dc7b5e43aef5c9ae37beaa99999a7b6da05b230f6ba12a",
+      "provider": "claude-code",
+      "text": "```json\n{\n  \"uncertainty\": 0.25,\n  \"outcome\": \"Submitted a single-task SymbiYosys prove setup (rr_arbiter.sby) and a property wrapper (rr_arbiter_props.sv) for the approved rr_arbiter.v. The properties are interface properties traced to every [req:RR-*] rule in interface_spec.md. There are no input assumptions, and every assertion guard has explicit covers. The formal.run and formal.cover evidence is for the platform to produce. None is claimed here.\",\n  \"artifacts\": [\n    {\n      \"kind\": \"assertions\",\n      \"title\": \"Formal property set for rr_arbiter (prove mode, no assumptions)\",\n      \"summary\": \"Serves [requirement:req-2e425ae6da]. The properties come from the approved spec [artifact:prj-238bc15062.interface-spec.a1] and target the approved RTL [artifact:prj-238bc15062.design-under-test.a1], which is instantiated by name and not copied. Each spec rule has its own assertion, so a failure names one rule: RR-RESET, RR-IDLE, RR-PICK (one-hot, plus first-in-rotation as three separate assertions), RR-ONLY-REQUESTERS, RR-ROTATE, RR-HOLD, RR-YIELD, and RR-BOUND (per-requester wait counters, at most 2 non-granted cycles, granted on the third). There are no assume statements. Before the first reset, last is unconstrained and the spec-dependent assertions are guarded by a reset-seen flag. Helper invariants are asserted to make 1-step induction close: last != 3 after reset, wait-counter/last relations, and counters at 0 before reset. $past is guarded by f_past_valid. Covers are written for reset, each grant, each value of last under req=111, idle, the yield scenario, and each requester reaching its wait bound. Mode is prove with smtbmc. The depth of 10 is the induction depth and also the cover depth.\"\n    }\n  ],\n  \"files\": [\n    {\n      \"path\": \"rr_arbiter.sby\",\n      \"kind\": \"formal_spec\",\n      \"title\": \"SymbiYosys single-task prove setup for rr_arbiter\",\n      \"summary\": \"Single-task setup with no [tasks] section, mode prove, depth 10, engine smtbmc. [files] lists the approved RTL rr_arbiter.v [artifact:prj-238bc15062.design-under-test.a1] and the property file rr_arbiter_props.sv. The top is rr_arbiter_props. Serves [requirement:req-2e425ae6da].\",\n      \"entry\": \"rr_arbiter_props\"\n    },\n    {\n      \"path\": \"rr_arbiter_props.sv\",\n      \"kind\": \"assertions\",\n      \"title\": \"rr_arbiter property wrapper (immediate assertions, covers, helper invariants)\",\n      \"summary\": \"Wrapper module rr_arbiter_props instantiates rr_arbiter from [artifact:prj-238bc15062.design-under-test.a1]. It asserts the [req:RR-*] rules of [artifact:prj-238bc15062.interface-spec.a1] using the immediate if-guarded subset the open Yosys front end reads. There are no assumptions. Covers are written for each guard and each scenario.\",\n      \"entry\": \"rr_arbiter_props\"\n    }\n  ],\n  \"tool_runs\": [],\n  \"claims\": [\n    \"Expectation, not a result: by hand-tracing against the spec, the RR-BOUND helper invariants hold on all reachable states. The invariants are: wait==1 implies last != i, and wait==2 implies i == (last+1) mod 3. If they hold, 1-step induction should close well within depth 10.\",\n    \"Expectation, not a result: every cover, including the reset-seen guard, should be reachable within depth 10 because no input is assumed. The longest cover, a wait counter reaching 2, needs about 4 steps.\",\n    \"The reset-seen guard is a modelling choice. interface_spec.md does not define behaviour when last == 3 or before the first reset, so the spec-dependent assertions are checked only after a reset has been seen. RR-ONLY-REQUESTERS and RR-HOLD are checked unconditionally.\"\n  ],\n  \"escalation\": null,\n  \"notes\": \"The properties come from the spec's rotation definition (last+1, last+2, last mod 3), not from the RTL case statement. Spec-dependent assertions apply only after a reset has been seen; the first-cycle state of last is otherwise free and no assumption is made. If formal.run fails induction, read the failing assertion and step in the log before changing anything. A likely cause is a missing helper invariant, not an RTL bug. A mutant check is recommended for review: for example, swap the priority order in one case arm of rr_arbiter.v. Independent review must come from another seat. The upstream review records are [evidence:prj-238bc15062.interface-spec.e1] and [evidence:prj-238bc15062.design-under-test.e1].\"\n}\n```\n=== FILE: rr_arbiter.sby ===\n[options]\nmode prove\ndepth 10\n\n[engines]\nsmtbmc\n\n[script]\nread -formal rr_arbiter.v\nread -formal rr_arbiter_props.sv\nprep -top rr_arbiter_props\n\n[files]\nrr_arbiter.v\nrr_arbiter_props.sv\n=== END FILE ===\n=== FILE: rr_arbiter_props.sv ===\n// Formal properties for rr_arbiter, derived from interface_spec.md.\n// Immediate assertions only (open Yosys front end). No assumptions.\n`default_nettype none\nmodule rr_arbiter_props (\n    input wire       clk,\n    input wire       rst_n,\n    input wire [2:0] req\n);\n    wire [2:0] grant;\n    wire [1:0] last;\n\n    rr_arbiter dut (\n        .clk  (clk),\n        .rst_n(rst_n),\n        .req  (req),\n        .grant(grant),\n        .last (last)\n    );\n\n    // ------------------------------------------------------------------\n    // Bookkeeping\n    // ------------------------------------------------------------------\n    reg f_past_valid = 1'b0;\n    reg f_reset_seen = 1'b0;\n    always @(posedge clk) begin\n        f_past_valid <= 1'b1;\n        if (!rst_n)\n            f_reset_seen <= 1'b1;\n    end\n\n    // Spec priority order: last+1, last+2, last (mod 3)\n    wire [1:0] f_first  = (last == 2'd2) ? 2'd0 : (last + 2'd1);\n    wire [1:0] f_second = (last == 2'd0) ? 2'd2 :\n                          ((last == 2'd1) ? 2'd0 : 2'd1);\n    wire [2:0] f_first_bit  = 3'b001 << f_first;\n    wire [2:0] f_second_bit = 3'b001 << f_second;\n    wire [2:0] f_last_bit   = 3'b001 << last;\n\n    wire f_grant_onehot = (grant != 3'b000) &&\n                          ((grant & (grant - 3'b001)) == 3'b000);\n    wire [1:0] f_gidx = grant[0] ? 2'd0 : (grant[1] ? 2'd1 : 2'd2);\n\n    // ------------------------------------------------------------------\n    // Combinational grant properties (2.2)\n    // ------------------------------------------------------------------\n    always @(*) begin\n        // [req:RR-ONLY-REQUESTERS]\n        assert ((grant & ~req) == 3'b000);\n\n        if (f_reset_seen) begin\n            // helper: last is 0, 1 or 2 once reset has been applied\n            assert (last != 2'd3);\n\n            // [req:RR-IDLE]\n            if (req == 3'b000)\n                assert (grant == 3'b000);\n\n            // [req:RR-PICK] exactly one grant when any request\n            if (req != 3'b000)\n                assert (f_grant_onehot);\n\n            // [req:RR-PICK] first requester in rotation order\n            if (req[f_first])\n                assert (grant == f_first_bit);\n            if (!req[f_first] && req[f_second])\n                assert (grant == f_second_bit);\n            if (!req[f_first] && !req[f_second] && req[last])\n                assert (grant == f_last_bit);\n        end\n    end\n\n    // ------------------------------------------------------------------\n    // Sequential properties (2.1, 2.3)\n    // ------------------------------------------------------------------\n    always @(posedge clk) begin\n        if (f_past_valid) begin\n            // [req:RR-RESET]\n            if (!$past(rst_n))\n                assert (last == 2'd2);\n\n            // [req:RR-ROTATE]\n            if ($past(rst_n) && $past(f_reset_seen) && ($past(grant) != 3'b000))\n                assert (last == $past(f_gidx));\n\n            // [req:RR-HOLD]\n            if ($past(rst_n) && ($past(grant) == 3'b000))\n                assert (last == $past(last));\n\n            // [req:RR-YIELD]\n            if ($past(rst_n) && $past(f_reset_seen) && ($past(grant) != 3'b000)\n                && ((req & ~$past(grant)) != 3'b000))\n                assert ((grant & $past(grant)) == 3'b000);\n        end\n    end\n\n    // ------------------------------------------------------------------\n    // Bounded wait (2.4): cycles a requester has held req without grant\n    // ------------------------------------------------------------------\n    reg [1:0] f_wait0 = 2'd0;\n    reg [1:0] f_wait1 = 2'd0;\n    reg [1:0] f_wait2 = 2'd0;\n\n    always @(posedge clk) begin\n        if (!rst_n || !f_reset_seen || !req[0] || grant[0])\n            f_wait0 <= 2'd0;\n        else\n            f_wait0 <= f_wait0 + 2'd1;\n\n        if (!rst_n || !f_reset_seen || !req[1] || grant[1])\n            f_wait1 <= 2'd0;\n        else\n            f_wait1 <= f_wait1 + 2'd1;\n\n        if (!rst_n || !f_reset_seen || !req[2] || grant[2])\n            f_wait2 <= 2'd0;\n        else\n            f_wait2 <= f_wait2 + 2'd1;\n    end\n\n    always @(*) begin\n        if (f_reset_seen) begin\n            // [req:RR-BOUND] at most two grants to others, granted on the third\n            assert (f_wait0 <= 2'd2);\n            assert (f_wait1 <= 2'd2);\n            assert (f_wait2 <= 2'd2);\n            if ((f_wait0 == 2'd2) && req[0])\n                assert (grant[0]);\n            if ((f_wait1 == 2'd2) && req[1])\n                assert (grant[1]);\n            if ((f_wait2 == 2'd2) && req[2])\n                assert (grant[2]);\n\n            // helper invariants for induction\n            if (f_wait0 == 2'd2)\n                assert (f_first == 2'd0);\n            if (f_wait1 == 2'd2)\n                assert (f_first == 2'd1);\n            if (f_wait2 == 2'd2)\n                assert (f_first == 2'd2);\n            if (f_wait0 == 2'd1)\n                assert (last != 2'd0);\n            if (f_wait1 == 2'd1)\n                assert (last != 2'd1);\n            if (f_wait2 == 2'd1)\n                assert (last != 2'd2);\n        end else begin\n            // helper: counters idle before the first reset\n            assert (f_wait0 == 2'd0);\n            assert (f_wait1 == 2'd0);\n            assert (f_wait2 == 2'd0);\n        end\n    end\n\n    // ------------------------------------------------------------------\n    // Covers: scenarios the proof must still allow\n    // ------------------------------------------------------------------\n    always @(posedge clk) begin\n        if (f_reset_seen) begin\n            cover (req == 3'b000);\n            cover (grant == 3'b001);\n            cover (grant == 3'b010);\n            cover (grant == 3'b100);\n            cover ((req == 3'b111) && (last == 2'd0));\n            cover ((req == 3'b111) && (last == 2'd1));\n            cover ((req == 3'b111) && (last == 2'd2));\n            cover ((f_wait0 == 2'd2) && req[0]);\n            cover ((f_wait1 == 2'd2) && req[1]);\n            cover ((f_wait2 == 2'd2) && req[2]);\n        end\n        if (f_past_valid) begin\n            cover (!$past(rst_n));\n            cover ($past(rst_n) && $past(f_reset_seen) && ($past(grant) != 3'b000)\n                   && ((req & ~$past(grant)) != 3'b000));\n            cover ($past(rst_n) && $past(f_reset_seen) && ($past(grant) == 3'b000));\n        end\n    end\nendmodule\n`default_nettype wire\n=== END FILE ==="
+    }
+  ],
+  "format": "nirmaan.eval-trial",
+  "harness_variant": "default",
+  "judge_runs": [
+    {
+      "check": "The seat's proof passes the approved RTL with every cover reached and fails each round-robin arbiter mutant",
+      "params": {
+        "sby": "/tmp/nirmaan-eval-l2lh63lz/judge/check-1/must-fail-mtnwjih2/clean/rr_arbiter.sby",
+        "sources": [
+          "/tmp/nirmaan-eval-l2lh63lz/judge/check-1/must-fail-mtnwjih2/clean/rr_arbiter_props.sv",
+          "/tmp/nirmaan-eval-l2lh63lz/judge/check-1/must-fail-mtnwjih2/clean/rr_arbiter.v"
+        ]
+      },
+      "run": "run-0003",
+      "succeeded": true,
+      "summary": "symbiyosys: formal passed: every property proven",
+      "tool": "formal.run"
+    },
+    {
+      "check": "The seat's proof passes the approved RTL with every cover reached and fails each round-robin arbiter mutant",
+      "params": {
+        "sby": "/tmp/nirmaan-eval-l2lh63lz/judge/check-1/must-fail-mtnwjih2/cover/rr_arbiter.sby",
+        "sources": [
+          "/tmp/nirmaan-eval-l2lh63lz/judge/check-1/must-fail-mtnwjih2/cover/rr_arbiter_props.sv",
+          "/tmp/nirmaan-eval-l2lh63lz/judge/check-1/must-fail-mtnwjih2/cover/rr_arbiter.v"
+        ]
+      },
+      "run": "run-0004",
+      "succeeded": true,
+      "summary": "symbiyosys-cover: not vacuous: every cover reached (13 of 13); every assertion antecedent reached (26 of 26)",
+      "tool": "formal.cover"
+    },
+    {
+      "check": "The seat's proof passes the approved RTL with every cover reached and fails each round-robin arbiter mutant",
+      "params": {
+        "sby": "/tmp/nirmaan-eval-l2lh63lz/judge/check-1/must-fail-mtnwjih2/mutant-1-1/rr_arbiter.sby",
+        "sources": [
+          "/tmp/nirmaan-eval-l2lh63lz/judge/check-1/must-fail-mtnwjih2/mutant-1-1/rr_arbiter_props.sv",
+          "/tmp/nirmaan-eval-l2lh63lz/judge/check-1/must-fail-mtnwjih2/mutant-1-1/rr_arbiter.v"
+        ]
+      },
+      "run": "run-0005",
+      "succeeded": false,
+      "summary": "symbiyosys: formal fail: 1 error; first: rr_arbiter_props.sv:145: [ASSERT] assertion rr_arbiter_props._witness_.check_assert_rr_arbiter_props_sv_145_161 failed at step 2",
+      "tool": "formal.run"
+    },
+    {
+      "check": "The seat's proof passes the approved RTL with every cover reached and fails each round-robin arbiter mutant",
+      "params": {
+        "sby": "/tmp/nirmaan-eval-l2lh63lz/judge/check-1/must-fail-mtnwjih2/mutant-1-2/rr_arbiter.sby",
+        "sources": [
+          "/tmp/nirmaan-eval-l2lh63lz/judge/check-1/must-fail-mtnwjih2/mutant-1-2/rr_arbiter_props.sv",
+          "/tmp/nirmaan-eval-l2lh63lz/judge/check-1/must-fail-mtnwjih2/mutant-1-2/rr_arbiter.v"
+        ]
+      },
+      "run": "run-0006",
+      "succeeded": false,
+      "summary": "symbiyosys: formal fail: 1 error; first: rr_arbiter_props.sv:143: [ASSERT] assertion rr_arbiter_props._witness_.check_assert_rr_arbiter_props_sv_143_158 failed at step 2",
+      "tool": "formal.run"
+    },
+    {
+      "check": "The seat's proof passes the approved RTL with every cover reached and fails each round-robin arbiter mutant",
+      "params": {
+        "sby": "/tmp/nirmaan-eval-l2lh63lz/judge/check-1/must-fail-mtnwjih2/mutant-1-3/rr_arbiter.sby",
+        "sources": [
+          "/tmp/nirmaan-eval-l2lh63lz/judge/check-1/must-fail-mtnwjih2/mutant-1-3/rr_arbiter_props.sv",
+          "/tmp/nirmaan-eval-l2lh63lz/judge/check-1/must-fail-mtnwjih2/mutant-1-3/rr_arbiter.v"
+        ]
+      },
+      "run": "run-0007",
+      "succeeded": false,
+      "summary": "symbiyosys: formal fail: 1 error; first: rr_arbiter_props.sv:87: [ASSERT] assertion rr_arbiter_props._witness_.check_assert_rr_arbiter_props_sv_87_95 failed at step 2",
+      "tool": "formal.run"
+    },
+    {
+      "check": "The seat's proof passes the approved RTL with every cover reached and fails each round-robin arbiter mutant",
+      "params": {
+        "sby": "/tmp/nirmaan-eval-l2lh63lz/judge/check-1/must-fail-mtnwjih2/mutant-1-4/rr_arbiter.sby",
+        "sources": [
+          "/tmp/nirmaan-eval-l2lh63lz/judge/check-1/must-fail-mtnwjih2/mutant-1-4/rr_arbiter_props.sv",
+          "/tmp/nirmaan-eval-l2lh63lz/judge/check-1/must-fail-mtnwjih2/mutant-1-4/rr_arbiter.v"
+        ]
+      },
+      "run": "run-0008",
+      "succeeded": false,
+      "summary": "symbiyosys: formal fail: 1 error; first: rr_arbiter_props.sv:79: [ASSERT] assertion rr_arbiter_props._witness_.check_assert_rr_arbiter_props_sv_79_86 failed at step 2",
+      "tool": "formal.run"
+    }
+  ],
+  "knowledge": "on",
+  "model": "claude-opus-5-5",
+  "purpose": "evidence",
+  "record": "2026-11-25-claude-code-claude-opus-5-5",
+  "result": {
+    "attempts": 1,
+    "attestations": [],
+    "audit_ok": true,
+    "case": "dv/formal-rr-arbiter",
+    "case_digest": "sha256:d87aa9e44e5d776badcfcf7ff7cb43f41cc3edf43a69a84bb811116f349518e5",
+    "cli": "2.1.325",
+    "cost_usd": null,
+    "detail": "The properties come from the spec's rotation definition (last+1, last+2, last mod 3), not from the RTL case statement. Spec-dependent assertions apply only after a reset has been seen; the first-cycle state of last is otherwise free and no assumption is made. If formal.run fails induction, read the failing assertion and step in the log before changing anything. A likely cause is a missing helper invariant, not an RTL bug. A mutant check is recommended for review: for example, swap the priority order in one case arm of rr_arbiter.v. Independent review must come from another seat. The upstream review records are [evidence:prj-238bc15062.interface-spec.e1] and [evidence:prj-238bc15062.design-under-test.e1].",
+    "duration_s": 107.758,
+    "gate_runs": [
+      {
+        "run": "run-0001",
+        "succeeded": true,
+        "summary": "symbiyosys: formal passed: every property proven",
+        "tool": "formal.run"
+      },
+      {
+        "run": "run-0002",
+        "succeeded": true,
+        "summary": "symbiyosys-cover: not vacuous: every cover reached (13 of 13); every assertion antecedent reached (26 of 26)",
+        "tool": "formal.cover"
+      }
+    ],
+    "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+    "input_tokens": 2,
+    "model_calls": 1,
+    "output_tokens": 11402,
+    "passed": true,
+    "replay": false,
+    "runtime": "claude-code",
+    "sandbox": "/tmp/nirmaan-eval-l2lh63lz",
+    "scores": [
+      {
+        "failed_runs": [
+          "run-0005",
+          "run-0006",
+          "run-0007",
+          "run-0008"
+        ],
+        "name": "The seat's proof passes the approved RTL with every cover reached and fails each round-robin arbiter mutant",
+        "runs": [
+          "run-0003",
+          "run-0004"
+        ],
+        "scorer": "must-fail",
+        "status": "passed",
+        "summary": "formal.run run-0003 passed on the clean inputs with every cover reached; 4 of 4 mutants failed it"
+      }
+    ],
+    "seat": "prj-238bc15062:assertions-formal",
+    "seat_status": "in_review",
+    "started_at": "2026-11-25T01:20:47.809321Z",
+    "submitted": true,
+    "tool_calls": [],
+    "version": "1.25.0"
+  },
+  "skills": {
+    "assertion_coverage": "sha256:9a2e389eba23a86d1f98c45a933969b8cb2fd8dd38ff53d820dd31c0473d916f",
+    "formal_verification": "sha256:496f8d92db14cfe796776c8c485fa2191df0c12e29c5a10bac2a86d7ac034dc7",
+    "sva": "sha256:dd2c6a58cb270577169dd2af6f053c57a72ac38aaecfd5449d234887c78606ee"
+  },
+  "stage": "assertions-formal",
+  "trial": 1,
+  "version": 1
+}
