@@ -255,9 +255,9 @@ def _must_fail_runs(ctx: ScoreContext, inputs: dict[str, list[Path]], entries: d
             for m, mutant in enumerate(mutants, start=1):
                 run_id, outcome = run(str(check.tool), f"mutant-{n}-{m}",
                                       (resolve(ctx.repo, original), resolve(ctx.repo, mutant)))
-                if outcome.succeeded:
+                if outcome.succeeded:  # the surviving mutant's run is listed, so the record carries it (M6)
                     return score(ScoreStatus.FAILED, f"mutant {mutant} survived: {check.tool} {run_id} passed",
-                                 tuple(passed), tuple(caught))
+                                 (*passed, run_id), tuple(caught))
                 if not outcome.references:
                     return score(ScoreStatus.NOT_RUN, f"mutant {mutant} was refused, not run: {outcome.summary}",
                                  tuple(passed), tuple(caught))
@@ -353,6 +353,7 @@ def _each_runs(ctx: ScoreContext, param: str, files: list[str], case_inputs: dic
     mutants = [(resolve(ctx.repo, original), resolve(ctx.repo, m))
                for original, ms in sorted(check.mutants.items()) for m in ms]
     passed: list[str] = []
+    survived: list[str] = []  # the runs a mutant passed: listed with the clean runs, so the record carries them (M6)
     failed_by: dict[str, dict[str, str]] = {str(m): {} for _, m in mutants}  # mutant -> file -> failed run
     try:
         for n, location in enumerate(files, start=1):
@@ -371,13 +372,15 @@ def _each_runs(ctx: ScoreContext, param: str, files: list[str], case_inputs: dic
             passed.append(clean_id)
             if not clean.succeeded:
                 return score(ScoreStatus.FAILED, f"{Path(location).name} does not pass on the clean inputs: "
-                                                 f"{check.tool} {clean_id}: {clean.summary}", tuple(passed))
+                                                 f"{check.tool} {clean_id}: {clean.summary}", (*passed, *survived))
             for m, (original, mutant) in enumerate(mutants, start=1):
                 run_id, outcome = run(f"mutant-{m}", (original, mutant))
                 if not outcome.succeeded and not outcome.references:
                     return score(ScoreStatus.NOT_RUN, f"mutant {mutant} was refused, not run: {outcome.summary}",
-                                 tuple(passed))
-                if not outcome.succeeded:
+                                 (*passed, *survived))
+                if outcome.succeeded:
+                    survived.append(run_id)
+                else:
                     failed_by[str(mutant)][location] = run_id
     except ToolAccessDenied as exc:
         return score(ScoreStatus.NOT_RUN, f"not run: {exc}")
@@ -387,9 +390,9 @@ def _each_runs(ctx: ScoreContext, param: str, files: list[str], case_inputs: dic
     if alone:
         return score(ScoreStatus.FAILED, f"no repro of its own fails {', '.join(Path(m).name for m in alone)}: "
                                          f"only {len(matching)} of {len(failed_by)} mutants have a file of their "
-                                         "own that fails them", tuple(passed), caught)
+                                         "own that fails them", (*passed, *survived), caught)
     return score(ScoreStatus.PASSED, f"each of {len(files)} files passed {check.tool} on the clean inputs; each of "
-                                     f"{len(failed_by)} mutants fails a file of its own", tuple(passed), caught)
+                                     f"{len(failed_by)} mutants fails a file of its own", (*passed, *survived), caught)
 
 
 # --- The object screen before a whole-flow check links seat C (G3, gate WF16) ------------------------------------

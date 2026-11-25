@@ -223,8 +223,9 @@ def test_a_testbench_blind_to_the_periodic_mask_meets_the_bounds_and_survives_on
     assert score.status is ScoreStatus.FAILED
     survivor = f"{TT}/mutants/tick_timer_irq_ie_ignored_periodic.v"
     assert score.summary.startswith(f"mutant {survivor} survived: coverage.read"), score.summary
-    # Every earlier mutant failed on a check, and the clean run and the cover run both passed the bounds.
-    assert len(score.runs) == 2 and len(score.failed_runs) == len(RTL_MUTANTS) - 1
+    # Every earlier mutant failed on a check, and the clean run and the cover run both passed the bounds; the
+    # survivor's own run is listed after them (M6).
+    assert len(score.runs) == 3 and len(score.failed_runs) == len(RTL_MUTANTS) - 1
 
 
 @needs(*GATE_TOOLS, *COVERAGE_TOOLS)

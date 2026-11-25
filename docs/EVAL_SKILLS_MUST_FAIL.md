@@ -61,7 +61,10 @@ The scorer passes only when, in order:
    check's `cover_bounds` when it has any (otherwise `failed`: "covers not
    reached"; "Cover bounds" below);
 3. every mutant run fails, on a run that executed and wrote its log. A mutant
-   that passes is reported by name as surviving. A refusal (a tool outcome with
+   that passes is reported by name as surviving, and its run is listed in the
+   score's `runs`, so the trial record's `judge_runs` carries it with
+   `succeeded: true` (`must-fail-each` lists every mutant run that passed a
+   file the same way). A refusal (a tool outcome with
    no log: a check problem, a missing file) is `not_run`, never a mutant caught.
 
 A check with no mutants is `not_run`. A tool the broker refuses is `not_run`.
