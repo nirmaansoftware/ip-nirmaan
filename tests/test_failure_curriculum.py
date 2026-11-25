@@ -146,3 +146,17 @@ def test_a_sibling_row_is_placed_inside_its_own_slot_folder(tmp_path):
         "| -2 | 1 | not passed | model (not further established) | x |\n")
     rows, problems = fc.labels(results)
     assert problems == [] and [f.id for f in rows] == ["g3-timer/slot-01/2026-01-01-x-m-2:trial-01"]
+
+
+def test_the_committed_w2_l1_answers_answer_every_model_failure_of_that_batch():
+    """Wave 2 close, decision M8: the thirteen answers are a committed file the script itself can read."""
+    results = ROOT / "evals" / "results"
+    keys = sorted(p.name for p in results.iterdir() if p.is_dir() and p.name.startswith(("2026-11-18-", "2026-11-19-")))
+    text = (ROOT / "evals" / "plans" / "2026-11-25-w2-l1-curriculum-answers.md").read_text()
+    out = io.StringIO()
+    assert fc.run(results, ROOT, keys, text, True, True, out) == 0, out.getvalue()
+    assert "model-labelled failures in scope: 13" in out.getvalue()
+    assert "unanswered: 0 of 13" in out.getvalue()
+    assert len(fc.parse_answers(text)) == 13
+    # The script must also fail on this batch when the answers are missing, or the test proves nothing.
+    assert fc.run(results, ROOT, keys, "", True, True, io.StringIO()) == 1

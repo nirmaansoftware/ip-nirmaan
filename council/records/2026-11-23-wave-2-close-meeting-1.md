@@ -2225,3 +2225,15 @@ One wording correction is made in place, at the reviews' request:
 eda-tooling's seat statement ended with a variant of a word this
 repository does not use for an agent's read; it now ends "Nothing here is
 a person's approval." No other line above this note moves.
+
+## Note (2026-11-25): the same answers in a file the script reads
+
+The reviews of the note above (ip#569) found that its block of answers is
+wrapped, so `scripts/failure_curriculum.py` cannot read it, and that the
+script's result was stated with no run a key could see. Both are closed
+by the pull request that carries this note: the thirteen lines, one line
+each, are in `evals/plans/2026-11-25-w2-l1-curriculum-answers.md`, and a
+test in `tests/test_failure_curriculum.py` runs the script on that file
+in the test job, with the record keys of W2-L1, and fails unless all
+thirteen are answered and it fails without them. Nothing else above
+changes.
