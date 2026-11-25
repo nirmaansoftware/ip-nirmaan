@@ -177,7 +177,7 @@ def test_a_model_that_never_reports_a_hole_survives_the_first_mutant(nirmaan_org
     assert score.status is ScoreStatus.FAILED
     assert score.summary.startswith(f"mutant {LIFO}/mutants/lifo4_fcov_tb_no_underflow.sv survived: coverage.read"), \
         score.summary
-    assert len(score.runs) == 1 and score.failed_runs == ()
+    assert len(score.runs) == 2 and score.failed_runs == ()  # the clean run, then the survivor's (M6)
 
 
 @needs(*COVERAGE_TOOLS)
