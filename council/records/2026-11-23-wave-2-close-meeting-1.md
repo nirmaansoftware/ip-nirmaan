@@ -2105,7 +2105,7 @@ approval.
   one yet. The replays show the job judges each reference answer and
   mutant as expected, once, and say nothing of W2-L1's tools. On the tick
   timer the coverage gate and the scorer judged as built. Nothing here is
-  signoff.
+  a person's approval.
 - **security** (gates W2C2 to W2C4). The trials ran in CI with the named
   tool steps as the seat account, as the plan claims and no wider. That
   every probe was denied in every run is the operator's account from
@@ -2136,3 +2136,92 @@ approval.
    the `live-eval` environment, and the residual of the seat account is
    the one the plan's section 5 states and decision 4 of meeting 1
    accepts.
+
+## Note (2026-11-25): the curriculum answers of decision M8, as given and checked
+
+The addendum above merged as ip#568 (`ff6c7633`). Its three reviews passed
+it, and key 2 and the Founder Proxy (agent) each recorded one finding that
+no key could close: the exit item "Curriculum answers for W2-L1" is met
+only when the pull request lists the thirteen answers and the list is
+checked against the script, the answers were in the pull request's text
+and in no committed file, and a key cannot read that text. This note
+closes it. It changes no decision, figure, level or gate above.
+
+The thirteen answers, word for word as the text of ip#568 gave them. Each
+is one line there; here a line is wrapped:
+
+```
+- 2026-11-18-claude-code-claude-opus-5-5-30:trial-01: note:
+  knowledge/verification/verification_planning.md (ip#439): the plan file's
+  format as the plan check reads it
+- 2026-11-18-claude-code-claude-opus-5-5-44:trial-01: note:
+  knowledge/verification/verification_planning.md (ip#439): the plan file's
+  format as the plan check reads it
+- 2026-11-18-claude-code-claude-opus-5-5-35:trial-01: note:
+  knowledge/verification/equivalence_checking.md (ip#431, ip#443, ip#453):
+  the sat strategy and the mutant it proved falsely
+- 2026-11-19-claude-code-claude-opus-5-5-29:trial-01: note:
+  knowledge/verification/equivalence_checking.md (ip#431, ip#443, ip#453):
+  the sat strategy and the mutant it proved falsely
+- 2026-11-19-claude-code-claude-opus-5-5-71:trial-01: note:
+  knowledge/verification/equivalence_checking.md (ip#431, ip#443, ip#453):
+  the sat strategy and the mutant it proved falsely
+- 2026-11-19-claude-code-claude-opus-5-5-18:trial-01: must-fail:
+  evals/dv/coverage_tick_timer.json (ip#436): its mutant
+  tick_timer_irq_ie_ignored_periodic.v is wrong in one mode only; that it is
+  of the same class as the survivor irq_ctrl_level_mask_ignored is an
+  inference
+- 2026-11-19-claude-code-claude-opus-5-5-37:trial-01: note:
+  knowledge/design/control_logic_design.md (ip#439), given as decision M8
+  rules; the note describes a register left out of the reset branch, and
+  design-architect's read of this record found both sample registers in the
+  reset branch and the input widened in an always @* block, so a corrected
+  answer is carried (design-architect)
+- 2026-11-19-claude-code-claude-opus-5-5-68:trial-01: note:
+  knowledge/design/control_logic_design.md (ip#439), given as decision M8
+  rules; the note describes a register left out of the reset branch, and
+  design-architect's read of this record found both sample registers in the
+  reset branch and the input widened in an always @* block, so a corrected
+  answer is carried (design-architect)
+- 2026-11-18-claude-code-claude-opus-5-5-calibration:trial-01: note:
+  knowledge/design/control_logic_design.md (ip#439), given as decision M8
+  rules; the note describes a register left out of the reset branch, and
+  design-architect's read of this record found both sample registers in the
+  reset branch and the input widened in an always @* block, so a corrected
+  answer is carried (design-architect)
+-
+  2026-11-18-claude-code-claude-opus-5-5-calibration-harness-attempts-3:trial-01:
+  note: knowledge/design/control_logic_design.md (ip#439), given as decision
+  M8 rules; the note describes a register left out of the reset branch, and
+  design-architect's read of this record found both sample registers in the
+  reset branch and the input widened in an always @* block, so a corrected
+  answer is carried (design-architect)
+- 2026-11-18-claude-code-claude-opus-5-5-8:trial-01: no: the repro was
+  refused for its verdict line and file I/O; the card now states the repro
+  gate's plusarg and verdict line (ip#442), and a card change is not a
+  knowledge note, so the answer is this written reason (meeting 1, decision
+  8, item 4); the label stays "model"
+- 2026-11-19-claude-code-claude-opus-5-5-without-knowledge-3:trial-01: no:
+  the arm without documents on debug/root-cause-uart-tx; the same written
+  reason as the trial with documents on this case, citing ip#442 (meeting 1,
+  decision 8, item 4); the label stays "model"
+- 2026-11-19-claude-code-claude-opus-5-5-without-knowledge-11:trial-01: no:
+  the arm without documents on dv/plan-irq-ctrl, where the documents are
+  withheld by design; the plan format it missed is answered by the note in
+  knowledge/verification/verification_planning.md (ip#439) for the trials
+  with documents
+```
+
+Checked after the merge, on `main` at `ff6c7633`:
+`scripts/failure_curriculum.py --require --pr 568`, given the record keys
+of W2-L1 dated 2026-11-18 and 2026-11-19, lists thirteen model-labelled
+failures, none unanswered, and no failed trial without a label, and exits
+0. Each path a line names is a file on `main`. So the exit item is met as
+the table of exit items words it, and the verdict stands as written. The
+pull request that carries this note repeats the thirteen lines in its
+text, so the same command passes on it.
+
+One wording correction is made in place, at the reviews' request:
+eda-tooling's seat statement ended with a variant of a word this
+repository does not use for an agent's read; it now ends "Nothing here is
+a person's approval." No other line above this note moves.
