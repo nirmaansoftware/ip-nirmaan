@@ -1,0 +1,195 @@
+{
+  "answers": [
+    {
+      "cache_read_tokens": 6728,
+      "cache_write_tokens": 314,
+      "error": null,
+      "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+      "input_tokens": 2,
+      "mode": "work",
+      "model": "claude-opus-5-5",
+      "output_tokens": 4264,
+      "packet_sha256": "d6860225181c7ba0a69cdd1d22991bbb1a2bd4565db2b0e4fb0882e3799dfa3f",
+      "prompt_sha256": "5582af32706b28a4b1b01aaec6df0dbcae62ed05431696f4cf18eff4703f564c",
+      "provider": "claude-code",
+      "text": "```json\n{\"uncertainty\": 0.35, \"outcome\": \"coverage_report delivered as the coverage model lifo4_fcov.sv. It plans 15 bins, one for each scenario in the approved matrix, and has no exclusions. Coverage closure has not been measured: both recorded tool runs for this task failed.\", \"artifacts\": [{\"kind\": \"coverage_report\", \"title\": \"lifo4 functional coverage closure statement and model\", \"summary\": \"Coverage model lifo4_fcov. It has 9 operation x occupancy cross bins, 5 occupancy bins (count 0..4) and 1 reset-while-holding-a-word bin. That makes planned = 15, and there are 0 exclusions. It is built from the approved matrix [artifact:prj-fd79cfafd7.plan-audit.a1], which was independently reviewed [evidence:prj-fd79cfafd7.plan-audit.e1]. It serves [requirement:req-fa481b0301]. Closure is not yet measured: [run:run-0001] and [run:run-0002] both failed.\"}], \"files\": [{\"path\": \"lifo4_fcov.sv\", \"kind\": \"coverage_report\", \"title\": \"lifo4_fcov functional coverage model\", \"summary\": \"Module lifo4_fcov with the exact port list from [artifact:prj-fd79cfafd7.plan-audit.a1]. At every rising edge of clk it samples the values from just before that edge. It tracks 15 planned bins taken from the matrix scenarios, not from the RTL. It drives planned = 15 and holes = the number of bins not yet hit. The closure statement in its header comments lists every bin and states that there are no exclusions. It serves [requirement:req-fa481b0301].\", \"entry\": \"lifo4_fcov\"}], \"tool_runs\": [\"run-0001\", \"run-0002\"], \"claims\": [\"Occupancy is classified from count before the edge: empty means count == 0, full means count == 4, and neither means count 1..3. The matrix defines empty and full exactly this way.\", \"The cross, occupancy and reset bins follow the matrix rule context. Cross and occupancy bins are sampled only when rst_n is high. The reset bin is sampled when rst_n is low and count is not 0.\", \"The model is written with plain procedural bin flags, not covergroups. This avoids relying on Verilator's partial covergroup support and on the coverage.read gate options, which do not measure functional covergroups in the testbench.\"], \"escalation\": null, \"notes\": \"The two recorded runs both failed. run-0001 (coverage.read) reported missing parameters 'sources' and 'top'. run-0002 (veritriage.investigate) reported that no artifact paths were given. Neither run provides any measured coverage, so this report does not claim closure. The matrix says closure is shown by the held-out testbench, which reads planned and holes after its last cycle; that check is left to the platform. The 'Merged coverage with reviewed exclusions' evidence requirement still needs a successful coverage.read or veritriage run over lifo4_fcov.sv with sources and top = lifo4_fcov. The 'Independent review recorded' evidence requirement for this coverage_report still needs a new independent review. The existing review record covers the plan-audit matrix only. There are no exclusions, so there is no waiver to review.\"}\n```\n=== FILE: lifo4_fcov.sv ===\n// lifo4_fcov: functional coverage model for the lifo4 stack block.\n// Built from the approved requirement-to-plan matrix (traceability_matrix.md, plan-audit stage).\n//\n// CLOSURE STATEMENT\n// Sampling: every rising edge of clk. The values used are the port values just before the edge.\n//   count is the stack occupancy before the edge.\n//   Occupancy class: EMPTY means count == 0, FULL means count == 4, MID means 1 <= count <= 3.\n//   Operation: PUSH means push alone, POP means pop alone, BOTH means push and pop together.\n//   The matrix plans no bin for \"neither push nor pop\".\n//   Cross and occupancy bins are sampled only when rst_n is high, because each rule applies with rst_n high.\n//\n// Planned bins (15):\n//   bin  0  PUSH x EMPTY  - LIFO-PUSH       push alone, stack empty\n//   bin  1  PUSH x MID    - LIFO-PUSH       push alone, stack neither empty nor full\n//   bin  2  PUSH x FULL   - LIFO-OVERFLOW   push alone, stack full\n//   bin  3  POP  x EMPTY  - LIFO-UNDERFLOW  pop alone, stack empty\n//   bin  4  POP  x MID    - LIFO-POP        pop alone, stack neither empty nor full\n//   bin  5  POP  x FULL   - LIFO-POP        pop alone, stack full\n//   bin  6  BOTH x EMPTY  - LIFO-BOTH-EMPTY push and pop together, stack empty\n//   bin  7  BOTH x MID    - LIFO-REPLACE    push and pop together, stack neither empty nor full\n//   bin  8  BOTH x FULL   - LIFO-REPLACE    push and pop together, stack full\n//   bin  9  occupancy 0   - (all)           stack reaches fill level 0\n//   bin 10  occupancy 1   - (all)           stack reaches fill level 1\n//   bin 11  occupancy 2   - (all)           stack reaches fill level 2\n//   bin 12  occupancy 3   - (all)           stack reaches fill level 3\n//   bin 13  occupancy 4   - (all)           stack reaches fill level 4\n//   bin 14  reset         - LIFO-RESET      rst_n low at an edge while the stack holds a word (count != 0)\n//\n// Exclusions: none. The matrix waives no scenario and names no unreachable scenario.\n//   planned = 15. holes = the number of planned bins not yet hit.\n\nmodule lifo4_fcov (\n    input  logic       clk, rst_n, push, pop,\n    input  logic [7:0] din, dout,\n    input  logic [2:0] count,\n    input  logic       empty, full, err,\n    output int         planned,   // how many bins the model plans\n    output int         holes      // how many of them have not been hit yet\n);\n\n    /* verilator lint_off UNUSEDSIGNAL */\n    logic [7:0] unused_din;\n    logic [7:0] unused_dout;\n    logic       unused_flags;\n    assign unused_din   = din;\n    assign unused_dout  = dout;\n    assign unused_flags = empty ^ full ^ err;\n    /* verilator lint_on UNUSEDSIGNAL */\n\n    localparam int NBINS = 15;\n\n    logic [NBINS-1:0] hit = '0;\n\n    logic occ_empty, occ_full, occ_mid;\n    logic op_push, op_pop, op_both;\n\n    assign occ_empty = (count == 3'd0);\n    assign occ_full  = (count == 3'd4);\n    assign occ_mid   = (count >= 3'd1) && (count <= 3'd3);\n\n    assign op_push = (push == 1'b1) && (pop == 1'b0);\n    assign op_pop  = (push == 1'b0) && (pop == 1'b1);\n    assign op_both = (push == 1'b1) && (pop == 1'b1);\n\n    always @(posedge clk) begin\n        if (rst_n == 1'b1) begin\n            // operation x occupancy crosses\n            if (op_push && occ_empty) hit[0] <= 1'b1;\n            if (op_push && occ_mid)   hit[1] <= 1'b1;\n            if (op_push && occ_full)  hit[2] <= 1'b1;\n            if (op_pop  && occ_empty) hit[3] <= 1'b1;\n            if (op_pop  && occ_mid)   hit[4] <= 1'b1;\n            if (op_pop  && occ_full)  hit[5] <= 1'b1;\n            if (op_both && occ_empty) hit[6] <= 1'b1;\n            if (op_both && occ_mid)   hit[7] <= 1'b1;\n            if (op_both && occ_full)  hit[8] <= 1'b1;\n            // occupancy levels\n            if (count == 3'd0) hit[9]  <= 1'b1;\n            if (count == 3'd1) hit[10] <= 1'b1;\n            if (count == 3'd2) hit[11] <= 1'b1;\n            if (count == 3'd3) hit[12] <= 1'b1;\n            if (count == 3'd4) hit[13] <= 1'b1;\n        end else if (rst_n == 1'b0) begin\n            // reset applied while the stack holds a word\n            if (count != 3'd0 && count <= 3'd4) hit[14] <= 1'b1;\n        end\n    end\n\n    always_comb begin\n        int n;\n        n = 0;\n        for (int i = 0; i < NBINS; i++) begin\n            if (!hit[i]) n = n + 1;\n        end\n        holes = n;\n    end\n\n    assign planned = NBINS;\n\nendmodule\n=== END FILE ==="
+    }
+  ],
+  "format": "nirmaan.eval-trial",
+  "harness_variant": "default",
+  "judge_runs": [
+    {
+      "check": "The seat's coverage model reports no hole when the stimulus drives every scenario, and reports a hole for each stimulus that skips one",
+      "params": {
+        "sources": [
+          "/tmp/nirmaan-eval-iapcp__a/judge/check-1/must-fail-95upl_a_/clean/lifo4_fcov.sv",
+          "/tmp/nirmaan-eval-iapcp__a/judge/check-1/must-fail-95upl_a_/clean/lifo4.v",
+          "/tmp/nirmaan-eval-iapcp__a/judge/check-1/must-fail-95upl_a_/clean/lifo4_fcov_tb.sv"
+        ],
+        "top": "lifo4_fcov_tb"
+      },
+      "run": "run-0003",
+      "succeeded": true,
+      "summary": "verilator-coverage: coverage read over lifo4.v, lifo4_fcov.sv: line 100.00% (11/11), toggle 59.57% (112/188), branch 97.61% (41/42); simulation passed: 2 checks passed, $finish reached, 0 errors",
+      "tool": "coverage.read"
+    },
+    {
+      "check": "The seat's coverage model reports no hole when the stimulus drives every scenario, and reports a hole for each stimulus that skips one",
+      "params": {
+        "sources": [
+          "/tmp/nirmaan-eval-iapcp__a/judge/check-1/must-fail-95upl_a_/mutant-1-1/lifo4_fcov.sv",
+          "/tmp/nirmaan-eval-iapcp__a/judge/check-1/must-fail-95upl_a_/mutant-1-1/lifo4.v",
+          "/tmp/nirmaan-eval-iapcp__a/judge/check-1/must-fail-95upl_a_/mutant-1-1/lifo4_fcov_tb.sv"
+        ],
+        "top": "lifo4_fcov_tb"
+      },
+      "run": "run-0004",
+      "succeeded": false,
+      "summary": "verilator-coverage: coverage not read: simulation failed: 2 errors, exit status -6, $finish never reached, the testbench printed no verdict (NIRMAAN-SIM <nonce> <n> passed, <m> failed); first: lifo4_fcov_tb.sv:107: Assertion failed in TOP.lifo4_fcov_tb: the model reports 1 planned bins not hit",
+      "tool": "coverage.read"
+    },
+    {
+      "check": "The seat's coverage model reports no hole when the stimulus drives every scenario, and reports a hole for each stimulus that skips one",
+      "params": {
+        "sources": [
+          "/tmp/nirmaan-eval-iapcp__a/judge/check-1/must-fail-95upl_a_/mutant-1-2/lifo4_fcov.sv",
+          "/tmp/nirmaan-eval-iapcp__a/judge/check-1/must-fail-95upl_a_/mutant-1-2/lifo4.v",
+          "/tmp/nirmaan-eval-iapcp__a/judge/check-1/must-fail-95upl_a_/mutant-1-2/lifo4_fcov_tb.sv"
+        ],
+        "top": "lifo4_fcov_tb"
+      },
+      "run": "run-0005",
+      "succeeded": false,
+      "summary": "verilator-coverage: coverage not read: simulation failed: 2 errors, exit status -6, $finish never reached, the testbench printed no verdict (NIRMAAN-SIM <nonce> <n> passed, <m> failed); first: lifo4_fcov_tb.sv:107: Assertion failed in TOP.lifo4_fcov_tb: the model reports 1 planned bins not hit",
+      "tool": "coverage.read"
+    },
+    {
+      "check": "The seat's coverage model reports no hole when the stimulus drives every scenario, and reports a hole for each stimulus that skips one",
+      "params": {
+        "sources": [
+          "/tmp/nirmaan-eval-iapcp__a/judge/check-1/must-fail-95upl_a_/mutant-1-3/lifo4_fcov.sv",
+          "/tmp/nirmaan-eval-iapcp__a/judge/check-1/must-fail-95upl_a_/mutant-1-3/lifo4.v",
+          "/tmp/nirmaan-eval-iapcp__a/judge/check-1/must-fail-95upl_a_/mutant-1-3/lifo4_fcov_tb.sv"
+        ],
+        "top": "lifo4_fcov_tb"
+      },
+      "run": "run-0006",
+      "succeeded": false,
+      "summary": "verilator-coverage: coverage not read: simulation failed: 2 errors, exit status -6, $finish never reached, the testbench printed no verdict (NIRMAAN-SIM <nonce> <n> passed, <m> failed); first: lifo4_fcov_tb.sv:107: Assertion failed in TOP.lifo4_fcov_tb: the model reports 1 planned bins not hit",
+      "tool": "coverage.read"
+    },
+    {
+      "check": "The seat's coverage model reports no hole when the stimulus drives every scenario, and reports a hole for each stimulus that skips one",
+      "params": {
+        "sources": [
+          "/tmp/nirmaan-eval-iapcp__a/judge/check-1/must-fail-95upl_a_/mutant-1-4/lifo4_fcov.sv",
+          "/tmp/nirmaan-eval-iapcp__a/judge/check-1/must-fail-95upl_a_/mutant-1-4/lifo4.v",
+          "/tmp/nirmaan-eval-iapcp__a/judge/check-1/must-fail-95upl_a_/mutant-1-4/lifo4_fcov_tb.sv"
+        ],
+        "top": "lifo4_fcov_tb"
+      },
+      "run": "run-0007",
+      "succeeded": false,
+      "summary": "verilator-coverage: coverage not read: simulation failed: 2 errors, exit status -6, $finish never reached, the testbench printed no verdict (NIRMAAN-SIM <nonce> <n> passed, <m> failed); first: lifo4_fcov_tb.sv:107: Assertion failed in TOP.lifo4_fcov_tb: the model reports 1 planned bins not hit",
+      "tool": "coverage.read"
+    },
+    {
+      "check": "The seat's coverage model reports no hole when the stimulus drives every scenario, and reports a hole for each stimulus that skips one",
+      "params": {
+        "sources": [
+          "/tmp/nirmaan-eval-iapcp__a/judge/check-1/must-fail-95upl_a_/mutant-1-5/lifo4_fcov.sv",
+          "/tmp/nirmaan-eval-iapcp__a/judge/check-1/must-fail-95upl_a_/mutant-1-5/lifo4.v",
+          "/tmp/nirmaan-eval-iapcp__a/judge/check-1/must-fail-95upl_a_/mutant-1-5/lifo4_fcov_tb.sv"
+        ],
+        "top": "lifo4_fcov_tb"
+      },
+      "run": "run-0008",
+      "succeeded": false,
+      "summary": "verilator-coverage: coverage not read: simulation failed: 2 errors, exit status -6, $finish never reached, the testbench printed no verdict (NIRMAAN-SIM <nonce> <n> passed, <m> failed); first: lifo4_fcov_tb.sv:107: Assertion failed in TOP.lifo4_fcov_tb: the model reports 1 planned bins not hit",
+      "tool": "coverage.read"
+    },
+    {
+      "check": "The seat's coverage model reports no hole when the stimulus drives every scenario, and reports a hole for each stimulus that skips one",
+      "params": {
+        "sources": [
+          "/tmp/nirmaan-eval-iapcp__a/judge/check-1/must-fail-95upl_a_/mutant-1-6/lifo4_fcov.sv",
+          "/tmp/nirmaan-eval-iapcp__a/judge/check-1/must-fail-95upl_a_/mutant-1-6/lifo4.v",
+          "/tmp/nirmaan-eval-iapcp__a/judge/check-1/must-fail-95upl_a_/mutant-1-6/lifo4_fcov_tb.sv"
+        ],
+        "top": "lifo4_fcov_tb"
+      },
+      "run": "run-0009",
+      "succeeded": false,
+      "summary": "verilator-coverage: coverage not read: simulation failed: 2 errors, exit status -6, $finish never reached, the testbench printed no verdict (NIRMAAN-SIM <nonce> <n> passed, <m> failed); first: lifo4_fcov_tb.sv:107: Assertion failed in TOP.lifo4_fcov_tb: the model reports 1 planned bins not hit",
+      "tool": "coverage.read"
+    }
+  ],
+  "knowledge": "on",
+  "model": "claude-opus-5-5",
+  "purpose": "evidence",
+  "record": "2026-11-25-claude-code-claude-opus-5-5",
+  "result": {
+    "attempts": 1,
+    "attestations": [],
+    "audit_ok": true,
+    "case": "dv/fcov-lifo4",
+    "case_digest": "sha256:95dd423e975cc32a31fe7743841b846370b88971758b080a8d197d1cf8723a3e",
+    "cli": "2.1.325",
+    "cost_usd": null,
+    "detail": "The two recorded runs both failed. run-0001 (coverage.read) reported missing parameters 'sources' and 'top'. run-0002 (veritriage.investigate) reported that no artifact paths were given. Neither run provides any measured coverage, so this report does not claim closure. The matrix says closure is shown by the held-out testbench, which reads planned and holes after its last cycle; that check is left to the platform. The 'Merged coverage with reviewed exclusions' evidence requirement still needs a successful coverage.read or veritriage run over lifo4_fcov.sv with sources and top = lifo4_fcov. The 'Independent review recorded' evidence requirement for this coverage_report still needs a new independent review. The existing review record covers the plan-audit matrix only. There are no exclusions, so there is no waiver to review.",
+    "duration_s": 61.596,
+    "gate_runs": [
+      {
+        "run": "run-0001",
+        "succeeded": false,
+        "summary": "verilator-coverage: missing parameter sources, top",
+        "tool": "coverage.read"
+      },
+      {
+        "run": "run-0002",
+        "succeeded": false,
+        "summary": "no artifact paths given",
+        "tool": "veritriage.investigate"
+      }
+    ],
+    "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+    "input_tokens": 2,
+    "model_calls": 1,
+    "output_tokens": 4264,
+    "passed": true,
+    "replay": false,
+    "runtime": "claude-code",
+    "sandbox": "/tmp/nirmaan-eval-iapcp__a",
+    "scores": [
+      {
+        "failed_runs": [
+          "run-0004",
+          "run-0005",
+          "run-0006",
+          "run-0007",
+          "run-0008",
+          "run-0009"
+        ],
+        "name": "The seat's coverage model reports no hole when the stimulus drives every scenario, and reports a hole for each stimulus that skips one",
+        "runs": [
+          "run-0003"
+        ],
+        "scorer": "must-fail",
+        "status": "passed",
+        "summary": "coverage.read run-0003 passed on the clean inputs; 6 of 6 mutants failed it"
+      }
+    ],
+    "seat": "prj-fd79cfafd7:coverage-closure",
+    "seat_status": "in_review",
+    "started_at": "2026-11-25T04:43:06.813134Z",
+    "submitted": true,
+    "tool_calls": [],
+    "version": "1.25.0"
+  },
+  "skills": {
+    "functional_coverage": "sha256:de690fa08b45794a7f2bb1e168a5aded6a571da2663bbf74bae5a4272f582f0f"
+  },
+  "stage": "coverage-closure",
+  "trial": 1,
+  "version": 1
+}
