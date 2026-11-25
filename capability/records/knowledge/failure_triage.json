@@ -2,15 +2,15 @@
   "format": "nirmaan.knowledge-check",
   "skill": "failure_triage",
   "knowledge_document": "knowledge/verification/failure_triage.md",
-  "document_sha256": "sha256:cccd8d561c4fe86835859c51bbd1cc9c2d34903e45b28f02d82092b4c93dbf26",
-  "writer": "IP-W2-K5 session (wave 2 knowledge batch, plan row W2-K5, 2026-11-15)",
-  "checker": "IP-W2-C5 session (wave 2 check batch, lane IP-W2-C5)",
+  "document_sha256": "sha256:cd5fb66e119f07f1c2bd4389fcc2fef17b606f6b2105eecd8346cab5a5bd4cde",
+  "writer": "IP-W2-K5 session (wave 2 knowledge batch, plan row W2-K5, 2026-11-15); the tool_runs sentence and the two skills.py citations by the W2-A37 session (action A3, gate W2C20, 2026-11-25)",
+  "checker": "W2-A37 verification-lead seat (read-only claude -p with council/verification-lead.md; action A3, 2026-11-25), a different session from the writer",
   "sources_read": [
     "[WER] Glerum et al., Debugging in the (Very) Large: Ten Years of Implementation and Experience, SOSP 2009 (conference copy), all 17 pages read to the end, https://www.sigops.org/s/conferences/sosp/2009/papers/glerum-sosp09.pdf",
     "[ZDelta] Zeller, The Debugging Book: Reducing Failure-Inducing Inputs (CC BY-NC-SA 4.0), whole chapter read to the end including Lessons Learned and Background, https://www.debuggingbook.org/html/DeltaDebugger.html",
     "[LogParse] Zhu et al., Tools and Benchmarks for Automated Log Parsing, ICSE-SEIP 2019 (open-access arXiv 1811.03509), all 8 pages read to the end, https://arxiv.org/abs/1811.03509"
   ],
-  "checked_at": "2026-11-15",
+  "checked_at": "2026-11-25",
   "gate_claims": [
     {
       "claim": "When a regression investigation asks for a reproduction, the triage and root-cause stages also write testbench files and a before-review gate runs simulator.run with expect=fail over the approved RTL under investigation and one testbench at a time, its top taken from that testbench",
@@ -70,11 +70,24 @@
     },
     {
       "claim": "card: classifying from the first error line only is the triage failure mode",
-      "evidence": "src/nirmaan/company/skills.py:494"
+      "evidence": "src/nirmaan/company/skills.py:514"
     },
     {
       "claim": "card: triage cites a VeriTriage session and its evidence nodes",
-      "evidence": "src/nirmaan/company/skills.py:495"
+      "evidence": "src/nirmaan/company/skills.py:515"
+    },
+    {
+      "claim": "card: in tool_runs a run is listed by its bare run id, the text after run: in its [run:<id>] citation token, not the token itself",
+      "evidence": "src/nirmaan/company/skills.py:512"
+    },
+    {
+      "claim": "an entry of tool_runs is taken as written and matched against the recorded runs, whose keys are bare run ids",
+      "evidence": "src/nirmaan/runtime/model.py:392"
     }
+  ],
+  "result": "the change is one sentence on the failure_triage card (skills.py:512-513) and the same sentence in the document, plus the skills.py line citations moved to :514 and :515; the sentence says tool_runs takes the bare run id, the text after run: in the [run:<id>] citation token, and was confirmed against prompt.py:52-53 (token form), harness.py:98-99 (system text) and model.py:392-394 with base.py:365 (entries are matched against bare run ids); the sources_read of the earlier record are unchanged by this edit and were not read again; no case, held-out input or reference answer is named; no em or en dash",
+  "notes": [
+    "Known stale, outside this change (action A3 is the sentence and the skills.py citations only): the document's scorers.py:240-268, 337-339 citation for the must-fail-each scorer and this record's scorers.py:240 and :337 entries. The checker reads the scorer at scorers.py:287-302 (_matched), 306-346 and 349-392 (must_fail_each and _each_runs, verdict 384-392), and 240-268 lies in the plain must-fail loop (_must_fail_runs, 230-271). A later knowledge change fixes both together.",
+    "All other citations in the document and this record were read at this head and hold: workflows.py:449-460 and 472-476, veritriage.py:49-68, eda_parsers.py:226-256 and the six cited tests."
   ]
 }
