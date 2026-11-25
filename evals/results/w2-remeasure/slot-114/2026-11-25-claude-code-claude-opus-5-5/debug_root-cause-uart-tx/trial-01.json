@@ -1,0 +1,197 @@
+{
+  "answers": [
+    {
+      "cache_read_tokens": 620,
+      "cache_write_tokens": 7746,
+      "error": null,
+      "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+      "input_tokens": 2,
+      "mode": "work",
+      "model": "claude-opus-5-5",
+      "output_tokens": 6119,
+      "packet_sha256": "9cfe5fa1a0dd82cee9dcd4668f76edd292fe2c6b1407f726b84a8d82d8c966ff",
+      "prompt_sha256": "f37e72f1fd1115e7ffaf57f76d37558da536a4b68f7c6ce10f40268a7179e043",
+      "provider": "claude-code",
+      "text": "{\"uncertainty\": 0.2, \"outcome\": \"rtl_bug\", \"artifacts\": [{\"kind\": \"root_cause_analysis\", \"title\": \"Root cause of the failing uart_tx regression test: hold register reloaded while a frame is in flight\", \"summary\": \"Conclusion: rtl_bug. The defect is in the approved RTL under investigation [artifact:prj-d4a591eb4b.design-under-investigation.a1].\\n\\nDefect: the always block contains an unconditional `if (start) hold <= data;` placed before the `case (state)`. It runs in every state, not only in IDLE. The IDLE branch already loads `hold` when a frame starts, so this extra statement only changes behaviour in START, DATA and STOP.\\n\\nIncorrectness: the file's own header specifies 8N1 framing and says \\\"A start pulse while a frame is in flight is ignored.\\\" A start pulse while busy overwrites `hold`. The frame still in progress then picks up its remaining bits from the new byte through `tx <= hold[bit_idx + 3'd1]`.\\n\\nCausality: the fault is written into `hold` in the cycle of the mid-frame start pulse. It becomes visible later, when each following data bit is serialised from the corrupted `hold`. The failing check marks where a corrupted bit was sampled, not the cycle where `hold` was overwritten. The state machine itself correctly ignores the pulse: no second frame is started and `busy` stays asserted. Only the payload is corrupted.\\n\\nObserved failure: triage reproduced the failure deterministically, with 1 of 4 checks failing and $finish reached at time 546000 [evidence:prj-d4a591eb4b.triage.e2] [run:run-0002]. VeriTriage's top hypothesis was \\\"Likely RTL bug\\\", but only at 30% confidence with an unknown_failure classification [evidence:prj-d4a591eb4b.triage.e1] [run:run-0001]. I treated that hypothesis as one candidate among four, not as a conclusion.\\n\\nRanked hypotheses, with the evidence that would refute each:\\n\\n(1) RTL bug: hold is reloaded while busy. This is the leading hypothesis, supported by reading the source against its own header clause.\\n- It would be refuted if a frame with a mid-frame start pulse carrying different data were received intact.\\n- The repro testbench uart_tx_rootcause_tb.v tests exactly this. Frame B sends 0x5A and pulses start with 0xFF during data bit 2. Bits 5 and 7 of 0x5A are 0, so the reload must flip them on this RTL.\\n\\n(2) Testbench bug: a wrong expectation in the regression check. Rejected as the primary cause.\\n- The expected value in the new repro comes from the header specification (the byte presented at the accepted start, serialised LSB-first), not from RTL output.\\n- Two control frames (0xA5 and 0x3C, with no mid-frame pulse) use the same receiver and the same checks. They are expected to pass, so a broken receiver or a wrong bit-order assumption would show up there.\\n- It would be refuted further by the same testbench passing on the clean reference RTL, which I cannot observe here.\\n\\n(3) Infrastructure. Rejected.\\n- The triage run built, reached $finish and failed a single counted check rather than crashing or timing out [evidence:prj-d4a591eb4b.triage.e2].\\n- A deterministic single-check failure is not the signature of a tool or environment fault.\\n- A clean rebuild that changes the outcome would refute this rejection.\\n\\n(4) Spec ambiguity. Rejected.\\n- The clause \\\"A start pulse while a frame is in flight is ignored\\\" explicitly fixes the behaviour under test in [artifact:prj-d4a591eb4b.design-under-investigation.a1].\\n- Ignoring a pulse cannot reasonably include adopting its data into the current frame.\\n\\nLimits:\\n- I did not have the content of the triage testbench or of regression_fail.log. So I cannot confirm that its one failing check is the mid-frame reload scenario, rather than a different symptom of the same cause.\\n- Recommended fix, for a later task and not done here: delete the unconditional pre-case `if (start) hold <= data;` and leave the IDLE-branch load as the only write to hold.\\n- Recommended follow-up: an assertion that `hold` is stable while `busy` is asserted.\\n\\nRequirement served: [requirement:req-d10c4df532].\"}], \"files\": [{\"path\": \"tb/uart_tx_rootcause_tb.v\", \"kind\": \"testbench\", \"title\": \"Self-checking repro: start pulse while busy must not change the frame in flight\", \"summary\": \"Self-checking repro for the defect in [artifact:prj-d4a591eb4b.design-under-investigation.a1], serving [requirement:req-d10c4df532].\\n\\nWhat it does:\\n- Resets the DUT with CLKS_PER_BIT=4.\\n- Sends control frame A (0xA5) and checks the received byte and the stop bit.\\n- Sends frame B (0x5A) and pulses start with 0xFF while busy during data bit 2. It checks that busy was high at the pulse, that the received byte is still 0x5A, the stop bit, and that no ghost frame follows.\\n- Sends control frame C (0x3C) and checks the byte and the stop bit.\\n\\nExpected results are taken from the header specification, not from RTL output. On the RTL under investigation, the frame B payload check is expected to fail because hold is reloaded. On RTL that ignores the pulse, all checks are expected to pass.\\n\\nIt counts its checks and prints exactly one `NIRMAAN-SIM <nonce> <passed> passed, <failed> failed` line just before $finish. A watchdog counts a timeout as a failed check and prints the same single verdict.\", \"entry\": \"uart_tx_rootcause_tb\"}], \"tool_runs\": [\"run:run-0001\", \"run:run-0002\"], \"claims\": [\"The clean reference uart_tx presumably loads hold only in IDLE; I have not seen it, so the expectation that this repro passes on clean RTL is unverified.\", \"The triage testbench's single failing check is assumed to be a symptom of the same hold-reload defect; its content was not available to me.\", \"Frame B's mid-frame pulse with 0xFF is expected to flip received bits 5 and 7 (at least) on the RTL under investigation, causing the payload check to fail.\"], \"escalation\": null, \"notes\": \"Outcome rtl_bug. The repro is built around the header clause 'A start pulse while a frame is in flight is ignored'. Control frames A and C guard against a receiver or expectation bug in the testbench itself. I have not run this testbench. The platform's simulator.run with expect=fail will decide whether it reproduces the failure on the approved RTL.\"}\n\n=== FILE: tb/uart_tx_rootcause_tb.v ===\n`timescale 1ns / 1ps\n// Repro for uart_tx: a start pulse while a frame is in flight must be ignored,\n// so the frame in flight must still carry the byte accepted at its start.\n// Expected values come from the specification (8N1, LSB first), not from RTL.\nmodule uart_tx_rootcause_tb;\n    localparam integer CPB = 4;\n\n    reg        clk   = 1'b0;\n    reg        rst   = 1'b1;\n    reg        start = 1'b0;\n    reg  [7:0] data  = 8'h00;\n    wire       tx;\n    wire       busy;\n\n    uart_tx #(.CLKS_PER_BIT(CPB)) dut (\n        .clk(clk), .rst(rst), .start(start), .data(data), .tx(tx), .busy(busy)\n    );\n\n    always #5 clk = ~clk;\n\n    integer passed = 0;\n    integer failed = 0;\n    reg [8*64-1:0] nonce;\n    reg [7:0] rx_byte;\n    reg       rx_stop;\n    reg       busy_at_pulse;\n    reg       ghost;\n    integer   k;\n\n    task check(input cond, input [8*40-1:0] name);\n        begin\n            if (cond) begin\n                passed = passed + 1;\n            end else begin\n                failed = failed + 1;\n                $display(\"CHECK FAILED: %0s at time %0t\", name, $time);\n            end\n        end\n    endtask\n\n    task send(input [7:0] b);\n        begin\n            @(negedge clk);\n            data  = b;\n            start = 1'b1;\n            @(negedge clk);\n            start = 1'b0;\n        end\n    endtask\n\n    // Samples the middle of every bit, starting from the start bit's falling edge.\n    task receive(output [7:0] b, output s);\n        integer i;\n        begin\n            @(negedge tx);\n            repeat (CPB/2) @(posedge clk);\n            #1;\n            for (i = 0; i < 8; i = i + 1) begin\n                repeat (CPB) @(posedge clk);\n                #1;\n                b[i] = tx;\n            end\n            repeat (CPB) @(posedge clk);\n            #1;\n            s = tx;\n        end\n    endtask\n\n    task finish_with_verdict;\n        begin\n            if (!$value$plusargs(\"nirmaan_nonce=%s\", nonce))\n                nonce = \"none\";\n            $display(\"NIRMAAN-SIM %0s %0d passed, %0d failed\", nonce, passed, failed);\n            $finish;\n        end\n    endtask\n\n    initial begin\n        #200000;\n        failed = failed + 1;\n        $display(\"CHECK FAILED: watchdog timeout\");\n        finish_with_verdict;\n    end\n\n    initial begin\n        repeat (4) @(posedge clk);\n        @(negedge clk);\n        rst = 1'b0;\n        repeat (2) @(posedge clk);\n\n        // Frame A: control frame, no interference.\n        fork\n            receive(rx_byte, rx_stop);\n            send(8'hA5);\n        join\n        check(rx_byte == 8'hA5, \"frame A payload 0xA5\");\n        check(rx_stop == 1'b1,  \"frame A stop bit\");\n        wait (busy == 1'b0);\n        repeat (CPB) @(posedge clk);\n\n        // Frame B: start pulse with different data during data bit 2.\n        fork\n            receive(rx_byte, rx_stop);\n            begin\n                send(8'h5A);\n                repeat (CPB*3) @(posedge clk);\n                @(negedge clk);\n                busy_at_pulse = busy;\n                data  = 8'hFF;\n                start = 1'b1;\n                @(negedge clk);\n                start = 1'b0;\n                data  = 8'h00;\n            end\n        join\n        check(busy_at_pulse == 1'b1, \"busy high at mid-frame pulse\");\n        check(rx_byte == 8'h5A, \"frame B payload kept 0x5A\");\n        check(rx_stop == 1'b1,  \"frame B stop bit\");\n\n        // The ignored pulse must not launch a second frame.\n        wait (busy == 1'b0);\n        ghost = 1'b0;\n        for (k = 0; k < 3*CPB; k = k + 1) begin\n            @(posedge clk);\n            #1;\n            if (busy !== 1'b0 || tx !== 1'b1)\n                ghost = 1'b1;\n        end\n        check(ghost == 1'b0, \"no frame from ignored pulse\");\n\n        // Frame C: control frame after the interference.\n        fork\n            receive(rx_byte, rx_stop);\n            send(8'h3C);\n        join\n        check(rx_byte == 8'h3C, \"frame C payload 0x3C\");\n        check(rx_stop == 1'b1,  \"frame C stop bit\");\n        wait (busy == 1'b0);\n        repeat (CPB) @(posedge clk);\n\n        finish_with_verdict;\n    end\nendmodule\n=== END FILE ==="
+    },
+    {
+      "cache_read_tokens": 620,
+      "cache_write_tokens": 9661,
+      "error": null,
+      "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+      "input_tokens": 2,
+      "mode": "work",
+      "model": "claude-opus-5-5",
+      "output_tokens": 4789,
+      "packet_sha256": "ff6351e9cbc876668285f0c89455d9059047c57d1de8121fd170de5bed0cff84",
+      "prompt_sha256": "906faad1f8648dfdac058a6d2081fbac8bf1e22b22d1f89f837cb2cd4cad7e7e",
+      "provider": "claude-code",
+      "text": "```json\n{\"uncertainty\": 0.2, \"outcome\": \"rtl_bug\", \"artifacts\": [{\"kind\": \"root_cause_analysis\", \"title\": \"uart_tx root cause: the hold register reloads on start while a frame is in flight\", \"summary\": \"Serves [requirement:req-d10c4df532]. This analysis reads the approved RTL [artifact:prj-d4a591eb4b.design-under-investigation.a1]. The file's header says: 'A start pulse while a frame is in flight is ignored.' DEFECT: the statement 'if (start) hold <= data;' sits before the case statement and is not guarded by state, so every start pulse reloads hold, including in START, DATA and STOP. FAULT: hold takes the new data in the middle of the frame. FAILURE: the DATA state drives tx <= hold[bit_idx + 3'd1] from the overwritten register, so every bit after the pulse carries the new byte. Causality: in the repro, a pulse with 0xFF during data bit 2 of a 0x5A frame should turn the received byte into 0xFA. Incorrectness: the reload breaks the stated ignore-while-busy rule for any state other than IDLE. The IDLE branch already loads hold on start, so the fix is to delete the unguarded load; no other change is needed. RANKED HYPOTHESES: (1) RTL bug, preferred. (2) Testbench bug: rejected by deriving the expected values again from the 8N1, LSB-first, ignore-while-busy text, not from RTL output. The repro checks control frames A and C, which have no interference and should pass. It also samples at mid-bit, which would refute a timing-skew explanation. (3) Infrastructure: refuted if the same repro passes on clean RTL and fails on this one; the platform's simulator.run over the repro is the evidence that decides this. (4) Spec ambiguity: rejected because the clause on start-while-busy is explicit in [artifact:prj-d4a591eb4b.design-under-investigation.a1]. What would refute this diagnosis: frame B is received as 0x5A on this RTL, or the control frames fail.\"}], \"files\": [{\"path\": \"uart_tx_rootcause_tb.v\", \"kind\": \"testbench\", \"title\": \"Self-checking repro: a start pulse while busy must not change the frame in flight\", \"summary\": \"A minimal self-checking repro of [requirement:req-d10c4df532] against [artifact:prj-d4a591eb4b.design-under-investigation.a1]. It sends control frame A (0xA5), then frame B (0x5A) with a 0xFF start pulse during data bit 2, then control frame C (0x3C). It also checks that the ignored pulse launches no extra frame. Expected values come from the specification text, not from RTL output. It counts its checks and prints one NIRMAAN-SIM verdict with the run's nonce just before $finish. It is intended to fail only the frame B payload check on this RTL and to pass on RTL that ignores start while busy.\", \"entry\": \"uart_tx_rootcause_tb\"}], \"tool_runs\": [], \"claims\": [\"By reading the code, frame B is expected to be received as 0xFA instead of 0x5A on the RTL under investigation, with all other checks passing; this is not yet shown by any recorded run.\", \"The fix is to remove the unguarded 'if (start) hold <= data;' and keep the load in the IDLE branch; this has not been simulated.\", \"The triage evidence cites runs run-0001 and run-0002, which the constitution reports were never recorded, so this analysis does not rely on them.\"], \"escalation\": null, \"notes\": \"Attempt 1 was refused only for listing unrecorded runs in tool_runs; tool_runs is now empty and the run tokens are not cited. The testbench is unchanged from attempt 1. The conclusion rests on the RTL text and on the platform's reproduction gate run over this testbench. Upstream triage evidence names runs that are reported as never executed; the tech lead may want to look at this provenance gap on the triage task, but it does not change this conclusion. An independent review_record is still required.\"}\n```\n=== FILE: uart_tx_rootcause_tb.v ===\n`timescale 1ns / 1ps\n// Repro for uart_tx: a start pulse while a frame is in flight must be ignored,\n// so the frame in flight must still carry the byte accepted at its start.\n// Expected values come from the specification (8N1, LSB first), not from RTL.\nmodule uart_tx_rootcause_tb;\n    localparam integer CPB = 4;\n\n    reg        clk   = 1'b0;\n    reg        rst   = 1'b1;\n    reg        start = 1'b0;\n    reg  [7:0] data  = 8'h00;\n    wire       tx;\n    wire       busy;\n\n    uart_tx #(.CLKS_PER_BIT(CPB)) dut (\n        .clk(clk), .rst(rst), .start(start), .data(data), .tx(tx), .busy(busy)\n    );\n\n    always #5 clk = ~clk;\n\n    integer passed = 0;\n    integer failed = 0;\n    reg [8*64-1:0] nonce;\n    reg [7:0] rx_byte;\n    reg       rx_stop;\n    reg       busy_at_pulse;\n    reg       ghost;\n    integer   k;\n\n    task check(input cond, input [8*40-1:0] name);\n        begin\n            if (cond) begin\n                passed = passed + 1;\n            end else begin\n                failed = failed + 1;\n                $display(\"CHECK FAILED: %0s at time %0t\", name, $time);\n            end\n        end\n    endtask\n\n    task send(input [7:0] b);\n        begin\n            @(negedge clk);\n            data  = b;\n            start = 1'b1;\n            @(negedge clk);\n            start = 1'b0;\n        end\n    endtask\n\n    // Samples the middle of every bit, starting from the start bit's falling edge.\n    task receive(output [7:0] b, output s);\n        integer i;\n        begin\n            @(negedge tx);\n            repeat (CPB/2) @(posedge clk);\n            #1;\n            for (i = 0; i < 8; i = i + 1) begin\n                repeat (CPB) @(posedge clk);\n                #1;\n                b[i] = tx;\n            end\n            repeat (CPB) @(posedge clk);\n            #1;\n            s = tx;\n        end\n    endtask\n\n    task finish_with_verdict;\n        begin\n            if (!$value$plusargs(\"nirmaan_nonce=%s\", nonce))\n                nonce = \"none\";\n            $display(\"NIRMAAN-SIM %0s %0d passed, %0d failed\", nonce, passed, failed);\n            $finish;\n        end\n    endtask\n\n    initial begin\n        #200000;\n        failed = failed + 1;\n        $display(\"CHECK FAILED: watchdog timeout\");\n        finish_with_verdict;\n    end\n\n    initial begin\n        repeat (4) @(posedge clk);\n        @(negedge clk);\n        rst = 1'b0;\n        repeat (2) @(posedge clk);\n\n        // Frame A: control frame, no interference.\n        fork\n            receive(rx_byte, rx_stop);\n            send(8'hA5);\n        join\n        check(rx_byte == 8'hA5, \"frame A payload 0xA5\");\n        check(rx_stop == 1'b1,  \"frame A stop bit\");\n        wait (busy == 1'b0);\n        repeat (CPB) @(posedge clk);\n\n        // Frame B: start pulse with different data during data bit 2.\n        fork\n            receive(rx_byte, rx_stop);\n            begin\n                send(8'h5A);\n                repeat (CPB*3) @(posedge clk);\n                @(negedge clk);\n                busy_at_pulse = busy;\n                data  = 8'hFF;\n                start = 1'b1;\n                @(negedge clk);\n                start = 1'b0;\n                data  = 8'h00;\n            end\n        join\n        check(busy_at_pulse == 1'b1, \"busy high at mid-frame pulse\");\n        check(rx_byte == 8'h5A, \"frame B payload kept 0x5A\");\n        check(rx_stop == 1'b1,  \"frame B stop bit\");\n\n        // The ignored pulse must not launch a second frame.\n        wait (busy == 1'b0);\n        ghost = 1'b0;\n        for (k = 0; k < 3*CPB; k = k + 1) begin\n            @(posedge clk);\n            #1;\n            if (busy !== 1'b0 || tx !== 1'b1)\n                ghost = 1'b1;\n        end\n        check(ghost == 1'b0, \"no frame from ignored pulse\");\n\n        // Frame C: control frame after the interference.\n        fork\n            receive(rx_byte, rx_stop);\n            send(8'h3C);\n        join\n        check(rx_byte == 8'h3C, \"frame C payload 0x3C\");\n        check(rx_stop == 1'b1,  \"frame C stop bit\");\n        wait (busy == 1'b0);\n        repeat (CPB) @(posedge clk);\n\n        finish_with_verdict;\n    end\nendmodule\n=== END FILE ==="
+    }
+  ],
+  "format": "nirmaan.eval-trial",
+  "harness_variant": "default",
+  "judge_runs": [
+    {
+      "check": "The seat's repro passes the fixed uart_tx and fails the RTL under investigation and its shift-register variant",
+      "params": {
+        "sources": [
+          "/tmp/nirmaan-eval-auo3qzt1/judge/check-1/must-fail-a_4hsh0l/clean/uart_tx_rootcause_tb.v",
+          "/tmp/nirmaan-eval-auo3qzt1/judge/check-1/must-fail-a_4hsh0l/clean/uart_tx.v"
+        ],
+        "top": "uart_tx_rootcause_tb"
+      },
+      "run": "run-0005",
+      "succeeded": true,
+      "summary": "icarus: simulation passed: 8 checks passed, $finish reached at time 1485000, 0 errors",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The seat's repro passes the fixed uart_tx and fails the RTL under investigation and its shift-register variant",
+      "params": {
+        "sources": [
+          "/tmp/nirmaan-eval-auo3qzt1/judge/check-1/must-fail-a_4hsh0l/mutant-1-1/uart_tx_rootcause_tb.v",
+          "/tmp/nirmaan-eval-auo3qzt1/judge/check-1/must-fail-a_4hsh0l/mutant-1-1/uart_tx.v"
+        ],
+        "top": "uart_tx_rootcause_tb"
+      },
+      "run": "run-0006",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: the testbench reports 1 of 8 checks failed",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The seat's repro passes the fixed uart_tx and fails the RTL under investigation and its shift-register variant",
+      "params": {
+        "sources": [
+          "/tmp/nirmaan-eval-auo3qzt1/judge/check-1/must-fail-a_4hsh0l/mutant-1-2/uart_tx_rootcause_tb.v",
+          "/tmp/nirmaan-eval-auo3qzt1/judge/check-1/must-fail-a_4hsh0l/mutant-1-2/uart_tx.v"
+        ],
+        "top": "uart_tx_rootcause_tb"
+      },
+      "run": "run-0007",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: the testbench reports 1 of 8 checks failed",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The same repro passes a second, independent fixed implementation and fails both defective ones",
+      "params": {
+        "sources": [
+          "/tmp/nirmaan-eval-auo3qzt1/judge/check-2/must-fail-ildxvedc/clean/uart_tx_rootcause_tb.v",
+          "/tmp/nirmaan-eval-auo3qzt1/judge/check-2/must-fail-ildxvedc/clean/uart_tx.v"
+        ],
+        "top": "uart_tx_rootcause_tb"
+      },
+      "run": "run-0008",
+      "succeeded": true,
+      "summary": "icarus: simulation passed: 8 checks passed, $finish reached at time 1485000, 0 errors",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The same repro passes a second, independent fixed implementation and fails both defective ones",
+      "params": {
+        "sources": [
+          "/tmp/nirmaan-eval-auo3qzt1/judge/check-2/must-fail-ildxvedc/mutant-1-1/uart_tx_rootcause_tb.v",
+          "/tmp/nirmaan-eval-auo3qzt1/judge/check-2/must-fail-ildxvedc/mutant-1-1/uart_tx.v"
+        ],
+        "top": "uart_tx_rootcause_tb"
+      },
+      "run": "run-0009",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: the testbench reports 1 of 8 checks failed",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The same repro passes a second, independent fixed implementation and fails both defective ones",
+      "params": {
+        "sources": [
+          "/tmp/nirmaan-eval-auo3qzt1/judge/check-2/must-fail-ildxvedc/mutant-1-2/uart_tx_rootcause_tb.v",
+          "/tmp/nirmaan-eval-auo3qzt1/judge/check-2/must-fail-ildxvedc/mutant-1-2/uart_tx.v"
+        ],
+        "top": "uart_tx_rootcause_tb"
+      },
+      "run": "run-0010",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: the testbench reports 1 of 8 checks failed",
+      "tool": "simulator.run"
+    }
+  ],
+  "knowledge": "on",
+  "model": "claude-opus-5-5",
+  "purpose": "evidence",
+  "record": "2026-11-25-claude-code-claude-opus-5-5",
+  "result": {
+    "attempts": 2,
+    "attestations": [],
+    "audit_ok": true,
+    "case": "debug/root-cause-uart-tx",
+    "case_digest": "sha256:9be6d4f3a142bf825f6b7a8938d836e9acec0f3ad6b69bf4cc519d4f81a9f06c",
+    "cli": "2.1.325",
+    "cost_usd": null,
+    "detail": "Attempt 1 was refused only for listing unrecorded runs in tool_runs; tool_runs is now empty and the run tokens are not cited. The testbench is unchanged from attempt 1. The conclusion rests on the RTL text and on the platform's reproduction gate run over this testbench. Upstream triage evidence names runs that are reported as never executed; the tech lead may want to look at this provenance gap on the triage task, but it does not change this conclusion. An independent review_record is still required.; submitted on attempt 2, after prj-d4a591eb4b:root-cause#t1",
+    "duration_s": 103.896,
+    "gate_runs": [
+      {
+        "run": "run-0003",
+        "succeeded": true,
+        "summary": "icarus: failure reproduced: the testbench reports 1 of 8 checks failed, $finish reached at time 1485000",
+        "tool": "simulator.run"
+      },
+      {
+        "run": "run-0004",
+        "succeeded": true,
+        "summary": "icarus: failure reproduced: the testbench reports 1 of 8 checks failed, $finish reached at time 1485000",
+        "tool": "simulator.run"
+      }
+    ],
+    "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+    "input_tokens": 4,
+    "model_calls": 2,
+    "output_tokens": 10908,
+    "passed": true,
+    "replay": false,
+    "runtime": "claude-code",
+    "sandbox": "/tmp/nirmaan-eval-auo3qzt1",
+    "scores": [
+      {
+        "failed_runs": [
+          "run-0006",
+          "run-0007"
+        ],
+        "name": "The seat's repro passes the fixed uart_tx and fails the RTL under investigation and its shift-register variant",
+        "runs": [
+          "run-0005"
+        ],
+        "scorer": "must-fail",
+        "status": "passed",
+        "summary": "simulator.run run-0005 passed on the clean inputs; 2 of 2 mutants failed it"
+      },
+      {
+        "failed_runs": [
+          "run-0009",
+          "run-0010"
+        ],
+        "name": "The same repro passes a second, independent fixed implementation and fails both defective ones",
+        "runs": [
+          "run-0008"
+        ],
+        "scorer": "must-fail",
+        "status": "passed",
+        "summary": "simulator.run run-0008 passed on the clean inputs; 2 of 2 mutants failed it"
+      }
+    ],
+    "seat": "prj-d4a591eb4b:root-cause",
+    "seat_status": "in_review",
+    "started_at": "2026-11-25T06:19:14.292248Z",
+    "submitted": true,
+    "tool_calls": [],
+    "version": "1.25.0"
+  },
+  "skills": {
+    "root_cause_analysis": "sha256:f4d03c138a6b5294b9837be1fff05475a5b312326df7029c2da6250b8563bc34"
+  },
+  "stage": "root-cause",
+  "trial": 1,
+  "version": 1
+}

@@ -1,0 +1,122 @@
+{
+  "answers": [
+    {
+      "cache_read_tokens": 7384,
+      "cache_write_tokens": 315,
+      "error": null,
+      "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+      "input_tokens": 2,
+      "mode": "work",
+      "model": "claude-opus-5-5",
+      "output_tokens": 10017,
+      "packet_sha256": "eb641a3f923134cb6ecb125b181ff2ac9df68bbd02aea4da8ee0d3db055fe3e8",
+      "prompt_sha256": "a76e3f97642589c8506fbc1da35d9af3248aee62870473eda2ea4fbd5dbe8922",
+      "provider": "claude-code",
+      "text": "```json\n{\"uncertainty\": 0.3, \"outcome\": \"Self-checking coverage testbench tick_timer_cov_tb.sv submitted for the platform's coverage.read run on the approved tick_timer.v. A coverage report plan is attached. No coverage numbers are reported, because no coverage run is cited.\", \"artifacts\": [{\"kind\": \"coverage_report\", \"title\": \"tick_timer coverage plan and gap justification (pre-run)\", \"summary\": \"This report plans coverage for [artifact:prj-4fd2403e98.design-under-test.a1] under [requirement:req-33bb46282b]. It extends the idle testbench [artifact:prj-4fd2403e98.testbench.a1], which only resets the block and reads it back. The run cited for that testbench, [run:run-0001], passed 5 checks, but nothing in it counted, expired or cleared. The new stimulus reaches each line and branch of the RTL. It loads, starts, counts down and expires in one-shot mode, then stops. In periodic mode it reloads on expiry. It reads and writes all four addresses. Writing 0 to STATUS leaves the flag set. Writing 1 to STATUS clears it. An expiry wins over a clear at the same edge. A CTRL write at a zero count takes the place of the expiry. Restarting while already enabled does not reload the count. A CTRL write with EN low stops the timer and the count holds. Writing IE alone makes irq rise and fall. A reset in mid-count returns every register to zero. Toggle stimulus drives wdata to all ones and back, and LOAD and COUNT to 0xFFFF and back to 0 through reset. That toggles every stored bit, addr, we, rst_n and irq. Some points are expected to stay uncovered, and each is unreachable for W=16, not out of scope by choice. rdata[31:16] is always 0, because only rdata[W-1:0] or less is ever assigned. unused_wdata is the constant 0 by construction, if Verilator keeps it at all. The real line, toggle and branch figures, and whatever bounds the requirement holds, come only from the platform's coverage.read run. No such run is cited here.\", \"entry\": null}], \"files\": [{\"path\": \"tick_timer_cov_tb.sv\", \"kind\": \"testbench\", \"title\": \"tick_timer_cov_tb.sv: self-checking coverage testbench for tick_timer\", \"summary\": \"This testbench extends [artifact:prj-4fd2403e98.testbench.a1] to exercise [artifact:prj-4fd2403e98.design-under-test.a1] for [requirement:req-33bb46282b]. It instantiates tick_timer with W=16 and drives the bus half a cycle after each clock edge, so there are no races. It checks register reads and irq at each step: one-shot expiry, periodic reload, W1C clear, expiry over clear, CTRL write over expiry, stop and hold, the upper wdata bits being ignored, and reset in mid-count. It prints the platform's NIRMAAN-SIM verdict line with the nonce. It uses no $fopen, $system, DPI, include, Verilator configuration or coverage pragmas.\", \"entry\": \"tick_timer_cov_tb\"}], \"tool_runs\": [], \"claims\": [\"The testbench is expected to pass on the approved RTL. The expected values follow from reading the RTL edge by edge, and the platform's coverage.read run has not yet confirmed them.\", \"Line and branch coverage of tick_timer.v are expected to be complete. Toggle coverage is expected to miss only the constant rdata[31:16] and the constant unused_wdata, if Verilator keeps it.\", \"The coverage bounds the requirement sets are not stated in the inputs. Whether toggle coverage meets them depends on those bounds and on how Verilator counts the constant bits.\"], \"escalation\": null, \"notes\": \"No tool was run by this seat. [run:run-0001] belongs to the idle testbench and is not evidence for this one, so tool_runs is empty. The coverage_report artifact is a plan with gap justifications. It should be updated with the real numbers once the platform's coverage.read run over tick_timer_cov_tb.sv exists. Independent review is still required after that run.\"}\n```\n=== FILE: tick_timer_cov_tb.sv ===\n// Coverage testbench for tick_timer.v (RX-E2), extending tick_timer_idle_tb.sv.\n// Exercises one-shot and periodic counting, expiry, W1C clear, expiry-over-clear,\n// CTRL-write-over-expiry, stop/hold, IE/irq, ignored upper wdata bits, and a\n// reset in mid-count, and toggles every stored bit of LOAD and COUNT.\n// The bus is driven 1 ns after each rising edge; rdata is combinational.\n`timescale 1ns / 1ps\nmodule tick_timer_cov_tb;\n    logic        clk = 1'b0;\n    logic        rst_n = 1'b0;\n    logic        we = 1'b0;\n    logic [1:0]  addr = 2'd0;\n    logic [31:0] wdata = 32'd0;\n    logic [31:0] rdata;\n    logic        irq;\n    int checks = 0, errors = 0;\n    logic [8*64-1:0] nonce;\n\n    tick_timer #(.W(16)) dut (.clk(clk), .rst_n(rst_n), .we(we), .addr(addr), .wdata(wdata), .rdata(rdata), .irq(irq));\n    always #5 clk = ~clk;\n\n    task automatic expect_reg(input logic [1:0] a, input logic [31:0] expected);\n        addr = a;\n        #1;\n        checks++;\n        if (rdata !== expected) begin\n            errors++;\n            $display(\"MISMATCH addr %0d: got %h expected %h at %0t\", a, rdata, expected, $time);\n        end\n    endtask\n\n    task automatic expect_irq(input logic expected);\n        checks++;\n        if (irq !== expected) begin\n            errors++;\n            $display(\"MISMATCH irq: got %b expected %b at %0t\", irq, expected, $time);\n        end\n    endtask\n\n    task automatic bus_write(input logic [1:0] a, input logic [31:0] d);\n        we = 1'b1; addr = a; wdata = d;\n        @(posedge clk); #1;\n        we = 1'b0; wdata = 32'd0;\n    endtask\n\n    task automatic cycles(input int n);\n        repeat (n) @(posedge clk);\n        #1;\n    endtask\n\n    initial begin\n        // Reset.\n        repeat (3) @(posedge clk);\n        #1;\n        rst_n = 1'b1;\n        cycles(1);\n        expect_reg(2'd0, 32'd0);\n        expect_reg(2'd1, 32'd0);\n        expect_reg(2'd2, 32'd0);\n        expect_reg(2'd3, 32'd0);\n        expect_irq(1'b0);\n\n        // Register access; upper wdata bits are ignored.\n        bus_write(2'd0, 32'h0000_0006);\n        expect_reg(2'd0, 32'h0000_0006);\n        expect_reg(2'd2, 32'd0);\n        bus_write(2'd1, 32'hFFFF_FFFF);\n        expect_reg(2'd1, 32'h0000_FFFF);\n        bus_write(2'd1, 32'h0000_0000);\n        expect_reg(2'd1, 32'd0);\n        bus_write(2'd0, 32'hFFFF_FFF8);\n        expect_reg(2'd0, 32'd0);\n\n        // One-shot: load 3, start, count to zero, expire, stop.\n        bus_write(2'd1, 32'd3);\n        bus_write(2'd0, 32'h0000_0001);\n        expect_reg(2'd2, 32'd3);\n        expect_reg(2'd0, 32'h0000_0001);\n        cycles(3);\n        expect_reg(2'd2, 32'd0);\n        expect_reg(2'd3, 32'd0);\n        cycles(1);\n        expect_reg(2'd3, 32'd1);\n        expect_reg(2'd0, 32'd0);\n        expect_reg(2'd2, 32'd0);\n        expect_irq(1'b0);\n        cycles(2);\n        expect_reg(2'd2, 32'd0);\n        expect_reg(2'd3, 32'd1);\n\n        // IE alone raises irq; writing 0 to STATUS keeps the flag, writing 1 clears it.\n        bus_write(2'd0, 32'h0000_0004);\n        expect_reg(2'd0, 32'h0000_0004);\n        expect_irq(1'b1);\n        expect_reg(2'd3, 32'd1);\n        bus_write(2'd3, 32'd0);\n        expect_reg(2'd3, 32'd1);\n        expect_irq(1'b1);\n        bus_write(2'd3, 32'd1);\n        expect_reg(2'd3, 32'd0);\n        expect_irq(1'b0);\n\n        // Periodic: load 2, start with IE.\n        bus_write(2'd1, 32'd2);\n        bus_write(2'd0, 32'h0000_0007);\n        expect_reg(2'd2, 32'd2);\n        expect_reg(2'd0, 32'h0000_0007);\n        cycles(2);\n        expect_reg(2'd2, 32'd0);\n        expect_reg(2'd3, 32'd0);\n        cycles(1);\n        expect_reg(2'd2, 32'd2);\n        expect_reg(2'd3, 32'd1);\n        expect_irq(1'b1);\n        // Clear while running.\n        bus_write(2'd3, 32'd1);\n        expect_reg(2'd2, 32'd1);\n        expect_reg(2'd3, 32'd0);\n        expect_irq(1'b0);\n        cycles(1);\n        expect_reg(2'd2, 32'd0);\n        // An expiry wins over a clear at the same edge.\n        bus_write(2'd3, 32'd1);\n        expect_reg(2'd3, 32'd1);\n        expect_reg(2'd2, 32'd2);\n        bus_write(2'd3, 32'd1);\n        expect_reg(2'd3, 32'd0);\n        expect_reg(2'd2, 32'd1);\n        cycles(1);\n        expect_reg(2'd2, 32'd0);\n        // A CTRL write at a zero count takes the expiry's place; no reload while enabled.\n        bus_write(2'd0, 32'h0000_0007);\n        expect_reg(2'd2, 32'd0);\n        expect_reg(2'd3, 32'd0);\n        expect_reg(2'd0, 32'h0000_0007);\n        cycles(1);\n        expect_reg(2'd3, 32'd1);\n        expect_reg(2'd2, 32'd2);\n        // Stop: the count holds.\n        bus_write(2'd0, 32'h0000_0000);\n        expect_reg(2'd0, 32'd0);\n        expect_reg(2'd2, 32'd2);\n        cycles(3);\n        expect_reg(2'd2, 32'd2);\n        expect_reg(2'd3, 32'd1);\n        expect_irq(1'b0);\n        bus_write(2'd3, 32'd1);\n        expect_reg(2'd3, 32'd0);\n\n        // Full-width count, then reset in mid-count.\n        bus_write(2'd1, 32'hFFFF_FFFF);\n        bus_write(2'd0, 32'h0000_0001);\n        expect_reg(2'd2, 32'h0000_FFFF);\n        cycles(1);\n        expect_reg(2'd2, 32'h0000_FFFE);\n        rst_n = 1'b0;\n        cycles(2);\n        rst_n = 1'b1;\n        cycles(1);\n        expect_reg(2'd0, 32'd0);\n        expect_reg(2'd1, 32'd0);\n        expect_reg(2'd2, 32'd0);\n        expect_reg(2'd3, 32'd0);\n        expect_irq(1'b0);\n\n        if (!$value$plusargs(\"nirmaan_nonce=%s\", nonce)) nonce = \"none\";\n        $display(\"NIRMAAN-SIM %0s %0d passed, %0d failed\", nonce, (checks > errors ? checks - errors : 0), errors);\n        $finish;\n    end\nendmodule\n=== END FILE ==="
+    }
+  ],
+  "format": "nirmaan.eval-trial",
+  "harness_variant": "default",
+  "judge_runs": [
+    {
+      "check": "The seat's testbench passes the approved RTL, meets the coverage bounds on it and fails each tick timer mutant, one of them wrong in periodic mode only",
+      "params": {
+        "sources": [
+          "/tmp/nirmaan-eval-xbohouxx/judge/check-1/must-fail-b2m8s1t8/clean/tick_timer_cov_tb.sv",
+          "/tmp/nirmaan-eval-xbohouxx/judge/check-1/must-fail-b2m8s1t8/clean/tick_timer.v"
+        ],
+        "top": "tick_timer_cov_tb"
+      },
+      "run": "run-0003",
+      "succeeded": true,
+      "summary": "verilator-coverage: coverage read over tick_timer.v: line 100.00% (10/10), toggle 84.54% (93/110), branch 100.00% (8/8); simulation passed: 61 checks passed, $finish reached, 0 errors",
+      "tool": "coverage.read"
+    },
+    {
+      "check": "The seat's testbench passes the approved RTL, meets the coverage bounds on it and fails each tick timer mutant, one of them wrong in periodic mode only",
+      "params": {
+        "sources": [
+          "/tmp/nirmaan-eval-xbohouxx/judge/check-1/must-fail-b2m8s1t8/cover/tick_timer_cov_tb.sv",
+          "/tmp/nirmaan-eval-xbohouxx/judge/check-1/must-fail-b2m8s1t8/cover/tick_timer.v"
+        ],
+        "top": "tick_timer_cov_tb"
+      },
+      "run": "run-0004",
+      "succeeded": true,
+      "summary": "verilator-coverage: coverage read over tick_timer.v: line 100.00% (10/10), toggle 84.54% (93/110), branch 100.00% (8/8); simulation passed: 61 checks passed, $finish reached, 0 errors",
+      "tool": "coverage.read"
+    },
+    {
+      "check": "The seat's testbench passes the approved RTL, meets the coverage bounds on it and fails each tick timer mutant, one of them wrong in periodic mode only",
+      "params": {
+        "sources": [
+          "/tmp/nirmaan-eval-xbohouxx/judge/check-1/must-fail-b2m8s1t8/mutant-1-1/tick_timer_cov_tb.sv",
+          "/tmp/nirmaan-eval-xbohouxx/judge/check-1/must-fail-b2m8s1t8/mutant-1-1/tick_timer.v"
+        ],
+        "top": "tick_timer_cov_tb"
+      },
+      "run": "run-0005",
+      "succeeded": false,
+      "summary": "verilator-coverage: coverage not read: simulation failed: the testbench reports 1 of 61 checks failed",
+      "tool": "coverage.read"
+    }
+  ],
+  "knowledge": "on",
+  "model": "claude-opus-5-5",
+  "purpose": "evidence",
+  "record": "2026-11-25-claude-code-claude-opus-5-5",
+  "result": {
+    "attempts": 1,
+    "attestations": [],
+    "audit_ok": true,
+    "case": "dv/coverage-tick-timer",
+    "case_digest": "sha256:b4be7351302e30fcb73109e39941b7d05871cf99957c46a9495fda80e3cae17a",
+    "cli": "2.1.325",
+    "cost_usd": null,
+    "detail": "No tool was run by this seat. [run:run-0001] belongs to the idle testbench and is not evidence for this one, so tool_runs is empty. The coverage_report artifact is a plan with gap justifications. It should be updated with the real numbers once the platform's coverage.read run over tick_timer_cov_tb.sv exists. Independent review is still required after that run.",
+    "duration_s": 106.476,
+    "gate_runs": [
+      {
+        "run": "run-0002",
+        "succeeded": true,
+        "summary": "verilator-coverage: coverage read over tick_timer.v: line 100.00% (10/10), toggle 84.54% (93/110), branch 100.00% (8/8); simulation passed: 61 checks passed, $finish reached, 0 errors",
+        "tool": "coverage.read"
+      }
+    ],
+    "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+    "input_tokens": 2,
+    "model_calls": 1,
+    "output_tokens": 10017,
+    "passed": false,
+    "replay": false,
+    "runtime": "claude-code",
+    "sandbox": "/tmp/nirmaan-eval-xbohouxx",
+    "scores": [
+      {
+        "failed_runs": [
+          "run-0005"
+        ],
+        "name": "The seat's testbench passes the approved RTL, meets the coverage bounds on it and fails each tick timer mutant, one of them wrong in periodic mode only",
+        "runs": [
+          "run-0003",
+          "run-0004"
+        ],
+        "scorer": "must-fail",
+        "status": "failed",
+        "summary": "mutant tests/fixtures/dv/tick_timer/mutants/tick_timer_load_late_applies.v survived: coverage.read run-0006 passed"
+      }
+    ],
+    "seat": "prj-4fd2403e98:coverage",
+    "seat_status": "in_review",
+    "started_at": "2026-11-25T05:20:00.768077Z",
+    "submitted": true,
+    "tool_calls": [],
+    "version": "1.25.0"
+  },
+  "skills": {
+    "code_coverage": "sha256:b5a1c9b8bb5f208c1e3ffcae7e9a5da4f26811e68a36954bf58fc612c481ea9b"
+  },
+  "stage": "coverage",
+  "trial": 1,
+  "version": 1
+}

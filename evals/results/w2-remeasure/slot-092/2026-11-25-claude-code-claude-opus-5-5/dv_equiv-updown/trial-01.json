@@ -1,0 +1,137 @@
+{
+  "answers": [
+    {
+      "cache_read_tokens": 7705,
+      "cache_write_tokens": 315,
+      "error": null,
+      "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+      "input_tokens": 2,
+      "mode": "work",
+      "model": "claude-opus-5-5",
+      "output_tokens": 1989,
+      "packet_sha256": "f5fce26f1ae1d2b3f2e079c32d2ff9bf9a3ceeb3b6d3e5b8e02080190a3a76e7",
+      "prompt_sha256": "17610be14f45e198a6737472645311def617037f5aa9512928e33695778cb8f6",
+      "provider": "claude-code",
+      "text": "{\"uncertainty\": 0.3, \"outcome\": \"Submitted one eqy setup comparing the approved updown_counter.v (gold) with the approved updown_counter_refactor.v (gate) using an sby/smtbmc strategy. The equivalence result is pending: the platform has not run equivalence.run yet, so no equivalence is established.\", \"artifacts\": [{\"kind\": \"equivalence_report\", \"title\": \"Equivalence report: updown_counter.v vs updown_counter_refactor.v\", \"summary\": \"This report serves [requirement:req-8077a859ef], an equivalence check of the up/down counter refactor. Gold is the approved [artifact:prj-f735fc7be7.design-under-test.a1] (updown_counter.v). Gate is the approved [artifact:prj-f735fc7be7.design-under-test.a2] (updown_counter_refactor.v). The upstream design has an independent review recorded in [evidence:prj-f735fc7be7.design-under-test.e1]. The setup in updown_counter.eqy reads each file into its own side and elaborates both with 'prep -top updown_counter', so names line up on q, carry and borrow. It proves partitions with the sby strategy using the smtbmc engine at depth 8. Per the knowledge document, sby is preferred to sat for the state-holding q register, and it is the only strategy listed, so no weaker fallback can be reached. No equivalence.run result exists yet, so this report states no pass or fail. The verdict depends on the platform run, which must report DONE (PASS), name both files, prove at least one partition and fail none. The reviewer should also read which partitions were proved and run a one-bit mutant of the gate against this setup.\"}], \"files\": [{\"path\": \"updown_counter.eqy\", \"kind\": \"equivalence_setup\", \"title\": \"eqy setup: updown_counter gold vs refactor gate\", \"summary\": \"eqy setup for [requirement:req-8077a859ef]. [gold] reads updown_counter.v, which is [artifact:prj-f735fc7be7.design-under-test.a1]. [gate] reads updown_counter_refactor.v, which is [artifact:prj-f735fc7be7.design-under-test.a2]. Both sides run prep -top updown_counter. The strategy is sby with the smtbmc engine at depth 8, and the setup uses only allow-listed commands and sections.\", \"entry\": \"updown_counter\"}], \"tool_runs\": [], \"claims\": [\"Hand reasoning, not a tool result: when up=1 the refactor toggles bit i when all lower bits of q are 1, which is an increment by 1. When up=0 it toggles bit i when all lower bits are 0, which is a decrement by 1. Its carry (edge_hit with up) equals q==15, and its borrow (edge_hit with ~up) equals q==0. From this the two versions appear equivalent at every output.\", \"Hand reasoning, not a tool result: depth 8 is expected to be enough. The only state is the 4-bit q register, matched by name on both sides, so each partition's next-state and output logic is shallow.\", \"Both versions declare the module name updown_counter. Because each is read into its own gold or gate design, they are not expected to clash.\"], \"escalation\": null, \"notes\": \"No run IDs were provided, so tool_runs is empty and nothing is reported as verified. The setup reads the approved files by name from beside the .eqy, as the task instructs, and writes no files with those names. [gold] and [gate] differ in the file they read, so the setup is not refused as a self-comparison. If the platform run fails, or proves partitions that do not cover q, carry and borrow, escalate to verification.formal.equivalence.senior.\"}\n\n=== FILE: updown_counter.eqy ===\n[gold]\nread_verilog updown_counter.v\nprep -top updown_counter\n\n[gate]\nread_verilog updown_counter_refactor.v\nprep -top updown_counter\n\n[strategy sby]\nuse sby\ndepth 8\nengine smtbmc\n=== END FILE ==="
+    }
+  ],
+  "format": "nirmaan.eval-trial",
+  "harness_variant": "default",
+  "judge_runs": [
+    {
+      "check": "The seat's setup proves the approved refactor equivalent and fails each non-equivalent refactor",
+      "params": {
+        "eqy": "/tmp/nirmaan-eval-hpexhhha/judge/check-1/must-fail-mfb5r8uv/clean/updown_counter.eqy",
+        "sources": [
+          "/tmp/nirmaan-eval-hpexhhha/judge/check-1/must-fail-mfb5r8uv/clean/updown_counter.v",
+          "/tmp/nirmaan-eval-hpexhhha/judge/check-1/must-fail-mfb5r8uv/clean/updown_counter_refactor.v"
+        ]
+      },
+      "run": "run-0002",
+      "succeeded": true,
+      "summary": "eqy: equivalent: gate updown_counter_refactor.v against gold updown_counter.v: every partition proved (3 of 3)",
+      "tool": "equivalence.run"
+    },
+    {
+      "check": "The seat's setup proves the approved refactor equivalent and fails each non-equivalent refactor",
+      "params": {
+        "eqy": "/tmp/nirmaan-eval-hpexhhha/judge/check-1/must-fail-mfb5r8uv/mutant-1-1/updown_counter.eqy",
+        "sources": [
+          "/tmp/nirmaan-eval-hpexhhha/judge/check-1/must-fail-mfb5r8uv/mutant-1-1/updown_counter.v",
+          "/tmp/nirmaan-eval-hpexhhha/judge/check-1/must-fail-mfb5r8uv/mutant-1-1/updown_counter_refactor.v"
+        ]
+      },
+      "run": "run-0003",
+      "succeeded": false,
+      "summary": "eqy: not equivalent: gate updown_counter_refactor.v against gold updown_counter.v: 2 of 3 partitions not proved; first: updown_counter.q (partitions not equivalent (strategy sby))",
+      "tool": "equivalence.run"
+    },
+    {
+      "check": "The seat's setup proves the approved refactor equivalent and fails each non-equivalent refactor",
+      "params": {
+        "eqy": "/tmp/nirmaan-eval-hpexhhha/judge/check-1/must-fail-mfb5r8uv/mutant-1-2/updown_counter.eqy",
+        "sources": [
+          "/tmp/nirmaan-eval-hpexhhha/judge/check-1/must-fail-mfb5r8uv/mutant-1-2/updown_counter.v",
+          "/tmp/nirmaan-eval-hpexhhha/judge/check-1/must-fail-mfb5r8uv/mutant-1-2/updown_counter_refactor.v"
+        ]
+      },
+      "run": "run-0004",
+      "succeeded": false,
+      "summary": "eqy: not equivalent: gate updown_counter_refactor.v against gold updown_counter.v: 1 of 3 partitions not proved; first: updown_counter.q (partitions not equivalent (strategy sby))",
+      "tool": "equivalence.run"
+    },
+    {
+      "check": "The seat's setup proves the approved refactor equivalent and fails each non-equivalent refactor",
+      "params": {
+        "eqy": "/tmp/nirmaan-eval-hpexhhha/judge/check-1/must-fail-mfb5r8uv/mutant-1-3/updown_counter.eqy",
+        "sources": [
+          "/tmp/nirmaan-eval-hpexhhha/judge/check-1/must-fail-mfb5r8uv/mutant-1-3/updown_counter.v",
+          "/tmp/nirmaan-eval-hpexhhha/judge/check-1/must-fail-mfb5r8uv/mutant-1-3/updown_counter_refactor.v"
+        ]
+      },
+      "run": "run-0005",
+      "succeeded": false,
+      "summary": "eqy: not equivalent: gate updown_counter_refactor.v against gold updown_counter.v: 1 of 3 partitions not proved; first: updown_counter.borrow (partitions not equivalent (strategy sby))",
+      "tool": "equivalence.run"
+    }
+  ],
+  "knowledge": "on",
+  "model": "claude-opus-5-5",
+  "purpose": "evidence",
+  "record": "2026-11-25-claude-code-claude-opus-5-5",
+  "result": {
+    "attempts": 1,
+    "attestations": [],
+    "audit_ok": true,
+    "case": "dv/equiv-updown",
+    "case_digest": "sha256:4b09a43c2c98a9316dd9fbc8279cd28f3e75f77982211d784ed8ee104afd80f5",
+    "cli": "2.1.325",
+    "cost_usd": null,
+    "detail": "No run IDs were provided, so tool_runs is empty and nothing is reported as verified. The setup reads the approved files by name from beside the .eqy, as the task instructs, and writes no files with those names. [gold] and [gate] differ in the file they read, so the setup is not refused as a self-comparison. If the platform run fails, or proves partitions that do not cover q, carry and borrow, escalate to verification.formal.equivalence.senior.",
+    "duration_s": 25.589,
+    "gate_runs": [
+      {
+        "run": "run-0001",
+        "succeeded": true,
+        "summary": "eqy: equivalent: gate updown_counter_refactor.v against gold updown_counter.v: every partition proved (3 of 3)",
+        "tool": "equivalence.run"
+      }
+    ],
+    "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+    "input_tokens": 2,
+    "model_calls": 1,
+    "output_tokens": 1989,
+    "passed": true,
+    "replay": false,
+    "runtime": "claude-code",
+    "sandbox": "/tmp/nirmaan-eval-hpexhhha",
+    "scores": [
+      {
+        "failed_runs": [
+          "run-0003",
+          "run-0004",
+          "run-0005"
+        ],
+        "name": "The seat's setup proves the approved refactor equivalent and fails each non-equivalent refactor",
+        "runs": [
+          "run-0002"
+        ],
+        "scorer": "must-fail",
+        "status": "passed",
+        "summary": "equivalence.run run-0002 passed on the clean inputs; 3 of 3 mutants failed it"
+      }
+    ],
+    "seat": "prj-f735fc7be7:equivalence",
+    "seat_status": "in_review",
+    "started_at": "2026-11-25T05:19:57.316823Z",
+    "submitted": true,
+    "tool_calls": [],
+    "version": "1.25.0"
+  },
+  "skills": {
+    "equivalence_checking": "sha256:3e5a9675b1f975732c708689218a173566da26d28321e898616b1f79b9db9bca"
+  },
+  "stage": "equivalence",
+  "trial": 1,
+  "version": 1
+}

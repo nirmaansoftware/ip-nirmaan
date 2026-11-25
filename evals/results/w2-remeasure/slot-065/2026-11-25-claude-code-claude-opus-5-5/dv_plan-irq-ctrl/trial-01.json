@@ -1,0 +1,125 @@
+{
+  "answers": [
+    {
+      "cache_read_tokens": 8125,
+      "cache_write_tokens": 315,
+      "error": null,
+      "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+      "input_tokens": 2,
+      "mode": "work",
+      "model": "claude-opus-5-5",
+      "output_tokens": 8735,
+      "packet_sha256": "88666f8f40cb523f8f243ef258ca19c21d24fa3f72dc31fe854b716db3db6067",
+      "prompt_sha256": "73ea91c2d8fa1aa792193cbff3a8f772879e48923df86f9a1dac5abe48b25033",
+      "provider": "claude-code",
+      "text": "```json\n{\"uncertainty\": 0.25, \"outcome\": \"verification_plan written: verification_plan.json lists all 14 tagged requirements of the approved interface spec and plans test, assertion and coverage_point items for each one. It is a statement of intent only. Nothing in it has been run, checked or reviewed.\", \"artifacts\": [{\"kind\": \"verification_plan\", \"title\": \"irq_ctrl verification plan\", \"summary\": \"Plan for verifying the existing irq_ctrl RTL, which serves [requirement:req-5fc7831312]. It quotes word for word the 14 requirements tagged in [artifact:prj-fa45b8ae0a.interface-spec.a1]: IRQ-PARAM, IRQ-RESET, IRQ-REG-RW, IRQ-READ, IRQ-LEVEL, IRQ-EDGE, IRQ-DETECT-DISABLED, IRQ-W1C, IRQ-ACK, IRQ-SET-WINS, IRQ-MASK, IRQ-PRIORITY, IRQ-CLAIM and IRQ-LATENCY. Each requirement maps to at least one item. Items are directed tests in irq_ctrl_tb.sv, assertions in irq_ctrl_sva.sv for a formal run or a quiet simulation, and cover points on the design file. The spec it covers was reviewed under [evidence:prj-fa45b8ae0a.interface-spec.e1].\"}], \"files\": [{\"path\": \"verification_plan.json\", \"kind\": \"verification_plan\", \"title\": \"irq_ctrl verification plan (nirmaan.vplan v1)\", \"summary\": \"nirmaan.vplan version 1 JSON plan. Its sources are interface_spec.md from [artifact:prj-fa45b8ae0a.interface-spec.a1], and it traces to [requirement:req-5fc7831312]. All 14 tagged requirements are quoted with their tags removed. There are 31 items, and every requirement has at least one item. No result fields are present.\", \"entry\": null}], \"tool_runs\": [], \"claims\": [\"vplan.check has not been run on this plan. The platform runs it after submission.\", \"The design file name irq_ctrl.sv used for the coverage_point items is an assumption. My inputs do not name the existing RTL's file. If the name differs, the coverage_point file fields must be changed so that coverage.read reads the right design file.\", \"The testbench and assertion file names irq_ctrl_tb.sv and irq_ctrl_sva.sv are planned names. No such files exist yet as far as my inputs show.\", \"IRQ-PARAM needs the test and assertions to be built at several values of N: 2, 8 (the default) and 32. Whether the existing RTL can be built that way has not been confirmed.\"], \"escalation\": null, \"notes\": \"Requirement text is copied word for word from interface_spec.md with the [req:ID] tags removed, and source is set to 'interface_spec.md'. Items were chosen so that each one names its stimulus and its check in the rationale. A reviewer should still read each item against its requirement, because vplan.check only compares IDs. Two requirements carry the most risk. IRQ-SET-WINS needs a set and a clear on the same edge. IRQ-LATENCY and IRQ-READ need the testbench to sample outputs combinationally, before the next edge. Both have assertions planned as well as tests. The main source of uncertainty is the assumed name of the design file for the coverage points.\"}\n```\n=== FILE: verification_plan.json ===\n{\n  \"format\": \"nirmaan.vplan\",\n  \"version\": 1,\n  \"requirements\": [\n    {\"id\": \"IRQ-PARAM\", \"section\": \"1. Parameters\", \"source\": \"interface_spec.md\",\n     \"text\": \"The block works for every `N` from 2 to 32, and bits `N` and up of the `ENABLE`, `MODE` and `PENDING` registers read as zero and ignore writes.\"},\n    {\"id\": \"IRQ-RESET\", \"section\": \"4.1 Reset and registers\", \"source\": \"interface_spec.md\",\n     \"text\": \"While `rst_n` is low at a rising edge of `clk`, `ENABLE`, `MODE` and `PENDING` clear to zero and the remembered level of every source clears to zero.\"},\n    {\"id\": \"IRQ-REG-RW\", \"section\": \"4.1 Reset and registers\", \"source\": \"interface_spec.md\",\n     \"text\": \"A write to `ENABLE` or `MODE` stores `wdata` bits `N-1` to 0 in that register.\"},\n    {\"id\": \"IRQ-READ\", \"section\": \"4.1 Reset and registers\", \"source\": \"interface_spec.md\",\n     \"text\": \"A read never changes any register; `rdata` follows `addr` with no clock edge.\"},\n    {\"id\": \"IRQ-LEVEL\", \"section\": \"4.2 Detection\", \"source\": \"interface_spec.md\",\n     \"text\": \"A high-level source sets its `PENDING` bit at every rising edge where its input is high.\"},\n    {\"id\": \"IRQ-EDGE\", \"section\": \"4.2 Detection\", \"source\": \"interface_spec.md\",\n     \"text\": \"A rising-edge source sets its `PENDING` bit at a rising edge where its input is high and was low at the previous rising edge, so an input held high sets it once.\"},\n    {\"id\": \"IRQ-DETECT-DISABLED\", \"section\": \"4.2 Detection\", \"source\": \"interface_spec.md\",\n     \"text\": \"Detection does not depend on `ENABLE`: a disabled source still sets its `PENDING` bit.\"},\n    {\"id\": \"IRQ-W1C\", \"section\": \"4.3 Clearing\", \"source\": \"interface_spec.md\",\n     \"text\": \"A write to `PENDING` clears each bit written 1 and leaves each bit written 0 unchanged; it never sets a bit.\"},\n    {\"id\": \"IRQ-ACK\", \"section\": \"4.3 Clearing\", \"source\": \"interface_spec.md\",\n     \"text\": \"A write to `CLAIM` acknowledges the source whose number is in `wdata` bits 4 to 0: that source's `PENDING` bit clears and no other bit changes; a number of `N` or more changes nothing.\"},\n    {\"id\": \"IRQ-SET-WINS\", \"section\": \"4.3 Clearing\", \"source\": \"interface_spec.md\",\n     \"text\": \"A source detected at the same rising edge as a write that clears its bit keeps its `PENDING` bit set, so a high-level source acknowledged while its input is still high stays pending.\"},\n    {\"id\": \"IRQ-MASK\", \"section\": \"4.4 The interrupt and the claim\", \"source\": \"interface_spec.md\",\n     \"text\": \"`irq` is high exactly when some source has both its `PENDING` and its `ENABLE` bit set, for high-level and rising-edge sources alike.\"},\n    {\"id\": \"IRQ-PRIORITY\", \"section\": \"4.4 The interrupt and the claim\", \"source\": \"interface_spec.md\",\n     \"text\": \"`irq_id` is the lowest-numbered source whose `PENDING` and `ENABLE` bits are both set, so source 0 has the highest priority, and it is 0 while `irq` is low.\"},\n    {\"id\": \"IRQ-CLAIM\", \"section\": \"4.4 The interrupt and the claim\", \"source\": \"interface_spec.md\",\n     \"text\": \"A read of `CLAIM` returns `irq` in bit 31 and `irq_id` in bits 4 to 0, with every other bit zero.\"},\n    {\"id\": \"IRQ-LATENCY\", \"section\": \"4.4 The interrupt and the claim\", \"source\": \"interface_spec.md\",\n     \"text\": \"`irq` and `irq_id` follow the registers with no clock edge, so a source detected at one rising edge drives `irq` until the next.\"}\n  ],\n  \"items\": [\n    {\"id\": \"T-SMOKE\", \"kind\": \"test\", \"file\": \"irq_ctrl_tb.sv\", \"name\": \"test_smoke\",\n     \"proves\": [\"IRQ-RESET\", \"IRQ-LEVEL\", \"IRQ-MASK\", \"IRQ-ACK\"],\n     \"rationale\": \"Smoke test. Reset, enable source 0 as high-level, pulse src[0] for one cycle, check irq=1 and irq_id=0, write 0 to CLAIM, check PENDING=0 and irq=0.\"},\n    {\"id\": \"T-PARAM-SWEEP\", \"kind\": \"test\", \"file\": \"irq_ctrl_tb.sv\", \"name\": \"test_param_unused_bits\",\n     \"proves\": [\"IRQ-PARAM\"],\n     \"rationale\": \"Build and run at N=2, N=8 and N=32. Write all ones to ENABLE and MODE, and drive all sources high so PENDING fills. Check that bits N and up of ENABLE, MODE and PENDING read 0. At N=32 every bit is in use.\"},\n    {\"id\": \"A-PARAM-UNUSED-ZERO\", \"kind\": \"assertion\", \"file\": \"irq_ctrl_sva.sv\", \"name\": \"a_unused_bits_zero\",\n     \"proves\": [\"IRQ-PARAM\"],\n     \"rationale\": \"At every cycle, when addr selects ENABLE, MODE or PENDING, rdata bits N and up are zero. Bound for each N in the sweep.\"},\n    {\"id\": \"T-RESET\", \"kind\": \"test\", \"file\": \"irq_ctrl_tb.sv\", \"name\": \"test_reset_clears\",\n     \"proves\": [\"IRQ-RESET\"],\n     \"rationale\": \"Set ENABLE, MODE and PENDING to non-zero values and hold some src inputs high, then assert rst_n low for one rising edge. Check the three registers read 0. To check that the remembered level was cleared, configure an edge-mode source whose input stayed high through reset, then check it is detected as a rising edge at the first edge after reset.\"},\n    {\"id\": \"A-RESET\", \"kind\": \"assertion\", \"file\": \"irq_ctrl_sva.sv\", \"name\": \"a_reset_clears_regs\",\n     \"proves\": [\"IRQ-RESET\"],\n     \"rationale\": \"rst_n low at a rising edge implies ENABLE, MODE and PENDING are zero after that edge. Because reset is synchronous, the assertion checks the edge and not the asynchronous level.\"},\n    {\"id\": \"T-REG-RW\", \"kind\": \"test\", \"file\": \"irq_ctrl_tb.sv\", \"name\": \"test_enable_mode_rw\",\n     \"proves\": [\"IRQ-REG-RW\"],\n     \"rationale\": \"Write walking-ones, walking-zeros and random patterns to ENABLE and MODE. Read each one back and compare with wdata[N-1:0]. Check that a write to one register leaves the other unchanged.\"},\n    {\"id\": \"T-READ-NO-SIDE-EFFECT\", \"kind\": \"test\", \"file\": \"irq_ctrl_tb.sv\", \"name\": \"test_read_no_side_effect\",\n     \"proves\": [\"IRQ-READ\"],\n     \"rationale\": \"With we low, step addr through 0 to 3 repeatedly, including CLAIM while a source is pending. Check that no register or PENDING bit changes. Sample rdata in the same cycle that addr changes to check it follows addr without a clock edge.\"},\n    {\"id\": \"A-READ-COMB\", \"kind\": \"assertion\", \"file\": \"irq_ctrl_sva.sv\", \"name\": \"a_rdata_follows_addr\",\n     \"proves\": [\"IRQ-READ\"],\n     \"rationale\": \"rdata always equals the register that addr selects, checked combinationally. With we low and no source detected, registers are stable across an edge.\"},\n    {\"id\": \"T-LEVEL\", \"kind\": \"test\", \"file\": \"irq_ctrl_tb.sv\", \"name\": \"test_level_detect\",\n     \"proves\": [\"IRQ-LEVEL\"],\n     \"rationale\": \"Set MODE bit to 0. Hold src high for several cycles while clearing PENDING through W1C between edges. Check the bit is set again at every edge where the input is high, and is not set by an edge where the input is low.\"},\n    {\"id\": \"T-EDGE\", \"kind\": \"test\", \"file\": \"irq_ctrl_tb.sv\", \"name\": \"test_edge_detect\",\n     \"proves\": [\"IRQ-EDGE\"],\n     \"rationale\": \"Set MODE bit to 1. Raise src and hold it high, then clear PENDING. Check it stays clear while the input stays high. Drop and raise the input again and check it is set once.\"},\n    {\"id\": \"A-EDGE\", \"kind\": \"assertion\", \"file\": \"irq_ctrl_sva.sv\", \"name\": \"a_edge_sets_once\",\n     \"proves\": [\"IRQ-EDGE\", \"IRQ-LEVEL\"],\n     \"rationale\": \"For an edge-mode source, PENDING rises only after a 0 then 1 sequence on src. For a level-mode source, src high at an edge implies PENDING is set after that edge.\"},\n    {\"id\": \"T-DETECT-DISABLED\", \"kind\": \"test\", \"file\": \"irq_ctrl_tb.sv\", \"name\": \"test_detect_while_disabled\",\n     \"proves\": [\"IRQ-DETECT-DISABLED\", \"IRQ-MASK\"],\n     \"rationale\": \"Set ENABLE to 0 and drive level-mode and edge-mode sources. Check PENDING bits set and irq stays 0. Then enable a source and check irq rises with no new detection.\"},\n    {\"id\": \"T-W1C\", \"kind\": \"test\", \"file\": \"irq_ctrl_tb.sv\", \"name\": \"test_pending_w1c\",\n     \"proves\": [\"IRQ-W1C\"],\n     \"rationale\": \"Fill PENDING, then drop all inputs. Write random masks to PENDING and check that only bits written 1 cleared. Write ones to clear bits and check no bit is ever set by the write.\"},\n    {\"id\": \"A-W1C-NEVER-SETS\", \"kind\": \"assertion\", \"file\": \"irq_ctrl_sva.sv\", \"name\": \"a_pending_write_never_sets\",\n     \"proves\": [\"IRQ-W1C\"],\n     \"rationale\": \"A PENDING bit can only go from 0 to 1 at an edge where its source is detected, never because of a write. A bit written 1 with no detection is 0 after the edge.\"},\n    {\"id\": \"T-ACK\", \"kind\": \"test\", \"file\": \"irq_ctrl_tb.sv\", \"name\": \"test_claim_ack\",\n     \"proves\": [\"IRQ-ACK\"],\n     \"rationale\": \"Fill PENDING and drop inputs. Write each source number to CLAIM and check that exactly that bit clears. Write numbers N to 31, and wdata with upper bits set beyond bit 4, and check that only wdata[4:0] is used and that numbers N or more change nothing.\"},\n    {\"id\": \"A-ACK-ONE-BIT\", \"kind\": \"assertion\", \"file\": \"irq_ctrl_sva.sv\", \"name\": \"a_ack_clears_only_named\",\n     \"proves\": [\"IRQ-ACK\"],\n     \"rationale\": \"A CLAIM write with id = wdata[4:0] < N and no detection clears PENDING[id] and leaves the other bits unchanged. A CLAIM write with id >= N leaves PENDING unchanged.\"},\n    {\"id\": \"T-SET-WINS\", \"kind\": \"test\", \"file\": \"irq_ctrl_tb.sv\", \"name\": \"test_set_wins_over_clear\",\n     \"proves\": [\"IRQ-SET-WINS\"],\n     \"rationale\": \"Cover both clear paths. In the first, write W1C to PENDING at the same edge where a level source is high. In the second, write CLAIM for that source while it is high. Repeat at the edge where an edge-mode source rises. Check the bit stays set in every case.\"},\n    {\"id\": \"A-SET-WINS\", \"kind\": \"assertion\", \"file\": \"irq_ctrl_sva.sv\", \"name\": \"a_detect_beats_clear\",\n     \"proves\": [\"IRQ-SET-WINS\"],\n     \"rationale\": \"Detection of source i at an edge implies PENDING[i] is 1 after that edge, whatever the write at that edge.\"},\n    {\"id\": \"T-MASK\", \"kind\": \"test\", \"file\": \"irq_ctrl_tb.sv\", \"name\": \"test_irq_mask\",\n     \"proves\": [\"IRQ-MASK\"],\n     \"rationale\": \"Random combinations of PENDING and ENABLE with mixed MODE. Check that irq equals the OR of (PENDING & ENABLE) in every cycle, for level-mode and edge-mode sources.\"},\n    {\"id\": \"A-MASK\", \"kind\": \"assertion\", \"file\": \"irq_ctrl_sva.sv\", \"name\": \"a_irq_eq_or_pending_enable\",\n     \"proves\": [\"IRQ-MASK\", \"IRQ-LATENCY\"],\n     \"rationale\": \"Checked combinationally at all times: irq == |(PENDING & ENABLE).\"},\n    {\"id\": \"T-PRIORITY\", \"kind\": \"test\", \"file\": \"irq_ctrl_tb.sv\", \"name\": \"test_priority\",\n     \"proves\": [\"IRQ-PRIORITY\"],\n     \"rationale\": \"Set several pending and enabled sources, then acknowledge them one by one. Check irq_id walks upward from the lowest number. Include a disabled lower-numbered pending source that must be skipped, the highest source N-1 by itself, and irq_id=0 while irq is low.\"},\n    {\"id\": \"A-PRIORITY\", \"kind\": \"assertion\", \"file\": \"irq_ctrl_sva.sv\", \"name\": \"a_irq_id_lowest\",\n     \"proves\": [\"IRQ-PRIORITY\", \"IRQ-LATENCY\"],\n     \"rationale\": \"Checked combinationally. When irq is low, irq_id is 0. When irq is high, irq_id is the lowest index of PENDING & ENABLE.\"},\n    {\"id\": \"T-CLAIM-READ\", \"kind\": \"test\", \"file\": \"irq_ctrl_tb.sv\", \"name\": \"test_claim_read_format\",\n     \"proves\": [\"IRQ-CLAIM\"],\n     \"rationale\": \"Read CLAIM with irq low and with irq high for several ids including N-1. Check bit 31 equals irq, bits 4 to 0 equal irq_id, and bits 30 to 5 are 0.\"},\n    {\"id\": \"A-CLAIM-FORMAT\", \"kind\": \"assertion\", \"file\": \"irq_ctrl_sva.sv\", \"name\": \"a_claim_rdata_format\",\n     \"proves\": [\"IRQ-CLAIM\"],\n     \"rationale\": \"When addr is 3, rdata == {irq, 26'b0, irq_id}.\"},\n    {\"id\": \"T-LATENCY\", \"kind\": \"test\", \"file\": \"irq_ctrl_tb.sv\", \"name\": \"test_irq_latency\",\n     \"proves\": [\"IRQ-LATENCY\"],\n     \"rationale\": \"Drive an enabled source and sample irq and irq_id just after the detecting edge, before the next one. Check they are already valid. Check they change in the same cycle that an ENABLE write or acknowledge takes effect.\"},\n    {\"id\": \"C-MODE-X-ENABLE\", \"kind\": \"coverage_point\", \"file\": \"irq_ctrl.sv\", \"name\": \"cp_mode_enable_pending\",\n     \"proves\": [\"IRQ-MASK\", \"IRQ-DETECT-DISABLED\", \"IRQ-LEVEL\", \"IRQ-EDGE\"],\n     \"rationale\": \"Cross of MODE, ENABLE and PENDING-set for each source. Shows every source was detected in both modes, both enabled and disabled.\"},\n    {\"id\": \"C-SET-AND-CLEAR\", \"kind\": \"coverage_point\", \"file\": \"irq_ctrl.sv\", \"name\": \"cp_set_clear_same_edge\",\n     \"proves\": [\"IRQ-SET-WINS\"],\n     \"rationale\": \"Shows that the case where detection and a clearing write (W1C and CLAIM) hit the same bit at the same edge was reached.\"},\n    {\"id\": \"C-ACK-ID\", \"kind\": \"coverage_point\", \"file\": \"irq_ctrl.sv\", \"name\": \"cp_ack_id_range\",\n     \"proves\": [\"IRQ-ACK\"],\n     \"rationale\": \"Bins for CLAIM write ids: each id below N, and ids N or more. Shows that the out-of-range acknowledge was exercised.\"},\n    {\"id\": \"C-IRQ-ID\", \"kind\": \"coverage_point\", \"file\": \"irq_ctrl.sv\", \"name\": \"cp_irq_id_values\",\n     \"proves\": [\"IRQ-PRIORITY\"],\n     \"rationale\": \"Each irq_id value 0 to N-1 seen with irq high, including the case where two or more sources are pending and enabled together.\"},\n    {\"id\": \"C-REG-WRITES\", \"kind\": \"coverage_point\", \"file\": \"irq_ctrl.sv\", \"name\": \"cp_register_writes\",\n     \"proves\": [\"IRQ-REG-RW\", \"IRQ-W1C\", \"IRQ-READ\"],\n     \"rationale\": \"Writes and reads seen at each addr 0 to 3.\"},\n    {\"id\": \"C-RESET-ACTIVE\", \"kind\": \"coverage_point\", \"file\": \"irq_ctrl.sv\", \"name\": \"cp_reset_with_state\",\n     \"proves\": [\"IRQ-RESET\"],\n     \"rationale\": \"Reset seen while registers were non-zero and an edge-mode source input was high.\"}\n  ]\n}\n=== END FILE ==="
+    }
+  ],
+  "format": "nirmaan.eval-trial",
+  "harness_variant": "default",
+  "judge_runs": [
+    {
+      "check": "The seat's plan covers the approved specification exactly and fails each specification mutant",
+      "params": {
+        "plan": [
+          "/tmp/nirmaan-eval-zj5dicmz/judge/check-1/must-fail-w776z852/clean/verification_plan.json"
+        ],
+        "spec": [
+          "/tmp/nirmaan-eval-zj5dicmz/judge/check-1/must-fail-w776z852/clean/interface_spec.md"
+        ]
+      },
+      "run": "run-0002",
+      "succeeded": true,
+      "summary": "verification_plan.json covers 14 of 14 requirements of interface_spec.md with 31 items",
+      "tool": "vplan.check"
+    },
+    {
+      "check": "The seat's plan covers the approved specification exactly and fails each specification mutant",
+      "params": {
+        "plan": [
+          "/tmp/nirmaan-eval-zj5dicmz/judge/check-1/must-fail-w776z852/mutant-1-1/verification_plan.json"
+        ],
+        "spec": [
+          "/tmp/nirmaan-eval-zj5dicmz/judge/check-1/must-fail-w776z852/mutant-1-1/interface_spec.md"
+        ]
+      },
+      "run": "run-0003",
+      "succeeded": false,
+      "summary": "verification_plan.json: 1 problem(s): interface_spec.md line 78: requirement IRQ-RECLAIM is not in the plan",
+      "tool": "vplan.check"
+    },
+    {
+      "check": "The seat's plan covers the approved specification exactly and fails each specification mutant",
+      "params": {
+        "plan": [
+          "/tmp/nirmaan-eval-zj5dicmz/judge/check-1/must-fail-w776z852/mutant-1-2/verification_plan.json"
+        ],
+        "spec": [
+          "/tmp/nirmaan-eval-zj5dicmz/judge/check-1/must-fail-w776z852/mutant-1-2/interface_spec.md"
+        ]
+      },
+      "run": "run-0004",
+      "succeeded": false,
+      "summary": "verification_plan.json: 1 problem(s): line 27: IRQ-PRIORITY does not quote interface_spec.md line 75, which says '`irq_id` is the highest-numbered source whose `PENDING` and `ENABLE` bits are both set, so source `N-1` has the highest priority, and it is 0 while `irq` is low.'",
+      "tool": "vplan.check"
+    }
+  ],
+  "knowledge": "on",
+  "model": "claude-opus-5-5",
+  "purpose": "evidence",
+  "record": "2026-11-25-claude-code-claude-opus-5-5",
+  "result": {
+    "attempts": 1,
+    "attestations": [],
+    "audit_ok": true,
+    "case": "dv/plan-irq-ctrl",
+    "case_digest": "sha256:1a553dafca71aece791fbac7921963f026cf0750fa3efd43e7f495dfd5ebb799",
+    "cli": "2.1.325",
+    "cost_usd": null,
+    "detail": "Requirement text is copied word for word from interface_spec.md with the [req:ID] tags removed, and source is set to 'interface_spec.md'. Items were chosen so that each one names its stimulus and its check in the rationale. A reviewer should still read each item against its requirement, because vplan.check only compares IDs. Two requirements carry the most risk. IRQ-SET-WINS needs a set and a clear on the same edge. IRQ-LATENCY and IRQ-READ need the testbench to sample outputs combinationally, before the next edge. Both have assertions planned as well as tests. The main source of uncertainty is the assumed name of the design file for the coverage points.",
+    "duration_s": 68.427,
+    "gate_runs": [
+      {
+        "run": "run-0001",
+        "succeeded": true,
+        "summary": "verification_plan.json covers 14 of 14 requirements of interface_spec.md with 31 items",
+        "tool": "vplan.check"
+      }
+    ],
+    "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+    "input_tokens": 2,
+    "model_calls": 1,
+    "output_tokens": 8735,
+    "passed": true,
+    "replay": false,
+    "runtime": "claude-code",
+    "sandbox": "/tmp/nirmaan-eval-zj5dicmz",
+    "scores": [
+      {
+        "failed_runs": [
+          "run-0003",
+          "run-0004"
+        ],
+        "name": "The seat's plan covers the approved specification exactly and fails each specification mutant",
+        "runs": [
+          "run-0002"
+        ],
+        "scorer": "must-fail",
+        "status": "passed",
+        "summary": "vplan.check run-0002 passed on the clean inputs; 2 of 2 mutants failed it"
+      }
+    ],
+    "seat": "prj-fa45b8ae0a:dv-plan",
+    "seat_status": "in_review",
+    "started_at": "2026-11-25T03:48:35.195373Z",
+    "submitted": true,
+    "tool_calls": [],
+    "version": "1.25.0"
+  },
+  "skills": {
+    "verification_planning": "sha256:77aed8426f0d85155bdf20b574328b735932a9bd35c3c7a44ead921bcbe4b3e2"
+  },
+  "stage": "dv-plan",
+  "trial": 1,
+  "version": 1
+}

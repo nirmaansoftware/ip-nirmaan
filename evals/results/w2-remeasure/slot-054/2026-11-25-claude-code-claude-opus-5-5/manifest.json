@@ -1,0 +1,24 @@
+{
+  "cases": [
+    "dv/formal-rr-arbiter"
+  ],
+  "command": "nirmaan eval run dv/formal-rr-arbiter --runtime claude-code --trials 1 --purpose evidence --out /home/runner/work/_temp/results",
+  "finished_at": "2026-11-25T03:15:42.379652Z",
+  "format": "nirmaan.eval-run",
+  "harness_variant": "default",
+  "head_sha": "f3ad96fe3ba7d08e276cc80f6db04a4987beeb52",
+  "id": "2026-11-25-claude-code-claude-opus-5-5",
+  "knowledge": "on",
+  "model": "claude-opus-5-5",
+  "nirmaan_version": "1.25.0",
+  "purpose": "evidence",
+  "replay": false,
+  "runtime": "claude-code",
+  "seats": [
+    "assertions-formal"
+  ],
+  "source": "",
+  "started_at": "2026-11-25T03:14:04.422416Z",
+  "trials": 1,
+  "version": 1
+}
