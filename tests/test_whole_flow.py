@@ -45,8 +45,8 @@ def _whole(**overrides) -> EvalCase:
     return EvalCase.model_validate(data)
 
 
-def _trial(flow: str = "seat", **extra) -> EvalTrial:
-    result = EvalResult(case="c", case_digest="sha256:x", runtime="claude-code", replay=False, version="t",
+def _trial(flow: str = "seat", case: str = "c", **extra) -> EvalTrial:
+    result = EvalResult(case=case, case_digest="sha256:x", runtime="claude-code", replay=False, version="t",
                         started_at=AT, duration_s=1.0, seat="rtl-implementation", seat_status="done",
                         submitted=True, attempts=1, passed=True, audit_ok=True, sandbox="s")
     return EvalTrial(record="r", trial=1, stage="rtl-implementation", result=result, flow=flow, **extra)
@@ -82,8 +82,11 @@ def test_a_whole_flow_case_trial_and_manifest_carry_the_label():
     assert EvalTrial.model_validate_json(_trial("whole").model_dump_json()).flow == "whole"
 
 
-#: Where a committed whole-flow record may live: one folder per timer slot, the record name as record_run wrote it.
-SLOT_RECORD = re.compile(r"g3-timer/slot-\d{2}/[^/]+")
+#: Where a committed whole-flow record may live: one folder per slot, the record name as record_run wrote it. The
+#: timer's folder is the plan's section 15; the register block's is named by its dated addition before slot 21.
+SLOT_RECORD = re.compile(r"(g3-timer|g3-regs-driver)/slot-\d{2}/[^/]+")
+#: Each case's slot folder under evals/results: its case and its first slot (the plan's section 10).
+BATCHES = {"g3-timer": ("flow/axil-timer", 1), "g3-regs-driver": ("flow/axi4-lite-regs-driver", 21)}
 
 
 def _check_record_structure(root: Path, folder: Path) -> None:
@@ -95,7 +98,9 @@ def _check_record_structure(root: Path, folder: Path) -> None:
     if not is_whole_flow(record):  # also raises when the record mixes the two kinds
         assert all(t.flow == "seat" and t.stages == () and t.flow_digest is None for t in record.trials), where
         return
-    assert SLOT_RECORD.fullmatch(where), f"{where}: a whole-flow record belongs in g3-timer/slot-NN/<record name>"
+    assert SLOT_RECORD.fullmatch(where), (f"{where}: a whole-flow record belongs in g3-timer/slot-NN/<record name> "
+                                          "or g3-regs-driver/slot-NN/<record name>")
+    case = BATCHES[where.split("/")[0]][0]
     assert record.trials, where
     # The measured run (purpose calibration) is outside the forty (plan, section 10), so a slot folder holds
     # evidence records only.
@@ -103,6 +108,8 @@ def _check_record_structure(root: Path, folder: Path) -> None:
     for trial in record.trials:
         assert trial.purpose == "evidence", f"{where} trial {trial.trial}: a slot folder holds no calibration record"
         assert trial.flow == "whole" and trial.stages and trial.flow_digest, f"{where} trial {trial.trial}"
+        assert trial.result.case == case, (f"{where} trial {trial.trial}: a record of {trial.result.case} in "
+                                           f"{case}'s folder")
         assert all(isinstance(stage, EvalStage) for stage in trial.stages), where
 
 
@@ -124,7 +131,7 @@ def test_a_nested_slot_record_is_read_as_a_whole_flow_record_and_a_misplaced_or_
         (folder / "flow_timer" / "trial-01.json").write_text(trial.model_dump_json(), encoding="utf-8")
         return folder
 
-    whole_trial = _trial("whole", stages=(stage,), flow_digest="sha256:f")
+    whole_trial = _trial("whole", "flow/axil-timer", stages=(stage,), flow_digest="sha256:f")
     # Two slots of one arm on one day: the same record name under two slot folders, both fine.
     for slot in ("slot-01", "slot-02"):
         _check_record_structure(tmp_path, write(f"g3-timer/{slot}/2026-11-23-claude-code-m", _manifest("whole"),
@@ -136,7 +143,13 @@ def test_a_nested_slot_record_is_read_as_a_whole_flow_record_and_a_misplaced_or_
         _check_record_structure(tmp_path, write("g3-timer/slot-03/m", _manifest("whole"), _trial("whole")))
     with pytest.raises(AssertionError):  # the manifest says whole but the trial does not: both must say so
         _check_record_structure(tmp_path, write("g3-timer/slot-04/m", _manifest("whole"), _trial()))
-    calibration = _trial("whole", stages=(stage,), flow_digest="sha256:f", purpose="calibration")
+    with pytest.raises(AssertionError, match="in flow/axil-timer's folder"):  # a case's record in the other's folder
+        _check_record_structure(tmp_path, write("g3-timer/slot-07/m", _manifest("whole"),
+                                                whole_trial.model_copy(update={"result": whole_trial.result.model_copy(
+                                                    update={"case": "flow/axi4-lite-regs-driver"})})))
+    _check_record_structure(tmp_path, write("g3-regs-driver/slot-21/m", _manifest("whole"), whole_trial.model_copy(
+        update={"result": whole_trial.result.model_copy(update={"case": "flow/axi4-lite-regs-driver"})})))
+    calibration = _trial("whole", "flow/axil-timer", stages=(stage,), flow_digest="sha256:f", purpose="calibration")
     with pytest.raises(AssertionError, match="no calibration record"):  # the measured run is no slot
         _check_record_structure(tmp_path, write("g3-timer/slot-05/m", _manifest("whole"), calibration))
     with pytest.raises(AssertionError, match="no calibration record"):
@@ -276,17 +289,19 @@ def _check_slot_reach(slot: Path, root: Path) -> bool:
 
 
 def _check_slots_reach(root: Path) -> None:
-    folders = sorted(root.glob("g3-timer/*"))
-    numbered = {}
-    for slot in folders:
-        match = SLOT_FOLDER.fullmatch(slot.name)
-        assert slot.is_dir() and match, f"{slot.relative_to(root)}: not a slot folder"
-        numbered[int(match.group(1))] = _check_slot_reach(slot, root)
-    with_record = sorted(n for n, has in numbered.items() if has)
-    assert with_record == list(range(1, len(with_record) + 1)), "the slots with a record run from 01 with none missing"
-    without = sorted(n for n, has in numbered.items() if not has)
-    assert without in ([], [len(with_record) + 1]), (
-        "only the highest slot folder may hold reach records and no record")
+    for batch, (_, first) in BATCHES.items():  # each case's slots, numbered as the plan's section 10 numbers them
+        numbered = {}
+        for slot in sorted(root.glob(f"{batch}/*")):
+            match = SLOT_FOLDER.fullmatch(slot.name)
+            assert slot.is_dir() and match, f"{slot.relative_to(root)}: not a slot folder"
+            assert first <= int(match.group(1)) < first + 20, f"{slot.relative_to(root)}: not a slot of {batch}"
+            numbered[int(match.group(1))] = _check_slot_reach(slot, root)
+        with_record = sorted(n for n, has in numbered.items() if has)
+        assert with_record == list(range(first, first + len(with_record))), (
+            f"{batch}: the slots with a record run from {first:02d} with none missing")
+        without = sorted(n for n, has in numbered.items() if not has)
+        assert without in ([], [first + len(with_record)]), (
+            f"{batch}: only the highest slot folder may hold reach records and no record")
 
 
 def test_every_committed_timer_slot_has_its_reach_folders_and_its_record_on_their_commit():
@@ -330,9 +345,10 @@ def _run(slot: Path, run: str, *, wrote: bool, jobs=("trials", "rejudge"), head:
     return folder
 
 
-def _slot(tmp_path: Path, n: int = 1, *, record: bool = True, rejudged: bool = True, head: str = SHA) -> Path:
+def _slot(tmp_path: Path, n: int = 1, *, record: bool = True, rejudged: bool = True, head: str = SHA,
+          batch: str = "g3-timer") -> Path:
     """A synthetic slot folder with one recording run (111) and, if asked, its record."""
-    slot = tmp_path / "g3-timer" / f"slot-{n:02d}"
+    slot = tmp_path / batch / f"slot-{n:02d}"
     if record:
         folder = slot / "2026-11-23-claude-code-m"
         folder.mkdir(parents=True)
@@ -369,6 +385,17 @@ def test_slots_whose_reach_folders_hold_every_check_pass(tmp_path):
     shutil.rmtree(tmp_path / "g3-timer" / "slot-04")
     _run(tmp_path / "g3-timer" / "slot-04", "95", wrote=False, jobs=("trials",), cause="exit 4, a fingerprint mismatch")
     _check_slots_reach(tmp_path)
+    # The register block's slots are numbered from 21 in their own folder, under the same checks.
+    _slot(tmp_path, 21, batch="g3-regs-driver")
+    _slot(tmp_path, 22, record=False, batch="g3-regs-driver")
+    _check_slots_reach(tmp_path)
+    for n, match in ((24, "run from 21 with none missing"), (1, "not a slot of g3-regs-driver")):
+        shutil.rmtree(tmp_path / "g3-regs-driver" / "slot-22")
+        _slot(tmp_path, n, batch="g3-regs-driver")
+        with pytest.raises(AssertionError, match=match):
+            _check_slots_reach(tmp_path)
+        shutil.rmtree(tmp_path / "g3-regs-driver" / f"slot-{n:02d}")
+        _slot(tmp_path, 22, record=False, batch="g3-regs-driver")
 
 
 @pytest.mark.parametrize("what, match", [
@@ -550,39 +577,60 @@ def test_a_slot_record_whose_manifest_holds_no_times_is_refused(tmp_path):
 
 # --- The plan's per-stage values (gate WF28; fifth addendum, decision F3, item 1) ----------------------------------
 #
-# A dated addition to the plan states, for each arm of the timer, every stage's skills and skill digests and the digest
-# over the first n stages. A later dated addition may state a table again, which then replaces the earlier one for that
-# arm. The stated values must give the stated digests with `flow_digest`, and the digest over every stage must be the
-# arm's flow digest in the latest table of the plan that states it.
+# A dated addition to the plan states, for each arm of each case, every stage's skills and skill digests and the digest
+# over the first n stages (the timer's before slot 1; the register block's before slot 21, fifth addendum, decision F4,
+# item 2). A later dated addition may state a table again, which then replaces the earlier one for that case and arm.
+# The stated values must give the stated digests with `flow_digest`, and the digest over every stage must be the arm's
+# flow digest in the latest values table of the plan that states it for that case. A values table names its case in
+# its first row (`Case, <id>, case digest`); the rows after it in the same section are that case's.
 
 PLAN = EVALS / "plans" / "2026-11-22-g3-whole-flow.md"
+TIMER_CASE, REGS_CASE = "flow/axil-timer", "flow/axi4-lite-regs-driver"
+_CASE = r"`(flow/[^`]+)`"
 _ARM = r"(with documents \(on\)|without documents \(off\))"
 _DIGEST = r"`(sha256:[0-9a-f]{64})`"
-STAGE_ROW = re.compile(rf"^\| `flow/axil-timer` \| {_ARM} \| (\d+) \| `([^`]+)` \| `([^`]+)` \| {_DIGEST} \|$")
-PREFIX_ROW = re.compile(rf"^\| `flow/axil-timer` \| {_ARM} \| (\d+) \| `([^`]+)` \| {_DIGEST} \|$")
-FLOW_ROW = re.compile(rf"^\| Flow digest, (with|without) documents \|.* {_DIGEST} \|$")
+STAGE_ROW = re.compile(rf"^\| {_CASE} \| {_ARM} \| (\d+) \| `([^`]+)` \| `([^`]+)` \| {_DIGEST} \|$")
+PREFIX_ROW = re.compile(rf"^\| {_CASE} \| {_ARM} \| (\d+) \| `([^`]+)` \| {_DIGEST} \|$")
+CASE_ROW = re.compile(rf"^\| Case, {_CASE}, case digest \|.* {_DIGEST} \|$")
+VALUE_ROW = re.compile(rf"^\| (Whole-flow fingerprint|Flow digest), (with|without) documents \|.* {_DIGEST} \|$")
 ARMS = {"with documents (on)": "with", "without documents (off)": "without"}
 
 
-def _stage_tables(text: str) -> tuple[dict, dict, dict]:
-    """The latest stage table, digest table and flow digest of each arm; a restated table is in a dated addition."""
+def _plan_values(text: str) -> dict[str, dict[str, str]]:
+    """Per case, the latest case digest, whole-flow fingerprint and flow digest of each arm the plan's values tables
+    state (keys `case digest`, `whole-flow fingerprint, with`, `flow digest, without` and so on)."""
+    values: dict[str, dict[str, str]] = {}
+    case = None
+    for line in text.splitlines():
+        if line.startswith("## "):
+            case = None
+        elif match := CASE_ROW.match(line):
+            case = match.group(1)
+            values.setdefault(case, {})["case digest"] = match.group(2)
+        elif match := VALUE_ROW.match(line):
+            assert case, f"a value row with no case row before it in its section: {line[:60]}"
+            values[case][f"{match.group(1).lower()}, {match.group(2)}"] = match.group(3)
+    return values
+
+
+def _stage_tables(text: str, case: str = TIMER_CASE) -> tuple[dict, dict, dict]:
+    """The case's latest stage table, digest table and flow digest of each arm; a restated table is in a dated
+    addition."""
     stages: dict[str, dict[int, tuple[str, dict[str, str]]]] = {}
     prefixes: dict[str, dict[int, tuple[str, str]]] = {}
-    flows: dict[str, str] = {}
+    values = _plan_values(text).get(case, {})
+    flows = {arm: values[f"flow digest, {arm}"] for arm in ARMS.values() if f"flow digest, {arm}" in values}
     section, dated, seen = 0, False, {}
     for line in text.splitlines():
         if line.startswith("## "):
             section, dated = section + 1, "Dated addition" in line
             continue
-        if match := FLOW_ROW.match(line):
-            flows[match.group(1)] = match.group(2)
-            continue
         match, kind = STAGE_ROW.match(line), "stages"
         if not match:
             match, kind = PREFIX_ROW.match(line), "prefixes"
-        if not match:
+        if not match or match.group(1) != case:
             continue
-        arm, n = ARMS[match.group(1)], int(match.group(2))
+        arm, n = ARMS[match.group(2)], int(match.group(3))
         table = stages if kind == "stages" else prefixes
         if seen.get((kind, arm), section) != section:
             assert dated, f"the {kind} table of the {arm}-documents arm is stated again outside a dated addition"
@@ -590,18 +638,18 @@ def _stage_tables(text: str) -> tuple[dict, dict, dict]:
         seen[(kind, arm)] = section
         rows = table.setdefault(arm, {})
         if kind == "stages":
-            name, skills = rows.setdefault(n, (match.group(3), {}))
-            assert name == match.group(3), f"{arm}: stage {n} is named {name!r} and {match.group(3)!r}"
-            assert match.group(4) not in skills, f"{arm}: stage {n} states skill {match.group(4)!r} twice"
-            skills[match.group(4)] = match.group(5)
+            name, skills = rows.setdefault(n, (match.group(4), {}))
+            assert name == match.group(4), f"{arm}: stage {n} is named {name!r} and {match.group(4)!r}"
+            assert match.group(5) not in skills, f"{arm}: stage {n} states skill {match.group(5)!r} twice"
+            skills[match.group(5)] = match.group(6)
         else:
             assert n not in rows, f"{arm}: the digest over the first {n} stages is stated twice"
-            rows[n] = (match.group(3), match.group(4))
+            rows[n] = (match.group(4), match.group(5))
     return stages, prefixes, flows
 
 
-def _check_stage_tables(text: str, exercised: dict) -> None:
-    stages, prefixes, flows = _stage_tables(text)
+def _check_stage_tables(text: str, exercised: dict, case: str = TIMER_CASE) -> None:
+    stages, prefixes, flows = _stage_tables(text, case)
     for arm in ARMS.values():
         st, pr = stages.get(arm), prefixes.get(arm)
         assert st and pr, f"the {arm}-documents arm has no stage table or no digest table"
@@ -616,44 +664,91 @@ def _check_stage_tables(text: str, exercised: dict) -> None:
         assert pr[count[-1]][1] == flows.get(arm), f"{arm}: the digest over every stage is not the arm's flow digest"
 
 
-def test_the_plan_states_each_stage_of_the_timer_and_its_digests_give_the_stated_flow_digests():
-    timer = {c.id: c for c in load_cases(EVALS, flow="whole")}["flow/axil-timer"]
-    _check_stage_tables(PLAN.read_text(encoding="utf-8"), {s: list(k) for s, k in timer.exercised.items()})
+def _exercised(case_id: str) -> dict[str, list[str]]:
+    case = {c.id: c for c in load_cases(EVALS, flow="whole")}[case_id]
+    return {stage: list(skills) for stage, skills in case.exercised.items()}
 
 
-def _tables(rows: dict, flows: dict, stages=None) -> str:
-    """A plan-like text with one dated addition holding both tables for both arms."""
-    lines = ["## 1. Values", *(f"| Flow digest, {arm} documents | `{d}` |" for arm, d in flows.items()),
+def _committed_slot_trials(root: Path) -> list[tuple[Path, int, dict]]:
+    """Every trial of every committed whole-flow record under ``root``, with the slot its folder names."""
+    found = []
+    for manifest in sorted(root.rglob("manifest.json")):
+        if json.loads(manifest.read_text(encoding="utf-8")).get("flow") != "whole":
+            continue
+        slot = next((int(m.group(1)) for part in manifest.parts if (m := SLOT_FOLDER.fullmatch(part))), None)
+        for path in sorted(manifest.parent.glob("*/trial-*.json")):
+            found.append((path, slot, json.loads(path.read_text(encoding="utf-8"))))
+    return found
+
+
+@pytest.mark.parametrize("case_id", [TIMER_CASE, REGS_CASE])
+def test_the_plan_states_each_stage_of_each_case_and_its_digests_give_the_stated_flow_digests(case_id):
+    """The timer's tables are stated (gate WF28). The register block's are checked the same way once stated, and no
+    record of a case whose tables the plan does not state may be committed (wave 2 close, decision M7, item 2)."""
+    text = PLAN.read_text(encoding="utf-8")
+    stages, prefixes, _ = _stage_tables(text, case_id)
+    if not stages and not prefixes and case_id != TIMER_CASE:
+        recorded = [p for p, _, t in _committed_slot_trials(EVALS / "results") if t["result"]["case"] == case_id]
+        assert not recorded, f"the plan states no stage tables for {case_id}, yet its records are committed: {recorded}"
+        return
+    _check_stage_tables(text, _exercised(case_id), case_id)
+
+
+def _tables(rows: dict, flows: dict, stages=None, case: str = TIMER_CASE, values: dict | None = None) -> str:
+    """A plan-like text with a values table and one dated addition holding both tables for both arms."""
+    values = values or {}
+    lines = ["## 1. Values", f"| Case, `{case}`, case digest | `{values.get('case digest', 'sha256:' + '9' * 64)}` |",
+             *(f"| Whole-flow fingerprint, {arm} documents | `{values[f'whole-flow fingerprint, {arm}']}` |"
+               for arm in ARMS.values() if f"whole-flow fingerprint, {arm}" in values),
+             *(f"| Flow digest, {arm} documents | `{d}` |" for arm, d in flows.items()),
              "## 2. Dated addition (2026-11-24): stages", "| Case | Arm | n | Stage | Skill | Skill digest |"]
-    order = list(stages or EXERCISED)
+    order = list(stages or rows["with"])
     for words, arm in ARMS.items():
         for n, stage in enumerate(order, start=1):
-            lines += [f"| `flow/axil-timer` | {words} | {n} | `{stage}` | `{skill}` | `{rows[arm][stage][skill]}` |"
+            lines += [f"| `{case}` | {words} | {n} | `{stage}` | `{skill}` | `{rows[arm][stage][skill]}` |"
                       for skill in sorted(rows[arm][stage])]
     lines.append("| Case | Arm | n | Last stage | Digest over the first n stages |")
     for words, arm in ARMS.items():
         for n, stage in enumerate(order, start=1):
             digest = flow_digest({s: rows[arm][s] for s in order[:n]})
-            lines.append(f"| `flow/axil-timer` | {words} | {n} | `{stage}` | `{digest}` |")
+            lines.append(f"| `{case}` | {words} | {n} | `{stage}` | `{digest}` |")
     return "\n".join(lines) + "\n"
 
 
-def _synthetic():
+def _synthetic(exercised: dict = EXERCISED):
     rows = {arm: {stage: {skill: "sha256:" + hashlib.sha256(f"{arm}{skill}".encode()).hexdigest() for skill in skills}
-                  for stage, skills in EXERCISED.items()} for arm in ARMS.values()}
+                  for stage, skills in exercised.items()} for arm in ARMS.values()}
     return rows, {arm: flow_digest(rows[arm]) for arm in ARMS.values()}
 
 
-def test_stage_tables_whose_digests_follow_from_their_values_pass():
-    rows, flows = _synthetic()
-    text = _tables(rows, flows)
-    _check_stage_tables(text, EXERCISED)
+@pytest.mark.parametrize("case_id", [TIMER_CASE, REGS_CASE])
+def test_stage_tables_whose_digests_follow_from_their_values_pass(case_id):
+    exercised = EXERCISED if case_id == TIMER_CASE else _exercised(case_id)
+    rows, flows = _synthetic(exercised)
+    text = _tables(rows, flows, case=case_id)
+    _check_stage_tables(text, exercised, case_id)
     # A later dated addition may state the tables again; the latest rules.
-    later = {arm: {stage: {skill: "sha256:" + "0" * 64 for skill in skills} for stage, skills in EXERCISED.items()}
+    later = {arm: {stage: {skill: "sha256:" + "0" * 64 for skill in skills} for stage, skills in exercised.items()}
              for arm in ARMS.values()}
-    again = _tables(later, {arm: flow_digest(later[arm]) for arm in ARMS.values()}).replace("## 1.", "## 3.").replace(
-        "## 2. Dated addition", "## 4. Dated addition")
-    _check_stage_tables(text + again, EXERCISED)
+    again = _tables(later, {arm: flow_digest(later[arm]) for arm in ARMS.values()}, case=case_id).replace(
+        "## 1.", "## 3.").replace("## 2. Dated addition", "## 4. Dated addition")
+    _check_stage_tables(text + again, exercised, case_id)
+
+
+def test_one_case_s_tables_and_values_are_never_read_as_the_other_s():
+    """Both cases in one plan: each case's tables are its own, and each flow digest is read from its own case's values
+    table, so the timer's four stages never stand for the register block's five, nor its digests for theirs."""
+    regs = _exercised(REGS_CASE)
+    timer_text = _tables(*_synthetic(EXERCISED))
+    regs_text = _tables(*_synthetic(regs), case=REGS_CASE).replace("## 1.", "## 3.").replace("## 2.", "## 4.")
+    for text in (timer_text + regs_text, regs_text + timer_text):
+        _check_stage_tables(text, EXERCISED, TIMER_CASE)
+        _check_stage_tables(text, regs, REGS_CASE)
+    assert _stage_tables(timer_text, REGS_CASE) == ({}, {}, {})  # no fall back to the timer's
+    with pytest.raises(AssertionError, match="no stage table"):
+        _check_stage_tables(timer_text, regs, REGS_CASE)
+    with pytest.raises(AssertionError, match="no case row before it"):
+        _plan_values("## 1. Values\n| Flow digest, with documents | `sha256:" + "0" * 64 + "` |\n")
 
 
 @pytest.mark.parametrize("what, match", [
@@ -683,12 +778,190 @@ def test_stage_tables_that_do_not_give_their_digests_are_refused(what, match):
     elif what == "an arm missing":
         text = "\n".join(line for line in lines if "without documents (off)" not in line) + "\n"
     elif what == "the tables stated again outside a dated addition":
-        text = text + "## 3. Not dated\n" + "\n".join(lines[4:]) + "\n"
+        start = next(i for i, line in enumerate(lines) if line.startswith("## 2.")) + 1
+        text = text + "## 3. Not dated\n" + "\n".join(lines[start:]) + "\n"
     elif what == "a stage out of order":
         text = _tables(rows, flows, stages=["interface-spec", "requirements", "microarchitecture",
                                             "rtl-implementation"])
     with pytest.raises(AssertionError, match=match):
         _check_stage_tables(text, EXERCISED)
+
+
+# --- Every committed slot record against the plan (fifth addendum, decision F3, item 3; wave 2 close, decision M7) ---
+#
+# The check the plan's section 24.2 states in words, made here on every committed slot record so that it controls what
+# merges: every comparison made before decision F3 (case and arm of the slot, purpose, flow label, harness variant, case
+# digest, fingerprint, CLI), and in place of the one flow digest comparison its four items, against the latest tables
+# the plan states for the record's case and arm. A record whose case has no stage tables in the plan is refused, with
+# no fall back to another case's. It runs in the ordinary test job: no secret, no dispatch.
+
+SLOT_ROW = re.compile(r"^\| (\d+) \| (flow/[^ |]+) \| (?:with|without) documents \((on|off)\) \|$", re.M)
+CLI_PIN = re.compile(r"Claude Code (\d+\.\d+\.\d+), the pin")
+KNOWLEDGE = {"on": "with", "off": "without"}
+NOT_RUN, COMPLETED = "not run", "completed"
+
+
+def _slot_record_problems(trial: dict, slot: int | None, text: str) -> list[str]:
+    """Why a slot record does not meet the check of decision F3, item 3 against the plan ``text``, or []."""
+    result = trial.get("result") or {}
+    case, arm = result.get("case"), KNOWLEDGE.get(trial.get("knowledge"))
+    planned = {int(n): (c, KNOWLEDGE[k]) for n, c, k in SLOT_ROW.findall(text)}
+    if (case, arm) != planned.get(slot):
+        return [f"case {case!r} and arm {arm!r}, planned for slot {slot}: {planned.get(slot)!r}"]
+    stages_t, prefixes_t, _ = _stage_tables(text, case)
+    plan, prefixes = stages_t.get(arm), prefixes_t.get(arm)
+    if not plan or not prefixes:
+        return [f"the plan states no stage tables for {case}, arm {arm} documents"]
+    plan = [plan[n] for n in sorted(plan)]
+    prefixes = [prefixes[n][1] for n in sorted(prefixes)]
+    values, cli = _plan_values(text).get(case, {}), CLI_PIN.search(text)
+    want = {"purpose": (trial.get("purpose"), "evidence"), "flow label": (trial.get("flow"), "whole"),
+            "harness variant": (trial.get("harness_variant"), "default"),
+            "case digest": (result.get("case_digest"), values.get("case digest")),
+            "fingerprint": (result.get("harness"), values.get(f"whole-flow fingerprint, {arm}")),
+            "CLI": (result.get("cli"), cli.group(1) if cli else None), "replay": (result.get("replay"), False)}
+    out = [f"{k} {got!r}, planned {exp!r}" for k, (got, exp) in want.items() if got != exp or exp is None]
+    stages = [st if isinstance(st, dict) else {} for st in trial.get("stages") or []]
+    # 1. The stage names, in order.
+    if [st.get("stage") for st in stages] != [name for name, _ in plan]:
+        out.append(f"stage names {[st.get('stage') for st in stages]!r}, planned {[name for name, _ in plan]!r}")
+    # 2. The seated stages first; every later one "not run" with nothing done; a stop after an incomplete stage.
+    seated = next((i for i, st in enumerate(stages) if st.get("status") == NOT_RUN), len(stages))
+    for st in stages[seated:]:
+        if st.get("status") != NOT_RUN:
+            out.append(f"stage {st.get('stage')!r} is {st.get('status')!r} after a stage not run")
+        done = [k for k in ("skills", "attempts", "model_calls", "gate_runs") if st.get(k)]
+        if done:
+            out.append(f"stage {st.get('stage')!r} is not run but records {', '.join(done)}")
+    if seated < len(stages):
+        if not seated:
+            out.append("no stage was seated")
+        out += [f"stage {st.get('stage')!r} is {st.get('status')!r} before the last seated stage"
+                for st in stages[:max(seated - 1, 0)] if st.get("status") != COMPLETED]
+        if seated and stages[seated - 1].get("status") == COMPLETED:
+            out.append(f"stage {stages[seated - 1].get('stage')!r} completed, yet the next stage was not run")
+    # 3. Each seated stage's skills and digests, exactly.
+    for i, st in enumerate(stages[:seated]):
+        expected = plan[i][1] if i < len(plan) else None
+        if st.get("skills") != expected:
+            out.append(f"stage {st.get('stage')!r} skills {st.get('skills')!r}, planned {expected!r}")
+    # 4. The flow digest: recomputed from its own seated stages, and the plan's over that many stages.
+    got = trial.get("flow_digest")
+    mine = flow_digest({st.get("stage"): st.get("skills") or {} for st in stages[:seated]})
+    if got != mine:
+        out.append(f"flow digest {got!r}, recomputed from the record's seated stages {mine!r}")
+    if got != (prefixes[seated - 1] if 0 < seated <= len(prefixes) else None):
+        out.append(f"flow digest {got!r} is not the plan's digest over the first {seated} stages")
+    return out
+
+
+def test_every_committed_slot_record_meets_the_check_of_decision_f3():
+    text = PLAN.read_text(encoding="utf-8")
+    found = _committed_slot_trials(EVALS / "results")
+    assert len(found) >= 20  # the timer's twenty slots are committed
+    for path, slot, trial in found:
+        assert not _slot_record_problems(trial, slot, text), (path, _slot_record_problems(trial, slot, text))
+
+
+def _committed(slot: int) -> dict:
+    [(_, _, trial)] = [f for f in _committed_slot_trials(EVALS / "results" / "g3-timer" / f"slot-{slot:02d}")]
+    return trial
+
+
+def _seated(trial: dict) -> list[int]:
+    return [i for i, st in enumerate(trial["stages"]) if st["status"] != NOT_RUN]
+
+
+def _skill_digest_changed(t):
+    skills = t["stages"][_seated(t)[0]]["skills"]
+    skills[sorted(skills)[0]] = "sha256:" + "0" * 64
+
+
+def _skills_removed(t):
+    t["stages"][_seated(t)[-1]]["skills"] = {}
+
+
+def _seated_after_not_run(t):
+    t["stages"][0].update(status=NOT_RUN, skills={}, attempts=0, model_calls=0, gate_runs=[])
+
+
+def _flow_digest_changed(t):
+    t["flow_digest"] = "sha256:" + "1" * 64
+
+
+#: Decision F3, item 5: the copies of a record the check must refuse, each for the change made to it.
+REFUSED_COPIES = {"a stage's skill digest changed": (_skill_digest_changed, "skills"),
+                  "a stage's skills removed": (_skills_removed, "skills {}"),
+                  "a seated stage after a stage not run": (_seated_after_not_run, "after a stage not run"),
+                  "the flow digest changed": (_flow_digest_changed, "flow digest 'sha256:1111")}
+
+
+def test_a_stopped_slot_record_is_accepted_and_each_copy_of_decision_f3_item_5_is_refused():
+    text = PLAN.read_text(encoding="utf-8")
+    stopped = _committed(4)  # slot 4: its flow stopped at the microarchitecture stage, a failed trial of its slot
+    assert [st["status"] for st in stopped["stages"]][-1] == NOT_RUN
+    assert _slot_record_problems(stopped, 4, text) == []
+    assert _slot_record_problems(stopped, 3, text)  # the slot of the other arm: refused
+    for what, (edit, match) in REFUSED_COPIES.items():
+        copy = json.loads(json.dumps(stopped))
+        edit(copy)
+        problems = _slot_record_problems(copy, 4, text)
+        assert any(match in p for p in problems), (what, problems)
+    full = _committed(3)  # a flow that seated every stage: the same copies are refused
+    assert _slot_record_problems(full, 3, text) == []
+    for what, (edit, match) in REFUSED_COPIES.items():
+        copy = json.loads(json.dumps(full))
+        edit(copy)
+        assert _slot_record_problems(copy, 3, text), what
+
+
+def _regs_plan() -> tuple[str, dict, dict]:
+    """The plan with a synthetic dated addition for the register block: both tables of both arms and its values."""
+    rows, flows = _synthetic(_exercised(REGS_CASE))
+    values = {"case digest": "sha256:" + "c" * 64, "whole-flow fingerprint, with": "sha256:" + "a" * 64,
+              "whole-flow fingerprint, without": "sha256:" + "b" * 64}
+    addition = _tables(rows, flows, case=REGS_CASE, values=values).replace("## 1. Values", "## 90. Dated addition "
+                                                                             "(test): the register block's values")
+    return PLAN.read_text(encoding="utf-8") + addition.replace("## 2. Dated addition", "## 91. Dated addition"), rows, \
+        values
+
+
+def _regs_trial(rows: dict, values: dict, arm: str, statuses: list[str]) -> dict:
+    """A register block slot record of the given arm and stage statuses, as record_run writes one."""
+    words = KNOWLEDGE[arm]
+    stages = [{"stage": stage, "status": status,
+               **({"skills": {}, "attempts": 0, "model_calls": 0, "gate_runs": []} if status == NOT_RUN else
+                  {"skills": dict(rows[words][stage]), "attempts": 1, "model_calls": 1, "gate_runs": []})}
+              for stage, status in zip(rows[words], statuses)]
+    digest = flow_digest({st["stage"]: st["skills"] for st in stages if st["status"] != NOT_RUN})
+    return {"flow": "whole", "knowledge": arm, "purpose": "evidence", "harness_variant": "default",
+            "flow_digest": digest, "stages": stages,
+            "result": {"case": REGS_CASE, "case_digest": values["case digest"], "cli": "2.1.325", "replay": False,
+                       "harness": values[f"whole-flow fingerprint, {words}"]}}
+
+
+def test_a_register_block_record_is_checked_against_its_own_tables_including_the_firmware_stage():
+    """The register block's five stages, on synthetic tables: a full flow and a flow stopped at the RTL stage are
+    accepted; item 5's copies and firmware-engineer's two (the firmware stage's skill digest changed, and the firmware
+    stage not run after a completed RTL stage) are refused; and without its tables the record is refused."""
+    text, rows, values = _regs_plan()
+    full = _regs_trial(rows, values, "on", [COMPLETED] * 4 + ["in_review"])
+    stopped = _regs_trial(rows, values, "off", [COMPLETED] * 3 + ["escalated", NOT_RUN])
+    assert _slot_record_problems(full, 21, text) == [] and _slot_record_problems(stopped, 22, text) == []
+    for what, (edit, match) in REFUSED_COPIES.items():
+        copy = json.loads(json.dumps(stopped))
+        edit(copy)
+        assert any(match in p for p in _slot_record_problems(copy, 22, text)), what
+    firmware = json.loads(json.dumps(full))
+    firmware["stages"][4]["skills"]["device_drivers"] = "sha256:" + "0" * 64
+    assert any("stage 'firmware' skills" in p for p in _slot_record_problems(firmware, 21, text))
+    after_rtl = _regs_trial(rows, values, "on", [COMPLETED] * 4 + [NOT_RUN])
+    assert any("'rtl-implementation' completed, yet the next stage was not run" in p
+               for p in _slot_record_problems(after_rtl, 21, text))
+    untabled = "\n".join(line for line in text.splitlines() if not line.startswith(f"| `{REGS_CASE}` |"))
+    assert _slot_record_problems(full, 21, untabled) == [
+        f"the plan states no stage tables for {REGS_CASE}, arm with documents"]
+    assert _slot_record_problems(full, 1, text)  # a timer slot: refused
 
 
 # --- Default case sets never hold a whole-flow case -----------------------------------------------------------
