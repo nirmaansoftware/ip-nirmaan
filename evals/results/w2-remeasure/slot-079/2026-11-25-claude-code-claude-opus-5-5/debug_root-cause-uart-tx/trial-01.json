@@ -1,0 +1,197 @@
+{
+  "answers": [
+    {
+      "cache_read_tokens": 8053,
+      "cache_write_tokens": 314,
+      "error": null,
+      "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+      "input_tokens": 2,
+      "mode": "work",
+      "model": "claude-opus-5-5",
+      "output_tokens": 5369,
+      "packet_sha256": "9cfe5fa1a0dd82cee9dcd4668f76edd292fe2c6b1407f726b84a8d82d8c966ff",
+      "prompt_sha256": "f37e72f1fd1115e7ffaf57f76d37558da536a4b68f7c6ce10f40268a7179e043",
+      "provider": "claude-code",
+      "text": "```json\n{\"uncertainty\": 0.2, \"outcome\": \"rtl_bug\", \"artifacts\": [{\"kind\": \"root_cause_analysis\", \"title\": \"Root cause of the failing uart_tx regression test: the data holding register reloads while a frame is in flight\", \"summary\": \"Requirement [requirement:req-d10c4df532]. Inputs: the approved RTL [artifact:prj-d4a591eb4b.design-under-investigation.a1], reviewed per [evidence:prj-d4a591eb4b.design-under-investigation.e1]. Triage evidence: [evidence:prj-d4a591eb4b.triage.e1] ([run:run-0001]) classified the log as unknown_failure at 30% confidence, with 'Likely RTL bug' as the top hypothesis. I treat that as one candidate only. [evidence:prj-d4a591eb4b.triage.e2] ([run:run-0002]) records the triage repro reaching $finish with 1 of 4 checks failed.\\n\\nDEFECT (from reading the source). The module header in [artifact:prj-d4a591eb4b.design-under-investigation.a1] states: 'A start pulse while a frame is in flight is ignored.' The always block contains an unconditional `if (start) hold <= data;` placed before the state case. It therefore updates `hold` in every state, including START, DATA and STOP. The IDLE branch already loads `hold` on start, so the outer statement is redundant in IDLE and wrong everywhere else.\\n\\nCAUSALITY. A start pulse during DATA overwrites `hold`. The later bits are driven from `tx <= hold[bit_idx + 3'd1]`, so the remaining data bits of the frame in flight come from the new byte. The frame on the wire becomes a mix of two bytes. A check of the serial bits against the originally requested byte fails at the first bit position where the two bytes differ.\\n\\nINCORRECTNESS. The header clause names the required behaviour: the pulse is ignored. Any correct implementation must latch `data` only when IDLE accepts the start.\\n\\nFIX DIRECTION, not applied here. Remove the outer `if (start) hold <= data;` and keep the load inside IDLE.\\n\\nRANKED HYPOTHESES, with the evidence that would refute each:\\n(1) rtl_bug, mid-frame reload of hold. Most likely. It is refuted if the repro uart_tx_rca_repro.v gate run shows all checks passing on [artifact:prj-d4a591eb4b.design-under-investigation.a1]. It is also refuted if the frame without an injected start fails too, which would point elsewhere.\\n(2) testbench_bug, a wrong expected value in the regression or triage checks. Ranked lower because the defect above is visible in the source independently of any check. My repro derives its expected bits from the header clause, not from RTL output. It is refuted as the sole cause if the new repro also fails only on the frame with a mid-frame start.\\n(3) infrastructure. Ranked lowest. [evidence:prj-d4a591eb4b.triage.e2] shows a build that reached $finish and produced a counted verdict, which is not the signature of a tool or build fault. It would be supported if a clean rebuild changed the result with no source change; that experiment is not recorded.\\n(4) spec_ambiguity. Rejected. The header clause explicitly fixes the behaviour for a start pulse while busy, so the expected value is not open to interpretation. It would be revived only if a governing specification outside this file contradicted the header; none is given to me.\\n\\nREPRO. The repro is uart_tx_rca_repro.v, a self-checking testbench of the specified behaviour. Frame 1 sends 0x5A with no disturbance and should pass on any correct RTL. Frame 2 sends 0xA5 and pulses start with 0x3C during data bit 1. With the defect, data bits 3, 4 and 7 come out as 0x3C's bits, so frame 2 should fail. Without the defect, frame 2 should pass. Whether it actually fails on the approved RTL is for the platform's simulator.run gate to establish; I report no such run.\"}], \"files\": [{\"path\": \"uart_tx_rca_repro.v\", \"kind\": \"testbench\", \"title\": \"Self-checking repro: a start pulse during a frame must be ignored\", \"summary\": \"Repro for the defect diagnosed in [artifact:prj-d4a591eb4b.design-under-investigation.a1]. It instantiates uart_tx with CLKS_PER_BIT=4 and samples tx at mid-bit for 10 bit periods per frame. It checks the start bit, the 8 data bits sent LSB first, and the stop bit, plus busy at mid-frame and after the frame.\\n\\nFrame 1 sends 0x5A with no disturbance. Frame 2 sends 0xA5 with a one-cycle start pulse carrying 0x3C during data bit 1. All expected values come from the header clause that a start pulse while a frame is in flight is ignored.\\n\\nIt reads +nirmaan_nonce and prints exactly one NIRMAAN-SIM verdict line before $finish. A watchdog also ends the run with a single verdict if the test hangs. It serves [requirement:req-d10c4df532].\", \"entry\": \"uart_tx_rca_repro\"}], \"tool_runs\": [\"run:run-0001\", \"run:run-0002\"], \"claims\": [\"Reading of the RTL source: the unconditional 'if (start) hold <= data;' outside the state case reloads hold during START/DATA/STOP, contradicting the header clause.\", \"Expected (not observed): uart_tx_rca_repro.v fails frame 2 at data bits 3, 4 and 7 on the approved RTL and passes all checks on RTL with the outer reload removed.\", \"No clean-rebuild experiment for the infrastructure hypothesis is recorded; its rejection rests on the triage run reaching $finish with a counted verdict.\", \"I did not see the content of the upstream triage testbench uart_tx_triage_repro.v or regression_fail.log, so I cannot confirm that its single failed check is the same mid-frame reload symptom.\"], \"escalation\": null, \"notes\": \"Independent review is still required (review_record) and has not happened for this work. The repro gate result must come from the platform's simulator.run run with expect=fail. Uncertainty is held at 0.2 mainly because I have not seen the regression log or the triage testbench, so I cannot tie the regression's specific failed check to this defect beyond inference.\"}\n```\n=== FILE: uart_tx_rca_repro.v ===\n// Root-cause repro for uart_tx: a start pulse while a frame is in flight\n// must be ignored (8N1, LSB first, CLKS_PER_BIT clocks per bit).\n`timescale 1ns / 1ps\nmodule uart_tx_rca_repro;\n    localparam integer CPB = 4;\n\n    reg        clk = 1'b0;\n    reg        rst = 1'b1;\n    reg        start = 1'b0;\n    reg  [7:0] data = 8'h00;\n    wire       tx;\n    wire       busy;\n\n    reg [8*64-1:0] nonce;\n    integer passed = 0;\n    integer failed = 0;\n    reg     done = 1'b0;\n\n    uart_tx #(.CLKS_PER_BIT(CPB)) dut (\n        .clk(clk), .rst(rst), .start(start), .data(data),\n        .tx(tx), .busy(busy)\n    );\n\n    always #5 clk = ~clk;\n\n    task check;\n        input       got;\n        input       exp;\n        input [8*24-1:0] what;\n        begin\n            if (got === exp) begin\n                passed = passed + 1;\n            end else begin\n                failed = failed + 1;\n                $display(\"CHECK FAIL t=%0t %0s: got %b expected %b\", $time, what, got, exp);\n            end\n        end\n    endtask\n\n    // Send one frame of byte b. If inject is set, pulse start with byte\n    // other for one clock during data bit 1. Sample tx at the middle of\n    // every bit and compare it with the frame of b alone.\n    task send_frame;\n        input [7:0] b;\n        input       inject;\n        input [7:0] other;\n        integer k;\n        reg [9:0] exp_bits;\n        begin\n            exp_bits = {1'b1, b, 1'b0};  // stop, data[7:0], start (LSB first)\n            @(negedge clk);\n            data  = b;\n            start = 1'b1;\n            @(posedge clk);              // frame accepted, start bit begins\n            #1 start = 1'b0;\n            repeat (2) @(posedge clk);\n            @(negedge clk);              // middle of the start bit\n            for (k = 0; k < 10; k = k + 1) begin\n                check(tx, exp_bits[k], \"tx mid-bit\");\n                if (k == 4)\n                    check(busy, 1'b1, \"busy mid-frame\");\n                if (k < 9) begin\n                    if (inject && k == 2) begin\n                        // data bit 1 in flight: a start pulse must be ignored\n                        data  = other;\n                        start = 1'b1;\n                        @(posedge clk);\n                        #1 start = 1'b0;\n                        repeat (CPB - 1) @(posedge clk);\n                    end else begin\n                        repeat (CPB) @(posedge clk);\n                    end\n                    @(negedge clk);\n                end\n            end\n            // Stop bit ends; the transmitter returns to idle.\n            repeat (CPB) @(posedge clk);\n            @(negedge clk);\n            check(busy, 1'b0, \"busy after frame\");\n            check(tx, 1'b1, \"tx idle after frame\");\n        end\n    endtask\n\n    initial begin\n        if (!$value$plusargs(\"nirmaan_nonce=%s\", nonce))\n            nonce = \"none\";\n        rst = 1'b1;\n        repeat (4) @(posedge clk);\n        @(negedge clk);\n        rst = 1'b0;\n        @(negedge clk);\n        check(tx, 1'b1, \"tx idle after reset\");\n        check(busy, 1'b0, \"busy idle after reset\");\n\n        send_frame(8'h5A, 1'b0, 8'h00);  // undisturbed frame\n        repeat (3) @(posedge clk);\n        send_frame(8'hA5, 1'b1, 8'h3C);  // frame with ignored mid-frame start\n\n        if (!done) begin\n            done = 1'b1;\n            $display(\"NIRMAAN-SIM %0s %0d passed, %0d failed\", nonce, passed, failed);\n            $finish;\n        end\n    end\n\n    initial begin\n        #20000;\n        if (!done) begin\n            done = 1'b1;\n            failed = failed + 1;\n            $display(\"CHECK FAIL watchdog timeout\");\n            $display(\"NIRMAAN-SIM %0s %0d passed, %0d failed\", nonce, passed, failed);\n            $finish;\n        end\n    end\nendmodule\n=== END FILE ==="
+    },
+    {
+      "cache_read_tokens": 620,
+      "cache_write_tokens": 9482,
+      "error": null,
+      "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+      "input_tokens": 2,
+      "mode": "work",
+      "model": "claude-opus-5-5",
+      "output_tokens": 4488,
+      "packet_sha256": "d2e5d898de97564771ed31ff0cb1c67a9259c4677ffd8e8018d7b3bf01f4dbb0",
+      "prompt_sha256": "77d17d27330b4cf5224dee4113581e828ec57740787bbb57b35884b8b244e363",
+      "provider": "claude-code",
+      "text": "{\"uncertainty\": 0.15, \"outcome\": \"rtl_bug\", \"artifacts\": [{\"kind\": \"root_cause_analysis\", \"title\": \"Root cause of the failing uart_tx regression test: hold register reloaded while a frame is in flight\", \"summary\": \"Requirement [requirement:req-d10c4df532]. Design under investigation: [artifact:prj-d4a591eb4b.design-under-investigation.a1] (uart_tx_reload_while_busy.v). Its header states that a start pulse while a frame is in flight is ignored.\\n\\nObserved: triage recorded the failure as reproduced, with 1 of 4 checks failed and $finish reached at time 546000 ([evidence:prj-d4a591eb4b.triage.e2], [run:run-0002]). VeriTriage classified the log as unknown_failure at 30% confidence, with top hypothesis 'Likely RTL bug' ([evidence:prj-d4a591eb4b.triage.e1], [run:run-0001]). Because that confidence is low, I treat the hypothesis as one candidate, not a conclusion.\\n\\nDefect: inside the non-reset branch, the statement `if (start) hold <= data;` sits before the case statement and does not test the state. So in START, DATA or STOP, a start pulse overwrites the holding register.\\n\\nCausality: in DATA, each new bit is driven from `hold[bit_idx + 3'd1]`. After the reload, the remaining data bits come from the new byte, not the byte that was accepted. That is the fault, and it shows up as a wrong tx level at a later mid-bit sample.\\n\\nIncorrectness: the module's own stated contract says a mid-frame start is ignored. The IDLE branch already loads hold when it accepts a frame, so the extra assignment serves no purpose and violates that contract.\\n\\nRanked hypotheses and what refutes each:\\n(1) rtl_bug (selected). Refuted if tx stays correct when start pulses mid-frame. The repro uart_tx_rca_repro.v is built to test this: frame A5 with a pulse carrying 3C during data bit 1. Under this defect, data bits 3, 4 and 7 should differ from the A5 frame.\\n(2) testbench_bug. Refuted if the expected values come from the 8N1 LSB-first frame of the accepted byte alone, not from DUT output, and if the same bench passes on RTL without the stray reload. The expected values here are taken from that frame definition.\\n(3) infrastructure. Refuted if the failure is deterministic and builds and finishes cleanly. Triage reports a build, a reached $finish and a specific failed-check count ([evidence:prj-d4a591eb4b.triage.e2]), not a tool or crash error.\\n(4) spec_ambiguity. Refuted if the behaviour is fixed by a written clause. The design header states the rule explicitly.\\n\\nRecommended fix (not made here): remove the unconditional `if (start) hold <= data;` so that hold loads only in IDLE. Also consider an assertion that hold is stable while busy.\"}], \"files\": [{\"path\": \"uart_tx_rca_repro.v\", \"kind\": \"testbench\", \"title\": \"Self-checking repro: a start pulse during a frame must be ignored\", \"summary\": \"Self-checking repro testbench for [artifact:prj-d4a591eb4b.design-under-investigation.a1], serving [requirement:req-d10c4df532].\\n\\nIt resets the DUT and checks the idle levels. It sends 5A undisturbed, then sends A5 with a one-clock start pulse carrying 3C during data bit 1. At every mid-bit it samples tx and compares it with the 8N1 frame of the accepted byte alone. It then checks busy and tx after the stop bit.\\n\\nIt counts passed and failed checks and prints the single NIRMAAN-SIM verdict with the run's nonce just before $finish. A watchdog prints the verdict instead if the run hangs.\\n\\nAgainst the stray hold reload, data bits 3, 4 and 7 of the second frame are expected to fail. An RTL that ignores mid-frame starts is expected to pass. Top module: uart_tx_rca_repro.\", \"entry\": \"uart_tx_rca_repro\"}], \"tool_runs\": [], \"claims\": [\"Tracing the code by hand, the repro predicts 3 failed checks on uart_tx_reload_while_busy.v: data bits 3, 4 and 7 of the A5 frame read from 3C. This is a prediction, not a simulation result.\", \"Removing the unconditional hold load outside the IDLE branch is expected to make the repro pass. No fixed RTL was simulated.\"], \"escalation\": null, \"notes\": \"This attempt repairs attempt 1. It lists no tool runs: run-0001 and run-0002 are cited only as triage evidence tokens, because the platform reported them as not recorded for this task. The testbench content is unchanged from the refused attempt; it was re-checked against the RTL by cycle trace. The platform runs the reproduction gate (simulator.run, expect=fail). Independent review has yet to be recorded by a different seat.\"}\n\n=== FILE: uart_tx_rca_repro.v ===\n// Root-cause repro for uart_tx: a start pulse while a frame is in flight\n// must be ignored (8N1, LSB first, CLKS_PER_BIT clocks per bit).\n`timescale 1ns / 1ps\nmodule uart_tx_rca_repro;\n    localparam integer CPB = 4;\n\n    reg        clk = 1'b0;\n    reg        rst = 1'b1;\n    reg        start = 1'b0;\n    reg  [7:0] data = 8'h00;\n    wire       tx;\n    wire       busy;\n\n    reg [8*64-1:0] nonce;\n    integer passed = 0;\n    integer failed = 0;\n    reg     done = 1'b0;\n\n    uart_tx #(.CLKS_PER_BIT(CPB)) dut (\n        .clk(clk), .rst(rst), .start(start), .data(data),\n        .tx(tx), .busy(busy)\n    );\n\n    always #5 clk = ~clk;\n\n    task check;\n        input       got;\n        input       exp;\n        input [8*24-1:0] what;\n        begin\n            if (got === exp) begin\n                passed = passed + 1;\n            end else begin\n                failed = failed + 1;\n                $display(\"CHECK FAIL t=%0t %0s: got %b expected %b\", $time, what, got, exp);\n            end\n        end\n    endtask\n\n    // Send one frame of byte b. If inject is set, pulse start with byte\n    // other for one clock during data bit 1. Sample tx at the middle of\n    // every bit and compare it with the frame of b alone.\n    task send_frame;\n        input [7:0] b;\n        input       inject;\n        input [7:0] other;\n        integer k;\n        reg [9:0] exp_bits;\n        begin\n            exp_bits = {1'b1, b, 1'b0};  // stop, data[7:0], start (LSB first)\n            @(negedge clk);\n            data  = b;\n            start = 1'b1;\n            @(posedge clk);              // frame accepted, start bit begins\n            #1 start = 1'b0;\n            repeat (2) @(posedge clk);\n            @(negedge clk);              // middle of the start bit\n            for (k = 0; k < 10; k = k + 1) begin\n                check(tx, exp_bits[k], \"tx mid-bit\");\n                if (k == 4)\n                    check(busy, 1'b1, \"busy mid-frame\");\n                if (k < 9) begin\n                    if (inject && k == 2) begin\n                        // data bit 1 in flight: a start pulse must be ignored\n                        data  = other;\n                        start = 1'b1;\n                        @(posedge clk);\n                        #1 start = 1'b0;\n                        repeat (CPB - 1) @(posedge clk);\n                    end else begin\n                        repeat (CPB) @(posedge clk);\n                    end\n                    @(negedge clk);\n                end\n            end\n            // Stop bit ends; the transmitter returns to idle.\n            repeat (CPB) @(posedge clk);\n            @(negedge clk);\n            check(busy, 1'b0, \"busy after frame\");\n            check(tx, 1'b1, \"tx idle after frame\");\n        end\n    endtask\n\n    initial begin\n        if (!$value$plusargs(\"nirmaan_nonce=%s\", nonce))\n            nonce = \"none\";\n        rst = 1'b1;\n        repeat (4) @(posedge clk);\n        @(negedge clk);\n        rst = 1'b0;\n        @(negedge clk);\n        check(tx, 1'b1, \"tx idle after reset\");\n        check(busy, 1'b0, \"busy idle after reset\");\n\n        send_frame(8'h5A, 1'b0, 8'h00);  // undisturbed frame\n        repeat (3) @(posedge clk);\n        send_frame(8'hA5, 1'b1, 8'h3C);  // frame with ignored mid-frame start\n\n        if (!done) begin\n            done = 1'b1;\n            $display(\"NIRMAAN-SIM %0s %0d passed, %0d failed\", nonce, passed, failed);\n            $finish;\n        end\n    end\n\n    initial begin\n        #20000;\n        if (!done) begin\n            done = 1'b1;\n            failed = failed + 1;\n            $display(\"CHECK FAIL watchdog timeout\");\n            $display(\"NIRMAAN-SIM %0s %0d passed, %0d failed\", nonce, passed, failed);\n            $finish;\n        end\n    end\nendmodule\n=== END FILE ==="
+    }
+  ],
+  "format": "nirmaan.eval-trial",
+  "harness_variant": "default",
+  "judge_runs": [
+    {
+      "check": "The seat's repro passes the fixed uart_tx and fails the RTL under investigation and its shift-register variant",
+      "params": {
+        "sources": [
+          "/tmp/nirmaan-eval-easwob6c/judge/check-1/must-fail-fw92dqbl/clean/uart_tx_rca_repro.v",
+          "/tmp/nirmaan-eval-easwob6c/judge/check-1/must-fail-fw92dqbl/clean/uart_tx.v"
+        ],
+        "top": "uart_tx_rca_repro"
+      },
+      "run": "run-0005",
+      "succeeded": true,
+      "summary": "icarus: simulation passed: 28 checks passed, $finish reached at time 950000, 0 errors",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The seat's repro passes the fixed uart_tx and fails the RTL under investigation and its shift-register variant",
+      "params": {
+        "sources": [
+          "/tmp/nirmaan-eval-easwob6c/judge/check-1/must-fail-fw92dqbl/mutant-1-1/uart_tx_rca_repro.v",
+          "/tmp/nirmaan-eval-easwob6c/judge/check-1/must-fail-fw92dqbl/mutant-1-1/uart_tx.v"
+        ],
+        "top": "uart_tx_rca_repro"
+      },
+      "run": "run-0006",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: the testbench reports 3 of 28 checks failed",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The seat's repro passes the fixed uart_tx and fails the RTL under investigation and its shift-register variant",
+      "params": {
+        "sources": [
+          "/tmp/nirmaan-eval-easwob6c/judge/check-1/must-fail-fw92dqbl/mutant-1-2/uart_tx_rca_repro.v",
+          "/tmp/nirmaan-eval-easwob6c/judge/check-1/must-fail-fw92dqbl/mutant-1-2/uart_tx.v"
+        ],
+        "top": "uart_tx_rca_repro"
+      },
+      "run": "run-0007",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: the testbench reports 3 of 28 checks failed",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The same repro passes a second, independent fixed implementation and fails both defective ones",
+      "params": {
+        "sources": [
+          "/tmp/nirmaan-eval-easwob6c/judge/check-2/must-fail-bqq9y8e_/clean/uart_tx_rca_repro.v",
+          "/tmp/nirmaan-eval-easwob6c/judge/check-2/must-fail-bqq9y8e_/clean/uart_tx.v"
+        ],
+        "top": "uart_tx_rca_repro"
+      },
+      "run": "run-0008",
+      "succeeded": true,
+      "summary": "icarus: simulation passed: 28 checks passed, $finish reached at time 950000, 0 errors",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The same repro passes a second, independent fixed implementation and fails both defective ones",
+      "params": {
+        "sources": [
+          "/tmp/nirmaan-eval-easwob6c/judge/check-2/must-fail-bqq9y8e_/mutant-1-1/uart_tx_rca_repro.v",
+          "/tmp/nirmaan-eval-easwob6c/judge/check-2/must-fail-bqq9y8e_/mutant-1-1/uart_tx.v"
+        ],
+        "top": "uart_tx_rca_repro"
+      },
+      "run": "run-0009",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: the testbench reports 3 of 28 checks failed",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The same repro passes a second, independent fixed implementation and fails both defective ones",
+      "params": {
+        "sources": [
+          "/tmp/nirmaan-eval-easwob6c/judge/check-2/must-fail-bqq9y8e_/mutant-1-2/uart_tx_rca_repro.v",
+          "/tmp/nirmaan-eval-easwob6c/judge/check-2/must-fail-bqq9y8e_/mutant-1-2/uart_tx.v"
+        ],
+        "top": "uart_tx_rca_repro"
+      },
+      "run": "run-0010",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: the testbench reports 3 of 28 checks failed",
+      "tool": "simulator.run"
+    }
+  ],
+  "knowledge": "on",
+  "model": "claude-opus-5-5",
+  "purpose": "evidence",
+  "record": "2026-11-25-claude-code-claude-opus-5-5",
+  "result": {
+    "attempts": 2,
+    "attestations": [],
+    "audit_ok": true,
+    "case": "debug/root-cause-uart-tx",
+    "case_digest": "sha256:9be6d4f3a142bf825f6b7a8938d836e9acec0f3ad6b69bf4cc519d4f81a9f06c",
+    "cli": "2.1.325",
+    "cost_usd": null,
+    "detail": "This attempt repairs attempt 1. It lists no tool runs: run-0001 and run-0002 are cited only as triage evidence tokens, because the platform reported them as not recorded for this task. The testbench content is unchanged from the refused attempt; it was re-checked against the RTL by cycle trace. The platform runs the reproduction gate (simulator.run, expect=fail). Independent review has yet to be recorded by a different seat.; submitted on attempt 2, after prj-d4a591eb4b:root-cause#t1",
+    "duration_s": 93.755,
+    "gate_runs": [
+      {
+        "run": "run-0003",
+        "succeeded": true,
+        "summary": "icarus: failure reproduced: the testbench reports 3 of 28 checks failed, $finish reached at time 950000",
+        "tool": "simulator.run"
+      },
+      {
+        "run": "run-0004",
+        "succeeded": true,
+        "summary": "icarus: failure reproduced: the testbench reports 3 of 28 checks failed, $finish reached at time 950000",
+        "tool": "simulator.run"
+      }
+    ],
+    "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+    "input_tokens": 4,
+    "model_calls": 2,
+    "output_tokens": 9857,
+    "passed": true,
+    "replay": false,
+    "runtime": "claude-code",
+    "sandbox": "/tmp/nirmaan-eval-easwob6c",
+    "scores": [
+      {
+        "failed_runs": [
+          "run-0006",
+          "run-0007"
+        ],
+        "name": "The seat's repro passes the fixed uart_tx and fails the RTL under investigation and its shift-register variant",
+        "runs": [
+          "run-0005"
+        ],
+        "scorer": "must-fail",
+        "status": "passed",
+        "summary": "simulator.run run-0005 passed on the clean inputs; 2 of 2 mutants failed it"
+      },
+      {
+        "failed_runs": [
+          "run-0009",
+          "run-0010"
+        ],
+        "name": "The same repro passes a second, independent fixed implementation and fails both defective ones",
+        "runs": [
+          "run-0008"
+        ],
+        "scorer": "must-fail",
+        "status": "passed",
+        "summary": "simulator.run run-0008 passed on the clean inputs; 2 of 2 mutants failed it"
+      }
+    ],
+    "seat": "prj-d4a591eb4b:root-cause",
+    "seat_status": "in_review",
+    "started_at": "2026-11-25T04:42:01.349986Z",
+    "submitted": true,
+    "tool_calls": [],
+    "version": "1.25.0"
+  },
+  "skills": {
+    "root_cause_analysis": "sha256:f4d03c138a6b5294b9837be1fff05475a5b312326df7029c2da6250b8563bc34"
+  },
+  "stage": "root-cause",
+  "trial": 1,
+  "version": 1
+}
