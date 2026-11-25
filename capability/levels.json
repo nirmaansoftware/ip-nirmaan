@@ -708,6 +708,27 @@
           ],
           "cli": "2.1.325",
           "counts": false,
+          "digest": "sha256:3e5a9675b1f975732c708689218a173566da26d28321e898616b1f79b9db9bca",
+          "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+          "lower": 0.2065,
+          "model": "claude-opus-5-5",
+          "n": 1,
+          "passed": 1,
+          "reasons": [
+            "1 trials, fewer than 5",
+            "Wilson lower bound 0.207, under 0.5"
+          ],
+          "records": [
+            "evals/results/w2-remeasure/slot-001/2026-11-25-claude-code-claude-opus-5-5"
+          ],
+          "unjudged": 0
+        },
+        {
+          "cases": [
+            "dv/equiv-gray"
+          ],
+          "cli": "2.1.325",
+          "counts": false,
           "digest": "sha256:98c09011ec8bf3f8292515da0049f217d15441840388191770aa9bfdb55a0f32",
           "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
           "lower": 0.3057,
@@ -768,6 +789,27 @@
             "evals/results/2026-11-19-claude-code-claude-opus-5-5-81"
           ],
           "unjudged": 8
+        },
+        {
+          "cases": [
+            "debug/triage-three-bugs"
+          ],
+          "cli": "2.1.325",
+          "counts": false,
+          "digest": "sha256:f94ee360df0608a5387e68952a4746f7b60c1a39ae395e3252bfd39f037d3317",
+          "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+          "lower": 0.2065,
+          "model": "claude-opus-5-5",
+          "n": 1,
+          "passed": 1,
+          "reasons": [
+            "1 trials, fewer than 5",
+            "Wilson lower bound 0.207, under 0.5"
+          ],
+          "records": [
+            "evals/results/w2-remeasure/slot-002/2026-11-25-claude-code-claude-opus-5-5"
+          ],
+          "unjudged": 0
         }
       ]
     },
