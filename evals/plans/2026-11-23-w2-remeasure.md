@@ -732,3 +732,45 @@ amendment pull request, and from slot 1 on only by a council ruling or a dated a
 | 115 | 8 | E (with documents, on) | dv/fcov-lifo4 |
 | 116 | 8 | E (with documents, on) | dv/equiv-updown |
 | 117 | 8 | N (without documents, off) | debug/root-cause-debounce |
+
+## 13. Dated addition (2026-11-25): the replays of gates W2C5 and W2C17, the start (W2C8) and the order (W2C9)
+
+This is the dated addition that section 11 asks for before slot 1. It changes no count, slot, arm, case or value:
+every value of section 6 stands as the amendment before trial 1 states it. No trial has run.
+
+**Gate W2C5.** Each of the 13 cases was replayed once (`replay=true`, `parallel=true`: the reference answer, no
+model, no token) from `main`, on the commit each run reports, which passed the dispatch check of section 7. Each
+replay passed: its `replay` and `rejudge` jobs succeeded, the reference answer passed every tool before review and
+every held-out check (every mutant failing where a check must fail), the re-judge gave the same verdict, and both
+jobs' tool reach records show every probe denied. Replays 1 to 9 ran on `57a972d8` (ip#523's merge) and 10 to 13
+on `7cde4ba6`; the dispatch check found every value of section 6 equal on both. A replay is not a trial and is not
+committed as a record.
+
+| Replay | Case | Run | Commit | Result | Tool versions the logs show | In flight at dispatch | Overlapped |
+|---|---|---|---|---|---|---|---|
+| replay-01 | `dv/equiv-gray` | [45509802665](https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45509802665) | `57a972d8` | PASS | cli 2.1.325, cocotb 2.1.0, iverilog 12.0-2build2, verilator 5.020-1, yosys 0.33-5build2 | 1 | replay-02, replay-03 |
+| replay-02 | `debug/triage-three-bugs` | [45509980228](https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45509980228) | `57a972d8` | PASS | cli 2.1.325, cocotb 2.1.0, iverilog 12.0-2build2, verilator 5.020-1, yosys 0.33-5build2 | 2 | replay-01, replay-03, replay-04 |
+| replay-03 | `rtl/apb-gpio` | [45510039472](https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45510039472) | `57a972d8` | PASS | cli 2.1.325, cocotb 2.1.0, iverilog 12.0-2build2, verilator 5.020-1, yosys 0.33-5build2 | 3 | replay-01, replay-02, replay-04 |
+| replay-04 | `dv/plan-irq-ctrl` | [45510718924](https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45510718924) | `57a972d8` | PASS | cli 2.1.325, cocotb 2.1.0, iverilog 12.0-2build2, verilator 5.020-1, yosys 0.33-5build2 | 3 | replay-02, replay-03, replay-05, replay-06 |
+| replay-05 | `dv/formal-rr-arbiter` | [45510990484](https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45510990484) | `57a972d8` | PASS | cli 2.1.325, cocotb 2.1.0, iverilog 12.0-2build2, verilator 5.020-1, yosys 0.33-5build2 | 2 | replay-04, replay-06, replay-07 |
+| replay-06 | `debug/root-cause-uart-tx` | [45511094038](https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45511094038) | `57a972d8` | PASS | cli 2.1.325, cocotb 2.1.0, iverilog 12.0-2build2, verilator 5.020-1, yosys 0.33-5build2 | 3 | replay-04, replay-05, replay-07 |
+| replay-07 | `dv/fcov-lifo4` | [45511788821](https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45511788821) | `57a972d8` | PASS | cli 2.1.325, cocotb 2.1.0, iverilog 12.0-2build2, verilator 5.020-1, yosys 0.33-5build2 | 3 | replay-05, replay-06, replay-08, replay-09 |
+| replay-08 | `dv/equiv-updown` | [45512045610](https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45512045610) | `57a972d8` | PASS | cli 2.1.325, cocotb 2.1.0, iverilog 12.0-2build2, verilator 5.020-1, yosys 0.33-5build2 | 2 | replay-07, replay-09 |
+| replay-09 | `dv/coverage-tick-timer` | [45512138746](https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45512138746) | `57a972d8` | PASS | cli 2.1.325, cocotb 2.1.0, iverilog 12.0-2build2, verilator 5.020-1, yosys 0.33-5build2 | 3 | replay-07, replay-08, replay-10, replay-11 |
+| replay-10 | `debug/triage-pwm-gen` | [45512988497](https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45512988497) | `7cde4ba6` | PASS | cli 2.1.325, cocotb 2.1.0, iverilog 12.0-2build2, verilator 5.020-1, yosys 0.33-5build2 | 2 | replay-09, replay-11, replay-12 |
+| replay-11 | `dv/cocotb-crc` | [45513076773](https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45513076773) | `7cde4ba6` | PASS | cli 2.1.325, cocotb 2.1.0, iverilog 12.0-2build2, verilator 5.020-1, yosys 0.33-5build2 | 3 | replay-09, replay-10, replay-12 |
+| replay-12 | `dv/plan-tick-timer` | [45513190881](https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45513190881) | `7cde4ba6` | PASS | cli 2.1.325, cocotb 2.1.0, iverilog 12.0-2build2, verilator 5.020-1, yosys 0.33-5build2 | 3 | replay-10, replay-11 |
+| replay-13 | `debug/root-cause-debounce` | [45514059773](https://github.com/nirmaansoftware/ip-nirmaan/actions/runs/45514059773) | `7cde4ba6` | PASS | cli 2.1.325, cocotb 2.1.0, iverilog 12.0-2build2, verilator 5.020-1, yosys 0.33-5build2 | 1 | none |
+
+**Gate W2C17.** The 13 replays were dispatched with the input `parallel`, under the width (3), the window
+and the run binding of section 3; at most 3 were in flight at once, so three were in flight at least once.
+Each run's id was bound from the dispatch response before the next dispatch. Replay-01's first runner process
+stopped one second after binding run 45509802665, when GitHub's API did not yet return the run (HTTP 404);
+nothing was cancelled, the run was not dispatched again, and the next runner process resumed and collected it.
+
+**Gate W2C8.** The batch starts on the founder's answer on usage, recorded as given: Founder, in session, 2026-11-23T06:15Z: "yes, run the re-measure batch in CI". Gate W2C8 of council/records/2026-11-23-wave-2-close-meeting-1.md: the founder's usage answer for the wave 2 re-measure batch (117 slots, CI only, as the seat account). Recorded by the orchestrator.
+
+**Gate W2C9.** The whole-flow timer case's last planned trial is recorded: the records of all twenty slots are on
+`main` (the last, slot 20, by ip#543, merged at `904bb511` at 2026-11-24T21:44:44Z), and no G3 runner was alive. No replay was dispatched
+before that: the first replay dispatch was at 2026-11-24T23:25:10Z. The register block's slots are
+not dispatched from slot 1 here until this batch's last trial is recorded (section 10).
