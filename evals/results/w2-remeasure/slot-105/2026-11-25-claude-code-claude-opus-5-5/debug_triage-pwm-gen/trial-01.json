@@ -1,0 +1,185 @@
+{
+  "answers": [
+    {
+      "cache_read_tokens": 6342,
+      "cache_write_tokens": 312,
+      "error": null,
+      "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+      "input_tokens": 2,
+      "mode": "work",
+      "model": "claude-opus-5-5",
+      "output_tokens": 13908,
+      "packet_sha256": "5eddd800b156ab19bf88c62c55c2ab818658d68a4b70b5ac1afe95c17bf6595a",
+      "prompt_sha256": "c1f9258ee39db1e5a83060afa96d9f9359647289f89e8b6bf3a2c9203d909432",
+      "provider": "claude-code",
+      "text": "```json\n{\"uncertainty\": 0.3, \"outcome\": \"Triage of the three failing pwm_gen tests. VeriTriage returned a low-confidence 'unknown_failure' with an 'RTL bug' hypothesis. Reading the approved RTL finds three separate defects, which I sort into three buckets: (1) period_fail: the counter wraps at PERIOD-2, so the period is PERIOD-1 cycles. (2) pulse_width_fail: the compare is `cnt <= duty`, so the pulse is duty+1 cycles wide and duty 0 still pulses. (3) duty_update_fail: the compare uses the live `duty` input, not the sampled `duty_q`, so a change in mid-period takes effect at once. There is one self-checking repro per bucket, and each checks only the behaviour its bucket's cause breaks.\", \"artifacts\": [{\"kind\": \"triage_report\", \"title\": \"pwm_gen nightly regression triage: three buckets\", \"summary\": \"Requirement [requirement:req-e946df186d]: triage the three failing pwm_gen tests and write one repro per failure.\\n\\nVeriTriage session [run:run-0001] covered pulse_width_fail.log, period_fail.log and duty_update_fail.log in one call. It classified them as unknown_failure at 30% confidence from 3 evidence nodes, with the top hypothesis 'Likely RTL bug'. That class is a lead, not a bucket. One combined call may also hide a class that a single log would show.\\n\\nThe buckets below come from reading the approved RTL [artifact:prj-f58c6d66a9.design-under-investigation.a1], which was independently reviewed upstream [evidence:prj-f58c6d66a9.design-under-investigation.e1]. Each bucket is set against the module's header comment, which is its specification.\\n\\nBucket A, period (period_fail):\\n- Code: `if (cnt == PERIOD - 2) cnt <= 0`.\\n- Effect: the counter runs 0..PERIOD-2, so the output repeats every PERIOD-1 = 7 cycles instead of 8.\\n- Signature: rising-edge spacing does not equal PERIOD at constant duty.\\n- Repro: tb/repro_period.v. It measures rise-to-rise spacing at duty 3 and duty 5 and expects 8. It does not depend on pulse width or on mid-period duty changes.\\n\\nBucket B, pulse width (pulse_width_fail):\\n- Code: `pwm <= (cnt <= duty_now)`.\\n- Effect: the pulse is high for duty+1 cycles, and duty 0 gives a one-cycle pulse instead of a constant low.\\n- Signature: the high run is longer than duty by one at constant duty.\\n- Repro: tb/repro_pulse_width.v. It expects widths of 3 and 5 at duty 3 and duty 5, and no high cycle at duty 0. It does not depend on the period length, which is 7 or 8 here, or on mid-period changes.\\n\\nBucket C, duty update (duty_update_fail):\\n- Code: `wire duty_now = duty` is used in the compare, while `duty_q`, sampled at cnt==0, is never read.\\n- Effect: a duty change in mid-period changes the current period.\\n- Signature: an extra or early rise after a mid-period increase, and a truncated pulse after a mid-pulse decrease.\\n- Repro: tb/repro_duty_update.v. It compares against period and width values measured in the same run, not against absolute numbers, so a wrong period or an off-by-one width alone does not trip it.\\n\\nOpen points:\\n- The mapping of each log to a bucket is inferred from the log names and the RTL. The log contents were not available to me.\\n- I recommend a per-log veritriage.investigate run and a same-seed rerun of each failure to confirm determinism before the buckets are final.\\n- The three repros must still be checked by the platform's simulator.run with expect=fail.\"}], \"files\": [{\"path\": \"tb/repro_period.v\", \"kind\": \"testbench\", \"title\": \"Repro for bucket A: PWM period\", \"summary\": \"Self-checking repro for the period bucket of [requirement:req-e946df186d], written against [artifact:prj-f58c6d66a9.design-under-investigation.a1]. It holds duty constant at 3 and then at 5, and checks that rising edges are PERIOD=8 cycles apart. On the RTL under investigation the wrap at PERIOD-2 should give 7. Inputs are driven on the falling edge and the test runs in a single thread with bounded waits. It prints one NIRMAAN-SIM verdict with the run nonce before $finish.\", \"entry\": \"tb_pwm_repro\"}, {\"path\": \"tb/repro_pulse_width.v\", \"kind\": \"testbench\", \"title\": \"Repro for bucket B: PWM pulse width\", \"summary\": \"Self-checking repro for the pulse-width bucket of [requirement:req-e946df186d], written against [artifact:prj-f58c6d66a9.design-under-investigation.a1]. It checks that the high run equals duty at duty 3 and duty 5, and that duty 0 keeps the output low. It measures widths only, so the period length does not affect it. On the RTL under investigation the `cnt <= duty` compare should make each pulse one cycle wider and give a pulse at duty 0. It prints one NIRMAAN-SIM verdict with the run nonce before $finish.\", \"entry\": \"tb_pwm_repro\"}, {\"path\": \"tb/repro_duty_update.v\", \"kind\": \"testbench\", \"title\": \"Repro for bucket C: duty sampled once per period\", \"summary\": \"Self-checking repro for the duty-update bucket of [requirement:req-e946df186d], written against [artifact:prj-f58c6d66a9.design-under-investigation.a1]. First it raises duty from 2 to 5 just after a pulse ends and checks that the next rise still comes one measured period after the last one. Then it lowers duty from 5 to 1 just after a rise and checks that the pulse keeps the width measured at steady duty 5. Both checks compare against values measured in the same run, so they isolate the use of the live duty input from the period and width defects. It prints one NIRMAAN-SIM verdict with the run nonce before $finish.\", \"entry\": \"tb_pwm_repro\"}], \"tool_runs\": [\"run-0001\"], \"claims\": [\"The mapping of period_fail.log, pulse_width_fail.log and duty_update_fail.log to buckets A, B and C is inferred from the log names and from reading the RTL; the log contents were not inspected.\", \"Expected results on the RTL under investigation: repro_period should measure a spacing of 7 instead of 8; repro_pulse_width should measure widths of 4 and 6 and a pulse at duty 0; repro_duty_update should see an early rise and a 2-cycle pulse. These are hand analysis, not simulation results.\", \"Each repro is intended to pass on an RTL where only its own bucket's defect is fixed relative to a correct design, and to be insensitive to the other two defects. This has not been simulated.\"], \"escalation\": null, \"notes\": \"VeriTriage confidence was low (30%, unknown_failure), so the buckets rest on reading the RTL against its header specification. Before signoff I suggest per-log veritriage.investigate runs and same-seed reruns. All three testbenches use the same top module name, tb_pwm_repro, so the top is correct however the platform takes the entry. Each file is meant to be run on its own with the RTL, as stated in the input contract. Every wait is bounded at 64 cycles, and a timeout counts as a failed check, so no run can hang before printing its verdict.\"}\n```\n=== FILE: tb/repro_period.v ===\n`timescale 1ns / 1ps\n// Repro, bucket A (period): with constant duty, rising edges of pwm must be\n// PERIOD (8) clock cycles apart.\nmodule tb_pwm_repro;\n    reg        clk  = 1'b0;\n    reg        rst  = 1'b1;\n    reg  [3:0] duty = 4'd3;\n    wire       pwm;\n\n    integer passed = 0;\n    integer failed = 0;\n    integer timeouts = 0;\n    integer cyc = 0;\n    integer rise_count = 0;\n    integer fall_count = 0;\n    integer last_rise = 0;\n    integer last_fall = 0;\n    integer r1, r2, r3;\n    reg     pwm_prev = 1'b0;\n    reg [8*64-1:0] nonce;\n\n    pwm_gen #(.PERIOD(8)) dut (.clk(clk), .rst(rst), .duty(duty), .pwm(pwm));\n\n    always #5 clk = ~clk;\n\n    task step;\n        begin\n            @(negedge clk);\n            cyc = cyc + 1;\n            if (pwm === 1'b1 && pwm_prev !== 1'b1) begin\n                rise_count = rise_count + 1;\n                last_rise  = cyc;\n            end\n            if (pwm === 1'b0 && pwm_prev === 1'b1) begin\n                fall_count = fall_count + 1;\n                last_fall  = cyc;\n            end\n            pwm_prev = pwm;\n        end\n    endtask\n\n    task wait_rise;\n        integer n, start;\n        begin\n            start = rise_count;\n            n = 0;\n            while (rise_count == start && n < 64) begin\n                step;\n                n = n + 1;\n            end\n            if (rise_count == start) begin\n                timeouts = timeouts + 1;\n                $display(\"TIMEOUT waiting for a rising edge at cycle %0d\", cyc);\n            end\n        end\n    endtask\n\n    task check;\n        input            cond;\n        input [8*48-1:0] label;\n        begin\n            if (cond) begin\n                passed = passed + 1;\n                $display(\"PASS %0s\", label);\n            end else begin\n                failed = failed + 1;\n                $display(\"FAIL %0s\", label);\n            end\n        end\n    endtask\n\n    initial begin\n        duty = 4'd3;\n        rst  = 1'b1;\n        repeat (4) step;\n        rst = 1'b0;\n\n        // duty 3: let it settle, then measure two rise-to-rise spacings\n        wait_rise; wait_rise; wait_rise;\n        r1 = last_rise; wait_rise; r2 = last_rise; wait_rise; r3 = last_rise;\n        $display(\"duty 3: rise spacing %0d, %0d (expect 8)\", r2 - r1, r3 - r2);\n        check(r2 - r1 == 8, \"period_duty3_first\");\n        check(r3 - r2 == 8, \"period_duty3_second\");\n\n        // duty 5: settle, then measure again\n        duty = 4'd5;\n        wait_rise; wait_rise; wait_rise;\n        r1 = last_rise; wait_rise; r2 = last_rise; wait_rise; r3 = last_rise;\n        $display(\"duty 5: rise spacing %0d, %0d (expect 8)\", r2 - r1, r3 - r2);\n        check(r2 - r1 == 8, \"period_duty5_first\");\n        check(r3 - r2 == 8, \"period_duty5_second\");\n\n        check(timeouts == 0, \"no_timeouts\");\n\n        if (!$value$plusargs(\"nirmaan_nonce=%s\", nonce))\n            nonce = \"none\";\n        $display(\"NIRMAAN-SIM %0s %0d passed, %0d failed\", nonce, passed, failed);\n        $finish;\n    end\nendmodule\n=== END FILE ===\n=== FILE: tb/repro_pulse_width.v ===\n`timescale 1ns / 1ps\n// Repro, bucket B (pulse width): with constant duty, pwm must be high for\n// exactly `duty` consecutive cycles per period, and duty 0 keeps it low.\nmodule tb_pwm_repro;\n    reg        clk  = 1'b0;\n    reg        rst  = 1'b1;\n    reg  [3:0] duty = 4'd3;\n    wire       pwm;\n\n    integer passed = 0;\n    integer failed = 0;\n    integer timeouts = 0;\n    integer cyc = 0;\n    integer rise_count = 0;\n    integer fall_count = 0;\n    integer last_rise = 0;\n    integer last_fall = 0;\n    integer w1, w2;\n    integer hi_cnt;\n    reg     pwm_prev = 1'b0;\n    reg [8*64-1:0] nonce;\n\n    pwm_gen #(.PERIOD(8)) dut (.clk(clk), .rst(rst), .duty(duty), .pwm(pwm));\n\n    always #5 clk = ~clk;\n\n    task step;\n        begin\n            @(negedge clk);\n            cyc = cyc + 1;\n            if (pwm === 1'b1 && pwm_prev !== 1'b1) begin\n                rise_count = rise_count + 1;\n                last_rise  = cyc;\n            end\n            if (pwm === 1'b0 && pwm_prev === 1'b1) begin\n                fall_count = fall_count + 1;\n                last_fall  = cyc;\n            end\n            pwm_prev = pwm;\n        end\n    endtask\n\n    task wait_rise;\n        integer n, start;\n        begin\n            start = rise_count;\n            n = 0;\n            while (rise_count == start && n < 64) begin\n                step;\n                n = n + 1;\n            end\n            if (rise_count == start) begin\n                timeouts = timeouts + 1;\n                $display(\"TIMEOUT waiting for a rising edge at cycle %0d\", cyc);\n            end\n        end\n    endtask\n\n    task wait_fall;\n        integer n, start;\n        begin\n            start = fall_count;\n            n = 0;\n            while (fall_count == start && n < 64) begin\n                step;\n                n = n + 1;\n            end\n            if (fall_count == start) begin\n                timeouts = timeouts + 1;\n                $display(\"TIMEOUT waiting for a falling edge at cycle %0d\", cyc);\n            end\n        end\n    endtask\n\n    task check;\n        input            cond;\n        input [8*48-1:0] label;\n        begin\n            if (cond) begin\n                passed = passed + 1;\n                $display(\"PASS %0s\", label);\n            end else begin\n                failed = failed + 1;\n                $display(\"FAIL %0s\", label);\n            end\n        end\n    endtask\n\n    initial begin\n        duty = 4'd3;\n        rst  = 1'b1;\n        repeat (4) step;\n        rst = 1'b0;\n\n        // duty 3: settle, then measure two pulses\n        wait_rise; wait_rise; wait_rise;\n        wait_rise; wait_fall; w1 = last_fall - last_rise;\n        wait_rise; wait_fall; w2 = last_fall - last_rise;\n        $display(\"duty 3: high widths %0d, %0d (expect 3)\", w1, w2);\n        check(w1 == 3, \"width_duty3_first\");\n        check(w2 == 3, \"width_duty3_second\");\n\n        // duty 5: settle, then measure two pulses\n        duty = 4'd5;\n        wait_rise; wait_rise; wait_rise;\n        wait_rise; wait_fall; w1 = last_fall - last_rise;\n        wait_rise; wait_fall; w2 = last_fall - last_rise;\n        $display(\"duty 5: high widths %0d, %0d (expect 5)\", w1, w2);\n        check(w1 == 5, \"width_duty5_first\");\n        check(w2 == 5, \"width_duty5_second\");\n\n        // duty 0: settle for three periods, then the output must stay low\n        duty = 4'd0;\n        repeat (24) step;\n        hi_cnt = 0;\n        repeat (16) begin\n            step;\n            if (pwm === 1'b1) hi_cnt = hi_cnt + 1;\n        end\n        $display(\"duty 0: %0d high cycles in 16 (expect 0)\", hi_cnt);\n        check(hi_cnt == 0, \"duty0_stays_low\");\n\n        check(timeouts == 0, \"no_timeouts\");\n\n        if (!$value$plusargs(\"nirmaan_nonce=%s\", nonce))\n            nonce = \"none\";\n        $display(\"NIRMAAN-SIM %0s %0d passed, %0d failed\", nonce, passed, failed);\n        $finish;\n    end\nendmodule\n=== END FILE ===\n=== FILE: tb/repro_duty_update.v ===\n`timescale 1ns / 1ps\n// Repro, bucket C (duty update): duty is sampled once per period, so a change\n// in the middle of a period must not alter that period. Checks compare against\n// the period and width measured in this same run, so they do not depend on the\n// absolute period length or pulse width.\nmodule tb_pwm_repro;\n    reg        clk  = 1'b0;\n    reg        rst  = 1'b1;\n    reg  [3:0] duty = 4'd2;\n    wire       pwm;\n\n    integer passed = 0;\n    integer failed = 0;\n    integer timeouts = 0;\n    integer cyc = 0;\n    integer rise_count = 0;\n    integer fall_count = 0;\n    integer last_rise = 0;\n    integer last_fall = 0;\n    integer r1, r2, r3, p_meas, w_steady, w_dec;\n    reg     pwm_prev = 1'b0;\n    reg [8*64-1:0] nonce;\n\n    pwm_gen #(.PERIOD(8)) dut (.clk(clk), .rst(rst), .duty(duty), .pwm(pwm));\n\n    always #5 clk = ~clk;\n\n    task step;\n        begin\n            @(negedge clk);\n            cyc = cyc + 1;\n            if (pwm === 1'b1 && pwm_prev !== 1'b1) begin\n                rise_count = rise_count + 1;\n                last_rise  = cyc;\n            end\n            if (pwm === 1'b0 && pwm_prev === 1'b1) begin\n                fall_count = fall_count + 1;\n                last_fall  = cyc;\n            end\n            pwm_prev = pwm;\n        end\n    endtask\n\n    task wait_rise;\n        integer n, start;\n        begin\n            start = rise_count;\n            n = 0;\n            while (rise_count == start && n < 64) begin\n                step;\n                n = n + 1;\n            end\n            if (rise_count == start) begin\n                timeouts = timeouts + 1;\n                $display(\"TIMEOUT waiting for a rising edge at cycle %0d\", cyc);\n            end\n        end\n    endtask\n\n    task wait_fall;\n        integer n, start;\n        begin\n            start = fall_count;\n            n = 0;\n            while (fall_count == start && n < 64) begin\n                step;\n                n = n + 1;\n            end\n            if (fall_count == start) begin\n                timeouts = timeouts + 1;\n                $display(\"TIMEOUT waiting for a falling edge at cycle %0d\", cyc);\n            end\n        end\n    endtask\n\n    task check;\n        input            cond;\n        input [8*48-1:0] label;\n        begin\n            if (cond) begin\n                passed = passed + 1;\n                $display(\"PASS %0s\", label);\n            end else begin\n                failed = failed + 1;\n                $display(\"FAIL %0s\", label);\n            end\n        end\n    endtask\n\n    initial begin\n        duty = 4'd2;\n        rst  = 1'b1;\n        repeat (4) step;\n        rst = 1'b0;\n\n        // Steady duty 2: settle, then measure the period in this run.\n        wait_rise; wait_rise; wait_rise;\n        wait_rise; r1 = last_rise;\n        wait_rise; r2 = last_rise;\n        p_meas = r2 - r1;\n        $display(\"measured period %0d\", p_meas);\n\n        // Raise duty in mid-period, just after the pulse ends: the current\n        // period must not change, so the next rise comes one period later.\n        wait_fall;\n        duty = 4'd5;\n        wait_rise; r3 = last_rise;\n        $display(\"after mid-period increase: rise %0d cycles after previous (expect %0d)\",\n                 r3 - r2, p_meas);\n        check(r3 - r2 == p_meas, \"increase_mid_period_waits_for_next_period\");\n\n        // Steady duty 5: settle, then measure the pulse width in this run.\n        wait_rise; wait_rise;\n        wait_rise; wait_fall; w_steady = last_fall - last_rise;\n\n        // Lower duty just after a rise: the pulse in progress must keep its width.\n        wait_rise;\n        duty = 4'd1;\n        wait_fall; w_dec = last_fall - last_rise;\n        $display(\"steady duty-5 width %0d, width after mid-pulse decrease %0d\",\n                 w_steady, w_dec);\n        check(w_dec == w_steady, \"decrease_mid_pulse_keeps_width\");\n\n        check(timeouts == 0, \"no_timeouts\");\n\n        if (!$value$plusargs(\"nirmaan_nonce=%s\", nonce))\n            nonce = \"none\";\n        $display(\"NIRMAAN-SIM %0s %0d passed, %0d failed\", nonce, passed, failed);\n        $finish;\n    end\nendmodule\n=== END FILE ==="
+    }
+  ],
+  "format": "nirmaan.eval-trial",
+  "harness_variant": "default",
+  "judge_runs": [
+    {
+      "check": "Each repro passes the fixed pwm_gen, and each seeded defect fails a repro of its own",
+      "params": {
+        "sources": [
+          "/tmp/nirmaan-eval-v1t3ke7y/judge/check-1/must-fail-each-2u30f6xn/file-1/clean/pwm_gen.v",
+          "/tmp/nirmaan-eval-v1t3ke7y/judge/check-1/must-fail-each-2u30f6xn/file-1/clean/repro_period.v"
+        ],
+        "top": "tb_pwm_repro"
+      },
+      "run": "run-0005",
+      "succeeded": true,
+      "summary": "icarus: simulation passed: 5 checks passed, $finish reached at time 770000, 0 errors",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "Each repro passes the fixed pwm_gen, and each seeded defect fails a repro of its own",
+      "params": {
+        "sources": [
+          "/tmp/nirmaan-eval-v1t3ke7y/judge/check-1/must-fail-each-2u30f6xn/file-2/clean/pwm_gen.v",
+          "/tmp/nirmaan-eval-v1t3ke7y/judge/check-1/must-fail-each-2u30f6xn/file-2/clean/repro_pulse_width.v"
+        ],
+        "top": "tb_pwm_repro"
+      },
+      "run": "run-0009",
+      "succeeded": true,
+      "summary": "icarus: simulation passed: 6 checks passed, $finish reached at time 1220000, 0 errors",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "Each repro passes the fixed pwm_gen, and each seeded defect fails a repro of its own",
+      "params": {
+        "sources": [
+          "/tmp/nirmaan-eval-v1t3ke7y/judge/check-1/must-fail-each-2u30f6xn/file-3/clean/pwm_gen.v",
+          "/tmp/nirmaan-eval-v1t3ke7y/judge/check-1/must-fail-each-2u30f6xn/file-3/clean/repro_duty_update.v"
+        ],
+        "top": "tb_pwm_repro"
+      },
+      "run": "run-0013",
+      "succeeded": true,
+      "summary": "icarus: simulation passed: 3 checks passed, $finish reached at time 820000, 0 errors",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "Each repro passes the fixed pwm_gen, and each seeded defect fails a repro of its own",
+      "params": {
+        "sources": [
+          "/tmp/nirmaan-eval-v1t3ke7y/judge/check-1/must-fail-each-2u30f6xn/file-3/mutant-3/pwm_gen.v",
+          "/tmp/nirmaan-eval-v1t3ke7y/judge/check-1/must-fail-each-2u30f6xn/file-3/mutant-3/repro_duty_update.v"
+        ],
+        "top": "tb_pwm_repro"
+      },
+      "run": "run-0016",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: the testbench reports 2 of 3 checks failed",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "Each repro passes the fixed pwm_gen, and each seeded defect fails a repro of its own",
+      "params": {
+        "sources": [
+          "/tmp/nirmaan-eval-v1t3ke7y/judge/check-1/must-fail-each-2u30f6xn/file-1/mutant-2/pwm_gen.v",
+          "/tmp/nirmaan-eval-v1t3ke7y/judge/check-1/must-fail-each-2u30f6xn/file-1/mutant-2/repro_period.v"
+        ],
+        "top": "tb_pwm_repro"
+      },
+      "run": "run-0007",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: the testbench reports 4 of 5 checks failed",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "Each repro passes the fixed pwm_gen, and each seeded defect fails a repro of its own",
+      "params": {
+        "sources": [
+          "/tmp/nirmaan-eval-v1t3ke7y/judge/check-1/must-fail-each-2u30f6xn/file-2/mutant-1/pwm_gen.v",
+          "/tmp/nirmaan-eval-v1t3ke7y/judge/check-1/must-fail-each-2u30f6xn/file-2/mutant-1/repro_pulse_width.v"
+        ],
+        "top": "tb_pwm_repro"
+      },
+      "run": "run-0010",
+      "succeeded": false,
+      "summary": "icarus: simulation failed: the testbench reports 5 of 6 checks failed",
+      "tool": "simulator.run"
+    }
+  ],
+  "knowledge": "on",
+  "model": "claude-opus-5-5",
+  "purpose": "evidence",
+  "record": "2026-11-25-claude-code-claude-opus-5-5",
+  "result": {
+    "attempts": 1,
+    "attestations": [],
+    "audit_ok": true,
+    "case": "debug/triage-pwm-gen",
+    "case_digest": "sha256:619d40ba18f41740d1fca50d12e45b6c3aa795938eb002f83d4f62ceef60fdf4",
+    "cli": "2.1.325",
+    "cost_usd": null,
+    "detail": "VeriTriage confidence was low (30%, unknown_failure), so the buckets rest on reading the RTL against its header specification. Before signoff I suggest per-log veritriage.investigate runs and same-seed reruns. All three testbenches use the same top module name, tb_pwm_repro, so the top is correct however the platform takes the entry. Each file is meant to be run on its own with the RTL, as stated in the input contract. Every wait is bounded at 64 cycles, and a timeout counts as a failed check, so no run can hang before printing its verdict.",
+    "duration_s": 127.962,
+    "gate_runs": [
+      {
+        "run": "run-0001",
+        "succeeded": true,
+        "summary": "VeriTriage classified pulse_width_fail.log, period_fail.log, duty_update_fail.log as unknown_failure (30% confidence, 3 evidence nodes); top hypothesis: Likely RTL bug",
+        "tool": "veritriage.investigate"
+      },
+      {
+        "run": "run-0002",
+        "succeeded": true,
+        "summary": "icarus: failure reproduced: the testbench reports 4 of 5 checks failed, $finish reached at time 680000",
+        "tool": "simulator.run"
+      },
+      {
+        "run": "run-0003",
+        "succeeded": true,
+        "summary": "icarus: failure reproduced: the testbench reports 5 of 6 checks failed, $finish reached at time 1070000",
+        "tool": "simulator.run"
+      },
+      {
+        "run": "run-0004",
+        "succeeded": true,
+        "summary": "icarus: failure reproduced: the testbench reports 2 of 3 checks failed, $finish reached at time 630000",
+        "tool": "simulator.run"
+      }
+    ],
+    "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+    "input_tokens": 2,
+    "model_calls": 1,
+    "output_tokens": 13908,
+    "passed": true,
+    "replay": false,
+    "runtime": "claude-code",
+    "sandbox": "/tmp/nirmaan-eval-v1t3ke7y",
+    "scores": [
+      {
+        "failed_runs": [
+          "run-0016",
+          "run-0007",
+          "run-0010"
+        ],
+        "name": "Each repro passes the fixed pwm_gen, and each seeded defect fails a repro of its own",
+        "runs": [
+          "run-0005",
+          "run-0009",
+          "run-0013"
+        ],
+        "scorer": "must-fail-each",
+        "status": "passed",
+        "summary": "each of 3 files passed simulator.run on the clean inputs; each of 3 mutants fails a file of its own"
+      }
+    ],
+    "seat": "prj-f58c6d66a9:triage",
+    "seat_status": "completed",
+    "started_at": "2026-11-25T05:50:55.367613Z",
+    "submitted": true,
+    "tool_calls": [],
+    "version": "1.25.0"
+  },
+  "skills": {
+    "failure_triage": "sha256:f94ee360df0608a5387e68952a4746f7b60c1a39ae395e3252bfd39f037d3317"
+  },
+  "stage": "triage",
+  "trial": 1,
+  "version": 1
+}

@@ -1,0 +1,186 @@
+{
+  "answers": [
+    {
+      "cache_read_tokens": 11925,
+      "cache_write_tokens": 314,
+      "error": null,
+      "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+      "input_tokens": 2,
+      "mode": "work",
+      "model": "claude-opus-5-5",
+      "output_tokens": 5770,
+      "packet_sha256": "0cbfdcf374794af81112e2aad5d3dced4b9f67f9a1978b661e0a813588b22092",
+      "prompt_sha256": "2ee3e993569da2ac1367416318e836408528a584976d7c2b404c6b27d49d7048",
+      "provider": "claude-code",
+      "text": "```json\n{\"uncertainty\": 0.22, \"outcome\": \"Prepared a cocotb test module, test_crc8_block.py, with top crc8_block, for the platform to run with simulator.run (backend cocotb) against the approved RTL. It has not run here.\", \"artifacts\": [{\"kind\": \"testbench\", \"title\": \"cocotb testbench for crc8_block\", \"summary\": \"Seven directed cocotb tests and one seeded random test for crc8_block. The reference model is written from the clauses of [artifact:prj-18ceafd90b.interface-spec.a1] (CRC-RESET, CRC-INIT, CRC-POLY, CRC-ORDER, CRC-HOLD, CRC-FINAL, CRC-EMPTY), not from the RTL. The tests drive the ports of [artifact:prj-18ceafd90b.design-under-test.a1] and serve [requirement:req-1ba1cdde03].\"}], \"files\": [{\"path\": \"test_crc8_block.py\", \"kind\": \"testbench\", \"title\": \"cocotb tests for crc8_block\", \"summary\": \"cocotb test module serving [requirement:req-1ba1cdde03]. The golden model is built only from [artifact:prj-18ceafd90b.interface-spec.a1]. Hand-computed vectors check the model itself. The tests cover reset, init priority over valid, hold, empty value, a reset in mid-frame and a seeded random scoreboard, all through the ports of [artifact:prj-18ceafd90b.design-under-test.a1].\", \"entry\": \"crc8_block\"}], \"tool_runs\": [], \"claims\": [\"The hand-computed vectors (start 0xFF, then byte 0x00 gives crc 0x0C, byte 0xFF gives crc 0xFF) were worked out by hand from spec section 2.2. No tool checked them.\", \"The tests are meant to fail on single-change mutants: a wrong polynomial, bit reversal, a missing final inversion, a wrong start value, init losing to valid, or valid ignored. No mutant run has been made.\", \"The module is written to work with both cocotb 1.x and 2.x APIs. This is untested.\"], \"escalation\": null, \"notes\": \"Inputs are driven on the falling edge. Outputs are sampled in ReadOnly after the rising edge. Every directed test compares crc on every cycle and asserts that its scenario was reached. The random test uses Python's random module, which cocotb seeds; the seed appears in the run log. The independent review record and the platform's simulator.run evidence are still outstanding.\"}\n```\n=== FILE: test_crc8_block.py ===\n\"\"\"cocotb tests for crc8_block, written from interface_spec.md (not from the RTL).\"\"\"\nimport random\n\nimport cocotb\nfrom cocotb.clock import Clock\nfrom cocotb.triggers import FallingEdge, ReadOnly, RisingEdge, Timer\n\nSTART = 0xFF   # spec 2: start value\nPOLY = 0x07    # spec 2.2: x^8 + x^2 + x + 1\n\n\ndef model_take(running, byte):\n    \"\"\"Spec 2.2, clause by clause: for each bit 7..0, XOR it into the top bit,\n    shift left one place, and if the bit shifted out was 1, XOR with 0x07.\"\"\"\n    r = running & 0xFF\n    for i in range(7, -1, -1):\n        bit = (byte >> i) & 1\n        r ^= bit << 7                  # XOR data bit into top bit\n        out = (r >> 7) & 1             # bit about to be shifted out\n        r = (r << 1) & 0xFF            # shift left one place\n        if out:\n            r ^= POLY\n    return r\n\n\ndef model_crc(running):\n    \"\"\"Spec 2.3: crc is the running value with every bit inverted.\"\"\"\n    return running ^ 0xFF\n\n\ndef as_int(sig):\n    v = sig.value\n    if hasattr(v, \"to_unsigned\"):\n        return v.to_unsigned()\n    if hasattr(v, \"integer\"):\n        return v.integer\n    return int(v)\n\n\nclass Bench:\n    def __init__(self, dut):\n        self.dut = dut\n        self.running = None\n        self.checks = 0\n\n    async def start(self):\n        cocotb.start_soon(Clock(self.dut.clk, 10, \"ns\").start())\n        self.dut.rst_n.value = 0\n        self.dut.init.value = 0\n        self.dut.valid.value = 0\n        self.dut.data.value = 0\n        await FallingEdge(self.dut.clk)\n\n    async def cycle(self, rst_n=1, init=0, valid=0, data=0, tag=\"\"):\n        \"\"\"Drive on the falling edge, apply one rising edge, update the model,\n        and compare crc after the design has settled.\"\"\"\n        dut = self.dut\n        dut.rst_n.value = rst_n\n        dut.init.value = init\n        dut.valid.value = valid\n        dut.data.value = data & 0xFF\n        await RisingEdge(dut.clk)\n        if not rst_n:\n            self.running = START                       # CRC-RESET\n        elif init:\n            self.running = START                       # CRC-INIT (wins over valid)\n        elif valid:\n            self.running = model_take(self.running, data)  # CRC-POLY / CRC-ORDER\n        # else: CRC-HOLD, running value unchanged\n        await ReadOnly()\n        got = as_int(dut.crc)\n        exp = model_crc(self.running)\n        assert got == exp, (\n            f\"[{tag}] crc mismatch: got 0x{got:02X} expected 0x{exp:02X} \"\n            f\"(rst_n={rst_n} init={init} valid={valid} data=0x{data & 0xFF:02X})\"\n        )\n        self.checks += 1\n        await FallingEdge(dut.clk)\n        return got\n\n    async def reset(self, cycles=3):\n        for _ in range(cycles):\n            await self.cycle(rst_n=0, tag=\"reset\")\n\n\ndef test_model_selfcheck():\n    \"\"\"Hand-computed from spec 2.2 so a wrong model cannot hide behind itself.\"\"\"\n    assert model_crc(START) == 0x00\n    assert model_crc(model_take(START, 0x00)) == 0x0C\n    assert model_crc(model_take(START, 0xFF)) == 0xFF\n\n\n@cocotb.test(timeout_time=50, timeout_unit=\"us\")\nasync def test_reset_and_empty(dut):\n    \"\"\"CRC-RESET, CRC-EMPTY: after reset with no byte taken, crc is 0x00.\"\"\"\n    test_model_selfcheck()\n    tb = Bench(dut)\n    await tb.start()\n    await tb.reset()\n    assert as_int(dut.crc) == 0x00, \"crc after reset is not 0x00\"\n    # reset while valid is offered still loads the start value\n    await tb.cycle(valid=1, data=0x5A, tag=\"byte\")\n    await tb.cycle(rst_n=0, valid=1, data=0xA5, tag=\"reset+valid\")\n    assert as_int(dut.crc) == 0x00, \"reset with valid did not load start value\"\n    assert tb.checks >= 5\n\n\n@cocotb.test(timeout_time=50, timeout_unit=\"us\")\nasync def test_known_vectors(dut):\n    \"\"\"CRC-POLY, CRC-ORDER, CRC-FINAL with hand-computed single-byte values.\"\"\"\n    tb = Bench(dut)\n    await tb.start()\n    await tb.reset()\n    got = await tb.cycle(valid=1, data=0x00, tag=\"0x00\")\n    assert got == 0x0C, f\"crc of 0x00 from start is 0x{got:02X}, expected 0x0C\"\n    await tb.cycle(init=1, tag=\"init\")\n    got = await tb.cycle(valid=1, data=0xFF, tag=\"0xFF\")\n    assert got == 0xFF, f\"crc of 0xFF from start is 0x{got:02X}, expected 0xFF\"\n    # single-bit bytes expose bit-order and reflection errors\n    for b in range(8):\n        await tb.cycle(init=1, tag=\"init\")\n        await tb.cycle(valid=1, data=1 << b, tag=f\"bit{b}\")\n    # a multi-byte frame\n    await tb.cycle(init=1, tag=\"init\")\n    for byte in b\"123456789\":\n        await tb.cycle(valid=1, data=byte, tag=\"frame\")\n    assert tb.checks >= 30\n\n\n@cocotb.test(timeout_time=50, timeout_unit=\"us\")\nasync def test_init_wins_over_valid(dut):\n    \"\"\"CRC-INIT: init with valid at the same edge reloads; the byte is dropped.\"\"\"\n    tb = Bench(dut)\n    await tb.start()\n    await tb.reset()\n    await tb.cycle(valid=1, data=0x3C, tag=\"byte\")\n    await tb.cycle(valid=1, data=0xC3, tag=\"byte\")\n    assert as_int(dut.crc) != 0x00, \"precondition: running value must differ from start\"\n    await tb.cycle(init=1, valid=1, data=0x77, tag=\"init+valid\")\n    assert as_int(dut.crc) == 0x00, \"init did not win over valid\"\n    await tb.cycle(init=1, valid=0, tag=\"init alone\")\n    assert as_int(dut.crc) == 0x00\n\n\n@cocotb.test(timeout_time=50, timeout_unit=\"us\")\nasync def test_hold(dut):\n    \"\"\"CRC-HOLD: valid low and init low keep the running value, whatever data is.\"\"\"\n    tb = Bench(dut)\n    await tb.start()\n    await tb.reset()\n    await tb.cycle(valid=1, data=0x91, tag=\"byte\")\n    held = as_int(dut.crc)\n    assert held != 0x00, \"precondition: running value must differ from start\"\n    for d in (0x00, 0xFF, 0x55, 0xAA, 0x91):\n        got = await tb.cycle(valid=0, data=d, tag=\"hold\")\n        assert got == held, f\"crc changed while holding: 0x{got:02X} vs 0x{held:02X}\"\n\n\n@cocotb.test(timeout_time=50, timeout_unit=\"us\")\nasync def test_reset_mid_frame(dut):\n    \"\"\"A reset in the middle of a frame restarts from the start value.\"\"\"\n    tb = Bench(dut)\n    await tb.start()\n    await tb.reset()\n    for byte in (0xDE, 0xAD):\n        await tb.cycle(valid=1, data=byte, tag=\"frame-a\")\n    await tb.cycle(rst_n=0, tag=\"mid reset\")\n    assert as_int(dut.crc) == 0x00\n    for byte in (0xBE, 0xEF):\n        await tb.cycle(valid=1, data=byte, tag=\"frame-b\")\n    exp = model_crc(model_take(model_take(START, 0xBE), 0xEF))\n    assert as_int(dut.crc) == exp\n\n\n@cocotb.test(timeout_time=50, timeout_unit=\"us\")\nasync def test_crc_is_combinational(dut):\n    \"\"\"CRC-FINAL: crc follows the running value with no extra clock edge.\"\"\"\n    tb = Bench(dut)\n    await tb.start()\n    await tb.reset()\n    await tb.cycle(valid=1, data=0x42, tag=\"byte\")\n    exp = model_crc(model_take(START, 0x42))\n    await Timer(1, \"ns\")\n    assert as_int(dut.crc) == exp, \"crc not updated within the edge's cycle\"\n\n\n@cocotb.test(timeout_time=500, timeout_unit=\"us\")\nasync def test_random_scoreboard(dut):\n    \"\"\"Seeded random traffic; every cycle compared against the spec model.\"\"\"\n    tb = Bench(dut)\n    await tb.start()\n    await tb.reset()\n    seen = {\"take\": 0, \"hold\": 0, \"init\": 0, \"init_valid\": 0, \"reset\": 0}\n    for _ in range(2000):\n        r = random.random()\n        rst_n = 0 if r < 0.02 else 1\n        init = 1 if random.random() < 0.08 else 0\n        valid = 1 if random.random() < 0.7 else 0\n        data = random.randrange(256)\n        if not rst_n:\n            seen[\"reset\"] += 1\n        elif init and valid:\n            seen[\"init_valid\"] += 1\n        elif init:\n            seen[\"init\"] += 1\n        elif valid:\n            seen[\"take\"] += 1\n        else:\n            seen[\"hold\"] += 1\n        await tb.cycle(rst_n=rst_n, init=init, valid=valid, data=data, tag=\"random\")\n    for k, n in seen.items():\n        assert n > 0, f\"random phase never reached scenario {k}\"\n    assert tb.checks >= 2000\n=== END FILE ==="
+    }
+  ],
+  "format": "nirmaan.eval-trial",
+  "harness_variant": "default",
+  "judge_runs": [
+    {
+      "check": "The seat's cocotb tests pass the approved RTL and fail each CRC block mutant",
+      "params": {
+        "backend": "cocotb",
+        "cocotb": [
+          "/tmp/nirmaan-eval-4qh27s7u/judge/check-1/must-fail-6ktvgo5g/clean/test_crc8_block.py"
+        ],
+        "sources": [
+          "/tmp/nirmaan-eval-4qh27s7u/judge/check-1/must-fail-6ktvgo5g/clean/crc8_block.v"
+        ],
+        "top": "crc8_block"
+      },
+      "run": "run-0002",
+      "succeeded": true,
+      "summary": "cocotb: 7 of 7 tests passed; cocotb 2.1.0 on Icarus Verilog version 12.0 (stable)",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The seat's cocotb tests pass the approved RTL and fail each CRC block mutant",
+      "params": {
+        "backend": "cocotb",
+        "cocotb": [
+          "/tmp/nirmaan-eval-4qh27s7u/judge/check-1/must-fail-6ktvgo5g/mutant-1-1/test_crc8_block.py"
+        ],
+        "sources": [
+          "/tmp/nirmaan-eval-4qh27s7u/judge/check-1/must-fail-6ktvgo5g/mutant-1-1/crc8_block.v"
+        ],
+        "top": "crc8_block"
+      },
+      "run": "run-0003",
+      "succeeded": false,
+      "summary": "cocotb: 7 of 7 tests failed; first: test_crc8_block.test_reset_and_empty (AssertionError: [byte] crc mismatch: got 0x13 expected 0x8D (rst_n=1 init=0 valid=1 data=0x5A)); cocotb 2.1.0 on Icarus Verilog version 12.0 (stable)",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The seat's cocotb tests pass the approved RTL and fail each CRC block mutant",
+      "params": {
+        "backend": "cocotb",
+        "cocotb": [
+          "/tmp/nirmaan-eval-4qh27s7u/judge/check-1/must-fail-6ktvgo5g/mutant-1-2/test_crc8_block.py"
+        ],
+        "sources": [
+          "/tmp/nirmaan-eval-4qh27s7u/judge/check-1/must-fail-6ktvgo5g/mutant-1-2/crc8_block.v"
+        ],
+        "top": "crc8_block"
+      },
+      "run": "run-0004",
+      "succeeded": false,
+      "summary": "cocotb: 4 of 7 tests failed; first: test_crc8_block.test_known_vectors (AssertionError: [bit0] crc mismatch: got 0x85 expected 0x0B (rst_n=1 init=0 valid=1 data=0x01)); cocotb 2.1.0 on Icarus Verilog version 12.0 (stable)",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The seat's cocotb tests pass the approved RTL and fail each CRC block mutant",
+      "params": {
+        "backend": "cocotb",
+        "cocotb": [
+          "/tmp/nirmaan-eval-4qh27s7u/judge/check-1/must-fail-6ktvgo5g/mutant-1-3/test_crc8_block.py"
+        ],
+        "sources": [
+          "/tmp/nirmaan-eval-4qh27s7u/judge/check-1/must-fail-6ktvgo5g/mutant-1-3/crc8_block.v"
+        ],
+        "top": "crc8_block"
+      },
+      "run": "run-0005",
+      "succeeded": false,
+      "summary": "cocotb: 7 of 7 tests failed; first: test_crc8_block.test_reset_and_empty (AssertionError: [reset] crc mismatch: got 0xFF expected 0x00 (rst_n=0 init=0 valid=0 data=0x00)); cocotb 2.1.0 on Icarus Verilog version 12.0 (stable)",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The seat's cocotb tests pass the approved RTL and fail each CRC block mutant",
+      "params": {
+        "backend": "cocotb",
+        "cocotb": [
+          "/tmp/nirmaan-eval-4qh27s7u/judge/check-1/must-fail-6ktvgo5g/mutant-1-4/test_crc8_block.py"
+        ],
+        "sources": [
+          "/tmp/nirmaan-eval-4qh27s7u/judge/check-1/must-fail-6ktvgo5g/mutant-1-4/crc8_block.v"
+        ],
+        "top": "crc8_block"
+      },
+      "run": "run-0006",
+      "succeeded": false,
+      "summary": "cocotb: 2 of 7 tests failed; first: test_crc8_block.test_init_wins_over_valid (AssertionError: [init+valid] crc mismatch: got 0x5F expected 0x00 (rst_n=1 init=1 valid=1 data=0x77)); cocotb 2.1.0 on Icarus Verilog version 12.0 (stable)",
+      "tool": "simulator.run"
+    },
+    {
+      "check": "The seat's cocotb tests pass the approved RTL and fail each CRC block mutant",
+      "params": {
+        "backend": "cocotb",
+        "cocotb": [
+          "/tmp/nirmaan-eval-4qh27s7u/judge/check-1/must-fail-6ktvgo5g/mutant-1-5/test_crc8_block.py"
+        ],
+        "sources": [
+          "/tmp/nirmaan-eval-4qh27s7u/judge/check-1/must-fail-6ktvgo5g/mutant-1-5/crc8_block.v"
+        ],
+        "top": "crc8_block"
+      },
+      "run": "run-0007",
+      "succeeded": false,
+      "summary": "cocotb: 2 of 7 tests failed; first: test_crc8_block.test_hold (AssertionError: [hold] crc mismatch: got 0xDC expected 0xF2 (rst_n=1 init=0 valid=0 data=0x00)); cocotb 2.1.0 on Icarus Verilog version 12.0 (stable)",
+      "tool": "simulator.run"
+    }
+  ],
+  "knowledge": "on",
+  "model": "claude-opus-5-5",
+  "purpose": "evidence",
+  "record": "2026-11-25-claude-code-claude-opus-5-5",
+  "result": {
+    "attempts": 1,
+    "attestations": [],
+    "audit_ok": true,
+    "case": "dv/cocotb-crc",
+    "case_digest": "sha256:33e82bcbc7ad3484867969aa9b51ed96ad9d218af263ee5e03cab58571c82542",
+    "cli": "2.1.325",
+    "cost_usd": null,
+    "detail": "Inputs are driven on the falling edge. Outputs are sampled in ReadOnly after the rising edge. Every directed test compares crc on every cycle and asserts that its scenario was reached. The random test uses Python's random module, which cocotb seeds; the seed appears in the run log. The independent review record and the platform's simulator.run evidence are still outstanding.",
+    "duration_s": 53.21,
+    "gate_runs": [
+      {
+        "run": "run-0001",
+        "succeeded": true,
+        "summary": "cocotb: 7 of 7 tests passed; cocotb 2.1.0 on Icarus Verilog version 12.0 (stable)",
+        "tool": "simulator.run"
+      }
+    ],
+    "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+    "input_tokens": 2,
+    "model_calls": 1,
+    "output_tokens": 5770,
+    "passed": true,
+    "replay": false,
+    "runtime": "claude-code",
+    "sandbox": "/tmp/nirmaan-eval-4qh27s7u",
+    "scores": [
+      {
+        "failed_runs": [
+          "run-0003",
+          "run-0004",
+          "run-0005",
+          "run-0006",
+          "run-0007"
+        ],
+        "name": "The seat's cocotb tests pass the approved RTL and fail each CRC block mutant",
+        "runs": [
+          "run-0002"
+        ],
+        "scorer": "must-fail",
+        "status": "passed",
+        "summary": "simulator.run run-0002 passed on the clean inputs; 5 of 5 mutants failed it"
+      }
+    ],
+    "seat": "prj-18ceafd90b:testbench",
+    "seat_status": "in_review",
+    "started_at": "2026-11-25T06:00:08.084940Z",
+    "submitted": true,
+    "tool_calls": [],
+    "version": "1.25.0"
+  },
+  "skills": {
+    "directed_testing": "sha256:6bf35095b83cbd9b641919c5b59bacdf5fc87ce7c569c2ad7df593ecddff70d6",
+    "python_verification": "sha256:cc303244c1935cadc231a36fe79445481e3418ef00464b89b9e45ff366d45758"
+  },
+  "stage": "testbench",
+  "trial": 1,
+  "version": 1
+}
