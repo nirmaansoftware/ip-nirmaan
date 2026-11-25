@@ -881,6 +881,7 @@
           "n": 16,
           "passed": 7,
           "reasons": [
+            "stale: the skill card or document changed after these trials",
             "Wilson lower bound 0.231, under 0.5"
           ],
           "records": [

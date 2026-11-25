@@ -130,7 +130,7 @@ name the sources above; "inference" marks this document's own reasoning;
 ## Common failure modes
 
 - Classifying from the first error line only (card:
-  src/nirmaan/company/skills.py:494).
+  src/nirmaan/company/skills.py:514).
 - Bucketing by the error text with times and values still in it, so every
   run is its own bucket (inference).
 - Merging two failures because they end in the same timeout or the same
@@ -145,4 +145,7 @@ name the sources above; "inference" marks this document's own reasoning;
 - Each bucket has a repro that fails on the RTL under investigation, and no
   repro stands for two buckets (inference).
 - The triage cites a VeriTriage session and its evidence nodes (card:
-  src/nirmaan/company/skills.py:495).
+  src/nirmaan/company/skills.py:515).
+- In the answer's tool_runs field, list a run by its bare run id, the text
+  after "run:" in its [run:<id>] citation token, not the token itself (card:
+  src/nirmaan/company/skills.py:512-513).
