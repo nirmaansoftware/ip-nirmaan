@@ -990,3 +990,444 @@ W2C14 (the workflow change merges before the timer's second measured run),
 and notes decision P5. Each is noted in place. Gate W2C9 stands exactly as
 written, and so do the width, the window, the stops and every other gate of
 this batch.
+
+## Addendum (2026-11-25): meeting 2, the read of the re-measure batch and the exit verdict
+
+This addendum is meeting 2 of the wave 2 close. It has two parts. Part 1
+holds the rulings that do not depend on how the re-measure batch came out.
+The seats gave them, and the chair decided them, while the batch was still
+running, and Part 1 was committed and pushed before the batch's last record
+merged, so that the rule of the verdict was fixed before anyone read the
+outcome. Part 2 is the one read of the batch (gates W2C11 and W2C18) and
+the exit verdict.
+
+A key is an agent review. Nothing here is a person's approval, a release, a
+warranty of capability, or a claim that a design is ready to be made in
+silicon. A level is a measured figure of an agent seat on named eval cases
+under a stated input contract. The verdict is a statement about measured
+eval trials, decided by the council under the founder's delegation, and the
+founder can overrule it.
+
+### Who decided what
+
+- The council decided every item of Part 1. The founder was away and can
+  overrule any of it.
+- The rules of the read were fixed before slot 1 by meeting 1, its
+  addendum on parallel trials and the committed plan
+  (`evals/plans/2026-11-23-w2-remeasure.md`). Part 1 adds the rule of the
+  verdict and what the read must and must not say. Nothing was chosen at
+  the read.
+- Reserved for the founder and not decided here: the usage for any later
+  batch (decision M4), a source for systemverilog (meeting 1, decision 8),
+  names, and any public wording of the verdict.
+- This addendum loosens no gate and lifts no refusal. It changes no code,
+  case, eval record, level, card, document, fingerprint or digest. The
+  changes it orders are made by their own pull requests, each after the
+  batch's last record is on `main`.
+
+### Part 1: fixed before the read
+
+Eighteen seats gave round 1 positions, each as a read-only process of its
+own that saw no other position. Every seat was told not to open the
+batch's records or the current `capability/levels.json`, and to state no
+figure of the batch. The seats read ip-nirmaan `main` at 7c4587f2. Eleven
+seats gave a view on one item or more; tax-accounts gave none, and
+market-research, finance-licensing, legal-counsel, legal-compliance,
+partnerships and site-engineer spoke only to wording, usage or public
+pages. No trial ran and no workflow was dispatched for the meeting.
+
+#### Facts checked
+
+MF1 to MF9 number this addendum's facts. qa-evidence checked MF1 to MF4,
+MF6 and MF8 against the code and the committed records; the seat named
+checked the others.
+
+- MF1. Before slot 1 (`capability/levels.json` at f4292ff7): 16 Practised,
+  29 at Knowledge, none Proven. Of the batch's skills,
+  equivalence_checking, verification_planning, failure_triage,
+  root_cause_analysis, control_logic_design, functional_coverage and
+  python_verification had no counted group; code_coverage,
+  formal_verification, sva, assertion_coverage, directed_testing, apb and
+  rtl_design were Practised and are pooled by the batch.
+- MF2. The pull requests of gate W2C6 are merged, and the closed list of
+  three exceptions and its test are on `main`
+  (`docs/EVAL_SKILLS_MUST_FAIL.md`, section 6; ip#450). brand-content
+  searched `README.md`, `site/` and `docs/LANDING_PAGE_BRIEF.md`: no page
+  names a level, and the three skills are described nowhere as a
+  Practising capability. Gate W2C10 is met.
+- MF3. `scripts/failure_curriculum.py`, given the record keys of W2-L1
+  dated 2026-11-18 and 2026-11-19, lists thirteen model-labelled failures
+  with no answer: the eleven of W2-L1 (nine with documents, two without)
+  and two calibration records of the harness comparison on `rtl/apb-gpio`
+  with the same fault as W2-L1's two failures on that case. Given a path
+  where it expects a key, the script reports no failure and exits 0
+  (verification-lead, qa-evidence).
+- MF4. How a seat is told to cite a run. The system text of every work
+  seat says: list in `tool_runs` only run IDs from the citation list
+  (`src/nirmaan/runtime/harness.py:98`). The citation list shows each run
+  only as a token, `[run:<id>]` (`src/nirmaan/runtime/prompt.py:44-53`;
+  `src/veritriage/models/ai.py:114-116`). The answer's `tool_runs` entries
+  are taken as written (`src/nirmaan/runtime/model.py:392`), and an entry
+  that is not a recorded run is refused by rule P5
+  (`src/nirmaan/runtime/base.py:364-373`,
+  `src/nirmaan/work/policy.py:254-256`). The bare id is never shown alone.
+  The harness itself adds every run it made before the answer to the
+  result (`model.py:410`, `:420`), and `Prompt.resolve` already maps a
+  token to its id (`prompt.py:83-84`) but is not used for `tool_runs`
+  (ai-engineer). Only the failure_triage card asks for a cited session
+  (`src/nirmaan/company/skills.py:513`).
+- MF5. Each of those files is in `harness.CODE` or the harness settings
+  (`harness.py:159`, `:279-292`), so a change to the system text, the
+  prompt or the parsing moves the default fingerprint and makes every
+  counted group of every skill stale. A card or document sentence moves
+  one skill's digest only.
+- MF6. A surviving mutant's run is dropped in the must-fail scorer: it is
+  in the score's summary and in neither list of runs
+  (`src/nirmaan/evals/scorers.py:259-260`), so the record's `judge_runs`
+  (`src/nirmaan/evals/records.py:172-176`) cannot carry it. `scorers.py`
+  is the pinned group "Held-out scorers" of both committed plans and is in
+  no harness fingerprint. The level rule asks only whether `judge_runs` is
+  empty (`src/nirmaan/evals/levels.py:342`), and the re-judge compares
+  status only (`records.py:473-480`) (eda-tooling, ai-engineer).
+- MF7. No committed test compares a whole-flow slot record with the
+  plan's stage tables for the register block, and
+  `tests/test_whole_flow.py` refuses any whole-flow record outside
+  `evals/results/g3-timer/`, so that file changes before the record of
+  slot 21 can merge in any case (eda-tooling).
+- MF8. The check record of equivalence_checking passed with stale line
+  citations noted, and the document's seat-facing text names the kind of
+  error that case's held-out mutants make (ip#455).
+- MF9. No committed record sets a number of Practised skills that a wave
+  must reach. The build-out record sets a share for the pilot only
+  (product-lead).
+
+#### M1. The rule of the verdict
+
+The verdict has three forms, and they mean this (product-lead):
+
+- "Met": every exit item met, with no exception. Not available to this
+  wave: meeting 1 already named exceptions (its decisions 2 and 8).
+- "Met with named exceptions": the wave's work is closed and was measured
+  once. It says nothing about how many skills are Practised. The next
+  wave may start.
+- "Not met": the measurement or an exit item is unsound. The next wave
+  does not start on this wave's levels.
+
+The verdict is "met with named exceptions" when all of these hold:
+
+1. all 117 records are on `main` and were read once;
+   `scripts/capability_levels.py --check` passes and the levels generator
+   refuses no record; `scripts/failure_curriculum.py --strict` finds no
+   failed trial of the batch without a label; no `causes.md` label of the
+   batch changed after its record merged; and every record was made on the
+   values the plan names;
+2. every exit item of the wave is met or is an exception named by meeting
+   1 or by this addendum;
+3. every skill of the batch has the level the level rule computes,
+   whatever it is, stated with its group; each skill of the batch that is
+   not Practised after the read is carried as an open item with an owner
+   seat.
+
+It is "not met" only when item 1 fails, or a pooled or new group does not
+count for a reason other than its pass count (trials without a clean
+re-judge are the case the plan's section 8 leaves open; such a group gives
+"not met" until the council rules on it), or an exit item is neither met
+nor a named exception.
+
+There is no floor on the number of Practised skills. Every seat that spoke
+to it said so (verification-lead, qa-evidence, ai-engineer, eda-tooling,
+design-architect, product-lead, dft-engineer, physical-design-engineer,
+partnerships): no committed record gives a number (fact MF9), the level
+rule already judges pass counts, and a number chosen while part of the
+batch was merged could not be shown to be free of the outcome.
+
+The verdict's sentence is never quoted alone: the computed levels and the
+list of exceptions go with it.
+
+Owner: verification-lead.
+
+#### M2. What the read says, added to gates W2C11 and W2C18
+
+The read also states:
+
+1. the commit of the levels file it reads, and for each figure its group
+   key (ai-engineer, qa-evidence);
+2. for gates W2C2 to W2C4, in the plan's words and no wider: where every
+   trial, replay and re-judge ran, which account ran the tools that read
+   seat files, and that W2-L1's part of each pooled group ran on the
+   owner's machine without the seat account (security);
+3. that pooled groups mix versions of the EDA tools that W2-L1's records
+   do not name, as a limit of the pooled figures
+   (physical-design-engineer; meeting 1, fact 6);
+4. beside the figure of equivalence_checking, fact MF8;
+5. if control_logic_design is Practised: "one case, one control
+   structure" (design-architect);
+6. that round 1 of this meeting was held before the read.
+
+Never said, beyond the plan's list: a rate "of judged trials" or any count
+that leaves refused trials out; that a refused trial would have passed;
+"harness defect" as a fact (the label is an inference); that the seat can
+or cannot triage; that a card change caused a difference from W2-L1's
+group; an expected level after a fix; that a skill is capable, strong or
+ready; "sandboxed", "isolated" or "safe"; that the language standard was
+read or used for systemverilog; "verified", "certified", "guaranteed" or
+"production ready" of the wave.
+
+Owner: qa-evidence.
+
+#### M3. Trials refused on the form of a cited run
+
+Some trials of the batch never reached review because the seat wrote a
+run in `tool_runs` in the token form and rule P5 refused it (fact MF4).
+The lane that ran the batch labelled each before its record merged, as the
+plan's section 8 requires. The read states them so:
+
+1. each is a failed trial of its group; no count leaves them out;
+2. each is listed under "the trials no judge ran", with its label as
+   written; no label is changed;
+3. no curriculum line is owed for a label that is not "model";
+4. the read lists every refusal of this form, for every group, from the
+   committed `causes.md` files only;
+5. the read gives the mechanism of fact MF4 in plain words, says that the
+   link from it to each refusal is an inference, as the label does, says
+   whether other trials of the same cases passed under the same contract,
+   and calls each affected figure a figure of the seat under this input
+   contract. No rate is given without that.
+
+All five seats with a view agreed (verification-lead, qa-evidence,
+ai-engineer, eda-tooling, product-lead).
+
+Owner: verification-lead; qa-evidence for the wording.
+
+#### M4. The fix for the cited run, and measuring again
+
+1. First, after the batch's last record is on `main`: one sentence on the
+   failure_triage card and in its document that the `tool_runs` field
+   takes the bare run id. It moves that skill's digest only; the pull
+   request shows that no other skill's digest moves. The document's stale
+   line citation (`knowledge/verification/failure_triage.md:147`) is
+   corrected in the same change.
+2. Second, the harness resolves an entry of `tool_runs` that is one whole
+   listed token, with or without its brackets, to its run id, and the
+   system text states the form. Conditions (security): the unwrap is
+   exact and is made before the filters for runs of other tasks and
+   advisory runs; nothing partial, case-folded or nearest is matched; no
+   tool name or label stands for a run; no id is taken from prose; an
+   unknown entry is never dropped silently and still goes to rule P5,
+   whose meaning does not change; and a test shows an unrecorded run
+   refused in either form. This change moves the default fingerprint
+   (fact MF5), so it never merges alone: it merges with the next planned
+   change that restarts every group, it returns to the council first
+   (gate ET7 of `council/records/2026-11-22-eda-tools-seat-account.md`),
+   and its pull request states the old and the new fingerprint and every
+   group it makes stale.
+3. No sentence is added to another skill's card now. Every work seat reads
+   the same system text, so every seat is exposed (fact MF4); only
+   failure_triage's card asks for a cited session, and a sentence
+   elsewhere would make a group stale with no recorded failure behind it.
+4. failure_triage is never measured again inside this batch. It is
+   measured again only under a new committed plan, in the next
+   verification batch, as a new group, in both arms, and that plan says
+   that the sentence of item 1 was written after these refusals were seen
+   and is part of what is measured. The usage for that batch is a new ask
+   to the founder (meeting 1, decision 5, item 4); nothing here approves
+   it (finance-licensing).
+
+ai-engineer added: if no change that restarts every group is planned by
+the time the next verification batch's plan is written, it would bring
+item 2 forward and accept the re-measure of every group. Not ruled now; it
+returns with that plan.
+
+Owners: verification-lead (items 1 and 4); ai-engineer, with security
+(item 2).
+
+#### M5. A note on testbenches and parameter values
+
+A knowledge note is wanted: a testbench is built at every parameter value
+the requirements name. Every seat that spoke agreed. It is written from
+open sources that an agent can read in full, each with its access type and
+licence check, summarised and cited and never copied; it holds no text,
+signal name, requirement id or parameter value of the timer case; and it
+is checked by a different session than the one that wrote it
+(legal-compliance, `knowledge/README.md`).
+
+Where it goes. The two trials that failed this way were whole-flow trials
+in which the RTL stage's seat wrote the testbench, and the testbench rules
+that seat reads are in `knowledge/design/rtl_design.md`
+(design-architect). So the note goes there, as one line of that section,
+because a note that does not reach the seat that failed does not answer
+the failure. It makes rtl_design's counted group stale, and no other
+group. It therefore merges after the register block's slot 40, so that
+both whole-flow cases run on one document, and together with the committed
+plan of the batch that measures rtl_design again. verification-lead may
+put the same rule in `knowledge/verification/directed_testing.md` with the
+next verification batch's plan; that is its choice as owner of that
+document and is not required here.
+
+Not adopted: verification-lead asked for the note in
+`directed_testing.md` now, because it costs the smaller group. Recorded
+under dissent. Also carried, from the same seat: the whole-flow testbench
+is written by a stage that holds no verification skill (owner
+design-architect, with verification-lead).
+
+Owners: verification-lead's lane writes it; design-architect holds key 1
+on it.
+
+#### M6. A surviving mutant's run in the record
+
+A surviving mutant's run is carried into `judge_runs`. The fix is in
+`src/nirmaan/evals/scorers.py`, where the run is dropped, for both
+must-fail scorers; the test, in `tests/test_nirmaan_eval_must_fail.py`,
+fails first and shows the run in `judge_runs` with `succeeded: true`. It
+moves the pinned group "Held-out scorers" of both plans and no
+fingerprint. So it merges after this batch's last record, and then either
+before the register block's slot 21, with the moved digest restated in
+that case's dated addition, or after slot 40, never in between. No
+committed record is rewritten; records made before it keep the gap, and
+the verdict of each is still held by its re-judge. No level moves (fact
+MF6).
+
+Owner: eda-tooling; qa-evidence checks.
+
+#### M7. The register block, before slot 21
+
+eda-tooling's condition in the eighth addendum to
+`council/records/2026-11-17-g3-whole-flow-cases.md` is confirmed. Before
+slot 21:
+
+1. the dispatcher refuses slots 21 to 40 when the whole-flow plan holds
+   no stage tables for the register block, with no fall back to the
+   timer's, and the showing of decision F3, item 5 of that record is made
+   again on a register block record; firmware-engineer asked that it add
+   one copy with the firmware stage's skill digest changed and one with
+   the firmware stage not run after a completed RTL stage;
+2. in `tests/test_whole_flow.py`, one pull request: the table test covers
+   the register block's rows, and a new test checks every committed slot
+   record against decision F3, item 3, with item 5's refused copies and
+   one accepted stopped record as cases. It runs in the ordinary test job,
+   with no secret and no dispatch. It controls what merges, not what is
+   dispatched;
+3. the register block's dated addition states, per arm, the firmware
+   stage's skills and digest, the parameters its held-out checks use, and
+   where the driver ran (firmware-engineer).
+
+A checker under `scripts/` that the dispatcher calls is a follow-up, not a
+condition. Item 2 as a condition is eda-tooling's and security's;
+verification-lead and firmware-engineer held that a repository check is a
+follow-up. The chair takes the condition: the file must change before the
+record of slot 21 can merge in any case (fact MF7), and a gate that rests
+on private tooling alone is a seat's statement and not a control.
+Recorded under dissent.
+
+Owners: eda-tooling (items 1 and 2); firmware-engineer reads item 3.
+
+#### M8. The curriculum answers for W2-L1
+
+Meeting 1, decision 8, item 5 asked for the eleven answers in the pull
+request of this addendum. They are given there, one line per failure, in
+the form `scripts/failure_curriculum.py` reads, with these rulings
+(verification-lead, qa-evidence):
+
+| Failures | Case | Answer |
+|---|---|---|
+| two, with documents | `dv/plan-irq-ctrl` | note: `knowledge/verification/verification_planning.md` (ip#439) |
+| three, with documents | `dv/equiv-gray` | note: `knowledge/verification/equivalence_checking.md` (ip#431, ip#443, ip#453) |
+| one, with documents | `dv/coverage-irq-ctrl` | must-fail: `evals/dv/coverage_tick_timer.json` (ip#436); that its mutant is of the same class as the survivor is an inference, and the line says so |
+| two, with documents | `rtl/apb-gpio` | note: `knowledge/design/control_logic_design.md` (ip#439). `evals/rtl/apb_gpio_reset.json` is not given as the answer: it merged before these failures |
+| one, with documents | `debug/root-cause-uart-tx` | no: a written reason that cites ip#442; a card change is not a note |
+| one, without documents | `debug/root-cause-uart-tx` | no: the same reason, citing ip#442 (meeting 1, decision 8, item 4) |
+| one, without documents | `dv/plan-irq-ctrl` | no: the arm without documents; the fault is answered by the note of the first row |
+
+The two calibration records of fact MF3 are answered in the same list with
+the note of the fourth row, since the script lists them with these keys
+and they show the same fault. The script is run with record keys only
+(fact MF3), and its output is quoted in the pull request.
+
+Owner: verification-lead; qa-evidence checks the list.
+
+#### M9. Open items of meeting 1
+
+1. **EDA tool versions and the fingerprint** (meeting 1, open item 5).
+   Ruled: tool versions do not enter the default fingerprint. It would
+   make the fingerprint depend on the machine and restart every group, and
+   a gate's verdict is held by the re-judge. Instead each trial records
+   the versions of the tools it ran, in a field of the record outside
+   every fingerprint, from the next verification batch on (owner
+   eda-tooling; ai-engineer checks). For physical design a version line is
+   not enough: before the first counted trial of a physical-design skill,
+   the identity of the tool image and of the library and rule files is in
+   the record and in that batch's fingerprint; decided with that wave's
+   plan (owner ai-engineer, with eda-tooling and
+   physical-design-engineer).
+2. **The equivalence_checking text** (fact MF8). Reworded after the
+   batch, in one change with the corrected line citations, so the group
+   goes stale once; the read carries the caveat (decision M2, item 4).
+   Owner verification-lead.
+3. **Stale citations in a check record.** Stale line numbers alone do not
+   fail a check record when the checker verified each sentence at the
+   head and the record carries the current location. A sentence that
+   could not be verified fails it. A machine check of cited lines is a
+   follow-up (owner qa-evidence).
+4. **`rtl/apb-gpio-reset`.** Ruled: its trials never enter any group's
+   count, since it is one task with `rtl/apb-gpio` and would count one
+   answer twice (meeting 1, fact 4). It stays a must-fail control and, if
+   ever run, is reported beside `rtl/apb-gpio` (design-architect).
+5. **Carried, not ruled:** history for the triage binding and a bound
+   `regression.run` (the next verification batch's wave, with the next
+   change that restarts every group; eda-tooling, ai-engineer, security);
+   section placement in the planning contract and second cases for
+   constrained_random, reference_modelling and model_checking (the next
+   verification batch's plan; verification-lead); second cases for
+   fsm_design, arbitration, pipeline_design and control_logic_design (the
+   Design wave; design-architect); the processor models unit (the
+   processor wave; design-architect, whose weak dissent of meeting 1 is
+   not renewed).
+
+#### M10. Practice leads, restated
+
+Meeting 1, decision 1 asked verification-lead to restate the fact at each
+wave close. The review's records still hold no wait per department: every
+key-1 verdict names the team. For the team, the median key-1 wait since
+meeting 1 was not above the other teams', and the long waits lay inside
+session-limit pauses. The condition is not met; no lead is seated.
+
+Owner: verification-lead.
+
+#### Positions not adopted, and dissent (Part 1)
+
+- verification-lead: the testbench note in `directed_testing.md` now
+  (decision M5). Not adopted.
+- verification-lead and firmware-engineer: the repository check for the
+  register block as a follow-up (decision M7). Not adopted.
+- verification-lead: the rule of the verdict merged before any seat reads
+  the batch. Adopted in substance: Part 1 was committed and pushed before
+  the batch's last record merged, and it merges with Part 2 in one pull
+  request, since a pull request merged during the batch would have gone
+  through the same review loop the batch's records were using.
+- ai-engineer: the harness fix brought forward if no change that restarts
+  every group is planned (decision M4). Not ruled.
+- qa-evidence and verification-lead named `records.py` for decision M6;
+  eda-tooling and ai-engineer showed the run is dropped in `scorers.py`.
+  The chair takes the owners' file.
+
+No seat dissented from the rule of the verdict, from having no floor,
+from how the refused trials are stated, or from the order of the two
+fixes.
+
+#### Gates added
+
+| Gate | Condition | Owner seat |
+|---|---|---|
+| W2C19 | The read states what decisions M2 and M3 ask and nothing they forbid | qa-evidence |
+| W2C20 | After the batch's last record: the failure_triage sentence of decision M4, item 1, moving one digest; failure_triage measured again only under a new committed plan, on the founder's answer on usage | verification-lead |
+| W2C21 | The harness change of decision M4, item 2 merges only with a planned change that restarts every group, after a council ruling, with security's conditions and their test | ai-engineer |
+| W2C22 | The note of decision M5 in `knowledge/design/rtl_design.md`, after slot 40 and with the plan that measures rtl_design again | design-architect |
+| W2C23 | The scorer change of decision M6, after this batch's last record and outside slots 21 to 40 | eda-tooling |
+| W2C24 | Before slot 21: decision M7, items 1 to 3 | eda-tooling |
+| W2C25 | From the next verification batch: each trial records the versions of the tools it ran (decision M9, item 1) | eda-tooling |
+
+### Part 2: the read and the verdict
+
+Not yet written. The batch's last record was not on `main` when Part 1
+was committed. Part 2 is added to this addendum, in the same pull request,
+after the one read.
