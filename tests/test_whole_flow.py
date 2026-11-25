@@ -958,7 +958,8 @@ def test_a_register_block_record_is_checked_against_its_own_tables_including_the
     after_rtl = _regs_trial(rows, values, "on", [COMPLETED] * 4 + [NOT_RUN])
     assert any("'rtl-implementation' completed, yet the next stage was not run" in p
                for p in _slot_record_problems(after_rtl, 21, text))
-    assert _slot_record_problems(full, 21, PLAN.read_text(encoding="utf-8")) == [
+    untabled = "\n".join(line for line in text.splitlines() if not line.startswith(f"| `{REGS_CASE}` |"))
+    assert _slot_record_problems(full, 21, untabled) == [
         f"the plan states no stage tables for {REGS_CASE}, arm with documents"]
     assert _slot_record_problems(full, 1, text)  # a timer slot: refused
 
