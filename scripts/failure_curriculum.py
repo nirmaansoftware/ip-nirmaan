@@ -17,6 +17,7 @@ its bare name, or `g3-timer/slot-NN/<name>` for a record nested under a slot fol
     python scripts/failure_curriculum.py --body-file body.md      answers from a file (`-` is stdin)
     python scripts/failure_curriculum.py --pr 123                 answers from that PR's body (gh)
 
+Exit 2 when a --records key matches no record (a path where a key belongs, a typo, no key at all).
 Exit 1 when a model failure in scope has no valid answer. With no answers given it lists and exits 0 (the dry run);
 `--require` makes that an error too. Failed trials that carry no label at all are listed and fail with `--strict`.
 """
@@ -123,6 +124,12 @@ def failed_trials(results: Path) -> list[tuple[str, int]]:
     return out
 
 
+def record_keys(results: Path) -> set[str]:
+    """The key of every committed record: a folder that holds a trial or a causes.md, passing trials included."""
+    keys = {_key(p.parent.parent, results) for p in results.rglob("trial-*.json")}
+    return keys | {_key(p.parent, results) for p in results.rglob("causes.md")}
+
+
 def parse_answers(text: str) -> dict[str, tuple[str, str]]:
     answers: dict[str, tuple[str, str]] = {}
     for line in text.splitlines():
@@ -147,6 +154,14 @@ def judge(failure: Failure, answers: dict[str, tuple[str, str]], root: Path) -> 
 
 def run(results: Path, root: Path, records: list[str] | None, answers_text: str | None, require: bool, strict: bool,
         out) -> int:
+    if records is not None:
+        known = record_keys(results)
+        unknown = [r for r in records if r not in known] or ([] if records else ["(no key given)"])
+        if unknown:
+            print("--records matches no record: " + ", ".join(repr(r) for r in unknown), file=out)
+            print("A record key is the folder's path under evals/results (its bare name, or "
+                  "g3-timer/slot-NN/<name>), not a file path.", file=out)
+            return 2
     rows, problems = labels(results)
     scope = (lambda r: records is None or r in records)
     model = [f for f in rows if f.is_model and scope(f.record)]

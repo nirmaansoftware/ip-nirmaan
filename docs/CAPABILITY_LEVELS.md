@@ -138,9 +138,10 @@ three things, listed in the pull request that commits the batch:
 The PR body carries a "Failure curriculum" section with one line per failure,
 `- <record folder>:trial-NN: note: <path>`, `must-fail: <path>` or `no: <reason>`
 (a reason is at least 20 characters; a path must exist in the repository).
-`python scripts/failure_curriculum.py --records <the batch's folders> --pr <n>`
+`python scripts/failure_curriculum.py --records <the batch's record keys> --pr <n>`
 lists the model-labelled failures of the batch and the answers, and exits 1 when
-one is unanswered. With no answers it is a dry run: it lists and exits 0
+one is unanswered, and exits 2 when a `--records` key matches no record (a key is the
+folder's path under `evals/results`, not a file path). With no answers it is a dry run: it lists and exits 0
 (`--require` makes it fail). Failed trials that no `causes.md` labels are listed
 too (`--strict` fails on them). Causes other than "model" (harness, case defect,
 plan limit) need no answer here; they have their own owners. The checker reads

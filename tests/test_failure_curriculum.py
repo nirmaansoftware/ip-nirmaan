@@ -126,7 +126,7 @@ def test_a_nested_failed_trial_with_no_label_is_listed_by_its_key_and_scope_foll
     code, out = _run(results, None, strict=True)
     assert code == 1 and "  g3-timer/slot-01/2026-01-01-x-m:trial-01" in out
     scoped = io.StringIO()
-    assert fc.run(results, ROOT, ["2026-01-01-x-m"], None, False, True, scoped) == 0  # a bare name is no key
+    assert fc.run(results, ROOT, ["2026-01-01-x-m"], None, False, True, scoped) == 2  # a bare name is no key: refused
     assert fc.run(results, ROOT, ["g3-timer/slot-01/2026-01-01-x-m"], None, False, True, io.StringIO()) == 1
 
 
@@ -160,3 +160,49 @@ def test_the_committed_w2_l1_answers_answer_every_model_failure_of_that_batch():
     assert len(fc.parse_answers(text)) == 13
     # The script must also fail on this batch when the answers are missing, or the test proves nothing.
     assert fc.run(results, ROOT, keys, "", True, True, io.StringIO()) == 1
+
+
+def _run_records(results, records, answers=None, **kw):
+    out = io.StringIO()
+    code = fc.run(results, ROOT, records, answers, kw.get("require", False), kw.get("strict", False), out)
+    return code, out.getvalue()
+
+
+def test_a_records_argument_that_matches_no_record_is_refused_not_reported_as_zero(tmp_path):
+    """Wave 2 close, action A7: a path where a key is expected reported 0 failures and exited 0."""
+    results = _batch(tmp_path)
+    for wrong in (["evals/results/2026-01-01-x-m"], ["2026-01-01-x"], ["2026-01-01-x-m/"], [""]):
+        code, text = _run_records(results, wrong)
+        assert code == 2, (wrong, text)
+        assert "matches no record" in text and "model-labelled failures in scope" not in text, (wrong, text)
+    assert _run_records(results, [])[0] == 2  # `--records` with no key at all
+
+
+def test_one_unknown_key_among_known_ones_refuses_the_whole_call(tmp_path):
+    results = _batch(tmp_path)
+    code, text = _run_records(results, ["2026-01-01-x-m", "2026-01-01-nope"], "", require=True)
+    assert code == 2 and "'2026-01-01-nope'" in text and "'2026-01-01-x-m'" not in text
+
+
+def test_a_records_key_that_names_a_record_still_scopes_the_batch(tmp_path):
+    results = _batch(tmp_path)
+    code, text = _run_records(results, ["2026-01-01-x-m"], "")
+    assert code == 1 and "model-labelled failures in scope: 1" in text
+    code, text = _run_records(results, ["2026-01-01-x-m"], None)
+    assert code == 0
+
+
+def test_a_record_with_only_passing_trials_is_still_a_record(tmp_path):
+    results = _batch(tmp_path)
+    clean = results / "2026-01-02-y-m" / "rtl_a"
+    clean.mkdir(parents=True)
+    (clean / "trial-01.json").write_text(json.dumps({"trial": 1, "purpose": "evidence",
+                                                     "result": {"passed": True, "replay": False}}))
+    code, text = _run_records(results, ["2026-01-02-y-m"], "")
+    assert code == 0 and "model-labelled failures in scope: 0" in text
+
+
+def test_main_exits_2_on_an_unknown_key(tmp_path, capsys):
+    results = _batch(tmp_path)
+    assert fc.main(["--results", str(results), "--records", "evals/results/2026-01-01-x-m"]) == 2
+    assert "matches no record" in capsys.readouterr().out
