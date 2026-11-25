@@ -1,0 +1,137 @@
+{
+  "answers": [
+    {
+      "cache_read_tokens": 7639,
+      "cache_write_tokens": 312,
+      "error": null,
+      "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+      "input_tokens": 2,
+      "mode": "work",
+      "model": "claude-opus-5-5",
+      "output_tokens": 1870,
+      "packet_sha256": "8e26ac78c4560330ac943b077dba6531cb4907a76ca49736f06641f13a2b2cc5",
+      "prompt_sha256": "764a4f5e16c78eccb12af4053fc857decda4454e4e5eccf911e09a8cf142d058",
+      "provider": "claude-code",
+      "text": "{\"uncertainty\": 0.25, \"outcome\": \"Equivalence setup submitted: gray_counter.v (gold) against gray_counter_refactor.v (gate), proved with the sby strategy. No equivalence result is reported here. The platform's equivalence.run decides the result.\", \"artifacts\": [{\"kind\": \"equivalence_report\", \"title\": \"Equivalence report: gray_counter.v (gold) vs gray_counter_refactor.v (gate)\", \"summary\": \"This report serves [requirement:req-5de0de52be], an equivalence check of the existing Gray-code counter against its refactor. Gold is the approved [artifact:prj-675bd09855.design-under-test.a1] gray_counter.v. Gate is the approved [artifact:prj-675bd09855.design-under-test.a2] gray_counter_refactor.v. Both are elaborated with 'prep -top gray_counter' from the allow-listed Yosys commands. The [gold] and [gate] scripts read different files, so the scripts differ. The setup reads both approved sources by name. It names a single strategy, 'sby' with engine smtbmc at depth 16, and no sat fallback. The reason is that the design holds a 4-bit state register, where a sat pass is weaker evidence. Depth 16 covers one full wrap of the 16-code sequence. The expected compare points are the outputs gray[3:0] and wrap, and the register gray, which has the same name in both versions. Independent review of the design-under-test inputs is recorded in [evidence:prj-675bd09855.design-under-test.e1]. No run result exists yet. Equivalence, the partition count and the compared file names must be read from the platform's equivalence.run summary. A reviewer mutation check is still outstanding, for example one wrong flip bit or a wrong wrap code in the gate.\"}], \"files\": [{\"path\": \"gray_counter.eqy\", \"kind\": \"equivalence_setup\", \"title\": \"eqy setup: gray_counter.v gold vs gray_counter_refactor.v gate\", \"summary\": \"Single eqy setup for [requirement:req-5de0de52be]. [gold] reads [artifact:prj-675bd09855.design-under-test.a1] gray_counter.v, and [gate] reads [artifact:prj-675bd09855.design-under-test.a2] gray_counter_refactor.v. Each side is elaborated with prep -top gray_counter. The only strategy is sby with engine smtbmc at depth 16. Only allow-listed sections and commands are used.\", \"entry\": \"gray_counter\"}], \"tool_runs\": [], \"claims\": [\"By hand reading: both versions reset gray to 4'b0000 synchronously and hold gray when en is low.\", \"By hand reading: the refactor's parity rule matches decode/+1/encode for a 4-bit reflected Gray code. On even parity it flips bit 0. Otherwise it flips the bit to the left of the lowest set bit, and from 1000 it flips bit 3, which wraps to 0000.\", \"By hand reading: wrap = en & gray[3] & ~|gray[2:0] is the same function as en && (gray == 4'b1000).\", \"These hand readings are not evidence. Only the platform's equivalence.run over gray_counter.eqy can substantiate equivalence.\"], \"escalation\": null, \"notes\": \"Exactly one equivalence_setup file is submitted. It refers to the approved RTL by name and writes no file with those names. Both RTL files declare module gray_counter, which is fine because eqy elaborates gold and gate as separate designs. No [match] or [recode] sections are needed: the state register and port names are identical and no FSM was recoded. Equivalence only shows the refactor matches gold. It does not show that gold meets a specification.\"}\n\n=== FILE: gray_counter.eqy ===\n[gold]\nread_verilog gray_counter.v\nprep -top gray_counter\n\n[gate]\nread_verilog gray_counter_refactor.v\nprep -top gray_counter\n\n[strategy sby]\nuse sby\ndepth 16\nengine smtbmc\n=== END FILE ==="
+    }
+  ],
+  "format": "nirmaan.eval-trial",
+  "harness_variant": "default",
+  "judge_runs": [
+    {
+      "check": "The seat's setup proves the approved refactor equivalent and fails each non-equivalent refactor",
+      "params": {
+        "eqy": "/tmp/nirmaan-eval-lau456xj/judge/check-1/must-fail-vz9q1ho3/clean/gray_counter.eqy",
+        "sources": [
+          "/tmp/nirmaan-eval-lau456xj/judge/check-1/must-fail-vz9q1ho3/clean/gray_counter.v",
+          "/tmp/nirmaan-eval-lau456xj/judge/check-1/must-fail-vz9q1ho3/clean/gray_counter_refactor.v"
+        ]
+      },
+      "run": "run-0002",
+      "succeeded": true,
+      "summary": "eqy: equivalent: gate gray_counter_refactor.v against gold gray_counter.v: every partition proved (2 of 2)",
+      "tool": "equivalence.run"
+    },
+    {
+      "check": "The seat's setup proves the approved refactor equivalent and fails each non-equivalent refactor",
+      "params": {
+        "eqy": "/tmp/nirmaan-eval-lau456xj/judge/check-1/must-fail-vz9q1ho3/mutant-1-1/gray_counter.eqy",
+        "sources": [
+          "/tmp/nirmaan-eval-lau456xj/judge/check-1/must-fail-vz9q1ho3/mutant-1-1/gray_counter.v",
+          "/tmp/nirmaan-eval-lau456xj/judge/check-1/must-fail-vz9q1ho3/mutant-1-1/gray_counter_refactor.v"
+        ]
+      },
+      "run": "run-0003",
+      "succeeded": false,
+      "summary": "eqy: not equivalent: gate gray_counter_refactor.v against gold gray_counter.v: 1 of 2 partitions not proved; first: gray_counter.gray (partitions not equivalent (strategy sby))",
+      "tool": "equivalence.run"
+    },
+    {
+      "check": "The seat's setup proves the approved refactor equivalent and fails each non-equivalent refactor",
+      "params": {
+        "eqy": "/tmp/nirmaan-eval-lau456xj/judge/check-1/must-fail-vz9q1ho3/mutant-1-2/gray_counter.eqy",
+        "sources": [
+          "/tmp/nirmaan-eval-lau456xj/judge/check-1/must-fail-vz9q1ho3/mutant-1-2/gray_counter.v",
+          "/tmp/nirmaan-eval-lau456xj/judge/check-1/must-fail-vz9q1ho3/mutant-1-2/gray_counter_refactor.v"
+        ]
+      },
+      "run": "run-0004",
+      "succeeded": false,
+      "summary": "eqy: not equivalent: gate gray_counter_refactor.v against gold gray_counter.v: 1 of 2 partitions not proved; first: gray_counter.wrap (partitions not equivalent (strategy sby))",
+      "tool": "equivalence.run"
+    },
+    {
+      "check": "The seat's setup proves the approved refactor equivalent and fails each non-equivalent refactor",
+      "params": {
+        "eqy": "/tmp/nirmaan-eval-lau456xj/judge/check-1/must-fail-vz9q1ho3/mutant-1-3/gray_counter.eqy",
+        "sources": [
+          "/tmp/nirmaan-eval-lau456xj/judge/check-1/must-fail-vz9q1ho3/mutant-1-3/gray_counter.v",
+          "/tmp/nirmaan-eval-lau456xj/judge/check-1/must-fail-vz9q1ho3/mutant-1-3/gray_counter_refactor.v"
+        ]
+      },
+      "run": "run-0005",
+      "succeeded": false,
+      "summary": "eqy: not equivalent: gate gray_counter_refactor.v against gold gray_counter.v: 1 of 2 partitions not proved; first: gray_counter.gray (partitions not equivalent (strategy sby))",
+      "tool": "equivalence.run"
+    }
+  ],
+  "knowledge": "on",
+  "model": "claude-opus-5-5",
+  "purpose": "evidence",
+  "record": "2026-11-25-claude-code-claude-opus-5-5",
+  "result": {
+    "attempts": 1,
+    "attestations": [],
+    "audit_ok": true,
+    "case": "dv/equiv-gray",
+    "case_digest": "sha256:d3b0b6f5c5928296533c6b021b3a0fe6621ce317f2cba76e68ba071fd116f860",
+    "cli": "2.1.325",
+    "cost_usd": null,
+    "detail": "Exactly one equivalence_setup file is submitted. It refers to the approved RTL by name and writes no file with those names. Both RTL files declare module gray_counter, which is fine because eqy elaborates gold and gate as separate designs. No [match] or [recode] sections are needed: the state register and port names are identical and no FSM was recoded. Equivalence only shows the refactor matches gold. It does not show that gold meets a specification.",
+    "duration_s": 21.897,
+    "gate_runs": [
+      {
+        "run": "run-0001",
+        "succeeded": true,
+        "summary": "eqy: equivalent: gate gray_counter_refactor.v against gold gray_counter.v: every partition proved (2 of 2)",
+        "tool": "equivalence.run"
+      }
+    ],
+    "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+    "input_tokens": 2,
+    "model_calls": 1,
+    "output_tokens": 1870,
+    "passed": true,
+    "replay": false,
+    "runtime": "claude-code",
+    "sandbox": "/tmp/nirmaan-eval-lau456xj",
+    "scores": [
+      {
+        "failed_runs": [
+          "run-0003",
+          "run-0004",
+          "run-0005"
+        ],
+        "name": "The seat's setup proves the approved refactor equivalent and fails each non-equivalent refactor",
+        "runs": [
+          "run-0002"
+        ],
+        "scorer": "must-fail",
+        "status": "passed",
+        "summary": "equivalence.run run-0002 passed on the clean inputs; 3 of 3 mutants failed it"
+      }
+    ],
+    "seat": "prj-675bd09855:equivalence",
+    "seat_status": "in_review",
+    "started_at": "2026-11-25T03:41:11.727726Z",
+    "submitted": true,
+    "tool_calls": [],
+    "version": "1.25.0"
+  },
+  "skills": {
+    "equivalence_checking": "sha256:3e5a9675b1f975732c708689218a173566da26d28321e898616b1f79b9db9bca"
+  },
+  "stage": "equivalence",
+  "trial": 1,
+  "version": 1
+}
