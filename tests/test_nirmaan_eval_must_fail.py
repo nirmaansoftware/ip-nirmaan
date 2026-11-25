@@ -239,7 +239,7 @@ def test_a_surviving_mutant_run_is_in_the_record(nirmaan_org, fixed_clock, tmp_p
 
 @needs("verilator", "iverilog", "vvp", "yosys")
 def test_must_fail_each_lists_its_passing_mutant_runs(nirmaan_org, fixed_clock, tmp_path):
-    """Decision M6: a triage with repros for two of three bugs; every mutant run is in judge_runs, passed or not."""
+    """Decision M6: a triage with repros for two of three bugs; every passing mutant run is in judge_runs."""
     from test_debug_evals import _case, _reference
 
     case = _case("debug/triage-three-bugs")
