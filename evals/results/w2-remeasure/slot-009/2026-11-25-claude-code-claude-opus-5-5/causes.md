@@ -1,0 +1,11 @@
+# Failed trial and its cause (dv/coverage-tick-timer, slot 9)
+
+Record `2026-11-25-claude-code-claude-opus-5-5`, one trial, wave 2 re-measure batch slot 9 of 117 (round 1, arm E, with documents), purpose evidence, run 45521481562, manifest head_sha `f4292ff7`, harness `sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00`, case digest `sha256:b4be7351302e30fcb73109e39941b7d05871cf99957c46a9495fda80e3cae17a`, Claude Code 2.1.325, seat model claude-opus-5-5. Re-judged: the verdict reproduces (`rejudge.json`, `same: true`). Written before this record merged, from the record only (the seat's answer, its gate run, the judge runs and the score); plan `evals/plans/2026-11-23-w2-remeasure.md`, section 8 ("Labels"). A cause is stated as fact only where the record shows it; anything else is marked inference.
+
+| Record | Trial | Outcome | Cause | What the record shows |
+|---|---|---|---|---|
+| this | 1 | not passed, judged | model (the testbench never runs periodic mode with IE clear) | The seat's gate passed: `coverage.read` run-0002, "line 100.00% (10/10), toggle 84.54% (93/110), branch 100.00% (8/8); simulation passed: 137 checks passed". The held-out must-fail check failed: the testbench passed the approved RTL (run-0003, run-0004) and three mutants failed it (run-0005 to run-0007), but "mutant tests/fixtures/dv/tick_timer/mutants/tick_timer_irq_ie_ignored_periodic.v survived: coverage.read run-0008 passed". That mutant's header: "IE masks the interrupt in one-shot mode only: in periodic mode irq follows EXPIRED whatever IE says." The testbench in the seat's answer writes CTRL only with `0x0`, `0x1`, `0x4`, `0x5`, `0x7` and `0xFFFF_FFFF`: periodic mode (bit 1) is set only together with IE (bit 2), so no check sees irq with IE clear in periodic mode. Its checks of irq low without IE are in one-shot mode. |
+
+Fact: every CTRL value the testbench writes that sets MODE also sets IE; the surviving mutant differs from the approved RTL only when MODE is set and IE is clear.
+
+Inference, not fact: the mutant survived because that combination is never driven. The judge does not report which check a testbench driving it would have failed. Whether the knowledge document or the case text names this combination is not part of this label.

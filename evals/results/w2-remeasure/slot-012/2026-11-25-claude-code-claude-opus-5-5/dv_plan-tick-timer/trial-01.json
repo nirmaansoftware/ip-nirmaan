@@ -1,0 +1,189 @@
+{
+  "answers": [
+    {
+      "cache_read_tokens": 620,
+      "cache_write_tokens": 7680,
+      "error": null,
+      "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+      "input_tokens": 2,
+      "mode": "work",
+      "model": "claude-opus-5-5",
+      "output_tokens": 7116,
+      "packet_sha256": "7f090b5000f82ad6d96c094a222c1057adea6bd0988bf03ff5d39265cd4be9d3",
+      "prompt_sha256": "0e28e9f09162a56730c3b76dd3efa675480113a3eca0d20f86aec94d55022971",
+      "provider": "claude-code",
+      "text": "```json\n{\"uncertainty\": 0.25, \"outcome\": \"Verification plan for tick_timer written as verification_plan.json. It quotes all 15 tagged requirements of the approved interface_spec.md. Each requirement has at least one planned test, and most also have an assertion. Nothing is verified yet; vplan.check has not run.\", \"artifacts\": [{\"kind\": \"verification_plan\", \"title\": \"tick_timer verification plan\", \"summary\": \"This plan maps each of the 15 [req:...] requirements of [artifact:prj-5d67729821.interface-spec.a1] to planned tests in tb_tick_timer.sv and assertions in tick_timer_sva.sv. It traces to [requirement:req-f7e179000a]. The spec it is based on has the review recorded as [evidence:prj-5d67729821.interface-spec.e1].\"}], \"files\": [{\"path\": \"verification_plan.json\", \"kind\": \"verification_plan\", \"title\": \"tick_timer verification plan (nirmaan.vplan v1)\", \"summary\": \"A nirmaan.vplan version 1 plan. It quotes every tagged requirement of [artifact:prj-5d67729821.interface-spec.a1] verbatim, with source interface_spec.md. It has 15 test items and 11 assertion items, and every requirement is proven by at least one item. It serves [requirement:req-f7e179000a].\", \"entry\": null}], \"tool_runs\": [], \"claims\": [\"Requirement texts were copied from the spec content shown in the task, with the [req:ID] tags removed; I expect them to match after whitespace is collapsed.\", \"No coverage_point items are planned. coverage.read reads coverage of design files, and the existing RTL file name is not given in my inputs, so I could not name the file. Functional coverage is still to be planned once the RTL file name is known.\", \"The testbench file tb_tick_timer.sv and the assertion file tick_timer_sva.sv are planned names; they do not exist yet as far as my inputs show.\", \"TMR-PARAM requires running the tests at several values of W (at least 4, 16 and 32); the test item states this.\"], \"escalation\": null, \"notes\": \"All requirements have at least one item, so no 'no item yet' entries are expected. Reviewers should check each item against the requirement text it claims to prove, because the check reads only the IDs. Write-ordering cases (TMR-WRITE-WINS, TMR-SET-WINS) are planned as both directed tests and assertions, since they are corner cases that random stimulus may miss.\"}\n```\n=== FILE: verification_plan.json ===\n{\n  \"format\": \"nirmaan.vplan\",\n  \"version\": 1,\n  \"requirements\": [\n    {\"id\": \"TMR-PARAM\", \"section\": \"1. Parameters\", \"source\": \"interface_spec.md\",\n     \"text\": \"The block works for every `W` from 4 to 32, and bits `W` and up of the `LOAD` and `COUNT` registers read as zero; a write to `LOAD` ignores them.\"},\n    {\"id\": \"TMR-RESET\", \"section\": \"4.1 Reset and registers\", \"source\": \"interface_spec.md\",\n     \"text\": \"While `rst_n` is low at a rising edge of `clk`, `CTRL`, `LOAD`, `COUNT` and `STATUS` clear to zero.\"},\n    {\"id\": \"TMR-REG-RW\", \"section\": \"4.1 Reset and registers\", \"source\": \"interface_spec.md\",\n     \"text\": \"A write to `CTRL` stores `wdata` bits 2 to 0 in it, and a write to `LOAD` stores `wdata` bits `W-1` to 0 in it.\"},\n    {\"id\": \"TMR-READ\", \"section\": \"4.1 Reset and registers\", \"source\": \"interface_spec.md\",\n     \"text\": \"A read never changes any register; `rdata` follows `addr` with no clock edge.\"},\n    {\"id\": \"TMR-START\", \"section\": \"4.2 Counting\", \"source\": \"interface_spec.md\",\n     \"text\": \"At a rising edge where a write to `CTRL` sets `EN` and `EN` was 0, the count loads the `LOAD` value.\"},\n    {\"id\": \"TMR-COUNT\", \"section\": \"4.2 Counting\", \"source\": \"interface_spec.md\",\n     \"text\": \"At a rising edge where `EN` is 1 and the count is not zero, and no write to `CTRL` takes place, the count falls by one.\"},\n    {\"id\": \"TMR-WRITE-WINS\", \"section\": \"4.2 Counting\", \"source\": \"interface_spec.md\",\n     \"text\": \"A write to `CTRL` takes the place of that edge's count step: at that edge the count does not fall and the timer does not expire, whatever the count was.\"},\n    {\"id\": \"TMR-STOP\", \"section\": \"4.2 Counting\", \"source\": \"interface_spec.md\",\n     \"text\": \"A write to `CTRL` that clears `EN` stops the timer and the count keeps its value.\"},\n    {\"id\": \"TMR-LOAD-LATE\", \"section\": \"4.2 Counting\", \"source\": \"interface_spec.md\",\n     \"text\": \"A write to `LOAD` does not change the count: the new value is used at the next start or periodic reload.\"},\n    {\"id\": \"TMR-EXPIRE\", \"section\": \"4.3 Expiry\", \"source\": \"interface_spec.md\",\n     \"text\": \"At a rising edge where `EN` is 1 and the count is zero, and no write to `CTRL` takes place, the timer expires: `EXPIRED` is set.\"},\n    {\"id\": \"TMR-PERIODIC\", \"section\": \"4.3 Expiry\", \"source\": \"interface_spec.md\",\n     \"text\": \"In periodic mode an expiry also loads the count with the `LOAD` value, and `EN` stays 1.\"},\n    {\"id\": \"TMR-ONESHOT\", \"section\": \"4.3 Expiry\", \"source\": \"interface_spec.md\",\n     \"text\": \"In one-shot mode an expiry also clears `EN`, and the count stays zero until the next start.\"},\n    {\"id\": \"TMR-W1C\", \"section\": \"4.4 The flag and the interrupt\", \"source\": \"interface_spec.md\",\n     \"text\": \"A write to `STATUS` with bit 0 set clears `EXPIRED`, and with bit 0 clear changes nothing; it never sets the flag.\"},\n    {\"id\": \"TMR-SET-WINS\", \"section\": \"4.4 The flag and the interrupt\", \"source\": \"interface_spec.md\",\n     \"text\": \"A timer that expires at the same rising edge as a write that clears `EXPIRED` keeps `EXPIRED` set.\"},\n    {\"id\": \"TMR-IRQ\", \"section\": \"4.4 The flag and the interrupt\", \"source\": \"interface_spec.md\",\n     \"text\": \"`irq` is high exactly when `EXPIRED` and `IE` are both 1, in one-shot and periodic mode alike; it follows the registers with no clock edge.\"}\n  ],\n  \"items\": [\n    {\"id\": \"T-PARAM-WIDTHS\", \"kind\": \"test\", \"file\": \"tb_tick_timer.sv\", \"name\": \"test_param_widths\", \"proves\": [\"TMR-PARAM\"],\n     \"rationale\": \"Elaborate and run the register and counting tests at W = 4, 16 and 32. Write all-ones to LOAD; check that LOAD and COUNT read back with bits W and up equal to zero, and that a full count-down to expiry takes LOAD+1 enabled edges.\"},\n    {\"id\": \"T-RESET\", \"kind\": \"test\", \"file\": \"tb_tick_timer.sv\", \"name\": \"test_reset\", \"proves\": [\"TMR-RESET\"],\n     \"rationale\": \"Drive every register to a non-zero value with the timer running and EXPIRED set. Hold rst_n low for one edge, then check that CTRL, LOAD, COUNT and STATUS all read zero. Also check the values seen right after power-on reset.\"},\n    {\"id\": \"A-RESET\", \"kind\": \"assertion\", \"file\": \"tick_timer_sva.sv\", \"name\": \"a_reset_clears\", \"proves\": [\"TMR-RESET\"],\n     \"rationale\": \"Property: if rst_n is low at a rising edge, all four registers are zero at the next sample.\"},\n    {\"id\": \"T-REG-RW\", \"kind\": \"test\", \"file\": \"tb_tick_timer.sv\", \"name\": \"test_reg_rw\", \"proves\": [\"TMR-REG-RW\", \"TMR-PARAM\"],\n     \"rationale\": \"Write random wdata to CTRL and LOAD and read both back. CTRL must hold only wdata[2:0] with other bits zero; LOAD must hold wdata[W-1:0]. Write to COUNT and check that nothing changes. Keep EN at 0 so the count does not move.\"},\n    {\"id\": \"T-READ\", \"kind\": \"test\", \"file\": \"tb_tick_timer.sv\", \"name\": \"test_read_side_effects\", \"proves\": [\"TMR-READ\"],\n     \"rationale\": \"Sweep addr over all four registers between clock edges with we low. Check that rdata changes combinationally with addr, and that repeated reads, including reads of STATUS with EXPIRED set, change no register.\"},\n    {\"id\": \"A-READ\", \"kind\": \"assertion\", \"file\": \"tick_timer_sva.sv\", \"name\": \"a_rdata_mux\", \"proves\": [\"TMR-READ\"],\n     \"rationale\": \"Immediate or concurrent check that rdata always equals the register addr selects, with no clock edge needed.\"},\n    {\"id\": \"T-START\", \"kind\": \"test\", \"file\": \"tb_tick_timer.sv\", \"name\": \"test_start\", \"proves\": [\"TMR-START\"],\n     \"rationale\": \"Program LOAD, then write CTRL with EN=1 from EN=0, and check that COUNT equals LOAD after that edge. Also write EN=1 while EN is already 1 and check that the count is not reloaded.\"},\n    {\"id\": \"A-START\", \"kind\": \"assertion\", \"file\": \"tick_timer_sva.sv\", \"name\": \"a_start_loads\", \"proves\": [\"TMR-START\"],\n     \"rationale\": \"Property: a CTRL write with wdata[0]=1 while EN==0 implies COUNT == LOAD at the next sample.\"},\n    {\"id\": \"T-COUNT\", \"kind\": \"test\", \"file\": \"tb_tick_timer.sv\", \"name\": \"test_count_down\", \"proves\": [\"TMR-COUNT\"],\n     \"rationale\": \"Start the timer with several LOAD values, including 1 and the maximum. With no CTRL writes, check that COUNT falls by exactly one per edge until zero.\"},\n    {\"id\": \"A-COUNT\", \"kind\": \"assertion\", \"file\": \"tick_timer_sva.sv\", \"name\": \"a_count_decrements\", \"proves\": [\"TMR-COUNT\"],\n     \"rationale\": \"Property: EN==1, COUNT!=0 and no CTRL write implies COUNT == $past(COUNT)-1.\"},\n    {\"id\": \"T-WRITE-WINS\", \"kind\": \"test\", \"file\": \"tb_tick_timer.sv\", \"name\": \"test_ctrl_write_wins\", \"proves\": [\"TMR-WRITE-WINS\"],\n     \"rationale\": \"While running, write CTRL keeping EN=1 at a non-zero count and check that the count holds for that edge. Repeat the write at count zero and check that EXPIRED is not set and no reload happens at that edge.\"},\n    {\"id\": \"A-WRITE-WINS\", \"kind\": \"assertion\", \"file\": \"tick_timer_sva.sv\", \"name\": \"a_ctrl_write_no_step\", \"proves\": [\"TMR-WRITE-WINS\"],\n     \"rationale\": \"Property: on any CTRL write edge, the count does not decrement and EXPIRED does not rise.\"},\n    {\"id\": \"T-STOP\", \"kind\": \"test\", \"file\": \"tb_tick_timer.sv\", \"name\": \"test_stop\", \"proves\": [\"TMR-STOP\"],\n     \"rationale\": \"Run partway down, write CTRL with EN=0, and check that COUNT keeps its value over many following edges and that no expiry occurs.\"},\n    {\"id\": \"A-STOP\", \"kind\": \"assertion\", \"file\": \"tick_timer_sva.sv\", \"name\": \"a_stopped_holds\", \"proves\": [\"TMR-STOP\"],\n     \"rationale\": \"Property: EN==0 and no start implies COUNT is stable.\"},\n    {\"id\": \"T-LOAD-LATE\", \"kind\": \"test\", \"file\": \"tb_tick_timer.sv\", \"name\": \"test_load_late\", \"proves\": [\"TMR-LOAD-LATE\"],\n     \"rationale\": \"While counting, write a new LOAD value and check that COUNT keeps decrementing from its old value. In periodic mode, check that the next reload uses the new value; after a stop, check that the next start uses it.\"},\n    {\"id\": \"T-EXPIRE\", \"kind\": \"test\", \"file\": \"tb_tick_timer.sv\", \"name\": \"test_expire\", \"proves\": [\"TMR-EXPIRE\"],\n     \"rationale\": \"Start with a small LOAD and check that EXPIRED sets exactly at the edge where EN==1 and COUNT==0, not earlier. Include LOAD=0.\"},\n    {\"id\": \"A-EXPIRE\", \"kind\": \"assertion\", \"file\": \"tick_timer_sva.sv\", \"name\": \"a_expire_sets\", \"proves\": [\"TMR-EXPIRE\", \"TMR-SET-WINS\"],\n     \"rationale\": \"Property: EN==1, COUNT==0 and no CTRL write implies EXPIRED==1 at the next sample, whatever STATUS write occurs at that edge.\"},\n    {\"id\": \"T-PERIODIC\", \"kind\": \"test\", \"file\": \"tb_tick_timer.sv\", \"name\": \"test_periodic\", \"proves\": [\"TMR-PERIODIC\"],\n     \"rationale\": \"With MODE=1, run several periods and check after each expiry that COUNT == LOAD and EN stays 1. The period must be LOAD+1 edges.\"},\n    {\"id\": \"T-ONESHOT\", \"kind\": \"test\", \"file\": \"tb_tick_timer.sv\", \"name\": \"test_oneshot\", \"proves\": [\"TMR-ONESHOT\"],\n     \"rationale\": \"With MODE=0, check that after expiry EN reads 0 and COUNT stays zero over many edges until a new start.\"},\n    {\"id\": \"A-MODE\", \"kind\": \"assertion\", \"file\": \"tick_timer_sva.sv\", \"name\": \"a_expiry_mode_effect\", \"proves\": [\"TMR-PERIODIC\", \"TMR-ONESHOT\"],\n     \"rationale\": \"Property: at an expiry edge, MODE=1 implies COUNT==LOAD with EN still 1, and MODE=0 implies EN==0 with COUNT==0.\"},\n    {\"id\": \"T-W1C\", \"kind\": \"test\", \"file\": \"tb_tick_timer.sv\", \"name\": \"test_status_w1c\", \"proves\": [\"TMR-W1C\"],\n     \"rationale\": \"With EXPIRED set, write STATUS with bit 0 = 0 and check that the flag stays set; then write bit 0 = 1 and check that it clears. With EXPIRED clear, write 1 and check that the flag is never set by the write.\"},\n    {\"id\": \"A-W1C\", \"kind\": \"assertion\", \"file\": \"tick_timer_sva.sv\", \"name\": \"a_status_never_set_by_write\", \"proves\": [\"TMR-W1C\"],\n     \"rationale\": \"Property: EXPIRED rises only on an expiry edge, and a STATUS write with wdata[0]=1 and no expiry clears it.\"},\n    {\"id\": \"T-SET-WINS\", \"kind\": \"test\", \"file\": \"tb_tick_timer.sv\", \"name\": \"test_set_wins\", \"proves\": [\"TMR-SET-WINS\"],\n     \"rationale\": \"Time a STATUS write-1 to land on the same edge as an expiry, in both one-shot and periodic modes, and check that EXPIRED stays set.\"},\n    {\"id\": \"T-IRQ\", \"kind\": \"test\", \"file\": \"tb_tick_timer.sv\", \"name\": \"test_irq\", \"proves\": [\"TMR-IRQ\"],\n     \"rationale\": \"Walk all four combinations of EXPIRED and IE in both modes and check irq after each register change, before the next clock edge.\"},\n    {\"id\": \"A-IRQ\", \"kind\": \"assertion\", \"file\": \"tick_timer_sva.sv\", \"name\": \"a_irq_equation\", \"proves\": [\"TMR-IRQ\"],\n     \"rationale\": \"Property checked at all times: irq == (EXPIRED && IE).\"},\n    {\"id\": \"T-RANDOM\", \"kind\": \"test\", \"file\": \"tb_tick_timer.sv\", \"name\": \"test_random_regression\", \"proves\": [\"TMR-COUNT\", \"TMR-WRITE-WINS\", \"TMR-LOAD-LATE\", \"TMR-EXPIRE\", \"TMR-W1C\", \"TMR-IRQ\"],\n     \"rationale\": \"Constrained-random register traffic against a cycle-accurate reference model with a scoreboard that compares every register and irq each cycle. It runs with the assertion file bound in.\"}\n  ]\n}\n=== END FILE ==="
+    }
+  ],
+  "format": "nirmaan.eval-trial",
+  "harness_variant": "default",
+  "judge_runs": [
+    {
+      "check": "The seat's plan covers the approved specification exactly and fails each specification mutant",
+      "params": {
+        "plan": [
+          "/tmp/nirmaan-eval-tme9zzq_/judge/check-1/must-fail-f_0nfmp_/clean/verification_plan.json"
+        ],
+        "spec": [
+          "/tmp/nirmaan-eval-tme9zzq_/judge/check-1/must-fail-f_0nfmp_/clean/interface_spec.md"
+        ]
+      },
+      "run": "run-0002",
+      "succeeded": true,
+      "summary": "verification_plan.json covers 15 of 15 requirements of interface_spec.md with 26 items",
+      "tool": "vplan.check"
+    },
+    {
+      "check": "The seat's plan covers the approved specification exactly and fails each specification mutant",
+      "params": {
+        "plan": [
+          "/tmp/nirmaan-eval-tme9zzq_/judge/check-1/must-fail-f_0nfmp_/mutant-1-1/verification_plan.json"
+        ],
+        "spec": [
+          "/tmp/nirmaan-eval-tme9zzq_/judge/check-1/must-fail-f_0nfmp_/mutant-1-1/interface_spec.md"
+        ]
+      },
+      "run": "run-0003",
+      "succeeded": false,
+      "summary": "verification_plan.json: 1 problem(s): interface_spec.md line 65: requirement TMR-RESTART is not in the plan",
+      "tool": "vplan.check"
+    },
+    {
+      "check": "The seat's plan covers the approved specification exactly and fails each specification mutant",
+      "params": {
+        "plan": [
+          "/tmp/nirmaan-eval-tme9zzq_/judge/check-1/must-fail-f_0nfmp_/mutant-1-2/verification_plan.json"
+        ],
+        "spec": [
+          "/tmp/nirmaan-eval-tme9zzq_/judge/check-1/must-fail-f_0nfmp_/mutant-1-2/interface_spec.md"
+        ]
+      },
+      "run": "run-0004",
+      "succeeded": false,
+      "summary": "verification_plan.json: 1 problem(s): line 19: TMR-STOP is not a requirement interface_spec.md tags",
+      "tool": "vplan.check"
+    },
+    {
+      "check": "The seat's plan covers the approved specification exactly and fails each specification mutant",
+      "params": {
+        "plan": [
+          "/tmp/nirmaan-eval-tme9zzq_/judge/check-1/must-fail-f_0nfmp_/mutant-1-3/verification_plan.json"
+        ],
+        "spec": [
+          "/tmp/nirmaan-eval-tme9zzq_/judge/check-1/must-fail-f_0nfmp_/mutant-1-3/interface_spec.md"
+        ]
+      },
+      "run": "run-0005",
+      "succeeded": false,
+      "summary": "verification_plan.json: 1 problem(s): line 5: TMR-PARAM does not quote interface_spec.md line 23, which says 'The block works for every `W` from 2 to 32, and bits `W` and up of the `LOAD` and `COUNT` registers read as zero; a write to `LOAD` ignores them.'",
+      "tool": "vplan.check"
+    },
+    {
+      "check": "The seat's plan covers the approved specification exactly and fails each specification mutant",
+      "params": {
+        "plan": [
+          "/tmp/nirmaan-eval-tme9zzq_/judge/check-1/must-fail-f_0nfmp_/mutant-1-4/verification_plan.json"
+        ],
+        "spec": [
+          "/tmp/nirmaan-eval-tme9zzq_/judge/check-1/must-fail-f_0nfmp_/mutant-1-4/interface_spec.md"
+        ]
+      },
+      "run": "run-0006",
+      "succeeded": false,
+      "summary": "verification_plan.json: 2 problem(s): line 31: TMR-SET-WINS is not a requirement interface_spec.md tags; interface_spec.md line 75: requirement TMR-EXPIRE-WINS is not in the plan",
+      "tool": "vplan.check"
+    },
+    {
+      "check": "The seat's plan covers the approved specification exactly and fails each specification mutant",
+      "params": {
+        "plan": [
+          "/tmp/nirmaan-eval-tme9zzq_/judge/check-1/must-fail-f_0nfmp_/mutant-1-5/verification_plan.json"
+        ],
+        "spec": [
+          "/tmp/nirmaan-eval-tme9zzq_/judge/check-1/must-fail-f_0nfmp_/mutant-1-5/interface_spec.md"
+        ]
+      },
+      "run": "run-0007",
+      "succeeded": false,
+      "summary": "verification_plan.json: 2 problem(s): interface_spec.md line 69: TMR-EXPIRE is tagged more than once; line 25: TMR-PERIODIC is not a requirement interface_spec.md tags",
+      "tool": "vplan.check"
+    },
+    {
+      "check": "The seat's plan covers the approved specification exactly and fails each specification mutant",
+      "params": {
+        "plan": [
+          "/tmp/nirmaan-eval-tme9zzq_/judge/check-1/must-fail-f_0nfmp_/mutant-1-6/verification_plan.json"
+        ],
+        "spec": [
+          "/tmp/nirmaan-eval-tme9zzq_/judge/check-1/must-fail-f_0nfmp_/mutant-1-6/interface_spec.md"
+        ]
+      },
+      "run": "run-0008",
+      "succeeded": false,
+      "summary": "verification_plan.json: 1 problem(s): line 33: TMR-IRQ does not quote interface_spec.md line 76, which says '`irq` is high exactly when `EXPIRED` and `IE` are both 1 in one-shot mode, and whenever `EXPIRED` is 1 in periodic mode; it follows the registers with no clock edge.'",
+      "tool": "vplan.check"
+    }
+  ],
+  "knowledge": "on",
+  "model": "claude-opus-5-5",
+  "purpose": "evidence",
+  "record": "2026-11-25-claude-code-claude-opus-5-5",
+  "result": {
+    "attempts": 1,
+    "attestations": [],
+    "audit_ok": true,
+    "case": "dv/plan-tick-timer",
+    "case_digest": "sha256:7737a5dbba68a1313cbd3ac54e330c5c6f56ae0d7b7a3cd3e59f7d8d1ccf21d4",
+    "cli": "2.1.325",
+    "cost_usd": null,
+    "detail": "All requirements have at least one item, so no 'no item yet' entries are expected. Reviewers should check each item against the requirement text it claims to prove, because the check reads only the IDs. Write-ordering cases (TMR-WRITE-WINS, TMR-SET-WINS) are planned as both directed tests and assertions, since they are corner cases that random stimulus may miss.; stripped undeclared citations: [req:...]",
+    "duration_s": 55.229,
+    "gate_runs": [
+      {
+        "run": "run-0001",
+        "succeeded": true,
+        "summary": "verification_plan.json covers 15 of 15 requirements of interface_spec.md with 26 items",
+        "tool": "vplan.check"
+      }
+    ],
+    "harness": "sha256:0ef27db15df3066826c1eb942c46ad42ade809b1a71ebd4d39d8c37d793bca00",
+    "input_tokens": 2,
+    "model_calls": 1,
+    "output_tokens": 7116,
+    "passed": true,
+    "replay": false,
+    "runtime": "claude-code",
+    "sandbox": "/tmp/nirmaan-eval-tme9zzq_",
+    "scores": [
+      {
+        "failed_runs": [
+          "run-0003",
+          "run-0004",
+          "run-0005",
+          "run-0006",
+          "run-0007",
+          "run-0008"
+        ],
+        "name": "The seat's plan covers the approved specification exactly and fails each specification mutant",
+        "runs": [
+          "run-0002"
+        ],
+        "scorer": "must-fail",
+        "status": "passed",
+        "summary": "vplan.check run-0002 passed on the clean inputs; 6 of 6 mutants failed it"
+      }
+    ],
+    "seat": "prj-5d67729821:dv-plan",
+    "seat_status": "in_review",
+    "started_at": "2026-11-25T01:05:31.040265Z",
+    "submitted": true,
+    "tool_calls": [],
+    "version": "1.25.0"
+  },
+  "skills": {
+    "verification_planning": "sha256:77aed8426f0d85155bdf20b574328b735932a9bd35c3c7a44ead921bcbe4b3e2"
+  },
+  "stage": "dv-plan",
+  "trial": 1,
+  "version": 1
+}
