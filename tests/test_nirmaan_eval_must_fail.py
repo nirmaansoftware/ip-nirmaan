@@ -206,7 +206,54 @@ def test_a_testbench_that_misses_the_mutants_fails(nirmaan_org, fixed_clock, tmp
     [score] = result.scores
     assert score.status is ScoreStatus.FAILED and not result.passed
     assert score.summary.startswith(f"mutant {OVERFLOW} survived: simulator.run run-"), score.summary
-    assert score.summary.endswith(" passed") and len(score.runs) == 1 and score.failed_runs == ()
+    assert score.summary.endswith(" passed") and len(score.runs) == 2 and score.failed_runs == ()  # clean, survivor
+
+
+def _mutant_runs(trial) -> list:
+    """The trial's judge runs over a staged mutant (a ``mutant-`` folder of the check's stage)."""
+    return [j for j in trial.judge_runs
+            if any(Path(s).parent.name.startswith("mutant-") for s in _values_of(j.params.get("sources", [])))]
+
+
+def _values_of(value) -> list[str]:
+    return [str(v) for v in value] if isinstance(value, (list, tuple)) else [str(value)]
+
+
+@needs("verilator", "iverilog", "vvp", "yosys")
+def test_a_surviving_mutant_run_is_in_the_record(nirmaan_org, fixed_clock, tmp_path):
+    """Decision M6 (gate W2C23): the run in which a mutant passed is in the score's runs and in judge_runs."""
+    case = load_case(_fifo_case(tmp_path, [_testbench_check()]))
+    rtl = (REPO / CLEAN).read_text(encoding="utf-8")
+    llm = ReplayLLM([("sync_fifo.v", "rtl_source", rtl, "sync_fifo"),
+                     ("weak_fifo_tb.v", "testbench", WEAK_FIFO_TB, "weak_fifo_tb")])
+    trial = record_trial(nirmaan_org, case, ModelRuntime(llm, runtime_id="weak-seat"), replay=False, record="tmp",
+                         trial=1, repo=REPO, sandbox=tmp_path / "sandbox", clock=fixed_clock)
+    [score] = trial.result.scores
+    assert score.status is ScoreStatus.FAILED and " survived: simulator.run " in score.summary, score.summary
+    survivor = score.summary.split("simulator.run ", 1)[1].split()[0]
+    assert score.runs[-1] == survivor and score.failed_runs == ()
+    [listed] = _mutant_runs(trial)
+    assert (listed.run, listed.tool, listed.succeeded) == (survivor, "simulator.run", True)
+    assert Path(listed.params["sources"][0]).parent.name == "mutant-1-1"  # the overflow mutant, sorted first
+
+
+@needs("verilator", "iverilog", "vvp", "yosys")
+def test_must_fail_each_lists_its_passing_mutant_runs(nirmaan_org, fixed_clock, tmp_path):
+    """Decision M6: a triage with repros for two of three bugs; every mutant run is in judge_runs, passed or not."""
+    from test_debug_evals import _case, _reference
+
+    case = _case("debug/triage-three-bugs")
+    files = _reference("debug/triage-three-bugs", drop=("uart_frame_tx_repro_frame_period.v",))
+    trial = record_trial(nirmaan_org, case, ModelRuntime(ReplayLLM(files, outcome=case.outcome), runtime_id="weak-seat"),
+                         replay=False, record="tmp", trial=1, repo=REPO, sandbox=tmp_path / "sandbox",
+                         clock=fixed_clock)
+    [score] = trial.result.scores
+    assert score.status is ScoreStatus.FAILED and "only 2 of 3 mutants" in score.summary, score.summary
+    mutant_runs = _mutant_runs(trial)
+    assert len(mutant_runs) == 2 * 3  # two repro files, each run on three mutants
+    passing = [j for j in mutant_runs if j.succeeded]
+    assert passing and all(j.run in score.runs for j in passing)
+    assert {j.run for j in mutant_runs if not j.succeeded} == set(score.failed_runs)
 
 
 @needs("verilator", "iverilog", "vvp", "yosys")
